@@ -1,51 +1,44 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 24 Aug 2017 12:01:47 -0500
+Date: Thu, 24 Aug 2017 12:04:45 -0500
 Subject: [PATCH v10] PCI: tango: Add MSI controller support
-In-Reply-To: <e32f8446-bd0b-0bc8-55b4-8dbebaeba101@sigmadesigns.com>
+In-Reply-To: <86efs3wesi.fsf@arm.com>
 References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
- <e32f8446-bd0b-0bc8-55b4-8dbebaeba101@sigmadesigns.com>
-Message-ID: <20170824170147.GN31858@bhelgaas-glaptop.roam.corp.google.com>
+ <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
+ <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
+ <86efs3wesi.fsf@arm.com>
+Message-ID: <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 02:59:42PM +0200, Marc Gonzalez wrote:
-> On 22/08/2017 16:56, Marc Gonzalez wrote:
+On Tue, Aug 22, 2017 at 09:03:41PM +0100, Marc Zyngier wrote:
+> On Tue, Aug 22 2017 at  8:02:18 pm BST, Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
+> > On 22/08/2017 18:29, Marc Zyngier wrote:
+> >
+> >> On 22/08/17 15:56, Marc Gonzalez wrote:
+> >>
+> >>>  #define SMP8759_MUX		0x48
+> >>>  #define SMP8759_TEST_OUT	0x74
+> >>> +#define SMP8759_STATUS		0x80
+> >>> +#define SMP8759_ENABLE		0xa0
+> >>> +#define SMP8759_DOORBELL	0xa002e07c
+> >> 
+> >> Why is this hardcoded and not coming from the device-tree, just like any
+> >> other address property?
+> >
+> > Since this bus address is software-configurable, I didn't think
+> > it belonged in the DT. Also, I didn't see anything similar in
+> > other binding docs, especially
+> >
+> > Documentation/devicetree/bindings/interrupt-controller/msi.txt
 > 
-> > @@ -76,7 +234,9 @@ static int tango_pcie_probe(struct platform_device *pdev)
-> >  	struct device *dev = &pdev->dev;
-> >  	struct tango_pcie *pcie;
-> >  	struct resource *res;
-> > -	int ret;
-> > +	struct irq_domain *msi_dom, *irq_dom;
-> > +	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
-> > +	int ret, reg, virq;
-> >  
-> >  	dev_warn(dev, "simultaneous PCI config and MMIO accesses may cause data corruption\n");
-> >  	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
-> 
->   CC      drivers/pci/host/pcie-tango.o
-> drivers/pci/host/pcie-tango.c: In function 'tango_pcie_probe':
-> drivers/pci/host/pcie-tango.c:257:6: warning: unused variable 'ret' [-Wunused-variable]
->   int ret, reg, virq;
->       ^~~
-> 
-> Hmmm, dunno how I managed to miss that...
-> Is the kbuild test robot enjoying a well-deserved vacation?
-> 
-> Bjorn, if/when you take the patch, can you first apply this fixup:
+> If that's software configurable, how on Earth did you pick the address?
+> How do you ensure that it doesn't conflict with DMA? How is it
+> configured into the RC?
 
-Sure, no problem.
+But we *do* need to resolve this.  This does seem like an address that
+shouldn't be hard-coded into the driver.  Since this driver is
+programming the address into an MSI message, but not into the receiver
+of that message, there's a coordination issue between this driver and
+whatever other software does that receiver configuration.
 
-> @@ -254,7 +254,7 @@ static int tango_pcie_probe(struct platform_device *pdev)
->         struct resource *res;
->         struct irq_domain *msi_dom, *irq_dom;
->         struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
-> -       int ret, reg, virq;
-> +       int reg, virq;
->  
->         dev_warn(dev, "simultaneous PCI config and MMIO accesses may cause data corruption\n");
->         add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
-> 
-> 
-> Regards.
-> 
+Bjorn
