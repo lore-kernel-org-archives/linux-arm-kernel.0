@@ -1,42 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Aug 2017 10:38:14 +0100
-Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
-In-Reply-To: <CAPM=9tzhzGEY_-FhGNECQ8QkxPtXxhojwPeVQT43Rcgf6X0Lww@mail.gmail.com>
-References: <20170817113028.16853-1-dja@axtens.net>
- <20170817113028.16853-2-dja@axtens.net>
- <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
- <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu-FCkV9Dv=yn_CNC9orj8Roiabb75jX34w3mMziWVZaeA@mail.gmail.com>
- <20170823135734.GB8498@bhelgaas-glaptop.roam.corp.google.com>
- <CAPM=9tzhzGEY_-FhGNECQ8QkxPtXxhojwPeVQT43Rcgf6X0Lww@mail.gmail.com>
-Message-ID: <CAKv+Gu8mfPtQ+vWgzP4adtVB+DByS4snF+FQ7k-UDV+=bxHSsg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 24 Aug 2017 11:46:31 +0200
+Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
+In-Reply-To: <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
+References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+ <20170821221339.70cfcfb7@bbrezillon>
+ <87pobmoz8n.fsf@belgarion.home>
+ <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
+Message-ID: <20170824114631.089d2628@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2017 at 01:57, Dave Airlie <airlied@gmail.com> wrote:
->> Yeah, maybe it's time to disconnect the "default display device" idea
->> from the VGA arbiter.  I have no idea what (if any) dependencies X has
->> on the legacy VGA resources.  I assume X works fine on power, where it
->> sounds like those resources are rarely or never available.
->
-> The question on non-x86 archs, is what is the correct device to default to.
->
-> On x86 we use the legacy VGA resources as a pointer, as this is the device
-> the BIOS appeared on at boot so hopefully should be one you can see stuff on.
->
-> On non-x86 I've no idea how to decide if there are multiple devices, maybe the
-> firmware needs to tag something for the kernel if there are. Otherwise
-> you'd just
-> be picking something in probe order.
->
-> I think the idea of these patches is to separate default display
-> device from the arbiter.
->
-> X uses the arbiter on x86 if required (it's horrible, and it's rare we
-> have to nowadays),
-> but for finding the default device it justs uses the sysfs boot_vga flag.
->
+Hi Robert,
 
-Part of the problem is that X refuses to start if there is only one
-display device to begin with in case it hasn't taken ownership of the
-VGA legacy resources.
+On Thu, 24 Aug 2017 11:33:02 +0200
+Andrea Adami <andrea.adami@gmail.com> wrote:
+
+> On Wed, Aug 23, 2017 at 9:33 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> > Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+> >  
+> >> Le Mon, 14 Aug 2017 22:48:31 +0200,  
+> >>> Andrea Adami (9):
+> >>>   mtd: sharpslpart: Add sharpslpart partition parser
+> >>>   mtd: nand: sharpsl: Add partition parsers platform data
+> >>>   mfd: tmio: Add partition parsers platform data
+> >>>   mtd: nand: sharpsl: Register partitions using the parsers
+> >>>   mtd: nand: tmio: Register partitions using the parsers  
+> >>
+> >> Applied patches 2, to 5 to nand/next.  
+> >>>   ARM: pxa/corgi: Remove hardcoded partitioning, use sharpslpart parser
+> >>>   ARM: pxa/tosa: Remove hardcoded partitioning, use sharpslpart parser
+> >>>   ARM: pxa/spitz: Remove hardcoded partitioning, use sharpslpart parser
+> >>>   ARM: pxa/poodle: Remove hardcoded partitioning, use sharpslpart parser  
+> >
+> > I'm quite happy with patches 6 to 9 except for the subject title length.
+> >  
+> 
+> Argh, this time I got it totally wrong with the titles of the patches!
+> Sorry for the eye-sore.
+> 
+> > Andrea, if you give me an idea of change, I'll modify the titles myself before
+> > applying, no need to resend a serie.
+> >
+> > For example, you could propose :
+> > ARM: pxa: corgi: use sharpslpart parser instead of hardcoded one
+> >
+> >
+> > Then I'll take them into pxa/for-next if there are no objections.
+
+Wait a bit before applying. I think patches 6 to 9 have a dependency on
+patch 1 (it's not a build dependency, but NAND partitioning might be
+wrong if you apply them), so we need to sync. What release is
+pxa/for-next targeting? If it's 4.15 I can apply patch 1 just after
+4.14-rc1 is out and provide an immutable branch for you to pull in
+pxa/for-next.
+
+Regards,
+
+Boris
