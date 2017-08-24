@@ -1,140 +1,68 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Aug 2017 17:17:57 +0900
-Subject: [PATCH 00/14] arm64: kexec: add kexec_file_load support
-Message-ID: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Aug 2017 10:36:20 +0200
+Subject: [GIT PULL] Allwinner clock changes for 4.14, take 3
+Message-ID: <20170824083620.b5cq4qtyr3cqtpjx@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the initial attempt of implementing kexec_file_load() support
-on arm64.[1]
-Most of the code is based on kexec-tools (along with some kernel code
-from x86 and from powerpc, which also came from kexec-tools).
+Hi,
 
+Here is a quite late PR, but this also something we've been waiting
+for for quite some time already.
 
-This patch series enables us to
-  * load the kernel, either Image or vmlinux, with kexec_file_load
-    system call, and
-  * optionally verify its signature at load time for trusted boot.
+These patches convert our last users of the old clock framework to the
+new one. We still have some marginal users of the old clock drivers,
+but they shouldn't prevent the fix for the orphans clocks we hold back
+to work.
 
-To load the kernel via kexec_file_load system call, a small change
-needs to be applied on kexec-tools. See [2]. This enables '-s' option.
+Maxime
 
-As we discussed a long time ago, users may not be allowed to specify
-device-tree file of the 2nd kernel explicitly with kexec-tools, therefore
-re-using the blob of the first kernel.
+The following changes since commit cd030a78f7aa06fe216f6665a6ea84b8f3e5b3d3:
 
-Regarding a method of placing the signature into the kernel binary,
-  * for 'Image', we conform with x86 (or rather Microsoft?) style of
-    signing since the binary can also be seen as in PE format
-    (assuming that CONFIG_EFI is enabled),
-  * for 'vmlinux', we follow powerpc approach[3]: The signature will
-    be appended just after the binary itself as module signing does.
-    This implies that we need to enable CONFIG_MODULE_SIG, too.
+  clk: sunxi-ng: support R40 SoC (2017-08-19 17:04:37 +0800)
 
-    Powerpc is also going to support extended-file-attribute-based
-    verification[3], but arm64 doesn't for now partly because we don't
-    have TPM-based IMA at this moment.
+are available in the git repository at:
 
-Accordingly, we can use the existing commands, sbsign and sig-file
-respectively, to sign the kernel. Please note that it is totally up to
-the system what key/certificate is used for signing.
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.14-3
 
-Some concerns(or future works):
-* Even if the kernel is configured with CONFIG_RANDOMIZE_BASE, the 2nd
-  kernel won't be placed at a randomized address. We will have to
-  add some boot code similar to efi-stub to implement the feature.
-* While big-endian kernel can support kernel signing, I'm not sure that
-  Image can be recognized as in PE format because x86 standard only
-  defines little-endian-based format.
-  So I tested big-endian kernel signing only with vmlinux.
-* IMA(and file extended attribute)-based kexec
+for you to fetch changes up to c84f5683f6e9fee78e054431d89121225ccb7464:
 
+  clk: sunxi-ng: Add sun4i/sun7i CCU driver (2017-08-24 10:15:54 +0200)
 
-Patch #1 to #7 are all preparatory patches on generic side.
-(Patch #1 is not part of mine, but a prerequisite from [4].)
-Patch #8 and #9 are purgatory code.
-Patch #10 to #12 are common for enabling kexec_file_load.
-Patch #13 is for 'Image' support.
-Patch #14 is for 'vmlinux' support.
+----------------------------------------------------------------
+Allwinner clock changes for 4.14, part 3
 
+Conversion of the last two SoCs (A10, A20) to the sunxi-ng framework.
 
-  [1] http://git.linaro.org/people/takahiro.akashi/linux-aarch64.git
-	branch:arm64/kexec_file
-  [2] http://git.linaro.org/people/takahiro.akashi/kexec-tools.git
-	branch:arm64/kexec_file
-  [3] http://lkml.iu.edu//hypermail/linux/kernel/1707.0/03669.html
-  [4] http://lkml.iu.edu//hypermail/linux/kernel/1707.0/03670.html
+----------------------------------------------------------------
+Priit Laes (3):
+      dt-bindings: List devicetree binding for the CCU of Allwinner A20
+      dt-bindings: List devicetree binding for the CCU of Allwinner A10
+      clk: sunxi-ng: Add sun4i/sun7i CCU driver
 
-
-AKASHI Takahiro (13):
-  include: pe.h: remove message[] from mz header definition
-  resource: add walk_system_ram_res_rev()
-  kexec_file: factor out vmlinux (elf) parser from powerpc
-  kexec_file: factor out crashdump elf header function from x86
-  kexec_file: add kexec_add_segment()
-  asm-generic: add kexec_file_load system call to unistd.h
-  arm64: kexec_file: create purgatory
-  arm64: kexec_file: add sha256 digest check in purgatory
-  arm64: kexec_file: load initrd, device-tree and purgatory segments
-  arm64: kexec_file: set up for crash dump adding elf core header
-  arm64: enable KEXEC_FILE config
-  arm64: kexec_file: add Image format support
-  arm64: kexec_file: add vmlinux format support
-
-Thiago Jung Bauermann (1):
-  MODSIGN: Export module signature definitions
-
- arch/Kconfig                            |   3 +
- arch/arm64/Kconfig                      |  33 ++
- arch/arm64/Makefile                     |   1 +
- arch/arm64/crypto/sha256-core.S_shipped |   2 +
- arch/arm64/include/asm/kexec.h          |  23 ++
- arch/arm64/include/asm/kexec_file.h     |  84 +++++
- arch/arm64/kernel/Makefile              |   5 +-
- arch/arm64/kernel/kexec_elf.c           | 216 ++++++++++++
- arch/arm64/kernel/kexec_image.c         | 112 ++++++
- arch/arm64/kernel/machine_kexec_file.c  | 606 ++++++++++++++++++++++++++++++++
- arch/arm64/purgatory/Makefile           |  43 +++
- arch/arm64/purgatory/entry.S            |  41 +++
- arch/arm64/purgatory/purgatory.c        |  20 ++
- arch/arm64/purgatory/sha256-core.S      |   1 +
- arch/arm64/purgatory/sha256.c           |  79 +++++
- arch/arm64/purgatory/sha256.h           |   1 +
- arch/arm64/purgatory/string.c           |  32 ++
- arch/arm64/purgatory/string.h           |   5 +
- arch/powerpc/Kconfig                    |   1 +
- arch/powerpc/kernel/kexec_elf_64.c      | 464 ------------------------
- arch/x86/kernel/crash.c                 | 324 -----------------
- include/linux/elf.h                     |  62 ++++
- include/linux/ioport.h                  |   3 +
- include/linux/kexec.h                   |  39 ++
- include/linux/module.h                  |   3 -
- include/linux/module_signature.h        |  47 +++
- include/linux/pe.h                      |   2 +-
- include/uapi/asm-generic/unistd.h       |   4 +-
- init/Kconfig                            |   6 +-
- kernel/Makefile                         |   3 +-
- kernel/crash_core.c                     | 333 ++++++++++++++++++
- kernel/kexec_file.c                     |  47 +++
- kernel/kexec_file_elf.c                 | 454 ++++++++++++++++++++++++
- kernel/module.c                         |   1 +
- kernel/module_signing.c                 |  74 ++--
- kernel/resource.c                       |  48 +++
- 36 files changed, 2383 insertions(+), 839 deletions(-)
- create mode 100644 arch/arm64/include/asm/kexec_file.h
- create mode 100644 arch/arm64/kernel/kexec_elf.c
- create mode 100644 arch/arm64/kernel/kexec_image.c
- create mode 100644 arch/arm64/kernel/machine_kexec_file.c
- create mode 100644 arch/arm64/purgatory/Makefile
- create mode 100644 arch/arm64/purgatory/entry.S
- create mode 100644 arch/arm64/purgatory/purgatory.c
- create mode 100644 arch/arm64/purgatory/sha256-core.S
- create mode 100644 arch/arm64/purgatory/sha256.c
- create mode 100644 arch/arm64/purgatory/sha256.h
- create mode 100644 arch/arm64/purgatory/string.c
- create mode 100644 arch/arm64/purgatory/string.h
- create mode 100644 include/linux/module_signature.h
- create mode 100644 kernel/kexec_file_elf.c
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |    2 +
+ drivers/clk/sunxi-ng/Kconfig                       |   13 +
+ drivers/clk/sunxi-ng/Makefile                      |    1 +
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.c               | 1456 ++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.h               |   61 +
+ include/dt-bindings/clock/sun4i-a10-ccu.h          |  200 +++
+ include/dt-bindings/clock/sun7i-a20-ccu.h          |   53 +
+ include/dt-bindings/reset/sun4i-a10-ccu.h          |   69 +
+ 8 files changed, 1855 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun4i-a10.h
+ create mode 100644 include/dt-bindings/clock/sun4i-a10-ccu.h
+ create mode 100644 include/dt-bindings/clock/sun7i-a20-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun4i-a10-ccu.h
 
 -- 
-2.14.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170824/d074719f/attachment.sig>
