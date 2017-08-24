@@ -1,35 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Aug 2017 17:06:33 +0100
-Subject: [PATCH] [RFC] ARM: vdso: work around gcc-8 warning
-In-Reply-To: <20170823140538.1590432-1-arnd@arndb.de>
-References: <20170823140538.1590432-1-arnd@arndb.de>
-Message-ID: <20170824160633.GW20805@n2100.armlinux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 24 Aug 2017 09:20:34 -0700
+Subject: [PATCH] KVM: arm/arm64: vgic: constify seq_operations and
+ file_operations
+In-Reply-To: <de67d01fab53d5b7874cda1ac2c269887c673450.1503471217.git.arvind.yadav.cs@gmail.com>
+References: <de67d01fab53d5b7874cda1ac2c269887c673450.1503471217.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170824162034.GC2150@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 04:05:26PM +0200, Arnd Bergmann wrote:
-> gcc-8 correctly points out that reading four bytes from a pointer to a
-> 'char' variable is wrong
+On Wed, Aug 23, 2017 at 12:25:36PM +0530, Arvind Yadav wrote:
+> vgic_debug_seq_ops and file_operations are not supposed to change
+> at runtime and none of the structures is modified.
 > 
-> arch/arm/kernel/vdso.c: In function 'vdso_init':
-> arch/arm/kernel/vdso.c:200:6: error: '__builtin_memcmp_eq' reading 4 bytes from a region of size 1 [-Werror=stringop-overflow=]
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+
+Applied, thanks.
+-Christoffer
+
+> ---
+>  virt/kvm/arm/vgic/vgic-debug.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> However, in this case the variable just stands for the beginning of the
-> vdso and is not actually a 'char', so the code is doing what it is meant
-> to do.
+> diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+> index 7072ab7..10b3817 100644
+> --- a/virt/kvm/arm/vgic/vgic-debug.c
+> +++ b/virt/kvm/arm/vgic/vgic-debug.c
+> @@ -234,7 +234,7 @@ static int vgic_debug_show(struct seq_file *s, void *v)
+>  	return 0;
+>  }
+>  
+> -static struct seq_operations vgic_debug_seq_ops = {
+> +static const struct seq_operations vgic_debug_seq_ops = {
+>  	.start = vgic_debug_start,
+>  	.next  = vgic_debug_next,
+>  	.stop  = vgic_debug_stop,
+> @@ -255,7 +255,7 @@ static int debug_open(struct inode *inode, struct file *file)
+>  	return ret;
+>  };
+>  
+> -static struct file_operations vgic_debug_fops = {
+> +static const struct file_operations vgic_debug_fops = {
+>  	.owner   = THIS_MODULE,
+>  	.open    = debug_open,
+>  	.read    = seq_read,
+> -- 
+> 1.9.1
 > 
-> Not sure what the best solution for this is, changing the hack to
-> declare the variable as 'int' instead makes the warning go away.
-
-Well, one way to look at the code is an array of characters, so
-we could say that it should be:
-
-extern char vdso_start[], vdso_end[];
-
-which is exactly the same construct that we use for _stext and
-similar.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
