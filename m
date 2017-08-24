@@ -1,123 +1,134 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 24 Aug 2017 12:59:07 -0700
-Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
- sun8i-h3-emac
-In-Reply-To: <20170824082124.GA14302@Red>
-References: <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
- <20170821132015.GB1703@lunn.ch> <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
- <20170821142321.GE1703@lunn.ch>
- <CAGb2v64E4T=1ff3POGuXZA=MvjGAnKQ6OF6A3sT_cU-=jh6zNw@mail.gmail.com>
- <bfe784b6-5137-8fcd-dbd0-ad96974f4060@gmail.com> <20170822181140.GA11596@Red>
- <352ae66b-78a4-e88b-4544-a8edd9390b0c@gmail.com>
- <20170823074942.yt3c5gvnmdw5pqge@flea.home>
- <f14fe754-6339-32a0-3439-2daff6dd1d7e@gmail.com> <20170824082124.GA14302@Red>
-Message-ID: <dfc8e7f3-e374-b30b-b320-017f1c50ab58@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Aug 2017 22:32:22 +0200
+Subject: [PATCH 04/11] watchdog: ftwdt010: Add clock support
+In-Reply-To: <20170814160536.GC7025@roeck-us.net>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-5-linus.walleij@linaro.org>
+ <20170814160536.GC7025@roeck-us.net>
+Message-ID: <CACRpkdYcEbWkHdgxA-3=6JiZTxecQcTYgqx4xDH23=NxF8zg_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2017 01:21 AM, Corentin Labbe wrote:
-> On Wed, Aug 23, 2017 at 09:31:53AM -0700, Florian Fainelli wrote:
->> On 08/23/2017 12:49 AM, Maxime Ripard wrote:
->>> Hi Florian,
->>>
->>> On Tue, Aug 22, 2017 at 11:35:01AM -0700, Florian Fainelli wrote:
->>>>>>> So I think what you are saying is either impossible or engineering-wise
->>>>>>> a very stupid design, like using an external MAC with a discrete PHY
->>>>>>> connected to the internal MAC's MDIO bus, while using the internal MAC
->>>>>>> with the internal PHY.
->>>>>>>
->>>>>>> Now can we please decide on something? We're a week and a half from
->>>>>>> the 4.13 release. If mdio-mux is wrong, then we could have two mdio
->>>>>>> nodes (internal-mdio & external-mdio).
->>>>>>
->>>>>> I really don't see a need for a mdio-mux in the first place, just have
->>>>>> one MDIO controller (current state) sub-node which describes the
->>>>>> built-in STMMAC MDIO controller and declare the internal PHY as a child
->>>>>> node (along with 'phy-is-integrated'). If a different configuration is
->>>>>> used, then just put the external PHY as a child node there.
->>>>>>
->>>>>> If fixed-link is required, the mdio node becomes unused anyway.
->>>>>>
->>>>>> Works for everyone?
->>>>>
->>>>> If we put an external PHY with reg=1 as a child of internal MDIO,
->>>>> il will be merged with internal PHY node and get
->>>>> phy-is-integrated.
->>>>
->>>> Then have the .dtsi file contain just the mdio node, but no internal or
->>>> external PHY and push all the internal and external PHY node definition
->>>> (in its entirety) to the per-board DTS file, does not that work?
->>>
->>> If possible, I'd really like to have the internal PHY in the
->>> DTSI. It's always there in hardware anyway, and duplicating the PHY,
->>> with its clock, reset line, and whatever info we might need in the
->>> future in each and every board DTS that uses it will be very error
->>> prone and we will have the usual bunch of issues that come up with
->>> duplication.
->>
->> OK, then what if you put the internal PHY in the DTSI, mark it with a
->> status = "disabled" property, and have the per-board DTS put a status =
->> "okay" property along with a "phy-is-integrated" boolean property? Would
->> that work?
-> 
-> No, I tested and for example with sun8i-h3-orangepi-plus.dts, the external PHY (ethernet-phy at 1) is still merged.
+On Mon, Aug 14, 2017 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 
-Is not there is a mistake in the unit address not matching the "reg"
-property, or am I not looking at the right tree?
+>> +     gwdt->pclk = devm_clk_get(dev, "PCLK");
+>> +     if (!IS_ERR(gwdt->pclk)) {
+>
+> devm_clk_get() can return NULL (if the clock subsystem is not enabled).
 
-&mdio {
-        ext_rgmii_phy: ethernet-phy at 1 {
-                compatible = "ethernet-phy-ieee802.3-c22";
-                reg = <0>;
-        };
-};
+That is fine I think? Because if the clock subsysten is not enabled
+all the clk_prepare() etc becomes stubs as well and the driver
+is happy. I think this is intended.
 
-If the PHY is really at MDIO address 0, then it should be
-ethernet-phy at 0, and not ethernet-phy at 1, and then no problem with the
-merging?
+>> +             ret = clk_prepare_enable(gwdt->pclk);
+>
+> Why enable pclk if extclk is used ?
 
+It is used to clock the silicon in the IP block (so one can access the
+registers etc) even if the timer per se uses EXTCLK.
 
-> So that adding a 'status = "disabled"' does not bring anything.
-> 
->>
->> What I really don't think is necessary is:
->>
->> - duplicating the "mdio" controller node for external vs. internal PHY,
->> because this is not accurate, there is just one MDIO controller, but
->> there may be different kinds of MDIO/PHY devices attached
-> 
-> For me, if we want to represent the reality, we need two MDIO:
-> - since two PHY at the same address could co-exists
-> - since they are isolated so not on the same MDIO bus
+So it must always be enabled.
 
-Is that really true? It might be, but from experience with e.g:
-bcmgenet, the integrated PHY and the external PHYs are on the same MDIO
-bus, which is convenient, except when you have an address conflict.
+>> +             if (ret) {
+>> +                     dev_err(&pdev->dev, "unable to enable PCLK\n");
+>> +                     return ret;
+>> +             }
+>> +             if (!gwdt->use_extclk)
+>> +                     gwdt->clk_freq = clk_get_rate(gwdt->pclk);
+>> +     } else {
+>> +             dev_info(dev, "PCLK clock not found assume always-on\n");
+>
+> Those info messages seem more like debug messages to me. Is this and the message
+> below about 5MHz clock on Gemini really necessary ?
 
-> 
->> - having the STMMAC driver MDIO probing code having to deal with a
->> "mdio" sub-node or an "internal-mdio" sub-node because this is confusing
->> and requiring more driver-level changes that are error prone
-> 
-> My patch for stmmac is really small, only the name of my variable ("need_mdio_mux_ids")
-> have to be changed to something like "register_parent_mdio"
-> 
-> 
-> So I agree with Maxime, we need to avoid merging PHY nodes, and we can avoid it only by having two separate MDIO nodes.
-> Furthermore, with only one MDIO, we will face with lots of small patch for adding phy-is-integrated, with two we do not need to change any board DT, all is simply clean.
-> Really having two MDIO seems cleaner.
+Depends on whether one is pr_info()/dev_info() minimalist or
+maximalist or something. I guess the extreme minimalist would be
+happiest of their dmesg was 0 lines if all is fine. Maybe it could
+just say the Linux version.
 
-The only valid thing that you have provided so far is this merging
-problem. Anything else ranging from "we will face with lots of small
-patch for adding phy-is-integrated" to "Really having two MDIO seems
-cleaner." are hard to receive as technical arguments for correctness.
+I even had the idea to add the subsystem maintainers preference
+for this to MAINTAINERS.
 
-What happens if someone connects an external PHY at the same MDIO
-address than the internal PHY, which one do you get responses from? If
-you shutdown the internal PHY and it stops responding, then this
-probably becomes deterministic, but it still supports the fact there is
-just one MDIO bus controller per MAC.
+I tend to like a bit of blather about the state of things in dmesg,
+(as in *info has a purpose) but I'm happy to do whatever the
+subsystem maintainer likes.
 
-Anyway, do whatever works best for you I guess.
--- 
-Florian
+So I can surely cut a whole slew of them if that is your preference?
+
+>> +     gwdt->extclk = devm_clk_get(dev, "EXTCLK");
+>> +     if (!IS_ERR(gwdt->extclk)) {
+>
+> devm_clk_get() can return NULL.
+
+Same answer: should be fine.
+
+>> +     if (gwdt->clk_freq == 0) {
+>> +             dev_err(dev, "no clocking available\n");
+>> +             return -EINVAL;
+>
+> So far this situation defaulted to 5 MHz (as there was nothing else).
+> Is this a new restriction or did it just not happen ?
+
+This comes from Jonas' Moxart driver.
+
+I guess this only happens if someone compiles out the
+clk subsystem so they get frequency 0 from the stub.
+
+The driver strictly needs this frequency
+so we cannot really work without it and it needs to fail
+over here.
+
+> Also, this can at least in theory happen if clk_get_rate() returns 0,
+> which would leave the clock enabled (although that would be an odd
+> situation).
+
+Yeah I should clk_disable_unprepare() on the error path,
+thanks. Fixing it.
+
+> devm_watchdog_register_device() can fail, which would leave the clocks
+> enabled. Also see below.
+
+Fixed it.
+
+>> +     if (!IS_ERR(gwdt->pclk))
+>> +             clk_disable_unprepare(gwdt->pclk);
+>> +     if (!IS_ERR(gwdt->extclk) && gwdt->use_extclk)
+>> +             clk_disable_unprepare(gwdt->extclk);
+>
+> One of those many situations where devm_clk_prepare_enable() would have
+> been very useful :-(. This disables the clocks while the watchdog itself
+> as well as its interrupt handler is still registered.
+
+Oh hm yeah. I ran into this thing with the IRQs still being
+enabled while the clocking get shut off. It is a problem in the
+entire kernel. I don't even have a good intuition for what
+order the devm_* things get cleaned up, I guess in the
+inverse order that one use them in probe()?
+
+>I don't know if this
+> will have adverse affects, but it makes me quite concerned. Please consider
+> adding devm_add_action() calls to clean up the clocks.
+
+I don't know if that is a very good idea. If we later get proper
+devm_* clock disabling functions then that gets messy
+to clean up.
+
+Stephen/Mike: what's your opinion?
+
+> Note that I would
+> resist replacing all the devm_ functions with non-devm equivalents just
+> because the clock subsystem doesn't provide the necessary API functions.
+
+I've seen people do this for this reason though :/
+
+> Side note: Maybe we _should_ introduce devm_watchdog_clk_prepare_enable()
+> since this problem affects several watchdog drivers.
+
+Hmmmmmmmmm a special watchdog primitive may be apropriate.
+Dunno what the clk maintainers think?
+
+Stephen/Mike: do you like that or would you rather see a primitive
+inside the clock subsystem for this?
+
+Yours,
+Linus Walleij
