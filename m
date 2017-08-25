@@ -1,90 +1,141 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 25 Aug 2017 10:35:33 +0800
-Subject: [PATCH v4 3/4] dt-bindings: PCI: rockchip: Add support for pcie
- wake irq
-In-Reply-To: <20170825021132.GA104845@google.com>
-References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
- <20170822031934.8675-4-jeffy.chen@rock-chips.com>
- <20170824165353.GL31858@bhelgaas-glaptop.roam.corp.google.com>
- <20170825021132.GA104845@google.com>
-Message-ID: <53dc2510-cf96-fdd6-4fb7-ba8cfa485556@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 25 Aug 2017 10:54:11 +0800
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <dfc8e7f3-e374-b30b-b320-017f1c50ab58@gmail.com>
+References: <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
+ <20170821132015.GB1703@lunn.ch> <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
+ <20170821142321.GE1703@lunn.ch>
+ <CAGb2v64E4T=1ff3POGuXZA=MvjGAnKQ6OF6A3sT_cU-=jh6zNw@mail.gmail.com>
+ <bfe784b6-5137-8fcd-dbd0-ad96974f4060@gmail.com> <20170822181140.GA11596@Red>
+ <352ae66b-78a4-e88b-4544-a8edd9390b0c@gmail.com>
+ <20170823074942.yt3c5gvnmdw5pqge@flea.home>
+ <f14fe754-6339-32a0-3439-2daff6dd1d7e@gmail.com> <20170824082124.GA14302@Red>
+ <dfc8e7f3-e374-b30b-b320-017f1c50ab58@gmail.com>
+Message-ID: <CAGb2v64jrDPSff+QL_PQBMaQJ+CcTVbskjuOUd1OqR4smbu+ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2017/8/25 10:11, Brian Norris wrote:
-> On Thu, Aug 24, 2017 at 11:53:54AM -0500, Bjorn Helgaas wrote:
->> On Tue, Aug 22, 2017 at 11:19:33AM +0800, Jeffy Chen wrote:
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> 
->>> diff --git a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
->>> index 5678be82530d..9f6504129e80 100644
->>> --- a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
->>> +++ b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
->>> @@ -20,10 +20,13 @@ Required properties:
->>>   - msi-map: Maps a Requester ID to an MSI controller and associated
->>>   	msi-specifier data. See ./pci-msi.txt
->>>   - interrupts: Three interrupt entries must be specified.
->>> -- interrupt-names: Must include the following names
->>> -	- "sys"
->>> -	- "legacy"
->>> -	- "client"
->>> +- interrupt-names: Include the following names
->>> +	Required:
->>> +		- "sys"
->>> +		- "legacy"
->>> +		- "client"
->>> +	Optional:
->>> +		- "wake"
+On Fri, Aug 25, 2017 at 3:59 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 08/24/2017 01:21 AM, Corentin Labbe wrote:
+>> On Wed, Aug 23, 2017 at 09:31:53AM -0700, Florian Fainelli wrote:
+>>> On 08/23/2017 12:49 AM, Maxime Ripard wrote:
+>>>> Hi Florian,
+>>>>
+>>>> On Tue, Aug 22, 2017 at 11:35:01AM -0700, Florian Fainelli wrote:
+>>>>>>>> So I think what you are saying is either impossible or engineering-wise
+>>>>>>>> a very stupid design, like using an external MAC with a discrete PHY
+>>>>>>>> connected to the internal MAC's MDIO bus, while using the internal MAC
+>>>>>>>> with the internal PHY.
+>>>>>>>>
+>>>>>>>> Now can we please decide on something? We're a week and a half from
+>>>>>>>> the 4.13 release. If mdio-mux is wrong, then we could have two mdio
+>>>>>>>> nodes (internal-mdio & external-mdio).
+>>>>>>>
+>>>>>>> I really don't see a need for a mdio-mux in the first place, just have
+>>>>>>> one MDIO controller (current state) sub-node which describes the
+>>>>>>> built-in STMMAC MDIO controller and declare the internal PHY as a child
+>>>>>>> node (along with 'phy-is-integrated'). If a different configuration is
+>>>>>>> used, then just put the external PHY as a child node there.
+>>>>>>>
+>>>>>>> If fixed-link is required, the mdio node becomes unused anyway.
+>>>>>>>
+>>>>>>> Works for everyone?
+>>>>>>
+>>>>>> If we put an external PHY with reg=1 as a child of internal MDIO,
+>>>>>> il will be merged with internal PHY node and get
+>>>>>> phy-is-integrated.
+>>>>>
+>>>>> Then have the .dtsi file contain just the mdio node, but no internal or
+>>>>> external PHY and push all the internal and external PHY node definition
+>>>>> (in its entirety) to the per-board DTS file, does not that work?
+>>>>
+>>>> If possible, I'd really like to have the internal PHY in the
+>>>> DTSI. It's always there in hardware anyway, and duplicating the PHY,
+>>>> with its clock, reset line, and whatever info we might need in the
+>>>> future in each and every board DTS that uses it will be very error
+>>>> prone and we will have the usual bunch of issues that come up with
+>>>> duplication.
+>>>
+>>> OK, then what if you put the internal PHY in the DTSI, mark it with a
+>>> status = "disabled" property, and have the per-board DTS put a status =
+>>> "okay" property along with a "phy-is-integrated" boolean property? Would
+>>> that work?
 >>
->> Why is there no other PCI binding that includes "wake" as an
->> interrupt-name?  This feels like something that should be fairly
->> common across host controllers.  I don't want a Rockport-specific
-> 
-> s/port/chip/ :)
-> 
->> DT description if it could be made more general.
-> 
-> I'm not sure we can really answer that question ("why do no other PCI
-> bindings have this?"). But one guess would be that every other
-> controller uses only beacon wake.
-> 
-> It would be OK with me if we made a blanket statement that a controller
-> with a "wake" interrupt means PCI WAKE# (per the specification). It's
-> possible this could even be stuck into some generic PCI/DT code
-> eventually. (I don't think we have a really good place for this today.)
+>> No, I tested and for example with sun8i-h3-orangepi-plus.dts, the external PHY (ethernet-phy at 1) is still merged.
+>
+> Is not there is a mistake in the unit address not matching the "reg"
+> property, or am I not looking at the right tree?
+>
+> &mdio {
+>         ext_rgmii_phy: ethernet-phy at 1 {
+>                 compatible = "ethernet-phy-ieee802.3-c22";
+>                 reg = <0>;
+>         };
+> };
+>
+> If the PHY is really at MDIO address 0, then it should be
+> ethernet-phy at 0, and not ethernet-phy at 1, and then no problem with the
+> merging?
 
-I guess we could register a pcie port service for dedicated WAKE# as it 
-seems fairly parallel to pme code there, if we need a common place for
-that?
+That is wrong. The board described in the example likely has a Realtek
+RTL8211E @ address 0x1. Address 0 for this PHY is a broadcast address,
+so it still works, but is the wrong representation.
 
-
-> 
-> Brian
-> 
->>>   - resets: Must contain seven entries for each entry in reset-names.
->>>   	   See ../reset/reset.txt for details.
->>>   - reset-names: Must include the following names
->>> @@ -87,10 +90,11 @@ pcie0: pcie at f8000000 {
->>>   	clock-names = "aclk", "aclk-perf",
->>>   		      "hclk", "pm";
->>>   	bus-range = <0x0 0x1>;
->>> -	interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
->>> -		     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
->>> -		     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>;
->>> -	interrupt-names = "sys", "legacy", "client";
->>> +	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
->>> +			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
->>> +			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
->>> +			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
->>> +	interrupt-names = "sys", "legacy", "client", "wake";
->>>   	assigned-clocks = <&cru SCLK_PCIEPHY_REF>;
->>>   	assigned-clock-parents = <&cru SCLK_PCIEPHY_REF100M>;
->>>   	assigned-clock-rates = <100000000>;
->>> -- 
->>> 2.11.0
+>
+>
+>> So that adding a 'status = "disabled"' does not bring anything.
+>>
 >>>
+>>> What I really don't think is necessary is:
 >>>
-> 
-> 
-> 
+>>> - duplicating the "mdio" controller node for external vs. internal PHY,
+>>> because this is not accurate, there is just one MDIO controller, but
+>>> there may be different kinds of MDIO/PHY devices attached
+>>
+>> For me, if we want to represent the reality, we need two MDIO:
+>> - since two PHY at the same address could co-exists
+>> - since they are isolated so not on the same MDIO bus
+>
+> Is that really true? It might be, but from experience with e.g:
+> bcmgenet, the integrated PHY and the external PHYs are on the same MDIO
+> bus, which is convenient, except when you have an address conflict.
+
+There's a mux in the hardware: either the internal MDIO+MII lines
+from the internal PHY are connected to the MAC, or the external
+MDIO+MII lines from the pin controller are connected. I believe
+this was already mentioned?
+
+>
+>>
+>>> - having the STMMAC driver MDIO probing code having to deal with a
+>>> "mdio" sub-node or an "internal-mdio" sub-node because this is confusing
+>>> and requiring more driver-level changes that are error prone
+>>
+>> My patch for stmmac is really small, only the name of my variable ("need_mdio_mux_ids")
+>> have to be changed to something like "register_parent_mdio"
+>>
+>>
+>> So I agree with Maxime, we need to avoid merging PHY nodes, and we can avoid it only by having two separate MDIO nodes.
+>> Furthermore, with only one MDIO, we will face with lots of small patch for adding phy-is-integrated, with two we do not need to change any board DT, all is simply clean.
+>> Really having two MDIO seems cleaner.
+>
+> The only valid thing that you have provided so far is this merging
+> problem. Anything else ranging from "we will face with lots of small
+> patch for adding phy-is-integrated" to "Really having two MDIO seems
+> cleaner." are hard to receive as technical arguments for correctness.
+>
+> What happens if someone connects an external PHY at the same MDIO
+> address than the internal PHY, which one do you get responses from? If
+> you shutdown the internal PHY and it stops responding, then this
+> probably becomes deterministic, but it still supports the fact there is
+> just one MDIO bus controller per MAC.
+
+Depends on whichever set of pins/lines are selected. But yeah, there's
+only one MDIO bus controller in the MAC.
+
+ChenYu
+
+> Anyway, do whatever works best for you I guess.
+> --
+> Florian
