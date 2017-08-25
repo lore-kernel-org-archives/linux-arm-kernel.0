@@ -1,409 +1,119 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Fri, 25 Aug 2017 15:28:41 +0200
-Subject: [PATCH v2] arm64: allwinner: h5: add support for NanoPi NEO Plus 2
-In-Reply-To: <20170825103242.5665-1-antony@phenome.org>
-References: <20170824231716.2623-1-antony@phenome.org>
- <20170825103242.5665-1-antony@phenome.org>
-Message-ID: <CAEKpxBkUKGUQR2Vh1+Ci4wbB-+x48nRjLmWME2EUECCHuuwsmQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Aug 2017 15:41:14 +0200
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170823103216.e43283308c195c4a80d929fa@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20170728160233.xooevio4hoqkgfaq@flea.lan>
+ <20170731111640.d5a8e580a48183cfce85943d@magewell.com>
+ <20170822174339.6woauylgzkgqxygk@flea.lan>
+ <20170823103216.e43283308c195c4a80d929fa@magewell.com>
+Message-ID: <20170825134114.rwttrmzw5gbtwdx2@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2017 at 12:32, Antony Antony <antony@phenome.org> wrote:
->         Add initial DT support for NanoPi NEO Plus 2 by FriendlyELEC
->                 Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
->                 1 GB DDR3 RAM
->                 8GB eMMC flash (Samsung KLM8G1WEPD-B031)
->                 micro SD card slot
->                 Gigabit Ethernet (external RTL8211E-VB-CG chip)
->                 802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
->                 2x USB 2.0 host ports & 2x USB via headers
->
->     The DTS is based on OrangePi PC 2, sun50i-h5-orangepi-pc2
->     Added dwmac-sun8i Gigabit Ethernet support based on
->     Nano Pi Neo2 DT and the schematics.
->
-> Signed-off-by: Antony Antony <antony@phenome.org>
-> ---
->  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
->  .../dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 341 +++++++++++++++++++++
->  2 files changed, 342 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
->
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index 108f12c..e6810c8 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -6,6 +6,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
->
->  always         := $(dtb-y)
->  subdir-y       := $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-> new file mode 100644
-> index 0000000..d279ad8
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-> @@ -0,0 +1,341 @@
-> +/*
-> + * Copyright (C) 2017 Antony Antony <antony@phenome.org>
-> + * Copyright (C) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun50i-h5.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +       model = "FriendlyARM NanoPi NEO Plus2";
-> +       compatible = "friendlyarm,nanopi-neo-pus2", "allwinner,sun50i-h5";
-Hi,
-s/pus/plus
-> +
-> +       reg_vcc3v3: vcc3v3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "vcc3v3";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +       };
-> +
-> +       aliases {
-> +               ethernet0 = &emac;
-> +               serial0 = &uart0;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = "serial0:115200n8";
-> +       };
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +
-> +               pwr {
-> +                       label = "orangepi:green:pwr";
-> +                       gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-> +                       default-state = "on";
-> +               };
-> +
-> +               status {
-> +                       label = "orangepi:red:status";
-> +                       gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-> +               };
-> +       };
-Is this correct?...check against the schematic and also remove orangepi c&p.
-> +
-> +       r-gpio-keys {
-> +               compatible = "gpio-keys";
-> +
-> +               sw4 {
-> +                       label = "sw4";
-> +                       linux,code = <BTN_0>;
-> +                       gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-> +               };
-> +       };
-Is there a key onboard?
+Hi Yong,
 
-> +
-> +       reg_gmac_3v3: gmac-3v3 {
-> +               compatible = "regulator-fixed";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&gmac_power_pin_nanopi>;
-> +               regulator-name = "gmac-3v3";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               startup-delay-us = <100000>;
-> +               enable-active-high;
-> +               gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
-> +       };
-> +
-> +       vdd_cpux: gpio-regulator {
-> +               compatible = "regulator-gpio";
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&vdd_cpux_r_npi>;
-> +
-> +               regulator-name = "vdd-cpux";
-> +               regulator-type = "voltage";
-> +               regulator-boot-on;
-> +               regulator-always-on;
-> +               regulator-min-microvolt = <1100000>;
-> +               regulator-max-microvolt = <1300000>;
-> +               regulator-ramp-delay = <50>; /* 4ms */
-> +
-> +               gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>;
-> +               gpios-states = <0x1>;
-> +               states = <1100000 0x0
-> +                         1300000 0x1>;
-> +       };
-> +
-> +       wifi_pwrseq: wifi_pwrseq {
-> +               compatible = "mmc-pwrseq-simple";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&wifi_en_npi>;
-> +               reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
-> +               post-power-on-delay-ms = <200>;
-> +       };
-> +};
-> +
-> +&codec {
-> +       allwinner,audio-routing =
-> +               "Line Out", "LINEOUT",
-> +               "MIC1", "Mic",
-> +               "Mic",  "MBIAS";
-> +       status = "okay";
-> +};
-> +
-> +&de {
-> +       status = "okay";
-> +};
-de2 stuff hasn't been delivered yet so don't include it.
-> +
-> +&ehci0 {
-> +       status = "okay";
-> +};
-> +
-> +&ehci1 {
-> +       status = "okay";
-> +};
-> +
-> +&ehci2 {
-> +       status = "okay";
-> +};
-USB 1 and 2 are on the header so should be disabled.
-> +
-> +&ehci3 {
-> +       status = "okay";
-> +};
-> +
-> +&emac {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&emac_rgmii_pins>;
-> +       phy-supply = <&reg_gmac_3v3>;
-> +       phy-handle = <&ext_rgmii_phy>;
-> +       phy-mode = "rgmii";
-> +       status = "okay";
-> +};
-> +
-> +&hdmi {
-> +       status = "okay";
-> +};
-ditto
-> +
-> +&ir {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&ir_pins_a>;
-> +       status = "okay";
-> +};
-No IR on the board, however it's on a header so disable or remove.
-> +
-> +&mdio {
-> +       ext_rgmii_phy: ethernet-phy at 7 {
-> +               compatible = "ethernet-phy-ieee802.3-c22";
-> +               reg = <7>;
-> +       };
-> +};
-> +
-> +&mixer0 {
-> +       status = "okay";
-> +};
-de2 ditto
-> +
-> +&mmc0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-> +       vmmc-supply = <&reg_vcc3v3>;
-> +       bus-width = <4>;
-> +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-> +       status = "okay";
-> +};
-> +
-> +&mmc1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc1_pins_a>;
-> +       vmmc-supply = <&reg_vcc3v3>;
-> +       vqmmc-supply = <&reg_vcc3v3>;
-> +       mmc-pwrseq = <&wifi_pwrseq>;
-> +       bus-width = <4>;
-> +       non-removable;
-> +       boot_device = <0>;
-> +       status = "okay";
-> +
-> +       brcmf: bcrmf at 1 {
-> +               reg = <1>;
-> +               compatible = "brcm,bcm4329-fmac";
-> +       };
-Incorrect wifi chip - just deliver what you've tested.
-> +};
-> +
-> +&mmc2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc2_8bit_pins>;
-> +       vmmc-supply = <&reg_vcc3v3>;
-> +       bus-width = <8>;
-> +       non-removable;
-> +       cap-mmc-hw-reset;
-> +       boot_device = <0>;
-> +       status = "okay";
-> +};
-> +
-> +&mmc2_8bit_pins {
-> +       /* Increase drive strength for DDR modes */
-> +       drive-strength = <40>;
-> +       /* eMMC is missing pull-ups */
-> +       bias-pull-up;
-> +};
-> +
-> +&ohci0 {
-> +       status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +       status = "okay";
-> +};
-> +
-> +&ohci2 {
-> +       status = "okay";
-> +};
-> +
-> +&ohci3 {
-> +       status = "okay";
-> +};
-> +
-> +&tcon0 {
-> +       status = "okay";
-> +};
-de2 ditto
-> +
-> +&spi0 {
-> +       status = "okay";
-> +       spi-flash at 0 {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               compatible = "jedec,spi-nor";
-> +               reg = <0>; /* Chip select 0 */
-> +               spi-max-frequency = <10000000>;
-> +               status = "okay";
-> +               partitions {
-> +                       compatible = "fixed-partitions";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       partition at 0 {
-> +                               label = "uboot";
-> +                               reg = <0x0 0x100000>;
-> +                       };
-> +                       partition at 100000 {
-> +                               label = "env";
-> +                               reg = <0x100000 0x100000>;
-> +                       };
-> +               };
-> +       };
-> +};
-spi0 is on the header and there is no spi flash.
+On Wed, Aug 23, 2017 at 10:32:16AM +0800, Yong wrote:
+> > > > > +static int sun6i_graph_notify_complete(struct v4l2_async_notifier *notifier)
+> > > > > +{
+> > > > > +	struct sun6i_csi *csi =
+> > > > > +			container_of(notifier, struct sun6i_csi, notifier);
+> > > > > +	struct sun6i_graph_entity *entity;
+> > > > > +	int ret;
+> > > > > +
+> > > > > +	dev_dbg(csi->dev, "notify complete, all subdevs registered\n");
+> > > > > +
+> > > > > +	/* Create links for every entity. */
+> > > > > +	list_for_each_entry(entity, &csi->entities, list) {
+> > > > > +		ret = sun6i_graph_build_one(csi, entity);
+> > > > > +		if (ret < 0)
+> > > > > +			return ret;
+> > > > > +	}
+> > > > > +
+> > > > > +	/* Create links for video node. */
+> > > > > +	ret = sun6i_graph_build_video(csi);
+> > > > > +	if (ret < 0)
+> > > > > +		return ret;
+> > > > 
+> > > > Can you elaborate a bit on the difference between a node parsed with
+> > > > _graph_build_one and _graph_build_video? Can't you just store the
+> > > > remote sensor when you build the notifier, and reuse it here?
+> > > 
+> > > There maybe many usercases:
+> > > 1. CSI->Sensor.
+> > > 2. CSI->MIPI->Sensor.
+> > > 3. CSI->FPGA->Sensor1
+> > >             ->Sensor2.
+> > > FPGA maybe some other video processor. FPGA, MIPI, Sensor can be
+> > > registered as v4l2 subdevs. We do not care about the driver code
+> > > of them. But they should be linked together here.
+> > > 
+> > > So, the _graph_build_one is used to link CSI port and subdevs. 
+> > > _graph_build_video is used to link CSI port and video node.
+> > 
+> > So the graph_build_one is for the two first cases, and the
+> > _build_video for the latter case?
+> 
+> No. 
+> The _graph_build_one is used to link the subdevs found in the device 
+> tree. _build_video is used to link the closest subdev to video node.
+> Video node is created in the driver, so the method to get it's pad is
+> diffrent to the subdevs.
 
-BR,
-CK
-> +
-> +&pio {
-> +       leds_npi: led_pins at 0 {
-> +               pins = "PA10";
-> +               function = "gpio_out";
-> +       };
-> +       gmac_power_pin_nanopi: gmac_power_pin at 0 {
-> +                       pins = "PD6";
-> +                       function = "gpio_out";
-> +       };
-> +};
-> +
-> +&r_pio {
-> +       leds_r_npi: led_pins at 0 {
-> +               pins = "PL10";
-> +               function = "gpio_out";
-> +       };
-> +
-> +       vdd_cpux_r_npi: regulator_pins at 0 {
-> +               allwinner,pins = "PL6";
-> +               allwinner,function = "gpio_out";
-> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +       };
-> +
-> +       wifi_en_npi: wifi_en_pin {
-> +               pins = "PL7";
-> +               function = "gpio_out";
-> +       };
-> +};
-> +
-> +&uart0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&uart0_pins_a>;
-> +       status = "okay";
-> +};
-> +
-> +&uart1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&uart1_pins>;
-> +       status = "disabled";
-> +};
-> +
-> +&uart2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&uart2_pins>;
-> +       status = "disabled";
-> +};
-> +
-> +&usb_otg {
-> +       dr_mode = "usb";
-> +       status = "okay";
-> +};
-> +
-> +&usbphy {
-> +       /* USB Type-A ports' VBUS is always on */
-> +       usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-> +       status = "okay";
-> +};
-> --
-> 2.9.3
->
+Sorry for being slow here, I'm still not sure I get it.
+
+In summary, both the sun6i_graph_build_one and sun6i_graph_build_video
+will iterate over each endpoint, will retrieve the remote entity, and
+will create the media link between the CSI pad and the remote pad.
+
+As far as I can see, there's basically two things that
+sun6i_graph_build_one does that sun6i_graph_build_video doesn't:
+  - It skips all the links that would connect to one of the CSI sinks
+  - It skips all the links that would connect to a remote node that is
+    equal to the CSI node.
+
+I assume the latter is because you want to avoid going in an infinite
+loop when you would follow one of the CSI endpoint (going to the
+sensor), and then follow back the same link in the opposite
+direction. Right?
+
+I'm confused about the first one though. All the pads you create in
+your driver are sink pads, so wouldn't that skip all the pads of the
+CSI nodes?
+
+Also, why do you iterate on all the CSI endpoints, when there's only
+of them? You want to anticipate the future binding for devices with
+multiple channels?
+
+> > 
+> > If so, you should take a look at the last iteration of the
+> > subnotifiers rework by Nikas S?derlund (v4l2-async: add subnotifier
+> > registration for subdevices).
+> > 
+> > It allows subdevs to register notifiers, and you don't have to build
+> > the graph from the video device, each device and subdev can only care
+> > about what's next in the pipeline, but not really what's behind it.
+> > 
+> > That would mean in your case that you can only deal with your single
+> > CSI pad, and whatever subdev driver will use it care about its own.
+> 
+> Do you mean the subdevs create pad link in the notifier registered by
+> themself ?
+
+Yes.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/87e9c2b5/attachment-0001.sig>
