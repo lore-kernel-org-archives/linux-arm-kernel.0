@@ -1,83 +1,64 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 24 Aug 2017 17:56:32 -0700
-Subject: [GIT PULL 6/6 V2] Broadcom drivers changes for 4.14
-In-Reply-To: <20170817183748.1450-1-f.fainelli@gmail.com>
-References: <20170817183748.1450-1-f.fainelli@gmail.com>
-Message-ID: <20170825005632.29599-1-f.fainelli@gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 25 Aug 2017 10:00:59 +0900
+Subject: [PATCH 08/14] arm64: kexec_file: create purgatory
+In-Reply-To: <20170824165617.GC29665@leverpostej>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-9-takahiro.akashi@linaro.org>
+ <20170824165617.GC29665@leverpostej>
+Message-ID: <20170825010054.GC6434@akashi-kouhiroshi-no-MacBook-Air.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+On Thu, Aug 24, 2017 at 05:56:17PM +0100, Mark Rutland wrote:
+> On Thu, Aug 24, 2017 at 05:18:05PM +0900, AKASHI Takahiro wrote:
+> > This is a basic purgtory, or a kind of glue code between the two kernel,
+> > for arm64. We will later add a feature of verifying a digest check against
+> > loaded memory segments.
+> > 
+> > arch_kexec_apply_relocations_add() is responsible for re-linking any
+> > relative symbols in purgatory. Please note that the purgatory is not
+> > an executable, but a non-linked archive of binaries so relative symbols
+> > contained here must be resolved at kexec load time.
+> > Despite that arm64_kernel_start and arm64_dtb_addr are only such global
+> > variables now, arch_kexec_apply_relocations_add() can manage more various
+> > types of relocations.
+> 
+> Why does the purgatory code need to be so complex?
+> 
+> Why is it not possible to write this as position-independent asm?
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+I don't get your point, but please note that these values are also
+re-written by the 1st kernel when it loads the 2nd kernel and so
+they must appear as globals.
 
-are available in the git repository at:
+> > +/*
+> > + * Apply purgatory relocations.
+> > + *
+> > + * ehdr: Pointer to elf headers
+> > + * sechdrs: Pointer to section headers.
+> > + * relsec: section index of SHT_RELA section.
+> > + *
+> > + * Note:
+> > + * Currently R_AARCH64_ABS64, R_AARCH64_LD_PREL_LO19 and R_AARCH64_CALL26
+> > + * are the only types to be generated from purgatory code.
+> 
+> Is this all that has been observed, or is this ensured somehow?
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/drivers
+It was observed by inserting a debug print message in this function,
+I'm not sure whether we can restrict only those three types.
 
-for you to fetch changes up to ed70bd0aa574d4922382ead47cd370174e31cb0e:
+> The arch_kexec_apply_relocations_add() function below duplicates a lot
+> of logic that already exists in the arm64 module loader's
+> apply_relocate_add() function.
+> 
+> Please reuse that code. Having a duplicate or alternative implementation
+> is just asking for subtle bugs.
 
-  soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-08-24 17:49:43 -0700)
+Okey, I'll look at it.
 
-----------------------------------------------------------------
-This pull request contains Broadcom ARM/ARM64 SoC drivers changes for 4.14,
-please pull the following:
+Thanks,
+-Takahiro AKASHI
 
-- Markus adds support for the Broadcom STB DDR PHY frontend which supports
-  dynamic firmware loading and offers the ability to respond with DRAM refresh
-  rates. He also adds a proper documentation binding document for that
-  peripheral
 
-- Brian adds support for S2/S3/S5 system suspend/resume modes on ARM-based SoCs
-  which is not new but had been lingering for a long time.
-
-- Justin adds S2/S3 system suspend/resume modes on MIPS-based SoCs which is a
-  bit new newer and builds on top of the ARM-based support.
-
-- Florian adds Device Tree binding documents for both ARM and MIPS based systems
-  describing the necessary nodes for S2/S3/S5 on these SoCs.
-
-----------------------------------------------------------------
-Brian Norris (1):
-      soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
-
-Florian Fainelli (2):
-      dt-bindings: ARM: brcmstb: Update Broadcom STB Power Management binding
-      dt-bindings: Document MIPS Broadcom STB power management nodes
-
-Justin Chen (1):
-      soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
-
-Markus Mayer (2):
-      dt-bindings: Add bindings for Broadcom STB DRAM Sensors
-      memory: brcmstb: Add driver for DPFE
-
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
- .../bindings/memory-controllers/brcm,dpfe-cpu.txt  |  27 +
- .../devicetree/bindings/mips/brcm/soc.txt          | 153 ++++
- MAINTAINERS                                        |   8 +
- drivers/memory/Makefile                            |   1 +
- drivers/memory/brcmstb_dpfe.c                      | 701 ++++++++++++++++++
- drivers/soc/bcm/Kconfig                            |   2 +
- drivers/soc/bcm/brcmstb/Kconfig                    |   9 +
- drivers/soc/bcm/brcmstb/Makefile                   |   1 +
- drivers/soc/bcm/brcmstb/pm/Makefile                |   3 +
- drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
- drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 822 +++++++++++++++++++++
- drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
- drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
- drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
- drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
- drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
- 17 files changed, 2817 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/brcm,dpfe-cpu.txt
- create mode 100644 drivers/memory/brcmstb_dpfe.c
- create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
- create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
- create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
+> Thanks,
+> Mark.
