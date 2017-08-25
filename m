@@ -1,61 +1,24 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 25 Aug 2017 08:57:06 -0500
-Subject: [PATCH v4 3/4] dt-bindings: PCI: rockchip: Add support for pcie
- wake irq
-In-Reply-To: <20170825021132.GA104845@google.com>
-References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
- <20170822031934.8675-4-jeffy.chen@rock-chips.com>
- <20170824165353.GL31858@bhelgaas-glaptop.roam.corp.google.com>
- <20170825021132.GA104845@google.com>
-Message-ID: <20170825135706.GB1304@bhelgaas-glaptop.roam.corp.google.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Fri, 25 Aug 2017 17:10:10 +0300
+Subject: [PATCH v2 0/9] PM / ACPI / i2c: Deploy runtime PM centric path
+ for system sleep
+In-Reply-To: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <4f22e64f-8a3c-9ce2-d12d-d3ff2c4108c9@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 07:11:32PM -0700, Brian Norris wrote:
-> On Thu, Aug 24, 2017 at 11:53:54AM -0500, Bjorn Helgaas wrote:
-> > On Tue, Aug 22, 2017 at 11:19:33AM +0800, Jeffy Chen wrote:
-> > > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+On 08/23/2017 05:42 PM, Ulf Hansson wrote:
+> This series has been tested on an ARM64 Hikey board, which isn't having the
+> i2c device attached to the ACPI PM domain. This means that the ACPI changes
+> needs to be tested on some relevant Intel SoCs and it's greatly appreciated
+> is someone could help out with this, so is of course review comments.
 > 
-> > > diff --git a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
-> > > index 5678be82530d..9f6504129e80 100644
-> > > --- a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
-> > > +++ b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
-> > > @@ -20,10 +20,13 @@ Required properties:
-> > >  - msi-map: Maps a Requester ID to an MSI controller and associated
-> > >  	msi-specifier data. See ./pci-msi.txt
-> > >  - interrupts: Three interrupt entries must be specified.
-> > > -- interrupt-names: Must include the following names
-> > > -	- "sys"
-> > > -	- "legacy"
-> > > -	- "client"
-> > > +- interrupt-names: Include the following names
-> > > +	Required:
-> > > +		- "sys"
-> > > +		- "legacy"
-> > > +		- "client"
-> > > +	Optional:
-> > > +		- "wake"
-> > 
-> > Why is there no other PCI binding that includes "wake" as an
-> > interrupt-name?  This feels like something that should be fairly
-> > common across host controllers.  I don't want a Rockport-specific
-> 
-> s/port/chip/ :)
+I tested this set on both platforms using drivers/acpi/acpi_lpss.c and 
+drivers/mfd/intel-lpss.c and didn't see any issues.
 
-I visited Rockport this summer, guess I had it on the brain :)
+I guess tested-by is not needed yet as details are cooking in ACPI part 
+of the set.
 
-> > DT description if it could be made more general.
-> 
-> I'm not sure we can really answer that question ("why do no other PCI
-> bindings have this?"). But one guess would be that every other
-> controller uses only beacon wake.
-> 
-> It would be OK with me if we made a blanket statement that a controller
-> with a "wake" interrupt means PCI WAKE# (per the specification). It's
-> possible this could even be stuck into some generic PCI/DT code
-> eventually. (I don't think we have a really good place for this today.)
-
-I'd just like every controller that uses WAKE# to use the same name in
-DT.  Maybe all that means for now is mentioning it in
-Documentation/devicetree/bindings/pci/pci.txt instead of (or in
-addition to) Documentation/devicetree/bindings/pci/rockchip-pcie.txt
+-- 
+Jarkko
