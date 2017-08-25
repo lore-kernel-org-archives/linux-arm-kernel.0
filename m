@@ -1,19 +1,20 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 25 Aug 2017 11:34:35 +0200
-Subject: [PATCH v2 1/3] arm64: dts: rockchip: add mmc nodes for rk3328
+Date: Fri, 25 Aug 2017 11:35:41 +0200
+Subject: [PATCH v2 3/3] arm64: dts: rockchip: add cpu regulator for rk3328
  evaluation board
-In-Reply-To: <1503542223-21044-2-git-send-email-cl@rock-chips.com>
+In-Reply-To: <1503542223-21044-4-git-send-email-cl@rock-chips.com>
 References: <1503542223-21044-1-git-send-email-cl@rock-chips.com>
- <1503542223-21044-2-git-send-email-cl@rock-chips.com>
-Message-ID: <4430314.yE5BBxJgsD@phil>
+ <1503542223-21044-4-git-send-email-cl@rock-chips.com>
+Message-ID: <3733498.rByIbfHvAf@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. August 2017, 10:37:01 CEST schrieb cl at rock-chips.com:
+Am Donnerstag, 24. August 2017, 10:37:03 CEST schrieb cl at rock-chips.com:
 > From: Liang Chen <cl@rock-chips.com>
 > 
-> Rockchip's rk3328 evaluation board has 3 mmc controllers for
-> sdio/sdmmc/emmc, let's enable them.
+> RK3328 Evaluation Board use rk805 pmic, and one of the DCDCs in
+> rk805 is for cpu regulator, assign the cpu regulator, so the
+> cpufreq can work fine.
 > 
 > Signed-off-by: Liang Chen <cl@rock-chips.com>
 
