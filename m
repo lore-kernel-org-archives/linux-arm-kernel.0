@@ -1,180 +1,111 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Aug 2017 10:56:25 +0200
-Subject: [PATCH v10] PCI: tango: Add MSI controller support
-In-Reply-To: <871so09j6g.fsf@arm.com>
-References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
- <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
- <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
- <86efs3wesi.fsf@arm.com>
- <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
- <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
- <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
- <e381170c-e462-01cd-12db-30773005602b@free.fr> <871so09j6g.fsf@arm.com>
-Message-ID: <90f38928-6f5c-c225-d150-d8daf7d4652c@free.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 25 Aug 2017 11:04:53 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
+ direct_complete for ACPI devices
+In-Reply-To: <4050921.GfHh1Z5NrX@aspire.rjw.lan>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
+ <CAPDyKFrGvqhBdenSyQ8Qr76DbfEvc74_dKZAjraA5qL63Mm2rg@mail.gmail.com>
+ <4050921.GfHh1Z5NrX@aspire.rjw.lan>
+Message-ID: <CAPDyKFpznYWU3NcuUfUD3=isR_w=it995+=GTaF8OU2Ho-GOQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/08/2017 09:54, Marc Zyngier wrote:
-> On Thu, Aug 24 2017 at 10:53:16 pm BST, Mason <slash.tmp@free.fr> wrote:
->> On 24/08/2017 20:35, Ard Biesheuvel wrote:
->>> On 24 August 2017 at 18:51, Marc Gonzalez wrote:
->>>> On 24/08/2017 19:04, Bjorn Helgaas wrote:
->>>>> On Tue, Aug 22, 2017 Marc Zyngier wrote:
->>>>>> Marc Gonzalez wrote:
->>>>>>> On 22/08/2017 18:29, Marc Zyngier wrote:
->>>>>>>> On 22/08/17 15:56, Marc Gonzalez wrote:
->>>>>>>>
->>>>>>>>>  #define SMP8759_MUX              0x48
->>>>>>>>>  #define SMP8759_TEST_OUT 0x74
->>>>>>>>> +#define SMP8759_STATUS           0x80
->>>>>>>>> +#define SMP8759_ENABLE           0xa0
->>>>>>>>> +#define SMP8759_DOORBELL 0xa002e07c
->>>>>>>>
->>>>>>>> Why is this hardcoded and not coming from the device-tree, just like any
->>>>>>>> other address property?
->>>>>>>
->>>>>>> Since this bus address is software-configurable, I didn't think
->>>>>>> it belonged in the DT. Also, I didn't see anything similar in
->>>>>>> other binding docs, especially
->>>>>>>
->>>>>>> Documentation/devicetree/bindings/interrupt-controller/msi.txt
->>>>>>
->>>>>> If that's software configurable, how on Earth did you pick the address?
->>>>>> How do you ensure that it doesn't conflict with DMA? How is it
->>>>>> configured into the RC?
->>>>>
->>>>> But we *do* need to resolve this.  This does seem like an address that
->>>>> shouldn't be hard-coded into the driver.  Since this driver is
->>>>> programming the address into an MSI message, but not into the receiver
->>>>> of that message, there's a coordination issue between this driver and
->>>>> whatever other software does that receiver configuration.
->>>>
->>>> OK. I'll move the doorbell address to the DT for v11.
->>>>
->>>> What property should be used for this address?
->>>>
->>>> sigma,doorbell ?
->>>>
->>>> Or maybe I can put it in reg, since I have a 1:1 mapping
->>>> between bus and cpu addresses?
->>>>
->>>> git grep -i doorbell arch/arm/boot/dts/ arch/arm64/boot/dts/
->>>> returns nothing.
->>>
->>> You haven't answered the question yet: you stated that the doorbell
->>> address is software configurable, yet your code does not seem to
->>> configure it. It only returns the doorbell address so that it gets
->>> communicated to the downstream devices.
->>>
->>> So how does the RC know which address is special, so it can trigger on
->>> inbound writes hitting that address and assert the SPI ?
+On 24 August 2017 at 16:57, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Thursday, August 24, 2017 10:19:43 AM CEST Ulf Hansson wrote:
+>> On 24 August 2017 at 01:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> > On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> >> In some cases a driver for an ACPI device needs to be able to prevent the
+>> >> ACPI PM domain from using the direct_complete path during system sleep.
+>> >>
+>> >> One typical case is when the driver for the device needs its device to stay
+>> >> runtime enabled, during the __device_suspend phase. This isn't the case
+>> >> when the direct_complete path is being executed by the PM core, as it then
+>> >> disables runtime PM for the device in __device_suspend(). Any following
+>> >> attempts to runtime resume the device after that point, just fails.
+>> >
+>> > OK, that is a problem.
+>> >
+>> >> A workaround to this problem is to let the driver runtime resume its device
+>> >> from its ->prepare() callback, as that would prevent the direct_complete
+>> >> path from being executed. However, that may often be a waste, especially if
+>> >> it turned out that no one really needed the device.
+>> >>
+>> >> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
+>> >> drivers to inform the ACPI PM domain to change its default behaviour during
+>> >> system sleep, and thus control whether it may use the direct_complete path
+>> >> or not.
+>> >
+>> > But I'm not sure this is the right place to address it as it very well
+>> > may affect a PCI device too.
+>> >
+>> > Also, this is about the device and not about its ACPI companion
+>> > object, so putting the flag in there is somewhat unclean, so to speak.
+>> >
+>> > It looks like we need a flag in dev_pm_info saying something along the
+>> > lines of "my system suspend callback can deal with runtime PM" that
+>> > will cause the direct_complete update to occur in
+>> > __device_suspend_late() instead of __device_suspend().
 >>
->> The CPU address of the MSI doorbell address is 0x2e07c
->> i.e. within the reg space of the PCIe controller block.
-> 
-> Which you describe in DT already, right? So why aren't you using an
-> offset in this region as your MSI doorbell (potentially applying an
-> offset, see below)?
-
-Yes, the controller is described in DT:
-
-	pcie at 2e000 {
-		compatible = "sigma,smp8759-pcie";
-		reg = <0x50000000 0x400000>, <0x2e000 0x100>;
-
-IIUC, you're saying I don't need the doorbell address
-explicitly in the DT, because I can compute:
-
-0x2e000 (from the DT) + 0x7c (offset within the block)
-
-OK, that sounds right.
-
-Then there is the matter of the region offset,
-i.e. 0xa0000000 in my current code.
-
-It might also be worth keeping in mind that there is
-a second revision of the PCIe controller that handles
-the doorbell differently. In rev2, I just pick an
-arbitrary address within the window, program that
-bus address into the controller, and the controller
-knows to forward that single address to the right
-place. See "[RFC PATCH v0.2] PCI: Add support for
-tango PCIe host bridge" for an example of this.
-
-Typically, I pick the first address of the window,
-BAR0.base, since I assume no device will ever need
-to read/write the first word of RAM.
-
-
->> As I discussed back in March, the RC implements an odd
->> bus-to-system mapping.
+>> I realize that in the end this turns out to be a comparison between
+>> the runtime PM centric path and the direct_complete path while
+>> implementing system sleep. In patch 9, there is some more explanation
+>> around this, however if you like I can elaborate even more about
+>> this!?
 >>
->> RC BAR0 defines a window in PCI address space (max 1GB).
->> Accesses outside this window are silently ignored.
->> The window is divided into 8 "regions" and there are 8
->> registers defining the offset into CPU space.
->>
->> In pseudo code, assuming pci_address is within the
->> window defined by BAR0:
->>
->> cpu_address map_bus_to_system(pci_address)
->> {
->>     temp = pci_address - BAR0.base
->>     region = temp / region_size
->>     offset = temp % region_size
->>     cpu_address = region_reg[region] + offset
->>     return cpu_address
->> }
->>
->> The current setup is:
->>
->> DRAM at 0x80000000-0xa0000000
->> BAR0.base = 0x80000000
->> REGION[0] = 0x80000000
->> REGION[1] = 0x88000000
->> REGION[2] = 0x90000000
->> REGION[3] = 0x98000000
->> REGION[4] = 0x0
->>
->> (This map means 1:1 identity for DRAM addresses.)
->>
->> Thus when a device writes to 0xa002e07c (region 4)
->> the write is forwarded to 0x2e07c.
-> 
-> But how do you find out about the 0xa0000000 offset? You must make sure
-> that the provided address is outside of RAM, should you end-up on a
-> system more than 1GB of RAM.
+>> Regarding making changes to the PM core and adding more flags to the
+>> dev_pm_info etc, I am not sure we really want that. Isn't it already
+>> complex enough?
+>
+> Maybe it is.
+>
+>> My point is, that I am trying to improve the behavior of the ACPI PM
+>> domain by enabling the runtime PM centric path for it, and even if
+>> there is something similar that could be done for PCI, I don't think
+>> we should need involvement by the PM core.
+>
+> Well, this generally simply doesn't work.
+>
+> The whole "runtime PM centric approach" idea is generally fine by me,
+> but the fact today is that there are drivers not ready for it.  Which
+> is why there is the direct_complete thing (it may be regarded as a
+> sort-of workaround for the unreadiness of drivers if you will).
 
-You're right, I've swept this issue under the rug so far.
+This is how I see it:
 
-The boards typically come with either
-- two 512MB DIMMs
-- two 1GB DIMMs
-(there may be other setups I'm not aware of, e.g. with
-a single memory module).
+The runtime PM centric path is being widely deployed, however it takes
+time to convert drivers.
 
-In the DT for my dev board, I describe *all* of the RAM.
+The direct_complete path offers a great intermediate step for the ACPI
+PM domain as it affects all its devices - while we wait for further
+optimizations being deployed using the runtime PM centric path.
 
-	memory at 80000000 {
-		device_type = "memory";
-		reg = <0x80000000 0x80000000>; /* 2 GB */
-	};
+>
+> Now, buy adding the no_direct_complete flag just to the ACPI PM domain
+> you basically overlook the fact that this potentially affects the parents
+> of the devices in question by preventing direct_complete from being set
+> for them.  And those parents may not be in the ACPI PM domain in principle,
+> so the problem needs to be addressed in the core.
 
-But actually, Linux is only given to manage a fraction
-of this memory, as some of it is for other processors
-and DSPs, and a large part is for video decoder buffers.
+Okay, let's move the flag to the dev_pm* structures, to not limit this
+to the ACPI PM domain.
 
-In the end, Linux manages, typically
-128MB, 256MB, 512MB, 2x128MB, or 2x256MB
-(there may be other setups I'm not aware of)
-And the actual config is passed to Linux through
-a mem= command-line directive.
+However in the current approach taken in this series, as it's coded as
+opt-in to use for drivers, I am questioning how big of a problem
+parent devices not being able to use the direct_complete path could
+be!?
+Couldn't it be good enough to just adopt the behavior of the ACPI PM
+domain and more or less leave the core out of it - at least for now!?
 
-It is not clear to me, as I discussed with Ard, how the
-Linux driver is supposed to make this all work.
+I am also thinking, that for those parent devices that potentially may
+suffer from not be able to use the direct_complete path, those can be
+fixed by deploying the runtime PM centric path in their
+subsystems/drivers. That would even mean that the parent devices get
+the additional benefits that the runtime PM centric path offers. So,
+in the end we would end up having a better optimized solution than we
+had before.
 
-Maybe I can have some platform code that walks the
-different RAM areas available to Linux, and sets up
-the appropriate physical-to-dma mappings?
+What do you think?
 
-Regards.
+Kind regards
+Uffe
