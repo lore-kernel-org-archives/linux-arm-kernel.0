@@ -1,27 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Aug 2017 13:28:00 -0500
-Subject: [PATCH v2 3/3] ARM: sunxi: add support for R40 SoC
-In-Reply-To: <20170822052322.15338-3-icenowy@aosc.io>
-References: <20170822052322.15338-1-icenowy@aosc.io>
- <20170822052322.15338-3-icenowy@aosc.io>
-Message-ID: <20170825182800.in2ljipod5nox5we@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Aug 2017 21:12:17 +0200
+Subject: [PATCH 4/4] net: stmmac: sun8i: Remove the compatibles
+In-Reply-To: <20170825191217.10278-1-maxime.ripard@free-electrons.com>
+References: <20170825191217.10278-1-maxime.ripard@free-electrons.com>
+Message-ID: <20170825191217.10278-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 01:23:22PM +0800, Icenowy Zheng wrote:
-> Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
-> like A20.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v2:
-> - Fix alphabetical orders.
-> 
->  Documentation/arm/sunxi/README                  | 6 ++++++
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->  3 files changed, 8 insertions(+)
+Since the bindings have been controversial, and we follow the DT stable ABI
+rule, we shouldn't let a driver with a DT binding that might change slip
+through in a stable release.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Remove the compatibles to make sure the driver will not probe and no-one
+will start using the binding currently implemented. This commit will
+obviously need to be reverted in due time.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+index fffd6d5fc907..39c2122a4f26 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -979,14 +979,6 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id sun8i_dwmac_match[] = {
+-	{ .compatible = "allwinner,sun8i-h3-emac",
+-		.data = &emac_variant_h3 },
+-	{ .compatible = "allwinner,sun8i-v3s-emac",
+-		.data = &emac_variant_v3s },
+-	{ .compatible = "allwinner,sun8i-a83t-emac",
+-		.data = &emac_variant_a83t },
+-	{ .compatible = "allwinner,sun50i-a64-emac",
+-		.data = &emac_variant_a64 },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_dwmac_match);
+-- 
+2.13.5
