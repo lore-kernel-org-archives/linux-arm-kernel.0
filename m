@@ -1,30 +1,39 @@
-From: mickael.guene@st.com (Mickael GUENE)
-Date: Fri, 25 Aug 2017 14:27:46 +0000
-Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
-In-Reply-To: <20170817083716.GN20805@n2100.armlinux.org.uk>
-References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
- <20170817083716.GN20805@n2100.armlinux.org.uk>
-Message-ID: <e181fb7b-3ef5-9f22-0aa5-c25e280a3fd8@st.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 25 Aug 2017 16:31:06 +0200
+Subject: [PATCH v4 4/4] ARM: configs: stm32: Add MDMA support in STM32
+ defconfig
+In-Reply-To: <1503671466-32029-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1503671466-32029-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1503671466-32029-5-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Mickael GUENE <mickael.guene@st.com> for the whole patch series.
+This patch adds MDMA support in STM32 defconfig file
 
-Thanks to you Nicolas for your upstreaming efforts.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+ Version history:
+    v4:
+    v3:
+        * None
+    v2:
+        * Add MDMA support in STM32 defconfig
+---
+---
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Regards
-Mickael
-
-On 08/17/2017 10:37 AM, Russell King - ARM Linux wrote:
-> On Thu, Aug 17, 2017 at 03:23:39AM -0400, Nicolas Pitre wrote:
->> This series provides the needed changes to suport the ELF_FDPIC binary
->> format on ARM. Both MMU and non-MMU systems are supported. This format
->> has many advantages over the BFLT format used on MMU-less systems, such
->> as being real ELF that can be parsed by standard tools, can support
->> shared dynamic libs, etc.
-> 
-> I don't see anything issues from the core arch point of view with this,
-> most of it looks straight forward, and the impact on existing users
-> should be low.  However, it would be nice to get some acks (if possible)
-> for the non-arch stuff and some tested-by's on this.
-> 
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 90e5c46..dd8919b 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_STM32=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
++CONFIG_STM32_MDMA=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
+-- 
+2.7.4
