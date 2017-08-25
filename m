@@ -1,66 +1,92 @@
 From: florent.revest@arm.com (Florent Revest)
-Date: Fri, 25 Aug 2017 09:31:36 +0100
-Subject: [RFC 06/11] KVM, arm64: Expose a VCPU initialization function
+Date: Fri, 25 Aug 2017 09:31:37 +0100
+Subject: [RFC 07/11] KVM: Allow initialization before the module target
 In-Reply-To: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
 References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-Message-ID: <1503649901-5834-7-git-send-email-florent.revest@arm.com>
+Message-ID: <1503649901-5834-8-git-send-email-florent.revest@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM's core now offers internal virtual machine capabilities, however on ARM
-the KVM_ARM_VCPU_INIT ioctl also has to be used to initialize a virtual CPU
+The kvm_init function has been designed to be executed during the
+module_init target. It requires a struct module pointer to be used as
+the owner of the /dev/* files and also tries to register /dev/kvm with a
+function (misc_register) that can only be used late in the boot process.
 
-This patch exposes a kvm_arm_vcpu_init() function to the rest of the kernel
-on arm64 so that it can be used for arm64 internal VM initialization.
+This patch modifies kvm_init to execute this late initialization code
+conditionally, only in the context of a module_init. It also offers a
+kvm_set_module function to be used for /dev/kvm registration and device
+files owning once the module target is reached.
 
-This function actually used to be named kvm_arch_vcpu_ioctl_vcpu_init() but
-the "ioctl" part of the name wasn't consistent with the rest of the KVM arm
-ioctl handlers. Moreover, it wasn't relevant to the usage of internal VMs.
-Therefore it has been decided to rename the function to make it less
-misleading.
+As is, this patch does not change anything. However it could be used by
+certain architectures to initialize the core of kvm earlier in the boot
+(e.g: in a subsys_initcall) and then initialize the userspace facing files
+in a module_init target. This can be useful to create internal VMs before
+being able to offer the userspace APIs.
 
 Signed-off-by: Florent Revest <florent.revest@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 2 ++
- virt/kvm/arm/arm.c                | 5 ++---
- 2 files changed, 4 insertions(+), 3 deletions(-)
+ include/linux/kvm_host.h |  1 +
+ virt/kvm/kvm_main.c      | 28 ++++++++++++++++++++--------
+ 2 files changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 65aab35..07b7460 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -372,6 +372,8 @@ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index dd10d3b..15a0a8d 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -563,6 +563,7 @@ static inline void kvm_irqfd_exit(void)
+ #endif
+ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
+                  struct module *module);
++int kvm_set_module(struct module *module);
+ void kvm_exit(void);
 
-+int kvm_arm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm_vcpu_init *init);
-+
- void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a39a1e1..aa29a5d 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -888,8 +888,7 @@ static int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
- }
+ struct kvm *kvm_create_internal_vm(unsigned long type);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index c1c8bb6..3c9cb00 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -4086,14 +4086,10 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
+        if (r)
+                goto out_free;
 
-
--static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
--                                        struct kvm_vcpu_init *init)
-+int kvm_arm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm_vcpu_init *init)
- {
-        int ret;
-
-@@ -973,7 +972,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-                if (copy_from_user(&init, argp, sizeof(init)))
-                        return -EFAULT;
-
--               return kvm_arch_vcpu_ioctl_vcpu_init(vcpu, &init);
-+               return kvm_arm_vcpu_init(vcpu, &init);
+-       kvm_chardev_ops.owner = module;
+-       kvm_vm_fops.owner = module;
+-       kvm_vcpu_fops.owner = module;
+-
+-       r = misc_register(&kvm_dev);
+-       if (r) {
+-               pr_err("kvm: misc device register failed\n");
+-               goto out_unreg;
++       if (module) {
++               r = kvm_set_module(module);
++               if (r)
++                       goto out_unreg;
         }
-        case KVM_SET_ONE_REG:
-        case KVM_GET_ONE_REG: {
+
+        register_syscore_ops(&kvm_syscore_ops);
+@@ -4136,6 +4132,22 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
+ }
+ EXPORT_SYMBOL_GPL(kvm_init);
+
++int kvm_set_module(struct module *module)
++{
++       int r;
++
++       kvm_chardev_ops.owner = module;
++       kvm_vm_fops.owner = module;
++       kvm_vcpu_fops.owner = module;
++
++       r = misc_register(&kvm_dev);
++       if (r)
++               pr_err("kvm: misc device register failed\n");
++
++       return r;
++}
++EXPORT_SYMBOL_GPL(kvm_set_module);
++
+ void kvm_exit(void)
+ {
+        debugfs_remove_recursive(kvm_debugfs_dir);
 --
 1.9.1
 
