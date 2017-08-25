@@ -1,65 +1,66 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Fri, 25 Aug 2017 14:32:30 +0800
-Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
- mtk-pmic-keys
+Date: Fri, 25 Aug 2017 14:32:33 +0800
+Subject: [PATCH v3 5/5] mfd: mt6397: Add PMIC keys support to MT6397 driver
 In-Reply-To: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
 References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1503642753-12385-6-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree binding documentation for the MediaTek
-pmic keys found on PMIC MT6397/MT6323.
+This patch adds compatible strings and interrupts for pmic keys
+which serves as child device of MFD.
 
 Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 ---
- .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+ drivers/mfd/mt6397-core.c |   22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-new file mode 100644
-index 0000000..100ec44
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-@@ -0,0 +1,38 @@
-+MediaTek MT6397/MT6323 PMIC Keys Device Driver
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 6546d7f..77b64bd 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -43,6 +43,16 @@
+ 	},
+ };
+ 
++static const struct resource mt6323_keys_resources[] = {
++	DEFINE_RES_IRQ(MT6323_IRQ_STATUS_PWRKEY),
++	DEFINE_RES_IRQ(MT6323_IRQ_STATUS_FCHRKEY),
++};
 +
-+There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
-+and homekey. The key functions are defined as the subnode of the function
-+node provided by MT6397/MT6323 PMIC that is being defined as one kind
-+of Muti-Function Device (MFD)
++static const struct resource mt6397_keys_resources[] = {
++	DEFINE_RES_IRQ(MT6397_IRQ_PWRKEY),
++	DEFINE_RES_IRQ(MT6397_IRQ_HOMEKEY),
++};
 +
-+For MT6397/MT6323 MFD bindings see:
-+Documentation/devicetree/bindings/mfd/mt6397.txt
-+
-+Required properties:
-+- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-+- linux,keycodes: Specifies the numeric keycode values to
-+	be used for reporting keys presses. The array can
-+	contain up to 2 entries.
-+
-+Optional Properties:
-+- wakeup-source: each key can be used as a wakeup source.
-+- mediatek,long-press-mode: Long press key shutdown setting, 1 for
-+	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
-+- debounce-interval: Long press key shutdown debouncing interval time
-+	in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
-+
-+Example:
-+
-+	pmic: mt6397 {
-+		compatible = "mediatek,mt6397";
-+
-+		...
-+
-+		mt6397keys: mt6397keys {
-+			compatible = "mediatek,mt6397-keys";
-+			linux,keycodes = <KEY_POWER>, <KEY_VOLUMEDOWN>;
-+			wakeup-source = <1>, <0>;
-+			mediatek,long-press-mode = <1>;
-+			debounce-interval = <0>;
-+		};
-+	};
+ static const struct mfd_cell mt6323_devs[] = {
+ 	{
+ 		.name = "mt6323-regulator",
+@@ -50,6 +60,11 @@
+ 	}, {
+ 		.name = "mt6323-led",
+ 		.of_compatible = "mediatek,mt6323-led"
++	}, {
++		.name = "mtk-pmic-keys",
++		.num_resources = ARRAY_SIZE(mt6323_keys_resources),
++		.resources = mt6323_keys_resources,
++		.of_compatible = "mediatek,mt6323-keys"
+ 	},
+ };
+ 
+@@ -71,7 +86,12 @@
+ 	}, {
+ 		.name = "mt6397-pinctrl",
+ 		.of_compatible = "mediatek,mt6397-pinctrl",
+-	},
++	}, {
++		.name = "mtk-pmic-keys",
++		.num_resources = ARRAY_SIZE(mt6397_keys_resources),
++		.resources = mt6397_keys_resources,
++		.of_compatible = "mediatek,mt6397-keys"
++	}
+ };
+ 
+ static void mt6397_irq_lock(struct irq_data *data)
 -- 
 1.7.9.5
