@@ -1,43 +1,57 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 25 Aug 2017 14:13:53 +0800
-Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
-In-Reply-To: <20170825020348.GA7308@akashi-kouhiroshi-no-MacBook-Air.local>
-References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-15-takahiro.akashi@linaro.org>
- <20170824173049.GG29665@leverpostej>
- <20170825020348.GA7308@akashi-kouhiroshi-no-MacBook-Air.local>
-Message-ID: <20170825061353.GB8604@dhcp-128-65.nay.redhat.com>
+From: mickael.guene@st.com (Mickael GUENE)
+Date: Fri, 25 Aug 2017 06:23:44 +0000
+Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
+In-Reply-To: <alpine.LFD.2.20.1708241114090.14288@knanqh.ubzr>
+References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
+ <20170817083716.GN20805@n2100.armlinux.org.uk>
+ <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
+ <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
+ <alpine.LFD.2.20.1708240834210.14288@knanqh.ubzr>
+ <770523b1-49f6-2033-ff68-027dae1d53fc@st.com>
+ <alpine.LFD.2.20.1708241114090.14288@knanqh.ubzr>
+Message-ID: <dcc24d72-c081-c1b6-3677-37087f715837@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/17 at 11:03am, AKASHI Takahiro wrote:
-> On Thu, Aug 24, 2017 at 06:30:50PM +0100, Mark Rutland wrote:
-> > On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
-> > > The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
-> > > will be loaded at the offset of TEXT_OFFSET from the begining of system
-> > > memory. The other PT_LOAD segments are placed relative to the first one.
-> > 
-> > I really don't like assuming things about the vmlinux ELF file.
-> 
-> If so, vmlinux is not an appropriate format for loading.
-> 
-> > > Regarding kernel verification, since there is no standard way to contain
-> > > a signature within elf binary, we follow PowerPC's (not yet upstreamed)
-> > > approach, that is, appending a signature right after the kernel binary
-> > > itself like module signing.
-> > 
-> > I also *really* don't like this. It's a bizarre in-band mechanism,
-> > without explcit information. It's not a nice ABI.
-> > 
-> > If we can load an Image, why do we need to be able to load a vmlinux?
-> 
-> Well, kexec-tools does. I don't know why Geoff wanted to support vmlinux.
-> I'm just trying to support what kexec-tools does support.
+Hi Nicolas,
 
-We only add things when it is really necessary, kexec-tools
-functionalities should have some historic reasons.
+  Thanks for explanation.
 
-If only for doing kexec-tools has done I would say just not to do it.
+Regards
+Mickael
 
-Thanks
-Dave
+On 08/24/2017 05:48 PM, Nicolas Pitre wrote:
+> On Thu, 24 Aug 2017, Mickael GUENE wrote:
+> 
+>> Hi Nicolas,
+>>
+>>> The first one is.
+>>    It also seems to me that 'Add tls support for cortex-m cpu family'
+>> patch is missing. There is the one that add the get_tls syscall but
+>> not this one which enable usage for cortex-m family.
+> 
+> The patch titled "Add tls support for cortex-m cpu family" in your
+> repository does 3 things:
+> 
+> - It defines switch_tls to switch_tls_none. Without the patch the
+>    default is switch_tls_software. But this has no purpose as on Cortex-M
+>    targets there is simply no switch_tls usage at all. The switch_tls
+>    macro is invoked in entry-armv.S within __switch_to whereas Cortex-M
+>    uses a different implementation of __switch_to in entry-v7m.S.
+> 
+> - The patch also defines has_tls_reg to 0. That's the same as de default
+>    without the patch.
+> 
+> - It also defines tls_emu to 1. That makes no sense as this is for ARMv6
+>    that lack the dedicated CP15 register and is completely wrong for
+>    Cortex-M. I suspect the actual reason for defining this to 1 was a
+>    dubious workaround to prevent set_tls() from storing the TLS value at
+>    the absolute address 0xffff0ff0. In recent kernels that particular
+>    code is properly conditioned on CONFIG_KUSER_HELPERS instead.
+> 
+> So in the current mainline kernel this patch is useless. This is why I
+> didn't consider it.
+> 
+> 
+> Nicolas
+> 
