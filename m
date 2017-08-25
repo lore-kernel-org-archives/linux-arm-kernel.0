@@ -1,27 +1,35 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Fri, 25 Aug 2017 08:49:55 +0800
-Subject: [PATCH v4 0/4] PCI: rockchip: Move PCIE_WAKE handling into
- rockchip pcie driver
-In-Reply-To: <20170824165505.GM31858@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
- <20170824165505.GM31858@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <599F7433.4070606@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 25 Aug 2017 09:50:07 +0900
+Subject: [PATCH 03/14] resource: add walk_system_ram_res_rev()
+In-Reply-To: <CAKv+Gu_UfeDf13RPUejVqz0y=QjSCGhPn6fTTCyLWHY=iu-4BA@mail.gmail.com>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-4-takahiro.akashi@linaro.org>
+ <CAKv+Gu_UfeDf13RPUejVqz0y=QjSCGhPn6fTTCyLWHY=iu-4BA@mail.gmail.com>
+Message-ID: <20170825005006.GB6434@akashi-kouhiroshi-no-MacBook-Air.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Thu, Aug 24, 2017 at 10:06:28AM +0100, Ard Biesheuvel wrote:
+> On 24 August 2017 at 09:18, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> > +       /* create a list */
+> > +       rams = vmalloc(sizeof(struct resource) * count);
+> > +       if (!rams)
+> > +               return ret;
+> > +
+> > +       res.start = start;
+> > +       res.end = end;
+> > +       res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> > +       orig_end = res.end;
+> > +       i = 0;
+> > +       while ((res.start < res.end) &&
+> > +               (!find_next_iomem_res(&res, IORES_DESC_NONE, true))) {
+> > +               if (i >= count) {
+> > +                       /* unlikely but */
+> > +                       vfree(rams);
+> > +                       count += 16;
+> 
+> If the count is likely to be < 16, why are we using vmalloc() here?
 
-On 08/25/2017 12:55 AM, Bjorn Helgaas wrote:
-> Looking for acks from Shawn and Rob...
->
-> And I'm not sure about the DT wake IRQ description.  That seems like it
-> could potentially be generic than this Rockchip-specific proposal.
->
->
-it looks like shawn already take the error handling patch into his 
-series, so i'll remove that one in my next version.
+Ah, you're right :)
 
-i'll wait for those error handling patches to land, then rebase and 
-resend this wake irq patches, thanks:)
-
->
+-Takahiro AKASHI
