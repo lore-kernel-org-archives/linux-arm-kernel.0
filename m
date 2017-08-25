@@ -1,67 +1,66 @@
 From: florent.revest@arm.com (Florent Revest)
-Date: Fri, 25 Aug 2017 09:31:35 +0100
-Subject: [RFC 05/11] KVM: Expose VM/VCPU creation functions
+Date: Fri, 25 Aug 2017 09:31:36 +0100
+Subject: [RFC 06/11] KVM, arm64: Expose a VCPU initialization function
 In-Reply-To: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
 References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-Message-ID: <1503649901-5834-6-git-send-email-florent.revest@arm.com>
+Message-ID: <1503649901-5834-7-git-send-email-florent.revest@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that KVM is capable of creating internal virtual machines, the rest of
-the kernel needs an API to access this capability.
+KVM's core now offers internal virtual machine capabilities, however on ARM
+the KVM_ARM_VCPU_INIT ioctl also has to be used to initialize a virtual CPU
 
-This patch exposes two functions for VMs and VCPUs creation in kvm_host.h:
- - kvm_create_internal_vm: ensures that kvm->mm is kept NULL at VM creation
- - kvm_vm_create_vcpu: simple alias of kvm_vm_ioctl_create_vcpu for clarity
+This patch exposes a kvm_arm_vcpu_init() function to the rest of the kernel
+on arm64 so that it can be used for arm64 internal VM initialization.
+
+This function actually used to be named kvm_arch_vcpu_ioctl_vcpu_init() but
+the "ioctl" part of the name wasn't consistent with the rest of the KVM arm
+ioctl handlers. Moreover, it wasn't relevant to the usage of internal VMs.
+Therefore it has been decided to rename the function to make it less
+misleading.
 
 Signed-off-by: Florent Revest <florent.revest@arm.com>
 ---
- include/linux/kvm_host.h |  3 +++
- virt/kvm/kvm_main.c      | 10 ++++++++++
- 2 files changed, 13 insertions(+)
+ arch/arm64/include/asm/kvm_host.h | 2 ++
+ virt/kvm/arm/arm.c                | 5 ++---
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 21a6fd6..dd10d3b 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -565,6 +565,9 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
-                  struct module *module);
- void kvm_exit(void);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 65aab35..07b7460 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -372,6 +372,8 @@ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+ static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
 
-+struct kvm *kvm_create_internal_vm(unsigned long type);
-+int kvm_vm_create_vcpu(struct kvm *kvm, u32 id);
++int kvm_arm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm_vcpu_init *init);
 +
- void kvm_get_kvm(struct kvm *kvm);
- void kvm_put_kvm(struct kvm *kvm);
-
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 2e7af1a..c1c8bb6 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -733,6 +733,11 @@ static struct kvm *kvm_create_vm(unsigned long type, struct mm_struct *mm)
-        return ERR_PTR(r);
+ void kvm_arm_init_debug(void);
+ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index a39a1e1..aa29a5d 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -888,8 +888,7 @@ static int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
  }
 
-+struct kvm *kvm_create_internal_vm(unsigned long type)
-+{
-+       return kvm_create_vm(type, NULL);
-+}
-+
- static void kvm_destroy_devices(struct kvm *kvm)
- {
-        struct kvm_device *dev, *tmp;
-@@ -2549,6 +2554,11 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
-        return r;
- }
 
-+int kvm_vm_create_vcpu(struct kvm *kvm, u32 id)
-+{
-+       return kvm_vm_ioctl_create_vcpu(kvm, id);
-+}
-+
- static int kvm_vcpu_ioctl_set_sigmask(struct kvm_vcpu *vcpu, sigset_t *sigset)
+-static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+-                                        struct kvm_vcpu_init *init)
++int kvm_arm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm_vcpu_init *init)
  {
-        if (sigset) {
+        int ret;
+
+@@ -973,7 +972,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+                if (copy_from_user(&init, argp, sizeof(init)))
+                        return -EFAULT;
+
+-               return kvm_arch_vcpu_ioctl_vcpu_init(vcpu, &init);
++               return kvm_arm_vcpu_init(vcpu, &init);
+        }
+        case KVM_SET_ONE_REG:
+        case KVM_GET_ONE_REG: {
 --
 1.9.1
 
