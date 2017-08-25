@@ -1,109 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Aug 2017 15:41:14 +0200
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170823103216.e43283308c195c4a80d929fa@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20170728160233.xooevio4hoqkgfaq@flea.lan>
- <20170731111640.d5a8e580a48183cfce85943d@magewell.com>
- <20170822174339.6woauylgzkgqxygk@flea.lan>
- <20170823103216.e43283308c195c4a80d929fa@magewell.com>
-Message-ID: <20170825134114.rwttrmzw5gbtwdx2@flea.lan>
+Date: Fri, 25 Aug 2017 15:48:44 +0200
+Subject: [PATCH 1/3] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for use
+ with LAN8710
+In-Reply-To: <447ade4b-c4ed-5b51-7a43-6972b276e553@gmail.com>
+References: <20170822114313.9038-1-stefan@olimex.com>
+ <20170822114313.9038-2-stefan@olimex.com>
+ <20170822203157.mvnx224l546vamah@flea.home>
+ <CAK17dA+xsYfBWZi=sE+aNchEBzwoXXisKr=C9O5vN-O0x4vvww@mail.gmail.com>
+ <20170823143018.trug6jmuxkoehoou@flea.home>
+ <447ade4b-c4ed-5b51-7a43-6972b276e553@gmail.com>
+Message-ID: <20170825134844.7vz3pdloagmgegcw@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Stefan,
 
-On Wed, Aug 23, 2017 at 10:32:16AM +0800, Yong wrote:
-> > > > > +static int sun6i_graph_notify_complete(struct v4l2_async_notifier *notifier)
-> > > > > +{
-> > > > > +	struct sun6i_csi *csi =
-> > > > > +			container_of(notifier, struct sun6i_csi, notifier);
-> > > > > +	struct sun6i_graph_entity *entity;
-> > > > > +	int ret;
-> > > > > +
-> > > > > +	dev_dbg(csi->dev, "notify complete, all subdevs registered\n");
-> > > > > +
-> > > > > +	/* Create links for every entity. */
-> > > > > +	list_for_each_entry(entity, &csi->entities, list) {
-> > > > > +		ret = sun6i_graph_build_one(csi, entity);
-> > > > > +		if (ret < 0)
-> > > > > +			return ret;
-> > > > > +	}
-> > > > > +
-> > > > > +	/* Create links for video node. */
-> > > > > +	ret = sun6i_graph_build_video(csi);
-> > > > > +	if (ret < 0)
-> > > > > +		return ret;
-> > > > 
-> > > > Can you elaborate a bit on the difference between a node parsed with
-> > > > _graph_build_one and _graph_build_video? Can't you just store the
-> > > > remote sensor when you build the notifier, and reuse it here?
-> > > 
-> > > There maybe many usercases:
-> > > 1. CSI->Sensor.
-> > > 2. CSI->MIPI->Sensor.
-> > > 3. CSI->FPGA->Sensor1
-> > >             ->Sensor2.
-> > > FPGA maybe some other video processor. FPGA, MIPI, Sensor can be
-> > > registered as v4l2 subdevs. We do not care about the driver code
-> > > of them. But they should be linked together here.
-> > > 
-> > > So, the _graph_build_one is used to link CSI port and subdevs. 
-> > > _graph_build_video is used to link CSI port and video node.
-> > 
-> > So the graph_build_one is for the two first cases, and the
-> > _build_video for the latter case?
-> 
-> No. 
-> The _graph_build_one is used to link the subdevs found in the device 
-> tree. _build_video is used to link the closest subdev to video node.
-> Video node is created in the driver, so the method to get it's pad is
-> diffrent to the subdevs.
+Please keep all the recipients in Cc.
 
-Sorry for being slow here, I'm still not sure I get it.
+On Thu, Aug 24, 2017 at 08:24:05AM +0300, Stefan Mavrodiev wrote:
+> On 08/23/2017 05:30 PM, Maxime Ripard wrote:
+> > On Tue, Aug 22, 2017 at 11:58:19PM +0300, Stefan Mavrodiev wrote:
+> > > As I can see, if GMAC is used, this function is GNULL - same as PA14
+> > > and PA9. I don't think that it's controlled by GMAC.
+> >
+> > Do you know if in such a case the level is properly asserted?
+>
+> I've checked the level with oscilloscope.
 
-In summary, both the sun6i_graph_build_one and sun6i_graph_build_video
-will iterate over each endpoint, will retrieve the remote entity, and
-will create the media link between the CSI pad and the remote pad.
+With the pin function set to GMAC? What was the outcome?
 
-As far as I can see, there's basically two things that
-sun6i_graph_build_one does that sun6i_graph_build_video doesn't:
-  - It skips all the links that would connect to one of the CSI sinks
-  - It skips all the links that would connect to a remote node that is
-    equal to the CSI node.
+> However, I've fixed the patch replacing GMAC node with EMAC and
+> setting PA17 as "emac" function. This way the PHY is working
+> correctly. Since it's 100T can I do this or there is particular
+> reason for using GMAC over EMAC?
 
-I assume the latter is because you want to avoid going in an infinite
-loop when you would follow one of the CSI endpoint (going to the
-sensor), and then follow back the same link in the opposite
-direction. Right?
+In general, the GMAC driver has more features and is better maintained
+than the EMAC one, so even it wouldn't change much in our case, it'd
+be better to stick to the GMAC.
 
-I'm confused about the first one though. All the pads you create in
-your driver are sink pads, so wouldn't that skip all the pads of the
-CSI nodes?
-
-Also, why do you iterate on all the CSI endpoints, when there's only
-of them? You want to anticipate the future binding for devices with
-multiple channels?
-
-> > 
-> > If so, you should take a look at the last iteration of the
-> > subnotifiers rework by Nikas S?derlund (v4l2-async: add subnotifier
-> > registration for subdevices).
-> > 
-> > It allows subdevs to register notifiers, and you don't have to build
-> > the graph from the video device, each device and subdev can only care
-> > about what's next in the pipeline, but not really what's behind it.
-> > 
-> > That would mean in your case that you can only deal with your single
-> > CSI pad, and whatever subdev driver will use it care about its own.
-> 
-> Do you mean the subdevs create pad link in the notifier registered by
-> themself ?
-
-Yes.
-
-Thanks!
 Maxime
 
 -- 
@@ -116,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/87e9c2b5/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/541a6f3d/attachment.sig>
