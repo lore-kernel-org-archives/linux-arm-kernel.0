@@ -1,30 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Aug 2017 01:10:34 +0200
-Subject: [PATCH 2/2] drivers: net: xgene: Clean up all outstanding tx
- descriptors
-In-Reply-To: <1503699810-12803-3-git-send-email-isubramanian@apm.com>
-References: <1503699810-12803-1-git-send-email-isubramanian@apm.com>
- <1503699810-12803-3-git-send-email-isubramanian@apm.com>
-Message-ID: <20170825231034.GC4207@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 25 Aug 2017 16:28:46 -0700
+Subject: [PATCH 04/11] watchdog: ftwdt010: Add clock support
+In-Reply-To: <CACRpkdYcEbWkHdgxA-3=6JiZTxecQcTYgqx4xDH23=NxF8zg_Q@mail.gmail.com>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-5-linus.walleij@linaro.org>
+ <20170814160536.GC7025@roeck-us.net>
+ <CACRpkdYcEbWkHdgxA-3=6JiZTxecQcTYgqx4xDH23=NxF8zg_Q@mail.gmail.com>
+Message-ID: <20170825232846.GR21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 03:23:30PM -0700, Iyappan Subramanian wrote:
-> When xgene_enet is rmmod'd and there are still outstanding tx descriptors
-> that have been setup but have not completed, it is possible on the next
-> modprobe of the driver to receive the oldest of such tx descriptors. This
-> results in a kernel NULL pointer dereference.
+On 08/24, Linus Walleij wrote:
+> On Mon, Aug 14, 2017 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 > 
-> This patch attempts to clean up (by tearing down) all outstanding tx
-> descriptors when the xgene_enet driver is being rmmod'd.
+> > Side note: Maybe we _should_ introduce devm_watchdog_clk_prepare_enable()
+> > since this problem affects several watchdog drivers.
 > 
-> Given that, on the next modprobe it should be safe to ignore any such tx
-> descriptors received that map to a NULL skb pointer.
+> Hmmmmmmmmm a special watchdog primitive may be apropriate.
+> Dunno what the clk maintainers think?
+> 
+> Stephen/Mike: do you like that or would you rather see a primitive
+> inside the clock subsystem for this?
+> 
 
-This does not sound correct. Before the module is allowed to be
-removed, everything needs to be finished. You need to wait for all the
-tx descriptors to be returned before unloading. How can you free the
-memory for the descriptor if it is still in use? How can you free the
-skbuf the descriptor points to, if it is still in use... 
+devm_clk_prepare_enable() was already proposed and then the
+thread went quiet. Re-kickstart it?
 
-      Andrew
+I'd still prefer we just disable clks on clk_put(), but Russell
+said we needed to fix all non-common clk implementations of the
+clk API to do that and then I forgot about the topic (so
+anti-climatic). I'm pretty much OK with us merging the temporary
+solution. We can churn again later and remove it all once we
+convert everything into one CCF.
+
+I'd prefer we also change common clk framework to actually do the
+disable on put though so we flush out any issues early. If the
+two things are packaged together I would be ultra happy. It's not
+like people are going to convert to CCF just so they can get clk
+disable on clk_put() as a feature, but at least we can have it as
+a feature.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
