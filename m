@@ -1,25 +1,185 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 25 Aug 2017 11:35:41 +0200
-Subject: [PATCH v2 3/3] arm64: dts: rockchip: add cpu regulator for rk3328
- evaluation board
-In-Reply-To: <1503542223-21044-4-git-send-email-cl@rock-chips.com>
-References: <1503542223-21044-1-git-send-email-cl@rock-chips.com>
- <1503542223-21044-4-git-send-email-cl@rock-chips.com>
-Message-ID: <3733498.rByIbfHvAf@phil>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 25 Aug 2017 11:28:25 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
+ direct_complete for ACPI devices
+In-Reply-To: <12333551.k204JYSgao@aspire.rjw.lan>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <1726767.L8TO24juDO@aspire.rjw.lan>
+ <CAPDyKFrj6RdsG4Qf847OvLQMgqHeyh1=YyeKZMeaGgQ2du3cNA@mail.gmail.com>
+ <12333551.k204JYSgao@aspire.rjw.lan>
+Message-ID: <CAPDyKFrFUgE0FJE==ht4Z5utj+Pht=9UGn-LYBR9hP4ncofreg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. August 2017, 10:37:03 CEST schrieb cl at rock-chips.com:
-> From: Liang Chen <cl@rock-chips.com>
-> 
-> RK3328 Evaluation Board use rk805 pmic, and one of the DCDCs in
-> rk805 is for cpu regulator, assign the cpu regulator, so the
-> cpufreq can work fine.
-> 
-> Signed-off-by: Liang Chen <cl@rock-chips.com>
+[...]
 
-applied ... but I cannot say if it will still be eligible for 4.14
-(late in the cycle). If necessary I'll move it forward a release.
+>>
+>> The above change would offer an improvement, however there are more
+>> benefits from the runtime PM centric path that it doesn't cover.
+>
+> The idea, though, is not to make it instead of, but in addition to the
+> runtime PM centric path.
+>
+> So a driver using the runtime PM centric (or rather runtime PM aware)
+> callbacks can set power.force_suspend and benefit from having direct_complete
+> set conditional on whether or not the device is runtime resumed before the
+> late suspend.
+>
+> If device_complete remains set in __device_suspend_late(), no system
+> suspend/resume callbacks will be invoked from that point on.  If it isn't
+> set, pm_runtime_force_suspend() should work just fine and then
+> pm_runtime_force_resume() should do the right thing on the way back.
+>
+> All boils down to (a) setting a flag and (b) using the right callbacks
+> for system suspend which is the case with your patches either.
 
-Thanks
-Heiko
+You make it sound simple. :-)
+
+I try to get inspired of your ideas and see what I can come up with.
+However, I really want us to avoid making it more difficult to
+understand the behavior of the core, so I probably look start changing
+the ACPI PM domain first, then trying to adopt the behavior of the
+core on top of those changes. Does that sound reasonable to you?
+
+>
+>> The below is pasted from the changelog for patch9 (I will make sure to
+>> fold in this in the changelog for $subject patch next version).
+>>
+>> In case the device is/gets runtime resumed before the device_suspend()
+>> phase is entered, the PM core doesn't run the direct_complete path for
+>> the device during system sleep. During system resume, this lead to
+>> that the device will always be brought back to full power when the
+>> i2c-dw-plat driver's ->resume() callback is invoked. This may not be
+>> necessary, thus increasing the resume time for the device and wasting
+>> power.
+>
+> Well, I guess that depends on what is there in its resume callbacks.
+>
+>> In the runtime PM centric path, the pm_runtime_force_resume() helper
+>> takes better care, as it resumes the device only in case it's really
+>> needed. Normally this means it can be postponed to be dealt with via
+>> regular calls to runtime PM (pm_runtime_get*()) instead. In other
+>> words, the device remains in its low power state until someone request
+>> a new i2c transfer, whenever that may be.
+>>
+>> As far as I can think of, the direct_complete path can't be adjusted
+>> to support this. Or can it?
+>
+> It surely can, it's just software. :-)  The question is how complicated that
+> is going to be in the end, however.
+>
+> So the patch I sent didn't address the dependency issue, but it allows the
+> core to deal with the issue which is a core issue, not an ACPI PM domain
+> issue, because the core disables runtime PM for devices with direct_complete
+> set, not the ACPI PM domain or PCI etc.
+>
+> [BTW, it is not entirely clear to me why it ever is necessary to runtime resume
+> a device with direct_complete set after __device_suspend(), because it can only
+> have direct_complete set at that point if all of the hierarchy below it has
+> this flag set too and so runtime PM has to be disabled for all of those
+> devices as well.]
+>
+> It can be made slightly better by adding a piece to avoid clearing the
+> parent's direct_complete if it had the new flag set, so below is a new
+> version (with the new flag renamed to safe_suspend which seemed better to
+> me).
+>
+> Of course, having safe_suspend set will still cause the parent's
+> direct_complete to be cleared unless the parent has safe_suspend set too,
+> but that's better than not allowing the parent to use direct_complete at all.
+
+Well, as I replied in the earlier response, deploying the runtime PM
+centric path also for the parent, offers additional optimizations
+while comparing to try to make the direct_complete path still to work.
+
+We could also pick that approach, which would mean additional
+arguments of moving drivers to the runtime PM centric path, of course
+only where it makes sense.
+
+>
+> ---
+>  drivers/acpi/device_pm.c  |    8 ++++++++
+>  drivers/base/power/main.c |   15 ++++++++++++---
+>  include/linux/pm.h        |    1 +
+>  3 files changed, 21 insertions(+), 3 deletions(-)
+>
+> Index: linux-pm/drivers/base/power/main.c
+> ===================================================================
+> --- linux-pm.orig/drivers/base/power/main.c
+> +++ linux-pm/drivers/base/power/main.c
+> @@ -1271,9 +1271,16 @@ static int __device_suspend_late(struct
+>                 goto Complete;
+>         }
+>
+> -       if (dev->power.syscore || dev->power.direct_complete)
+> +       if (dev->power.syscore)
+>                 goto Complete;
+>
+> +       if (dev->power.direct_complete) {
+> +               if (pm_runtime_status_suspended(dev))
+> +                       goto Complete;
+> +
+> +               dev->power.direct_complete = false;
+> +       }
+> +
+>         if (dev->pm_domain) {
+>                 info = "late power domain ";
+>                 callback = pm_late_early_op(&dev->pm_domain->ops, state);
+> @@ -1482,7 +1489,7 @@ static int __device_suspend(struct devic
+>         if (dev->power.syscore)
+>                 goto Complete;
+>
+> -       if (dev->power.direct_complete) {
+> +       if (dev->power.direct_complete && !dev->power.safe_suspend) {
+>                 if (pm_runtime_status_suspended(dev)) {
+>                         pm_runtime_disable(dev);
+>                         if (pm_runtime_status_suspended(dev))
+> @@ -1549,7 +1556,9 @@ static int __device_suspend(struct devic
+>                 if (parent) {
+>                         spin_lock_irq(&parent->power.lock);
+>
+> -                       dev->parent->power.direct_complete = false;
+> +                       if (!dev->parent->power.safe_suspend)
+> +                               dev->parent->power.direct_complete = false;
+> +
+>                         if (dev->power.wakeup_path
+>                             && !dev->parent->power.ignore_children)
+>                                 dev->parent->power.wakeup_path = true;
+> Index: linux-pm/include/linux/pm.h
+> ===================================================================
+> --- linux-pm.orig/include/linux/pm.h
+> +++ linux-pm/include/linux/pm.h
+> @@ -554,6 +554,7 @@ struct dev_pm_info {
+>         pm_message_t            power_state;
+>         unsigned int            can_wakeup:1;
+>         unsigned int            async_suspend:1;
+> +       unsigned int            safe_suspend:1;
+>         bool                    in_dpm_list:1;  /* Owned by the PM core */
+>         bool                    is_prepared:1;  /* Owned by the PM core */
+>         bool                    is_suspended:1; /* Ditto */
+> Index: linux-pm/drivers/acpi/device_pm.c
+> ===================================================================
+> --- linux-pm.orig/drivers/acpi/device_pm.c
+> +++ linux-pm/drivers/acpi/device_pm.c
+> @@ -1025,9 +1025,17 @@ EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
+>   *
+>   * Follow PCI and resume devices suspended at run time before running their
+>   * system suspend callbacks.
+> + *
+> + * If the power.direct_complete flag is set for the device, though, skip all
+> + * that, because the device doesn't need to be resumed then and if it is
+> + * resumed via runtime PM, the core will notice that and will carry out the
+> + * late suspend for it.
+>   */
+>  int acpi_subsys_suspend(struct device *dev)
+>  {
+> +       if (dev->power.direct_complete)
+> +               return 0;
+> +
+>         pm_runtime_resume(dev);
+>         return pm_generic_suspend(dev);
+>  }
+>
+
+Kind regards
+Uffe
