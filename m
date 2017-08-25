@@ -1,18 +1,39 @@
-From: florent.revest@arm.com (Florent Revest)
-Date: Fri, 25 Aug 2017 10:40:35 +0100
-Subject: [RFC 00/11] KVM, EFI, arm64: EFI Runtime Services Sandboxing
-In-Reply-To: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-Message-ID: <1503654035.8893.2.camel@e106757-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Aug 2017 11:49:53 +0200
+Subject: [PATCH 2/2] mmc: sunxi: Reset the device at probe time
+In-Reply-To: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
+References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
+Message-ID: <20170825094953.3247-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We might be into some troubles if the bootloader misconfigured the MMC
+controller.
 
-I just realised that my email client was not configured correctly and
-the confidential disclaimer at the bottom of my emails obviously don't
-apply. Sorry about that.
+We currently only de-assert the reset line at probe time, which means that
+if the device was already out of reset, we're going to keep whatever state
+was set already.
 
-    Florent
+Switch to a reset instead of the deassert to have a device in a pristine
+state when we start operating.
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index da5f46a14497..53c970fe0873 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1242,7 +1242,7 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 	}
+ 
+ 	if (!IS_ERR(host->reset)) {
+-		ret = reset_control_deassert(host->reset);
++		ret = reset_control_reset(host->reset);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "reset err %d\n", ret);
+ 			goto error_disable_clk_sample;
+-- 
+2.13.5
