@@ -1,55 +1,33 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 25 Aug 2017 19:20:57 +0800
-Subject: [PATCH v11 3/6] ACPI: build and enable APEI GHES in the Makefile
- and configuration
-In-Reply-To: <599ECEF3.80001@huawei.com>
-References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
- <1503066227-18251-4-git-send-email-gengdongjiu@huawei.com>
- <599ECEF3.80001@huawei.com>
-Message-ID: <6afc4dfa-5ad1-8df1-7dce-4704a796d8aa@huawei.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 25 Aug 2017 14:05:42 +0200
+Subject: [PATCH v2] arm64: allwinner: h5: add support for NanoPi NEO Plus 2
+In-Reply-To: <20170825103242.5665-1-antony@phenome.org>
+References: <20170824231716.2623-1-antony@phenome.org>
+ <20170825103242.5665-1-antony@phenome.org>
+Message-ID: <20170825120542.GA9475@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 25, 2017 at 12:32:42PM +0200, Antony Antony wrote:
+> 	Add initial DT support for NanoPi NEO Plus 2 by FriendlyELEC
+> 		Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
+> 		1 GB DDR3 RAM
+> 		8GB eMMC flash (Samsung KLM8G1WEPD-B031)
+> 		micro SD card slot
+> 		Gigabit Ethernet (external RTL8211E-VB-CG chip)
+> 		802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
+> 		2x USB 2.0 host ports & 2x USB via headers
+> 
+>     The DTS is based on OrangePi PC 2, sun50i-h5-orangepi-pc2
+>     Added dwmac-sun8i Gigabit Ethernet support based on
+>     Nano Pi Neo2 DT and the schematics.
+> 
+> Signed-off-by: Antony Antony <antony@phenome.org>
 
+Hello
 
-On 2017/8/24 21:04, Shannon Zhao wrote:
-> 
-> 
-> On 2017/8/18 22:23, Dongjiu Geng wrote:
->> Add CONFIG_ACPI_APEI configuration in the Makefile and
->> enable it in the arm-softmmu.mak
->>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
->>  default-configs/arm-softmmu.mak | 1 +
->>  hw/acpi/Makefile.objs           | 1 +
->>  2 files changed, 2 insertions(+)
->>
->> diff --git a/default-configs/arm-softmmu.mak b/default-configs/arm-softmmu.mak
->> index bbdd3c1..c362113 100644
->> --- a/default-configs/arm-softmmu.mak
->> +++ b/default-configs/arm-softmmu.mak
->> @@ -129,3 +129,4 @@ CONFIG_ACPI=y
->>  CONFIG_SMBIOS=y
->>  CONFIG_ASPEED_SOC=y
->>  CONFIG_GPIO_KEY=y
->> +CONFIG_ACPI_APEI=y
->> diff --git a/hw/acpi/Makefile.objs b/hw/acpi/Makefile.objs
->> index 11c35bc..bafb148 100644
->> --- a/hw/acpi/Makefile.objs
->> +++ b/hw/acpi/Makefile.objs
->> @@ -6,6 +6,7 @@ common-obj-$(CONFIG_ACPI_MEMORY_HOTPLUG) += memory_hotplug.o
->>  common-obj-$(CONFIG_ACPI_CPU_HOTPLUG) += cpu.o
->>  common-obj-$(CONFIG_ACPI_NVDIMM) += nvdimm.o
->>  common-obj-$(CONFIG_ACPI_VMGENID) += vmgenid.o
->> +common-obj-$(CONFIG_ACPI_APEI) += hest_ghes.o
->>  common-obj-$(call lnot,$(CONFIG_ACPI_X86)) += acpi-stub.o
->>  
->>  common-obj-y += acpi_interface.o
->>
-> Fold this patch into previous one.
-Ok, thanks
+I do not see changes between v1 to v2.
+And you need to set your real name in signed-off.
 
-> 
-> Thanks,
-> 
+Regards
+Corentin Labbe
