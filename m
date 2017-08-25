@@ -1,154 +1,195 @@
 From: florent.revest@arm.com (Florent Revest)
-Date: Fri, 25 Aug 2017 09:31:32 +0100
-Subject: [RFC 02/11] KVM: arm64: Return an Unknown ID on unhandled HVC
+Date: Fri, 25 Aug 2017 09:31:33 +0100
+Subject: [RFC 03/11] KVM: Allow VM lifecycle management without userspace
 In-Reply-To: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
 References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-Message-ID: <1503649901-5834-3-git-send-email-florent.revest@arm.com>
+Message-ID: <1503649901-5834-4-git-send-email-florent.revest@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, when the KVM hypervisor received an hvc from a guest, it only
-routed the hypercall to the PSCI calls handler. If the function ID of the
-hypercall wouldn't be supported by the PSCI code, a PSCI_RET_NOT_SUPPORTED
-error code would be returned in x0.
+The current codebase of KVM makes many assumptions regarding the origin of
+the virtual machine being executed or configured. Indeed, the KVM API
+implementation has been written with userspace usage in mind and lots of
+userspace-specific code is used (namely preempt_notifiers, eventfd, mmu
+notifiers, current->mm...)
 
-This patch introduces a kvm_psci_is_call() check which is verified before
-entering the PSCI calls handling code. The HVC is now only routed to the
-PSCI code if its function ID is in the ranges of PSCI functions defined by
-SMCCC (0x84000000-0x8400001f and 0xc4000000-0xc400001f).
+The aim of this patch is to make the KVM API (create_vm, create_vcpu etc)
+usable from a kernel context. A simple trick is used to distinguish
+userspace VMs (coming from QEMU or LKVM...) from internal VMs. (coming
+from other subsystems, for example for sandboxing purpose):
+  - When a VM is created from an ioctl, kvm->mm is set to current->mm
+  - When a VM is created from the kernel, kvm->mm must be set to NULL
 
-If the function ID is not in those ranges, an Unknown Function Identifier
-is returned in x0. This implements the behavior defined by SMCCC and paves
-the way for other hvc handlers.
+This ensures that no userspace program can create internal VMs and allows
+to easily check whether a given VM is attached to a process or is internal.
+
+This patch simply encloses the userspace-specific pieces of code of
+kvm_main in conditions checking if kvm->mm is present and modifies the
+prototype of kvm_create_vm to enable NULL mm.
 
 Signed-off-by: Florent Revest <florent.revest@arm.com>
 ---
- arch/arm/include/asm/kvm_psci.h   |  1 +
- arch/arm64/include/asm/kvm_psci.h |  1 +
- arch/arm64/kvm/handle_exit.c      | 24 ++++++++++++++++++------
- include/uapi/linux/psci.h         |  2 ++
- virt/kvm/arm/psci.c               | 21 +++++++++++++++++++++
- 5 files changed, 43 insertions(+), 6 deletions(-)
+ virt/kvm/kvm_main.c | 64 ++++++++++++++++++++++++++++++++++-------------------
+ 1 file changed, 41 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
-index 6bda945..8dcd642 100644
---- a/arch/arm/include/asm/kvm_psci.h
-+++ b/arch/arm/include/asm/kvm_psci.h
-@@ -22,6 +22,7 @@
- #define KVM_ARM_PSCI_0_2       2
-
- int kvm_psci_version(struct kvm_vcpu *vcpu);
-+bool kvm_psci_is_call(struct kvm_vcpu *vcpu);
- int kvm_psci_call(struct kvm_vcpu *vcpu);
-
- #endif /* __ARM_KVM_PSCI_H__ */
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
-index bc39e55..1a28809 100644
---- a/arch/arm64/include/asm/kvm_psci.h
-+++ b/arch/arm64/include/asm/kvm_psci.h
-@@ -22,6 +22,7 @@
- #define KVM_ARM_PSCI_0_2       2
-
- int kvm_psci_version(struct kvm_vcpu *vcpu);
-+bool kvm_psci_is_call(struct kvm_vcpu *vcpu);
- int kvm_psci_call(struct kvm_vcpu *vcpu);
-
- #endif /* __ARM64_KVM_PSCI_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 17d8a16..bc7ade5 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -21,6 +21,7 @@
-
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <linux/smccc_fn.h>
-
- #include <asm/esr.h>
- #include <asm/kvm_asm.h>
-@@ -34,19 +35,30 @@
-
- typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
-
-+/*
-+ * handle_hvc - handle a guest hypercall
-+ *
-+ * @vcpu:      the vcpu pointer
-+ * @run:       access to the kvm_run structure for results
-+ *
-+ * Route a given hypercall to its right HVC handler thanks to its function ID.
-+ * If no corresponding handler is found, write an Unknown ID in x0 (cf. SMCCC).
-+ *
-+ * This function returns: > 0 (success), 0 (success but exit to user
-+ * space), and < 0 (errors)
-+ */
- static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 15252d7..2e7af1a 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -154,7 +154,8 @@ int vcpu_load(struct kvm_vcpu *vcpu)
+        if (mutex_lock_killable(&vcpu->mutex))
+                return -EINTR;
+        cpu = get_cpu();
+-       preempt_notifier_register(&vcpu->preempt_notifier);
++       if (vcpu->kvm->mm)
++               preempt_notifier_register(&vcpu->preempt_notifier);
+        kvm_arch_vcpu_load(vcpu, cpu);
+        put_cpu();
+        return 0;
+@@ -165,7 +166,8 @@ void vcpu_put(struct kvm_vcpu *vcpu)
  {
--       int ret;
-+       int ret = 1;
-
-        trace_kvm_hvc_arm64(*vcpu_pc(vcpu), vcpu_get_reg(vcpu, 0),
-                            kvm_vcpu_hvc_get_imm(vcpu));
-        vcpu->stat.hvc_exit_stat++;
-
--       ret = kvm_psci_call(vcpu);
--       if (ret < 0) {
--               kvm_inject_undefined(vcpu);
--               return 1;
--       }
-+       if (kvm_psci_is_call(vcpu))
-+               ret = kvm_psci_call(vcpu);
-+       else
-+               vcpu_set_reg(vcpu, 0, SMCCC_STD_RET_UNKNOWN_ID);
-
-        return ret;
+        preempt_disable();
+        kvm_arch_vcpu_put(vcpu);
+-       preempt_notifier_unregister(&vcpu->preempt_notifier);
++       if (vcpu->kvm->mm)
++               preempt_notifier_unregister(&vcpu->preempt_notifier);
+        preempt_enable();
+        mutex_unlock(&vcpu->mutex);
  }
-diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-index 3d7a0fc..79704fe 100644
---- a/include/uapi/linux/psci.h
-+++ b/include/uapi/linux/psci.h
-@@ -24,10 +24,12 @@
- /* PSCI v0.2 interface */
- #define PSCI_0_2_FN_BASE                       0x84000000
- #define PSCI_0_2_FN(n)                         (PSCI_0_2_FN_BASE + (n))
-+#define PSCI_0_2_FN_END                                PSCI_0_2_FN(0x1F)
- #define PSCI_0_2_64BIT                         0x40000000
- #define PSCI_0_2_FN64_BASE                     \
-                                        (PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
- #define PSCI_0_2_FN64(n)                       (PSCI_0_2_FN64_BASE + (n))
-+#define PSCI_0_2_FN64_END                      PSCI_0_2_FN64(0x1F)
-
- #define PSCI_0_2_FN_PSCI_VERSION               PSCI_0_2_FN(0)
- #define PSCI_0_2_FN_CPU_SUSPEND                        PSCI_0_2_FN(1)
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index f1e363b..9602894 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -332,3 +332,24 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
-                return -EINVAL;
-        };
+@@ -640,7 +642,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
+        return 0;
  }
+
+-static struct kvm *kvm_create_vm(unsigned long type)
++static struct kvm *kvm_create_vm(unsigned long type, struct mm_struct *mm)
+ {
+        int r, i;
+        struct kvm *kvm = kvm_arch_alloc_vm();
+@@ -649,9 +651,11 @@ static struct kvm *kvm_create_vm(unsigned long type)
+                return ERR_PTR(-ENOMEM);
+
+        spin_lock_init(&kvm->mmu_lock);
+-       mmgrab(current->mm);
+-       kvm->mm = current->mm;
+-       kvm_eventfd_init(kvm);
++       kvm->mm = mm;
++       if (mm) {
++               mmgrab(current->mm);
++               kvm_eventfd_init(kvm);
++       }
+        mutex_init(&kvm->lock);
+        mutex_init(&kvm->irq_lock);
+        mutex_init(&kvm->slots_lock);
+@@ -697,15 +701,18 @@ static struct kvm *kvm_create_vm(unsigned long type)
+                        goto out_err;
+        }
+
+-       r = kvm_init_mmu_notifier(kvm);
+-       if (r)
+-               goto out_err;
++       if (mm) {
++               r = kvm_init_mmu_notifier(kvm);
++               if (r)
++                       goto out_err;
++       }
+
+        spin_lock(&kvm_lock);
+        list_add(&kvm->vm_list, &vm_list);
+        spin_unlock(&kvm_lock);
+
+-       preempt_notifier_inc();
++       if (mm)
++               preempt_notifier_inc();
+
+        return kvm;
+
+@@ -721,7 +728,8 @@ static struct kvm *kvm_create_vm(unsigned long type)
+        for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
+                kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
+        kvm_arch_free_vm(kvm);
+-       mmdrop(current->mm);
++       if (mm)
++               mmdrop(mm);
+        return ERR_PTR(r);
+ }
+
+@@ -772,9 +780,11 @@ static void kvm_destroy_vm(struct kvm *kvm)
+        cleanup_srcu_struct(&kvm->irq_srcu);
+        cleanup_srcu_struct(&kvm->srcu);
+        kvm_arch_free_vm(kvm);
+-       preempt_notifier_dec();
++       if (mm)
++               preempt_notifier_dec();
+        hardware_disable_all();
+-       mmdrop(mm);
++       if (mm)
++               mmdrop(mm);
+ }
+
+ void kvm_get_kvm(struct kvm *kvm)
+@@ -1269,6 +1279,9 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
+        if (kvm_is_error_hva(addr))
+                return PAGE_SIZE;
+
++       if (!kvm->mm)
++               return PAGE_SIZE;
 +
-+/**
-+ * kvm_psci_is_call - checks if a HVC function ID is in a PSCI range
-+ * @vcpu: Pointer to the VCPU struct
-+ *
-+ * When a hypercall is received from a guest. The SMCCC defines a function ID
-+ * as a value to be put in x0 to identify the destination of the call. The same
-+ * document defines ranges of function IDs to be used by PSCI. This function
-+ * checks whether a given vcpu is requesting a PSCI related handler.
-+ *
-+ * This function returns:
-+ *  - true if this HVC should be handled by kvm_psci_call
-+ *  - false if it shouldn't
-+ */
-+inline bool kvm_psci_is_call(struct kvm_vcpu *vcpu)
-+{
-+       unsigned long fn = vcpu_get_reg(vcpu, 0) & ~((u32) 0);
-+
-+       return ((fn >= PSCI_0_2_FN_BASE   && fn <= PSCI_0_2_FN_END) ||
-+               (fn >= PSCI_0_2_FN64_BASE && fn <= PSCI_0_2_FN64_END));
-+}
+        down_read(&current->mm->mmap_sem);
+        vma = find_vma(current->mm, addr);
+        if (!vma)
+@@ -2486,9 +2499,11 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+        if (r)
+                goto vcpu_destroy;
+
+-       r = kvm_create_vcpu_debugfs(vcpu);
+-       if (r)
+-               goto vcpu_destroy;
++       if (kvm->mm) {
++               r = kvm_create_vcpu_debugfs(vcpu);
++               if (r)
++                       goto vcpu_destroy;
++       }
+
+        mutex_lock(&kvm->lock);
+        if (kvm_get_vcpu_by_id(kvm, id)) {
+@@ -2499,11 +2514,13 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+        BUG_ON(kvm->vcpus[atomic_read(&kvm->online_vcpus)]);
+
+        /* Now it's all set up, let userspace reach it */
+-       kvm_get_kvm(kvm);
+-       r = create_vcpu_fd(vcpu);
+-       if (r < 0) {
+-               kvm_put_kvm(kvm);
+-               goto unlock_vcpu_destroy;
++       if (kvm->mm) {
++               kvm_get_kvm(kvm);
++               r = create_vcpu_fd(vcpu);
++               if (r < 0) {
++                       kvm_put_kvm(kvm);
++                       goto unlock_vcpu_destroy;
++               }
+        }
+
+        kvm->vcpus[atomic_read(&kvm->online_vcpus)] = vcpu;
+@@ -2521,7 +2538,8 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+
+ unlock_vcpu_destroy:
+        mutex_unlock(&kvm->lock);
+-       debugfs_remove_recursive(vcpu->debugfs_dentry);
++       if (kvm->mm)
++               debugfs_remove_recursive(vcpu->debugfs_dentry);
+ vcpu_destroy:
+        kvm_arch_vcpu_destroy(vcpu);
+ vcpu_decrement:
+@@ -3191,7 +3209,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
+        struct kvm *kvm;
+        struct file *file;
+
+-       kvm = kvm_create_vm(type);
++       kvm = kvm_create_vm(type, current->mm);
+        if (IS_ERR(kvm))
+                return PTR_ERR(kvm);
+ #ifdef CONFIG_KVM_MMIO
 --
 1.9.1
 
