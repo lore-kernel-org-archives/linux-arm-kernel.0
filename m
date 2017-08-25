@@ -1,108 +1,48 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Fri, 25 Aug 2017 14:02:15 -0400
-Subject: [PATCH] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-Message-ID: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 Aug 2017 13:14:39 -0500
+Subject: [PATCH v4 3/4] dt-bindings: PCI: rockchip: Add support for pcie
+ wake irq
+In-Reply-To: <20170822031934.8675-4-jeffy.chen@rock-chips.com>
+References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
+ <20170822031934.8675-4-jeffy.chen@rock-chips.com>
+Message-ID: <20170825181439.d3hlwrcbmcss3sx6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma ops from the parent DWC device are not getting passed to the
-child xhci-hcd device. This patch makes use of
-platform_device_register_full to set the DMA ops. For the DT/OF case,
-dma_ops were still null after the the device register, so
-of_dma_configure is called in only the OF case.
+On Tue, Aug 22, 2017 at 11:19:33AM +0800, Jeffy Chen wrote:
+> Add an optional interrupt for PCIE_WAKE pin.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/pci/rockchip-pcie.txt        | 20 ++++++++++++--------
+>  1 file changed, 12 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
+> index 5678be82530d..9f6504129e80 100644
+> --- a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
+> @@ -20,10 +20,13 @@ Required properties:
+>  - msi-map: Maps a Requester ID to an MSI controller and associated
+>  	msi-specifier data. See ./pci-msi.txt
+>  - interrupts: Three interrupt entries must be specified.
+> -- interrupt-names: Must include the following names
+> -	- "sys"
+> -	- "legacy"
+> -	- "client"
+> +- interrupt-names: Include the following names
+> +	Required:
+> +		- "sys"
+> +		- "legacy"
+> +		- "client"
+> +	Optional:
+> +		- "wake"
 
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
- drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
- 1 file changed, 17 insertions(+), 22 deletions(-)
+Use the wakeup source binding:
+Documentation/devicetree/bindings/power/wakeup-source.txt
 
-diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-index 76f0b0d..662e9e2 100644
---- a/drivers/usb/dwc3/host.c
-+++ b/drivers/usb/dwc3/host.c
-@@ -16,6 +16,7 @@
-  */
- 
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- 
- #include "core.h"
- 
-@@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
- {
- 	struct property_entry	props[3];
- 	struct platform_device	*xhci;
-+	struct platform_device_info dwc_plat_info = {};
- 	int			ret, irq;
- 	struct resource		*res;
- 	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
-@@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
- 	dwc->xhci_resources[1].flags = res->flags;
- 	dwc->xhci_resources[1].name = res->name;
- 
--	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
--	if (!xhci) {
--		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
--		return -ENOMEM;
--	}
-+	dwc_plat_info.name = "xhci-hcd";
-+	dwc_plat_info.parent = dwc->dev;
-+	dwc_plat_info.res = dwc->xhci_resources;
-+	dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
-+	dwc_plat_info.fwnode = dwc->dev->fwnode;
-+	dwc_plat_info.dma_mask = *dwc->dev->dma_mask;
- 
--	xhci->dev.parent	= dwc->dev;
-+	xhci = platform_device_register_full(&dwc_plat_info);
-+	if (IS_ERR(xhci)) {
-+		dev_err(dwc->dev, "failed to register xHCI device\n");
-+		return PTR_ERR(xhci);
-+	}
- 
- 	dwc->xhci = xhci;
--
--	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
--						DWC3_XHCI_RESOURCES_NUM);
--	if (ret) {
--		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
--		goto err1;
--	}
-+	if (dwc->dev->of_node)
-+		of_dma_configure(&xhci->dev, dwc->dev->of_node);
- 
- 	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
- 
-@@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
- 		ret = platform_device_add_properties(xhci, props);
- 		if (ret) {
- 			dev_err(dwc->dev, "failed to add properties to xHCI\n");
--			goto err1;
-+			goto err;
- 		}
- 	}
- 
-@@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
- 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
- 			  dev_name(dwc->dev));
- 
--	ret = platform_device_add(xhci);
--	if (ret) {
--		dev_err(dwc->dev, "failed to register xHCI device\n");
--		goto err2;
--	}
--
- 	return 0;
--err2:
-+err:
- 	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
- 			  dev_name(dwc->dev));
- 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
- 			  dev_name(dwc->dev));
--err1:
- 	platform_device_put(xhci);
- 	return ret;
- }
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Rob
