@@ -1,35 +1,45 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Fri, 25 Aug 2017 14:32:28 +0800
-Subject: [PATCH v3 0/5] Add MediaTek PMIC keys support
-Message-ID: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+Date: Fri, 25 Aug 2017 14:32:31 +0800
+Subject: [PATCH v3 3/5] dt-bindings: mfd: Add bindings for the keys as subnode
+ of PMIC
+In-Reply-To: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1503642753-12385-4-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MediaTek PMIC are multi-function devices that can handle key interrupts,
-typically there are two keys attached to PMIC, which called pwrkey
-and homekey. PWRKEY usually used to wake up system from sleep. Homekey
-can used as volume down key due to board design. Long press keys can
-shutdown PMIC, the mode can be choose to be one key only or two keys
-together.
-This series add support for key functions for MediaTek PMIC MT6397/MT6323.
+This patch adds documentation for device tree bindings for keys support
+as the subnode of MT6397/MT6323 PMIC.
 
-Chen Zhong (5):
-  mfd: mt6397: create irq mappings in mfd core driver
-  dt-bindings: input: Add document bindings for mtk-pmic-keys
-  dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
-  input: Add MediaTek PMIC keys support
-  mfd: mt6397: Add PMIC keys support to MT6397 driver
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ Documentation/devicetree/bindings/mfd/mt6397.txt |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
- .../devicetree/bindings/input/mtk-pmic-keys.txt    |  38 +++
- Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
- drivers/input/keyboard/Kconfig                     |   9 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/mtk-pmic-keys.c             | 308 +++++++++++++++++++++
- drivers/mfd/mt6397-core.c                          |  26 +-
- drivers/rtc/rtc-mt6397.c                           |   7 +-
- 7 files changed, 388 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
- create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
-
+diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+index 522a3bb..d1df77f 100644
+--- a/Documentation/devicetree/bindings/mfd/mt6397.txt
++++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
+@@ -7,6 +7,7 @@ MT6397/MT6323 is a multifunction device with the following sub modules:
+ - GPIO
+ - Clock
+ - LED
++- Keys
+ 
+ It is interfaced to host controller using SPI interface by a proprietary hardware
+ called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
+@@ -40,6 +41,11 @@ Optional subnodes:
+ 		- compatible: "mediatek,mt6323-led"
+ 	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
+ 
++- keys
++	Required properties:
++		- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
++	see Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
++
+ Example:
+ 	pwrap: pwrap at 1000f000 {
+ 		compatible = "mediatek,mt8135-pwrap";
 -- 
-1.9.1
+1.7.9.5
