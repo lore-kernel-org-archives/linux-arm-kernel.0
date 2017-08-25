@@ -1,43 +1,180 @@
-From: stuartl@longlandclan.id.au (Stuart Longland)
-Date: Fri, 25 Aug 2017 18:50:23 +1000
-Subject: [patch v6 0/3] JTAG driver introduction
-In-Reply-To: <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
-References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
- <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
- <CAPLgG==Jj=Ys=SvhOCspSfunbWnuqPySvW9RfuqE8HYnG4C=ZQ@mail.gmail.com>
- <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
-Message-ID: <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 25 Aug 2017 10:56:25 +0200
+Subject: [PATCH v10] PCI: tango: Add MSI controller support
+In-Reply-To: <871so09j6g.fsf@arm.com>
+References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
+ <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
+ <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
+ <86efs3wesi.fsf@arm.com>
+ <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
+ <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
+ <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
+ <e381170c-e462-01cd-12db-30773005602b@free.fr> <871so09j6g.fsf@arm.com>
+Message-ID: <90f38928-6f5c-c225-d150-d8daf7d4652c@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Note: dropping vadimp at maellanox.com as SMTP server complained about the
-DNS server returning NXDOMAIN.  Apologies.]
-On 25/08/17 18:32, Linus Walleij wrote:
-> Gnah!
-> Whoever writes a slot-in replacement making the character device
-> take precendence wins lots of karma.
+On 25/08/2017 09:54, Marc Zyngier wrote:
+> On Thu, Aug 24 2017 at 10:53:16 pm BST, Mason <slash.tmp@free.fr> wrote:
+>> On 24/08/2017 20:35, Ard Biesheuvel wrote:
+>>> On 24 August 2017 at 18:51, Marc Gonzalez wrote:
+>>>> On 24/08/2017 19:04, Bjorn Helgaas wrote:
+>>>>> On Tue, Aug 22, 2017 Marc Zyngier wrote:
+>>>>>> Marc Gonzalez wrote:
+>>>>>>> On 22/08/2017 18:29, Marc Zyngier wrote:
+>>>>>>>> On 22/08/17 15:56, Marc Gonzalez wrote:
+>>>>>>>>
+>>>>>>>>>  #define SMP8759_MUX              0x48
+>>>>>>>>>  #define SMP8759_TEST_OUT 0x74
+>>>>>>>>> +#define SMP8759_STATUS           0x80
+>>>>>>>>> +#define SMP8759_ENABLE           0xa0
+>>>>>>>>> +#define SMP8759_DOORBELL 0xa002e07c
+>>>>>>>>
+>>>>>>>> Why is this hardcoded and not coming from the device-tree, just like any
+>>>>>>>> other address property?
+>>>>>>>
+>>>>>>> Since this bus address is software-configurable, I didn't think
+>>>>>>> it belonged in the DT. Also, I didn't see anything similar in
+>>>>>>> other binding docs, especially
+>>>>>>>
+>>>>>>> Documentation/devicetree/bindings/interrupt-controller/msi.txt
+>>>>>>
+>>>>>> If that's software configurable, how on Earth did you pick the address?
+>>>>>> How do you ensure that it doesn't conflict with DMA? How is it
+>>>>>> configured into the RC?
+>>>>>
+>>>>> But we *do* need to resolve this.  This does seem like an address that
+>>>>> shouldn't be hard-coded into the driver.  Since this driver is
+>>>>> programming the address into an MSI message, but not into the receiver
+>>>>> of that message, there's a coordination issue between this driver and
+>>>>> whatever other software does that receiver configuration.
+>>>>
+>>>> OK. I'll move the doorbell address to the DT for v11.
+>>>>
+>>>> What property should be used for this address?
+>>>>
+>>>> sigma,doorbell ?
+>>>>
+>>>> Or maybe I can put it in reg, since I have a 1:1 mapping
+>>>> between bus and cpu addresses?
+>>>>
+>>>> git grep -i doorbell arch/arm/boot/dts/ arch/arm64/boot/dts/
+>>>> returns nothing.
+>>>
+>>> You haven't answered the question yet: you stated that the doorbell
+>>> address is software configurable, yet your code does not seem to
+>>> configure it. It only returns the doorbell address so that it gets
+>>> communicated to the downstream devices.
+>>>
+>>> So how does the RC know which address is special, so it can trigger on
+>>> inbound writes hitting that address and assert the SPI ?
+>>
+>> The CPU address of the MSI doorbell address is 0x2e07c
+>> i.e. within the reg space of the PCIe controller block.
+> 
+> Which you describe in DT already, right? So why aren't you using an
+> offset in this region as your MSI doorbell (potentially applying an
+> offset, see below)?
 
-What would such a replacement look like though?
+Yes, the controller is described in DT:
 
-Some sort of system whereby you can read/write single-line commands as
-if talking to a GPIO expander over a UART?
+	pcie at 2e000 {
+		compatible = "sigma,smp8759-pcie";
+		reg = <0x50000000 0x400000>, <0x2e000 0x100>;
 
-Would you access the GPIOs one by one, or would you perhaps map them
-into a bitmap (maybe arbitrarily, up to 64-bits wide) and perform masked
-operations on the bitmap?
+IIUC, you're saying I don't need the doorbell address
+explicitly in the DT, because I can compute:
 
-I'm no fan of the sysfs GPIO interface, but it beats poking around at
-registers behind the kernel's back.
--- 
-Stuart Longland (aka Redhatter, VK4MSL)
+0x2e000 (from the DT) + 0x7c (offset within the block)
 
-I haven't lost my mind...
-  ...it's backed up on a tape somewhere.
+OK, that sounds right.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/122b6c6d/attachment.sig>
+Then there is the matter of the region offset,
+i.e. 0xa0000000 in my current code.
+
+It might also be worth keeping in mind that there is
+a second revision of the PCIe controller that handles
+the doorbell differently. In rev2, I just pick an
+arbitrary address within the window, program that
+bus address into the controller, and the controller
+knows to forward that single address to the right
+place. See "[RFC PATCH v0.2] PCI: Add support for
+tango PCIe host bridge" for an example of this.
+
+Typically, I pick the first address of the window,
+BAR0.base, since I assume no device will ever need
+to read/write the first word of RAM.
+
+
+>> As I discussed back in March, the RC implements an odd
+>> bus-to-system mapping.
+>>
+>> RC BAR0 defines a window in PCI address space (max 1GB).
+>> Accesses outside this window are silently ignored.
+>> The window is divided into 8 "regions" and there are 8
+>> registers defining the offset into CPU space.
+>>
+>> In pseudo code, assuming pci_address is within the
+>> window defined by BAR0:
+>>
+>> cpu_address map_bus_to_system(pci_address)
+>> {
+>>     temp = pci_address - BAR0.base
+>>     region = temp / region_size
+>>     offset = temp % region_size
+>>     cpu_address = region_reg[region] + offset
+>>     return cpu_address
+>> }
+>>
+>> The current setup is:
+>>
+>> DRAM at 0x80000000-0xa0000000
+>> BAR0.base = 0x80000000
+>> REGION[0] = 0x80000000
+>> REGION[1] = 0x88000000
+>> REGION[2] = 0x90000000
+>> REGION[3] = 0x98000000
+>> REGION[4] = 0x0
+>>
+>> (This map means 1:1 identity for DRAM addresses.)
+>>
+>> Thus when a device writes to 0xa002e07c (region 4)
+>> the write is forwarded to 0x2e07c.
+> 
+> But how do you find out about the 0xa0000000 offset? You must make sure
+> that the provided address is outside of RAM, should you end-up on a
+> system more than 1GB of RAM.
+
+You're right, I've swept this issue under the rug so far.
+
+The boards typically come with either
+- two 512MB DIMMs
+- two 1GB DIMMs
+(there may be other setups I'm not aware of, e.g. with
+a single memory module).
+
+In the DT for my dev board, I describe *all* of the RAM.
+
+	memory at 80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x80000000>; /* 2 GB */
+	};
+
+But actually, Linux is only given to manage a fraction
+of this memory, as some of it is for other processors
+and DSPs, and a large part is for video decoder buffers.
+
+In the end, Linux manages, typically
+128MB, 256MB, 512MB, 2x128MB, or 2x256MB
+(there may be other setups I'm not aware of)
+And the actual config is passed to Linux through
+a mem= command-line directive.
+
+It is not clear to me, as I discussed with Ard, how the
+Linux driver is supposed to make this all work.
+
+Maybe I can have some platform code that walks the
+different RAM areas available to Linux, and sets up
+the appropriate physical-to-dma mappings?
+
+Regards.
