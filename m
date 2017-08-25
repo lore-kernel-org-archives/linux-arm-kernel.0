@@ -1,74 +1,41 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 25 Aug 2017 21:41:06 +0200
-Subject: [RFC 1/3] dt-bindings: interrupt-controller: Add Realtek RTD1295
-In-Reply-To: <20170822021459.l3oiid3f4fs6vfa2@rob-hp-laptop>
-References: <20170817101140.32000-1-afaerber@suse.de>
- <20170817101140.32000-2-afaerber@suse.de>
- <20170822021459.l3oiid3f4fs6vfa2@rob-hp-laptop>
-Message-ID: <06bc5f05-cbfb-edc3-7881-dafeba6fa8ea@suse.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 25 Aug 2017 22:43:41 +0200 (CEST)
+Subject: [PATCH v2 1/1] futex: remove duplicated code and fix UB
+In-Reply-To: <20170824094756.GA6346@arm.com>
+References: <20170824073105.3901-1-jslaby@suse.cz>
+ <20170824094756.GA6346@arm.com>
+Message-ID: <alpine.DEB.2.20.1708252243020.2124@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 22.08.2017 um 04:14 schrieb Rob Herring:
-> On Thu, Aug 17, 2017 at 12:11:38PM +0200, Andreas F?rber wrote:
->> Add binding for Realtek RTD1295 IRQ mux.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  .../interrupt-controller/realtek,rtd119x-mux.txt   | 28 ++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
->>
->> diff --git a/Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt b/Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
->> new file mode 100644
->> index 000000000000..4b43370e3d74
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
->> @@ -0,0 +1,28 @@
->> +Realtek RTD119x/129x IRQ Mux Controller
->> +=======================================
->> +
->> +Required properties:
->> +
->> +- compatible           :  Should be one of the following:
->> +                          - "realtek,rtd1295-irq-mux"
->> +                          - "realtek,rtd1295-iso-irq-mux"
->> +- reg                  :  Specifies base physical address and size of the registers.
->> +- interrupts           :  Specifies the interrupt line which is mux'ed.
->> +- interrupt-controller :  Presence indicates the node as interrupt controller.
->> +- #interrupt-cells     :  Shall be 1. See common bindings in interrupt.txt.
->> +
->> +
->> +Optional properties:
->> +
->> +See interrupt.txt for common bindings.
+On Thu, 24 Aug 2017, Will Deacon wrote:
+> On Thu, Aug 24, 2017 at 09:31:05AM +0200, Jiri Slaby wrote:
+> > +static int futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
+> > +{
+> > +	unsigned int op =	  (encoded_op & 0x70000000) >> 28;
+> > +	unsigned int cmp =	  (encoded_op & 0x0f000000) >> 24;
+> > +	int oparg = sign_extend32((encoded_op & 0x00fff000) >> 12, 12);
+> > +	int cmparg = sign_extend32(encoded_op & 0x00000fff, 12);
+> > +	int oldval, ret;
+> > +
+> > +	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28)) {
+> > +		if (oparg < 0 || oparg > 31)
+> > +			return -EINVAL;
+> > +		oparg = 1 << oparg;
+> > +	}
+> > +
+> > +	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
+> > +		return -EFAULT;
+> > +
+> > +	ret = arch_futex_atomic_op_inuser(op, oparg, &oldval, uaddr);
+> > +	if (ret)
+> > +		return ret;
 > 
-> What else would apply here? interrupt-parent is the only thing I see, 
-> but that's really implicit anyway.
+> We could move the pagefault_{disable,enable} calls here, and then remove
+> them from the futex_atomic_op_inuser callsites elsewhere in futex.c
 
-interrupt-names would be another optional property not needed today.
-interrupt-controller and #interrupt-cells are common properties, too.
+Correct, but we can do that after getting this in.
 
-I'll drop both lines if you prefer. Otherwise okay?
+Thanks,
 
-Regards,
-Andreas
-
->> +
->> +
->> +Example:
->> +
->> +	interrupt-controller at 98007000 {
->> +		compatible = "realtek,rtd1295-iso-irq-mux";
->> +		reg = <0x98007000 0x100>;
->> +		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
->> +		interrupt-controller;
->> +		#interrupt-cells = <1>;
->> +	};
->> -- 
->> 2.12.3
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+	tglx
