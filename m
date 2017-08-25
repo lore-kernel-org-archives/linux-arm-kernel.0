@@ -1,41 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Aug 2017 16:39:24 -0500
-Subject: [PATCH v3] gpio: uniphier: add UniPhier GPIO controller driver
-In-Reply-To: <1503418601-9728-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1503418601-9728-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170825213924.xhbeiffp3oidclor@rob-hp-laptop>
+Date: Fri, 25 Aug 2017 17:03:57 -0500
+Subject: [PATCH v4 2/3] dt-bindings: PCI: add PCIe hotplug property
+In-Reply-To: <1503564548-1834-3-git-send-email-oza.oza@broadcom.com>
+References: <1503564548-1834-1-git-send-email-oza.oza@broadcom.com>
+ <1503564548-1834-3-git-send-email-oza.oza@broadcom.com>
+Message-ID: <20170825220356.s75yxkfasnnaygfc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 01:16:41AM +0900, Masahiro Yamada wrote:
-> This GPIO controller device is used on UniPhier SoCs.
+On Thu, Aug 24, 2017 at 02:19:07PM +0530, Oza Pawandeep wrote:
+> Host drivers have the requirement of implementing PCI hotplug
+> based on the how their SOC supports PCI hotplug.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> Couple of properties have been added. the one to enable
+> the hotplug feature itself, and the other caters to
+> the PCI hotplug implementation with the use of gpios.
 > 
-> Changes in v3:
->   - Add .irq_set_affinity() hook
->   - Use irq_domain_create_hierarchy() instead of legacy
->     irq_domain_add_hierarchy().
-> 
-> Changes in v2:
->   - Remove +32 offset for parent interrupts to follow the GIC
->     binding convention
->   - Let uniphier_gpio_irq_alloc() fail if nr_irqs != 1
->   - Allocate gpio_chip statically because just one instance is
->     supported
->   - Fix suspend and resume hooks
-> 
->  .../devicetree/bindings/gpio/gpio-uniphier.txt     |  42 ++
+> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+I acked v2. Please add acks when posting new versions.
 
->  MAINTAINERS                                        |   1 +
->  drivers/gpio/Kconfig                               |   7 +
->  drivers/gpio/Makefile                              |   1 +
->  drivers/gpio/gpio-uniphier.c                       | 589 +++++++++++++++++++++
->  include/dt-bindings/gpio/uniphier-gpio.h           |  18 +
->  6 files changed, 658 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
->  create mode 100644 drivers/gpio/gpio-uniphier.c
->  create mode 100644 include/dt-bindings/gpio/uniphier-gpio.h
+Rob
