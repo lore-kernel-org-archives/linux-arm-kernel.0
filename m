@@ -1,26 +1,24 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 25 Aug 2017 11:29:55 +0200
-Subject: [PATCH v2 2/3] cpufreq: rockchip: add support for rk3328 soc
-In-Reply-To: <1503542223-21044-3-git-send-email-cl@rock-chips.com>
+Date: Fri, 25 Aug 2017 11:34:35 +0200
+Subject: [PATCH v2 1/3] arm64: dts: rockchip: add mmc nodes for rk3328
+ evaluation board
+In-Reply-To: <1503542223-21044-2-git-send-email-cl@rock-chips.com>
 References: <1503542223-21044-1-git-send-email-cl@rock-chips.com>
- <1503542223-21044-3-git-send-email-cl@rock-chips.com>
-Message-ID: <1648103.UpmdRsUd1Z@phil>
+ <1503542223-21044-2-git-send-email-cl@rock-chips.com>
+Message-ID: <4430314.yE5BBxJgsD@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Donnerstag, 24. August 2017, 10:37:02 CEST schrieb cl at rock-chips.com:
+Am Donnerstag, 24. August 2017, 10:37:01 CEST schrieb cl at rock-chips.com:
 > From: Liang Chen <cl@rock-chips.com>
 > 
-> Add compatible rockchip,rk3328 to the machines table to
-> launch cpufreq-dt driver for rk3328 soc.
+> Rockchip's rk3328 evaluation board has 3 mmc controllers for
+> sdio/sdmmc/emmc, let's enable them.
 > 
 > Signed-off-by: Liang Chen <cl@rock-chips.com>
 
-this already got added some days ago by a patch from Finley [0]
+applied ... but I cannot say if it will still be eligible for 4.14
+(late in the cycle). If necessary I'll move it forward a release.
 
-
+Thanks
 Heiko
-
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=319af40a0053fea2ecadcf10bef7e796c91ea8c0
