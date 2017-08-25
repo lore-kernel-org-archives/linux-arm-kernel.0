@@ -1,27 +1,108 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Aug 2017 13:01:45 -0500
-Subject: [PATCH v3 1/3] dt-bindings: usb: add DT binding for RK3328 dwc3
- controller
-In-Reply-To: <1503322566-31489-2-git-send-email-william.wu@rock-chips.com>
-References: <1503322566-31489-1-git-send-email-william.wu@rock-chips.com>
- <1503322566-31489-2-git-send-email-william.wu@rock-chips.com>
-Message-ID: <20170825180145.cgpgkrjitwqkpmbz@rob-hp-laptop>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Fri, 25 Aug 2017 14:02:15 -0400
+Subject: [PATCH] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
+Message-ID: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 09:36:04PM +0800, William Wu wrote:
-> Adds the device tree bindings description for RK3328 and
-> compatible USB DWC3 controller.
-> 
-> Signed-off-by: William Wu <william.wu@rock-chips.com>
-> ---
-> Changes in v3:
-> - Add this for separate usb dt-bindings patch.
-> 
-> Changes in v2:
-> - None
-> 
->  Documentation/devicetree/bindings/usb/rockchip,dwc3.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+The dma ops from the parent DWC device are not getting passed to the
+child xhci-hcd device. This patch makes use of
+platform_device_register_full to set the DMA ops. For the DT/OF case,
+dma_ops were still null after the the device register, so
+of_dma_configure is called in only the OF case.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+ drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
+ 1 file changed, 17 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+index 76f0b0d..662e9e2 100644
+--- a/drivers/usb/dwc3/host.c
++++ b/drivers/usb/dwc3/host.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <linux/platform_device.h>
++#include <linux/of_platform.h>
+ 
+ #include "core.h"
+ 
+@@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+ {
+ 	struct property_entry	props[3];
+ 	struct platform_device	*xhci;
++	struct platform_device_info dwc_plat_info = {};
+ 	int			ret, irq;
+ 	struct resource		*res;
+ 	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
+@@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 	dwc->xhci_resources[1].flags = res->flags;
+ 	dwc->xhci_resources[1].name = res->name;
+ 
+-	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
+-	if (!xhci) {
+-		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
+-		return -ENOMEM;
+-	}
++	dwc_plat_info.name = "xhci-hcd";
++	dwc_plat_info.parent = dwc->dev;
++	dwc_plat_info.res = dwc->xhci_resources;
++	dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
++	dwc_plat_info.fwnode = dwc->dev->fwnode;
++	dwc_plat_info.dma_mask = *dwc->dev->dma_mask;
+ 
+-	xhci->dev.parent	= dwc->dev;
++	xhci = platform_device_register_full(&dwc_plat_info);
++	if (IS_ERR(xhci)) {
++		dev_err(dwc->dev, "failed to register xHCI device\n");
++		return PTR_ERR(xhci);
++	}
+ 
+ 	dwc->xhci = xhci;
+-
+-	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
+-						DWC3_XHCI_RESOURCES_NUM);
+-	if (ret) {
+-		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
+-		goto err1;
+-	}
++	if (dwc->dev->of_node)
++		of_dma_configure(&xhci->dev, dwc->dev->of_node);
+ 
+ 	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
+ 
+@@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 		ret = platform_device_add_properties(xhci, props);
+ 		if (ret) {
+ 			dev_err(dwc->dev, "failed to add properties to xHCI\n");
+-			goto err1;
++			goto err;
+ 		}
+ 	}
+ 
+@@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+ 			  dev_name(dwc->dev));
+ 
+-	ret = platform_device_add(xhci);
+-	if (ret) {
+-		dev_err(dwc->dev, "failed to register xHCI device\n");
+-		goto err2;
+-	}
+-
+ 	return 0;
+-err2:
++err:
+ 	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
+ 			  dev_name(dwc->dev));
+ 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
+ 			  dev_name(dwc->dev));
+-err1:
+ 	platform_device_put(xhci);
+ 	return ret;
+ }
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
