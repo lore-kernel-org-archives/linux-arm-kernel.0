@@ -1,41 +1,41 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 25 Aug 2017 22:43:41 +0200 (CEST)
-Subject: [PATCH v2 1/1] futex: remove duplicated code and fix UB
-In-Reply-To: <20170824094756.GA6346@arm.com>
-References: <20170824073105.3901-1-jslaby@suse.cz>
- <20170824094756.GA6346@arm.com>
-Message-ID: <alpine.DEB.2.20.1708252243020.2124@nanos>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 Aug 2017 16:39:24 -0500
+Subject: [PATCH v3] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <1503418601-9728-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1503418601-9728-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170825213924.xhbeiffp3oidclor@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Aug 2017, Will Deacon wrote:
-> On Thu, Aug 24, 2017 at 09:31:05AM +0200, Jiri Slaby wrote:
-> > +static int futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
-> > +{
-> > +	unsigned int op =	  (encoded_op & 0x70000000) >> 28;
-> > +	unsigned int cmp =	  (encoded_op & 0x0f000000) >> 24;
-> > +	int oparg = sign_extend32((encoded_op & 0x00fff000) >> 12, 12);
-> > +	int cmparg = sign_extend32(encoded_op & 0x00000fff, 12);
-> > +	int oldval, ret;
-> > +
-> > +	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28)) {
-> > +		if (oparg < 0 || oparg > 31)
-> > +			return -EINVAL;
-> > +		oparg = 1 << oparg;
-> > +	}
-> > +
-> > +	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-> > +		return -EFAULT;
-> > +
-> > +	ret = arch_futex_atomic_op_inuser(op, oparg, &oldval, uaddr);
-> > +	if (ret)
-> > +		return ret;
+On Wed, Aug 23, 2017 at 01:16:41AM +0900, Masahiro Yamada wrote:
+> This GPIO controller device is used on UniPhier SoCs.
 > 
-> We could move the pagefault_{disable,enable} calls here, and then remove
-> them from the futex_atomic_op_inuser callsites elsewhere in futex.c
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+> Changes in v3:
+>   - Add .irq_set_affinity() hook
+>   - Use irq_domain_create_hierarchy() instead of legacy
+>     irq_domain_add_hierarchy().
+> 
+> Changes in v2:
+>   - Remove +32 offset for parent interrupts to follow the GIC
+>     binding convention
+>   - Let uniphier_gpio_irq_alloc() fail if nr_irqs != 1
+>   - Allocate gpio_chip statically because just one instance is
+>     supported
+>   - Fix suspend and resume hooks
+> 
+>  .../devicetree/bindings/gpio/gpio-uniphier.txt     |  42 ++
 
-Correct, but we can do that after getting this in.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks,
-
-	tglx
+>  MAINTAINERS                                        |   1 +
+>  drivers/gpio/Kconfig                               |   7 +
+>  drivers/gpio/Makefile                              |   1 +
+>  drivers/gpio/gpio-uniphier.c                       | 589 +++++++++++++++++++++
+>  include/dt-bindings/gpio/uniphier-gpio.h           |  18 +
+>  6 files changed, 658 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+>  create mode 100644 drivers/gpio/gpio-uniphier.c
+>  create mode 100644 include/dt-bindings/gpio/uniphier-gpio.h
