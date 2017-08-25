@@ -1,44 +1,64 @@
-From: raltherr@google.com (Rick Altherr)
-Date: Fri, 25 Aug 2017 09:53:40 -0700
-Subject: [patch v6 0/3] JTAG driver introduction
-In-Reply-To: <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
-References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
- <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
- <CAPLgG==Jj=Ys=SvhOCspSfunbWnuqPySvW9RfuqE8HYnG4C=ZQ@mail.gmail.com>
- <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
- <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
-Message-ID: <CAPLgG=ke+5kX5TuTtciVCxtCr6agpFMo-6peXfhbE0UCvy6M3w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Aug 2017 19:12:33 +0200
+Subject: [PATCH] net: stmmac: dwmac-sun8i: Use reset exclusive
+In-Reply-To: <20170825151733.GB9475@Red>
+References: <20170825143805.21733-1-clabbe.montjoie@gmail.com>
+ <20170825144832.3w6izhri5vstbndp@flea.lan>
+ <20170825151733.GB9475@Red>
+Message-ID: <20170825171233.4xoihzakca3mqscd@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 1:50 AM, Stuart Longland
-<stuartl@longlandclan.id.au> wrote:
-> [Note: dropping vadimp at maellanox.com as SMTP server complained about the
-> DNS server returning NXDOMAIN.  Apologies.]
-> On 25/08/17 18:32, Linus Walleij wrote:
->> Gnah!
->> Whoever writes a slot-in replacement making the character device
->> take precendence wins lots of karma.
->
-> What would such a replacement look like though?
+On Fri, Aug 25, 2017 at 05:17:33PM +0200, Corentin Labbe wrote:
+> On Fri, Aug 25, 2017 at 04:48:32PM +0200, Maxime Ripard wrote:
+> > On Fri, Aug 25, 2017 at 04:38:05PM +0200, Corentin Labbe wrote:
+> > > The current dwmac_sun8i module cannot be rmmod/modprobe due to that
+> > > the reset controller was not released when removed.
+> > > 
+> > > This patch remove ambiguity, by using of_reset_control_get_exclusive and
+> > > add the missing reset_control_put().
+> > > 
+> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > ---
+> > >  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> > > index fffd6d5fc907..675a09629d85 100644
+> > > --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> > > +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> > > @@ -782,6 +782,7 @@ static int sun8i_dwmac_unpower_internal_phy(struct sunxi_priv_data *gmac)
+> > >  
+> > >  	clk_disable_unprepare(gmac->ephy_clk);
+> > >  	reset_control_assert(gmac->rst_ephy);
+> > > +	reset_control_put(gmac->rst_ephy);
+> > >  	return 0;
+> > >  }
+> > >  
+> > > @@ -942,7 +943,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
+> > >  			return -EINVAL;
+> > >  		}
+> > >  
+> > > -		gmac->rst_ephy = of_reset_control_get(plat_dat->phy_node, NULL);
+> > > +		gmac->rst_ephy = of_reset_control_get_exclusive(plat_dat->phy_node, NULL);
+> > 
+> > Why not just use devm_reset_control_get?
+> > 
+> 
+> Because there no devm_ functions with of_
 
-See Linus's comments about using the existing kernel GPIO chardev
-interface.  It already supports requesting multiple GPIO line state
-changes in a single request.
+devm_reset_control_get uses of_reset_control_get internally.
 
->
-> Some sort of system whereby you can read/write single-line commands as
-> if talking to a GPIO expander over a UART?
->
-> Would you access the GPIOs one by one, or would you perhaps map them
-> into a bitmap (maybe arbitrarily, up to 64-bits wide) and perform masked
-> operations on the bitmap?
->
-> I'm no fan of the sysfs GPIO interface, but it beats poking around at
-> registers behind the kernel's back.
-> --
-> Stuart Longland (aka Redhatter, VK4MSL)
->
-> I haven't lost my mind...
->   ...it's backed up on a tape somewhere.
->
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/2caca452/attachment-0001.sig>
