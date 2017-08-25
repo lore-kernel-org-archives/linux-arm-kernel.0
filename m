@@ -1,58 +1,318 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Aug 2017 21:12:13 +0200
-Subject: [PATCH 0/4] net: stmmac: revert the EMAC bindings
-Message-ID: <20170825191217.10278-1-maxime.ripard@free-electrons.com>
+Date: Fri, 25 Aug 2017 21:12:15 +0200
+Subject: [PATCH 2/4] arm64: dts: allwinner: Revert EMAC changes
+In-Reply-To: <20170825191217.10278-1-maxime.ripard@free-electrons.com>
+References: <20170825191217.10278-1-maxime.ripard@free-electrons.com>
+Message-ID: <20170825191217.10278-3-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since the discussion is not settled yet for the EMAC, and that the release
+in getting really close, let's revert the changes for now, and we'll
+reintroduce them later.
 
-The bindings of the stmmac glue for the new Allwinner EMAC controller
-are still controversial and being discussed, even though they've been
-merged in 4.13.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts   | 17 -----------------
+ .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts    | 15 ---------------
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts  | 18 ------------------
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 17 -----------------
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi        | 20 --------------------
+ .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts     | 17 -----------------
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts    | 17 -----------------
+ .../boot/dts/allwinner/sun50i-h5-orangepi-prime.dts  | 17 -----------------
+ 8 files changed, 138 deletions(-)
 
-In order not to introduce any binding we do not really want to commit
-to in a stable release, especially since that would mean we would have
-to support both the right and old bindings, let's revert them.
-
-We will reintroduce them in due time, once the discussion has settled
-down.
-
-The first three patches should go through the arm-soc tree, the last
-one through the net tree. All of them must be treated as fixes.
-
-Thanks!
-Maxime
-
-Maxime Ripard (4):
-  dt-bindings: net: Revert sun8i dwmac binding
-  arm64: dts: allwinner: Revert EMAC changes
-  arm: dts: sunxi: Revert EMAC changes
-  net: stmmac: sun8i: Remove the compatibles
-
- .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ----------------------
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |  9 ---
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 19 -----
- arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  8 ---
- arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          |  7 --
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  8 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  8 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |  5 --
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  8 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       | 22 ------
- arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts     | 16 -----
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 26 -------
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 17 -----
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 15 ----
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 18 -----
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 17 -----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 20 ------
- .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   | 17 -----
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 17 -----
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 17 -----
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  8 ---
- 21 files changed, 366 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 4a8d3f83a36e..d347f52e27f6 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -51,7 +51,6 @@
+ 	compatible = "sinovoip,bananapi-m64", "allwinner,sun50i-a64";
+ 
+ 	aliases {
+-		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 	};
+@@ -70,15 +69,6 @@
+ 	status = "okay";
+ };
+ 
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&rgmii_pins>;
+-	phy-mode = "rgmii";
+-	phy-handle = <&ext_rgmii_phy>;
+-	phy-supply = <&reg_dc1sw>;
+-	status = "okay";
+-};
+-
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+@@ -89,13 +79,6 @@
+ 	bias-pull-up;
+ };
+ 
+-&mdio {
+-	ext_rgmii_phy: ethernet-phy at 1 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <1>;
+-	};
+-};
+-
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+index 24f1aac366d6..f82ccf332c0f 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+@@ -48,18 +48,3 @@
+ 
+ 	/* TODO: Camera, touchscreen, etc. */
+ };
+-
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&rgmii_pins>;
+-	phy-mode = "rgmii";
+-	phy-handle = <&ext_rgmii_phy>;
+-	status = "okay";
+-};
+-
+-&mdio {
+-	ext_rgmii_phy: ethernet-phy at 1 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <1>;
+-	};
+-};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 122b5d8e5438..caf8b6fbe5e3 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -51,7 +51,6 @@
+ 	compatible = "pine64,pine64", "allwinner,sun50i-a64";
+ 
+ 	aliases {
+-		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+@@ -79,16 +78,6 @@
+ 	status = "okay";
+ };
+ 
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&rmii_pins>;
+-	phy-mode = "rmii";
+-	phy-handle = <&ext_rmii_phy1>;
+-	phy-supply = <&reg_dc1sw>;
+-	status = "okay";
+-
+-};
+-
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+@@ -99,13 +88,6 @@
+ 	bias-pull-up;
+ };
+ 
+-&mdio {
+-	ext_rmii_phy1: ethernet-phy at 1 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <1>;
+-	};
+-};
+-
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index a053a6ac5267..17ccc12b58df 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -53,7 +53,6 @@
+ 		     "allwinner,sun50i-a64";
+ 
+ 	aliases {
+-		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -77,22 +76,6 @@
+ 	status = "okay";
+ };
+ 
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&rgmii_pins>;
+-	phy-mode = "rgmii";
+-	phy-handle = <&ext_rgmii_phy>;
+-	phy-supply = <&reg_dc1sw>;
+-	status = "okay";
+-};
+-
+-&mdio {
+-	ext_rgmii_phy: ethernet-phy at 1 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <1>;
+-	};
+-};
+-
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 50f17bab0c07..8c8db1b057df 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -449,26 +449,6 @@
+ 			#size-cells = <0>;
+ 		};
+ 
+-		emac: ethernet at 1c30000 {
+-			compatible = "allwinner,sun50i-a64-emac";
+-			syscon = <&syscon>;
+-			reg = <0x01c30000 0x10000>;
+-			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupt-names = "macirq";
+-			resets = <&ccu RST_BUS_EMAC>;
+-			reset-names = "stmmaceth";
+-			clocks = <&ccu CLK_BUS_EMAC>;
+-			clock-names = "stmmaceth";
+-			status = "disabled";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			mdio: mdio {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
+-		};
+-
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+index 968908761194..1c2387bd5df6 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+@@ -50,7 +50,6 @@
+ 	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
+ 
+ 	aliases {
+-		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -109,22 +108,6 @@
+ 	status = "okay";
+ };
+ 
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&emac_rgmii_pins>;
+-	phy-supply = <&reg_gmac_3v3>;
+-	phy-handle = <&ext_rgmii_phy>;
+-	phy-mode = "rgmii";
+-	status = "okay";
+-};
+-
+-&mdio {
+-	ext_rgmii_phy: ethernet-phy at 7 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <7>;
+-	};
+-};
+-
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+index a8296feee884..4f77c8470f6c 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+@@ -59,7 +59,6 @@
+ 	};
+ 
+ 	aliases {
+-		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -137,28 +136,12 @@
+ 	status = "okay";
+ };
+ 
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&emac_rgmii_pins>;
+-	phy-supply = <&reg_gmac_3v3>;
+-	phy-handle = <&ext_rgmii_phy>;
+-	phy-mode = "rgmii";
+-	status = "okay";
+-};
+-
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
+ 	status = "okay";
+ };
+ 
+-&mdio {
+-	ext_rgmii_phy: ethernet-phy at 1 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <1>;
+-	};
+-};
+-
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+index d906b302cbcd..6be06873e5af 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+@@ -54,7 +54,6 @@
+ 	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
+ 
+ 	aliases {
+-		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -144,28 +143,12 @@
+ 	status = "okay";
+ };
+ 
+-&emac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&emac_rgmii_pins>;
+-	phy-supply = <&reg_gmac_3v3>;
+-	phy-handle = <&ext_rgmii_phy>;
+-	phy-mode = "rgmii";
+-	status = "okay";
+-};
+-
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
+ 	status = "okay";
+ };
+ 
+-&mdio {
+-	ext_rgmii_phy: ethernet-phy at 1 {
+-		compatible = "ethernet-phy-ieee802.3-c22";
+-		reg = <1>;
+-	};
+-};
+-
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 -- 
 2.13.5
