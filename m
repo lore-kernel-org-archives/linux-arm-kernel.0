@@ -1,57 +1,59 @@
-From: surenderp@techveda.org (surenderp at techveda.org)
-Date: Fri, 25 Aug 2017 13:37:22 +0530
-Subject: [RESEND PATCH] arm: dts: artpec6: Remove unnecessary interrupt-parent
- property from sub-nodes
-Message-ID: <1503648442-3364-1-git-send-email-surenderp@techveda.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 25 Aug 2017 10:23:11 +0200
+Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
+ trigger"
+In-Reply-To: <20170823193419.GA7965@amd>
+References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+ <CAMuHMdUjZHpEQKmhCGnqtZjw_PK5PeQe2kEH6TTKfS8Ne2+drQ@mail.gmail.com>
+ <20170823193419.GA7965@amd>
+Message-ID: <CAMuHMdXm_WQh8-krQgT2+nfr3xTuDvnHbK3B+qJJaeVsvRu5gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Surender Polsani <surenderp@techveda.org>
+On Wed, Aug 23, 2017 at 9:34 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>> On Tue, Jun 13, 2017 at 4:39 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
+>> > This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+>> >
+>> > System cannot enter suspend mode because of heartbeat led trigger.
+>> > In autosleep_wq, try_to_suspend function will try to enter suspend
+>> > mode in specific period. it will get wakeup_count then call pm_notifier
+>> > chain callback function and freeze processes.
+>> > Heartbeat_pm_notifier is called and it call led_trigger_unregister to
+>> > change the trigger of led device to none. It will send uevent message
+>> > and the wakeup source count changed. As wakeup_count changed, suspend
+>> > will abort.
+>> >
+>> > Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
+>>
+>> While investigating an heartbeat LED issue in v4.9.40-ltsi, I stumpled on this
+>> revert (commit 436c4c45b5b9562b ("Revert "leds: handle suspend/resume in
+>> heartbeat trigger"") in v4.12-rc6), which was not backported to v4.9 (yet).
+>>
+>> Interestingly, while running v4.9.x on r8a7791/koelsch with an LED configured
+>> for heartbeat, I can actually suspend the system using s2ram.
+>> However, after system resume the heartbeat LED no longer flashes.
+>> /sys/class/leds/LED6/trigger shows the trigger is still "none", and thus
+>> wasn't restored to "heartbeat" by the notifier.
+>> There's no "could not re-register heartbeat trigger" message printed.
+>>
+>> Backporting the revert fixes this.
+>
+> You have my Acked-by: if you want to submit this to some -stable
+> kernels...
 
-"interrupt-parent" property is declared in root node, so it is global
-to all nodes. This property is re-declared in few sub-nodes. To avoid
-duplication this property is removed from following sub-nodes: pmu,
-amba at 0, amba at 0/ethernet.
+Thank you!
 
-Signed-off-by: Surender Polsani <surenderp@techveda.org>
----
-Note:
-- Patch is rebased and built(ARCH=arm) on latest next-20170824.
-- This patch is a resend, the earlier version of this patch was
-ack'ed by Niklas Cassel but it was not merged with corresponding
-git trees. lkml conversation link:
-"https://lkml.org/lkml/2017/8/11/125"
----
- arch/arm/boot/dts/artpec6.dtsi | 3 ---
- 1 file changed, 3 deletions(-)
+Greg: Can you please queue 436c4c45b5b9562b ("Revert "leds: handle
+suspend/resume in heartbeat trigger"") for v4.9.x or v4.9-ltsi?
+Thanks!
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index 767cbe8..2ed1177 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -151,7 +151,6 @@
- 		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
- 			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-affinity = <&cpu0>, <&cpu1>;
--		interrupt-parent = <&intc>;
- 	};
- 
- 	pcie: pcie at f8050000 {
-@@ -185,7 +184,6 @@
- 		compatible = "simple-bus";
- 		#address-cells = <0x1>;
- 		#size-cells = <0x1>;
--		interrupt-parent = <&intc>;
- 		ranges;
- 		dma-ranges = <0x80000000 0x00000000 0x40000000>;
- 		dma-coherent;
-@@ -195,7 +193,6 @@
- 			clocks = <&eth_phy_ref_clk>,
- 				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
- 			compatible = "snps,dwc-qos-ethernet-4.10";
--			interrupt-parent = <&intc>;
- 			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xf8010000 0x4000>;
- 
--- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
