@@ -1,76 +1,162 @@
 From: alcooperx@gmail.com (Al Cooper)
-Date: Fri, 25 Aug 2017 13:51:31 -0400
-Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
-Message-ID: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+Date: Fri, 25 Aug 2017 13:51:35 -0400
+Subject: [PATCH V5 4/4] phy: usb: phy-brcm-usb: Add ability to force DRD mode
+ to host or device
+In-Reply-To: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+Message-ID: <1503683495-11766-5-git-send-email-alcooperx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new USB Phy driver for Broadcom STB SoCs. This driver
-supports Broadcom STB ARM SoCs. This driver in
-combination with the Broadcom STB ohci, ehci and xhci
-drivers will enable USB1.1, USB2.0 and USB3.0 support.
-This Phy driver also supports the Broadcom BDC gadget
-driver.
+From: Al Cooper <al.cooper@broadcom.com>
 
-Changes since v4:
-- MIPS support was dropped, so remove MIPS specific code
-  in the brcmusb_readl/brcmusb_writel routines.
-- Use readl/writel instead of readl_relaxed/writel_relaxed.
-- Remove double blank lines between some functions.
-- Remove support for obselete phy phandle argument.
+When the usb phy device mode is set to "drd", the USB port will
+switch between device and host modes depending on what's plugged
+into the port. Customers have asked for the ability to force
+host or device mode from software. This commit adds sysfs
+entries to the phy device that allow this. The sysfs for the phy
+device can be found at:
+/sys/bus/platform/drivers/brcmstb-usb-phy/*.usb-phy
 
-Changes since v3:
-- Removed MIPS support because there is such a small
-  amount of code that is common to both ARM and MIPS.
-  I'll create a separate MIPS driver in the future.
-- Have the Kconfig selection for this driver also select
-  "CONFIG_SOC_BRCMSTB" which contains needed functions.
-- Change device tree properties to use "brcm,has_xhci" and
-  "brcm,has_eohci" to determine if the phy contains
-  a xhci phy, and e/ohci phy or both.
-- Change the phy xlate routine to return an error instead
-  of NULL for a requested phy that doesn't exist.
-- Moved some probe functionality into it's own funtion to
-  simplify the many "if (has_xhci)" statements.
+The following sysfs entries were added:
+- "dr_mode" (RO) - The current phy "dr_mode" setting.
+  It will be set to one of the following values:
+  - "host" - host mode
+  - "peripheral " - device mode
+  - "drd" - switch between device and host mode based on
+    installed device
+  - "typec-pd" - device/host mode is controller by the USB
+    Type-C PD protocol.
 
-Changes since v2:
-- Fix kbuild errors by changing Kconfig so the driver
-  only builds for ARCH_BRCMSTB || BMIPS_GENERIC systems
+If "dr_mode" is "drd"
+- "drd_select" (RW) -
+  It will be set to one of the following values:
+  - "host" - force host mode
+  - "device" - force device mode
+  - "auto" - allow normal auto selection of host/device based on
+    inserted USB device
 
-Changes since v1:
-- Rebased to next
-- Add Kconfig entry to build the driver
-- Commented all delays
-- Split out sysfs functionality in separate patch
-- Removed parsing of old obselete device tree properties
-- Changed device property "device" to "dr_mode" using
-  standard values "host" and "peripheral" along with new
-  values "drd" and "typec-pd"
-- Add ability to handle the standard PHY_TYPE_USB2 and
-  PHY_TYPE_USB3 arguments passed in by phy consumers.
-- Moved phy_provider_register() to end of probe routine
+Signed-off-by: Al Cooper <alcooperx@gmail.com>
+---
+ drivers/phy/broadcom/phy-brcm-usb.c | 85 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-Al Cooper (4):
-  soc: brcmstb: Add Product ID and Family ID helper functions
-  dt-bindings: Add Broadcom STB USB PHY binding document
-  phy: usb: phy-brcm-usb: Add Broadcom STB USB phy driver
-  phy: usb: phy-brcm-usb: Add ability to force DRD mode to host or
-    device
-
- .../bindings/phy/brcm,brcmstb-usb-phy.txt          |   43 +
- MAINTAINERS                                        |    7 +
- drivers/phy/broadcom/Kconfig                       |   13 +
- drivers/phy/broadcom/Makefile                      |    3 +
- drivers/phy/broadcom/phy-brcm-usb-init.c           | 1007 ++++++++++++++++++++
- drivers/phy/broadcom/phy-brcm-usb-init.h           |   50 +
- drivers/phy/broadcom/phy-brcm-usb.c                |  458 +++++++++
- drivers/soc/bcm/brcmstb/common.c                   |   12 +
- include/linux/soc/brcmstb/brcmstb.h                |   10 +
- 9 files changed, 1603 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
- create mode 100644 drivers/phy/broadcom/phy-brcm-usb-init.c
- create mode 100644 drivers/phy/broadcom/phy-brcm-usb-init.h
- create mode 100644 drivers/phy/broadcom/phy-brcm-usb.c
-
+diff --git a/drivers/phy/broadcom/phy-brcm-usb.c b/drivers/phy/broadcom/phy-brcm-usb.c
+index cda27e0..e30cc1d 100644
+--- a/drivers/phy/broadcom/phy-brcm-usb.c
++++ b/drivers/phy/broadcom/phy-brcm-usb.c
+@@ -27,6 +27,8 @@
+ 
+ #include "phy-brcm-usb-init.h"
+ 
++static DEFINE_MUTEX(sysfs_lock);
++
+ enum brcm_usb_phy_id {
+ 	BRCM_USB_PHY_2_0 = 0,
+ 	BRCM_USB_PHY_3_0,
+@@ -45,6 +47,12 @@ struct value_to_name_map {
+ 	{ USB_CTLR_MODE_TYPEC_PD, "typec-pd" }
+ };
+ 
++static struct value_to_name_map brcm_dual_mode_to_name[] = {
++	{ 0, "host" },
++	{ 1, "device" },
++	{ 2, "auto" },
++};
++
+ struct brcm_usb_phy {
+ 	struct phy *phy;
+ 	unsigned int id;
+@@ -160,6 +168,73 @@ static int name_to_value(struct value_to_name_map *table, int count,
+ 	return -EINVAL;
+ }
+ 
++static const char *value_to_name(struct value_to_name_map *table, int count,
++				int value)
++{
++	if (value >= count)
++		return "unknown";
++	return table[value].name;
++}
++
++static ssize_t dr_mode_show(struct device *dev,
++				struct device_attribute *attr,
++				char *buf)
++{
++	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
++
++	return sprintf(buf, "%s\n",
++		value_to_name(&brcm_dr_mode_to_name[0],
++			ARRAY_SIZE(brcm_dr_mode_to_name),
++			priv->ini.mode));
++}
++static DEVICE_ATTR_RO(dr_mode);
++
++static ssize_t dual_select_store(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf, size_t len)
++{
++	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
++	int value;
++	int res;
++
++	mutex_lock(&sysfs_lock);
++	res = name_to_value(&brcm_dual_mode_to_name[0],
++			ARRAY_SIZE(brcm_dual_mode_to_name), buf, &value);
++	if (!res) {
++		brcm_usb_init_set_dual_select(&priv->ini, value);
++		res = len;
++	}
++	mutex_unlock(&sysfs_lock);
++	return res;
++}
++
++static ssize_t dual_select_show(struct device *dev,
++				struct device_attribute *attr,
++				char *buf)
++{
++	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
++	int value;
++
++	mutex_lock(&sysfs_lock);
++	value = brcm_usb_init_get_dual_select(&priv->ini);
++	mutex_unlock(&sysfs_lock);
++	return sprintf(buf, "%s\n",
++		value_to_name(&brcm_dual_mode_to_name[0],
++			ARRAY_SIZE(brcm_dual_mode_to_name),
++			value));
++}
++static DEVICE_ATTR_RW(dual_select);
++
++static struct attribute *brcm_usb_phy_attrs[] = {
++	&dev_attr_dr_mode.attr,
++	&dev_attr_dual_select.attr,
++	NULL
++};
++
++static const struct attribute_group brcm_usb_phy_group = {
++	.attrs = brcm_usb_phy_attrs,
++};
++
+ static int brcm_usb_phy_dvr_init(struct device *dev,
+ 				struct brcm_usb_phy_data *priv,
+ 				struct device_node *dn)
+@@ -276,6 +351,16 @@ static int brcm_usb_phy_probe(struct platform_device *pdev)
+ 	/* make sure invert settings are correct */
+ 	brcm_usb_init_ipp(&priv->ini);
+ 
++	/*
++	 * Create sysfs entries for mode.
++	 * Remove "dual_select" attribute if not in dual mode
++	 */
++	if (priv->ini.mode != USB_CTLR_MODE_DRD)
++		brcm_usb_phy_attrs[1] = NULL;
++	err = sysfs_create_group(&dev->kobj, &brcm_usb_phy_group);
++	if (err)
++		dev_warn(dev, "Error creating sysfs attributes\n");
++
+ 	/* start with everything off */
+ 	if (priv->has_xhci)
+ 		brcm_usb_uninit_xhci(&priv->ini);
 -- 
 1.9.0.138.g2de3478
