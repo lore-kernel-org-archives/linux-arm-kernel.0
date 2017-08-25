@@ -1,74 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 25 Aug 2017 10:39:29 +0200
-Subject: [PATCH v3 1/5] mfd: mt6397: create irq mappings in mfd core driver
-In-Reply-To: <1503642753-12385-2-git-send-email-chen.zhong@mediatek.com>
-References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
- <1503642753-12385-2-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <20170825083929.ztyzfelwqcxvpiex@piout.net>
+From: stuartl@longlandclan.id.au (Stuart Longland)
+Date: Fri, 25 Aug 2017 18:50:23 +1000
+Subject: [patch v6 0/3] JTAG driver introduction
+In-Reply-To: <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
+References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
+ <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
+ <CAPLgG==Jj=Ys=SvhOCspSfunbWnuqPySvW9RfuqE8HYnG4C=ZQ@mail.gmail.com>
+ <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
+Message-ID: <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/08/2017 at 14:32:29 +0800, Chen Zhong wrote:
-> The core driver should create and manage irq mappings instead of
-> leaf drivers. This patch change to pass irq domain to
-> devm_mfd_add_devices() and it will create mapping for irq resources
-> automatically. And remove irq mapping in rtc driver since this has
-> been done in core driver.
-> 
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+[Note: dropping vadimp at maellanox.com as SMTP server complained about the
+DNS server returning NXDOMAIN.  Apologies.]
+On 25/08/17 18:32, Linus Walleij wrote:
+> Gnah!
+> Whoever writes a slot-in replacement making the character device
+> take precendence wins lots of karma.
 
-> ---
->  drivers/mfd/mt6397-core.c |    4 ++--
->  drivers/rtc/rtc-mt6397.c  |    7 +++----
->  2 files changed, 5 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 04a601f..6546d7f 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
->  
->  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
->  					   ARRAY_SIZE(mt6323_devs), NULL,
-> -					   0, NULL);
-> +					   0, pmic->irq_domain);
->  		break;
->  
->  	case MT6397_CID_CODE:
-> @@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
->  
->  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
->  					   ARRAY_SIZE(mt6397_devs), NULL,
-> -					   0, NULL);
-> +					   0, pmic->irq_domain);
->  		break;
->  
->  	default:
-> diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-> index 1a61fa5..385f830 100644
-> --- a/drivers/rtc/rtc-mt6397.c
-> +++ b/drivers/rtc/rtc-mt6397.c
-> @@ -322,10 +322,9 @@ static int mtk_rtc_probe(struct platform_device *pdev)
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	rtc->addr_base = res->start;
->  
-> -	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> -	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
-> -	if (rtc->irq <= 0)
-> -		return -EINVAL;
-> +	rtc->irq = platform_get_irq(pdev, 0);
-> +	if (rtc->irq < 0)
-> +		return rtc->irq;
->  
->  	rtc->regmap = mt6397_chip->regmap;
->  	rtc->dev = &pdev->dev;
-> -- 
-> 1.7.9.5
-> 
+What would such a replacement look like though?
 
+Some sort of system whereby you can read/write single-line commands as
+if talking to a GPIO expander over a UART?
+
+Would you access the GPIOs one by one, or would you perhaps map them
+into a bitmap (maybe arbitrarily, up to 64-bits wide) and perform masked
+operations on the bitmap?
+
+I'm no fan of the sysfs GPIO interface, but it beats poking around at
+registers behind the kernel's back.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Stuart Longland (aka Redhatter, VK4MSL)
+
+I haven't lost my mind...
+  ...it's backed up on a tape somewhere.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/122b6c6d/attachment.sig>
