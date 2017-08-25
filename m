@@ -1,153 +1,62 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 25 Aug 2017 11:03:51 +0900
-Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
-In-Reply-To: <20170824173049.GG29665@leverpostej>
-References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-15-takahiro.akashi@linaro.org>
- <20170824173049.GG29665@leverpostej>
-Message-ID: <20170825020348.GA7308@akashi-kouhiroshi-no-MacBook-Air.local>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 25 Aug 2017 10:06:53 +0800
+Subject: [PATCH] arm64: defconfig: enable rockchip graphics
+In-Reply-To: <20170824150210.10949-1-heiko@sntech.de>
+References: <20170824150210.10949-1-heiko@sntech.de>
+Message-ID: <599F863D.5020208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 06:30:50PM +0100, Mark Rutland wrote:
-> On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
-> > The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
-> > will be loaded at the offset of TEXT_OFFSET from the begining of system
-> > memory. The other PT_LOAD segments are placed relative to the first one.
-> 
-> I really don't like assuming things about the vmlinux ELF file.
+On 2017?08?24? 23:02, Heiko Stuebner wrote:
+> Enable the graphics-related options needed by Rockchip boards.
+> This includes the pwm-backlight which will be needed by the internal
+> displays used on Gru Chrome-devices.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+Hi Heiko
 
-If so, vmlinux is not an appropriate format for loading.
+Thanks for the patch, and it looks good for me.
 
-> > Regarding kernel verification, since there is no standard way to contain
-> > a signature within elf binary, we follow PowerPC's (not yet upstreamed)
-> > approach, that is, appending a signature right after the kernel binary
-> > itself like module signing.
-> 
-> I also *really* don't like this. It's a bizarre in-band mechanism,
-> without explcit information. It's not a nice ABI.
-> 
-> If we can load an Image, why do we need to be able to load a vmlinux?
+Reviewed-by: Mark Yao at rock-chips.com
 
-Well, kexec-tools does. I don't know why Geoff wanted to support vmlinux.
-I'm just trying to support what kexec-tools does support.
+>   arch/arm64/configs/defconfig | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index b4ca115b3be1..0789c7a66969 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -358,6 +358,12 @@ CONFIG_DRM_EXYNOS_DSI=y
+>   # CONFIG_DRM_EXYNOS_DP is not set
+>   CONFIG_DRM_EXYNOS_HDMI=y
+>   CONFIG_DRM_EXYNOS_MIC=y
+> +CONFIG_DRM_ROCKCHIP=m
+> +CONFIG_ROCKCHIP_ANALOGIX_DP=y
+> +CONFIG_ROCKCHIP_CDN_DP=y
+> +CONFIG_ROCKCHIP_DW_HDMI=y
+> +CONFIG_ROCKCHIP_DW_MIPI_DSI=y
+> +CONFIG_ROCKCHIP_INNO_HDMI=y
+>   CONFIG_DRM_RCAR_DU=m
+>   CONFIG_DRM_RCAR_LVDS=y
+>   CONFIG_DRM_RCAR_VSP=y
+> @@ -370,6 +376,7 @@ CONFIG_DRM_MESON=m
+>   CONFIG_FB=y
+>   CONFIG_FB_ARMCLCD=y
+>   CONFIG_BACKLIGHT_GENERIC=m
+> +CONFIG_BACKLIGHT_PWM=m
+>   CONFIG_BACKLIGHT_LP855X=m
+>   CONFIG_FRAMEBUFFER_CONSOLE=y
+>   CONFIG_LOGO=y
+> @@ -482,6 +489,7 @@ CONFIG_ARM_MHU=y
+>   CONFIG_PLATFORM_MHU=y
+>   CONFIG_BCM2835_MBOX=y
+>   CONFIG_HI6220_MBOX=y
+> +CONFIG_ROCKCHIP_IOMMU=y
+>   CONFIG_ARM_SMMU=y
+>   CONFIG_ARM_SMMU_V3=y
+>   CONFIG_RPMSG_QCOM_SMD=y
 
-> [...]
-> 
-> > diff --git a/arch/arm64/kernel/kexec_elf.c b/arch/arm64/kernel/kexec_elf.c
-> > new file mode 100644
-> > index 000000000000..7bd3c1e1f65a
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/kexec_elf.c
-> > @@ -0,0 +1,216 @@
-> > +/*
-> > + * Kexec vmlinux loader
-> > +
-> > + * Copyright (C) 2017 Linaro Limited
-> > + * Authors: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#define pr_fmt(fmt)	"kexec_file(elf): " fmt
-> > +
-> > +#include <linux/elf.h>
-> > +#include <linux/err.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/kexec.h>
-> > +#include <linux/module_signature.h>
-> > +#include <linux/types.h>
-> > +#include <linux/verification.h>
-> > +#include <asm/byteorder.h>
-> > +#include <asm/kexec_file.h>
-> > +#include <asm/memory.h>
-> > +
-> > +static int elf64_probe(const char *buf, unsigned long len)
-> > +{
-> > +	struct elfhdr ehdr;
-> > +
-> > +	/* Check for magic and architecture */
-> > +	memcpy(&ehdr, buf, sizeof(ehdr));
-> > +	if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) ||
-> > +		(elf16_to_cpu(&ehdr, ehdr.e_machine) != EM_AARCH64))
-> > +		return -ENOEXEC;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int elf_exec_load(struct kimage *image, struct elfhdr *ehdr,
-> > +			 struct elf_info *elf_info,
-> > +			 unsigned long *kernel_load_addr)
-> > +{
-> > +	struct kexec_buf kbuf;
-> > +	const struct elf_phdr *phdr;
-> > +	const struct arm64_image_header *h;
-> > +	unsigned long text_offset, rand_offset;
-> > +	unsigned long page_offset, phys_offset;
-> > +	int first_segment, i, ret = -ENOEXEC;
-> > +
-> > +	kbuf.image = image;
-> > +	if (image->type == KEXEC_TYPE_CRASH) {
-> > +		kbuf.buf_min = crashk_res.start;
-> > +		kbuf.buf_max = crashk_res.end + 1;
-> > +	} else {
-> > +		kbuf.buf_min = 0;
-> > +		kbuf.buf_max = ULONG_MAX;
-> > +	}
-> > +	kbuf.top_down = 0;
-> > +
-> > +	/* Load PT_LOAD segments. */
-> > +	for (i = 0, first_segment = 1; i < ehdr->e_phnum; i++) {
-> > +		phdr = &elf_info->proghdrs[i];
-> > +		if (phdr->p_type != PT_LOAD)
-> > +			continue;
-> > +
-> > +		kbuf.buffer = (void *) elf_info->buffer + phdr->p_offset;
-> > +		kbuf.bufsz = min(phdr->p_filesz, phdr->p_memsz);
-> > +		kbuf.memsz = phdr->p_memsz;
-> > +		kbuf.buf_align = phdr->p_align;
-> > +
-> > +		if (first_segment) {
-> > +			/*
-> > +			 * Identify TEXT_OFFSET:
-> > +			 * When CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET=y the image
-> > +			 * header could be offset in the elf segment. The linker
-> > +			 * script sets ehdr->e_entry to the start of text.
-> 
-> Please, let's not have to go delving into the vmlinux, knowing intimate
-> details about how it's put together.
 
-If we don't need to take care of RANDOMIZE_TEXT_OFFSET, the code would
-be much simpler and look similar to Image code.
-
-> 
-> > +			 *
-> > +			 * NOTE: In v3.16 or older, h->text_offset is 0,
-> > +			 * so use the default, 0x80000
-> > +			 */
-> > +			rand_offset = ehdr->e_entry - phdr->p_vaddr;
-> > +			h = (struct arm64_image_header *)
-> > +					(elf_info->buffer + phdr->p_offset +
-> > +					rand_offset);
-> > +
-> > +			if (!arm64_header_check_magic(h))
-> > +				goto out;
-> > +
-> > +			if (h->image_size)
-> > +				text_offset = le64_to_cpu(h->text_offset);
-> > +			else
-> > +				text_offset = 0x80000;
-> 
-> Surely we can share the Image header parsing with the Image parser?
-> 
-> The Image code had practically the exact same logic operating on the
-> header struct.
-
-Thanks,
--Takahiro AKASHI
-
-> Thanks,
-> Mark.
+-- 
+?ark Yao
