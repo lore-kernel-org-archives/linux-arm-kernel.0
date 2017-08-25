@@ -1,111 +1,77 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 25 Aug 2017 11:04:53 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <4050921.GfHh1Z5NrX@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
- <CAPDyKFrGvqhBdenSyQ8Qr76DbfEvc74_dKZAjraA5qL63Mm2rg@mail.gmail.com>
- <4050921.GfHh1Z5NrX@aspire.rjw.lan>
-Message-ID: <CAPDyKFpznYWU3NcuUfUD3=isR_w=it995+=GTaF8OU2Ho-GOQg@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 25 Aug 2017 10:15:55 +0100
+Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.14
+In-Reply-To: <55aac7c8-3a68-082a-6b13-63201670f711@monstr.eu>
+References: <8d0c07a6-27e9-e14a-560f-3fc89327f8cd@monstr.eu>
+ <CAK8P3a0KttjyxbtP=WyrYdRSV49jr_NMBWfhquxThL-x8wdiXQ@mail.gmail.com>
+ <55aac7c8-3a68-082a-6b13-63201670f711@monstr.eu>
+Message-ID: <3ae81a59-36ea-280c-627c-792f4f3158e8@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2017 at 16:57, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Thursday, August 24, 2017 10:19:43 AM CEST Ulf Hansson wrote:
->> On 24 August 2017 at 01:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
->> > On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> >> In some cases a driver for an ACPI device needs to be able to prevent the
->> >> ACPI PM domain from using the direct_complete path during system sleep.
->> >>
->> >> One typical case is when the driver for the device needs its device to stay
->> >> runtime enabled, during the __device_suspend phase. This isn't the case
->> >> when the direct_complete path is being executed by the PM core, as it then
->> >> disables runtime PM for the device in __device_suspend(). Any following
->> >> attempts to runtime resume the device after that point, just fails.
->> >
->> > OK, that is a problem.
->> >
->> >> A workaround to this problem is to let the driver runtime resume its device
->> >> from its ->prepare() callback, as that would prevent the direct_complete
->> >> path from being executed. However, that may often be a waste, especially if
->> >> it turned out that no one really needed the device.
->> >>
->> >> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
->> >> drivers to inform the ACPI PM domain to change its default behaviour during
->> >> system sleep, and thus control whether it may use the direct_complete path
->> >> or not.
->> >
->> > But I'm not sure this is the right place to address it as it very well
->> > may affect a PCI device too.
->> >
->> > Also, this is about the device and not about its ACPI companion
->> > object, so putting the flag in there is somewhat unclean, so to speak.
->> >
->> > It looks like we need a flag in dev_pm_info saying something along the
->> > lines of "my system suspend callback can deal with runtime PM" that
->> > will cause the direct_complete update to occur in
->> > __device_suspend_late() instead of __device_suspend().
+
+
+On 24/08/17 14:34, Michal Simek wrote:
+> On 22.8.2017 17:45, Arnd Bergmann wrote:
+>> On Mon, Aug 21, 2017 at 3:05 PM, Michal Simek <monstr@monstr.eu> wrote:
+>>> Hi,
+>>>
+>>> please apply these two patches to your tree.
+>>>
+>>> Thanks,
+>>> Michal
+>>>
+>>>
+>>>   The following changes since commit
+>>> 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>>>
+>>>     Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>>>
+>>>   are available in the git repository at:
+>>>
+>>>     https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.14
+>>>
+>>>   for you to fetch changes up to b04d4c876b1b7f25cff35b7c26c5b9f518f612b2:
+>>>
+>>>     ARM: zynq: Add support for Zynq-7000S devices (2017-08-21 14:22:50 +0200)
+>>>
+>>>   ----------------------------------------------------------------
+>>>   arm: Xilinx Zynq patches for v4.14
+>>>
+>>>   - Add support for 7000s devices
+>>>
+>>>   ----------------------------------------------------------------
+>>>   Michal Simek (2):
+>>>         devicetree: ARM: zynq: Add DT binding for eFuse controller
+>>>         ARM: zynq: Add support for Zynq-7000S devices
+>>>
+>>>    Documentation/devicetree/bindings/nvmem/zynq-efuse.txt | 15
+>>> +++++++++++++++
+>>>    arch/arm/boot/dts/zynq-7000.dtsi                       |  5 +++++
+>>>    arch/arm/mach-zynq/Makefile                            |  2 +-
+>>>    arch/arm/mach-zynq/common.c                            |  1 +
+>>>    arch/arm/mach-zynq/common.h                            |  3 +++
+>>>    arch/arm/mach-zynq/efuse.c                             | 75
+>>> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>    arch/arm/mach-zynq/platsmp.c                           |  3 +++
+>>>    7 files changed, 103 insertions(+), 1 deletion(-)
 >>
->> I realize that in the end this turns out to be a comparison between
->> the runtime PM centric path and the direct_complete path while
->> implementing system sleep. In patch 9, there is some more explanation
->> around this, however if you like I can elaborate even more about
->> this!?
+>> Not pulled yet, it looked like you add a driver stub for something
+>> that belongs into drivers/nvmem/.
 >>
->> Regarding making changes to the PM core and adding more flags to the
->> dev_pm_info etc, I am not sure we really want that. Isn't it already
->> complex enough?
->
-> Maybe it is.
->
->> My point is, that I am trying to improve the behavior of the ACPI PM
->> domain by enabling the runtime PM centric path for it, and even if
->> there is something similar that could be done for PCI, I don't think
->> we should need involvement by the PM core.
->
-> Well, this generally simply doesn't work.
->
-> The whole "runtime PM centric approach" idea is generally fine by me,
-> but the fact today is that there are drivers not ready for it.  Which
-> is why there is the direct_complete thing (it may be regarded as a
-> sort-of workaround for the unreadiness of drivers if you will).
+>> Can you consult with Srinivas Kandagatla about what the right
+>> approach is for this?
+> 
+> Srinivas: Any comment?
 
-This is how I see it:
+> We can move it to nvmem and make regular driver from this.
+looking at the driver,  I see no reason why this should not be a nvmem 
+provider driver.
 
-The runtime PM centric path is being widely deployed, however it takes
-time to convert drivers.
-
-The direct_complete path offers a great intermediate step for the ACPI
-PM domain as it affects all its devices - while we wait for further
-optimizations being deployed using the runtime PM centric path.
-
->
-> Now, buy adding the no_direct_complete flag just to the ACPI PM domain
-> you basically overlook the fact that this potentially affects the parents
-> of the devices in question by preventing direct_complete from being set
-> for them.  And those parents may not be in the ACPI PM domain in principle,
-> so the problem needs to be addressed in the core.
-
-Okay, let's move the flag to the dev_pm* structures, to not limit this
-to the ACPI PM domain.
-
-However in the current approach taken in this series, as it's coded as
-opt-in to use for drivers, I am questioning how big of a problem
-parent devices not being able to use the direct_complete path could
-be!?
-Couldn't it be good enough to just adopt the behavior of the ACPI PM
-domain and more or less leave the core out of it - at least for now!?
-
-I am also thinking, that for those parent devices that potentially may
-suffer from not be able to use the direct_complete path, those can be
-fixed by deploying the runtime PM centric path in their
-subsystems/drivers. That would even mean that the parent devices get
-the additional benefits that the runtime PM centric path offers. So,
-in the end we would end up having a better optimized solution than we
-had before.
-
-What do you think?
-
-Kind regards
-Uffe
+thanks,
+srini
+> 
+> Thanks,
+> Michal
+> 
+> 
