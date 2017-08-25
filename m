@@ -1,57 +1,65 @@
-From: mickael.guene@st.com (Mickael GUENE)
-Date: Fri, 25 Aug 2017 06:23:44 +0000
-Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
-In-Reply-To: <alpine.LFD.2.20.1708241114090.14288@knanqh.ubzr>
-References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
- <20170817083716.GN20805@n2100.armlinux.org.uk>
- <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
- <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
- <alpine.LFD.2.20.1708240834210.14288@knanqh.ubzr>
- <770523b1-49f6-2033-ff68-027dae1d53fc@st.com>
- <alpine.LFD.2.20.1708241114090.14288@knanqh.ubzr>
-Message-ID: <dcc24d72-c081-c1b6-3677-37087f715837@st.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Fri, 25 Aug 2017 14:32:30 +0800
+Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+This patch adds the device tree binding documentation for the MediaTek
+pmic keys found on PMIC MT6397/MT6323.
 
-  Thanks for explanation.
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
 
-Regards
-Mickael
-
-On 08/24/2017 05:48 PM, Nicolas Pitre wrote:
-> On Thu, 24 Aug 2017, Mickael GUENE wrote:
-> 
->> Hi Nicolas,
->>
->>> The first one is.
->>    It also seems to me that 'Add tls support for cortex-m cpu family'
->> patch is missing. There is the one that add the get_tls syscall but
->> not this one which enable usage for cortex-m family.
-> 
-> The patch titled "Add tls support for cortex-m cpu family" in your
-> repository does 3 things:
-> 
-> - It defines switch_tls to switch_tls_none. Without the patch the
->    default is switch_tls_software. But this has no purpose as on Cortex-M
->    targets there is simply no switch_tls usage at all. The switch_tls
->    macro is invoked in entry-armv.S within __switch_to whereas Cortex-M
->    uses a different implementation of __switch_to in entry-v7m.S.
-> 
-> - The patch also defines has_tls_reg to 0. That's the same as de default
->    without the patch.
-> 
-> - It also defines tls_emu to 1. That makes no sense as this is for ARMv6
->    that lack the dedicated CP15 register and is completely wrong for
->    Cortex-M. I suspect the actual reason for defining this to 1 was a
->    dubious workaround to prevent set_tls() from storing the TLS value at
->    the absolute address 0xffff0ff0. In recent kernels that particular
->    code is properly conditioned on CONFIG_KUSER_HELPERS instead.
-> 
-> So in the current mainline kernel this patch is useless. This is why I
-> didn't consider it.
-> 
-> 
-> Nicolas
-> 
+diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+new file mode 100644
+index 0000000..100ec44
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+@@ -0,0 +1,38 @@
++MediaTek MT6397/MT6323 PMIC Keys Device Driver
++
++There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
++and homekey. The key functions are defined as the subnode of the function
++node provided by MT6397/MT6323 PMIC that is being defined as one kind
++of Muti-Function Device (MFD)
++
++For MT6397/MT6323 MFD bindings see:
++Documentation/devicetree/bindings/mfd/mt6397.txt
++
++Required properties:
++- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
++- linux,keycodes: Specifies the numeric keycode values to
++	be used for reporting keys presses. The array can
++	contain up to 2 entries.
++
++Optional Properties:
++- wakeup-source: each key can be used as a wakeup source.
++- mediatek,long-press-mode: Long press key shutdown setting, 1 for
++	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
++- debounce-interval: Long press key shutdown debouncing interval time
++	in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
++
++Example:
++
++	pmic: mt6397 {
++		compatible = "mediatek,mt6397";
++
++		...
++
++		mt6397keys: mt6397keys {
++			compatible = "mediatek,mt6397-keys";
++			linux,keycodes = <KEY_POWER>, <KEY_VOLUMEDOWN>;
++			wakeup-source = <1>, <0>;
++			mediatek,long-press-mode = <1>;
++			debounce-interval = <0>;
++		};
++	};
+-- 
+1.7.9.5
