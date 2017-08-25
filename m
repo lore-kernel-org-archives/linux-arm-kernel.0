@@ -1,59 +1,78 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 25 Aug 2017 10:23:11 +0200
-Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
- trigger"
-In-Reply-To: <20170823193419.GA7965@amd>
-References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
- <CAMuHMdUjZHpEQKmhCGnqtZjw_PK5PeQe2kEH6TTKfS8Ne2+drQ@mail.gmail.com>
- <20170823193419.GA7965@amd>
-Message-ID: <CAMuHMdXm_WQh8-krQgT2+nfr3xTuDvnHbK3B+qJJaeVsvRu5gw@mail.gmail.com>
+From: florent.revest@arm.com (Florent Revest)
+Date: Fri, 25 Aug 2017 09:31:30 +0100
+Subject: [RFC 00/11] KVM, EFI, arm64: EFI Runtime Services Sandboxing
+Message-ID: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 9:34 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> On Tue, Jun 13, 2017 at 4:39 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
->> > This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
->> >
->> > System cannot enter suspend mode because of heartbeat led trigger.
->> > In autosleep_wq, try_to_suspend function will try to enter suspend
->> > mode in specific period. it will get wakeup_count then call pm_notifier
->> > chain callback function and freeze processes.
->> > Heartbeat_pm_notifier is called and it call led_trigger_unregister to
->> > change the trigger of led device to none. It will send uevent message
->> > and the wakeup source count changed. As wakeup_count changed, suspend
->> > will abort.
->> >
->> > Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
->>
->> While investigating an heartbeat LED issue in v4.9.40-ltsi, I stumpled on this
->> revert (commit 436c4c45b5b9562b ("Revert "leds: handle suspend/resume in
->> heartbeat trigger"") in v4.12-rc6), which was not backported to v4.9 (yet).
->>
->> Interestingly, while running v4.9.x on r8a7791/koelsch with an LED configured
->> for heartbeat, I can actually suspend the system using s2ram.
->> However, after system resume the heartbeat LED no longer flashes.
->> /sys/class/leds/LED6/trigger shows the trigger is still "none", and thus
->> wasn't restored to "heartbeat" by the notifier.
->> There's no "could not re-register heartbeat trigger" message printed.
->>
->> Backporting the revert fixes this.
->
-> You have my Acked-by: if you want to submit this to some -stable
-> kernels...
+Hi,
 
-Thank you!
+This series implements a mechanism to sandbox EFI Runtime Services on arm64.
+It can be enabled with CONFIG_EFI_SANDBOX. At boot it spawns an internal KVM
+virtual machine that is ran everytime an EFI Runtime Service is called. This
+limits the possible security and stability impact of EFI runtime on the kernel.
 
-Greg: Can you please queue 436c4c45b5b9562b ("Revert "leds: handle
-suspend/resume in heartbeat trigger"") for v4.9.x or v4.9-ltsi?
-Thanks!
+The patch set is split as follow:
+ - Patches 1 and 2: Give more control over HVC handling to KVM
+ - Patches 3 to 6: Introduce the concept of KVM "internal VMs"
+ - Patches 7 to 9: Reorder KVM and EFI initialization on ARM
+ - Patch 10: Introduces the EFI sandboxing VM and wrappers
+ - Patch 11: Workarounds some EFI Runtime Services relying on EL3
 
-Gr{oetje,eeting}s,
+The sandboxing has been tested to work reliably (rtc and efivars) on a
+SoftIron OverDrive 1000 box and on a ARMv8.3 model with VHE enabled. Normal
+userspace KVM instance have also been tested to still work correctly.
 
-                        Geert
+Those patches apply cleanly on the Linus' v4.13-rc6 tag and have no other
+dependencies.
+
+Florent Revest (11):
+  arm64: Add an SMCCC function IDs header
+  KVM: arm64: Return an Unknown ID on unhandled HVC
+  KVM: Allow VM lifecycle management without userspace
+  KVM, arm, arm64: Offer PAs to IPAs idmapping to internal VMs
+  KVM: Expose VM/VCPU creation functions
+  KVM, arm64: Expose a VCPU initialization function
+  KVM: Allow initialization before the module target
+  KVM, arm, arm64: Initialize KVM's core earlier
+  EFI, arm, arm64: Enable EFI Runtime Services later
+  efi, arm64: Sandbox Runtime Services in a VM
+  KVM, arm64: Don't trap internal VMs SMC calls
+
+ arch/arm/include/asm/efi.h                 |   7 +
+ arch/arm/include/asm/kvm_coproc.h          |   3 +
+ arch/arm/include/asm/kvm_host.h            |   1 +
+ arch/arm/include/asm/kvm_psci.h            |   1 +
+ arch/arm/kvm/coproc.c                      |   6 +
+ arch/arm/kvm/coproc_a15.c                  |   3 +-
+ arch/arm/kvm/coproc_a7.c                   |   3 +-
+ arch/arm64/include/asm/efi.h               |  71 ++++
+ arch/arm64/include/asm/kvm_emulate.h       |   3 +
+ arch/arm64/include/asm/kvm_host.h          |   4 +
+ arch/arm64/include/asm/kvm_psci.h          |   1 +
+ arch/arm64/kernel/asm-offsets.c            |   3 +
+ arch/arm64/kvm/handle_exit.c               |  27 +-
+ arch/arm64/kvm/sys_regs_generic_v8.c       |   8 +-
+ arch/x86/include/asm/efi.h                 |   2 +
+ drivers/firmware/efi/Kconfig               |  10 +
+ drivers/firmware/efi/Makefile              |   1 +
+ drivers/firmware/efi/arm-runtime.c         |   5 +-
+ drivers/firmware/efi/arm-sandbox-payload.S |  96 +++++
+ drivers/firmware/efi/arm-sandbox.c         | 569 +++++++++++++++++++++++++++++
+ drivers/firmware/efi/efi.c                 |   3 +
+ include/linux/kvm_host.h                   |   4 +
+ include/linux/smccc_fn.h                   |  53 +++
+ include/uapi/linux/psci.h                  |   2 +
+ virt/kvm/arm/arm.c                         |  18 +-
+ virt/kvm/arm/mmu.c                         |  76 +++-
+ virt/kvm/arm/psci.c                        |  21 ++
+ virt/kvm/kvm_main.c                        | 102 ++++--
+ 28 files changed, 1050 insertions(+), 53 deletions(-)
+ create mode 100644 drivers/firmware/efi/arm-sandbox-payload.S
+ create mode 100644 drivers/firmware/efi/arm-sandbox.c
+ create mode 100644 include/linux/smccc_fn.h
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+1.9.1
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
