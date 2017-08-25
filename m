@@ -1,36 +1,27 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 25 Aug 2017 08:39:51 +0800
-Subject: [PATCH v3] Revert "staging: Fix build issues with new binder API"
-Message-ID: <20170825003951.1961-1-jszhang@marvell.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Fri, 25 Aug 2017 08:49:55 +0800
+Subject: [PATCH v4 0/4] PCI: rockchip: Move PCIE_WAKE handling into
+ rockchip pcie driver
+In-Reply-To: <20170824165505.GM31858@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
+ <20170824165505.GM31858@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <599F7433.4070606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit d0bdff0db809 ("staging: Fix build issues with new
-binder API"), because commit e38361d032f1 ("ARM: 8091/2: add get_user()
-support for 8 byte types") has added the 64bit __get_user_asm_*
-implementation.
+Hi Bjorn,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- Since v2:
-  - fix the commit msg again.
- Since v1:
-  - fix the commit msg
- drivers/android/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 08/25/2017 12:55 AM, Bjorn Helgaas wrote:
+> Looking for acks from Shawn and Rob...
+>
+> And I'm not sure about the DT wake IRQ description.  That seems like it
+> could potentially be generic than this Rockchip-specific proposal.
+>
+>
+it looks like shawn already take the error handling patch into his 
+series, so i'll remove that one in my next version.
 
-diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
-index 832e885349b1..aca5dc30b97b 100644
---- a/drivers/android/Kconfig
-+++ b/drivers/android/Kconfig
-@@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
- 	  therefore logically separated from the other devices.
- 
- config ANDROID_BINDER_IPC_32BIT
--	bool
-+	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
- 	depends on !64BIT && ANDROID_BINDER_IPC
- 	default y
- 	---help---
--- 
-2.14.1
+i'll wait for those error handling patches to land, then rebase and 
+resend this wake irq patches, thanks:)
+
+>
