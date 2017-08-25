@@ -1,115 +1,122 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 25 Aug 2017 15:23:29 -0700
-Subject: [PATCH 1/2] drivers: net: xgene: Correct probe sequence handling
-In-Reply-To: <1503699810-12803-1-git-send-email-isubramanian@apm.com>
-References: <1503699810-12803-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1503699810-12803-2-git-send-email-isubramanian@apm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 25 Aug 2017 18:03:42 -0500
+Subject: [PATCH] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
+In-Reply-To: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
+References: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <d0e84021-15c0-4a34-323c-66dba67942ab@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Quan Nguyen <qnguyen@apm.com>
 
-The phy is connected at early stage of probe but not properly
-disconnected if error occurs.  This patch fixes the issue.
 
-Also changing the return type of xgene_enet_check_phy_handle(),
-since this function always returns success.
+On 08/25/2017 01:02 PM, Adam Wallis wrote:
+> The dma ops from the parent DWC device are not getting passed to the
+> child xhci-hcd device. This patch makes use of
+> platform_device_register_full to set the DMA ops. For the DT/OF case,
+> dma_ops were still null after the the device register, so
+> of_dma_configure is called in only the OF case.
+> 
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
 
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 27 ++++++++++++------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
+Hm. There were set of fixes in this area recently which actually removed
+settings you are going to restore
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 1d307f2..6e253d9 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -1661,21 +1661,21 @@ static int xgene_enet_get_irqs(struct xgene_enet_pdata *pdata)
- 	return 0;
- }
- 
--static int xgene_enet_check_phy_handle(struct xgene_enet_pdata *pdata)
-+static void xgene_enet_check_phy_handle(struct xgene_enet_pdata *pdata)
- {
- 	int ret;
- 
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII)
--		return 0;
-+		return;
- 
- 	if (!IS_ENABLED(CONFIG_MDIO_XGENE))
--		return 0;
-+		return;
- 
- 	ret = xgene_enet_phy_connect(pdata->ndev);
- 	if (!ret)
- 		pdata->mdio_driver = true;
- 
--	return 0;
-+	return;
- }
- 
- static void xgene_enet_gpiod_get(struct xgene_enet_pdata *pdata)
-@@ -1779,10 +1779,6 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- 	if (ret)
- 		return ret;
- 
--	ret = xgene_enet_check_phy_handle(pdata);
--	if (ret)
--		return ret;
--
- 	xgene_enet_gpiod_get(pdata);
- 
- 	pdata->clk = devm_clk_get(&pdev->dev, NULL);
-@@ -2097,9 +2093,11 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
-+	xgene_enet_check_phy_handle(pdata);
-+
- 	ret = xgene_enet_init_hw(pdata);
- 	if (ret)
--		goto err;
-+		goto err2;
- 
- 	link_state = pdata->mac_ops->link_state;
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
-@@ -2117,29 +2115,30 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 	spin_lock_init(&pdata->stats_lock);
- 	ret = xgene_extd_stats_init(pdata);
- 	if (ret)
--		goto err2;
-+		goto err1;
- 
- 	xgene_enet_napi_add(pdata);
- 	ret = register_netdev(ndev);
- 	if (ret) {
- 		netdev_err(ndev, "Failed to register netdev\n");
--		goto err2;
-+		goto err1;
- 	}
- 
- 	return 0;
- 
--err2:
-+err1:
- 	/*
- 	 * If necessary, free_netdev() will call netif_napi_del() and undo
- 	 * the effects of xgene_enet_napi_add()'s calls to netif_napi_add().
- 	 */
- 
-+	xgene_enet_delete_desc_rings(pdata);
-+
-+err2:
- 	if (pdata->mdio_driver)
- 		xgene_enet_phy_disconnect(pdata);
- 	else if (phy_interface_mode_is_rgmii(pdata->phy_mode))
- 		xgene_enet_mdio_remove(pdata);
--err1:
--	xgene_enet_delete_desc_rings(pdata);
- err:
- 	free_netdev(ndev);
- 	return ret;
+4c39d4b usb: xhci: use bus->sysdev for DMA configuration
+
+d64ff40 usb: dwc3: use bus->sysdev for DMA configuration
+
+> ---
+>   drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
+>   1 file changed, 17 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+> index 76f0b0d..662e9e2 100644
+> --- a/drivers/usb/dwc3/host.c
+> +++ b/drivers/usb/dwc3/host.c
+> @@ -16,6 +16,7 @@
+>    */
+>   
+>   #include <linux/platform_device.h>
+> +#include <linux/of_platform.h>
+>   
+>   #include "core.h"
+>   
+> @@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+>   {
+>   	struct property_entry	props[3];
+>   	struct platform_device	*xhci;
+> +	struct platform_device_info dwc_plat_info = {};
+>   	int			ret, irq;
+>   	struct resource		*res;
+>   	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
+> @@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
+>   	dwc->xhci_resources[1].flags = res->flags;
+>   	dwc->xhci_resources[1].name = res->name;
+>   
+> -	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
+> -	if (!xhci) {
+> -		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
+> -		return -ENOMEM;
+> -	}
+> +	dwc_plat_info.name = "xhci-hcd";
+> +	dwc_plat_info.parent = dwc->dev;
+> +	dwc_plat_info.res = dwc->xhci_resources;
+> +	dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
+> +	dwc_plat_info.fwnode = dwc->dev->fwnode;
+> +	dwc_plat_info.dma_mask = *dwc->dev->dma_mask;
+>   
+> -	xhci->dev.parent	= dwc->dev;
+> +	xhci = platform_device_register_full(&dwc_plat_info);
+> +	if (IS_ERR(xhci)) {
+> +		dev_err(dwc->dev, "failed to register xHCI device\n");
+> +		return PTR_ERR(xhci);
+> +	}
+>   
+>   	dwc->xhci = xhci;
+> -
+> -	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
+> -						DWC3_XHCI_RESOURCES_NUM);
+> -	if (ret) {
+> -		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
+> -		goto err1;
+> -	}
+> +	if (dwc->dev->of_node)
+> +		of_dma_configure(&xhci->dev, dwc->dev->of_node);
+>   
+>   	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
+>   
+> @@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+>   		ret = platform_device_add_properties(xhci, props);
+>   		if (ret) {
+>   			dev_err(dwc->dev, "failed to add properties to xHCI\n");
+> -			goto err1;
+> +			goto err;
+>   		}
+>   	}
+>   
+> @@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
+>   	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+>   			  dev_name(dwc->dev));
+>   
+> -	ret = platform_device_add(xhci);
+> -	if (ret) {
+> -		dev_err(dwc->dev, "failed to register xHCI device\n");
+> -		goto err2;
+> -	}
+> -
+>   	return 0;
+> -err2:
+> +err:
+>   	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
+>   			  dev_name(dwc->dev));
+>   	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
+>   			  dev_name(dwc->dev));
+> -err1:
+>   	platform_device_put(xhci);
+>   	return ret;
+>   }
+> 
+
 -- 
-2.7.4
+regards,
+-grygorii
