@@ -1,55 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Aug 2017 16:48:32 +0200
-Subject: [PATCH] net: stmmac: dwmac-sun8i: Use reset exclusive
-In-Reply-To: <20170825143805.21733-1-clabbe.montjoie@gmail.com>
-References: <20170825143805.21733-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170825144832.3w6izhri5vstbndp@flea.lan>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 25 Aug 2017 16:54:57 +0200
+Subject: [PATCH 2/2] of: Restrict DMA configuration
+In-Reply-To: <CAL_Jsq+pDHbrpLDYUVu22tk4OtR9Di4vxZUozwWJDu2ebYSBdg@mail.gmail.com>
+References: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
+ <82633e62b64e28dc18bc466319065b92faf2414f.1502468875.git.robin.murphy@arm.com>
+ <CAL_JsqKW7nhkCDu4eEDCgdC87b0MLH1UFO8LvaH22BcJMBsY7w@mail.gmail.com>
+ <6819c6ae-e898-3293-d8b0-7a80108d7628@arm.com>
+ <CAL_Jsq+pDHbrpLDYUVu22tk4OtR9Di4vxZUozwWJDu2ebYSBdg@mail.gmail.com>
+Message-ID: <20170825145457.GA17842@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 04:38:05PM +0200, Corentin Labbe wrote:
-> The current dwmac_sun8i module cannot be rmmod/modprobe due to that
-> the reset controller was not released when removed.
+On Tue, Aug 15, 2017 at 09:19:50AM -0500, Rob Herring wrote:
+> > For the immediate issue at hand, I guess the alternative plan of attack
+> > would be to stick a flag in struct bus_type for the bus drivers
+> > themselves to opt into generic DMA configuration. That at least keeps
+> > everything within the kernel (and come to think of it probably works
+> > neatly for modular bus types as well).
 > 
-> This patch remove ambiguity, by using of_reset_control_get_exclusive and
-> add the missing reset_control_put().
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> index fffd6d5fc907..675a09629d85 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> @@ -782,6 +782,7 @@ static int sun8i_dwmac_unpower_internal_phy(struct sunxi_priv_data *gmac)
->  
->  	clk_disable_unprepare(gmac->ephy_clk);
->  	reset_control_assert(gmac->rst_ephy);
-> +	reset_control_put(gmac->rst_ephy);
->  	return 0;
->  }
->  
-> @@ -942,7 +943,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
->  			return -EINVAL;
->  		}
->  
-> -		gmac->rst_ephy = of_reset_control_get(plat_dat->phy_node, NULL);
-> +		gmac->rst_ephy = of_reset_control_get_exclusive(plat_dat->phy_node, NULL);
+> I'm fine with the change as is, it's really just the commit text I'm
+> commenting on.
 
-Why not just use devm_reset_control_get?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/25f931d1/attachment.sig>
+Robin, can you resend this with an updated commit text?
