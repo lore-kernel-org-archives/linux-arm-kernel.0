@@ -1,22 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Aug 2017 13:27:22 -0500
-Subject: [PATCH v2 1/3] dt-bindings: add compatible string for Allwinner
- V3s SoC
-In-Reply-To: <20170822052322.15338-1-icenowy@aosc.io>
+Date: Fri, 25 Aug 2017 13:28:00 -0500
+Subject: [PATCH v2 3/3] ARM: sunxi: add support for R40 SoC
+In-Reply-To: <20170822052322.15338-3-icenowy@aosc.io>
 References: <20170822052322.15338-1-icenowy@aosc.io>
-Message-ID: <20170825182722.dhnj6dfta4hakmn6@rob-hp-laptop>
+ <20170822052322.15338-3-icenowy@aosc.io>
+Message-ID: <20170825182800.in2ljipod5nox5we@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 01:23:20PM +0800, Icenowy Zheng wrote:
-> The compatible string for Allwinner V3s SoC used to be missing.
+On Tue, Aug 22, 2017 at 01:23:22PM +0800, Icenowy Zheng wrote:
+> Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
+> like A20.
 > 
-> Add it to the binding document.
+> Add support for it.
 > 
-> Fixes: b074fede01c0 ("arm: sunxi: add support for V3s SoC")
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
+> Changes in v2:
+> - Fix alphabetical orders.
+> 
+>  Documentation/arm/sunxi/README                  | 6 ++++++
 >  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  3 files changed, 8 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
