@@ -1,44 +1,69 @@
-From: antony@phenome.org (Antony Antony)
-Date: Fri, 25 Aug 2017 19:47:41 +0200
-Subject: [PATCH v2] arm64: allwinner: h5: add support for NanoPi NEO Plus 2
-In-Reply-To: <20170825120542.GA9475@Red>
-References: <20170824231716.2623-1-antony@phenome.org>
- <20170825103242.5665-1-antony@phenome.org>
- <20170825120542.GA9475@Red>
-Message-ID: <20170825174741.55tlbx4en2dtafax@AntonyAntony.local>
+From: alcooperx@gmail.com (Al Cooper)
+Date: Fri, 25 Aug 2017 13:51:33 -0400
+Subject: [PATCH V5 2/4] dt-bindings: Add Broadcom STB USB PHY binding document
+In-Reply-To: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+Message-ID: <1503683495-11766-3-git-send-email-alcooperx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 02:05:42PM +0200, Corentin Labbe wrote:
-> On Fri, Aug 25, 2017 at 12:32:42PM +0200, Antony Antony wrote:
-> > 	Add initial DT support for NanoPi NEO Plus 2 by FriendlyELEC
-> > 		Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
-> > 		1 GB DDR3 RAM
-> > 		8GB eMMC flash (Samsung KLM8G1WEPD-B031)
-> > 		micro SD card slot
-> > 		Gigabit Ethernet (external RTL8211E-VB-CG chip)
-> > 		802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
-> > 		2x USB 2.0 host ports & 2x USB via headers
-> > 
-> >     The DTS is based on OrangePi PC 2, sun50i-h5-orangepi-pc2
-> >     Added dwmac-sun8i Gigabit Ethernet support based on
-> >     Nano Pi Neo2 DT and the schematics.
-> > 
-> > Signed-off-by: Antony Antony <antony@phenome.org>
-> 
-> Hello
-> 
-> I do not see changes between v1 to v2.
+Add DT bindings document for Broadcom STB USB PHYs
 
-I missed it. I will include in v3, both v1 -> v2 and v2->v3
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Al Cooper <alcooperx@gmail.com>
+---
+ .../bindings/phy/brcm,brcmstb-usb-phy.txt          | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
 
-
-> And you need to set your real name in signed-off.
-
-I see my real name "Antony Antony" in Signed-off-by:
-
-regards,
--antony
-
-PS Did you #19 on this list?
-http://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/
+diff --git a/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
+new file mode 100644
+index 0000000..24a0d06
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
+@@ -0,0 +1,43 @@
++Broadcom STB USB PHY
++
++Required properties:
++ - compatible: brcm,brcmstb-usb-phy
++ - reg: two offset and length pairs.
++	The first pair specifies a manditory set of memory mapped
++	registers used for general control of the PHY.
++	The second pair specifies optional registers used by some of
++	the SoCs that support USB 3.x
++ - #phy-cells: Shall be 1 as it expects one argument for setting
++	       the type of the PHY. Possible values are:
++	       - PHY_TYPE_USB2 for USB1.1/2.0 PHY
++	       - PHY_TYPE_USB3 for USB3.x PHY
++
++Optional Properties:
++- clocks : clock phandles.
++- clock-names: String, clock name.
++- brcm,ipp: Boolean, Invert Port Power.
++  Possible values are: 0 (Don't invert), 1 (Invert)
++- brcm,ioc: Boolean, Invert Over Current detection.
++  Possible values are: 0 (Don't invert), 1 (Invert)
++NOTE: one or both of the following two properties must be set
++- brcm,has-xhci: Boolean indicating the phy has an XHCI phy.
++- brcm,has-eohci: Boolean indicating the phy has an EHCI/OHCI phy.
++- dr_mode: String, PHY Device mode.
++  Possible values are: "host", "peripheral ", "drd" or "typec-pd"
++  If this property is not defined, the phy will default to "host" mode.
++
++Example:
++
++usbphy_0: usb-phy at f0470200 {
++	reg = <0xf0470200 0xb8>,
++		<0xf0471940 0x6c0>;
++	compatible = "brcm,brcmstb-usb-phy";
++	#phy-cells = <1>;
++	dr_mode = "host"
++	brcm,ioc = <1>;
++	brcm,ipp = <1>;
++	brcm,has-xhci;
++	brcm,has-eohci;
++	clocks = <&usb20>, <&usb30>;
++	clock-names = "sw_usb", "sw_usb3";
++};
+-- 
+1.9.0.138.g2de3478
