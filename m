@@ -1,24 +1,57 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 25 Aug 2017 16:54:57 +0200
-Subject: [PATCH 2/2] of: Restrict DMA configuration
-In-Reply-To: <CAL_Jsq+pDHbrpLDYUVu22tk4OtR9Di4vxZUozwWJDu2ebYSBdg@mail.gmail.com>
-References: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
- <82633e62b64e28dc18bc466319065b92faf2414f.1502468875.git.robin.murphy@arm.com>
- <CAL_JsqKW7nhkCDu4eEDCgdC87b0MLH1UFO8LvaH22BcJMBsY7w@mail.gmail.com>
- <6819c6ae-e898-3293-d8b0-7a80108d7628@arm.com>
- <CAL_Jsq+pDHbrpLDYUVu22tk4OtR9Di4vxZUozwWJDu2ebYSBdg@mail.gmail.com>
-Message-ID: <20170825145457.GA17842@lst.de>
+From: jacobchen110@gmail.com (Jacob Chen)
+Date: Fri, 25 Aug 2017 22:57:21 +0800
+Subject: [PATCH v7] rockchip/rga: v4l2 m2m support
+In-Reply-To: <fe2c1de6-dd6c-378f-8a1e-d790807310b1@xs4all.nl>
+References: <1501737812-24171-1-git-send-email-jacob-chen@iotwrt.com>
+ <fe2c1de6-dd6c-378f-8a1e-d790807310b1@xs4all.nl>
+Message-ID: <CAFLEztQOyOxqPajzwANr7cG-EGqv813Wad3weeMGBB1BNNT2Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 09:19:50AM -0500, Rob Herring wrote:
-> > For the immediate issue at hand, I guess the alternative plan of attack
-> > would be to stick a flag in struct bus_type for the bus drivers
-> > themselves to opt into generic DMA configuration. That at least keeps
-> > everything within the kernel (and come to think of it probably works
-> > neatly for modular bus types as well).
-> 
-> I'm fine with the change as is, it's really just the commit text I'm
-> commenting on.
+Hi Hans,
 
-Robin, can you resend this with an updated commit text?
+2017-08-21 22:16 GMT+08:00 Hans Verkuil <hverkuil@xs4all.nl>:
+> Hi Jacob,
+>
+> On 08/03/2017 07:23 AM, Jacob Chen wrote:
+>> Rockchip RGA is a separate 2D raster graphic acceleration unit. It
+>> accelerates 2D graphics operations, such as point/line drawing, image
+>> scaling, rotation, BitBLT, alpha blending and image blur/sharpness
+>>
+>> The drvier is mostly based on s5p-g2d v4l2 m2m driver
+>> And supports various operations from the rendering pipeline.
+>>  - copy
+>>  - fast solid color fill
+>>  - rotation
+>>  - flip
+>>  - alpha blending
+>>
+>> The code in rga-hw.c is used to configure regs according to operations
+>> The code in rga-buf.c is used to create private mmu table for RGA.
+>>
+>> changes in V7:
+>> - fix some warning reported by "checkpatch --strict"
+>>
+>> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+>
+> Can you post the v4l2-compliance output? I gather that there is at least one
+> colorspace-related error that appears to be a v4l2-compliance bug, so I'd
+> like to see the exact error it gives. I'll see if I can fix it so this driver
+> has a clean compliance output.
+>
+
+OK, i will post it.
+
+> I apologize that this driver probably won't make 4.14. Too much to review...
+>
+
+It doesn't matter,
+I'm still writing the userspace for this driver ,
+At peresent this driver might have a lot of bugs, since i didn't test
+it much in production environment .
+
+> I hope to do the v7 review within a week.
+>
+> Regards,
+>
+>         Hans
