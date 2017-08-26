@@ -1,143 +1,132 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 26 Aug 2017 14:08:32 +0100
-Subject: [PATCH v10] PCI: tango: Add MSI controller support
-In-Reply-To: <50ba5ba7-6f5d-5a38-9fa3-7ba798165609@free.fr> (Mason's message
- of "Fri, 25 Aug 2017 18:44:27 +0200")
-References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
- <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
- <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
- <86efs3wesi.fsf@arm.com>
- <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
- <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
- <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
- <e381170c-e462-01cd-12db-30773005602b@free.fr>
- <871so09j6g.fsf@arm.com>
- <acdef092-3fb9-4338-5199-a458ac2439c7@free.fr>
- <4954977e-46fd-8d54-ec76-db2134d3073a@arm.com>
- <de6d3ad7-80ee-3b47-d084-54cada956232@free.fr>
- <349671d2-077f-4702-2dac-d82276ddd675@arm.com>
- <50ba5ba7-6f5d-5a38-9fa3-7ba798165609@free.fr>
-Message-ID: <86378ewk6n.fsf@arm.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sat, 26 Aug 2017 20:55:37 +0530
+Subject: [PATCH] video: fbdev: make fb_videomode const
+Message-ID: <1503761137-25263-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25 2017 at  6:44:27 pm BST, Mason <slash.tmp@free.fr> wrote:
-> On 25/08/2017 17:45, Robin Murphy wrote:
->
->> On 25/08/17 16:35, Mason wrote:
->>
->>> On 25/08/2017 17:25, Robin Murphy wrote:
->>>
->>>> On 25/08/17 16:01, Mason wrote:
->>>>
->>>>> Robin wrote a prophetic post back in March:
->>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492965.html
->>>>>
->>>>>> The appropriate DT property would be "dma-ranges", i.e.
->>>>>>
->>>>>> pci at ... {
->>>>>> 	...
->>>>>> 	dma-ranges = <(PCI bus address) (CPU phys address) (size)>;
->>>>>> }
->>>>>
->>>>> The dma-ranges property seems to be exactly what I'm looking for:
->>>>>
->>>>> Restrict DMA to the first X MB of RAM (use a bounce buffer
->>>>> for other physical addresses).
->>>>>
->>>>> I added the following property to my PCIe node
->>>>>
->>>>>   dma-ranges = <0x0 0x80000000 0x80000000 0x20000000>;
->>>>>
->>>>> with the intent to create a 1:1 mapping for [0x80000000, 0xa0000000[
->>>>>
->>>>> But it does not work. Arg!
->>>>>
->>>>> My PCIe controller driver seems to be correctly calling of_dma_get_range:
->>>>>
->>>>> [ 0.520469] [<c03d85e8>] (of_dma_get_range) from [<c03d5ad8>]
->>>>> (of_dma_configure+0x48/0x234)
->>>>> [ 0.520483] [<c03d5ad8>] (of_dma_configure) from [<c02fa154>]
->>>>> (pci_device_add+0xac/0x350)
->>>>> [ 0.520493] [<c02fa154>] (pci_device_add) from [<c02fa488>]
->>>>> (pci_scan_single_device+0x90/0xb0)
->>>>> [ 0.520501] [<c02fa488>] (pci_scan_single_device) from
->>>>> [<c02fa500>] (pci_scan_slot+0x58/0x100)
->>>>> [ 0.520510] [<c02fa500>] (pci_scan_slot) from [<c02fb418>]
->>>>> (pci_scan_child_bus+0x20/0xf8)
->>>>> [ 0.520519] [<c02fb418>] (pci_scan_child_bus) from [<c02fb6e8>]
->>>>> (pci_scan_root_bus_msi+0xcc/0xd8)
->>>>> [ 0.520527] [<c02fb6e8>] (pci_scan_root_bus_msi) from
->>>>> [<c02fb70c>] (pci_scan_root_bus+0x18/0x20)
->>>>> [ 0.520537] [<c02fb70c>] (pci_scan_root_bus) from [<c0310544>]
->>>>> (pci_host_common_probe+0xc8/0x314)
->>>>> [ 0.520546] [<c0310544>] (pci_host_common_probe) from
->>>>> [<c0310ce8>] (tango_pcie_probe+0x148/0x350)
->>>>> [ 0.520557] [<c0310ce8>] (tango_pcie_probe) from [<c034d398>]
->>>>> (platform_drv_probe+0x34/0x6c)
->>>>>
->>>>> of_dma_get_range() is called on the pcie node (which is expected)
->>>>> but after parsing n_addr_cells and n_size_cells in the while loop,
->>>>> the code jumps to the parent node ("soc")... while my property is
->>>>> attached to the pcie node...
->>>>
->>>> This is not your driver calling of_dma_get_range(), this is the PCI core
->>>> doing so in the act of DMA master configuration for a discovered
->>>> *endpoint*. The fact that the "pass the host controller's OF node
->>>> because we don't have one for the endpoint" bodge only works properly
->>>> for dma-coherent and not dma-ranges is a known, but irrelevant, problem.
->>>>
->>>> If your host controller driver needs to discover its windows from DT to
->>>> configure *itself*, it needs to parse dma-ranges itself; see pcie-iproc,
->>>> pcie-racar, pcie-xgene, etc. for examples.
->>>
->>> Yes, I'm aware that I need to do my own parsing of dma-ranges.
->>> I can use that information to configure BAR0.base and the
->>> region registers.
->>>
->>> But Linux needs to record my settings at some point, right?
->>> Otherwise, how does the DMA framework know that devices can
->>> only reach cpu addresses [0x80000000, 0xa0000000[ and when
->>> to use bounce buffers?
->>>
->>> What's preventing the XHCI driver from allocating memory
->>> outside of my "safe" range, and having the DMA framework
->>> blindly map that?
->> 
->> At the moment, nothing. Systems that have physical memory that is not
->> visible in PCI mem space are having a bad time and will not go to space
->> today.
->> 
->> But that bears no relation to your MSI controller getting its doorbell
->> address set appropriately.
->
-> OK, so this is what I propose for v11 in order to not
-> hard code the MSI doorbell address (e.g. 0xa002e07c)
->
-> I add the following property to the pcie node:
->
-> 	dma-ranges = <0x0 0x80000000 0x80000000 0x20000000>;
->
-> I.e. pci_addr = 0x80000000, cpu_addr = 0x80000000, len=0x20000000
->
-> Then in the PCIe driver, I parse dma-ranges.
->
-> Consequently
->
-> 	MSI_doorbell_addr = cpu_addr + len + res.start + 0x7c
->
-> Bjorn, Marc, Robin, is that an acceptable solution?
+Make these const as they are only passed to a const argument of the
+function fb_find_mode.
+Done using Coccinelle.
 
-It seems to work, but I still have my doubts about this BAR0.base and
-the associated regions. Are these regions so hardcoded in HW that the RC
-cannot DMA outside of this 1GB region? Or can it be reconfigured by some
-SW agent to cover more RAM, should someone decide that 1GB is on the
-"too little" side?
+@match disable optional_qualifier@
+identifier s;
+@@
+static struct fb_videomode s = {...};
 
-If the former is true, the HW is remarkably busted and/or inflexible. If
-the latter is true, then the dma-ranges property feels very fragile, as
-it must be kept in sync with the amount of memory that the system has.
+@ref@
+position p;
+identifier match.s;
+@@
+s at p
 
-	M.
+@good1@
+identifier match.s;
+expression list[5] es;
+position ref.p;
+@@
+fb_find_mode(es,&s at p,...)
+
+@bad depends on  !good1@
+position ref.p;
+identifier match.s;
+@@
+s at p
+
+@depends on forall !bad disable optional_qualifier@
+identifier match.s;
+@@
+static
++ const
+struct fb_videomode s;
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/video/fbdev/aty/aty128fb.c         | 2 +-
+ drivers/video/fbdev/aty/atyfb_base.c       | 2 +-
+ drivers/video/fbdev/cyber2000fb.c          | 2 +-
+ drivers/video/fbdev/matrox/matroxfb_base.c | 2 +-
+ drivers/video/fbdev/sm501fb.c              | 2 +-
+ drivers/video/fbdev/vermilion/vermilion.c  | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/video/fbdev/aty/aty128fb.c b/drivers/video/fbdev/aty/aty128fb.c
+index ba64e26..db18474 100644
+--- a/drivers/video/fbdev/aty/aty128fb.c
++++ b/drivers/video/fbdev/aty/aty128fb.c
+@@ -116,7 +116,7 @@
+ 
+ /* default modedb mode */
+ /* 640x480, 60 Hz, Non-Interlaced (25.172 MHz dotclock) */
+-static struct fb_videomode defaultmode = {
++static const struct fb_videomode defaultmode = {
+ 	.refresh =	60,
+ 	.xres =		640,
+ 	.yres =		480,
+diff --git a/drivers/video/fbdev/aty/atyfb_base.c b/drivers/video/fbdev/aty/atyfb_base.c
+index 1681d2d..f49efb2 100644
+--- a/drivers/video/fbdev/aty/atyfb_base.c
++++ b/drivers/video/fbdev/aty/atyfb_base.c
+@@ -274,7 +274,7 @@ static int aty_crtc_to_var(const struct crtc *crtc,
+ 	0, FB_VMODE_NONINTERLACED
+ };
+ 
+-static struct fb_videomode defmode = {
++static const struct fb_videomode defmode = {
+ 	/* 640x480 @ 60 Hz, 31.5 kHz hsync */
+ 	NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
+ 	0, FB_VMODE_NONINTERLACED
+diff --git a/drivers/video/fbdev/cyber2000fb.c b/drivers/video/fbdev/cyber2000fb.c
+index 99acf53..9a5751c 100644
+--- a/drivers/video/fbdev/cyber2000fb.c
++++ b/drivers/video/fbdev/cyber2000fb.c
+@@ -1336,7 +1336,7 @@ static void cyber2000fb_i2c_unregister(struct cfb_info *cfb)
+  * These parameters give
+  * 640x480, hsync 31.5kHz, vsync 60Hz
+  */
+-static struct fb_videomode cyber2000fb_default_mode = {
++static const struct fb_videomode cyber2000fb_default_mode = {
+ 	.refresh	= 60,
+ 	.xres		= 640,
+ 	.yres		= 480,
+diff --git a/drivers/video/fbdev/matrox/matroxfb_base.c b/drivers/video/fbdev/matrox/matroxfb_base.c
+index 49ef48d..b9b284d7 100644
+--- a/drivers/video/fbdev/matrox/matroxfb_base.c
++++ b/drivers/video/fbdev/matrox/matroxfb_base.c
+@@ -1573,7 +1573,7 @@ struct video_board {
+ 		NULL}};
+ 
+ #ifndef MODULE
+-static struct fb_videomode defaultmode = {
++static const struct fb_videomode defaultmode = {
+ 	/* 640x480 @ 60Hz, 31.5 kHz */
+ 	NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
+ 	0, FB_VMODE_NONINTERLACED
+diff --git a/drivers/video/fbdev/sm501fb.c b/drivers/video/fbdev/sm501fb.c
+index 67e314f..076dd27 100644
+--- a/drivers/video/fbdev/sm501fb.c
++++ b/drivers/video/fbdev/sm501fb.c
+@@ -46,7 +46,7 @@
+ static char *fb_mode = "640x480-16 at 60";
+ static unsigned long default_bpp = 16;
+ 
+-static struct fb_videomode sm501_default_mode = {
++static const struct fb_videomode sm501_default_mode = {
+ 	.refresh	= 60,
+ 	.xres		= 640,
+ 	.yres		= 480,
+diff --git a/drivers/video/fbdev/vermilion/vermilion.c b/drivers/video/fbdev/vermilion/vermilion.c
+index 3fde493..6f8d444 100644
+--- a/drivers/video/fbdev/vermilion/vermilion.c
++++ b/drivers/video/fbdev/vermilion/vermilion.c
+@@ -55,7 +55,7 @@
+ static struct fb_ops vmlfb_ops;
+ static struct vml_sys *subsys = NULL;
+ static char *vml_default_mode = "1024x768 at 60";
+-static struct fb_videomode defaultmode = {
++static const struct fb_videomode defaultmode = {
+ 	NULL, 60, 1024, 768, 12896, 144, 24, 29, 3, 136, 6,
+ 	0, FB_VMODE_NONINTERLACED
+ };
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
