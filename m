@@ -1,9 +1,9 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sat, 26 Aug 2017 15:50:07 +0530
-Subject: [PATCH 05/10] [media]: s5p-g2d: make video_device const
+Date: Sat, 26 Aug 2017 15:50:08 +0530
+Subject: [PATCH 06/10] [media]: ti-vpe:  make video_device const
 In-Reply-To: <1503742812-16139-1-git-send-email-bhumirks@gmail.com>
 References: <1503742812-16139-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1503742812-16139-6-git-send-email-bhumirks@gmail.com>
+Message-ID: <1503742812-16139-7-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,35 @@ Make this const as it is only used in a copy operation.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- drivers/media/platform/s5p-g2d/g2d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/platform/ti-vpe/cal.c | 2 +-
+ drivers/media/platform/ti-vpe/vpe.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-g2d/g2d.c b/drivers/media/platform/s5p-g2d/g2d.c
-index bd655b5..66aa8cf 100644
---- a/drivers/media/platform/s5p-g2d/g2d.c
-+++ b/drivers/media/platform/s5p-g2d/g2d.c
-@@ -602,7 +602,7 @@ static irqreturn_t g2d_isr(int irq, void *prv)
- 	.vidioc_cropcap			= vidioc_cropcap,
+diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
+index 0c7ddf8..42e383a 100644
+--- a/drivers/media/platform/ti-vpe/cal.c
++++ b/drivers/media/platform/ti-vpe/cal.c
+@@ -1420,7 +1420,7 @@ static void cal_stop_streaming(struct vb2_queue *vq)
+ 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
  };
  
--static struct video_device g2d_videodev = {
-+static const struct video_device g2d_videodev = {
- 	.name		= G2D_NAME,
- 	.fops		= &g2d_fops,
- 	.ioctl_ops	= &g2d_ioctl_ops,
+-static struct video_device cal_videodev = {
++static const struct video_device cal_videodev = {
+ 	.name		= CAL_MODULE_NAME,
+ 	.fops		= &cal_fops,
+ 	.ioctl_ops	= &cal_ioctl_ops,
+diff --git a/drivers/media/platform/ti-vpe/vpe.c b/drivers/media/platform/ti-vpe/vpe.c
+index 2873c22..45bd105 100644
+--- a/drivers/media/platform/ti-vpe/vpe.c
++++ b/drivers/media/platform/ti-vpe/vpe.c
+@@ -2421,7 +2421,7 @@ static int vpe_release(struct file *file)
+ 	.mmap		= v4l2_m2m_fop_mmap,
+ };
+ 
+-static struct video_device vpe_videodev = {
++static const struct video_device vpe_videodev = {
+ 	.name		= VPE_MODULE_NAME,
+ 	.fops		= &vpe_fops,
+ 	.ioctl_ops	= &vpe_ioctl_ops,
 -- 
 1.9.1
