@@ -1,89 +1,49 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 26 Aug 2017 13:46:20 +0200 (CEST)
-Subject: [Bug] ARM: cpuidle: possible memleak
-In-Reply-To: <37728512.316309.1502619006183@email.1und1.de>
-References: <1980049531.494543.1502543973258@email.1und1.de>
- <20170813035040.GA13637@leoy-linaro>
- <37728512.316309.1502619006183@email.1und1.de>
-Message-ID: <299133306.50715.1503747980116@email.1und1.de>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Sat, 26 Aug 2017 08:59:42 -0300
+Subject: [PATCH 00/10] [media] platform: make video_device const
+In-Reply-To: <1503742812-16139-1-git-send-email-bhumirks@gmail.com>
+References: <1503742812-16139-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170826085942.78e0d222@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Em Sat, 26 Aug 2017 15:50:02 +0530
+Bhumika Goyal <bhumirks@gmail.com> escreveu:
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 13. August 2017 um 12:10 geschrieben:
+> Make make video_device const.
 > 
+> Bhumika Goyal (10):
+>   [media] cx88: make video_device const
+>   [media] dt3155: make video_device const
+>   [media]: marvell-ccic: make video_device const
+>   [media] mx2-emmaprp: make video_device const
+>   [media]: s5p-g2d: make video_device const
+>   [media]: ti-vpe:  make video_device const
+>   [media] via-camera: make video_device const
+>   [media]: fsl-viu: make video_device const
+>   [media] m2m-deinterlace: make video_device const
+>   [media] vim2m: make video_device const
 > 
-> Hi Leo,
-> 
-> > Leo Yan <leo.yan@linaro.org> hat am 13. August 2017 um 05:50 geschrieben:
-> > 
-> > 
-> > Hi Stefan,
-> > 
-> > On Sat, Aug 12, 2017 at 03:19:33PM +0200, Stefan Wahren wrote:
-> > > Hi,
-> > > 
-> > > if i additionally enable kmemleak (on top of multi_v7_defconfig) on RPi 3 (4 cores) with 4.13-rc4, i get the following output from kmemleak:
-> > > 
-> > > unreferenced object 0xede0dc00 (size 1024):
-> > >   comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
-> > >   hex dump (first 32 bytes):
-> > >     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> > >     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00  WFI.............
-> > >   backtrace:
-> > >     [<c1295f04>] arm_idle_init+0x44/0x1ac
-> > >     [<c0301e6c>] do_one_initcall+0x3c/0x16c
-> > >     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
-> > >     [<c0cb3624>] kernel_init+0x8/0x114
-> > >     [<c0307a98>] ret_from_fork+0x14/0x3c
-> > >     [<ffffffff>] 0xffffffff
-> > > 
-> > > If i revert the last commit in cpuidle-arm d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition") then kmemleak stays calm.
-> > 
-> > I cannot reproduce the error at my side, I also tried to disable idle
-> > states but cannot trigger the failure. So first thing is to know the
-> > reason for registeration failure and finally introduce the memory
-> > leaking. Could you point out the dts you are using for idle states
-> > binding?
-> 
-> thanks for you quick response. Sorry, i forgot to mention that arch/arm64/boot/dts/broadcom/bcm2837.dtsi doesn't contain any idle states. So the error path of dt_init_idle_driver() is expected. If i get it right, the clean up loop after out_fail only handles registered drivers (better label name or a comment would be helpful). So combined with your fix the following fixes the memleak for me (didn't test the clean up loop):
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 7080c38..827ab25 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -104,12 +104,14 @@ static int __init arm_idle_init(void)
->  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
->  		if (ret <= 0) {
->  			ret = ret ? : -ENODEV;
-> +			kfree(drv);
->  			goto out_fail;
->  		}
->  
->  		ret = cpuidle_register_driver(drv);
->  		if (ret) {
->  			pr_err("Failed to register cpuidle driver\n");
-> +			kfree(drv);
->  			goto out_fail;
->  		}
->  
-> @@ -152,11 +154,13 @@ static int __init arm_idle_init(void)
->  out_fail:
->  	while (--cpu >= 0) {
->  		dev = per_cpu(cpuidle_devices, cpu);
-> -		cpuidle_unregister_device(dev);
-> -		kfree(dev);
-> -		drv = cpuidle_get_driver();
-> +		drv = cpuidle_get_cpu_driver(dev);
-> +
->  		cpuidle_unregister_driver(drv);
->  		kfree(drv);
-> +
-> +		cpuidle_unregister_device(dev);
-> +		kfree(dev);
->  	}
->  
->  	return ret;
+>  drivers/media/pci/cx88/cx88-blackbird.c         | 2 +-
+>  drivers/media/pci/dt3155/dt3155.c               | 2 +-
+>  drivers/media/platform/fsl-viu.c                | 2 +-
+>  drivers/media/platform/m2m-deinterlace.c        | 2 +-
+>  drivers/media/platform/marvell-ccic/mcam-core.c | 2 +-
+>  drivers/media/platform/mx2_emmaprp.c            | 2 +-
+>  drivers/media/platform/s5p-g2d/g2d.c            | 2 +-
+>  drivers/media/platform/ti-vpe/cal.c             | 2 +-
+>  drivers/media/platform/ti-vpe/vpe.c             | 2 +-
+>  drivers/media/platform/via-camera.c             | 2 +-
+>  drivers/media/platform/vim2m.c                  | 2 +-
 
-should i split this patch (fix for "my" memleak and cleanup fix)?
+Please, don't do one such cleanup patch per file. Instead, group
+it per subdirectory, e. g. on e patch for:
+	drivers/media/platform/
+
+and another one for:
+	drivers/media/pci/
+
+That makes a lot easier to review and apply.
+
+Thanks,
+Mauro
