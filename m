@@ -1,82 +1,31 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Sat, 26 Aug 2017 10:49:44 +0800
-Subject: [PATCH v11 2/6] ACPI: Add APEI GHES Table Generation support
-In-Reply-To: <59A0C9FE.5010204@huawei.com>
-References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
- <1503066227-18251-3-git-send-email-gengdongjiu@huawei.com>
- <599ECE95.10205@huawei.com> <9a878b42-c480-2c7b-0f04-202193d8c56b@huawei.com>
- <59A0C9FE.5010204@huawei.com>
-Message-ID: <27894653-ff09-7839-a46d-b41b9ee8ae48@huawei.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Sat, 26 Aug 2017 12:21:42 +0530
+Subject: [PATCH 1/2] of: Add vendor prefix for Amarula Solutions
+Message-ID: <1503730303-11422-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-On 2017/8/26 9:08, Shannon Zhao wrote:
-> 
-> 
-> On 2017/8/25 19:20, gengdongjiu wrote:
->>>> diff --git a/hw/arm/virt-acpi-build.c b/hw/arm/virt-acpi-build.c
->>>>>> index 3d78ff6..def1ec1 100644
->>>>>> --- a/hw/arm/virt-acpi-build.c
->>>>>> +++ b/hw/arm/virt-acpi-build.c
->>>>>> @@ -45,6 +45,7 @@
->>>>>>  #include "hw/arm/virt.h"
->>>>>>  #include "sysemu/numa.h"
->>>>>>  #include "kvm_arm.h"
->>>>>> +#include "hw/acpi/hest_ghes.h"
->>>>>>  
->>>>>>  #define ARM_SPI_BASE 32
->>>>>>  #define ACPI_POWER_BUTTON_DEVICE "PWRB"
->>>>>> @@ -771,6 +772,9 @@ void virt_acpi_build(VirtMachineState *vms, AcpiBuildTables *tables)
->>>>>>      acpi_add_table(table_offsets, tables_blob);
->>>>>>      build_spcr(tables_blob, tables->linker, vms);
->>>>>>  
->>>>>> +    acpi_add_table(table_offsets, tables_blob);
->>>>>> +    ghes_build_acpi(tables_blob, tables->hardware_errors, tables->linker);
->>>>>> +
->>>> So we add this table unconditionally. Is there any bad impact if QEMU
->>>> runs on old kvm? Does it need to check whether KVM supports RAS?
->> this table is added before guest OS boot. so can not use KVM to check it.
-> No, we can check the RAS capability when we create vcpus like you done
-> in another patch ans can use that in table generation.
-understand your meaning.
+Added 'amarula' as a vendor prefix for Amarula Solutions,
+specialist in Embedded and Opensource solutions.
 
-ARM James ever have below comments about the table generation.
-----------------------------------------------------------------------------------
-But you can use APEI in a guest on CPUs without the RAS extensions: the host may
-signal memory errors to Qemu for any number of reasons, user-space shouldn't
-care how it knows. Examples are PCI-AER, any APEI event notified by polling or
-one of the flavours of irq.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-I would expect Qemu to generate a HEST based on its abilities, i.e. if it
-supports any mechanism of notifying the guest about errors. Choosing the
-mechanism then depends on the type of error.
-
-Ideally the Qemu code for HEST/GHES/CPER generation code using some of the irqs
-and polling could be shared with x86, as these should be possible using common
-KVM APIs.
------------------------------------------------------------------------------------
-
-He means we can use APEI on CPUs without RAS and may be share this code with x86,
-if Qemu can support any mechanism of notifying the guest about errors, it should be
-generate the table.
-Now we depend on the macro KVM_HAVE_MCE_INJECTION to decide whether Qemu can support
-notifying the guest.
-
-what do you think which we should be dependent on to generate the table?
-
-> 
->> if the old kvm does not support RAS, it does not have bad impact. only waste table memory.
->> May be we can make it as device? if this device is enabled in the qemu
->> boot parameters, then we will add this table?
->>
-> 
-> And you need to add a option to virt machine for (migration)
-> compatibility. On new virt machine it's on by default while off for old
-> ones.
-ok.
-
-> 
-> Thanks,
-> 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 7e5754e..2e9cd5a 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -17,6 +17,7 @@ al	Annapurna Labs
+ allwinner	Allwinner Technology Co., Ltd.
+ alphascale	AlphaScale Integrated Circuits Systems, Inc.
+ altr	Altera Corp.
++amarula	Amarula Solutions
+ amazon	Amazon.com, Inc.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+ amd	Advanced Micro Devices (AMD), Inc.
+-- 
+2.7.4
