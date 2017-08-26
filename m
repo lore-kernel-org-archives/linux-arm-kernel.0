@@ -1,60 +1,47 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Sat, 26 Aug 2017 09:45:02 +0800
-Subject: [PATCH v11 1/6] ACPI: add APEI/HEST/CPER structures and macros
-In-Reply-To: <59A0C813.2060201@huawei.com>
-References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
- <1503066227-18251-2-git-send-email-gengdongjiu@huawei.com>
- <599EC7AB.3080604@huawei.com>
- <69090a96-ce90-4b2b-a419-c8d847d56093@huawei.com>
- <59A0C813.2060201@huawei.com>
-Message-ID: <03f2f404-2718-75c7-d0eb-7bdeba146a2e@huawei.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Sat, 26 Aug 2017 10:30:39 +0800
+Subject: [PATCH v3 0/5] Add MediaTek PMIC keys support
+In-Reply-To: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1503714639.3340.14.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sorry for missing the change history.
 
+Changes since v2:
+- use standard properties for keycodes and debounce time
+- change to use platform_get_irq in leaf drivers
+- use better ways to define IRQ resources
 
-On 2017/8/26 9:00, Shannon Zhao wrote:
+Changes since v1:
+- create irq mappings in mfd core driver instead of leaf drivers
+- remove some unused parts in mtk-pmic-keys driver
+
+On Fri, 2017-08-25 at 14:32 +0800, Chen Zhong wrote:
+> MediaTek PMIC are multi-function devices that can handle key interrupts,
+> typically there are two keys attached to PMIC, which called pwrkey
+> and homekey. PWRKEY usually used to wake up system from sleep. Homekey
+> can used as volume down key due to board design. Long press keys can
+> shutdown PMIC, the mode can be choose to be one key only or two keys
+> together.
+> This series add support for key functions for MediaTek PMIC MT6397/MT6323.
 > 
+> Chen Zhong (5):
+>   mfd: mt6397: create irq mappings in mfd core driver
+>   dt-bindings: input: Add document bindings for mtk-pmic-keys
+>   dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
+>   input: Add MediaTek PMIC keys support
+>   mfd: mt6397: Add PMIC keys support to MT6397 driver
 > 
-> On 2017/8/25 18:37, gengdongjiu wrote:
->>>> +
->>>>>> +/* From the ACPI 6.1 spec, "18.3.2.9 Hardware Error Notification" */
->>>>>> +
->>>> It's better to refer to the first spec version of this structure and
->>>> same with others you define.
->>  do you mean which spec version? the definition is aligned with the linux kernel.
-> What I mean here is that it's better to refer to the ACPI spec version
-> which introduces Hardware Error Notification first time.
-Ok, I basically understand your meaning. I will clear that. thanks.
-
-> 
->>>>
->>>>>> +enum AcpiHestNotifyType {
->>>>>> +    ACPI_HEST_NOTIFY_POLLED = 0,
->>>>>> +    ACPI_HEST_NOTIFY_EXTERNAL = 1,
->>>>>> +    ACPI_HEST_NOTIFY_LOCAL = 2,
->>>>>> +    ACPI_HEST_NOTIFY_SCI = 3,
->>>>>> +    ACPI_HEST_NOTIFY_NMI = 4,
->>>>>> +    ACPI_HEST_NOTIFY_CMCI = 5,  /* ACPI 5.0 */
->>>>>> +    ACPI_HEST_NOTIFY_MCE = 6,   /* ACPI 5.0 */
->>>>>> +    ACPI_HEST_NOTIFY_GPIO = 7,  /* ACPI 6.0 */
->>>>>> +    ACPI_HEST_NOTIFY_SEA = 8,   /* ACPI 6.1 */
->>>>>> +    ACPI_HEST_NOTIFY_SEI = 9,   /* ACPI 6.1 */
->>>>>> +    ACPI_HEST_NOTIFY_GSIV = 10, /* ACPI 6.1 */
->>>>>> +    ACPI_HEST_NOTIFY_RESERVED = 11  /* 11 and greater are reserved */
->>>> In ACPI 6.2, 11 is for Software Delegated Exception, is this useful for
->>>> your patchset?
->>   it is usefull, for all the error source, I reserved the space for them.
->> Because the space is allocated one time, is not dynamically allocated.
->> so I use the ACPI_HEST_NOTIFY_RESERVED to specify that there is 11 error source.
->>
-> I mean whether the new type Software Delegated Exception is useful for
-> RAS. If so, we could add this new type here.
-Just now I check the ACPI 6.2 spec, it indeed introduced the new type SDEI.
-
-currently we do not use the type Software Delegated Exception which introduced by ACPI 6.2,
-so may not need to add a new type.
-
-> 
-> Thanks,
+>  .../devicetree/bindings/input/mtk-pmic-keys.txt    |  38 +++
+>  Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
+>  drivers/input/keyboard/Kconfig                     |   9 +
+>  drivers/input/keyboard/Makefile                    |   1 +
+>  drivers/input/keyboard/mtk-pmic-keys.c             | 308 +++++++++++++++++++++
+>  drivers/mfd/mt6397-core.c                          |  26 +-
+>  drivers/rtc/rtc-mt6397.c                           |   7 +-
+>  7 files changed, 388 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+>  create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
 > 
