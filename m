@@ -1,61 +1,192 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Sat, 26 Aug 2017 09:28:59 -0300
-Subject: [PATCH 00/10] [media] platform: make video_device const
-In-Reply-To: <CAOH+1jH0BUgoyJK7=QUQcBMpqYf+W0TeMyJ+T2JSyxzY2Ha8fQ@mail.gmail.com>
-References: <1503742812-16139-1-git-send-email-bhumirks@gmail.com>
- <20170826085942.78e0d222@vento.lan>
- <CAOH+1jH0BUgoyJK7=QUQcBMpqYf+W0TeMyJ+T2JSyxzY2Ha8fQ@mail.gmail.com>
-Message-ID: <20170826092859.23ee1639@vento.lan>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sat, 26 Aug 2017 18:27:26 +0530
+Subject: [PATCH v2] [media] platform: make video_device const
+Message-ID: <1503752246-19643-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sat, 26 Aug 2017 17:42:34 +0530
-Bhumika Goyal <bhumirks@gmail.com> escreveu:
+Make these const as they are only used during a copy operation.
+Done using Coccinelle:
 
-> On Sat, Aug 26, 2017 at 5:29 PM, Mauro Carvalho Chehab
-> <mchehab@s-opensource.com> wrote:
-> > Em Sat, 26 Aug 2017 15:50:02 +0530
-> > Bhumika Goyal <bhumirks@gmail.com> escreveu:
-> >  
-> >> Make make video_device const.
-> >>
-> >> Bhumika Goyal (10):
-> >>   [media] cx88: make video_device const
-> >>   [media] dt3155: make video_device const
-> >>   [media]: marvell-ccic: make video_device const
-> >>   [media] mx2-emmaprp: make video_device const
-> >>   [media]: s5p-g2d: make video_device const
-> >>   [media]: ti-vpe:  make video_device const
-> >>   [media] via-camera: make video_device const
-> >>   [media]: fsl-viu: make video_device const
-> >>   [media] m2m-deinterlace: make video_device const
-> >>   [media] vim2m: make video_device const
-> >>
-> >>  drivers/media/pci/cx88/cx88-blackbird.c         | 2 +-
-> >>  drivers/media/pci/dt3155/dt3155.c               | 2 +-
-> >>  drivers/media/platform/fsl-viu.c                | 2 +-
-> >>  drivers/media/platform/m2m-deinterlace.c        | 2 +-
-> >>  drivers/media/platform/marvell-ccic/mcam-core.c | 2 +-
-> >>  drivers/media/platform/mx2_emmaprp.c            | 2 +-
-> >>  drivers/media/platform/s5p-g2d/g2d.c            | 2 +-
-> >>  drivers/media/platform/ti-vpe/cal.c             | 2 +-
-> >>  drivers/media/platform/ti-vpe/vpe.c             | 2 +-
-> >>  drivers/media/platform/via-camera.c             | 2 +-
-> >>  drivers/media/platform/vim2m.c                  | 2 +-  
-> >
-> > Please, don't do one such cleanup patch per file. Instead, group
-> > it per subdirectory, e. g. on e patch for:
-> >         drivers/media/platform/
-> >
-> > and another one for:
-> >         drivers/media/pci/
-> >
-> > That makes a lot easier to review and apply.
-> >  
-> 
-> Okay, I will keep this in mind. Should I send a v2 for both the series?
+@match disable optional_qualifier@
+identifier s;
+@@
+static struct video_device s = {...};
 
-Yes, please.
+@ref@
+position p;
+identifier match.s;
+@@
+s at p
 
-Thanks,
-Mauro
+@good1@
+identifier match.s;
+expression list[3] es;
+position ref.p;
+@@
+cx88_vdev_init(es,&s at p,...)
+
+@good2@
+position ref.p;
+identifier match.s,f,c;
+expression e;
+@@
+(
+e = s at p
+|
+e = s at p.f
+|
+c(...,s at p.f,...)
+|
+c(...,s at p,...)
+)
+
+@bad depends on  !good1 && !good2@
+position ref.p;
+identifier match.s;
+@@
+s at p
+
+@depends on forall !bad disable optional_qualifier@
+identifier match.s;
+@@
+static
++ const
+struct video_device s;
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+Changes in v2:
+* Combine the patch series sent for drivers/media/platform/ into a 
+single patch.
+
+ drivers/media/platform/fsl-viu.c                | 2 +-
+ drivers/media/platform/m2m-deinterlace.c        | 2 +-
+ drivers/media/platform/marvell-ccic/mcam-core.c | 2 +-
+ drivers/media/platform/mx2_emmaprp.c            | 2 +-
+ drivers/media/platform/s5p-g2d/g2d.c            | 2 +-
+ drivers/media/platform/ti-vpe/cal.c             | 2 +-
+ drivers/media/platform/ti-vpe/vpe.c             | 2 +-
+ drivers/media/platform/via-camera.c             | 2 +-
+ drivers/media/platform/vim2m.c                  | 2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/media/platform/fsl-viu.c b/drivers/media/platform/fsl-viu.c
+index f7b88e5..b3b91cb 100644
+--- a/drivers/media/platform/fsl-viu.c
++++ b/drivers/media/platform/fsl-viu.c
+@@ -1380,7 +1380,7 @@ static int viu_mmap(struct file *file, struct vm_area_struct *vma)
+ 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+ };
+ 
+-static struct video_device viu_template = {
++static const struct video_device viu_template = {
+ 	.name		= "FSL viu",
+ 	.fops		= &viu_fops,
+ 	.minor		= -1,
+diff --git a/drivers/media/platform/m2m-deinterlace.c b/drivers/media/platform/m2m-deinterlace.c
+index 98f6db2..c8a1249 100644
+--- a/drivers/media/platform/m2m-deinterlace.c
++++ b/drivers/media/platform/m2m-deinterlace.c
+@@ -979,7 +979,7 @@ static int deinterlace_mmap(struct file *file, struct vm_area_struct *vma)
+ 	.mmap		= deinterlace_mmap,
+ };
+ 
+-static struct video_device deinterlace_videodev = {
++static const struct video_device deinterlace_videodev = {
+ 	.name		= MEM2MEM_NAME,
+ 	.fops		= &deinterlace_fops,
+ 	.ioctl_ops	= &deinterlace_ioctl_ops,
+diff --git a/drivers/media/platform/marvell-ccic/mcam-core.c b/drivers/media/platform/marvell-ccic/mcam-core.c
+index 8cac2f2..b07a251 100644
+--- a/drivers/media/platform/marvell-ccic/mcam-core.c
++++ b/drivers/media/platform/marvell-ccic/mcam-core.c
+@@ -1639,7 +1639,7 @@ static int mcam_v4l_release(struct file *filp)
+  * This template device holds all of those v4l2 methods; we
+  * clone it for specific real devices.
+  */
+-static struct video_device mcam_v4l_template = {
++static const struct video_device mcam_v4l_template = {
+ 	.name = "mcam",
+ 	.fops = &mcam_v4l_fops,
+ 	.ioctl_ops = &mcam_v4l_ioctl_ops,
+diff --git a/drivers/media/platform/mx2_emmaprp.c b/drivers/media/platform/mx2_emmaprp.c
+index 7fd209e..3493d40 100644
+--- a/drivers/media/platform/mx2_emmaprp.c
++++ b/drivers/media/platform/mx2_emmaprp.c
+@@ -873,7 +873,7 @@ static int emmaprp_mmap(struct file *file, struct vm_area_struct *vma)
+ 	.mmap		= emmaprp_mmap,
+ };
+ 
+-static struct video_device emmaprp_videodev = {
++static const struct video_device emmaprp_videodev = {
+ 	.name		= MEM2MEM_NAME,
+ 	.fops		= &emmaprp_fops,
+ 	.ioctl_ops	= &emmaprp_ioctl_ops,
+diff --git a/drivers/media/platform/s5p-g2d/g2d.c b/drivers/media/platform/s5p-g2d/g2d.c
+index bd655b5..66aa8cf 100644
+--- a/drivers/media/platform/s5p-g2d/g2d.c
++++ b/drivers/media/platform/s5p-g2d/g2d.c
+@@ -602,7 +602,7 @@ static irqreturn_t g2d_isr(int irq, void *prv)
+ 	.vidioc_cropcap			= vidioc_cropcap,
+ };
+ 
+-static struct video_device g2d_videodev = {
++static const struct video_device g2d_videodev = {
+ 	.name		= G2D_NAME,
+ 	.fops		= &g2d_fops,
+ 	.ioctl_ops	= &g2d_ioctl_ops,
+diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
+index 0c7ddf8..42e383a 100644
+--- a/drivers/media/platform/ti-vpe/cal.c
++++ b/drivers/media/platform/ti-vpe/cal.c
+@@ -1420,7 +1420,7 @@ static void cal_stop_streaming(struct vb2_queue *vq)
+ 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+ };
+ 
+-static struct video_device cal_videodev = {
++static const struct video_device cal_videodev = {
+ 	.name		= CAL_MODULE_NAME,
+ 	.fops		= &cal_fops,
+ 	.ioctl_ops	= &cal_ioctl_ops,
+diff --git a/drivers/media/platform/ti-vpe/vpe.c b/drivers/media/platform/ti-vpe/vpe.c
+index 2873c22..45bd105 100644
+--- a/drivers/media/platform/ti-vpe/vpe.c
++++ b/drivers/media/platform/ti-vpe/vpe.c
+@@ -2421,7 +2421,7 @@ static int vpe_release(struct file *file)
+ 	.mmap		= v4l2_m2m_fop_mmap,
+ };
+ 
+-static struct video_device vpe_videodev = {
++static const struct video_device vpe_videodev = {
+ 	.name		= VPE_MODULE_NAME,
+ 	.fops		= &vpe_fops,
+ 	.ioctl_ops	= &vpe_ioctl_ops,
+diff --git a/drivers/media/platform/via-camera.c b/drivers/media/platform/via-camera.c
+index e16f70a..805d4a8 100644
+--- a/drivers/media/platform/via-camera.c
++++ b/drivers/media/platform/via-camera.c
+@@ -1259,7 +1259,7 @@ static int viacam_resume(void *priv)
+  * Setup stuff.
+  */
+ 
+-static struct video_device viacam_v4l_template = {
++static const struct video_device viacam_v4l_template = {
+ 	.name		= "via-camera",
+ 	.minor		= -1,
+ 	.tvnorms	= V4L2_STD_NTSC_M,
+diff --git a/drivers/media/platform/vim2m.c b/drivers/media/platform/vim2m.c
+index afbaa35..b01fba0 100644
+--- a/drivers/media/platform/vim2m.c
++++ b/drivers/media/platform/vim2m.c
+@@ -974,7 +974,7 @@ static int vim2m_release(struct file *file)
+ 	.mmap		= v4l2_m2m_fop_mmap,
+ };
+ 
+-static struct video_device vim2m_videodev = {
++static const struct video_device vim2m_videodev = {
+ 	.name		= MEM2MEM_NAME,
+ 	.vfl_dir	= VFL_DIR_M2M,
+ 	.fops		= &vim2m_fops,
+-- 
+1.9.1
