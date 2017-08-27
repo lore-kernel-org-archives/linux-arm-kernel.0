@@ -1,58 +1,36 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 27 Aug 2017 13:40:48 -0400
-Subject: [PATCH V13 1/4] PCI: Don't ignore valid response before CRS timeout
-Message-ID: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 27 Aug 2017 21:49:38 +0300
+Subject: [PATCH] tty: serial: 8250_mtk: Use PTR_ERR_OR_ZERO
+In-Reply-To: <1503815501-9205-1-git-send-email-himanshujha199640@gmail.com>
+References: <1503815501-9205-1-git-send-email-himanshujha199640@gmail.com>
+Message-ID: <a9a1bd05-cdcf-1273-9229-20b963a97128@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Helgaas <bhelgaas@google.com>
 
-While waiting for a device to become ready (i.e., to return a non-CRS
-completion to a read of its Vendor ID), if we got a valid response to the
-very last read before timing out, we printed a warning and gave up on the
-device even though it was actually ready.
 
-For a typical 60s timeout, we wait about 65s (it's not exact because of the
-exponential backoff), but we treated devices that became ready between 33s
-and 65s as though they failed.
+On 08/27/2017 09:31 AM, Himanshu Jha wrote:
+> Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+> 
+> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+> ---
+>   drivers/tty/serial/8250/8250_mtk.c | 5 +----
+>   1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> index ce0cc47..fb45770 100644
+> --- a/drivers/tty/serial/8250/8250_mtk.c
+> +++ b/drivers/tty/serial/8250/8250_mtk.c
+> @@ -171,10 +171,7 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
+>   	}
+>   
+>   	data->bus_clk = devm_clk_get(&pdev->dev, "bus");
+> -	if (IS_ERR(data->bus_clk))
+> -		return PTR_ERR(data->bus_clk);
+> -
+> -	return 0;
+> +	return PTR_ERR_OR_ZERO(data->bus_clk);
+>   }
+>   
 
-Move the Device ID read later so we check whether the device is ready
-immediately, before checking for a timeout.
-
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-[okaya: reorder reads so that we check device presence after sleep]
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/probe.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index c31310d..2849e0e 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1847,17 +1847,18 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
- 		if (!crs_timeout)
- 			return false;
- 
--		msleep(delay);
--		delay *= 2;
--		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
--			return false;
--		/* Card hasn't responded in 60 seconds?  Must be stuck. */
- 		if (delay > crs_timeout) {
- 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
- 			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
- 			       PCI_FUNC(devfn));
- 			return false;
- 		}
-+
-+		msleep(delay);
-+		delay *= 2;
-+
-+		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-+			return false;
- 	}
- 
- 	return true;
--- 
-1.9.1
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
