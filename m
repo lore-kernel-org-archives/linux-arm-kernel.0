@@ -1,37 +1,156 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 27 Aug 2017 15:47:29 +0200
-Subject: [RFC 1/3] dt-bindings: rtc: Add Realtek RTD1295
-In-Reply-To: <629b9ed0-7b2d-7c5c-20b8-17289a76f097@suse.de>
-References: <20170820013632.18375-1-afaerber@suse.de>
- <20170820013632.18375-2-afaerber@suse.de>
- <20170823002911.y35nn7jkt34dvjbc@rob-hp-laptop>
- <629b9ed0-7b2d-7c5c-20b8-17289a76f097@suse.de>
-Message-ID: <20170827134729.GE13622@lunn.ch>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 27 Aug 2017 10:06:41 -0700
+Subject: [PATCH 04/11] watchdog: ftwdt010: Add clock support
+In-Reply-To: <CACRpkdYcEbWkHdgxA-3=6JiZTxecQcTYgqx4xDH23=NxF8zg_Q@mail.gmail.com>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-5-linus.walleij@linaro.org>
+ <20170814160536.GC7025@roeck-us.net>
+ <CACRpkdYcEbWkHdgxA-3=6JiZTxecQcTYgqx4xDH23=NxF8zg_Q@mail.gmail.com>
+Message-ID: <20170827170641.GF22819@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Thanks. Did you read the RFC question in the cover letter as well and
-> have any comments? Downstream has an rtc-base-year = <2014>; property
-> that I had left out in this RFC and due to your ack not included in v2.
+On Thu, Aug 24, 2017 at 10:32:22PM +0200, Linus Walleij wrote:
+> On Mon, Aug 14, 2017 at 6:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 > 
-> Should we default to 2014 in the driver and add an optional base-year
-> property once we encounter a diverging device, or should we make it
-> required from the beginning? I did not spot any other rtc binding with
-> such a property and would appreciate a clarification.
+> >> +     gwdt->pclk = devm_clk_get(dev, "PCLK");
+> >> +     if (!IS_ERR(gwdt->pclk)) {
+> >
+> > devm_clk_get() can return NULL (if the clock subsystem is not enabled).
+> 
+> That is fine I think? Because if the clock subsysten is not enabled
+> all the clk_prepare() etc becomes stubs as well and the driver
+> is happy. I think this is intended.
 
-Hi Andreas
+If I understand your comment below correctly, the driver won't work
+without clock subsystem because the clock frequency would in that case
+be 0. Why not catch that situation here, or even better make the driver
+depends on the clock subsystem ?
 
->From the perspective of the hardware, does it care what the base is?
+> 
+> >> +             ret = clk_prepare_enable(gwdt->pclk);
+> >
+> > Why enable pclk if extclk is used ?
+> 
+> It is used to clock the silicon in the IP block (so one can access the
+> registers etc) even if the timer per se uses EXTCLK.
+> 
+> So it must always be enabled.
+> 
+> >> +             if (ret) {
+> >> +                     dev_err(&pdev->dev, "unable to enable PCLK\n");
+> >> +                     return ret;
+> >> +             }
+> >> +             if (!gwdt->use_extclk)
+> >> +                     gwdt->clk_freq = clk_get_rate(gwdt->pclk);
+> >> +     } else {
+> >> +             dev_info(dev, "PCLK clock not found assume always-on\n");
+> >
+> > Those info messages seem more like debug messages to me. Is this and the message
+> > below about 5MHz clock on Gemini really necessary ?
+> 
+> Depends on whether one is pr_info()/dev_info() minimalist or
+> maximalist or something. I guess the extreme minimalist would be
+> happiest of their dmesg was 0 lines if all is fine. Maybe it could
+> just say the Linux version.
+> 
+> I even had the idea to add the subsystem maintainers preference
+> for this to MAINTAINERS.
+> 
+> I tend to like a bit of blather about the state of things in dmesg,
+> (as in *info has a purpose) but I'm happy to do whatever the
+> subsystem maintainer likes.
+> 
+> So I can surely cut a whole slew of them if that is your preference?
+> 
+Minimalist.
 
-A device using a different base will initially return the wrong
-time. But once the correct time has been written back, it will be O.K.
+> >> +     gwdt->extclk = devm_clk_get(dev, "EXTCLK");
+> >> +     if (!IS_ERR(gwdt->extclk)) {
+> >
+> > devm_clk_get() can return NULL.
+> 
+> Same answer: should be fine.
+> 
+> >> +     if (gwdt->clk_freq == 0) {
+> >> +             dev_err(dev, "no clocking available\n");
+> >> +             return -EINVAL;
+> >
+> > So far this situation defaulted to 5 MHz (as there was nothing else).
+> > Is this a new restriction or did it just not happen ?
+> 
+> This comes from Jonas' Moxart driver.
+> 
+> I guess this only happens if someone compiles out the
+> clk subsystem so they get frequency 0 from the stub.
+> 
+> The driver strictly needs this frequency
+> so we cannot really work without it and it needs to fail
+> over here.
+> 
+Repeating from above, doesn't that mean that the driver depends
+on the clock subsystem ? Or am I missong some context ?
 
-This only becomes an issue if a device is used with different OSs,
-which have different bases. Swapping back and forth between OSs then
-becomes an issue.
+> > Also, this can at least in theory happen if clk_get_rate() returns 0,
+> > which would leave the clock enabled (although that would be an odd
+> > situation).
+> 
+> Yeah I should clk_disable_unprepare() on the error path,
+> thanks. Fixing it.
+> 
+> > devm_watchdog_register_device() can fail, which would leave the clocks
+> > enabled. Also see below.
+> 
+> Fixed it.
+> 
+> >> +     if (!IS_ERR(gwdt->pclk))
+> >> +             clk_disable_unprepare(gwdt->pclk);
+> >> +     if (!IS_ERR(gwdt->extclk) && gwdt->use_extclk)
+> >> +             clk_disable_unprepare(gwdt->extclk);
+> >
+> > One of those many situations where devm_clk_prepare_enable() would have
+> > been very useful :-(. This disables the clocks while the watchdog itself
+> > as well as its interrupt handler is still registered.
+> 
+> Oh hm yeah. I ran into this thing with the IRQs still being
+> enabled while the clocking get shut off. It is a problem in the
+> entire kernel. I don't even have a good intuition for what
+> order the devm_* things get cleaned up, I guess in the
+> inverse order that one use them in probe()?
+> 
+Correct.
 
-KISS suggests not having a base in DT until it is actually
-required. Since it is an additional property, it does not break
-backwards compatibility when added.
+> >I don't know if this
+> > will have adverse affects, but it makes me quite concerned. Please consider
+> > adding devm_add_action() calls to clean up the clocks.
+> 
+> I don't know if that is a very good idea. If we later get proper
+> devm_* clock disabling functions then that gets messy
+> to clean up.
 
-	  Andrew
+No, it is equivalent.
+
+> 
+> Stephen/Mike: what's your opinion?
+> 
+> > Note that I would
+> > resist replacing all the devm_ functions with non-devm equivalents just
+> > because the clock subsystem doesn't provide the necessary API functions.
+> 
+> I've seen people do this for this reason though :/
+> 
+Yes, but that doesn't make it better.
+
+Guenter
+
+> > Side note: Maybe we _should_ introduce devm_watchdog_clk_prepare_enable()
+> > since this problem affects several watchdog drivers.
+> 
+> Hmmmmmmmmm a special watchdog primitive may be apropriate.
+> Dunno what the clk maintainers think?
+> 
+> Stephen/Mike: do you like that or would you rather see a primitive
+> inside the clock subsystem for this?
+> 
+> Yours,
+> Linus Walleij
