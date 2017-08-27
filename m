@@ -1,81 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Aug 2017 23:20:51 +0200
-Subject: [PATCH v4 4/5] net: stmmac: dwmac-sun8i: choose internal PHY via
- phy-is-integrated
-In-Reply-To: <20170826073311.25612-5-clabbe.montjoie@gmail.com>
-References: <20170826073311.25612-1-clabbe.montjoie@gmail.com>
- <20170826073311.25612-5-clabbe.montjoie@gmail.com>
-Message-ID: <20170826212051.GA10418@lunn.ch>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 27 Aug 2017 02:33:25 +0200
+Subject: [PATCH v2 0/3] arm64: Realtek RTD1295 RTC
+Message-ID: <20170827003328.28370-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Corentin
+Hello,
 
-I think we have now all agreed this is an mdio-mux, plus it is also an
-MII mux. We should represent that in device tree. This patchset does
-this. However, as it is now, the mux structure in DT is ignored. All
-it does is search for the phy-is-integrated flags and goes on that.
+This series adds the RTC for the Realtek RTD1295 SoC.
+Based on my RTD1295 clk series.
 
-I made the comment that the device tree representation cannot be
-implemented using an MDIO mux driver, because of driver loading
-issues.  However, the core of the MDIO mux code is just a library,
-symbols exported as GPL, free for anything to use.
+There being no public source code for RTD1295, the implementation is based on
+register offsets seen in the vendor DT, as well as older mach-rtk119x code
+published by QNAP.
 
-What i think should happen is the mdio-mux is implemented inside the
-MAC driver, using the mux-core as a library. The device tree structure
-of a mix is then reflected within Linux. The mux switch callback is
-implemented within the MAC driver. So it can reset the MAC when the
-mux is switched. The 'phy-is-integrated' property is then no longer
-needed.
+The base year is still hardcoded in v2. Calculations changed.
 
-I would suggest a binding something like:
+The DT node depends on the clk series for clock index and header.
 
-emac: ethernet at 1c0b000 {
-        compatible = "allwinner,sun8i-h3-emac";
-        syscon = <&syscon>;
-        reg = <0x01c0b000 0x104>;
-        interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-        interrupt-names = "macirq";
-        resets = <&ccu RST_BUS_EMAC>;
-        reset-names = "stmmaceth";
-        clocks = <&ccu CLK_BUS_EMAC>;
-        clock-names = "stmmaceth";
-        #address-cells = <1>;
-        #size-cells = <0>;
+More experimental patches at:
+https://github.com/afaerber/linux/commits/rtd1295-next
 
-        phy-handle = <&int_mii_phy>;
-        phy-mode = "mii";
-        allwinner,leds-active-low;
+Have a lot of fun!
 
-        mdio: mdio {
-                #address-cells = <1>;
-                #size-cells = <0>;
-	}
+Cheers,
+Andreas
 
-	mdio-mux {
-                #address-cells = <1>;
-                #size-cells = <0>;
+v1 -> v2:
+* Updated rtc driver to no longer use open/release (Alexandre)
+* Cleaned up debug output (Andrew)
+* Avoided COMPILE_TEST division errors (kbuild)
+* Various cleanups and extensions
 
-		mdio at 0 {
-			reg = <0>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: linux-rtc at vger.kernel.org
+Cc: Roc He <hepeng@zidoo.tv>
+Cc: ??? <jiang.liqin@geniatech.com>
+Cc: devicetree at vger.kernel.org
+Cc: Andrew Lunn <andrew@lunn.ch>
 
-                        int_mii_phy: ethernet-phy at 1 {
-                                reg = <1>;
-                                clocks = <&ccu CLK_BUS_EPHY>;
-                                resets = <&ccu RST_BUS_EPHY>;
-                        };
-                };
-                ext_mdio: mdio at 0 {
-                        #address-cells = <1>;
-                        #size-cells = <0>;
+Andreas F?rber (3):
+  dt-bindings: rtc: Add Realtek RTD1295
+  rtc: Add Realtek RTD1295
+  arm64: dts: realtek: Add RTD1295 RTC node
 
-                        ext_rgmii_phy: ethernet-phy at 1 {
-                                reg = <1>;
-                        };
-                };
-       };
-};
+ .../devicetree/bindings/rtc/realtek,rtd119x.txt    |  16 ++
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi           |   6 +
+ drivers/rtc/Kconfig                                |   8 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-rtd119x.c                          | 254 +++++++++++++++++++++
+ 5 files changed, 285 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/realtek,rtd119x.txt
+ create mode 100644 drivers/rtc/rtc-rtd119x.c
 
-	Andrew
+-- 
+2.12.3
