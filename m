@@ -1,34 +1,49 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sun, 27 Aug 2017 21:46:34 +0200
-Subject: [PATCH] clocksource: Delete an error message for a failed memory
- allocation in bcm2835_timer_init()
-Message-ID: <1907fa5f-e1c3-a2dd-99e0-f06150086351@users.sourceforge.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Aug 2017 00:25:14 +0200
+Subject: [patch v6 0/3] JTAG driver introduction
+In-Reply-To: <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
+References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
+ <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
+ <CAPLgG==Jj=Ys=SvhOCspSfunbWnuqPySvW9RfuqE8HYnG4C=ZQ@mail.gmail.com>
+ <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
+ <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
+Message-ID: <CACRpkdbgbRgqi=sVs0Rk_qPLUFC6wwvcWKKdiDjfXHdUZ4EXjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 27 Aug 2017 21:38:13 +0200
+On Fri, Aug 25, 2017 at 10:50 AM, Stuart Longland
+<stuartl@longlandclan.id.au> wrote:
+> [Note: dropping vadimp at maellanox.com as SMTP server complained about the
+> DNS server returning NXDOMAIN.  Apologies.]
+> On 25/08/17 18:32, Linus Walleij wrote:
+>> Gnah!
+>> Whoever writes a slot-in replacement making the character device
+>> take precendence wins lots of karma.
+>
+> What would such a replacement look like though?
 
-Omit an extra message for a memory allocation failure in this function.
+Something that looks for /dev/gpiochipN and if it exists open the GPIOs
+from there and make that take precedence over any /sys/gpio/*
+poking.
 
-This issue was detected by using the Coccinelle software.
+> Some sort of system whereby you can read/write single-line commands as
+> if talking to a GPIO expander over a UART?
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/clocksource/bcm2835_timer.c | 1 -
- 1 file changed, 1 deletion(-)
+I don't really understand the question. All GPIO expanders become
+a gpiochip, and have their own character device in /dev.
 
-diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
-index 82828d3a4739..39e489a96ad7 100644
---- a/drivers/clocksource/bcm2835_timer.c
-+++ b/drivers/clocksource/bcm2835_timer.c
-@@ -114,7 +114,6 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 
- 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
- 	if (!timer) {
--		pr_err("Can't allocate timer struct\n");
- 		ret = -ENOMEM;
- 		goto err_iounmap;
- 	}
--- 
-2.14.1
+> Would you access the GPIOs one by one, or would you perhaps map them
+> into a bitmap (maybe arbitrarily, up to 64-bits wide) and perform masked
+> operations on the bitmap?
+
+The character device supports up to 64bits of simultaneous line
+switches, but the in-kernel API can only handle 32bits
+in a single register write.
+
+> I'm no fan of the sysfs GPIO interface, but it beats poking around at
+> registers behind the kernel's back.
+
+Have a look at libgpiod and tools/gpio/* in the kernel.
+
+Yours,
+Linus Walleij
