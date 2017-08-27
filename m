@@ -1,49 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Aug 2017 00:25:14 +0200
+Date: Mon, 28 Aug 2017 00:30:05 +0200
 Subject: [patch v6 0/3] JTAG driver introduction
-In-Reply-To: <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
+In-Reply-To: <CAPLgG=mv1p98e4Vzso1N-VU=1MSotkTmnF+DcDTXPcd3q-n8HA@mail.gmail.com>
 References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
  <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
  <CAPLgG==Jj=Ys=SvhOCspSfunbWnuqPySvW9RfuqE8HYnG4C=ZQ@mail.gmail.com>
  <CACRpkdbozWaL0RXyZXjzxYK3JHiqYziSkTGSgGORdptX-rwR8A@mail.gmail.com>
- <593cd0d3-8e06-0992-c155-1322014c0477@longlandclan.id.au>
-Message-ID: <CACRpkdbgbRgqi=sVs0Rk_qPLUFC6wwvcWKKdiDjfXHdUZ4EXjg@mail.gmail.com>
+ <CAPLgG=mv1p98e4Vzso1N-VU=1MSotkTmnF+DcDTXPcd3q-n8HA@mail.gmail.com>
+Message-ID: <CACRpkdb75L5BrYN+V-BMwzrRm8_Wtymr3d08eMWt43FiBpH5Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 10:50 AM, Stuart Longland
-<stuartl@longlandclan.id.au> wrote:
-> [Note: dropping vadimp at maellanox.com as SMTP server complained about the
-> DNS server returning NXDOMAIN.  Apologies.]
-> On 25/08/17 18:32, Linus Walleij wrote:
+On Fri, Aug 25, 2017 at 6:52 PM, Rick Altherr <raltherr@google.com> wrote:
+
+>> Incidentally, people are sending patches to expose the FTDI
+>> expanders as common GPIO chips under Linux, so we can
+>> internally in the kernel or from the usersapce character device
+>> access them as "some GPIOs".
+>
+> I know my team at Google has an internal patch for exactly that.  FTDI
+> expanders are complicated as they can be used as UART, GPIO, I2C, SPI
+> depending on configuration.  Our project was using a mix of I2C and
+> GPIO so I directly my team to approach it as an MFD.  I'd like to see
+> all of these use cases handled by the kernel but I understand the
+> other viewpoint of relying on libusb for cross-platform compatiblity.
+
+Hm. I see. But I see people pushing the in-kernel method so I think
+it will eventually win out.
+
+>>>> In my worst nightmare they export GPIO lines using
+>>>> the horrid ABI in /sys/gpio/*
+>>>
+>>> https://sourceforge.net/p/openocd/code/ci/v0.10.0/tree/src/jtag/drivers/sysfsgpio.c
+>>
 >> Gnah!
 >> Whoever writes a slot-in replacement making the character device
 >> take precendence wins lots of karma.
 >
-> What would such a replacement look like though?
+> If they show up at Linux Plumbers or visit San Jose, I'll take them to
+> dinner.  I didn't see any docs for the chardev in Documentation.  I
+> _think_ I understand how it works from reading the relevant sections
+> of gpiolib.c but I can see how users end up using sysfs instead.
 
-Something that looks for /dev/gpiochipN and if it exists open the GPIOs
-from there and make that take precedence over any /sys/gpio/*
-poking.
+I intended tools/gpio/* to be the documentation:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/tools/gpio
 
-> Some sort of system whereby you can read/write single-line commands as
-> if talking to a GPIO expander over a UART?
-
-I don't really understand the question. All GPIO expanders become
-a gpiochip, and have their own character device in /dev.
-
-> Would you access the GPIOs one by one, or would you perhaps map them
-> into a bitmap (maybe arbitrarily, up to 64-bits wide) and perform masked
-> operations on the bitmap?
-
-The character device supports up to 64bits of simultaneous line
-switches, but the in-kernel API can only handle 32bits
-in a single register write.
-
-> I'm no fan of the sysfs GPIO interface, but it beats poking around at
-> registers behind the kernel's back.
-
-Have a look at libgpiod and tools/gpio/* in the kernel.
+If we need more written documentation we can do it I guess,
 
 Yours,
 Linus Walleij
