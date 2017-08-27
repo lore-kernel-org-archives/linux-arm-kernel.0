@@ -1,27 +1,39 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 27 Aug 2017 12:28:38 +0200
-Subject: [PATCH v2 2/3] rtc: Add Realtek RTD1295
-In-Reply-To: <20170827082714.nya7m3movufujtjk@piout.net>
-References: <20170827003328.28370-1-afaerber@suse.de>
- <20170827003328.28370-3-afaerber@suse.de> <20170827020501.GB13622@lunn.ch>
- <a2a21bc4-b7a9-cadf-920c-f078c673dbb9@suse.de>
- <20170827082714.nya7m3movufujtjk@piout.net>
-Message-ID: <1e054135-b825-5d3e-e508-201589b0c451@suse.de>
+Date: Sun, 27 Aug 2017 12:41:46 +0200
+Subject: [RFC 1/3] dt-bindings: rtc: Add Realtek RTD1295
+In-Reply-To: <20170823002911.y35nn7jkt34dvjbc@rob-hp-laptop>
+References: <20170820013632.18375-1-afaerber@suse.de>
+ <20170820013632.18375-2-afaerber@suse.de>
+ <20170823002911.y35nn7jkt34dvjbc@rob-hp-laptop>
+Message-ID: <629b9ed0-7b2d-7c5c-20b8-17289a76f097@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.08.2017 um 10:27 schrieb Alexandre Belloni:
-> On 27/08/2017 at 04:30:08 +0200, Andreas F?rber wrote:
->> Am 27.08.2017 um 04:05 schrieb Andrew Lunn:
->> By that same argument we could ask why so many drivers (and mine, too)
->> are calling rtc_valid_tm() when __rtc_read_time() calls it again...
+Hi Rob,
+
+Am 23.08.2017 um 02:29 schrieb Rob Herring:
+> On Sun, Aug 20, 2017 at 03:36:29AM +0200, Andreas F?rber wrote:
+>> Add a binding for the RTC on the Realtek RTD119x/RTD129x SoC families.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  .../devicetree/bindings/rtc/realtek,rtd119x.txt          | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/rtc/realtek,rtd119x.txt
 > 
-> Most of them probably predates the introduction of the check in
-> __rtc_read_time().
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Replacing with 0 here then.
+Thanks. Did you read the RFC question in the cover letter as well and
+have any comments? Downstream has an rtc-base-year = <2014>; property
+that I had left out in this RFC and due to your ack not included in v2.
 
-Regards,
+Should we default to 2014 in the driver and add an optional base-year
+property once we encounter a diverging device, or should we make it
+required from the beginning? I did not spot any other rtc binding with
+such a property and would appreciate a clarification.
+
+Thanks in advance,
+
 Andreas
 
 -- 
