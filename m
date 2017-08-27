@@ -1,287 +1,132 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sun, 27 Aug 2017 21:43:41 +0800
-Subject: [PATCH 1/1] ARM: imx7ulp: add cpuidle support
-Message-ID: <1503841421-17677-1-git-send-email-aisheng.dong@nxp.com>
+From: jonnyc@amazon.com (Chocron, Jonathan)
+Date: Sun, 27 Aug 2017 13:47:19 +0000
+Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
+In-Reply-To: <20170203205823.GA22572@lunn.ch>
+References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+ <20170203181216.30214-5-antoine.tenart@free-electrons.com>,
+ <20170203205823.GA22572@lunn.ch>
+Message-ID: <1503841641816.62526@amazon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7ULP support 3 levels idle as below:
-1. patial stop mode 3;
-2. patial stop mode 2;
-3. patial stop mode 1.
+This is a fixed version of my previous response (using proper indentation and leaving only the specific questions responded to).
 
-PSTOP1 - Partial Stop with system and bus clock disabled
-PSTOP2 - Partial Stop with system clock disabled and bus clock enabled
-PSTOP3 - Partial Stop with system clock enabled and bus clock enabled
+> > +/* MDIO */
+> > +#define AL_ETH_MDIO_C45_DEV_MASK     0x1f0000
+> > +#define AL_ETH_MDIO_C45_DEV_SHIFT    16
+> > +#define AL_ETH_MDIO_C45_REG_MASK     0xffff
+> > +
+> > +static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
+> > +{
+> > +     struct al_eth_adapter *adapter = bp->priv;
+> > +     u16 value = 0;
+> > +     int rc;
+> > +     int timeout = MDIO_TIMEOUT_MSEC;
+> > +
+> > +     while (timeout > 0) {
+> > +             if (reg & MII_ADDR_C45) {
+> > +                     netdev_dbg(adapter->netdev, "[c45]: dev %x reg %x val %x\n",
+> > +                                ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
+> > +                                (reg & AL_ETH_MDIO_C45_REG_MASK), value);
+> > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
+> > +                             ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
+> > +                             (reg & AL_ETH_MDIO_C45_REG_MASK), &value);
+> > +             } else {
+> > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
+> > +                                           MDIO_DEVAD_NONE, reg, &value);
+> > +             }
+> > +
+> > +             if (rc == 0)
+> > +                     return value;
+> > +
+> > +             netdev_dbg(adapter->netdev,
+> > +                        "mdio read failed. try again in 10 msec\n");
+> > +
+> > +             timeout -= 10;
+> > +             msleep(10);
+> > +     }
+> 
+> This is rather unusual, retrying MDIO operations. Are you working
+> around a hardware bug? I suspect this also opens up race conditions,
+> in particular with PHY interrupts, which can be clear on read.
 
-For PSTOP 1/2 mode, as the system and bus clock will be disabled, the
-devices working inprogress may not be able to work anymore, driver needs
-to use pm_qos API to prevent system enter those modes.
+The MDIO bus is shared between the ethernet units. There is a HW lock used to arbitrate between different interfaces trying to access the bus, 
+therefore there is a retry loop. The reg isn't accessed before obtaining the lock, so there shouldn't be any clear on read issues.
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- arch/arm/mach-imx/Makefile          |  1 +
- arch/arm/mach-imx/common.h          | 12 +++++++
- arch/arm/mach-imx/cpuidle-imx7ulp.c | 69 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle.h         |  5 +++
- arch/arm/mach-imx/mach-imx7ulp.c    |  7 ++++
- arch/arm/mach-imx/pm-imx7ulp.c      | 65 +++++++++++++++++++++++++++++++---
- 6 files changed, 155 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx7ulp.c
+> > +/* al_eth_mdiobus_setup - initialize mdiobus and register to kernel */
+> > +static int al_eth_mdiobus_setup(struct al_eth_adapter *adapter)
+> > +{
+> > +     struct phy_device *phydev;
+> > +     int i;
+> > +     int ret = 0;
+> > +
+> > +     adapter->mdio_bus = mdiobus_alloc();
+> > +     if (!adapter->mdio_bus)
+> > +             return -ENOMEM;
+> > +
+> > +     adapter->mdio_bus->name     = "al mdio bus";
+> > +     snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
+> > +              (adapter->pdev->bus->number << 8) | adapter->pdev->devfn);
+> > +     adapter->mdio_bus->priv     = adapter;
+> > +     adapter->mdio_bus->parent   = &adapter->pdev->dev;
+> > +     adapter->mdio_bus->read     = &al_mdio_read;
+> > +     adapter->mdio_bus->write    = &al_mdio_write;
+> > +     adapter->mdio_bus->phy_mask = ~BIT(adapter->phy_addr);
+>
+> Why do this?
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index c5948b7..a3f55a9 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
- obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
- obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
-+obj-$(CONFIG_SOC_IMX7ULP) += cpuidle-imx7ulp.o
- endif
+Since the MDIO bus is shared, we want each interface to probe only for the PHY associated with it.
+
+> > + * acquire mdio interface ownership
+> > + * when mdio interface shared between multiple eth controllers, this function waits until the ownership granted for this controller.
+> > + * this function does nothing when the mdio interface is used only by this controller.
+> > + *
+> > + * @param adapter
+> > + * @return 0 on success, -ETIMEDOUT  on timeout.
+> > + */
+> > +static int al_eth_mdio_lock(struct al_hw_eth_adapter *adapter)
+> > +{
+> > +     int count = 0;
+> > +     u32 mdio_ctrl_1;
+> > +
+> > +     if (!adapter->shared_mdio_if)
+> > +             return 0; /* nothing to do when interface is not shared */
+> > +
+> > +     do {
+> > +             mdio_ctrl_1 = readl(&adapter->mac_regs_base->gen.mdio_ctrl_1);
+> > +             if (mdio_ctrl_1 & BIT(0)) {
+> > +                     if (count > 0)
+> > +                             netdev_dbg(adapter->netdev,
+> > +                                        "eth %s mdio interface still busy!\n",
+> > +                                        adapter->name);
+> > +             } else {
+> > +                     return 0;
+> > +             }
+> > +             udelay(AL_ETH_MDIO_DELAY_PERIOD);
+> > +     } while (count++ < (AL_ETH_MDIO_DELAY_COUNT * 4));
+>
+> This needs explaining. How can a read alone perform a lock? How is
+> this race free?
+
+This is how this HW lock works: when the bit is 0 this means the lock is free. When a read transaction arrives
+to the lock, it changes its value to 1 but sends 0 as the response, basically taking ownership.
+When the owner is done, it writes  a 0 which essentially "frees" the lock.
+
+> > +             if (adapter->mdio_type == AL_ETH_MDIO_TYPE_CLAUSE_22)
+> > +                     rc = al_eth_mdio_10g_mac_type22(adapter, 1, phy_addr,
+> > +                                                     reg, val);
+> > +             else
+> > +                     rc = al_eth_mdio_10g_mac_type45(adapter, 1, phy_addr,
+> > +                                                     device, reg, val);
+> 
+> This seems odd. My understanding is that the device on the MDIO bus,
+> the PHY, is either c22 or c45. The PHY driver will tell you this, not
+> the adaptor.
  
- ifdef CONFIG_SND_IMX_SOC
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index b0e85df..9b78902 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -78,6 +78,17 @@ enum mx3_cpu_pwr_mode {
- 	MX3_SLEEP,
- };
- 
-+enum imx7ulp_cpu_pwr_mode {
-+	HSRUN,
-+	RUN,
-+	VLPR,
-+	WAIT,
-+	VLPW,
-+	STOP,
-+	VLPS,
-+	VLLS,
-+};
-+
- void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
- 
- void imx_enable_cpu(int cpu, bool enable);
-@@ -106,6 +117,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode);
- void imx6_set_int_mem_clk_lpm(bool enable);
- void imx6sl_set_wait_clk(bool enter);
- int imx_mmdc_get_ddr_type(void);
-+int imx7ulp_set_lpm(enum imx7ulp_cpu_pwr_mode mode);
- 
- void imx_cpu_die(unsigned int cpu);
- int imx_cpu_kill(unsigned int cpu);
-diff --git a/arch/arm/mach-imx/cpuidle-imx7ulp.c b/arch/arm/mach-imx/cpuidle-imx7ulp.c
-new file mode 100644
-index 0000000..f165d85
---- /dev/null
-+++ b/arch/arm/mach-imx/cpuidle-imx7ulp.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2017 NXP.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <asm/cpuidle.h>
-+
-+#include "common.h"
-+#include "cpuidle.h"
-+#include "hardware.h"
-+
-+static int imx7ulp_enter_idle(struct cpuidle_device *dev,
-+			      struct cpuidle_driver *drv, int index)
-+{
-+	switch (index) {
-+	case 1:
-+		imx7ulp_set_lpm(WAIT);
-+		break;
-+	case 2:
-+		imx7ulp_set_lpm(STOP);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	cpu_do_idle();
-+
-+	imx7ulp_set_lpm(RUN);
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver imx7ulp_cpuidle_driver = {
-+	.name = "imx7ulp_cpuidle",
-+	.owner = THIS_MODULE,
-+	.states = {
-+		/* WFI */
-+		ARM_CPUIDLE_WFI_STATE,
-+		/* WAIT */
-+		{
-+			.exit_latency = 50,
-+			.target_residency = 75,
-+			.enter = imx7ulp_enter_idle,
-+			.name = "WAIT",
-+			.desc = "PSTOP2",
-+		},
-+		/* STOP */
-+		{
-+			.exit_latency = 100,
-+			.target_residency = 150,
-+			.enter = imx7ulp_enter_idle,
-+			.name = "STOP",
-+			.desc = "PSTOP1",
-+		},
-+	},
-+	.state_count = 3,
-+	.safe_state_index = 0,
-+};
-+
-+int __init imx7ulp_cpuidle_init(void)
-+{
-+	return cpuidle_register(&imx7ulp_cpuidle_driver, NULL);
-+}
-diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
-index f914012..7694c8f 100644
---- a/arch/arm/mach-imx/cpuidle.h
-+++ b/arch/arm/mach-imx/cpuidle.h
-@@ -15,6 +15,7 @@ extern int imx5_cpuidle_init(void);
- extern int imx6q_cpuidle_init(void);
- extern int imx6sl_cpuidle_init(void);
- extern int imx6sx_cpuidle_init(void);
-+extern int imx7ulp_cpuidle_init(void);
- #else
- static inline int imx5_cpuidle_init(void)
- {
-@@ -32,4 +33,8 @@ static inline int imx6sx_cpuidle_init(void)
- {
- 	return 0;
- }
-+static inline int imx7ulp_cpuidle_init(void)
-+{
-+	return 0;
-+}
- #endif
-diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
-index 9f7a25c..1d8fe71 100644
---- a/arch/arm/mach-imx/mach-imx7ulp.c
-+++ b/arch/arm/mach-imx/mach-imx7ulp.c
-@@ -15,8 +15,14 @@
- #include <asm/mach/arch.h>
- 
- #include "common.h"
-+#include "cpuidle.h"
- #include "hardware.h"
- 
-+static void __init imx7ulp_init_late(void)
-+{
-+	imx7ulp_cpuidle_init();
-+}
-+
- static void __init imx7ulp_init_machine(void)
- {
- 	imx7ulp_pm_init();
-@@ -33,5 +39,6 @@ static const char *const imx7ulp_dt_compat[] __initconst = {
- 
- DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
- 	.init_machine	= imx7ulp_init_machine,
-+	.init_late	= imx7ulp_init_late,
- 	.dt_compat	= imx7ulp_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
-index df5d6b6..5f85040 100644
---- a/arch/arm/mach-imx/pm-imx7ulp.c
-+++ b/arch/arm/mach-imx/pm-imx7ulp.c
-@@ -14,20 +14,77 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- 
-+#include "common.h"
-+
-+/* SMC registers */
-+#define SMC_PMPROT		0x8
- #define SMC_PMCTRL		0x10
-+#define SMC_PMSTAT		0x18
-+#define SMC_SRS			0x20
-+#define SMC_RPC			0x24
-+#define SMC_SSRS		0x28
-+#define SMC_SRIE		0x2c
-+#define SMC_SRIF		0x30
-+#define SMC_CSRE		0x34
-+#define SMC_MR			0x40
-+#define SMC_FM			0x40
-+
-+/* PMPROT */
-+#define BM_PMPROT_AHSRUN        BIT(7)
-+#define BM_PMPROT_AVLP          BIT(5)
-+#define BM_PMPROT_ALLS          BIT(3)
-+#define BM_PMPROT_AVLLS         BIT(1)
-+
-+/* PMCTRL */
-+#define BM_PMCTRL_STOPA         (0x1 << 24)
- #define BP_PMCTRL_PSTOPO        16
-+#define BM_PMCTRL_PSTOPO        (0x3 << BP_PMCTRL_PSTOPO)
-+#define BP_PMCTRL_RUNM		8
-+#define BM_PMCTRL_RUNM          (0x3 << BP_PMCTRL_RUNM)
-+#define BP_PMCTRL_STOPM		0
-+#define BM_PMCTRL_STOPM         (0x7 << BP_PMCTRL_STOPM)
-+
- #define PSTOPO_PSTOP3		0x3
-+#define PSTOPO_PSTOP2		0x2
-+#define PSTOPO_PSTOP1		0x1
-+
-+static void __iomem *smc1_base;
-+
-+int imx7ulp_set_lpm(enum imx7ulp_cpu_pwr_mode mode)
-+{
-+	u32 smc_ctrl = readl_relaxed(smc1_base + SMC_PMCTRL);
-+
-+	smc_ctrl &= ~(BM_PMCTRL_RUNM | BM_PMCTRL_STOPM | BM_PMCTRL_PSTOPO);
-+
-+	switch (mode) {
-+	case RUN:
-+		/* system/bus clock enabled */
-+		smc_ctrl |= PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO;
-+		break;
-+	case WAIT:
-+		/* system clock disabled, bus clock enabled */
-+		smc_ctrl |= PSTOPO_PSTOP2 << BP_PMCTRL_PSTOPO;
-+		break;
-+	case STOP:
-+		/* system/bus clock disabled */
-+		smc_ctrl |= PSTOPO_PSTOP1 << BP_PMCTRL_PSTOPO;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	writel_relaxed(smc_ctrl, smc1_base + SMC_PMCTRL);
-+
-+	return 0;
-+}
- 
- void __init imx7ulp_pm_init(void)
- {
- 	struct device_node *np;
--	void __iomem *smc1_base;
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
- 	smc1_base = of_iomap(np, 0);
- 	WARN_ON(!smc1_base);
- 
--	/* Partial Stop mode 3 with system/bus clock enabled */
--	writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO,
--		       smc1_base + SMC_PMCTRL);
-+	imx7ulp_set_lpm(RUN);
- }
--- 
-2.7.4
+The current implementation sets mdio_type according to information which is originally deduced from the
+DeviceTree (the bootloader parses the ethernet node of the DeviceTree and saves this data to HW registers, which are then read by this driver).
+How can this information be obtained by the PHY driver?
+
+>    Andrew
+
+Jonathan
