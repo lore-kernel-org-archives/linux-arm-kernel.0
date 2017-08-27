@@ -1,61 +1,58 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 27 Aug 2017 13:40:51 -0400
-Subject: [PATCH V13 4/4] PCI: Warn periodically while waiting for device to
- become ready
-In-Reply-To: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
-References: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1503855651-17409-4-git-send-email-okaya@codeaurora.org>
+Date: Sun, 27 Aug 2017 13:40:48 -0400
+Subject: [PATCH V13 1/4] PCI: Don't ignore valid response before CRS timeout
+Message-ID: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a print statement in pci_bus_wait_crs() so that user observes the
-progress of device polling instead of silently waiting for timeout to be
-reached.
+From: Bjorn Helgaas <bhelgaas@google.com>
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-[bhelgaas: check for timeout first so we don't print "waiting, giving up",
-always print time we've slept (not the actual timeout, print a "ready"
-message if we've printed a "waiting" message]
+While waiting for a device to become ready (i.e., to return a non-CRS
+completion to a read of its Vendor ID), if we got a valid response to the
+very last read before timing out, we printed a warning and gave up on the
+device even though it was actually ready.
+
+For a typical 60s timeout, we wait about 65s (it's not exact because of the
+exponential backoff), but we treated devices that became ready between 33s
+and 65s as though they failed.
+
+Move the Device ID read later so we check whether the device is ready
+immediately, before checking for a timeout.
+
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+[okaya: reorder reads so that we check device presence after sleep]
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/probe.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ drivers/pci/probe.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index d834a20..8f7ba16 100644
+index c31310d..2849e0e 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -1847,11 +1847,16 @@ static bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 l,
- 	 */
- 	while ((l & 0xffff) == 0x0001) {
- 		if (delay > timeout) {
--			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
--			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
--			       PCI_FUNC(devfn));
-+			pr_warn("pci %04x:%02x:%02x.%d: not ready after %dms; giving up\n",
-+				pci_domain_nr(bus), bus->number,
-+				PCI_SLOT(devfn), PCI_FUNC(devfn), delay - 1);
-+
+@@ -1847,17 +1847,18 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+ 		if (!crs_timeout)
+ 			return false;
+ 
+-		msleep(delay);
+-		delay *= 2;
+-		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+-			return false;
+-		/* Card hasn't responded in 60 seconds?  Must be stuck. */
+ 		if (delay > crs_timeout) {
+ 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
+ 			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
+ 			       PCI_FUNC(devfn));
  			return false;
  		}
-+		if (delay >= 1000)
-+			pr_info("pci %04x:%02x:%02x.%d: not ready after %dms; waiting\n",
-+				pci_domain_nr(bus), bus->number,
-+				PCI_SLOT(devfn), PCI_FUNC(devfn), delay - 1);
- 
- 		msleep(delay);
- 		delay *= 2;
-@@ -1860,6 +1865,11 @@ static bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 l,
- 			return false;
++
++		msleep(delay);
++		delay *= 2;
++
++		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
++			return false;
  	}
  
-+	if (delay >= 1000)
-+		pr_info("pci %04x:%02x:%02x.%d: ready after %dms\n",
-+			pci_domain_nr(bus), bus->number,
-+			PCI_SLOT(devfn), PCI_FUNC(devfn), delay - 1);
-+
  	return true;
- }
- 
 -- 
 1.9.1
