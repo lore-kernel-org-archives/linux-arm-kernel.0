@@ -1,32 +1,44 @@
-From: himanshujha199640@gmail.com (Himanshu Jha)
-Date: Sun, 27 Aug 2017 12:01:41 +0530
-Subject: [PATCH] tty: serial: 8250_mtk: Use PTR_ERR_OR_ZERO
-Message-ID: <1503815501-9205-1-git-send-email-himanshujha199640@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 27 Aug 2017 10:27:14 +0200
+Subject: [PATCH v2 2/3] rtc: Add Realtek RTD1295
+In-Reply-To: <a2a21bc4-b7a9-cadf-920c-f078c673dbb9@suse.de>
+References: <20170827003328.28370-1-afaerber@suse.de>
+ <20170827003328.28370-3-afaerber@suse.de>
+ <20170827020501.GB13622@lunn.ch>
+ <a2a21bc4-b7a9-cadf-920c-f078c673dbb9@suse.de>
+Message-ID: <20170827082714.nya7m3movufujtjk@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+On 27/08/2017 at 04:30:08 +0200, Andreas F?rber wrote:
+> Am 27.08.2017 um 04:05 schrieb Andrew Lunn:
+> > n Sun, Aug 27, 2017 at 02:33:27AM +0200, Andreas F?rber wrote:
+> >> +struct rtd119x_rtc {
+> >> +	void __iomem *base;
+> >> +	struct clk *clk;
+> >> +	struct rtc_device *rtcdev;
+> >> +	unsigned base_year;
+> >> +	spinlock_t lock;
+> > 
+> > Where is this lock initialised? I would expect a call to
+> > spin_lock_init() somewhere.
+> 
+> Hm, the spinlock in my irq mux series doesn't have that call either; my
+> reset driver did have it. The zero initialization appears to work OK,
+> but you're probably right that it should be there.
+> 
+> > I also wonder what this lock is protecting, which rtc->ops_lock does
+> > not protect?
+> 
+> By that same argument we could ask why so many drivers (and mine, too)
+> are calling rtc_valid_tm() when __rtc_read_time() calls it again...
+> 
 
-Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
----
- drivers/tty/serial/8250/8250_mtk.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+Most of them probably predates the introduction of the check in
+__rtc_read_time().
 
-diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index ce0cc47..fb45770 100644
---- a/drivers/tty/serial/8250/8250_mtk.c
-+++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -171,10 +171,7 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
- 	}
- 
- 	data->bus_clk = devm_clk_get(&pdev->dev, "bus");
--	if (IS_ERR(data->bus_clk))
--		return PTR_ERR(data->bus_clk);
--
--	return 0;
-+	return PTR_ERR_OR_ZERO(data->bus_clk);
- }
- 
- static int mtk8250_probe(struct platform_device *pdev)
+
 -- 
-2.7.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
