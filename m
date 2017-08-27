@@ -1,70 +1,106 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 27 Aug 2017 19:26:11 +0200
-Subject: [RFC 1/3] dt-bindings: rtc: Add Realtek RTD1295
-In-Reply-To: <20170827134729.GE13622@lunn.ch>
-References: <20170820013632.18375-1-afaerber@suse.de>
- <20170820013632.18375-2-afaerber@suse.de>
- <20170823002911.y35nn7jkt34dvjbc@rob-hp-laptop>
- <629b9ed0-7b2d-7c5c-20b8-17289a76f097@suse.de>
- <20170827134729.GE13622@lunn.ch>
-Message-ID: <feaa47ff-083a-9ee5-c055-ff1f7efce371@suse.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 27 Aug 2017 13:40:50 -0400
+Subject: [PATCH V13 3/4] PCI: Handle CRS ('device not ready') returned by
+ device after FLR
+In-Reply-To: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
+References: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1503855651-17409-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Sporadic reset issues have been observed with Intel 750 NVMe drive while
+assigning the physical function to the guest machine.  The sequence of
+events observed is as follows:
 
-Am 27.08.2017 um 15:47 schrieb Andrew Lunn:
->> Thanks. Did you read the RFC question in the cover letter as well and
->> have any comments? Downstream has an rtc-base-year = <2014>; property
->> that I had left out in this RFC and due to your ack not included in v2.
->>
->> Should we default to 2014 in the driver and add an optional base-year
->> property once we encounter a diverging device, or should we make it
->> required from the beginning? I did not spot any other rtc binding with
->> such a property and would appreciate a clarification.
-> 
-> From the perspective of the hardware, does it care what the base is?
+- perform a Function Level Reset (FLR)
+- sleep up to 1000ms total
+- read ~0 from PCI_COMMAND
+- warn that the device didn't return from FLR
+- touch the device before it's ready
+- device drops config writes when we restore register settings
+- incomplete register restore leaves device in inconsistent state
+- device probe fails because device is in inconsistent state
 
-The hardware stores a 15-bit number of days since Jan 1st of that base
-year. It does not store the base year.
+After reset, an endpoint may respond to config requests with Configuration
+Request Retry Status (CRS) to indicate that it is not ready to accept new
+requests. See PCIe r3.1, sec 2.3.1 and 6.6.2.
 
-The datasheet does not name such a base year. No manual is available.
+Increase the timeout value from 1 second to 60 seconds to cover the period
+where device responds with CRS and also report polling progress.
 
-The driver needs to get it from somewhere for calculating day/month/year
-in read_time and days in set_time.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.c | 52 +++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 37 insertions(+), 15 deletions(-)
 
-The read_offset/set_offset API appeared to be something different.
-
-> A device using a different base will initially return the wrong
-> time. But once the correct time has been written back, it will be O.K.
-> 
-> This only becomes an issue if a device is used with different OSs,
-> which have different bases. Swapping back and forth between OSs then
-> becomes an issue.
-
-These are TV boxes, so yes, I'm dual-booting into Android with a vendor
-4.1 kernel and would like to keep date compatibility.
-
-https://en.opensuse.org/HCL:Zidoo_X9S
-https://en.opensuse.org/HCL:ProBox2_Ava
-https://en.opensuse.org/HCL:Lake1
-
-As stated in the v2 rtc commit message, 2014 is the base year
-encountered on all three devices that I've had access to.
-@Jiang, if you're using a different base year, please speak up!
-
-> KISS suggests not having a base in DT until it is actually
-> required. Since it is an additional property, it does not break
-> backwards compatibility when added.
-
-That's what I've attempted here - but for RDA8810PL serial Rob said he
-did not want future changes to my binding, therefore I am asking for his
-confirmation here.
-
-Regards,
-Andreas
-
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..abab64b 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3811,27 +3811,49 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+ }
+ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
+ 
+-/*
+- * We should only need to wait 100ms after FLR, but some devices take longer.
+- * Wait for up to 1000ms for config space to return something other than -1.
+- * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
+- * dword because VFs don't implement the 1st dword.
+- */
+ static void pci_flr_wait(struct pci_dev *dev)
+ {
+-	int i = 0;
++	int delay = 1, timeout = 60000;
+ 	u32 id;
+ 
+-	do {
+-		msleep(100);
++	/*
++	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
++	 * 100ms, but may silently discard requests while the FLR is in
++	 * progress.  Wait 100ms before trying to access the device.
++	 */
++	msleep(100);
++
++	/*
++	 * After 100ms, the device should not silently discard config
++	 * requests, but it may still indicate that it needs more time by
++	 * responding to them with CRS completions.  The Root Port will
++	 * generally synthesize ~0 data to complete the read (except when
++	 * CRS SV is enabled and the read was for the Vendor ID; in that
++	 * case it synthesizes 0x0001 data).
++	 *
++	 * Wait for the device to return a non-CRS completion.  Read the
++	 * Command register instead of Vendor ID so we don't have to
++	 * contend with the CRS SV value.
++	 */
++	pci_read_config_dword(dev, PCI_COMMAND, &id);
++	while (id == ~0) {
++		if (delay > timeout) {
++			dev_warn(&dev->dev, "not ready %dms after FLR; giving up\n",
++				 delay - 1);
++			return;
++		}
++
++		if (delay > 1000)
++			dev_info(&dev->dev, "not ready %dms after FLR; waiting\n",
++				 delay - 1);
++
++		msleep(delay);
++		delay *= 2;
+ 		pci_read_config_dword(dev, PCI_COMMAND, &id);
+-	} while (i++ < 10 && id == ~0);
++	}
+ 
+-	if (id == ~0)
+-		dev_warn(&dev->dev, "Failed to return from FLR\n");
+-	else if (i > 1)
+-		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+-			 (i - 1) * 100);
++	if (delay > 1000)
++		dev_info(&dev->dev, "ready %dms after FLR\n", delay - 1);
+ }
+ 
+ /**
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+1.9.1
