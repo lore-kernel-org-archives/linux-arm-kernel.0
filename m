@@ -1,33 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 27 Aug 2017 21:10:02 +0800
-Subject: [PATCH 1/2] clk: sunxi-ng: Provide a default reset hook
-In-Reply-To: <884514a2d304315f54dc81b8b42aea74@aosc.io>
-References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
- <884514a2d304315f54dc81b8b42aea74@aosc.io>
-Message-ID: <CAGb2v647hP6Ytm+bqNiuA+eMUU5WQrF36mFpVaagLgKZbuQrWQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 27 Aug 2017 15:31:47 +0200
+Subject: [PATCH v4 2/3] dt-bindings: i2c: Add MediaTek MT7622 i2c binding
+In-Reply-To: <1503286614-17670-3-git-send-email-jun.gao@mediatek.com>
+References: <1503286614-17670-1-git-send-email-jun.gao@mediatek.com>
+ <1503286614-17670-3-git-send-email-jun.gao@mediatek.com>
+Message-ID: <20170827133147.gv3mjvz3buodta26@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 27, 2017 at 9:01 PM,  <icenowy@aosc.io> wrote:
-> ? 2017-08-25 17:49?Maxime Ripard ???
->>
->> The reset hook was left implemented. Provide a dumb implementation so that
->> client drivers can depend on it.
->
->
-> I think some clients should also convert to use this.
->
-> For example:
->
-> - The TCON driver in sun4i-drm. (It now uses reset_control_status, but
->   this is also not implemented in CCU.)
+On Mon, Aug 21, 2017 at 11:36:53AM +0800, Jun Gao wrote:
+> From: Jun Gao <jun.gao@mediatek.com>
+> 
+> Add MT7622 i2c binding to binding file. Compare to MT8173 i2c
+> controller, MT7622 limits message numbers to 255, and does not
+> support 4GB DMA mode.
+> 
+> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
 
-I have patches for both sides of this.
+Applied to for-next, thanks!
 
-> - The EPHY in dwmac-sun8i driver. (It uses explicit assert then deassert)
->
-> P.S. maybe the status hook should also be implemented?
-
-Yes.
-
-ChenYu
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170827/71d60c52/attachment-0001.sig>
