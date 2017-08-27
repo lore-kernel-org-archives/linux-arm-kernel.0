@@ -1,328 +1,130 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 27 Aug 2017 02:33:27 +0200
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Aug 2017 04:05:01 +0200
 Subject: [PATCH v2 2/3] rtc: Add Realtek RTD1295
-In-Reply-To: <20170827003328.28370-1-afaerber@suse.de>
+In-Reply-To: <20170827003328.28370-3-afaerber@suse.de>
 References: <20170827003328.28370-1-afaerber@suse.de>
-Message-ID: <20170827003328.28370-3-afaerber@suse.de>
+ <20170827003328.28370-3-afaerber@suse.de>
+Message-ID: <20170827020501.GB13622@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on QNAP's arch/arm/mach-rtk119x/driver/rtk_rtc_drv.c code and
-mach-rtk119x/driver/dc2vo/fpga/include/mis_reg.h register definitions.
+n Sun, Aug 27, 2017 at 02:33:27AM +0200, Andreas F?rber wrote:
+> Based on QNAP's arch/arm/mach-rtk119x/driver/rtk_rtc_drv.c code and
+> mach-rtk119x/driver/dc2vo/fpga/include/mis_reg.h register definitions.
+> 
+> The base year 2014 was observed on all of Zidoo X9S, ProBox2 Ava and
+> Beelink Lake I.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v1 -> v2:
+>  * Dropped open/release in favor of probe/remove (Alexandre)
+>  * read_time: Reordered register accesses (Alexandre)
+>  * read_time/set_time: Refactored day calculations to avoid time64_t (Alexandre)
+>  * read_time: Retry if seconds change (Alexandre)
+>  * probe: Added missing RTCACR initialization code
+>  * set_time: Fixed year check (off by 1900)
+>  * set_time: Fixed new seconds (off by factor two)
+>  * Cleaned up debug output (Andrew)
+>  * Added spinlocks around register accesses
+>  * Added masks for register fields
+>  
+>  drivers/rtc/Kconfig       |   8 ++
+>  drivers/rtc/Makefile      |   1 +
+>  drivers/rtc/rtc-rtd119x.c | 254 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 263 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-rtd119x.c
+> 
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index 22efa21b1d81..d5a46f311ecb 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1765,6 +1765,14 @@ config RTC_DRV_CPCAP
+>  	   Say y here for CPCAP rtc found on some Motorola phones
+>  	   and tablets such as Droid 4.
+>  
+> +config RTC_DRV_RTD119X
+> +	bool "Realtek RTD129x RTC"
+> +	depends on ARCH_REALTEK || COMPILE_TEST
+> +	default ARCH_REALTEK
+> +	help
+> +	  If you say yes here, you get support for the RTD1295 SoC
+> +	  Real Time Clock.
+> +
+>  comment "HID Sensor RTC drivers"
+>  
+>  config RTC_DRV_HID_SENSOR_TIME
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+> index acd366b41c85..55a0a5ca45b0 100644
+> --- a/drivers/rtc/Makefile
+> +++ b/drivers/rtc/Makefile
+> @@ -131,6 +131,7 @@ obj-$(CONFIG_RTC_DRV_RP5C01)	+= rtc-rp5c01.o
+>  obj-$(CONFIG_RTC_DRV_RS5C313)	+= rtc-rs5c313.o
+>  obj-$(CONFIG_RTC_DRV_RS5C348)	+= rtc-rs5c348.o
+>  obj-$(CONFIG_RTC_DRV_RS5C372)	+= rtc-rs5c372.o
+> +obj-$(CONFIG_RTC_DRV_RTD119X)	+= rtc-rtd119x.o
+>  obj-$(CONFIG_RTC_DRV_RV3029C2)	+= rtc-rv3029c2.o
+>  obj-$(CONFIG_RTC_DRV_RV8803)	+= rtc-rv8803.o
+>  obj-$(CONFIG_RTC_DRV_RX4581)	+= rtc-rx4581.o
+> diff --git a/drivers/rtc/rtc-rtd119x.c b/drivers/rtc/rtc-rtd119x.c
+> new file mode 100644
+> index 000000000000..27fa68a5af30
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-rtd119x.c
+> @@ -0,0 +1,254 @@
+> +/*
+> + * Realtek RTD129x RTC
+> + *
+> + * Copyright (c) 2017 Andreas F?rber
+> + *
+> + * SPDX-License-Identifier: GPL-2.0+
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtc.h>
+> +#include <linux/spinlock.h>
+> +
+> +#define RTD_RTCSEC		0x00
+> +#define RTD_RTCMIN		0x04
+> +#define RTD_RTCHR		0x08
+> +#define RTD_RTCDATE1		0x0c
+> +#define RTD_RTCDATE2		0x10
+> +#define RTD_RTCACR		0x28
+> +#define RTD_RTCEN		0x2c
+> +#define RTD_RTCCR		0x30
+> +
+> +#define RTD_RTCSEC_RTCSEC_MASK		0x7f
+> +
+> +#define RTD_RTCMIN_RTCMIN_MASK		0x3f
+> +
+> +#define RTD_RTCHR_RTCHR_MASK		0x1f
+> +
+> +#define RTD_RTCDATE1_RTCDATE1_MASK	0xff
+> +
+> +#define RTD_RTCDATE2_RTCDATE2_MASK	0x7f
+> +
+> +#define RTD_RTCACR_RTCPWR		BIT(7)
+> +
+> +#define RTD_RTCEN_RTCEN_MASK		0xff
+> +
+> +#define RTD_RTCCR_RTCRST		BIT(6)
+> +
+> +struct rtd119x_rtc {
+> +	void __iomem *base;
+> +	struct clk *clk;
+> +	struct rtc_device *rtcdev;
+> +	unsigned base_year;
+> +	spinlock_t lock;
 
-The base year 2014 was observed on all of Zidoo X9S, ProBox2 Ava and
-Beelink Lake I.
+Where is this lock initialised? I would expect a call to
+spin_lock_init() somewhere.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v1 -> v2:
- * Dropped open/release in favor of probe/remove (Alexandre)
- * read_time: Reordered register accesses (Alexandre)
- * read_time/set_time: Refactored day calculations to avoid time64_t (Alexandre)
- * read_time: Retry if seconds change (Alexandre)
- * probe: Added missing RTCACR initialization code
- * set_time: Fixed year check (off by 1900)
- * set_time: Fixed new seconds (off by factor two)
- * Cleaned up debug output (Andrew)
- * Added spinlocks around register accesses
- * Added masks for register fields
- 
- drivers/rtc/Kconfig       |   8 ++
- drivers/rtc/Makefile      |   1 +
- drivers/rtc/rtc-rtd119x.c | 254 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 263 insertions(+)
- create mode 100644 drivers/rtc/rtc-rtd119x.c
+I also wonder what this lock is protecting, which rtc->ops_lock does
+not protect?
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 22efa21b1d81..d5a46f311ecb 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1765,6 +1765,14 @@ config RTC_DRV_CPCAP
- 	   Say y here for CPCAP rtc found on some Motorola phones
- 	   and tablets such as Droid 4.
- 
-+config RTC_DRV_RTD119X
-+	bool "Realtek RTD129x RTC"
-+	depends on ARCH_REALTEK || COMPILE_TEST
-+	default ARCH_REALTEK
-+	help
-+	  If you say yes here, you get support for the RTD1295 SoC
-+	  Real Time Clock.
-+
- comment "HID Sensor RTC drivers"
- 
- config RTC_DRV_HID_SENSOR_TIME
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index acd366b41c85..55a0a5ca45b0 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -131,6 +131,7 @@ obj-$(CONFIG_RTC_DRV_RP5C01)	+= rtc-rp5c01.o
- obj-$(CONFIG_RTC_DRV_RS5C313)	+= rtc-rs5c313.o
- obj-$(CONFIG_RTC_DRV_RS5C348)	+= rtc-rs5c348.o
- obj-$(CONFIG_RTC_DRV_RS5C372)	+= rtc-rs5c372.o
-+obj-$(CONFIG_RTC_DRV_RTD119X)	+= rtc-rtd119x.o
- obj-$(CONFIG_RTC_DRV_RV3029C2)	+= rtc-rv3029c2.o
- obj-$(CONFIG_RTC_DRV_RV8803)	+= rtc-rv8803.o
- obj-$(CONFIG_RTC_DRV_RX4581)	+= rtc-rx4581.o
-diff --git a/drivers/rtc/rtc-rtd119x.c b/drivers/rtc/rtc-rtd119x.c
-new file mode 100644
-index 000000000000..27fa68a5af30
---- /dev/null
-+++ b/drivers/rtc/rtc-rtd119x.c
-@@ -0,0 +1,254 @@
-+/*
-+ * Realtek RTD129x RTC
-+ *
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: GPL-2.0+
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/spinlock.h>
-+
-+#define RTD_RTCSEC		0x00
-+#define RTD_RTCMIN		0x04
-+#define RTD_RTCHR		0x08
-+#define RTD_RTCDATE1		0x0c
-+#define RTD_RTCDATE2		0x10
-+#define RTD_RTCACR		0x28
-+#define RTD_RTCEN		0x2c
-+#define RTD_RTCCR		0x30
-+
-+#define RTD_RTCSEC_RTCSEC_MASK		0x7f
-+
-+#define RTD_RTCMIN_RTCMIN_MASK		0x3f
-+
-+#define RTD_RTCHR_RTCHR_MASK		0x1f
-+
-+#define RTD_RTCDATE1_RTCDATE1_MASK	0xff
-+
-+#define RTD_RTCDATE2_RTCDATE2_MASK	0x7f
-+
-+#define RTD_RTCACR_RTCPWR		BIT(7)
-+
-+#define RTD_RTCEN_RTCEN_MASK		0xff
-+
-+#define RTD_RTCCR_RTCRST		BIT(6)
-+
-+struct rtd119x_rtc {
-+	void __iomem *base;
-+	struct clk *clk;
-+	struct rtc_device *rtcdev;
-+	unsigned base_year;
-+	spinlock_t lock;
-+};
-+
-+static inline int rtd119x_rtc_year_days(int year)
-+{
-+	return rtc_year_days(1, 12, year);
-+}
-+
-+static void rtd119x_rtc_reset(struct device *dev)
-+{
-+	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-+	u32 val;
-+
-+	val = readl_relaxed(data->base + RTD_RTCCR);
-+	val |= RTD_RTCCR_RTCRST;
-+	writel_relaxed(val, data->base + RTD_RTCCR);
-+
-+	val &= ~RTD_RTCCR_RTCRST;
-+	writel(val, data->base + RTD_RTCCR);
-+}
-+
-+static void rtd119x_rtc_set_enabled(struct device *dev, bool enable)
-+{
-+	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-+	u32 val;
-+
-+	val = readl_relaxed(data->base + RTD_RTCEN);
-+	if (enable) {
-+		if ((val & RTD_RTCEN_RTCEN_MASK) == 0x5a)
-+			return;
-+		writel_relaxed(0x5a, data->base + RTD_RTCEN);
-+	} else {
-+		writel_relaxed(0, data->base + RTD_RTCEN);
-+	}
-+}
-+
-+static int rtd119x_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-+	unsigned long flags;
-+	s32 day;
-+	u32 sec;
-+	unsigned year;
-+	int tries = 0;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	while (true) {
-+		tm->tm_sec = (readl_relaxed(data->base + RTD_RTCSEC) & RTD_RTCSEC_RTCSEC_MASK) >> 1;
-+		tm->tm_min  = readl_relaxed(data->base + RTD_RTCMIN) & RTD_RTCMIN_RTCMIN_MASK;
-+		tm->tm_hour = readl_relaxed(data->base + RTD_RTCHR) & RTD_RTCHR_RTCHR_MASK;
-+		day  =  readl_relaxed(data->base + RTD_RTCDATE1) & RTD_RTCDATE1_RTCDATE1_MASK;
-+		day |= (readl_relaxed(data->base + RTD_RTCDATE2) & RTD_RTCDATE2_RTCDATE2_MASK) << 8;
-+		sec  = (readl_relaxed(data->base + RTD_RTCSEC) & RTD_RTCSEC_RTCSEC_MASK) >> 1;
-+		tries++;
-+
-+		if (sec == tm->tm_sec)
-+			break;
-+
-+		if (tries >= 3) {
-+			spin_unlock_irqrestore(&data->lock, flags);
-+			return -EINVAL;
-+		}
-+	}
-+	if (tries > 1)
-+		dev_dbg(dev, "%s: needed %i tries\n", __func__, tries);
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	year = data->base_year;
-+	while (day >= rtd119x_rtc_year_days(year)) {
-+		day -= rtd119x_rtc_year_days(year);
-+		year++;
-+	}
-+	tm->tm_year = year - 1900;
-+	tm->tm_yday = day;
-+
-+	tm->tm_mon = 0;
-+	while (day >= rtc_month_days(tm->tm_mon, year)) {
-+		day -= rtc_month_days(tm->tm_mon, year);
-+		tm->tm_mon++;
-+	}
-+	tm->tm_mday = day + 1;
-+
-+	return rtc_valid_tm(tm);
-+}
-+
-+static int rtd119x_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-+	unsigned long flags;
-+	unsigned day;
-+	int i;
-+
-+	if (1900 + tm->tm_year < data->base_year)
-+		return -EINVAL;
-+
-+	day = 0;
-+	for (i = data->base_year; i < 1900 + tm->tm_year; i++)
-+		day += rtd119x_rtc_year_days(i);
-+
-+	day += tm->tm_yday;
-+	if (day > 0x7fff)
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	rtd119x_rtc_set_enabled(dev, false);
-+
-+	writel_relaxed((tm->tm_sec << 1) & RTD_RTCSEC_RTCSEC_MASK, data->base + RTD_RTCSEC);
-+	writel_relaxed(tm->tm_min & RTD_RTCMIN_RTCMIN_MASK, data->base + RTD_RTCMIN);
-+	writel_relaxed(tm->tm_hour & RTD_RTCHR_RTCHR_MASK, data->base + RTD_RTCHR);
-+	writel_relaxed(day & RTD_RTCDATE1_RTCDATE1_MASK, data->base + RTD_RTCDATE1);
-+	writel_relaxed((day >> 8) & RTD_RTCDATE2_RTCDATE2_MASK, data->base + RTD_RTCDATE2);
-+
-+	rtd119x_rtc_set_enabled(dev, true);
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct rtc_class_ops rtd119x_rtc_ops = {
-+	.read_time	= rtd119x_rtc_read_time,
-+	.set_time	= rtd119x_rtc_set_time,
-+};
-+
-+static const struct of_device_id rtd119x_rtc_dt_ids[] = {
-+	 { .compatible = "realtek,rtd1295-rtc" },
-+	 { }
-+};
-+
-+static int rtd119x_rtc_probe(struct platform_device *pdev)
-+{
-+	struct rtd119x_rtc *data;
-+	struct resource *res;
-+	u32 val;
-+	int ret;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, data);
-+	data->base_year = 2014;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	data->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(data->base))
-+		return PTR_ERR(data->base);
-+
-+	data->clk = of_clk_get(pdev->dev.of_node, 0);
-+	if (IS_ERR(data->clk))
-+		return PTR_ERR(data->clk);
-+
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		clk_put(data->clk);
-+		return ret;
-+	}
-+
-+	val = readl_relaxed(data->base + RTD_RTCACR);
-+	if (!(val & RTD_RTCACR_RTCPWR)) {
-+		writel_relaxed(RTD_RTCACR_RTCPWR, data->base + RTD_RTCACR);
-+
-+		rtd119x_rtc_reset(&pdev->dev);
-+
-+		writel_relaxed(0, data->base + RTD_RTCMIN);
-+		writel_relaxed(0, data->base + RTD_RTCHR);
-+		writel_relaxed(0, data->base + RTD_RTCDATE1);
-+		writel_relaxed(0, data->base + RTD_RTCDATE2);
-+	}
-+
-+	rtd119x_rtc_set_enabled(&pdev->dev, true);
-+
-+	data->rtcdev = devm_rtc_device_register(&pdev->dev, "rtc",
-+				&rtd119x_rtc_ops, THIS_MODULE);
-+	if (IS_ERR(data->rtcdev)) {
-+		dev_err(&pdev->dev, "failed to register rtc device");
-+		clk_disable_unprepare(data->clk);
-+		clk_put(data->clk);
-+		return PTR_ERR(data->rtcdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int rtd119x_rtc_remove(struct platform_device *pdev)
-+{
-+	struct rtd119x_rtc *data = platform_get_drvdata(pdev);
-+
-+	rtd119x_rtc_set_enabled(&pdev->dev, false);
-+
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver rtd119x_rtc_driver = {
-+	.probe = rtd119x_rtc_probe,
-+	.remove = rtd119x_rtc_remove,
-+	.driver = {
-+		.name = "rtd1295-rtc",
-+		.of_match_table	= rtd119x_rtc_dt_ids,
-+	},
-+};
-+builtin_platform_driver(rtd119x_rtc_driver);
--- 
-2.12.3
+    Andrew
