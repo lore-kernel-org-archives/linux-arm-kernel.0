@@ -1,36 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 27 Aug 2017 14:54:23 +0200
-Subject: [PATCH 1/3] dt-bindings: Add vendor prefix for ProBox2
-In-Reply-To: <20170827125425.3400-1-afaerber@suse.de>
-References: <20170827125425.3400-1-afaerber@suse.de>
-Message-ID: <20170827125425.3400-2-afaerber@suse.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 27 Aug 2017 21:10:02 +0800
+Subject: [PATCH 1/2] clk: sunxi-ng: Provide a default reset hook
+In-Reply-To: <884514a2d304315f54dc81b8b42aea74@aosc.io>
+References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
+ <884514a2d304315f54dc81b8b42aea74@aosc.io>
+Message-ID: <CAGb2v647hP6Ytm+bqNiuA+eMUU5WQrF36mFpVaagLgKZbuQrWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PROBOX2 is a Hong Kong based manufacturer of TV boxes.
+On Sun, Aug 27, 2017 at 9:01 PM,  <icenowy@aosc.io> wrote:
+> ? 2017-08-25 17:49?Maxime Ripard ???
+>>
+>> The reset hook was left implemented. Provide a dumb implementation so that
+>> client drivers can depend on it.
+>
+>
+> I think some clients should also convert to use this.
+>
+> For example:
+>
+> - The TCON driver in sun4i-drm. (It now uses reset_control_status, but
+>   this is also not implemented in CCU.)
 
-Cc: support at probox2.com
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- I did not find a fully spelled out company name for this brand.
- 
- http://probox2.com/contact-us/
- https://www.facebook.com/pg/probox2/about/
- 
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+I have patches for both sides of this.
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 37867c3cb94b..683b1693078f 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -261,6 +261,7 @@ plathome	Plat'Home Co., Ltd.
- plda	PLDA
- poslab	Poslab Technology Co., Ltd.
- powervr	PowerVR (deprecated, use img)
-+probox2	PROBOX2
- pulsedlight	PulsedLight, Inc
- qca	Qualcomm Atheros, Inc.
- qcom	Qualcomm Technologies, Inc
--- 
-2.12.3
+> - The EPHY in dwmac-sun8i driver. (It uses explicit assert then deassert)
+>
+> P.S. maybe the status hook should also be implemented?
+
+Yes.
+
+ChenYu
