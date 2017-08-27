@@ -1,31 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 27 Aug 2017 15:34:54 +0200
-Subject: [PATCH v2 1/3] i2c: davinci: Preserve return value of devm_clk_get
-In-Reply-To: <20170816221715.15027-2-fcooper@ti.com>
-References: <20170816221715.15027-1-fcooper@ti.com>
- <20170816221715.15027-2-fcooper@ti.com>
-Message-ID: <20170827133454.ffroiht5ayfqyr4k@ninjato>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Aug 2017 15:37:51 +0200
+Subject: [PATCH v2 2/3] rtc: Add Realtek RTD1295
+In-Reply-To: <d20fbc21-bd8f-c191-ed51-03487868e7b0@suse.de>
+References: <20170827003328.28370-1-afaerber@suse.de>
+ <20170827003328.28370-3-afaerber@suse.de>
+ <20170827091301.wbuzxkh7opz4blrc@piout.net>
+ <d20fbc21-bd8f-c191-ed51-03487868e7b0@suse.de>
+Message-ID: <20170827133751.GD13622@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 05:17:13PM -0500, Franklin S Cooper Jr wrote:
-> The i2c driver can run into driver dependency issues if its loaded
-> before a clock driver it depends on. Therefore, EPROBE_DEFER may be
-> returned by devm_clk_get and should be returned in probe to allow the
-> kernel to reprobe the driver at a later time. This patch allows the error
-> value returned by devm_clk_get to be passed through and not overwritten.
+> >> +static inline int rtd119x_rtc_year_days(int year)
+> >> +{
+> >> +	return rtc_year_days(1, 12, year);
+> > 
+> > I'm not sure it is worth wrapping rtc_year_days
+> [snip]
 > 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Well, I found your rtc_year_days rather confusing and had to play with
+> the arguments until I got it working as expected, so I wanted an inline
+> function (or macro) as abstraction from my three callers.
 
-Applied to for-next, thanks!
+I agree with that. I was wondering why 1st December was being used. I
+would say this API does not do too well on Rusty's API Design
+Manifesto.
 
-Waiting for V3 of the other patches.
+It does at least get the day/month/year in the right order ;-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170827/5304240f/attachment.sig>
+	Andrew
