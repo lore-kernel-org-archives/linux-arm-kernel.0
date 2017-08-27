@@ -1,106 +1,107 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 27 Aug 2017 13:40:50 -0400
-Subject: [PATCH V13 3/4] PCI: Handle CRS ('device not ready') returned by
- device after FLR
+Date: Sun, 27 Aug 2017 13:40:49 -0400
+Subject: [PATCH V13 2/4] PCI: Factor out pci_bus_wait_crs()
 In-Reply-To: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
 References: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1503855651-17409-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1503855651-17409-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sporadic reset issues have been observed with Intel 750 NVMe drive while
-assigning the physical function to the guest machine.  The sequence of
-events observed is as follows:
+Configuration Request Retry Status (CRS) was previously hidden inside
+pci_bus_read_dev_vendor_id().  We want to add support for CRS in other
+situations, such as waiting for a device to become ready after a Function
+Level Reset.
 
-- perform a Function Level Reset (FLR)
-- sleep up to 1000ms total
-- read ~0 from PCI_COMMAND
-- warn that the device didn't return from FLR
-- touch the device before it's ready
-- device drops config writes when we restore register settings
-- incomplete register restore leaves device in inconsistent state
-- device probe fails because device is in inconsistent state
-
-After reset, an endpoint may respond to config requests with Configuration
-Request Retry Status (CRS) to indicate that it is not ready to accept new
-requests. See PCIe r3.1, sec 2.3.1 and 6.6.2.
-
-Increase the timeout value from 1 second to 60 seconds to cover the period
-where device responds with CRS and also report polling progress.
+Move CRS handling into pci_bus_wait_crs() so it can be called from other
+places and also introduce pci_bus_crs_visibility_pending() to determine
+when we should wait.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.c | 52 +++++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 37 insertions(+), 15 deletions(-)
+ drivers/pci/probe.c | 52 ++++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 34 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index af0cc34..abab64b 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3811,27 +3811,49 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 2849e0e..d834a20 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1824,30 +1824,29 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
  }
- EXPORT_SYMBOL(pci_wait_for_pending_transaction);
+ EXPORT_SYMBOL(pci_alloc_dev);
  
--/*
-- * We should only need to wait 100ms after FLR, but some devices take longer.
-- * Wait for up to 1000ms for config space to return something other than -1.
-- * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
-- * dword because VFs don't implement the 1st dword.
-- */
- static void pci_flr_wait(struct pci_dev *dev)
+-bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+-				int crs_timeout)
++static inline bool pci_bus_crs_visibility_pending(u32 l)
++{
++	return (l & 0xffff) == 0x0001;
++}
++
++static bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 l,
++			     int timeout)
  {
--	int i = 0;
-+	int delay = 1, timeout = 60000;
- 	u32 id;
+ 	int delay = 1;
  
--	do {
--		msleep(100);
-+	/*
-+	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
-+	 * 100ms, but may silently discard requests while the FLR is in
-+	 * progress.  Wait 100ms before trying to access the device.
-+	 */
-+	msleep(100);
-+
-+	/*
-+	 * After 100ms, the device should not silently discard config
-+	 * requests, but it may still indicate that it needs more time by
-+	 * responding to them with CRS completions.  The Root Port will
-+	 * generally synthesize ~0 data to complete the read (except when
-+	 * CRS SV is enabled and the read was for the Vendor ID; in that
-+	 * case it synthesizes 0x0001 data).
-+	 *
-+	 * Wait for the device to return a non-CRS completion.  Read the
-+	 * Command register instead of Vendor ID so we don't have to
-+	 * contend with the CRS SV value.
-+	 */
-+	pci_read_config_dword(dev, PCI_COMMAND, &id);
-+	while (id == ~0) {
+-	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+-		return false;
++	if ((l & 0xffff) != 0x0001)
++		return true;	/* not a CRS completion */
+ 
+-	/* some broken boards return 0 or ~0 if a slot is empty: */
+-	if (*l == 0xffffffff || *l == 0x00000000 ||
+-	    *l == 0x0000ffff || *l == 0xffff0000)
+-		return false;
++	if (!timeout)
++		return false;	/* CRS, but caller doesn't want to wait */
+ 
+ 	/*
+-	 * Configuration Request Retry Status.  Some root ports return the
+-	 * actual device ID instead of the synthetic ID (0xFFFF) required
+-	 * by the PCIe spec.  Ignore the device ID and only check for
+-	 * (vendor id == 1).
++	 * We got the reserved Vendor ID that indicates a completion with
++	 * Configuration Request Retry Status (CRS).  Retry until we get a
++	 * valid Vendor ID or we time out.
+ 	 */
+-	while ((*l & 0xffff) == 0x0001) {
+-		if (!crs_timeout)
+-			return false;
+-
+-		if (delay > crs_timeout) {
++	while ((l & 0xffff) == 0x0001) {
 +		if (delay > timeout) {
-+			dev_warn(&dev->dev, "not ready %dms after FLR; giving up\n",
-+				 delay - 1);
-+			return;
-+		}
-+
-+		if (delay > 1000)
-+			dev_info(&dev->dev, "not ready %dms after FLR; waiting\n",
-+				 delay - 1);
-+
-+		msleep(delay);
-+		delay *= 2;
- 		pci_read_config_dword(dev, PCI_COMMAND, &id);
--	} while (i++ < 10 && id == ~0);
-+	}
+ 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
+ 			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
+ 			       PCI_FUNC(devfn));
+@@ -1857,12 +1856,29 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+ 		msleep(delay);
+ 		delay *= 2;
  
--	if (id == ~0)
--		dev_warn(&dev->dev, "Failed to return from FLR\n");
--	else if (i > 1)
--		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
--			 (i - 1) * 100);
-+	if (delay > 1000)
-+		dev_info(&dev->dev, "ready %dms after FLR\n", delay - 1);
+-		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
++		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
+ 			return false;
+ 	}
+ 
+ 	return true;
  }
++
++bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
++				int timeout)
++{
++	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
++		return false;
++
++	/* some broken boards return 0 or ~0 if a slot is empty: */
++	if (*l == 0xffffffff || *l == 0x00000000 ||
++	    *l == 0x0000ffff || *l == 0xffff0000)
++		return false;
++
++	if (pci_bus_crs_visibility_pending(*l))
++		return pci_bus_wait_crs(bus, devfn, *l, timeout);
++
++	return true;
++}
+ EXPORT_SYMBOL(pci_bus_read_dev_vendor_id);
  
- /**
+ /*
 -- 
 1.9.1
