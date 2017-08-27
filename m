@@ -1,79 +1,83 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 28 Aug 2017 03:01:47 +0800
-Subject: [GIT PULL] arm: mediatek: dts32 updates for v4.14
-In-Reply-To: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
-References: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
-Message-ID: <1503860507.19230.50.camel@mtkswgap22>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 27 Aug 2017 21:07:49 +0200
+Subject: [RFC 1/3] dt-bindings: rtc: Add Realtek RTD1295
+In-Reply-To: <feaa47ff-083a-9ee5-c055-ff1f7efce371@suse.de>
+References: <20170820013632.18375-1-afaerber@suse.de>
+ <20170820013632.18375-2-afaerber@suse.de>
+ <20170823002911.y35nn7jkt34dvjbc@rob-hp-laptop>
+ <629b9ed0-7b2d-7c5c-20b8-17289a76f097@suse.de>
+ <20170827134729.GE13622@lunn.ch>
+ <feaa47ff-083a-9ee5-c055-ff1f7efce371@suse.de>
+Message-ID: <20170827190749.6njixw7cxwbhmclp@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-just a gentle ping. 
+On 27/08/2017 at 19:26:11 +0200, Andreas F?rber wrote:
+> Hi Andrew,
+> 
+> Am 27.08.2017 um 15:47 schrieb Andrew Lunn:
+> >> Thanks. Did you read the RFC question in the cover letter as well and
+> >> have any comments? Downstream has an rtc-base-year = <2014>; property
+> >> that I had left out in this RFC and due to your ack not included in v2.
+> >>
+> >> Should we default to 2014 in the driver and add an optional base-year
+> >> property once we encounter a diverging device, or should we make it
+> >> required from the beginning? I did not spot any other rtc binding with
+> >> such a property and would appreciate a clarification.
+> > 
+> > From the perspective of the hardware, does it care what the base is?
+> 
+> The hardware stores a 15-bit number of days since Jan 1st of that base
+> year. It does not store the base year.
+> 
+> The datasheet does not name such a base year. No manual is available.
+> 
+> The driver needs to get it from somewhere for calculating day/month/year
+> in read_time and days in set_time.
+> 
+> The read_offset/set_offset API appeared to be something different.
+> 
 
-Are those changes similar to missing ones ? The other changes like
-next/dts32 and next/soc seems have been already in the next tree.
+There is no api to change the epoch of an RTC because it is difficult to
+do in a race free way. This has to be worked on.
 
+Anyway, you don't really care for now as it goes up to 2093 and
+hopefully, you will never have a product with a different epoch.
 
-On Thu, 2017-08-17 at 15:37 +0200, Matthias Brugger wrote:
-> Hi Olof and Arnd,
+> > A device using a different base will initially return the wrong
+> > time. But once the correct time has been written back, it will be O.K.
+> > 
+
+The other issue being that you don't have any way to know whether the
+base is correct or not until the date is set.
+
+> > This only becomes an issue if a device is used with different OSs,
+> > which have different bases. Swapping back and forth between OSs then
+> > becomes an issue.
 > 
-> for v4.14 please take the following pull request into account.
+> These are TV boxes, so yes, I'm dual-booting into Android with a vendor
+> 4.1 kernel and would like to keep date compatibility.
 > 
-> Thanks,
-> Matthias
+> https://en.opensuse.org/HCL:Zidoo_X9S
+> https://en.opensuse.org/HCL:ProBox2_Ava
+> https://en.opensuse.org/HCL:Lake1
 > 
-> ---
+> As stated in the v2 rtc commit message, 2014 is the base year
+> encountered on all three devices that I've had access to.
+> @Jiang, if you're using a different base year, please speak up!
 > 
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> > KISS suggests not having a base in DT until it is actually
+> > required. Since it is an additional property, it does not break
+> > backwards compatibility when added.
 > 
->    Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-> 
-> are available in the git repository at:
-> 
->    https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-dts64
-> 
-> for you to fetch changes up to bdf2cbb2b3160122f7ff16445fdb73267fffd583:
-> 
->    arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile 
-> (2017-08-17 15:33:45 +0200)
-> 
-> ----------------------------------------------------------------
-> - add SoC mt7622 and its reference board
-> - cleanup of dts bindings
-> - mt6797: add watchdog and delete unused clock
-> - add support for SoC mt2701 and it's eval board
-> 
-> ----------------------------------------------------------------
-> Matthias Brugger (4):
->        ARM: mediatek: dts: Cleanup bindings documentation
->        ARM: mediatek: dts: Add MT6797 binding
->        arm64: dts: mediatek: add watchdog to MT6797
->        arm64: dts: mediatek: Delete unused dummy clock for MT6797
-> 
-> Sean Wang (2):
->        arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
->        arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
-> 
-> yt.shen at mediatek.com (2):
->        dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
->        arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile
-> 
->   Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->   .../interrupt-controller/mediatek,sysirq.txt       |   1 +
->   .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
->   .../devicetree/bindings/watchdog/mtk-wdt.txt       |   6 +-
->   arch/arm64/boot/dts/mediatek/Makefile              |   2 +
->   arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
->   arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 171 +++++++++++++++++++++
->   arch/arm64/boot/dts/mediatek/mt6797.dtsi           |  12 +-
->   arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       |  27 ++++
->   arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 110 +++++++++++++
->   10 files changed, 356 insertions(+), 10 deletions(-)
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> That's what I've attempted here - but for RDA8810PL serial Rob said he
+> did not want future changes to my binding, therefore I am asking for his
+> confirmation here.
+
+It would be a change that is easy enough to do in a backward compatible
+way so that is probably fine.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
