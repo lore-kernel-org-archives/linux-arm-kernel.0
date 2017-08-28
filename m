@@ -1,130 +1,122 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 28 Aug 2017 13:18:50 -0500
-Subject: [PATCH V2] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-In-Reply-To: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
-References: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <5e764550-5104-e132-5b68-8f91a1ad6f33@ti.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 28 Aug 2017 20:19:02 +0200
+Subject: [PATCH v3 52/59] KVM: arm/arm64: GICv4: Use the doorbell
+ interrupt as an unblocking source
+In-Reply-To: <20170731172637.29355-53-marc.zyngier@arm.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-53-marc.zyngier@arm.com>
+Message-ID: <20170828181902.GN24649@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On 08/28/2017 11:35 AM, Adam Wallis wrote:
-> The dma ops from the parent DWC device are not getting passed to the
-> child xhci-hcd device. This patch makes use of
-> platform_device_register_full to set the DMA ops. For the DT/OF case,
-> dma_ops were still null after the the device register, so
-> of_dma_configure is called in only the OF case.
-
-1) And how this is different form
-https://patchwork.kernel.org/patch/8931771/
-which was not accepted and which is actually my solution.
-
-2) How platform_device_register_full can help with DMA setting?
-
-3) I've did some search and provided you with links not for fun
-but to provide you with useful information, so you can find out that 
-xhci-hcd device is not expected to be used for dma, but sysdev is.
-And if xhci-hcd is not working for you it means current code has
-some issue with sysdev initialization or some part of USB code not updated 
-properly to use sysydev.
-
-NACK
-
+On Mon, Jul 31, 2017 at 06:26:30PM +0100, Marc Zyngier wrote:
+> The doorbell interrupt is only useful if the vcpu is blocked on WFI.
+> In all other cases, recieving a doorbell interrupt is just a waste
+> of cycles.
 > 
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> So let's only enable the doorbell if a vcpu is getting blocked,
+> and disable it when it is unblocked. This is very similar to
+> what we're doing for the background timer.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->   drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
->   1 file changed, 17 insertions(+), 22 deletions(-)
+>  include/kvm/arm_vgic.h      |  3 +++
+>  virt/kvm/arm/arm.c          |  2 ++
+>  virt/kvm/arm/vgic/vgic-v4.c | 32 +++++++++++++++++++++++++++++++-
+>  3 files changed, 36 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-> index 76f0b0d..c289da1 100644
-> --- a/drivers/usb/dwc3/host.c
-> +++ b/drivers/usb/dwc3/host.c
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 050f78d4fb42..7b1cc7ff5b42 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -375,4 +375,7 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
+>  int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
+>  				 struct kvm_kernel_irq_routing_entry *irq_entry);
+>  
+> +void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu);
+> +void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __KVM_ARM_VGIC_H */
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 6803ea27c47d..5dbc8dc8fbf4 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -316,11 +316,13 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+>  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+>  {
+>  	kvm_timer_schedule(vcpu);
+> +	kvm_vgic_v4_enable_doorbell(vcpu);
+>  }
+>  
+>  void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
+>  {
+>  	kvm_timer_unschedule(vcpu);
+> +	kvm_vgic_v4_disable_doorbell(vcpu);
+>  }
+>  
+>  int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index 6af3cde6d7d4..50721c4e3da5 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
 > @@ -16,6 +16,7 @@
->    */
->   
->   #include <linux/platform_device.h>
-> +#include <linux/of_platform.h>
->   
->   #include "core.h"
->   
-> @@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
->   {
->   	struct property_entry	props[3];
->   	struct platform_device	*xhci;
-> +	struct platform_device_info dwc_plat_info = {};
->   	int			ret, irq;
->   	struct resource		*res;
->   	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
-> @@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
->   	dwc->xhci_resources[1].flags = res->flags;
->   	dwc->xhci_resources[1].name = res->name;
->   
-> -	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
-> -	if (!xhci) {
-> -		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
-> -		return -ENOMEM;
-> -	}
-> +	dwc_plat_info.name = "xhci-hcd";
-> +	dwc_plat_info.parent = dwc->sysdev;
-> +	dwc_plat_info.res = dwc->xhci_resources;
-> +	dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
-> +	dwc_plat_info.fwnode = dwc->sysdev->fwnode;
-> +	dwc_plat_info.dma_mask = *dwc->sysdev->dma_mask;
->   
-> -	xhci->dev.parent	= dwc->dev;
-> +	xhci = platform_device_register_full(&dwc_plat_info);
-> +	if (IS_ERR(xhci)) {
-> +		dev_err(dwc->dev, "failed to register xHCI device\n");
-> +		return PTR_ERR(xhci);
+>   */
+>  
+>  #include <linux/interrupt.h>
+> +#include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/kvm_host.h>
+>  
+> @@ -73,6 +74,14 @@ int vgic_v4_init(struct kvm *kvm)
+>  	kvm_for_each_vcpu(i, vcpu, kvm) {
+>  		int irq = dist->its_vm.vpes[i]->irq;
+>  
+> +		/*
+> +		 * Don't automatically enable the doorbell, as we're
+> +		 * flipping it back and forth when the vcpu gets
+> +		 * blocked. Also disable the lazy disabling, as the
+> +		 * doorbell could kick us out of the guest too
+> +		 * early...
+> +		 */
+> +		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
+>  		ret = request_irq(irq, vgic_v4_doorbell_handler,
+>  				  0, "vcpu", vcpu);
+>  		if (ret) {
+> @@ -98,7 +107,10 @@ void vgic_v4_teardown(struct kvm *kvm)
+>  
+>  	for (i = 0; i < its_vm->nr_vpes; i++) {
+>  		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
+> -		free_irq(its_vm->vpes[i]->irq, vcpu);
+> +		int irq = its_vm->vpes[i]->irq;
+> +
+> +		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
+> +		free_irq(irq, vcpu);
+>  	}
+>  
+>  	its_free_vcpu_irqs(its_vm);
+> @@ -211,3 +223,21 @@ int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
+>  	mutex_unlock(&its->its_lock);
+>  	return ret;
+>  }
+> +
+> +void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu)
+> +{
+> +	if (vgic_is_v4_capable(vcpu->kvm)) {
+> +		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +		if (irq)
+> +			enable_irq(irq);
 > +	}
->   
->   	dwc->xhci = xhci;
-> -
-> -	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
-> -						DWC3_XHCI_RESOURCES_NUM);
-> -	if (ret) {
-> -		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
-> -		goto err1;
-> -	}
-> +	if (dwc->sysdev->of_node)
-> +		of_dma_configure(&xhci->dev, dwc->sysdev->of_node);
->   
->   	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
->   
-> @@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
->   		ret = platform_device_add_properties(xhci, props);
->   		if (ret) {
->   			dev_err(dwc->dev, "failed to add properties to xHCI\n");
-> -			goto err1;
-> +			goto err;
->   		}
->   	}
->   
-> @@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
->   	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
->   			  dev_name(dwc->dev));
->   
-> -	ret = platform_device_add(xhci);
-> -	if (ret) {
-> -		dev_err(dwc->dev, "failed to register xHCI device\n");
-> -		goto err2;
-> -	}
-> -
->   	return 0;
-> -err2:
-> +err:
->   	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
->   			  dev_name(dwc->dev));
->   	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
->   			  dev_name(dwc->dev));
-> -err1:
->   	platform_device_put(xhci);
->   	return ret;
->   }
+> +}
+> +
+> +void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu)
+> +{
+> +	if (vgic_is_v4_capable(vcpu->kvm)) {
+> +		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +		if (irq)
+> +			disable_irq(irq);
+> +	}
+> +}
+> -- 
+> 2.11.0
 > 
-
--- 
-regards,
--grygorii
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
