@@ -1,46 +1,108 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 28 Aug 2017 18:16:27 +0200
-Subject: [PATCH v3 2/3] rtc: Add Realtek RTD1295
-In-Reply-To: <20170828111041.17946-3-afaerber@suse.de>
-References: <20170828111041.17946-1-afaerber@suse.de>
- <20170828111041.17946-3-afaerber@suse.de>
-Message-ID: <20170828161627.4vndoeucudh3rfto@piout.net>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Mon, 28 Aug 2017 12:35:10 -0400
+Subject: [PATCH V2] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
+Message-ID: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The dma ops from the parent DWC device are not getting passed to the
+child xhci-hcd device. This patch makes use of
+platform_device_register_full to set the DMA ops. For the DT/OF case,
+dma_ops were still null after the the device register, so
+of_dma_configure is called in only the OF case.
 
-Seems fine to me, one small comment:
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+ drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
+ 1 file changed, 17 insertions(+), 22 deletions(-)
 
-On 28/08/2017 at 13:10:40 +0200, Andreas F?rber wrote:
-> +static int rtd119x_rtc_remove(struct platform_device *pdev)
-> +{
-> +	struct rtd119x_rtc *data = platform_get_drvdata(pdev);
-> +
-> +	rtd119x_rtc_set_enabled(&pdev->dev, false);
-> +
-> +	clk_disable_unprepare(data->clk);
-
-Missing clk_put ?
-
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver rtd119x_rtc_driver = {
-> +	.probe = rtd119x_rtc_probe,
-> +	.remove = rtd119x_rtc_remove,
-> +	.driver = {
-> +		.name = "rtd1295-rtc",
-> +		.of_match_table	= rtd119x_rtc_dt_ids,
-> +	},
-> +};
-> +builtin_platform_driver(rtd119x_rtc_driver);
-> -- 
-> 2.12.3
-> 
-
+diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
+index 76f0b0d..c289da1 100644
+--- a/drivers/usb/dwc3/host.c
++++ b/drivers/usb/dwc3/host.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <linux/platform_device.h>
++#include <linux/of_platform.h>
+ 
+ #include "core.h"
+ 
+@@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+ {
+ 	struct property_entry	props[3];
+ 	struct platform_device	*xhci;
++	struct platform_device_info dwc_plat_info = {};
+ 	int			ret, irq;
+ 	struct resource		*res;
+ 	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
+@@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 	dwc->xhci_resources[1].flags = res->flags;
+ 	dwc->xhci_resources[1].name = res->name;
+ 
+-	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
+-	if (!xhci) {
+-		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
+-		return -ENOMEM;
+-	}
++	dwc_plat_info.name = "xhci-hcd";
++	dwc_plat_info.parent = dwc->sysdev;
++	dwc_plat_info.res = dwc->xhci_resources;
++	dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
++	dwc_plat_info.fwnode = dwc->sysdev->fwnode;
++	dwc_plat_info.dma_mask = *dwc->sysdev->dma_mask;
+ 
+-	xhci->dev.parent	= dwc->dev;
++	xhci = platform_device_register_full(&dwc_plat_info);
++	if (IS_ERR(xhci)) {
++		dev_err(dwc->dev, "failed to register xHCI device\n");
++		return PTR_ERR(xhci);
++	}
+ 
+ 	dwc->xhci = xhci;
+-
+-	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
+-						DWC3_XHCI_RESOURCES_NUM);
+-	if (ret) {
+-		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
+-		goto err1;
+-	}
++	if (dwc->sysdev->of_node)
++		of_dma_configure(&xhci->dev, dwc->sysdev->of_node);
+ 
+ 	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
+ 
+@@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 		ret = platform_device_add_properties(xhci, props);
+ 		if (ret) {
+ 			dev_err(dwc->dev, "failed to add properties to xHCI\n");
+-			goto err1;
++			goto err;
+ 		}
+ 	}
+ 
+@@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
+ 			  dev_name(dwc->dev));
+ 
+-	ret = platform_device_add(xhci);
+-	if (ret) {
+-		dev_err(dwc->dev, "failed to register xHCI device\n");
+-		goto err2;
+-	}
+-
+ 	return 0;
+-err2:
++err:
+ 	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
+ 			  dev_name(dwc->dev));
+ 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
+ 			  dev_name(dwc->dev));
+-err1:
+ 	platform_device_put(xhci);
+ 	return ret;
+ }
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
