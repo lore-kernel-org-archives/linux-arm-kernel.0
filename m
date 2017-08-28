@@ -1,68 +1,63 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Aug 2017 16:29:04 +0200
-Subject: [PATCH v3 02/13] mmc: meson-gx: cfg init overwrite values
-In-Reply-To: <20170828142915.27020-1-jbrunet@baylibre.com>
-References: <20170828142915.27020-1-jbrunet@baylibre.com>
-Message-ID: <20170828142915.27020-3-jbrunet@baylibre.com>
+Date: Mon, 28 Aug 2017 16:29:02 +0200
+Subject: [PATCH v3 00/13] mmc: meson-gx: driver fixups and upgrades
+Message-ID: <20170828142915.27020-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cfg init function overwrite values set in the clk init function
-Remove the cfg pokes from the clk init. Actually, trying to use
-the CLK_AUTO, like initially tried in clk_init, would break
-the card initialization
+The patchset features several bugfixes, rework and upgrade for the
+meson-gx MMC driver.
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/mmc/host/meson-gx-mmc.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+The main goal is to improve readability and enable new high speed
+modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index d2de5c11cdce..7d14d382cb1c 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -337,7 +337,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	int i, ret = 0;
- 	const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
- 	const char *clk_div_parents[1];
--	u32 clk_reg, cfg;
-+	u32 clk_reg;
- 
- 	/* init SD_EMMC_CLOCK to sane defaults w/min clock rate */
- 	clk_reg = 0;
-@@ -402,12 +402,6 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	if (WARN_ON(PTR_ERR_OR_ZERO(host->cfg_div_clk)))
- 		return PTR_ERR(host->cfg_div_clk);
- 
--	/* Ensure clock starts in "auto" mode, not "always on" */
--	cfg = readl(host->regs + SD_EMMC_CFG);
--	cfg &= ~CFG_CLK_ALWAYS_ON;
--	cfg |= CFG_AUTO_CLK;
--	writel(cfg, host->regs + SD_EMMC_CFG);
--
- 	ret = clk_prepare_enable(host->cfg_div_clk);
- 	if (ret)
- 		return ret;
-@@ -956,6 +950,9 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_core_clk;
- 
-+	/* set config to sane default */
-+	meson_mmc_cfg_init(host);
-+
- 	/* Stop execution */
- 	writel(0, host->regs + SD_EMMC_START);
- 
-@@ -964,9 +961,6 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_STATUS);
- 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_IRQ_EN);
- 
--	/* set config to sane default */
--	meson_mmc_cfg_init(host);
--
- 	ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
- 					meson_mmc_irq_thread, IRQF_SHARED,
- 					NULL, host);
+SDR104 is not working with a few cards on the p200 and the
+libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
+of these boards, adding noise to the signal and eventually breaking
+the communication with some cards. The same cards are working well on a
+laptop or the nanopi-k2 at 200Mhz.
+
+This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
+gxl-s905x-libretech-cc
+
+Changes since v2 [1]:
+* Drop patches 1 to 3: Applied.
+* Drop patch 4: Debug stuff which should not have been sent.
+* Added fix to previous patch 3:
+  If the clock register is not initialized before registering the clk
+  with CCF, the framework will complain about an illegal divider value.
+  This had gone unnoticed because it was later fixed by the clock init
+  rework.
+
+  Ulf, I know it is getting late but it would be nice if patch #1 of
+  this v3 could go with 3 patches you already applied. The rest can
+  wait for the following cycle.
+
+Changes since v1 [0]:
+* Reorder patches to have fixes first, then rework and finally
+  enhancements.
+* Use CCF to manage clock phases
+
+[0]: https://lkml.kernel.org/r/20170804174353.16486-1-jbrunet at baylibre.com
+[1]: https://lkml.kernel.org/r/20170821160301.21899-1-jbrunet at baylibre.com
+
+Jerome Brunet (13):
+  mmc: meson-gx: initialize sane clk default before clock register
+  mmc: meson-gx: cfg init overwrite values
+  mmc: meson-gx: rework set_ios function
+  mmc: meson-gx: rework clk_set function
+  mmc: meson-gx: rework clock init function
+  mmc: meson-gx: fix dual data rate mode frequencies
+  mmc: meson-gx: work around clk-stop issue
+  mmc: meson-gx: simplify interrupt handler
+  mmc: meson-gx: implement card_busy callback
+  mmc: meson-gx: use CCF to handle the clock phases
+  mmc: meson-gx: implement voltage switch callback
+  mmc: meson-gx: change default tx phase
+  mmc: meson-gx: rework tuning function
+
+ drivers/mmc/host/meson-gx-mmc.c | 710 ++++++++++++++++++++++++++++------------
+ 1 file changed, 493 insertions(+), 217 deletions(-)
+
 -- 
 2.9.5
