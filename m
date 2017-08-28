@@ -1,32 +1,29 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Mon, 28 Aug 2017 14:16:02 +0200
-Subject: [PATCH 2/4] clk: rockchip: export clock pclk_efuse_256 for RK3368 SoCs
+Date: Mon, 28 Aug 2017 14:16:01 +0200
+Subject: [PATCH 1/4] clk: rockchip: add clock id for PCLK_EFUSE256 of RK3368
+ SoCs
 In-Reply-To: <20170828121604.15968-1-romain.perier@collabora.com>
 References: <20170828121604.15968-1-romain.perier@collabora.com>
-Message-ID: <20170828121604.15968-3-romain.perier@collabora.com>
+Message-ID: <20170828121604.15968-2-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This exports the clock for the pclk gate of the eFuse that is part of
-the RK3368 SoCs. So we can use it from the dt-bindings.
-
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
- drivers/clk/rockchip/clk-rk3368.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/dt-bindings/clock/rk3368-cru.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index fc56565379dd..7c4d242f19c1 100644
---- a/drivers/clk/rockchip/clk-rk3368.c
-+++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -711,7 +711,7 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
- 	GATE(PCLK_SIM, "pclk_sim", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 8, GFLAGS),
- 	GATE(PCLK_PWM1, "pclk_pwm1", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 6, GFLAGS),
- 	GATE(PCLK_UART2, "pclk_uart2", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 5, GFLAGS),
--	GATE(0, "pclk_efuse_256", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 1, GFLAGS),
-+	GATE(PCLK_EFUSE256, "pclk_efuse_256", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 1, GFLAGS),
- 	GATE(0, "pclk_efuse_1024", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 0, GFLAGS),
+diff --git a/include/dt-bindings/clock/rk3368-cru.h b/include/dt-bindings/clock/rk3368-cru.h
+index aeb83e581a11..a0063ed7284a 100644
+--- a/include/dt-bindings/clock/rk3368-cru.h
++++ b/include/dt-bindings/clock/rk3368-cru.h
+@@ -156,6 +156,7 @@
+ #define PCLK_ISP		366
+ #define PCLK_VIP		367
+ #define PCLK_WDT		368
++#define PCLK_EFUSE256		369
  
- 	/*
+ /* hclk gates */
+ #define HCLK_SFC		448
 -- 
 2.11.0
