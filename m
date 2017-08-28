@@ -1,86 +1,117 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 28 Aug 2017 23:18:25 +0200
-Subject: [PATCH 1/2] mtd: spi-nor: add an option to force 3byte adressing
- mode
-In-Reply-To: <1503954854-30963-2-git-send-email-mw@semihalf.com>
-References: <1503954854-30963-1-git-send-email-mw@semihalf.com>
- <1503954854-30963-2-git-send-email-mw@semihalf.com>
-Message-ID: <CAMuHMdX0b=J9AuPAvdRXGGVXvc7f9n7TJ0_VKR13P05toq9REw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 28 Aug 2017 23:14:43 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
+ direct_complete for ACPI devices
+In-Reply-To: <CAPDyKFq_AN+jEfgDoE0iv=QS5ydDCgPGxW5ivBwp0BAgHDyrGw@mail.gmail.com>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <1644235.K1erQvOgW9@aspire.rjw.lan>
+ <CAPDyKFq_AN+jEfgDoE0iv=QS5ydDCgPGxW5ivBwp0BAgHDyrGw@mail.gmail.com>
+Message-ID: <3394725.Atsz4N1K4M@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 11:14 PM, Marcin Wojtas <mw@semihalf.com> wrote:
-> Hitherto code set 4B addressing mode for all SPI flashes whose
-> size exceeds 16MB. However, changing the default 3B access
-> in some cases may be harmful - it may happen that the Boot ROM
-> is not capable of handling non-default state of the SPI NOR
-> (e.g. after soft reset). Some flash devices allow to access the
-> memory above 128Mib without changing mode to 4byte thanks
-> to special op codes (see SPI_NOR_4B_OPCODES flag). Unfortunately
-> for those which don't support them, the problem persists.
->
-> This patch adds optional property that can be added to the
-> SPI flash node and which will force to use 3B addressing mode,
-> limiting the accessible memory size to 16MiB.
-> Binding documentation is updated accordingly.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-bus.txt |  2 ++
->  drivers/mtd/spi-nor/spi-nor.c                     | 12 +++++++++++-
->  2 files changed, 13 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-> index 1f6e86f..f13b773 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-> @@ -77,6 +77,8 @@ All slave nodes can contain the following optional properties:
->                     Defaults to 1 if not present.
->  - spi-rx-delay-us - Microsecond delay after a read transfer.
->  - spi-tx-delay-us - Microsecond delay after a write transfer.
-> +- spi-3byte-addressing - Empty property indicating device access to be done
-> +                   only in 3byte addressing mode.
+On Monday, August 28, 2017 4:24:51 PM CEST Ulf Hansson wrote:
+> On 28 August 2017 at 15:40, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Monday, August 28, 2017 2:54:40 PM CEST Ulf Hansson wrote:
+> >> On 28 August 2017 at 14:39, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> > On Monday, August 28, 2017 10:31:44 AM CEST Ulf Hansson wrote:
+> >> >> On 28 August 2017 at 03:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> >> > On Friday, August 25, 2017 3:42:35 PM CEST Rafael J. Wysocki wrote:
+> >> >> >> On Thursday, August 24, 2017 11:50:40 PM CEST Rafael J. Wysocki wrote:
+> >> >> >> > On Thursday, August 24, 2017 6:35:49 PM CEST Rafael J. Wysocki wrote:
+> >> >> >> > > On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
+> >
+> > [cut]
+> >
+> >> >> >
+> >> >> > Well, not really, because if the device remains runtime suspended,
+> >> >> > ->runtime_suspend() will not be called by pm_runtime_force_suspend() and
+> >> >> > acpi_dev_suspend_late() should not be called then.
+> >> >> >
+> >> >> > So more changes in the ACPI PM domain are needed after all.
+> >> >>
+> >> >> Yes, that's what I thought as well.
+> >> >>
+> >> >> Anyway, let me cook a new version of the series - trying to address
+> >> >> the first bits you have pointed out. Then we can continue with
+> >> >> fine-tuning on top, addressing further optimizations of the ACPI PM
+> >> >> domain.
+> >> >
+> >> > Actually, please hold on and let me show you what I would like to do
+> >> > first.
+> >>
+> >> Hmm.
+> >>
+> >> I think I have almost done the work for the ACPI PM domain already.
+> >> It's just a matter of minor tweaks to the changes in patch 6 and 7
+> >> (and of course to get them into a shape that you prefer) and then
+> >> dropping patch 5 altogether.
+> >>
+> >> Wouldn't it be better if you build upon my changes?
+> >>
+> >> Anyway, if you have strong opinion of driving this, I am fine stepping aside.
+> >
+> > OK, so see below. :-)
+> >
+> > If what you want is to make the i2c designware driver use _force_suspend() and
+> > _force_resume(), then to me this is only tangentially related to direct_complete
+> > and can be done without messing up with that one.
+> >
+> > So the problem is not when direct_complete is set (becasue the driver's and
+> > PM domain's callbacks will not be invoked then even), but when it is not set.
+> 
+> For i2c designware driver case - then you are right! Although, that's
+> because the i2c designware driver has nothing else to do than to call
+> pm_runtime_force_suspend|resume() from the late suspend and early
+> resume callbacks.
+> 
+> However, for other drivers this isn't the case. A driver may have some
+> additional things to cope with during system sleep, besides making
+> sure to call pm_runtime_force_suspend|resume().
 
-spi-force-3byte-addressing?
+Sure enough, but I'm seeing that as a separate issue.
 
->  Some SPI controllers and devices support Dual and Quad SPI transfer mode.
->  It allows data in the SPI system to be transferred using 2 wires (DUAL) or 4
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index 1413828..029c87d 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -2002,7 +2002,17 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
->                 if (JEDEC_MFR(info) == SNOR_MFR_SPANSION ||
->                     info->flags & SPI_NOR_4B_OPCODES)
->                         spi_nor_set_4byte_opcodes(nor, info);
-> -               else
-> +               else if (of_property_read_bool(np, "spi-3byte-addressing")) {
-> +                       /*
-> +                        * Do not enter 4byte mode in order to prevent
-> +                        * the early bootloader to come up on non-default
-> +                        * SPI NOR memory during boot. Limit accessible
-> +                        * size to 16MiB.
-> +                        */
-> +                       nor->addr_width = 3;
-> +                       mtd->size = 0x1000000;
+> Then as I stated earlier, it would be of great value if we could
+> remain having runtime PM enabled during the entire device_suspend()
+> phase. I am not sure how you intend to address that, or perhaps you
+> did in some of those earlier patches you posted.
 
-What if the device is smaller than 16 MiB?
+I did, but I'd prefer to get back to that later.
 
-mtd->size = min(mtd->size, 0x1000000);
+If the issues occurring when direct_complete is not set are addressed first,
+disabling direct_complete for the devices that cannot use it should be
+straightforward.
 
-> +                       dev_info(dev, "Force 3B addressing mode\n");
-> +               } else
->                         set_4byte(nor, info, 1);
->         } else {
->                 nor->addr_width = 3;
+> In my re-spinned series (not posted yet), I am still addressing both
+> issues above, but also not preventing the direct_complete path for
+> parent/suppliers when the runtime PM centric path is used.
+> 
+> > If direct_complete is not set, the ACPI PM domain resumes the device in
+> > acpi_subsys_suspend(), because it doesn't know two things: (a) why direct_complete
+> > is not set and (b) whether or not the drivers PM callbacks can cope with a
+> > runtime suspended device.  These two things are separate, so they need to
+> > be addressed separately.
+> 
+> Yes.
+> 
+> >
+> > For (b) I'd like to use the SAFE_SUSPEND flag from my previous patch.
+> 
+> Seems like a reasonable approach.
+> 
+> >
+> > As far as (a) is concerned, there are two possible reasons for not setting
+> > direct_complete.  First, it may be necessary to change the power state of the
+> > device and in that case the device *should* be resumed in acpi_subsys_suspend().
+> > Second, direct_complete may not be set for the device's children and in that
+> > case acpi_subsys_suspend() may not care as long as SAFE_SUSPEND is set.
+> 
+> Okay!
 
-Gr{oetje,eeting}s,
+Good. :-)
 
-                        Geert
+Let me split the patch into a more manageable series, then, clean it up a bit
+and add the LPSS coverage to the ACPI part.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Rafael
