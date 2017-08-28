@@ -1,26 +1,44 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Mon, 28 Aug 2017 14:16:00 +0200
-Subject: [PATCH 0/4] rockchip: Add efuse support for RK3368 SoCs
-Message-ID: <20170828121604.15968-1-romain.perier@collabora.com>
+Date: Mon, 28 Aug 2017 14:16:04 +0200
+Subject: [PATCH 4/4] arm64: dts: rockchip: add efuse for RK3368 SoCs
+In-Reply-To: <20170828121604.15968-1-romain.perier@collabora.com>
+References: <20170828121604.15968-1-romain.perier@collabora.com>
+Message-ID: <20170828121604.15968-5-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches exports the right clocks, add required functions
-and data, and definition for enabling and supporting eFuse on RK3368
-SoCs.
+This adds the definition for eFuse that is found on RK3368 SoCs with the
+corresponding data cells.
 
-Romain Perier (4):
-  clk: rockchip: add clock id for PCLK_EFUSE256 of RK3368 SoCs
-  clk: rockchip: export clock pclk_efuse_256 for RK3368 SoCs
-  nvmem: rockchip: add support for RK3368
-  arm64: dts: rockchip: add efuse for RK3368 SoCs
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
- .../devicetree/bindings/nvmem/rockchip-efuse.txt   |  1 +
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 14 ++++
- drivers/clk/rockchip/clk-rk3368.c                  |  2 +-
- drivers/nvmem/rockchip-efuse.c                     | 80 ++++++++++++++++++++++
- include/dt-bindings/clock/rk3368-cru.h             |  1 +
- 5 files changed, 97 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 3039c2da533e..cca2ce1705b3 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -569,6 +569,20 @@
+ 		};
+ 	};
+ 
++	efuse: efuse at ffb00000 {
++		compatible = "rockchip,rk3368-efuse";
++		reg = <0x0 0xffb00000 0x0 0x20>;
++		clocks = <&cru PCLK_EFUSE_256>;
++		clock-names = "pclk_efuse";
++
++		cpu_leakage: cpu-leakage at 17 {
++			reg = <0x17 0x1>;
++		};
++		temp_adjust: temp-adjust at 1f {
++			reg = <0x1f 0x1>;
++		};
++	};
++
+ 	tsadc: tsadc at ff280000 {
+ 		compatible = "rockchip,rk3368-tsadc";
+ 		reg = <0x0 0xff280000 0x0 0x100>;
 -- 
 2.11.0
