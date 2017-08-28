@@ -1,63 +1,32 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 28 Aug 2017 16:44:45 +0530
-Subject: [PATCH v3 00/17] Broadcom SBA-RAID driver improvements
-In-Reply-To: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-References: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170828111445.GF3053@localhost>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Mon, 28 Aug 2017 13:24:40 +0200
+Subject: [PATCH linux-next] fix compilation error in mach-omap2/display.c
+In-Reply-To: <20170828093207.GA29080@amd>
+References: <20170828093207.GA29080@amd>
+Message-ID: <20170828112439.47zuaxeemkqmjuof@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 03:26:49PM +0530, Anup Patel wrote:
-> This patchset does various improvments to Broadcom SBA-RAID
-> driver.
-> 
-> The patches are based on Linux-4.13-rc3 and can also be found
-> at sba-raid-imp-v3 branch of
-> https://github.com/Broadcom/arm64-linux.git
+Hi,
 
-Applied all, thanks
+On Mon, Aug 28, 2017 at 11:32:07AM +0200, Pavel Machek wrote:
+> In linux-next 0828, I get
+> 
+>   CC      arch/arm/mach-omap2/display.o
+>   arch/arm/mach-omap2/display.c: In function 'omapdss_init_fbdev':
+>   arch/arm/mach-omap2/display.c:184:2: error: 'r' undeclared (first
+> 
+> Fix it.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> Changes since v2:
->  - Update patch description for PATCH1 and PATCH3
->  - Add dev_err() for debugfs API failures instead of bailing out
->  - Add PATCH17 to remove redundant SBA_REQUEST_STATE_COMPLETED
-> 
-> Changes since v1:
->  - Split PATCH1 into 10 smaller patches for easier review
->  - Added more info to commit description of PATCH2
->  - Split PATCH4 into 2 patches for easier review
->  - Dropped PATCH6 because it is now part of
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1456425.html
-> 
-> Anup Patel (17):
->   dmaengine: bcm-sba-raid: Minor improvments in comments
->   dmaengine: bcm-sba-raid: Reduce locking context in sba_alloc_request()
->   dmaengine: bcm-sba-raid: Common flags for sba_request state and fence
->   dmaengine: bcm-sba-raid: Remove redundant next_count from sba_request
->   dmaengine: bcm-sba-raid: Remove redundant resp_dma from sba_request
->   dmaengine: bcm-sba-raid: Remove reqs_free_count from sba_device
->   dmaengine: bcm-sba-raid: Allow arbitrary number free sba_request
->   dmaengine: bcm-sba-raid: Increase number of free sba_request
->   dmaengine: bcm-sba-raid: Improve sba_issue_pending() run duration
->   dmaengine: bcm-sba-raid: Alloc resources before registering DMA device
->   dmaengine: bcm-sba-raid: Peek mbox when we have no free requests
->   dmaengine: bcm-sba-raid: Pre-ack async tx descriptor
->   dmaengine: bcm-sba-raid: Re-factor sba_process_deferred_requests()
->   dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_RECEIVED
->   dmaengine: bcm-sba-raid: Add debugfs support
->   dmaengine: bcm-sba-raid: Explicitly ACK mailbox message after sending
->   dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_COMPLETED
-> 
->  drivers/dma/bcm-sba-raid.c | 538 ++++++++++++++++++++++++---------------------
->  1 file changed, 292 insertions(+), 246 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+https://lkml.org/lkml/2017/8/23/346
 
--- 
-~Vinod
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/d6b169ef/attachment.sig>
