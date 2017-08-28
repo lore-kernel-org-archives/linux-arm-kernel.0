@@ -1,112 +1,150 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Aug 2017 16:29:08 +0200
-Subject: [PATCH v3 06/13] mmc: meson-gx: fix dual data rate mode frequencies
+Date: Mon, 28 Aug 2017 16:29:09 +0200
+Subject: [PATCH v3 07/13] mmc: meson-gx: work around clk-stop issue
 In-Reply-To: <20170828142915.27020-1-jbrunet@baylibre.com>
 References: <20170828142915.27020-1-jbrunet@baylibre.com>
-Message-ID: <20170828142915.27020-7-jbrunet@baylibre.com>
+Message-ID: <20170828142915.27020-8-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In DDR modes, meson mmc controller requires an input rate twice as fast
-as the output rate
+It seems that the mmc clock is also used and required, somehow, by
+the controller itself.
 
-Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
+It is shown during init, when writing to CFG while the divider is set
+to 0 will crash the SoC. During a voltage switch, the controller may
+crash and the card may then fail to exit busy state if the clock is
+stopped.
+
+To avoid this, it is best to keep the clock running for the controller,
+except during rate change. However, we still need to be able to gate
+the clock out of the SoC. Let's use the pinmux for this, and fallback
+to gpio mode (pulled-down) when we need to gate the clock
+
 Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 41 +++++++++++++++++++++++++++++------------
- 1 file changed, 29 insertions(+), 12 deletions(-)
+ drivers/mmc/host/meson-gx-mmc.c | 74 +++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 68 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 7800a7ace2de..341e5a1b32cc 100644
+index 341e5a1b32cc..43aabb793121 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -262,14 +262,29 @@ static void meson_mmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
- 			     mmc_get_dma_dir(data));
+@@ -137,6 +137,10 @@ struct meson_host {
+ 	struct clk *mmc_clk;
+ 	unsigned long req_rate;
+ 
++	struct pinctrl *pinctrl;
++	struct pinctrl_state *pins_default;
++	struct pinctrl_state *pins_clk_gate;
++
+ 	unsigned int bounce_buf_size;
+ 	void *bounce_buf;
+ 	dma_addr_t bounce_dma_addr;
+@@ -272,6 +276,42 @@ static bool meson_mmc_timing_is_ddr(struct mmc_ios *ios)
+ 	return false;
  }
  
--static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
-+static bool meson_mmc_timing_is_ddr(struct mmc_ios *ios)
++/*
++ * Gating the clock on this controller is tricky.  It seems the mmc clock
++ * is also used by the controller.  It may crash during some operation if the
++ * clock is stopped.  The safest thing to do, whenever possible, is to keep
++ * clock running at stop it at the pad using the pinmux.
++ */
++static void meson_mmc_clk_gate(struct meson_host *host)
 +{
-+	if (ios->timing == MMC_TIMING_MMC_DDR52 ||
-+	    ios->timing == MMC_TIMING_UHS_DDR50 ||
-+	    ios->timing == MMC_TIMING_MMC_HS400)
-+		return true;
++	u32 cfg;
 +
-+	return false;
++	if (host->pins_clk_gate) {
++		pinctrl_select_state(host->pinctrl, host->pins_clk_gate);
++	} else {
++		/*
++		 * If the pinmux is not provided - default to the classic and
++		 * unsafe method
++		 */
++		cfg = readl(host->regs + SD_EMMC_CFG);
++		cfg |= CFG_STOP_CLOCK;
++		writel(cfg, host->regs + SD_EMMC_CFG);
++	}
 +}
 +
-+static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
++static void meson_mmc_clk_ungate(struct meson_host *host)
++{
++	u32 cfg;
++
++	if (host->pins_clk_gate)
++		pinctrl_select_state(host->pinctrl, host->pins_default);
++
++	/* Make sure the clock is not stopped in the controller */
++	cfg = readl(host->regs + SD_EMMC_CFG);
++	cfg &= ~CFG_STOP_CLOCK;
++	writel(cfg, host->regs + SD_EMMC_CFG);
++}
++
+ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
  {
  	struct mmc_host *mmc = host->mmc;
-+	unsigned long rate = ios->clock;
- 	int ret;
- 	u32 cfg;
- 
-+	/* DDR modes require higher module clock */
-+	if (meson_mmc_timing_is_ddr(ios))
-+		rate <<= 1;
-+
- 	/* Same request - bail-out */
--	if (host->req_rate == clk_rate)
-+	if (host->req_rate == rate)
+@@ -288,9 +328,7 @@ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
  		return 0;
  
  	/* stop clock */
-@@ -278,25 +293,29 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
- 	writel(cfg, host->regs + SD_EMMC_CFG);
+-	cfg = readl(host->regs + SD_EMMC_CFG);
+-	cfg |= CFG_STOP_CLOCK;
+-	writel(cfg, host->regs + SD_EMMC_CFG);
++	meson_mmc_clk_gate(host);
  	host->req_rate = 0;
  
--	if (!clk_rate) {
-+	if (!rate) {
- 		mmc->actual_clock = 0;
- 		/* return with clock being stopped */
+ 	if (!rate) {
+@@ -299,6 +337,11 @@ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
  		return 0;
  	}
  
--	ret = clk_set_rate(host->mmc_clk, clk_rate);
-+	ret = clk_set_rate(host->mmc_clk, rate);
++	/* Stop the clock during rate change to avoid glitches */
++	cfg = readl(host->regs + SD_EMMC_CFG);
++	cfg |= CFG_STOP_CLOCK;
++	writel(cfg, host->regs + SD_EMMC_CFG);
++
+ 	ret = clk_set_rate(host->mmc_clk, rate);
  	if (ret) {
  		dev_err(host->dev, "Unable to set cfg_div_clk to %lu. ret=%d\n",
--			clk_rate, ret);
-+			rate, ret);
- 		return ret;
- 	}
- 
--	host->req_rate = clk_rate;
-+	host->req_rate = rate;
- 	mmc->actual_clock = clk_get_rate(host->mmc_clk);
- 
-+	/* We should report the real output frequency of the controller */
-+	if (meson_mmc_timing_is_ddr(ios))
-+		mmc->actual_clock >>= 1;
-+
- 	dev_dbg(host->dev, "clk rate: %u Hz\n", mmc->actual_clock);
--	if (clk_rate != mmc->actual_clock)
--		dev_dbg(host->dev, "requested rate was %lu\n", clk_rate);
-+	if (ios->clock != mmc->actual_clock)
-+		dev_dbg(host->dev, "requested rate was %u\n", ios->clock);
+@@ -318,9 +361,7 @@ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
+ 		dev_dbg(host->dev, "requested rate was %u\n", ios->clock);
  
  	/* (re)start clock */
- 	cfg = readl(host->regs + SD_EMMC_CFG);
-@@ -490,16 +509,14 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	val |= FIELD_PREP(CFG_BUS_WIDTH_MASK, bus_width);
+-	cfg = readl(host->regs + SD_EMMC_CFG);
+-	cfg &= ~CFG_STOP_CLOCK;
+-	writel(cfg, host->regs + SD_EMMC_CFG);
++	meson_mmc_clk_ungate(host);
  
- 	val &= ~CFG_DDR;
--	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
--	    ios->timing == MMC_TIMING_MMC_DDR52 ||
--	    ios->timing == MMC_TIMING_MMC_HS400)
-+	if (meson_mmc_timing_is_ddr(ios))
- 		val |= CFG_DDR;
+ 	return 0;
+ }
+@@ -931,6 +972,27 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 		goto free_host;
+ 	}
  
- 	val &= ~CFG_CHK_DS;
- 	if (ios->timing == MMC_TIMING_MMC_HS400)
- 		val |= CFG_CHK_DS;
- 
--	err = meson_mmc_clk_set(host, ios->clock);
-+	err = meson_mmc_clk_set(host, ios);
- 	if (err)
- 		dev_err(host->dev, "Failed to set clock: %d\n,", err);
- 
++	host->pinctrl = devm_pinctrl_get(&pdev->dev);
++	if (IS_ERR(host->pinctrl)) {
++		ret = PTR_ERR(host->pinctrl);
++		goto free_host;
++	}
++
++	host->pins_default = pinctrl_lookup_state(host->pinctrl,
++						  PINCTRL_STATE_DEFAULT);
++	if (IS_ERR(host->pins_default)) {
++		ret = PTR_ERR(host->pins_default);
++		goto free_host;
++	}
++
++	host->pins_clk_gate = pinctrl_lookup_state(host->pinctrl,
++						   "clk-gate");
++	if (IS_ERR(host->pins_clk_gate)) {
++		dev_warn(&pdev->dev,
++			 "can't get clk-gate pinctrl, using clk_stop bit\n");
++		host->pins_clk_gate = NULL;
++	}
++
+ 	host->core_clk = devm_clk_get(&pdev->dev, "core");
+ 	if (IS_ERR(host->core_clk)) {
+ 		ret = PTR_ERR(host->core_clk);
 -- 
 2.9.5
