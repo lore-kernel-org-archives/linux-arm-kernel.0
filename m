@@ -1,41 +1,32 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 28 Aug 2017 17:42:05 +0530
-Subject: [PATCH 1/3] iommu: exynos: constify iommu_ops
-Message-ID: <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Mon, 28 Aug 2017 14:16:02 +0200
+Subject: [PATCH 2/4] clk: rockchip: export clock pclk_efuse_256 for RK3368 SoCs
+In-Reply-To: <20170828121604.15968-1-romain.perier@collabora.com>
+References: <20170828121604.15968-1-romain.perier@collabora.com>
+Message-ID: <20170828121604.15968-3-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu_ops are not supposed to change at runtime.
-Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
-const iommu_ops provided by <linux/iommu.h>. So mark the non-const
-structs as const.
+This exports the clock for the pclk gate of the eFuse that is part of
+the RK3368 SoCs. So we can use it from the dt-bindings.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
- drivers/iommu/exynos-iommu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/rockchip/clk-rk3368.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 2395478..a540016 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -569,7 +569,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 	spin_unlock_irqrestore(&data->lock, flags);
- }
+diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
+index fc56565379dd..7c4d242f19c1 100644
+--- a/drivers/clk/rockchip/clk-rk3368.c
++++ b/drivers/clk/rockchip/clk-rk3368.c
+@@ -711,7 +711,7 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	GATE(PCLK_SIM, "pclk_sim", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 8, GFLAGS),
+ 	GATE(PCLK_PWM1, "pclk_pwm1", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 6, GFLAGS),
+ 	GATE(PCLK_UART2, "pclk_uart2", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 5, GFLAGS),
+-	GATE(0, "pclk_efuse_256", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 1, GFLAGS),
++	GATE(PCLK_EFUSE256, "pclk_efuse_256", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 1, GFLAGS),
+ 	GATE(0, "pclk_efuse_1024", "pclk_bus", 0, RK3368_CLKGATE_CON(13), 0, GFLAGS),
  
--static struct iommu_ops exynos_iommu_ops;
-+static const struct iommu_ops exynos_iommu_ops;
- 
- static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- {
-@@ -1323,7 +1323,7 @@ static int exynos_iommu_of_xlate(struct device *dev,
- 	return 0;
- }
- 
--static struct iommu_ops exynos_iommu_ops = {
-+static const struct iommu_ops exynos_iommu_ops = {
- 	.domain_alloc = exynos_iommu_domain_alloc,
- 	.domain_free = exynos_iommu_domain_free,
- 	.attach_dev = exynos_iommu_attach_device,
+ 	/*
 -- 
-1.9.1
+2.11.0
