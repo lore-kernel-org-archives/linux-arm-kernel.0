@@ -1,108 +1,104 @@
-From: vviswana@codeaurora.org (Vijay Viswanath)
-Date: Mon, 28 Aug 2017 18:05:12 +0530
-Subject: [PATCH 4/5] mmc: sdhci-msm: Add ops to do sdhc register write
-In-Reply-To: <ace15bcd-7470-3802-5225-de87956b0b4e@intel.com>
-References: <1503033582-48703-1-git-send-email-vviswana@codeaurora.org>
- <1503033582-48703-5-git-send-email-vviswana@codeaurora.org>
- <ace15bcd-7470-3802-5225-de87956b0b4e@intel.com>
-Message-ID: <09757fef-ad37-d6d7-b0ea-01164193cbc7@codeaurora.org>
+From: vincent.abriou@st.com (Vincent ABRIOU)
+Date: Mon, 28 Aug 2017 14:07:46 +0000
+Subject: [v2,5/8] ARM: add ELF_FDPIC support
+In-Reply-To: <20170817072347.19990-6-nicolas.pitre@linaro.org>
+References: <20170817072347.19990-6-nicolas.pitre@linaro.org>
+Message-ID: <8c3f3295-430d-7aee-5747-3607b7e1613d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nicolas
 
-
-On 8/24/2017 3:41 PM, Adrian Hunter wrote:
-> On 18/08/17 08:19, Vijay Viswanath wrote:
->> Register writes which change voltage of IO lines or turn the IO bus
->> on/off require controller to be ready before progressing further. When
->> the controller is ready, it will generate a power irq which needs to be
->> handled. The thread which initiated the register write should wait for
->> power irq to complete. This will be done through the new sdhc msm write
->> APIs which will check whether the particular write can trigger a power
->> irq and wait for it with a timeout if it is expected.
->> The SDHC core power control IRQ gets triggered when -
->> * There is a state change in power control bit (bit 0)
->>    of SDHCI_POWER_CONTROL register.
->> * There is a state change in 1.8V enable bit (bit 3) of
->>    SDHCI_HOST_CONTROL2 register.
->> * Bit 1 of SDHCI_SOFTWARE_RESET is set.
->>
->> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
->> ---
->>   drivers/mmc/host/sdhci-msm.c | 39 +++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 39 insertions(+)
->>
->> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
->> index 6d3b1fd..6571880 100644
->> --- a/drivers/mmc/host/sdhci-msm.c
->> +++ b/drivers/mmc/host/sdhci-msm.c
->> @@ -1250,6 +1250,41 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
->>   	__sdhci_msm_set_clock(host, clock);
->>   }
->>   
->> +#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
->> +static void __sdhci_msm_check_write(struct sdhci_host *host, u16 val, int reg)
->> +{
->> +	u32 req_type = 0;
->> +
->> +	switch (reg) {
->> +	case SDHCI_HOST_CONTROL2:
->> +		req_type = (val & SDHCI_CTRL_VDD_180) ? REQ_IO_LOW :
->> +			REQ_IO_HIGH;
->> +		break;
->> +	case SDHCI_SOFTWARE_RESET:
->> +		if (host->pwr && (val & SDHCI_RESET_ALL))
->> +			req_type = REQ_BUS_OFF;
->> +		break;
->> +	case SDHCI_POWER_CONTROL:
->> +		req_type = !val ? REQ_BUS_OFF : REQ_BUS_ON;
->> +		break;
->> +	}
->> +
->> +	if (req_type)
+On 08/17/2017 09:23 AM, Nicolas Pitre wrote:
+> This includes the necessary code to recognise the FDPIC format on ARM
+> and the ptrace command definitions used by the common ptrace code.
 > 
-> So you are really relying on these register writes not being done in an
-> atomic context.  Since the spin lock was removed from sdhci_set_ios() that
-> seems to be true, but it would be good to add a comment here acknowledging
-> that you are depending on that.
->
-
-Will add the comments mentioning that this function can sleep and that 
-it should not be called from atomic contexts.
-
->> +		sdhci_msm_check_power_status(host, req_type);
->> +}
->> +
->> +static void sdhci_msm_writew(struct sdhci_host *host, u16 val, int reg)
->> +{
->> +		writew_relaxed(val, host->ioaddr + reg);
->> +		__sdhci_msm_check_write(host, val, reg);
->> +}
->> +
->> +static void sdhci_msm_writeb(struct sdhci_host *host, u8 val, int reg)
->> +{
->> +		writeb_relaxed(val, host->ioaddr + reg);
->> +		__sdhci_msm_check_write(host, val, reg);
->> +}
->> +#endif
->>   static const struct of_device_id sdhci_msm_dt_match[] = {
->>   	{ .compatible = "qcom,sdhci-msm-v4" },
->>   	{},
->> @@ -1264,6 +1299,10 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
->>   	.get_max_clock = sdhci_msm_get_max_clock,
->>   	.set_bus_width = sdhci_set_bus_width,
->>   	.set_uhs_signaling = sdhci_msm_set_uhs_signaling,
->> +#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
->> +	.write_w = sdhci_msm_writew,
->> +	.write_b = sdhci_msm_writeb,
->> +#endif
->>   };
->>   
->>   static const struct sdhci_pltfm_data sdhci_msm_pdata = {
->>
+> Based on patches originally from Mickael Guene <mickael.guene@st.com>.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Tested-by: Vincent Abriou <vincent.abriou@st.com>
+
+BR
+Vincent
+
+> ---
+>   arch/arm/include/asm/elf.h         | 12 ++++++++++++
+>   arch/arm/include/asm/mmu.h         |  4 ++++
+>   arch/arm/include/uapi/asm/ptrace.h |  4 ++++
+>   fs/Kconfig.binfmt                  |  2 +-
+>   4 files changed, 21 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index e2786acf82..ad0ca4f2ba 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -100,6 +100,11 @@ struct elf32_hdr;
+>   extern int elf_check_arch(const struct elf32_hdr *);
+>   #define elf_check_arch elf_check_arch
+>   
+> +#define ELFOSABI_ARM_FDPIC  65	/* ARM FDPIC platform */
+> +#define elf_check_fdpic(x)  ((x)->e_ident[EI_OSABI] == ELFOSABI_ARM_FDPIC)
+> +#define elf_check_const_displacement(x)  ((x)->e_flags & EF_ARM_PIC)
+> +#define ELF_FDPIC_CORE_EFLAGS  0
+> +
+>   #define vmcore_elf64_check_arch(x) (0)
+>   
+>   extern int arm_elf_read_implies_exec(int);
+> @@ -120,6 +125,13 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
+>      have no such handler.  */
+>   #define ELF_PLAT_INIT(_r, load_addr)	(_r)->ARM_r0 = 0
+>   
+> +#define ELF_FDPIC_PLAT_INIT(_r, _exec_map_addr, _interp_map_addr, dynamic_addr) \
+> +	do { \
+> +		(_r)->ARM_r7 = _exec_map_addr; \
+> +		(_r)->ARM_r8 = _interp_map_addr; \
+> +		(_r)->ARM_r9 = dynamic_addr; \
+> +	} while(0)
+> +
+>   extern void elf_set_personality(const struct elf32_hdr *);
+>   #define SET_PERSONALITY(ex)	elf_set_personality(&(ex))
+>   
+> diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
+> index a5b4742105..e0eb16680a 100644
+> --- a/arch/arm/include/asm/mmu.h
+> +++ b/arch/arm/include/asm/mmu.h
+> @@ -33,6 +33,10 @@ typedef struct {
+>    */
+>   typedef struct {
+>   	unsigned long	end_brk;
+> +#ifdef CONFIG_BINFMT_ELF_FDPIC
+> +	unsigned long	exec_fdpic_loadmap;
+> +	unsigned long	interp_fdpic_loadmap;
+> +#endif
+>   } mm_context_t;
+>   
+>   #endif
+> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
+> index 5af0ed1b82..3173eb9751 100644
+> --- a/arch/arm/include/uapi/asm/ptrace.h
+> +++ b/arch/arm/include/uapi/asm/ptrace.h
+> @@ -31,6 +31,10 @@
+>   #define PTRACE_SETVFPREGS	28
+>   #define PTRACE_GETHBPREGS	29
+>   #define PTRACE_SETHBPREGS	30
+> +#define PTRACE_GETFDPIC		31
+> +
+> +#define PTRACE_GETFDPIC_EXEC	0
+> +#define PTRACE_GETFDPIC_INTERP	1
+>   
+>   /*
+>    * PSR bits
+> diff --git a/fs/Kconfig.binfmt b/fs/Kconfig.binfmt
+> index b2f82cf6bf..6ef70ce8e9 100644
+> --- a/fs/Kconfig.binfmt
+> +++ b/fs/Kconfig.binfmt
+> @@ -35,7 +35,7 @@ config ARCH_BINFMT_ELF_STATE
+>   config BINFMT_ELF_FDPIC
+>   	bool "Kernel support for FDPIC ELF binaries"
+>   	default y
+> -	depends on (FRV || BLACKFIN || (SUPERH32 && !MMU) || C6X)
+> +	depends on ((ARM && !MMU) || FRV || BLACKFIN || (SUPERH32 && !MMU) || C6X)
+>   	select ELFCORE
+>   	help
+>   	  ELF FDPIC binaries are based on ELF, but allow the individual load
 > 
