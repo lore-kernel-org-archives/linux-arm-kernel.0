@@ -1,41 +1,18 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 28 Aug 2017 11:32:07 +0200
-Subject: [PATCH linux-next] fix compilation error in mach-omap2/display.c
-Message-ID: <20170828093207.GA29080@amd>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 28 Aug 2017 17:42:38 +0800
+Subject: [PATCH 1/2] clk: imx: constify clk_div_table
+In-Reply-To: <1503898133-10862-2-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1503898133-10862-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1503898133-10862-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20170828094236.GA3525@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 28, 2017 at 10:58:52AM +0530, Arvind Yadav wrote:
+> clk_div_table are not supposed to change at runtime. All functions
+> working with clk_div_table provided by <linux/clk-provider.h> work
+> with const clk_div_table. So mark the non-const structs as const.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-In linux-next 0828, I get
-
-  CC      arch/arm/mach-omap2/display.o
-  arch/arm/mach-omap2/display.c: In function 'omapdss_init_fbdev':
-  arch/arm/mach-omap2/display.c:184:2: error: 'r' undeclared (first
-
-Fix it.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index 798fc71..b3f6eb5 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -172,6 +172,7 @@ static int __init omapdss_init_fbdev(void)
- 		.set_min_bus_tput = omap_dss_set_min_bus_tput,
- 	};
- 	struct device_node *node;
-+	int r;
- 
- 	board_data.version = omap_display_get_version();
- 	if (board_data.version == OMAPDSS_VER_UNKNOWN) {
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/552b08cb/attachment.sig>
+Acked-by: Shawn Guo <shawnguo@kernel.org>
