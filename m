@@ -1,41 +1,23 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 28 Aug 2017 16:23:04 +0200
-Subject: [PATCH 0/3] DWC host without MSI controller
-Message-ID: <20170828142307.30061-1-l.stach@pengutronix.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 29 Aug 2017 00:03:10 +0900
+Subject: [PATCH 1/2] ARM: dts: uniphier: add AIDET nodes
+In-Reply-To: <1503835351-9685-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1503835351-9685-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQ+7ETDV3gp-hXRT7WHOCNqTNtoYTo9nDhd9fu1OF_awg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+2017-08-27 21:02 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Add UniPhier AIDET (ARM Interrupt Detector) nodes to support
+> active low interrupts.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-this small series tries to fix/workaround a serious design flaw of the DWC PCIe
-host controller: it is unable to work with both legacy and MSI IRQs enabled at
-the same time. As soon as the first MSI is enabled in the DWC MSI controller,
-the host stops forwarding legacy IRQs.
+Series, applied.
 
-If the MSI controller is present, MSIs will be used for the PCIe port services
-IRQs, leaving endpoint devices which don't support MSIs unable to raise IRQs.
-It is only safe to enable the MSI controller if it is validated that all PCIe
-devices and drivers in the system support working MSIs. As most devices
-support falling back to using legacy PCIe IRQs if MSI support is missing it is
-much safer to disable the MSI by default and only enable it on validated
-systems.
 
-Feedback welcome.
-
-Regards,
-Lucas
-
-Lucas Stach (3):
-  PCI: designware: only register MSI controller when MSI irq line is
-    valid
-  PCI: imx6: allow MSI irq to be absent
-  ARM: dts: imx6qdl: remove MSI irq line
-
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 ++++----
- arch/arm/boot/dts/imx6qdl.dtsi                     |  2 --
- drivers/pci/dwc/pci-imx6.c                         | 23 +++++++++++-----------
- drivers/pci/dwc/pcie-designware-host.c             |  4 ++--
- 4 files changed, 17 insertions(+), 20 deletions(-)
 
 -- 
-2.11.0
+Best Regards
+Masahiro Yamada
