@@ -1,50 +1,111 @@
 From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Mon, 28 Aug 2017 09:32:42 +0300
-Subject: [PATCH v2 1/2] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for
- LAN8710
+Date: Mon, 28 Aug 2017 09:32:43 +0300
+Subject: [PATCH v2 2/2] ARM: dts: sun7i: Add dts file for
+ A20-OLinuXino-MICRO-eMMC
 In-Reply-To: <1503901963-9457-1-git-send-email-stefan@olimex.com>
 References: <1503901963-9457-1-git-send-email-stefan@olimex.com>
-Message-ID: <1503901963-9457-2-git-send-email-stefan@olimex.com>
+Message-ID: <1503901963-9457-3-git-send-email-stefan@olimex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From revision J the board uses new phy chip LAN8710. Compared
-with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
-not to work. To fix this PA17 is muxed with GMAC function. This
-makes the pin output-low.
-
-This patch is compatible with earlier board revisions, since this
-pin wasn't connected to phy.
+A20-OLinuXino-MICRO has option with onboard eMMC chip. For
+now it's only shipped with 4BG chip, but in the future this
+may change.
 
 Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                         |  1 +
+ .../boot/dts/sun7i-a20-olinuxino-micro-emmc.dts    | 70 ++++++++++++++++++++++
+ 2 files changed, 71 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro-emmc.dts
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 0b7403e..cb1b081 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -102,7 +102,7 @@
- 
- &gmac {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&gmac_pins_mii_a>;
-+	pinctrl-0 = <&gmac_pins_mii_a>,<&gmac_txerr>;
- 	phy = <&phy1>;
- 	phy-mode = "mii";
- 	status = "okay";
-@@ -229,6 +229,11 @@
- };
- 
- &pio {
-+	gmac_txerr: gmac_txerr at 0 {
-+		pins = "PA17";
-+		function = "gmac";
-+	};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4b17f35..e1d1e93 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -880,6 +880,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-lime2-emmc.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
++	sun7i-a20-olinuxino-micro-emmc.dtb \
+ 	sun7i-a20-orangepi.dtb \
+ 	sun7i-a20-orangepi-mini.dtb \
+ 	sun7i-a20-pcduino3.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro-emmc.dts
+new file mode 100644
+index 0000000..d99e7b1
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro-emmc.dts
+@@ -0,0 +1,70 @@
++ /*
++ * Copyright 2017 Olimex Ltd.
++ * Stefan Mavrodiev <stefan@olimex.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- 	mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
- 		pins = "PH11";
- 		function = "gpio_in";
++#include "sun7i-a20-olinuxino-micro.dts"
++
++/ {
++	model = "Olimex A20-OLinuXino-MICRO-eMMC";
++	compatible = "olimex,a20-olinuxino-micro-emmc", "allwinner,sun7i-a20";
++
++	mmc2_pwrseq: pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	mmc-pwrseq = <&mmc2_pwrseq>;
++	status = "okay";
++
++	emmc: emmc at 0 {
++		reg = <0>;
++		compatible = "mmc-card";
++		broken-hpi;
++	};
++};
 -- 
 2.7.4
