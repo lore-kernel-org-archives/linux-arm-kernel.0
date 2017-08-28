@@ -1,43 +1,54 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 28 Aug 2017 15:44:49 -0700
-Subject: [PATCH v4 3/4] dt-bindings: PCI: rockchip: Add support for pcie
- wake irq
-In-Reply-To: <CAL_Jsq+MeiwOf=VDLZrxgPuLNEDvtGY=X-K1=6w9aaFVZgg1hA@mail.gmail.com>
-References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
- <20170822031934.8675-4-jeffy.chen@rock-chips.com>
- <20170825181439.d3hlwrcbmcss3sx6@rob-hp-laptop>
- <20170825181959.GA64040@google.com>
- <CAL_Jsq+MeiwOf=VDLZrxgPuLNEDvtGY=X-K1=6w9aaFVZgg1hA@mail.gmail.com>
-Message-ID: <20170828224447.GA3119@google.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 29 Aug 2017 04:43:47 +0530
+Subject: [PATCH v2 11/20] rpmsg: glink: Fix idr_lock from mutex to spinlock
+In-Reply-To: <88b34df6-d697-1d98-6427-5ddfe14785b1@codeaurora.org>
+References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
+ <1503559302-3744-12-git-send-email-sricharan@codeaurora.org>
+ <88b34df6-d697-1d98-6427-5ddfe14785b1@codeaurora.org>
+Message-ID: <ad77bb2a-cfa2-68af-8a44-a99938aecadd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 04:32:55PM -0500, Rob Herring wrote:
-> On Fri, Aug 25, 2017 at 1:20 PM, Brian Norris <briannorris@chromium.org> wrote:
-> > On Fri, Aug 25, 2017 at 01:14:39PM -0500, Rob Herring wrote:
-> >> Use the wakeup source binding:
-> >> Documentation/devicetree/bindings/power/wakeup-source.txt
-> >
-> > And I suppose this means we'd fall under this paragraph?
-> >
-> >     "However if the devices have dedicated interrupt as the wakeup source
-> >     then they need to specify/identify the same using device specific
-> >     interrupt name. In such cases only that interrupt can be used as wakeup
-> >     interrupt."
-> >
-> > We don't expect *any* interrupt to qualify as PCI WAKE#; so we should
-> > still also document the interrupt name ("wake"?) in
-> > Documentation/devicetree/bindings/pci/pci.txt as Bjorn suggested, in
-> > addition to using the 'wakeup-source' property documented there.
+Hi Chris,
+
+On 8/29/2017 3:21 AM, Chris Lew wrote:
+> Hi Sricharan,
 > 
-> I believe the defined interrupt name is "wakeup" as example 1 shows.
+> Minor bug in this patch.
+> 
+> On 8/24/2017 12:21 AM, Sricharan R wrote:
+> [..]
+>> @@ -829,11 +839,14 @@ static int qcom_glink_rx_open(struct qcom_glink *glink, unsigned int rcid,
+>> ????? struct device_node *node;
+>> ????? int lcid;
+>> ????? int ret;
+>> +??? unsigned long flags;
+>> ? +??? spin_lock_irqsave(&glink->idr_lock, flags);
+>> ????? idr_for_each_entry(&glink->lcids, channel, lcid) {
+>> ????????? if (!strcmp(channel->name, name))
+>> ????????????? break;
+>> ????? }
+>> +??? spin_unlock_irqrestore(&glink->idr_lock, flags);
+>> ? ????? if (!channel) {
+>> ????????? channel = qcom_glink_alloc_channel(glink, name);
+>> @@ -844,15 +857,15 @@ static int qcom_glink_rx_open(struct qcom_glink *glink, unsigned int rcid,
+>> ????????? create_device = true;
+>> ????? }
+>> ? -??? mutex_lock(&glink->idr_lock);
+>> +??? spin_lock_irqsave(&glink->idr_lock, flags);
+>> ????? ret = idr_alloc(&glink->rcids, channel, rcid, rcid + 1, GFP_KERNEL);
+> 
+> I think GFP_KERNEL should be changed to GFP_ATOMIC if the mutex is changed to spinlock.
+> 
 
-That's an example, not a definition. And the definition I quoted
-literally says "device specific interrupt name". The PCIe specification
-calls it "WAKE#" all over the place, so I figured that's a good name to
-use.
+ ha, thanks for the catch.
 
-"wakeup" is also fine I suppose, as long as we document that it must be
-PCIe WAKE# signal, as per the PCIe specfication.
+Regards,
+ Sricharan
 
-Brian
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
+---
+This email has been checked for viruses by Avast antivirus software.
+https://www.avast.com/antivirus
