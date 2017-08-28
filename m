@@ -1,57 +1,60 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 29 Aug 2017 00:23:32 +0900
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.14
-Message-ID: <CAK7LNAQrKNRWTAe-bRU2UvE6fJPrrL0Vp-yGEKDeT+ktKu-ioQ@mail.gmail.com>
+From: jlu@pengutronix.de (Jan Luebbe)
+Date: Mon, 28 Aug 2017 17:25:16 +0200
+Subject: [PATCH 1/2] bus: mbus: fix window size calculation for 4GB windows
+In-Reply-To: <20170828152517.24506-1-jlu@pengutronix.de>
+References: <20170828152517.24506-1-jlu@pengutronix.de>
+Message-ID: <20170828152517.24506-2-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+At least the Armada XP SoC supports 4GB on a single DRAM window. Because
+the size register values contain the actual size - 1, the MSB is set in
+that case. For example, the SDRAM window's control register's value is
+0xffffffe1 for 4GB (bits 31 to 24 contain the size).
 
-Sorry for my last-minute pull request.
-Please pull a little more for the upcoming merge window.
-Here are some trivial UniPhier DT (32bit) updates.  Please pull!
+The MBUS driver reads back each window's size from registers and
+calculates the actual size as (control_reg | ~DDR_SIZE_MASK) + 1, which
+overflows for 32 bit values, resulting in other miscalculations further
+on (a bad RAM window for the CESA crypto engine calculated by
+mvebu_mbus_setup_cpu_target_nooverlap() in my case).
 
+This patch changes the type in 'struct mbus_dram_window' from u32 to
+u64, which allows us to keep using the same register calculation code in
+most MBUS-using drivers (which calculate ->size - 1 again).
 
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+---
+ drivers/bus/mvebu-mbus.c | 2 +-
+ include/linux/mbus.h     | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-The following changes since commit 69f9cdc63319e5ccc210b30d1cec1dfda7096b04:
-
-  ARM: dts: uniphier: add Denali NAND controller node (2017-08-16
-01:47:01 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt-v4.14-2
-
-for you to fetch changes up to 8a7a516afaed2ee6b5da551a01c573eba3b69c16:
-
-  ARM: dts: uniphier: add pinctrl groups of ethernet phy mode
-(2017-08-29 00:00:43 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC DT updates for v4.14 (2nd)
-
-- add AIDET irqchip device nodes
-- fix size of sdctrl node
-- add ethernet pinmux nodes
-
-----------------------------------------------------------------
-Kunihiko Hayashi (1):
-      ARM: dts: uniphier: add pinctrl groups of ethernet phy mode
-
-Masahiro Yamada (2):
-      ARM: dts: uniphier: add AIDET nodes
-      ARM: dts: uniphier: fix size of sdctrl nodes
-
- arch/arm/boot/dts/uniphier-ld4.dtsi     |  7 +++++++
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/uniphier-pro4.dtsi    |  7 +++++++
- arch/arm/boot/dts/uniphier-pro5.dtsi    |  9 ++++++++-
- arch/arm/boot/dts/uniphier-pxs2.dtsi    |  9 ++++++++-
- arch/arm/boot/dts/uniphier-sld8.dtsi    |  7 +++++++
- 6 files changed, 52 insertions(+), 2 deletions(-)
-
-
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index c7f396903184..70db4d5638a6 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -720,7 +720,7 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
+ 			if (mbus->hw_io_coherency)
+ 				w->mbus_attr |= ATTR_HW_COHERENCY;
+ 			w->base = base & DDR_BASE_CS_LOW_MASK;
+-			w->size = (size | ~DDR_SIZE_MASK) + 1;
++			w->size = (u64)(size | ~DDR_SIZE_MASK) + 1;
+ 		}
+ 	}
+ 	mvebu_mbus_dram_info.num_cs = cs;
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index 0d3f14fd2621..4773145246ed 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -31,8 +31,8 @@ struct mbus_dram_target_info
+ 	struct mbus_dram_window {
+ 		u8	cs_index;
+ 		u8	mbus_attr;
+-		u32	base;
+-		u32	size;
++		u64	base;
++		u64	size;
+ 	} cs[4];
+ };
+ 
 -- 
-Best Regards
-Masahiro Yamada
+2.11.0
