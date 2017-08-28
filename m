@@ -1,37 +1,34 @@
-From: dustinb@codeaurora.org (Dustin Brown)
-Date: Mon, 28 Aug 2017 13:53:49 -0700
-Subject: arm: Export save_stack_trace_tsk()
-Message-ID: <001b01d3203f$c04a4e40$40deeac0$@codeaurora.org>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 28 Aug 2017 23:14:12 +0200
+Subject: [PATCH 0/2] SPI NOR - force 3byte addressing mode
+Message-ID: <1503954854-30963-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel watchdog is a great debugging tool for finding tasks that
-consume a disproportionate amount of CPU time in contiguous chunks. One
-can imagine building a similar watchdog for arbitrary driver threads
-using save_stack_trace_tsk() and print_stack_trace(). However, this is
-not viable for dynamically loaded driver modules on ARM platforms
-because save_stack_trace_tsk() is not exported for those architectures.
-Export save_stack_trace_tsk() for the ARM architecture to align with x86
-and support various debugging use cases such as arbitrary driver thread
-watchdog timers.
+Hi,
 
-Signed-off-by: Dustin Brown <dustinb@codeaurora.org>
----
-arch/arm/kernel/stacktrace.c | 1 +
-1 file changed, 1 insertion(+)
+This very short patchset introduces optional forcing via DT
+3byte addressing mode for accessing the SPI flash, whose
+size exceeds 16MiB.
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 3a2fa203637a..564bb468b7ba 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -171,6 +171,7 @@ void save_stack_trace_tsk(struct task_struct *tsk,
-struct stack_trace *trace)
-{
-              __save_stack_trace(tsk, trace, 1);
-}
-+EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
+It can be used in case the device does not support
+SPI_NOR_4B_OPCODES and helps overcome an issue, when
+the Boot ROM cannot handle non-default settings
+that could be enabled in the kernel and remain after soft reset.
 
- void save_stack_trace(struct stack_trace *trace)
-{
+I'm looking forward to any comments or remarks.
+
+Best regards,
+Marcin
+
+Marcin Wojtas (2):
+  mtd: spi-nor: add an option to force 3byte adressing mode
+  arm64: dts: marvell: Force 3byte addressing mode for SPI on A7040 DB
+
+ Documentation/devicetree/bindings/spi/spi-bus.txt |  2 ++
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts    |  1 +
+ drivers/mtd/spi-nor/spi-nor.c                     | 12 +++++++++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+
 -- 
-2.12.2
+1.8.3.1
