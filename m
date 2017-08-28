@@ -1,205 +1,51 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 28 Aug 2017 13:34:09 +0300
-Subject: [PATCH v4 3/4] mmc: sdhci: enable/disable the clock in
- sdhci_pltfm_suspend/resume
-In-Reply-To: <1503461703-16225-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1503461703-16225-1-git-send-email-yamada.masahiro@socionext.com>
- <1503461703-16225-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <a91d1893-997b-e132-3c5b-03adb81aaa6c@intel.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon, 28 Aug 2017 12:53:42 +0200
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Add Realtek RTD1295
+In-Reply-To: <20170828105344.8338-1-afaerber@suse.de>
+References: <20170828105344.8338-1-afaerber@suse.de>
+Message-ID: <20170828105344.8338-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/17 07:15, Masahiro Yamada wrote:
-> This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
-> sdhci: disable the clock in sdhci_pltfm_unregister()") did for
-> unregister hooks.
-> 
-> sdhci-brcmstb.c and sdhci-sirf.c implement their own suspend/resume
-> hooks to handle pltfm_host->clk.  Move clock handling to sdhci_pltfm.c
-> so that the drivers can reuse sdhci_pltfm_pmops.
-> 
-> The following drivers did not previously touch pltfm_host->clk during
-> suspend/resume, but now do:
->   - sdhci-bcm-kona.c
->   - sdhci-dove.c
->   - sdhci-iproc.c
->   - sdhci-pxav2.c
->   - sdhci-tegra.c
->   - sdhci-xenon.c
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Add binding for Realtek RTD1295 IRQ mux.
 
-Would have been nice to see some more Acks on this but from sdhci point of view:
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v1 -> v2:
+ * Dropped reference to common interrupt.txt bindings (Rob)
+ 
+ .../interrupt-controller/realtek,rtd119x-mux.txt   | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
-> ---
-> 
-> Changes in v4:
->   - Disable clk when resume fails
-> 
-> Changes in v3: None
-> Changes in v2:
->   - Fix build error reported by kbuild test robot
-> 
->  drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
->  drivers/mmc/host/sdhci-pltfm.c   | 22 ++++++++++++++++++++--
->  drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
->  3 files changed, 22 insertions(+), 76 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
-> index e2f638338e8f..6d461fcdd663 100644
-> --- a/drivers/mmc/host/sdhci-brcmstb.c
-> +++ b/drivers/mmc/host/sdhci-brcmstb.c
-> @@ -21,41 +21,6 @@
->  
->  #include "sdhci-pltfm.h"
->  
-> -#ifdef CONFIG_PM_SLEEP
-> -
-> -static int sdhci_brcmstb_suspend(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int res;
-> -
-> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> -		mmc_retune_needed(host->mmc);
-> -
-> -	res = sdhci_suspend_host(host);
-> -	if (res)
-> -		return res;
-> -	clk_disable_unprepare(pltfm_host->clk);
-> -	return res;
-> -}
-> -
-> -static int sdhci_brcmstb_resume(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int err;
-> -
-> -	err = clk_prepare_enable(pltfm_host->clk);
-> -	if (err)
-> -		return err;
-> -	return sdhci_resume_host(host);
-> -}
-> -
-> -#endif /* CONFIG_PM_SLEEP */
-> -
-> -static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
-> -			sdhci_brcmstb_resume);
-> -
->  static const struct sdhci_ops sdhci_brcmstb_ops = {
->  	.set_clock = sdhci_set_clock,
->  	.set_bus_width = sdhci_set_bus_width,
-> @@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
->  static struct platform_driver sdhci_brcmstb_driver = {
->  	.driver		= {
->  		.name	= "sdhci-brcmstb",
-> -		.pm	= &sdhci_brcmstb_pmops,
-> +		.pm	= &sdhci_pltfm_pmops,
->  		.of_match_table = of_match_ptr(sdhci_brcm_of_match),
->  	},
->  	.probe		= sdhci_brcmstb_probe,
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index e090d8c42ddb..4c0135e184e9 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -212,18 +212,36 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
->  static int sdhci_pltfm_suspend(struct device *dev)
->  {
->  	struct sdhci_host *host = dev_get_drvdata(dev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	int ret;
->  
->  	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
->  		mmc_retune_needed(host->mmc);
->  
-> -	return sdhci_suspend_host(host);
-> +	ret = sdhci_suspend_host(host);
-> +	if (ret)
-> +		return ret;
-> +
-> +	clk_disable_unprepare(pltfm_host->clk);
-> +
-> +	return 0;
->  }
->  
->  static int sdhci_pltfm_resume(struct device *dev)
->  {
->  	struct sdhci_host *host = dev_get_drvdata(dev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(pltfm_host->clk);
-> +	if (ret)
-> +		return ret;
->  
-> -	return sdhci_resume_host(host);
-> +	ret = sdhci_resume_host(host);
-> +	if (ret)
-> +		clk_disable_unprepare(pltfm_host->clk);
-> +
-> +	return ret;
->  }
->  #endif
->  
-> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-> index c251c6c0a112..0c7aa89df4e2 100644
-> --- a/drivers/mmc/host/sdhci-sirf.c
-> +++ b/drivers/mmc/host/sdhci-sirf.c
-> @@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
->  	return ret;
->  }
->  
-> -#ifdef CONFIG_PM_SLEEP
-> -static int sdhci_sirf_suspend(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int ret;
-> -
-> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> -		mmc_retune_needed(host->mmc);
-> -
-> -	ret = sdhci_suspend_host(host);
-> -	if (ret)
-> -		return ret;
-> -
-> -	clk_disable(pltfm_host->clk);
-> -
-> -	return 0;
-> -}
-> -
-> -static int sdhci_sirf_resume(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int ret;
-> -
-> -	ret = clk_enable(pltfm_host->clk);
-> -	if (ret) {
-> -		dev_dbg(dev, "Resume: Error enabling clock\n");
-> -		return ret;
-> -	}
-> -
-> -	return sdhci_resume_host(host);
-> -}
-> -#endif
-> -
-> -static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
-> -
->  static const struct of_device_id sdhci_sirf_of_match[] = {
->  	{ .compatible = "sirf,prima2-sdhc" },
->  	{ }
-> @@ -277,7 +240,7 @@ static struct platform_driver sdhci_sirf_driver = {
->  	.driver		= {
->  		.name	= "sdhci-sirf",
->  		.of_match_table = sdhci_sirf_of_match,
-> -		.pm	= &sdhci_sirf_pm_ops,
-> +		.pm	= &sdhci_pltfm_pmops,
->  	},
->  	.probe		= sdhci_sirf_probe,
->  	.remove		= sdhci_pltfm_unregister,
-> 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt b/Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
+new file mode 100644
+index 000000000000..952e5c54a5fa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
+@@ -0,0 +1,23 @@
++Realtek RTD119x/129x IRQ Mux Controller
++=======================================
++
++Required properties:
++
++- compatible           :  Should be one of the following:
++                          - "realtek,rtd1295-irq-mux"
++                          - "realtek,rtd1295-iso-irq-mux"
++- reg                  :  Specifies base physical address and size of the registers.
++- interrupts           :  Specifies the interrupt line which is mux'ed.
++- interrupt-controller :  Presence indicates the node as interrupt controller.
++- #interrupt-cells     :  Shall be 1. See common bindings in interrupt.txt.
++
++
++Example:
++
++	interrupt-controller at 98007000 {
++		compatible = "realtek,rtd1295-iso-irq-mux";
++		reg = <0x98007000 0x100>;
++		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
+-- 
+2.12.3
