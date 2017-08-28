@@ -1,44 +1,46 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 28 Aug 2017 10:48:27 -0600
-Subject: [PATCH 0/9] constify amba_id
-In-Reply-To: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <CANLsYkyxDoaw5aX-QXUHYWFz4m_xA+1gxGvWw0uPNasOqVjr1Q@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 28 Aug 2017 09:57:57 -0700
+Subject: [PATCH v3 4/5] input: Add MediaTek PMIC keys support
+In-Reply-To: <1503642753-12385-5-git-send-email-chen.zhong@mediatek.com>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+ <1503642753-12385-5-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <20170828165757.GE12195@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2017 at 10:35, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
-> amba_id are not supposed to change at runtime. All functions
-> working with const amba_id. So mark the non-const structs as const.
->
-> Arvind Yadav (9):
->   [PATCH 1/9] coresight: constify amba_id
->   [PATCH 2/9] coresight: etb10: constify amba_id
->   [PATCH 3/9] coresight: etm3x: constify amba_id
->   [PATCH 4/9] coresight: etm4x: constify amba_id
->   [PATCH 5/9] coresight: funnel: constify amba_id
->   [PATCH 6/9] coresight: replicator: constify amba_id
->   [PATCH 7/9] coresight: stm: constify amba_id
->   [PATCH 8/9] coresight: tmc: constify amba_id
->   [PATCH 9/9] coresight: tpiu: constify amba_id
->
->  drivers/hwtracing/coresight/coresight-cpu-debug.c       | 2 +-
->  drivers/hwtracing/coresight/coresight-etb10.c           | 2 +-
->  drivers/hwtracing/coresight/coresight-etm3x.c           | 2 +-
->  drivers/hwtracing/coresight/coresight-etm4x.c           | 2 +-
->  drivers/hwtracing/coresight/coresight-funnel.c          | 2 +-
->  drivers/hwtracing/coresight/coresight-replicator-qcom.c | 2 +-
->  drivers/hwtracing/coresight/coresight-stm.c             | 2 +-
->  drivers/hwtracing/coresight/coresight-tmc.c             | 2 +-
->  drivers/hwtracing/coresight/coresight-tpiu.c            | 2 +-
->  9 files changed, 9 insertions(+), 9 deletions(-)
->
+Hi Chen,
 
-Applied.
+On Fri, Aug 25, 2017 at 02:32:32PM +0800, Chen Zhong wrote:
+> +static int mtk_pmic_key_setup(struct mtk_pmic_keys *keys,
+> +		struct pmic_keys_info *info)
+> +{
+> +	int ret;
+> +
+> +	info->keys = keys;
+> +
+> +	ret = regmap_update_bits(keys->regmap, info->regs->intsel_reg,
+> +				 info->regs->intsel_mask,
+> +				 info->regs->intsel_mask);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = devm_request_threaded_irq(keys->dev, info->irq, NULL,
+> +					mtk_pmic_keys_irq_handler_thread,
+> +					IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+> +					"mtk-pmic-keys", info);
+> +	if (ret) {
+> +		dev_err(keys->dev, "Failed to request IRQ: %d: %d\n",
+> +			info->irq, ret);
+> +		return ret;
+> +	}
+> +
+> +	if (info->wakeup)
+> +		irq_set_irq_wake(info->irq, 1);
 
-Thanks,
-Mathieu
+Normally we do this in suspend() (and undo in resume()), and I believe
+the drover API is enable_irq_wake() and disable_irq_wake().
 
-> --
-> 2.7.4
->
+Thanks.
+
+-- 
+Dmitry
