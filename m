@@ -1,43 +1,30 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 28 Aug 2017 11:11:45 +0900
-Subject: [PATCH] ARM: dts: uniphier: add pinctrl groups of ethernet phy mode
-Message-ID: <1503886305-29815-1-git-send-email-hayashi.kunihiko@socionext.com>
+Date: Mon, 28 Aug 2017 11:21:26 +0900
+Subject: [PATCH] pinctrl: uniphier: fix members of rmii group for Pro4
+Message-ID: <1503886886-30065-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl groups of ethenet phy mode, such as "ether_rgmii", "ether_rmii",
-and "ether_mii".
+The ether_rmii_groups should have "ether_rmii" and "ether_rmiib" as
+members. This patch replaces to them.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-index 425b8f1..be82cdd 100644
---- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-@@ -18,6 +18,21 @@
- 		function = "emmc";
- 	};
- 
-+	pinctrl_ether_mii: ether_mii_grp {
-+		groups = "ether_mii";
-+		function = "ether_mii";
-+	};
-+
-+	pinctrl_ether_rgmii: ether_rgmii_grp {
-+		groups = "ether_rgmii";
-+		function = "ether_rgmii";
-+	};
-+
-+	pinctrl_ether_rmii: ether_rmii_grp {
-+		groups = "ether_rmii";
-+		function = "ether_rmii";
-+	};
-+
- 	pinctrl_i2c0: i2c0_grp {
- 		groups = "i2c0";
- 		function = "i2c0";
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+index a433a30..adc65ea 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+@@ -1462,7 +1462,7 @@ static const struct uniphier_pinctrl_group uniphier_pro4_groups[] = {
+ static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
+ static const char * const ether_mii_groups[] = {"ether_mii"};
+ static const char * const ether_rgmii_groups[] = {"ether_rgmii"};
+-static const char * const ether_rmii_groups[] = {"ether_rgmii", "ether_rgmiib"};
++static const char * const ether_rmii_groups[] = {"ether_rmii", "ether_rmiib"};
+ static const char * const i2c0_groups[] = {"i2c0"};
+ static const char * const i2c1_groups[] = {"i2c1"};
+ static const char * const i2c2_groups[] = {"i2c2"};
 -- 
 2.7.4
