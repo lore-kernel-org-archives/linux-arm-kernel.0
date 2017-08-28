@@ -1,63 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 28 Aug 2017 15:59:59 +0200
-Subject: [PATCH] nokia n900: update dts with camera support
-In-Reply-To: <20170817000845.agkcuvqaheejm33j@earth>
-References: <20170810204923.GA18442@amd>
- <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
- <20170815220349.GA15441@amd>
- <20170816205332.rqcuenvuxfs5jvuw@earth>
- <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
- <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
- <20170817000845.agkcuvqaheejm33j@earth>
-Message-ID: <20170828135959.GA32560@amd>
+From: vincent.abriou@st.com (Vincent ABRIOU)
+Date: Mon, 28 Aug 2017 14:05:58 +0000
+Subject: [v2,1/8] ARM: implement get_tls syscall
+In-Reply-To: <20170817072347.19990-2-nicolas.pitre@linaro.org>
+References: <20170817072347.19990-2-nicolas.pitre@linaro.org>
+Message-ID: <9921300a-2fa4-9e2e-73a9-8b56b34d39eb@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Nicolas,
 
-> > > Well, strobe property above already uses = <0>/<1> format, as do
-> > > others.
-> >
-> > > Problem with "false = property does not exist" is that you don't know
-> > > if it is "someone forgot to define it" or "someone made a typo" or
-> > > "dts is too old to know about this property" or "the property indeed
-> > > should be false"...
-> >
-> > As this is an established practice, I think we should follow it for bool
-> > properties.
-> 
-> Yes it's common practice, there is also device_property_read_bool()
-> to get the value.
-> 
-> > We could change the existing ones, too, and leave some extra checks in
-> > place to handle old dtbs.
-> 
-> The following should be downward compatible:
-> 
-> var = read_bool();
-> if (var && !read_int())
->     var = false;
-> 
-> Btw. DT people should be CC'd for DT binding additions/changes.
+I have successfully tested your set of patches on cortex-M7 STM32 MCU.
 
-Ok, so for now we do crc=1 by default. Now we'd like to have crc
-support configurable in the dts. But if we just introduce "crc;"
-option, it will break old dts users. We could introduce "no-crc;" and
-that would work in this particular case, but will break when we want
-different defaults at different devices.
 
-Anyway, introducing "no-crc;" seems pretty ugly to me. I'd rather do
-"crc=<0>;", in a similar way we handle other options now.
+On 08/17/2017 09:23 AM, Nicolas Pitre wrote:
+> When there is no dedicated register to hold the tp value and no MMU
+> to provide a fixed address kuser helper entry point, all that is
+> left as fallback is a syscall.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Tested-by: Vincent Abriou <vincent.abriou@st.com>
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/99e52bf9/attachment.sig>
+BR
+Vincent
+
+> ---
+>   arch/arm/include/uapi/asm/unistd.h | 1 +
+>   arch/arm/kernel/traps.c            | 3 +++
+>   2 files changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+> index 28bd456494..575b25fc29 100644
+> --- a/arch/arm/include/uapi/asm/unistd.h
+> +++ b/arch/arm/include/uapi/asm/unistd.h
+> @@ -35,5 +35,6 @@
+>   #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
+>   #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
+>   #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
+> +#define __ARM_NR_get_tls		(__ARM_NR_BASE+6)
+>   
+>   #endif /* _UAPI__ASM_ARM_UNISTD_H */
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 948c648fea..43c0560f7b 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -647,6 +647,9 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+>   		set_tls(regs->ARM_r0);
+>   		return 0;
+>   
+> +	case NR(get_tls):
+> +		return current_thread_info()->tp_value[0];
+> +
+>   	default:
+>   		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
+>   		   if not implemented, rather than raising SIGILL.  This
+> 
