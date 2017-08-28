@@ -1,122 +1,69 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 28 Aug 2017 20:19:02 +0200
-Subject: [PATCH v3 52/59] KVM: arm/arm64: GICv4: Use the doorbell
- interrupt as an unblocking source
-In-Reply-To: <20170731172637.29355-53-marc.zyngier@arm.com>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-53-marc.zyngier@arm.com>
-Message-ID: <20170828181902.GN24649@cbox>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Mon, 28 Aug 2017 21:20:14 +0300
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170828150725.nvrr2c3a2lir5xic@valkosipuli.retiisi.org.uk>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170815220349.GA15441@amd> <20170816205332.rqcuenvuxfs5jvuw@earth>
+ <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
+ <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
+ <20170817000845.agkcuvqaheejm33j@earth> <20170828135959.GA32560@amd>
+ <20170828150725.nvrr2c3a2lir5xic@valkosipuli.retiisi.org.uk>
+Message-ID: <c97709fe-0c30-9f40-b4fe-740ad54bc5a7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 06:26:30PM +0100, Marc Zyngier wrote:
-> The doorbell interrupt is only useful if the vcpu is blocked on WFI.
-> In all other cases, recieving a doorbell interrupt is just a waste
-> of cycles.
+Hi
+
+On 28.08.2017 18:07, Sakari Ailus wrote:
+> Hi Pavel,
 > 
-> So let's only enable the doorbell if a vcpu is getting blocked,
-> and disable it when it is unblocked. This is very similar to
-> what we're doing for the background timer.
+> On Mon, Aug 28, 2017 at 03:59:59PM +0200, Pavel Machek wrote:
+>> Hi!
+>>
+>>>>> Well, strobe property above already uses = <0>/<1> format, as do
+>>>>> others.
+>>>>
+>>>>> Problem with "false = property does not exist" is that you don't know
+>>>>> if it is "someone forgot to define it" or "someone made a typo" or
+>>>>> "dts is too old to know about this property" or "the property indeed
+>>>>> should be false"...
+>>>>
+>>>> As this is an established practice, I think we should follow it for bool
+>>>> properties.
+>>>
+>>> Yes it's common practice, there is also device_property_read_bool()
+>>> to get the value.
+>>>
+>>>> We could change the existing ones, too, and leave some extra checks in
+>>>> place to handle old dtbs.
+>>>
+>>> The following should be downward compatible:
+>>>
+>>> var = read_bool();
+>>> if (var && !read_int())
+>>>      var = false;
+>>>
+>>> Btw. DT people should be CC'd for DT binding additions/changes.
+>>
+>> Ok, so for now we do crc=1 by default. Now we'd like to have crc
+>> support configurable in the dts. But if we just introduce "crc;"
+>> option, it will break old dts users. We could introduce "no-crc;" and
+>> that would work in this particular case, but will break when we want
+>> different defaults at different devices.
+>>
+>> Anyway, introducing "no-crc;" seems pretty ugly to me. I'd rather do
+>> "crc=<0>;", in a similar way we handle other options now.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/kvm/arm_vgic.h      |  3 +++
->  virt/kvm/arm/arm.c          |  2 ++
->  virt/kvm/arm/vgic/vgic-v4.c | 32 +++++++++++++++++++++++++++++++-
->  3 files changed, 36 insertions(+), 1 deletion(-)
+> The same issue actually exists for CSI-2: the CRC is typically enabled and
+> I think you can at least disable the check (in OMAP3 ISP). Do we have a
+> need to disable it at the moment for any purpose? I think I've seen this
+> was disabled somewhere but it may just as well be a thoughtlessly written
+> configuration.
 > 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 050f78d4fb42..7b1cc7ff5b42 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -375,4 +375,7 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
->  int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
->  				 struct kvm_kernel_irq_routing_entry *irq_entry);
->  
-> +void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu);
-> +void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu);
-> +
->  #endif /* __KVM_ARM_VGIC_H */
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 6803ea27c47d..5dbc8dc8fbf4 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -316,11 +316,13 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
->  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
->  {
->  	kvm_timer_schedule(vcpu);
-> +	kvm_vgic_v4_enable_doorbell(vcpu);
->  }
->  
->  void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
->  {
->  	kvm_timer_unschedule(vcpu);
-> +	kvm_vgic_v4_disable_doorbell(vcpu);
->  }
->  
->  int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
-> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-> index 6af3cde6d7d4..50721c4e3da5 100644
-> --- a/virt/kvm/arm/vgic/vgic-v4.c
-> +++ b/virt/kvm/arm/vgic/vgic-v4.c
-> @@ -16,6 +16,7 @@
->   */
->  
->  #include <linux/interrupt.h>
-> +#include <linux/irq.h>
->  #include <linux/irqdomain.h>
->  #include <linux/kvm_host.h>
->  
-> @@ -73,6 +74,14 @@ int vgic_v4_init(struct kvm *kvm)
->  	kvm_for_each_vcpu(i, vcpu, kvm) {
->  		int irq = dist->its_vm.vpes[i]->irq;
->  
-> +		/*
-> +		 * Don't automatically enable the doorbell, as we're
-> +		 * flipping it back and forth when the vcpu gets
-> +		 * blocked. Also disable the lazy disabling, as the
-> +		 * doorbell could kick us out of the guest too
-> +		 * early...
-> +		 */
-> +		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
->  		ret = request_irq(irq, vgic_v4_doorbell_handler,
->  				  0, "vcpu", vcpu);
->  		if (ret) {
-> @@ -98,7 +107,10 @@ void vgic_v4_teardown(struct kvm *kvm)
->  
->  	for (i = 0; i < its_vm->nr_vpes; i++) {
->  		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
-> -		free_irq(its_vm->vpes[i]->irq, vcpu);
-> +		int irq = its_vm->vpes[i]->irq;
-> +
-> +		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-> +		free_irq(irq, vcpu);
->  	}
->  
->  	its_free_vcpu_irqs(its_vm);
-> @@ -211,3 +223,21 @@ int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
->  	mutex_unlock(&its->its_lock);
->  	return ret;
->  }
-> +
-> +void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu)
-> +{
-> +	if (vgic_is_v4_capable(vcpu->kvm)) {
-> +		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
-> +		if (irq)
-> +			enable_irq(irq);
-> +	}
-> +}
-> +
-> +void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu)
-> +{
-> +	if (vgic_is_v4_capable(vcpu->kvm)) {
-> +		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
-> +		if (irq)
-> +			disable_irq(irq);
-> +	}
-> +}
-> -- 
-> 2.11.0
-> 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
+Front camera has crc disabled in Nokia kernel. I am not sure the sensor 
+supports crc at all.
+
+Regards,
+Ivo
