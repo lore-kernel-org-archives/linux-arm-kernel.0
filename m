@@ -1,77 +1,110 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Aug 2017 11:26:51 +0200
-Subject: [GIT PULL] Allwinner fixes for 4.13, take 3
-Message-ID: <20170828092651.xwrz6toedrmht5nh@flea.lan>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 28 Aug 2017 17:27:47 +0800
+Subject: [RESEND PATCH] drm/hisilicon: Ensure LDI regs are properly
+ configured.
+In-Reply-To: <20170828085108.zp4pjkmt6gbewwgm@phenom.ffwll.local>
+References: <1502806465-17772-1-git-send-email-peter.griffin@linaro.org>
+ <CAGd==07ygp97ggXSAK5JCYweRZPFwjqa2WNV3g1fdyY6736pPw@mail.gmail.com>
+ <20170828085108.zp4pjkmt6gbewwgm@phenom.ffwll.local>
+Message-ID: <CAGd==0558EHJFdh_+C=Zo11OJDNgbS-BOkj+TvbVKFJkU=gDHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Daniel,
 
-Here is a bunch of patches essentially reverting the EMAC bindings
-additions. Indeed, it was discovered after the release of 4.13-rc1
-that we overlooked some issues while reviewing the driver, and we
-couldn't find a proper solution since then.
+On 28 August 2017 at 16:51, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Mon, Aug 28, 2017 at 04:44:30PM +0800, Xinliang Liu wrote:
+>> Hi,
+>>
+>> On 15 August 2017 at 22:14, Peter Griffin <peter.griffin@linaro.org> wrote:
+>>
+>> > This patch fixes the following soft lockup:
+>> >   BUG: soft lockup - CPU#0 stuck for 23s! [weston:307]
+>> >
+>> > On weston idle-timeout the IP is powered down and reset
+>> > asserted. On weston resume we get a massive vblank
+>> > IRQ storm due to the LDI registers having lost some state.
+>> >
+>> > This state loss is caused by ade_crtc_atomic_begin() not
+>> > calling ade_ldi_set_mode(). With this patch applied
+>> > resuming from Weston idle-timeout works well.
+>> >
+>> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>> > Tested-by: John Stultz <john.stultz@linaro.org>
+>> >
+>>
+>> Thanks Peter,
+>> This patch looks good to me.
+>> Reviewed-by: Xinliang Liu <xinliang.liu@linaro.org>
+>>
+>> @Sean, could you please help to apply to drm-misc if others has no more
+>> comments, thanks.
+>
+> hisilicon isn't maintained in drm-misc, and you're the maintainer. This is
+> not how it works. So either
+> a) pick up the patch and send out a pull request to Dave Airlie
+> b) move hisilicon over to drm-misc and become a drm-misc maintainer
+> yourself. This needs a MAINTAINERS update to point the git tree at
+> drm-misc.
+>
+> drm-misc maintainers don't maintain everyone else's driver as a service,
+> that simply doesn't scale.
 
-Since the binding is as such not stable yet, we can't allow it to
-reach a stable release.
+Sorry for my misunderstanding and thanks for pointing out that how
+drm-misc works.
+So I will pick up the patch and send a pull request.
 
-Maxime
+Thanks,
+Xinliang
 
-The following changes since commit d86e63e1f0b7868c55c8d4a54854b85e2bac690b:
-
-  arm64: allwinner: h5: fix pinctrl IRQs (2017-08-14 14:18:21 +0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.13-3
-
-for you to fetch changes up to fe45174b72aead678da581bab9e9a37c9b26a070:
-
-  arm: dts: sunxi: Revert EMAC changes (2017-08-28 11:11:24 +0200)
-
-----------------------------------------------------------------
-Allwinner fixes for 4.13, take 3
-
-This is a revert of the EMAC bindings. The discussion has not settled down
-yet on a proper representation of the PHY, and therefore we cannot commit
-to a binding yet
-
-----------------------------------------------------------------
-Maxime Ripard (3):
-      dt-bindings: net: Revert sun8i dwmac binding
-      arm64: dts: allwinner: Revert EMAC changes
-      arm: dts: sunxi: Revert EMAC changes
-
- .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ----------------------
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |  9 ---
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 19 -----
- arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          |  7 --
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  8 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  8 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |  5 --
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  8 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       | 22 ------
- arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts     | 16 -----
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 26 -------
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 16 -----
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 15 ----
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 17 -----
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 16 -----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 20 ------
- .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   | 17 -----
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 17 -----
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 17 -----
- 19 files changed, 347 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/7fab7f04/attachment-0001.sig>
+>
+> Thanks, Daniel
+>
+>>
+>> Thanks,
+>> Xinliang
+>>
+>>
+>> > Cc: stable at vger.kernel.org
+>> > ---
+>> >  drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 3 +++
+>> >  1 file changed, 3 insertions(+)
+>> >
+>> > diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> > b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> > index c96c228..72c6357 100644
+>> > --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> > +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>> > @@ -519,9 +519,12 @@ static void ade_crtc_atomic_begin(struct drm_crtc
+>> > *crtc,
+>> >  {
+>> >         struct ade_crtc *acrtc = to_ade_crtc(crtc);
+>> >         struct ade_hw_ctx *ctx = acrtc->ctx;
+>> > +       struct drm_display_mode *mode = &crtc->state->mode;
+>> > +       struct drm_display_mode *adj_mode = &crtc->state->adjusted_mode;
+>> >
+>> >         if (!ctx->power_on)
+>> >                 (void)ade_power_up(ctx);
+>> > +       ade_ldi_set_mode(acrtc, mode, adj_mode);
+>> >  }
+>> >
+>> >  static void ade_crtc_atomic_flush(struct drm_crtc *crtc,
+>> > --
+>> > 2.7.4
+>> >
+>> > _______________________________________________
+>> > dri-devel mailing list
+>> > dri-devel at lists.freedesktop.org
+>> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>> >
+>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+>
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
