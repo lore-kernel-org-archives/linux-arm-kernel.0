@@ -1,521 +1,69 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Mon, 28 Aug 2017 13:54:05 +0300
-Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
-Message-ID: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 28 Aug 2017 14:05:18 +0300
+Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
+Message-ID: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stuart Yoder <stuart.yoder@nxp.com>
+This patch contains the minimal changes required to support imx6sx OPP
+of 198 Mhz. Without this patch cpufreq still reports success but the
+frequency is not changed, the "arm" clock will still be at 396000000 in
+clk_summary.
 
-Move the source files out of staging into their final locations:
-  -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
-  -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
-  -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
-  -README.txt, providing and overview of DPAA goes to
-   Documentation/dpaa2/overview.txt
+In order to do this PLL1 needs to be still kept enabled while changing
+the ARM clock. This is a hardware requirement: when ARM_PODF is changed
+in CCM we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy,
+and this bit is sync with PLL1 clock, so if PLL1 NOT enabled, this
+bit will never get clear.
 
-Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
-Update dpaa2_eth and dpio staging drivers.
+Keep pll1_sys explicitly enabled until after the rate is change to deal
+with this. Otherwise from the clk framework perspective pll1_sys is
+unused and gets turned off.
 
-Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-[Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
-Notes:
-    -v2:
-      - group irqchip gic its glue code together with the rest (Marc Zyngier)
+Changes since v1:
+ - Link: https://lkml.org/lkml/2017/7/19/302
+ - Only keep pll1_sys enabled until after ARM rate is changed.
+ - Incorporate more elaborate explanation from Anson
+ - Do not add new clocks or bypass PLL1. Just let it get disabled.
 
- .../README.txt => Documentation/dpaa2/overview.txt     |  0
- MAINTAINERS                                            |  2 +-
- drivers/bus/Kconfig                                    |  2 ++
- drivers/bus/Makefile                                   |  3 +++
- drivers/bus/fsl-mc/Kconfig                             | 17 +++++++++++++++++
- drivers/bus/fsl-mc/Makefile                            | 17 +++++++++++++++++
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp-cmd.h |  0
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.c     |  2 +-
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.h     |  0
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng-cmd.h |  0
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-cmd.h  |  0
- .../{staging/fsl-mc/bus => bus/fsl-mc}/dprc-driver.c   |  1 -
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.c      |  2 +-
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.h      |  0
- .../fsl-mc/bus => bus/fsl-mc}/fsl-mc-allocator.c       |  1 -
- .../{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-bus.c    |  0
- .../{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-msi.c    |  0
- .../fsl-mc/bus => bus/fsl-mc}/fsl-mc-private.h         |  2 +-
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-io.c     |  1 -
- drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-sys.c    |  2 +-
- drivers/irqchip/Makefile                               |  1 +
- .../fsl-mc/bus => irqchip}/irq-gic-v3-its-fsl-mc-msi.c |  2 +-
- drivers/staging/fsl-dpaa2/ethernet/README              |  2 +-
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c         |  2 +-
- drivers/staging/fsl-dpaa2/ethernet/dpni.c              |  2 +-
- drivers/staging/fsl-mc/TODO                            | 18 ------------------
- drivers/staging/fsl-mc/bus/Kconfig                     | 10 ----------
- drivers/staging/fsl-mc/bus/Makefile                    | 15 ++-------------
- drivers/staging/fsl-mc/bus/dpbp.c                      |  2 +-
- drivers/staging/fsl-mc/bus/dpcon.c                     |  2 +-
- drivers/staging/fsl-mc/bus/dpio/dpio-driver.c          |  2 +-
- drivers/staging/fsl-mc/bus/dpio/dpio-service.c         |  2 +-
- drivers/staging/fsl-mc/bus/dpio/dpio.c                 |  2 +-
- .../staging/fsl-mc/include => include/linux/fsl}/mc.h  |  0
- 34 files changed, 56 insertions(+), 58 deletions(-)
- rename drivers/staging/fsl-mc/README.txt => Documentation/dpaa2/overview.txt (100%)
- create mode 100644 drivers/bus/fsl-mc/Kconfig
- create mode 100644 drivers/bus/fsl-mc/Makefile
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp-cmd.h (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.c (99%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.h (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng-cmd.h (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-cmd.h (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-driver.c (99%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.c (99%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.h (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-allocator.c (99%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-bus.c (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-msi.c (100%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-private.h (99%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-io.c (99%)
- rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-sys.c (99%)
- rename drivers/{staging/fsl-mc/bus => irqchip}/irq-gic-v3-its-fsl-mc-msi.c (99%)
- delete mode 100644 drivers/staging/fsl-mc/TODO
- rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc.h (100%)
+ drivers/cpufreq/imx6q-cpufreq.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/staging/fsl-mc/README.txt b/Documentation/dpaa2/overview.txt
-similarity index 100%
-rename from drivers/staging/fsl-mc/README.txt
-rename to Documentation/dpaa2/overview.txt
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6f7721d..2149eeb 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10900,7 +10900,7 @@ M:	Stuart Yoder <stuyoder@gmail.com>
- M:	Laurentiu Tudor <laurentiu.tudor@nxp.com>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
--F:	drivers/staging/fsl-mc/
-+F:	drivers/bus/fsl-mc/
- F:	Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index b6edd3c..14466a9 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -47,6 +47,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	struct dev_pm_opp *opp;
+ 	unsigned long freq_hz, volt, volt_old;
+ 	unsigned int old_freq, new_freq;
++	bool pll1_sys_temp_enabled = false;
+ 	int ret;
  
- QT1010 MEDIA DRIVER
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 2408ea3..23e0279 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -183,4 +183,6 @@ config DA8XX_MSTPRI
- 	  configuration. Allows to adjust the priorities of all master
- 	  peripherals.
+ 	new_freq = freq_table[index].frequency;
+@@ -124,6 +125,10 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+ 			clk_set_rate(pll1_sys_clk, new_freq * 1000);
+ 			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
++		} else {
++			/* pll1_sys needs to be enabled for divider rate change to work. */
++			pll1_sys_temp_enabled = true;
++			clk_prepare_enable(pll1_sys_clk);
+ 		}
+ 	}
  
-+source "drivers/bus/fsl-mc/Kconfig"
+@@ -135,6 +140,10 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		return ret;
+ 	}
+ 
++	/* PLL1 is only needed until after ARM-PODF is set. */
++	if (pll1_sys_temp_enabled)
++		clk_disable_unprepare(pll1_sys_clk);
 +
- endmenu
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index cc6364b..dee9a84 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -14,6 +14,9 @@ obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
- # Interconnect bus driver for OMAP SoCs.
- obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
- 
-+# DPAA2 fsl-mc bus
-+obj-$(CONFIG_FSL_MC_BUS)	+= fsl-mc/
-+
- obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_QCOM_EBI2)		+= qcom-ebi2.o
- obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
-diff --git a/drivers/bus/fsl-mc/Kconfig b/drivers/bus/fsl-mc/Kconfig
-new file mode 100644
-index 0000000..30b55ac
---- /dev/null
-+++ b/drivers/bus/fsl-mc/Kconfig
-@@ -0,0 +1,17 @@
-+#
-+# DPAA2 fsl-mc bus
-+#
-+# Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
-+#
-+# This file is released under the GPLv2
-+#
-+
-+config FSL_MC_BUS
-+	bool "QorIQ DPAA2 fsl-mc bus driver"
-+	depends on OF && (ARCH_LAYERSCAPE || (COMPILE_TEST && (ARM || ARM64 || X86 || PPC)))
-+	select GENERIC_MSI_IRQ_DOMAIN
-+	help
-+	  Driver to enable the bus infrastructure for the QorIQ DPAA2
-+	  architecture.  The fsl-mc bus driver handles discovery of
-+	  DPAA2 objects (which are represented as Linux devices) and
-+	  binding objects to drivers.
-diff --git a/drivers/bus/fsl-mc/Makefile b/drivers/bus/fsl-mc/Makefile
-new file mode 100644
-index 0000000..1fe40282
---- /dev/null
-+++ b/drivers/bus/fsl-mc/Makefile
-@@ -0,0 +1,17 @@
-+#
-+# Freescale Management Complex (MC) bus drivers
-+#
-+# Copyright (C) 2014 Freescale Semiconductor, Inc.
-+#
-+# This file is released under the GPLv2
-+#
-+obj-$(CONFIG_FSL_MC_BUS) += mc-bus-driver.o
-+
-+mc-bus-driver-objs := fsl-mc-bus.o \
-+		      mc-sys.o \
-+		      mc-io.o \
-+		      dprc.o \
-+		      dprc-driver.o \
-+		      fsl-mc-allocator.o \
-+		      fsl-mc-msi.o \
-+		      dpmcp.o
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h b/drivers/bus/fsl-mc/dpmcp-cmd.h
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-rename to drivers/bus/fsl-mc/dpmcp-cmd.h
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp.c b/drivers/bus/fsl-mc/dpmcp.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/dpmcp.c
-rename to drivers/bus/fsl-mc/dpmcp.c
-index eea42f6..e56505f 100644
---- a/drivers/staging/fsl-mc/bus/dpmcp.c
-+++ b/drivers/bus/fsl-mc/dpmcp.c
-@@ -30,7 +30,7 @@
-  * POSSIBILITY OF SUCH DAMAGE.
-  */
- #include <linux/kernel.h>
--#include "../include/mc.h"
-+#include <linux/fsl/mc.h>
- 
- #include "dpmcp.h"
- #include "dpmcp-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp.h b/drivers/bus/fsl-mc/dpmcp.h
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/dpmcp.h
-rename to drivers/bus/fsl-mc/dpmcp.h
-diff --git a/drivers/staging/fsl-mc/bus/dpmng-cmd.h b/drivers/bus/fsl-mc/dpmng-cmd.h
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/dpmng-cmd.h
-rename to drivers/bus/fsl-mc/dpmng-cmd.h
-diff --git a/drivers/staging/fsl-mc/bus/dprc-cmd.h b/drivers/bus/fsl-mc/dprc-cmd.h
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/dprc-cmd.h
-rename to drivers/bus/fsl-mc/dprc-cmd.h
-diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/bus/fsl-mc/dprc-driver.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/dprc-driver.c
-rename to drivers/bus/fsl-mc/dprc-driver.c
-index 06df528..42a1f6a 100644
---- a/drivers/staging/fsl-mc/bus/dprc-driver.c
-+++ b/drivers/bus/fsl-mc/dprc-driver.c
-@@ -13,7 +13,6 @@
- #include <linux/slab.h>
- #include <linux/interrupt.h>
- #include <linux/msi.h>
--#include "../include/mc.h"
- 
- #include "dprc-cmd.h"
- #include "fsl-mc-private.h"
-diff --git a/drivers/staging/fsl-mc/bus/dprc.c b/drivers/bus/fsl-mc/dprc.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/dprc.c
-rename to drivers/bus/fsl-mc/dprc.c
-index 6f6c65a..f8d579e 100644
---- a/drivers/staging/fsl-mc/bus/dprc.c
-+++ b/drivers/bus/fsl-mc/dprc.c
-@@ -30,7 +30,7 @@
-  * POSSIBILITY OF SUCH DAMAGE.
-  */
- #include <linux/kernel.h>
--#include "../include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "dprc.h"
- 
- #include "dprc-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dprc.h b/drivers/bus/fsl-mc/dprc.h
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/dprc.h
-rename to drivers/bus/fsl-mc/dprc.h
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/bus/fsl-mc/fsl-mc-allocator.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-rename to drivers/bus/fsl-mc/fsl-mc-allocator.c
-index b37a6f4..4ff5c7b 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-+++ b/drivers/bus/fsl-mc/fsl-mc-allocator.c
-@@ -10,7 +10,6 @@
- 
- #include <linux/module.h>
- #include <linux/msi.h>
--#include "../include/mc.h"
- 
- #include "fsl-mc-private.h"
- 
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-bus.c
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-rename to drivers/bus/fsl-mc/fsl-mc-bus.c
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/bus/fsl-mc/fsl-mc-msi.c
-similarity index 100%
-rename from drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-rename to drivers/bus/fsl-mc/fsl-mc-msi.c
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-private.h b/drivers/bus/fsl-mc/fsl-mc-private.h
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/fsl-mc-private.h
-rename to drivers/bus/fsl-mc/fsl-mc-private.h
-index 62d3989..d8b8281 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-private.h
-+++ b/drivers/bus/fsl-mc/fsl-mc-private.h
-@@ -10,7 +10,7 @@
- #ifndef _FSL_MC_PRIVATE_H_
- #define _FSL_MC_PRIVATE_H_
- 
--#include "../include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "dprc.h"
- #include <linux/mutex.h>
- 
-diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/bus/fsl-mc/mc-io.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/mc-io.c
-rename to drivers/bus/fsl-mc/mc-io.c
-index f65c23c..1e17ce6 100644
---- a/drivers/staging/fsl-mc/bus/mc-io.c
-+++ b/drivers/bus/fsl-mc/mc-io.c
-@@ -31,7 +31,6 @@
-  */
- 
- #include <linux/io.h>
--#include "../include/mc.h"
- 
- #include "fsl-mc-private.h"
- #include "dpmcp.h"
-diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/bus/fsl-mc/mc-sys.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/mc-sys.c
-rename to drivers/bus/fsl-mc/mc-sys.c
-index 7ce105b..def3d3c 100644
---- a/drivers/staging/fsl-mc/bus/mc-sys.c
-+++ b/drivers/bus/fsl-mc/mc-sys.c
-@@ -38,7 +38,7 @@
- #include <linux/device.h>
- #include <linux/io.h>
- #include <linux/io-64-nonatomic-hi-lo.h>
--#include "../include/mc.h"
-+#include <linux/fsl/mc.h>
- 
- #include "dpmcp.h"
- 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e88d856..1a5b354 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -29,6 +29,7 @@ obj-$(CONFIG_ARCH_REALVIEW)		+= irq-gic-realview.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
- obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-+obj-$(CONFIG_FSL_MC_BUS)		+= irq-gic-v3-its-fsl-mc-msi.o
- obj-$(CONFIG_PARTITION_PERCPU)		+= irq-partition-percpu.o
- obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
-diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
-similarity index 99%
-rename from drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-rename to drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
-index 123e4af..57c6b2a 100644
---- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
-@@ -15,7 +15,7 @@
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
--#include "fsl-mc-private.h"
-+#include <linux/fsl/mc.h>
- 
- static struct irq_chip its_msi_irq_chip = {
- 	.name = "ITS-fMSI",
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/README b/drivers/staging/fsl-dpaa2/ethernet/README
-index 410952e..1e825df 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/README
-+++ b/drivers/staging/fsl-dpaa2/ethernet/README
-@@ -36,7 +36,7 @@ are treated as internal resources of other objects.
- 
- For a more detailed description of the DPAA2 architecture and its object
- abstractions see:
--	drivers/staging/fsl-mc/README.txt
-+	Documentation/dpaa2/overview.txt
- 
- Each Linux net device is built on top of a Datapath Network Interface (DPNI)
- object and uses Buffer Pools (DPBPs), I/O Portals (DPIOs) and Concentrators
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index 26017fe..3f50e1a 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -39,7 +39,7 @@
- #include <linux/kthread.h>
- #include <linux/iommu.h>
- 
--#include "../../fsl-mc/include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "dpaa2-eth.h"
- 
- /* CREATE_TRACE_POINTS only needs to be defined once. Other dpa files
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpni.c b/drivers/staging/fsl-dpaa2/ethernet/dpni.c
-index 04a5b14..67f0623 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpni.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpni.c
-@@ -32,7 +32,7 @@
-  */
- #include <linux/kernel.h>
- #include <linux/errno.h>
--#include "../../fsl-mc/include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "dpni.h"
- #include "dpni-cmd.h"
- 
-diff --git a/drivers/staging/fsl-mc/TODO b/drivers/staging/fsl-mc/TODO
-deleted file mode 100644
-index 54a8bc6..0000000
---- a/drivers/staging/fsl-mc/TODO
-+++ /dev/null
-@@ -1,18 +0,0 @@
--* Add at least one device driver for a DPAA2 object (child device of the
--  fsl-mc bus).  Most likely candidate for this is adding DPAA2 Ethernet
--  driver support, which depends on drivers for several objects: DPNI,
--  DPIO, DPMAC.  Other pre-requisites include:
--
--     * MC firmware uprev.  The MC firmware upon which the fsl-mc
--       bus driver and DPAA2 object drivers are based is continuing
--       to evolve, so minor updates are needed to keep in sync with binary
--       interface changes to the MC.
--
--* Cleanup
--
--Please send any patches to Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
--german.rivera at freescale.com, devel at driverdev.osuosl.org,
--linux-kernel at vger.kernel.org
--
--[1] https://lkml.org/lkml/2015/7/9/93
--[2] https://lkml.org/lkml/2015/7/7/712
-diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
-index 504c987..9700f2c 100644
---- a/drivers/staging/fsl-mc/bus/Kconfig
-+++ b/drivers/staging/fsl-mc/bus/Kconfig
-@@ -6,16 +6,6 @@
- # This file is released under the GPLv2
- #
- 
--config FSL_MC_BUS
--	bool "QorIQ DPAA2 fsl-mc bus driver"
--	depends on OF && (ARCH_LAYERSCAPE || (COMPILE_TEST && (ARM || ARM64 || X86 || PPC)))
--	select GENERIC_MSI_IRQ_DOMAIN
--	help
--	  Driver to enable the bus infrastructure for the QorIQ DPAA2
--	  architecture.  The fsl-mc bus driver handles discovery of
--	  DPAA2 objects (which are represented as Linux devices) and
--	  binding objects to drivers.
--
- config FSL_MC_DPIO
-         tristate "QorIQ DPAA2 DPIO driver"
-         depends on FSL_MC_BUS && ARCH_LAYERSCAPE
-diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
-index 6df407e..b8f4c4d 100644
---- a/drivers/staging/fsl-mc/bus/Makefile
-+++ b/drivers/staging/fsl-mc/bus/Makefile
-@@ -5,19 +5,8 @@
- #
- # This file is released under the GPLv2
- #
--obj-$(CONFIG_FSL_MC_BUS) += mc-bus-driver.o
--
--mc-bus-driver-objs := fsl-mc-bus.o \
--		      mc-sys.o \
--		      mc-io.o \
--		      dprc.o \
--		      dprc-driver.o \
--		      fsl-mc-allocator.o \
--		      fsl-mc-msi.o \
--		      irq-gic-v3-its-fsl-mc-msi.o \
--		      dpmcp.o \
--		      dpbp.o \
--		      dpcon.o
-+obj-$(CONFIG_FSL_MC_BUS) += dpbp.o \
-+			    dpcon.o
- 
- # MC DPIO driver
- obj-$(CONFIG_FSL_MC_DPIO) += dpio/
-diff --git a/drivers/staging/fsl-mc/bus/dpbp.c b/drivers/staging/fsl-mc/bus/dpbp.c
-index 363730a..9f9ff82 100644
---- a/drivers/staging/fsl-mc/bus/dpbp.c
-+++ b/drivers/staging/fsl-mc/bus/dpbp.c
-@@ -30,7 +30,7 @@
-  * POSSIBILITY OF SUCH DAMAGE.
-  */
- #include <linux/kernel.h>
--#include "../include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "../include/dpbp.h"
- 
- #include "dpbp-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
-index ca1da85..aa9ab7b 100644
---- a/drivers/staging/fsl-mc/bus/dpcon.c
-+++ b/drivers/staging/fsl-mc/bus/dpcon.c
-@@ -30,7 +30,7 @@
-  * POSSIBILITY OF SUCH DAMAGE.
-  */
- #include <linux/kernel.h>
--#include "../include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "../include/dpcon.h"
- 
- #include "dpcon-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-index e36da20..6170547 100644
---- a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-+++ b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-@@ -38,8 +38,8 @@
- #include <linux/msi.h>
- #include <linux/dma-mapping.h>
- #include <linux/delay.h>
-+#include <linux/fsl/mc.h>
- 
--#include "../../include/mc.h"
- #include "../../include/dpaa2-io.h"
- 
- #include "qbman-portal.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-index f809682..706eeb5 100644
---- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-+++ b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-@@ -30,7 +30,7 @@
-  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
- #include <linux/types.h>
--#include "../../include/mc.h"
-+#include <linux/fsl/mc.h>
- #include "../../include/dpaa2-io.h"
- #include <linux/init.h>
- #include <linux/module.h>
-diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio.c b/drivers/staging/fsl-mc/bus/dpio/dpio.c
-index 00eb221..7db0a04 100644
---- a/drivers/staging/fsl-mc/bus/dpio/dpio.c
-+++ b/drivers/staging/fsl-mc/bus/dpio/dpio.c
-@@ -31,7 +31,7 @@
-  * POSSIBILITY OF SUCH DAMAGE.
-  */
- #include <linux/kernel.h>
--#include "../../include/mc.h"
-+#include <linux/fsl/mc.h>
- 
- #include "dpio.h"
- #include "dpio-cmd.h"
-diff --git a/drivers/staging/fsl-mc/include/mc.h b/include/linux/fsl/mc.h
-similarity index 100%
-rename from drivers/staging/fsl-mc/include/mc.h
-rename to include/linux/fsl/mc.h
+ 	/* scaling down?  scale voltage after frequency */
+ 	if (new_freq < old_freq) {
+ 		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
 -- 
-2.9.4
+2.7.4
