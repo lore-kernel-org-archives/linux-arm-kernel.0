@@ -1,34 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 28 Aug 2017 21:01:13 +0100
-Subject: ARM64 kernel Image size limitations?
-In-Reply-To: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
-References: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
-Message-ID: <CAKv+Gu-b1+dZaw=Sbnqd3NnpZ4G7Q5Gog7o=3Wucn69neChyNA@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 28 Aug 2017 22:03:05 +0200
+Subject: [patch v1 0/2] JTAG driver introduction
+In-Reply-To: <20170803174822.GI15018@lunn.ch>
+References: <1501679918-20486-1-git-send-email-oleksandrs@mellanox.com>
+ <20170802141209.GB25781@lunn.ch>
+ <AM4PR0501MB2194E6B8D14EC15356C1C0BFB1B10@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+ <20170803174822.GI15018@lunn.ch>
+Message-ID: <20170828200305.GA5132@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi!
 
-On 28 August 2017 at 20:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Hi,
->
-> I have been fighting with a reasonably large kernel Image: 46MB and
-> found unable to boot it. This is on v4.13-rc6, but I could go back as
-> far as v4.9~ish. It is so big, because it's got some debugging enabled,
-> and the initramfs compression is disabled, but still that ought to be
-> possible.
->
-> After some experimentation I found that the breaking size is somewhere
-> around 33MB total for arch/arm64/boot/Image and when that happens, I get
-> the following backtrace which suggests that there is some memory
-> corruption of some kind (or so it seems to me), other experiments
-> indicated that the backtrace may point back to where the bootloader had
-> set up its exception vector. I am fairly confident that the bootloader
-> is not responsible for corrupting the Image that is loaded.
->
-> Is there such a size limitation or am I possibly tripping over something
-> else?
->
+> > Thanks a lot for review.
+> > 
+> 
+> > We used user space tool for that, which is an adaptation of some
+> > Lattice tools, which allows programming of SVF files. We are using
+> > it for Lattice CPLD burning, since we have for such devices on our
+> > system, but this tool could be used for programming other devices
+> > from other vendors as well.
+>  
+> > https://github.com/mellanoxbmc/mellanox-bmc-tools
+> 
+> Since you are defining a new Kernel ABI here, it would be good to get
+> some buy-in from potential users for the ABI. Maybe for the next
+> version of the patchset you can cross post to the OpenOCD-devel list?
 
-What boot environment are you using? Is it possible the DTB is copied
-on top of the kernel by the boot loader?
+Actually, since you are defining a new ABI, it would be nice to have a
+Documentation/ file with the ABI description, so that people can
+review it...
+
+Otherwise... yes, this looks like a step in right direction from 60000
+feet above. I guess it is still a lot of work to get gdb running...
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/134d74ca/attachment.sig>
