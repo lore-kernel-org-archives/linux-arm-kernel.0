@@ -1,21 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Aug 2017 17:51:35 +0200
-Subject: [RFC] ARM: Orion: Check DRAM window size
-In-Reply-To: <20170828153039.27088-1-jlu@pengutronix.de>
-References: <20170828152517.24506-1-jlu@pengutronix.de>
- <20170828153039.27088-1-jlu@pengutronix.de>
-Message-ID: <20170828155135.GF10418@lunn.ch>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 28 Aug 2017 08:56:38 -0700
+Subject: [PATCH] ARM: dts: keystone-k2g: Add McASP nodes
+In-Reply-To: <20170828071957.9597-1-peter.ujfalusi@ti.com>
+References: <20170828071957.9597-1-peter.ujfalusi@ti.com>
+Message-ID: <574004f6-6e6c-7d15-e5f8-3c3beec0e9b8@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 05:30:39PM +0200, Jan Luebbe wrote:
-> This is a corresponding change as "PCI: mvebu: Check DRAM window size" applied
-> to the Orion PCIe driver. I don't have the relevant hardware myself, but the
-> patch may still be useful for someone who has. This is completely untested.
+On 8/28/2017 12:19 AM, Peter Ujfalusi wrote:
+> Add three McASP nodes present on 66AK2G device.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi Santosh,
+> 
+> There is no driver change dependency for McASP to work on 66AK2G, only the nodes
+> need to be in place.
+> 
+Will add that to 4.15 queue. Thanks !!
 
-Hi Jan
-
-I've never seen one of these boards have more than 512M bytes of RAM.
-So it is probably a non-issue.
-
-   Andrew
+Regards,
+Santosh
