@@ -1,104 +1,91 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 28 Aug 2017 20:35:50 +0200
-Subject: [PATCH v3 56/59] KVM: arm/arm64: GICv4: Prevent heterogenous
- systems from using GICv4
-In-Reply-To: <20170731172637.29355-57-marc.zyngier@arm.com>
+Date: Mon, 28 Aug 2017 20:18:50 +0200
+Subject: [PATCH v3 51/59] KVM: arm/arm64: GICv4: Add doorbell interrupt
+ handling
+In-Reply-To: <8a35ee18-85a5-168b-b3d2-b9f51390b475@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-57-marc.zyngier@arm.com>
-Message-ID: <20170828183550.GQ24649@cbox>
+ <20170731172637.29355-52-marc.zyngier@arm.com>
+ <8a35ee18-85a5-168b-b3d2-b9f51390b475@arm.com>
+Message-ID: <20170828181850.GL24649@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 06:26:34PM +0100, Marc Zyngier wrote:
-> The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
-> cohabit with CPUs limited to GICv3 in the same system.
+On Fri, Aug 04, 2017 at 08:44:04AM +0100, Marc Zyngier wrote:
+> On 31/07/17 18:26, Marc Zyngier wrote:
+> > When a vPE is not running, a VLPI being made pending results in a
+> > doorbell interrupt being delivered. Let's handle this interrupt
+> > and update the pending_last flag that indicates that VLPIs are
+> > pending. The corresponding vcpu is also kicked into action.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-v4.c | 34 ++++++++++++++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> > index 534d3051a078..6af3cde6d7d4 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v4.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> > @@ -21,6 +21,19 @@
+> >  
+> >  #include "vgic.h"
+> >  
+> > +static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+> > +{
+> > +	struct kvm_vcpu *vcpu = info;
+> > +
+> > +	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
+> > +		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+> > +		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+> > +		kvm_vcpu_kick(vcpu);
+> > +	}
 > 
-> This is mad (the sheduler would have to be made aware of the v4
-
-*scheduler
-
-> capability), and we're certainly not going to support this any
-> time soon. So let's check that all online CPUs are GICv4 capable,
-> and disable the functionnality if not.
-
-*functionality
-
+> This code is so obviously broken that I completely overlooked it.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/linux/irqchip/arm-gic-v3.h |  2 ++
->  virt/kvm/arm/vgic/vgic-v3.c        | 22 +++++++++++++++++++++-
->  2 files changed, 23 insertions(+), 1 deletion(-)
+> If we have take a doorbell interrupt, then it means nothing was
+> otherwise pending (because we'd have been kicked out of the blocking
+> state, and will have masked the doorbell). So checking for pending
+> interrupts is pointless.
 > 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 1ea576c8126f..dfa4a51643d6 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -532,6 +532,8 @@
->  #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
->  #define ICH_VTR_A3V_SHIFT		21
->  #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
-> +#define ICH_VTR_nV4_SHIFT		20
-> +#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
+> Furthermore, calling kvm_vgic_vcpu_pending_irq() takes the ap_list
+> lock. If we take a doorbell interrupt while injecting a virtual
+> interrupt (from userspace, for example) on the same CPU, we end-up
+> in deadlock land. This would be solved by Christoffer's latest
+> crop of timer patches, but there is no point getting there the first
+> place.
+> 
+> The patchlet below solves it:
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index 15feb1151797..48e4d6ebeaa8 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -94,11 +94,9 @@ static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+>  {
+>  	struct kvm_vcpu *vcpu = info;
 >  
->  #define ICC_IAR1_EL1_SPURIOUS		0x3ff
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 405733678c2f..252268e83ade 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -466,6 +466,18 @@ static int __init early_gicv4_enable(char *buf)
->  }
->  early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
->  
-> +static void vgic_check_v4_cpuif(void *param)
-> +{
-> +	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
-> +	bool *v4 = param, this_cpu_is_v4;
-> +
-> +	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
-> +	if (!this_cpu_is_v4)
-> +		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
-> +
-> +	*v4 &= this_cpu_is_v4;
+> -	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
+> -		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+> -		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+> -		kvm_vcpu_kick(vcpu);
+> -	}
+> +	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+> +	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+> +	kvm_vcpu_kick(vcpu);
 
-nit: You could make this function look slightly less scary by declaring
-this_cpu_is_v4 on a separate line and not use a bitwise operator on a
-boolean type.  Actually, having a function called 'check' with a side
-effect is not the nicest thing either, so why not just return what this
-particular CPU does and do the comparison in the calling loop.
+I don't think you need the request and kick, because if you're getting
+this doorbell, doesn't that also mean that the VCPU is not running in
+the guest and you simply need to make sure the VCPU thread gets
+scheduled again, so you could call kvm_vcpu_wake_up() instead.
 
-#bikeshedding
+Unless the request is there to ensure proper memory barriers around
+setting pending_last?
+
+In that case, is the read barrier taken care of by prepare_to_swait in
+kvm_vcpu_block()?
+
+Drew?
 
 
 Thanks,
 -Christoffer
-
-
-
-> +}
-> +
->  /**
->   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
->   * @node:	pointer to the DT node
-> @@ -485,8 +497,16 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
->  	kvm_vgic_global_state.can_emulate_gicv2 = false;
->  	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
->  
-> -	/* GICv4 support? */
-> +	/*
-> +	 * GICv4 support? We need to check on all CPUs in case of some
-> +	 * extremely creative form of big-little brain damage...
-> +	 */
->  	if (info->has_v4) {
-> +		int cpu;
-> +
-> +		for_each_online_cpu(cpu)
-> +			smp_call_function_single(cpu, vgic_check_v4_cpuif,
-> +						 &gicv4_enable, 1);
->  		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
->  		kvm_info("GICv4 support %sabled\n",
->  			 gicv4_enable ? "en" : "dis");
-> -- 
-> 2.11.0
-> 
