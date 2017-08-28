@@ -1,59 +1,30 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Mon, 28 Aug 2017 09:59:34 -0700
-Subject: [PATCH 0/3] DWC host without MSI controller
-In-Reply-To: <20170828142307.30061-1-l.stach@pengutronix.de>
-References: <20170828142307.30061-1-l.stach@pengutronix.de>
-Message-ID: <CAJ+vNU1GZMpptQ2oCE-cOzX+G=cj248bVGXhC_vSqD_4d7D7+Q@mail.gmail.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Mon, 28 Aug 2017 23:02:11 +0530
+Subject: [PATCH] fpga: make xlnx_pr_decoupler_br_ops const
+Message-ID: <1503941531-17977-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 7:23 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hi all,
->
-> this small series tries to fix/workaround a serious design flaw of the DWC PCIe
-> host controller: it is unable to work with both legacy and MSI IRQs enabled at
-> the same time. As soon as the first MSI is enabled in the DWC MSI controller,
-> the host stops forwarding legacy IRQs.
->
-> If the MSI controller is present, MSIs will be used for the PCIe port services
-> IRQs, leaving endpoint devices which don't support MSIs unable to raise IRQs.
-> It is only safe to enable the MSI controller if it is validated that all PCIe
-> devices and drivers in the system support working MSIs. As most devices
-> support falling back to using legacy PCIe IRQs if MSI support is missing it is
-> much safer to disable the MSI by default and only enable it on validated
-> systems.
->
-> Feedback welcome.
->
-> Regards,
-> Lucas
->
-> Lucas Stach (3):
->   PCI: designware: only register MSI controller when MSI irq line is
->     valid
->   PCI: imx6: allow MSI irq to be absent
->   ARM: dts: imx6qdl: remove MSI irq line
->
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 ++++----
->  arch/arm/boot/dts/imx6qdl.dtsi                     |  2 --
->  drivers/pci/dwc/pci-imx6.c                         | 23 +++++++++++-----------
->  drivers/pci/dwc/pcie-designware-host.c             |  4 ++--
->  4 files changed, 17 insertions(+), 20 deletions(-)
->
+Make this const as it is only passed to a const argument of the function
+fpga_bridge_register.
 
-Lucas,
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/fpga/xilinx-pr-decoupler.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thank you for following up on this!
-
-I tested it with and without the third patch that removes msi from the
-dt thus with both an ath9k 802.11 device which only supports legacy
-interrupts and a Marvell sky2 device which supports msi as well as
-legacy interrupts and it works as expected:
- - without msi enabled in dts (default): both sky2 and ath9k work
- - with msi enabled in dt: sky2 works ath9k does not
-
-Tested-by: Tim Harvey <tharvey@gateworks.com>
-
-Regards,
-
-Tim
+diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
+index e359930..0d77430 100644
+--- a/drivers/fpga/xilinx-pr-decoupler.c
++++ b/drivers/fpga/xilinx-pr-decoupler.c
+@@ -79,7 +79,7 @@ static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
+ 	return !status;
+ }
+ 
+-static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
++static const struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+ 	.enable_set = xlnx_pr_decoupler_enable_set,
+ 	.enable_show = xlnx_pr_decoupler_enable_show,
+ };
+-- 
+1.9.1
