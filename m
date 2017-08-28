@@ -1,28 +1,50 @@
 From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Mon, 28 Aug 2017 09:32:41 +0300
-Subject: [PATCH v2 0/2] Update board support for A20-OLinuXino-MICRO
-Message-ID: <1503901963-9457-1-git-send-email-stefan@olimex.com>
+Date: Mon, 28 Aug 2017 09:32:42 +0300
+Subject: [PATCH v2 1/2] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for
+ LAN8710
+In-Reply-To: <1503901963-9457-1-git-send-email-stefan@olimex.com>
+References: <1503901963-9457-1-git-send-email-stefan@olimex.com>
+Message-ID: <1503901963-9457-2-git-send-email-stefan@olimex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From rev.J of A20-OLinuXino-MICRO, the board has new PHY chip
-(LAN8710) which replace RTL8201. Also there is option for 4GB
-eMMC chip.
+>From revision J the board uses new phy chip LAN8710. Compared
+with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
+not to work. To fix this PA17 is muxed with GMAC function. This
+makes the pin output-low.
 
-Changes in v2:
-	* Remove pinctrl request for eMMC reset pin
-	* Dump the idea of renaming boards with emmc
-	* Using txerr as gmac function
+This patch is compatible with earlier board revisions, since this
+pin wasn't connected to phy.
 
-Stefan Mavrodiev (2):
-  ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for LAN8710
-  ARM: dts: sun7i: Add dts file for A20-OLinuXino-MICRO-eMMC
+Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/Makefile                         |  1 +
- .../boot/dts/sun7i-a20-olinuxino-micro-emmc.dts    | 70 ++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  7 ++-
- 3 files changed, 77 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro-emmc.dts
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index 0b7403e..cb1b081 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -102,7 +102,7 @@
+ 
+ &gmac {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&gmac_pins_mii_a>;
++	pinctrl-0 = <&gmac_pins_mii_a>,<&gmac_txerr>;
+ 	phy = <&phy1>;
+ 	phy-mode = "mii";
+ 	status = "okay";
+@@ -229,6 +229,11 @@
+ };
+ 
+ &pio {
++	gmac_txerr: gmac_txerr at 0 {
++		pins = "PA17";
++		function = "gmac";
++	};
++
+ 	mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
+ 		pins = "PH11";
+ 		function = "gpio_in";
 -- 
 2.7.4
