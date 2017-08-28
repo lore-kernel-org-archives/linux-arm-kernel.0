@@ -1,85 +1,80 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 28 Aug 2017 14:54:02 -0500
-Subject: [PATCH v8 2/3] PCI: iproc: retry request when CRS returned from EP
-In-Reply-To: <CAMSpPPf5LJqvjFdrsR0hXK7oq2n38zCUjEpdmV0m8h6R_oiEXg@mail.gmail.com>
-References: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
- <1503551066-23212-3-git-send-email-oza.oza@broadcom.com>
- <20170828191708.GJ8154@bhelgaas-glaptop.roam.corp.google.com>
- <CAMSpPPf5LJqvjFdrsR0hXK7oq2n38zCUjEpdmV0m8h6R_oiEXg@mail.gmail.com>
-Message-ID: <20170828195402.GK8154@bhelgaas-glaptop.roam.corp.google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 28 Aug 2017 12:55:23 -0700
+Subject: ARM64 kernel Image size limitations?
+Message-ID: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 01:09:53AM +0530, Oza Oza wrote:
-> On Tue, Aug 29, 2017 at 12:47 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Thu, Aug 24, 2017 at 10:34:25AM +0530, Oza Pawandeep wrote:
-> >> PCIe spec r3.1, sec 2.3.2
-> >> If CRS software visibility is not enabled, the RC must reissue the
-> >> config request as a new request.
-> >>
-> >> - If CRS software visibility is enabled,
-> >> - for a config read of Vendor ID, the RC must return 0x0001 data
-> >> - for all other config reads/writes, the RC must reissue the
-> >>   request
-> >>
-> >> iproc PCIe Controller spec:
-> >> 4.7.3.3. Retry Status On Configuration Cycle
-> >> Endpoints are allowed to generate retry status on configuration
-> >> cycles. In this case, the RC needs to re-issue the request. The IP
-> >> does not handle this because the number of configuration cycles needed
-> >> will probably be less than the total number of non-posted operations
-> >> needed.
-> >>
-> >> When a retry status is received on the User RX interface for a
-> >> configuration request that was sent on the User TX interface,
-> >> it will be indicated with a completion with the CMPL_STATUS field set
-> >> to 2=CRS, and the user will have to find the address and data values
-> >> and send a new transaction on the User TX interface.
-> >> When the internal configuration space returns a retry status during a
-> >> configuration cycle (user_cscfg = 1) on the Command/Status interface,
-> >> the pcie_cscrs will assert with the pcie_csack signal to indicate the
-> >> CRS status.
-> >> When the CRS Software Visibility Enable register in the Root Control
-> >> register is enabled, the IP will return the data value to 0x0001 for
-> >> the Vendor ID value and 0xffff  (all 1?s) for the rest of the data in
-> >> the request for reads of offset 0 that return with CRS status.  This
-> >> is true for both the User RX Interface and for the Command/Status
-> >> interface.  When CRS Software Visibility is enabled, the CMPL_STATUS
-> >> field of the completion on the User RX Interface will not be 2=CRS and
-> >> the pcie_cscrs signal will not assert on the Command/Status interface.
-> >>
-> >> Per PCIe r3.1, sec 2.3.2, config requests that receive completions
-> >> with Configuration Request Retry Status (CRS) should be reissued by
-> >> the hardware except reads of the Vendor ID when CRS Software
-> >> Visibility is enabled.
-> >>
-> >> This hardware never reissues configuration requests when it receives
-> >> CRS completions.
-> >> Note that, neither PCIe host bridge nor PCIe core re-issues the
-> >> request for any configuration offset.
-> >>
-> >> For config reads, this hardware returns CFG_RETRY_STATUS data when
-> >> it receives a CRS completion for a config read, regardless of the
-> >> address of the read or the CRS Software Visibility Enable bit.
-> >
-> > I can't remember how Stingray handles the CRS Software Visibility Enable
-> > bit.  Is it a read-only zero?  Is it writable?  Does the hardware look at
-> > it all (I think not)?
-> 
-> HW doesnt look it at all, it is "dont care" bit.
+Hi,
 
-Sigh, I made the classic mistake of asking more than one question, and
-I guess I'm about to do it again :)  It'll save time if you can answer
-all the questions at once.
+I have been fighting with a reasonably large kernel Image: 46MB and
+found unable to boot it. This is on v4.13-rc6, but I could go back as
+far as v4.9~ish. It is so big, because it's got some debugging enabled,
+and the initramfs compression is disabled, but still that ought to be
+possible.
 
-Linux enables PCI_EXP_RTCTL_CRSSVE if PCI_EXP_RTCAP says it is
-supported (see pci_enable_crs()).
+After some experimentation I found that the breaking size is somewhere
+around 33MB total for arch/arm64/boot/Image and when that happens, I get
+the following backtrace which suggests that there is some memory
+corruption of some kind (or so it seems to me), other experiments
+indicated that the backtrace may point back to where the bootloader had
+set up its exception vector. I am fairly confident that the bootloader
+is not responsible for corrupting the Image that is loaded.
 
-  - What does PCI_EXP_RTCAP say?
+Is there such a size limitation or am I possibly tripping over something
+else?
 
-  - Is PCI_EXP_RTCTL_CRSSVE writable?
+(gdb) bt
+#0  0xffffff800880721c in arch_spin_lock (lock=<optimized out>)
+    at ./arch/arm64/include/asm/spinlock.h:89
+#1  do_raw_spin_lock_flags (flags=<optimized out>, lock=<optimized out>)
+    at ./include/linux/spinlock.h:155
+#2  __raw_spin_lock_irqsave (lock=<optimized out>)
+    at ./include/linux/spinlock_api_smp.h:119
+#3  _raw_spin_lock_irqsave (lock=0xffffff800a1100f8)
+    at kernel/locking/spinlock.c:159
+#4  0xffffff80080888b4 in die (str=0xffffff800894a490 "Oops",
+    regs=0xffffff800a013630, err=-1778384892) at
+arch/arm64/kernel/traps.c:279
+#5  0x80ffffff080952c4 in ?? ()
+Backtrace stopped: previous frame inner to this frame (corrupt stack?)
+(gdb) info reg
+x0             0xffffff800a1100f8       18446743524122624248
+x1             0x1c0    448
+x2             0x10000  65536
+x3             0x1      1
+x4             0x0      0
+x5             0xffffff8008857dc8       18446743524096703944
+x6             0xffffff800a00494f       18446743524121528655
+x7             0x6572646461206c65       7310015527464758373
+x8             0x65676e6172207373       7306930285237531507
+x9             0x0      0
+x10            0xffffff800a0134e0       18446743524121588960
+x11            0xffffff800a0134e0       18446743524121588960
+x12            0x40d00  265472
+x13            0x72422820352e382e       8233187187582973998
+x14            0x73206d6f6364616f       8295750838792773999
+x15            0x0      0
+x16            0x0      0
+x17            0x0      0
+x18            0x0      0
+x19            0xffffff800a110000       18446743524122624000
+x20            0x96000004       2516582404
+x21            0xffffff800894a490       18446743524097696912
+x22            0xffffff800a013630       18446743524121589296
+x23            0xffffff800a013630       18446743524121589296
+x24            0x25     37
+x25            0xffffff800a018000       18446743524121608192
+x26            0xffffff8008955622       18446743524097742370
+x27            0xffffff8008955622       18446743524097742370
+x28            0xffffff800a01dd80       18446743524121632128
+x29            0xffffff800a0134d0       18446743524121588944
+x30            0xffffff80080888b4       18446743524088514740
+sp             0xffffff800a0134d0       0xffffff800a0134d0
+pc             0xffffff800880721c       0xffffff800880721c
+<_raw_spin_lock_irqsave+44>
+CPSR           0x600001c5       1610613189
+(gdb)
 
-With all the CRS-related work going on, I suspect we may someday want to
-read PCI_EXP_RTCTL_CRSSVE to see if CRS SV is enabled.
-
-Bjorn
+-- 
+Florian
