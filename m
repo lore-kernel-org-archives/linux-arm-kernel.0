@@ -1,56 +1,61 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Mon, 28 Aug 2017 14:35:10 -0700
-Subject: [PATCH v2 29/30] arm: Implement thread_struct whitelist for hardened
- usercopy
+Date: Mon, 28 Aug 2017 14:35:09 -0700
+Subject: [PATCH v2 28/30] arm64: Implement thread_struct whitelist for
+ hardened usercopy
 In-Reply-To: <1503956111-36652-1-git-send-email-keescook@chromium.org>
 References: <1503956111-36652-1-git-send-email-keescook@chromium.org>
-Message-ID: <1503956111-36652-30-git-send-email-keescook@chromium.org>
+Message-ID: <1503956111-36652-29-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM does not carry FPU state in the thread structure, so it can declare
-no usercopy whitelist at all.
+This whitelists the FPU register state portion of the thread_struct for
+copying to userspace, instead of the default entire structure.
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: James Morse <james.morse@arm.com>
 Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: zijun_hu <zijun_hu@htc.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/Kconfig                 | 1 +
- arch/arm/include/asm/processor.h | 7 +++++++
- 2 files changed, 8 insertions(+)
+ arch/arm64/Kconfig                 | 1 +
+ arch/arm64/include/asm/processor.h | 8 ++++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a208bfe367b5..3781f08d00fa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -48,6 +48,7 @@ config ARM
- 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
- 	select HAVE_ARCH_MMAP_RND_BITS if MMU
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index dfd908630631..b773299bc4e3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -73,6 +73,7 @@ config ARM64
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+ 	select HAVE_ARCH_SECCOMP_FILTER
 +	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
  	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARM_SMCCC if CPU_V7
- 	select HAVE_CBPF_JIT
-diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index c3d5fc124a05..d6dc45c92ee5 100644
---- a/arch/arm/include/asm/processor.h
-+++ b/arch/arm/include/asm/processor.h
-@@ -45,6 +45,13 @@ struct thread_struct {
- 	struct debug_info	debug;
+ 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	select HAVE_ARM_SMCCC
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 64c9e78f9882..799f112e5ff7 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -90,6 +90,14 @@ struct thread_struct {
+ 	struct debug_info	debug;		/* debugging */
  };
  
-+/* Nothing needs to be usercopy-whitelisted from thread_struct. */
++/* Whitelist the fpsimd_state for copying to userspace. */
 +static inline void arch_thread_struct_whitelist(unsigned long *offset,
 +						unsigned long *size)
 +{
-+	*offset = *size = 0;
++	*offset = offsetof(struct thread_struct, fpsimd_state);
++	*size = sizeof(struct fpsimd_state);
 +}
 +
- #define INIT_THREAD  {	}
- 
- #ifdef CONFIG_MMU
+ #ifdef CONFIG_COMPAT
+ #define task_user_tls(t)						\
+ ({									\
 -- 
 2.7.4
