@@ -1,44 +1,41 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 28 Aug 2017 16:23:05 +0200
-Subject: [PATCH 1/3] PCI: designware: only register MSI controller when MSI
- irq line is valid
-In-Reply-To: <20170828142307.30061-1-l.stach@pengutronix.de>
-References: <20170828142307.30061-1-l.stach@pengutronix.de>
-Message-ID: <20170828142307.30061-2-l.stach@pengutronix.de>
+Date: Mon, 28 Aug 2017 16:23:04 +0200
+Subject: [PATCH 0/3] DWC host without MSI controller
+Message-ID: <20170828142307.30061-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSI part of the controller isn't essential, so the host controller can
-be registered without the MSI controller being present. This allows the
-host to work in PCIe legancy interrupt only mode, if the IRQ line for the
-MSI controller is missing.
+Hi all,
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/pci/dwc/pcie-designware-host.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+this small series tries to fix/workaround a serious design flaw of the DWC PCIe
+host controller: it is unable to work with both legacy and MSI IRQs enabled at
+the same time. As soon as the first MSI is enabled in the DWC MSI controller,
+the host stops forwarding legacy IRQs.
 
-diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-index d29c020da082..8494089f088d 100644
---- a/drivers/pci/dwc/pcie-designware-host.c
-+++ b/drivers/pci/dwc/pcie-designware-host.c
-@@ -381,7 +381,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	if (ret)
- 		pci->num_viewport = 2;
- 
--	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
- 		if (!pp->ops->msi_host_init) {
- 			pp->irq_domain = irq_domain_add_linear(dev->of_node,
- 						MAX_MSI_IRQS, &msi_domain_ops,
-@@ -412,7 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	bridge->ops = &dw_pcie_ops;
- 	bridge->map_irq = of_irq_parse_and_map_pci;
- 	bridge->swizzle_irq = pci_common_swizzle;
--	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
- 		bridge->msi = &dw_pcie_msi_chip;
- 		dw_pcie_msi_chip.dev = dev;
- 	}
+If the MSI controller is present, MSIs will be used for the PCIe port services
+IRQs, leaving endpoint devices which don't support MSIs unable to raise IRQs.
+It is only safe to enable the MSI controller if it is validated that all PCIe
+devices and drivers in the system support working MSIs. As most devices
+support falling back to using legacy PCIe IRQs if MSI support is missing it is
+much safer to disable the MSI by default and only enable it on validated
+systems.
+
+Feedback welcome.
+
+Regards,
+Lucas
+
+Lucas Stach (3):
+  PCI: designware: only register MSI controller when MSI irq line is
+    valid
+  PCI: imx6: allow MSI irq to be absent
+  ARM: dts: imx6qdl: remove MSI irq line
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 ++++----
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  2 --
+ drivers/pci/dwc/pci-imx6.c                         | 23 +++++++++++-----------
+ drivers/pci/dwc/pcie-designware-host.c             |  4 ++--
+ 4 files changed, 17 insertions(+), 20 deletions(-)
+
 -- 
 2.11.0
