@@ -1,96 +1,95 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Mon, 28 Aug 2017 23:27:45 +0530
-Subject: [PATCH V2] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-In-Reply-To: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
-References: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <CAFp+6iEqkZGBF5z0QS6p-EuqDPj9TzH5Zej+f6006UP=0t0PAg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 28 Aug 2017 20:09:32 +0200
+Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
+In-Reply-To: <1503841641816.62526@amazon.com>
+References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+ <20170203181216.30214-5-antoine.tenart@free-electrons.com>
+ <20170203205823.GA22572@lunn.ch> <1503841641816.62526@amazon.com>
+Message-ID: <20170828180932.GG10418@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+On Sun, Aug 27, 2017 at 01:47:19PM +0000, Chocron, Jonathan wrote:
+> This is a fixed version of my previous response (using proper indentation and leaving only the specific questions responded to).
 
+Wow, this is old.  3 Feb 2017. I had to go dig into the archive to
+refresh my memory.
 
-On Mon, Aug 28, 2017 at 10:05 PM, Adam Wallis <awallis@codeaurora.org> wrote:
-> The dma ops from the parent DWC device are not getting passed to the
-> child xhci-hcd device. This patch makes use of
-> platform_device_register_full to set the DMA ops. For the DT/OF case,
-> dma_ops were still null after the the device register, so
-> of_dma_configure is called in only the OF case.
->
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
-> ---
->  drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
->  1 file changed, 17 insertions(+), 22 deletions(-)
->
-> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-> index 76f0b0d..c289da1 100644
-> --- a/drivers/usb/dwc3/host.c
-> +++ b/drivers/usb/dwc3/host.c
-> @@ -16,6 +16,7 @@
->   */
->
->  #include <linux/platform_device.h>
-> +#include <linux/of_platform.h>
->
->  #include "core.h"
->
-> @@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
->  {
->         struct property_entry   props[3];
->         struct platform_device  *xhci;
-> +       struct platform_device_info dwc_plat_info = {};
->         int                     ret, irq;
->         struct resource         *res;
->         struct platform_device  *dwc3_pdev = to_platform_device(dwc->dev);
-> @@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
->         dwc->xhci_resources[1].flags = res->flags;
->         dwc->xhci_resources[1].name = res->name;
->
-> -       xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
-> -       if (!xhci) {
-> -               dev_err(dwc->dev, "couldn't allocate xHCI device\n");
-> -               return -ENOMEM;
-> -       }
-> +       dwc_plat_info.name = "xhci-hcd";
-> +       dwc_plat_info.parent = dwc->sysdev;
-> +       dwc_plat_info.res = dwc->xhci_resources;
-> +       dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
-> +       dwc_plat_info.fwnode = dwc->sysdev->fwnode;
-> +       dwc_plat_info.dma_mask = *dwc->sysdev->dma_mask;
->
-> -       xhci->dev.parent        = dwc->dev;
-> +       xhci = platform_device_register_full(&dwc_plat_info);
-> +       if (IS_ERR(xhci)) {
-> +               dev_err(dwc->dev, "failed to register xHCI device\n");
-> +               return PTR_ERR(xhci);
-> +       }
->
->         dwc->xhci = xhci;
-> -
-> -       ret = platform_device_add_resources(xhci, dwc->xhci_resources,
-> -                                               DWC3_XHCI_RESOURCES_NUM);
-> -       if (ret) {
-> -               dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
-> -               goto err1;
-> -       }
-> +       if (dwc->sysdev->of_node)
-> +               of_dma_configure(&xhci->dev, dwc->sysdev->of_node);
+> > > +/* MDIO */
+> > > +#define AL_ETH_MDIO_C45_DEV_MASK     0x1f0000
+> > > +#define AL_ETH_MDIO_C45_DEV_SHIFT    16
+> > > +#define AL_ETH_MDIO_C45_REG_MASK     0xffff
+> > > +
+> > > +static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
+> > > +{
+> > > +     struct al_eth_adapter *adapter = bp->priv;
+> > > +     u16 value = 0;
+> > > +     int rc;
+> > > +     int timeout = MDIO_TIMEOUT_MSEC;
+> > > +
+> > > +     while (timeout > 0) {
+> > > +             if (reg & MII_ADDR_C45) {
+> > > +                     netdev_dbg(adapter->netdev, "[c45]: dev %x reg %x val %x\n",
+> > > +                                ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
+> > > +                                (reg & AL_ETH_MDIO_C45_REG_MASK), value);
+> > > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
+> > > +                             ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
+> > > +                             (reg & AL_ETH_MDIO_C45_REG_MASK), &value);
+> > > +             } else {
+> > > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
+> > > +                                           MDIO_DEVAD_NONE, reg, &value);
+> > > +             }
+> > > +
+> > > +             if (rc == 0)
+> > > +                     return value;
+> > > +
+> > > +             netdev_dbg(adapter->netdev,
+> > > +                        "mdio read failed. try again in 10 msec\n");
+> > > +
+> > > +             timeout -= 10;
+> > > +             msleep(10);
+> > > +     }
+> > 
+> > This is rather unusual, retrying MDIO operations. Are you working
+> > around a hardware bug? I suspect this also opens up race conditions,
+> > in particular with PHY interrupts, which can be clear on read.
+> 
+> The MDIO bus is shared between the ethernet units. There is a HW
+> lock used to arbitrate between different interfaces trying to access
+> the bus, therefore there is a retry loop. The reg isn't accessed
+> before obtaining the lock, so there shouldn't be any clear on read
+> issues.
+> 
+> > > +/* al_eth_mdiobus_setup - initialize mdiobus and register to kernel */
+> > > +static int al_eth_mdiobus_setup(struct al_eth_adapter *adapter)
+> > > +{
+> > > +     struct phy_device *phydev;
+> > > +     int i;
+> > > +     int ret = 0;
+> > > +
+> > > +     adapter->mdio_bus = mdiobus_alloc();
+> > > +     if (!adapter->mdio_bus)
+> > > +             return -ENOMEM;
+> > > +
+> > > +     adapter->mdio_bus->name     = "al mdio bus";
+> > > +     snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
+> > > +              (adapter->pdev->bus->number << 8) | adapter->pdev->devfn);
+> > > +     adapter->mdio_bus->priv     = adapter;
+> > > +     adapter->mdio_bus->parent   = &adapter->pdev->dev;
+> > > +     adapter->mdio_bus->read     = &al_mdio_read;
+> > > +     adapter->mdio_bus->write    = &al_mdio_write;
+> > > +     adapter->mdio_bus->phy_mask = ~BIT(adapter->phy_addr);
+> >
+> > Why do this?
+> 
+> Since the MDIO bus is shared, we want each interface to probe only for the PHY associated with it.
 
-Isn't this code doing the same thing what the xhci-plat also does right now
-since dwc->sysdev is either dwc->dev or dwc->dev->parent.
+So i think this is the core of the problem. You have one physical MDIO
+bus, yet you register it twice with the MDIO framework.
 
->From xhci_plat_probe():
-        sysdev = &pdev->dev;
-        if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
-                sysdev = sysdev->parent;
+How about you only register it once? A lot of the complexity then goes
+away. The mutex in the mdio core per bus means you don't need your
+hardware locking. All that code goes away. All the retry code goes
+away. Life is simple.
 
-after which it tries to set the dma masks.
-
-<snip>
-
-
-regards
-Vivek
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+	Andrew
