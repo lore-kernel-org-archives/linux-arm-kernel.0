@@ -1,53 +1,61 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 28 Aug 2017 18:59:38 +0900
-Subject: [PATCH] reset: uniphier: add ethernet reset control support
-Message-ID: <1503914378-24615-1-git-send-email-hayashi.kunihiko@socionext.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 28 Aug 2017 12:04:10 +0200
+Subject: [RESEND PATCH v3 5/9] dt-bindings: iio: Add STM32 LPTimer trigger
+ binding
+In-Reply-To: <1503914654-19963-1-git-send-email-fabrice.gasnier@st.com>
+References: <1503914654-19963-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1503914654-19963-6-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset lines for ethernet controller on Pro4, PXs2, LD11 and
-LD20 SoCs.
+Add documentation for STMicroelectronics STM32 Low-Power Timer Trigger
+binding.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/reset/reset-uniphier.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Changes in v3:
+- Rob's comments: node name timer at ..., update reg property
+  description
 
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index bda2dd1..6e40f7d 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -58,6 +58,7 @@ static const struct uniphier_reset_data uniphier_ld4_sys_reset_data[] = {
- 
- static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x2000, 2),		/* NAND */
-+	UNIPHIER_RESETX(6, 0x2000, 12),		/* Ether */
- 	UNIPHIER_RESETX(8, 0x2000, 10),		/* STDMAC (HSC, MIO, RLE) */
- 	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (Ether, SATA, USB3) */
- 	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
-@@ -76,6 +77,7 @@ static const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
- 
- static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x2000, 2),		/* NAND */
-+	UNIPHIER_RESETX(6, 0x2000, 12),		/* Ether */
- 	UNIPHIER_RESETX(8, 0x2000, 10),		/* STDMAC (HSC, RLE) */
- 	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
- 	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
-@@ -92,6 +94,7 @@ static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
- static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
- 	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
-+	UNIPHIER_RESETX(6, 0x200c, 6),		/* Ether */
- 	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC, MIO) */
- 	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
- 	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
-@@ -102,6 +105,7 @@ static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
- static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
- 	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
-+	UNIPHIER_RESETX(6, 0x200c, 6),		/* Ether */
- 	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC) */
- 	UNIPHIER_RESETX(12, 0x200c, 5),		/* GIO (PCIe, USB3) */
- 	UNIPHIER_RESETX(16, 0x200c, 12),	/* USB30-PHY0 */
+Changes in v2:
+- s/Low Power/Low-Power
+- remove leading 0x in example (parent node)
+- improve reg property description
+---
+ .../bindings/iio/timer/stm32-lptimer-trigger.txt   | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+
+diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+new file mode 100644
+index 0000000..85e6806
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+@@ -0,0 +1,23 @@
++STMicroelectronics STM32 Low-Power Timer Trigger
++
++STM32 Low-Power Timer provides trigger source (LPTIM output) that can be used
++by STM32 internal ADC and/or DAC.
++
++Must be a sub-node of an STM32 Low-Power Timer device tree node.
++See ../mfd/stm32-lptimer.txt for details about the parent node.
++
++Required properties:
++- compatible:		Must be "st,stm32-lptimer-trigger".
++- reg:			Identify trigger hardware block. Must be 0, 1 or 2
++			respectively for lptimer1, lptimer2 or lptimer3
++			trigger output.
++
++Example:
++	timer at 40002400 {
++		compatible = "st,stm32-lptimer";
++		...
++		trigger at 0 {
++			compatible = "st,stm32-lptimer-trigger";
++			reg = <0>;
++		};
++	};
 -- 
-2.7.4
+1.9.1
