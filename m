@@ -1,91 +1,119 @@
-From: jlu@pengutronix.de (Jan Luebbe)
-Date: Mon, 28 Aug 2017 17:25:17 +0200
-Subject: [PATCH 2/2] PCI: mvebu: Check DRAM window size
-In-Reply-To: <20170828152517.24506-1-jlu@pengutronix.de>
-References: <20170828152517.24506-1-jlu@pengutronix.de>
-Message-ID: <20170828152517.24506-3-jlu@pengutronix.de>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 28 Aug 2017 17:26:01 +0200
+Subject: [PATCH v3] ARM: dts: stm32: change pinctrl bindings definition
+In-Reply-To: <20170803202134.ne3wkzremxf5mbuw@rob-hp-laptop>
+References: <1501163393-28884-1-git-send-email-alexandre.torgue@st.com>
+ <1501163393-28884-2-git-send-email-alexandre.torgue@st.com>
+ <20170803202134.ne3wkzremxf5mbuw@rob-hp-laptop>
+Message-ID: <b8894885-a96e-f4e9-5513-a16d04ff3600@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sum of the DRAM windows may exceed 4GB (at least on Armada XP).
-Return an error in that case.
+Hi Rob,
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
----
- drivers/pci/host/pci-mvebu.c | 27 ++++++++++++++++++++++-----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+On 08/03/2017 10:21 PM, Rob Herring wrote:
+> On Thu, Jul 27, 2017 at 03:49:53PM +0200, Alexandre Torgue wrote:
+>> Initially each pin was declared in "include/dt-bindings/stm32<SOC>-pinfunc.h"
+>> and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
+>> Since this approach was approved, the number of supported MCU has
+>> increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
+>> file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
+>> a new approach which consist to use a macro to define pin muxing in device
+>> tree. All STM32 will use the common macro to define pinmux. Furthermore, it
+>> will make STM32 maintenance and integration of new SOC easier .
+>>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> Reviewed-by: Vikas MANOCHA <vikas.manocha@st.com>
+>> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> index d907a74..567aa72 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> @@ -126,22 +126,27 @@ configuration, pullups, drive, output high/low and output speed.
+>>       };
+>>   
+>>   Required properties:
+>> -- pinmux: integer array, represents gpio pin number and mux setting.
+>> -  Supported pin number and mux varies for different SoCs, and are defined in
+>> -  dt-bindings/pinctrl/<soc>-pinfunc.h directly.
+>> -  These defines are calculated as:
+>> -    ((port * 16 + line) << 8) | function
+>> +- pinmux: integer array, represents gpio pin number and mux setting. Use
+>> +  following macro: STM32_PINMUX(PIN_NO(port_name, line), mode) to declare it.
+> 
+> I would keep the above formula. It can't change because that is the ABI.
+> The macro is just convenience.
+> 
+> Is there any reason to have 2 macros? I'd just do STM32_PINMUX(port,
+> line, mode) and make port names defines (PA, PB, PC, etc.).
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index f353a6eb2f01..5d74af81d104 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -206,10 +206,10 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
-  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-  * WIN[0-3] -> DRAM bank[0-3]
-  */
--static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-+static int mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
- {
- 	const struct mbus_dram_target_info *dram;
--	u32 size;
-+	u64 size;
- 	int i;
- 
- 	dram = mv_mbus_dram_info();
-@@ -252,19 +252,32 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
- 	if ((size & (size - 1)) != 0)
- 		size = 1 << fls(size);
- 
-+	if (size > 0x100000000) {
-+		dev_err(&port->pcie->pdev->dev,
-+			"Could not configure DRAM window (too large): 0x%llx\n",
-+			size);
-+
-+		return -EINVAL;
-+	}
-+
- 	/* Setup BAR[1] to all DRAM banks. */
- 	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
- 	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
- 	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
- 		     PCIE_BAR_CTRL_OFF(1));
-+
-+	return 0;
- }
- 
--static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-+static int mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
- {
- 	u32 cmd, mask;
-+	int ret;
- 
- 	/* Point PCIe unit MBUS decode windows to DRAM space. */
--	mvebu_pcie_setup_wins(port);
-+	ret = mvebu_pcie_setup_wins(port);
-+	if (ret)
-+		return ret;
- 
- 	/* Master + slave enable. */
- 	cmd = mvebu_readl(port, PCIE_CMD_OFF);
-@@ -277,6 +290,8 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
- 	mask = mvebu_readl(port, PCIE_MASK_OFF);
- 	mask |= PCIE_MASK_ENABLE_INTS;
- 	mvebu_writel(port, mask, PCIE_MASK_OFF);
-+
-+	return 0;
- }
- 
- static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
-@@ -882,7 +897,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 
- 		if (!port->base)
- 			continue;
--		mvebu_pcie_setup_hw(port);
-+		err = mvebu_pcie_setup_hw(port);
-+		if (err)
-+			return 0;
- 	}
- 
- 	return 1;
--- 
-2.11.0
+No. It has been done in this way to simplify macro definition, but it 
+could be done in another way. I can try to create a macro like you 
+propose: STM32_PINMUX(port, line, mode) if you think it is more readable.
+
+> 
+>> +
+>>     With:
+>> -    - port: The gpio port index (PA = 0, PB = 1, ..., PK = 11)
+>> -    - line: The line offset within the port (PA0 = 0, PA1 = 1, ..., PA15 = 15)
+>> -    - function: The function number, can be:
+>> -      * 0 : GPIO
+>> -      * 1 : Alternate Function 0
+>> -      * 2 : Alternate Function 1
+>> -      * 3 : Alternate Function 2
+>> +    - port_name: The gpio port name ('A', 'B', ..., 'K')
+>> +    - line: The line offset within the port (0, 1, ..., 15)
+>> +    - mode: The mode can be:
+>> +      * GPIO
+>> +      * AF0 : Alternate Function 0
+>> +      * AF1 : Alternate Function 1
+>> +      * AF2 : Alternate Function 2
+>>         * ...
+>> -      * 16 : Alternate Function 15
+>> -      * 17 : Analog
+>> +      * AF15 : Alternate Function 15
+>> +      * ANALOG
+> 
+> Here too, keeping the numbers is important.
+> 
+> Perhaps the macro description should either be its own additional
+> section or document it inline with the macro definition.
+
+I agree. I can keep previous definition like it was done, and add a 
+section only for the new macro.
+
+Thanks for your review.
+
+Alex
+
+
+> 
+> Overall, it does seem like a nice shrinking of the header files.
+> 
+>> +
+>> +  Example:
+>> +    To declare pin PA7 in mode "alternate function 7" you have to
+>> +    declare:
+>> +      pinmux = <STM32_PINMUX(PIN_NO('A', 9), AF7)>;
+>> +
+>> +  This macro is defined in dt-bindings/pinctrl/stm32-pinfunc.h
+>>   
+>>   Optional properties:
+>>   - GENERIC_PINCONFIG: is the generic pinconfig options to use.
+>> @@ -165,13 +170,13 @@ pin-controller {
+>>   ...
+>>   	usart1_pins_a: usart1 at 0 {
+>>   		pins1 {
+>> -			pinmux = <STM32F429_PA9_FUNC_USART1_TX>;
+>> +			pinmux = <STM32_PINMUX(PIN_NO('A', 9), AF7)>; /* USART1_TX */
+>>   			bias-disable;
+>>   			drive-push-pull;
+>>   			slew-rate = <0>;
+>>   		};
+>>   		pins2 {
+>> -			pinmux = <STM32F429_PA10_FUNC_USART1_RX>;
+>> +			pinmux = <STM32_PINMUX(PIN_NO('A', 10), AF7)>; /* USART1_RX */
+>>   			bias-disable;
+>>   		};
+>>   	};
