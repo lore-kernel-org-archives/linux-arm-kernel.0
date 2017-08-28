@@ -1,23 +1,37 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 28 Aug 2017 08:56:38 -0700
-Subject: [PATCH] ARM: dts: keystone-k2g: Add McASP nodes
-In-Reply-To: <20170828071957.9597-1-peter.ujfalusi@ti.com>
-References: <20170828071957.9597-1-peter.ujfalusi@ti.com>
-Message-ID: <574004f6-6e6c-7d15-e5f8-3c3beec0e9b8@oracle.com>
+From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
+Date: Mon, 28 Aug 2017 17:54:54 +0200
+Subject: [PATCH 3/3] iommu: s390: constify iommu_ops
+In-Reply-To: <1503922370-25990-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1503922370-25990-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20170828175454.1401491a@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/28/2017 12:19 AM, Peter Ujfalusi wrote:
-> Add three McASP nodes present on 66AK2G device.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Hi Santosh,
-> 
-> There is no driver change dependency for McASP to work on 66AK2G, only the nodes
-> need to be in place.
-> 
-Will add that to 4.15 queue. Thanks !!
+On Mon, 28 Aug 2017 17:42:50 +0530
+Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
 
-Regards,
-Santosh
+> iommu_ops are not supposed to change at runtime.
+> Functions 'bus_set_iommu' working with const iommu_ops provided
+> by <linux/iommu.h>. So mark the non-const structs as const.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/iommu/s390-iommu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+
+Acked-by: Gerald Schaefer <gerald.schaefer@de.ibm.com>
+
+> 
+> diff --git a/drivers/iommu/s390-iommu.c b/drivers/iommu/s390-iommu.c
+> index 8788640..400d75f 100644
+> --- a/drivers/iommu/s390-iommu.c
+> +++ b/drivers/iommu/s390-iommu.c
+> @@ -327,7 +327,7 @@ static size_t s390_iommu_unmap(struct iommu_domain *domain,
+>  	return size;
+>  }
+> 
+> -static struct iommu_ops s390_iommu_ops = {
+> +static const struct iommu_ops s390_iommu_ops = {
+>  	.capable = s390_iommu_capable,
+>  	.domain_alloc = s390_domain_alloc,
+>  	.domain_free = s390_domain_free,
