@@ -1,47 +1,59 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Mon, 28 Aug 2017 08:13:27 +0000
-Subject: [PATCH 1/7] dt-bindings: usb: Document the STM32F7xx DWC2 USB OTG
- HS core binding
-In-Reply-To: <20170822021059.suqqn7332sjbvfj3@rob-hp-laptop>
-References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
- <1502962386-6683-2-git-send-email-amelie.delaunay@st.com>
- <20170822021059.suqqn7332sjbvfj3@rob-hp-laptop>
-Message-ID: <e46c3681-01e8-cb16-2ee8-5947bdd6b62c@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 28 Aug 2017 09:29:35 +0100
+Subject: [PATCH 3/3] ARM: XIP kernel: store .data compressed in ROM
+In-Reply-To: <alpine.LFD.2.20.1708261129170.14288@knanqh.ubzr>
+References: <20170825162600.15709-1-nicolas.pitre@linaro.org>
+ <20170825162600.15709-4-nicolas.pitre@linaro.org>
+ <CAKv+Gu-5W-bDrMKRctV=muZgN3D9YWThCqP7bqY00zo2AnrA1w@mail.gmail.com>
+ <alpine.LFD.2.20.1708261129170.14288@knanqh.ubzr>
+Message-ID: <CAKv+Gu-PtmjH0Jq=eJ+gg7wo-EC38vTGNR1hb1ZgP1y2emCiYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/22/2017 04:10 AM, Rob Herring wrote:
-> On Thu, Aug 17, 2017 at 11:33:00AM +0200, Amelie Delaunay wrote:
->> This patch adds binding documentation for DWC2 controller in HS mode found
->> on STMicroelectronics STM32F7xx SoC.
+On 26 August 2017 at 16:41, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Sat, 26 Aug 2017, Ard Biesheuvel wrote:
+>
+>> On 25 August 2017 at 17:26, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > The .data segment stored in ROM is only copied to RAM once at boot time
+>> > and never referenced afterwards. This is arguably a suboptimal usage of
+>> > ROM resources.
+>> >
+>> > This patch allows for compressing the .data segment before storing it
+>> > into ROM and decompressing it to RAM rather than simply copying it,
+>> > saving on precious ROM space.
+>> >
+>> > Because global data is not available yet (obviously) we must allocate
+>> > decompressor workspace memory on the stack. The .bss area is used as a
+>> > stack area for that purpose before it is cleared. The required stack
+>> > frame is 9568 bytes for __inflate_kernel_data() alone, so make sure
+>> > the .bss is large enough to cope with that plus extra room for called
+>> > functions or fail the build.
+>> >
+>> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>> > ---
+> [...]
+>> > +#ifdef CONFIG_XIP_DEFLATED_DATA
+>> > +/*
+>> > + * The .bss is used as a stack area for __inflate_kernel_data() whose stack
+>> > + * frame is 9568 bytes. Make sure it has extra room left.
+>> > + */
+>> > +ASSERT((_end - __bss_start) >= 12288, ".bss too small for CONFIG_XIP_DEFLATED_DATA")
 >>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->> ---
->>   Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
->> index fcf199b..e64d903 100644
->> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
->> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
->> @@ -19,6 +19,8 @@ Required properties:
->>     configured in FS mode;
->>     - "st,stm32f4x9-hsotg": The DWC2 USB HS controller instance in STM32F4x9 SoCs
->>     configured in HS mode;
->> +  - "st,stm32f7xx-hsotg": The DWC2 USB HS controller instance in STM32F7xx SoCs
->> +    configured in HS mode;
-> 
-> Don't use wildcards in compatible strings (not sure how the previous one
-> snuck in). Just "stm32f7" (i.e. just drop the xx) is probably specific
-> enough though.
-OK to drop the "xx", I used them only to match the previous one.
+>> The open coded numbers are a bit confusing here: the stack check uses
+>> 10240, the code actually needs >9568 bytes and here, you assert that
+>> there is at least 12288 space between _end and __bss_start.
+>
+> The 9568 bytes is what my particular gcc version actually uses for
+> __inflate_kernel_data(). That is not a tail function so some more space
+> is needed. I imagine this may vary a bit from compiler versions.
+>
+> The 10240 is 2.5x page size and 12288 is 3x page size. Those numbers are
+> arbitrary but I had to pick something.
+>
 
-> 
->>   - reg : Should contain 1 register range (address and length)
->>   - interrupts : Should contain 1 interrupt
->>   - clocks: clock provider specifier
->> -- 
->> 2.7.4
->>
+OK, fair enough.
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+BTW, I know this is unrelated but I don't think _end is guaranteed to
+be suitably aligned.
