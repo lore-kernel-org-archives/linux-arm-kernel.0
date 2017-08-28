@@ -1,107 +1,119 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon, 28 Aug 2017 14:18:05 -0400
-Subject: [PATCH V2] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-In-Reply-To: <CAFp+6iEqkZGBF5z0QS6p-EuqDPj9TzH5Zej+f6006UP=0t0PAg@mail.gmail.com>
-References: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
- <CAFp+6iEqkZGBF5z0QS6p-EuqDPj9TzH5Zej+f6006UP=0t0PAg@mail.gmail.com>
-Message-ID: <e00c252f-99f9-e597-2637-454733f5bbc0@codeaurora.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 28 Aug 2017 20:18:13 +0200
+Subject: [PATCH v3 57/59] KVM: arm/arm64: GICv4: Theory of operations
+In-Reply-To: <20170731172637.29355-58-marc.zyngier@arm.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-58-marc.zyngier@arm.com>
+Message-ID: <20170828181813.GD24649@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/28/2017 1:57 PM, Vivek Gautam wrote:
-> Hi Adam,
+On Mon, Jul 31, 2017 at 06:26:35PM +0100, Marc Zyngier wrote:
+> Yet another braindump so I can free some cells...
 > 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-v4.c | 68 +++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
 > 
-> On Mon, Aug 28, 2017 at 10:05 PM, Adam Wallis <awallis@codeaurora.org> wrote:
->> The dma ops from the parent DWC device are not getting passed to the
->> child xhci-hcd device. This patch makes use of
->> platform_device_register_full to set the DMA ops. For the DT/OF case,
->> dma_ops were still null after the the device register, so
->> of_dma_configure is called in only the OF case.
->>
->> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
->> ---
->>  drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
->>  1 file changed, 17 insertions(+), 22 deletions(-)
->>
->> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
->> index 76f0b0d..c289da1 100644
->> --- a/drivers/usb/dwc3/host.c
->> +++ b/drivers/usb/dwc3/host.c
->> @@ -16,6 +16,7 @@
->>   */
->>
->>  #include <linux/platform_device.h>
->> +#include <linux/of_platform.h>
->>
->>  #include "core.h"
->>
->> @@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
->>  {
->>         struct property_entry   props[3];
->>         struct platform_device  *xhci;
->> +       struct platform_device_info dwc_plat_info = {};
->>         int                     ret, irq;
->>         struct resource         *res;
->>         struct platform_device  *dwc3_pdev = to_platform_device(dwc->dev);
->> @@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
->>         dwc->xhci_resources[1].flags = res->flags;
->>         dwc->xhci_resources[1].name = res->name;
->>
->> -       xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
->> -       if (!xhci) {
->> -               dev_err(dwc->dev, "couldn't allocate xHCI device\n");
->> -               return -ENOMEM;
->> -       }
->> +       dwc_plat_info.name = "xhci-hcd";
->> +       dwc_plat_info.parent = dwc->sysdev;
->> +       dwc_plat_info.res = dwc->xhci_resources;
->> +       dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
->> +       dwc_plat_info.fwnode = dwc->sysdev->fwnode;
->> +       dwc_plat_info.dma_mask = *dwc->sysdev->dma_mask;
->>
->> -       xhci->dev.parent        = dwc->dev;
->> +       xhci = platform_device_register_full(&dwc_plat_info);
->> +       if (IS_ERR(xhci)) {
->> +               dev_err(dwc->dev, "failed to register xHCI device\n");
->> +               return PTR_ERR(xhci);
->> +       }
->>
->>         dwc->xhci = xhci;
->> -
->> -       ret = platform_device_add_resources(xhci, dwc->xhci_resources,
->> -                                               DWC3_XHCI_RESOURCES_NUM);
->> -       if (ret) {
->> -               dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
->> -               goto err1;
->> -       }
->> +       if (dwc->sysdev->of_node)
->> +               of_dma_configure(&xhci->dev, dwc->sysdev->of_node);
-> 
-> Isn't this code doing the same thing what the xhci-plat also does right now
-> since dwc->sysdev is either dwc->dev or dwc->dev->parent.
-> 
-> From xhci_plat_probe():
->         sysdev = &pdev->dev;
->         if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
->                 sysdev = sysdev->parent;
-> 
-> after which it tries to set the dma masks.
-> 
-> <snip>
-> 
-Yep, you are right - I was testing against 4.11 (which was broken). When I pull
-in a8c06e407ef969461b7f51ec72839fe382dd3c29 and
-4c39d4b949d36faffbc726525b469886cf311d1c, I am good to go. This patch can be
-disregarded. Thanks for the help
-> 
-> regards
-> Vivek
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index 0a8deefbcf1c..0c002d2be620 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -22,6 +22,74 @@
+>  
+>  #include "vgic.h"
+>  
+> +/*
+> + * How KVM uses GICv4 (insert rude comments here):
+> + *
+> + * The vgic-v4 layer acts as a bridge between several entities:
+> + * - The GICv4 ITS representation offered by the ITS driver
+> + * - VFIO, which is in charge of the PCI endpoint
+> + * - The virtual ITS, which is the only thing the guest sees
+> + *
+> + * The configuration of VLPIs is triggered by a callback from VFIO,
+> + * instructing KVM that a PCI device has been configured to deliver
+> + * MSIs to a vITS.
+> + *
+> + * kvm_vgic_v4_set_forwarding() is thus called with the routing entry,
+> + * and this is used to find the corresponding vITS data structures
+> + * (ITS instance, device, event and irq) using a process that is
+> + * extremely similar to the injection of an MSI.
+> + *
+> + * At this stage, we can link the guest's view of an LPI (uniquely
+> + * identified by the routing entry) and the host irq, using the GICv4
+> + * driver mapping operation. Should the mapping succeed, we've then
+> + * successfully upgraded the guest's LPI to a VLPI. We can then start
+> + * with updating GICv4's view of the property table and generating an
+> + * INValidation in order to kickstart the delivery of this VLPI to the
+> + * guest directly, without software intervention. Well, almost.
+> + *
+> + * When the PCI endpoint is deconfigured, this operation is reversed
+> + * with VFIO calling kvm_vgic_v4_unset_forwarding().
+> + *
+> + * Once the VLPI has been mapped, it needs to follow any change the
+> + * guest performs on its LPI through the vITS. For that, a number of
+> + * command handlers have hooks to communicate these changes to the HW:
+> + * - Any invalidation triggers a call to its_prop_update_vlpi()
+> + * - The INT command results in a irq_set_irqchip_state(), which
+> + *   generates an INT on the corresponding VLPI.
+> + * - The CLEAR command results in a irq_set_irqchip_state(), which
+> + *   generates an CLEAR on the corresponding VLPI.
+> + * - DISCARD translates into an unmap, similar to a call to
+> + *   kvm_vgic_v4_unset_forwarding().
+
+So is VFIO notified of this or does it still think the IRQ is
+forwarded?  Or does it not care, and it's state maintained by the irq
+subsystem?
+
+> + * - MOVI is translated by an update of the existing mapping, changing
+> + *   the target vcpu, resulting in a VMOVI being generated.
+> + * - MOVALL is translated by a string of mapping updates (similar to
+> + *   the handling of MOVI). MOVALL is horrible.
+> + *
+> + * Note that a DISCARD/MAPTI sequence emitted from the guest without
+> + * reprogramming the PCI endpoint after MAPTI does not result in a
+> + * VLPI being mapped, as there is no callback from VFIO (the guest
+> + * will get the interrupt via the normal SW injection). Fixing this is
+> + * not trivial, and requires some horrible messing with the VFIO
+> + * internals. Not fun. Don't do that.
+
+Is there not a quick way to check with VFIO or the irq subsystem if this
+interrupt can be forwarded and attempt that when handling the MAPTI in
+the vTIS, or does this break in horrible ways?
+
+> + *
+> + * Then there is the scheduling. Each time a vcpu is about to run on a
+> + * physical CPU, KVM must tell the corresponding redistributor about
+> + * it. And if we've migrated our vcpu from one CPU to another, we must
+> + * tell the ITS (so that the messages reach the right redistributor).
+> + * This is done in two steps: first issue a irq_set_affinity() on the
+> + * irq corresponding to the vcpu, then call its_schedule_vpe(). You
+> + * must be in a non-preemptible context. On exit, another call to
+> + * its_schedule_vpe() tells the redistributor that we're done with the
+> + * vcpu.
+> + *
+> + * Finally, the doorbell handling: Each vcpu is allocated an interrupt
+> + * which will fire each time a VLPI is made pending whilst the vcpu is
+> + * not running. Each time the vcpu gets blocked, the doorbell
+> + * interrupt gets enabled. When the vcpu is unblocked (for whatever
+> + * reason), the doorbell interrupt is disabled. This behaviour is
+> + * pretty similar to that of the backgroud timer.
+
+*background
+
+However, I think you can probably drop the last sentence in interest of
+clarity.
+
+> + */
+> +
+>  static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+>  {
+>  	struct kvm_vcpu *vcpu = info;
+> -- 
+> 2.11.0
 > 
 
-
--- 
-Adam Wallis
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thanks for an otherwise excellent (and of course entertaining) writeup!
+-Christoffer
