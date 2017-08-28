@@ -1,121 +1,100 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 28 Aug 2017 03:30:52 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <2333939.YcVPemMPxH@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <6003495.864qntojfu@aspire.rjw.lan> <2333939.YcVPemMPxH@aspire.rjw.lan>
-Message-ID: <35832703.Y3V01Ybc1Y@aspire.rjw.lan>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 28 Aug 2017 10:04:44 +0800
+Subject: [GIT PULL] arm: mediatek: dts32 updates for v4.14
+In-Reply-To: <1503860507.19230.50.camel@mtkswgap22>
+References: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
+ <1503860507.19230.50.camel@mtkswgap22>
+Message-ID: <1503885884.19230.83.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 25, 2017 3:42:35 PM CEST Rafael J. Wysocki wrote:
-> On Thursday, August 24, 2017 11:50:40 PM CEST Rafael J. Wysocki wrote:
-> > On Thursday, August 24, 2017 6:35:49 PM CEST Rafael J. Wysocki wrote:
-> > > On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
-> > 
-> > [cut]
-> > 
-> > > [BTW, it is not entirely clear to me why it ever is necessary to runtime resume
-> > > a device with direct_complete set after __device_suspend(), because it can only
-> > > have direct_complete set at that point if all of the hierarchy below it has
-> > > this flag set too and so runtime PM has to be disabled for all of those
-> > > devices as well.]
-> > 
-> > Which makes me realize that we should take a step back and look at what
-> > problems there are.
-> > 
-> > First, there are devices (I know about two examples so far and both are PCI)
-> > that may need to be runtime resumed during system suspend for reasons other
-> > than the ones checked by the ACPI PM domain (or the PCI bus type).  There needs
-> > to be a way to indicate that from the driver side.
-> > 
-> > However, it still may be valuable to check the power-related conditions for
-> > leaving the device in runtime suspend over system suspend/resume in case
-> > it actually doesn't need to be runtime resumed during system suspend after
-> > all.  That's what the majority of my patch was about.
-> > 
-> > The second problem is that the ACPI PM domain (and the PCI bus type)
-> > runtime resumes all devices unconditionally in its ->suspend callback,
-> > even though that may not be necessary for some devices.  Therefore there
-> > needs to be a way to indicate that too.  That still would be good to
-> > have *regardless* of the direct_complete mechanism, because the direct_complete
-> > flag may not be set very often due to dependencies and then the
-> > resume-during-suspend will take place unnecessarily.
-> > 
-> > Accordingly, it looks like we need a "no need to resume me" flag in the first
-> > place.  That would indicate to interested pieces of code that, from the
-> > driver perspective, the device doesn't need to be runtime resumed before
-> > invoking its system suspend callbacks.  This should be clear enough to everyone
-> > IMO.
-> > 
-> > [Note that if that flag is set for all devices, we may drop it along with
-> > direct_complete, but before that happens both are needed.]
-> 
-> I think we are in agreement that direct_complete will not be necessary any
-> more when all drivers/bus types/PM domains and so on can do the "safe
-> suspend", but we're not there yet. :-)
-> 
-> > To address the first issue I would add something like the flag in the patches
-> > I sent (but without the ACPI PM domain part which should be covered by the
-> > "no need to resume me" flag above), because that allows the device's ->suspend
-> > callback to run in principle and the driver may use that callback even to
-> > runtime resume the device if that's what it wants to do.  So something like
-> > "run my ->suspend callback even though I might stay in runtime suspend".
-> > 
-> > I would probably add driver_flags to dev_pm_info for that to set at the probe
-> > time (and I would make the core clear that on driver removal).
-> > 
-> > The complexity concern is there, but honestly I don't see a better way at
-> > this point.
-> 
-> So below is a prototype patch.  It still is missing a documentation update, but
-> other than that it should be complete unless I missed something.
-> 
-> The way it works is that the SAFE_SUSPEND flag is not looked at by the core
-> at all.  The ACPI PM domain looks at it and the PCI bus type can be modified
-> to take it into account in the future.  That is what causes the "runtime resume
-> during system suspend" to be skipped.
-> 
-> In turn, the ALWAYS_SUSPEND flag is only looked at by the core and it causes
-> the decision on whether or not to use direct_complete to be deferred to the
-> __device_suspend_late() time.  If you set it for a PCI device, the effect is
-> equivalent to "no direct_complete".  If you set it for a device in the ACPI
-> PM domain, that depends on whether or not SAFE_SUSPEND is set.  If it isn't
-> set, the effect is equivalent to "no direct_complete" too, but if it is set,
-> the core may still try to use direct_complete for the device, but it will
-> make the decision on it in __device_suspend_late() and then it will not invoke
-> the ->suspend_late callback for the device if it is still runtime suspended.
-> [Note that you cannot runtime resume and runtime suspend again a device during
-> system suspend, so if it is runtime suspended in __device_suspend_late(), it
-> has been runtime suspend all the way since device_prepare().]
-> 
-> So say you point the ->suspend_late and ->resume_early callbacks of
-> the designware i2c driver to pm_runtime_force_suspend() and
-> pm_runtime_force_resume(), respectively, and set both the SAFE_SUSPEND
-> and ALWAYS_SUSPEND flags for the device.
-> 
-> If system suspend is started and the device is not runtime suspended,
-> direct_complete is not set for it and everything works as usual, so say
-> the device is runtime suspended in device_prepare().  Then, the ACPI PM
-> domain checks the other conditions for leaving it in runtime suspend and
-> returns either 0 or a positive number from acpi_subsys_prepare().
-> 
-> If 0 is returned, direct_complete is not set by the core and
-> acpi_subsys_suspend() is called.  It checks the SAFE_SUSPEND flag and sees
-> that the device need not be runtime resumed, so it invokes the driver's
-> ->suspend callback (which is not present, so it doesn't do anything).
-> Next, in __device_suspend_late(), acpi_subsys_suspend_late() is invoked
-> and it calls pm_runtime_force_suspend(), which executes the driver's
-> ->runtime_suspend() callback, and then (if successful) calls
-> acpi_dev_suspend_late() to put the device into a low-power state.  The
-> resume path is a reverse of the above in this case.  So far, so good.
 
-Well, not really, because if the device remains runtime suspended,
-->runtime_suspend() will not be called by pm_runtime_force_suspend() and
-acpi_dev_suspend_late() should not be called then.
+On Mon, 2017-08-28 at 03:01 +0800, Sean Wang wrote:
+> just a gentle ping. 
+> 
+> Are those changes similar to missing ones ? The other changes like
+> next/dts32 and next/soc seems have been already in the next tree.
+> 
+> 
+Sorry for that I ping the mistaken mail and also want to fix the typo in
+the former reply here
 
-So more changes in the ACPI PM domain are needed after all.
+in fact, i want to ping
+http://lists.infradead.org/pipermail/linux-mediatek/2017-August/010150.html
 
-Thanks,
-Rafael
+
+Are those changes similar to missing ones ? The other changes like
+next/dts64 and next/soc seems have been already in the next tree.
+
+
+> On Thu, 2017-08-17 at 15:37 +0200, Matthias Brugger wrote:
+> > Hi Olof and Arnd,
+> > 
+> > for v4.14 please take the following pull request into account.
+> > 
+> > Thanks,
+> > Matthias
+> > 
+> > ---
+> > 
+> > The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> > 
+> >    Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >    https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-dts64
+> > 
+> > for you to fetch changes up to bdf2cbb2b3160122f7ff16445fdb73267fffd583:
+> > 
+> >    arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile 
+> > (2017-08-17 15:33:45 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > - add SoC mt7622 and its reference board
+> > - cleanup of dts bindings
+> > - mt6797: add watchdog and delete unused clock
+> > - add support for SoC mt2701 and it's eval board
+> > 
+> > ----------------------------------------------------------------
+> > Matthias Brugger (4):
+> >        ARM: mediatek: dts: Cleanup bindings documentation
+> >        ARM: mediatek: dts: Add MT6797 binding
+> >        arm64: dts: mediatek: add watchdog to MT6797
+> >        arm64: dts: mediatek: Delete unused dummy clock for MT6797
+> > 
+> > Sean Wang (2):
+> >        arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
+> >        arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
+> > 
+> > yt.shen at mediatek.com (2):
+> >        dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
+> >        arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile
+> > 
+> >   Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+> >   .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+> >   .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+> >   .../devicetree/bindings/watchdog/mtk-wdt.txt       |   6 +-
+> >   arch/arm64/boot/dts/mediatek/Makefile              |   2 +
+> >   arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
+> >   arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 171 +++++++++++++++++++++
+> >   arch/arm64/boot/dts/mediatek/mt6797.dtsi           |  12 +-
+> >   arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       |  27 ++++
+> >   arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 110 +++++++++++++
+> >   10 files changed, 356 insertions(+), 10 deletions(-)
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > 
+> > _______________________________________________
+> > Linux-mediatek mailing list
+> > Linux-mediatek at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
+> 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
