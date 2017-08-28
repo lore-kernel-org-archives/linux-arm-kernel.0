@@ -1,11 +1,11 @@
 From: aneela@codeaurora.org (Arun Kumar Neelakantam)
-Date: Mon, 28 Aug 2017 17:12:53 +0530
-Subject: [PATCH v2 01/20] rpmsg: glink: Rename glink_rpm_xx functions to
- qcom_glink_xx
-In-Reply-To: <1503559302-3744-2-git-send-email-sricharan@codeaurora.org>
+Date: Mon, 28 Aug 2017 17:14:09 +0530
+Subject: [PATCH v2 02/20] rpmsg: glink: Associate indirections for pipe
+ fifo accessor's
+In-Reply-To: <1503559302-3744-3-git-send-email-sricharan@codeaurora.org>
 References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
- <1503559302-3744-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <a8650e37-ceb4-07c3-71b4-12f551956188@codeaurora.org>
+ <1503559302-3744-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <5483ccba-2cc6-45ad-4443-557d8e557af0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,769 +14,323 @@ List-Id: linux-arm-kernel.lists.infradead.org
 On 8/24/2017 12:51 PM, Sricharan R wrote:
 > From: Bjorn Andersson <bjorn.andersson@linaro.org>
 >
-> Renaming the glink_rpm_xx functions and structs to qcom_glink_xx
-> equivalents helps to reuse the core glink protocol while adding
-> support for smem based glink transport in the later patches.
+> With the intention of reusing the glink core protocol commands
+> and code across both rpm and smem based transports, the only thing
+> different is way of accessing the shared-memory of the transport
+> (FIFO). So put the fifo accessor's of the transport's pipe (rx/tx)
+> behind indirections, so that the rest of the code can be shared.
+>
+> For this, have a qcom_glink_pipe that can be used in the common code
+> containing the indirections and wrap it with glink_rpm_pipe that contains
+> the transport specific members.
 >
 > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+
 Acked-by: Arun Kumar Neelakantam <aneela@codeaurora.org>
 
-Reagrds
+Regards,
 Arun N
 > ---
->   drivers/rpmsg/qcom_glink_rpm.c | 248 +++++++++++++++++++++--------------------
->   1 file changed, 128 insertions(+), 120 deletions(-)
+>   drivers/rpmsg/qcom_glink_rpm.c | 144 ++++++++++++++++++++++++++++++-----------
+>   1 file changed, 106 insertions(+), 38 deletions(-)
 >
 > diff --git a/drivers/rpmsg/qcom_glink_rpm.c b/drivers/rpmsg/qcom_glink_rpm.c
-> index 3559a3e..56a0a66 100644
+> index 56a0a66..870ce32 100644
 > --- a/drivers/rpmsg/qcom_glink_rpm.c
 > +++ b/drivers/rpmsg/qcom_glink_rpm.c
-> @@ -101,7 +101,7 @@ struct glink_defer_cmd {
->    * @lcids:	idr of all channels with a known local channel id
->    * @rcids:	idr of all channels with a known remote channel id
->    */
-> -struct glink_rpm {
-> +struct qcom_glink {
->   	struct device *dev;
+> @@ -41,12 +41,28 @@
+>   #define RPM_GLINK_CID_MIN	1
+>   #define RPM_GLINK_CID_MAX	65536
 >   
+> +#define to_rpm_pipe(p)	container_of(p, struct glink_rpm_pipe, native)
+> +
+>   struct rpm_toc_entry {
+>   	__le32 id;
+>   	__le32 offset;
+>   	__le32 size;
+>   } __packed;
+>   
+> +struct qcom_glink;
+> +
+> +struct qcom_glink_pipe {
+> +	size_t length;
+> +
+> +	size_t (*avail)(struct qcom_glink_pipe *glink_pipe);
+> +	void (*peak)(struct qcom_glink_pipe *glink_pipe, void *data,
+> +		     size_t count);
+> +	void (*advance)(struct qcom_glink_pipe *glink_pipe, size_t count);
+> +	void (*write)(struct qcom_glink_pipe *glink_pipe,
+> +		      const void *hdr, size_t hlen,
+> +		      const void *data, size_t dlen);
+> +};
+> +
+>   struct rpm_toc {
+>   	__le32 magic;
+>   	__le32 count;
+> @@ -62,12 +78,12 @@ struct glink_msg {
+>   } __packed;
+>   
+>   struct glink_rpm_pipe {
+> +	struct qcom_glink_pipe native;
+> +
+>   	void __iomem *tail;
+>   	void __iomem *head;
+>   
+>   	void __iomem *fifo;
+> -
+> -	size_t length;
+>   };
+>   
+>   /**
+> @@ -107,8 +123,8 @@ struct qcom_glink {
 >   	struct mbox_client mbox_client;
-> @@ -134,7 +134,7 @@ enum {
->    * struct glink_channel - internal representation of a channel
->    * @rpdev:	rpdev reference, only used for primary endpoints
->    * @ept:	rpmsg endpoint this channel is associated with
-> - * @glink:	glink_rpm context handle
-> + * @glink:	qcom_glink context handle
->    * @refcount:	refcount for the channel object
->    * @recv_lock:	guard for @ept.cb
->    * @name:	unique channel name/identifier
-> @@ -150,7 +150,7 @@ struct glink_channel {
->   	struct rpmsg_endpoint ept;
+>   	struct mbox_chan *mbox_chan;
 >   
->   	struct rpmsg_device *rpdev;
-> -	struct glink_rpm *glink;
-> +	struct qcom_glink *glink;
+> -	struct glink_rpm_pipe rx_pipe;
+> -	struct glink_rpm_pipe tx_pipe;
+> +	struct qcom_glink_pipe *rx_pipe;
+> +	struct qcom_glink_pipe *tx_pipe;
 >   
->   	struct kref refcount;
+>   	int irq;
 >   
-> @@ -184,8 +184,8 @@ struct glink_channel {
->   
->   #define GLINK_FEATURE_INTENTLESS	BIT(1)
->   
-> -static struct glink_channel *glink_rpm_alloc_channel(struct glink_rpm *glink,
-> -						     const char *name)
-> +static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
-> +						      const char *name)
->   {
->   	struct glink_channel *channel;
->   
-> @@ -206,7 +206,7 @@ static struct glink_channel *glink_rpm_alloc_channel(struct glink_rpm *glink,
->   	return channel;
->   }
->   
-> -static void glink_rpm_channel_release(struct kref *ref)
-> +static void qcom_glink_channel_release(struct kref *ref)
->   {
->   	struct glink_channel *channel = container_of(ref, struct glink_channel,
->   						     refcount);
-> @@ -215,7 +215,7 @@ static void glink_rpm_channel_release(struct kref *ref)
+> @@ -215,9 +231,9 @@ static void qcom_glink_channel_release(struct kref *ref)
 >   	kfree(channel);
 >   }
 >   
-> -static size_t glink_rpm_rx_avail(struct glink_rpm *glink)
-> +static size_t qcom_glink_rx_avail(struct qcom_glink *glink)
+> -static size_t qcom_glink_rx_avail(struct qcom_glink *glink)
+> +static size_t glink_rpm_rx_avail(struct qcom_glink_pipe *glink_pipe)
 >   {
->   	struct glink_rpm_pipe *pipe = &glink->rx_pipe;
+> -	struct glink_rpm_pipe *pipe = &glink->rx_pipe;
+> +	struct glink_rpm_pipe *pipe = to_rpm_pipe(glink_pipe);
 >   	unsigned int head;
-> @@ -230,8 +230,8 @@ static size_t glink_rpm_rx_avail(struct glink_rpm *glink)
+>   	unsigned int tail;
+>   
+> @@ -225,21 +241,26 @@ static size_t qcom_glink_rx_avail(struct qcom_glink *glink)
+>   	tail = readl(pipe->tail);
+>   
+>   	if (head < tail)
+> -		return pipe->length - tail + head;
+> +		return pipe->native.length - tail + head;
+>   	else
 >   		return head - tail;
 >   }
 >   
-> -static void glink_rpm_rx_peak(struct glink_rpm *glink,
-> -			      void *data, size_t count)
+> -static void qcom_glink_rx_peak(struct qcom_glink *glink,
+> -			       void *data, size_t count)
+> +static size_t qcom_glink_rx_avail(struct qcom_glink *glink)
+> +{
+> +	return glink->rx_pipe->avail(glink->rx_pipe);
+> +}
+> +
+> +static void glink_rpm_rx_peak(struct qcom_glink_pipe *glink_pipe,
+> +			      void *data, size_t count)
+>   {
+> -	struct glink_rpm_pipe *pipe = &glink->rx_pipe;
+> +	struct glink_rpm_pipe *pipe = to_rpm_pipe(glink_pipe);
+>   	unsigned int tail;
+>   	size_t len;
+>   
+>   	tail = readl(pipe->tail);
+>   
+> -	len = min_t(size_t, count, pipe->length - tail);
+> +	len = min_t(size_t, count, pipe->native.length - tail);
+>   	if (len) {
+>   		__ioread32_copy(data, pipe->fifo + tail,
+>   				len / sizeof(u32));
+> @@ -251,24 +272,35 @@ static void qcom_glink_rx_peak(struct qcom_glink *glink,
+>   	}
+>   }
+>   
+> -static void qcom_glink_rx_advance(struct qcom_glink *glink,
+> -				  size_t count)
 > +static void qcom_glink_rx_peak(struct qcom_glink *glink,
 > +			       void *data, size_t count)
 >   {
->   	struct glink_rpm_pipe *pipe = &glink->rx_pipe;
+> -	struct glink_rpm_pipe *pipe = &glink->rx_pipe;
+> +	glink->rx_pipe->peak(glink->rx_pipe, data, count);
+> +}
+> +
+> +static void glink_rpm_rx_advance(struct qcom_glink_pipe *glink_pipe,
+> +				 size_t count)
+> +{
+> +	struct glink_rpm_pipe *pipe = to_rpm_pipe(glink_pipe);
 >   	unsigned int tail;
-> @@ -251,8 +251,8 @@ static void glink_rpm_rx_peak(struct glink_rpm *glink,
->   	}
->   }
 >   
-> -static void glink_rpm_rx_advance(struct glink_rpm *glink,
-> -				 size_t count)
-> +static void qcom_glink_rx_advance(struct qcom_glink *glink,
-> +				  size_t count)
->   {
->   	struct glink_rpm_pipe *pipe = &glink->rx_pipe;
->   	unsigned int tail;
-> @@ -266,7 +266,7 @@ static void glink_rpm_rx_advance(struct glink_rpm *glink,
+>   	tail = readl(pipe->tail);
+>   
+>   	tail += count;
+> -	if (tail >= pipe->length)
+> -		tail -= pipe->length;
+> +	if (tail >= pipe->native.length)
+> +		tail -= pipe->native.length;
+>   
 >   	writel(tail, pipe->tail);
 >   }
 >   
-> -static size_t glink_rpm_tx_avail(struct glink_rpm *glink)
-> +static size_t qcom_glink_tx_avail(struct qcom_glink *glink)
+> -static size_t qcom_glink_tx_avail(struct qcom_glink *glink)
+> +static void qcom_glink_rx_advance(struct qcom_glink *glink, size_t count)
+> +{
+> +	glink->rx_pipe->advance(glink->rx_pipe, count);
+> +}
+> +
+> +static size_t glink_rpm_tx_avail(struct qcom_glink_pipe *glink_pipe)
 >   {
->   	struct glink_rpm_pipe *pipe = &glink->tx_pipe;
+> -	struct glink_rpm_pipe *pipe = &glink->tx_pipe;
+> +	struct glink_rpm_pipe *pipe = to_rpm_pipe(glink_pipe);
 >   	unsigned int head;
-> @@ -281,9 +281,9 @@ static size_t glink_rpm_tx_avail(struct glink_rpm *glink)
+>   	unsigned int tail;
+>   
+> @@ -276,19 +308,23 @@ static size_t qcom_glink_tx_avail(struct qcom_glink *glink)
+>   	tail = readl(pipe->tail);
+>   
+>   	if (tail <= head)
+> -		return pipe->length - head + tail;
+> +		return pipe->native.length - head + tail;
+>   	else
 >   		return tail - head;
 >   }
 >   
-> -static unsigned int glink_rpm_tx_write(struct glink_rpm *glink,
-> -				       unsigned int head,
-> -				       const void *data, size_t count)
-> +static unsigned int qcom_glink_tx_write(struct qcom_glink *glink,
-> +					unsigned int head,
-> +					const void *data, size_t count)
+> -static unsigned int qcom_glink_tx_write(struct qcom_glink *glink,
+> -					unsigned int head,
+> -					const void *data, size_t count)
+> +static size_t qcom_glink_tx_avail(struct qcom_glink *glink)
+> +{
+> +	return glink->tx_pipe->avail(glink->tx_pipe);
+> +}
+> +
+> +static unsigned int glink_rpm_tx_write_one(struct glink_rpm_pipe *pipe,
+> +					   unsigned int head,
+> +					   const void *data, size_t count)
 >   {
->   	struct glink_rpm_pipe *pipe = &glink->tx_pipe;
+> -	struct glink_rpm_pipe *pipe = &glink->tx_pipe;
 >   	size_t len;
-> @@ -306,8 +306,8 @@ static unsigned int glink_rpm_tx_write(struct glink_rpm *glink,
+>   
+> -	len = min_t(size_t, count, pipe->length - head);
+> +	len = min_t(size_t, count, pipe->native.length - head);
+>   	if (len) {
+>   		__iowrite32_copy(pipe->fifo + head, data,
+>   				 len / sizeof(u32));
+> @@ -300,23 +336,41 @@ static unsigned int qcom_glink_tx_write(struct qcom_glink *glink,
+>   	}
+>   
+>   	head += count;
+> -	if (head >= pipe->length)
+> -		head -= pipe->length;
+> +	if (head >= pipe->native.length)
+> +		head -= pipe->native.length;
+>   
 >   	return head;
 >   }
 >   
-> -static int glink_rpm_tx(struct glink_rpm *glink,
-> -			const void *hdr, size_t hlen,
-> +static int qcom_glink_tx(struct qcom_glink *glink,
-> +			 const void *hdr, size_t hlen,
+> +static void glink_rpm_tx_write(struct qcom_glink_pipe *glink_pipe,
+> +			       const void *hdr, size_t hlen,
+> +			       const void *data, size_t dlen)
+> +{
+> +	struct glink_rpm_pipe *pipe = to_rpm_pipe(glink_pipe);
+> +	unsigned int head;
+> +
+> +	head = readl(pipe->head);
+> +	head = glink_rpm_tx_write_one(pipe, head, hdr, hlen);
+> +	head = glink_rpm_tx_write_one(pipe, head, data, dlen);
+> +	writel(head, pipe->head);
+> +}
+> +
+> +static void qcom_glink_tx_write(struct qcom_glink *glink,
+> +				const void *hdr, size_t hlen,
+> +				const void *data, size_t dlen)
+> +{
+> +	glink->tx_pipe->write(glink->tx_pipe, hdr, hlen, data, dlen);
+> +}
+> +
+>   static int qcom_glink_tx(struct qcom_glink *glink,
+>   			 const void *hdr, size_t hlen,
 >   			const void *data, size_t dlen, bool wait)
 >   {
->   	struct glink_rpm_pipe *pipe = &glink->tx_pipe;
-> @@ -326,7 +326,7 @@ static int glink_rpm_tx(struct glink_rpm *glink,
->   	if (ret)
->   		return ret;
+> -	struct glink_rpm_pipe *pipe = &glink->tx_pipe;
+> -	unsigned int head;
+>   	unsigned int tlen = hlen + dlen;
+>   	int ret;
 >   
-> -	while (glink_rpm_tx_avail(glink) < tlen) {
-> +	while (qcom_glink_tx_avail(glink) < tlen) {
->   		if (!wait) {
->   			ret = -ENOMEM;
->   			goto out;
-> @@ -336,8 +336,8 @@ static int glink_rpm_tx(struct glink_rpm *glink,
+>   	/* Reject packets that are too big */
+> -	if (tlen >= glink->tx_pipe.length)
+> +	if (tlen >= glink->tx_pipe->length)
+>   		return -EINVAL;
+>   
+>   	if (WARN(tlen % 8, "Unaligned TX request"))
+> @@ -335,10 +389,7 @@ static int qcom_glink_tx(struct qcom_glink *glink,
+>   		msleep(10);
 >   	}
 >   
->   	head = readl(pipe->head);
-> -	head = glink_rpm_tx_write(glink, head, hdr, hlen);
-> -	head = glink_rpm_tx_write(glink, head, data, dlen);
-> +	head = qcom_glink_tx_write(glink, head, hdr, hlen);
-> +	head = qcom_glink_tx_write(glink, head, data, dlen);
->   	writel(head, pipe->head);
+> -	head = readl(pipe->head);
+> -	head = qcom_glink_tx_write(glink, head, hdr, hlen);
+> -	head = qcom_glink_tx_write(glink, head, data, dlen);
+> -	writel(head, pipe->head);
+> +	qcom_glink_tx_write(glink, hdr, hlen, data, dlen);
 >   
 >   	mbox_send_message(glink->mbox_chan, NULL);
-> @@ -349,7 +349,7 @@ static int glink_rpm_tx(struct glink_rpm *glink,
->   	return ret;
->   }
+>   	mbox_client_txdone(glink->mbox_chan, 0);
+> @@ -1075,14 +1126,14 @@ static int glink_rpm_parse_toc(struct device *dev,
 >   
-> -static int glink_rpm_send_version(struct glink_rpm *glink)
-> +static int qcom_glink_send_version(struct qcom_glink *glink)
->   {
->   	struct glink_msg msg;
+>   		switch (id) {
+>   		case RPM_RX_FIFO_ID:
+> -			rx->length = size;
+> +			rx->native.length = size;
 >   
-> @@ -357,10 +357,10 @@ static int glink_rpm_send_version(struct glink_rpm *glink)
->   	msg.param1 = cpu_to_le16(1);
->   	msg.param2 = cpu_to_le32(GLINK_FEATURE_INTENTLESS);
->   
-> -	return glink_rpm_tx(glink, &msg, sizeof(msg), NULL, 0, true);
-> +	return qcom_glink_tx(glink, &msg, sizeof(msg), NULL, 0, true);
->   }
->   
-> -static void glink_rpm_send_version_ack(struct glink_rpm *glink)
-> +static void qcom_glink_send_version_ack(struct qcom_glink *glink)
->   {
->   	struct glink_msg msg;
->   
-> @@ -368,11 +368,11 @@ static void glink_rpm_send_version_ack(struct glink_rpm *glink)
->   	msg.param1 = cpu_to_le16(1);
->   	msg.param2 = cpu_to_le32(0);
->   
-> -	glink_rpm_tx(glink, &msg, sizeof(msg), NULL, 0, true);
-> +	qcom_glink_tx(glink, &msg, sizeof(msg), NULL, 0, true);
->   }
->   
-> -static void glink_rpm_send_open_ack(struct glink_rpm *glink,
-> -					 struct glink_channel *channel)
-> +static void qcom_glink_send_open_ack(struct qcom_glink *glink,
-> +				     struct glink_channel *channel)
->   {
->   	struct glink_msg msg;
->   
-> @@ -380,11 +380,11 @@ static void glink_rpm_send_open_ack(struct glink_rpm *glink,
->   	msg.param1 = cpu_to_le16(channel->rcid);
->   	msg.param2 = cpu_to_le32(0);
->   
-> -	glink_rpm_tx(glink, &msg, sizeof(msg), NULL, 0, true);
-> +	qcom_glink_tx(glink, &msg, sizeof(msg), NULL, 0, true);
->   }
->   
->   /**
-> - * glink_rpm_send_open_req() - send a RPM_CMD_OPEN request to the remote
-> + * qcom_glink_send_open_req() - send a RPM_CMD_OPEN request to the remote
->    * @glink:
->    * @channel:
->    *
-> @@ -393,8 +393,8 @@ static void glink_rpm_send_open_ack(struct glink_rpm *glink,
->    *
->    * Returns 0 on success, negative errno otherwise.
->    */
-> -static int glink_rpm_send_open_req(struct glink_rpm *glink,
-> -					 struct glink_channel *channel)
-> +static int qcom_glink_send_open_req(struct qcom_glink *glink,
-> +				    struct glink_channel *channel)
->   {
->   	struct {
->   		struct glink_msg msg;
-> @@ -420,7 +420,7 @@ static int glink_rpm_send_open_req(struct glink_rpm *glink,
->   	req.msg.param2 = cpu_to_le32(name_len);
->   	strcpy(req.name, channel->name);
->   
-> -	ret = glink_rpm_tx(glink, &req, req_len, NULL, 0, true);
-> +	ret = qcom_glink_tx(glink, &req, req_len, NULL, 0, true);
->   	if (ret)
->   		goto remove_idr;
->   
-> @@ -435,8 +435,8 @@ static int glink_rpm_send_open_req(struct glink_rpm *glink,
->   	return ret;
->   }
->   
-> -static void glink_rpm_send_close_req(struct glink_rpm *glink,
-> -					  struct glink_channel *channel)
-> +static void qcom_glink_send_close_req(struct qcom_glink *glink,
-> +				      struct glink_channel *channel)
->   {
->   	struct glink_msg req;
->   
-> @@ -444,10 +444,11 @@ static void glink_rpm_send_close_req(struct glink_rpm *glink,
->   	req.param1 = cpu_to_le16(channel->lcid);
->   	req.param2 = 0;
->   
-> -	glink_rpm_tx(glink, &req, sizeof(req), NULL, 0, true);
-> +	qcom_glink_tx(glink, &req, sizeof(req), NULL, 0, true);
->   }
->   
-> -static void glink_rpm_send_close_ack(struct glink_rpm *glink, unsigned int rcid)
-> +static void qcom_glink_send_close_ack(struct qcom_glink *glink,
-> +				      unsigned int rcid)
->   {
->   	struct glink_msg req;
->   
-> @@ -455,16 +456,16 @@ static void glink_rpm_send_close_ack(struct glink_rpm *glink, unsigned int rcid)
->   	req.param1 = cpu_to_le16(rcid);
->   	req.param2 = 0;
->   
-> -	glink_rpm_tx(glink, &req, sizeof(req), NULL, 0, true);
-> +	qcom_glink_tx(glink, &req, sizeof(req), NULL, 0, true);
->   }
->   
-> -static int glink_rpm_rx_defer(struct glink_rpm *glink, size_t extra)
-> +static int qcom_glink_rx_defer(struct qcom_glink *glink, size_t extra)
->   {
->   	struct glink_defer_cmd *dcmd;
->   
->   	extra = ALIGN(extra, 8);
->   
-> -	if (glink_rpm_rx_avail(glink) < sizeof(struct glink_msg) + extra) {
-> +	if (qcom_glink_rx_avail(glink) < sizeof(struct glink_msg) + extra) {
->   		dev_dbg(glink->dev, "Insufficient data in rx fifo");
->   		return -ENXIO;
->   	}
-> @@ -475,19 +476,19 @@ static int glink_rpm_rx_defer(struct glink_rpm *glink, size_t extra)
->   
->   	INIT_LIST_HEAD(&dcmd->node);
->   
-> -	glink_rpm_rx_peak(glink, &dcmd->msg, sizeof(dcmd->msg) + extra);
-> +	qcom_glink_rx_peak(glink, &dcmd->msg, sizeof(dcmd->msg) + extra);
->   
->   	spin_lock(&glink->rx_lock);
->   	list_add_tail(&dcmd->node, &glink->rx_queue);
->   	spin_unlock(&glink->rx_lock);
->   
->   	schedule_work(&glink->rx_work);
-> -	glink_rpm_rx_advance(glink, sizeof(dcmd->msg) + extra);
-> +	qcom_glink_rx_advance(glink, sizeof(dcmd->msg) + extra);
->   
->   	return 0;
->   }
->   
-> -static int glink_rpm_rx_data(struct glink_rpm *glink, size_t avail)
-> +static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
->   {
->   	struct glink_channel *channel;
->   	struct {
-> @@ -504,7 +505,7 @@ static int glink_rpm_rx_data(struct glink_rpm *glink, size_t avail)
->   		return -EAGAIN;
->   	}
->   
-> -	glink_rpm_rx_peak(glink, &hdr, sizeof(hdr));
-> +	qcom_glink_rx_peak(glink, &hdr, sizeof(hdr));
->   	chunk_size = le32_to_cpu(hdr.chunk_size);
->   	left_size = le32_to_cpu(hdr.left_size);
->   
-> @@ -522,7 +523,8 @@ static int glink_rpm_rx_data(struct glink_rpm *glink, size_t avail)
->   		dev_dbg(glink->dev, "Data on non-existing channel\n");
->   
->   		/* Drop the message */
-> -		glink_rpm_rx_advance(glink, ALIGN(sizeof(hdr) + chunk_size, 8));
-> +		qcom_glink_rx_advance(glink,
-> +				      ALIGN(sizeof(hdr) + chunk_size, 8));
->   		return 0;
->   	}
->   
-> @@ -536,17 +538,18 @@ static int glink_rpm_rx_data(struct glink_rpm *glink, size_t avail)
->   		channel->buf_offset = 0;
->   	}
->   
-> -	glink_rpm_rx_advance(glink, sizeof(hdr));
-> +	qcom_glink_rx_advance(glink, sizeof(hdr));
->   
->   	if (channel->buf_size - channel->buf_offset < chunk_size) {
->   		dev_err(glink->dev, "Insufficient space in input buffer\n");
->   
->   		/* The packet header lied, drop payload */
-> -		glink_rpm_rx_advance(glink, chunk_size);
-> +		qcom_glink_rx_advance(glink, chunk_size);
->   		return -ENOMEM;
->   	}
->   
-> -	glink_rpm_rx_peak(glink, channel->buf + channel->buf_offset, chunk_size);
-> +	qcom_glink_rx_peak(glink, channel->buf + channel->buf_offset,
-> +			   chunk_size);
->   	channel->buf_offset += chunk_size;
->   
->   	/* Handle message when no fragments remain to be received */
-> @@ -567,12 +570,12 @@ static int glink_rpm_rx_data(struct glink_rpm *glink, size_t avail)
->   	}
->   
->   	/* Each message starts at 8 byte aligned address */
-> -	glink_rpm_rx_advance(glink, ALIGN(chunk_size, 8));
-> +	qcom_glink_rx_advance(glink, ALIGN(chunk_size, 8));
->   
->   	return 0;
->   }
->   
-> -static int glink_rpm_rx_open_ack(struct glink_rpm *glink, unsigned int lcid)
-> +static int qcom_glink_rx_open_ack(struct qcom_glink *glink, unsigned int lcid)
->   {
->   	struct glink_channel *channel;
->   
-> @@ -587,9 +590,9 @@ static int glink_rpm_rx_open_ack(struct glink_rpm *glink, unsigned int lcid)
->   	return 0;
->   }
->   
-> -static irqreturn_t glink_rpm_intr(int irq, void *data)
-> +static irqreturn_t qcom_glink_intr(int irq, void *data)
->   {
-> -	struct glink_rpm *glink = data;
-> +	struct qcom_glink *glink = data;
->   	struct glink_msg msg;
->   	unsigned int param1;
->   	unsigned int param2;
-> @@ -598,11 +601,11 @@ static irqreturn_t glink_rpm_intr(int irq, void *data)
->   	int ret;
->   
->   	for (;;) {
-> -		avail = glink_rpm_rx_avail(glink);
-> +		avail = qcom_glink_rx_avail(glink);
->   		if (avail < sizeof(msg))
+>   			rx->tail = msg_ram + offset;
+>   			rx->head = msg_ram + offset + sizeof(u32);
+>   			rx->fifo = msg_ram + offset + 2 * sizeof(u32);
 >   			break;
+>   		case RPM_TX_FIFO_ID:
+> -			tx->length = size;
+> +			tx->native.length = size;
 >   
-> -		glink_rpm_rx_peak(glink, &msg, sizeof(msg));
-> +		qcom_glink_rx_peak(glink, &msg, sizeof(msg));
->   
->   		cmd = le16_to_cpu(msg.cmd);
->   		param1 = le16_to_cpu(msg.param1);
-> @@ -613,21 +616,21 @@ static irqreturn_t glink_rpm_intr(int irq, void *data)
->   		case RPM_CMD_VERSION_ACK:
->   		case RPM_CMD_CLOSE:
->   		case RPM_CMD_CLOSE_ACK:
-> -			ret = glink_rpm_rx_defer(glink, 0);
-> +			ret = qcom_glink_rx_defer(glink, 0);
->   			break;
->   		case RPM_CMD_OPEN_ACK:
-> -			ret = glink_rpm_rx_open_ack(glink, param1);
-> -			glink_rpm_rx_advance(glink, ALIGN(sizeof(msg), 8));
-> +			ret = qcom_glink_rx_open_ack(glink, param1);
-> +			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
->   			break;
->   		case RPM_CMD_OPEN:
-> -			ret = glink_rpm_rx_defer(glink, param2);
-> +			ret = qcom_glink_rx_defer(glink, param2);
->   			break;
->   		case RPM_CMD_TX_DATA:
->   		case RPM_CMD_TX_DATA_CONT:
-> -			ret = glink_rpm_rx_data(glink, avail);
-> +			ret = qcom_glink_rx_data(glink, avail);
->   			break;
->   		case RPM_CMD_READ_NOTIF:
-> -			glink_rpm_rx_advance(glink, ALIGN(sizeof(msg), 8));
-> +			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
->   
->   			mbox_send_message(glink->mbox_chan, NULL);
->   			mbox_client_txdone(glink->mbox_chan, 0);
-> @@ -648,17 +651,17 @@ static irqreturn_t glink_rpm_intr(int irq, void *data)
->   }
->   
->   /* Locally initiated rpmsg_create_ept */
-> -static struct glink_channel *glink_rpm_create_local(struct glink_rpm *glink,
-> -						    const char *name)
-> +static struct glink_channel *qcom_glink_create_local(struct qcom_glink *glink,
-> +						     const char *name)
->   {
->   	struct glink_channel *channel;
->   	int ret;
->   
-> -	channel = glink_rpm_alloc_channel(glink, name);
-> +	channel = qcom_glink_alloc_channel(glink, name);
->   	if (IS_ERR(channel))
->   		return ERR_CAST(channel);
->   
-> -	ret = glink_rpm_send_open_req(glink, channel);
-> +	ret = qcom_glink_send_open_req(glink, channel);
->   	if (ret)
->   		goto release_channel;
->   
-> @@ -670,34 +673,34 @@ static struct glink_channel *glink_rpm_create_local(struct glink_rpm *glink,
->   	if (!ret)
->   		goto err_timeout;
->   
-> -	glink_rpm_send_open_ack(glink, channel);
-> +	qcom_glink_send_open_ack(glink, channel);
->   
->   	return channel;
->   
->   err_timeout:
-> -	/* glink_rpm_send_open_req() did register the channel in lcids*/
-> +	/* qcom_glink_send_open_req() did register the channel in lcids*/
->   	mutex_lock(&glink->idr_lock);
->   	idr_remove(&glink->lcids, channel->lcid);
->   	mutex_unlock(&glink->idr_lock);
->   
->   release_channel:
-> -	/* Release glink_rpm_send_open_req() reference */
-> -	kref_put(&channel->refcount, glink_rpm_channel_release);
-> -	/* Release glink_rpm_alloc_channel() reference */
-> -	kref_put(&channel->refcount, glink_rpm_channel_release);
-> +	/* Release qcom_glink_send_open_req() reference */
-> +	kref_put(&channel->refcount, qcom_glink_channel_release);
-> +	/* Release qcom_glink_alloc_channel() reference */
-> +	kref_put(&channel->refcount, qcom_glink_channel_release);
->   
->   	return ERR_PTR(-ETIMEDOUT);
->   }
->   
->   /* Remote initiated rpmsg_create_ept */
-> -static int glink_rpm_create_remote(struct glink_rpm *glink,
-> -				   struct glink_channel *channel)
-> +static int qcom_glink_create_remote(struct qcom_glink *glink,
-> +				    struct glink_channel *channel)
->   {
->   	int ret;
->   
-> -	glink_rpm_send_open_ack(glink, channel);
-> +	qcom_glink_send_open_ack(glink, channel);
->   
-> -	ret = glink_rpm_send_open_req(glink, channel);
-> +	ret = qcom_glink_send_open_req(glink, channel);
->   	if (ret)
->   		goto close_link;
->   
-> @@ -714,21 +717,23 @@ static int glink_rpm_create_remote(struct glink_rpm *glink,
->   	 * Send a close request to "undo" our open-ack. The close-ack will
->   	 * release the last reference.
->   	 */
-> -	glink_rpm_send_close_req(glink, channel);
-> +	qcom_glink_send_close_req(glink, channel);
->   
-> -	/* Release glink_rpm_send_open_req() reference */
-> -	kref_put(&channel->refcount, glink_rpm_channel_release);
-> +	/* Release qcom_glink_send_open_req() reference */
-> +	kref_put(&channel->refcount, qcom_glink_channel_release);
->   
->   	return ret;
->   }
->   
-> -static struct rpmsg_endpoint *glink_rpm_create_ept(struct rpmsg_device *rpdev,
-> -						  rpmsg_rx_cb_t cb, void *priv,
-> -						  struct rpmsg_channel_info chinfo)
-> +static struct rpmsg_endpoint *qcom_glink_create_ept(struct rpmsg_device *rpdev,
-> +						    rpmsg_rx_cb_t cb,
-> +						    void *priv,
-> +						    struct rpmsg_channel_info
-> +						    chinfo)
->   {
->   	struct glink_channel *parent = to_glink_channel(rpdev->ept);
->   	struct glink_channel *channel;
-> -	struct glink_rpm *glink = parent->glink;
-> +	struct qcom_glink *glink = parent->glink;
->   	struct rpmsg_endpoint *ept;
->   	const char *name = chinfo.name;
->   	int cid;
-> @@ -740,11 +745,11 @@ static struct rpmsg_endpoint *glink_rpm_create_ept(struct rpmsg_device *rpdev,
->   	}
->   
->   	if (!channel) {
-> -		channel = glink_rpm_create_local(glink, name);
-> +		channel = qcom_glink_create_local(glink, name);
->   		if (IS_ERR(channel))
->   			return NULL;
->   	} else {
-> -		ret = glink_rpm_create_remote(glink, channel);
-> +		ret = qcom_glink_create_remote(glink, channel);
->   		if (ret)
->   			return NULL;
->   	}
-> @@ -758,10 +763,10 @@ static struct rpmsg_endpoint *glink_rpm_create_ept(struct rpmsg_device *rpdev,
->   	return ept;
->   }
->   
-> -static void glink_rpm_destroy_ept(struct rpmsg_endpoint *ept)
-> +static void qcom_glink_destroy_ept(struct rpmsg_endpoint *ept)
->   {
->   	struct glink_channel *channel = to_glink_channel(ept);
-> -	struct glink_rpm *glink = channel->glink;
-> +	struct qcom_glink *glink = channel->glink;
->   	unsigned long flags;
->   
->   	spin_lock_irqsave(&channel->recv_lock, flags);
-> @@ -771,13 +776,13 @@ static void glink_rpm_destroy_ept(struct rpmsg_endpoint *ept)
->   	/* Decouple the potential rpdev from the channel */
->   	channel->rpdev = NULL;
->   
-> -	glink_rpm_send_close_req(glink, channel);
-> +	qcom_glink_send_close_req(glink, channel);
->   }
->   
-> -static int __glink_rpm_send(struct glink_channel *channel,
-> +static int __qcom_glink_send(struct glink_channel *channel,
->   			     void *data, int len, bool wait)
->   {
-> -	struct glink_rpm *glink = channel->glink;
-> +	struct qcom_glink *glink = channel->glink;
->   	struct {
->   		struct glink_msg msg;
->   		__le32 chunk_size;
-> @@ -793,27 +798,27 @@ static int __glink_rpm_send(struct glink_channel *channel,
->   	req.chunk_size = cpu_to_le32(len);
->   	req.left_size = cpu_to_le32(0);
->   
-> -	return glink_rpm_tx(glink, &req, sizeof(req), data, len, wait);
-> +	return qcom_glink_tx(glink, &req, sizeof(req), data, len, wait);
->   }
->   
-> -static int glink_rpm_send(struct rpmsg_endpoint *ept, void *data, int len)
-> +static int qcom_glink_send(struct rpmsg_endpoint *ept, void *data, int len)
->   {
->   	struct glink_channel *channel = to_glink_channel(ept);
->   
-> -	return __glink_rpm_send(channel, data, len, true);
-> +	return __qcom_glink_send(channel, data, len, true);
->   }
->   
-> -static int glink_rpm_trysend(struct rpmsg_endpoint *ept, void *data, int len)
-> +static int qcom_glink_trysend(struct rpmsg_endpoint *ept, void *data, int len)
->   {
->   	struct glink_channel *channel = to_glink_channel(ept);
->   
-> -	return __glink_rpm_send(channel, data, len, false);
-> +	return __qcom_glink_send(channel, data, len, false);
->   }
->   
->   /*
->    * Finds the device_node for the glink child interested in this channel.
->    */
-> -static struct device_node *glink_rpm_match_channel(struct device_node *node,
-> +static struct device_node *qcom_glink_match_channel(struct device_node *node,
->   						    const char *channel)
->   {
->   	struct device_node *child;
-> @@ -835,16 +840,16 @@ static struct device_node *glink_rpm_match_channel(struct device_node *node,
->   }
->   
->   static const struct rpmsg_device_ops glink_device_ops = {
-> -	.create_ept = glink_rpm_create_ept,
-> +	.create_ept = qcom_glink_create_ept,
->   };
->   
->   static const struct rpmsg_endpoint_ops glink_endpoint_ops = {
-> -	.destroy_ept = glink_rpm_destroy_ept,
-> -	.send = glink_rpm_send,
-> -	.trysend = glink_rpm_trysend,
-> +	.destroy_ept = qcom_glink_destroy_ept,
-> +	.send = qcom_glink_send,
-> +	.trysend = qcom_glink_trysend,
->   };
->   
-> -static void glink_rpm_rpdev_release(struct device *dev)
-> +static void qcom_glink_rpdev_release(struct device *dev)
->   {
->   	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
->   	struct glink_channel *channel = to_glink_channel(rpdev->ept);
-> @@ -853,14 +858,15 @@ static void glink_rpm_rpdev_release(struct device *dev)
->   	kfree(rpdev);
->   }
->   
-> -static int glink_rpm_rx_open(struct glink_rpm *glink, unsigned int rcid,
-> -			     char *name)
-> +static int qcom_glink_rx_open(struct qcom_glink *glink, unsigned int rcid,
-> +			      char *name)
->   {
->   	struct glink_channel *channel;
->   	struct rpmsg_device *rpdev;
->   	bool create_device = false;
->   	int lcid;
->   	int ret;
-> +	struct device_node *node;
->   
->   	idr_for_each_entry(&glink->lcids, channel, lcid) {
->   		if (!strcmp(channel->name, name))
-> @@ -868,7 +874,7 @@ static int glink_rpm_rx_open(struct glink_rpm *glink, unsigned int rcid,
->   	}
->   
->   	if (!channel) {
-> -		channel = glink_rpm_alloc_channel(glink, name);
-> +		channel = qcom_glink_alloc_channel(glink, name);
->   		if (IS_ERR(channel))
->   			return PTR_ERR(channel);
->   
-> @@ -901,9 +907,10 @@ static int glink_rpm_rx_open(struct glink_rpm *glink, unsigned int rcid,
->   		rpdev->dst = RPMSG_ADDR_ANY;
->   		rpdev->ops = &glink_device_ops;
->   
-> -		rpdev->dev.of_node = glink_rpm_match_channel(glink->dev->of_node, name);
-> +		node = qcom_glink_match_channel(glink->dev->of_node, name);
-> +		rpdev->dev.of_node = node;
->   		rpdev->dev.parent = glink->dev;
-> -		rpdev->dev.release = glink_rpm_rpdev_release;
-> +		rpdev->dev.release = qcom_glink_rpdev_release;
->   
->   		ret = rpmsg_register_device(rpdev);
->   		if (ret)
-> @@ -924,12 +931,12 @@ static int glink_rpm_rx_open(struct glink_rpm *glink, unsigned int rcid,
->   free_channel:
->   	/* Release the reference, iff we took it */
->   	if (create_device)
-> -		kref_put(&channel->refcount, glink_rpm_channel_release);
-> +		kref_put(&channel->refcount, qcom_glink_channel_release);
->   
->   	return ret;
->   }
->   
-> -static void glink_rpm_rx_close(struct glink_rpm *glink, unsigned int rcid)
-> +static void qcom_glink_rx_close(struct qcom_glink *glink, unsigned int rcid)
->   {
->   	struct rpmsg_channel_info chinfo;
->   	struct glink_channel *channel;
-> @@ -946,17 +953,17 @@ static void glink_rpm_rx_close(struct glink_rpm *glink, unsigned int rcid)
->   		rpmsg_unregister_device(glink->dev, &chinfo);
->   	}
->   
-> -	glink_rpm_send_close_ack(glink, channel->rcid);
-> +	qcom_glink_send_close_ack(glink, channel->rcid);
->   
->   	mutex_lock(&glink->idr_lock);
->   	idr_remove(&glink->rcids, channel->rcid);
->   	channel->rcid = 0;
->   	mutex_unlock(&glink->idr_lock);
->   
-> -	kref_put(&channel->refcount, glink_rpm_channel_release);
-> +	kref_put(&channel->refcount, qcom_glink_channel_release);
->   }
->   
-> -static void glink_rpm_rx_close_ack(struct glink_rpm *glink, unsigned int lcid)
-> +static void qcom_glink_rx_close_ack(struct qcom_glink *glink, unsigned int lcid)
->   {
->   	struct glink_channel *channel;
->   
-> @@ -969,12 +976,13 @@ static void glink_rpm_rx_close_ack(struct glink_rpm *glink, unsigned int lcid)
->   	channel->lcid = 0;
->   	mutex_unlock(&glink->idr_lock);
->   
-> -	kref_put(&channel->refcount, glink_rpm_channel_release);
-> +	kref_put(&channel->refcount, qcom_glink_channel_release);
->   }
->   
-> -static void glink_rpm_work(struct work_struct *work)
-> +static void qcom_glink_work(struct work_struct *work)
->   {
-> -	struct glink_rpm *glink = container_of(work, struct glink_rpm, rx_work);
-> +	struct qcom_glink *glink = container_of(work, struct qcom_glink,
-> +						rx_work);
->   	struct glink_defer_cmd *dcmd;
->   	struct glink_msg *msg;
->   	unsigned long flags;
-> @@ -999,18 +1007,18 @@ static void glink_rpm_work(struct work_struct *work)
->   
->   		switch (cmd) {
->   		case RPM_CMD_VERSION:
-> -			glink_rpm_send_version_ack(glink);
-> +			qcom_glink_send_version_ack(glink);
->   			break;
->   		case RPM_CMD_VERSION_ACK:
->   			break;
->   		case RPM_CMD_OPEN:
-> -			glink_rpm_rx_open(glink, param1, msg->data);
-> +			qcom_glink_rx_open(glink, param1, msg->data);
->   			break;
->   		case RPM_CMD_CLOSE:
-> -			glink_rpm_rx_close(glink, param1);
-> +			qcom_glink_rx_close(glink, param1);
->   			break;
->   		case RPM_CMD_CLOSE_ACK:
-> -			glink_rpm_rx_close_ack(glink, param1);
-> +			qcom_glink_rx_close_ack(glink, param1);
->   			break;
->   		default:
->   			WARN(1, "Unknown defer object %d\n", cmd);
-> @@ -1098,7 +1106,7 @@ static int glink_rpm_parse_toc(struct device *dev,
->   
+>   			tx->tail = msg_ram + offset;
+>   			tx->head = msg_ram + offset + sizeof(u32);
+> @@ -1107,6 +1158,8 @@ static int glink_rpm_parse_toc(struct device *dev,
 >   static int glink_rpm_probe(struct platform_device *pdev)
 >   {
-> -	struct glink_rpm *glink;
-> +	struct qcom_glink *glink;
+>   	struct qcom_glink *glink;
+> +	struct glink_rpm_pipe *rx_pipe;
+> +	struct glink_rpm_pipe *tx_pipe;
 >   	struct device_node *np;
 >   	void __iomem *msg_ram;
 >   	size_t msg_ram_size;
-> @@ -1116,7 +1124,7 @@ static int glink_rpm_probe(struct platform_device *pdev)
+> @@ -1121,6 +1174,11 @@ static int glink_rpm_probe(struct platform_device *pdev)
+>   
+>   	glink->dev = dev;
+>   
+> +	rx_pipe = devm_kzalloc(&pdev->dev, sizeof(*rx_pipe), GFP_KERNEL);
+> +	tx_pipe = devm_kzalloc(&pdev->dev, sizeof(*tx_pipe), GFP_KERNEL);
+> +	if (!rx_pipe || !tx_pipe)
+> +		return -ENOMEM;
+> +
 >   	mutex_init(&glink->tx_lock);
 >   	spin_lock_init(&glink->rx_lock);
 >   	INIT_LIST_HEAD(&glink->rx_queue);
-> -	INIT_WORK(&glink->rx_work, glink_rpm_work);
-> +	INIT_WORK(&glink->rx_work, qcom_glink_work);
+> @@ -1150,12 +1208,22 @@ static int glink_rpm_probe(struct platform_device *pdev)
+>   		return -ENOMEM;
 >   
->   	mutex_init(&glink->idr_lock);
->   	idr_init(&glink->lcids);
-> @@ -1151,7 +1159,7 @@ static int glink_rpm_probe(struct platform_device *pdev)
->   
->   	irq = platform_get_irq(pdev, 0);
->   	ret = devm_request_irq(dev, irq,
-> -			       glink_rpm_intr,
-> +			       qcom_glink_intr,
->   			       IRQF_NO_SUSPEND | IRQF_SHARED,
->   			       "glink-rpm", glink);
->   	if (ret) {
-> @@ -1161,7 +1169,7 @@ static int glink_rpm_probe(struct platform_device *pdev)
->   
->   	glink->irq = irq;
->   
-> -	ret = glink_rpm_send_version(glink);
-> +	ret = qcom_glink_send_version(glink);
+>   	ret = glink_rpm_parse_toc(dev, msg_ram, msg_ram_size,
+> -				  &glink->rx_pipe, &glink->tx_pipe);
+> +				  rx_pipe, tx_pipe);
 >   	if (ret)
 >   		return ret;
 >   
-> @@ -1179,7 +1187,7 @@ static int glink_rpm_remove_device(struct device *dev, void *data)
+> -	writel(0, glink->tx_pipe.head);
+> -	writel(0, glink->rx_pipe.tail);
+> +	/* Pipe specific accessors */
+> +	rx_pipe->native.avail = glink_rpm_rx_avail;
+> +	rx_pipe->native.peak = glink_rpm_rx_peak;
+> +	rx_pipe->native.advance = glink_rpm_rx_advance;
+> +	tx_pipe->native.avail = glink_rpm_tx_avail;
+> +	tx_pipe->native.write = glink_rpm_tx_write;
+> +
+> +	glink->tx_pipe = &tx_pipe->native;
+> +	glink->rx_pipe = &rx_pipe->native;
+> +
+> +	writel(0, tx_pipe->head);
+> +	writel(0, rx_pipe->tail);
 >   
->   static int glink_rpm_remove(struct platform_device *pdev)
->   {
-> -	struct glink_rpm *glink = platform_get_drvdata(pdev);
-> +	struct qcom_glink *glink = platform_get_drvdata(pdev);
->   	struct glink_channel *channel;
->   	int cid;
->   	int ret;
-> @@ -1193,7 +1201,7 @@ static int glink_rpm_remove(struct platform_device *pdev)
->   
->   	/* Release any defunct local channels, waiting for close-ack */
->   	idr_for_each_entry(&glink->lcids, channel, cid)
-> -		kref_put(&channel->refcount, glink_rpm_channel_release);
-> +		kref_put(&channel->refcount, qcom_glink_channel_release);
->   
->   	idr_destroy(&glink->lcids);
->   	idr_destroy(&glink->rcids);
+>   	irq = platform_get_irq(pdev, 0);
+>   	ret = devm_request_irq(dev, irq,
