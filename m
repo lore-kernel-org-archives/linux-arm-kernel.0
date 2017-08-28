@@ -1,110 +1,41 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Mon, 28 Aug 2017 17:27:47 +0800
-Subject: [RESEND PATCH] drm/hisilicon: Ensure LDI regs are properly
- configured.
-In-Reply-To: <20170828085108.zp4pjkmt6gbewwgm@phenom.ffwll.local>
-References: <1502806465-17772-1-git-send-email-peter.griffin@linaro.org>
- <CAGd==07ygp97ggXSAK5JCYweRZPFwjqa2WNV3g1fdyY6736pPw@mail.gmail.com>
- <20170828085108.zp4pjkmt6gbewwgm@phenom.ffwll.local>
-Message-ID: <CAGd==0558EHJFdh_+C=Zo11OJDNgbS-BOkj+TvbVKFJkU=gDHg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 28 Aug 2017 11:32:07 +0200
+Subject: [PATCH linux-next] fix compilation error in mach-omap2/display.c
+Message-ID: <20170828093207.GA29080@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On 28 August 2017 at 16:51, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Mon, Aug 28, 2017 at 04:44:30PM +0800, Xinliang Liu wrote:
->> Hi,
->>
->> On 15 August 2017 at 22:14, Peter Griffin <peter.griffin@linaro.org> wrote:
->>
->> > This patch fixes the following soft lockup:
->> >   BUG: soft lockup - CPU#0 stuck for 23s! [weston:307]
->> >
->> > On weston idle-timeout the IP is powered down and reset
->> > asserted. On weston resume we get a massive vblank
->> > IRQ storm due to the LDI registers having lost some state.
->> >
->> > This state loss is caused by ade_crtc_atomic_begin() not
->> > calling ade_ldi_set_mode(). With this patch applied
->> > resuming from Weston idle-timeout works well.
->> >
->> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> > Tested-by: John Stultz <john.stultz@linaro.org>
->> >
->>
->> Thanks Peter,
->> This patch looks good to me.
->> Reviewed-by: Xinliang Liu <xinliang.liu@linaro.org>
->>
->> @Sean, could you please help to apply to drm-misc if others has no more
->> comments, thanks.
->
-> hisilicon isn't maintained in drm-misc, and you're the maintainer. This is
-> not how it works. So either
-> a) pick up the patch and send out a pull request to Dave Airlie
-> b) move hisilicon over to drm-misc and become a drm-misc maintainer
-> yourself. This needs a MAINTAINERS update to point the git tree at
-> drm-misc.
->
-> drm-misc maintainers don't maintain everyone else's driver as a service,
-> that simply doesn't scale.
+In linux-next 0828, I get
 
-Sorry for my misunderstanding and thanks for pointing out that how
-drm-misc works.
-So I will pick up the patch and send a pull request.
+  CC      arch/arm/mach-omap2/display.o
+  arch/arm/mach-omap2/display.c: In function 'omapdss_init_fbdev':
+  arch/arm/mach-omap2/display.c:184:2: error: 'r' undeclared (first
 
-Thanks,
-Xinliang
+Fix it.
 
->
-> Thanks, Daniel
->
->>
->> Thanks,
->> Xinliang
->>
->>
->> > Cc: stable at vger.kernel.org
->> > ---
->> >  drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 3 +++
->> >  1 file changed, 3 insertions(+)
->> >
->> > diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->> > b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->> > index c96c228..72c6357 100644
->> > --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->> > +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->> > @@ -519,9 +519,12 @@ static void ade_crtc_atomic_begin(struct drm_crtc
->> > *crtc,
->> >  {
->> >         struct ade_crtc *acrtc = to_ade_crtc(crtc);
->> >         struct ade_hw_ctx *ctx = acrtc->ctx;
->> > +       struct drm_display_mode *mode = &crtc->state->mode;
->> > +       struct drm_display_mode *adj_mode = &crtc->state->adjusted_mode;
->> >
->> >         if (!ctx->power_on)
->> >                 (void)ade_power_up(ctx);
->> > +       ade_ldi_set_mode(acrtc, mode, adj_mode);
->> >  }
->> >
->> >  static void ade_crtc_atomic_flush(struct drm_crtc *crtc,
->> > --
->> > 2.7.4
->> >
->> > _______________________________________________
->> > dri-devel mailing list
->> > dri-devel at lists.freedesktop.org
->> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
->> >
->
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
->
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index 798fc71..b3f6eb5 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -172,6 +172,7 @@ static int __init omapdss_init_fbdev(void)
+ 		.set_min_bus_tput = omap_dss_set_min_bus_tput,
+ 	};
+ 	struct device_node *node;
++	int r;
+ 
+ 	board_data.version = omap_display_get_version();
+ 	if (board_data.version == OMAPDSS_VER_UNKNOWN) {
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/552b08cb/attachment.sig>
