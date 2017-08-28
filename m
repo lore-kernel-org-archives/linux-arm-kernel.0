@@ -1,57 +1,58 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 28 Aug 2017 15:13:43 +0200
-Subject: [PATCH 1/3] iommu: exynos: constify iommu_ops
-In-Reply-To: <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <CGME20170828121232epcas2p49f8a17002f18d19b613b43ba38f71df9@epcas2p4.samsung.com>
- <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <18f05dd3-4305-e607-57bb-dea086481bb8@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 28 Aug 2017 15:18:16 +0200
+Subject: [PATCH] nokia n900: drop unneeded/undocumented parts of the dts
+In-Reply-To: <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+Message-ID: <20170828131816.GB30115@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arvind,
 
-On 2017-08-28 14:12, Arvind Yadav wrote:
-> iommu_ops are not supposed to change at runtime.
-> Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
-> const iommu_ops provided by <linux/iommu.h>. So mark the non-const
-> structs as const.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Sakari mentioned that some parts of the dts are not needed and do
+not have proper documentation, yet.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+As the camera works without them, remove them for now.
 
-I remember that in the past there were a reason for non-const iommu_ops 
-in the
-IOMMU API, but I hope it has been finally resolved.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> ---
->   drivers/iommu/exynos-iommu.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 2395478..a540016 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -569,7 +569,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
->   	spin_unlock_irqrestore(&data->lock, flags);
->   }
->   
-> -static struct iommu_ops exynos_iommu_ops;
-> +static const struct iommu_ops exynos_iommu_ops;
->   
->   static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   {
-> @@ -1323,7 +1323,7 @@ static int exynos_iommu_of_xlate(struct device *dev,
->   	return 0;
->   }
->   
-> -static struct iommu_ops exynos_iommu_ops = {
-> +static const struct iommu_ops exynos_iommu_ops = {
->   	.domain_alloc = exynos_iommu_domain_alloc,
->   	.domain_free = exynos_iommu_domain_free,
->   	.attach_dev = exynos_iommu_attach_device,
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -144,15 +144,6 @@
+ 		io-channel-names = "temp", "bsi", "vbat";
+ 	};
+ 
+-	rear_camera: camera at 0 {
+-		compatible = "linux,camera";
+-
+-		module {
+-			model = "TCM8341MD";
+-			sensor = <&cam1>;
+-		};
+-	};
+-
+ 	pwm9: dmtimer-pwm {
+ 		compatible = "ti,omap-dmtimer-pwm";
+ 		#pwm-cells = <3>;
+@@ -189,10 +180,8 @@
+ 				clock-lanes = <1>;
+ 				data-lanes = <0>;
+ 				lane-polarity = <0 0>;
+-				clock-inv = <0>;
+ 				/* Select strobe = <1> for back camera, <0> for front camera */
+ 				strobe = <1>;
+-				crc = <0>;
+ 			};
+ 		};
+ 	};
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/0bd7ef9c/attachment.sig>
