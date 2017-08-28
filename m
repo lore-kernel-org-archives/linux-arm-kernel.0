@@ -1,150 +1,215 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Aug 2017 16:29:09 +0200
-Subject: [PATCH v3 07/13] mmc: meson-gx: work around clk-stop issue
+Date: Mon, 28 Aug 2017 16:29:07 +0200
+Subject: [PATCH v3 05/13] mmc: meson-gx: rework clock init function
 In-Reply-To: <20170828142915.27020-1-jbrunet@baylibre.com>
 References: <20170828142915.27020-1-jbrunet@baylibre.com>
-Message-ID: <20170828142915.27020-8-jbrunet@baylibre.com>
+Message-ID: <20170828142915.27020-6-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that the mmc clock is also used and required, somehow, by
-the controller itself.
+Thanks to devm, carrying the clock structure around after init is not
+necessary. Rework the function to remove these from the controller host
+data.
 
-It is shown during init, when writing to CFG while the divider is set
-to 0 will crash the SoC. During a voltage switch, the controller may
-crash and the card may then fail to exit busy state if the clock is
-stopped.
-
-To avoid this, it is best to keep the clock running for the controller,
-except during rate change. However, we still need to be able to gate
-the clock out of the SoC. Let's use the pinmux for this, and fallback
-to gpio mode (pulled-down) when we need to gate the clock
+Finally, set initial mmc clock rate before enabling it, simplifying the
+exit condition.
 
 Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 74 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 68 insertions(+), 6 deletions(-)
+ drivers/mmc/host/meson-gx-mmc.c | 94 ++++++++++++++++++++---------------------
+ 1 file changed, 46 insertions(+), 48 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 341e5a1b32cc..43aabb793121 100644
+index cd5964aa4f58..7800a7ace2de 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -137,6 +137,10 @@ struct meson_host {
- 	struct clk *mmc_clk;
+@@ -42,10 +42,7 @@
+ 
+ #define SD_EMMC_CLOCK 0x0
+ #define   CLK_DIV_MASK GENMASK(5, 0)
+-#define   CLK_DIV_MAX 63
+ #define   CLK_SRC_MASK GENMASK(7, 6)
+-#define   CLK_SRC_XTAL 0   /* external crystal */
+-#define   CLK_SRC_PLL 1    /* FCLK_DIV2 */
+ #define   CLK_CORE_PHASE_MASK GENMASK(9, 8)
+ #define   CLK_TX_PHASE_MASK GENMASK(11, 10)
+ #define   CLK_RX_PHASE_MASK GENMASK(13, 12)
+@@ -137,13 +134,9 @@ struct meson_host {
+ 	spinlock_t lock;
+ 	void __iomem *regs;
+ 	struct clk *core_clk;
+-	struct clk_mux mux;
+-	struct clk *mux_clk;
++	struct clk *mmc_clk;
  	unsigned long req_rate;
  
-+	struct pinctrl *pinctrl;
-+	struct pinctrl_state *pins_default;
-+	struct pinctrl_state *pins_clk_gate;
-+
+-	struct clk_divider cfg_div;
+-	struct clk *cfg_div_clk;
+-
  	unsigned int bounce_buf_size;
  	void *bounce_buf;
  	dma_addr_t bounce_dma_addr;
-@@ -272,6 +276,42 @@ static bool meson_mmc_timing_is_ddr(struct mmc_ios *ios)
- 	return false;
- }
- 
-+/*
-+ * Gating the clock on this controller is tricky.  It seems the mmc clock
-+ * is also used by the controller.  It may crash during some operation if the
-+ * clock is stopped.  The safest thing to do, whenever possible, is to keep
-+ * clock running at stop it at the pad using the pinmux.
-+ */
-+static void meson_mmc_clk_gate(struct meson_host *host)
-+{
-+	u32 cfg;
-+
-+	if (host->pins_clk_gate) {
-+		pinctrl_select_state(host->pinctrl, host->pins_clk_gate);
-+	} else {
-+		/*
-+		 * If the pinmux is not provided - default to the classic and
-+		 * unsafe method
-+		 */
-+		cfg = readl(host->regs + SD_EMMC_CFG);
-+		cfg |= CFG_STOP_CLOCK;
-+		writel(cfg, host->regs + SD_EMMC_CFG);
-+	}
-+}
-+
-+static void meson_mmc_clk_ungate(struct meson_host *host)
-+{
-+	u32 cfg;
-+
-+	if (host->pins_clk_gate)
-+		pinctrl_select_state(host->pinctrl, host->pins_default);
-+
-+	/* Make sure the clock is not stopped in the controller */
-+	cfg = readl(host->regs + SD_EMMC_CFG);
-+	cfg &= ~CFG_STOP_CLOCK;
-+	writel(cfg, host->regs + SD_EMMC_CFG);
-+}
-+
- static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
- {
- 	struct mmc_host *mmc = host->mmc;
-@@ -288,9 +328,7 @@ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
- 		return 0;
- 
- 	/* stop clock */
--	cfg = readl(host->regs + SD_EMMC_CFG);
--	cfg |= CFG_STOP_CLOCK;
--	writel(cfg, host->regs + SD_EMMC_CFG);
-+	meson_mmc_clk_gate(host);
- 	host->req_rate = 0;
- 
- 	if (!rate) {
-@@ -299,6 +337,11 @@ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
+@@ -291,7 +284,7 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
  		return 0;
  	}
  
-+	/* Stop the clock during rate change to avoid glitches */
-+	cfg = readl(host->regs + SD_EMMC_CFG);
-+	cfg |= CFG_STOP_CLOCK;
-+	writel(cfg, host->regs + SD_EMMC_CFG);
-+
- 	ret = clk_set_rate(host->mmc_clk, rate);
+-	ret = clk_set_rate(host->cfg_div_clk, clk_rate);
++	ret = clk_set_rate(host->mmc_clk, clk_rate);
  	if (ret) {
  		dev_err(host->dev, "Unable to set cfg_div_clk to %lu. ret=%d\n",
-@@ -318,9 +361,7 @@ static int meson_mmc_clk_set(struct meson_host *host, struct mmc_ios *ios)
- 		dev_dbg(host->dev, "requested rate was %u\n", ios->clock);
- 
- 	/* (re)start clock */
--	cfg = readl(host->regs + SD_EMMC_CFG);
--	cfg &= ~CFG_STOP_CLOCK;
--	writel(cfg, host->regs + SD_EMMC_CFG);
-+	meson_mmc_clk_ungate(host);
- 
- 	return 0;
- }
-@@ -931,6 +972,27 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 		goto free_host;
+ 			clk_rate, ret);
+@@ -299,7 +292,7 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
  	}
  
-+	host->pinctrl = devm_pinctrl_get(&pdev->dev);
-+	if (IS_ERR(host->pinctrl)) {
-+		ret = PTR_ERR(host->pinctrl);
-+		goto free_host;
-+	}
+ 	host->req_rate = clk_rate;
+-	mmc->actual_clock = clk_get_rate(host->cfg_div_clk);
++	mmc->actual_clock = clk_get_rate(host->mmc_clk);
+ 
+ 	dev_dbg(host->dev, "clk rate: %u Hz\n", mmc->actual_clock);
+ 	if (clk_rate != mmc->actual_clock)
+@@ -321,10 +314,13 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+ static int meson_mmc_clk_init(struct meson_host *host)
+ {
+ 	struct clk_init_data init;
++	struct clk_mux *mux;
++	struct clk_divider *div;
++	struct clk *clk;
+ 	char clk_name[32];
+ 	int i, ret = 0;
+ 	const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
+-	const char *clk_div_parents[1];
++	const char *clk_parent[1];
+ 	u32 clk_reg;
+ 
+ 	/* init SD_EMMC_CLOCK to sane defaults w/min clock rate */
+@@ -353,55 +349,57 @@ static int meson_mmc_clk_init(struct meson_host *host)
+ 	}
+ 
+ 	/* create the mux */
++	mux = devm_kzalloc(host->dev, sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		return -ENOMEM;
 +
-+	host->pins_default = pinctrl_lookup_state(host->pinctrl,
-+						  PINCTRL_STATE_DEFAULT);
-+	if (IS_ERR(host->pins_default)) {
-+		ret = PTR_ERR(host->pins_default);
-+		goto free_host;
-+	}
+ 	snprintf(clk_name, sizeof(clk_name), "%s#mux", dev_name(host->dev));
+ 	init.name = clk_name;
+ 	init.ops = &clk_mux_ops;
+ 	init.flags = 0;
+ 	init.parent_names = mux_parent_names;
+ 	init.num_parents = MUX_CLK_NUM_PARENTS;
+-	host->mux.reg = host->regs + SD_EMMC_CLOCK;
+-	host->mux.shift = __bf_shf(CLK_SRC_MASK);
+-	host->mux.mask = CLK_SRC_MASK >> host->mux.shift;
+-	host->mux.flags = 0;
+-	host->mux.table = NULL;
+-	host->mux.hw.init = &init;
+ 
+-	host->mux_clk = devm_clk_register(host->dev, &host->mux.hw);
+-	if (WARN_ON(IS_ERR(host->mux_clk)))
+-		return PTR_ERR(host->mux_clk);
++	mux->reg = host->regs + SD_EMMC_CLOCK;
++	mux->shift = __bf_shf(CLK_SRC_MASK);
++	mux->mask = CLK_SRC_MASK >> mux->shift;
++	mux->hw.init = &init;
 +
-+	host->pins_clk_gate = pinctrl_lookup_state(host->pinctrl,
-+						   "clk-gate");
-+	if (IS_ERR(host->pins_clk_gate)) {
-+		dev_warn(&pdev->dev,
-+			 "can't get clk-gate pinctrl, using clk_stop bit\n");
-+		host->pins_clk_gate = NULL;
-+	}
++	clk = devm_clk_register(host->dev, &mux->hw);
++	if (WARN_ON(IS_ERR(clk)))
++		return PTR_ERR(clk);
+ 
+ 	/* create the divider */
++	div = devm_kzalloc(host->dev, sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return -ENOMEM;
 +
- 	host->core_clk = devm_clk_get(&pdev->dev, "core");
- 	if (IS_ERR(host->core_clk)) {
- 		ret = PTR_ERR(host->core_clk);
+ 	snprintf(clk_name, sizeof(clk_name), "%s#div", dev_name(host->dev));
+ 	init.name = clk_name;
+ 	init.ops = &clk_divider_ops;
+ 	init.flags = CLK_SET_RATE_PARENT;
+-	clk_div_parents[0] = __clk_get_name(host->mux_clk);
+-	init.parent_names = clk_div_parents;
+-	init.num_parents = ARRAY_SIZE(clk_div_parents);
+-
+-	host->cfg_div.reg = host->regs + SD_EMMC_CLOCK;
+-	host->cfg_div.shift = __bf_shf(CLK_DIV_MASK);
+-	host->cfg_div.width = __builtin_popcountl(CLK_DIV_MASK);
+-	host->cfg_div.hw.init = &init;
+-	host->cfg_div.flags = CLK_DIVIDER_ONE_BASED |
+-		CLK_DIVIDER_ROUND_CLOSEST;
+-
+-	host->cfg_div_clk = devm_clk_register(host->dev, &host->cfg_div.hw);
+-	if (WARN_ON(PTR_ERR_OR_ZERO(host->cfg_div_clk)))
+-		return PTR_ERR(host->cfg_div_clk);
+-
+-	ret = clk_prepare_enable(host->cfg_div_clk);
+-	if (ret)
+-		return ret;
++	clk_parent[0] = __clk_get_name(clk);
++	init.parent_names = clk_parent;
++	init.num_parents = 1;
++
++	div->reg = host->regs + SD_EMMC_CLOCK;
++	div->shift = __bf_shf(CLK_DIV_MASK);
++	div->width = __builtin_popcountl(CLK_DIV_MASK);
++	div->hw.init = &init;
++	div->flags = (CLK_DIVIDER_ONE_BASED |
++		      CLK_DIVIDER_ROUND_CLOSEST);
+ 
+-	/* Get the nearest minimum clock to 400KHz */
+-	host->mmc->f_min = clk_round_rate(host->cfg_div_clk, 400000);
++	host->mmc_clk = devm_clk_register(host->dev, &div->hw);
++	if (WARN_ON(PTR_ERR_OR_ZERO(host->mmc_clk)))
++		return PTR_ERR(host->mmc_clk);
+ 
+-	ret = meson_mmc_clk_set(host, host->mmc->f_min);
++	/* init SD_EMMC_CLOCK to sane defaults w/min clock rate */
++	host->mmc->f_min = clk_round_rate(host->mmc_clk, 400000);
++	ret = clk_set_rate(host->mmc_clk, host->mmc->f_min);
+ 	if (ret)
+-		clk_disable_unprepare(host->cfg_div_clk);
++		return ret;
+ 
+-	return ret;
++	return clk_prepare_enable(host->mmc_clk);
+ }
+ 
+ static void meson_mmc_set_tuning_params(struct mmc_host *mmc)
+@@ -949,7 +947,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 					meson_mmc_irq_thread, IRQF_SHARED,
+ 					NULL, host);
+ 	if (ret)
+-		goto err_div_clk;
++		goto err_init_clk;
+ 
+ 	mmc->caps |= MMC_CAP_CMD23;
+ 	mmc->max_blk_count = CMD_CFG_LENGTH_MASK;
+@@ -965,7 +963,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 	if (host->bounce_buf == NULL) {
+ 		dev_err(host->dev, "Unable to map allocate DMA bounce buffer.\n");
+ 		ret = -ENOMEM;
+-		goto err_div_clk;
++		goto err_init_clk;
+ 	}
+ 
+ 	host->descs = dma_alloc_coherent(host->dev, SD_EMMC_DESC_BUF_LEN,
+@@ -984,8 +982,8 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ err_bounce_buf:
+ 	dma_free_coherent(host->dev, host->bounce_buf_size,
+ 			  host->bounce_buf, host->bounce_dma_addr);
+-err_div_clk:
+-	clk_disable_unprepare(host->cfg_div_clk);
++err_init_clk:
++	clk_disable_unprepare(host->mmc_clk);
+ err_core_clk:
+ 	clk_disable_unprepare(host->core_clk);
+ free_host:
+@@ -1007,7 +1005,7 @@ static int meson_mmc_remove(struct platform_device *pdev)
+ 	dma_free_coherent(host->dev, host->bounce_buf_size,
+ 			  host->bounce_buf, host->bounce_dma_addr);
+ 
+-	clk_disable_unprepare(host->cfg_div_clk);
++	clk_disable_unprepare(host->mmc_clk);
+ 	clk_disable_unprepare(host->core_clk);
+ 
+ 	mmc_free_host(host->mmc);
 -- 
 2.9.5
