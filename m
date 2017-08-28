@@ -1,130 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 28 Aug 2017 10:31:44 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <35832703.Y3V01Ybc1Y@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <6003495.864qntojfu@aspire.rjw.lan> <2333939.YcVPemMPxH@aspire.rjw.lan>
- <35832703.Y3V01Ybc1Y@aspire.rjw.lan>
-Message-ID: <CAPDyKFrRW3BLetxGW=89_Ksoxn4GW_7ebcADT1pyUrAT4ySpjA@mail.gmail.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Mon, 28 Aug 2017 11:39:27 +0300
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+References: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
+ <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
+ <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+ <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+Message-ID: <59A3D6BF.7010400@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2017 at 03:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, August 25, 2017 3:42:35 PM CEST Rafael J. Wysocki wrote:
->> On Thursday, August 24, 2017 11:50:40 PM CEST Rafael J. Wysocki wrote:
->> > On Thursday, August 24, 2017 6:35:49 PM CEST Rafael J. Wysocki wrote:
->> > > On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
->> >
->> > [cut]
->> >
->> > > [BTW, it is not entirely clear to me why it ever is necessary to runtime resume
->> > > a device with direct_complete set after __device_suspend(), because it can only
->> > > have direct_complete set at that point if all of the hierarchy below it has
->> > > this flag set too and so runtime PM has to be disabled for all of those
->> > > devices as well.]
->> >
->> > Which makes me realize that we should take a step back and look at what
->> > problems there are.
->> >
->> > First, there are devices (I know about two examples so far and both are PCI)
->> > that may need to be runtime resumed during system suspend for reasons other
->> > than the ones checked by the ACPI PM domain (or the PCI bus type).  There needs
->> > to be a way to indicate that from the driver side.
->> >
->> > However, it still may be valuable to check the power-related conditions for
->> > leaving the device in runtime suspend over system suspend/resume in case
->> > it actually doesn't need to be runtime resumed during system suspend after
->> > all.  That's what the majority of my patch was about.
->> >
->> > The second problem is that the ACPI PM domain (and the PCI bus type)
->> > runtime resumes all devices unconditionally in its ->suspend callback,
->> > even though that may not be necessary for some devices.  Therefore there
->> > needs to be a way to indicate that too.  That still would be good to
->> > have *regardless* of the direct_complete mechanism, because the direct_complete
->> > flag may not be set very often due to dependencies and then the
->> > resume-during-suspend will take place unnecessarily.
->> >
->> > Accordingly, it looks like we need a "no need to resume me" flag in the first
->> > place.  That would indicate to interested pieces of code that, from the
->> > driver perspective, the device doesn't need to be runtime resumed before
->> > invoking its system suspend callbacks.  This should be clear enough to everyone
->> > IMO.
->> >
->> > [Note that if that flag is set for all devices, we may drop it along with
->> > direct_complete, but before that happens both are needed.]
->>
->> I think we are in agreement that direct_complete will not be necessary any
->> more when all drivers/bus types/PM domains and so on can do the "safe
->> suspend", but we're not there yet. :-)
->>
->> > To address the first issue I would add something like the flag in the patches
->> > I sent (but without the ACPI PM domain part which should be covered by the
->> > "no need to resume me" flag above), because that allows the device's ->suspend
->> > callback to run in principle and the driver may use that callback even to
->> > runtime resume the device if that's what it wants to do.  So something like
->> > "run my ->suspend callback even though I might stay in runtime suspend".
->> >
->> > I would probably add driver_flags to dev_pm_info for that to set at the probe
->> > time (and I would make the core clear that on driver removal).
->> >
->> > The complexity concern is there, but honestly I don't see a better way at
->> > this point.
->>
->> So below is a prototype patch.  It still is missing a documentation update, but
->> other than that it should be complete unless I missed something.
->>
->> The way it works is that the SAFE_SUSPEND flag is not looked at by the core
->> at all.  The ACPI PM domain looks at it and the PCI bus type can be modified
->> to take it into account in the future.  That is what causes the "runtime resume
->> during system suspend" to be skipped.
->>
->> In turn, the ALWAYS_SUSPEND flag is only looked at by the core and it causes
->> the decision on whether or not to use direct_complete to be deferred to the
->> __device_suspend_late() time.  If you set it for a PCI device, the effect is
->> equivalent to "no direct_complete".  If you set it for a device in the ACPI
->> PM domain, that depends on whether or not SAFE_SUSPEND is set.  If it isn't
->> set, the effect is equivalent to "no direct_complete" too, but if it is set,
->> the core may still try to use direct_complete for the device, but it will
->> make the decision on it in __device_suspend_late() and then it will not invoke
->> the ->suspend_late callback for the device if it is still runtime suspended.
->> [Note that you cannot runtime resume and runtime suspend again a device during
->> system suspend, so if it is runtime suspended in __device_suspend_late(), it
->> has been runtime suspend all the way since device_prepare().]
->>
->> So say you point the ->suspend_late and ->resume_early callbacks of
->> the designware i2c driver to pm_runtime_force_suspend() and
->> pm_runtime_force_resume(), respectively, and set both the SAFE_SUSPEND
->> and ALWAYS_SUSPEND flags for the device.
->>
->> If system suspend is started and the device is not runtime suspended,
->> direct_complete is not set for it and everything works as usual, so say
->> the device is runtime suspended in device_prepare().  Then, the ACPI PM
->> domain checks the other conditions for leaving it in runtime suspend and
->> returns either 0 or a positive number from acpi_subsys_prepare().
->>
->> If 0 is returned, direct_complete is not set by the core and
->> acpi_subsys_suspend() is called.  It checks the SAFE_SUSPEND flag and sees
->> that the device need not be runtime resumed, so it invokes the driver's
->> ->suspend callback (which is not present, so it doesn't do anything).
->> Next, in __device_suspend_late(), acpi_subsys_suspend_late() is invoked
->> and it calls pm_runtime_force_suspend(), which executes the driver's
->> ->runtime_suspend() callback, and then (if successful) calls
->> acpi_dev_suspend_late() to put the device into a low-power state.  The
->> resume path is a reverse of the above in this case.  So far, so good.
+On 23.08.2017 17:30, Mason wrote:
+> On 23/08/2017 14:41, Mason wrote:
 >
-> Well, not really, because if the device remains runtime suspended,
-> ->runtime_suspend() will not be called by pm_runtime_force_suspend() and
-> acpi_dev_suspend_late() should not be called then.
+>> I compiled a minimal kernel, with lots of irrelevant drivers and
+>> frameworks left out, including power management. I still get the
+>> "xHCI host controller not responding, assume dead" issue.
 >
-> So more changes in the ACPI PM domain are needed after all.
+> The problem seems to have a timing-related aspect.
+>
+> I added a bunch of logs (to a slow serial console) and the HC was
+> not killed. I was able to plug the Flash drive a second time.
+> (I am logging config space reads and writes.)
 
-Yes, that's what I thought as well.
 
-Anyway, let me cook a new version of the series - trying to address
-the first bits you have pointed out. Then we can continue with
-fine-tuning on top, addressing further optimizations of the ACPI PM
-domain.
+Could you take a log with the following added debug, without
+your extra delays, It should show a bit more about the state
+of the controller when we read 0xffffffff
 
-Kind regards
-Uffe
+
+diff --git a/drivers/usb/host/xhci-hub.c b/drivers/usb/host/xhci-hub.c
+index 4bc6f42..a124c3d 100644
+--- a/drivers/usb/host/xhci-hub.c
++++ b/drivers/usb/host/xhci-hub.c
+@@ -23,6 +23,7 @@
+  
+  #include <linux/slab.h>
+  #include <asm/unaligned.h>
++#include <linux/pci.h>
+  
+  #include "xhci.h"
+  #include "xhci-trace.h"
+@@ -1280,7 +1281,11 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+                 wIndex--;
+                 temp = readl(port_array[wIndex]);
+                 if (temp == ~(u32)0) {
+-                       xhci_hc_died(xhci);
++                       struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
++                       xhci_err(xhci, "ClearPortFeat port%d @%p=%x, hcd->state:0x%x hcd->flags:0x%x, pci_state 0x%x\n",
++                                wIndex, port_array[wIndex], temp, hcd->state, hcd->flags, pdev->current_state);
++
++                       WARN_ON(1);
+                         retval = -ENODEV;
+                         break;
+                 }
+
+Thanks
+-Mathias
