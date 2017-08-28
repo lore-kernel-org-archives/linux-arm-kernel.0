@@ -1,53 +1,85 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 28 Aug 2017 12:32:41 +0530
-Subject: [PATCH 3/3] clk: ux500: prcc: constify clk_ops.
-In-Reply-To: <1503903761-21730-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1503903761-21730-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1503903761-21730-4-git-send-email-arvind.yadav.cs@gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 28 Aug 2017 10:19:57 +0300
+Subject: [PATCH] ARM: dts: keystone-k2g: Add McASP nodes
+Message-ID: <20170828071957.9597-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_ops are not supposed to change at runtime. All functions
-working with clk_ops provided by <linux/clk-provider.h> work
-with const clk_ops. So mark the non-const clk_ops as const.
+?Add three McASP nodes present on 66AK2G device.
 
-Here, Function "clk_reg_prcc" is used to initialized clk_init_data.
-clk_init_data is working with const clk_ops. So make clk_reg_prcc
-non-const clk_ops argument as const.
-
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/clk/ux500/clk-prcc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Hi Santosh,
 
-diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
-index 0e95076..f505927 100644
---- a/drivers/clk/ux500/clk-prcc.c
-+++ b/drivers/clk/ux500/clk-prcc.c
-@@ -79,13 +79,13 @@ static int clk_prcc_is_enabled(struct clk_hw *hw)
- 	return clk->is_enabled;
- }
- 
--static struct clk_ops clk_prcc_pclk_ops = {
-+static const struct clk_ops clk_prcc_pclk_ops = {
- 	.enable = clk_prcc_pclk_enable,
- 	.disable = clk_prcc_pclk_disable,
- 	.is_enabled = clk_prcc_is_enabled,
+There is no driver change dependency for McASP to work on 66AK2G, only the nodes
+need to be in place.
+
+Regards,
+Peter
+
+ arch/arm/boot/dts/keystone-k2g.dtsi | 48 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index 826b286665e6..5fcd2c6da46d 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -343,5 +343,53 @@
+ 			clock-names = "fck", "mmchsdb_fck";
+ 			status = "disabled";
+ 		};
++
++		mcasp0: mcasp at 02340000 {
++			compatible = "ti,am33xx-mcasp-audio";
++			reg = <0x02340000 0x2000>,
++			      <0x21804000 0x1000>;
++			reg-names = "mpu","dat";
++			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "tx", "rx";
++			dmas = <&edma0 24 1>, <&edma0 25 1>;
++			dma-names = "tx", "rx";
++			power-domains = <&k2g_pds 0x4>;
++			clocks = <&k2g_clks 0x4 0>;
++			clock-names = "fck";
++			status = "disabled";
++		};
++
++		mcasp1: mcasp at 02342000 {
++			compatible = "ti,am33xx-mcasp-audio";
++			reg = <0x02342000 0x2000>,
++			      <0x21804400 0x1000>;
++			reg-names = "mpu","dat";
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "tx", "rx";
++			dmas = <&edma1 48 1>, <&edma1 49 1>;
++			dma-names = "tx", "rx";
++			power-domains = <&k2g_pds 0x5>;
++			clocks = <&k2g_clks 0x5 0>;
++			clock-names = "fck";
++			status = "disabled";
++		};
++
++		mcasp2: mcasp at 02344000 {
++			compatible = "ti,am33xx-mcasp-audio";
++			reg = <0x02344000 0x2000>,
++			      <0x21804800 0x1000>;
++			reg-names = "mpu","dat";
++			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "tx", "rx";
++			dmas = <&edma1 50 1>, <&edma1 51 1>;
++			dma-names = "tx", "rx";
++			power-domains = <&k2g_pds 0x6>;
++			clocks = <&k2g_clks 0x6 0>;
++			clock-names = "fck";
++			status = "disabled";
++		};
+ 	};
  };
- 
--static struct clk_ops clk_prcc_kclk_ops = {
-+static const struct clk_ops clk_prcc_kclk_ops = {
- 	.enable = clk_prcc_kclk_enable,
- 	.disable = clk_prcc_kclk_disable,
- 	.is_enabled = clk_prcc_is_enabled,
-@@ -96,7 +96,7 @@ static struct clk *clk_reg_prcc(const char *name,
- 				resource_size_t phy_base,
- 				u32 cg_sel,
- 				unsigned long flags,
--				struct clk_ops *clk_prcc_ops)
-+				const struct clk_ops *clk_prcc_ops)
- {
- 	struct clk_prcc *clk;
- 	struct clk_init_data clk_prcc_init;
 -- 
-1.9.1
+2.14.1
+
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
