@@ -1,73 +1,25 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 28 Aug 2017 14:07:51 +0200
-Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
-In-Reply-To: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
-References: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
-Message-ID: <1503922071.2347.0.camel@pengutronix.de>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Mon, 28 Aug 2017 17:41:37 +0530
+Subject: [PATCH 0/3] constify iommu_ops
+Message-ID: <1503922298-25862-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 28.08.2017, 14:05 +0300 schrieb Leonard Crestez:
-> This patch contains the minimal changes required to support imx6sx OPP
-> of 198 Mhz. Without this patch cpufreq still reports success but the
-> frequency is not changed, the "arm" clock will still be at 396000000 in
-> clk_summary.
-> 
-> In order to do this PLL1 needs to be still kept enabled while changing
-> the ARM clock. This is a hardware requirement: when ARM_PODF is changed
-> in CCM we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy,
-> and this bit is sync with PLL1 clock, so if PLL1 NOT enabled, this
-> bit will never get clear.
-> 
-> Keep pll1_sys explicitly enabled until after the rate is change to deal
-> with this. Otherwise from the clk framework perspective pll1_sys is
-> unused and gets turned off.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+iommu_ops are not supposed to change at runtime.
+Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
+const iommu_ops provided by <linux/iommu.h>. So mark the non-const
+structs as const.
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Arvind Yadav (3):
+  [PATCH 1/3] iommu: exynos: constify iommu_ops
+  [PATCH 2/3] iommu: mtk: constify iommu_ops
+  [PATCH 3/3] iommu: s390: constify iommu_ops
 
-> ---
-> Changes since v1:
->  - Link: https://lkml.org/lkml/2017/7/19/302
->  - Only keep pll1_sys enabled until after ARM rate is changed.
->  - Incorporate more elaborate explanation from Anson
->  - Do not add new clocks or bypass PLL1. Just let it get disabled.
-> 
->  drivers/cpufreq/imx6q-cpufreq.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index b6edd3c..14466a9 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -47,6 +47,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  	struct dev_pm_opp *opp;
->  	unsigned long freq_hz, volt, volt_old;
->  	unsigned int old_freq, new_freq;
-> +	bool pll1_sys_temp_enabled = false;
->  	int ret;
->  
->  	new_freq = freq_table[index].frequency;
-> @@ -124,6 +125,10 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
->  			clk_set_rate(pll1_sys_clk, new_freq * 1000);
->  			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +		} else {
-> +			/* pll1_sys needs to be enabled for divider rate change to work. */
-> +			pll1_sys_temp_enabled = true;
-> +			clk_prepare_enable(pll1_sys_clk);
->  		}
->  	}
->  
-> @@ -135,6 +140,10 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		return ret;
->  	}
->  
-> +	/* PLL1 is only needed until after ARM-PODF is set. */
-> +	if (pll1_sys_temp_enabled)
-> +		clk_disable_unprepare(pll1_sys_clk);
-> +
->  	/* scaling down?  scale voltage after frequency */
->  	if (new_freq < old_freq) {
->  		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+ drivers/iommu/exynos-iommu.c | 4 ++--
+ drivers/iommu/mtk_iommu.c    | 4 ++--
+ drivers/iommu/mtk_iommu_v1.c | 4 ++--
+ drivers/iommu/s390-iommu.c   | 2 +-
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
+-- 
+1.9.1
