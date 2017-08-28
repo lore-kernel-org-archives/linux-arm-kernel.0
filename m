@@ -1,22 +1,21 @@
 From: aneela@codeaurora.org (Arun Kumar Neelakantam)
-Date: Mon, 28 Aug 2017 17:19:53 +0530
-Subject: [PATCH v2 13/20] rpmsg: glink: Use the local intents when
- receiving data
-In-Reply-To: <1503559302-3744-14-git-send-email-sricharan@codeaurora.org>
+Date: Mon, 28 Aug 2017 17:21:57 +0530
+Subject: [PATCH v2 17/20] rpmsg: glink: Receive and store the remote
+ intent buffers
+In-Reply-To: <1503559302-3744-18-git-send-email-sricharan@codeaurora.org>
 References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
- <1503559302-3744-14-git-send-email-sricharan@codeaurora.org>
-Message-ID: <031d0f32-1522-437c-83cc-53ae3ec1f00c@codeaurora.org>
+ <1503559302-3744-18-git-send-email-sricharan@codeaurora.org>
+Message-ID: <d16133ed-480a-2745-80ab-afaa0a6686fc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 8/24/2017 12:51 PM, Sricharan R wrote:
-> So previously on request from remote side, we allocated local
-> intent buffers and passed the ids to the remote. Now when
-> we receive data buffers from remote directed to that intent
-> id, copy the data to the corresponding preallocated intent
-> buffer.
+> Just like we allocating and sending intent ids to remote,
+> remote side allocates and sends us the intents as well.
+> So save the intent ids and use it later while sending
+> data targeting the appropriate intents based on the size.
 >
 > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
@@ -25,139 +24,124 @@ Acked-by: Arun Kumar Neelakantam <aneela@codeaurora.org>
 Regards,
 Arun N
 > ---
->   drivers/rpmsg/qcom_glink_native.c | 75 ++++++++++++++++++++++++++-------------
->   1 file changed, 50 insertions(+), 25 deletions(-)
+>   drivers/rpmsg/qcom_glink_native.c | 71 ++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 70 insertions(+), 1 deletion(-)
 >
 > diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-> index 7778e57..67eeb86 100644
+> index 76ee86e..d93d651 100644
 > --- a/drivers/rpmsg/qcom_glink_native.c
 > +++ b/drivers/rpmsg/qcom_glink_native.c
-> @@ -162,7 +162,7 @@ struct glink_channel {
+> @@ -139,8 +139,9 @@ enum {
+>    * @name:	unique channel name/identifier
+>    * @lcid:	channel id, in local space
+>    * @rcid:	channel id, in remote space
+> - * @intent_lock: lock for protection of @liids
+> + * @intent_lock: lock for protection of @liids, @riids
+>    * @liids:	idr of all local intents
+> + * @riids:	idr of all remote intents
+>    * @intent_work: worker responsible for transmitting rx_done packets
+>    * @done_intents: list of intents that needs to be announced rx_done
+>    * @buf:	receive buffer, for gathering fragments
+> @@ -165,6 +166,7 @@ struct glink_channel {
+>   
 >   	spinlock_t intent_lock;
 >   	struct idr liids;
+> +	struct idr riids;
+>   	struct work_struct intent_work;
+>   	struct list_head done_intents;
 >   
-> -	void *buf;
-> +	struct glink_core_rx_intent *buf;
->   	int buf_offset;
->   	int buf_size;
+> @@ -222,6 +224,7 @@ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
+>   	INIT_WORK(&channel->intent_work, qcom_glink_rx_done_work);
 >   
-> @@ -614,6 +614,7 @@ static int qcom_glink_rx_defer(struct qcom_glink *glink, size_t extra)
+>   	idr_init(&channel->liids);
+> +	idr_init(&channel->riids);
+>   	kref_init(&channel->refcount);
 >   
->   static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
->   {
-> +	struct glink_core_rx_intent *intent;
->   	struct glink_channel *channel;
->   	struct {
->   		struct glink_msg msg;
-> @@ -623,6 +624,8 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
->   	unsigned int chunk_size;
->   	unsigned int left_size;
->   	unsigned int rcid;
-> +	unsigned int liid;
-> +	int ret = 0;
->   	unsigned long flags;
+>   	return channel;
+> @@ -235,6 +238,7 @@ static void qcom_glink_channel_release(struct kref *ref)
 >   
->   	if (avail < sizeof(hdr)) {
-> @@ -650,56 +653,78 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
->   		dev_dbg(glink->dev, "Data on non-existing channel\n");
+>   	spin_lock_irqsave(&channel->intent_lock, flags);
+>   	idr_destroy(&channel->liids);
+> +	idr_destroy(&channel->riids);
+>   	spin_unlock_irqrestore(&channel->intent_lock, flags);
 >   
->   		/* Drop the message */
-> -		qcom_glink_rx_advance(glink,
-> -				      ALIGN(sizeof(hdr) + chunk_size, 8));
-> -		return 0;
-> +		goto advance_rx;
->   	}
->   
-> -	/* Might have an ongoing, fragmented, message to append */
-> -	if (!channel->buf) {
-> -		channel->buf = kmalloc(chunk_size + left_size, GFP_ATOMIC);
-> -		if (!channel->buf)
-> -			return -ENOMEM;
-> +	if (glink->intentless) {
-> +		/* Might have an ongoing, fragmented, message to append */
-> +		if (!channel->buf) {
-> +			intent = kzalloc(sizeof(*intent), GFP_ATOMIC);
-> +			if (!intent)
-> +				return -ENOMEM;
-> +
-> +			intent->data = kmalloc(chunk_size + left_size,
-> +					       GFP_ATOMIC);
-> +			if (!intent->data) {
-> +				kfree(intent);
-> +				return -ENOMEM;
-> +			}
-> +
-> +			intent->id = 0xbabababa;
-> +			intent->size = chunk_size + left_size;
-> +			intent->offset = 0;
-> +
-> +			channel->buf = intent;
-> +		} else {
-> +			intent = channel->buf;
-> +		}
-> +	} else {
-> +		liid = le32_to_cpu(hdr.msg.param2);
->   
-> -		channel->buf_size = chunk_size + left_size;
-> -		channel->buf_offset = 0;
-> -	}
-> +		spin_lock_irqsave(&channel->intent_lock, flags);
-> +		intent = idr_find(&channel->liids, liid);
-> +		spin_unlock_irqrestore(&channel->intent_lock, flags);
->   
-> -	qcom_glink_rx_advance(glink, sizeof(hdr));
-> +		if (!intent) {
-> +			dev_err(glink->dev,
-> +				"no intent found for channel %s intent %d",
-> +				channel->name, liid);
-> +			goto advance_rx;
-> +		}
-> +	}
->   
-> -	if (channel->buf_size - channel->buf_offset < chunk_size) {
-> -		dev_err(glink->dev, "Insufficient space in input buffer\n");
-> +	if (intent->size - intent->offset < chunk_size) {
-> +		dev_err(glink->dev, "Insufficient space in intent\n");
->   
->   		/* The packet header lied, drop payload */
-> -		qcom_glink_rx_advance(glink, chunk_size);
-> -		return -ENOMEM;
-> +		goto advance_rx;
->   	}
->   
-> -	qcom_glink_rx_peak(glink, channel->buf + channel->buf_offset,
-> +	qcom_glink_rx_advance(glink, ALIGN(sizeof(hdr), 8));
-> +	qcom_glink_rx_peak(glink, intent->data + intent->offset,
->   			   chunk_size);
-> -	channel->buf_offset += chunk_size;
-> +	intent->offset += chunk_size;
->   
->   	/* Handle message when no fragments remain to be received */
->   	if (!left_size) {
->   		spin_lock(&channel->recv_lock);
->   		if (channel->ept.cb) {
->   			channel->ept.cb(channel->ept.rpdev,
-> -					channel->buf,
-> -					channel->buf_offset,
-> +					intent->data,
-> +					intent->offset,
->   					channel->ept.priv,
->   					RPMSG_ADDR_ANY);
->   		}
->   		spin_unlock(&channel->recv_lock);
->   
-> -		kfree(channel->buf);
-> +		intent->offset = 0;
->   		channel->buf = NULL;
-> -		channel->buf_size = 0;
->   	}
->   
-> -	/* Each message starts at 8 byte aligned address */
-> +advance_rx:
->   	qcom_glink_rx_advance(glink, ALIGN(chunk_size, 8));
->   
-> -	return 0;
-> +	return ret;
+>   	kfree(channel->name);
+> @@ -806,6 +810,68 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
+>   	return ret;
 >   }
 >   
+> +static void qcom_glink_handle_intent(struct qcom_glink *glink,
+> +				     unsigned int cid,
+> +				     unsigned int count,
+> +				     size_t avail)
+> +{
+> +	struct glink_core_rx_intent *intent;
+> +	struct glink_channel *channel;
+> +	struct intent_pair {
+> +		__le32 size;
+> +		__le32 iid;
+> +	};
+> +
+> +	struct {
+> +		struct glink_msg msg;
+> +		struct intent_pair intents[];
+> +	} __packed * msg;
+> +
+> +	const size_t msglen = sizeof(*msg) + sizeof(struct intent_pair) * count;
+> +	int ret;
+> +	int i;
+> +	unsigned long flags;
+> +
+> +	if (avail < msglen) {
+> +		dev_dbg(glink->dev, "Not enough data in fifo\n");
+> +		return;
+> +	}
+> +
+> +	spin_lock_irqsave(&glink->idr_lock, flags);
+> +	channel = idr_find(&glink->rcids, cid);
+> +	spin_unlock_irqrestore(&glink->idr_lock, flags);
+> +	if (!channel) {
+> +		dev_err(glink->dev, "intents for non-existing channel\n");
+> +		return;
+> +	}
+> +
+> +	msg = kmalloc(msglen, GFP_ATOMIC);
+> +	if (!msg)
+> +		return;
+> +
+> +	qcom_glink_rx_peak(glink, msg, 0, msglen);
+> +
+> +	for (i = 0; i < count; ++i) {
+> +		intent = kzalloc(sizeof(*intent), GFP_ATOMIC);
+> +		if (!intent)
+> +			break;
+> +
+> +		intent->id = le32_to_cpu(msg->intents[i].iid);
+> +		intent->size = le32_to_cpu(msg->intents[i].size);
+> +
+> +		spin_lock_irqsave(&channel->intent_lock, flags);
+> +		ret = idr_alloc(&channel->riids, intent,
+> +				intent->id, intent->id + 1, GFP_ATOMIC);
+> +		spin_unlock_irqrestore(&channel->intent_lock, flags);
+> +
+> +		if (ret < 0)
+> +			dev_err(glink->dev, "failed to store remote intent\n");
+> +	}
+> +
+> +	kfree(msg);
+> +	qcom_glink_rx_advance(glink, ALIGN(msglen, 8));
+> +}
+> +
 >   static int qcom_glink_rx_open_ack(struct qcom_glink *glink, unsigned int lcid)
+>   {
+>   	struct glink_channel *channel;
+> @@ -871,6 +937,9 @@ static irqreturn_t qcom_glink_native_intr(int irq, void *data)
+>   
+>   			ret = 0;
+>   			break;
+> +		case RPM_CMD_INTENT:
+> +			qcom_glink_handle_intent(glink, param1, param2, avail);
+> +			break;
+>   		default:
+>   			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
+>   			dev_err(glink->dev, "unhandled rx cmd: %d\n", cmd);
