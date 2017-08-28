@@ -1,54 +1,47 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 28 Aug 2017 10:57:32 +0300
-Subject: [PATCH 2/5] mmc: sdhci: Add quirk to indicate MMC_RSP_136 has CRC
-In-Reply-To: <20170821074132.4622-3-kishon@ti.com>
-References: <20170821074132.4622-1-kishon@ti.com>
- <20170821074132.4622-3-kishon@ti.com>
-Message-ID: <24fa9713-1367-08d7-54b6-b853e32fd6aa@intel.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Mon, 28 Aug 2017 08:13:27 +0000
+Subject: [PATCH 1/7] dt-bindings: usb: Document the STM32F7xx DWC2 USB OTG
+ HS core binding
+In-Reply-To: <20170822021059.suqqn7332sjbvfj3@rob-hp-laptop>
+References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+ <1502962386-6683-2-git-send-email-amelie.delaunay@st.com>
+ <20170822021059.suqqn7332sjbvfj3@rob-hp-laptop>
+Message-ID: <e46c3681-01e8-cb16-2ee8-5947bdd6b62c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/17 10:41, Kishon Vijay Abraham I wrote:
-> TI's implementation of sdhci controller used in DRA7 SoC's has
-> CRC in responses with length 136 bits. Add quirk to indicate
-> the controller has CRC in MMC_RSP_136. If this quirk is
-> set sdhci library shouldn't shift the response present in
-> SDHCI_RESPONSE register.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-> ---
->  drivers/mmc/host/sdhci.c | 3 +++
->  drivers/mmc/host/sdhci.h | 2 ++
->  2 files changed, 5 insertions(+)
+On 08/22/2017 04:10 AM, Rob Herring wrote:
+> On Thu, Aug 17, 2017 at 11:33:00AM +0200, Amelie Delaunay wrote:
+>> This patch adds binding documentation for DWC2 controller in HS mode found
+>> on STMicroelectronics STM32F7xx SoC.
+>>
+>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+>> ---
+>>   Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+>> index fcf199b..e64d903 100644
+>> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+>> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+>> @@ -19,6 +19,8 @@ Required properties:
+>>     configured in FS mode;
+>>     - "st,stm32f4x9-hsotg": The DWC2 USB HS controller instance in STM32F4x9 SoCs
+>>     configured in HS mode;
+>> +  - "st,stm32f7xx-hsotg": The DWC2 USB HS controller instance in STM32F7xx SoCs
+>> +    configured in HS mode;
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index ba639b7851cb..9c8d7428df3c 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1182,6 +1182,9 @@ static void sdhci_read_rsp_136(struct sdhci_host *host, struct mmc_command *cmd)
->  		cmd->resp[i] = sdhci_readl(host, reg);
->  	}
->  
-> +	if (host->quirks2 & SDHCI_QUIRK2_RSP_136_HAS_CRC)
-> +		return;
-> +
->  	/* CRC is stripped so we need to do some shifting */
->  	for (i = 0; i < 4; i++) {
->  		cmd->resp[i] <<= 8;
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 399edc681623..54bc444c317f 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -435,6 +435,8 @@ struct sdhci_host {
->  #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
->  /* Broken Clock divider zero in controller */
->  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
-> +/* Controller has CRC in 136 bit Command Response */
-> +#define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
->  
->  	int irq;		/* Device IRQ */
->  	void __iomem *ioaddr;	/* Mapped address */
+> Don't use wildcards in compatible strings (not sure how the previous one
+> snuck in). Just "stm32f7" (i.e. just drop the xx) is probably specific
+> enough though.
+OK to drop the "xx", I used them only to match the previous one.
+
 > 
+>>   - reg : Should contain 1 register range (address and length)
+>>   - interrupts : Should contain 1 interrupt
+>>   - clocks: clock provider specifier
+>> -- 
+>> 2.7.4
+>>
