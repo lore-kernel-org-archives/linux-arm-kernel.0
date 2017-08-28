@@ -1,61 +1,78 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Aug 2017 16:29:13 +0200
-Subject: [PATCH v3 11/13] mmc: meson-gx: implement voltage switch callback
-In-Reply-To: <20170828142915.27020-1-jbrunet@baylibre.com>
-References: <20170828142915.27020-1-jbrunet@baylibre.com>
-Message-ID: <20170828142915.27020-12-jbrunet@baylibre.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 28 Aug 2017 16:23:06 +0200
+Subject: [PATCH 2/3] PCI: imx6: allow MSI irq to be absent
+In-Reply-To: <20170828142307.30061-1-l.stach@pengutronix.de>
+References: <20170828142307.30061-1-l.stach@pengutronix.de>
+Message-ID: <20170828142307.30061-3-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement voltage switch callback (shamelessly copied from sunxi mmc
-driver). This allow, with the appropriate tuning function, to use
-SD ultra high speed modes.
+The host can fall back to PCIe legacy IRQ only operation if the MSI irq is
+missing, thus allowing systems to work with peripherals that don't support
+MSI irqs.
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 ++++----
+ drivers/pci/dwc/pci-imx6.c                         | 23 +++++++++++-----------
+ 2 files changed, 15 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 2fa18faa7f0f..0cffc705bfe3 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -1049,6 +1049,27 @@ static int meson_mmc_card_busy(struct mmc_host *mmc)
- 	return !(FIELD_GET(STATUS_DATI, regval) & 0xf);
- }
+diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+index cf92d3ba5a26..d85db21503f4 100644
+--- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+@@ -10,14 +10,14 @@ Required properties:
+ 	- "fsl,imx6qp-pcie"
+ 	- "fsl,imx7d-pcie"
+ - reg: base address and length of the PCIe controller
+-- interrupts: A list of interrupt outputs of the controller. Must contain an
+-  entry for each entry in the interrupt-names property.
+-- interrupt-names: Must include the following entries:
+-	- "msi": The interrupt that is asserted when an MSI is received
+ - clock-names: Must include the following additional entries:
+ 	- "pcie_phy"
  
-+static int meson_mmc_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	/* vqmmc regulator is available */
-+	if (!IS_ERR(mmc->supply.vqmmc)) {
-+		/*
-+		 * The usual amlogic setup uses a GPIO to switch from one
-+		 * regulator to the other. While the voltage ramp up is
-+		 * pretty fast, care must be taken when switching from 3.3v
-+		 * to 1.8v. Please make sure the regulator framework is aware
-+		 * of your own regulator constraints
-+		 */
-+		return mmc_regulator_set_vqmmc(mmc, ios);
-+	}
-+
-+	/* no vqmmc regulator, assume fixed regulator at 3/3.3V */
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+
- static const struct mmc_host_ops meson_mmc_ops = {
- 	.request	= meson_mmc_request,
- 	.set_ios	= meson_mmc_set_ios,
-@@ -1057,6 +1078,7 @@ static const struct mmc_host_ops meson_mmc_ops = {
- 	.post_req	= meson_mmc_post_req,
- 	.execute_tuning = meson_mmc_execute_tuning,
- 	.card_busy	= meson_mmc_card_busy,
-+	.start_signal_voltage_switch = meson_mmc_voltage_switch,
- };
+ Optional properties:
++- interrupts: A list of interrupt outputs of the controller. Must contain an
++  entry for each entry in the interrupt-names property.
++- interrupt-names: Must include the following entries:
++        - "msi": The interrupt that is asserted when an MSI is received
+ - fsl,tx-deemph-gen1: Gen1 De-emphasis value. Default: 0
+ - fsl,tx-deemph-gen2-3p5db: Gen2 (3.5db) De-emphasis value. Default: 0
+ - fsl,tx-deemph-gen2-6db: Gen2 (6db) De-emphasis value. Default: 20
+diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+index bf5c3616e344..d2507272b3ab 100644
+--- a/drivers/pci/dwc/pci-imx6.c
++++ b/drivers/pci/dwc/pci-imx6.c
+@@ -671,18 +671,17 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
  
- static int meson_mmc_probe(struct platform_device *pdev)
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+ 		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+-		if (pp->msi_irq <= 0) {
+-			dev_err(dev, "failed to get MSI irq\n");
+-			return -ENODEV;
+-		}
+-
+-		ret = devm_request_irq(dev, pp->msi_irq,
+-				       imx6_pcie_msi_handler,
+-				       IRQF_SHARED | IRQF_NO_THREAD,
+-				       "mx6-pcie-msi", imx6_pcie);
+-		if (ret) {
+-			dev_err(dev, "failed to request MSI irq\n");
+-			return ret;
++		if (pp->msi_irq > 0) {
++			ret = devm_request_irq(dev, pp->msi_irq,
++					       imx6_pcie_msi_handler,
++					       IRQF_SHARED | IRQF_NO_THREAD,
++					       "mx6-pcie-msi", imx6_pcie);
++			if (ret) {
++				dev_err(dev, "failed to request MSI irq\n");
++				return ret;
++			}
++		} else {
++			dev_info(dev, "missing MSI irq, MSI support unavailable\n");
+ 		}
+ 	}
+ 
 -- 
-2.9.5
+2.11.0
