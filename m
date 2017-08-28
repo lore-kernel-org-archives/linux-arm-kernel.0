@@ -1,22 +1,19 @@
 From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Mon, 28 Aug 2017 14:08:19 +0000
-Subject: [v2,7/8] binfmt_elf: don't attempt to load FDPIC binaries
-In-Reply-To: <20170817072347.19990-8-nicolas.pitre@linaro.org>
-References: <20170817072347.19990-8-nicolas.pitre@linaro.org>
-Message-ID: <44be341a-fb74-a3e7-0d0f-1aba8e58da24@st.com>
+Date: Mon, 28 Aug 2017 14:08:55 +0000
+Subject: [v2, 8/8] binfmt_elf_fdpic: fix crash on MMU system with dynamic
+ binaries
+In-Reply-To: <20170817072347.19990-9-nicolas.pitre@linaro.org>
+References: <20170817072347.19990-9-nicolas.pitre@linaro.org>
+Message-ID: <b552d5ba-fc88-667e-dc56-114367ab7b12@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Nicolas,
 
 On 08/17/2017 09:23 AM, Nicolas Pitre wrote:
-> On platforms where both ELF and ELF-FDPIC variants are available, the
-> regular ELF loader will happily identify FDPIC binaries as proper ELF
-> and load them without the necessary FDPIC fixups, resulting in an
-> immediate user space crash. Let's prevent binflt_elf from loading those
-> binaries so binfmt_elf_fdpic has a chance to pick them up. For those
-> architectures that don't define elf_check_fdpic(), a default version
-> returning false is provided.
+> In elf_fdpic_map_file() there is a test to ensure the dynamic section in
+> user space is properly terminated. However it does so by dereferencing
+> a user address directly. Add proper user space accessor.
 > 
 > Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Tested-by: Vincent Abriou <vincent.abriou@st.com>
@@ -25,61 +22,34 @@ BR
 Vincent
 
 > ---
->   fs/binfmt_elf.c | 15 +++++++++++++--
->   1 file changed, 13 insertions(+), 2 deletions(-)
+>   fs/binfmt_elf_fdpic.c | 8 ++++++--
+>   1 file changed, 6 insertions(+), 2 deletions(-)
 > 
-> diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
-> index 879ff9c7ff..84d64afaea 100644
-> --- a/fs/binfmt_elf.c
-> +++ b/fs/binfmt_elf.c
-> @@ -51,6 +51,11 @@
->   #define user_siginfo_t siginfo_t
->   #endif
->   
-> +/* That's for binfmt_elf_fdpic to deal with */
-> +#ifndef elf_check_fdpic
-> +#define elf_check_fdpic(ex) false
-> +#endif
+> diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
+> index 692e2a1fd2..6a56dea138 100644
+> --- a/fs/binfmt_elf_fdpic.c
+> +++ b/fs/binfmt_elf_fdpic.c
+> @@ -835,6 +835,9 @@ static int elf_fdpic_map_file(struct elf_fdpic_params *params,
+>   			if (phdr->p_vaddr >= seg->p_vaddr &&
+>   			    phdr->p_vaddr + phdr->p_memsz <=
+>   			    seg->p_vaddr + seg->p_memsz) {
+> +				Elf32_Dyn __user *dyn;
+> +				Elf32_Sword d_tag;
 > +
->   static int load_elf_binary(struct linux_binprm *bprm);
->   static unsigned long elf_map(struct file *, unsigned long, struct elf_phdr *,
->   				int, int, unsigned long);
-> @@ -541,7 +546,8 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
->   	if (interp_elf_ex->e_type != ET_EXEC &&
->   	    interp_elf_ex->e_type != ET_DYN)
->   		goto out;
-> -	if (!elf_check_arch(interp_elf_ex))
-> +	if (!elf_check_arch(interp_elf_ex) ||
-> +	    elf_check_fdpic(interp_elf_ex))
->   		goto out;
->   	if (!interpreter->f_op->mmap)
->   		goto out;
-> @@ -718,6 +724,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
->   		goto out;
->   	if (!elf_check_arch(&loc->elf_ex))
->   		goto out;
-> +	if (elf_check_fdpic(&loc->elf_ex))
-> +		goto out;
->   	if (!bprm->file->f_op->mmap)
->   		goto out;
+>   				params->dynamic_addr =
+>   					(phdr->p_vaddr - seg->p_vaddr) +
+>   					seg->addr;
+> @@ -847,8 +850,9 @@ static int elf_fdpic_map_file(struct elf_fdpic_params *params,
+>   					goto dynamic_error;
 >   
-> @@ -817,7 +825,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
->   		if (memcmp(loc->interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
->   			goto out_free_dentry;
->   		/* Verify the interpreter has a valid arch */
-> -		if (!elf_check_arch(&loc->interp_elf_ex))
-> +		if (!elf_check_arch(&loc->interp_elf_ex) ||
-> +		    elf_check_fdpic(&loc->interp_elf_ex))
->   			goto out_free_dentry;
->   
->   		/* Load the interpreter program headers */
-> @@ -1189,6 +1198,8 @@ static int load_elf_library(struct file *file)
->   	if (elf_ex.e_type != ET_EXEC || elf_ex.e_phnum > 2 ||
->   	    !elf_check_arch(&elf_ex) || !file->f_op->mmap)
->   		goto out;
-> +	if (elf_check_fdpic(&elf_ex))
-> +		goto out;
->   
->   	/* Now read in all of the header information */
->   
+>   				tmp = phdr->p_memsz / sizeof(Elf32_Dyn);
+> -				if (((Elf32_Dyn *)
+> -				     params->dynamic_addr)[tmp - 1].d_tag != 0)
+> +				dyn = (Elf32_Dyn __user *)params->dynamic_addr;
+> +				__get_user(d_tag, &dyn[tmp - 1].d_tag);
+> +				if (d_tag != 0)
+>   					goto dynamic_error;
+>   				break;
+>   			}
+> 
 > 
