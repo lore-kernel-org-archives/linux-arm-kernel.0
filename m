@@ -1,33 +1,47 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Mon, 28 Aug 2017 16:20:12 +0200
-Subject: [PATCHv2 1/7] dt-bindings: usb: Document the STM32F7 DWC2 USB OTG HS
- core binding
+Date: Mon, 28 Aug 2017 16:20:13 +0200
+Subject: [PATCHv2 2/7] usb: dwc2: add support for STM32F7 USB OTG HS
 In-Reply-To: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
 References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1503930018-536-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1503930018-536-3-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds binding documentation for DWC2 controller in HS mode found
-on STMicroelectronics STM32F7 SoC.
+This patch adds the dwc2_set_params function for STM32F7 USB OTG HS.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/usb/dwc2/params.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
-index fcf199b..46da5f1 100644
---- a/Documentation/devicetree/bindings/usb/dwc2.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-@@ -19,6 +19,8 @@ Required properties:
-   configured in FS mode;
-   - "st,stm32f4x9-hsotg": The DWC2 USB HS controller instance in STM32F4x9 SoCs
-   configured in HS mode;
-+  - "st,stm32f7-hsotg": The DWC2 USB HS controller instance in STM32F7 SoCs
-+    configured in HS mode;
- - reg : Should contain 1 register range (address and length)
- - interrupts : Should contain 1 interrupt
- - clocks: clock provider specifier
+diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
+index a3ffe97..d5b672d 100644
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -136,6 +136,15 @@ static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
+ 	p->activate_stm_fs_transceiver = true;
+ }
+ 
++static void dwc2_set_stm32f7_hsotg_params(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_core_params *p = &hsotg->params;
++
++	p->host_rx_fifo_size = 622;
++	p->host_nperio_tx_fifo_size = 128;
++	p->host_perio_tx_fifo_size = 256;
++}
++
+ const struct of_device_id dwc2_of_match_table[] = {
+ 	{ .compatible = "brcm,bcm2835-usb", .data = dwc2_set_bcm_params },
+ 	{ .compatible = "hisilicon,hi6220-usb", .data = dwc2_set_his_params  },
+@@ -154,6 +163,8 @@ const struct of_device_id dwc2_of_match_table[] = {
+ 	{ .compatible = "st,stm32f4x9-fsotg",
+ 	  .data = dwc2_set_stm32f4x9_fsotg_params },
+ 	{ .compatible = "st,stm32f4x9-hsotg" },
++	{ .compatible = "st,stm32f7-hsotg",
++	  .data = dwc2_set_stm32f7_hsotg_params },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
 -- 
 2.7.4
