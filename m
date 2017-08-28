@@ -1,63 +1,84 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Aug 2017 16:29:02 +0200
-Subject: [PATCH v3 00/13] mmc: meson-gx: driver fixups and upgrades
-Message-ID: <20170828142915.27020-1-jbrunet@baylibre.com>
+Date: Mon, 28 Aug 2017 16:29:06 +0200
+Subject: [PATCH v3 04/13] mmc: meson-gx: rework clk_set function
+In-Reply-To: <20170828142915.27020-1-jbrunet@baylibre.com>
+References: <20170828142915.27020-1-jbrunet@baylibre.com>
+Message-ID: <20170828142915.27020-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patchset features several bugfixes, rework and upgrade for the
-meson-gx MMC driver.
+Clean-up clk_set function to prepare the next changes (DDR and clk-stop)
 
-The main goal is to improve readability and enable new high speed
-modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/mmc/host/meson-gx-mmc.c | 30 +++++++++---------------------
+ 1 file changed, 9 insertions(+), 21 deletions(-)
 
-SDR104 is not working with a few cards on the p200 and the
-libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
-of these boards, adding noise to the signal and eventually breaking
-the communication with some cards. The same cards are working well on a
-laptop or the nanopi-k2 at 200Mhz.
-
-This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
-gxl-s905x-libretech-cc
-
-Changes since v2 [1]:
-* Drop patches 1 to 3: Applied.
-* Drop patch 4: Debug stuff which should not have been sent.
-* Added fix to previous patch 3:
-  If the clock register is not initialized before registering the clk
-  with CCF, the framework will complain about an illegal divider value.
-  This had gone unnoticed because it was later fixed by the clock init
-  rework.
-
-  Ulf, I know it is getting late but it would be nice if patch #1 of
-  this v3 could go with 3 patches you already applied. The rest can
-  wait for the following cycle.
-
-Changes since v1 [0]:
-* Reorder patches to have fixes first, then rework and finally
-  enhancements.
-* Use CCF to manage clock phases
-
-[0]: https://lkml.kernel.org/r/20170804174353.16486-1-jbrunet at baylibre.com
-[1]: https://lkml.kernel.org/r/20170821160301.21899-1-jbrunet at baylibre.com
-
-Jerome Brunet (13):
-  mmc: meson-gx: initialize sane clk default before clock register
-  mmc: meson-gx: cfg init overwrite values
-  mmc: meson-gx: rework set_ios function
-  mmc: meson-gx: rework clk_set function
-  mmc: meson-gx: rework clock init function
-  mmc: meson-gx: fix dual data rate mode frequencies
-  mmc: meson-gx: work around clk-stop issue
-  mmc: meson-gx: simplify interrupt handler
-  mmc: meson-gx: implement card_busy callback
-  mmc: meson-gx: use CCF to handle the clock phases
-  mmc: meson-gx: implement voltage switch callback
-  mmc: meson-gx: change default tx phase
-  mmc: meson-gx: rework tuning function
-
- drivers/mmc/host/meson-gx-mmc.c | 710 ++++++++++++++++++++++++++++------------
- 1 file changed, 493 insertions(+), 217 deletions(-)
-
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index 0d29f1f347eb..cd5964aa4f58 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -139,7 +139,7 @@ struct meson_host {
+ 	struct clk *core_clk;
+ 	struct clk_mux mux;
+ 	struct clk *mux_clk;
+-	unsigned long current_clock;
++	unsigned long req_rate;
+ 
+ 	struct clk_divider cfg_div;
+ 	struct clk *cfg_div_clk;
+@@ -275,29 +275,18 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+ 	int ret;
+ 	u32 cfg;
+ 
+-	if (clk_rate) {
+-		if (WARN_ON(clk_rate > mmc->f_max))
+-			clk_rate = mmc->f_max;
+-		else if (WARN_ON(clk_rate < mmc->f_min))
+-			clk_rate = mmc->f_min;
+-	}
+-
+-	if (clk_rate == host->current_clock)
++	/* Same request - bail-out */
++	if (host->req_rate == clk_rate)
+ 		return 0;
+ 
+ 	/* stop clock */
+ 	cfg = readl(host->regs + SD_EMMC_CFG);
+-	if (!(cfg & CFG_STOP_CLOCK)) {
+-		cfg |= CFG_STOP_CLOCK;
+-		writel(cfg, host->regs + SD_EMMC_CFG);
+-	}
+-
+-	dev_dbg(host->dev, "change clock rate %u -> %lu\n",
+-		mmc->actual_clock, clk_rate);
++	cfg |= CFG_STOP_CLOCK;
++	writel(cfg, host->regs + SD_EMMC_CFG);
++	host->req_rate = 0;
+ 
+ 	if (!clk_rate) {
+ 		mmc->actual_clock = 0;
+-		host->current_clock = 0;
+ 		/* return with clock being stopped */
+ 		return 0;
+ 	}
+@@ -309,13 +298,12 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+ 		return ret;
+ 	}
+ 
++	host->req_rate = clk_rate;
+ 	mmc->actual_clock = clk_get_rate(host->cfg_div_clk);
+-	host->current_clock = clk_rate;
+ 
++	dev_dbg(host->dev, "clk rate: %u Hz\n", mmc->actual_clock);
+ 	if (clk_rate != mmc->actual_clock)
+-		dev_dbg(host->dev,
+-			"divider requested rate %lu != actual rate %u\n",
+-			clk_rate, mmc->actual_clock);
++		dev_dbg(host->dev, "requested rate was %lu\n", clk_rate);
+ 
+ 	/* (re)start clock */
+ 	cfg = readl(host->regs + SD_EMMC_CFG);
 -- 
 2.9.5
