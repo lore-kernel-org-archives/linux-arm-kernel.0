@@ -1,252 +1,56 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 28 Aug 2017 12:53:43 +0200
-Subject: [PATCH v2 2/3] irqchip: Add Realtek RTD1295 mux driver
-In-Reply-To: <20170828105344.8338-1-afaerber@suse.de>
-References: <20170828105344.8338-1-afaerber@suse.de>
-Message-ID: <20170828105344.8338-3-afaerber@suse.de>
+Date: Mon, 28 Aug 2017 12:53:41 +0200
+Subject: [PATCH v2 0/3] arm64: Realtek RTD1295 IRQ mux
+Message-ID: <20170828105344.8338-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This irq mux driver is derived from the RTD1295 vendor DT and assumes a
-linear mapping between intr_en and intr_status registers.
-Code for RTD119x indicates this may not always be the case (i2c_3).
+Hello,
 
-Based in part on QNAP's arch/arm/mach-rtk119x/rtk_irq_mux.c code.
+This series adds two IRQ muxes for the Realtek RTD1295 SoC.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v1 -> v2:
- * Renamed struct fields to avoid ambiguity (Marc)
- * Refactored offset lookup to avoid per-compatible init functions
- * Inserted white lines to clarify balanced locking (Marc)
- * Dropped forwarding of set_affinity to GIC (Marc)
- * Added spinlocks for consistency (Marc)
- * Limited initialization quirk to iso mux
- * Fixed spinlock initialization (Andrew)
- 
- drivers/irqchip/Makefile          |   1 +
- drivers/irqchip/irq-rtd119x-mux.c | 204 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 205 insertions(+)
+There being no public source code for RTD1295, the implementation is based on
+register offsets seen in the vendor DT, split up into two separate nodes,
+as well as code from QNAP's rtk119x GPL code dump.
+
+v2 does various cleanups, including limiting the serial quirk to the iso mux.
+
+More experimental patches at:
+https://github.com/afaerber/linux/commits/rtd1295-next
+
+Have a lot of fun!
+
+Cheers,
+Andreas
+
+v1 -> v2:
+* Rebased, avoiding dependency on reset series for DT nodes
+* Don't forward set_affinity to GIC (Marc)
+* Added more spinlocks (Marc)
+* Code cleanups
+* Investigated quirk
+* Fixed spinlock initialization (Andrew)
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Roc He <hepeng@zidoo.tv>
+Cc: ??? <jiang.liqin@geniatech.com>
+Cc: devicetree at vger.kernel.org
+Cc: Andrew Lunn <andrew@lunn.ch>
+
+Andreas F?rber (3):
+  dt-bindings: interrupt-controller: Add Realtek RTD1295
+  irqchip: Add Realtek RTD1295 mux driver
+  arm64: dts: realtek: Add irq mux to RTD1295
+
+ .../interrupt-controller/realtek,rtd119x-mux.txt   |  23 +++
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi           |  22 +++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-rtd119x-mux.c                  | 204 +++++++++++++++++++++
+ 4 files changed, 250 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
  create mode 100644 drivers/irqchip/irq-rtd119x-mux.c
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e88d856cc09c..46202a0b7d96 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -78,3 +78,4 @@ obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
- obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o irq-aspeed-i2c-ic.o
- obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
- obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
-+obj-$(CONFIG_ARCH_REALTEK)		+= irq-rtd119x-mux.o
-diff --git a/drivers/irqchip/irq-rtd119x-mux.c b/drivers/irqchip/irq-rtd119x-mux.c
-new file mode 100644
-index 000000000000..65d22e163bef
---- /dev/null
-+++ b/drivers/irqchip/irq-rtd119x-mux.c
-@@ -0,0 +1,204 @@
-+/*
-+ * Realtek RTD129x IRQ mux
-+ *
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: GPL-2.0+
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/slab.h>
-+
-+struct rtd119x_irq_mux_info {
-+	unsigned intr_status_offset;
-+	unsigned intr_en_offset;
-+};
-+
-+struct rtd119x_irq_mux_data {
-+	void __iomem *intr_status;
-+	void __iomem *intr_en;
-+	int irq;
-+	struct irq_domain *domain;
-+	spinlock_t lock;
-+};
-+
-+static void rtd119x_mux_irq_handle(struct irq_desc *desc)
-+{
-+	struct rtd119x_irq_mux_data *data = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	u32 intr_en, intr_status, status;
-+	int ret;
-+
-+	chained_irq_enter(chip, desc);
-+
-+	spin_lock(&data->lock);
-+	intr_en     = readl(data->intr_en);
-+	intr_status = readl(data->intr_status);
-+	spin_unlock(&data->lock);
-+
-+	status = intr_status & intr_en;
-+	if (status != 0) {
-+		unsigned irq = __ffs(status);
-+		ret = generic_handle_irq(irq_find_mapping(data->domain, irq));
-+		if (ret == 0) {
-+			spin_lock(&data->lock);
-+
-+			intr_status = readl(data->intr_status);
-+			intr_status |= BIT(irq - 1);
-+			writel(intr_status, data->intr_status);
-+
-+			spin_unlock(&data->lock);
-+		}
-+	}
-+
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static void rtd119x_mux_mask_irq(struct irq_data *data)
-+{
-+	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
-+	u32 intr_status;
-+
-+	spin_lock(&mux_data->lock);
-+
-+	intr_status = readl(mux_data->intr_status);
-+	intr_status |= BIT(data->hwirq);
-+	writel(intr_status, mux_data->intr_status);
-+
-+	spin_unlock(&mux_data->lock);
-+}
-+
-+static void rtd119x_mux_unmask_irq(struct irq_data *data)
-+{
-+	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
-+	u32 intr_en;
-+
-+	spin_lock(&mux_data->lock);
-+
-+	intr_en = readl(mux_data->intr_en);
-+	intr_en |= BIT(data->hwirq);
-+	writel(intr_en, mux_data->intr_en);
-+
-+	spin_unlock(&mux_data->lock);
-+}
-+
-+static int rtd119x_mux_set_affinity(struct irq_data *d,
-+			const struct cpumask *mask_val, bool force)
-+{
-+	/* Forwarding the affinity to the parent would affect all 32 interrupts. */
-+	return -EINVAL;
-+}
-+
-+static struct irq_chip rtd119x_mux_irq_chip = {
-+	.name			= "rtd119x-mux",
-+	.irq_mask		= rtd119x_mux_mask_irq,
-+	.irq_unmask		= rtd119x_mux_unmask_irq,
-+	.irq_set_affinity	= rtd119x_mux_set_affinity,
-+};
-+
-+static int rtd119x_mux_irq_domain_map(struct irq_domain *d,
-+		unsigned int irq, irq_hw_number_t hw)
-+{
-+	struct rtd119x_irq_mux_data *data = d->host_data;
-+
-+	irq_set_chip_and_handler(irq, &rtd119x_mux_irq_chip, handle_level_irq);
-+	irq_set_chip_data(irq, data);
-+	irq_set_probe(irq);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops rtd119x_mux_irq_domain_ops = {
-+	.xlate	= irq_domain_xlate_onecell,
-+	.map	= rtd119x_mux_irq_domain_map,
-+};
-+
-+static const struct rtd119x_irq_mux_info rtd1295_iso_irq_mux_info = {
-+	.intr_status_offset	= 0x0,
-+	.intr_en_offset		= 0x40,
-+};
-+
-+static const struct rtd119x_irq_mux_info rtd1295_irq_mux_info = {
-+	.intr_status_offset	= 0xc,
-+	.intr_en_offset		= 0x80,
-+};
-+
-+static const struct of_device_id rtd1295_irq_mux_dt_matches[] = {
-+	{
-+		.compatible = "realtek,rtd1295-iso-irq-mux",
-+		.data = &rtd1295_iso_irq_mux_info,
-+	}, {
-+		.compatible = "realtek,rtd1295-irq-mux",
-+		.data = &rtd1295_irq_mux_info,
-+	}, {
-+	}
-+};
-+
-+static int __init rtd119x_irq_mux_init(struct device_node *node,
-+				       struct device_node *parent)
-+{
-+	struct rtd119x_irq_mux_data *data;
-+	const struct of_device_id *match;
-+	const struct rtd119x_irq_mux_info *info;
-+	void __iomem *base;
-+	u32 val;
-+
-+	match = of_match_node(rtd1295_irq_mux_dt_matches, node);
-+	if (!match)
-+		return -EINVAL;
-+
-+	info = match->data;
-+	if (!info)
-+		return -EINVAL;
-+
-+	base = of_iomap(node, 0);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	data->intr_status = base + info->intr_status_offset;
-+	data->intr_en     = base + info->intr_en_offset;
-+
-+	data->irq = irq_of_parse_and_map(node, 0);
-+	if (data->irq <= 0) {
-+		kfree(data);
-+		return -EINVAL;
-+	}
-+
-+	spin_lock_init(&data->lock);
-+
-+	data->domain = irq_domain_add_linear(node, 32,
-+				&rtd119x_mux_irq_domain_ops, data);
-+	if (!data->domain) {
-+		kfree(data);
-+		return -ENOMEM;
-+	}
-+
-+	if (of_device_is_compatible(node, "realtek,rtd1295-iso-irq-mux")) {
-+		const int uart0_irq = 2;
-+
-+		spin_lock(&data->lock);
-+
-+		val = readl(data->intr_en);
-+		val &= ~BIT(uart0_irq);
-+		writel(val, data->intr_en);
-+
-+		writel(BIT(uart0_irq), data->intr_status);
-+
-+		spin_unlock(&data->lock);
-+	}
-+
-+	irq_set_chained_handler_and_data(data->irq, rtd119x_mux_irq_handle, data);
-+
-+	return 0;
-+}
-+IRQCHIP_DECLARE(rtd1295_iso_mux, "realtek,rtd1295-iso-irq-mux", rtd119x_irq_mux_init);
-+IRQCHIP_DECLARE(rtd1295_mux, "realtek,rtd1295-irq-mux", rtd119x_irq_mux_init);
 -- 
 2.12.3
