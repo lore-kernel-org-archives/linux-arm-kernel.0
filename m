@@ -1,51 +1,31 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 28 Aug 2017 10:58:53 +0530
-Subject: [PATCH 2/2] clk: zte: constify clk_div_table
-In-Reply-To: <1503898133-10862-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1503898133-10862-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1503898133-10862-3-git-send-email-arvind.yadav.cs@gmail.com>
+Date: Mon, 28 Aug 2017 11:22:20 +0530
+Subject: [PATCH] net: stmmac: constify clk_div_table
+Message-ID: <a54fe9764d287df370c16b0f0814d09d8fa24591.1503899422.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_div_table are not supposed to change at runtime. All functions
-working with clk_div_table provided by <linux/clk-provider.h> work
-with const clk_div_table. So mark the non-const structs as const.
+clk_div_table are not supposed to change at runtime.
+meson8b_dwmac structure is working with const clk_div_table.
+So mark the non-const structs as const.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/clk/zte/clk-zx296718.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/zte/clk-zx296718.c b/drivers/clk/zte/clk-zx296718.c
-index 27f853d..354dd50 100644
---- a/drivers/clk/zte/clk-zx296718.c
-+++ b/drivers/clk/zte/clk-zx296718.c
-@@ -451,7 +451,7 @@
- 	FFACTOR(0, "emmc_mux_div2",	"emmc_mux", 1, 2, CLK_SET_RATE_PARENT),
- };
- 
--static struct clk_div_table noc_div_table[] = {
-+static const struct clk_div_table noc_div_table[] = {
- 	{ .val = 1, .div = 2, },
- 	{ .val = 3, .div = 4, },
- };
-@@ -644,7 +644,7 @@ static int __init top_clocks_init(struct device_node *np)
- 	return 0;
- }
- 
--static struct clk_div_table common_even_div_table[] = {
-+static const struct clk_div_table common_even_div_table[] = {
- 	{ .val = 0, .div = 1, },
- 	{ .val = 1, .div = 2, },
- 	{ .val = 3, .div = 4, },
-@@ -656,7 +656,7 @@ static int __init top_clocks_init(struct device_node *np)
- 	{ .val = 15, .div = 16, },
- };
- 
--static struct clk_div_table common_div_table[] = {
-+static const struct clk_div_table common_div_table[] = {
- 	{ .val = 0, .div = 1, },
- 	{ .val = 1, .div = 2, },
- 	{ .val = 2, .div = 3, },
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+index 9685555..4404650b 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+@@ -89,7 +89,7 @@ static int meson8b_init_clk(struct meson8b_dwmac *dwmac)
+ 	char clk_name[32];
+ 	const char *clk_div_parents[1];
+ 	const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
+-	static struct clk_div_table clk_25m_div_table[] = {
++	static const struct clk_div_table clk_25m_div_table[] = {
+ 		{ .val = 0, .div = 5 },
+ 		{ .val = 1, .div = 10 },
+ 		{ /* sentinel */ },
 -- 
 1.9.1
