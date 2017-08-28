@@ -1,117 +1,50 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 28 Aug 2017 23:14:43 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <CAPDyKFq_AN+jEfgDoE0iv=QS5ydDCgPGxW5ivBwp0BAgHDyrGw@mail.gmail.com>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <1644235.K1erQvOgW9@aspire.rjw.lan>
- <CAPDyKFq_AN+jEfgDoE0iv=QS5ydDCgPGxW5ivBwp0BAgHDyrGw@mail.gmail.com>
-Message-ID: <3394725.Atsz4N1K4M@aspire.rjw.lan>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 28 Aug 2017 14:24:32 -0700
+Subject: ARM64 kernel Image size limitations?
+In-Reply-To: <CAKv+Gu-b1+dZaw=Sbnqd3NnpZ4G7Q5Gog7o=3Wucn69neChyNA@mail.gmail.com>
+References: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
+ <CAKv+Gu-b1+dZaw=Sbnqd3NnpZ4G7Q5Gog7o=3Wucn69neChyNA@mail.gmail.com>
+Message-ID: <de4d0ebc-c522-eb80-0052-3ea13ce4b750@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 28, 2017 4:24:51 PM CEST Ulf Hansson wrote:
-> On 28 August 2017 at 15:40, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Monday, August 28, 2017 2:54:40 PM CEST Ulf Hansson wrote:
-> >> On 28 August 2017 at 14:39, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >> > On Monday, August 28, 2017 10:31:44 AM CEST Ulf Hansson wrote:
-> >> >> On 28 August 2017 at 03:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >> >> > On Friday, August 25, 2017 3:42:35 PM CEST Rafael J. Wysocki wrote:
-> >> >> >> On Thursday, August 24, 2017 11:50:40 PM CEST Rafael J. Wysocki wrote:
-> >> >> >> > On Thursday, August 24, 2017 6:35:49 PM CEST Rafael J. Wysocki wrote:
-> >> >> >> > > On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
-> >
-> > [cut]
-> >
-> >> >> >
-> >> >> > Well, not really, because if the device remains runtime suspended,
-> >> >> > ->runtime_suspend() will not be called by pm_runtime_force_suspend() and
-> >> >> > acpi_dev_suspend_late() should not be called then.
-> >> >> >
-> >> >> > So more changes in the ACPI PM domain are needed after all.
-> >> >>
-> >> >> Yes, that's what I thought as well.
-> >> >>
-> >> >> Anyway, let me cook a new version of the series - trying to address
-> >> >> the first bits you have pointed out. Then we can continue with
-> >> >> fine-tuning on top, addressing further optimizations of the ACPI PM
-> >> >> domain.
-> >> >
-> >> > Actually, please hold on and let me show you what I would like to do
-> >> > first.
-> >>
-> >> Hmm.
-> >>
-> >> I think I have almost done the work for the ACPI PM domain already.
-> >> It's just a matter of minor tweaks to the changes in patch 6 and 7
-> >> (and of course to get them into a shape that you prefer) and then
-> >> dropping patch 5 altogether.
-> >>
-> >> Wouldn't it be better if you build upon my changes?
-> >>
-> >> Anyway, if you have strong opinion of driving this, I am fine stepping aside.
-> >
-> > OK, so see below. :-)
-> >
-> > If what you want is to make the i2c designware driver use _force_suspend() and
-> > _force_resume(), then to me this is only tangentially related to direct_complete
-> > and can be done without messing up with that one.
-> >
-> > So the problem is not when direct_complete is set (becasue the driver's and
-> > PM domain's callbacks will not be invoked then even), but when it is not set.
-> 
-> For i2c designware driver case - then you are right! Although, that's
-> because the i2c designware driver has nothing else to do than to call
-> pm_runtime_force_suspend|resume() from the late suspend and early
-> resume callbacks.
-> 
-> However, for other drivers this isn't the case. A driver may have some
-> additional things to cope with during system sleep, besides making
-> sure to call pm_runtime_force_suspend|resume().
+(fixed Will's address, apologies)
 
-Sure enough, but I'm seeing that as a separate issue.
-
-> Then as I stated earlier, it would be of great value if we could
-> remain having runtime PM enabled during the entire device_suspend()
-> phase. I am not sure how you intend to address that, or perhaps you
-> did in some of those earlier patches you posted.
-
-I did, but I'd prefer to get back to that later.
-
-If the issues occurring when direct_complete is not set are addressed first,
-disabling direct_complete for the devices that cannot use it should be
-straightforward.
-
-> In my re-spinned series (not posted yet), I am still addressing both
-> issues above, but also not preventing the direct_complete path for
-> parent/suppliers when the runtime PM centric path is used.
+On 08/28/2017 01:01 PM, Ard Biesheuvel wrote:
+> Hi,
 > 
-> > If direct_complete is not set, the ACPI PM domain resumes the device in
-> > acpi_subsys_suspend(), because it doesn't know two things: (a) why direct_complete
-> > is not set and (b) whether or not the drivers PM callbacks can cope with a
-> > runtime suspended device.  These two things are separate, so they need to
-> > be addressed separately.
+> On 28 August 2017 at 20:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> Hi,
+>>
+>> I have been fighting with a reasonably large kernel Image: 46MB and
+>> found unable to boot it. This is on v4.13-rc6, but I could go back as
+>> far as v4.9~ish. It is so big, because it's got some debugging enabled,
+>> and the initramfs compression is disabled, but still that ought to be
+>> possible.
+>>
+>> After some experimentation I found that the breaking size is somewhere
+>> around 33MB total for arch/arm64/boot/Image and when that happens, I get
+>> the following backtrace which suggests that there is some memory
+>> corruption of some kind (or so it seems to me), other experiments
+>> indicated that the backtrace may point back to where the bootloader had
+>> set up its exception vector. I am fairly confident that the bootloader
+>> is not responsible for corrupting the Image that is loaded.
+>>
+>> Is there such a size limitation or am I possibly tripping over something
+>> else?
+>>
 > 
-> Yes.
-> 
-> >
-> > For (b) I'd like to use the SAFE_SUSPEND flag from my previous patch.
-> 
-> Seems like a reasonable approach.
-> 
-> >
-> > As far as (a) is concerned, there are two possible reasons for not setting
-> > direct_complete.  First, it may be necessary to change the power state of the
-> > device and in that case the device *should* be resumed in acpi_subsys_suspend().
-> > Second, direct_complete may not be set for the device's children and in that
-> > case acpi_subsys_suspend() may not care as long as SAFE_SUSPEND is set.
-> 
-> Okay!
+> What boot environment are you using? Is it possible the DTB is copied
+> on top of the kernel by the boot loader?
 
-Good. :-)
+Bootloader is BOLT (Broadcom's own implementation, has PSCI and is
+capable of doing FDT live patching), and yes the DTB is provided by the
+bootloader at an address higher than the kernel.
 
-Let me split the patch into a more manageable series, then, clean it up a bit
-and add the LPSS coverage to the ACPI part.
+Physical offset of the RAM on this platform is 0, so the load is going
+to be at PA 0x80000, 0x80000 + size (35MB) = 0x2280000, DTB is placed at
+0x771f000 and is 0x90ef bytes.
 
-Thanks,
-Rafael
+
+-- 
+Florian
