@@ -1,32 +1,57 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 28 Aug 2017 16:05:29 +0300
-Subject: [PATCH] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-In-Reply-To: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
-References: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <877exnyh9i.fsf@linux.intel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 28 Aug 2017 15:13:43 +0200
+Subject: [PATCH 1/3] iommu: exynos: constify iommu_ops
+In-Reply-To: <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <CGME20170828121232epcas2p49f8a17002f18d19b613b43ba38f71df9@epcas2p4.samsung.com>
+ <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <18f05dd3-4305-e607-57bb-dea086481bb8@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arvind,
 
-Hi,
-
-Adam Wallis <awallis@codeaurora.org> writes:
-> The dma ops from the parent DWC device are not getting passed to the
-> child xhci-hcd device. This patch makes use of
-> platform_device_register_full to set the DMA ops. For the DT/OF case,
-> dma_ops were still null after the the device register, so
-> of_dma_configure is called in only the OF case.
+On 2017-08-28 14:12, Arvind Yadav wrote:
+> iommu_ops are not supposed to change at runtime.
+> Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
+> const iommu_ops provided by <linux/iommu.h>. So mark the non-const
+> structs as const.
 >
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-you need to sysdev property, IMO.
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
+I remember that in the past there were a reason for non-const iommu_ops 
+in the
+IOMMU API, but I hope it has been finally resolved.
+
+> ---
+>   drivers/iommu/exynos-iommu.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 2395478..a540016 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -569,7 +569,7 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+>   	spin_unlock_irqrestore(&data->lock, flags);
+>   }
+>   
+> -static struct iommu_ops exynos_iommu_ops;
+> +static const struct iommu_ops exynos_iommu_ops;
+>   
+>   static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>   {
+> @@ -1323,7 +1323,7 @@ static int exynos_iommu_of_xlate(struct device *dev,
+>   	return 0;
+>   }
+>   
+> -static struct iommu_ops exynos_iommu_ops = {
+> +static const struct iommu_ops exynos_iommu_ops = {
+>   	.domain_alloc = exynos_iommu_domain_alloc,
+>   	.domain_free = exynos_iommu_domain_free,
+>   	.attach_dev = exynos_iommu_attach_device,
+
+Best regards
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170828/1e8e9aff/attachment.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
