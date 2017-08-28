@@ -1,21 +1,21 @@
 From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Mon, 28 Aug 2017 14:05:58 +0000
-Subject: [v2,1/8] ARM: implement get_tls syscall
-In-Reply-To: <20170817072347.19990-2-nicolas.pitre@linaro.org>
-References: <20170817072347.19990-2-nicolas.pitre@linaro.org>
-Message-ID: <9921300a-2fa4-9e2e-73a9-8b56b34d39eb@st.com>
+Date: Mon, 28 Aug 2017 14:06:54 +0000
+Subject: [v2,2/8] arm_elf_read_implies_exec(): remove unused argument
+In-Reply-To: <20170817072347.19990-3-nicolas.pitre@linaro.org>
+References: <20170817072347.19990-3-nicolas.pitre@linaro.org>
+Message-ID: <ffe7c390-1dfe-16e0-ddbd-622df34fca27@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Nicolas,
 
-I have successfully tested your set of patches on cortex-M7 STM32 MCU.
-
-
 On 08/17/2017 09:23 AM, Nicolas Pitre wrote:
-> When there is no dedicated register to hold the tp value and no MMU
-> to provide a fixed address kuser helper entry point, all that is
-> left as fallback is a syscall.
+> The first argument to elf_read_implies_exec() is either the actual
+> header structure or a pointer to that structure whether one looks
+> at fs/binfmt_elf.c or fs/binfmt_elf_fdpic.c. This ought to be fixed
+> of course, but in the mean time let's sidestep the issue by removing
+> that first argument from arm_elf_read_implies_exec() as it is unused
+> anyway.
 > 
 > Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Tested-by: Vincent Abriou <vincent.abriou@st.com>
@@ -24,33 +24,36 @@ BR
 Vincent
 
 > ---
->   arch/arm/include/uapi/asm/unistd.h | 1 +
->   arch/arm/kernel/traps.c            | 3 +++
->   2 files changed, 4 insertions(+)
+>   arch/arm/include/asm/elf.h | 4 ++--
+>   arch/arm/kernel/elf.c      | 2 +-
+>   2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
-> index 28bd456494..575b25fc29 100644
-> --- a/arch/arm/include/uapi/asm/unistd.h
-> +++ b/arch/arm/include/uapi/asm/unistd.h
-> @@ -35,5 +35,6 @@
->   #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
->   #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
->   #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
-> +#define __ARM_NR_get_tls		(__ARM_NR_BASE+6)
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index f13ae153fb..e2786acf82 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -102,8 +102,8 @@ extern int elf_check_arch(const struct elf32_hdr *);
 >   
->   #endif /* _UAPI__ASM_ARM_UNISTD_H */
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 948c648fea..43c0560f7b 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -647,6 +647,9 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
->   		set_tls(regs->ARM_r0);
->   		return 0;
+>   #define vmcore_elf64_check_arch(x) (0)
 >   
-> +	case NR(get_tls):
-> +		return current_thread_info()->tp_value[0];
-> +
->   	default:
->   		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
->   		   if not implemented, rather than raising SIGILL.  This
+> -extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
+> -#define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
+> +extern int arm_elf_read_implies_exec(int);
+> +#define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(stk)
+>   
+>   struct task_struct;
+>   int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
+> diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+> index d0d1e83150..52fb98358d 100644
+> --- a/arch/arm/kernel/elf.c
+> +++ b/arch/arm/kernel/elf.c
+> @@ -80,7 +80,7 @@ EXPORT_SYMBOL(elf_set_personality);
+>    *  - the binary requires an executable stack
+>    *  - we're running on a CPU which doesn't support NX.
+>    */
+> -int arm_elf_read_implies_exec(const struct elf32_hdr *x, int executable_stack)
+> +int arm_elf_read_implies_exec(int executable_stack)
+>   {
+>   	if (executable_stack != EXSTACK_DISABLE_X)
+>   		return 1;
 > 
