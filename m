@@ -1,294 +1,108 @@
-From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Mon, 28 Aug 2017 14:07:23 +0000
-Subject: [v2,4/8] ARM: signal handling support for FDPIC_FUNCPTRS functions
-In-Reply-To: <20170817072347.19990-5-nicolas.pitre@linaro.org>
-References: <20170817072347.19990-5-nicolas.pitre@linaro.org>
-Message-ID: <bb362907-089d-a004-afbc-631990247ab9@st.com>
+From: vviswana@codeaurora.org (Vijay Viswanath)
+Date: Mon, 28 Aug 2017 18:05:12 +0530
+Subject: [PATCH 4/5] mmc: sdhci-msm: Add ops to do sdhc register write
+In-Reply-To: <ace15bcd-7470-3802-5225-de87956b0b4e@intel.com>
+References: <1503033582-48703-1-git-send-email-vviswana@codeaurora.org>
+ <1503033582-48703-5-git-send-email-vviswana@codeaurora.org>
+ <ace15bcd-7470-3802-5225-de87956b0b4e@intel.com>
+Message-ID: <09757fef-ad37-d6d7-b0ea-01164193cbc7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
 
-On 08/17/2017 09:23 AM, Nicolas Pitre wrote:
-> Signal handlers are not direct function pointers but pointers to function
-> descriptor in that case. Therefore we must retrieve the actual function
-> address and load the GOT value into r9 from the descriptor before branching
-> to the actual handler.
-> 
-> If a restorer is provided, we also have to load its address and GOT from
-> its descriptor. That descriptor address and the code to load it is pushed
-> onto the stack to be executed as soon as the signal handler returns.
-> 
-> However, to be compatible with NX stacks, the FDPIC bounce code is also
-> copied to the signal page along with the other code stubs. Therefore this
-> code must get at the descriptor address whether it executes from the stack
-> or the signal page. To do so we use the stack pointer which points at the
-> signal stack frame where the descriptor address was stored. Because the
-> rt signal frame is different from the simpler frame, two versions of the
-> bounce code are needed, and two variants (ARM and Thumb) as well. The
-> asm-offsets facility is used to determine the actual offset in the signal
-> frame for each version, meaning that struct sigframe and rt_sigframe had
-> to be moved to a separate file.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Tested-by: Vincent Abriou <vincent.abriou@st.com>
 
-BR
-Vincent
-
-> ---
->   arch/arm/include/asm/ucontext.h   |  1 +
->   arch/arm/kernel/asm-offsets.c     |  4 +++
->   arch/arm/kernel/signal.c          | 53 +++++++++++++++++++++++++-----------
->   arch/arm/kernel/signal.h          | 11 ++++++++
->   arch/arm/kernel/sigreturn_codes.S | 56 +++++++++++++++++++++++++++++++++++----
->   5 files changed, 105 insertions(+), 20 deletions(-)
->   create mode 100644 arch/arm/kernel/signal.h
+On 8/24/2017 3:41 PM, Adrian Hunter wrote:
+> On 18/08/17 08:19, Vijay Viswanath wrote:
+>> Register writes which change voltage of IO lines or turn the IO bus
+>> on/off require controller to be ready before progressing further. When
+>> the controller is ready, it will generate a power irq which needs to be
+>> handled. The thread which initiated the register write should wait for
+>> power irq to complete. This will be done through the new sdhc msm write
+>> APIs which will check whether the particular write can trigger a power
+>> irq and wait for it with a timeout if it is expected.
+>> The SDHC core power control IRQ gets triggered when -
+>> * There is a state change in power control bit (bit 0)
+>>    of SDHCI_POWER_CONTROL register.
+>> * There is a state change in 1.8V enable bit (bit 3) of
+>>    SDHCI_HOST_CONTROL2 register.
+>> * Bit 1 of SDHCI_SOFTWARE_RESET is set.
+>>
+>> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
+>> ---
+>>   drivers/mmc/host/sdhci-msm.c | 39 +++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 39 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+>> index 6d3b1fd..6571880 100644
+>> --- a/drivers/mmc/host/sdhci-msm.c
+>> +++ b/drivers/mmc/host/sdhci-msm.c
+>> @@ -1250,6 +1250,41 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
+>>   	__sdhci_msm_set_clock(host, clock);
+>>   }
+>>   
+>> +#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+>> +static void __sdhci_msm_check_write(struct sdhci_host *host, u16 val, int reg)
+>> +{
+>> +	u32 req_type = 0;
+>> +
+>> +	switch (reg) {
+>> +	case SDHCI_HOST_CONTROL2:
+>> +		req_type = (val & SDHCI_CTRL_VDD_180) ? REQ_IO_LOW :
+>> +			REQ_IO_HIGH;
+>> +		break;
+>> +	case SDHCI_SOFTWARE_RESET:
+>> +		if (host->pwr && (val & SDHCI_RESET_ALL))
+>> +			req_type = REQ_BUS_OFF;
+>> +		break;
+>> +	case SDHCI_POWER_CONTROL:
+>> +		req_type = !val ? REQ_BUS_OFF : REQ_BUS_ON;
+>> +		break;
+>> +	}
+>> +
+>> +	if (req_type)
 > 
-> diff --git a/arch/arm/include/asm/ucontext.h b/arch/arm/include/asm/ucontext.h
-> index 921d827485..b42c75ae0d 100644
-> --- a/arch/arm/include/asm/ucontext.h
-> +++ b/arch/arm/include/asm/ucontext.h
-> @@ -2,6 +2,7 @@
->   #define _ASMARM_UCONTEXT_H
->   
->   #include <asm/fpstate.h>
-> +#include <asm/user.h>
->   
->   /*
->    * struct sigcontext only has room for the basic registers, but struct
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 608008229c..13c1558508 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -28,6 +28,7 @@
->   #include <asm/vdso_datapage.h>
->   #include <asm/hardware/cache-l2x0.h>
->   #include <linux/kbuild.h>
-> +#include "signal.h"
->   
->   /*
->    * Make sure that the compiler and target are compatible.
-> @@ -112,6 +113,9 @@ int main(void)
->     DEFINE(SVC_ADDR_LIMIT,	offsetof(struct svc_pt_regs, addr_limit));
->     DEFINE(SVC_REGS_SIZE,		sizeof(struct svc_pt_regs));
->     BLANK();
-> +  DEFINE(SIGFRAME_RC3_OFFSET,	offsetof(struct sigframe, retcode[3]));
-> +  DEFINE(RT_SIGFRAME_RC3_OFFSET, offsetof(struct rt_sigframe, sig.retcode[3]));
-> +  BLANK();
->   #ifdef CONFIG_CACHE_L2X0
->     DEFINE(L2X0_R_PHY_BASE,	offsetof(struct l2x0_regs, phy_base));
->     DEFINE(L2X0_R_AUX_CTRL,	offsetof(struct l2x0_regs, aux_ctrl));
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 5814298ef0..1f3574ec4f 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -18,11 +18,12 @@
->   #include <asm/elf.h>
->   #include <asm/cacheflush.h>
->   #include <asm/traps.h>
-> -#include <asm/ucontext.h>
->   #include <asm/unistd.h>
->   #include <asm/vfp.h>
->   
-> -extern const unsigned long sigreturn_codes[7];
-> +#include "signal.h"
-> +
-> +extern const unsigned long sigreturn_codes[17];
->   
->   static unsigned long signal_return_offset;
->   
-> @@ -171,15 +172,6 @@ static int restore_vfp_context(char __user **auxp)
->   /*
->    * Do a signal return; undo the signal stack.  These are aligned to 64-bit.
->    */
-> -struct sigframe {
-> -	struct ucontext uc;
-> -	unsigned long retcode[2];
-> -};
-> -
-> -struct rt_sigframe {
-> -	struct siginfo info;
-> -	struct sigframe sig;
-> -};
->   
->   static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
->   {
-> @@ -365,9 +357,20 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
->   	     unsigned long __user *rc, void __user *frame)
->   {
->   	unsigned long handler = (unsigned long)ksig->ka.sa.sa_handler;
-> +	unsigned long handler_fdpic_GOT = 0;
->   	unsigned long retcode;
-> -	int thumb = 0;
-> +	unsigned int idx, thumb = 0;
->   	unsigned long cpsr = regs->ARM_cpsr & ~(PSR_f | PSR_E_BIT);
-> +	bool fdpic = IS_ENABLED(CONFIG_BINFMT_ELF_FDPIC) &&
-> +		     (current->personality & FDPIC_FUNCPTRS);
-> +
-> +	if (fdpic) {
-> +		unsigned long __user *fdpic_func_desc =
-> +					(unsigned long __user *)handler;
-> +		if (__get_user(handler, &fdpic_func_desc[0]) ||
-> +		    __get_user(handler_fdpic_GOT, &fdpic_func_desc[1]))
-> +			return 1;
-> +	}
->   
->   	cpsr |= PSR_ENDSTATE;
->   
-> @@ -407,9 +410,26 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
->   
->   	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
->   		retcode = (unsigned long)ksig->ka.sa.sa_restorer;
-> +		if (fdpic) {
-> +			/*
-> +			 * We need code to load the function descriptor.
-> +			 * That code follows the standard sigreturn code
-> +			 * (6 words), and is made of 3 + 2 words for each
-> +			 * variant. The 4th copied word is the actual FD
-> +			 * address that the assembly code expects.
-> +			 */
-> +			idx = 6 + thumb * 3;
-> +			if (ksig->ka.sa.sa_flags & SA_SIGINFO)
-> +				idx += 5;
-> +			if (__put_user(sigreturn_codes[idx],   rc  ) ||
-> +			    __put_user(sigreturn_codes[idx+1], rc+1) ||
-> +			    __put_user(sigreturn_codes[idx+2], rc+2) ||
-> +			    __put_user(retcode,                rc+3))
-> +				return 1;
-> +			goto rc_finish;
-> +		}
->   	} else {
-> -		unsigned int idx = thumb << 1;
-> -
-> +		idx = thumb << 1;
->   		if (ksig->ka.sa.sa_flags & SA_SIGINFO)
->   			idx += 3;
->   
-> @@ -421,6 +441,7 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
->   		    __put_user(sigreturn_codes[idx+1], rc+1))
->   			return 1;
->   
-> +rc_finish:
->   #ifdef CONFIG_MMU
->   		if (cpsr & MODE32_BIT) {
->   			struct mm_struct *mm = current->mm;
-> @@ -440,7 +461,7 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
->   			 * the return code written onto the stack.
->   			 */
->   			flush_icache_range((unsigned long)rc,
-> -					   (unsigned long)(rc + 2));
-> +					   (unsigned long)(rc + 3));
->   
->   			retcode = ((unsigned long)rc) + thumb;
->   		}
-> @@ -450,6 +471,8 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
->   	regs->ARM_sp = (unsigned long)frame;
->   	regs->ARM_lr = retcode;
->   	regs->ARM_pc = handler;
-> +	if (fdpic)
-> +		regs->ARM_r9 = handler_fdpic_GOT;
->   	regs->ARM_cpsr = cpsr;
->   
->   	return 0;
-> diff --git a/arch/arm/kernel/signal.h b/arch/arm/kernel/signal.h
-> new file mode 100644
-> index 0000000000..b7b838b052
-> --- /dev/null
-> +++ b/arch/arm/kernel/signal.h
-> @@ -0,0 +1,11 @@
-> +#include <asm/ucontext.h>
-> +
-> +struct sigframe {
-> +	struct ucontext uc;
-> +	unsigned long retcode[4];
-> +};
-> +
-> +struct rt_sigframe {
-> +	struct siginfo info;
-> +	struct sigframe sig;
-> +};
-> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
-> index b84d0cb136..2c7b22e321 100644
-> --- a/arch/arm/kernel/sigreturn_codes.S
-> +++ b/arch/arm/kernel/sigreturn_codes.S
-> @@ -14,6 +14,8 @@
->    * GNU General Public License for more details.
->    */
->   
-> +#include <asm/assembler.h>
-> +#include <asm/asm-offsets.h>
->   #include <asm/unistd.h>
->   
->   /*
-> @@ -51,6 +53,17 @@ ARM_OK(	.arm	)
->   	.thumb
->   	.endm
->   
-> +	.macro arm_fdpic_slot n
-> +	.org	sigreturn_codes + 24 + 20 * (\n)
-> +ARM_OK(	.arm	)
-> +	.endm
-> +
-> +	.macro thumb_fdpic_slot n
-> +	.org	sigreturn_codes + 24 + 20 * (\n) + 12
-> +	.thumb
-> +	.endm
-> +
-> +
->   #if __LINUX_ARM_ARCH__ <= 4
->   	/*
->   	 * Note we manually set minimally required arch that supports
-> @@ -90,13 +103,46 @@ ARM_OK(	swi	#(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE)	)
->   	movs	r7, #(__NR_rt_sigreturn - __NR_SYSCALL_BASE)
->   	swi	#0
->   
-> +	/* ARM sigreturn restorer FDPIC bounce code snippet */
-> +	arm_fdpic_slot 0
-> +ARM_OK(	ldr	r3, [sp, #SIGFRAME_RC3_OFFSET] )
-> +ARM_OK(	ldmia	r3, {r3, r9} )
-> +#ifdef CONFIG_ARM_THUMB
-> +ARM_OK(	bx	r3 )
-> +#else
-> +ARM_OK(	ret	r3 )
-> +#endif
-> +
-> +	/* Thumb sigreturn restorer FDPIC bounce code snippet */
-> +	thumb_fdpic_slot 0
-> +	ldr	r3, [sp, #SIGFRAME_RC3_OFFSET]
-> +	ldmia	r3, {r2, r3}
-> +	mov	r9, r3
-> +	bx	r2
-> +
-> +	/* ARM sigreturn_rt restorer FDPIC bounce code snippet */
-> +	arm_fdpic_slot 1
-> +ARM_OK(	ldr	r3, [sp, #RT_SIGFRAME_RC3_OFFSET] )
-> +ARM_OK(	ldmia	r3, {r3, r9} )
-> +#ifdef CONFIG_ARM_THUMB
-> +ARM_OK(	bx	r3 )
-> +#else
-> +ARM_OK(	ret	r3 )
-> +#endif
-> +
-> +	/* Thumb sigreturn_rt restorer FDPIC bounce code snippet */
-> +	thumb_fdpic_slot 1
-> +	ldr	r3, [sp, #RT_SIGFRAME_RC3_OFFSET]
-> +	ldmia	r3, {r2, r3}
-> +	mov	r9, r3
-> +	bx	r2
-> +
->   	/*
-> -	 * Note on addtional space: setup_return in signal.c
-> -	 * algorithm uses two words copy regardless whether
-> -	 * it is thumb case or not, so we need additional
-> -	 * word after real last entry.
-> +	 * Note on additional space: setup_return in signal.c
-> +	 * always copies the same number of words regardless whether
-> +	 * it is thumb case or not, so we need one additional padding
-> +	 * word after the last entry.
->   	 */
-> -	arm_slot 2
->   	.space	4
->   
->   	.size	sigreturn_codes, . - sigreturn_codes
+> So you are really relying on these register writes not being done in an
+> atomic context.  Since the spin lock was removed from sdhci_set_ios() that
+> seems to be true, but it would be good to add a comment here acknowledging
+> that you are depending on that.
+>
+
+Will add the comments mentioning that this function can sleep and that 
+it should not be called from atomic contexts.
+
+>> +		sdhci_msm_check_power_status(host, req_type);
+>> +}
+>> +
+>> +static void sdhci_msm_writew(struct sdhci_host *host, u16 val, int reg)
+>> +{
+>> +		writew_relaxed(val, host->ioaddr + reg);
+>> +		__sdhci_msm_check_write(host, val, reg);
+>> +}
+>> +
+>> +static void sdhci_msm_writeb(struct sdhci_host *host, u8 val, int reg)
+>> +{
+>> +		writeb_relaxed(val, host->ioaddr + reg);
+>> +		__sdhci_msm_check_write(host, val, reg);
+>> +}
+>> +#endif
+>>   static const struct of_device_id sdhci_msm_dt_match[] = {
+>>   	{ .compatible = "qcom,sdhci-msm-v4" },
+>>   	{},
+>> @@ -1264,6 +1299,10 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
+>>   	.get_max_clock = sdhci_msm_get_max_clock,
+>>   	.set_bus_width = sdhci_set_bus_width,
+>>   	.set_uhs_signaling = sdhci_msm_set_uhs_signaling,
+>> +#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+>> +	.write_w = sdhci_msm_writew,
+>> +	.write_b = sdhci_msm_writeb,
+>> +#endif
+>>   };
+>>   
+>>   static const struct sdhci_pltfm_data sdhci_msm_pdata = {
+>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
