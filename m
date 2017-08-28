@@ -1,95 +1,120 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Aug 2017 20:09:32 +0200
-Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
-In-Reply-To: <1503841641816.62526@amazon.com>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
- <20170203181216.30214-5-antoine.tenart@free-electrons.com>
- <20170203205823.GA22572@lunn.ch> <1503841641816.62526@amazon.com>
-Message-ID: <20170828180932.GG10418@lunn.ch>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 28 Aug 2017 20:17:58 +0200
+Subject: [PATCH v3 53/59] KVM: arm/arm64: GICv4: Hook vPE scheduling into
+ vgic flush/sync
+In-Reply-To: <20170731172637.29355-54-marc.zyngier@arm.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-54-marc.zyngier@arm.com>
+Message-ID: <20170828181758.GA24649@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 27, 2017 at 01:47:19PM +0000, Chocron, Jonathan wrote:
-> This is a fixed version of my previous response (using proper indentation and leaving only the specific questions responded to).
-
-Wow, this is old.  3 Feb 2017. I had to go dig into the archive to
-refresh my memory.
-
-> > > +/* MDIO */
-> > > +#define AL_ETH_MDIO_C45_DEV_MASK     0x1f0000
-> > > +#define AL_ETH_MDIO_C45_DEV_SHIFT    16
-> > > +#define AL_ETH_MDIO_C45_REG_MASK     0xffff
-> > > +
-> > > +static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
-> > > +{
-> > > +     struct al_eth_adapter *adapter = bp->priv;
-> > > +     u16 value = 0;
-> > > +     int rc;
-> > > +     int timeout = MDIO_TIMEOUT_MSEC;
-> > > +
-> > > +     while (timeout > 0) {
-> > > +             if (reg & MII_ADDR_C45) {
-> > > +                     netdev_dbg(adapter->netdev, "[c45]: dev %x reg %x val %x\n",
-> > > +                                ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-> > > +                                (reg & AL_ETH_MDIO_C45_REG_MASK), value);
-> > > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
-> > > +                             ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-> > > +                             (reg & AL_ETH_MDIO_C45_REG_MASK), &value);
-> > > +             } else {
-> > > +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
-> > > +                                           MDIO_DEVAD_NONE, reg, &value);
-> > > +             }
-> > > +
-> > > +             if (rc == 0)
-> > > +                     return value;
-> > > +
-> > > +             netdev_dbg(adapter->netdev,
-> > > +                        "mdio read failed. try again in 10 msec\n");
-> > > +
-> > > +             timeout -= 10;
-> > > +             msleep(10);
-> > > +     }
-> > 
-> > This is rather unusual, retrying MDIO operations. Are you working
-> > around a hardware bug? I suspect this also opens up race conditions,
-> > in particular with PHY interrupts, which can be clear on read.
+On Mon, Jul 31, 2017 at 06:26:31PM +0100, Marc Zyngier wrote:
+> The redistributor needs to be told which vPE is about to be run,
+> and tells us whether there is any pending VLPI on exit.
 > 
-> The MDIO bus is shared between the ethernet units. There is a HW
-> lock used to arbitrate between different interfaces trying to access
-> the bus, therefore there is a retry loop. The reg isn't accessed
-> before obtaining the lock, so there shouldn't be any clear on read
-> issues.
+> Let's add the scheduling calls to the vgic flush/sync functions,
+> allowing the VLPIs to be delivered to the guest.
 > 
-> > > +/* al_eth_mdiobus_setup - initialize mdiobus and register to kernel */
-> > > +static int al_eth_mdiobus_setup(struct al_eth_adapter *adapter)
-> > > +{
-> > > +     struct phy_device *phydev;
-> > > +     int i;
-> > > +     int ret = 0;
-> > > +
-> > > +     adapter->mdio_bus = mdiobus_alloc();
-> > > +     if (!adapter->mdio_bus)
-> > > +             return -ENOMEM;
-> > > +
-> > > +     adapter->mdio_bus->name     = "al mdio bus";
-> > > +     snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
-> > > +              (adapter->pdev->bus->number << 8) | adapter->pdev->devfn);
-> > > +     adapter->mdio_bus->priv     = adapter;
-> > > +     adapter->mdio_bus->parent   = &adapter->pdev->dev;
-> > > +     adapter->mdio_bus->read     = &al_mdio_read;
-> > > +     adapter->mdio_bus->write    = &al_mdio_write;
-> > > +     adapter->mdio_bus->phy_mask = ~BIT(adapter->phy_addr);
-> >
-> > Why do this?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-v4.c | 24 ++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.c    |  4 ++++
+>  virt/kvm/arm/vgic/vgic.h    |  1 +
+>  3 files changed, 29 insertions(+)
 > 
-> Since the MDIO bus is shared, we want each interface to probe only for the PHY associated with it.
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index 50721c4e3da5..0a8deefbcf1c 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -119,6 +119,30 @@ void vgic_v4_teardown(struct kvm *kvm)
+>  	its_vm->vpes = NULL;
+>  }
+>  
+> +int vgic_v4_schedule(struct kvm_vcpu *vcpu, bool on)
+> +{
+> +	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +
+> +	if (!vgic_is_v4_capable(vcpu->kvm) || !irq)
+> +		return 0;
 
-So i think this is the core of the problem. You have one physical MDIO
-bus, yet you register it twice with the MDIO framework.
+why do we need to check the its_vpe.irq here?  This check is certainly
+not untuitive, as I don't understand what happened on a v4 capable
+system that somehow failed.  Is it because a specific VM is configured
+to not use VLPIs, or?
 
-How about you only register it once? A lot of the complexity then goes
-away. The mutex in the mdio core per bus means you don't need your
-hardware locking. All that code goes away. All the retry code goes
-away. Life is simple.
+> +
+> +	/*
+> +	 * Before making the VPE resident, make sure the redistributor
+> +	 * expects us here.
+> +	 */
+> +	if (on) {
+> +		int err;
+> +
+> +		err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
 
-	Andrew
+This is pretty unintuitive, and coming here without having read your
+documentation may make people completely puzzled.  Could we provide a
+pointer to the documentation that explains how the vpe irq hooks this
+all together?
+
+> +		if (err) {
+> +			kvm_err("failed irq_set_affinity IRQ%d (%d)\n", irq, err);
+> +			return err;
+> +		}
+> +	}
+> +
+> +	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, on);
+> +}
+> +
+
+I'd prefer this function be split into two and follow the vgic notation
+of having a flush and a sync function.
+
+>  static struct vgic_its *vgic_get_its(struct kvm *kvm,
+>  				     struct kvm_kernel_irq_routing_entry *irq_entry)
+>  {
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index dfac894f6f03..9ab52108989d 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -721,6 +721,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  
+> +	WARN_ON(vgic_v4_schedule(vcpu, false));
+> +
+
+This is in the critical path, so would it be worth considering a static
+key to cater for non-GICv4 systems here?
+
+>  	/* An empty ap_list_head implies used_lrs == 0 */
+>  	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+>  		return;
+> @@ -733,6 +735,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  /* Flush our emulation state into the GIC hardware before entering the guest. */
+>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>  {
+> +	WARN_ON(vgic_v4_schedule(vcpu, true));
+> +
+>  	/*
+>  	 * If there are no virtual interrupts active or pending for this
+>  	 * VCPU, then there is no work to do and we can bail out without
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 1210bf4681dc..693b654acf4d 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -234,5 +234,6 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>  bool vgic_is_v4_capable(struct kvm *kvm);
+>  int vgic_v4_init(struct kvm *kvm);
+>  void vgic_v4_teardown(struct kvm *kvm);
+> +int vgic_v4_schedule(struct kvm_vcpu *vcpu, bool on);
+>  
+>  #endif
+> -- 
+> 2.11.0
+> 
+Functionally, this looks correct.
+
+Thanks,
+-Christoffer
