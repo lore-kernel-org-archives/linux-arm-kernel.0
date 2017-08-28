@@ -1,154 +1,62 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Mon, 28 Aug 2017 14:16:03 +0200
-Subject: [PATCH 3/4] nvmem: rockchip: add support for RK3368
-In-Reply-To: <20170828121604.15968-1-romain.perier@collabora.com>
-References: <20170828121604.15968-1-romain.perier@collabora.com>
-Message-ID: <20170828121604.15968-4-romain.perier@collabora.com>
+From: antony@phenome.org (Antony Antony)
+Date: Mon, 28 Aug 2017 14:16:44 +0200
+Subject: [PATCH v2] arm64: allwinner: h5: add support for NanoPi NEO Plus 2
+In-Reply-To: <CAEKpxBkUKGUQR2Vh1+Ci4wbB-+x48nRjLmWME2EUECCHuuwsmQ@mail.gmail.com>
+References: <20170824231716.2623-1-antony@phenome.org>
+ <20170825103242.5665-1-antony@phenome.org>
+ <CAEKpxBkUKGUQR2Vh1+Ci4wbB-+x48nRjLmWME2EUECCHuuwsmQ@mail.gmail.com>
+Message-ID: <20170828121644.p7mknytubsajzctg@AntonyAntony.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the necessary functions and data for handling support on RK3368
-SoCs.
+On Fri, Aug 25, 2017 at 03:28:41PM +0200, Code Kipper wrote:
+> On 25 August 2017 at 12:32, Antony Antony <antony@phenome.org> wrote:
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- .../devicetree/bindings/nvmem/rockchip-efuse.txt   |  1 +
- drivers/nvmem/rockchip-efuse.c                     | 80 ++++++++++++++++++++++
- 2 files changed, 81 insertions(+)
+> > +
+> > +       brcmf: bcrmf at 1 {
+> > +               reg = <1>;
+> > +               compatible = "brcm,bcm4329-fmac";
+> > +       };
+> Incorrect wifi chip - just deliver what you've tested.
 
-diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-index 1ff02afdc55a..60bec4782806 100644
---- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-+++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-@@ -6,6 +6,7 @@ Required properties:
-   - "rockchip,rk3188-efuse" - for RK3188 SoCs.
-   - "rockchip,rk3228-efuse" - for RK3228 SoCs.
-   - "rockchip,rk3288-efuse" - for RK3288 SoCs.
-+  - "rockchip,rk3368-efuse" - for RK3368 SoCs.
-   - "rockchip,rk3399-efuse" - for RK3399 SoCs.
- - reg: Should contain the registers location and exact eFuse size
- - clocks: Should be the clock id of eFuse
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 63e3eb55f3ac..4e11f251035f 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -14,6 +14,7 @@
-  * more details.
-  */
- 
-+#include <linux/arm-smccc.h>
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/device.h>
-@@ -46,9 +47,17 @@
- #define REG_EFUSE_CTRL		0x0000
- #define REG_EFUSE_DOUT		0x0004
- 
-+/* SMC function IDs for SiP Service queries */
-+#define ROCKCHIP_SIP_ACCESS_REG	0x82000002
-+
-+/* SIP access registers: read or write */
-+#define ROCKCHIP_SIP_SECURE_REG_RD	0x0
-+#define ROCKCHIP_SIP_SECURE_REG_WR	0x1
-+
- struct rockchip_efuse_chip {
- 	struct device *dev;
- 	void __iomem *base;
-+	phys_addr_t phys;
- 	struct clk *clk;
- };
- 
-@@ -92,6 +101,72 @@ static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
- 	return 0;
- }
- 
-+static u32 smc_reg_read(u32 addr_phy)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(ROCKCHIP_SIP_ACCESS_REG, 0, addr_phy,
-+		      ROCKCHIP_SIP_SECURE_REG_RD, 0, 0, 0, 0, &res);
-+	if (res.a0)
-+		pr_err("%s error: %d, addr phy: 0x%x\n", __func__, (int)res.a0,
-+		       addr_phy);
-+	return res.a1;
-+}
-+
-+static u32 smc_reg_write(u32 addr_phy, u32 val)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(ROCKCHIP_SIP_ACCESS_REG, val, addr_phy,
-+		      ROCKCHIP_SIP_SECURE_REG_WR, 0, 0, 0, 0, &res);
-+	if (res.a0)
-+		pr_err("%s error: %d, addr phy: 0x%x\n", __func__, (int)res.a0,
-+                       addr_phy);
-+	return res.a0;
-+}
-+
-+static int rockchip_rk3368_efuse_read(void *context, unsigned int offset,
-+				      void *val, size_t bytes)
-+{
-+	struct rockchip_efuse_chip *efuse = context;
-+	u8 *buf = val;
-+	int ret;
-+
-+	ret = clk_prepare_enable(efuse->clk);
-+	if (ret < 0) {
-+		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
-+		return ret;
-+	}
-+
-+	smc_reg_write(efuse->phys + REG_EFUSE_CTRL, RK3288_LOAD | RK3288_PGENB);
-+	udelay(1);
-+	while (bytes--) {
-+		smc_reg_write(efuse->phys + REG_EFUSE_CTRL,
-+			      smc_reg_read(efuse->phys + REG_EFUSE_CTRL) &
-+			      (~(RK3288_A_MASK << RK3288_A_SHIFT)));
-+		smc_reg_write(efuse->phys + REG_EFUSE_CTRL,
-+			      smc_reg_read(efuse->phys + REG_EFUSE_CTRL) |
-+			      ((offset++ & RK3288_A_MASK) << RK3288_A_SHIFT));
-+
-+		udelay(1);
-+		smc_reg_write(efuse->phys + REG_EFUSE_CTRL,
-+			      smc_reg_read(efuse->phys + REG_EFUSE_CTRL) |
-+			      RK3288_STROBE);
-+		udelay(1);
-+		*buf++ = smc_reg_read(efuse->phys + REG_EFUSE_DOUT);
-+		smc_reg_write(efuse->phys + REG_EFUSE_CTRL,
-+			      smc_reg_read(efuse->phys + REG_EFUSE_CTRL) &
-+			      (~RK3288_STROBE));
-+		udelay(1);
-+	}
-+
-+	/* Switch to standby mode */
-+	smc_reg_write(efuse->phys + REG_EFUSE_CTRL, RK3288_PGENB | RK3288_CSB);
-+
-+	clk_disable_unprepare(efuse->clk);
-+	return 0;
-+}
-+
- static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
- 				      void *val, size_t bytes)
- {
-@@ -178,6 +253,10 @@ static const struct of_device_id rockchip_efuse_match[] = {
- 		.data = (void *)&rockchip_rk3288_efuse_read,
- 	},
- 	{
-+		.compatible = "rockchip,rk3368-efuse",
-+		.data = (void *)&rockchip_rk3368_efuse_read,
-+	},
-+	{
- 		.compatible = "rockchip,rk3399-efuse",
- 		.data = (void *)&rockchip_rk3399_efuse_read,
- 	},
-@@ -205,6 +284,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	efuse->phys = res->start;
- 	efuse->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(efuse->base))
- 		return PTR_ERR(efuse->base);
--- 
-2.11.0
+You are right. Now I found the correct chip ID by enabling debug with 
+Broadcom kernel module 'modprobe brcmfmac debug=0x3ffff6'
+
+The module is Ampak AP6212A with Broadcom 43430 rev=1 inside it.
+
+brcmfmac: brcmf_chip_recognition found AXI chip: BCM43430, rev=1
+brcmfmac: brcmf_ops_sdio_probe sdio vendor ID: 0x02d0
+brcmfmac: brcmf_ops_sdio_probe sdio device ID: 0xa9a6
+
+IPv6: ADDRCONF(NETDEV_CHANGE): wlan0: link becomes ready
+
+This information mostly match with https://wikidevi.com/wiki/AMPAK, except 
+module is actually AP6212A. Some of the modules may not have 'A' printed on 
+them. However the ones that identify as rev=1 is a  AP6212A.
+
+FYI: there were two things that confused me
+	- bcm4329-fmac also works.
+	- I couldn't configure it to join WiFi network with password.
+
+With change I will send a v4. Here is the propssed diff to v3.
+
+arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+
+        /*
+-        * WiFi driver support could be incomplete,
+-        * wlan0 is able to see Base Stations, however not able to join.
++        * AMPAK AP6212A WiFi module with BCM43430, rev=1 inside
++        * sdio vendor ID: 0x02d0, sdio device ID: 0xa9a6
+         */
+	brcmf: wifi at 1 {
+		reg = <1>;
+-               compatible = "brcm,bcm4329-fmac";
++               compatible = "brcm,bcm43430-fmac";
+	}; 
+
+I think now nanopi-neo-plus2.dts, v4, is in a good shape to merge.
+
+thanks for the feedback and review.
+
+regards,
+-antony
