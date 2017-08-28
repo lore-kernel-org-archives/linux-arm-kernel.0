@@ -1,20 +1,66 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 29 Aug 2017 00:04:33 +0900
-Subject: [PATCH] arm64: dts: uniphier: add PXs3 SoC support
-In-Reply-To: <1503923587-1251-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1503923587-1251-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAR4FoEm2JPRXrGonu1AciMX3i_QXvcPmXV1Sr8uCn2SFA@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 28 Aug 2017 18:07:25 +0300
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170828135959.GA32560@amd>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170815220349.GA15441@amd>
+ <20170816205332.rqcuenvuxfs5jvuw@earth>
+ <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
+ <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
+ <20170817000845.agkcuvqaheejm33j@earth>
+ <20170828135959.GA32560@amd>
+Message-ID: <20170828150725.nvrr2c3a2lir5xic@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-08-28 21:33 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Initial support for PXs3 SoC and its reference development board.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+Hi Pavel,
 
-Applied.
+On Mon, Aug 28, 2017 at 03:59:59PM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > > Well, strobe property above already uses = <0>/<1> format, as do
+> > > > others.
+> > >
+> > > > Problem with "false = property does not exist" is that you don't know
+> > > > if it is "someone forgot to define it" or "someone made a typo" or
+> > > > "dts is too old to know about this property" or "the property indeed
+> > > > should be false"...
+> > >
+> > > As this is an established practice, I think we should follow it for bool
+> > > properties.
+> > 
+> > Yes it's common practice, there is also device_property_read_bool()
+> > to get the value.
+> > 
+> > > We could change the existing ones, too, and leave some extra checks in
+> > > place to handle old dtbs.
+> > 
+> > The following should be downward compatible:
+> > 
+> > var = read_bool();
+> > if (var && !read_int())
+> >     var = false;
+> > 
+> > Btw. DT people should be CC'd for DT binding additions/changes.
+> 
+> Ok, so for now we do crc=1 by default. Now we'd like to have crc
+> support configurable in the dts. But if we just introduce "crc;"
+> option, it will break old dts users. We could introduce "no-crc;" and
+> that would work in this particular case, but will break when we want
+> different defaults at different devices.
+> 
+> Anyway, introducing "no-crc;" seems pretty ugly to me. I'd rather do
+> "crc=<0>;", in a similar way we handle other options now.
+
+The same issue actually exists for CSI-2: the CRC is typically enabled and
+I think you can at least disable the check (in OMAP3 ISP). Do we have a
+need to disable it at the moment for any purpose? I think I've seen this
+was disabled somewhere but it may just as well be a thoughtlessly written
+configuration.
 
 -- 
-Best Regards
-Masahiro Yamada
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
