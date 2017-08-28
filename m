@@ -1,124 +1,238 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon, 28 Aug 2017 11:31:36 -0400
-Subject: [PATCH] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-In-Reply-To: <d0e84021-15c0-4a34-323c-66dba67942ab@ti.com>
-References: <1503684135-24207-1-git-send-email-awallis@codeaurora.org>
- <d0e84021-15c0-4a34-323c-66dba67942ab@ti.com>
-Message-ID: <6fd85414-baee-046c-1831-e38898da5924@codeaurora.org>
+From: alcooperx@gmail.com (Alan Cooper)
+Date: Mon, 28 Aug 2017 11:35:18 -0400
+Subject: [PATCH v4 3/4] mmc: sdhci: enable/disable the clock in
+ sdhci_pltfm_suspend/resume
+In-Reply-To: <a91d1893-997b-e132-3c5b-03adb81aaa6c@intel.com>
+References: <1503461703-16225-1-git-send-email-yamada.masahiro@socionext.com>
+ <1503461703-16225-4-git-send-email-yamada.masahiro@socionext.com>
+ <a91d1893-997b-e132-3c5b-03adb81aaa6c@intel.com>
+Message-ID: <CAOGqxeXSS+tCvDg-=FjZCCk133qy4juUxHyMgSnOxqz=VD1ZVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/25/2017 7:03 PM, Grygorii Strashko wrote:
-> 
-> 
-> On 08/25/2017 01:02 PM, Adam Wallis wrote:
->> The dma ops from the parent DWC device are not getting passed to the
->> child xhci-hcd device. This patch makes use of
->> platform_device_register_full to set the DMA ops. For the DT/OF case,
->> dma_ops were still null after the the device register, so
->> of_dma_configure is called in only the OF case.
+> On 23/08/17 07:15, Masahiro Yamada wrote:
+> > This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
+> > sdhci: disable the clock in sdhci_pltfm_unregister()") did for
+> > unregister hooks.
+> >
+> > sdhci-brcmstb.c and sdhci-sirf.c implement their own suspend/resume
+> > hooks to handle pltfm_host->clk.  Move clock handling to sdhci_pltfm.c
+> > so that the drivers can reuse sdhci_pltfm_pmops.
+> >
+> > The following drivers did not previously touch pltfm_host->clk during
+> > suspend/resume, but now do:
+> >   - sdhci-bcm-kona.c
+> >   - sdhci-dove.c
+> >   - sdhci-iproc.c
+> >   - sdhci-pxav2.c
+> >   - sdhci-tegra.c
+> >   - sdhci-xenon.c
+> >
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>
+> Would have been nice to see some more Acks on this but from sdhci point of view:
+>
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+Looks good for sdhci-brcmstb.c
+
+Acked-by: Al Cooper <alcooperx@gmail.com>
+
+
+
+On Mon, Aug 28, 2017 at 6:34 AM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 23/08/17 07:15, Masahiro Yamada wrote:
+>> This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
+>> sdhci: disable the clock in sdhci_pltfm_unregister()") did for
+>> unregister hooks.
 >>
->> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
-> 
-> Hm. There were set of fixes in this area recently which actually removed
-> settings you are going to restore
-
-The set of fixes works for DWC if it is a child device, but in my testing, those
-DMA settings do not get propagated to the created xHCI-hcd child device (which
-is instantiated in dwc3_host_init). I see the same behavior with ACPI and
-Device-Tree/OF boot.
-
-> 
-> 4c39d4b usb: xhci: use bus->sysdev for DMA configuration
-> 
-> d64ff40 usb: dwc3: use bus->sysdev for DMA configuration
-> 
+>> sdhci-brcmstb.c and sdhci-sirf.c implement their own suspend/resume
+>> hooks to handle pltfm_host->clk.  Move clock handling to sdhci_pltfm.c
+>> so that the drivers can reuse sdhci_pltfm_pmops.
+>>
+>> The following drivers did not previously touch pltfm_host->clk during
+>> suspend/resume, but now do:
+>>   - sdhci-bcm-kona.c
+>>   - sdhci-dove.c
+>>   - sdhci-iproc.c
+>>   - sdhci-pxav2.c
+>>   - sdhci-tegra.c
+>>   - sdhci-xenon.c
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>
+> Would have been nice to see some more Acks on this but from sdhci point of view:
+>
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+>
 >> ---
->> ? drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
->> ? 1 file changed, 17 insertions(+), 22 deletions(-)
 >>
->> diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
->> index 76f0b0d..662e9e2 100644
->> --- a/drivers/usb/dwc3/host.c
->> +++ b/drivers/usb/dwc3/host.c
->> @@ -16,6 +16,7 @@
->> ?? */
->> ? ? #include <linux/platform_device.h>
->> +#include <linux/of_platform.h>
->> ? ? #include "core.h"
->> ? @@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
->> ? {
->> ????? struct property_entry??? props[3];
->> ????? struct platform_device??? *xhci;
->> +??? struct platform_device_info dwc_plat_info = {};
->> ????? int??????????? ret, irq;
->> ????? struct resource??????? *res;
->> ????? struct platform_device??? *dwc3_pdev = to_platform_device(dwc->dev);
->> @@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
->> ????? dwc->xhci_resources[1].flags = res->flags;
->> ????? dwc->xhci_resources[1].name = res->name;
->> ? -??? xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
->> -??? if (!xhci) {
->> -??????? dev_err(dwc->dev, "couldn't allocate xHCI device\n");
->> -??????? return -ENOMEM;
->> -??? }
->> +??? dwc_plat_info.name = "xhci-hcd";
->> +??? dwc_plat_info.parent = dwc->dev;
->> +??? dwc_plat_info.res = dwc->xhci_resources;
->> +??? dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
->> +??? dwc_plat_info.fwnode = dwc->dev->fwnode;
->> +??? dwc_plat_info.dma_mask = *dwc->dev->dma_mask;
->> ? -??? xhci->dev.parent??? = dwc->dev;
->> +??? xhci = platform_device_register_full(&dwc_plat_info);
->> +??? if (IS_ERR(xhci)) {
->> +??????? dev_err(dwc->dev, "failed to register xHCI device\n");
->> +??????? return PTR_ERR(xhci);
->> +??? }
->> ? ????? dwc->xhci = xhci;
->> -
->> -??? ret = platform_device_add_resources(xhci, dwc->xhci_resources,
->> -??????????????????????? DWC3_XHCI_RESOURCES_NUM);
->> -??? if (ret) {
->> -??????? dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
->> -??????? goto err1;
->> -??? }
->> +??? if (dwc->dev->of_node)
->> +??????? of_dma_configure(&xhci->dev, dwc->dev->of_node);
->> ? ????? memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
->> ? @@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
->> ????????? ret = platform_device_add_properties(xhci, props);
->> ????????? if (ret) {
->> ????????????? dev_err(dwc->dev, "failed to add properties to xHCI\n");
->> -??????????? goto err1;
->> +??????????? goto err;
->> ????????? }
->> ????? }
->> ? @@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
->> ????? phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
->> ??????????????? dev_name(dwc->dev));
->> ? -??? ret = platform_device_add(xhci);
->> -??? if (ret) {
->> -??????? dev_err(dwc->dev, "failed to register xHCI device\n");
->> -??????? goto err2;
->> -??? }
->> -
->> ????? return 0;
->> -err2:
->> +err:
->> ????? phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
->> ??????????????? dev_name(dwc->dev));
->> ????? phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
->> ??????????????? dev_name(dwc->dev));
->> -err1:
->> ????? platform_device_put(xhci);
->> ????? return ret;
->> ? }
+>> Changes in v4:
+>>   - Disable clk when resume fails
 >>
-> 
-
-
--- 
-Adam Wallis
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+>> Changes in v3: None
+>> Changes in v2:
+>>   - Fix build error reported by kbuild test robot
+>>
+>>  drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
+>>  drivers/mmc/host/sdhci-pltfm.c   | 22 ++++++++++++++++++++--
+>>  drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
+>>  3 files changed, 22 insertions(+), 76 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
+>> index e2f638338e8f..6d461fcdd663 100644
+>> --- a/drivers/mmc/host/sdhci-brcmstb.c
+>> +++ b/drivers/mmc/host/sdhci-brcmstb.c
+>> @@ -21,41 +21,6 @@
+>>
+>>  #include "sdhci-pltfm.h"
+>>
+>> -#ifdef CONFIG_PM_SLEEP
+>> -
+>> -static int sdhci_brcmstb_suspend(struct device *dev)
+>> -{
+>> -     struct sdhci_host *host = dev_get_drvdata(dev);
+>> -     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> -     int res;
+>> -
+>> -     if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+>> -             mmc_retune_needed(host->mmc);
+>> -
+>> -     res = sdhci_suspend_host(host);
+>> -     if (res)
+>> -             return res;
+>> -     clk_disable_unprepare(pltfm_host->clk);
+>> -     return res;
+>> -}
+>> -
+>> -static int sdhci_brcmstb_resume(struct device *dev)
+>> -{
+>> -     struct sdhci_host *host = dev_get_drvdata(dev);
+>> -     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> -     int err;
+>> -
+>> -     err = clk_prepare_enable(pltfm_host->clk);
+>> -     if (err)
+>> -             return err;
+>> -     return sdhci_resume_host(host);
+>> -}
+>> -
+>> -#endif /* CONFIG_PM_SLEEP */
+>> -
+>> -static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
+>> -                     sdhci_brcmstb_resume);
+>> -
+>>  static const struct sdhci_ops sdhci_brcmstb_ops = {
+>>       .set_clock = sdhci_set_clock,
+>>       .set_bus_width = sdhci_set_bus_width,
+>> @@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
+>>  static struct platform_driver sdhci_brcmstb_driver = {
+>>       .driver         = {
+>>               .name   = "sdhci-brcmstb",
+>> -             .pm     = &sdhci_brcmstb_pmops,
+>> +             .pm     = &sdhci_pltfm_pmops,
+>>               .of_match_table = of_match_ptr(sdhci_brcm_of_match),
+>>       },
+>>       .probe          = sdhci_brcmstb_probe,
+>> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+>> index e090d8c42ddb..4c0135e184e9 100644
+>> --- a/drivers/mmc/host/sdhci-pltfm.c
+>> +++ b/drivers/mmc/host/sdhci-pltfm.c
+>> @@ -212,18 +212,36 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
+>>  static int sdhci_pltfm_suspend(struct device *dev)
+>>  {
+>>       struct sdhci_host *host = dev_get_drvdata(dev);
+>> +     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +     int ret;
+>>
+>>       if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+>>               mmc_retune_needed(host->mmc);
+>>
+>> -     return sdhci_suspend_host(host);
+>> +     ret = sdhci_suspend_host(host);
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     clk_disable_unprepare(pltfm_host->clk);
+>> +
+>> +     return 0;
+>>  }
+>>
+>>  static int sdhci_pltfm_resume(struct device *dev)
+>>  {
+>>       struct sdhci_host *host = dev_get_drvdata(dev);
+>> +     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +     int ret;
+>> +
+>> +     ret = clk_prepare_enable(pltfm_host->clk);
+>> +     if (ret)
+>> +             return ret;
+>>
+>> -     return sdhci_resume_host(host);
+>> +     ret = sdhci_resume_host(host);
+>> +     if (ret)
+>> +             clk_disable_unprepare(pltfm_host->clk);
+>> +
+>> +     return ret;
+>>  }
+>>  #endif
+>>
+>> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+>> index c251c6c0a112..0c7aa89df4e2 100644
+>> --- a/drivers/mmc/host/sdhci-sirf.c
+>> +++ b/drivers/mmc/host/sdhci-sirf.c
+>> @@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+>>       return ret;
+>>  }
+>>
+>> -#ifdef CONFIG_PM_SLEEP
+>> -static int sdhci_sirf_suspend(struct device *dev)
+>> -{
+>> -     struct sdhci_host *host = dev_get_drvdata(dev);
+>> -     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> -     int ret;
+>> -
+>> -     if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+>> -             mmc_retune_needed(host->mmc);
+>> -
+>> -     ret = sdhci_suspend_host(host);
+>> -     if (ret)
+>> -             return ret;
+>> -
+>> -     clk_disable(pltfm_host->clk);
+>> -
+>> -     return 0;
+>> -}
+>> -
+>> -static int sdhci_sirf_resume(struct device *dev)
+>> -{
+>> -     struct sdhci_host *host = dev_get_drvdata(dev);
+>> -     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> -     int ret;
+>> -
+>> -     ret = clk_enable(pltfm_host->clk);
+>> -     if (ret) {
+>> -             dev_dbg(dev, "Resume: Error enabling clock\n");
+>> -             return ret;
+>> -     }
+>> -
+>> -     return sdhci_resume_host(host);
+>> -}
+>> -#endif
+>> -
+>> -static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
+>> -
+>>  static const struct of_device_id sdhci_sirf_of_match[] = {
+>>       { .compatible = "sirf,prima2-sdhc" },
+>>       { }
+>> @@ -277,7 +240,7 @@ static struct platform_driver sdhci_sirf_driver = {
+>>       .driver         = {
+>>               .name   = "sdhci-sirf",
+>>               .of_match_table = sdhci_sirf_of_match,
+>> -             .pm     = &sdhci_sirf_pm_ops,
+>> +             .pm     = &sdhci_pltfm_pmops,
+>>       },
+>>       .probe          = sdhci_sirf_probe,
+>>       .remove         = sdhci_pltfm_unregister,
+>>
+>
