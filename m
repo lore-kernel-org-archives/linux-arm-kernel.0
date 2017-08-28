@@ -1,41 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 Aug 2017 09:53:01 +0200
-Subject: [PATCH ] ARM: dts: iwg20d-q7: Add chosen node
-In-Reply-To: <SG2PR06MB1711E12964D1C1300C4EEB64B89A0@SG2PR06MB1711.apcprd06.prod.outlook.com>
-References: <1503075488-44304-1-git-send-email-biju.das@bp.renesas.com>
- <20170822080735.GH30838@verge.net.au>
- <SG2PR06MB1711E12964D1C1300C4EEB64B89A0@SG2PR06MB1711.apcprd06.prod.outlook.com>
-Message-ID: <20170828075301.GC22421@verge.net.au>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 28 Aug 2017 10:57:32 +0300
+Subject: [PATCH 2/5] mmc: sdhci: Add quirk to indicate MMC_RSP_136 has CRC
+In-Reply-To: <20170821074132.4622-3-kishon@ti.com>
+References: <20170821074132.4622-1-kishon@ti.com>
+ <20170821074132.4622-3-kishon@ti.com>
+Message-ID: <24fa9713-1367-08d7-54b6-b853e32fd6aa@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 02:32:47PM +0000, Biju Das wrote:
+On 21/08/17 10:41, Kishon Vijay Abraham I wrote:
+> TI's implementation of sdhci controller used in DRA7 SoC's has
+> CRC in responses with length 136 bits. Add quirk to indicate
+> the controller has CRC in MMC_RSP_136. If this quirk is
+> set sdhci library shouldn't shift the response present in
+> SDHCI_RESPONSE register.
 > 
-> 
-> > -----Original Message-----
-> > From: Simon Horman [mailto:horms at verge.net.au]
-> > Sent: 22 August 2017 09:08
-> > To: Biju Das <biju.das@bp.renesas.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> > <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
-> > Russell King <linux@armlinux.org.uk>; Chris Paterson
-> > <Chris.Paterson2@renesas.com>; Fabrizio Castro
-> > <fabrizio.castro@bp.renesas.com>; devicetree at vger.kernel.org; linux-renesas-
-> > soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH ] ARM: dts: iwg20d-q7: Add chosen node
-> >
-> > On Fri, Aug 18, 2017 at 05:58:08PM +0100, Biju Das wrote:
-> > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > > ---
-> > > This patch tested against renesas-dev tag
-> > > renesas-devel-20170815-v4.13-rc5
-> >
-> > Thanks, I have applied this for v4.15.
-> >
-> > There was some fuzz when applying this patch.
-> > Please check that it is correct when I have pushed today's devel tag to the
-> > renesas tree.
-> 
-> Looks like this node is misplaced. I will repost this patch.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Thanks, I have dropped this patch.
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> ---
+>  drivers/mmc/host/sdhci.c | 3 +++
+>  drivers/mmc/host/sdhci.h | 2 ++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index ba639b7851cb..9c8d7428df3c 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1182,6 +1182,9 @@ static void sdhci_read_rsp_136(struct sdhci_host *host, struct mmc_command *cmd)
+>  		cmd->resp[i] = sdhci_readl(host, reg);
+>  	}
+>  
+> +	if (host->quirks2 & SDHCI_QUIRK2_RSP_136_HAS_CRC)
+> +		return;
+> +
+>  	/* CRC is stripped so we need to do some shifting */
+>  	for (i = 0; i < 4; i++) {
+>  		cmd->resp[i] <<= 8;
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 399edc681623..54bc444c317f 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -435,6 +435,8 @@ struct sdhci_host {
+>  #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
+>  /* Broken Clock divider zero in controller */
+>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+> +/* Controller has CRC in 136 bit Command Response */
+> +#define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+>  
+>  	int irq;		/* Device IRQ */
+>  	void __iomem *ioaddr;	/* Mapped address */
+> 
