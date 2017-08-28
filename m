@@ -1,123 +1,46 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 28 Aug 2017 18:13:24 +0200
-Subject: [PATCH v10] PCI: tango: Add MSI controller support
-In-Reply-To: <4954977e-46fd-8d54-ec76-db2134d3073a@arm.com>
-References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
- <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
- <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
- <86efs3wesi.fsf@arm.com>
- <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
- <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
- <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
- <e381170c-e462-01cd-12db-30773005602b@free.fr> <871so09j6g.fsf@arm.com>
- <acdef092-3fb9-4338-5199-a458ac2439c7@free.fr>
- <4954977e-46fd-8d54-ec76-db2134d3073a@arm.com>
-Message-ID: <26b17bd9-232f-b992-68ac-3b5a7752ba54@free.fr>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 28 Aug 2017 18:16:27 +0200
+Subject: [PATCH v3 2/3] rtc: Add Realtek RTD1295
+In-Reply-To: <20170828111041.17946-3-afaerber@suse.de>
+References: <20170828111041.17946-1-afaerber@suse.de>
+ <20170828111041.17946-3-afaerber@suse.de>
+Message-ID: <20170828161627.4vndoeucudh3rfto@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/08/2017 17:25, Robin Murphy wrote:
+Hi,
 
-> If your host controller driver needs to discover its windows from DT to
-> configure *itself*, it needs to parse dma-ranges itself; see pcie-iproc,
-> pcie-rcar, pcie-xgene, etc. for examples.
+Seems fine to me, one small comment:
 
-$ git grep '"dma-ranges"' drivers/pci/host
-drivers/pci/host/pci-ftpci100.c:        parser->range = of_get_property(node, "dma-ranges", &rlen);
-drivers/pci/host/pci-rcar-gen2.c:       parser->range = of_get_property(node, "dma-ranges", &rlen);
-drivers/pci/host/pci-xgene.c:   parser->range = of_get_property(node, "dma-ranges", &rlen);
-drivers/pci/host/pcie-iproc.c:  parser->range = of_get_property(node, "dma-ranges", &rlen);
-drivers/pci/host/pcie-rcar.c:   parser->range = of_get_property(node, "dma-ranges", &rlen);
+On 28/08/2017 at 13:10:40 +0200, Andreas F?rber wrote:
+> +static int rtd119x_rtc_remove(struct platform_device *pdev)
+> +{
+> +	struct rtd119x_rtc *data = platform_get_drvdata(pdev);
+> +
+> +	rtd119x_rtc_set_enabled(&pdev->dev, false);
+> +
+> +	clk_disable_unprepare(data->clk);
 
-These 5 drivers are using the same function: pci_dma_range_parser_init
+Missing clk_put ?
 
-pci-ftpci100.c:		d3c68e0a7e34a (Linus Walleij     2017-03-12
-pci-rcar-gen2.c:	8d598cabf50d8 (Phil Edworthy     2015-11-03
-pci-xgene.c:		5f6b6ccdbe1cd (Tanmay Inamdar    2014-10-01
-pcie-iproc.c:		dd9d4e7498de3 (Ray Jui           2016-10-31
-pcie-rcar.c:		c25da4778803b (Phil Edworthy     2014-05-12
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver rtd119x_rtc_driver = {
+> +	.probe = rtd119x_rtc_probe,
+> +	.remove = rtd119x_rtc_remove,
+> +	.driver = {
+> +		.name = "rtd1295-rtc",
+> +		.of_match_table	= rtd119x_rtc_dt_ids,
+> +	},
+> +};
+> +builtin_platform_driver(rtd119x_rtc_driver);
+> -- 
+> 2.12.3
+> 
 
-which seems to be a copy of of_pci_range_parser_init
-with "ranges" changed to "dma-ranges"
-
-drivers/of/address.c	29b635c00f3eb (Andrew Murray     2013-05-16
-
-Perhaps pci_dma_range_parser_init() can be factorized?
-
-Rob, Frank, what do you think of the patch below?
-
-
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 580bbf6ca2b1..4cfd29e4ee1b 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -232,8 +232,8 @@ int of_pci_address_to_resource(struct device_node *dev, int bar,
- }
- EXPORT_SYMBOL_GPL(of_pci_address_to_resource);
- 
--int of_pci_range_parser_init(struct of_pci_range_parser *parser,
--				struct device_node *node)
-+static int parser_init(struct of_pci_range_parser *parser,
-+			struct device_node *node, const char *name)
- {
- 	const int na = 3, ns = 2;
- 	int rlen;
-@@ -242,7 +242,7 @@ int of_pci_range_parser_init(struct of_pci_range_parser *parser,
- 	parser->pna = of_n_addr_cells(node);
- 	parser->np = parser->pna + na + ns;
- 
--	parser->range = of_get_property(node, "ranges", &rlen);
-+	parser->range = of_get_property(node, name, &rlen);
- 	if (parser->range == NULL)
- 		return -ENOENT;
- 
-@@ -250,8 +250,21 @@ int of_pci_range_parser_init(struct of_pci_range_parser *parser,
- 
- 	return 0;
- }
-+
-+int of_pci_range_parser_init(struct of_pci_range_parser *parser,
-+				struct device_node *node)
-+{
-+	return parser_init(parser, node, "ranges");
-+}
- EXPORT_SYMBOL_GPL(of_pci_range_parser_init);
- 
-+int of_pci_dma_range_parser_init(struct of_pci_range_parser *parser,
-+				struct device_node *node)
-+{
-+	return parser_init(parser, node, "dma-ranges");
-+}
-+EXPORT_SYMBOL_GPL(of_pci_dma_range_parser_init);
-+
- struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
- 						struct of_pci_range *range)
- {
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 37864734ca50..8beed2de98e9 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -49,6 +49,8 @@ extern const __be32 *of_get_address(struct device_node *dev, int index,
- 
- extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
- 			struct device_node *node);
-+extern int of_pci_dma_range_parser_init(struct of_pci_range_parser *parser,
-+			struct device_node *node);
- extern struct of_pci_range *of_pci_range_parser_one(
- 					struct of_pci_range_parser *parser,
- 					struct of_pci_range *range);
-@@ -85,7 +87,13 @@ static inline const __be32 *of_get_address(struct device_node *dev, int index,
- static inline int of_pci_range_parser_init(struct of_pci_range_parser *parser,
- 			struct device_node *node)
- {
--	return -1;
-+	return -ENOSYS;
-+}
-+
-+static inline int of_pci_dma_range_parser_init(struct of_pci_range_parser *parser,
-+			struct device_node *node)
-+{
-+	return -ENOSYS;
- }
- 
- static inline struct of_pci_range *of_pci_range_parser_one(
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
