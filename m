@@ -1,108 +1,44 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon, 28 Aug 2017 12:35:10 -0400
-Subject: [PATCH V2] usb: dwc3: Initialize DMA ops/mask for xhci-hcd
-Message-ID: <1503938110-23712-1-git-send-email-awallis@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Aug 2017 18:47:33 +0200
+Subject: [PATCH] clk: gemini: hands off PCI OE bit
+In-Reply-To: <20170809172308.GC2146@codeaurora.org>
+References: <20170808190818.11740-1-linus.walleij@linaro.org>
+ <20170809014312.GZ2146@codeaurora.org>
+ <CACRpkda0cLMuiipEBX+mH6MJ3v6k=CY+q=Q6NUj=BM+6wnFO2A@mail.gmail.com>
+ <20170809172308.GC2146@codeaurora.org>
+Message-ID: <CACRpkdY3y6_W3heTYGW3SejZ=+trH=hvOAdqg2gV3hQ5g8FhYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma ops from the parent DWC device are not getting passed to the
-child xhci-hcd device. This patch makes use of
-platform_device_register_full to set the DMA ops. For the DT/OF case,
-dma_ops were still null after the the device register, so
-of_dma_configure is called in only the OF case.
+On Wed, Aug 9, 2017 at 7:23 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 08/09, Linus Walleij wrote:
+>> On Wed, Aug 9, 2017 at 3:43 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> > On 08/08, Linus Walleij wrote:
+>> >> This bit is pin control, and needs to be carefully managed by the
+>> >> new pin control driver.
+>> >>
+>> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> >
+>> > Fixes tag?
+>>
+>> It's not a fix, it'd just that we move the responsibility of managing the
+>> pin from the clock driver to the pin control driver.
+>>
+>> I initially thought the Gemini would not need a separate pin control
+>> driver because it was "simple" ... so these bits could be handled here
+>> and there among the peripherals. Little did I know. Mea culpa.
+>>
+>> > Does this need to be merged now as a critical fix? Or we can wait
+>> > on it for next release?
+>>
+>> Just put it in for the next release, thanks!
+>>
+>
+> Alright. Thanks!
 
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
- drivers/usb/dwc3/host.c | 39 +++++++++++++++++----------------------
- 1 file changed, 17 insertions(+), 22 deletions(-)
+Stephen are you queueing this patch?
 
-diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-index 76f0b0d..c289da1 100644
---- a/drivers/usb/dwc3/host.c
-+++ b/drivers/usb/dwc3/host.c
-@@ -16,6 +16,7 @@
-  */
- 
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- 
- #include "core.h"
- 
-@@ -56,6 +57,7 @@ int dwc3_host_init(struct dwc3 *dwc)
- {
- 	struct property_entry	props[3];
- 	struct platform_device	*xhci;
-+	struct platform_device_info dwc_plat_info = {};
- 	int			ret, irq;
- 	struct resource		*res;
- 	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
-@@ -79,22 +81,22 @@ int dwc3_host_init(struct dwc3 *dwc)
- 	dwc->xhci_resources[1].flags = res->flags;
- 	dwc->xhci_resources[1].name = res->name;
- 
--	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
--	if (!xhci) {
--		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
--		return -ENOMEM;
--	}
-+	dwc_plat_info.name = "xhci-hcd";
-+	dwc_plat_info.parent = dwc->sysdev;
-+	dwc_plat_info.res = dwc->xhci_resources;
-+	dwc_plat_info.num_res = DWC3_XHCI_RESOURCES_NUM;
-+	dwc_plat_info.fwnode = dwc->sysdev->fwnode;
-+	dwc_plat_info.dma_mask = *dwc->sysdev->dma_mask;
- 
--	xhci->dev.parent	= dwc->dev;
-+	xhci = platform_device_register_full(&dwc_plat_info);
-+	if (IS_ERR(xhci)) {
-+		dev_err(dwc->dev, "failed to register xHCI device\n");
-+		return PTR_ERR(xhci);
-+	}
- 
- 	dwc->xhci = xhci;
--
--	ret = platform_device_add_resources(xhci, dwc->xhci_resources,
--						DWC3_XHCI_RESOURCES_NUM);
--	if (ret) {
--		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
--		goto err1;
--	}
-+	if (dwc->sysdev->of_node)
-+		of_dma_configure(&xhci->dev, dwc->sysdev->of_node);
- 
- 	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
- 
-@@ -117,7 +119,7 @@ int dwc3_host_init(struct dwc3 *dwc)
- 		ret = platform_device_add_properties(xhci, props);
- 		if (ret) {
- 			dev_err(dwc->dev, "failed to add properties to xHCI\n");
--			goto err1;
-+			goto err;
- 		}
- 	}
- 
-@@ -126,19 +128,12 @@ int dwc3_host_init(struct dwc3 *dwc)
- 	phy_create_lookup(dwc->usb3_generic_phy, "usb3-phy",
- 			  dev_name(dwc->dev));
- 
--	ret = platform_device_add(xhci);
--	if (ret) {
--		dev_err(dwc->dev, "failed to register xHCI device\n");
--		goto err2;
--	}
--
- 	return 0;
--err2:
-+err:
- 	phy_remove_lookup(dwc->usb2_generic_phy, "usb2-phy",
- 			  dev_name(dwc->dev));
- 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
- 			  dev_name(dwc->dev));
--err1:
- 	platform_device_put(xhci);
- 	return ret;
- }
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Or someone else from the clk group?
+
+Yours,
+Linus Walleij
