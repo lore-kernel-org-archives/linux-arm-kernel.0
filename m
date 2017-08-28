@@ -1,122 +1,147 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 28 Aug 2017 18:23:54 +0530
-Subject: [PATCH] arm64: fix unwind_frame() for filtered out fn via
- set_graph_notrace
-Message-ID: <4a92b0bf5ee602de6463057e5d98d20b4d4f2bcd.1503924827.git.panand@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 28 Aug 2017 14:54:40 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
+ direct_complete for ACPI devices
+In-Reply-To: <26411805.tiHaCQcaUh@aspire.rjw.lan>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <35832703.Y3V01Ybc1Y@aspire.rjw.lan>
+ <CAPDyKFrRW3BLetxGW=89_Ksoxn4GW_7ebcADT1pyUrAT4ySpjA@mail.gmail.com>
+ <26411805.tiHaCQcaUh@aspire.rjw.lan>
+Message-ID: <CAPDyKFr6RZuEqwUR3QwV9cDtzNe8Qi12PmkYttUia2QEwNRWqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Testcase:
-cd /sys/kernel/debug/tracing/
-echo schedule > set_graph_notrace
-echo 1 > options/display-graph
-echo wakeup > current_tracer
-ps -ef | grep -i agent
+On 28 August 2017 at 14:39, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, August 28, 2017 10:31:44 AM CEST Ulf Hansson wrote:
+>> On 28 August 2017 at 03:30, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Friday, August 25, 2017 3:42:35 PM CEST Rafael J. Wysocki wrote:
+>> >> On Thursday, August 24, 2017 11:50:40 PM CEST Rafael J. Wysocki wrote:
+>> >> > On Thursday, August 24, 2017 6:35:49 PM CEST Rafael J. Wysocki wrote:
+>> >> > > On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
+>> >> >
+>> >> > [cut]
+>> >> >
+>> >> > > [BTW, it is not entirely clear to me why it ever is necessary to runtime resume
+>> >> > > a device with direct_complete set after __device_suspend(), because it can only
+>> >> > > have direct_complete set at that point if all of the hierarchy below it has
+>> >> > > this flag set too and so runtime PM has to be disabled for all of those
+>> >> > > devices as well.]
+>> >> >
+>> >> > Which makes me realize that we should take a step back and look at what
+>> >> > problems there are.
+>> >> >
+>> >> > First, there are devices (I know about two examples so far and both are PCI)
+>> >> > that may need to be runtime resumed during system suspend for reasons other
+>> >> > than the ones checked by the ACPI PM domain (or the PCI bus type).  There needs
+>> >> > to be a way to indicate that from the driver side.
+>> >> >
+>> >> > However, it still may be valuable to check the power-related conditions for
+>> >> > leaving the device in runtime suspend over system suspend/resume in case
+>> >> > it actually doesn't need to be runtime resumed during system suspend after
+>> >> > all.  That's what the majority of my patch was about.
+>> >> >
+>> >> > The second problem is that the ACPI PM domain (and the PCI bus type)
+>> >> > runtime resumes all devices unconditionally in its ->suspend callback,
+>> >> > even though that may not be necessary for some devices.  Therefore there
+>> >> > needs to be a way to indicate that too.  That still would be good to
+>> >> > have *regardless* of the direct_complete mechanism, because the direct_complete
+>> >> > flag may not be set very often due to dependencies and then the
+>> >> > resume-during-suspend will take place unnecessarily.
+>> >> >
+>> >> > Accordingly, it looks like we need a "no need to resume me" flag in the first
+>> >> > place.  That would indicate to interested pieces of code that, from the
+>> >> > driver perspective, the device doesn't need to be runtime resumed before
+>> >> > invoking its system suspend callbacks.  This should be clear enough to everyone
+>> >> > IMO.
+>> >> >
+>> >> > [Note that if that flag is set for all devices, we may drop it along with
+>> >> > direct_complete, but before that happens both are needed.]
+>> >>
+>> >> I think we are in agreement that direct_complete will not be necessary any
+>> >> more when all drivers/bus types/PM domains and so on can do the "safe
+>> >> suspend", but we're not there yet. :-)
+>> >>
+>> >> > To address the first issue I would add something like the flag in the patches
+>> >> > I sent (but without the ACPI PM domain part which should be covered by the
+>> >> > "no need to resume me" flag above), because that allows the device's ->suspend
+>> >> > callback to run in principle and the driver may use that callback even to
+>> >> > runtime resume the device if that's what it wants to do.  So something like
+>> >> > "run my ->suspend callback even though I might stay in runtime suspend".
+>> >> >
+>> >> > I would probably add driver_flags to dev_pm_info for that to set at the probe
+>> >> > time (and I would make the core clear that on driver removal).
+>> >> >
+>> >> > The complexity concern is there, but honestly I don't see a better way at
+>> >> > this point.
+>> >>
+>> >> So below is a prototype patch.  It still is missing a documentation update, but
+>> >> other than that it should be complete unless I missed something.
+>> >>
+>> >> The way it works is that the SAFE_SUSPEND flag is not looked at by the core
+>> >> at all.  The ACPI PM domain looks at it and the PCI bus type can be modified
+>> >> to take it into account in the future.  That is what causes the "runtime resume
+>> >> during system suspend" to be skipped.
+>> >>
+>> >> In turn, the ALWAYS_SUSPEND flag is only looked at by the core and it causes
+>> >> the decision on whether or not to use direct_complete to be deferred to the
+>> >> __device_suspend_late() time.  If you set it for a PCI device, the effect is
+>> >> equivalent to "no direct_complete".  If you set it for a device in the ACPI
+>> >> PM domain, that depends on whether or not SAFE_SUSPEND is set.  If it isn't
+>> >> set, the effect is equivalent to "no direct_complete" too, but if it is set,
+>> >> the core may still try to use direct_complete for the device, but it will
+>> >> make the decision on it in __device_suspend_late() and then it will not invoke
+>> >> the ->suspend_late callback for the device if it is still runtime suspended.
+>> >> [Note that you cannot runtime resume and runtime suspend again a device during
+>> >> system suspend, so if it is runtime suspended in __device_suspend_late(), it
+>> >> has been runtime suspend all the way since device_prepare().]
+>> >>
+>> >> So say you point the ->suspend_late and ->resume_early callbacks of
+>> >> the designware i2c driver to pm_runtime_force_suspend() and
+>> >> pm_runtime_force_resume(), respectively, and set both the SAFE_SUSPEND
+>> >> and ALWAYS_SUSPEND flags for the device.
+>> >>
+>> >> If system suspend is started and the device is not runtime suspended,
+>> >> direct_complete is not set for it and everything works as usual, so say
+>> >> the device is runtime suspended in device_prepare().  Then, the ACPI PM
+>> >> domain checks the other conditions for leaving it in runtime suspend and
+>> >> returns either 0 or a positive number from acpi_subsys_prepare().
+>> >>
+>> >> If 0 is returned, direct_complete is not set by the core and
+>> >> acpi_subsys_suspend() is called.  It checks the SAFE_SUSPEND flag and sees
+>> >> that the device need not be runtime resumed, so it invokes the driver's
+>> >> ->suspend callback (which is not present, so it doesn't do anything).
+>> >> Next, in __device_suspend_late(), acpi_subsys_suspend_late() is invoked
+>> >> and it calls pm_runtime_force_suspend(), which executes the driver's
+>> >> ->runtime_suspend() callback, and then (if successful) calls
+>> >> acpi_dev_suspend_late() to put the device into a low-power state.  The
+>> >> resume path is a reverse of the above in this case.  So far, so good.
+>> >
+>> > Well, not really, because if the device remains runtime suspended,
+>> > ->runtime_suspend() will not be called by pm_runtime_force_suspend() and
+>> > acpi_dev_suspend_late() should not be called then.
+>> >
+>> > So more changes in the ACPI PM domain are needed after all.
+>>
+>> Yes, that's what I thought as well.
+>>
+>> Anyway, let me cook a new version of the series - trying to address
+>> the first bits you have pointed out. Then we can continue with
+>> fine-tuning on top, addressing further optimizations of the ACPI PM
+>> domain.
+>
+> Actually, please hold on and let me show you what I would like to do
+> first.
 
-Above commands result in
-PANIC: "Unable to handle kernel paging request at virtual address
-ffff801bcbde7000"
+Hmm.
 
-vmcore analysis:
-1)
-crash> bt
-PID: 1561   TASK: ffff8003cb7e4000  CPU: 0   COMMAND: "ps"
- #0 [ffff8003c4ff77b0] crash_kexec at ffff00000816b9b8
- #1 [ffff8003c4ff77e0] die at ffff000008088b34
- #2 [ffff8003c4ff7820] __do_kernel_fault at ffff00000809b830
- #3 [ffff8003c4ff7850] do_bad_area at ffff000008098b90
- #4 [ffff8003c4ff7880] do_translation_fault at ffff0000087c6cdc
- #5 [ffff8003c4ff78b0] do_mem_abort at ffff000008081334
- #6 [ffff8003c4ff7ab0] el1_ia at ffff000008082cc0
-     PC: ffff00000808811c  [unwind_frame+300]
-     LR: ffff0000080858a8  [get_wchan+212]
-     SP: ffff8003c4ff7ab0  PSTATE: 60000145
-    X29: ffff8003c4ff7ab0  X28: 0000000000000001  X27: 0000000000000000
-    X26: 0000000000000000  X25: 0000000000000000  X24: 0000000000000000
-    X23: ffff8003c1c20000  X22: ffff000008c73000  X21: ffff8003c1c1c000
-    X20: 000000000000000f  X19: ffff8003c1bc7000  X18: 0000000000000010
-    X17: 0000000000000000  X16: 0000000000000001  X15: ffffffffffffffed
-    X14: 0000000000000010  X13: ffffffffffffffff  X12: 0000000000000004
-    X11: 0000000000000000  X10: 0000000002dd14c0   X9: 1999999999999999
-     X8: 000000000000003f   X7: 00008003f71b0000   X6: 0000000000000018
-     X5: 0000000000000000   X4: ffff8003c1c1fd20   X3: ffff8003c1c1fd10
-     X2: 00000017ffe80000   X1: ffff8003c4ff7af8   X0: ffff8003cbf67000
- #7 [ffff8003c4ff7b20] do_task_stat at ffff000008304f0c
- #8 [ffff8003c4ff7c60] proc_tgid_stat at ffff000008305b48
- #9 [ffff8003c4ff7ca0] proc_single_show at ffff0000082fdd10
- #10 [ffff8003c4ff7ce0] seq_read at ffff0000082b27bc
- #11 [ffff8003c4ff7d70] __vfs_read at ffff000008289e54
- #12 [ffff8003c4ff7e30] vfs_read at ffff00000828b14c
- #13 [ffff8003c4ff7e70] sys_read at ffff00000828c2d0
- #14 [ffff8003c4ff7ed0] __sys_trace at ffff00000808349c
-     PC: 00000006  LR: 00000000  SP: ffffffffffffffed  PSTATE: 0000003f
-    X12: 00000010 X11: ffffffffffffffff X10: 00000004  X9: ffff7febe8d0
-     X8: 00000000  X7: 1999999999999999  X6: 0000003f  X5: 0000000c
-     X4: ffff7fce9c78  X3: 0000000c  X2: 00000000  X1: 00000000
-     X0: 00000400
+I think I have almost done the work for the ACPI PM domain already.
+It's just a matter of minor tweaks to the changes in patch 6 and 7
+(and of course to get them into a shape that you prefer) and then
+dropping patch 5 altogether.
 
-(2) Instruction at ffff00000808811c caused IA/DA.
+Wouldn't it be better if you build upon my changes?
 
-crash> dis -l ffff000008088108 6
-/usr/src/debug/xxxxxxxxxxxx/xxxxxxxxxx/arch/arm64/kernel/stacktrace.c:
-84
-0xffff000008088108 <unwind_frame+280>:  ldr     w2, [x1,#24]
-0xffff00000808810c <unwind_frame+284>:  sub     w6, w2, #0x1
-0xffff000008088110 <unwind_frame+288>:  str     w6, [x1,#24]
-0xffff000008088114 <unwind_frame+292>:  mov     w6, #0x18 // #24
-0xffff000008088118 <unwind_frame+296>:  umull   x2, w2, w6
-0xffff00000808811c <unwind_frame+300>:  ldr     x0, [x0,x2]
+Anyway, if you have strong opinion of driving this, I am fine stepping aside.
 
-Corresponding c statement is
-frame->pc = tsk->ret_stack[frame->graph--].ret;
-
-(3) So, it caused data abort while executing
-0xffff00000808811c <unwind_frame+300>:  ldr     x0, [x0,x2]
-
-x0 + x2 = ffff8003cbf67000 + 00000017ffe80000 = ffff801bcbde7000
-Access of ffff801bcbde7000 resulted in "Unable to handle kernel paging
-request"
-
-from above data: frame->graph = task->curr_ret_stack which  should be,
-x2 / 0x18 = FFFF0000, which is -FTRACE_NOTRACE_DEPTH.
-
-OK, so problem is here:
-do_task_stat() calls get_wchan(). Here p->curr_ret_stack  is
--FTRACE_NOTRACE_DEPTH in the failed case. It means, when do_task_stat()
-has been called for task A (ps in this case) on CPUm,task A was in mid
-of execution on CPUn, and was in the mid of mcount() execution where
-curr_ret_stack had been decremented in ftrace_push_return_trace() for
-hitting schedule() function, but it was yet to be incremented in
-ftrace_return_to_handler().
-
-Similar problem we can have with calling of walk_stackframe() from
-save_stack_trace_tsk() or dump_backtrace().
-
-This patch fixes unwind_frame() to not to manipulate frame->pc for
-function graph tracer if the function has been marked in
-set_graph_notrace.
-
-This patch fixes: 20380bb390a4 (arm64: ftrace: fix a stack tracer's
-output under function graph tracer)
-
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- arch/arm64/kernel/stacktrace.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 09d37d66b630..e79035d673b3 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -74,7 +74,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk->ret_stack &&
--			(frame->pc == (unsigned long)return_to_handler)) {
-+			(frame->pc == (unsigned long)return_to_handler) &&
-+			(frame->graph > -1)) {
- 		/*
- 		 * This is a case where function graph tracer has
- 		 * modified a return address (LR) in a stack frame
--- 
-2.9.4
+Kind regards
+Uffe
