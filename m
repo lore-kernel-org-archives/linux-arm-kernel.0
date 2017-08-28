@@ -1,120 +1,45 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 28 Aug 2017 20:17:58 +0200
-Subject: [PATCH v3 53/59] KVM: arm/arm64: GICv4: Hook vPE scheduling into
- vgic flush/sync
-In-Reply-To: <20170731172637.29355-54-marc.zyngier@arm.com>
+Date: Mon, 28 Aug 2017 20:18:04 +0200
+Subject: [PATCH v3 42/59] KVM: arm/arm64: GICv4: Handle INT command
+ applied to a VLPI
+In-Reply-To: <20170731172637.29355-43-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-54-marc.zyngier@arm.com>
-Message-ID: <20170828181758.GA24649@cbox>
+ <20170731172637.29355-43-marc.zyngier@arm.com>
+Message-ID: <20170828181804.GB24649@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 06:26:31PM +0100, Marc Zyngier wrote:
-> The redistributor needs to be told which vPE is about to be run,
-> and tells us whether there is any pending VLPI on exit.
+On Mon, Jul 31, 2017 at 06:26:20PM +0100, Marc Zyngier wrote:
+> If the guest issues an INT command targetting a VLPI, let's
+> call into the irq_set_irqchip_state() helper to make it pending
+> on the physical side.
 > 
-> Let's add the scheduling calls to the vgic flush/sync functions,
-> allowing the VLPIs to be delivered to the guest.
+> This works just as well if userspace decides to inject an interrupt
+> using the normal userspace API...
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Acked-by: Christoffer Dall <cdall@linaro.org>
+
 > ---
->  virt/kvm/arm/vgic/vgic-v4.c | 24 ++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.c    |  4 ++++
->  virt/kvm/arm/vgic/vgic.h    |  1 +
->  3 files changed, 29 insertions(+)
+>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-> index 50721c4e3da5..0a8deefbcf1c 100644
-> --- a/virt/kvm/arm/vgic/vgic-v4.c
-> +++ b/virt/kvm/arm/vgic/vgic-v4.c
-> @@ -119,6 +119,30 @@ void vgic_v4_teardown(struct kvm *kvm)
->  	its_vm->vpes = NULL;
->  }
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index a2217f53bbe5..40aeadef33fe 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -573,6 +573,10 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+>  	if (err)
+>  		return err;
 >  
-> +int vgic_v4_schedule(struct kvm_vcpu *vcpu, bool on)
-> +{
-> +	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +	if (irq->hw)
+> +		return irq_set_irqchip_state(irq->host_irq,
+> +					     IRQCHIP_STATE_PENDING, true);
 > +
-> +	if (!vgic_is_v4_capable(vcpu->kvm) || !irq)
-> +		return 0;
-
-why do we need to check the its_vpe.irq here?  This check is certainly
-not untuitive, as I don't understand what happened on a v4 capable
-system that somehow failed.  Is it because a specific VM is configured
-to not use VLPIs, or?
-
-> +
-> +	/*
-> +	 * Before making the VPE resident, make sure the redistributor
-> +	 * expects us here.
-> +	 */
-> +	if (on) {
-> +		int err;
-> +
-> +		err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
-
-This is pretty unintuitive, and coming here without having read your
-documentation may make people completely puzzled.  Could we provide a
-pointer to the documentation that explains how the vpe irq hooks this
-all together?
-
-> +		if (err) {
-> +			kvm_err("failed irq_set_affinity IRQ%d (%d)\n", irq, err);
-> +			return err;
-> +		}
-> +	}
-> +
-> +	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, on);
-> +}
-> +
-
-I'd prefer this function be split into two and follow the vgic notation
-of having a flush and a sync function.
-
->  static struct vgic_its *vgic_get_its(struct kvm *kvm,
->  				     struct kvm_kernel_irq_routing_entry *irq_entry)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index dfac894f6f03..9ab52108989d 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -721,6 +721,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  
-> +	WARN_ON(vgic_v4_schedule(vcpu, false));
-> +
-
-This is in the critical path, so would it be worth considering a static
-key to cater for non-GICv4 systems here?
-
->  	/* An empty ap_list_head implies used_lrs == 0 */
->  	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
->  		return;
-> @@ -733,6 +735,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  /* Flush our emulation state into the GIC hardware before entering the guest. */
->  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
->  {
-> +	WARN_ON(vgic_v4_schedule(vcpu, true));
-> +
->  	/*
->  	 * If there are no virtual interrupts active or pending for this
->  	 * VCPU, then there is no work to do and we can bail out without
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 1210bf4681dc..693b654acf4d 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -234,5 +234,6 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->  bool vgic_is_v4_capable(struct kvm *kvm);
->  int vgic_v4_init(struct kvm *kvm);
->  void vgic_v4_teardown(struct kvm *kvm);
-> +int vgic_v4_schedule(struct kvm_vcpu *vcpu, bool on);
->  
->  #endif
+>  	spin_lock(&irq->irq_lock);
+>  	irq->pending_latch = true;
+>  	vgic_queue_irq_unlock(kvm, irq);
 > -- 
 > 2.11.0
 > 
-Functionally, this looks correct.
-
-Thanks,
--Christoffer
