@@ -1,62 +1,25 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Mon, 28 Aug 2017 11:39:27 +0300
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
-References: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
- <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
- <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
- <599D62EA.7050100@linux.intel.com>
- <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
-Message-ID: <59A3D6BF.7010400@linux.intel.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Mon, 28 Aug 2017 10:36:11 +0200
+Subject: [patch v6 3/3] Doccumentation: jtag: Add bindings for Aspeed SoC
+ 24xx and 25xx families JTAG master driver
+In-Reply-To: <1503418256-5215-4-git-send-email-oleksandrs@mellanox.com>
+References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
+ <1503418256-5215-4-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20170828083610.GB1951@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2017 17:30, Mason wrote:
-> On 23/08/2017 14:41, Mason wrote:
->
->> I compiled a minimal kernel, with lots of irrelevant drivers and
->> frameworks left out, including power management. I still get the
->> "xHCI host controller not responding, assume dead" issue.
->
-> The problem seems to have a timing-related aspect.
->
-> I added a bunch of logs (to a slow serial console) and the HC was
-> not killed. I was able to plug the Flash drive a second time.
-> (I am logging config space reads and writes.)
+On 2017-08-22 at 18:10:56 +0200, Oleksandr Shamray <oleksandrs@mellanox.com> wrote:
+> It has been tested on Mellanox system with BMC equipped with
+> Aspeed 2520 SoC for programming CPLD devices.
+> 
+> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> v5->v6
+> Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+> - Small nit: s/doccumentation/Documentation/
 
-
-Could you take a log with the following added debug, without
-your extra delays, It should show a bit more about the state
-of the controller when we read 0xffffffff
-
-
-diff --git a/drivers/usb/host/xhci-hub.c b/drivers/usb/host/xhci-hub.c
-index 4bc6f42..a124c3d 100644
---- a/drivers/usb/host/xhci-hub.c
-+++ b/drivers/usb/host/xhci-hub.c
-@@ -23,6 +23,7 @@
-  
-  #include <linux/slab.h>
-  #include <asm/unaligned.h>
-+#include <linux/pci.h>
-  
-  #include "xhci.h"
-  #include "xhci-trace.h"
-@@ -1280,7 +1281,11 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
-                 wIndex--;
-                 temp = readl(port_array[wIndex]);
-                 if (temp == ~(u32)0) {
--                       xhci_hc_died(xhci);
-+                       struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
-+                       xhci_err(xhci, "ClearPortFeat port%d @%p=%x, hcd->state:0x%x hcd->flags:0x%x, pci_state 0x%x\n",
-+                                wIndex, port_array[wIndex], temp, hcd->state, hcd->flags, pdev->current_state);
-+
-+                       WARN_ON(1);
-                         retval = -ENODEV;
-                         break;
-                 }
-
-Thanks
--Mathias
+There's still one 'c' too many in 'Doccumentation' in the subject (in
+case you're doing another respin of the series).
