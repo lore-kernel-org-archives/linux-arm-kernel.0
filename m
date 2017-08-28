@@ -1,66 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 28 Aug 2017 16:32:55 -0500
-Subject: [PATCH v4 3/4] dt-bindings: PCI: rockchip: Add support for pcie
- wake irq
-In-Reply-To: <20170825181959.GA64040@google.com>
-References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
- <20170822031934.8675-4-jeffy.chen@rock-chips.com>
- <20170825181439.d3hlwrcbmcss3sx6@rob-hp-laptop>
- <20170825181959.GA64040@google.com>
-Message-ID: <CAL_Jsq+MeiwOf=VDLZrxgPuLNEDvtGY=X-K1=6w9aaFVZgg1hA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 28 Aug 2017 14:35:10 -0700
+Subject: [PATCH v2 29/30] arm: Implement thread_struct whitelist for hardened
+ usercopy
+In-Reply-To: <1503956111-36652-1-git-send-email-keescook@chromium.org>
+References: <1503956111-36652-1-git-send-email-keescook@chromium.org>
+Message-ID: <1503956111-36652-30-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 1:20 PM, Brian Norris <briannorris@chromium.org> wrote:
-> On Fri, Aug 25, 2017 at 01:14:39PM -0500, Rob Herring wrote:
->> On Tue, Aug 22, 2017 at 11:19:33AM +0800, Jeffy Chen wrote:
->> > Add an optional interrupt for PCIE_WAKE pin.
->> >
->> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->> > ---
->> >
->> > Changes in v4: None
->> > Changes in v3: None
->> > Changes in v2: None
->> >
->> >  .../devicetree/bindings/pci/rockchip-pcie.txt        | 20 ++++++++++++--------
->> >  1 file changed, 12 insertions(+), 8 deletions(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
->> > index 5678be82530d..9f6504129e80 100644
->> > --- a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
->> > +++ b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
->> > @@ -20,10 +20,13 @@ Required properties:
->> >  - msi-map: Maps a Requester ID to an MSI controller and associated
->> >     msi-specifier data. See ./pci-msi.txt
->> >  - interrupts: Three interrupt entries must be specified.
->> > -- interrupt-names: Must include the following names
->> > -   - "sys"
->> > -   - "legacy"
->> > -   - "client"
->> > +- interrupt-names: Include the following names
->> > +   Required:
->> > +           - "sys"
->> > +           - "legacy"
->> > +           - "client"
->> > +   Optional:
->> > +           - "wake"
->>
->> Use the wakeup source binding:
->> Documentation/devicetree/bindings/power/wakeup-source.txt
->
-> And I suppose this means we'd fall under this paragraph?
->
->     "However if the devices have dedicated interrupt as the wakeup source
->     then they need to specify/identify the same using device specific
->     interrupt name. In such cases only that interrupt can be used as wakeup
->     interrupt."
->
-> We don't expect *any* interrupt to qualify as PCI WAKE#; so we should
-> still also document the interrupt name ("wake"?) in
-> Documentation/devicetree/bindings/pci/pci.txt as Bjorn suggested, in
-> addition to using the 'wakeup-source' property documented there.
+ARM does not carry FPU state in the thread structure, so it can declare
+no usercopy whitelist at all.
 
-I believe the defined interrupt name is "wakeup" as example 1 shows.
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/Kconfig                 | 1 +
+ arch/arm/include/asm/processor.h | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-Rob
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a208bfe367b5..3781f08d00fa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -48,6 +48,7 @@ config ARM
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
++	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARM_SMCCC if CPU_V7
+ 	select HAVE_CBPF_JIT
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index c3d5fc124a05..d6dc45c92ee5 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -45,6 +45,13 @@ struct thread_struct {
+ 	struct debug_info	debug;
+ };
+ 
++/* Nothing needs to be usercopy-whitelisted from thread_struct. */
++static inline void arch_thread_struct_whitelist(unsigned long *offset,
++						unsigned long *size)
++{
++	*offset = *size = 0;
++}
++
+ #define INIT_THREAD  {	}
+ 
+ #ifdef CONFIG_MMU
+-- 
+2.7.4
