@@ -1,44 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Aug 2017 18:47:33 +0200
-Subject: [PATCH] clk: gemini: hands off PCI OE bit
-In-Reply-To: <20170809172308.GC2146@codeaurora.org>
-References: <20170808190818.11740-1-linus.walleij@linaro.org>
- <20170809014312.GZ2146@codeaurora.org>
- <CACRpkda0cLMuiipEBX+mH6MJ3v6k=CY+q=Q6NUj=BM+6wnFO2A@mail.gmail.com>
- <20170809172308.GC2146@codeaurora.org>
-Message-ID: <CACRpkdY3y6_W3heTYGW3SejZ=+trH=hvOAdqg2gV3hQ5g8FhYQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 28 Aug 2017 10:48:27 -0600
+Subject: [PATCH 0/9] constify amba_id
+In-Reply-To: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <CANLsYkyxDoaw5aX-QXUHYWFz4m_xA+1gxGvWw0uPNasOqVjr1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 7:23 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 08/09, Linus Walleij wrote:
->> On Wed, Aug 9, 2017 at 3:43 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> > On 08/08, Linus Walleij wrote:
->> >> This bit is pin control, and needs to be carefully managed by the
->> >> new pin control driver.
->> >>
->> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> >
->> > Fixes tag?
->>
->> It's not a fix, it'd just that we move the responsibility of managing the
->> pin from the clock driver to the pin control driver.
->>
->> I initially thought the Gemini would not need a separate pin control
->> driver because it was "simple" ... so these bits could be handled here
->> and there among the peripherals. Little did I know. Mea culpa.
->>
->> > Does this need to be merged now as a critical fix? Or we can wait
->> > on it for next release?
->>
->> Just put it in for the next release, thanks!
->>
+On 24 August 2017 at 10:35, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+> amba_id are not supposed to change at runtime. All functions
+> working with const amba_id. So mark the non-const structs as const.
 >
-> Alright. Thanks!
+> Arvind Yadav (9):
+>   [PATCH 1/9] coresight: constify amba_id
+>   [PATCH 2/9] coresight: etb10: constify amba_id
+>   [PATCH 3/9] coresight: etm3x: constify amba_id
+>   [PATCH 4/9] coresight: etm4x: constify amba_id
+>   [PATCH 5/9] coresight: funnel: constify amba_id
+>   [PATCH 6/9] coresight: replicator: constify amba_id
+>   [PATCH 7/9] coresight: stm: constify amba_id
+>   [PATCH 8/9] coresight: tmc: constify amba_id
+>   [PATCH 9/9] coresight: tpiu: constify amba_id
+>
+>  drivers/hwtracing/coresight/coresight-cpu-debug.c       | 2 +-
+>  drivers/hwtracing/coresight/coresight-etb10.c           | 2 +-
+>  drivers/hwtracing/coresight/coresight-etm3x.c           | 2 +-
+>  drivers/hwtracing/coresight/coresight-etm4x.c           | 2 +-
+>  drivers/hwtracing/coresight/coresight-funnel.c          | 2 +-
+>  drivers/hwtracing/coresight/coresight-replicator-qcom.c | 2 +-
+>  drivers/hwtracing/coresight/coresight-stm.c             | 2 +-
+>  drivers/hwtracing/coresight/coresight-tmc.c             | 2 +-
+>  drivers/hwtracing/coresight/coresight-tpiu.c            | 2 +-
+>  9 files changed, 9 insertions(+), 9 deletions(-)
+>
 
-Stephen are you queueing this patch?
+Applied.
 
-Or someone else from the clk group?
+Thanks,
+Mathieu
 
-Yours,
-Linus Walleij
+> --
+> 2.7.4
+>
