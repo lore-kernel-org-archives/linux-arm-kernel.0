@@ -1,47 +1,27 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Tue, 29 Aug 2017 19:08:10 +0200
-Subject: [PATCH] ARM: dts: sun7i: Enable power supplies on A20-OLinuxIno-Micro
-Message-ID: <20170829170810.1302-1-harald@ccbib.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 29 Aug 2017 12:17:06 -0500
+Subject: [PATCH v7 1/3] dt-bindings: display: Add Document for Rockchip
+ Soc LVDS
+In-Reply-To: <1503469622-39462-1-git-send-email-hjc@rock-chips.com>
+References: <1503469615-39406-1-git-send-email-hjc@rock-chips.com>
+ <1503469622-39462-1-git-send-email-hjc@rock-chips.com>
+Message-ID: <20170829171706.lnb4ugm2olbz7ajj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The axp209.dtsi defines nodes for ac, usb and battery supplies for a
-while now. This patch enables these nodes for the A20-Olinuxino-Micro,
-which has connectors for all three of them.
+On Wed, Aug 23, 2017 at 02:26:59PM +0800, Sandy Huang wrote:
+> This patch add Document for Rockchip Soc RK3288 LVDS,
+> This based on the patches from Mark yao and Heiko Stuebner.
+> 
+> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+> Signed-off-by: Mark yao <mark.yao@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> 
+> Changes according to Rob Herring's review.    
+> 
+>  .../bindings/display/rockchip/rockchip-lvds.txt    | 99 ++++++++++++++++++++++
+>  1 file changed, 99 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
 
-The patch was run-tested against linux-next-20170825.
-
-Signed-off-by: Harald Geyer <harald@ccbib.org>
----
-Note: I guess the same change is good for the olinuxino lime boards too.
-However I don't have such boards to test, so I don't formally submit a
-patch for them.
-
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 0b7403e..64c993a 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -256,6 +256,18 @@
- 
- #include "axp209.dtsi"
- 
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
- &reg_dcdc2 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <1000000>;
--- 
-2.1.4
+Reviewed-by: Rob Herring <robh@kernel.org>
