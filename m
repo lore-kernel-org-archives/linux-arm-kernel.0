@@ -1,51 +1,98 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Aug 2017 11:38:58 +0200
-Subject: [RFC PATCH 0/4] Handle forwarded level-triggered interrupts
-Message-ID: <20170829093902.15379-1-cdall@linaro.org>
+Date: Tue, 29 Aug 2017 11:39:01 +0200
+Subject: [RFC PATCH 3/4] KVM: arm/arm64: Rearrange kvm_vgic_[un]map_phys code
+ in vgic.c
+In-Reply-To: <20170829093902.15379-1-cdall@linaro.org>
+References: <20170829093902.15379-1-cdall@linaro.org>
+Message-ID: <20170829093902.15379-4-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series illustrates an alternative approach to Eric Auger's direct EOI
-setup patches [1] in terms of the KVM VGIC support.
+The small indirection of a static function made the locking very obvious
+but becomes pretty ugly as we start passing function pointer around.
+Let's inline these two functions first to make the following patch more
+readable.
 
-The idea is to maintain existing semantics for the VGIC for mapped
-level-triggered IRQs and think support for the timer into it.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic.c | 38 +++++++++++++-------------------------
+ 1 file changed, 13 insertions(+), 25 deletions(-)
 
-Patch 1 is stolen from Eric's series and is necessary for these patches
-to compile as well.  Patch 2 includes the core support for mapped
-level-triggered interrupts.  Patch 3 moves some code around for patch 4.
-Patch 4 implements an optimization for the timer.  The last two patches
-could be deferred until the timer optimization series.
-
-This series is untested (hence the RFC tag) and I'm looking for
-feedback from the VGIC guys (you know who you are) on the approach and
-whether we know up-front that this breaks for some reason.
-
-I'll be happy to test and debug further if we agree on the overall
-approach.
-
-Based on v4.13-rc7.
-
-Thanks,
--Christoffer
-
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2017-June/026072.html
-
-Christoffer Dall (3):
-  KVM: arm/arm64: vgic: Support level-triggered mapped interrupts
-  KVM: arm/arm64: Rearrange kvm_vgic_[un]map_phys code in vgic.c
-  KVM: arm/arm64: Provide a vgic interrupt line level sample function
-
-Eric Auger (1):
-  KVM: arm/arm64: vgic: restructure kvm_vgic_(un)map_phys_irq
-
- include/kvm/arm_vgic.h      | 19 +++++++++++--
- virt/kvm/arm/arch_timer.c   | 38 ++++++++++---------------
- virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c | 29 +++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c    | 68 +++++++++++++++++++++++++++++++++++++--------
- virt/kvm/arm/vgic/vgic.h    |  7 +++++
- 6 files changed, 153 insertions(+), 37 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 2691a0a..e3ce2fa 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -428,12 +428,17 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 	return 0;
+ }
+ 
+-/* @irq->irq_lock must be held */
+-static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+-			    unsigned int host_irq)
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
++			  u32 vintid)
+ {
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	struct irq_desc *desc;
+ 	struct irq_data *data;
++	int ret = 0;
++
++	BUG_ON(!irq);
++
++	spin_lock(&irq->irq_lock);
+ 
+ 	/*
+ 	 * Find the physical IRQ number corresponding to @host_irq
+@@ -441,7 +446,8 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	desc = irq_to_desc(host_irq);
+ 	if (!desc) {
+ 		kvm_err("%s: no interrupt descriptor\n", __func__);
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto out;
+ 	}
+ 	data = irq_desc_get_irq_data(desc);
+ 	while (data->parent_data)
+@@ -450,29 +456,10 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	irq->hw = true;
+ 	irq->host_irq = host_irq;
+ 	irq->hwintid = data->hwirq;
+-	return 0;
+-}
+-
+-/* @irq->irq_lock must be held */
+-static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
+-{
+-	irq->hw = false;
+-	irq->hwintid = 0;
+-}
+-
+-int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+-			  u32 vintid)
+-{
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+-	int ret;
+ 
+-	BUG_ON(!irq);
+-
+-	spin_lock(&irq->irq_lock);
+-	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
++out:
+ 	spin_unlock(&irq->irq_lock);
+ 	vgic_put_irq(vcpu->kvm, irq);
+-
+ 	return ret;
+ }
+ 
+@@ -487,7 +474,8 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+ 	BUG_ON(!irq);
+ 
+ 	spin_lock(&irq->irq_lock);
+-	kvm_vgic_unmap_irq(irq);
++	irq->hw = false;
++	irq->hwintid = 0;
+ 	spin_unlock(&irq->irq_lock);
+ 	vgic_put_irq(vcpu->kvm, irq);
+ 
 -- 
 2.9.0
