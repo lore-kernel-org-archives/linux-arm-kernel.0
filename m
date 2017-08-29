@@ -1,39 +1,43 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 29 Aug 2017 14:47:30 +0200
-Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
- implementation defined pmu core events
-In-Reply-To: <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
- <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
-Message-ID: <20170829124730.GH17961@rric.localdomain>
+From: cohuck@redhat.com (Cornelia Huck)
+Date: Tue, 29 Aug 2017 15:00:44 +0200
+Subject: [PATCH RFC v3 7/9] KVM: add kvm_free_vcpus and kvm_arch_free_vcpus
+In-Reply-To: <45e07499-e60c-5289-f439-9c51f59866ec@redhat.com>
+References: <20170821203530.9266-1-rkrcmar@redhat.com>
+ <20170821203530.9266-8-rkrcmar@redhat.com>
+ <45e07499-e60c-5289-f439-9c51f59866ec@redhat.com>
+Message-ID: <20170829150044.554b5288.cohuck@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shaokun,
+On Tue, 22 Aug 2017 16:18:59 +0200
+David Hildenbrand <david@redhat.com> wrote:
 
-On 29.08.17 17:26:00, Zhangshaokun wrote:
-> On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
-> > This is not a full event list, but a short list of useful events.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > ---
-> >  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
-> >  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
-> >  2 files changed, 77 insertions(+)
-> >  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
-> >  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-> > 
+> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> > index 33a15e176927..0d2d8b0c785c 100644
+> > --- a/virt/kvm/kvm_main.c
+> > +++ b/virt/kvm/kvm_main.c
+> > @@ -750,6 +750,23 @@ static void kvm_destroy_devices(struct kvm *kvm)
+> >  	}
+> >  }
+> >  
+> > +void kvm_free_vcpus(struct kvm *kvm)
+> > +{
+> > +	int i;
+> > +
+> > +	kvm_arch_free_vcpus(kvm);  
 > 
-> I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
-> that would use vendor sub-folder?
-> Of course, appreciate maintainer's comments.
+> I wonder if it would be possible to get rid of kvm_arch_free_vcpus(kvm)
+> completely and simply call
+> 
+> kvm_for_each_vcpu(i, vcpu, kvm)
+> 	kvm_arch_vcpu_free(vcpu);
+> 
+> at that point.
+> 
+> Would certainly require some refactoring, and I am not sure if we could
+> modify the special mmu handling for x86 ("Unpin any mmu pages first.").
+> But if in doubt, that part could be moved to kvm_arch_destroy_vm(), just
+> before calling kvm_free_vcpus().
 
-this would just add another level of subdirectories. I rather would
-prefer to have a per platform dir comparable to what is listed in
-
- arch/arm64/Kconfig.platforms
-
-This is the same as Ganapat has implemented it.
-
--Robert
+Nod, that crossed my mind as well. Would avoid adding lots of
+kvm_arch_free_vcpus() that do the same thing for many archs.
