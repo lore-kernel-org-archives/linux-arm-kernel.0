@@ -1,61 +1,40 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 29 Aug 2017 09:32:40 +0000
-Subject: [PATCH 1/1] ARM: imx7ulp: add cpuidle support
-In-Reply-To: <b8d1f428-a4f5-5a02-8aa4-379b5c85e8d7@linaro.org>
-References: <1503841421-17677-1-git-send-email-aisheng.dong@nxp.com>
- <b8d1f428-a4f5-5a02-8aa4-379b5c85e8d7@linaro.org>
-Message-ID: <AM3PR04MB30646BD7272372A182F22DA809F0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 29 Aug 2017 11:34:27 +0200
+Subject: [PATCH 9/9] clocksource/drivers/bcm2835: Remove message on memory
+ allocation failure
+In-Reply-To: <1503999271-15712-1-git-send-email-daniel.lezcano@linaro.org>
+References: <20170829093354.GA2572@mai>
+ <1503999271-15712-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1503999271-15712-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Daniel Lezcano [mailto:daniel.lezcano at linaro.org]
-> Sent: Tuesday, August 29, 2017 4:30 PM
-> To: A.s. Dong; linux-pm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; rjw at rjwysocki.net;
-> shawnguo at kernel.org; Anson Huang
-> Subject: Re: [PATCH 1/1] ARM: imx7ulp: add cpuidle support
-> 
-> On 27/08/2017 15:43, Dong Aisheng wrote:
-> > i.MX7ULP support 3 levels idle as below:
-> > 1. patial stop mode 3;
-> > 2. patial stop mode 2;
-> > 3. patial stop mode 1.
-> >
-> > PSTOP1 - Partial Stop with system and bus clock disabled
-> > PSTOP2 - Partial Stop with system clock disabled and bus clock enabled
-> > PSTOP3 - Partial Stop with system clock enabled and bus clock enabled
-> >
-> > For PSTOP 1/2 mode, as the system and bus clock will be disabled, the
-> > devices working inprogress may not be able to work anymore, driver
-> > needs to use pm_qos API to prevent system enter those modes.
-> >
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> Will you consider in the future to move the driver to a DT based
-> description and to the cpuidle-arm driver ?
-> 
+From: Markus Elfring <elfring@users.sourceforge.net>
 
-Thanks for the suggestion.
-I will investigate it later when I'm free.
+The bcm2835_timer_init() function emits an error message in case of a memory
+allocation failure. This is pointless as the mm core already do that.
 
-Shawn,
-This is based on the former imx7ulp arch patch series.
-Will notify you once they're merged.
+Remove this message.
 
-Regards
-Dong Aisheng
+This issue was detected by using the Coccinelle software.
 
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter | <http://www.linaro.org/linaro-
-> blog/> Blog
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/bcm2835_timer.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
+index 82828d3..39e489a 100644
+--- a/drivers/clocksource/bcm2835_timer.c
++++ b/drivers/clocksource/bcm2835_timer.c
+@@ -114,7 +114,6 @@ static int __init bcm2835_timer_init(struct device_node *node)
+ 
+ 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
+ 	if (!timer) {
+-		pr_err("Can't allocate timer struct\n");
+ 		ret = -ENOMEM;
+ 		goto err_iounmap;
+ 	}
+-- 
+2.7.4
