@@ -1,52 +1,100 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Tue, 29 Aug 2017 15:12:32 +0200
-Subject: [RFC PATCH v9 1/7] edac: thunderx: Remove suspend/resume support
+Date: Tue, 29 Aug 2017 15:12:38 +0200
+Subject: [RFC PATCH v9 7/7] perf: cavium: Add Documentation
 In-Reply-To: <20170829131238.4988-1-jglauber@cavium.com>
 References: <20170829131238.4988-1-jglauber@cavium.com>
-Message-ID: <20170829131238.4988-2-jglauber@cavium.com>
+Message-ID: <20170829131238.4988-8-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory controller on ThunderX/OcteonTX systems does not
-support power management. Therefore remove the suspend/resume
-callbacks.
+Document Cavium SoC PMUs.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/edac/thunderx_edac.c | 21 ---------------------
- 1 file changed, 21 deletions(-)
+ Documentation/perf/cavium-pmu.txt | 75 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/perf/cavium-pmu.txt
 
-diff --git a/drivers/edac/thunderx_edac.c b/drivers/edac/thunderx_edac.c
-index 2d352b4..d02bf3b 100644
---- a/drivers/edac/thunderx_edac.c
-+++ b/drivers/edac/thunderx_edac.c
-@@ -639,27 +639,6 @@ static irqreturn_t thunderx_lmc_threaded_isr(int irq, void *dev_id)
- 	return ret;
- }
- 
--#ifdef CONFIG_PM
--static int thunderx_lmc_suspend(struct pci_dev *pdev, pm_message_t state)
--{
--	pci_save_state(pdev);
--	pci_disable_device(pdev);
--
--	pci_set_power_state(pdev, pci_choose_state(pdev, state));
--
--	return 0;
--}
--
--static int thunderx_lmc_resume(struct pci_dev *pdev)
--{
--	pci_set_power_state(pdev, PCI_D0);
--	pci_enable_wake(pdev, PCI_D0, 0);
--	pci_restore_state(pdev);
--
--	return 0;
--}
--#endif
--
- static const struct pci_device_id thunderx_lmc_pci_tbl[] = {
- 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_LMC) },
- 	{ 0, },
+diff --git a/Documentation/perf/cavium-pmu.txt b/Documentation/perf/cavium-pmu.txt
+new file mode 100644
+index 0000000..6fbf824
+--- /dev/null
++++ b/Documentation/perf/cavium-pmu.txt
+@@ -0,0 +1,75 @@
++Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
++==============================================================
++
++Cavium SoCs contain various system devices such as L2 caches, processor
++interconnect and memory controllers. Unfortunately the PMU counters
++are not following a common design so each device has a slightly different
++approach how to control and use the PMU counters.
++
++Common properties of all devices carrying PMU counters:
++- The devices are PCI devices and the counters are embedded somewhere
++  in the PCI register space.
++- All counters are 64 bit wide.
++- There are no overflow interrupts (unnecessary because of the 64 bit wide
++  counters).
++
++Properties depending on the device type:
++- How to start/stop the counters
++- Programmable vs. fixed purpose counters
++- Stoppable vs. always running counters
++- Independent vs. grouped counters
++- Read-only vs. writable counters
++- PCI device to PMU group relationship
++
++
++Devices with PMU counters
++-------------------------
++
++Memory controller (LMC):
++- one PCI device per LMC
++- fixed-purpose counters
++- always running counters without start/stop/reset control
++- read-only counters
++
++CCPI interface controller (OCX) Transmit link (TLK) counters:
++- writable counters
++- only one PCI device exposes multiple TLK units (3 units on T88)
++- start/stop control per unit
++- only present on multi-socket systems
++
++PMU (perf) driver
++-----------------
++
++The cavium-pmu driver registers several perf PMU drivers. Each of the perf
++driver provides description of its available events and configuration options
++in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
++
++The "format" directory describes format of the config (event ID),
++The "events" directory shows the names of the events and provides configuration
++templates for all supported event types that can be used with perf tool. For
++example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
++
++Each perf driver also provides a "cpumask" sysfs attribute, which contains a
++single CPU ID of the processor which will be used to handle all the PMU events.
++
++Example for perf tool use:
++
++ / # perf list | grep -e lmc
++   lmc0/bank_conflict1/                               [Kernel PMU event]
++   lmc0/bank_conflict2/                               [Kernel PMU event]
++   lmc0/dclk_cnt/                                     [Kernel PMU event]
++   lmc0/ifb_cnt/                                      [Kernel PMU event]
++   lmc0/ops_cnt/                                      [Kernel PMU event]
++
++ / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
++
++   Performance counter stats for 'system wide':
++
++             176,133      lmc0/ops_cnt/                                               
++         670,243,653      lmc0/dclk_cnt/                                              
++
++         1.005479295 seconds time elapsed
++
++The driver does not support sampling, therefore "perf record" will
++not work. System wide mode ("-a") must be used as per-task (without "-a")
++perf sessions are not supported.
 -- 
 2.9.0.rc0.21.g7777322
