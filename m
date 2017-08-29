@@ -1,182 +1,90 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Aug 2017 20:26:10 +0100 (BST)
-Subject: Applied "ASoC: rockchip: Add support for DP codec" to the asoc tree
-In-Reply-To: <20170817044417.22069-8-jeffy.chen@rock-chips.com>
-Message-ID: <20170829192610.ACAF14400E7@finisterre.ee.mobilebroadband>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 29 Aug 2017 14:53:22 -0500
+Subject: [PATCH V13 1/4] PCI: Don't ignore valid response before CRS
+ timeout
+In-Reply-To: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
+References: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170829195322.GB2304@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Sun, Aug 27, 2017 at 01:40:48PM -0400, Sinan Kaya wrote:
+> From: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> While waiting for a device to become ready (i.e., to return a non-CRS
+> completion to a read of its Vendor ID), if we got a valid response to the
+> very last read before timing out, we printed a warning and gave up on the
+> device even though it was actually ready.
+> 
+> For a typical 60s timeout, we wait about 65s (it's not exact because of the
+> exponential backoff), but we treated devices that became ready between 33s
+> and 65s as though they failed.
+> 
+> Move the Device ID read later so we check whether the device is ready
+> immediately, before checking for a timeout.
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> [okaya: reorder reads so that we check device presence after sleep]
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-   ASoC: rockchip: Add support for DP codec
+Applied this series to pci/enumeration for v4.14.  You didn't include a
+cover letter, but the series includes:
 
-has been applied to the asoc tree at
+  [V13 1/4] PCI: Don't ignore valid response before CRS timeout
+  [V13 2/4] PCI: Factor out pci_bus_wait_crs()
+  [V13 3/4] PCI: Handle CRS ('device not ready') returned by device af
+  [V13 4/4] PCI: Warn periodically while waiting for device to become
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+I made some changes:
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+  - Renamed pci_bus_crs_visibility_pending() to pci_bus_crs_vendor_id()
+    because the CRS completion is not "pending".  It is not waiting
+    somewhere for us to do something about it.  The CRS completion has
+    already occurred and is over.  All we have now is a magic Vendor ID
+    value that tells us that it happened.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+  - Split addition of pci_bus_crs_vendor_id() to a separate patch, move
+    it to probe.c, and make it static.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+  - Pass a pointer, not a value, to pci_bus_wait_crs() so the caller gets
+    correct Vendor ID when we're finished waiting.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+  - Add in the 100ms mandatory sleep in the delays we print in
+    pci_flr_wait() so the printed value reflects the entire time since the
+    FLR was started.
 
-Thanks,
-Mark
-
->From 3313faf1053ee6cb90045f6877f11e2f61ead63a Mon Sep 17 00:00:00 2001
-From: Jeffy Chen <jeffy.chen@rock-chips.com>
-Date: Thu, 24 Aug 2017 12:52:25 +0800
-Subject: [PATCH] ASoC: rockchip: Add support for DP codec
-
-Add support for optional cdn dp codec.
-
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/rockchip/Kconfig            |  1 +
- sound/soc/rockchip/rk3399_gru_sound.c | 59 +++++++++++++++++++++++++++++++++--
- 2 files changed, 58 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-index c84487805876..8f0d0d8d34e6 100644
---- a/sound/soc/rockchip/Kconfig
-+++ b/sound/soc/rockchip/Kconfig
-@@ -68,6 +68,7 @@ config SND_SOC_RK3399_GRU_SOUND
- 	select SND_SOC_RT5514
- 	select SND_SOC_DA7219
- 	select SND_SOC_RT5514_SPI
-+	select SND_SOC_HDMI_CODEC
- 	help
- 	  Say Y or M here if you want to add support multiple codecs for SoC
- 	  audio on Rockchip RK3399 GRU boards.
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 347c34d0db4c..91aab5c18f3b 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -228,6 +228,45 @@ static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
- 	return 0;
- }
- 
-+static int rockchip_sound_cdndp_hw_params(struct snd_pcm_substream *substream,
-+					  struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	int mclk, ret;
-+
-+	/* in bypass mode, the mclk has to be one of the frequencies below */
-+	switch (params_rate(params)) {
-+	case 8000:
-+	case 16000:
-+	case 24000:
-+	case 32000:
-+	case 48000:
-+	case 64000:
-+	case 96000:
-+		mclk = 12288000;
-+		break;
-+	case 11025:
-+	case 22050:
-+	case 44100:
-+	case 88200:
-+		mclk = 11289600;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
-+				     SND_SOC_CLOCK_OUT);
-+	if (ret < 0) {
-+		dev_err(codec_dai->dev, "Can't set cpu clock out %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static const struct snd_soc_ops rockchip_sound_max98357a_ops = {
- 	.hw_params = rockchip_sound_max98357a_hw_params,
- };
-@@ -240,6 +279,10 @@ static const struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
- 
-+static struct snd_soc_ops rockchip_sound_cdndp_ops = {
-+	.hw_params = rockchip_sound_cdndp_hw_params,
-+};
-+
- static struct snd_soc_card rockchip_sound_card = {
- 	.name = "rk3399-gru-sound",
- 	.owner = THIS_MODULE,
-@@ -252,6 +295,7 @@ static struct snd_soc_card rockchip_sound_card = {
- };
- 
- enum {
-+	DAILINK_CDNDP,
- 	DAILINK_DA7219,
- 	DAILINK_MAX98357A,
- 	DAILINK_RT5514,
-@@ -259,6 +303,7 @@ enum {
- };
- 
- static const char * const dailink_compat[] = {
-+	[DAILINK_CDNDP] = "rockchip,rk3399-cdn-dp",
- 	[DAILINK_DA7219] = "dlg,da7219",
- 	[DAILINK_MAX98357A] = "maxim,max98357a",
- 	[DAILINK_RT5514] = "realtek,rt5514-i2c",
-@@ -266,6 +311,14 @@ static const char * const dailink_compat[] = {
- };
- 
- static const struct snd_soc_dai_link rockchip_dais[] = {
-+	[DAILINK_CDNDP] = {
-+		.name = "DP",
-+		.stream_name = "DP PCM",
-+		.codec_dai_name = "i2s-hifi",
-+		.ops = &rockchip_sound_cdndp_ops,
-+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			SND_SOC_DAIFMT_CBS_CFS,
-+	},
- 	[DAILINK_DA7219] = {
- 		.name = "DA7219",
- 		.stream_name = "DA7219 PCM",
-@@ -316,7 +369,7 @@ static int rockchip_sound_codec_node_match(struct device_node *np_codec)
- static int rockchip_sound_of_parse_dais(struct device *dev,
- 					struct snd_soc_card *card)
- {
--	struct device_node *np_cpu;
-+	struct device_node *np_cpu, *np_cpu0, *np_cpu1;
- 	struct device_node *np_codec;
- 	struct snd_soc_dai_link *dai;
- 	int i, index;
-@@ -326,7 +379,8 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 	if (!card->dai_link)
- 		return -ENOMEM;
- 
--	np_cpu = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
-+	np_cpu0 = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
-+	np_cpu1 = of_parse_phandle(dev->of_node, "rockchip,cpu", 1);
- 
- 	card->num_links = 0;
- 	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++) {
-@@ -342,6 +396,7 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 		if (index < 0)
- 			continue;
- 
-+		np_cpu = (index == DAILINK_CDNDP) ? np_cpu1 : np_cpu0;
- 		if (!np_cpu) {
- 			dev_err(dev, "Missing 'rockchip,cpu' for %s\n",
- 				rockchip_dais[index].name);
--- 
-2.13.2
+> ---
+>  drivers/pci/probe.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index c31310d..2849e0e 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1847,17 +1847,18 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+>  		if (!crs_timeout)
+>  			return false;
+>  
+> -		msleep(delay);
+> -		delay *= 2;
+> -		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+> -			return false;
+> -		/* Card hasn't responded in 60 seconds?  Must be stuck. */
+>  		if (delay > crs_timeout) {
+>  			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
+>  			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
+>  			       PCI_FUNC(devfn));
+>  			return false;
+>  		}
+> +
+> +		msleep(delay);
+> +		delay *= 2;
+> +
+> +		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+> +			return false;
+>  	}
+>  
+>  	return true;
+> -- 
+> 1.9.1
+> 
