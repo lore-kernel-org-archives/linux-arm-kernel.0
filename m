@@ -1,55 +1,62 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Tue, 29 Aug 2017 10:11:35 +0800
-Subject: [PATCH v3 4/5] input: Add MediaTek PMIC keys support
-In-Reply-To: <20170828165757.GE12195@dtor-ws>
-References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
- <1503642753-12385-5-git-send-email-chen.zhong@mediatek.com>
- <20170828165757.GE12195@dtor-ws>
-Message-ID: <1503972695.3340.16.camel@mhfsdcap03>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Tue, 29 Aug 2017 11:52:16 +0900
+Subject: [PATCH v4 3/3] ARM: dts: exynos: Remove the display-timing and
+ delay from rinato dts
+In-Reply-To: <1499912443-3671-4-git-send-email-hoegeun.kwon@samsung.com>
+References: <1499912443-3671-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170713022057epcas1p464b817a426638cc1566e665aa7903ed7@epcas1p4.samsung.com>
+ <1499912443-3671-4-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <2be78f06-8c3a-0076-a19b-07d501c3d460@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-08-28 at 09:57 -0700, Dmitry Torokhov wrote:
-> Hi Chen,
-> 
-> On Fri, Aug 25, 2017 at 02:32:32PM +0800, Chen Zhong wrote:
-> > +static int mtk_pmic_key_setup(struct mtk_pmic_keys *keys,
-> > +		struct pmic_keys_info *info)
-> > +{
-> > +	int ret;
-> > +
-> > +	info->keys = keys;
-> > +
-> > +	ret = regmap_update_bits(keys->regmap, info->regs->intsel_reg,
-> > +				 info->regs->intsel_mask,
-> > +				 info->regs->intsel_mask);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	ret = devm_request_threaded_irq(keys->dev, info->irq, NULL,
-> > +					mtk_pmic_keys_irq_handler_thread,
-> > +					IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
-> > +					"mtk-pmic-keys", info);
-> > +	if (ret) {
-> > +		dev_err(keys->dev, "Failed to request IRQ: %d: %d\n",
-> > +			info->irq, ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	if (info->wakeup)
-> > +		irq_set_irq_wake(info->irq, 1);
-> 
-> Normally we do this in suspend() (and undo in resume()), and I believe
-> the drover API is enable_irq_wake() and disable_irq_wake().
-> 
+Hi Krzysztof,
 
-Hi Dmitry,
+The driver has been merged into exynos-drm-misc.
+Could you please check this patch(3/3).
 
-I'll add suspend/resume callback functions and do this with
-enable_irq_wake() and disable_irq_wake().
+Best regards,
+Hoegeun
 
-Thank you.
-
-
-> Thanks.
-> 
+On 07/13/2017 11:20 AM, Hoegeun Kwon wrote:
+> The display-timing and delay are included in the panel driver. So it
+> should be removed in dts.
+>
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
+>   1 file changed, 22 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+> index 443e0c9..6b70c8d 100644
+> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+> @@ -242,28 +242,6 @@
+>   		vci-supply = <&ldo20_reg>;
+>   		reset-gpios = <&gpe0 1 GPIO_ACTIVE_LOW>;
+>   		te-gpios = <&gpx0 6 GPIO_ACTIVE_HIGH>;
+> -		power-on-delay= <30>;
+> -		power-off-delay= <120>;
+> -		reset-delay = <5>;
+> -		init-delay = <100>;
+> -		flip-horizontal;
+> -		flip-vertical;
+> -		panel-width-mm = <29>;
+> -		panel-height-mm = <29>;
+> -
+> -		display-timings {
+> -			timing-0 {
+> -				clock-frequency = <4600000>;
+> -				hactive = <320>;
+> -				vactive = <320>;
+> -				hfront-porch = <1>;
+> -				hback-porch = <1>;
+> -				hsync-len = <1>;
+> -				vfront-porch = <150>;
+> -				vback-porch = <1>;
+> -				vsync-len = <2>;
+> -			};
+> -		};
+>   
+>   		port {
+>   			dsi_in: endpoint {
