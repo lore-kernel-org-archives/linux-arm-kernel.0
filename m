@@ -1,67 +1,156 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 29 Aug 2017 12:51:27 +0800
-Subject: [PATCH RESEND 2/2] dmaengine: sun6i: support V3s SoC variant
-In-Reply-To: <20170829045127.19951-1-icenowy@aosc.io>
-References: <20170829045127.19951-1-icenowy@aosc.io>
-Message-ID: <20170829045127.19951-3-icenowy@aosc.io>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Tue, 29 Aug 2017 10:55:27 +0530
+Subject: [PATCH v8 0/3] PCI: iproc: SOC specific fixes
+In-Reply-To: <20170828215309.GM8154@bhelgaas-glaptop.roam.corp.google.com>
+References: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
+ <20170828215309.GM8154@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAMSpPPeUjDzK=zGBCgeJoD=vhZimRCzq=R6VPopHeRgmA54yCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+On Tue, Aug 29, 2017 at 3:23 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Aug 24, 2017 at 10:34:23AM +0530, Oza Pawandeep wrote:
+>> PCI: iproc: Retry request when CRS returned from EP Above patch adds
+>> support for CRS in PCI RC driver, otherwise if not handled at lower
+>> level, the user space PMD (poll mode drivers) can timeout.
+>>
+>> PCI: iproc: add device shutdown for PCI RC This fixes the issue where
+>> certian PCI endpoints are not getting detected on Stingray SOC after
+>> reboot.
+>>
+>> Changes Since v7:
+>> Factor out the ep config access code.
+>>
+>> Changes Since v6:
+>> Rebased patches on top of Lorenzo's patches.
+>> Bjorn's comments addressed.
+>> now the confg retry returns 0xffffffff as data.
+>> Added reference to PCIe spec and iproc Controller spec in Changelog.
+>>
+>> Changes Since v5:
+>> Ray's comments addressed.
+>>
+>> Changes Since v4:
+>> Bjorn's comments addressed.
+>>
+>> Changes Since v3:
+>> [re-send]
+>>
+>> Changes Since v2:
+>> Fix compilation errors for pcie-iproc-platform.ko which was caught
+>> by kbuild.
+>>
+>> Oza Pawandeep (3):
+>>   PCI: iproc: factor-out ep configuration access
+>>   PCI: iproc: Retry request when CRS returned from EP
+>>   PCI: iproc: add device shutdown for PCI RC
+>>
+>>  drivers/pci/host/pcie-iproc-platform.c |   8 ++
+>>  drivers/pci/host/pcie-iproc.c          | 143 ++++++++++++++++++++++++++-------
+>>  drivers/pci/host/pcie-iproc.h          |   1 +
+>>  3 files changed, 124 insertions(+), 28 deletions(-)
+>
+> I applied these to pci/host-iproc for v4.14.  Man, this is ugly.
+>
+> I reworked the changelog to try to make it more readable.  I also tried to
+> disable the PCI_EXP_RTCAP_CRSVIS bit, which advertises CRS SV support.  And
+> I removed what looked like a duplicate pci_generic_config_read32() call.
+> And I added a warning about the fact that we corrupt reads of config
+> registers that happen to contain 0xffff0001.
+>
+> I'm pretty sure I broke something, so please take a look.
 
-Allwinner V3s has a DMA engine similar to the ones from A31, but with
-fewer channels and DRQs.
+Appreciate your time in adding PCI_EXP_RTCAP_CRSVIS and other changes.
+I just tested the patch, and it works fine.
+which tells us, that CRS visibility bit has no effect.
 
-Add support for it.
+so things look okay to me.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
- drivers/dma/sun6i-dma.c                             | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-index 6b267045f522..98fbe1a5c6dd 100644
---- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-@@ -9,6 +9,7 @@ Required properties:
- 		  "allwinner,sun8i-a23-dma"
- 		  "allwinner,sun8i-a83t-dma"
- 		  "allwinner,sun8i-h3-dma"
-+		  "allwinner,sun8i-v3s-dma"
- - reg:		Should contain the registers base address and length
- - interrupts:	Should contain a reference to the interrupt used by this device
- - clocks:	Should contain a reference to the parent AHB clock
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 252b59c1d1d5..bcd496edc70f 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -1040,11 +1040,24 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- };
- 
-+/*
-+ * The V3s have only 8 physical channels, a maximum DRQ port id of 23,
-+ * and a total of 24 usable source and destination endpoints.
-+ */
-+
-+static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
-+	.nr_max_channels = 8,
-+	.nr_max_requests = 23,
-+	.nr_max_vchans   = 24,
-+	.gate_needed	 = true,
-+};
-+
- static const struct of_device_id sun6i_dma_match[] = {
- 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-+	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_dma_match);
--- 
-2.13.5
+Regards,
+Oza.
+>
+> Incremental diff from your v8 to what's on pci/host-iproc:
+>
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index cbdabe8a073e..8bd5e544b1c1 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -69,7 +69,7 @@
+>  #define APB_ERR_EN                   BIT(APB_ERR_EN_SHIFT)
+>
+>  #define CFG_RETRY_STATUS             0xffff0001
+> -#define CFG_RETRY_STATUS_TIMEOUT_US  500000 /* 500 milli-seconds. */
+> +#define CFG_RETRY_STATUS_TIMEOUT_US  500000 /* 500 milliseconds */
+>
+>  /* derive the enum index of the outbound/inbound mapping registers */
+>  #define MAP_REG(base_reg, index)      ((base_reg) + (index) * 2)
+> @@ -482,17 +482,21 @@ static unsigned int iproc_pcie_cfg_retry(void __iomem *cfg_data_p)
+>         unsigned int data;
+>
+>         /*
+> -        * As per PCIe spec r3.1, sec 2.3.2, CRS Software
+> -        * Visibility only affects config read of the Vendor ID.
+> -        * For config write or any other config read the Root must
+> -        * automatically re-issue configuration request again as a
+> -        * new request.
+> +        * As per PCIe spec r3.1, sec 2.3.2, CRS Software Visibility only
+> +        * affects config reads of the Vendor ID.  For config writes or any
+> +        * other config reads, the Root may automatically reissue the
+> +        * configuration request again as a new request.
+>          *
+> -        * For config reads, this hardware returns CFG_RETRY_STATUS data when
+> -        * it receives a CRS completion for a config read, regardless of the
+> -        * address of the read or the CRS Software Visibility Enable bit. As a
+> +        * For config reads, this hardware returns CFG_RETRY_STATUS data
+> +        * when it receives a CRS completion, regardless of the address of
+> +        * the read or the CRS Software Visibility Enable bit.  As a
+>          * partial workaround for this, we retry in software any read that
+>          * returns CFG_RETRY_STATUS.
+> +        *
+> +        * Note that a non-Vendor ID config register may have a value of
+> +        * CFG_RETRY_STATUS.  If we read that, we can't distinguish it from
+> +        * a CRS completion, so we will incorrectly retry the read and
+> +        * eventually return the wrong data (0xffffffff).
+>          */
+>         data = readl(cfg_data_p);
+>         while (data == CFG_RETRY_STATUS && timeout--) {
+> @@ -515,10 +519,19 @@ static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
+>         unsigned int busno = bus->number;
+>         void __iomem *cfg_data_p;
+>         unsigned int data;
+> +       int ret;
+>
+> -       /* root complex access. */
+> -       if (busno == 0)
+> -               return pci_generic_config_read32(bus, devfn, where, size, val);
+> +       /* root complex access */
+> +       if (busno == 0) {
+> +               ret = pci_generic_config_read32(bus, devfn, where, size, val);
+> +               if (ret != PCIBIOS_SUCCESSFUL)
+> +                       return ret;
+> +
+> +               /* Don't advertise CRS SV support */
+> +               if ((where & ~0x3) == PCI_EXP_CAP + PCI_EXP_RTCAP)
+> +                       *val &= ~(PCI_EXP_RTCAP_CRSVIS << 16);
+> +               return PCIBIOS_SUCCESSFUL;
+> +       }
+>
+>         cfg_data_p = iproc_pcie_map_ep_cfg_reg(pcie, busno, slot, fn, where);
+>
+> @@ -635,7 +648,6 @@ static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+>                 ret = iproc_pcie_config_read(bus, devfn, where, size, val);
+>         else
+>                 ret = pci_generic_config_read32(bus, devfn, where, size, val);
+> -       ret = pci_generic_config_read32(bus, devfn, where, size, val);
+>         iproc_pcie_apb_err_disable(bus, false);
+>
+>         return ret;
+> @@ -1309,6 +1321,8 @@ static int iproc_pcie_rev_init(struct iproc_pcie *pcie)
+>                 pcie->ib.nr_regions = ARRAY_SIZE(paxb_v2_ib_map);
+>                 pcie->ib_map = paxb_v2_ib_map;
+>                 pcie->need_msi_steer = true;
+> +               dev_warn(dev, "reads of config registers that contain %#x return incorrect data\n",
+> +                        CFG_RETRY_STATUS);
+>                 break;
+>         case IPROC_PCIE_PAXC:
+>                 regs = iproc_pcie_reg_paxc;
