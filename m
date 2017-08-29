@@ -1,13 +1,57 @@
-From: sinara_group@163.com (Julian Smith)
-Date: Tue, 29 Aug 2017 10:46:57 -0400 (EDT)
-Subject: Inquiry 29-08-2017
-Message-ID: <20170829144657.8FA3BD7A0F@mail.dealer.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 29 Aug 2017 18:38:11 +0200
+Subject: [PATCH 3/3] PM: i2c-designware-platdrv: System sleep handling
+ rework
+In-Reply-To: <6543072.R9SdZCE16v@aspire.rjw.lan>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <4245176.X6JjkhnUAM@aspire.rjw.lan> <6543072.R9SdZCE16v@aspire.rjw.lan>
+Message-ID: <2533904.WxKdIHdxQJ@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tuesday, August 29, 2017 2:59:49 AM CEST Rafael J. Wysocki wrote:
+> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> 
+> Rework the power management part of the i2c-designware-platdrv driver
+> so that its ->suspend and ->resume callbacks do not point to the
+> callback routines used by it for runtime PM.  Instead, point its late
+> suspend and early resume callbacks to pm_runtime_force_suspend() and
+> pm_runtime_force_resume(), respectively, and make it set the
+> SAFE_SUSPEND driver flag (introduced earlier) to instruct the generic
+> ACPI PM domain code that the driver can cope with runtime suspended
+> devices in its system sleep callbacks.
+> 
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+>  drivers/i2c/busses/i2c-designware-platdrv.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> Index: linux-pm/drivers/i2c/busses/i2c-designware-platdrv.c
+> ===================================================================
+> --- linux-pm.orig/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ linux-pm/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -358,6 +358,7 @@ static int dw_i2c_plat_probe(struct plat
+>  	if (dev->pm_disabled) {
+>  		pm_runtime_forbid(&pdev->dev);
+>  	} else {
+> +		dev->power.driver_flags = DPM_FLAG_SAFE_SUSPEND;
+>  		pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
+>  		pm_runtime_use_autosuspend(&pdev->dev);
+>  		pm_runtime_set_active(&pdev->dev);
+> @@ -455,7 +456,8 @@ static int dw_i2c_plat_resume(struct dev
+>  static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
+>  	.prepare = dw_i2c_plat_prepare,
+>  	.complete = dw_i2c_plat_complete,
+> -	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
+> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> +				     pm_runtime_force_resume)
+>  	SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
+>  };
 
-My name is Ms Julian Smith and i am from Sinara Group Co.,LTD in Russia..We are glad to know about your company from the web and we are interested in your products.Please send us your Latest catalog and price list for our trial order
+This isn't going to work, because pm_runtime_force_suspend() will invoke
+the bus type callback and not the driver's one.
 
-Julian Smith,
-Purchasing Manager
+So scratch this, please.
+
+Thanks,
+Rafael
