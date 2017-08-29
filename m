@@ -1,53 +1,73 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Aug 2017 08:39:23 +0200
-Subject: [PATCH V3 1/8] drivers: Add boot constraints core
-In-Reply-To: <1a844e27ee7e0b22acf8ea582bf4e8d35f54c84a.1501578037.git.viresh.kumar@linaro.org>
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Tue, 29 Aug 2017 09:48:46 +0300
+Subject: [PATCH V3 2/8] drivers: boot_constraint: Add
+ boot_constraints_disable kernel parameter
+In-Reply-To: <20170829063734.GC12198@kroah.com>
 References: <cover.1501578037.git.viresh.kumar@linaro.org>
- <1a844e27ee7e0b22acf8ea582bf4e8d35f54c84a.1501578037.git.viresh.kumar@linaro.org>
-Message-ID: <20170829063923.GD12198@kroah.com>
+ <4bec0c3e58f76e06e5305c5ddbab859e2a87935e.1501578037.git.viresh.kumar@linaro.org>
+ <20170829063734.GC12198@kroah.com>
+Message-ID: <87378aamy9.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 02:53:42PM +0530, Viresh Kumar wrote:
-> Some devices are powered ON by the bootloader before the bootloader
-> handovers control to Linux. It maybe important for those devices to keep
-> working until the time a Linux device driver probes the device and
-> reconfigure its resources.
-> 
-> A typical example of that can be the LCD controller, which is used by
-> the bootloaders to show image(s) while the platform is booting into
-> Linux. The LCD controller can be using some resources, like clk,
-> regulators, PM domain, etc, that are shared between several devices.
-> These shared resources should be configured to satisfy need of all the
-> users. If another device's (X) driver gets probed before the LCD
-> controller driver in this case, then it may end up reconfiguring these
-> resources to ranges satisfying the current users (only device X) and
-> that can make the LCD screen unstable.
-> 
-> This patch introduces the concept of boot-constraints, which will be set
-> by the bootloaders and the kernel will satisfy them until the time
-> driver for such a device is probed (successfully or unsuccessfully).
-> 
-> The list of boot constraint types is empty for now, and will be
-> incrementally updated by later patches.
-> 
-> Only two routines are exposed by the boot constraints core for now:
-> 
-> - dev_boot_constraint_add(): This shall be called by parts of the kernel
->   (before the device is probed) to set the constraints.
-> 
-> - dev_boot_constraints_remove(): This is called only by the driver core
->   after a device is probed successfully or unsuccessfully. Special
->   handling is done here for deffered probing.
+On Tue, 29 Aug 2017, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+> On Tue, Aug 01, 2017 at 02:53:43PM +0530, Viresh Kumar wrote:
+>> Users must be given an option to discard any constraints set by
+>> bootloaders. For example, consider that a constraint is set for the LCD
+>> controller's supply and the LCD driver isn't loaded by the kernel. If
+>> the user doesn't need to use the LCD device, then he shouldn't be forced
+>> to honour the constraint.
+>> 
+>> We can also think about finer control of such constraints with help of
+>> some sysfs files, but a kernel parameter is fine to begin with.
+>> 
+>> Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> ---
+>>  Documentation/admin-guide/kernel-parameters.txt |  3 +++
+>>  drivers/base/boot_constraints/core.c            | 17 +++++++++++++++++
+>>  2 files changed, 20 insertions(+)
+>> 
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index d9c171ce4190..0706d1b6004d 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -426,6 +426,9 @@
+>>  			embedded devices based on command line input.
+>>  			See Documentation/block/cmdline-partition.txt
+>>  
+>> +	boot_constraints_disable
+>> +			Do not set any boot constraints for devices.
+>
+> Shouldn't that be the default?  As really, that is what the situation is
+> today, why force everyone to always enable the disable value?  And
+> enabling a value to disable something is usually a sign of bad naming...
+>
+>> +
+>>  	boot_delay=	Milliseconds to delay each printk during boot.
+>>  			Values larger than 10 seconds (10000) are changed to
+>>  			no delay (0).
+>> diff --git a/drivers/base/boot_constraints/core.c b/drivers/base/boot_constraints/core.c
+>> index 366a05d6d9ba..e0c33b2b216f 100644
+>> --- a/drivers/base/boot_constraints/core.c
+>> +++ b/drivers/base/boot_constraints/core.c
+>> @@ -24,6 +24,17 @@
+>>  static LIST_HEAD(constraint_devices);
+>>  static DEFINE_MUTEX(constraint_devices_mutex);
+>>  
+>> +static bool boot_constraints_disabled;
+>
+> Again, this should only be an "enable" type of option, that kicks in if
+> you are using this type of bootloader/kernel interaction.  Don't force
+> someone to disable it.
 
-How is this information getting to the kernel from the bootloader?  I
-didn't see where that happened, just a single example driver that
-somehow "knew" what had to happen, which seems odd...
+I might add that "disable" type options lead to annoying double
+negatives. Regardless of the default, I'd generally prefer "enable" type
+options that you enable/disable as needed.
 
-This is a lot of new code for no users, I would like to see at least 3
-real drivers that are using it before we merge it, as then you have a
-chance of getting the user/kernel api correct.
+BR,
+Jani.
 
-thanks,
 
-greg k-h
+-- 
+Jani Nikula, Intel Open Source Technology Center
