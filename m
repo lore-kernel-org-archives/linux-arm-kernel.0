@@ -1,14 +1,14 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Tue, 29 Aug 2017 15:12:34 +0200
-Subject: [RFC PATCH v9 3/7] edac,
- soc: thunderx: Add wrapper for EDAC OCX PCI device
+Date: Tue, 29 Aug 2017 15:12:33 +0200
+Subject: [RFC PATCH v9 2/7] edac,
+ soc: thunderx: Add wrapper for EDAC LMC PCI device
 In-Reply-To: <20170829131238.4988-1-jglauber@cavium.com>
 References: <20170829131238.4988-1-jglauber@cavium.com>
-Message-ID: <20170829131238.4988-4-jglauber@cavium.com>
+Message-ID: <20170829131238.4988-3-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cavium SOCs contain an processor interconnect that is presented as a
+Cavium SOCs contain a memory controller that is presented as a
 PCI device. This PCI device will be used by an EDAC driver and
 by a PMU driver.
 
@@ -16,157 +16,189 @@ To allow both subsystems to access the device a small wrapper is
 introduced that multi-plexes PCI probe and removal calls of the
 device to the EDAC driver.
 
+The same mechanism will be used later to call the PMU driver.
+
+The ThunderX EDAC driver is limited to only build as module
+with this patch. The reason is that with multiple users of the
+multi-plexer all users must be either builtin or modules.
+
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/edac/Kconfig            |  1 +
- drivers/edac/thunderx_edac.c    | 42 +++++++-------------------------------
- drivers/soc/cavium/Kconfig      |  4 ++++
+ drivers/edac/Kconfig            |  2 ++
+ drivers/edac/thunderx_edac.c    | 31 ++++++--------------------
+ drivers/soc/Kconfig             |  1 +
+ drivers/soc/Makefile            |  1 +
+ drivers/soc/cavium/Kconfig      |  6 +++++
  drivers/soc/cavium/Makefile     |  1 +
- drivers/soc/cavium/cavium_ocx.c | 45 +++++++++++++++++++++++++++++++++++++++++
- include/linux/soc/cavium/ocx.h  |  9 +++++++++
- 6 files changed, 67 insertions(+), 35 deletions(-)
- create mode 100644 drivers/soc/cavium/cavium_ocx.c
- create mode 100644 include/linux/soc/cavium/ocx.h
+ drivers/soc/cavium/cavium_lmc.c | 49 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/soc/cavium/lmc.h  |  9 ++++++++
+ 8 files changed, 76 insertions(+), 24 deletions(-)
+ create mode 100644 drivers/soc/cavium/Kconfig
+ create mode 100644 drivers/soc/cavium/Makefile
+ create mode 100644 drivers/soc/cavium/cavium_lmc.c
+ create mode 100644 include/linux/soc/cavium/lmc.h
 
 diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-index 7330447..8304212 100644
+index 96afb2a..7330447 100644
 --- a/drivers/edac/Kconfig
 +++ b/drivers/edac/Kconfig
-@@ -373,6 +373,7 @@ config EDAC_THUNDERX
+@@ -371,6 +371,8 @@ config EDAC_THUNDERX
+ 	tristate "Cavium ThunderX EDAC"
+ 	depends on ARM64
  	depends on PCI
- 	depends on m
- 	select CAVIUM_LMC
-+	select CAVIUM_OCX
++	depends on m
++	select CAVIUM_LMC
  	help
  	  Support for error detection and correction on the
  	  Cavium ThunderX memory controllers (LMC), Cache
 diff --git a/drivers/edac/thunderx_edac.c b/drivers/edac/thunderx_edac.c
-index 16f3d62..ddbda71 100644
+index d02bf3b..16f3d62 100644
 --- a/drivers/edac/thunderx_edac.c
 +++ b/drivers/edac/thunderx_edac.c
-@@ -22,6 +22,7 @@
+@@ -12,6 +12,7 @@
+ #include <linux/module.h>
+ #include <linux/pci.h>
+ #include <linux/edac.h>
++#include <linux/export.h>
+ #include <linux/interrupt.h>
+ #include <linux/string.h>
+ #include <linux/stop_machine.h>
+@@ -20,6 +21,7 @@
+ #include <linux/atomic.h>
  #include <linux/bitfield.h>
  #include <linux/circ_buf.h>
- #include <linux/soc/cavium/lmc.h>
-+#include <linux/soc/cavium/ocx.h>
++#include <linux/soc/cavium/lmc.h>
  
  #include <asm/page.h>
  
-@@ -814,8 +815,6 @@ EXPORT_SYMBOL_GPL(thunderx_edac_lmc_remove);
- 
- /*---------------------- OCX driver ---------------------------------*/
- 
--#define PCI_DEVICE_ID_THUNDER_OCX 0xa013
--
- #define OCX_LINK_INTS		3
- #define OCX_INTS		(OCX_LINK_INTS + 1)
- #define OCX_RX_LANES		24
-@@ -1311,11 +1310,6 @@ struct debugfs_entry *ocx_dfs_ents[] = {
- 	&debugfs_com_int,
- };
- 
--static const struct pci_device_id thunderx_ocx_pci_tbl[] = {
--	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_OCX) },
--	{ 0, },
--};
--
- static void thunderx_ocx_clearstats(struct thunderx_ocx *ocx)
- {
- 	int lane, stat, cfg;
-@@ -1331,8 +1325,8 @@ static void thunderx_ocx_clearstats(struct thunderx_ocx *ocx)
- 	}
+@@ -654,8 +656,7 @@ static inline int pci_dev_to_mc_idx(struct pci_dev *pdev)
+ 	return ret;
  }
  
--static int thunderx_ocx_probe(struct pci_dev *pdev,
--			      const struct pci_device_id *id)
-+int thunderx_edac_ocx_probe(struct pci_dev *pdev,
-+			    const struct pci_device_id *id)
+-static int thunderx_lmc_probe(struct pci_dev *pdev,
+-				const struct pci_device_id *id)
++int thunderx_edac_lmc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
  {
- 	struct thunderx_ocx *ocx;
- 	struct edac_device_ctl_info *edac_dev;
-@@ -1461,8 +1455,9 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
+ 	struct thunderx_lmc *lmc;
+ 	struct edac_mc_layer layer;
+@@ -797,8 +798,9 @@ static int thunderx_lmc_probe(struct pci_dev *pdev,
  
  	return ret;
  }
-+EXPORT_SYMBOL_GPL(thunderx_edac_ocx_probe);
++EXPORT_SYMBOL_GPL(thunderx_edac_lmc_probe);
  
--static void thunderx_ocx_remove(struct pci_dev *pdev)
-+void thunderx_edac_ocx_remove(struct pci_dev *pdev)
+-static void thunderx_lmc_remove(struct pci_dev *pdev)
++void thunderx_edac_lmc_remove(struct pci_dev *pdev)
  {
- 	struct edac_device_ctl_info *edac_dev = pci_get_drvdata(pdev);
- 	struct thunderx_ocx *ocx = edac_dev->pvt_info;
-@@ -1480,15 +1475,7 @@ static void thunderx_ocx_remove(struct pci_dev *pdev)
- 	edac_device_del_device(&pdev->dev);
- 	edac_device_free_ctl_info(edac_dev);
+ 	struct mem_ctl_info *mci = pci_get_drvdata(pdev);
+ 	struct thunderx_lmc *lmc = mci->pvt_info;
+@@ -808,19 +810,7 @@ static void thunderx_lmc_remove(struct pci_dev *pdev)
+ 	edac_mc_del_mc(&pdev->dev);
+ 	edac_mc_free(mci);
  }
 -
--MODULE_DEVICE_TABLE(pci, thunderx_ocx_pci_tbl);
+-MODULE_DEVICE_TABLE(pci, thunderx_lmc_pci_tbl);
 -
--static struct pci_driver thunderx_ocx_driver = {
--	.name     = "thunderx_ocx_edac",
--	.probe    = thunderx_ocx_probe,
--	.remove   = thunderx_ocx_remove,
--	.id_table = thunderx_ocx_pci_tbl,
+-static struct pci_driver thunderx_lmc_driver = {
+-	.name     = "thunderx_lmc_edac",
+-	.probe    = thunderx_lmc_probe,
+-	.remove   = thunderx_lmc_remove,
+-#ifdef CONFIG_PM
+-	.suspend  = thunderx_lmc_suspend,
+-	.resume   = thunderx_lmc_resume,
+-#endif
+-	.id_table = thunderx_lmc_pci_tbl,
 -};
-+EXPORT_SYMBOL_GPL(thunderx_edac_ocx_remove);
++EXPORT_SYMBOL_GPL(thunderx_edac_lmc_remove);
  
- /*---------------------- L2C driver ---------------------------------*/
+ /*---------------------- OCX driver ---------------------------------*/
  
-@@ -2104,27 +2091,12 @@ static struct pci_driver thunderx_l2c_driver = {
- 
- static int __init thunderx_edac_init(void)
+@@ -2116,13 +2106,9 @@ static int __init thunderx_edac_init(void)
  {
--	int rc = 0;
--
--	rc = pci_register_driver(&thunderx_ocx_driver);
+ 	int rc = 0;
+ 
+-	rc = pci_register_driver(&thunderx_lmc_driver);
 -	if (rc)
 -		return rc;
 -
--	rc = pci_register_driver(&thunderx_l2c_driver);
--	if (rc)
--		goto err_ocx;
--
--	return rc;
--err_ocx:
--	pci_unregister_driver(&thunderx_ocx_driver);
--
--	return rc;
-+	return pci_register_driver(&thunderx_l2c_driver);
- }
+ 	rc = pci_register_driver(&thunderx_ocx_driver);
+ 	if (rc)
+-		goto err_lmc;
++		return rc;
  
- static void __exit thunderx_edac_exit(void)
+ 	rc = pci_register_driver(&thunderx_l2c_driver);
+ 	if (rc)
+@@ -2131,8 +2117,6 @@ static int __init thunderx_edac_init(void)
+ 	return rc;
+ err_ocx:
+ 	pci_unregister_driver(&thunderx_ocx_driver);
+-err_lmc:
+-	pci_unregister_driver(&thunderx_lmc_driver);
+ 
+ 	return rc;
+ }
+@@ -2141,7 +2125,6 @@ static void __exit thunderx_edac_exit(void)
  {
  	pci_unregister_driver(&thunderx_l2c_driver);
--	pci_unregister_driver(&thunderx_ocx_driver);
+ 	pci_unregister_driver(&thunderx_ocx_driver);
+-	pci_unregister_driver(&thunderx_lmc_driver);
  
  }
  
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 07fc0ac..6e31936 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -3,6 +3,7 @@ menu "SOC (System On Chip) specific Drivers"
+ source "drivers/soc/actions/Kconfig"
+ source "drivers/soc/atmel/Kconfig"
+ source "drivers/soc/bcm/Kconfig"
++source "drivers/soc/cavium/Kconfig"
+ source "drivers/soc/fsl/Kconfig"
+ source "drivers/soc/imx/Kconfig"
+ source "drivers/soc/mediatek/Kconfig"
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 9241125..96eff43 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -5,6 +5,7 @@
+ obj-$(CONFIG_ARCH_ACTIONS)	+= actions/
+ obj-$(CONFIG_ARCH_AT91)		+= atmel/
+ obj-y				+= bcm/
++obj-$(CONFIG_ARCH_THUNDER)	+= cavium/
+ obj-$(CONFIG_ARCH_DOVE)		+= dove/
+ obj-$(CONFIG_MACH_DOVE)		+= dove/
+ obj-y				+= fsl/
 diff --git a/drivers/soc/cavium/Kconfig b/drivers/soc/cavium/Kconfig
-index 46ded89..fe56503 100644
---- a/drivers/soc/cavium/Kconfig
+new file mode 100644
+index 0000000..46ded89
+--- /dev/null
 +++ b/drivers/soc/cavium/Kconfig
-@@ -4,3 +4,7 @@
- config CAVIUM_LMC
-         depends on ARCH_THUNDER
- 	def_tristate m
-+
-+config CAVIUM_OCX
-+	depends on ARCH_THUNDER
+@@ -0,0 +1,6 @@
++#
++# Cavium ThunderX Soc drivers
++#
++config CAVIUM_LMC
++        depends on ARCH_THUNDER
 +	def_tristate m
 diff --git a/drivers/soc/cavium/Makefile b/drivers/soc/cavium/Makefile
-index 4ad0c7f..bf7ba25 100644
---- a/drivers/soc/cavium/Makefile
-+++ b/drivers/soc/cavium/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_CAVIUM_LMC) += cavium_lmc.o
-+obj-$(CONFIG_CAVIUM_OCX) += cavium_ocx.o
-diff --git a/drivers/soc/cavium/cavium_ocx.c b/drivers/soc/cavium/cavium_ocx.c
 new file mode 100644
-index 0000000..fa3341b
+index 0000000..4ad0c7f
 --- /dev/null
-+++ b/drivers/soc/cavium/cavium_ocx.c
-@@ -0,0 +1,45 @@
++++ b/drivers/soc/cavium/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_CAVIUM_LMC) += cavium_lmc.o
+diff --git a/drivers/soc/cavium/cavium_lmc.c b/drivers/soc/cavium/cavium_lmc.c
+new file mode 100644
+index 0000000..87248e8
+--- /dev/null
++++ b/drivers/soc/cavium/cavium_lmc.c
+@@ -0,0 +1,49 @@
 +/*
++ * These PCI devices contain RAS functionality and PMU counters. To allow
++ * independent RAS and PMU drivers this driver registers for the PCI devices
++ * and multi-plexes probe and removal.
++ *
 + * This file is subject to the terms and conditions of the GNU General Public
 + * License.  See the file "COPYING" in the main directory of this archive
 + * for more details.
@@ -176,54 +208,54 @@ index 0000000..fa3341b
 + */
 +#include <linux/module.h>
 +#include <linux/pci.h>
-+#include <linux/soc/cavium/ocx.h>
++#include <linux/soc/cavium/lmc.h>
 +
-+static int cvm_ocx_probe(struct pci_dev *pdev,
++static int cvm_lmc_probe(struct pci_dev *pdev,
 +			 const struct pci_device_id *ent)
 +{
 +	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
-+		thunderx_edac_ocx_probe(pdev, ent);
++		thunderx_edac_lmc_probe(pdev, ent);
 +	return 0;
 +}
 +
-+static void cvm_ocx_remove(struct pci_dev *pdev)
++static void cvm_lmc_remove(struct pci_dev *pdev)
 +{
 +	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
-+		thunderx_edac_ocx_remove(pdev);
++		thunderx_edac_lmc_remove(pdev);
 +}
 +
-+static const struct pci_device_id cvm_ocx_pci_table[] = {
-+	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa013) },
++static const struct pci_device_id cvm_lmc_pci_table[] = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa022) },
 +	{ 0, },
 +};
 +
-+MODULE_DEVICE_TABLE(pci, cvm_ocx_pci_table);
++MODULE_DEVICE_TABLE(pci, cvm_lmc_pci_table);
 +
-+static struct pci_driver cvm_ocx_pci_driver = {
-+	.name     = "Cavium ThunderX interconnect",
-+	.id_table = cvm_ocx_pci_table,
-+	.probe    = cvm_ocx_probe,
-+	.remove   = cvm_ocx_remove,
++static struct pci_driver cvm_lmc_pci_driver = {
++	.name     = "Cavium SOC memory controller",
++	.id_table = cvm_lmc_pci_table,
++	.probe    = cvm_lmc_probe,
++	.remove   = cvm_lmc_remove,
 +};
 +
-+module_pci_driver(cvm_ocx_pci_driver);
++module_pci_driver(cvm_lmc_pci_driver);
 +
 +MODULE_LICENSE("GPL v2");
 +MODULE_AUTHOR("Cavium, Inc.");
-+MODULE_DESCRIPTION("PCI driver for Cavium ThunderX interconnect");
-diff --git a/include/linux/soc/cavium/ocx.h b/include/linux/soc/cavium/ocx.h
++MODULE_DESCRIPTION("PCI driver for Cavium SOC memory controller");
+diff --git a/include/linux/soc/cavium/lmc.h b/include/linux/soc/cavium/lmc.h
 new file mode 100644
-index 0000000..29f55b3
+index 0000000..336f467
 --- /dev/null
-+++ b/include/linux/soc/cavium/ocx.h
++++ b/include/linux/soc/cavium/lmc.h
 @@ -0,0 +1,9 @@
-+#ifndef _OCX_H
-+#define _OCX_H
++#ifndef _LMC_H
++#define _LMC_H
 +
 +#include <linux/pci.h>
 +
-+int thunderx_edac_ocx_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
-+void thunderx_edac_ocx_remove(struct pci_dev *pdev);
++int thunderx_edac_lmc_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
++void thunderx_edac_lmc_remove(struct pci_dev *pdev);
 +
 +#endif
 -- 
