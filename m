@@ -1,27 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Aug 2017 07:43:38 -0700
-Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
- sdhci-omap controller
-In-Reply-To: <20170829135822.GR6008@atomide.com>
-References: <20170821142132.GH6008@atomide.com>
- <20170823054246.23927-1-kishon@ti.com>
- <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
- <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
- <CAPDyKFqCZFM7UmHyQCm=DwwZXJvzUde3pW0HqARKrsgfgxSuaw@mail.gmail.com>
- <0c7e0705-d9c2-4499-54ba-cbd84589dc01@ti.com>
- <20170829115050.3axlr5uysmqlhvd2@earth>
- <20170829135822.GR6008@atomide.com>
-Message-ID: <20170829144338.GY6008@atomide.com>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Tue, 29 Aug 2017 20:14:04 +0530
+Subject: [PATCH] rtc: Use PTR_ERR_OR_ZERO
+In-Reply-To: <20170829142011.76w67w64a7lheef4@piout.net>
+References: <1504014419-16894-1-git-send-email-himanshujha199640@gmail.com>
+ <20170829142011.76w67w64a7lheef4@piout.net>
+Message-ID: <20170829144404.GA19791@himanshu-Vostro-3559>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170829 06:58]:
-> It's best to enable devices to use the new compatible as things are
-> tested rather than hope for some magic "flag day" flip that might
-> never happen. Having two days attempting to probe with the same
-> binding just won't work.
+On Tue, Aug 29, 2017 at 04:20:11PM +0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 29/08/2017 at 19:16:59 +0530, Himanshu Jha wrote:
+> > Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+> > 
+> 
+> I'm not taking that kind of useless changes (especially since it make
+> the code less readable) unless you have other significant improvement in
+> those drivers.
 
-Hehe I mean "Having two drivers attempting to probe with the same
-binding" above.
+Apologies!! I got this change accepted in staging, and didn't think
+about it's readability.
 
-Tony
+
+Thanks
+
+
+> 
+> > Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+> > ---
+> >  drivers/rtc/rtc-digicolor.c | 5 +----
+> >  drivers/rtc/rtc-ds1347.c    | 5 +----
+> >  2 files changed, 2 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/drivers/rtc/rtc-digicolor.c b/drivers/rtc/rtc-digicolor.c
+> > index b253bf1..1e200a0 100644
+> > --- a/drivers/rtc/rtc-digicolor.c
+> > +++ b/drivers/rtc/rtc-digicolor.c
+> > @@ -202,10 +202,7 @@ static int __init dc_rtc_probe(struct platform_device *pdev)
+> >  	platform_set_drvdata(pdev, rtc);
+> >  	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
+> >  						&dc_rtc_ops, THIS_MODULE);
+> > -	if (IS_ERR(rtc->rtc_dev))
+> > -		return PTR_ERR(rtc->rtc_dev);
+> > -
+> > -	return 0;
+> > +	return PTR_ERR_OR_ZERO(rtc->rtc_dev);
+> >  }
+> >  
+> >  static const struct of_device_id dc_dt_ids[] = {
+> > diff --git a/drivers/rtc/rtc-ds1347.c b/drivers/rtc/rtc-ds1347.c
+> > index ccfc9d4..9a02ca7 100644
+> > --- a/drivers/rtc/rtc-ds1347.c
+> > +++ b/drivers/rtc/rtc-ds1347.c
+> > @@ -155,10 +155,7 @@ static int ds1347_probe(struct spi_device *spi)
+> >  	rtc = devm_rtc_device_register(&spi->dev, "ds1347",
+> >  				&ds1347_rtc_ops, THIS_MODULE);
+> >  
+> > -	if (IS_ERR(rtc))
+> > -		return PTR_ERR(rtc);
+> > -
+> > -	return 0;
+> > +	return PTR_ERR_OR_ZERO(rtc);
+> >  }
+> >  
+> >  static struct spi_driver ds1347_driver = {
+> > -- 
+> > 2.7.4
+> > 
+> 
+> -- 
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
