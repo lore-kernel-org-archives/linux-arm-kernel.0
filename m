@@ -1,51 +1,39 @@
-From: cohuck@redhat.com (Cornelia Huck)
-Date: Tue, 29 Aug 2017 14:42:47 +0200
-Subject: [PATCH RFC v3 1/9] KVM: s390: optimize detection of started vcpus
-In-Reply-To: <d63ceb80-bdf7-0a24-a4ac-3265b7528a60@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-2-rkrcmar@redhat.com>
- <67a8b09c-3e7a-943d-8684-f9ad6e70514b@redhat.com>
- <20170829132342.1ef25500.cohuck@redhat.com>
- <d63ceb80-bdf7-0a24-a4ac-3265b7528a60@redhat.com>
-Message-ID: <20170829144247.5b0644dc.cohuck@redhat.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 29 Aug 2017 14:47:30 +0200
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+ <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+Message-ID: <20170829124730.GH17961@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Aug 2017 14:05:40 +0200
-David Hildenbrand <david@redhat.com> wrote:
+Shaokun,
 
-> On 29.08.2017 13:23, Cornelia Huck wrote:
-> > On Tue, 22 Aug 2017 13:31:27 +0200
-> > David Hildenbrand <david@redhat.com> wrote:
-> >   
-> >> On 21.08.2017 22:35, Radim Kr?m?? wrote:  
-> >>> We can add a variable instead of scanning all online VCPUs to know how
-> >>> many are started.  We can't trivially tell which VCPU is the last one,
-> >>> though.    
-> >>
-> >> You could keep the started vcpus in a list. Then you might drop unsigned
-> >> started_vcpus;
-> >>
-> >> No started vcpus: Start pointer NULL
-> >> Single started vcpu: Only one element in the list (easy to check)  
-> >>> 1 started vcpus: More than one element int he list (easy to check)    
+On 29.08.17 17:26:00, Zhangshaokun wrote:
+> On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+> > This is not a full event list, but a short list of useful events.
 > > 
-> > I'm not sure the added complication of keeping a list buys us much
-> > here: We only have the "look for the last vcpu not stopped" operation
-> > for the 2->1 transition.
-> >   
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+> >  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+> >  2 files changed, 77 insertions(+)
+> >  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+> >  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> > 
 > 
-> That is wrong, we also have to know the last remaining (started) VCPU.
-> For that, right now we have to iterate over all VCPUs.
+> I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+> that would use vendor sub-folder?
+> Of course, appreciate maintainer's comments.
 
-Yes, but that's only for the 2->1 transition... and all in all that is
-still much better that before.
+this would just add another level of subdirectories. I rather would
+prefer to have a per platform dir comparable to what is listed in
 
-> 
-> There shouldn't be much complexity. We already perform changes under a
-> lock, so it is as simple as adding/removing from the list.
-> 
-> Detecting the transitions boils down to looking at two pointers.
+ arch/arm64/Kconfig.platforms
 
-Having a private vcpu list feels a bit wrong... and I don't really see
-much benefit.
+This is the same as Ganapat has implemented it.
+
+-Robert
