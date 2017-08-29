@@ -1,69 +1,38 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Tue, 29 Aug 2017 15:40:59 +0800
-Subject: [PATCH v3 4/5] input: Add MediaTek PMIC keys support
-In-Reply-To: <20170829073453.GB4469@gangnam>
-References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
- <CGME20170825063247epcas5p1df2f4440010dd55dada66e8764d18e50@epcas5p1.samsung.com>
- <1503642753-12385-5-git-send-email-chen.zhong@mediatek.com>
- <20170829073453.GB4469@gangnam>
-Message-ID: <1503992459.15359.4.camel@mhfsdcap03>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 29 Aug 2017 15:58:37 +0800
+Subject: [PATCH 1/2] clk: hi6220: change watchdog clock source
+Message-ID: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andi,
+The old code uses tcxo (19.2MHz) as watchdog clock but actually the
+watchdog uses 32K clock, as result the watchdog timeout cannot be set
+correctly and delay long time to reset SoC.
 
-Sorry for that, i deleted some prefix since the namings will be such
-long. If this should be consistent, I'll check and modify them in the
-next version.
+So this patch is to use 'ref32k' as clock source for watchdog.
 
-Thank you.
+Fixes: 72ea48610d43 ("clk: hi6220: Clock driver support for Hisilicon hi6220 SoC")
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/clk/hisilicon/clk-hi6220.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-On Tue, 2017-08-29 at 16:34 +0900, Andi Shyti wrote:
-> Hi Chen,
-> 
-> what I would ask you is to be consistent with the naming, if your
-> driver is called mtk-pmic, then all your functions and global
-> variables should be named accordingly as mtk_pmic or MTK_PMIC.
-> Please check in between the lines for real examples:
-> 
-> > +#define PWRKEY_RST_EN_MASK	0x1
-> > +#define PWRKEY_RST_EN_SHIFT	6
-> > +#define HOMEKEY_RST_EN_MASK	0x1
-> > +#define HOMEKEY_RST_EN_SHIFT	5
-> > +#define RST_DU_MASK		0x3
-> > +#define RST_DU_SHIFT		8
-> > +
-> > +#define PMIC_PWRKEY_INDEX	0
-> > +#define PMIC_HOMEKEY_INDEX	1
-> > +#define PMIC_MAX_KEY_COUNT	2
-> 
-> #define MTK_PMIC_*
-> 
-> > +struct pmic_keys_regs {
-> 
-> struct mtk_pmic_keys_regs
-> 
-> > +	u32 deb_reg;
-> > +	u32 deb_mask;
-> > +	u32 intsel_reg;
-> > +	u32 intsel_mask;
-> > +};
-> > +
-> > +#define PMIC_KEYS_REGS(_deb_reg, _deb_mask, _intsel_reg, _intsel_mask)	\
-> 
-> MTK_PMIC_KEYS_REGS
-> 
-> > +{									\
-> > +	.deb_reg		= _deb_reg,				\
-> > +	.deb_mask		= _deb_mask,				\
-> > +	.intsel_reg		= _intsel_reg,				\
-> > +	.intsel_mask		= _intsel_mask,				\
-> > +}
-> > +
-> > +struct pmic_regs {
-> 
-> mtk_pmic_regs
-> 
-> and so on... you got the point.
-> 
-> Andi
+diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+index 4181b68..e786d71 100644
+--- a/drivers/clk/hisilicon/clk-hi6220.c
++++ b/drivers/clk/hisilicon/clk-hi6220.c
+@@ -55,9 +55,9 @@ static struct hisi_fixed_factor_clock hi6220_fixed_factor_clks[] __initdata = {
+ };
+ 
+ static struct hisi_gate_clock hi6220_separated_gate_clks_ao[] __initdata = {
+-	{ HI6220_WDT0_PCLK,   "wdt0_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 12, 0, },
+-	{ HI6220_WDT1_PCLK,   "wdt1_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 13, 0, },
+-	{ HI6220_WDT2_PCLK,   "wdt2_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 14, 0, },
++	{ HI6220_WDT0_PCLK,   "wdt0_pclk",   "ref32k",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 12, 0, },
++	{ HI6220_WDT1_PCLK,   "wdt1_pclk",   "ref32k",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 13, 0, },
++	{ HI6220_WDT2_PCLK,   "wdt2_pclk",   "ref32k",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 14, 0, },
+ 	{ HI6220_TIMER0_PCLK, "timer0_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 15, 0, },
+ 	{ HI6220_TIMER1_PCLK, "timer1_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 16, 0, },
+ 	{ HI6220_TIMER2_PCLK, "timer2_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 17, 0, },
+-- 
+2.7.4
