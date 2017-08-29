@@ -1,86 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 29 Aug 2017 22:25:30 +0200
-Subject: [PATCH 1/2] arm: AT91: enable ac97 controller for at91sam9g45
-In-Reply-To: <e789197b91251657a45c7a9c1c59c35d163ef85a.1504037038.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1504037038.git.mirq-linux@rere.qmqm.pl>
- <e789197b91251657a45c7a9c1c59c35d163ef85a.1504037038.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20170829202530.aacmi6rh4dmvdhv4@piout.net>
+From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
+Date: Tue, 29 Aug 2017 22:26:50 +0200
+Subject: [RESEND PATCH 0/2] Enable SPI on A64/Pine64
+Message-ID: <20170829202652.5476-1-stefan.bruens@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A64 SPI controller is compatible to the H3/H5 controller, i.e. same
+registers and same queue depth.
 
-I have that in my tree which seems similar enough:
-https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=1a9f9af07e806dd4d5df109c61ac0d5c74fe9b32
+The Pine64 exposes both controllers on the PI-2 and Euler connectors.
 
-On 29/08/2017 at 22:08:53 +0200, Micha? Miros?aw wrote:
-> Add AC97 controller node as present on AT91SAM9G45-EKES board.
-> 
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> ---
->  arch/arm/boot/dts/at91sam9g45.dtsi     | 21 +++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts |  4 ++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index e567d5fd3f9d..0e69a97695cd 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -846,6 +846,16 @@
->  					};
->  				};
->  
-> +				ac97 {
-> +					pinctrl_ac97: ac97-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PD8 periph A AC97FS pin */
-> +							 AT91_PIOD 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PD9 periph A AC97CK pin */
-> +							 AT91_PIOD 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PD7 periph A AC97TX pin */
-> +							 AT91_PIOD 6 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PD6 periph A AC97RX pin */
-> +					};
-> +				};
-> +
->  				pioA: gpio at fffff200 {
->  					compatible = "atmel,at91rm9200-gpio";
->  					reg = <0xfffff200 0x200>;
-> @@ -965,6 +975,17 @@
->  				status = "disabled";
->  			};
->  
-> +			ac97: sound at fffac000 {
-> +				compatible = "atmel,at91sam9263-ac97c";
-> +				reg = <0xfffac000 0x4000>;
-> +				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_ac97>;
-> +				clocks = <&ac97_clk>;
-> +				clock-names = "ac97_clk";
-> +				status = "disabled";
-> +			};
-> +
->  			macb0: ethernet at fffbc000 {
->  				compatible = "cdns,at91sam9260-macb", "cdns,macb";
->  				reg = <0xfffbc000 0x100>;
-> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> index 2400c99134f7..9cf1f5163fbd 100644
-> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> @@ -47,6 +47,10 @@
->  				status = "okay";
->  			};
->  
-> +			ac97: sound at fffac000 {
-> +				status = "okay";
-> +			};
-> +
->  			macb0: ethernet at fffbc000 {
->  				phy-mode = "rmii";
->  				status = "okay";
-> -- 
-> 2.11.0
-> 
+Tested/verified with logic analyser and spidev_test using MOSI/MISO loopback.
+
+Note: spi0 on the A64 may conflict with the eMMC controller, as the MISO pin is
+also used for the HS400 eMMC data strobe. This is only a concern if the board
+uses eMMC (does not apply to the Pine64) *and* is using HS400 mode. The same
+pin conflict exists for the H5.
+
+Stefan Br?ns (2):
+  arm64: allwinner: a64: add SPI nodes
+  arm64: allwinner: pine64: Enable spi0/spi1
+
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  8 +++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 40 ++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.14.1
