@@ -1,35 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Aug 2017 17:48:24 +0100
-Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
-In-Reply-To: <20170829133351.GK10796@e110455-lin.cambridge.arm.com>
-References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
- <20170726102748.GM31807@n2100.armlinux.org.uk>
- <20170728152311.GA970@e110455-lin.cambridge.arm.com>
- <20170728155827.GV31807@n2100.armlinux.org.uk>
- <20170829133351.GK10796@e110455-lin.cambridge.arm.com>
-Message-ID: <20170829164824.GH20805@n2100.armlinux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 29 Aug 2017 17:49:34 +0100
+Subject: [PATCH] arm64: fpsimd: Prevent registers leaking across exec
+Message-ID: <1504025374-17068-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 02:33:52PM +0100, Liviu Dudau wrote:
-> I've worked with Vladimir Murzin inside ARM to try to sort out problems
-> on the board like the one that you have. He's got to a point where the HDLCD
-> starts correctly after adding a non-fixed pxlclk source, but then the rest of
-> the setup is semi-useless without a working IRQ because DRM atomic calls
-> will give you a vblank timeout splat everytime you invoke them. So I'm
-> not sure how you want to progress with this patch, as not having an IRQ
-> line means you will not get any vblank interrupts and you can't use the
-> driver with userspace that calls DRM API.
-> 
-> The RTL guys are apparently working on a fix, but I have no ETA or
-> details on when they are going to do.
+commit 096622104e14d8a1db4860bd557717067a0515d2 upstream.
 
-It sounds then like this patch doesn't make sense - so I'm happy
-for it to be dropped.  It's something to bear in mind in the future
-when folk decide whether to adopt fbdev or DRM support for hardware
-that gets used in MMU-less hardware...
+There are some tricky dependencies between the different stages of
+flushing the FPSIMD register state during exec, and these can race
+with context switch in ways that can cause the old task's regs to
+leak across.  In particular, a context switch during the memset() can
+cause some of the task's old FPSIMD registers to reappear.
 
+Disabling preemption for this small window would be no big deal for
+performance: preemption is already disabled for similar scenarios
+like updating the FPSIMD registers in sigreturn.
+
+So, instead of rearranging things in ways that might swap existing
+subtle bugs for new ones, this patch just disables preemption
+around the FPSIMD state flushing so that races of this type can't
+occur here.  This brings fpsimd_flush_thread() into line with other
+code paths.
+
+Cc: <stable@vger.kernel.org> # 3.16.x
+Cc: <stable@vger.kernel.org> # 4.1.x-4.9.x
+Fixes: 674c242c9323 ("arm64: flush FP/SIMD state correctly after execve()")
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+For stable only.
+
+3.17.x-4.0.x don't appear active, and this patch isn't sufficient to fix
+them (they would need 674c242c9323 also).
+
+ arch/arm64/kernel/fpsimd.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 394c61d..1d5890f 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -157,9 +157,11 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 
+ void fpsimd_flush_thread(void)
+ {
++	preempt_disable();
+ 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+ 	fpsimd_flush_task_state(current);
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
++	preempt_enable();
+ }
+ 
+ /*
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.1.4
