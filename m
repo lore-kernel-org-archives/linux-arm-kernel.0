@@ -1,26 +1,113 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 29 Aug 2017 17:19:54 -0500
-Subject: [PATCHv2 0/2] PCI: add ls2088a and ls1088a support
-In-Reply-To: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
-References: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
-Message-ID: <20170829221954.GT8154@bhelgaas-glaptop.roam.corp.google.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue, 29 Aug 2017 15:43:12 -0700
+Subject: [PATCH] drivers: net: xgene: Correct probe sequence handling
+Message-ID: <1504046592-24779-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Minghuan, Mingkai, Roy]
+From: Quan Nguyen <qnguyen@apm.com>
 
-On Fri, Aug 04, 2017 at 02:41:32PM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> Hou Zhiqiang (2):
->   PCI: layerscape: Add support for ls2088a
->   PCI: layerscape: Add support for ls1088a
-> 
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  2 ++
->  drivers/pci/dwc/pci-layerscape.c                         | 10 ++++++++++
->  2 files changed, 12 insertions(+)
+The phy is connected at early stage of probe but not properly
+disconnected if error occurs.  This patch fixes the issue.
 
-These still apply cleanly, but I haven't seen an ack from the driver
-maintainers.
+Also changing the return type of xgene_enet_check_phy_handle(),
+since this function always returns success.
 
-Bjorn
+Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 27 ++++++++++++------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 1d307f2..6e253d9 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -1661,21 +1661,21 @@ static int xgene_enet_get_irqs(struct xgene_enet_pdata *pdata)
+ 	return 0;
+ }
+ 
+-static int xgene_enet_check_phy_handle(struct xgene_enet_pdata *pdata)
++static void xgene_enet_check_phy_handle(struct xgene_enet_pdata *pdata)
+ {
+ 	int ret;
+ 
+ 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII)
+-		return 0;
++		return;
+ 
+ 	if (!IS_ENABLED(CONFIG_MDIO_XGENE))
+-		return 0;
++		return;
+ 
+ 	ret = xgene_enet_phy_connect(pdata->ndev);
+ 	if (!ret)
+ 		pdata->mdio_driver = true;
+ 
+-	return 0;
++	return;
+ }
+ 
+ static void xgene_enet_gpiod_get(struct xgene_enet_pdata *pdata)
+@@ -1779,10 +1779,6 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = xgene_enet_check_phy_handle(pdata);
+-	if (ret)
+-		return ret;
+-
+ 	xgene_enet_gpiod_get(pdata);
+ 
+ 	pdata->clk = devm_clk_get(&pdev->dev, NULL);
+@@ -2097,9 +2093,11 @@ static int xgene_enet_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
+ 
++	xgene_enet_check_phy_handle(pdata);
++
+ 	ret = xgene_enet_init_hw(pdata);
+ 	if (ret)
+-		goto err;
++		goto err2;
+ 
+ 	link_state = pdata->mac_ops->link_state;
+ 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+@@ -2117,29 +2115,30 @@ static int xgene_enet_probe(struct platform_device *pdev)
+ 	spin_lock_init(&pdata->stats_lock);
+ 	ret = xgene_extd_stats_init(pdata);
+ 	if (ret)
+-		goto err2;
++		goto err1;
+ 
+ 	xgene_enet_napi_add(pdata);
+ 	ret = register_netdev(ndev);
+ 	if (ret) {
+ 		netdev_err(ndev, "Failed to register netdev\n");
+-		goto err2;
++		goto err1;
+ 	}
+ 
+ 	return 0;
+ 
+-err2:
++err1:
+ 	/*
+ 	 * If necessary, free_netdev() will call netif_napi_del() and undo
+ 	 * the effects of xgene_enet_napi_add()'s calls to netif_napi_add().
+ 	 */
+ 
++	xgene_enet_delete_desc_rings(pdata);
++
++err2:
+ 	if (pdata->mdio_driver)
+ 		xgene_enet_phy_disconnect(pdata);
+ 	else if (phy_interface_mode_is_rgmii(pdata->phy_mode))
+ 		xgene_enet_mdio_remove(pdata);
+-err1:
+-	xgene_enet_delete_desc_rings(pdata);
+ err:
+ 	free_netdev(ndev);
+ 	return ret;
+-- 
+2.7.4
