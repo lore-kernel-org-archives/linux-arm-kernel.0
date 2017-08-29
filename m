@@ -1,63 +1,101 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 29 Aug 2017 12:54:43 -0700
-Subject: [PATCH v3 3/4] arm/syscalls: Optimize address limit check
-In-Reply-To: <CAJcbSZEd10fMp6OSgSYv_Wmt=wX5fw_Gu-_N=fM_QmP==wUMew@mail.gmail.com>
-References: <20170814213732.104301-1-thgarnie@google.com>
- <20170814213732.104301-3-thgarnie@google.com>
- <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
- <CAJcbSZEd10fMp6OSgSYv_Wmt=wX5fw_Gu-_N=fM_QmP==wUMew@mail.gmail.com>
-Message-ID: <CAGXu5jKuk9589qap=74kPtefm=xKY0ORDH37W_3iZPd_7yc8VQ@mail.gmail.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 29 Aug 2017 19:58:57 +0000
+Subject: [PATCH 0/3] make XIP kernel .data compressed in ROM
+In-Reply-To: <nycvar.YSQ.7.76.1708281520380.2606@knanqh.ubzr>
+References: <20170825162600.15709-1-nicolas.pitre@linaro.org>
+ <SG2PR06MB1165EDDA573890B891E542CB8A9E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1708281520380.2606@knanqh.ubzr>
+Message-ID: <SG2PR06MB116536F14485B36DF66385758A9F0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 7:32 AM, Thomas Garnier <thgarnie@google.com> wrote:
-> On Tue, Aug 22, 2017 at 9:42 AM, Thomas Garnier <thgarnie@google.com> wrote:
->> On Mon, Aug 14, 2017 at 2:37 PM, Thomas Garnier <thgarnie@google.com> wrote:
->>> Disable the generic address limit check in favor of an architecture
->>> specific optimized implementation. The generic implementation using
->>> pending work flags did not work well with ARM and alignment faults.
->>>
->>> The address limit is checked on each syscall return path to user-mode
->>> path as well as the irq user-mode return function. If the address limit
->>> was changed, a function is called to report data corruption (stopping
->>> the kernel or process based on configuration).
->>>
->>> The address limit check has to be done before any pending work because
->>> they can reset the address limit and the process is killed using a
->>> SIGKILL signal. For example the lkdtm address limit check does not work
->>> because the signal to kill the process will reset the user-mode address
->>> limit.
->>>
->>> Signed-off-by: Thomas Garnier <thgarnie@google.com>
->>
->> Any feedback?
->
-> CCing LW at karo-electronics.de who experienced the same issue this patch
-> proposal fix.
->
-> Russell: Any feedback?
+On Tuesday, August 29, 2017, Nicolas Pitre wrote:
+> On Mon, 28 Aug 2017, Chris Brandt wrote:
+> 
+> > On Friday, August 25, 2017 1, Nicolas Pitre wrote:
+> > > This patch series provides the ability to store the kernel .data
+> > > segment compressed in ROM. It has to be copied to RAM anyway so
+> > > storing it uncompressed is arguably a waste of ROM resources.
+> > >
+> > > While at it, the copying of .data (when not compressed) and the
+> > > clearing of .bss is performed using optimized string routines rather
+> > > than doing it one word at a time. And throw in small linker script
+> > > cleanups for good measure.
+> > >
+> >
+> > I like the idea, but unfortunately it won't build for my RZ/A1
+> > (CONFIG_ARCH_R7S72100=y) XIP system. It's a Cortex-A9 with MMU (meaning
+> > you have to hack the Kconfig because apparently allowing
+> > CONFIG_ARCH_MULTIPLATFORM=y and CONFIG_XIP_KERNEL=y in the same build
+> > is considered a ridiculous thing to do).
+> 
+> If you want XIP, it is likely that your kernel won't have the same
+> physical address across different platforms. It is also likely that the
+> RAM offset will be different across different platforms. And the very
+> nature of XIP means the kernel cannot be be self-modified to adjust
+> those discrepencies like it does in the multiplatform case. And Flash is
+> a precious resource so why would you waste it with platform code that
+> you'll never execute?
 
-These implement Russell's suggestion. An Ack here would be nice. :) I
-can't throw these into the ARM patch tracker because they depend on
-stuff in -next (and the commit that needs to be reverted is in tglx's
-tree).
+It's not really that I plan on running an XIP_KERNEL on multiple 
+different images, it's that if you look at an MMU based system, you have no 
+choice but to build it as a ARCH_MULTIPLATFORM in the current Kconfig 
+structure.
+Of course for my .config, I go in and uncheck every other CPU and driver
+that has nothing to do with my system which is why my XIP KERNEL binary
+is only 4MB which include all static drivers built in.
 
-Regardless, these all test out correctly for me, so:
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Tested-by: Kees Cook <keescook@chromium.org>
 
-In a perfect world, these 4 patches should go together with the other
-address limit check patches in tglx's tree. Thomas (Gleixner), can you
-update your tree for the merge window? At the very least, we need to
-revert 73ac5d6a2b6ac ("arm/syscalls: Check address limit on user-mode
-return"), which has caused infinite loops in some cases. Better to
-take all 4 patches in this series, though.
+> If the Kconfig language could let you confirm that only one platform is
+> selected then the XIP config option could be offered only in that case.
+> Maybe something like:
+> 
+> config PLATFORM_FOO
+> 	bool "blah"
+> 	select MANY_PLATFORMS if ONE_PLATFORM_SELECTED
+> 	select ONE_PLATFORM_SELECTED
+> 
+> config XIP_KERNEL
+> 	bool "blah"
+> 	depends on !MANY_PLATFORMS
 
-Thanks!
 
--Kees
+Yes, that's the argument. But, I've tried many different ways with the 
+current Kconfig system, and submitted many different patches over the 
+last year and a half and not everyone is ever completely happy...so I'm 
+stuck with hacking the 2 lines in the Kconfig.
+But, that's not what this thread is about.
 
--- 
-Kees Cook
-Pixel Security
+
+> But I don't think the above works and that's unfortunate. For having
+> spent some time in the kconfig code a while ago, it shouldn't be hard to
+> implement something like incrementable variables but that's not in my
+> short term plans.
+
+The only way that would seem to make people happy is to make some new 
+'Kconfig type', but that's a bit more involved than just editing some 
+Kconfig files.
+
+
+> >   LD      vmlinux
+> >   SORTEX  vmlinux
+> >   SYSMAP  System.map
+> >   XIPZ    arch/arm/boot/xipImage
+> > data segment doesn't match end of xipImage
+> 
+> OK......... I now know why.
+> 
+> Executive summary: our linker script is a complete mess. In your case
+> that would be partly solved by the patch that Arnd sent on Jul 28th 2017
+> titled "ARM: move __bug_table into .data for XIP_KERNEL". However the
+> XIP linker script is still broken for similar reasons.
+
+Ya, I thought that would happen eventually. The only way I could get 
+agreement to fix existing broken XIP_KERNEL stuff was to split the linker 
+script into XIP and non-XIP. But, trying to follow every vmlinux.lds.S 
+change and checking to see if it is needed for vmlinux-xip.lds.S is a bit 
+daunting.
+
+
+Chris
