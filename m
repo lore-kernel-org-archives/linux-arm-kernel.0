@@ -1,100 +1,230 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Tue, 29 Aug 2017 15:12:38 +0200
-Subject: [RFC PATCH v9 7/7] perf: cavium: Add Documentation
+Date: Tue, 29 Aug 2017 15:12:34 +0200
+Subject: [RFC PATCH v9 3/7] edac,
+ soc: thunderx: Add wrapper for EDAC OCX PCI device
 In-Reply-To: <20170829131238.4988-1-jglauber@cavium.com>
 References: <20170829131238.4988-1-jglauber@cavium.com>
-Message-ID: <20170829131238.4988-8-jglauber@cavium.com>
+Message-ID: <20170829131238.4988-4-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Cavium SoC PMUs.
+Cavium SOCs contain an processor interconnect that is presented as a
+PCI device. This PCI device will be used by an EDAC driver and
+by a PMU driver.
+
+To allow both subsystems to access the device a small wrapper is
+introduced that multi-plexes PCI probe and removal calls of the
+device to the EDAC driver.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- Documentation/perf/cavium-pmu.txt | 75 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/perf/cavium-pmu.txt
+ drivers/edac/Kconfig            |  1 +
+ drivers/edac/thunderx_edac.c    | 42 +++++++-------------------------------
+ drivers/soc/cavium/Kconfig      |  4 ++++
+ drivers/soc/cavium/Makefile     |  1 +
+ drivers/soc/cavium/cavium_ocx.c | 45 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/soc/cavium/ocx.h  |  9 +++++++++
+ 6 files changed, 67 insertions(+), 35 deletions(-)
+ create mode 100644 drivers/soc/cavium/cavium_ocx.c
+ create mode 100644 include/linux/soc/cavium/ocx.h
 
-diff --git a/Documentation/perf/cavium-pmu.txt b/Documentation/perf/cavium-pmu.txt
+diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+index 7330447..8304212 100644
+--- a/drivers/edac/Kconfig
++++ b/drivers/edac/Kconfig
+@@ -373,6 +373,7 @@ config EDAC_THUNDERX
+ 	depends on PCI
+ 	depends on m
+ 	select CAVIUM_LMC
++	select CAVIUM_OCX
+ 	help
+ 	  Support for error detection and correction on the
+ 	  Cavium ThunderX memory controllers (LMC), Cache
+diff --git a/drivers/edac/thunderx_edac.c b/drivers/edac/thunderx_edac.c
+index 16f3d62..ddbda71 100644
+--- a/drivers/edac/thunderx_edac.c
++++ b/drivers/edac/thunderx_edac.c
+@@ -22,6 +22,7 @@
+ #include <linux/bitfield.h>
+ #include <linux/circ_buf.h>
+ #include <linux/soc/cavium/lmc.h>
++#include <linux/soc/cavium/ocx.h>
+ 
+ #include <asm/page.h>
+ 
+@@ -814,8 +815,6 @@ EXPORT_SYMBOL_GPL(thunderx_edac_lmc_remove);
+ 
+ /*---------------------- OCX driver ---------------------------------*/
+ 
+-#define PCI_DEVICE_ID_THUNDER_OCX 0xa013
+-
+ #define OCX_LINK_INTS		3
+ #define OCX_INTS		(OCX_LINK_INTS + 1)
+ #define OCX_RX_LANES		24
+@@ -1311,11 +1310,6 @@ struct debugfs_entry *ocx_dfs_ents[] = {
+ 	&debugfs_com_int,
+ };
+ 
+-static const struct pci_device_id thunderx_ocx_pci_tbl[] = {
+-	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_OCX) },
+-	{ 0, },
+-};
+-
+ static void thunderx_ocx_clearstats(struct thunderx_ocx *ocx)
+ {
+ 	int lane, stat, cfg;
+@@ -1331,8 +1325,8 @@ static void thunderx_ocx_clearstats(struct thunderx_ocx *ocx)
+ 	}
+ }
+ 
+-static int thunderx_ocx_probe(struct pci_dev *pdev,
+-			      const struct pci_device_id *id)
++int thunderx_edac_ocx_probe(struct pci_dev *pdev,
++			    const struct pci_device_id *id)
+ {
+ 	struct thunderx_ocx *ocx;
+ 	struct edac_device_ctl_info *edac_dev;
+@@ -1461,8 +1455,9 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(thunderx_edac_ocx_probe);
+ 
+-static void thunderx_ocx_remove(struct pci_dev *pdev)
++void thunderx_edac_ocx_remove(struct pci_dev *pdev)
+ {
+ 	struct edac_device_ctl_info *edac_dev = pci_get_drvdata(pdev);
+ 	struct thunderx_ocx *ocx = edac_dev->pvt_info;
+@@ -1480,15 +1475,7 @@ static void thunderx_ocx_remove(struct pci_dev *pdev)
+ 	edac_device_del_device(&pdev->dev);
+ 	edac_device_free_ctl_info(edac_dev);
+ }
+-
+-MODULE_DEVICE_TABLE(pci, thunderx_ocx_pci_tbl);
+-
+-static struct pci_driver thunderx_ocx_driver = {
+-	.name     = "thunderx_ocx_edac",
+-	.probe    = thunderx_ocx_probe,
+-	.remove   = thunderx_ocx_remove,
+-	.id_table = thunderx_ocx_pci_tbl,
+-};
++EXPORT_SYMBOL_GPL(thunderx_edac_ocx_remove);
+ 
+ /*---------------------- L2C driver ---------------------------------*/
+ 
+@@ -2104,27 +2091,12 @@ static struct pci_driver thunderx_l2c_driver = {
+ 
+ static int __init thunderx_edac_init(void)
+ {
+-	int rc = 0;
+-
+-	rc = pci_register_driver(&thunderx_ocx_driver);
+-	if (rc)
+-		return rc;
+-
+-	rc = pci_register_driver(&thunderx_l2c_driver);
+-	if (rc)
+-		goto err_ocx;
+-
+-	return rc;
+-err_ocx:
+-	pci_unregister_driver(&thunderx_ocx_driver);
+-
+-	return rc;
++	return pci_register_driver(&thunderx_l2c_driver);
+ }
+ 
+ static void __exit thunderx_edac_exit(void)
+ {
+ 	pci_unregister_driver(&thunderx_l2c_driver);
+-	pci_unregister_driver(&thunderx_ocx_driver);
+ 
+ }
+ 
+diff --git a/drivers/soc/cavium/Kconfig b/drivers/soc/cavium/Kconfig
+index 46ded89..fe56503 100644
+--- a/drivers/soc/cavium/Kconfig
++++ b/drivers/soc/cavium/Kconfig
+@@ -4,3 +4,7 @@
+ config CAVIUM_LMC
+         depends on ARCH_THUNDER
+ 	def_tristate m
++
++config CAVIUM_OCX
++	depends on ARCH_THUNDER
++	def_tristate m
+diff --git a/drivers/soc/cavium/Makefile b/drivers/soc/cavium/Makefile
+index 4ad0c7f..bf7ba25 100644
+--- a/drivers/soc/cavium/Makefile
++++ b/drivers/soc/cavium/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_CAVIUM_LMC) += cavium_lmc.o
++obj-$(CONFIG_CAVIUM_OCX) += cavium_ocx.o
+diff --git a/drivers/soc/cavium/cavium_ocx.c b/drivers/soc/cavium/cavium_ocx.c
 new file mode 100644
-index 0000000..6fbf824
+index 0000000..fa3341b
 --- /dev/null
-+++ b/Documentation/perf/cavium-pmu.txt
-@@ -0,0 +1,75 @@
-+Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
-+==============================================================
++++ b/drivers/soc/cavium/cavium_ocx.c
+@@ -0,0 +1,45 @@
++/*
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ *
++ * Copyright: Cavium, Inc. (C) 2017
++ *
++ */
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/soc/cavium/ocx.h>
 +
-+Cavium SoCs contain various system devices such as L2 caches, processor
-+interconnect and memory controllers. Unfortunately the PMU counters
-+are not following a common design so each device has a slightly different
-+approach how to control and use the PMU counters.
++static int cvm_ocx_probe(struct pci_dev *pdev,
++			 const struct pci_device_id *ent)
++{
++	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
++		thunderx_edac_ocx_probe(pdev, ent);
++	return 0;
++}
 +
-+Common properties of all devices carrying PMU counters:
-+- The devices are PCI devices and the counters are embedded somewhere
-+  in the PCI register space.
-+- All counters are 64 bit wide.
-+- There are no overflow interrupts (unnecessary because of the 64 bit wide
-+  counters).
++static void cvm_ocx_remove(struct pci_dev *pdev)
++{
++	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
++		thunderx_edac_ocx_remove(pdev);
++}
 +
-+Properties depending on the device type:
-+- How to start/stop the counters
-+- Programmable vs. fixed purpose counters
-+- Stoppable vs. always running counters
-+- Independent vs. grouped counters
-+- Read-only vs. writable counters
-+- PCI device to PMU group relationship
++static const struct pci_device_id cvm_ocx_pci_table[] = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa013) },
++	{ 0, },
++};
 +
++MODULE_DEVICE_TABLE(pci, cvm_ocx_pci_table);
 +
-+Devices with PMU counters
-+-------------------------
++static struct pci_driver cvm_ocx_pci_driver = {
++	.name     = "Cavium ThunderX interconnect",
++	.id_table = cvm_ocx_pci_table,
++	.probe    = cvm_ocx_probe,
++	.remove   = cvm_ocx_remove,
++};
 +
-+Memory controller (LMC):
-+- one PCI device per LMC
-+- fixed-purpose counters
-+- always running counters without start/stop/reset control
-+- read-only counters
++module_pci_driver(cvm_ocx_pci_driver);
 +
-+CCPI interface controller (OCX) Transmit link (TLK) counters:
-+- writable counters
-+- only one PCI device exposes multiple TLK units (3 units on T88)
-+- start/stop control per unit
-+- only present on multi-socket systems
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Cavium, Inc.");
++MODULE_DESCRIPTION("PCI driver for Cavium ThunderX interconnect");
+diff --git a/include/linux/soc/cavium/ocx.h b/include/linux/soc/cavium/ocx.h
+new file mode 100644
+index 0000000..29f55b3
+--- /dev/null
++++ b/include/linux/soc/cavium/ocx.h
+@@ -0,0 +1,9 @@
++#ifndef _OCX_H
++#define _OCX_H
 +
-+PMU (perf) driver
-+-----------------
++#include <linux/pci.h>
 +
-+The cavium-pmu driver registers several perf PMU drivers. Each of the perf
-+driver provides description of its available events and configuration options
-+in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
++int thunderx_edac_ocx_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
++void thunderx_edac_ocx_remove(struct pci_dev *pdev);
 +
-+The "format" directory describes format of the config (event ID),
-+The "events" directory shows the names of the events and provides configuration
-+templates for all supported event types that can be used with perf tool. For
-+example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
-+
-+Each perf driver also provides a "cpumask" sysfs attribute, which contains a
-+single CPU ID of the processor which will be used to handle all the PMU events.
-+
-+Example for perf tool use:
-+
-+ / # perf list | grep -e lmc
-+   lmc0/bank_conflict1/                               [Kernel PMU event]
-+   lmc0/bank_conflict2/                               [Kernel PMU event]
-+   lmc0/dclk_cnt/                                     [Kernel PMU event]
-+   lmc0/ifb_cnt/                                      [Kernel PMU event]
-+   lmc0/ops_cnt/                                      [Kernel PMU event]
-+
-+ / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
-+
-+   Performance counter stats for 'system wide':
-+
-+             176,133      lmc0/ops_cnt/                                               
-+         670,243,653      lmc0/dclk_cnt/                                              
-+
-+         1.005479295 seconds time elapsed
-+
-+The driver does not support sampling, therefore "perf record" will
-+not work. System wide mode ("-a") must be used as per-task (without "-a")
-+perf sessions are not supported.
++#endif
 -- 
 2.9.0.rc0.21.g7777322
