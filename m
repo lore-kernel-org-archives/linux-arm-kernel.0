@@ -1,22 +1,73 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 29 Aug 2017 12:51:25 +0800
-Subject: [PATCH RESEND 0/2] Allwinner V3s DMA support
-Message-ID: <20170829045127.19951-1-icenowy@aosc.io>
+Date: Tue, 29 Aug 2017 12:51:26 +0800
+Subject: [PATCH RESEND 1/2] dmaengine: sun6i: make gate bit in sun8i's DMA
+ engines a common quirk
+In-Reply-To: <20170829045127.19951-1-icenowy@aosc.io>
+References: <20170829045127.19951-1-icenowy@aosc.io>
+Message-ID: <20170829045127.19951-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a dedicated patchset of Allwinner V3s DMA support, which used
-to be part of the audio codec support patchset.
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-It's a derivation of the DMA part of v3 of the codec patchset.
+Originally we enable a special gate bit when the compatible indicates
+A23/33.
 
-Icenowy Zheng (2):
-  dmaengine: sun6i: make gate bit in sun8i's DMA engines a common quirk
-  dmaengine: sun6i: support V3s SoC variant
+But according to BSP sources and user manuals, more SoCs will need this
+gate bit.
 
- .../devicetree/bindings/dma/sun6i-dma.txt          |  1 +
- drivers/dma/sun6i-dma.c                            | 33 +++++++++++++++++-----
- 2 files changed, 27 insertions(+), 7 deletions(-)
+So make it a common quirk configured in the config struct.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/dma/sun6i-dma.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index a2358780ab2c..252b59c1d1d5 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -101,6 +101,17 @@ struct sun6i_dma_config {
+ 	u32 nr_max_channels;
+ 	u32 nr_max_requests;
+ 	u32 nr_max_vchans;
++	/*
++	 * In the datasheets/user manuals of newer Allwinner SoCs, a special
++	 * bit (bit 2 at register 0x20) is present.
++	 * It's named "DMA MCLK interface circuit auto gating bit" in the
++	 * documents, and the footnote of this register says that this bit
++	 * should be set up when initializing the DMA controller.
++	 * Allwinner A23/A33 user manuals do not have this bit documented,
++	 * however these SoCs really have and need this bit, as seen in the
++	 * BSP kernel source code.
++	 */
++	bool gate_needed;
+ };
+ 
+ /*
+@@ -1009,6 +1020,7 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 24,
+ 	.nr_max_vchans   = 37,
++	.gate_needed	 = true,
+ };
+ 
+ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+@@ -1174,13 +1186,7 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 		goto err_dma_unregister;
+ 	}
+ 
+-	/*
+-	 * sun8i variant requires us to toggle a dma gating register,
+-	 * as seen in Allwinner's SDK. This register is not documented
+-	 * in the A23 user manual.
+-	 */
+-	if (of_device_is_compatible(pdev->dev.of_node,
+-				    "allwinner,sun8i-a23-dma"))
++	if (sdc->cfg->gate_needed)
+ 		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
+ 
+ 	return 0;
 -- 
 2.13.5
