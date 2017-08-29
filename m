@@ -1,99 +1,123 @@
 From: thgarnie@google.com (Thomas Garnier)
-Date: Tue, 29 Aug 2017 07:31:45 -0700
-Subject: commit 73ac5d6a "arm/syscalls: Check address limit on user-mode
- return" breaks NFS boot on i.MX6 platforms
-In-Reply-To: <20170829162756.14c78897@karo-electronics.de>
-References: <20170829162756.14c78897@karo-electronics.de>
-Message-ID: <CAJcbSZEZyhrfe_86r4YN7mjhagC=O2k08W5rbjhhT4bED5SD1g@mail.gmail.com>
+Date: Tue, 29 Aug 2017 07:32:39 -0700
+Subject: [PATCH v3 3/4] arm/syscalls: Optimize address limit check
+In-Reply-To: <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
+References: <20170814213732.104301-1-thgarnie@google.com>
+ <20170814213732.104301-3-thgarnie@google.com>
+ <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
+Message-ID: <CAJcbSZEd10fMp6OSgSYv_Wmt=wX5fw_Gu-_N=fM_QmP==wUMew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 7:27 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+On Tue, Aug 22, 2017 at 9:42 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> On Mon, Aug 14, 2017 at 2:37 PM, Thomas Garnier <thgarnie@google.com> wrote:
+>> Disable the generic address limit check in favor of an architecture
+>> specific optimized implementation. The generic implementation using
+>> pending work flags did not work well with ARM and alignment faults.
+>>
+>> The address limit is checked on each syscall return path to user-mode
+>> path as well as the irq user-mode return function. If the address limit
+>> was changed, a function is called to report data corruption (stopping
+>> the kernel or process based on configuration).
+>>
+>> The address limit check has to be done before any pending work because
+>> they can reset the address limit and the process is killed using a
+>> SIGKILL signal. For example the lkdtm address limit check does not work
+>> because the signal to kill the process will reset the user-mode address
+>> limit.
+>>
+>> Signed-off-by: Thomas Garnier <thgarnie@google.com>
 >
-> Hi,
->
-> I found that I cannot boot a 4.13-rc7 (next-20170829) kernel on a TX6Q
-> module. With NFS root the kernel works well until it starts the init
-> process and then is busy making NFS calls over the network, but doesn't
-> seem to proceed any further. It reacts to sysrq triggers.
+> Any feedback?
 
-We got report of a similar bugs few weeks ago. I have a change queued
-waiting for Russel approval. I will CC you to this thread.
+CCing LW at karo-electronics.de who experienced the same issue this patch
+proposal fix.
+
+Russel: Any feedback?
 
 >
-> I bisected it down to commit 73ac5d6a ("arm/syscalls: Check address
-> limit on user-mode return").
-> When reverting this commit on top of next-20170829 everything works
-> well again, though there is a deadlock reported by lockdep:
+>> ---
+>>  arch/arm/kernel/entry-common.S | 11 +++++++++++
+>>  arch/arm/kernel/signal.c       |  7 +++++++
+>>  2 files changed, 18 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+>> index 0b60adf4a5d9..99c908226065 100644
+>> --- a/arch/arm/kernel/entry-common.S
+>> +++ b/arch/arm/kernel/entry-common.S
+>> @@ -12,6 +12,7 @@
+>>  #include <asm/unistd.h>
+>>  #include <asm/ftrace.h>
+>>  #include <asm/unwind.h>
+>> +#include <asm/memory.h>
+>>  #ifdef CONFIG_AEABI
+>>  #include <asm/unistd-oabi.h>
+>>  #endif
+>> @@ -48,10 +49,14 @@ ret_fast_syscall:
+>>   UNWIND(.fnstart       )
+>>   UNWIND(.cantunwind    )
+>>         disable_irq_notrace                     @ disable interrupts
+>> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+>> +       cmp     r2, #TASK_SIZE
+>> +       blne    addr_limit_check_failed
+>>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>>         bne     fast_work_pending
+>>
+>> +
+>>         /* perform architecture specific actions before user return */
+>>         arch_ret_to_user r1, lr
+>>
+>> @@ -74,6 +79,9 @@ ret_fast_syscall:
+>>   UNWIND(.cantunwind    )
+>>         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
+>>         disable_irq_notrace                     @ disable interrupts
+>> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+>> +       cmp     r2, #TASK_SIZE
+>> +       blne    addr_limit_check_failed
+>>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>>         beq     no_work_pending
+>> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
+>>  ret_slow_syscall:
+>>         disable_irq_notrace                     @ disable interrupts
+>>  ENTRY(ret_to_user_from_irq)
+>> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+>> +       cmp     r2, #TASK_SIZE
+>> +       blne    addr_limit_check_failed
+>>         ldr     r1, [tsk, #TI_FLAGS]
+>>         tst     r1, #_TIF_WORK_MASK
+>>         bne     slow_work_pending
+>> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+>> index 5814298ef0b7..b67ae12503f3 100644
+>> --- a/arch/arm/kernel/signal.c
+>> +++ b/arch/arm/kernel/signal.c
+>> @@ -14,6 +14,7 @@
+>>  #include <linux/uaccess.h>
+>>  #include <linux/tracehook.h>
+>>  #include <linux/uprobes.h>
+>> +#include <linux/syscalls.h>
+>>
+>>  #include <asm/elf.h>
+>>  #include <asm/cacheflush.h>
+>> @@ -673,3 +674,9 @@ struct page *get_signal_page(void)
+>>
+>>         return page;
+>>  }
+>> +
+>> +/* Defer to generic check */
+>> +asmlinkage void addr_limit_check_failed(void)
+>> +{
+>> +       addr_limit_user_check();
+>> +}
+>> --
+>> 2.14.1.480.gb18f417b89-goog
+>>
 >
-> ======================================================
-> WARNING: possible circular locking dependency detected
-> 4.13.0-rc7-next-20170829-karo-00001-ge6888ab #46 Not tainted
-> ------------------------------------------------------
-> kworker/0:1H/1035 is trying to acquire lock:
->  ((&task->u.tk_work)){+.+.}, at: [<80136264>] process_one_work+0x128/0x42c
->
-> but task is already holding lock:
->  ("xprtiod"){+.+.}, at: [<80136264>] process_one_work+0x128/0x42c
->
-> which lock already depends on the new lock.
 >
 >
-> the existing dependency chain (in reverse order) is:
->
-> -> #1 ("xprtiod"){+.+.}:
->        flush_work+0x1b0/0x248
->        __cancel_work_timer+0x108/0x1e0
->        xs_destroy+0x34/0x50
->        __rpc_execute+0x94/0x26c
->        process_one_work+0x1a4/0x42c
->        worker_thread+0x38/0x4d4
->        kthread+0x138/0x170
->        ret_from_fork+0x14/0x24
->
-> -> #0 ((&task->u.tk_work)){+.+.}:
->        lock_acquire+0x70/0x90
->        process_one_work+0x18c/0x42c
->        worker_thread+0x38/0x4d4
->        kthread+0x138/0x170
->        ret_from_fork+0x14/0x24
->
-> other info that might help us debug this:
->
->  Possible unsafe locking scenario:
->
->        CPU0                    CPU1
->        ----                    ----
->   lock("xprtiod");
->                                lock((&task->u.tk_work));
->                                lock("xprtiod");
->   lock((&task->u.tk_work));
->
->  *** DEADLOCK ***
->
-> 1 lock held by kworker/0:1H/1035:
->  #0:  ("xprtiod"){+.+.}, at: [<80136264>] process_one_work+0x128/0x42c
->
-> stack backtrace:
-> CPU: 0 PID: 1035 Comm: kworker/0:1H Not tainted 4.13.0-rc7-next-20170829-karo-00001-ge6888ab #46
-> Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-> Workqueue: xprtiod rpc_async_schedule
-> [<801100cc>] (unwind_backtrace) from [<8010bcb8>] (show_stack+0x10/0x14)
-> [<8010bcb8>] (show_stack) from [<80739af4>] (dump_stack+0xb8/0xe4)
-> [<80739af4>] (dump_stack) from [<80161108>] (print_circular_bug+0x258/0x414)
-> [<80161108>] (print_circular_bug) from [<80162330>] (check_prev_add+0x44c/0x910)
-> [<80162330>] (check_prev_add) from [<801653ac>] (__lock_acquire+0x1488/0x15ec)
-> [<801653ac>] (__lock_acquire) from [<80165d60>] (lock_acquire+0x70/0x90)
-> [<80165d60>] (lock_acquire) from [<801362c8>] (process_one_work+0x18c/0x42c)
-> [<801362c8>] (process_one_work) from [<801365a0>] (worker_thread+0x38/0x4d4)
-> [<801365a0>] (worker_thread) from [<8013c8b4>] (kthread+0x138/0x170)
-> [<8013c8b4>] (kthread) from [<80107b30>] (ret_from_fork+0x14/0x24)
-> Executing /sbin/init
->
->
->
-> Lothar Wa?mann
-
+> --
+> Thomas
 
 
 
