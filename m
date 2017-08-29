@@ -1,34 +1,54 @@
-From: liwei213@huawei.com (Li Wei)
-Date: Tue, 29 Aug 2017 16:41:15 +0800
-Subject: [PATCH v3 4/5] arm64: defconfig: enable configs for Hisilicon ufs
-In-Reply-To: <20170829084116.106695-1-liwei213@huawei.com>
-References: <20170829084116.106695-1-liwei213@huawei.com>
-Message-ID: <20170829084116.106695-5-liwei213@huawei.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 29 Aug 2017 11:04:43 +0200
+Subject: [Bug] ARM: cpuidle: possible memleak
+In-Reply-To: <299133306.50715.1503747980116@email.1und1.de>
+References: <1980049531.494543.1502543973258@email.1und1.de>
+ <20170813035040.GA13637@leoy-linaro>
+ <37728512.316309.1502619006183@email.1und1.de>
+ <299133306.50715.1503747980116@email.1und1.de>
+Message-ID: <7a5e668d-61dc-90f2-deae-36ef3398af07@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enable configs for Hisilicon Hixxxx UFS driver.
+On 26/08/2017 13:46, Stefan Wahren wrote:
 
-Signed-off-by: Li Wei <liwei213@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+[ ... ]
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index b4ca115b3be1..7514ecf08f2a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -164,6 +164,9 @@ CONFIG_EEPROM_AT25=m
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_SAS_ATA=y
- CONFIG_SCSI_HISI_SAS=y
-+CONFIG_SCSI_UFSHCD=y
-+CONFIG_SCSI_UFSHCD_PLATFORM=y
-+CONFIG_SCSI_UFS_HISI=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
+>> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+>> index 7080c38..827ab25 100644
+>> --- a/drivers/cpuidle/cpuidle-arm.c
+>> +++ b/drivers/cpuidle/cpuidle-arm.c
+>> @@ -104,12 +104,14 @@ static int __init arm_idle_init(void)
+>>  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
+>>  		if (ret <= 0) {
+>>  			ret = ret ? : -ENODEV;
+>> +			kfree(drv);
+>>  			goto out_fail;
+>>  		}
+>>  
+>>  		ret = cpuidle_register_driver(drv);
+>>  		if (ret) {
+>>  			pr_err("Failed to register cpuidle driver\n");
+>> +			kfree(drv);
+>>  			goto out_fail;
+>>  		}
+
+I would prefer if you create another label on top of out_fail to free
+'drv' and 'dev'. So you can remove the kfree in this loop (also take the
+opportunity to remove the pr_err("Failed to allocate cpuidle device")
+message.
+
+> should i split this patch (fix for "my" memleak and cleanup fix)?
+
+Yes, please.
+
+Thanks.
+
+  -- Daniel
+
 -- 
-2.11.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
