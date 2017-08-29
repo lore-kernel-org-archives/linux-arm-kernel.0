@@ -1,51 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 29 Aug 2017 09:15:30 +0100
-Subject: ARM64 kernel Image size limitations?
-In-Reply-To: <de4d0ebc-c522-eb80-0052-3ea13ce4b750@gmail.com>
-References: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
- <CAKv+Gu-b1+dZaw=Sbnqd3NnpZ4G7Q5Gog7o=3Wucn69neChyNA@mail.gmail.com>
- <de4d0ebc-c522-eb80-0052-3ea13ce4b750@gmail.com>
-Message-ID: <CAKv+Gu8iBDYpP4Zzq+2Q7cm=kgZpMcGnXNUwyti__TUv+MR=zg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 29 Aug 2017 13:52:51 +0530
+Subject: [PATCH] ARM: dts: da850-evm: add serial and ethernet aliases
+Message-ID: <1dd5c92749644601bc23ebd4fb92c5fb30b51d20.1503994832.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2017 at 22:24, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> (fixed Will's address, apologies)
->
-> On 08/28/2017 01:01 PM, Ard Biesheuvel wrote:
->> Hi,
->>
->> On 28 August 2017 at 20:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> Hi,
->>>
->>> I have been fighting with a reasonably large kernel Image: 46MB and
->>> found unable to boot it. This is on v4.13-rc6, but I could go back as
->>> far as v4.9~ish. It is so big, because it's got some debugging enabled,
->>> and the initramfs compression is disabled, but still that ought to be
->>> possible.
->>>
->>> After some experimentation I found that the breaking size is somewhere
->>> around 33MB total for arch/arm64/boot/Image and when that happens, I get
->>> the following backtrace which suggests that there is some memory
->>> corruption of some kind (or so it seems to me), other experiments
->>> indicated that the backtrace may point back to where the bootloader had
->>> set up its exception vector. I am fairly confident that the bootloader
->>> is not responsible for corrupting the Image that is loaded.
->>>
->>> Is there such a size limitation or am I possibly tripping over something
->>> else?
->>>
->>
->> What boot environment are you using? Is it possible the DTB is copied
->> on top of the kernel by the boot loader?
->
-> Bootloader is BOLT (Broadcom's own implementation, has PSCI and is
-> capable of doing FDT live patching), and yes the DTB is provided by the
-> bootloader at an address higher than the kernel.
->
-> Physical offset of the RAM on this platform is 0, so the load is going
-> to be at PA 0x80000, 0x80000 + size (35MB) = 0x2280000, DTB is placed at
-> 0x771f000 and is 0x90ef bytes.
->
+Add aliases for serial and ethernet nodes. Serial
+aliases help keep order of tty nodes fixed and
+ethernet alias is used by bootloader to setup mac
+address correctly.
 
-Could you try to dump __log_buf from gdb?
+Reported-by: Adam Ford <aford173@gmail.com>
+Fixes: dd7deaf218bf ("ARM: davinci: da850: add DT node for ethernet")
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/boot/dts/da850-evm.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 67e72bc72e80..c75507922f7d 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -15,6 +15,13 @@
+ 	compatible = "ti,da850-evm", "ti,da850";
+ 	model = "DA850/AM1808/OMAP-L138 EVM";
+ 
++	aliases {
++		serial0 = &serial0;
++		serial1 = &serial1;
++		serial2 = &serial2;
++		ethernet0 = &eth0;
++	};
++
+ 	soc at 1c00000 {
+ 		pmx_core: pinmux at 14120 {
+ 			status = "okay";
+-- 
+2.9.0
