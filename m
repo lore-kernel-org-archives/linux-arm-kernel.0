@@ -1,50 +1,30 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 29 Aug 2017 11:04:43 +0200
-Subject: [Bug] ARM: cpuidle: possible memleak
-In-Reply-To: <299133306.50715.1503747980116@email.1und1.de>
-References: <1980049531.494543.1502543973258@email.1und1.de>
- <20170813035040.GA13637@leoy-linaro>
- <37728512.316309.1502619006183@email.1und1.de>
- <299133306.50715.1503747980116@email.1und1.de>
-Message-ID: <7a5e668d-61dc-90f2-deae-36ef3398af07@linaro.org>
+Date: Tue, 29 Aug 2017 11:14:11 +0200
+Subject: [PATCH] clocksource: Delete an error message for a failed memory
+ allocation in bcm2835_timer_init()
+In-Reply-To: <1907fa5f-e1c3-a2dd-99e0-f06150086351@users.sourceforge.net>
+References: <1907fa5f-e1c3-a2dd-99e0-f06150086351@users.sourceforge.net>
+Message-ID: <a292aac5-b98e-6f84-8ef4-e9a00c582ba8@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/2017 13:46, Stefan Wahren wrote:
+On 27/08/2017 21:46, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 27 Aug 2017 21:38:13 +0200
+> 
+> Omit an extra message for a memory allocation failure in this function.
+> 
+> This issue was detected by using the Coccinelle software.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
 
-[ ... ]
-
->> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->> index 7080c38..827ab25 100644
->> --- a/drivers/cpuidle/cpuidle-arm.c
->> +++ b/drivers/cpuidle/cpuidle-arm.c
->> @@ -104,12 +104,14 @@ static int __init arm_idle_init(void)
->>  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
->>  		if (ret <= 0) {
->>  			ret = ret ? : -ENODEV;
->> +			kfree(drv);
->>  			goto out_fail;
->>  		}
->>  
->>  		ret = cpuidle_register_driver(drv);
->>  		if (ret) {
->>  			pr_err("Failed to register cpuidle driver\n");
->> +			kfree(drv);
->>  			goto out_fail;
->>  		}
-
-I would prefer if you create another label on top of out_fail to free
-'drv' and 'dev'. So you can remove the kfree in this loop (also take the
-opportunity to remove the pr_err("Failed to allocate cpuidle device")
-message.
-
-> should i split this patch (fix for "my" memleak and cleanup fix)?
-
-Yes, please.
+I have applied it.
 
 Thanks.
 
   -- Daniel
+
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
