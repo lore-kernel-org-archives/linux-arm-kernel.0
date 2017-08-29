@@ -1,90 +1,63 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 29 Aug 2017 14:53:22 -0500
-Subject: [PATCH V13 1/4] PCI: Don't ignore valid response before CRS
- timeout
-In-Reply-To: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
-References: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170829195322.GB2304@bhelgaas-glaptop.roam.corp.google.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 29 Aug 2017 12:54:43 -0700
+Subject: [PATCH v3 3/4] arm/syscalls: Optimize address limit check
+In-Reply-To: <CAJcbSZEd10fMp6OSgSYv_Wmt=wX5fw_Gu-_N=fM_QmP==wUMew@mail.gmail.com>
+References: <20170814213732.104301-1-thgarnie@google.com>
+ <20170814213732.104301-3-thgarnie@google.com>
+ <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
+ <CAJcbSZEd10fMp6OSgSYv_Wmt=wX5fw_Gu-_N=fM_QmP==wUMew@mail.gmail.com>
+Message-ID: <CAGXu5jKuk9589qap=74kPtefm=xKY0ORDH37W_3iZPd_7yc8VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 27, 2017 at 01:40:48PM -0400, Sinan Kaya wrote:
-> From: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> While waiting for a device to become ready (i.e., to return a non-CRS
-> completion to a read of its Vendor ID), if we got a valid response to the
-> very last read before timing out, we printed a warning and gave up on the
-> device even though it was actually ready.
-> 
-> For a typical 60s timeout, we wait about 65s (it's not exact because of the
-> exponential backoff), but we treated devices that became ready between 33s
-> and 65s as though they failed.
-> 
-> Move the Device ID read later so we check whether the device is ready
-> immediately, before checking for a timeout.
-> 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> [okaya: reorder reads so that we check device presence after sleep]
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+On Tue, Aug 29, 2017 at 7:32 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> On Tue, Aug 22, 2017 at 9:42 AM, Thomas Garnier <thgarnie@google.com> wrote:
+>> On Mon, Aug 14, 2017 at 2:37 PM, Thomas Garnier <thgarnie@google.com> wrote:
+>>> Disable the generic address limit check in favor of an architecture
+>>> specific optimized implementation. The generic implementation using
+>>> pending work flags did not work well with ARM and alignment faults.
+>>>
+>>> The address limit is checked on each syscall return path to user-mode
+>>> path as well as the irq user-mode return function. If the address limit
+>>> was changed, a function is called to report data corruption (stopping
+>>> the kernel or process based on configuration).
+>>>
+>>> The address limit check has to be done before any pending work because
+>>> they can reset the address limit and the process is killed using a
+>>> SIGKILL signal. For example the lkdtm address limit check does not work
+>>> because the signal to kill the process will reset the user-mode address
+>>> limit.
+>>>
+>>> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+>>
+>> Any feedback?
+>
+> CCing LW at karo-electronics.de who experienced the same issue this patch
+> proposal fix.
+>
+> Russell: Any feedback?
 
-Applied this series to pci/enumeration for v4.14.  You didn't include a
-cover letter, but the series includes:
+These implement Russell's suggestion. An Ack here would be nice. :) I
+can't throw these into the ARM patch tracker because they depend on
+stuff in -next (and the commit that needs to be reverted is in tglx's
+tree).
 
-  [V13 1/4] PCI: Don't ignore valid response before CRS timeout
-  [V13 2/4] PCI: Factor out pci_bus_wait_crs()
-  [V13 3/4] PCI: Handle CRS ('device not ready') returned by device af
-  [V13 4/4] PCI: Warn periodically while waiting for device to become
+Regardless, these all test out correctly for me, so:
 
-I made some changes:
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Tested-by: Kees Cook <keescook@chromium.org>
 
-  - Renamed pci_bus_crs_visibility_pending() to pci_bus_crs_vendor_id()
-    because the CRS completion is not "pending".  It is not waiting
-    somewhere for us to do something about it.  The CRS completion has
-    already occurred and is over.  All we have now is a magic Vendor ID
-    value that tells us that it happened.
+In a perfect world, these 4 patches should go together with the other
+address limit check patches in tglx's tree. Thomas (Gleixner), can you
+update your tree for the merge window? At the very least, we need to
+revert 73ac5d6a2b6ac ("arm/syscalls: Check address limit on user-mode
+return"), which has caused infinite loops in some cases. Better to
+take all 4 patches in this series, though.
 
-  - Split addition of pci_bus_crs_vendor_id() to a separate patch, move
-    it to probe.c, and make it static.
+Thanks!
 
-  - Pass a pointer, not a value, to pci_bus_wait_crs() so the caller gets
-    correct Vendor ID when we're finished waiting.
+-Kees
 
-  - Add in the 100ms mandatory sleep in the delays we print in
-    pci_flr_wait() so the printed value reflects the entire time since the
-    FLR was started.
-
-> ---
->  drivers/pci/probe.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index c31310d..2849e0e 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1847,17 +1847,18 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
->  		if (!crs_timeout)
->  			return false;
->  
-> -		msleep(delay);
-> -		delay *= 2;
-> -		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-> -			return false;
-> -		/* Card hasn't responded in 60 seconds?  Must be stuck. */
->  		if (delay > crs_timeout) {
->  			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
->  			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
->  			       PCI_FUNC(devfn));
->  			return false;
->  		}
-> +
-> +		msleep(delay);
-> +		delay *= 2;
-> +
-> +		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-> +			return false;
->  	}
->  
->  	return true;
-> -- 
-> 1.9.1
-> 
+-- 
+Kees Cook
+Pixel Security
