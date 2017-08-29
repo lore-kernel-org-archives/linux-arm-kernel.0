@@ -1,25 +1,26 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 Aug 2017 17:52:42 -0400 (EDT)
-Subject: [PATCH 0/3] make XIP kernel .data compressed in ROM
-In-Reply-To: <20170829215048.GI20805@n2100.armlinux.org.uk>
-References: <20170825162600.15709-1-nicolas.pitre@linaro.org>
- <SG2PR06MB1165EDDA573890B891E542CB8A9E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1708281520380.2606@knanqh.ubzr>
- <20170829215048.GI20805@n2100.armlinux.org.uk>
-Message-ID: <nycvar.YSQ.7.76.1708291751410.2606@knanqh.ubzr>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 29 Aug 2017 17:19:54 -0500
+Subject: [PATCHv2 0/2] PCI: add ls2088a and ls1088a support
+In-Reply-To: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
+References: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
+Message-ID: <20170829221954.GT8154@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Aug 2017, Russell King - ARM Linux wrote:
+[+cc Minghuan, Mingkai, Roy]
 
-> On Tue, Aug 29, 2017 at 03:07:09PM -0400, Nicolas Pitre wrote:
-> > @Arnd: please don't send that patch upstream. I have a better fix for 
-> > it now.
+On Fri, Aug 04, 2017 at 02:41:32PM +0800, Zhiqiang Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> It's not really up to Arnd to send it to Linus, it's something that
-> should come through me...
+> Hou Zhiqiang (2):
+>   PCI: layerscape: Add support for ls2088a
+>   PCI: layerscape: Add support for ls1088a
+> 
+>  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  2 ++
+>  drivers/pci/dwc/pci-layerscape.c                         | 10 ++++++++++
+>  2 files changed, 12 insertions(+)
 
-By upstream I did mean you.
+These still apply cleanly, but I haven't seen an ack from the driver
+maintainers.
 
-
-Nicolas
+Bjorn
