@@ -1,131 +1,84 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Mon, 28 Aug 2017 22:02:22 -0400
-Subject: [PATCH v7 11/11] mm: stop zeroing memory during allocation in vmemmap
+Date: Mon, 28 Aug 2017 22:02:13 -0400
+Subject: [PATCH v7 02/11] sparc64/mm: setting fields in deferred pages
 In-Reply-To: <1503972142-289376-1-git-send-email-pasha.tatashin@oracle.com>
 References: <1503972142-289376-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1503972142-289376-12-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1503972142-289376-3-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vmemmap_alloc_block() will no longer zero the block, so zero memory
-at its call sites for everything except struct pages.  Struct page memory
-is zero'd by struct page initialization.
+Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
+flags and other fields in "struct page"es are never changed prior to first
+initializing struct pages by going through __init_single_page().
 
-Replace allocators in sprase-vmemmap to use the non-zeroing version. So,
-we will get the performance improvement by zeroing the memory in parallel
-when struct pages are zeroed.
+With deferred struct page feature enabled there is a case where we set some
+fields prior to initializing:
+
+mem_init() {
+     register_page_bootmem_info();
+     free_all_bootmem();
+     ...
+}
+
+When register_page_bootmem_info() is called only non-deferred struct pages
+are initialized. But, this function goes through some reserved pages which
+might be part of the deferred, and thus are not yet initialized.
+
+mem_init
+register_page_bootmem_info
+register_page_bootmem_info_node
+ get_page_bootmem
+  .. setting fields here ..
+  such as: page->freelist = (void *)type;
+
+free_all_bootmem()
+free_low_memory_core_early()
+ for_each_reserved_mem_region()
+  reserve_bootmem_region()
+   init_reserved_page() <- Only if this is deferred reserved page
+    __init_single_pfn()
+     __init_single_page()
+      memset(0) <-- Loose the set fields here
+
+We end-up with similar issue as in the previous patch, where currently we
+do not observe problem as memory is zeroed. But, if flag asserts are
+changed we can start hitting issues.
+
+Also, because in this patch series we will stop zeroing struct page memory
+during allocation, we must make sure that struct pages are properly
+initialized prior to using them.
+
+The deferred-reserved pages are initialized in free_all_bootmem().
+Therefore, the fix is to switch the above calls.
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
 Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
- include/linux/mm.h  | 11 +++++++++++
- mm/sparse-vmemmap.c | 14 +++++++-------
- mm/sparse.c         |  6 +++---
- 3 files changed, 21 insertions(+), 10 deletions(-)
+ arch/sparc/mm/init_64.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index 0a440ff8f226..fba540aef1da 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -2456,6 +2456,17 @@ static inline void *vmemmap_alloc_block_buf(unsigned long size, int node)
- 	return __vmemmap_alloc_block_buf(size, node, NULL);
- }
+diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
+index b3020a956b87..12dbba85a2e2 100644
+--- a/arch/sparc/mm/init_64.c
++++ b/arch/sparc/mm/init_64.c
+@@ -2508,9 +2508,15 @@ void __init mem_init(void)
+ {
+ 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
  
-+static inline void *vmemmap_alloc_block_zero(unsigned long size, int node)
-+{
-+	void *p = vmemmap_alloc_block(size, node);
+-	register_page_bootmem_info();
+ 	free_all_bootmem();
+ 
++	/* Must be done after boot memory is put on freelist, because here we
++	 * might set fields in deferred struct pages that have not yet been
++	 * initialized, and free_all_bootmem() initializes all the reserved
++	 * deferred pages for us.
++	 */
++	register_page_bootmem_info();
 +
-+	if (!p)
-+		return NULL;
-+	memset(p, 0, size);
-+
-+	return p;
-+}
-+
- void vmemmap_verify(pte_t *, int, unsigned long, unsigned long);
- int vmemmap_populate_basepages(unsigned long start, unsigned long end,
- 			       int node);
-diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
-index c50b1a14d55e..423d4da85a91 100644
---- a/mm/sparse-vmemmap.c
-+++ b/mm/sparse-vmemmap.c
-@@ -41,7 +41,7 @@ static void * __ref __earlyonly_bootmem_alloc(int node,
- 				unsigned long align,
- 				unsigned long goal)
- {
--	return memblock_virt_alloc_try_nid(size, align, goal,
-+	return memblock_virt_alloc_try_nid_raw(size, align, goal,
- 					    BOOTMEM_ALLOC_ACCESSIBLE, node);
- }
- 
-@@ -56,11 +56,11 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
- 
- 		if (node_state(node, N_HIGH_MEMORY))
- 			page = alloc_pages_node(
--				node, GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
-+				node, GFP_KERNEL | __GFP_RETRY_MAYFAIL,
- 				get_order(size));
- 		else
- 			page = alloc_pages(
--				GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
-+				GFP_KERNEL | __GFP_RETRY_MAYFAIL,
- 				get_order(size));
- 		if (page)
- 			return page_address(page);
-@@ -188,7 +188,7 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
- {
- 	pmd_t *pmd = pmd_offset(pud, addr);
- 	if (pmd_none(*pmd)) {
--		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-+		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
- 		pmd_populate_kernel(&init_mm, pmd, p);
-@@ -200,7 +200,7 @@ pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
- {
- 	pud_t *pud = pud_offset(p4d, addr);
- 	if (pud_none(*pud)) {
--		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-+		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
- 		pud_populate(&init_mm, pud, p);
-@@ -212,7 +212,7 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
- {
- 	p4d_t *p4d = p4d_offset(pgd, addr);
- 	if (p4d_none(*p4d)) {
--		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-+		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
- 		p4d_populate(&init_mm, p4d, p);
-@@ -224,7 +224,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
- {
- 	pgd_t *pgd = pgd_offset_k(addr);
- 	if (pgd_none(*pgd)) {
--		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-+		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
- 		pgd_populate(&init_mm, pgd, p);
-diff --git a/mm/sparse.c b/mm/sparse.c
-index 7b4be3fd5cac..0e315766ad11 100644
---- a/mm/sparse.c
-+++ b/mm/sparse.c
-@@ -441,9 +441,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
- 	}
- 
- 	size = PAGE_ALIGN(size);
--	map = memblock_virt_alloc_try_nid(size * map_count,
--					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
--					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
-+	map = memblock_virt_alloc_try_nid_raw(size * map_count,
-+					      PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
-+					      BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
- 	if (map) {
- 		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
- 			if (!present_section_nr(pnum))
+ 	/*
+ 	 * Set up the zero page, mark it reserved, so that page count
+ 	 * is not manipulated when freeing the page from user ptes.
 -- 
 2.14.1
