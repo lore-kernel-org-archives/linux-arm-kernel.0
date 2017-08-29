@@ -1,43 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Aug 2017 11:01:12 +0100
-Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
-In-Reply-To: <20170824173049.GG29665@leverpostej>
-References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-15-takahiro.akashi@linaro.org>
- <20170824173049.GG29665@leverpostej>
-Message-ID: <20170829100112.GC2901@leverpostej>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Aug 2017 12:02:41 +0200
+Subject: [PATCH V3 2/8] drivers: boot_constraint: Add
+ boot_constraints_disable kernel parameter
+In-Reply-To: <20170829063734.GC12198@kroah.com>
+References: <cover.1501578037.git.viresh.kumar@linaro.org>
+ <4bec0c3e58f76e06e5305c5ddbab859e2a87935e.1501578037.git.viresh.kumar@linaro.org>
+ <20170829063734.GC12198@kroah.com>
+Message-ID: <20170829100241.GB3101@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 06:30:50PM +0100, Mark Rutland wrote:
-> On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
-> > The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
-> > will be loaded at the offset of TEXT_OFFSET from the begining of system
-> > memory. The other PT_LOAD segments are placed relative to the first one.
+On 29-08-17, 08:37, Greg Kroah-Hartman wrote:
+> On Tue, Aug 01, 2017 at 02:53:43PM +0530, Viresh Kumar wrote:
+> > +	boot_constraints_disable
+> > +			Do not set any boot constraints for devices.
 > 
-> I really don't like assuming things about the vmlinux ELF file.
-> 
-> > Regarding kernel verification, since there is no standard way to contain
-> > a signature within elf binary, we follow PowerPC's (not yet upstreamed)
-> > approach, that is, appending a signature right after the kernel binary
-> > itself like module signing.
-> 
-> I also *really* don't like this. It's a bizarre in-band mechanism,
-> without explcit information. It's not a nice ABI.
-> 
-> If we can load an Image, why do we need to be able to load a vmlinux?
+> Shouldn't that be the default?  As really, that is what the situation is
+> today, why force everyone to always enable the disable value?  And
+> enabling a value to disable something is usually a sign of bad naming...
 
-So IIUC, the whole point of this is to be able to kexec_file_load() a
-vmlinux + signature bundle, for !CONFIG_EFI kernels.
+I will explain once again how it is getting used and then will do whatever you
+suggest.
 
-For that, I think that we actually need a new kexec_file_load${N}
-syscall, where we can pass the signature for the kernel as a separate
-file. Ideally also with a flags argument and perhaps the ability to sign
-the initrd too.
+- Platforms that don't need boot constraints should not enable the CONFIG in the
+  first place. Though we use the same kernel image on multiple hardware types
+  many times.
+- If a platform doesn't have a platform-specific driver that adds constraints at
+  boot, then the boot constraint core wouldn't get into picture at all and it is
+  as good as being disabled.
+- And the above boot-argument (boot_constraints_disable) is used ONLY in the
+  case where the platform driver is adding boot constraints at runtime.
 
-That way we don't ahve to come up with a magic vmlinux+signature format,
-as we can just pass a regular image and a signature for that image
-separately. That should work for PPC and others, too.
+So, the boot-constraints are disabled by default for everyone even if the
+configuration is enabled. And that's why I named it the way it is right now.
 
-Thanks,
-Mark.
+Do you still feel that it needs to be renamed? 
+
+-- 
+viresh
