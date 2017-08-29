@@ -1,123 +1,61 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Tue, 29 Aug 2017 17:26:00 +0800
-Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
- implementation defined pmu core events
-In-Reply-To: <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
-Message-ID: <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 29 Aug 2017 09:32:40 +0000
+Subject: [PATCH 1/1] ARM: imx7ulp: add cpuidle support
+In-Reply-To: <b8d1f428-a4f5-5a02-8aa4-379b5c85e8d7@linaro.org>
+References: <1503841421-17677-1-git-send-email-aisheng.dong@nxp.com>
+ <b8d1f428-a4f5-5a02-8aa4-379b5c85e8d7@linaro.org>
+Message-ID: <AM3PR04MB30646BD7272372A182F22DA809F0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Ganapat,
-
-On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
-> This is not a full event list, but a short list of useful events.
+> -----Original Message-----
+> From: Daniel Lezcano [mailto:daniel.lezcano at linaro.org]
+> Sent: Tuesday, August 29, 2017 4:30 PM
+> To: A.s. Dong; linux-pm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; rjw at rjwysocki.net;
+> shawnguo at kernel.org; Anson Huang
+> Subject: Re: [PATCH 1/1] ARM: imx7ulp: add cpuidle support
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->  2 files changed, 77 insertions(+)
->  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> On 27/08/2017 15:43, Dong Aisheng wrote:
+> > i.MX7ULP support 3 levels idle as below:
+> > 1. patial stop mode 3;
+> > 2. patial stop mode 2;
+> > 3. patial stop mode 1.
+> >
+> > PSTOP1 - Partial Stop with system and bus clock disabled
+> > PSTOP2 - Partial Stop with system clock disabled and bus clock enabled
+> > PSTOP3 - Partial Stop with system clock enabled and bus clock enabled
+> >
+> > For PSTOP 1/2 mode, as the system and bus clock will be disabled, the
+> > devices working inprogress may not be able to work anymore, driver
+> > needs to use pm_qos API to prevent system enter those modes.
+> >
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> 
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> Will you consider in the future to move the driver to a DT based
+> description and to the cpuidle-arm driver ?
 > 
 
-I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
-that would use vendor sub-folder?
-Of course, appreciate maintainer's comments.
+Thanks for the suggestion.
+I will investigate it later when I'm free.
 
-Thanks,
-Shaokun
+Shawn,
+This is based on the former imx7ulp arch patch series.
+Will notify you once they're merged.
 
-> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> new file mode 100644
-> index 0000000..7167086
-> --- /dev/null
-> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> @@ -0,0 +1,15 @@
-> +# Format:
-> +#	MIDR,Version,JSON/file/pathname,Type
-> +#
-> +# where
-> +#	MIDR	Processor version
-> +#		Variant[23:20] and Revision [3:0] should be zero.
-> +#	Version could be used to track version of of JSON file
-> +#		but currently unused.
-> +#	JSON/file/pathname is the path to JSON file, relative
-> +#		to tools/perf/pmu-events/arch/arm64/.
-> +#	Type is core, uncore etc
-> +#
-> +#
-> +#Family-model,Version,Filename,EventType
-> +0x00000000420f5160,v1,thunderx2,core
-> diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-> new file mode 100644
-> index 0000000..2db45c4
-> --- /dev/null
-> +++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-> @@ -0,0 +1,62 @@
-> +[
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data cache access, read",
-> +        "EventCode": "0x40",
-> +        "EventName": "l1d_cache_rd",
-> +        "BriefDescription": "L1D cache read",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data cache access, write ",
-> +        "EventCode": "0x41",
-> +        "EventName": "l1d_cache_wr",
-> +        "BriefDescription": "L1D cache write",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data cache refill, read",
-> +        "EventCode": "0x42",
-> +        "EventName": "l1d_cache_refill_rd",
-> +        "BriefDescription": "L1D cache refill read",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data cache refill, write",
-> +        "EventCode": "0x43",
-> +        "EventName": "l1d_cache_refill_wr",
-> +        "BriefDescription": "L1D refill write",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-> +        "EventCode": "0x4C",
-> +        "EventName": "l1d_tlb_refill_rd",
-> +        "BriefDescription": "L1D tlb refill read",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-> +        "EventCode": "0x4D",
-> +        "EventName": "l1d_tlb_refill_wr",
-> +        "BriefDescription": "L1D tlb refill write",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-> +        "EventCode": "0x4E",
-> +        "EventName": "l1d_tlb_rd",
-> +        "BriefDescription": "L1D tlb read",
-> +    },
-> +    {
-> +        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-> +        "EventCode": "0x4F",
-> +        "EventName": "l1d_tlb_wr",
-> +        "BriefDescription": "L1D tlb write",
-> +    },
-> +    {
-> +        "PublicDescription": "Bus access read",
-> +        "EventCode": "0x60",
-> +        "EventName": "bus_access_rd",
-> +        "BriefDescription": "Bus access read",
-> +   },
-> +   {
-> +        "PublicDescription": "Bus access write",
-> +        "EventCode": "0x61",
-> +        "EventName": "bus_access_wr",
-> +        "BriefDescription": "Bus access write",
-> +   }
-> +]
+Regards
+Dong Aisheng
+
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 > 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter | <http://www.linaro.org/linaro-
+> blog/> Blog
