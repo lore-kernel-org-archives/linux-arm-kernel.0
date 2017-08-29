@@ -1,273 +1,63 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Aug 2017 08:36:16 +0200
-Subject: [PATCH V3 6/8] drivers: boot_constraint: Add debugfs support
-In-Reply-To: <7a42cfb49a580a07c2045207fe7f1a3cb2096ce3.1501578037.git.viresh.kumar@linaro.org>
+Date: Tue, 29 Aug 2017 08:37:34 +0200
+Subject: [PATCH V3 2/8] drivers: boot_constraint: Add
+ boot_constraints_disable kernel parameter
+In-Reply-To: <4bec0c3e58f76e06e5305c5ddbab859e2a87935e.1501578037.git.viresh.kumar@linaro.org>
 References: <cover.1501578037.git.viresh.kumar@linaro.org>
- <7a42cfb49a580a07c2045207fe7f1a3cb2096ce3.1501578037.git.viresh.kumar@linaro.org>
-Message-ID: <20170829063616.GB12198@kroah.com>
+ <4bec0c3e58f76e06e5305c5ddbab859e2a87935e.1501578037.git.viresh.kumar@linaro.org>
+Message-ID: <20170829063734.GC12198@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 02:53:47PM +0530, Viresh Kumar wrote:
-> This patch adds debugfs support for boot constraints. This is how it
-> looks for a "vmmc-supply" constraint for the MMC device.
+On Tue, Aug 01, 2017 at 02:53:43PM +0530, Viresh Kumar wrote:
+> Users must be given an option to discard any constraints set by
+> bootloaders. For example, consider that a constraint is set for the LCD
+> controller's supply and the LCD driver isn't loaded by the kernel. If
+> the user doesn't need to use the LCD device, then he shouldn't be forced
+> to honour the constraint.
 > 
-> $ ls -R /sys/kernel/debug/boot_constraints/
-> /sys/kernel/debug/boot_constraints/:
-> f723d000.dwmmc0
-> 
-> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
-> clk-ciu  pm-domain  supply-vmmc  supply-vmmcaux
-> 
-> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/clk-ciu:
-> 
-> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/pm-domain:
-> 
-> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
-> u_volt_max  u_volt_min
-> 
-> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmcaux:
-> u_volt_max  u_volt_min
+> We can also think about finer control of such constraints with help of
+> some sysfs files, but a kernel parameter is fine to begin with.
 > 
 > Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
 > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Minor debugfs api interaction nits below:
-
-
 > ---
->  drivers/base/boot_constraints/clk.c    |  4 ++
->  drivers/base/boot_constraints/core.c   | 72 ++++++++++++++++++++++++++++++++++
->  drivers/base/boot_constraints/core.h   |  6 +++
->  drivers/base/boot_constraints/pm.c     | 12 +++++-
->  drivers/base/boot_constraints/supply.c | 10 +++++
->  5 files changed, 102 insertions(+), 2 deletions(-)
+>  Documentation/admin-guide/kernel-parameters.txt |  3 +++
+>  drivers/base/boot_constraints/core.c            | 17 +++++++++++++++++
+>  2 files changed, 20 insertions(+)
 > 
-> diff --git a/drivers/base/boot_constraints/clk.c b/drivers/base/boot_constraints/clk.c
-> index b5b1d63c3e76..bdbfcbc2944d 100644
-> --- a/drivers/base/boot_constraints/clk.c
-> +++ b/drivers/base/boot_constraints/clk.c
-> @@ -49,6 +49,9 @@ int constraint_clk_add(struct constraint *constraint, void *data)
->  	cclk->clk_info.name = kstrdup_const(clk_info->name, GFP_KERNEL);
->  	constraint->private = cclk;
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index d9c171ce4190..0706d1b6004d 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -426,6 +426,9 @@
+>  			embedded devices based on command line input.
+>  			See Documentation/block/cmdline-partition.txt
 >  
-> +	/* Debugfs */
+> +	boot_constraints_disable
+> +			Do not set any boot constraints for devices.
 
-That's obvious no need for the comment...
+Shouldn't that be the default?  As really, that is what the situation is
+today, why force everyone to always enable the disable value?  And
+enabling a value to disable something is usually a sign of bad naming...
 
-> +	constraint_add_debugfs(constraint, clk_info->name);
 > +
->  	return 0;
->  
->  put_clk:
-> @@ -63,6 +66,7 @@ void constraint_clk_remove(struct constraint *constraint)
->  {
->  	struct constraint_clk *cclk = constraint->private;
->  
-> +	constraint_remove_debugfs(constraint);
->  	kfree_const(cclk->clk_info.name);
->  	clk_disable_unprepare(cclk->clk);
->  	clk_put(cclk->clk);
+>  	boot_delay=	Milliseconds to delay each printk during boot.
+>  			Values larger than 10 seconds (10000) are changed to
+>  			no delay (0).
 > diff --git a/drivers/base/boot_constraints/core.c b/drivers/base/boot_constraints/core.c
-> index 06267f0c88d4..c0e3a85ff85a 100644
+> index 366a05d6d9ba..e0c33b2b216f 100644
 > --- a/drivers/base/boot_constraints/core.c
 > +++ b/drivers/base/boot_constraints/core.c
-> @@ -35,6 +35,76 @@ static int __init constraints_disable(char *str)
->  }
->  early_param("boot_constraints_disable", constraints_disable);
+> @@ -24,6 +24,17 @@
+>  static LIST_HEAD(constraint_devices);
+>  static DEFINE_MUTEX(constraint_devices_mutex);
 >  
-> +/* Debugfs */
-> +
-> +static struct dentry *rootdir;
-> +
-> +static void constraint_device_add_debugfs(struct constraint_dev *cdev)
-> +{
-> +	struct device *dev = cdev->dev;
-> +
-> +	cdev->dentry = debugfs_create_dir(dev_name(dev), rootdir);
-> +	if (!cdev->dentry)
-> +		dev_err(dev, "Failed to create constraint dev debugfs dir\n");
+> +static bool boot_constraints_disabled;
 
-No, you never need to check the return value of a debugfs call.  You
-shouldn't care what happens here, it's just debugfs, a user can't do
-anything with this info, and neither should you change your actions
-(which you aren't here, which is good, but not true later on...)
-
-So just call the function, save the value, and move on, it's always
-going to return a value that you can use in any future debugfs calls, no
-need to care.
-
-> +}
-> +
-> +static void constraint_device_remove_debugfs(struct constraint_dev *cdev)
-> +{
-> +	debugfs_remove_recursive(cdev->dentry);
-> +}
-> +
-> +void constraint_add_debugfs(struct constraint *constraint, const char *suffix)
-> +{
-> +	struct device *dev = constraint->cdev->dev;
-> +	const char *prefix;
-> +	char name[NAME_MAX];
-> +
-> +	switch (constraint->type) {
-> +	case DEV_BOOT_CONSTRAINT_CLK:
-> +		prefix = "clk";
-> +		break;
-> +	case DEV_BOOT_CONSTRAINT_PM:
-> +		prefix = "pm";
-> +		break;
-> +	case DEV_BOOT_CONSTRAINT_SUPPLY:
-> +		prefix = "supply";
-> +		break;
-> +	default:
-> +		dev_err(dev, "%s: Constraint type (%d) not supported\n",
-> +			__func__, constraint->type);
-> +		return;
-> +	}
-> +
-> +	snprintf(name, NAME_MAX, "%s-%s", prefix, suffix);
-> +
-> +	constraint->dentry = debugfs_create_dir(name, constraint->cdev->dentry);
-> +	if (!constraint->dentry)
-> +		dev_err(dev, "Failed to create constraint (%s) debugfs dir\n",
-> +			name);
-
-Again, you don't care, just call it and move on.
-
-> +}
-> +
-> +void constraint_remove_debugfs(struct constraint *constraint)
-> +{
-> +	debugfs_remove_recursive(constraint->dentry);
-> +}
-> +
-> +static int __init constraint_debugfs_init(void)
-> +{
-> +	if (boot_constraints_disabled)
-> +		return -ENODEV;
-> +
-> +	/* Create /sys/kernel/debug/opp directory */
-> +	rootdir = debugfs_create_dir("boot_constraints", NULL);
-> +	if (!rootdir) {
-> +		pr_err("Failed to create root directory\n");
-> +		return -ENOMEM;
-
-And again, you don't care, call it and move on, don't return an
-incorrect value like this :)
-
-
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +core_initcall(constraint_debugfs_init);
-> +
-> +
->  /* Boot constraints core */
->  
->  static struct constraint_dev *constraint_device_find(struct device *dev)
-> @@ -62,12 +132,14 @@ static struct constraint_dev *constraint_device_allocate(struct device *dev)
->  	INIT_LIST_HEAD(&cdev->constraints);
->  
->  	list_add(&cdev->node, &constraint_devices);
-> +	constraint_device_add_debugfs(cdev);
->  
->  	return cdev;
->  }
->  
->  static void constraint_device_free(struct constraint_dev *cdev)
->  {
-> +	constraint_device_remove_debugfs(cdev);
->  	list_del(&cdev->node);
->  	kfree(cdev);
->  }
-> diff --git a/drivers/base/boot_constraints/core.h b/drivers/base/boot_constraints/core.h
-> index a051c3d7c8ab..ee84e237c66a 100644
-> --- a/drivers/base/boot_constraints/core.h
-> +++ b/drivers/base/boot_constraints/core.h
-> @@ -8,6 +8,7 @@
->  #define _CORE_H
->  
->  #include <linux/boot_constraint.h>
-> +#include <linux/debugfs.h>
->  #include <linux/device.h>
->  #include <linux/list.h>
->  
-> @@ -15,6 +16,7 @@ struct constraint_dev {
->  	struct device *dev;
->  	struct list_head node;
->  	struct list_head constraints;
-> +	struct dentry *dentry;
->  };
->  
->  struct constraint {
-> @@ -23,12 +25,16 @@ struct constraint {
->  	enum dev_boot_constraint_type type;
->  	void (*free_resources)(void *data);
->  	void *free_resources_data;
-> +	struct dentry *dentry;
->  
->  	int (*add)(struct constraint *constraint, void *data);
->  	void (*remove)(struct constraint *constraint);
->  	void *private;
->  };
->  
-> +void constraint_add_debugfs(struct constraint *constraint, const char *suffix);
-> +void constraint_remove_debugfs(struct constraint *constraint);
-> +
->  /* Forward declarations of constraint specific callbacks */
->  int constraint_clk_add(struct constraint *constraint, void *data);
->  void constraint_clk_remove(struct constraint *constraint);
-> diff --git a/drivers/base/boot_constraints/pm.c b/drivers/base/boot_constraints/pm.c
-> index edba5eca5093..95910d0dc457 100644
-> --- a/drivers/base/boot_constraints/pm.c
-> +++ b/drivers/base/boot_constraints/pm.c
-> @@ -14,11 +14,19 @@
->  int constraint_pm_add(struct constraint *constraint, void *data)
->  {
->  	struct device *dev = constraint->cdev->dev;
-> +	int ret;
->  
-> -	return dev_pm_domain_attach(dev, true);
-> +	ret = dev_pm_domain_attach(dev, true);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Debugfs */
-
-Again, obvious comment, no need to have it.
-
-
-> +	constraint_add_debugfs(constraint, "domain");
-> +
-> +	return 0;
->  }
->  
->  void constraint_pm_remove(struct constraint *constraint)
->  {
-> -	/* Nothing to do for now */
-> +	constraint_remove_debugfs(constraint);
->  }
-> diff --git a/drivers/base/boot_constraints/supply.c b/drivers/base/boot_constraints/supply.c
-> index 30f816dbf12c..b206f500b2bc 100644
-> --- a/drivers/base/boot_constraints/supply.c
-> +++ b/drivers/base/boot_constraints/supply.c
-> @@ -60,6 +60,15 @@ int constraint_supply_add(struct constraint *constraint, void *data)
->  	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
->  	constraint->private = csupply;
->  
-> +	/* Debugfs */
-> +	constraint_add_debugfs(constraint, supply->name);
-> +
-> +	debugfs_create_u32("u_volt_min", 0444, constraint->dentry,
-> +			   &csupply->supply.u_volt_min);
-> +
-> +	debugfs_create_u32("u_volt_max", 0444, constraint->dentry,
-> +			   &csupply->supply.u_volt_max);
-
-See, that's how you do it!
+Again, this should only be an "enable" type of option, that kicks in if
+you are using this type of bootloader/kernel interaction.  Don't force
+someone to disable it.
 
 thanks,
 
