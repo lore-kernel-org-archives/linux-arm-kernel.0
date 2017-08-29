@@ -1,31 +1,86 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 Aug 2017 16:04:03 -0400 (EDT)
-Subject: [PATCH 0/3] make XIP kernel .data compressed in ROM
-In-Reply-To: <SG2PR06MB116536F14485B36DF66385758A9F0@SG2PR06MB1165.apcprd06.prod.outlook.com>
-References: <20170825162600.15709-1-nicolas.pitre@linaro.org>
- <SG2PR06MB1165EDDA573890B891E542CB8A9E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1708281520380.2606@knanqh.ubzr>
- <SG2PR06MB116536F14485B36DF66385758A9F0@SG2PR06MB1165.apcprd06.prod.outlook.com>
-Message-ID: <nycvar.YSQ.7.76.1708291602080.2606@knanqh.ubzr>
+From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
+Date: Tue, 29 Aug 2017 22:08:54 +0200
+Subject: [PATCH 2/2] arm: AT91: fix DT duplicate node name
+In-Reply-To: <cover.1504037038.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1504037038.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <910fee2eb99b2d95e59fa6b997645b498f167022.1504037038.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Aug 2017, Chris Brandt wrote:
+Fix following warning at bootup:
 
-> On Tuesday, August 29, 2017, Nicolas Pitre wrote:
-> > Executive summary: our linker script is a complete mess. In your case
-> > that would be partly solved by the patch that Arnd sent on Jul 28th 2017
-> > titled "ARM: move __bug_table into .data for XIP_KERNEL". However the
-> > XIP linker script is still broken for similar reasons.
-> 
-> Ya, I thought that would happen eventually. The only way I could get 
-> agreement to fix existing broken XIP_KERNEL stuff was to split the linker 
-> script into XIP and non-XIP. But, trying to follow every vmlinux.lds.S 
-> change and checking to see if it is needed for vmlinux-xip.lds.S is a bit 
-> daunting.
+device-tree: Duplicate name in fb at 0x00500000, renamed to "display#1"
 
-It is. And even in the non-XIP case with regards to changes in 
-include/asm-generic/vmlinux.lds.h too.
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+---
+ arch/arm/boot/dts/at91sam9m10g45ek.dts | 48 +++++++++++++++++-----------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 9cf1f5163fbd..272af5867403 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -223,30 +223,6 @@
+ 		fb0: fb at 0x00500000 {
+ 			display = <&display0>;
+ 			status = "okay";
+-
+-			display0: display {
+-				bits-per-pixel = <32>;
+-				atmel,lcdcon-backlight;
+-				atmel,dmacon = <0x1>;
+-				atmel,lcdcon2 = <0x80008002>;
+-				atmel,guard-time = <9>;
+-				atmel,lcd-wiring-mode = "RGB";
+-
+-				display-timings {
+-					native-mode = <&timing0>;
+-					timing0: timing0 {
+-						clock-frequency = <9000000>;
+-						hactive = <480>;
+-						vactive = <272>;
+-						hback-porch = <1>;
+-						hfront-porch = <1>;
+-						vback-porch = <40>;
+-						vfront-porch = <1>;
+-						hsync-len = <45>;
+-						vsync-len = <1>;
+-					};
+-				};
+-			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+@@ -293,6 +269,30 @@
+ 		};
+ 	};
+ 
++	display0: display {
++		bits-per-pixel = <32>;
++		atmel,lcdcon-backlight;
++		atmel,dmacon = <0x1>;
++		atmel,lcdcon2 = <0x80008002>;
++		atmel,guard-time = <9>;
++		atmel,lcd-wiring-mode = "RGB";
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 480x272 {
++				clock-frequency = <9000000>;
++				hactive = <480>;
++				vactive = <272>;
++				hback-porch = <1>;
++				hfront-porch = <1>;
++				vback-porch = <40>;
++				vfront-porch = <1>;
++				hsync-len = <45>;
++				vsync-len = <1>;
++			};
++		};
++	};
++
+ 	pwmleds {
+ 		compatible = "pwm-leds";
+ 
+-- 
+2.11.0
