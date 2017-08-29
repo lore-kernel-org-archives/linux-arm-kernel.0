@@ -1,50 +1,49 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Aug 2017 13:56:11 +0200
-Subject: [PATCH V3 2/8] drivers: boot_constraint: Add
- boot_constraints_disable kernel parameter
-In-Reply-To: <20170829100241.GB3101@ubuntu>
+Date: Tue, 29 Aug 2017 14:03:43 +0200
+Subject: [PATCH V3 1/8] drivers: Add boot constraints core
+In-Reply-To: <20170829095217.GA3101@ubuntu>
 References: <cover.1501578037.git.viresh.kumar@linaro.org>
- <4bec0c3e58f76e06e5305c5ddbab859e2a87935e.1501578037.git.viresh.kumar@linaro.org>
- <20170829063734.GC12198@kroah.com> <20170829100241.GB3101@ubuntu>
-Message-ID: <20170829115611.GA4089@kroah.com>
+ <1a844e27ee7e0b22acf8ea582bf4e8d35f54c84a.1501578037.git.viresh.kumar@linaro.org>
+ <20170829063923.GD12198@kroah.com> <20170829095217.GA3101@ubuntu>
+Message-ID: <20170829120343.GA4321@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 12:02:41PM +0200, Viresh Kumar wrote:
-> On 29-08-17, 08:37, Greg Kroah-Hartman wrote:
-> > On Tue, Aug 01, 2017 at 02:53:43PM +0530, Viresh Kumar wrote:
-> > > +	boot_constraints_disable
-> > > +			Do not set any boot constraints for devices.
-> > 
-> > Shouldn't that be the default?  As really, that is what the situation is
-> > today, why force everyone to always enable the disable value?  And
-> > enabling a value to disable something is usually a sign of bad naming...
+On Tue, Aug 29, 2017 at 11:52:17AM +0200, Viresh Kumar wrote:
+> On 29-08-17, 08:39, Greg Kroah-Hartman wrote:
+> > How is this information getting to the kernel from the bootloader?  I
+> > didn't see where that happened, just a single example driver that
+> > somehow "knew" what had to happen, which seems odd...
 > 
-> I will explain once again how it is getting used and then will do whatever you
-> suggest.
+> I tried to do it with DT earlier, but we couldn't reach to an agreement on what
+> bindings to add and so this series started doing things the old way. The kernel
+> would have platform specific drivers, which would exactly know what constraints
+> to set and we wouldn't need the bootloaders to pass anything for now.
+
+Who couldn't reach an agreement?  So you gave up and decided to make a
+whole bunch of kernel code instead of just using new DT entries?  That's
+crazy...
+
+> > This is a lot of new code for no users,
 > 
-> - Platforms that don't need boot constraints should not enable the CONFIG in the
->   first place. Though we use the same kernel image on multiple hardware types
->   many times.
-
-Right, which means this is useless as an option, don't ever rely on it
-:)
-
-> - If a platform doesn't have a platform-specific driver that adds constraints at
->   boot, then the boot constraint core wouldn't get into picture at all and it is
->   as good as being disabled.
-
-Possibly, but see above for the goal of one kernel image, many different
-devices.
-
-> - And the above boot-argument (boot_constraints_disable) is used ONLY in the
->   case where the platform driver is adding boot constraints at runtime.
+> I agree and so added the patch 8/8 to show a real user. I will convert that to a
+> patch going forward, which can be merged along with this series.
 > 
-> So, the boot-constraints are disabled by default for everyone even if the
-> configuration is enabled. And that's why I named it the way it is right now.
+> > I would like to see at least 3
+> > real drivers that are using it before we merge it, as then you have a
+> > chance of getting the user/kernel api correct.
 > 
-> Do you still feel that it needs to be renamed? 
+> Hmm, so I am quite sure that this is a fairly generic problem to solve,
+> specifically for all the handheld devices. I can get code for few of the Qcom
+> SoCs but they may end up using the same platform driver. Not sure if I can get
+> code for multiple SoC families in the beginning.
 
-Well, negative options are ackward (although usb_disable is an
-option...)  It still feels wrong, and I worry about the above
-single-image goal...
+Let's see a working system or two first here please.
+
+But you are implying that existing handheld devices need this problem
+solved, how do they do it today without this code as obviously they are
+shipping working solutions.
+
+thanks,
+
+greg k-h
