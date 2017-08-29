@@ -1,38 +1,39 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 29 Aug 2017 15:58:37 +0800
-Subject: [PATCH 1/2] clk: hi6220: change watchdog clock source
-Message-ID: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
+Date: Tue, 29 Aug 2017 15:58:38 +0800
+Subject: [PATCH 2/2] arm64: dts: hi6220: enable watchdog
+In-Reply-To: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
+References: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1503993518-24428-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old code uses tcxo (19.2MHz) as watchdog clock but actually the
-watchdog uses 32K clock, as result the watchdog timeout cannot be set
-correctly and delay long time to reset SoC.
+From: Dmitry Shmidt <dimitrysh@google.com>
 
-So this patch is to use 'ref32k' as clock source for watchdog.
+This patch is to add watchdog binding for Hi6220 on Hikey board.
 
-Fixes: 72ea48610d43 ("clk: hi6220: Clock driver support for Hisilicon hi6220 SoC")
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
 ---
- drivers/clk/hisilicon/clk-hi6220.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
-index 4181b68..e786d71 100644
---- a/drivers/clk/hisilicon/clk-hi6220.c
-+++ b/drivers/clk/hisilicon/clk-hi6220.c
-@@ -55,9 +55,9 @@ static struct hisi_fixed_factor_clock hi6220_fixed_factor_clks[] __initdata = {
- };
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index eacbe0d..77dc28f 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -809,6 +809,14 @@
+ 			pinctrl-1 = <&sdio_pmx_idle &sdio_clk_cfg_idle &sdio_cfg_idle>;
+ 		};
  
- static struct hisi_gate_clock hi6220_separated_gate_clks_ao[] __initdata = {
--	{ HI6220_WDT0_PCLK,   "wdt0_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 12, 0, },
--	{ HI6220_WDT1_PCLK,   "wdt1_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 13, 0, },
--	{ HI6220_WDT2_PCLK,   "wdt2_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 14, 0, },
-+	{ HI6220_WDT0_PCLK,   "wdt0_pclk",   "ref32k",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 12, 0, },
-+	{ HI6220_WDT1_PCLK,   "wdt1_pclk",   "ref32k",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 13, 0, },
-+	{ HI6220_WDT2_PCLK,   "wdt2_pclk",   "ref32k",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 14, 0, },
- 	{ HI6220_TIMER0_PCLK, "timer0_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 15, 0, },
- 	{ HI6220_TIMER1_PCLK, "timer1_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 16, 0, },
- 	{ HI6220_TIMER2_PCLK, "timer2_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 17, 0, },
++		watchdog0: watchdog at f8005000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xf8005000 0x0 0x1000>;
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ao_ctrl HI6220_WDT0_PCLK>;
++			clock-names = "apb_pclk";
++		};
++
+ 		tsensor: tsensor at 0,f7030700 {
+ 			compatible = "hisilicon,tsensor";
+ 			reg = <0x0 0xf7030700 0x0 0x1000>;
 -- 
 2.7.4
