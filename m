@@ -1,148 +1,105 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 29 Aug 2017 12:29:53 +0200
-Subject: [PATCH v7 1/3] dt-bindings: display: Add Document for Rockchip
- Soc LVDS
-In-Reply-To: <59A53F27.2010308@rock-chips.com>
-References: <1503469615-39406-1-git-send-email-hjc@rock-chips.com>
- <1503469622-39462-1-git-send-email-hjc@rock-chips.com>
- <59A53F27.2010308@rock-chips.com>
-Message-ID: <150421032.ptNih2SRiG@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Aug 2017 11:31:03 +0100
+Subject: ARM64 kernel Image size limitations?
+In-Reply-To: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
+References: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
+Message-ID: <20170829103102.GD2901@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. August 2017, 18:17:11 CEST schrieb Mark yao:
-> On 2017?08?23? 14:26, Sandy Huang wrote:
-> > This patch add Document for Rockchip Soc RK3288 LVDS,
-> > This based on the patches from Mark yao and Heiko Stuebner.
-> >
-> > Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> > Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> Looks good for me:
+On Mon, Aug 28, 2017 at 12:55:23PM -0700, Florian Fainelli wrote:
+> Hi,
 > 
-> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
+> I have been fighting with a reasonably large kernel Image: 46MB and
+> found unable to boot it. This is on v4.13-rc6, but I could go back as
+> far as v4.9~ish. It is so big, because it's got some debugging enabled,
+> and the initramfs compression is disabled, but still that ought to be
+> possible.
 
-Signed-off ordering is wrong though ... you add a Signed-off below
-all others and you could also drop the one from me, as I don't
-think I did provide to much value between Mark's and Sandy's variant
-of the patches :-)
+I regularly boot 90+ MB kernels, so this is certainly possible, in
+regular-ish configurations.
 
-
-Heiko
-
-
-> > Changes according to Rob Herring's review.
-> >
-> >   .../bindings/display/rockchip/rockchip-lvds.txt    | 99 ++++++++++++++++++++++
-> >   1 file changed, 99 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
-> > new file mode 100644
-> > index 0000000..da6939e
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
-> > @@ -0,0 +1,99 @@
-> > +Rockchip RK3288 LVDS interface
-> > +================================
-> > +
-> > +Required properties:
-> > +- compatible: matching the soc type, one of
-> > +	- "rockchip,rk3288-lvds";
-> > +
-> > +- reg: physical base address of the controller and length
-> > +	of memory mapped region.
-> > +- clocks: must include clock specifiers corresponding to entries in the
-> > +	clock-names property.
-> > +- clock-names: must contain "pclk_lvds"
-> > +
-> > +- avdd1v0-supply: regulator phandle for 1.0V analog power
-> > +- avdd1v8-supply: regulator phandle for 1.8V analog power
-> > +- avdd3v3-supply: regulator phandle for 3.3V analog power
-> > +
-> > +- rockchip,grf: phandle to the general register files syscon
-> > +- rockchip,output: "rgb", "lvds" or "duallvds", This describes the output interface
-> > +
-> > +Optional properties:
-> > +- pinctrl-names: must contain a "lcdc" entry.
-> > +- pinctrl-0: pin control group to be used for this controller.
-> > +
-> > +Required nodes:
-> > +
-> > +The lvds has two video ports as described by
-> > +	Documentation/devicetree/bindings/media/video-interfaces.txt
-> > +Their connections are modeled using the OF graph bindings specified in
-> > +	Documentation/devicetree/bindings/graph.txt.
-> > +
-> > +- video port 0 for the VOP input, the remote endpoint maybe vopb or vopl
-> > +- video port 1 for either a panel or subsequent encoder
-> > +
-> > +the lvds panel described by
-> > +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> > +
-> > +Panel required properties:
-> > +- ports for remote LVDS output
-> > +
-> > +Panel optional properties:
-> > +- data-mapping: should be "vesa-24","jeida-24" or "jeida-18".
-> > +This describes decribed by:
-> > +	Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> > +
-> > +Example:
-> > +
-> > +lvds_panel: lvds-panel {
-> > +	compatible = "auo,b101ean01";
-> > +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
-> > +	data-mapping = "jeida-24";
-> > +
-> > +	ports {
-> > +		panel_in_lvds: endpoint {
-> > +			remote-endpoint = <&lvds_out_panel>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +For Rockchip RK3288:
-> > +
-> > +	lvds: lvds at ff96c000 {
-> > +		compatible = "rockchip,rk3288-lvds";
-> > +		rockchip,grf = <&grf>;
-> > +		reg = <0xff96c000 0x4000>;
-> > +		clocks = <&cru PCLK_LVDS_PHY>;
-> > +		clock-names = "pclk_lvds";
-> > +		pinctrl-names = "lcdc";
-> > +		pinctrl-0 = <&lcdc_ctl>;
-> > +		avdd1v0-supply = <&vdd10_lcd>;
-> > +		avdd1v8-supply = <&vcc18_lcd>;
-> > +		avdd3v3-supply = <&vcca_33>;
-> > +		rockchip,output = "rgb";
-> > +		ports {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			lvds_in: port at 0 {
-> > +				reg = <0>;
-> > +
-> > +				lvds_in_vopb: endpoint at 0 {
-> > +					reg = <0>;
-> > +					remote-endpoint = <&vopb_out_lvds>;
-> > +				};
-> > +				lvds_in_vopl: endpoint at 1 {
-> > +					reg = <1>;
-> > +					remote-endpoint = <&vopl_out_lvds>;
-> > +				};
-> > +			};
-> > +
-> > +			lvds_out: port at 1 {
-> > +				reg = <1>;
-> > +
-> > +				lvds_out_panel: endpoint {
-> > +					remote-endpoint = <&panel_in_lvds>;
-> > +				};
-> > +			};
-> > +		};
-> > +	};
+> After some experimentation I found that the breaking size is somewhere
+> around 33MB total for arch/arm64/boot/Image and when that happens, I get
+> the following backtrace which suggests that there is some memory
+> corruption of some kind (or so it seems to me), other experiments
+> indicated that the backtrace may point back to where the bootloader had
+> set up its exception vector. I am fairly confident that the bootloader
+> is not responsible for corrupting the Image that is loaded.
 > 
+> Is there such a size limitation or am I possibly tripping over something
+> else?
+
+Are you using 16K pages, by any chance?
+
+With 16K pages, the early page tables can only map up to 32M, and thus
+cannot map a kernel image larger than this.
+
+When those go wrong, you'd see what looks like memory corruption, or
+unmapped memory.
+
+With 4K page, we can map up to 1G, and with 64K we can map up to 512M.
+
+Thanks,
+Mark.
+
 > 
+> (gdb) bt
+> #0  0xffffff800880721c in arch_spin_lock (lock=<optimized out>)
+>     at ./arch/arm64/include/asm/spinlock.h:89
+> #1  do_raw_spin_lock_flags (flags=<optimized out>, lock=<optimized out>)
+>     at ./include/linux/spinlock.h:155
+> #2  __raw_spin_lock_irqsave (lock=<optimized out>)
+>     at ./include/linux/spinlock_api_smp.h:119
+> #3  _raw_spin_lock_irqsave (lock=0xffffff800a1100f8)
+>     at kernel/locking/spinlock.c:159
+> #4  0xffffff80080888b4 in die (str=0xffffff800894a490 "Oops",
+>     regs=0xffffff800a013630, err=-1778384892) at
+> arch/arm64/kernel/traps.c:279
+> #5  0x80ffffff080952c4 in ?? ()
+> Backtrace stopped: previous frame inner to this frame (corrupt stack?)
+> (gdb) info reg
+> x0             0xffffff800a1100f8       18446743524122624248
+> x1             0x1c0    448
+> x2             0x10000  65536
+> x3             0x1      1
+> x4             0x0      0
+> x5             0xffffff8008857dc8       18446743524096703944
+> x6             0xffffff800a00494f       18446743524121528655
+> x7             0x6572646461206c65       7310015527464758373
+> x8             0x65676e6172207373       7306930285237531507
+> x9             0x0      0
+> x10            0xffffff800a0134e0       18446743524121588960
+> x11            0xffffff800a0134e0       18446743524121588960
+> x12            0x40d00  265472
+> x13            0x72422820352e382e       8233187187582973998
+> x14            0x73206d6f6364616f       8295750838792773999
+> x15            0x0      0
+> x16            0x0      0
+> x17            0x0      0
+> x18            0x0      0
+> x19            0xffffff800a110000       18446743524122624000
+> x20            0x96000004       2516582404
+> x21            0xffffff800894a490       18446743524097696912
+> x22            0xffffff800a013630       18446743524121589296
+> x23            0xffffff800a013630       18446743524121589296
+> x24            0x25     37
+> x25            0xffffff800a018000       18446743524121608192
+> x26            0xffffff8008955622       18446743524097742370
+> x27            0xffffff8008955622       18446743524097742370
+> x28            0xffffff800a01dd80       18446743524121632128
+> x29            0xffffff800a0134d0       18446743524121588944
+> x30            0xffffff80080888b4       18446743524088514740
+> sp             0xffffff800a0134d0       0xffffff800a0134d0
+> pc             0xffffff800880721c       0xffffff800880721c
+> <_raw_spin_lock_irqsave+44>
+> CPSR           0x600001c5       1610613189
+> (gdb)
 > 
+> -- 
+> Florian
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
