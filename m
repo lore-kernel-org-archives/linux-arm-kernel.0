@@ -1,33 +1,30 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 29 Aug 2017 11:18:37 +0200
-Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
-In-Reply-To: <20170824114631.089d2628@bbrezillon> (Boris Brezillon's message
- of "Thu, 24 Aug 2017 11:46:31 +0200")
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <20170821221339.70cfcfb7@bbrezillon> <87pobmoz8n.fsf@belgarion.home>
- <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
- <20170824114631.089d2628@bbrezillon>
-Message-ID: <87inh6pw9e.fsf@belgarion.home>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 29 Aug 2017 17:20:41 +0800
+Subject: [PATCH RESEND v2 1/3] usb: xhci-mtk: add generic compatible string
+Message-ID: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1503998338.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+The xhci-mtk driver is a generic driver for MediaTek xHCI IP, add
+a generic compatible to avoid confusion when support new SoCs but
+use a compatible with specific SoC's name "mt8173".
 
-> Hi Robert,
-> Wait a bit before applying. I think patches 6 to 9 have a dependency on
-> patch 1 (it's not a build dependency, but NAND partitioning might be
-> wrong if you apply them), so we need to sync. What release is
-> pxa/for-next targeting? If it's 4.15 I can apply patch 1 just after
-> 4.14-rc1 is out and provide an immutable branch for you to pull in
-> pxa/for-next.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/host/xhci-mtk.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Hi Boris,
-
-It's targeting 4.15 right now. And we can do as you like, either an immutable
-branch, or I wait to include these patches into my pxa/for-next until you give
-me your go, it's as you like.
-
-Cheers.
-
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 67d5dc7..8fb6065 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -795,6 +795,7 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
+ #ifdef CONFIG_OF
+ static const struct of_device_id mtk_xhci_of_match[] = {
+ 	{ .compatible = "mediatek,mt8173-xhci"},
++	{ .compatible = "mediatek,mtk-xhci"},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, mtk_xhci_of_match);
 -- 
-Robert
+1.7.9.5
