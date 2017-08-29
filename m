@@ -1,50 +1,22 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Aug 2017 13:57:15 -0700
-Subject: [PATCH v2 09/20] rpmsg: glink: Fix default case while handling
- received commands
-In-Reply-To: <1503559302-3744-10-git-send-email-sricharan@codeaurora.org>
-References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
- <1503559302-3744-10-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170829205715.GJ29306@minitux>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Aug 2017 22:50:49 +0100
+Subject: [PATCH 0/3] make XIP kernel .data compressed in ROM
+In-Reply-To: <nycvar.YSQ.7.76.1708281520380.2606@knanqh.ubzr>
+References: <20170825162600.15709-1-nicolas.pitre@linaro.org>
+ <SG2PR06MB1165EDDA573890B891E542CB8A9E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <nycvar.YSQ.7.76.1708281520380.2606@knanqh.ubzr>
+Message-ID: <20170829215048.GI20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 24 Aug 00:21 PDT 2017, Sricharan R wrote:
+On Tue, Aug 29, 2017 at 03:07:09PM -0400, Nicolas Pitre wrote:
+> @Arnd: please don't send that patch upstream. I have a better fix for 
+> it now.
 
-> Currently if we receive a command that we still do not
-> support, then its simply discarded. While doing so, the
-> RX FIFO pointer also needs to be incremented. Fixing this.
-> 
+It's not really up to Arnd to send it to Linus, it's something that
+should come through me...
 
-Messages are variable length, so when we hit a unrecognized message we
-don't know how far to advance the rx tail, meaning that with this change
-we're more likely to get out of sync than to actually find the next
-message. Which like would make people debug side effects of this.
-
-I believe a better way to handle this would be to acquire a reference to
-the parent struct rproc and call rproc_report_crash() on this, if it
-exist (i.e. it's not RPM).
-
-Regards,
-Bjorn
-
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  drivers/rpmsg/qcom_glink_native.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-> index 50a8008..9a58925 100644
-> --- a/drivers/rpmsg/qcom_glink_native.c
-> +++ b/drivers/rpmsg/qcom_glink_native.c
-> @@ -541,6 +541,7 @@ static irqreturn_t qcom_glink_native_intr(int irq, void *data)
->  			ret = 0;
->  			break;
->  		default:
-> +			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
->  			dev_err(glink->dev, "unhandled rx cmd: %d\n", cmd);
->  			ret = -EINVAL;
->  			break;
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
