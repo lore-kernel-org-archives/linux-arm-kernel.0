@@ -1,51 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Aug 2017 15:57:41 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-3720-db: Add vmmc regulator for
- SD slot
-Message-ID: <20170829135741.4263-1-gregory.clement@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Aug 2017 06:58:23 -0700
+Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
+ sdhci-omap controller
+In-Reply-To: <20170829115050.3axlr5uysmqlhvd2@earth>
+References: <20170821142132.GH6008@atomide.com>
+ <20170823054246.23927-1-kishon@ti.com>
+ <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
+ <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
+ <CAPDyKFqCZFM7UmHyQCm=DwwZXJvzUde3pW0HqARKrsgfgxSuaw@mail.gmail.com>
+ <0c7e0705-d9c2-4499-54ba-cbd84589dc01@ti.com>
+ <20170829115050.3axlr5uysmqlhvd2@earth>
+Message-ID: <20170829135822.GR6008@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By adding this regulator, a proper reset is done during boot. Without
-this, the UHS failed to be detected after a warm reboot when the SD card
-remained in the slot, then it fallback to an HS.
+* Sebastian Reichel <sebastian.reichel@collabora.co.uk> [170829 04:51]:
+> On Tue, Aug 29, 2017 at 04:50:22PM +0530, Kishon Vijay Abraham I wrote:
+> > On Thursday 24 August 2017 04:59 PM, Ulf Hansson wrote:
+> > > I guess we have two options.
+> > > 
+> > > 1) Allow us to invent and use new bindings - and a new compatible.
+> > > When everything is implemented in sdhci-omap, we can deprecate the old
+> > > omap_hsmmc driver and its corresponding compatible/bindings. At some
+> > > point later we can remove the legacy driver/bindings altogether - of
+> > > course that might take a while. This option allows us to re-think some
+> > > of the old bindings and really clean up some if its related code. For
+> > > example, I think "ti,dual-volt" is a bad binding. Instead it would be
+> > > better to use the existing mmc bindings about which speed mode the
+> > > controller/board supports (as the voltage level comes with it).
+> > > 
+> > > 2) Invent only a new compatible, but stick to use the old omap hsmmc
+> > > bindings and thus also deploy the similar code dealing with them. When
+> > > everything is implemented move the old omap_hsmmc compatibles into the
+> > > new sdhci-omap driver and them remove the old omap_hsmmc driver. At
+> > > that point we could also deprecate the old omap hsmmc compatibles, but
+> > > to me that is rather pointless.
+> > > 
+> > > The two options has different advantages, feel free to pick any of them!
+> > 
+> > Okay. I'll send a new version with option '1' (new compatible/new bindings).
 
-Note that the vmcc is supported by the xenon driver only with the
-following fix: "mmc: sdhci-xenon: add set_power callback".
+Agreed.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> > And when we deprecate the omap_hsmmc driver (some time later), we'll add
+> > support for the legacy bindings in sdhci-omap driver (so that old dtbs continue
+> > to work). Tony, are you okay with this?
+> 
+> I think you should Cc Rob Herring and Mark Rutland (DT binding
+> maintainers). This sounds like "I use DT to describe driver
+> behaviour" instead of "I use DT to describe hardware".
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 9df0f06ce607..e6e0f38ce6e1 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -94,6 +94,16 @@
- 			  3300000 0x0>;
- 		enable-active-high;
- 	};
-+
-+	vcc_sd_reg2: regulator-vmcc {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sd2";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		enable-active-high;
-+		gpio = <&gpio_exp 4 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- /* Gigabit module on CON19(V2.0)/CON21(V1.4) */
-@@ -179,6 +189,7 @@
- 	bus-width = <4>;
- 	marvell,pad-type = "sd";
- 	vqmmc-supply = <&vcc_sd_reg1>;
-+	vmmc-supply = <&vcc_sd_reg2>;
- 	status = "okay";
- };
- 
--- 
-2.14.1
+Yes please.
+
+> I would expect the conversion to look like the one done for UART,
+> see CONFIG_SERIAL_OMAP vs CONFIG_SERIAL_8250_OMAP. Both use the
+> same compatible value and you can choose using kernel configuration.
+
+That does not work unfortunately :( We are now stuck in a situation
+where two drivers are attempting to probe with the same compatible
+and we can't enable 8250_OMAP because of the user space breakage
+with the device names. And I'm actuallly thinking we should add a
+new compatible for 8250-omap to be able to start enabling it one
+board at a time.
+
+It's best to enable devices to use the new compatible as things are
+tested rather than hope for some magic "flag day" flip that might
+never happen. Having two days attempting to probe with the same
+binding just won't work.
+
+So yeah, I agree with Kishon that we should stick with generic
+and sdhci bindings. And then we can start already using it for
+boards that can use it, then eventually when we're ready, start
+parsing also the legacy bindings and maybe drop the old driver.
+
+Regards,
+
+Tony
