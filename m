@@ -1,57 +1,35 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Aug 2017 18:38:11 +0200
-Subject: [PATCH 3/3] PM: i2c-designware-platdrv: System sleep handling
- rework
-In-Reply-To: <6543072.R9SdZCE16v@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <4245176.X6JjkhnUAM@aspire.rjw.lan> <6543072.R9SdZCE16v@aspire.rjw.lan>
-Message-ID: <2533904.WxKdIHdxQJ@aspire.rjw.lan>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Aug 2017 17:48:24 +0100
+Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
+In-Reply-To: <20170829133351.GK10796@e110455-lin.cambridge.arm.com>
+References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+ <20170726102748.GM31807@n2100.armlinux.org.uk>
+ <20170728152311.GA970@e110455-lin.cambridge.arm.com>
+ <20170728155827.GV31807@n2100.armlinux.org.uk>
+ <20170829133351.GK10796@e110455-lin.cambridge.arm.com>
+Message-ID: <20170829164824.GH20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 29, 2017 2:59:49 AM CEST Rafael J. Wysocki wrote:
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On Tue, Aug 29, 2017 at 02:33:52PM +0100, Liviu Dudau wrote:
+> I've worked with Vladimir Murzin inside ARM to try to sort out problems
+> on the board like the one that you have. He's got to a point where the HDLCD
+> starts correctly after adding a non-fixed pxlclk source, but then the rest of
+> the setup is semi-useless without a working IRQ because DRM atomic calls
+> will give you a vblank timeout splat everytime you invoke them. So I'm
+> not sure how you want to progress with this patch, as not having an IRQ
+> line means you will not get any vblank interrupts and you can't use the
+> driver with userspace that calls DRM API.
 > 
-> Rework the power management part of the i2c-designware-platdrv driver
-> so that its ->suspend and ->resume callbacks do not point to the
-> callback routines used by it for runtime PM.  Instead, point its late
-> suspend and early resume callbacks to pm_runtime_force_suspend() and
-> pm_runtime_force_resume(), respectively, and make it set the
-> SAFE_SUSPEND driver flag (introduced earlier) to instruct the generic
-> ACPI PM domain code that the driver can cope with runtime suspended
-> devices in its system sleep callbacks.
-> 
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> ---
->  drivers/i2c/busses/i2c-designware-platdrv.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> Index: linux-pm/drivers/i2c/busses/i2c-designware-platdrv.c
-> ===================================================================
-> --- linux-pm.orig/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ linux-pm/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -358,6 +358,7 @@ static int dw_i2c_plat_probe(struct plat
->  	if (dev->pm_disabled) {
->  		pm_runtime_forbid(&pdev->dev);
->  	} else {
-> +		dev->power.driver_flags = DPM_FLAG_SAFE_SUSPEND;
->  		pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
->  		pm_runtime_use_autosuspend(&pdev->dev);
->  		pm_runtime_set_active(&pdev->dev);
-> @@ -455,7 +456,8 @@ static int dw_i2c_plat_resume(struct dev
->  static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
->  	.prepare = dw_i2c_plat_prepare,
->  	.complete = dw_i2c_plat_complete,
-> -	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
-> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +				     pm_runtime_force_resume)
->  	SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
->  };
+> The RTL guys are apparently working on a fix, but I have no ETA or
+> details on when they are going to do.
 
-This isn't going to work, because pm_runtime_force_suspend() will invoke
-the bus type callback and not the driver's one.
+It sounds then like this patch doesn't make sense - so I'm happy
+for it to be dropped.  It's something to bear in mind in the future
+when folk decide whether to adopt fbdev or DRM support for hardware
+that gets used in MMU-less hardware...
 
-So scratch this, please.
-
-Thanks,
-Rafael
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
