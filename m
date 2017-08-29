@@ -1,109 +1,78 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Tue, 29 Aug 2017 14:33:52 +0100
-Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
-In-Reply-To: <20170728155827.GV31807@n2100.armlinux.org.uk>
-References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
- <20170726102748.GM31807@n2100.armlinux.org.uk>
- <20170728152311.GA970@e110455-lin.cambridge.arm.com>
- <20170728155827.GV31807@n2100.armlinux.org.uk>
-Message-ID: <20170829133351.GK10796@e110455-lin.cambridge.arm.com>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Tue, 29 Aug 2017 19:05:32 +0530
+Subject: [PATCH] PCI: dwc: Use PTR_ERR_OR_ZERO
+Message-ID: <1504013732-16112-1-git-send-email-himanshujha199640@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 04:58:27PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 28, 2017 at 04:23:11PM +0100, Liviu Dudau wrote:
-> > On Wed, Jul 26, 2017 at 11:27:48AM +0100, Russell King - ARM Linux wrote:
-> > > On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
-> > > > Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
-> > > > initialise without an interrupt present.
-> > > > 
-> > > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > 
-> > 
-> > Hi Russell,
-> > 
-> > Sorry for my silence, I was on holiday this week and just came back
-> > today.
-> > 
-> > > This isn't fully functional on ARM MPS platforms yet, but at least
-> > > gets us further.  Without any display connected:
-> > > 
-> > > [   14.315986] [drm] found ARM HDLCD version r0p0
-> > > [   14.557038] tda998x 2-0070: found TDA19988
-> > > [   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-> > > [   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> > > [   14.639335] [drm] No driver support for vblank timestamp query.
-> > > [   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
-> > > [   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
-> > > [   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
-> > > 
-> > > With a TV connected, the driver doesn't initialise:
-> > > 
-> > > [   14.422810] [drm] found ARM HDLCD version r0p0
-> > > [   14.657227] tda998x 2-0070: found TDA19988
-> > > [   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-> > > [   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> > > [   14.739538] [drm] No driver support for vblank timestamp query.
-> > > [   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
-> > > [   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
-> > > [   15.365082] tda998x: probe of 2-0070 failed with error -12
-> > > 
-> > > I don't think this is correct behaviour - if we fail to set an initial
-> > > configuration (which will be based on the resolution of the connected
-> > > display) why should the driver fail to probe - it's not that there is
-> > > no device, it's (in this case) that there aren't the resources for the
-> > > chosen mode.  Userspace could always try setting a different mode.
-> > > 
-> > > I suspect the above failure is down to either (a) not having enough
-> > > memory available to allocate a 1920x1080 frame buffer, or (b) not
-> > > (yet) being able to program the hdlcd pixel clock for this platform,
-> > > which is currently hard-coded in DT at 23.75MHz.
-> > 
-> > I don't think it is the clock, if that fails then you would not see the
-> > r0p0 version number being printed. Due to the fact that until now HDLCD
-> > has run mostly on platforms that have SCP, which takes care of actual
-> > setup of the clocks, it is pretty lax on errors on pixel clock setup.
-> 
-> Note, however, that in this case, the clock is a fixed frequency clock.
-> I wasn't meaning a failure to obtain the clock, I was meaning a failure
-> to set the appropriate rate.
-> 
-> > Also, may I ask what MPS platform you are trying to use? I might be able
-> > to source one internally and try to reproduce your problems.
-> 
-> I'll point you in the direction of Ian Rickards in ARM for that
-> information.  (I'm not sure if I can mention the board publically
-> yet as its early days...)
+Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
 
-Hi Russell,
+Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+---
+ drivers/pci/dwc/pci-exynos.c |  5 +----
+ drivers/pci/dwc/pcie-kirin.c | 10 ++--------
+ drivers/pci/dwc/pcie-qcom.c  |  5 +----
+ 3 files changed, 4 insertions(+), 16 deletions(-)
 
-I've worked with Vladimir Murzin inside ARM to try to sort out problems
-on the board like the one that you have. He's got to a point where the HDLCD
-starts correctly after adding a non-fixed pxlclk source, but then the rest of
-the setup is semi-useless without a working IRQ because DRM atomic calls
-will give you a vblank timeout splat everytime you invoke them. So I'm
-not sure how you want to progress with this patch, as not having an IRQ
-line means you will not get any vblank interrupts and you can't use the
-driver with userspace that calls DRM API.
-
-The RTL guys are apparently working on a fix, but I have no ETA or
-details on when they are going to do.
-
-Best regards,
-Liviu
-
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-
+diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+index f77f872..1880518 100644
+--- a/drivers/pci/dwc/pci-exynos.c
++++ b/drivers/pci/dwc/pci-exynos.c
+@@ -152,10 +152,7 @@ static int exynos5440_pcie_get_mem_resources(struct platform_device *pdev,
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	ep->mem_res->block_base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(ep->mem_res->block_base))
+-		return PTR_ERR(ep->mem_res->block_base);
+-
+-	return 0;
++	return PTR_ERR_OR_ZERO(ep->mem_res->block_base);
+ }
+ 
+ static int exynos5440_pcie_get_clk_resources(struct exynos_pcie *ep)
+diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
+index dc3033c..bf327eb 100644
+--- a/drivers/pci/dwc/pcie-kirin.c
++++ b/drivers/pci/dwc/pcie-kirin.c
+@@ -142,10 +142,7 @@ static long kirin_pcie_get_clk(struct kirin_pcie *kirin_pcie,
+ 		return PTR_ERR(kirin_pcie->apb_sys_clk);
+ 
+ 	kirin_pcie->pcie_aclk = devm_clk_get(dev, "pcie_aclk");
+-	if (IS_ERR(kirin_pcie->pcie_aclk))
+-		return PTR_ERR(kirin_pcie->pcie_aclk);
+-
+-	return 0;
++	return PTR_ERR_OR_ZERO(kirin_pcie->pcie_aclk);
+ }
+ 
+ static long kirin_pcie_get_resource(struct kirin_pcie *kirin_pcie,
+@@ -178,10 +175,7 @@ static long kirin_pcie_get_resource(struct kirin_pcie *kirin_pcie,
+ 
+ 	kirin_pcie->sysctrl =
+ 		syscon_regmap_lookup_by_compatible("hisilicon,hi3660-sctrl");
+-	if (IS_ERR(kirin_pcie->sysctrl))
+-		return PTR_ERR(kirin_pcie->sysctrl);
+-
+-	return 0;
++	return PTR_ERR_OR_ZERO(kirin_pcie->sysctrl);
+ }
+ 
+ static int kirin_pcie_phy_init(struct kirin_pcie *kirin_pcie)
+diff --git a/drivers/pci/dwc/pcie-qcom.c b/drivers/pci/dwc/pcie-qcom.c
+index 871e7d9..7ec92ef 100644
+--- a/drivers/pci/dwc/pcie-qcom.c
++++ b/drivers/pci/dwc/pcie-qcom.c
+@@ -679,10 +679,7 @@ static int qcom_pcie_get_resources_v3(struct qcom_pcie *pcie)
+ 		return PTR_ERR(res->ahb_reset);
+ 
+ 	res->phy_ahb_reset = devm_reset_control_get_exclusive(dev, "phy_ahb");
+-	if (IS_ERR(res->phy_ahb_reset))
+-		return PTR_ERR(res->phy_ahb_reset);
+-
+-	return 0;
++	return PTR_ERR_OR_ZERO(res->phy_ahb_reset);
+ }
+ 
+ static void qcom_pcie_deinit_v3(struct qcom_pcie *pcie)
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.7.4
