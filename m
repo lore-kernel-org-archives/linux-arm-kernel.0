@@ -1,43 +1,123 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 29 Aug 2017 17:20:43 +0800
-Subject: [PATCH RESEND v2 3/3] dt-bindings: mt8173-mtu3: add generic
- compatible and rename file
-In-Reply-To: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1503998338.git.chunfeng.yun@mediatek.com>
-References: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1503998338.git.chunfeng.yun@mediatek.com>
-Message-ID: <61060035e057b13f43d383645c53c8726b7e67ab.1503998339.git.chunfeng.yun@mediatek.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Tue, 29 Aug 2017 17:26:00 +0800
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+Message-ID: <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mt8173-mtu3.txt actually holds the bindings for all mediatek
-SoCs with usb3 DRD IP, so add a generic compatible and change the
-name to mediatek,mtu3.txt.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../usb/{mt8173-mtu3.txt => mediatek,mtu3.txt}     |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
- rename Documentation/devicetree/bindings/usb/{mt8173-mtu3.txt => mediatek,mtu3.txt} (92%)
+Hi Ganapat,
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-similarity index 92%
-rename from Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-rename to Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-index b8ea394..722a029 100644
---- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-@@ -1,7 +1,11 @@
- The device node for Mediatek USB3.0 DRD controller
- 
- Required properties:
-- - compatible : should be "mediatek,mt8173-mtu3"
-+ - compatible : should be "mediatek,soc-model-mtu3", "mediatek,mtu3",
-+	soc-model is the name of SoC, such as mt8173, mt2712 etc,
-+	when using "mediatek,mtu3" compatible string, you need SoC specific
-+	ones in addition, one of:
-+	- "mediatek,mt8173-mtu3"
-  - reg : specifies physical base address and size of the registers
-  - reg-names: should be "mac" for device IP and "ippc" for IP port control
-  - interrupts : interrupt used by the device IP
--- 
-1.7.9.5
+On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+> This is not a full event list, but a short list of useful events.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>  2 files changed, 77 insertions(+)
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> 
+
+I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+that would use vendor sub-folder?
+Of course, appreciate maintainer's comments.
+
+Thanks,
+Shaokun
+
+> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> new file mode 100644
+> index 0000000..7167086
+> --- /dev/null
+> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> @@ -0,0 +1,15 @@
+> +# Format:
+> +#	MIDR,Version,JSON/file/pathname,Type
+> +#
+> +# where
+> +#	MIDR	Processor version
+> +#		Variant[23:20] and Revision [3:0] should be zero.
+> +#	Version could be used to track version of of JSON file
+> +#		but currently unused.
+> +#	JSON/file/pathname is the path to JSON file, relative
+> +#		to tools/perf/pmu-events/arch/arm64/.
+> +#	Type is core, uncore etc
+> +#
+> +#
+> +#Family-model,Version,Filename,EventType
+> +0x00000000420f5160,v1,thunderx2,core
+> diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> new file mode 100644
+> index 0000000..2db45c4
+> --- /dev/null
+> +++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> @@ -0,0 +1,62 @@
+> +[
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data cache access, read",
+> +        "EventCode": "0x40",
+> +        "EventName": "l1d_cache_rd",
+> +        "BriefDescription": "L1D cache read",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data cache access, write ",
+> +        "EventCode": "0x41",
+> +        "EventName": "l1d_cache_wr",
+> +        "BriefDescription": "L1D cache write",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data cache refill, read",
+> +        "EventCode": "0x42",
+> +        "EventName": "l1d_cache_refill_rd",
+> +        "BriefDescription": "L1D cache refill read",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data cache refill, write",
+> +        "EventCode": "0x43",
+> +        "EventName": "l1d_cache_refill_wr",
+> +        "BriefDescription": "L1D refill write",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data TLB refill, read",
+> +        "EventCode": "0x4C",
+> +        "EventName": "l1d_tlb_refill_rd",
+> +        "BriefDescription": "L1D tlb refill read",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data TLB refill, write",
+> +        "EventCode": "0x4D",
+> +        "EventName": "l1d_tlb_refill_wr",
+> +        "BriefDescription": "L1D tlb refill write",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
+> +        "EventCode": "0x4E",
+> +        "EventName": "l1d_tlb_rd",
+> +        "BriefDescription": "L1D tlb read",
+> +    },
+> +    {
+> +        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
+> +        "EventCode": "0x4F",
+> +        "EventName": "l1d_tlb_wr",
+> +        "BriefDescription": "L1D tlb write",
+> +    },
+> +    {
+> +        "PublicDescription": "Bus access read",
+> +        "EventCode": "0x60",
+> +        "EventName": "bus_access_rd",
+> +        "BriefDescription": "Bus access read",
+> +   },
+> +   {
+> +        "PublicDescription": "Bus access write",
+> +        "EventCode": "0x61",
+> +        "EventName": "bus_access_wr",
+> +        "BriefDescription": "Bus access write",
+> +   }
+> +]
+> 
