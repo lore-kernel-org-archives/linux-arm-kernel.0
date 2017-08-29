@@ -1,80 +1,41 @@
-From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Tue, 29 Aug 2017 22:26:51 +0200
-Subject: [RESEND PATCH 1/2] arm64: allwinner: a64: add SPI nodes
-In-Reply-To: <20170829202652.5476-1-stefan.bruens@rwth-aachen.de>
-References: <20170829202652.5476-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170829202652.5476-2-stefan.bruens@rwth-aachen.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 29 Aug 2017 22:19:43 +0200
+Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path
+ for system sleep
+In-Reply-To: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1957183.ZU1CWrAZoR@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 SPI controllers are register compatible to the h3/h5 SPI
-controllers.
+On Tuesday, August 29, 2017 4:56:42 PM CEST Ulf Hansson wrote:
+> The i2c designware platform driver, drivers/i2c/busses/i2c-designware-platdrv.c,
+> isn't well optimized for system sleep.
+> 
+> What makes this driver particularly interesting is because it's a cross-SoC
+> driver, which sometimes means there is an ACPI PM domain attached to the i2c
+> device and sometimes not. The driver is being used on both x86 and ARM.
+> 
+> In principle, to optimize the system sleep support in i2c driver, this series
+> enables the proven runtime PM centric path for the i2c driver. However, to do
+> that the ACPI PM domain also have to collaborate and understand this behaviour.
+> From earlier versions, Rafael has also pointed out that also the PM core needs
+> to be involved.
 
-The A64 has two SPI controllers, each with a single chip select.
-The handles for the DMA channels (23/24 for SPI0/SPI1) are omitted,
-as the A64 DMA controller node is currently missing.
+Earlier today I realized that drivers pointing their ->suspend_late and
+->resume_early callbacks, respectively, to pm_runtime_force_suspend() and
+pm_runtime_force_resume(), are fundamentally incompatible with any bus type
+doing nontrivial PM and with almost any nontrivial PM domains, for two reasons.
 
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+First, it basically requires the bus type or PM domain to expect that its
+->runtime_suspend callback may or may not be indirectly invoked from its
+own ->suspend_late callback, depending on the driver (and analogously
+for ->runtime_resume and ->resume early), which is insane.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index bd0f33b77f57..373cd14f0206 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -325,6 +325,16 @@
- 				drive-strength = <40>;
- 			};
- 
-+			spi0_pins: spi0 {
-+				pins = "PC0", "PC1", "PC2", "PC3";
-+				function = "spi0";
-+			};
-+
-+			spi1_pins: spi1 {
-+				pins = "PD0", "PD1", "PD2", "PD3";
-+				function = "spi1";
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
-@@ -527,5 +537,35 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 		};
-+
-+		spi0: spi at 01c68000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c68000 0x1000>;
-+			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
-+			clock-names = "ahb", "mod";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pins>;
-+			resets = <&ccu RST_BUS_SPI0>;
-+			status = "disabled";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		spi1: spi at 01c69000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c69000 0x1000>;
-+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
-+			clock-names = "ahb", "mod";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_pins>;
-+			resets = <&ccu RST_BUS_SPI1>;
-+			status = "disabled";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
- 	};
- };
--- 
-2.14.1
+Second, it is a layering violation, because it makes the driver effectively
+override the upper layer's decisions about what code to run.
+
+That's why I'm afraid that we've reached a dead end here. :-(
+
+Thanks,
+Rafael
