@@ -1,110 +1,89 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 29 Aug 2017 16:56:50 +0200
-Subject: [PATCH v3 8/8] i2c: designware: Deploy the runtime PM centric path
- for system sleep
-In-Reply-To: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
-References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1504018610-10822-9-git-send-email-ulf.hansson@linaro.org>
+Date: Tue, 29 Aug 2017 16:56:42 +0200
+Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path for
+ system sleep
+Message-ID: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the device is runtime resumed in the i2c-dw-plat driver's
-->suspend() callback, which is needed to manage system sleep properly.
+The i2c designware platform driver, drivers/i2c/busses/i2c-designware-platdrv.c,
+isn't well optimized for system sleep.
 
-The particular reason for the runtime resume is because the PM core may
-unset the direct_complete flag for a parent device, in case its child
-device are being system suspended before. This leads to that the
-i2c-dw-plat driver's ->suspend() callback can be invoked when the device is
-runtime suspended.
+What makes this driver particularly interesting is because it's a cross-SoC
+driver, which sometimes means there is an ACPI PM domain attached to the i2c
+device and sometimes not. The driver is being used on both x86 and ARM.
 
-Runtime resuming the device in this scenario may be unnecessary, in case
-when the device is already in its proper lower power state for system
-sleep. This behaviour increases the time it takes to put the device into
-low power state, but means also a waste of power.
+In principle, to optimize the system sleep support in i2c driver, this series
+enables the proven runtime PM centric path for the i2c driver. However, to do
+that the ACPI PM domain also have to collaborate and understand this behaviour.
+>From earlier versions, Rafael has also pointed out that also the PM core needs
+to be involved.
 
-Let's fix the behaviour by deploying the runtime PM centric path for system
-sleep, via assigning the pm_runtime_force_suspend|resume() helpers as the
-system sleep callbacks for the i2c-dw-plat driver. We must also inform the
-PM core and the ACPI PM domain that we are now using the runtime PM centric
-path, therefore we call dev_pm_use_rpm_sleep() during ->probe().
+Therefore a number of changes, patch 1 to patch 6, makes the needed changes to
+the PM core and the ACPI PM domain. In patch7 and patch 8, the i2c driver gets
+optimized and is converted to the runtime PM centric path for system sleep.
 
-While deploying the runtime PM centric path, the ->prepare() callback
-becomes redundant, so let's drop it.
+It shall be noted, the behaviour of the ACPI PM domain should remain intact,
+still taking benefit of using the direct_complete path during system sleep,
+except for those drivers that uses the runtime PM centric path.
 
-Along with these improvements, of course we also get the other regular
-benefits one get when deploying the runtime PM centric path.
+This series has been tested on an ARM64 Hikey board, which isn't having the
+i2c device attached to the ACPI PM domain. This means that the ACPI changes
+needs to be tested on some relevant Intel SoCs and it's greatly appreciated
+is someone could help out with this, so is of course review comments.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+Some news in v3:
+	- The fix for the i2c driver [1], is now present in Linus' tree from tag
+	v4.13-rc7 - and so does Rafael's tree.
+	- To simplify for testers, I have published a branch [3] based upon
+	Rafael's pm tree and linux-next branch.
+	- Rephrased some part of the coverletter to clarify the intent of this
+	series.
+	- Addressed review comments from v2.
 
-Changes in v3:
-	- Use dev_pm_use_rpm_sleep() instead of the earlier
-	acpi_disable_direct_complete() from v2.
-	- Updated changelog.
+Some news in v2:
+	- The v1 contained a fix for the i2c driver, this has been sent
+	separately [1] and picked up for fixes by Wolfram for v4.13-rcs. However
+	the fix has not yet reached Linus' tree. The changes on i2c driver
+	are based upon that change.
+	- To simplify for testers, I have published a branch [2] based upon
+	Rafael's pm tree and linux-next branch, which also includes the above
+	patch.
+	- Rephrased the coverletter to clarify the intent of this series.
+	- Addressed review comments from v1.
 
----
- drivers/i2c/busses/i2c-designware-platdrv.c | 26 +++++---------------------
- 1 file changed, 5 insertions(+), 21 deletions(-)
+[1]
+http://patchwork.ozlabs.org/patch/799803/
 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 38121c9..20db3c2 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -371,6 +371,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto exit_probe;
- 
-+	dev_pm_use_rpm_sleep(&pdev->dev);
- 	return ret;
- 
- exit_probe:
-@@ -412,15 +413,6 @@ static const struct of_device_id dw_i2c_of_match[] = {
- MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
- #endif
- 
--#ifdef CONFIG_PM_SLEEP
--static int dw_i2c_plat_prepare(struct device *dev)
--{
--	return pm_runtime_suspended(dev);
--}
--#else
--#define dw_i2c_plat_prepare	NULL
--#endif
--
- #ifdef CONFIG_PM
- static int dw_i2c_plat_runtime_suspend(struct device *dev)
- {
-@@ -433,7 +425,7 @@ static int dw_i2c_plat_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int dw_i2c_plat_resume(struct device *dev)
-+static int dw_i2c_plat_runtime_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-@@ -444,19 +436,11 @@ static int dw_i2c_plat_resume(struct device *dev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int dw_i2c_plat_suspend(struct device *dev)
--{
--	pm_runtime_resume(dev);
--	return dw_i2c_plat_runtime_suspend(dev);
--}
--#endif
--
- static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
--	.prepare = dw_i2c_plat_prepare,
--	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				     pm_runtime_force_resume)
- 	SET_RUNTIME_PM_OPS(dw_i2c_plat_runtime_suspend,
--			   dw_i2c_plat_resume,
-+			   dw_i2c_plat_runtime_resume,
- 			   NULL)
- };
- 
+[2]
+git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git acpi_pm_i2c_rpm_path_v2
+
+[3]
+git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git acpi_pm_i2c_rpm_path_v3
+
+Kind regards
+Ulf Hansson
+
+
+Ulf Hansson (8):
+  PM / Sleep: Make the runtime PM centric path known to the PM core
+  PM / ACPI: Restore acpi_subsys_complete()
+  PM / Sleep: Remove pm_complete_with_resume_check()
+  PM / ACPI: Split code validating need for runtime resume in
+    ->prepare()
+  PM / ACPI: Split acpi_lpss_suspend_late|resume_early()
+  PM / ACPI: Enable the runtime PM centric approach for system sleep
+  i2c: designware: Don't resume device in the ->complete() callback
+  i2c: designware: Deploy the runtime PM centric path for system sleep
+
+ drivers/acpi/acpi_lpss.c                    |  79 ++++++++++++++------
+ drivers/acpi/device_pm.c                    | 111 ++++++++++++++++++++++------
+ drivers/base/power/generic_ops.c            |  23 ------
+ drivers/base/power/main.c                   |  49 ++++++++++--
+ drivers/base/power/runtime.c                |   1 +
+ drivers/i2c/busses/i2c-designware-platdrv.c |  34 ++-------
+ include/linux/pm.h                          |   8 +-
+ 7 files changed, 204 insertions(+), 101 deletions(-)
+
 -- 
 2.7.4
