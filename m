@@ -1,34 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 29 Aug 2017 11:14:11 +0200
-Subject: [PATCH] clocksource: Delete an error message for a failed memory
- allocation in bcm2835_timer_init()
-In-Reply-To: <1907fa5f-e1c3-a2dd-99e0-f06150086351@users.sourceforge.net>
-References: <1907fa5f-e1c3-a2dd-99e0-f06150086351@users.sourceforge.net>
-Message-ID: <a292aac5-b98e-6f84-8ef4-e9a00c582ba8@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 29 Aug 2017 11:18:37 +0200
+Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
+In-Reply-To: <20170824114631.089d2628@bbrezillon> (Boris Brezillon's message
+ of "Thu, 24 Aug 2017 11:46:31 +0200")
+References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+ <20170821221339.70cfcfb7@bbrezillon> <87pobmoz8n.fsf@belgarion.home>
+ <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
+ <20170824114631.089d2628@bbrezillon>
+Message-ID: <87inh6pw9e.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/2017 21:46, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Sun, 27 Aug 2017 21:38:13 +0200
-> 
-> Omit an extra message for a memory allocation failure in this function.
-> 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
 
-I have applied it.
+> Hi Robert,
+> Wait a bit before applying. I think patches 6 to 9 have a dependency on
+> patch 1 (it's not a build dependency, but NAND partitioning might be
+> wrong if you apply them), so we need to sync. What release is
+> pxa/for-next targeting? If it's 4.15 I can apply patch 1 just after
+> 4.14-rc1 is out and provide an immutable branch for you to pull in
+> pxa/for-next.
 
-Thanks.
+Hi Boris,
 
-  -- Daniel
+It's targeting 4.15 right now. And we can do as you like, either an immutable
+branch, or I wait to include these patches into my pxa/for-next until you give
+me your go, it's as you like.
 
+Cheers.
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Robert
