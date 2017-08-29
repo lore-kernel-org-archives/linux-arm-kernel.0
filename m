@@ -1,47 +1,43 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Aug 2017 12:00:55 +0200
-Subject: [PATCH RFC v3 2/9] KVM: arm/arm64: fix vcpu self-detection in
- vgic_v3_dispatch_sgi()
-In-Reply-To: <20170821203530.9266-3-rkrcmar@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-3-rkrcmar@redhat.com>
-Message-ID: <20170829100055.GV24649@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Aug 2017 11:01:12 +0100
+Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
+In-Reply-To: <20170824173049.GG29665@leverpostej>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-15-takahiro.akashi@linaro.org>
+ <20170824173049.GG29665@leverpostej>
+Message-ID: <20170829100112.GC2901@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 10:35:23PM +0200, Radim Kr?m?? wrote:
-> The index in kvm->vcpus array and vcpu->vcpu_id are very different
-> things.  Comparing struct kvm_vcpu pointers is a sure way to know.
+On Thu, Aug 24, 2017 at 06:30:50PM +0100, Mark Rutland wrote:
+> On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
+> > The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
+> > will be loaded at the offset of TEXT_OFFSET from the begining of system
+> > memory. The other PT_LOAD segments are placed relative to the first one.
 > 
-> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+> I really don't like assuming things about the vmlinux ELF file.
+> 
+> > Regarding kernel verification, since there is no standard way to contain
+> > a signature within elf binary, we follow PowerPC's (not yet upstreamed)
+> > approach, that is, appending a signature right after the kernel binary
+> > itself like module signing.
+> 
+> I also *really* don't like this. It's a bizarre in-band mechanism,
+> without explcit information. It's not a nice ABI.
+> 
+> If we can load an Image, why do we need to be able to load a vmlinux?
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
+So IIUC, the whole point of this is to be able to kexec_file_load() a
+vmlinux + signature bundle, for !CONFIG_EFI kernels.
 
-> ---
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 408ef06638fc..9d4b69b766ec 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -797,7 +797,6 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  	u16 target_cpus;
->  	u64 mpidr;
->  	int sgi, c;
-> -	int vcpu_id = vcpu->vcpu_id;
->  	bool broadcast;
->  
->  	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
-> @@ -821,7 +820,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  			break;
->  
->  		/* Don't signal the calling VCPU */
-> -		if (broadcast && c == vcpu_id)
-> +		if (broadcast && c_vcpu == vcpu)
->  			continue;
->  
->  		if (!broadcast) {
-> -- 
-> 2.13.3
-> 
+For that, I think that we actually need a new kexec_file_load${N}
+syscall, where we can pass the signature for the kernel as a separate
+file. Ideally also with a flags argument and perhaps the ability to sign
+the initrd too.
+
+That way we don't ahve to come up with a magic vmlinux+signature format,
+as we can just pass a regular image and a signature for that image
+separately. That should work for PPC and others, too.
+
+Thanks,
+Mark.
