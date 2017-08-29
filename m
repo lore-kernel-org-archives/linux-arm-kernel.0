@@ -1,256 +1,267 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 29 Aug 2017 16:32:35 +0200
-Subject: [PATCH v11 3/3] PCI: tango: Add MSI controller support
-In-Reply-To: <f10055cc-4430-ff30-f892-3d3d6f24354c@sigmadesigns.com>
-References: <f10055cc-4430-ff30-f892-3d3d6f24354c@sigmadesigns.com>
-Message-ID: <7217503d-5996-f43f-ee56-1b7719d8ac8a@sigmadesigns.com>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Tue, 29 Aug 2017 20:09:03 +0530
+Subject: [PATCH] rtc: remove cast to void pointer
+Message-ID: <1504017543-19720-1-git-send-email-himanshujha199640@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSI controller in Tango supports 256 message-signaled interrupts
-and a single doorbell address.
+casting to void pointer from any pointer type and vice-versa is done
+implicitly and therefore casting is not needed in such a case.
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
 ---
-Changes from v10 to v11
-* Discover msi_doorbell in probe by parsing dma-ranges
----
- drivers/pci/host/pcie-tango.c | 205 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 202 insertions(+), 3 deletions(-)
+ drivers/rtc/interface.c      | 4 ++--
+ drivers/rtc/rtc-88pm80x.c    | 2 +-
+ drivers/rtc/rtc-88pm860x.c   | 2 +-
+ drivers/rtc/rtc-at32ap700x.c | 2 +-
+ drivers/rtc/rtc-hym8563.c    | 2 +-
+ drivers/rtc/rtc-m48t59.c     | 2 +-
+ drivers/rtc/rtc-max8925.c    | 2 +-
+ drivers/rtc/rtc-pic32.c      | 2 +-
+ drivers/rtc/rtc-s3c.c        | 4 ++--
+ drivers/rtc/rtc-st-lpc.c     | 2 +-
+ drivers/rtc/rtc-stm32.c      | 2 +-
+ drivers/rtc/rtc-sun6i.c      | 2 +-
+ drivers/rtc/rtc-sunxi.c      | 2 +-
+ drivers/rtc/rtc-vr41xx.c     | 4 ++--
+ drivers/rtc/rtc-xgene.c      | 2 +-
+ drivers/rtc/rtc-zynqmp.c     | 2 +-
+ 16 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
-index 6bbb81f06a53..e23f7383ac33 100644
---- a/drivers/pci/host/pcie-tango.c
-+++ b/drivers/pci/host/pcie-tango.c
-@@ -1,12 +1,172 @@
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/pci-ecam.h>
- #include <linux/delay.h>
--#include <linux/of.h>
-+#include <linux/msi.h>
-+#include <linux/of_address.h>
-+
-+#define MSI_MAX			256
- 
- #define SMP8759_MUX		0x48
- #define SMP8759_TEST_OUT	0x74
-+#define SMP8759_DOORBELL	0x7c
-+#define SMP8759_STATUS		0x80
-+#define SMP8759_ENABLE		0xa0
- 
- struct tango_pcie {
--	void __iomem *base;
-+	DECLARE_BITMAP(used_msi, MSI_MAX);
-+	u64			msi_doorbell;
-+	spinlock_t		used_msi_lock;
-+	void __iomem		*base;
-+	struct irq_domain	*dom;
-+};
-+
-+static void tango_msi_isr(struct irq_desc *desc)
-+{
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct tango_pcie *pcie = irq_desc_get_handler_data(desc);
-+	unsigned long status, base, virq, idx, pos = 0;
-+
-+	chained_irq_enter(chip, desc);
-+	spin_lock(&pcie->used_msi_lock);
-+
-+	while ((pos = find_next_bit(pcie->used_msi, MSI_MAX, pos)) < MSI_MAX) {
-+		base = round_down(pos, 32);
-+		status = readl_relaxed(pcie->base + SMP8759_STATUS + base / 8);
-+		for_each_set_bit(idx, &status, 32) {
-+			virq = irq_find_mapping(pcie->dom, base + idx);
-+			generic_handle_irq(virq);
-+		}
-+		pos = base + 32;
-+	}
-+
-+	spin_unlock(&pcie->used_msi_lock);
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static void tango_ack(struct irq_data *d)
-+{
-+	struct tango_pcie *pcie = d->chip_data;
-+	u32 offset = (d->hwirq / 32) * 4;
-+	u32 bit = BIT(d->hwirq % 32);
-+
-+	writel_relaxed(bit, pcie->base + SMP8759_STATUS + offset);
-+}
-+
-+static void update_msi_enable(struct irq_data *d, bool unmask)
-+{
-+	unsigned long flags;
-+	struct tango_pcie *pcie = d->chip_data;
-+	u32 offset = (d->hwirq / 32) * 4;
-+	u32 bit = BIT(d->hwirq % 32);
-+	u32 val;
-+
-+	spin_lock_irqsave(&pcie->used_msi_lock, flags);
-+	val = readl_relaxed(pcie->base + SMP8759_ENABLE + offset);
-+	val = unmask ? val | bit : val & ~bit;
-+	writel_relaxed(val, pcie->base + SMP8759_ENABLE + offset);
-+	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
-+}
-+
-+static void tango_mask(struct irq_data *d)
-+{
-+	update_msi_enable(d, false);
-+}
-+
-+static void tango_unmask(struct irq_data *d)
-+{
-+	update_msi_enable(d, true);
-+}
-+
-+static int tango_set_affinity(struct irq_data *d, const struct cpumask *mask,
-+			      bool force)
-+{
-+	return -EINVAL;
-+}
-+
-+static void tango_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
-+{
-+	struct tango_pcie *pcie = d->chip_data;
-+	msg->address_lo = lower_32_bits(pcie->msi_doorbell);
-+	msg->address_hi = upper_32_bits(pcie->msi_doorbell);
-+	msg->data = d->hwirq;
-+}
-+
-+static struct irq_chip tango_chip = {
-+	.irq_ack		= tango_ack,
-+	.irq_mask		= tango_mask,
-+	.irq_unmask		= tango_unmask,
-+	.irq_set_affinity	= tango_set_affinity,
-+	.irq_compose_msi_msg	= tango_compose_msi_msg,
-+};
-+
-+static void msi_ack(struct irq_data *d)
-+{
-+	irq_chip_ack_parent(d);
-+}
-+
-+static void msi_mask(struct irq_data *d)
-+{
-+	pci_msi_mask_irq(d);
-+	irq_chip_mask_parent(d);
-+}
-+
-+static void msi_unmask(struct irq_data *d)
-+{
-+	pci_msi_unmask_irq(d);
-+	irq_chip_unmask_parent(d);
-+}
-+
-+static struct irq_chip msi_chip = {
-+	.name = "MSI",
-+	.irq_ack = msi_ack,
-+	.irq_mask = msi_mask,
-+	.irq_unmask = msi_unmask,
-+};
-+
-+static struct msi_domain_info msi_dom_info = {
-+	.flags	= MSI_FLAG_PCI_MSIX
-+		| MSI_FLAG_USE_DEF_DOM_OPS
-+		| MSI_FLAG_USE_DEF_CHIP_OPS,
-+	.chip	= &msi_chip,
-+};
-+
-+static int tango_irq_domain_alloc(struct irq_domain *dom, unsigned int virq,
-+				  unsigned int nr_irqs, void *args)
-+{
-+	struct tango_pcie *pcie = dom->host_data;
-+	unsigned long flags;
-+	int pos;
-+
-+	spin_lock_irqsave(&pcie->used_msi_lock, flags);
-+	pos = find_first_zero_bit(pcie->used_msi, MSI_MAX);
-+	if (pos >= MSI_MAX) {
-+		spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
-+		return -ENOSPC;
-+	}
-+	__set_bit(pos, pcie->used_msi);
-+	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
-+	irq_domain_set_info(dom, virq, pos, &tango_chip,
-+			pcie, handle_edge_irq, NULL, NULL);
-+
-+	return 0;
-+}
-+
-+static void tango_irq_domain_free(struct irq_domain *dom, unsigned int virq,
-+				  unsigned int nr_irqs)
-+{
-+	unsigned long flags;
-+	struct irq_data *d = irq_domain_get_irq_data(dom, virq);
-+	struct tango_pcie *pcie = d->chip_data;
-+
-+	spin_lock_irqsave(&pcie->used_msi_lock, flags);
-+	__clear_bit(d->hwirq, pcie->used_msi);
-+	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
-+}
-+
-+static const struct irq_domain_ops dom_ops = {
-+	.alloc	= tango_irq_domain_alloc,
-+	.free	= tango_irq_domain_free,
- };
- 
- static int smp8759_config_read(struct pci_bus *bus, unsigned int devfn,
-@@ -76,7 +236,11 @@ static int tango_pcie_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct tango_pcie *pcie;
- 	struct resource *res;
--	int ret;
-+	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
-+	struct irq_domain *msi_dom, *irq_dom;
-+	struct of_pci_range_parser parser;
-+	struct of_pci_range range;
-+	int virq, offset;
- 
- 	dev_warn(dev, "simultaneous PCI config and MMIO accesses may cause data corruption\n");
- 	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
-@@ -95,6 +259,41 @@ static int tango_pcie_probe(struct platform_device *pdev)
- 	if (!tango_pcie_link_up(pcie))
- 		return -ENODEV;
- 
-+	if (of_pci_dma_range_parser_init(&parser, dev->of_node) < 0)
-+		return -ENOENT;
-+
-+	if (of_pci_range_parser_one(&parser, &range) == NULL)
-+		return -ENOENT;
-+
-+	range.pci_addr += range.size;
-+	pcie->msi_doorbell = range.pci_addr + res->start + SMP8759_DOORBELL;
-+
-+	for (offset = 0; offset < MSI_MAX / 8; offset += 4)
-+		writel_relaxed(0, pcie->base + SMP8759_ENABLE + offset);
-+
-+	virq = platform_get_irq(pdev, 1);
-+	if (virq <= 0) {
-+		dev_err(dev, "Failed to map IRQ\n");
-+		return -ENXIO;
-+	}
-+
-+	irq_dom = irq_domain_create_linear(fwnode, MSI_MAX, &dom_ops, pcie);
-+	if (!irq_dom) {
-+		dev_err(dev, "Failed to create IRQ domain\n");
-+		return -ENOMEM;
-+	}
-+
-+	msi_dom = pci_msi_create_irq_domain(fwnode, &msi_dom_info, irq_dom);
-+	if (!msi_dom) {
-+		dev_err(dev, "Failed to create MSI domain\n");
-+		irq_domain_remove(irq_dom);
-+		return -ENOMEM;
-+	}
-+
-+	pcie->dom = irq_dom;
-+	spin_lock_init(&pcie->used_msi_lock);
-+	irq_set_chained_handler_and_data(virq, tango_msi_isr, pcie);
-+
- 	return pci_host_common_probe(pdev, &smp8759_ecam_ops);
+diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+index 8cec9a0..81c85d2 100644
+--- a/drivers/rtc/interface.c
++++ b/drivers/rtc/interface.c
+@@ -528,7 +528,7 @@ void rtc_handle_legacy_irq(struct rtc_device *rtc, int num, int mode)
+  */
+ void rtc_aie_update_irq(void *private)
+ {
+-	struct rtc_device *rtc = (struct rtc_device *)private;
++	struct rtc_device *rtc = private;
+ 	rtc_handle_legacy_irq(rtc, 1, RTC_AF);
  }
  
+@@ -541,7 +541,7 @@ void rtc_aie_update_irq(void *private)
+  */
+ void rtc_uie_update_irq(void *private)
+ {
+-	struct rtc_device *rtc = (struct rtc_device *)private;
++	struct rtc_device *rtc = private;
+ 	rtc_handle_legacy_irq(rtc, 1,  RTC_UF);
+ }
+ 
+diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
+index 466bf7f..819612e 100644
+--- a/drivers/rtc/rtc-88pm80x.c
++++ b/drivers/rtc/rtc-88pm80x.c
+@@ -60,7 +60,7 @@ struct pm80x_rtc_info {
+ 
+ static irqreturn_t rtc_update_handler(int irq, void *data)
+ {
+-	struct pm80x_rtc_info *info = (struct pm80x_rtc_info *)data;
++	struct pm80x_rtc_info *info = data;
+ 	int mask;
+ 
+ 	mask = PM800_ALARM | PM800_ALARM_WAKEUP;
+diff --git a/drivers/rtc/rtc-88pm860x.c b/drivers/rtc/rtc-88pm860x.c
+index 19e53b3..67f7fa3 100644
+--- a/drivers/rtc/rtc-88pm860x.c
++++ b/drivers/rtc/rtc-88pm860x.c
+@@ -59,7 +59,7 @@ struct pm860x_rtc_info {
+ 
+ static irqreturn_t rtc_update_handler(int irq, void *data)
+ {
+-	struct pm860x_rtc_info *info = (struct pm860x_rtc_info *)data;
++	struct pm860x_rtc_info *info = data;
+ 	int mask;
+ 
+ 	mask = ALARM | ALARM_WAKEUP;
+diff --git a/drivers/rtc/rtc-at32ap700x.c b/drivers/rtc/rtc-at32ap700x.c
+index de8bf56..f603f99 100644
+--- a/drivers/rtc/rtc-at32ap700x.c
++++ b/drivers/rtc/rtc-at32ap700x.c
+@@ -164,7 +164,7 @@ static int at32_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 
+ static irqreturn_t at32_rtc_interrupt(int irq, void *dev_id)
+ {
+-	struct rtc_at32ap700x *rtc = (struct rtc_at32ap700x *)dev_id;
++	struct rtc_at32ap700x *rtc = dev_id;
+ 	unsigned long isr = rtc_readl(rtc, ISR);
+ 	unsigned long events = 0;
+ 	int ret = IRQ_NONE;
+diff --git a/drivers/rtc/rtc-hym8563.c b/drivers/rtc/rtc-hym8563.c
+index e5ad527..0709968 100644
+--- a/drivers/rtc/rtc-hym8563.c
++++ b/drivers/rtc/rtc-hym8563.c
+@@ -436,7 +436,7 @@ static struct clk *hym8563_clkout_register_clk(struct hym8563 *hym8563)
+  */
+ static irqreturn_t hym8563_irq(int irq, void *dev_id)
+ {
+-	struct hym8563 *hym8563 = (struct hym8563 *)dev_id;
++	struct hym8563 *hym8563 = dev_id;
+ 	struct i2c_client *client = hym8563->client;
+ 	struct mutex *lock = &hym8563->rtc->ops_lock;
+ 	int data, ret;
+diff --git a/drivers/rtc/rtc-m48t59.c b/drivers/rtc/rtc-m48t59.c
+index d99a705..2e35f73 100644
+--- a/drivers/rtc/rtc-m48t59.c
++++ b/drivers/rtc/rtc-m48t59.c
+@@ -302,7 +302,7 @@ static int m48t59_rtc_proc(struct device *dev, struct seq_file *seq)
+  */
+ static irqreturn_t m48t59_rtc_interrupt(int irq, void *dev_id)
+ {
+-	struct device *dev = (struct device *)dev_id;
++	struct device *dev = dev_id;
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct m48t59_plat_data *pdata = dev_get_platdata(&pdev->dev);
+ 	struct m48t59_private *m48t59 = platform_get_drvdata(pdev);
+diff --git a/drivers/rtc/rtc-max8925.c b/drivers/rtc/rtc-max8925.c
+index 67d6fc2..45d7e40 100644
+--- a/drivers/rtc/rtc-max8925.c
++++ b/drivers/rtc/rtc-max8925.c
+@@ -74,7 +74,7 @@ struct max8925_rtc_info {
+ 
+ static irqreturn_t rtc_update_handler(int irq, void *data)
+ {
+-	struct max8925_rtc_info *info = (struct max8925_rtc_info *)data;
++	struct max8925_rtc_info *info = data;
+ 
+ 	/* disable ALARM0 except for 1SEC alarm */
+ 	max8925_set_bits(info->rtc, MAX8925_ALARM0_CNTL, 0x7f, 0);
+diff --git a/drivers/rtc/rtc-pic32.c b/drivers/rtc/rtc-pic32.c
+index 5cfb6df..04788c3 100644
+--- a/drivers/rtc/rtc-pic32.c
++++ b/drivers/rtc/rtc-pic32.c
+@@ -92,7 +92,7 @@ static void pic32_rtc_alarm_clk_enable(struct pic32_rtc_dev *pdata,
+ 
+ static irqreturn_t pic32_rtc_alarmirq(int irq, void *id)
+ {
+-	struct pic32_rtc_dev *pdata = (struct pic32_rtc_dev *)id;
++	struct pic32_rtc_dev *pdata = id;
+ 
+ 	clk_enable(pdata->clk);
+ 	rtc_update_irq(pdata->rtc, 1, RTC_AF | RTC_IRQF);
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index a8992c2..8e8a815 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -113,7 +113,7 @@ static void s3c_rtc_disable_clk(struct s3c_rtc *info)
+ /* IRQ Handlers */
+ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
+ {
+-	struct s3c_rtc *info = (struct s3c_rtc *)id;
++	struct s3c_rtc *info = id;
+ 
+ 	if (info->data->irq_handler)
+ 		info->data->irq_handler(info, S3C2410_INTP_TIC);
+@@ -123,7 +123,7 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
+ 
+ static irqreturn_t s3c_rtc_alarmirq(int irq, void *id)
+ {
+-	struct s3c_rtc *info = (struct s3c_rtc *)id;
++	struct s3c_rtc *info = id;
+ 
+ 	if (info->data->irq_handler)
+ 		info->data->irq_handler(info, S3C2410_INTP_ALM);
+diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
+index 82b0af1..75eb92c 100644
+--- a/drivers/rtc/rtc-st-lpc.c
++++ b/drivers/rtc/rtc-st-lpc.c
+@@ -74,7 +74,7 @@ static void st_rtc_set_hw_alarm(struct st_rtc *rtc,
+ 
+ static irqreturn_t st_rtc_handler(int this_irq, void *data)
+ {
+-	struct st_rtc *rtc = (struct st_rtc *)data;
++	struct st_rtc *rtc = data;
+ 
+ 	rtc_update_irq(rtc->rtc_dev, 1, RTC_AF);
+ 
+diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
+index 3a5c3d7..66fc7ba 100644
+--- a/drivers/rtc/rtc-stm32.c
++++ b/drivers/rtc/rtc-stm32.c
+@@ -169,7 +169,7 @@ static int stm32_rtc_wait_sync(struct stm32_rtc *rtc)
+ 
+ static irqreturn_t stm32_rtc_alarm_irq(int irq, void *dev_id)
+ {
+-	struct stm32_rtc *rtc = (struct stm32_rtc *)dev_id;
++	struct stm32_rtc *rtc = dev_id;
+ 	unsigned int isr, cr;
+ 
+ 	mutex_lock(&rtc->rtc_dev->ops_lock);
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index 305c4d0..496a8dd 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -256,7 +256,7 @@ CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
+ 
+ static irqreturn_t sun6i_rtc_alarmirq(int irq, void *id)
+ {
+-	struct sun6i_rtc_dev *chip = (struct sun6i_rtc_dev *) id;
++	struct sun6i_rtc_dev *chip = id;
+ 	irqreturn_t ret = IRQ_NONE;
+ 	u32 val;
+ 
+diff --git a/drivers/rtc/rtc-sunxi.c b/drivers/rtc/rtc-sunxi.c
+index abada60..f1f7fd7 100644
+--- a/drivers/rtc/rtc-sunxi.c
++++ b/drivers/rtc/rtc-sunxi.c
+@@ -158,7 +158,7 @@ struct sunxi_rtc_dev {
+ 
+ static irqreturn_t sunxi_rtc_alarmirq(int irq, void *id)
+ {
+-	struct sunxi_rtc_dev *chip = (struct sunxi_rtc_dev *) id;
++	struct sunxi_rtc_dev *chip = id;
+ 	u32 val;
+ 
+ 	val = readl(chip->base + SUNXI_ALRM_IRQ_STA);
+diff --git a/drivers/rtc/rtc-vr41xx.c b/drivers/rtc/rtc-vr41xx.c
+index 7ce2296..a0aa377 100644
+--- a/drivers/rtc/rtc-vr41xx.c
++++ b/drivers/rtc/rtc-vr41xx.c
+@@ -228,7 +228,7 @@ static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 
+ static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
+ {
+-	struct platform_device *pdev = (struct platform_device *)dev_id;
++	struct platform_device *pdev = dev_id;
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+ 
+ 	rtc2_write(RTCINTREG, ELAPSEDTIME_INT);
+@@ -240,7 +240,7 @@ static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
+ 
+ static irqreturn_t rtclong1_interrupt(int irq, void *dev_id)
+ {
+-	struct platform_device *pdev = (struct platform_device *)dev_id;
++	struct platform_device *pdev = dev_id;
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+ 	unsigned long count = periodic_count;
+ 
+diff --git a/drivers/rtc/rtc-xgene.c b/drivers/rtc/rtc-xgene.c
+index 65b432a..2b8247d 100644
+--- a/drivers/rtc/rtc-xgene.c
++++ b/drivers/rtc/rtc-xgene.c
+@@ -131,7 +131,7 @@ static const struct rtc_class_ops xgene_rtc_ops = {
+ 
+ static irqreturn_t xgene_rtc_interrupt(int irq, void *id)
+ {
+-	struct xgene_rtc_dev *pdata = (struct xgene_rtc_dev *) id;
++	struct xgene_rtc_dev *pdata = id;
+ 
+ 	/* Check if interrupt asserted */
+ 	if (!(readl(pdata->csr_base + RTC_STAT) & RTC_STAT_BIT))
+diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
+index da18a8a..f2f8a2d 100644
+--- a/drivers/rtc/rtc-zynqmp.c
++++ b/drivers/rtc/rtc-zynqmp.c
+@@ -193,7 +193,7 @@ static const struct rtc_class_ops xlnx_rtc_ops = {
+ 
+ static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
+ {
+-	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *)id;
++	struct xlnx_rtc_dev *xrtcdev = id;
+ 	unsigned int status;
+ 
+ 	status = readl(xrtcdev->reg_base + RTC_INT_STS);
 -- 
-2.11.0
+2.7.4
