@@ -1,130 +1,37 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Aug 2017 11:39:02 +0200
-Subject: [RFC PATCH 4/4] KVM: arm/arm64: Provide a vgic interrupt line level
- sample function
-In-Reply-To: <20170829093902.15379-1-cdall@linaro.org>
-References: <20170829093902.15379-1-cdall@linaro.org>
-Message-ID: <20170829093902.15379-5-cdall@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Aug 2017 11:52:17 +0200
+Subject: [PATCH V3 1/8] drivers: Add boot constraints core
+In-Reply-To: <20170829063923.GD12198@kroah.com>
+References: <cover.1501578037.git.viresh.kumar@linaro.org>
+ <1a844e27ee7e0b22acf8ea582bf4e8d35f54c84a.1501578037.git.viresh.kumar@linaro.org>
+ <20170829063923.GD12198@kroah.com>
+Message-ID: <20170829095217.GA3101@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC sometimes need to sample the physical line of a mapped
-interrupt.  As we know this to be notoriously slow, provide a callback
-function for devices (such as the timer) which can do this much faster
-than talking to the distributor, for example by comparing a few
-in-memory values.  Fall back to the good old method of poking the
-physical GIC if no callback is provided.
+On 29-08-17, 08:39, Greg Kroah-Hartman wrote:
+> How is this information getting to the kernel from the bootloader?  I
+> didn't see where that happened, just a single example driver that
+> somehow "knew" what had to happen, which seems odd...
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- include/kvm/arm_vgic.h    | 13 ++++++++++++-
- virt/kvm/arm/arch_timer.c | 16 +++++++++++++++-
- virt/kvm/arm/vgic/vgic.c  |  7 ++++++-
- 3 files changed, 33 insertions(+), 3 deletions(-)
+I tried to do it with DT earlier, but we couldn't reach to an agreement on what
+bindings to add and so this series started doing things the old way. The kernel
+would have platform specific drivers, which would exactly know what constraints
+to set and we wouldn't need the bootloaders to pass anything for now.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 53f631b..a52990b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -125,6 +125,17 @@ struct vgic_irq {
- 	u8 priority;
- 	enum vgic_irq_config config;	/* Level or edge */
- 
-+	/*
-+	 * Callback function pointer to in-kernel devices that can tell us the
-+	 * state of the input level of mapped level-triggered IRQ faster than
-+	 * peaking into the physical GIC.
-+	 *
-+	 * Always called in non-preemptible section and the functions can use
-+	 * kvm_arm_get_running_vcpu() to get the vcpu pointer for private
-+	 * IRQs.
-+	 */
-+	bool (*get_input_level)(int vintid);
-+
- 	void *owner;			/* Opaque pointer to reserve an interrupt
- 					   for in-kernel devices. */
- };
-@@ -309,7 +320,7 @@ void kvm_vgic_init_cpu_hardware(void);
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level, void *owner);
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid);
-+			  u32 vintid, bool (*callback)(int vindid));
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index b24e2f7..82169ef 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -643,6 +643,19 @@ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
-+static bool timer_get_input_level(int vintid)
-+{
-+	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-+	struct arch_timer_context *timer;
-+
-+	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
-+		timer = vcpu_vtimer(vcpu);
-+	else
-+		BUG(); /* We only map the vtimer so far */
-+
-+	return kvm_timer_should_fire(timer);
-+}
-+
- int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -664,7 +677,8 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	}
- 
--	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
-+	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
-+				    &timer_get_input_level);
- 	if (ret)
- 		return ret;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index e3ce2fa..0466c10 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -147,6 +147,9 @@ bool vgic_irq_line_level(struct vgic_irq *irq)
- 
- 	BUG_ON(!irq->hw);
- 
-+	if (irq->get_input_level)
-+		return irq->get_input_level(irq->intid);
-+
- 	WARN_ON(irq_get_irqchip_state(irq->host_irq,
- 				      IRQCHIP_STATE_PENDING,
- 				      &line_level));
-@@ -429,7 +432,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- }
- 
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid)
-+			  u32 vintid, bool (*callback)(int vindid))
- {
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	struct irq_desc *desc;
-@@ -456,6 +459,7 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
- 	irq->hw = true;
- 	irq->host_irq = host_irq;
- 	irq->hwintid = data->hwirq;
-+	irq->get_input_level = callback;
- 
- out:
- 	spin_unlock(&irq->irq_lock);
-@@ -476,6 +480,7 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
- 	spin_lock(&irq->irq_lock);
- 	irq->hw = false;
- 	irq->hwintid = 0;
-+	irq->get_input_level = NULL;
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
+> This is a lot of new code for no users,
+
+I agree and so added the patch 8/8 to show a real user. I will convert that to a
+patch going forward, which can be merged along with this series.
+
+> I would like to see at least 3
+> real drivers that are using it before we merge it, as then you have a
+> chance of getting the user/kernel api correct.
+
+Hmm, so I am quite sure that this is a fairly generic problem to solve,
+specifically for all the handheld devices. I can get code for few of the Qcom
+SoCs but they may end up using the same platform driver. Not sure if I can get
+code for multiple SoC families in the beginning.
+
 -- 
-2.9.0
+viresh
