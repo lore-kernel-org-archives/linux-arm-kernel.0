@@ -1,49 +1,33 @@
-From: himanshujha199640@gmail.com (Himanshu Jha)
-Date: Tue, 29 Aug 2017 19:16:59 +0530
-Subject: [PATCH] rtc: Use PTR_ERR_OR_ZERO
-Message-ID: <1504014419-16894-1-git-send-email-himanshujha199640@gmail.com>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Tue, 29 Aug 2017 15:38:52 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <59A56C15.2000403@linux.intel.com>
+References: <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
+ <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+ <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com>
+Message-ID: <20170829133852.GA13355@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+On Tue, Aug 29, 2017 at 04:28:53PM +0300, Mathias Nyman wrote:
+> Then again it might be a bit too drastic to kill xhci just because
+> we read 0xffffffff once from a mmio xhci register. Maybe we should
+> return an error a couple times before actually tearing down xhci.
+> 
+> This tight check was originally done to detect pci hotplug removed
+> hosts as soon as possible.
 
-Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
----
- drivers/rtc/rtc-digicolor.c | 5 +----
- drivers/rtc/rtc-ds1347.c    | 5 +----
- 2 files changed, 2 insertions(+), 8 deletions(-)
+Just make pci_dev_is_disconnected() public to detect PCI hot removal.
+We *know* when the device was hot removed, so I think there's no need
+to guess that based on reading "all ones" from mmio (which may happen
+for entirely legitimate reasons unrelated to hot removal).
 
-diff --git a/drivers/rtc/rtc-digicolor.c b/drivers/rtc/rtc-digicolor.c
-index b253bf1..1e200a0 100644
---- a/drivers/rtc/rtc-digicolor.c
-+++ b/drivers/rtc/rtc-digicolor.c
-@@ -202,10 +202,7 @@ static int __init dc_rtc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, rtc);
- 	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
- 						&dc_rtc_ops, THIS_MODULE);
--	if (IS_ERR(rtc->rtc_dev))
--		return PTR_ERR(rtc->rtc_dev);
--
--	return 0;
-+	return PTR_ERR_OR_ZERO(rtc->rtc_dev);
- }
- 
- static const struct of_device_id dc_dt_ids[] = {
-diff --git a/drivers/rtc/rtc-ds1347.c b/drivers/rtc/rtc-ds1347.c
-index ccfc9d4..9a02ca7 100644
---- a/drivers/rtc/rtc-ds1347.c
-+++ b/drivers/rtc/rtc-ds1347.c
-@@ -155,10 +155,7 @@ static int ds1347_probe(struct spi_device *spi)
- 	rtc = devm_rtc_device_register(&spi->dev, "ds1347",
- 				&ds1347_rtc_ops, THIS_MODULE);
- 
--	if (IS_ERR(rtc))
--		return PTR_ERR(rtc);
--
--	return 0;
-+	return PTR_ERR_OR_ZERO(rtc);
- }
- 
- static struct spi_driver ds1347_driver = {
--- 
-2.7.4
+Thanks,
+
+Lukas
