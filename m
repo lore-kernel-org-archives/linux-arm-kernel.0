@@ -1,29 +1,25 @@
 From: cohuck@redhat.com (Cornelia Huck)
-Date: Tue, 29 Aug 2017 13:23:42 +0200
+Date: Tue, 29 Aug 2017 13:26:35 +0200
 Subject: [PATCH RFC v3 1/9] KVM: s390: optimize detection of started vcpus
-In-Reply-To: <67a8b09c-3e7a-943d-8684-f9ad6e70514b@redhat.com>
+In-Reply-To: <20170821203530.9266-2-rkrcmar@redhat.com>
 References: <20170821203530.9266-1-rkrcmar@redhat.com>
  <20170821203530.9266-2-rkrcmar@redhat.com>
- <67a8b09c-3e7a-943d-8684-f9ad6e70514b@redhat.com>
-Message-ID: <20170829132342.1ef25500.cohuck@redhat.com>
+Message-ID: <20170829132635.23941a6f.cohuck@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Aug 2017 13:31:27 +0200
-David Hildenbrand <david@redhat.com> wrote:
+On Mon, 21 Aug 2017 22:35:22 +0200
+Radim Kr?m?? <rkrcmar@redhat.com> wrote:
 
-> On 21.08.2017 22:35, Radim Kr?m?? wrote:
-> > We can add a variable instead of scanning all online VCPUs to know how
-> > many are started.  We can't trivially tell which VCPU is the last one,
-> > though.  
+> We can add a variable instead of scanning all online VCPUs to know how
+> many are started.  We can't trivially tell which VCPU is the last one,
+> though.
 > 
-> You could keep the started vcpus in a list. Then you might drop unsigned
-> started_vcpus;
-> 
-> No started vcpus: Start pointer NULL
-> Single started vcpu: Only one element in the list (easy to check)
-> > 1 started vcpus: More than one element int he list (easy to check)  
+> Suggested-by: Cornelia Huck <cohuck@redhat.com>
+> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+> ---
+>  arch/s390/include/asm/kvm_host.h |  1 +
+>  arch/s390/kvm/kvm-s390.c         | 39 +++++++++++++++------------------------
+>  2 files changed, 16 insertions(+), 24 deletions(-)
 
-I'm not sure the added complication of keeping a list buys us much
-here: We only have the "look for the last vcpu not stopped" operation
-for the 2->1 transition.
+Modulo the bug noticed by Christian, I think this looks good.
