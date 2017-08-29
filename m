@@ -1,44 +1,69 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 29 Aug 2017 09:40:06 +0200
-Subject: [PATCH 1/2] mtd: spi-nor: add an option to force 3byte adressing
- mode
-In-Reply-To: <37be90e4-c43b-26f8-7551-45ab107e2a4d@gmail.com>
-References: <1503954854-30963-1-git-send-email-mw@semihalf.com>
- <1503954854-30963-2-git-send-email-mw@semihalf.com>
- <37be90e4-c43b-26f8-7551-45ab107e2a4d@gmail.com>
-Message-ID: <CAPv3WKcL4wNseCrG5=2q51=6Xs1jERoB=50ar6T58nDK8aM9vw@mail.gmail.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Tue, 29 Aug 2017 15:40:59 +0800
+Subject: [PATCH v3 4/5] input: Add MediaTek PMIC keys support
+In-Reply-To: <20170829073453.GB4469@gangnam>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+ <CGME20170825063247epcas5p1df2f4440010dd55dada66e8764d18e50@epcas5p1.samsung.com>
+ <1503642753-12385-5-git-send-email-chen.zhong@mediatek.com>
+ <20170829073453.GB4469@gangnam>
+Message-ID: <1503992459.15359.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Andi,
 
-2017-08-29 1:24 GMT+02:00 Marek Vasut <marek.vasut@gmail.com>:
-> On 08/28/2017 11:14 PM, Marcin Wojtas wrote:
->> Hitherto code set 4B addressing mode for all SPI flashes whose
->> size exceeds 16MB. However, changing the default 3B access
->> in some cases may be harmful - it may happen that the Boot ROM
->> is not capable of handling non-default state of the SPI NOR
->> (e.g. after soft reset).
->
-> No, this happens when your hardware is broken and does NOT reset the
-> flash while reseting the CPU as well. If the flash is in some funny
-> state (ie. middle of page program or erase cycle, which takes long OR
-> 4byte addressing mode) and the CPU resets , then if the SPI NOR is not
-> reset, your system will still get stuck . You need to fix your hardware
-> such that you use the reset output of your CPU to detect when the CPU
-> restarted and add logic to reset your storage as well.
->
-> This stuff below is a poor workaround and has it's known problems which
-> can only be solved by fixing the hardware. This problem keeps coming up
-> repeatedly, just skim through the Linux MTD and U-Boot lists for other
-> victims of bad HW design. I don't think I want to see it in the kernel
-> as that would motivate people to use it rather than fixing their HW .
->
+Sorry for that, i deleted some prefix since the namings will be such
+long. If this should be consistent, I'll check and modify them in the
+next version.
 
-Understood. I just only got impression that attempts to overcome the
-HW design faults in terms of keeping SPI NOR default state during boot
-can be added - introducing SPI_NOR_4B_OPCODES seems to have no other
-reason, however it favors only a group of devices that support it.
+Thank you.
 
-Best regards,
-Marcin
+On Tue, 2017-08-29 at 16:34 +0900, Andi Shyti wrote:
+> Hi Chen,
+> 
+> what I would ask you is to be consistent with the naming, if your
+> driver is called mtk-pmic, then all your functions and global
+> variables should be named accordingly as mtk_pmic or MTK_PMIC.
+> Please check in between the lines for real examples:
+> 
+> > +#define PWRKEY_RST_EN_MASK	0x1
+> > +#define PWRKEY_RST_EN_SHIFT	6
+> > +#define HOMEKEY_RST_EN_MASK	0x1
+> > +#define HOMEKEY_RST_EN_SHIFT	5
+> > +#define RST_DU_MASK		0x3
+> > +#define RST_DU_SHIFT		8
+> > +
+> > +#define PMIC_PWRKEY_INDEX	0
+> > +#define PMIC_HOMEKEY_INDEX	1
+> > +#define PMIC_MAX_KEY_COUNT	2
+> 
+> #define MTK_PMIC_*
+> 
+> > +struct pmic_keys_regs {
+> 
+> struct mtk_pmic_keys_regs
+> 
+> > +	u32 deb_reg;
+> > +	u32 deb_mask;
+> > +	u32 intsel_reg;
+> > +	u32 intsel_mask;
+> > +};
+> > +
+> > +#define PMIC_KEYS_REGS(_deb_reg, _deb_mask, _intsel_reg, _intsel_mask)	\
+> 
+> MTK_PMIC_KEYS_REGS
+> 
+> > +{									\
+> > +	.deb_reg		= _deb_reg,				\
+> > +	.deb_mask		= _deb_mask,				\
+> > +	.intsel_reg		= _intsel_reg,				\
+> > +	.intsel_mask		= _intsel_mask,				\
+> > +}
+> > +
+> > +struct pmic_regs {
+> 
+> mtk_pmic_regs
+> 
+> and so on... you got the point.
+> 
+> Andi
