@@ -1,24 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 29 Aug 2017 16:13:32 -0700 (PDT)
-Subject: [PATCH] drivers: net: xgene: Correct probe sequence handling
-In-Reply-To: <1504046592-24779-1-git-send-email-isubramanian@apm.com>
-References: <1504046592-24779-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20170829.161332.1279744093983010191.davem@davemloft.net>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Wed, 30 Aug 2017 01:53:10 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <59A56C15.2000403@linux.intel.com>
+References: <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
+ <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+ <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com>
+Message-ID: <20170829235310.GA20214@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Tue, 29 Aug 2017 15:43:12 -0700
+On Tue, Aug 29, 2017 at 04:28:53PM +0300, Mathias Nyman wrote:
+> This tight check was originally done to detect pci hotplug removed
+> hosts as soon as possible.
 
-> From: Quan Nguyen <qnguyen@apm.com>
-> 
-> The phy is connected at early stage of probe but not properly
-> disconnected if error occurs.  This patch fixes the issue.
-> 
-> Also changing the return type of xgene_enet_check_phy_handle(),
-> since this function always returns success.
-> 
-> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+In Mason's case, the parent of the XHCI controller isn't a hotplug port,
+see this lspci output:
 
-Applied, thank you.
+https://www.spinics.net/lists/linux-usb/msg160010.html
+
+Please check is_hotplug_bridge in the parent's struct pci_dev before
+assuming that the XHCI controller was unplugged.
+
+Thanks,
+
+Lukas
