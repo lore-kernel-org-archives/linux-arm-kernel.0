@@ -1,62 +1,61 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Aug 2017 18:40:27 +0200
-Subject: [PATCH 3/3] PM: i2c-designware-platdrv: System sleep handling
- rework
-In-Reply-To: <2533904.WxKdIHdxQJ@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <6543072.R9SdZCE16v@aspire.rjw.lan> <2533904.WxKdIHdxQJ@aspire.rjw.lan>
-Message-ID: <3516258.tZRHLsck48@aspire.rjw.lan>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 29 Aug 2017 09:51:14 -0700
+Subject: ARM64 kernel Image size limitations?
+In-Reply-To: <CAKv+Gu8iBDYpP4Zzq+2Q7cm=kgZpMcGnXNUwyti__TUv+MR=zg@mail.gmail.com>
+References: <02d56481-bba0-fd32-17d8-9f3760d09148@gmail.com>
+ <CAKv+Gu-b1+dZaw=Sbnqd3NnpZ4G7Q5Gog7o=3Wucn69neChyNA@mail.gmail.com>
+ <de4d0ebc-c522-eb80-0052-3ea13ce4b750@gmail.com>
+ <CAKv+Gu8iBDYpP4Zzq+2Q7cm=kgZpMcGnXNUwyti__TUv+MR=zg@mail.gmail.com>
+Message-ID: <aced65d9-13f4-5851-0398-0329bd64dca3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 29, 2017 6:38:11 PM CEST Rafael J. Wysocki wrote:
-> On Tuesday, August 29, 2017 2:59:49 AM CEST Rafael J. Wysocki wrote:
-> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > 
-> > Rework the power management part of the i2c-designware-platdrv driver
-> > so that its ->suspend and ->resume callbacks do not point to the
-> > callback routines used by it for runtime PM.  Instead, point its late
-> > suspend and early resume callbacks to pm_runtime_force_suspend() and
-> > pm_runtime_force_resume(), respectively, and make it set the
-> > SAFE_SUSPEND driver flag (introduced earlier) to instruct the generic
-> > ACPI PM domain code that the driver can cope with runtime suspended
-> > devices in its system sleep callbacks.
-> > 
-> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > ---
-> >  drivers/i2c/busses/i2c-designware-platdrv.c |    4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > Index: linux-pm/drivers/i2c/busses/i2c-designware-platdrv.c
-> > ===================================================================
-> > --- linux-pm.orig/drivers/i2c/busses/i2c-designware-platdrv.c
-> > +++ linux-pm/drivers/i2c/busses/i2c-designware-platdrv.c
-> > @@ -358,6 +358,7 @@ static int dw_i2c_plat_probe(struct plat
-> >  	if (dev->pm_disabled) {
-> >  		pm_runtime_forbid(&pdev->dev);
-> >  	} else {
-> > +		dev->power.driver_flags = DPM_FLAG_SAFE_SUSPEND;
-> >  		pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
-> >  		pm_runtime_use_autosuspend(&pdev->dev);
-> >  		pm_runtime_set_active(&pdev->dev);
-> > @@ -455,7 +456,8 @@ static int dw_i2c_plat_resume(struct dev
-> >  static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
-> >  	.prepare = dw_i2c_plat_prepare,
-> >  	.complete = dw_i2c_plat_complete,
-> > -	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
-> > +	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> > +				     pm_runtime_force_resume)
-> >  	SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
-> >  };
+On 08/29/2017 01:15 AM, Ard Biesheuvel wrote:
+> On 28 August 2017 at 22:24, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> (fixed Will's address, apologies)
+>>
+>> On 08/28/2017 01:01 PM, Ard Biesheuvel wrote:
+>>> Hi,
+>>>
+>>> On 28 August 2017 at 20:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>> Hi,
+>>>>
+>>>> I have been fighting with a reasonably large kernel Image: 46MB and
+>>>> found unable to boot it. This is on v4.13-rc6, but I could go back as
+>>>> far as v4.9~ish. It is so big, because it's got some debugging enabled,
+>>>> and the initramfs compression is disabled, but still that ought to be
+>>>> possible.
+>>>>
+>>>> After some experimentation I found that the breaking size is somewhere
+>>>> around 33MB total for arch/arm64/boot/Image and when that happens, I get
+>>>> the following backtrace which suggests that there is some memory
+>>>> corruption of some kind (or so it seems to me), other experiments
+>>>> indicated that the backtrace may point back to where the bootloader had
+>>>> set up its exception vector. I am fairly confident that the bootloader
+>>>> is not responsible for corrupting the Image that is loaded.
+>>>>
+>>>> Is there such a size limitation or am I possibly tripping over something
+>>>> else?
+>>>>
+>>>
+>>> What boot environment are you using? Is it possible the DTB is copied
+>>> on top of the kernel by the boot loader?
+>>
+>> Bootloader is BOLT (Broadcom's own implementation, has PSCI and is
+>> capable of doing FDT live patching), and yes the DTB is provided by the
+>> bootloader at an address higher than the kernel.
+>>
+>> Physical offset of the RAM on this platform is 0, so the load is going
+>> to be at PA 0x80000, 0x80000 + size (35MB) = 0x2280000, DTB is placed at
+>> 0x771f000 and is 0x90ef bytes.
+>>
 > 
-> This isn't going to work, because pm_runtime_force_suspend() will invoke
-> the bus type callback and not the driver's one.
-> 
-> So scratch this, please.
+> Could you try to dump __log_buf from gdb?
 
-BTW, I don't think it is OK to mess up with bus type _runtime_suspend and
-_runtime_resume and try to make them magically handle the system suspend
-case as well.  There has to be a different way ...
+Silly me, this is a bootloader limitation, unlike what I thought the
+load address is not at PA 0, it is at PA 0x06FFC000 and there is only
+~34MB worth of space available, mayhem ensues.
 
-Thanks,
-Rafael
+Thanks!
+-- 
+Florian
