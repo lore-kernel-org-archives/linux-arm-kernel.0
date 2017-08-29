@@ -1,46 +1,73 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Tue, 29 Aug 2017 14:05:40 +0200
-Subject: [PATCH RFC v3 1/9] KVM: s390: optimize detection of started vcpus
-In-Reply-To: <20170829132342.1ef25500.cohuck@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-2-rkrcmar@redhat.com>
- <67a8b09c-3e7a-943d-8684-f9ad6e70514b@redhat.com>
- <20170829132342.1ef25500.cohuck@redhat.com>
-Message-ID: <d63ceb80-bdf7-0a24-a4ac-3265b7528a60@redhat.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Tue, 29 Aug 2017 20:28:47 +0800
+Subject: [PATCH v5 0/6] Add HiSilicon SoC uncore Performance Monitoring
+ Unit driver
+In-Reply-To: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <bbc54c70-7f8f-a815-659b-20550912bfd3@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.08.2017 13:23, Cornelia Huck wrote:
-> On Tue, 22 Aug 2017 13:31:27 +0200
-> David Hildenbrand <david@redhat.com> wrote:
-> 
->> On 21.08.2017 22:35, Radim Kr?m?? wrote:
->>> We can add a variable instead of scanning all online VCPUs to know how
->>> many are started.  We can't trivially tell which VCPU is the last one,
->>> though.  
->>
->> You could keep the started vcpus in a list. Then you might drop unsigned
->> started_vcpus;
->>
->> No started vcpus: Start pointer NULL
->> Single started vcpu: Only one element in the list (easy to check)
->>> 1 started vcpus: More than one element int he list (easy to check)  
-> 
-> I'm not sure the added complication of keeping a list buys us much
-> here: We only have the "look for the last vcpu not stopped" operation
-> for the 2->1 transition.
-> 
+Hi Mark/Will,
 
-That is wrong, we also have to know the last remaining (started) VCPU.
-For that, right now we have to iterate over all VCPUs.
-
-There shouldn't be much complexity. We already perform changes under a
-lock, so it is as simple as adding/removing from the list.
-
-Detecting the transitions boils down to looking at two pointers.
-
--- 
+Do you have any comments on this patch set? Appreciate your comments.
 
 Thanks,
+Shaokun
 
-David
+On 2017/8/22 16:07, Shaokun Zhang wrote:
+> This patchset adds support for HiSilicon SoC uncore PMUs driver. It
+> includes L3C, Hydra Home Agent (HHA) and DDRC.
+> 
+> Changes in v5:
+> * remove unnecessary name/num_events member in hisi_pmu
+> * refactor hisi_pmu_hwevents structure
+> * remove hisi_pmu_alloc function
+> * revise cpuhotplug for L3C PMUs
+> * add cpuhotplug for HHA/DDRC PMUs
+> * fix the name format of uncore PMUs
+> * remove unnecessary variants
+> 
+> Changes in v4:
+> * remove redundant code and comments
+> * reverse the functions order in exit function
+> * remove some GPL information
+> * revise including header file
+> * fix Jonathan's other comments
+> 
+> Changes in v3:
+> * rebase to 4.13-rc1
+> * add dev_err if ioremap fails for PMUs
+>  
+> Changes in v2:
+> * fix kbuild test robot error
+> * make hisi_uncore_ops static
+> 
+> Shaokun Zhang (6):
+>   Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
+>   perf: hisi: Add support for HiSilicon SoC uncore PMU driver
+>   perf: hisi: Add support for HiSilicon SoC L3C PMU driver
+>   perf: hisi: Add support for HiSilicon SoC HHA PMU driver
+>   perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
+>   arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
+> 
+>  Documentation/perf/hisi-pmu.txt               |  53 +++
+>  MAINTAINERS                                   |   7 +
+>  drivers/perf/Kconfig                          |   7 +
+>  drivers/perf/Makefile                         |   1 +
+>  drivers/perf/hisilicon/Makefile               |   1 +
+>  drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 467 +++++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 477 +++++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 482 ++++++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_pmu.c      | 440 +++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_pmu.h      | 107 ++++++
+>  include/linux/cpuhotplug.h                    |   3 +
+>  11 files changed, 2045 insertions(+)
+>  create mode 100644 Documentation/perf/hisi-pmu.txt
+>  create mode 100644 drivers/perf/hisilicon/Makefile
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+> 
