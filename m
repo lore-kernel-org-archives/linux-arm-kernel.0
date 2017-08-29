@@ -1,19 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 29 Aug 2017 10:56:51 -0700 (PDT)
-Subject: [PATCH] net: stmmac: constify clk_div_table
-In-Reply-To: <a54fe9764d287df370c16b0f0814d09d8fa24591.1503899422.git.arvind.yadav.cs@gmail.com>
-References: <a54fe9764d287df370c16b0f0814d09d8fa24591.1503899422.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170829.105651.2053286906261018644.davem@davemloft.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 29 Aug 2017 11:03:39 -0700
+Subject: [PATCH] ARM: brcmstb: Add appropriate ARM_BE8() macros for swapping
+Message-ID: <1504029821-38267-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Mon, 28 Aug 2017 11:22:20 +0530
+Building a big-endian kernel for ARCH_BRCMSTB revealed that we would not
+be correctly polling for the right bit in the busyuart macro, turns out
+there are a few transformations needed to work with big-endian kernels.
+First we need to swap the value we read from SUN_TOP_CTRL to properly
+compare it against our local tables. Then, just like 8250.S we need to
+swap the value before storing it, and conversely swap it after a load.
 
-> clk_div_table are not supposed to change at runtime.
-> meson8b_dwmac structure is working with const clk_div_table.
-> So mark the non-const structs as const.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/include/debug/brcmstb.S | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Applied.
+diff --git a/arch/arm/include/debug/brcmstb.S b/arch/arm/include/debug/brcmstb.S
+index 52aaed2b936f..c826f15d2f80 100644
+--- a/arch/arm/include/debug/brcmstb.S
++++ b/arch/arm/include/debug/brcmstb.S
+@@ -58,6 +58,7 @@
+ 		/* Check SUN_TOP_CTRL base */
+ 		ldr	\rp, =SUN_TOP_CTRL_BASE	@ load SUN_TOP_CTRL PA
+ 		ldr	\rv, [\rp, #0]		@ get register contents
++ARM_BE8(	rev	\rv, \rv )
+ 		and	\rv, \rv, #0xffffff00	@ strip revision bits [7:0]
+ 
+ 		/* Chip specific detection starts here */
+@@ -98,11 +99,13 @@
+ 		.endm
+ 
+ 		.macro	store, rd, rx:vararg
++ARM_BE8(	rev	\rd, \rd )
+ 		str	\rd, \rx
+ 		.endm
+ 
+ 		.macro	load, rd, rx:vararg
+ 		ldr	\rd, \rx
++ARM_BE8(	rev	\rd, \rd )
+ 		.endm
+ 
+ 		.macro	senduart,rd,rx
+-- 
+1.9.1
