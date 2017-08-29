@@ -1,33 +1,26 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Tue, 29 Aug 2017 15:38:52 +0200
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <59A56C15.2000403@linux.intel.com>
-References: <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
- <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
- <599D62EA.7050100@linux.intel.com>
- <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
- <59A3D6BF.7010400@linux.intel.com>
- <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
- <59A56C15.2000403@linux.intel.com>
-Message-ID: <20170829133852.GA13355@wunner.de>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Tue, 29 Aug 2017 15:53:41 +0200
+Subject: [PATCH 0/3] PM / ACPI / i2c: Runtime PM aware system sleep
+ handling
+In-Reply-To: <CAPDyKFp5dpuUeRjmmSSA3sZzFVwJihmzteyCDzqG33s2Xb1ewA@mail.gmail.com>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <4245176.X6JjkhnUAM@aspire.rjw.lan>
+ <20170829102927.5lpjkfj2jbtpxadm@sig21.net>
+ <CAPDyKFp5dpuUeRjmmSSA3sZzFVwJihmzteyCDzqG33s2Xb1ewA@mail.gmail.com>
+Message-ID: <20170829135341.moanebdmbdz3ajjm@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 04:28:53PM +0300, Mathias Nyman wrote:
-> Then again it might be a bit too drastic to kill xhci just because
-> we read 0xffffffff once from a mmio xhci register. Maybe we should
-> return an error a couple times before actually tearing down xhci.
+On Tue, Aug 29, 2017 at 01:44:11PM +0200, Ulf Hansson wrote:
+> Did you try out my series (v2) if that could fix this problem in a
+> more flexible manner?
 > 
-> This tight check was originally done to detect pci hotplug removed
-> hosts as soon as possible.
+> In other words, is it fine if the device remains runtime PM enabled
+> during the entire device_suspend() phase, and also not being suspended
+> until ->suspend_late()?
 
-Just make pci_dev_is_disconnected() public to detect PCI hot removal.
-We *know* when the device was hot removed, so I think there's no need
-to guess that based on reading "all ones" from mmio (which may happen
-for entirely legitimate reasons unrelated to hot removal).
+I tried to try but I also had some test patches applied
+and it hung up on suspend but I ran out of time to check why...
+I intend to try again soon.
 
-Thanks,
-
-Lukas
+Johannes
