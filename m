@@ -1,61 +1,80 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Aug 2017 02:18:13 +0200
-Subject: [PATCH 0/3] PM / ACPI / i2c: Runtime PM aware system sleep handling
-In-Reply-To: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <4245176.X6JjkhnUAM@aspire.rjw.lan>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Mon, 28 Aug 2017 22:02:18 -0400
+Subject: [PATCH v7 07/11] sparc64: optimized struct page zeroing
+In-Reply-To: <1503972142-289376-1-git-send-email-pasha.tatashin@oracle.com>
+References: <1503972142-289376-1-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1503972142-289376-8-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 23, 2017 4:42:00 PM CEST Ulf Hansson wrote:
-> The i2c designware platform driver, drivers/i2c/busses/i2c-designware-platdrv.c,
-> isn't well optimized for system sleep.
-> 
-> What makes this driver particularly interesting is because it's a cross-SoC
-> driver, which sometimes means there is an ACPI PM domain attached to the i2c
-> device and sometimes not. The driver is being used on both x86 and ARM.
-> 
-> In principle, to optimize the system sleep support in i2c driver, this series
-> enables the proven runtime PM centric path for the i2c driver. However, to do
-> that the ACPI PM domain also have to collaborate and understand this behaviour.
-> Therefore a number of changes, patch 1 to patch 7, makes the needed changes to
-> the ACPI PM domain. In patch8 and patch 9, the i2c driver gets optimized and is
-> converted to the runtime PM centric path for system sleep.
-> 
-> It shall be noted, the behaviour of the ACPI PM domain should remain intact,
-> still taking benefit of using the direct_complete path during system sleep,
-> except for those drivers that explicitly request it not to (via a new ACPI API
-> added in this series).
+Add an optimized mm_zero_struct_page(), so struct page's are zeroed without
+calling memset(). We do eight to ten regular stores based on the size of
+struct page. Compiler optimizes out the conditions of switch() statement.
 
-The following is my take on this (untested so far).
+SPARC-M6 with 15T of memory, single thread performance:
 
-Basically, the point is to allow i2c-designware-platdrv to point its late
-suspend and early resume callbacks, respectively, to pm_runtime_force_suspend()
-and pm_runtime_force_resume() which then will do the right thing regardless of
-whether or not the device is runtime suspended when system suspend starts.
+                               BASE            FIX  OPTIMIZED_FIX
+        bootmem_init   28.440467985s   2.305674818s   2.305161615s
+free_area_init_nodes  202.845901673s 225.343084508s 172.556506560s
+                      --------------------------------------------
+Total                 231.286369658s 227.648759326s 174.861668175s
 
-However, for this to work, the ACPI PM domain (and the LPSS driver which also
-has to work with i2c-designware-platdrv) must do the right thing regardless of
-whether or not the device is runtime suspended when system suspend starts too.
+BASE:  current linux
+FIX:   This patch series without "optimized struct page zeroing"
+OPTIMIZED_FIX: This patch series including the current patch.
 
-The primary problem with that is that acpi_subsys_suspend() has to decide
-whether or not to runtime resume the device and then
-acpi_subsys_suspend_late/resume_early() (and their counterparts in the ACPI
-LPSS driver) need to know whether or not to run acpi_dev_suspend_late/resume_early(), respectively.
+bootmem_init() is where memory for struct pages is zeroed during
+allocation. Note, about two seconds in this function is a fixed time: it
+does not increase as memory is increased.
 
-In order to make that decision, acpi_subsys_suspend() needs to know (a) if
-the power state of the device has to be updated (in which case the device
-should be runtime resumed) and (b) if the driver's callbacks that will be
-run subsequently can cope with a runtime suspended device.  The former can
-be figured out from the check done in acpi_subsys_prepare() (but its result
-needs to be saved), but the latter is only known to the driver, so it needs a
-way to tell the code above it about that.  Hence, the SAFE_SUSPEND flag
-introduced by the first patch.
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
+---
+ arch/sparc/include/asm/pgtable_64.h | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-The second patch simply reworks the ACPI PM domain and the ACPI LPSS driver
-to do all the checks etc as needed.
-
-The third one finally updates i2c-designware-platdrv.
-
-Thanks,
-Rafael
+diff --git a/arch/sparc/include/asm/pgtable_64.h b/arch/sparc/include/asm/pgtable_64.h
+index 6fbd931f0570..cee5cc7ccc51 100644
+--- a/arch/sparc/include/asm/pgtable_64.h
++++ b/arch/sparc/include/asm/pgtable_64.h
+@@ -230,6 +230,36 @@ extern unsigned long _PAGE_ALL_SZ_BITS;
+ extern struct page *mem_map_zero;
+ #define ZERO_PAGE(vaddr)	(mem_map_zero)
+ 
++/* This macro must be updated when the size of struct page grows above 80
++ * or reduces below 64.
++ * The idea that compiler optimizes out switch() statement, and only
++ * leaves clrx instructions
++ */
++#define	mm_zero_struct_page(pp) do {					\
++	unsigned long *_pp = (void *)(pp);				\
++									\
++	 /* Check that struct page is either 64, 72, or 80 bytes */	\
++	BUILD_BUG_ON(sizeof(struct page) & 7);				\
++	BUILD_BUG_ON(sizeof(struct page) < 64);				\
++	BUILD_BUG_ON(sizeof(struct page) > 80);				\
++									\
++	switch (sizeof(struct page)) {					\
++	case 80:							\
++		_pp[9] = 0;	/* fallthrough */			\
++	case 72:							\
++		_pp[8] = 0;	/* fallthrough */			\
++	default:							\
++		_pp[7] = 0;						\
++		_pp[6] = 0;						\
++		_pp[5] = 0;						\
++		_pp[4] = 0;						\
++		_pp[3] = 0;						\
++		_pp[2] = 0;						\
++		_pp[1] = 0;						\
++		_pp[0] = 0;						\
++	}								\
++} while (0)
++
+ /* PFNs are real physical page numbers.  However, mem_map only begins to record
+  * per-page information starting at pfn_base.  This is to handle systems where
+  * the first physical page in the machine is at some huge physical address,
+-- 
+2.14.1
