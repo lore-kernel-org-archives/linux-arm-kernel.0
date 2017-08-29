@@ -1,89 +1,52 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Aug 2017 17:51:38 +0200
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <20170829153456.GA13712@wunner.de>
-References: <599D62EA.7050100@linux.intel.com>
- <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
- <59A3D6BF.7010400@linux.intel.com>
- <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
- <59A56C15.2000403@linux.intel.com>
- <20170829133852.GA13355@wunner.de>
- <20170829144725.GB22532@kroah.com>
- <20170829153456.GA13712@wunner.de>
-Message-ID: <20170829155138.GA32369@kroah.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 29 Aug 2017 10:09:49 -0600
+Subject: [PATCH] fpga: make xlnx_pr_decoupler_br_ops const
+In-Reply-To: <78e2ed1d-ea20-eb68-b6b4-d993a98984a6@xilinx.com>
+References: <1503941531-17977-1-git-send-email-bhumirks@gmail.com>
+ <78e2ed1d-ea20-eb68-b6b4-d993a98984a6@xilinx.com>
+Message-ID: <CAAtXAHcf1bjyFg9XPZRmJS4Pw7=+P_E4TB-euJBSrj6ZGBSAig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 05:34:56PM +0200, Lukas Wunner wrote:
-> On Tue, Aug 29, 2017 at 04:47:25PM +0200, Greg Kroah-Hartman wrote:
-> > On Tue, Aug 29, 2017 at 03:38:52PM +0200, Lukas Wunner wrote:
-> > > On Tue, Aug 29, 2017 at 04:28:53PM +0300, Mathias Nyman wrote:
-> > > > Then again it might be a bit too drastic to kill xhci just because
-> > > > we read 0xffffffff once from a mmio xhci register. Maybe we should
-> > > > return an error a couple times before actually tearing down xhci.
-> > > > 
-> > > > This tight check was originally done to detect pci hotplug removed
-> > > > hosts as soon as possible.
-> > > 
-> > > Just make pci_dev_is_disconnected() public to detect PCI hot removal.
-> > > We *know* when the device was hot removed, so I think there's no need
-> > > to guess that based on reading "all ones" from mmio (which may happen
-> > > for entirely legitimate reasons unrelated to hot removal).
-> > 
-> > No, you don't always "know" when a device is removed, don't rely on it,
-> > not all platforms support that.
-> 
-> Please explain, which platforms don't support that?  They wouldn't be
-> compliant with the spec it seems.
-> 
-> PCIe r3.1, section 6.7.3:
-> 
-> 	"A Downstream Port with hot-plug capabilities supports the
-> 	 following hot-plug events:
-> 
-> 	 Presence Detect Changed
-> 
-> 	 A Downstream Port with hot-plug capabilities monitors the slot
-> 	 it controls for the slot events listed above. [...]
-> 	 If enabled through the associated enable field, slot events
-> 	 must generate a software notification."
-> 
-> And pciehp sets the flag on all downstream devices that they're removed
-> once the software notification has been received and processed.
+On Tue, Aug 29, 2017 at 12:00 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 28.8.2017 19:32, Bhumika Goyal wrote:
+>> Make this const as it is only passed to a const argument of the function
+>> fpga_bridge_register.
+>>
+>> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-What about all of the non-pciehp platforms?  :)
+Acked-by: Moritz Fischer <mdf@kernel.org>
+>> ---
+>>  drivers/fpga/xilinx-pr-decoupler.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
+>> index e359930..0d77430 100644
+>> --- a/drivers/fpga/xilinx-pr-decoupler.c
+>> +++ b/drivers/fpga/xilinx-pr-decoupler.c
+>> @@ -79,7 +79,7 @@ static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
+>>       return !status;
+>>  }
+>>
+>> -static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+>> +static const struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+>>       .enable_set = xlnx_pr_decoupler_enable_set,
+>>       .enable_show = xlnx_pr_decoupler_enable_show,
+>>  };
 
-Also, there is always a race between when that notification has been
-sent and processed on the PCIe channel and the reading of all 1s on the
-PCI bus by the driver.
+Must've been a leftover from when I worked on integrating a simple
+GPIO based one.
+I'll have to rebase that and submit it.
+>>
+>
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+>
+> Thanks,
+> Michal
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-For fun, try disconnecting a USB device from one of the more modern
-laptops with a USB 3.1 connection on it.  The bios treats those as a pci
-hotpluggable xhci controller on the PCI bus.  When the device is
-disconnected, the BIOS rips out the PCI device as well, but all that
-time, the xhci driver is thinking the device is still present as it
-takes a while for the BIOS to do all of the needed housekeeping.  It's a
-really long time for everything to shut down and to help prevent the
-driver from going crazy, it has to detect ffff reads as "disconnection
-happened".
-
-All PCI drivers have had to do this for decades now, it's nothing new
-here, PCIe just gave us a chance to be notified that the device really
-is gone now, PCI hotplug has always been out-of-band like this.
-
-> > Reading all ff shows the device is removed, that's all the PCI spec
-> > guarantees.  What other legitimate reason could that happen for?
-> 
-> Is 0xffffffff not a valid value to be stored in and read from mmio space?
-
-For a specific register, doubtful, which is why the code errors out,
-right?  If it is a valid value, then it shouldn't be exiting, and move
-on to the next read.
-
-I don't understand what we are arguing about here anymore...
-
-thanks,
-
-greg k-h
+Thanks,
+Moritz
