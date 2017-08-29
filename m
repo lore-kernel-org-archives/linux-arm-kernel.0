@@ -1,91 +1,208 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 29 Aug 2017 16:56:44 +0200
-Subject: [PATCH v3 2/8] PM / ACPI: Restore acpi_subsys_complete()
+Date: Tue, 29 Aug 2017 16:56:43 +0200
+Subject: [PATCH v3 1/8] PM / Sleep: Make the runtime PM centric path known to
+ the PM core
 In-Reply-To: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
 References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1504018610-10822-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1504018610-10822-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 58a1fbbb2ee8 ("PM / PCI / ACPI: Kick devices that might have
-been reset by firmware"), made PCI's and ACPI's ->complete() callbacks to
-be assigned to a new API called pm_complete_with_resume_check(), which was
-introduced in the same change.
+The main principle behind the runtime PM centric path, is to re-use the
+runtime PM callbacks to implement system sleep - and while doing that also
+achieve a fully optimized behaviour from PM point of view.
 
-Later it turned out that using pm_complete_with_resume_check() isn't good
-enough for PCI, as it needs additional PCI specific checks, before deciding
-whether runtime resuming the device is needed when running the ->complete()
-callback.
+More precisely, avoid to wake up a device from its low power state during
+system sleep, unless the device is really needed to be operational. That
+does not only mean avoiding to waste power, but may also decrease system
+suspend/resume time for a device.
 
-This leaves ACPI being the only user of pm_complete_with_resume_check().
-Therefore let's restore ACPI's acpi_subsys_complete(), which was dropped in
-commit 58a1fbbb2ee8 ("PM / PCI / ACPI: Kick devices that might have been
-reset by firmware").
+However, using the runtime PM centric path for a device, does put some
+requirements on the behaviour of the PM core and a potential PM domain that
+may be attached to the device. So far, these requirements are not being
+specially considered, except by the generic PM domain.
 
-This enables us to remove the pm_complete_with_resume_check() API in a
-following change, but it also enables ACPI to add more ACPI specific checks
-in acpi_subsys_complete() if it turns out that is needed.
+To move forward and to make it possible to deploy the runtime PM centric
+path for cross SoC drivers, which may have different PM domains attached to
+its devices depending on the SoC, we must address how to deal with these
+requirements. This change starts by making some adoptions to the PM core,
+while other parts, such as the ACPI PM domain needs to be taken care of
+separately.
+
+In the runtime PM centric path, the driver is expected to make use of the
+pm_runtime_force_suspend|resume() helpers, to deploy system sleep support.
+More precisely it may assign the system sleep callbacks to these helpers or
+may call them from its own callbacks, in case it needs to perform
+additional actions during system sleep.
+
+In other words, the PM core must always invoke the system sleep callbacks
+for the device when they are present, to allow the driver to deal with
+the system sleep operations.
+
+In case the PM core decides to run the direct_complete path for the device,
+it skips invoking most of the system sleep callbacks, besides
+->prepare|complete(). Therefore using the direct_complete path in
+combination with the runtime PM centric patch for a device, does not play
+well.
+
+To deal with this issue, let's add a flag 'is_rpm_sleep', to the struct
+dev_pm_info. The driver that deploys the runtime PM centric path, shall set
+the flag for the device during ->probe(), to inform the PM core about that
+it must not use the direct_complete path for the device.
+
+Note, not allowing the direct_complete path for a device, doesn't implicit
+need to propagate to the device's parent/suppliers. Therefore make the PM
+core check this condition in device_suspend(), before it decides to abandon
+the direct_complete path for parent/suppliers.
+
+To make the is_rpm_sleep flag internal to the PM core, let's add two APIs.
+	- dev_pm_use_rpm_sleep(): It sets the flag and should be called by
+	  the driver during ->probe().
+	- dev_pm_is_rpm_sleep(): Makes it possible for users of the device,
+	  like a PM domain, to fetch the state of the flag.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 
 Changes in v3:
-	- None.
+	- New patch.
+	- This replaces the earlier method of adding the no_direct_complete to
+	the ACPI structures, according to comments from Rafael.
+	- This change also address the consern Rafael had around that
+	direct_complete should not have to be disabled for parent/suppliers, in
+	case a device use the runtime PM centric path for system sleep.
 
 ---
- drivers/acpi/acpi_lpss.c |  2 +-
- drivers/acpi/device_pm.c | 19 ++++++++++++++++++-
- 2 files changed, 19 insertions(+), 2 deletions(-)
+ drivers/base/power/main.c    | 49 +++++++++++++++++++++++++++++++++++++++-----
+ drivers/base/power/runtime.c |  1 +
+ include/linux/pm.h           |  7 +++++++
+ 3 files changed, 52 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-index 032ae44..0c84d15 100644
---- a/drivers/acpi/acpi_lpss.c
-+++ b/drivers/acpi/acpi_lpss.c
-@@ -894,7 +894,7 @@ static struct dev_pm_domain acpi_lpss_pm_domain = {
- #ifdef CONFIG_PM
- #ifdef CONFIG_PM_SLEEP
- 		.prepare = acpi_subsys_prepare,
--		.complete = pm_complete_with_resume_check,
-+		.complete = acpi_subsys_complete,
- 		.suspend = acpi_subsys_suspend,
- 		.suspend_late = acpi_lpss_suspend_late,
- 		.resume_early = acpi_lpss_resume_early,
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index fbcc73f..632f214 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -1020,6 +1020,23 @@ int acpi_subsys_prepare(struct device *dev)
- EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
+diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
+index ea1732e..865737a 100644
+--- a/drivers/base/power/main.c
++++ b/drivers/base/power/main.c
+@@ -1549,14 +1549,16 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
+ 		if (parent) {
+ 			spin_lock_irq(&parent->power.lock);
  
- /**
-+ * acpi_subsys_complete - Finalize device's resume during system resume.
-+ * @dev: Device to handle.
+-			dev->parent->power.direct_complete = false;
++			if (!dev->power.is_rpm_sleep)
++				dev->parent->power.direct_complete = false;
+ 			if (dev->power.wakeup_path
+ 			    && !dev->parent->power.ignore_children)
+ 				dev->parent->power.wakeup_path = true;
+ 
+ 			spin_unlock_irq(&parent->power.lock);
+ 		}
+-		dpm_clear_suppliers_direct_complete(dev);
++		if (!dev->power.is_rpm_sleep)
++			dpm_clear_suppliers_direct_complete(dev);
+ 	}
+ 
+ 	device_unlock(dev);
+@@ -1709,11 +1711,14 @@ static int device_prepare(struct device *dev, pm_message_t state)
+ 	 * A positive return value from ->prepare() means "this device appears
+ 	 * to be runtime-suspended and its state is fine, so if it really is
+ 	 * runtime-suspended, you can leave it in that state provided that you
+-	 * will do the same thing with all of its descendants".  This only
+-	 * applies to suspend transitions, however.
++	 * will do the same thing with all of its descendants". To allow this,
++	 * the is_rpm_sleep flag must not be set, which is default false, but
++	 * may have been changed by a driver. This only applies to suspend
++	 * transitions, however.
+ 	 */
+ 	spin_lock_irq(&dev->power.lock);
+-	dev->power.direct_complete = ret > 0 && state.event == PM_EVENT_SUSPEND;
++	dev->power.direct_complete = ret > 0 && !dev->power.is_rpm_sleep &&
++				state.event == PM_EVENT_SUSPEND;
+ 	spin_unlock_irq(&dev->power.lock);
+ 	return 0;
+ }
+@@ -1841,6 +1846,40 @@ void dpm_for_each_dev(void *data, void (*fn)(struct device *, void *))
+ }
+ EXPORT_SYMBOL_GPL(dpm_for_each_dev);
+ 
++/**
++ * dev_pm_use_rpm_sleep - use the runtime PM centric sleep path.
++ * @dev: the device to use the path for.
++ *
++ * The runtime PM centric path requires the system sleep callbacks for the
++ * driver of the device to be invoked. This function sets the is_rpm_sleep flag
++ * to enable this path to be used, which makes the PM core to adopt to this
++ * behaviour. More precisely the PM core makes sure to not run the
++ * direct_complete path for the chosen device during system sleep, when the
++ * is_rpm_sleep flag is set. A driver using the runtime PM centric path, shall
++ * use the pm_runtime_force_suspend|resume() helpers, to deploy system sleep
++ * support and call this function during ->probe().
++ * The is_rpm_sleep flag is cleared when unbinding/bind-failure of the driver.
 + */
-+void acpi_subsys_complete(struct device *dev)
++void dev_pm_use_rpm_sleep(struct device *dev)
 +{
-+	pm_generic_complete(dev);
-+	/*
-+	 * If the device had been runtime-suspended before the system went into
-+	 * the sleep state it is going out of and it has never been resumed till
-+	 * now, resume it in case the firmware powered it up.
-+	 */
-+	if (dev->power.direct_complete && pm_resume_via_firmware())
-+		pm_request_resume(dev);
++	dev->power.is_rpm_sleep = true;
 +}
-+EXPORT_SYMBOL_GPL(acpi_subsys_complete);
++EXPORT_SYMBOL_GPL(dev_pm_use_rpm_sleep);
 +
 +/**
-  * acpi_subsys_suspend - Run the device driver's suspend callback.
-  * @dev: Device to handle.
-  *
-@@ -1087,7 +1104,7 @@ static struct dev_pm_domain acpi_general_pm_domain = {
- 		.runtime_resume = acpi_subsys_runtime_resume,
- #ifdef CONFIG_PM_SLEEP
- 		.prepare = acpi_subsys_prepare,
--		.complete = pm_complete_with_resume_check,
-+		.complete = acpi_subsys_complete,
- 		.suspend = acpi_subsys_suspend,
- 		.suspend_late = acpi_subsys_suspend_late,
- 		.resume_early = acpi_subsys_resume_early,
++ * dev_pm_is_rpm_sleep - Returns the value of the is_rpm_sleep flag.
++ * @dev: the device to return the flag for.
++ *
++ * The caller of this function is typically a subsystem or a PM domain that
++ * needs to know if the runtime PM centric path is used for the device. It may
++ * be invoked during any of the system sleep phases.
++ */
++bool dev_pm_is_rpm_sleep(struct device *dev)
++{
++	return dev->power.is_rpm_sleep;
++}
++EXPORT_SYMBOL_GPL(dev_pm_is_rpm_sleep);
++
+ static bool pm_ops_is_empty(const struct dev_pm_ops *ops)
+ {
+ 	if (!ops)
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 7bcf80f..b2ab22c 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -1522,6 +1522,7 @@ void pm_runtime_reinit(struct device *dev)
+ 				pm_runtime_put(dev->parent);
+ 		}
+ 	}
++	dev->power.is_rpm_sleep = false;
+ }
+ 
+ /**
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 47ded8a..5bf96d2 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -559,6 +559,7 @@ struct dev_pm_info {
+ 	bool			is_suspended:1;	/* Ditto */
+ 	bool			is_noirq_suspended:1;
+ 	bool			is_late_suspended:1;
++	bool			is_rpm_sleep:1;	/* Owned by the PM core */
+ 	bool			early_init:1;	/* Owned by the PM core */
+ 	bool			direct_complete:1;	/* Owned by the PM core */
+ 	spinlock_t		lock;
+@@ -716,6 +717,9 @@ extern void __suspend_report_result(const char *function, void *fn, int ret);
+ extern int device_pm_wait_for_dev(struct device *sub, struct device *dev);
+ extern void dpm_for_each_dev(void *data, void (*fn)(struct device *, void *));
+ 
++extern void dev_pm_use_rpm_sleep(struct device *dev);
++extern bool dev_pm_is_rpm_sleep(struct device *dev);
++
+ extern int pm_generic_prepare(struct device *dev);
+ extern int pm_generic_suspend_late(struct device *dev);
+ extern int pm_generic_suspend_noirq(struct device *dev);
+@@ -759,6 +763,9 @@ static inline void dpm_for_each_dev(void *data, void (*fn)(struct device *, void
+ {
+ }
+ 
++static inline void dev_pm_use_rpm_sleep(struct device *dev) {}
++static inline bool dev_pm_is_rpm_sleep(struct device *dev) { return false; }
++
+ #define pm_generic_prepare		NULL
+ #define pm_generic_suspend_late		NULL
+ #define pm_generic_suspend_noirq	NULL
 -- 
 2.7.4
