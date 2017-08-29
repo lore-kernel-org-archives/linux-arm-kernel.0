@@ -1,53 +1,63 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Aug 2017 17:27:55 +0200
-Subject: [PATCH v3 6/8] PM / ACPI: Enable the runtime PM centric approach
- for system sleep
-In-Reply-To: <1504018610-10822-7-git-send-email-ulf.hansson@linaro.org>
-References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
- <1504018610-10822-7-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <2855684.NY3Ly9PzrE@aspire.rjw.lan>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Tue, 29 Aug 2017 17:34:56 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <20170829144725.GB22532@kroah.com>
+References: <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+ <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com>
+ <20170829133852.GA13355@wunner.de>
+ <20170829144725.GB22532@kroah.com>
+Message-ID: <20170829153456.GA13712@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 29, 2017 4:56:48 PM CEST Ulf Hansson wrote:
-> This change enables the ACPI PM domain to cope with drivers that deploys
-> the runtime PM centric path for system sleep.
+On Tue, Aug 29, 2017 at 04:47:25PM +0200, Greg Kroah-Hartman wrote:
+> On Tue, Aug 29, 2017 at 03:38:52PM +0200, Lukas Wunner wrote:
+> > On Tue, Aug 29, 2017 at 04:28:53PM +0300, Mathias Nyman wrote:
+> > > Then again it might be a bit too drastic to kill xhci just because
+> > > we read 0xffffffff once from a mmio xhci register. Maybe we should
+> > > return an error a couple times before actually tearing down xhci.
+> > > 
+> > > This tight check was originally done to detect pci hotplug removed
+> > > hosts as soon as possible.
+> > 
+> > Just make pci_dev_is_disconnected() public to detect PCI hot removal.
+> > We *know* when the device was hot removed, so I think there's no need
+> > to guess that based on reading "all ones" from mmio (which may happen
+> > for entirely legitimate reasons unrelated to hot removal).
+> 
+> No, you don't always "know" when a device is removed, don't rely on it,
+> not all platforms support that.
 
-[cut]
+Please explain, which platforms don't support that?  They wouldn't be
+compliant with the spec it seems.
 
-> @@ -1052,11 +1066,20 @@ EXPORT_SYMBOL_GPL(acpi_subsys_complete);
->   * @dev: Device to handle.
->   *
->   * Follow PCI and resume devices suspended at run time before running their
-> - * system suspend callbacks.
-> + * system suspend callbacks. However, try to avoid it in case the runtime PM
-> + * centric path is used for the device and then trust the driver to do the
-> + * right thing.
->   */
->  int acpi_subsys_suspend(struct device *dev)
->  {
-> -	pm_runtime_resume(dev);
-> +	struct acpi_device *adev = ACPI_COMPANION(dev);
-> +
-> +	if (!adev)
-> +		return 0;
-> +
-> +	if (!dev_pm_is_rpm_sleep(dev) || acpi_dev_needs_resume(dev, adev))
-> +		pm_runtime_resume(dev);
-> +
->  	return pm_generic_suspend(dev);
->  }
->  EXPORT_SYMBOL_GPL(acpi_subsys_suspend);
+PCIe r3.1, section 6.7.3:
 
-Well, I tried to avoid calling acpi_dev_needs_resume() for multiple times
-and that's why I added the update_state thing.
+	"A Downstream Port with hot-plug capabilities supports the
+	 following hot-plug events:
 
-Moreover, the is_rpm_sleep flag here has to mean not only that
-direct_complete should not be used with the device, but also that its driver
-is fine with not resuming it.
+	 Presence Detect Changed
 
-IMO it is not a good idea to use one flag for these two different things at the
-same time at all.
+	 A Downstream Port with hot-plug capabilities monitors the slot
+	 it controls for the slot events listed above. [...]
+	 If enabled through the associated enable field, slot events
+	 must generate a software notification."
 
-Thanks,
-Rafael
+And pciehp sets the flag on all downstream devices that they're removed
+once the software notification has been received and processed.
+
+
+> Reading all ff shows the device is removed, that's all the PCI spec
+> guarantees.  What other legitimate reason could that happen for?
+
+Is 0xffffffff not a valid value to be stored in and read from mmio space?
+
+Best regards,
+
+Lukas
