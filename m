@@ -1,156 +1,193 @@
 From: oza.oza@broadcom.com (Oza Oza)
-Date: Tue, 29 Aug 2017 10:55:27 +0530
-Subject: [PATCH v8 0/3] PCI: iproc: SOC specific fixes
-In-Reply-To: <20170828215309.GM8154@bhelgaas-glaptop.roam.corp.google.com>
+Date: Tue, 29 Aug 2017 11:02:23 +0530
+Subject: [PATCH v8 2/3] PCI: iproc: retry request when CRS returned from EP
+In-Reply-To: <20170828214753.GL8154@bhelgaas-glaptop.roam.corp.google.com>
 References: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
- <20170828215309.GM8154@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAMSpPPeUjDzK=zGBCgeJoD=vhZimRCzq=R6VPopHeRgmA54yCw@mail.gmail.com>
+ <1503551066-23212-3-git-send-email-oza.oza@broadcom.com>
+ <20170828214753.GL8154@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAMSpPPcFFULWZ+QTfzMSGhzQx0JboT618Uq6EA0=qPGpAK+h1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 3:23 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Thu, Aug 24, 2017 at 10:34:23AM +0530, Oza Pawandeep wrote:
->> PCI: iproc: Retry request when CRS returned from EP Above patch adds
->> support for CRS in PCI RC driver, otherwise if not handled at lower
->> level, the user space PMD (poll mode drivers) can timeout.
+On Tue, Aug 29, 2017 at 3:17 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Aug 24, 2017 at 10:34:25AM +0530, Oza Pawandeep wrote:
+>> PCIe spec r3.1, sec 2.3.2
+>> If CRS software visibility is not enabled, the RC must reissue the
+>> config request as a new request.
 >>
->> PCI: iproc: add device shutdown for PCI RC This fixes the issue where
->> certian PCI endpoints are not getting detected on Stingray SOC after
->> reboot.
+>> - If CRS software visibility is enabled,
+>> - for a config read of Vendor ID, the RC must return 0x0001 data
+>> - for all other config reads/writes, the RC must reissue the
+>>   request
 >>
->> Changes Since v7:
->> Factor out the ep config access code.
+>> iproc PCIe Controller spec:
+>> 4.7.3.3. Retry Status On Configuration Cycle
+>> Endpoints are allowed to generate retry status on configuration
+>> cycles. In this case, the RC needs to re-issue the request. The IP
+>> does not handle this because the number of configuration cycles needed
+>> will probably be less than the total number of non-posted operations
+>> needed.
 >>
->> Changes Since v6:
->> Rebased patches on top of Lorenzo's patches.
->> Bjorn's comments addressed.
->> now the confg retry returns 0xffffffff as data.
->> Added reference to PCIe spec and iproc Controller spec in Changelog.
+>> When a retry status is received on the User RX interface for a
+>> configuration request that was sent on the User TX interface,
+>> it will be indicated with a completion with the CMPL_STATUS field set
+>> to 2=CRS, and the user will have to find the address and data values
+>> and send a new transaction on the User TX interface.
+>> When the internal configuration space returns a retry status during a
+>> configuration cycle (user_cscfg = 1) on the Command/Status interface,
+>> the pcie_cscrs will assert with the pcie_csack signal to indicate the
+>> CRS status.
+>> When the CRS Software Visibility Enable register in the Root Control
+>> register is enabled, the IP will return the data value to 0x0001 for
+>> the Vendor ID value and 0xffff  (all 1?s) for the rest of the data in
+>> the request for reads of offset 0 that return with CRS status.  This
+>> is true for both the User RX Interface and for the Command/Status
+>> interface.  When CRS Software Visibility is enabled, the CMPL_STATUS
+>> field of the completion on the User RX Interface will not be 2=CRS and
+>> the pcie_cscrs signal will not assert on the Command/Status interface.
 >>
->> Changes Since v5:
->> Ray's comments addressed.
+>> Per PCIe r3.1, sec 2.3.2, config requests that receive completions
+>> with Configuration Request Retry Status (CRS) should be reissued by
+>> the hardware except reads of the Vendor ID when CRS Software
+>> Visibility is enabled.
 >>
->> Changes Since v4:
->> Bjorn's comments addressed.
+>> This hardware never reissues configuration requests when it receives
+>> CRS completions.
+>> Note that, neither PCIe host bridge nor PCIe core re-issues the
+>> request for any configuration offset.
 >>
->> Changes Since v3:
->> [re-send]
+>> For config reads, this hardware returns CFG_RETRY_STATUS data when
+>> it receives a CRS completion for a config read, regardless of the
+>> address of the read or the CRS Software Visibility Enable bit.
 >>
->> Changes Since v2:
->> Fix compilation errors for pcie-iproc-platform.ko which was caught
->> by kbuild.
+>> This patch implements iproc_pcie_config_read which gets called for
+>> Stingray, if it receives a CRS completion, it retries reading it again.
+>> In case of timeout, it returns 0xffffffff.
+>> For other iproc based SOC, it falls back to PCI generic APIs.
 >>
->> Oza Pawandeep (3):
->>   PCI: iproc: factor-out ep configuration access
->>   PCI: iproc: Retry request when CRS returned from EP
->>   PCI: iproc: add device shutdown for PCI RC
+>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
 >>
->>  drivers/pci/host/pcie-iproc-platform.c |   8 ++
->>  drivers/pci/host/pcie-iproc.c          | 143 ++++++++++++++++++++++++++-------
->>  drivers/pci/host/pcie-iproc.h          |   1 +
->>  3 files changed, 124 insertions(+), 28 deletions(-)
+>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+>> index 61d9be6..37f4adf 100644
+>> --- a/drivers/pci/host/pcie-iproc.c
+>> +++ b/drivers/pci/host/pcie-iproc.c
+>> @@ -68,6 +68,9 @@
+>>  #define APB_ERR_EN_SHIFT             0
+>>  #define APB_ERR_EN                   BIT(APB_ERR_EN_SHIFT)
+>>
+>> +#define CFG_RETRY_STATUS             0xffff0001
+>> +#define CFG_RETRY_STATUS_TIMEOUT_US  500000 /* 500 milli-seconds. */
+>> +
+>>  /* derive the enum index of the outbound/inbound mapping registers */
+>>  #define MAP_REG(base_reg, index)      ((base_reg) + (index) * 2)
+>>
+>> @@ -473,6 +476,64 @@ static void __iomem *iproc_pcie_map_ep_cfg_reg(struct iproc_pcie *pcie,
+>>       return (pcie->base + offset);
+>>  }
+>>
+>> +static unsigned int iproc_pcie_cfg_retry(void __iomem *cfg_data_p)
+>> +{
+>> +     int timeout = CFG_RETRY_STATUS_TIMEOUT_US;
+>> +     unsigned int data;
+>> +
+>> +     /*
+>> +      * As per PCIe spec r3.1, sec 2.3.2, CRS Software
+>> +      * Visibility only affects config read of the Vendor ID.
+>> +      * For config write or any other config read the Root must
+>> +      * automatically re-issue configuration request again as a
+>> +      * new request.
+>> +      *
+>> +      * For config reads, this hardware returns CFG_RETRY_STATUS data when
+>> +      * it receives a CRS completion for a config read, regardless of the
+>> +      * address of the read or the CRS Software Visibility Enable bit. As a
+>> +      * partial workaround for this, we retry in software any read that
+>> +      * returns CFG_RETRY_STATUS.
+>> +      */
+>> +     data = readl(cfg_data_p);
+>> +     while (data == CFG_RETRY_STATUS && timeout--) {
+>> +             udelay(1);
+>> +             data = readl(cfg_data_p);
+>> +     }
+>> +
+>> +     if (data == CFG_RETRY_STATUS)
+>> +             data = 0xffffffff;
+>> +
+>> +     return data;
+>> +}
+>> +
+>> +static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
+>> +                                 int where, int size, u32 *val)
+>> +{
+>> +     struct iproc_pcie *pcie = iproc_data(bus);
+>> +     unsigned int slot = PCI_SLOT(devfn);
+>> +     unsigned int fn = PCI_FUNC(devfn);
+>> +     unsigned int busno = bus->number;
+>> +     void __iomem *cfg_data_p;
+>> +     unsigned int data;
+>> +
+>> +     /* root complex access. */
+>> +     if (busno == 0)
+>> +             return pci_generic_config_read32(bus, devfn, where, size, val);
 >
-> I applied these to pci/host-iproc for v4.14.  Man, this is ugly.
+> It sounds like Stingray advertises CRS SV support in its Root Capabilities
+> register.  I think we should mask out PCI_EXP_RTCAP_CRSVIS so we don't
+> advertise it.  That will keep Linux from trying to enable it.  I know the
+> hardware doesn't look at PCI_EXP_RTCTL_CRSSVE, but there's no point in
+> confusing users reading the lspci output.
 >
-> I reworked the changelog to try to make it more readable.  I also tried to
-> disable the PCI_EXP_RTCAP_CRSVIS bit, which advertises CRS SV support.  And
-> I removed what looked like a duplicate pci_generic_config_read32() call.
-> And I added a warning about the fact that we corrupt reads of config
-> registers that happen to contain 0xffff0001.
+> We did something similar with f09f8735fb9c ("PCI: xgene: Disable
+> Configuration Request Retry Status for v1 silicon").
 >
-> I'm pretty sure I broke something, so please take a look.
+> I tried to do this in the patch I pushed to pci/host-iproc.
+>
+>> +
+>> +     cfg_data_p = iproc_pcie_map_ep_cfg_reg(pcie, busno, slot, fn, where);
+>> +
+>> +     if (!cfg_data_p)
+>> +             return PCIBIOS_DEVICE_NOT_FOUND;
+>> +
+>> +     data = iproc_pcie_cfg_retry(cfg_data_p);
+>> +
+>> +     *val = data;
+>> +     if (size <= 2)
+>> +             *val = (data >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
+>> +
+>> +     return PCIBIOS_SUCCESSFUL;
+>> +}
+>> +
+>>  /**
+>>   * Note access to the configuration registers are protected at the higher layer
+>>   * by 'pci_lock' in drivers/pci/access.c
+>> @@ -567,8 +628,13 @@ static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+>>                                   int where, int size, u32 *val)
+>>  {
+>>       int ret;
+>> +     struct iproc_pcie *pcie = iproc_data(bus);
+>>
+>>       iproc_pcie_apb_err_disable(bus, true);
+>> +     if (pcie->type == IPROC_PCIE_PAXB_V2)
+>> +             ret = iproc_pcie_config_read(bus, devfn, where, size, val);
+>> +     else
+>> +             ret = pci_generic_config_read32(bus, devfn, where, size, val);
+>>       ret = pci_generic_config_read32(bus, devfn, where, size, val);
+>
+> This last pci_generic_config_read32() call looks like a duplicate.
 
-Appreciate your time in adding PCI_EXP_RTCAP_CRSVIS and other changes.
-I just tested the patch, and it works fine.
-which tells us, that CRS visibility bit has no effect.
+yes indeed.
+I have tested your CRS visibility bit changes; and it works fine.
 
-so things look okay to me.
+do you want me to post new patch-set by removing the duplicate call
+along with the changes you have made ?
 
-Regards,
-Oza.
+or since, you have already applied patches, with your changes, you
+will take care of removing this last duplicate call ?
+I think this is the last change for this patch-set, If I did not miss anything.
+
+please let me know.
+
 >
-> Incremental diff from your v8 to what's on pci/host-iproc:
->
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index cbdabe8a073e..8bd5e544b1c1 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -69,7 +69,7 @@
->  #define APB_ERR_EN                   BIT(APB_ERR_EN_SHIFT)
->
->  #define CFG_RETRY_STATUS             0xffff0001
-> -#define CFG_RETRY_STATUS_TIMEOUT_US  500000 /* 500 milli-seconds. */
-> +#define CFG_RETRY_STATUS_TIMEOUT_US  500000 /* 500 milliseconds */
->
->  /* derive the enum index of the outbound/inbound mapping registers */
->  #define MAP_REG(base_reg, index)      ((base_reg) + (index) * 2)
-> @@ -482,17 +482,21 @@ static unsigned int iproc_pcie_cfg_retry(void __iomem *cfg_data_p)
->         unsigned int data;
->
->         /*
-> -        * As per PCIe spec r3.1, sec 2.3.2, CRS Software
-> -        * Visibility only affects config read of the Vendor ID.
-> -        * For config write or any other config read the Root must
-> -        * automatically re-issue configuration request again as a
-> -        * new request.
-> +        * As per PCIe spec r3.1, sec 2.3.2, CRS Software Visibility only
-> +        * affects config reads of the Vendor ID.  For config writes or any
-> +        * other config reads, the Root may automatically reissue the
-> +        * configuration request again as a new request.
->          *
-> -        * For config reads, this hardware returns CFG_RETRY_STATUS data when
-> -        * it receives a CRS completion for a config read, regardless of the
-> -        * address of the read or the CRS Software Visibility Enable bit. As a
-> +        * For config reads, this hardware returns CFG_RETRY_STATUS data
-> +        * when it receives a CRS completion, regardless of the address of
-> +        * the read or the CRS Software Visibility Enable bit.  As a
->          * partial workaround for this, we retry in software any read that
->          * returns CFG_RETRY_STATUS.
-> +        *
-> +        * Note that a non-Vendor ID config register may have a value of
-> +        * CFG_RETRY_STATUS.  If we read that, we can't distinguish it from
-> +        * a CRS completion, so we will incorrectly retry the read and
-> +        * eventually return the wrong data (0xffffffff).
->          */
->         data = readl(cfg_data_p);
->         while (data == CFG_RETRY_STATUS && timeout--) {
-> @@ -515,10 +519,19 @@ static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
->         unsigned int busno = bus->number;
->         void __iomem *cfg_data_p;
->         unsigned int data;
-> +       int ret;
->
-> -       /* root complex access. */
-> -       if (busno == 0)
-> -               return pci_generic_config_read32(bus, devfn, where, size, val);
-> +       /* root complex access */
-> +       if (busno == 0) {
-> +               ret = pci_generic_config_read32(bus, devfn, where, size, val);
-> +               if (ret != PCIBIOS_SUCCESSFUL)
-> +                       return ret;
-> +
-> +               /* Don't advertise CRS SV support */
-> +               if ((where & ~0x3) == PCI_EXP_CAP + PCI_EXP_RTCAP)
-> +                       *val &= ~(PCI_EXP_RTCAP_CRSVIS << 16);
-> +               return PCIBIOS_SUCCESSFUL;
-> +       }
->
->         cfg_data_p = iproc_pcie_map_ep_cfg_reg(pcie, busno, slot, fn, where);
->
-> @@ -635,7 +648,6 @@ static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
->                 ret = iproc_pcie_config_read(bus, devfn, where, size, val);
->         else
->                 ret = pci_generic_config_read32(bus, devfn, where, size, val);
-> -       ret = pci_generic_config_read32(bus, devfn, where, size, val);
->         iproc_pcie_apb_err_disable(bus, false);
->
->         return ret;
-> @@ -1309,6 +1321,8 @@ static int iproc_pcie_rev_init(struct iproc_pcie *pcie)
->                 pcie->ib.nr_regions = ARRAY_SIZE(paxb_v2_ib_map);
->                 pcie->ib_map = paxb_v2_ib_map;
->                 pcie->need_msi_steer = true;
-> +               dev_warn(dev, "reads of config registers that contain %#x return incorrect data\n",
-> +                        CFG_RETRY_STATUS);
->                 break;
->         case IPROC_PCIE_PAXC:
->                 regs = iproc_pcie_reg_paxc;
+>>       iproc_pcie_apb_err_disable(bus, false);
+>>
+>> --
+>> 1.9.1
+>>
