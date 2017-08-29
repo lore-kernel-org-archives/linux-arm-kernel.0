@@ -1,43 +1,25 @@
-From: cohuck@redhat.com (Cornelia Huck)
-Date: Tue, 29 Aug 2017 15:00:44 +0200
-Subject: [PATCH RFC v3 7/9] KVM: add kvm_free_vcpus and kvm_arch_free_vcpus
-In-Reply-To: <45e07499-e60c-5289-f439-9c51f59866ec@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-8-rkrcmar@redhat.com>
- <45e07499-e60c-5289-f439-9c51f59866ec@redhat.com>
-Message-ID: <20170829150044.554b5288.cohuck@redhat.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 29 Aug 2017 15:12:31 +0200
+Subject: [PATCH 9/9] clocksource/drivers/bcm2835: Remove message on memory
+ allocation failure
+In-Reply-To: <01662951-8a60-5c1c-cc72-464af1d3950d@linaro.org>
+References: <20170829093354.GA2572@mai>
+ <1503999271-15712-1-git-send-email-daniel.lezcano@linaro.org>
+ <1503999271-15712-9-git-send-email-daniel.lezcano@linaro.org>
+ <1822c0d4-8f5d-611c-21df-4945f298be0a@users.sourceforge.net>
+ <01662951-8a60-5c1c-cc72-464af1d3950d@linaro.org>
+Message-ID: <9497cd71-c61d-5672-e6a1-93761618ce9b@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Aug 2017 16:18:59 +0200
-David Hildenbrand <david@redhat.com> wrote:
+>> Would a wording like ?? does that already.? be more appropriate here?
+> 
+> Yep. Fixed.
 
-> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> > index 33a15e176927..0d2d8b0c785c 100644
-> > --- a/virt/kvm/kvm_main.c
-> > +++ b/virt/kvm/kvm_main.c
-> > @@ -750,6 +750,23 @@ static void kvm_destroy_devices(struct kvm *kvm)
-> >  	}
-> >  }
-> >  
-> > +void kvm_free_vcpus(struct kvm *kvm)
-> > +{
-> > +	int i;
-> > +
-> > +	kvm_arch_free_vcpus(kvm);  
-> 
-> I wonder if it would be possible to get rid of kvm_arch_free_vcpus(kvm)
-> completely and simply call
-> 
-> kvm_for_each_vcpu(i, vcpu, kvm)
-> 	kvm_arch_vcpu_free(vcpu);
-> 
-> at that point.
-> 
-> Would certainly require some refactoring, and I am not sure if we could
-> modify the special mmu handling for x86 ("Unpin any mmu pages first.").
-> But if in doubt, that part could be moved to kvm_arch_destroy_vm(), just
-> before calling kvm_free_vcpus().
+Thanks for this adjustment.
+https://git.linaro.org/people/daniel.lezcano/linux.git/commit/?h=clockevents/4.14&id=fd388bc07c2ca854f28f405bb65470647499dcaa
 
-Nod, that crossed my mind as well. Would avoid adding lots of
-kvm_arch_free_vcpus() that do the same thing for many archs.
+Do you disagree to my suggestion to amend also the commit subject?
+
+Regards,
+Markus
