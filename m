@@ -1,115 +1,23 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 29 Aug 2017 16:50:22 +0530
-Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
- sdhci-omap controller
-In-Reply-To: <CAPDyKFqCZFM7UmHyQCm=DwwZXJvzUde3pW0HqARKrsgfgxSuaw@mail.gmail.com>
-References: <20170821142132.GH6008@atomide.com>
- <20170823054246.23927-1-kishon@ti.com>
- <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
- <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
- <CAPDyKFqCZFM7UmHyQCm=DwwZXJvzUde3pW0HqARKrsgfgxSuaw@mail.gmail.com>
-Message-ID: <0c7e0705-d9c2-4499-54ba-cbd84589dc01@ti.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 29 Aug 2017 13:21:25 +0200
+Subject: [PATCH 9/9] clocksource/drivers/bcm2835: Remove message on memory
+ allocation failure
+In-Reply-To: <1503999271-15712-9-git-send-email-daniel.lezcano@linaro.org>
+References: <20170829093354.GA2572@mai>
+ <1503999271-15712-1-git-send-email-daniel.lezcano@linaro.org>
+ <1503999271-15712-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1822c0d4-8f5d-611c-21df-4945f298be0a@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
+I would prefer to use the wording ?for a? instead of ?on? in the commit subject.
 
-On Thursday 24 August 2017 04:59 PM, Ulf Hansson wrote:
-> On 23 August 2017 at 15:56, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi Uffe,
->>
->> On Wednesday 23 August 2017 06:37 PM, Ulf Hansson wrote:
->>> On 23 August 2017 at 07:42, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> Add binding for the TI's sdhci-omap controller. This now includes only
->>>> a subset of properties documented in ti-omap-hsmmc.txt but will eventually
->>>> include all the properties.
->>>>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>> Changes from v2:
->>>> *) Fixed example to use the updated compatible
->>>>
->>>> Changes from v1:
->>>> *) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
->>>>    of using the ti-omap-hsmmc.txt as suggested by Tony
->>>>  .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
->>>>  1 file changed, 22 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>>> new file mode 100644
->>>> index 000000000000..139695ad2d58
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>>> @@ -0,0 +1,22 @@
->>>> +* TI OMAP SDHCI Controller
->>>> +
->>>> +Refer to mmc.txt for standard MMC bindings.
->>>> +
->>>> +Required properties:
->>>> +- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
->>>> +- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
->>>> +
->>>> +Optional properties:
->>>> +- ti,dual-volt: boolean, supports dual voltage cards
->>>> +- ti,non-removable: non-removable slot (like eMMC)
->>>> +
->>>> +Example:
->>>> +       mmc1: mmc at 0x4809c000 {
->>>> +               compatible = "ti,dra7-sdhci";
->>>> +               reg = <0x4809c000 0x400>;
->>>> +               ti,hwmods = "mmc1";
->>>> +               ti,dual-volt;
->>>> +               bus-width = <4>;
->>>> +               vmmc-supply = <&vmmc>; /* phandle to regulator node */
->>>> +               ti,non-removable;
->>>> +       };
->>>> --
->>>> 2.11.0
->>>>
->>>
->>> I am wondering a bit on the long term plan here.
->>>
->>> Ideally at some point in future, we would like to remove the old
->>> omap_hsmmc driver, but from compatible string point of view, that
->>> means we first needs to deprecate the old ones for a while. Right?
->>
->> right but sdhci-omap is still lacking features that was present in omap_hsmmc
->> like context save/restore, SDIO support etc. I think we should deprecate
->> omap_hsmmc compatible once we add all the features in sdhci-omap?
->>>
->>> That said, what is then the reason to why we should bring over the
->>> existing omap_hsmmc bindings to the sdhci-omap bindings?
->>
->> This is mainly for old dt compatibility. Even after removing the omap_hsmmc
->> driver, users should still be able to use newer kernel with their existing dtbs.
-> 
-> I guess we have two options.
-> 
-> 1) Allow us to invent and use new bindings - and a new compatible.
-> When everything is implemented in sdhci-omap, we can deprecate the old
-> omap_hsmmc driver and its corresponding compatible/bindings. At some
-> point later we can remove the legacy driver/bindings altogether - of
-> course that might take a while. This option allows us to re-think some
-> of the old bindings and really clean up some if its related code. For
-> example, I think "ti,dual-volt" is a bad binding. Instead it would be
-> better to use the existing mmc bindings about which speed mode the
-> controller/board supports (as the voltage level comes with it).
-> 
-> 2) Invent only a new compatible, but stick to use the old omap hsmmc
-> bindings and thus also deploy the similar code dealing with them. When
-> everything is implemented move the old omap_hsmmc compatibles into the
-> new sdhci-omap driver and them remove the old omap_hsmmc driver. At
-> that point we could also deprecate the old omap hsmmc compatibles, but
-> to me that is rather pointless.
-> 
-> The two options has different advantages, feel free to pick any of them!
 
-Okay. I'll send a new version with option '1' (new compatible/new bindings).
+> The bcm2835_timer_init() function emits an error message in case of a memory
+> allocation failure. This is pointless as the mm core already do that.
 
-And when we deprecate the omap_hsmmc driver (some time later), we'll add
-support for the legacy bindings in sdhci-omap driver (so that old dtbs continue
-to work). Tony, are you okay with this?
+Does this commit message contain a typo?
+Would a wording like ?? does that already.? be more appropriate here?
 
-Thanks
-Kishon
+Regards,
+Markus
