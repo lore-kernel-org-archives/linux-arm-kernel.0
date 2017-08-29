@@ -1,37 +1,274 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 29 Aug 2017 08:00:20 +0200
-Subject: [PATCH] fpga: make xlnx_pr_decoupler_br_ops const
-In-Reply-To: <1503941531-17977-1-git-send-email-bhumirks@gmail.com>
-References: <1503941531-17977-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <78e2ed1d-ea20-eb68-b6b4-d993a98984a6@xilinx.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 29 Aug 2017 08:36:16 +0200
+Subject: [PATCH V3 6/8] drivers: boot_constraint: Add debugfs support
+In-Reply-To: <7a42cfb49a580a07c2045207fe7f1a3cb2096ce3.1501578037.git.viresh.kumar@linaro.org>
+References: <cover.1501578037.git.viresh.kumar@linaro.org>
+ <7a42cfb49a580a07c2045207fe7f1a3cb2096ce3.1501578037.git.viresh.kumar@linaro.org>
+Message-ID: <20170829063616.GB12198@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.8.2017 19:32, Bhumika Goyal wrote:
-> Make this const as it is only passed to a const argument of the function
-> fpga_bridge_register.
+On Tue, Aug 01, 2017 at 02:53:47PM +0530, Viresh Kumar wrote:
+> This patch adds debugfs support for boot constraints. This is how it
+> looks for a "vmmc-supply" constraint for the MMC device.
 > 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> $ ls -R /sys/kernel/debug/boot_constraints/
+> /sys/kernel/debug/boot_constraints/:
+> f723d000.dwmmc0
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
+> clk-ciu  pm-domain  supply-vmmc  supply-vmmcaux
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/clk-ciu:
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/pm-domain:
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
+> u_volt_max  u_volt_min
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmcaux:
+> u_volt_max  u_volt_min
+> 
+> Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Minor debugfs api interaction nits below:
+
+
 > ---
->  drivers/fpga/xilinx-pr-decoupler.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/base/boot_constraints/clk.c    |  4 ++
+>  drivers/base/boot_constraints/core.c   | 72 ++++++++++++++++++++++++++++++++++
+>  drivers/base/boot_constraints/core.h   |  6 +++
+>  drivers/base/boot_constraints/pm.c     | 12 +++++-
+>  drivers/base/boot_constraints/supply.c | 10 +++++
+>  5 files changed, 102 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
-> index e359930..0d77430 100644
-> --- a/drivers/fpga/xilinx-pr-decoupler.c
-> +++ b/drivers/fpga/xilinx-pr-decoupler.c
-> @@ -79,7 +79,7 @@ static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
->  	return !status;
+> diff --git a/drivers/base/boot_constraints/clk.c b/drivers/base/boot_constraints/clk.c
+> index b5b1d63c3e76..bdbfcbc2944d 100644
+> --- a/drivers/base/boot_constraints/clk.c
+> +++ b/drivers/base/boot_constraints/clk.c
+> @@ -49,6 +49,9 @@ int constraint_clk_add(struct constraint *constraint, void *data)
+>  	cclk->clk_info.name = kstrdup_const(clk_info->name, GFP_KERNEL);
+>  	constraint->private = cclk;
+>  
+> +	/* Debugfs */
+
+That's obvious no need for the comment...
+
+> +	constraint_add_debugfs(constraint, clk_info->name);
+> +
+>  	return 0;
+>  
+>  put_clk:
+> @@ -63,6 +66,7 @@ void constraint_clk_remove(struct constraint *constraint)
+>  {
+>  	struct constraint_clk *cclk = constraint->private;
+>  
+> +	constraint_remove_debugfs(constraint);
+>  	kfree_const(cclk->clk_info.name);
+>  	clk_disable_unprepare(cclk->clk);
+>  	clk_put(cclk->clk);
+> diff --git a/drivers/base/boot_constraints/core.c b/drivers/base/boot_constraints/core.c
+> index 06267f0c88d4..c0e3a85ff85a 100644
+> --- a/drivers/base/boot_constraints/core.c
+> +++ b/drivers/base/boot_constraints/core.c
+> @@ -35,6 +35,76 @@ static int __init constraints_disable(char *str)
+>  }
+>  early_param("boot_constraints_disable", constraints_disable);
+>  
+> +/* Debugfs */
+> +
+> +static struct dentry *rootdir;
+> +
+> +static void constraint_device_add_debugfs(struct constraint_dev *cdev)
+> +{
+> +	struct device *dev = cdev->dev;
+> +
+> +	cdev->dentry = debugfs_create_dir(dev_name(dev), rootdir);
+> +	if (!cdev->dentry)
+> +		dev_err(dev, "Failed to create constraint dev debugfs dir\n");
+
+No, you never need to check the return value of a debugfs call.  You
+shouldn't care what happens here, it's just debugfs, a user can't do
+anything with this info, and neither should you change your actions
+(which you aren't here, which is good, but not true later on...)
+
+So just call the function, save the value, and move on, it's always
+going to return a value that you can use in any future debugfs calls, no
+need to care.
+
+> +}
+> +
+> +static void constraint_device_remove_debugfs(struct constraint_dev *cdev)
+> +{
+> +	debugfs_remove_recursive(cdev->dentry);
+> +}
+> +
+> +void constraint_add_debugfs(struct constraint *constraint, const char *suffix)
+> +{
+> +	struct device *dev = constraint->cdev->dev;
+> +	const char *prefix;
+> +	char name[NAME_MAX];
+> +
+> +	switch (constraint->type) {
+> +	case DEV_BOOT_CONSTRAINT_CLK:
+> +		prefix = "clk";
+> +		break;
+> +	case DEV_BOOT_CONSTRAINT_PM:
+> +		prefix = "pm";
+> +		break;
+> +	case DEV_BOOT_CONSTRAINT_SUPPLY:
+> +		prefix = "supply";
+> +		break;
+> +	default:
+> +		dev_err(dev, "%s: Constraint type (%d) not supported\n",
+> +			__func__, constraint->type);
+> +		return;
+> +	}
+> +
+> +	snprintf(name, NAME_MAX, "%s-%s", prefix, suffix);
+> +
+> +	constraint->dentry = debugfs_create_dir(name, constraint->cdev->dentry);
+> +	if (!constraint->dentry)
+> +		dev_err(dev, "Failed to create constraint (%s) debugfs dir\n",
+> +			name);
+
+Again, you don't care, just call it and move on.
+
+> +}
+> +
+> +void constraint_remove_debugfs(struct constraint *constraint)
+> +{
+> +	debugfs_remove_recursive(constraint->dentry);
+> +}
+> +
+> +static int __init constraint_debugfs_init(void)
+> +{
+> +	if (boot_constraints_disabled)
+> +		return -ENODEV;
+> +
+> +	/* Create /sys/kernel/debug/opp directory */
+> +	rootdir = debugfs_create_dir("boot_constraints", NULL);
+> +	if (!rootdir) {
+> +		pr_err("Failed to create root directory\n");
+> +		return -ENOMEM;
+
+And again, you don't care, call it and move on, don't return an
+incorrect value like this :)
+
+
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +core_initcall(constraint_debugfs_init);
+> +
+> +
+>  /* Boot constraints core */
+>  
+>  static struct constraint_dev *constraint_device_find(struct device *dev)
+> @@ -62,12 +132,14 @@ static struct constraint_dev *constraint_device_allocate(struct device *dev)
+>  	INIT_LIST_HEAD(&cdev->constraints);
+>  
+>  	list_add(&cdev->node, &constraint_devices);
+> +	constraint_device_add_debugfs(cdev);
+>  
+>  	return cdev;
 >  }
 >  
-> -static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
-> +static const struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
->  	.enable_set = xlnx_pr_decoupler_enable_set,
->  	.enable_show = xlnx_pr_decoupler_enable_show,
+>  static void constraint_device_free(struct constraint_dev *cdev)
+>  {
+> +	constraint_device_remove_debugfs(cdev);
+>  	list_del(&cdev->node);
+>  	kfree(cdev);
+>  }
+> diff --git a/drivers/base/boot_constraints/core.h b/drivers/base/boot_constraints/core.h
+> index a051c3d7c8ab..ee84e237c66a 100644
+> --- a/drivers/base/boot_constraints/core.h
+> +++ b/drivers/base/boot_constraints/core.h
+> @@ -8,6 +8,7 @@
+>  #define _CORE_H
+>  
+>  #include <linux/boot_constraint.h>
+> +#include <linux/debugfs.h>
+>  #include <linux/device.h>
+>  #include <linux/list.h>
+>  
+> @@ -15,6 +16,7 @@ struct constraint_dev {
+>  	struct device *dev;
+>  	struct list_head node;
+>  	struct list_head constraints;
+> +	struct dentry *dentry;
 >  };
-> 
+>  
+>  struct constraint {
+> @@ -23,12 +25,16 @@ struct constraint {
+>  	enum dev_boot_constraint_type type;
+>  	void (*free_resources)(void *data);
+>  	void *free_resources_data;
+> +	struct dentry *dentry;
+>  
+>  	int (*add)(struct constraint *constraint, void *data);
+>  	void (*remove)(struct constraint *constraint);
+>  	void *private;
+>  };
+>  
+> +void constraint_add_debugfs(struct constraint *constraint, const char *suffix);
+> +void constraint_remove_debugfs(struct constraint *constraint);
+> +
+>  /* Forward declarations of constraint specific callbacks */
+>  int constraint_clk_add(struct constraint *constraint, void *data);
+>  void constraint_clk_remove(struct constraint *constraint);
+> diff --git a/drivers/base/boot_constraints/pm.c b/drivers/base/boot_constraints/pm.c
+> index edba5eca5093..95910d0dc457 100644
+> --- a/drivers/base/boot_constraints/pm.c
+> +++ b/drivers/base/boot_constraints/pm.c
+> @@ -14,11 +14,19 @@
+>  int constraint_pm_add(struct constraint *constraint, void *data)
+>  {
+>  	struct device *dev = constraint->cdev->dev;
+> +	int ret;
+>  
+> -	return dev_pm_domain_attach(dev, true);
+> +	ret = dev_pm_domain_attach(dev, true);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Debugfs */
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+Again, obvious comment, no need to have it.
 
-Thanks,
-Michal
+
+> +	constraint_add_debugfs(constraint, "domain");
+> +
+> +	return 0;
+>  }
+>  
+>  void constraint_pm_remove(struct constraint *constraint)
+>  {
+> -	/* Nothing to do for now */
+> +	constraint_remove_debugfs(constraint);
+>  }
+> diff --git a/drivers/base/boot_constraints/supply.c b/drivers/base/boot_constraints/supply.c
+> index 30f816dbf12c..b206f500b2bc 100644
+> --- a/drivers/base/boot_constraints/supply.c
+> +++ b/drivers/base/boot_constraints/supply.c
+> @@ -60,6 +60,15 @@ int constraint_supply_add(struct constraint *constraint, void *data)
+>  	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
+>  	constraint->private = csupply;
+>  
+> +	/* Debugfs */
+> +	constraint_add_debugfs(constraint, supply->name);
+> +
+> +	debugfs_create_u32("u_volt_min", 0444, constraint->dentry,
+> +			   &csupply->supply.u_volt_min);
+> +
+> +	debugfs_create_u32("u_volt_max", 0444, constraint->dentry,
+> +			   &csupply->supply.u_volt_max);
+
+See, that's how you do it!
+
+thanks,
+
+greg k-h
