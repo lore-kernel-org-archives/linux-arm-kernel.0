@@ -1,18 +1,25 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 29 Aug 2017 16:56:46 +0200
-Subject: [PATCH v3 4/8] PM / ACPI: Split code validating need for runtime
- resume in ->prepare()
+Date: Tue, 29 Aug 2017 16:56:49 +0200
+Subject: [PATCH v3 7/8] i2c: designware: Don't resume device in the
+ ->complete() callback
 In-Reply-To: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
 References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1504018610-10822-5-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1504018610-10822-8-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the code dealing with validation of whether runtime resuming the
-device is needed during system suspend.
+In case the PM core is able to use the direct_complete path during system
+sleep for the i2c device, the device is runtime resumed in the ->complete()
+callback. For ACPI platforms this is needed to synchronize the power state
+of the device, while for non-ACPI platforms this is a waste.
 
-In this way it becomes more clear for what circumstances ACPI is prevented
-from trying the direct_complete path.
+To better deal with this, let's drop the ->complete() callback from the
+i2c-dw-plat driver altogether, thus avoiding the runtime resume of the
+device.
+
+This change still plays well for the ACPI case, because the ACPI PM
+domain's ->complete() callback, assigned to acpi_subsys_complete(), already
+deals with runtime resuming the device in case it's needed.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
@@ -21,70 +28,36 @@ Changes in v3:
 	- None.
 
 ---
- drivers/acpi/device_pm.c | 37 ++++++++++++++++++++++++-------------
- 1 file changed, 24 insertions(+), 13 deletions(-)
+ drivers/i2c/busses/i2c-designware-platdrv.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index 632f214..5181057 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -989,6 +989,27 @@ int acpi_dev_resume_early(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(acpi_dev_resume_early);
- 
-+static bool acpi_dev_needs_resume(struct device *dev, struct acpi_device *adev)
-+{
-+	u32 sys_target = acpi_target_system_state();
-+	int ret, state;
-+
-+	if (device_may_wakeup(dev) != !!adev->wakeup.prepare_count)
-+		return true;
-+
-+	if (sys_target == ACPI_STATE_S0)
-+		return false;
-+
-+	if (adev->power.flags.dsw_present)
-+		return true;
-+
-+	ret = acpi_dev_pm_get_state(dev, adev, sys_target, NULL, &state);
-+	if (ret)
-+		return true;
-+
-+	return state != adev->power.state;
-+}
-+
- /**
-  * acpi_subsys_prepare - Prepare device for system transition to a sleep state.
-  * @dev: Device to prepare.
-@@ -996,26 +1017,16 @@ EXPORT_SYMBOL_GPL(acpi_dev_resume_early);
- int acpi_subsys_prepare(struct device *dev)
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index 57248bc..38121c9 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -417,15 +417,8 @@ static int dw_i2c_plat_prepare(struct device *dev)
  {
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
--	u32 sys_target;
--	int ret, state;
-+	int ret;
- 
- 	ret = pm_generic_prepare(dev);
- 	if (ret < 0)
- 		return ret;
- 
--	if (!adev || !pm_runtime_suspended(dev)
--	    || device_may_wakeup(dev) != !!adev->wakeup.prepare_count)
--		return 0;
--
--	sys_target = acpi_target_system_state();
--	if (sys_target == ACPI_STATE_S0)
--		return 1;
--
--	if (adev->power.flags.dsw_present)
-+	if (!adev || !pm_runtime_suspended(dev))
- 		return 0;
- 
--	ret = acpi_dev_pm_get_state(dev, adev, sys_target, NULL, &state);
--	return !ret && state == adev->power.state;
-+	return !acpi_dev_needs_resume(dev, adev);
+ 	return pm_runtime_suspended(dev);
  }
- EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
+-
+-static void dw_i2c_plat_complete(struct device *dev)
+-{
+-	if (dev->power.direct_complete)
+-		pm_request_resume(dev);
+-}
+ #else
+ #define dw_i2c_plat_prepare	NULL
+-#define dw_i2c_plat_complete	NULL
+ #endif
  
+ #ifdef CONFIG_PM
+@@ -461,7 +454,6 @@ static int dw_i2c_plat_suspend(struct device *dev)
+ 
+ static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
+ 	.prepare = dw_i2c_plat_prepare,
+-	.complete = dw_i2c_plat_complete,
+ 	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
+ 	SET_RUNTIME_PM_OPS(dw_i2c_plat_runtime_suspend,
+ 			   dw_i2c_plat_resume,
 -- 
 2.7.4
