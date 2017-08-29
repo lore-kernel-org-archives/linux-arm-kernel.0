@@ -1,143 +1,64 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Aug 2017 10:03:33 -0700
-Subject: [PATCH 3/5] ARM: OMAP2+: Fix overwriting of clkctrl and modulemode
- values
+Date: Tue, 29 Aug 2017 10:03:35 -0700
+Subject: [PATCH 5/5] ARM: OMAP2+: Drop unused omap_hwmod_mux_info
 In-Reply-To: <20170829170335.11536-1-tony@atomide.com>
 References: <20170829170335.11536-1-tony@atomide.com>
-Message-ID: <20170829170335.11536-4-tony@atomide.com>
+Message-ID: <20170829170335.11536-6-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are currently overwiting the hwmod clkctrl registers if we
-configure a clock ctrl clock from device tree.
-
-While this does not expose any bugs except for kernel coders
-when debugging things, it should be fixed for correctness.
-It is now impossible to use the hwmod data for checking the
-clkctrl register values after booting for debugging or
-generating dts data from hwmod data.
-
-Let's fix the issue by adding a helper to detect if clkctrl
-clock is configured.
+This is no longer used as we boot in device tree
+only mode.
 
 Cc: Lokesh Vutla <lokeshvutla@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c | 49 +++++++++++++++++++++++++++++++++-------
- arch/arm/mach-omap2/omap_hwmod.h |  3 +++
- 2 files changed, 44 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.h | 18 ------------------
+ 1 file changed, 18 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -993,6 +993,34 @@ static int _enable_clocks(struct omap_hwmod *oh)
- 	return 0;
- }
- 
-+/**
-+ * _omap4_clkctrl_managed_by_clkfwk - true if clkctrl managed by clock framework
-+ * @oh: struct omap_hwmod *
-+ */
-+static bool _omap4_clkctrl_managed_by_clkfwk(struct omap_hwmod *oh)
-+{
-+	if (oh->prcm.omap4.flags & HWMOD_OMAP4_CLKFWK_CLKCTR_CLOCK)
-+		return true;
-+
-+	return false;
-+}
-+
-+/**
-+ * _omap4_has_clkctrl_clock - returns true if a module has clkctrl clock
-+ * @oh: struct omap_hwmod *
-+ */
-+static bool _omap4_has_clkctrl_clock(struct omap_hwmod *oh)
-+{
-+	if (oh->prcm.omap4.clkctrl_offs)
-+		return true;
-+
-+	if (!oh->prcm.omap4.clkctrl_offs &&
-+	    oh->prcm.omap4.flags & HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET)
-+		return true;
-+
-+	return false;
-+}
-+
- /**
-  * _disable_clocks - disable hwmod main clock and interface clocks
-  * @oh: struct omap_hwmod *
-@@ -1030,7 +1058,8 @@ static int _disable_clocks(struct omap_hwmod *oh)
-  */
- static void _omap4_enable_module(struct omap_hwmod *oh)
- {
--	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
-+	if (!oh->clkdm || !oh->prcm.omap4.modulemode ||
-+	    _omap4_clkctrl_managed_by_clkfwk(oh))
- 		return;
- 
- 	pr_debug("omap_hwmod: %s: %s: %d\n",
-@@ -1061,8 +1090,10 @@ static int _omap4_wait_target_disable(struct omap_hwmod *oh)
- 	if (oh->flags & HWMOD_NO_IDLEST)
- 		return 0;
- 
--	if (!oh->prcm.omap4.clkctrl_offs &&
--	    !(oh->prcm.omap4.flags & HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET))
-+	if (_omap4_clkctrl_managed_by_clkfwk(oh))
-+		return 0;
-+
-+	if (!_omap4_has_clkctrl_clock(oh))
- 		return 0;
- 
- 	return omap_cm_wait_module_idle(oh->clkdm->prcm_partition,
-@@ -1847,7 +1878,8 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
- {
- 	int v;
- 
--	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
-+	if (!oh->clkdm || !oh->prcm.omap4.modulemode ||
-+	    _omap4_clkctrl_managed_by_clkfwk(oh))
- 		return -EINVAL;
- 
- 	/*
-@@ -2831,8 +2863,10 @@ static int _omap4_wait_target_ready(struct omap_hwmod *oh)
- 	if (!_find_mpu_rt_port(oh))
- 		return 0;
- 
--	if (!oh->prcm.omap4.clkctrl_offs &&
--	    !(oh->prcm.omap4.flags & HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET))
-+	if (_omap4_clkctrl_managed_by_clkfwk(oh))
-+		return 0;
-+
-+	if (!_omap4_has_clkctrl_clock(oh))
- 		return 0;
- 
- 	/* XXX check module SIDLEMODE, hardreset status */
-@@ -2988,8 +3022,7 @@ static int _omap4_disable_direct_prcm(struct omap_hwmod *oh)
- 	if (!oh)
- 		return -EINVAL;
- 
--	oh->prcm.omap4.clkctrl_offs = 0;
--	oh->prcm.omap4.modulemode = 0;
-+	oh->prcm.omap4.flags |= HWMOD_OMAP4_CLKFWK_CLKCTR_CLOCK;
- 
- 	return 0;
- }
 diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
 --- a/arch/arm/mach-omap2/omap_hwmod.h
 +++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -446,9 +446,12 @@ struct omap_hwmod_omap2_prcm {
-  * HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET: Some IP blocks have a valid CLKCTRL
-  *	offset of zero; this flag bit should be set in those cases to
-  *	distinguish from hwmods that have no clkctrl offset.
-+ * HWMOD_OMAP4_CLKFWK_CLKCTR_CLOCK: Module clockctrl clock is managed
-+ *	by the common clock framework and not hwmod.
-  */
- #define HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT		(1 << 0)
- #define HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET		(1 << 1)
-+#define HWMOD_OMAP4_CLKFWK_CLKCTR_CLOCK		(1 << 2)
+@@ -21,7 +21,6 @@
+  *
+  * To do:
+  * - add interconnect error log structures
+- * - add pinmuxing
+  * - init_conn_id_bit (CONNID_BIT_VECTOR)
+  * - implement default hwmod SMS/SDRC flags?
+  * - move Linux-specific data ("non-ROM data") out
+@@ -150,22 +149,6 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3;
+ #define DEBUG_AM33XXUART1_FLAGS DEBUG_OMAPUART_FLAGS
+ #endif
  
+-/**
+- * struct omap_hwmod_mux_info - hwmod specific mux configuration
+- * @pads:              array of omap_device_pad entries
+- * @nr_pads:           number of omap_device_pad entries
+- *
+- * Note that this is currently built during init as needed.
+- */
+-struct omap_hwmod_mux_info {
+-	int				nr_pads;
+-	struct omap_device_pad		*pads;
+-	int				nr_pads_dynamic;
+-	struct omap_device_pad		**pads_dynamic;
+-	int				*irqs;
+-	bool				enabled;
+-};
+-
  /**
-  * struct omap_hwmod_omap4_prcm - OMAP4-specific PRCM data
+  * struct omap_hwmod_irq_info - MPU IRQs used by the hwmod
+  * @name: name of the IRQ channel (module local name)
+@@ -673,7 +656,6 @@ struct omap_hwmod {
+ 	const char			*name;
+ 	struct omap_hwmod_class		*class;
+ 	struct omap_device		*od;
+-	struct omap_hwmod_mux_info	*mux;
+ 	struct omap_hwmod_irq_info	*mpu_irqs;
+ 	struct omap_hwmod_dma_info	*sdma_reqs;
+ 	struct omap_hwmod_rst_info	*rst_lines;
 -- 
 2.14.1
