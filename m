@@ -1,125 +1,35 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Tue, 29 Aug 2017 07:32:39 -0700
-Subject: [PATCH v3 3/4] arm/syscalls: Optimize address limit check
-In-Reply-To: <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
-References: <20170814213732.104301-1-thgarnie@google.com>
- <20170814213732.104301-3-thgarnie@google.com>
- <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
-Message-ID: <CAJcbSZEd10fMp6OSgSYv_Wmt=wX5fw_Gu-_N=fM_QmP==wUMew@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 29 Aug 2017 16:19:26 +0200
+Subject: [PATCH 0/3] Tango PCIe host bridge MSI support + required API
+Message-ID: <f10055cc-4430-ff30-f892-3d3d6f24354c@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 9:42 AM, Thomas Garnier <thgarnie@google.com> wrote:
-> On Mon, Aug 14, 2017 at 2:37 PM, Thomas Garnier <thgarnie@google.com> wrote:
->> Disable the generic address limit check in favor of an architecture
->> specific optimized implementation. The generic implementation using
->> pending work flags did not work well with ARM and alignment faults.
->>
->> The address limit is checked on each syscall return path to user-mode
->> path as well as the irq user-mode return function. If the address limit
->> was changed, a function is called to report data corruption (stopping
->> the kernel or process based on configuration).
->>
->> The address limit check has to be done before any pending work because
->> they can reset the address limit and the process is killed using a
->> SIGKILL signal. For example the lkdtm address limit check does not work
->> because the signal to kill the process will reset the user-mode address
->> limit.
->>
->> Signed-off-by: Thomas Garnier <thgarnie@google.com>
->
-> Any feedback?
+Bjorn, Marc,
 
-CCing LW at karo-electronics.de who experienced the same issue this patch
-proposal fix.
+This patch-set includes
+	[PATCH v11] PCI: tango: Add MSI controller support
+with the doorbell address parsed from DT instead of hard-coded
+in the driver.
 
-Russel: Any feedback?
+A wrapper to parse dma-ranges was added to drivers/of/address.c
 
->
->> ---
->>  arch/arm/kernel/entry-common.S | 11 +++++++++++
->>  arch/arm/kernel/signal.c       |  7 +++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->> index 0b60adf4a5d9..99c908226065 100644
->> --- a/arch/arm/kernel/entry-common.S
->> +++ b/arch/arm/kernel/entry-common.S
->> @@ -12,6 +12,7 @@
->>  #include <asm/unistd.h>
->>  #include <asm/ftrace.h>
->>  #include <asm/unwind.h>
->> +#include <asm/memory.h>
->>  #ifdef CONFIG_AEABI
->>  #include <asm/unistd-oabi.h>
->>  #endif
->> @@ -48,10 +49,14 @@ ret_fast_syscall:
->>   UNWIND(.fnstart       )
->>   UNWIND(.cantunwind    )
->>         disable_irq_notrace                     @ disable interrupts
->> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
->> +       cmp     r2, #TASK_SIZE
->> +       blne    addr_limit_check_failed
->>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->>         bne     fast_work_pending
->>
->> +
->>         /* perform architecture specific actions before user return */
->>         arch_ret_to_user r1, lr
->>
->> @@ -74,6 +79,9 @@ ret_fast_syscall:
->>   UNWIND(.cantunwind    )
->>         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
->>         disable_irq_notrace                     @ disable interrupts
->> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
->> +       cmp     r2, #TASK_SIZE
->> +       blne    addr_limit_check_failed
->>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->>         beq     no_work_pending
->> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
->>  ret_slow_syscall:
->>         disable_irq_notrace                     @ disable interrupts
->>  ENTRY(ret_to_user_from_irq)
->> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
->> +       cmp     r2, #TASK_SIZE
->> +       blne    addr_limit_check_failed
->>         ldr     r1, [tsk, #TI_FLAGS]
->>         tst     r1, #_TIF_WORK_MASK
->>         bne     slow_work_pending
->> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
->> index 5814298ef0b7..b67ae12503f3 100644
->> --- a/arch/arm/kernel/signal.c
->> +++ b/arch/arm/kernel/signal.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/uaccess.h>
->>  #include <linux/tracehook.h>
->>  #include <linux/uprobes.h>
->> +#include <linux/syscalls.h>
->>
->>  #include <asm/elf.h>
->>  #include <asm/cacheflush.h>
->> @@ -673,3 +674,9 @@ struct page *get_signal_page(void)
->>
->>         return page;
->>  }
->> +
->> +/* Defer to generic check */
->> +asmlinkage void addr_limit_check_failed(void)
->> +{
->> +       addr_limit_user_check();
->> +}
->> --
->> 2.14.1.480.gb18f417b89-goog
->>
->
->
->
-> --
-> Thomas
+A few drivers were converted to use the new wrapper.
 
+Marc Gonzalez (3):
+  of/pci: Add dma-ranges parsing support
+  PCI: Use of_pci_dma_range_parser_init API
+  PCI: tango: Add MSI controller support
 
+ drivers/of/address.c             |  19 +++-
+ drivers/pci/host/pci-ftpci100.c  |  20 +---
+ drivers/pci/host/pci-rcar-gen2.c |  20 +---
+ drivers/pci/host/pci-xgene.c     |  20 +---
+ drivers/pci/host/pcie-iproc.c    |  20 +---
+ drivers/pci/host/pcie-rcar.c     |  20 +---
+ drivers/pci/host/pcie-tango.c    | 205 ++++++++++++++++++++++++++++++++++++++-
+ include/linux/of_address.h       |  10 +-
+ 8 files changed, 232 insertions(+), 102 deletions(-)
 
 -- 
-Thomas
+2.11.0
