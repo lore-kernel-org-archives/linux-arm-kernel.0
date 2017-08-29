@@ -1,84 +1,63 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Aug 2017 18:44:02 +0200
-Subject: [PATCH 0/3] PM / ACPI / i2c: Runtime PM aware system sleep
- handling
-In-Reply-To: <CAPDyKFq-XDYE0xr2qONwO7_w8_jHfv5=iCwx4QdH7OHWqJ1e-Q@mail.gmail.com>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <1512684.bFXWtdU0Ox@aspire.rjw.lan>
- <CAPDyKFq-XDYE0xr2qONwO7_w8_jHfv5=iCwx4QdH7OHWqJ1e-Q@mail.gmail.com>
-Message-ID: <5440066.jm2MzmQIeF@aspire.rjw.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Aug 2017 10:29:55 -0700
+Subject: [PATCH 0/6] Drop omap hwmod legacy resources
+Message-ID: <20170829173001.20358-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 29, 2017 5:05:20 PM CEST Ulf Hansson wrote:
-> On 29 August 2017 at 16:43, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Tuesday, August 29, 2017 1:44:11 PM CEST Ulf Hansson wrote:
-> >> On 29 August 2017 at 12:29, Johannes Stezenbach <js@sig21.net> wrote:
-> >> > Hi,
-> >> >
-> >> > On Tue, Aug 29, 2017 at 02:18:13AM +0200, Rafael J. Wysocki wrote:
-> >> >> On Wednesday, August 23, 2017 4:42:00 PM CEST Ulf Hansson wrote:
-> >> >> > The i2c designware platform driver, drivers/i2c/busses/i2c-designware-platdrv.c,
-> >> >> > isn't well optimized for system sleep.
-> >> >> >
-> >> >> > What makes this driver particularly interesting is because it's a cross-SoC
-> >> >> > driver, which sometimes means there is an ACPI PM domain attached to the i2c
-> >> >> > device and sometimes not. The driver is being used on both x86 and ARM.
-> >> > ...
-> >> >> Basically, the point is to allow i2c-designware-platdrv to point its late
-> >> >> suspend and early resume callbacks, respectively, to pm_runtime_force_suspend()
-> >> >> and pm_runtime_force_resume() which then will do the right thing regardless of
-> >> >> whether or not the device is runtime suspended when system suspend starts.
-> >> >
-> >> > I'd like to point out a comment added by Hans de Goede in
-> >> > https://bugzilla.kernel.org/show_bug.cgi?id=193891#c99
-> >> >
-> >> >   The D0 / D3 methods of some devices use ACPI OpRegions on the PMIC which is
-> >> >   attached to I2C7, these methods get executed by acpi_dev_suspend_late /
-> >> >   acpi_dev_resume_early. Since the i2c-designware driver uses regular suspend /
-> >> >   resume callbacks it is already suspended at the time those calls happen,
-> >> >   leading to a device-suspend error and the system not suspending at all.
-> >>
-> >> Yes, that's why I moved those operation to be managed at the
-> >> ->suspend_late() in my series, and at the same time prevent the
-> >> direct_complete patch from executed for this device.
-> >>
-> >> >
-> >> > It's the reason for the Cherrytrail I2C7 special treatment in
-> >> > i2c-designware-platdrv.c and pm_disabled = true in i2c-designware-baytrail.c,
-> >> > however pm_disabled seems to be a problem for S0ix support.
-> >> > To solve it, i2c-designware-platdrv needs to suspend after all
-> >> > devices using ACPI OpRegions for suspend.
-> >> >
-> >> >
-> >> > Johannes
-> >>
-> >> Did you try out my series (v2) if that could fix this problem in a
-> >> more flexible manner?
-> >>
-> >> In other words, is it fine if the device remains runtime PM enabled
-> >> during the entire device_suspend() phase, and also not being suspended
-> >> until ->suspend_late()?
-> >
-> > Ulf, please, this is a *different* problem.
-> 
-> Yes, it is!
-> 
-> Just wanted to point out that if the device remains runtime PM enabled
-> the entire device_suspend() phase, that *could* solve the problem.
-> 
-> >
-> > Can we focus on one problem at a time?
-> 
-> Yes!
-> 
-> However, there is lots of things following when we try to enable the
-> runtime PM centric path for ACPI. :-)
+Hi all,
 
-Which, I guess, we won't do after all ...
+Here are changes to drop hwmod legacy resources for dma, irq and io.
 
-So I would prefer to think about addressing problems instead of trying to
-"enable the runtime PM centric path for ACPI" just for the sake of it.
+Note that these are against current next and needs the following
+two sets of fixes in preparation:
 
-Thanks,
-Rafael
+[PATCH 00/17] Fix missing device tree hwmods and IO ranges omap variants
+[PATCH 0/5] Fixes for omap hwmod for dropping legacy data
+
+These are naturally too late for v4.14 merge window but might be
+doable for v4.15.
+
+Regards,
+
+Tony
+
+
+Tony Lindgren (6):
+  ARM: OMAP2+: Populate legacy resources for dma and smartreflex
+  ARM: OMAP3: Remove legacy IRQ for PRM
+  ARM: OMAP4: Remove legacy IRQ for PRM
+  ARM: OMAP2+: Drop omap_hwmod_irq_info
+  ARM: OMAP2+: Drop omap_hwmod_dma_info
+  ARM: OMAP2+: Drop legacy struct omap_hwmod_addr_space
+
+ arch/arm/mach-omap2/Makefile                       |   1 -
+ arch/arm/mach-omap2/common.h                       |   1 -
+ arch/arm/mach-omap2/omap4-common.c                 |  24 -
+ arch/arm/mach-omap2/omap_device.c                  | 269 ++++------
+ arch/arm/mach-omap2/omap_device.h                  |   4 -
+ arch/arm/mach-omap2/omap_hwmod.c                   | 444 +----------------
+ arch/arm/mach-omap2/omap_hwmod.h                   |  62 ---
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   2 -
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   2 -
+ .../omap_hwmod_2xxx_3xxx_interconnect_data.c       |  27 -
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |  15 -
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   6 -
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       | 100 ----
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  39 --
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  43 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 548 ---------------------
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  20 -
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  38 --
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  44 --
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |  41 --
+ arch/arm/mach-omap2/prcm-common.h                  |   1 -
+ arch/arm/mach-omap2/prm.h                          |   2 -
+ arch/arm/mach-omap2/prm3xxx.c                      |  14 +-
+ arch/arm/mach-omap2/prm44xx.c                      |  21 +-
+ arch/arm/mach-omap2/prm_common.c                   |  12 +-
+ 25 files changed, 107 insertions(+), 1673 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
+
+-- 
+2.14.1
