@@ -1,49 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Aug 2017 14:03:43 +0200
-Subject: [PATCH V3 1/8] drivers: Add boot constraints core
-In-Reply-To: <20170829095217.GA3101@ubuntu>
-References: <cover.1501578037.git.viresh.kumar@linaro.org>
- <1a844e27ee7e0b22acf8ea582bf4e8d35f54c84a.1501578037.git.viresh.kumar@linaro.org>
- <20170829063923.GD12198@kroah.com> <20170829095217.GA3101@ubuntu>
-Message-ID: <20170829120343.GA4321@kroah.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Tue, 29 Aug 2017 14:05:40 +0200
+Subject: [PATCH RFC v3 1/9] KVM: s390: optimize detection of started vcpus
+In-Reply-To: <20170829132342.1ef25500.cohuck@redhat.com>
+References: <20170821203530.9266-1-rkrcmar@redhat.com>
+ <20170821203530.9266-2-rkrcmar@redhat.com>
+ <67a8b09c-3e7a-943d-8684-f9ad6e70514b@redhat.com>
+ <20170829132342.1ef25500.cohuck@redhat.com>
+Message-ID: <d63ceb80-bdf7-0a24-a4ac-3265b7528a60@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 11:52:17AM +0200, Viresh Kumar wrote:
-> On 29-08-17, 08:39, Greg Kroah-Hartman wrote:
-> > How is this information getting to the kernel from the bootloader?  I
-> > didn't see where that happened, just a single example driver that
-> > somehow "knew" what had to happen, which seems odd...
+On 29.08.2017 13:23, Cornelia Huck wrote:
+> On Tue, 22 Aug 2017 13:31:27 +0200
+> David Hildenbrand <david@redhat.com> wrote:
 > 
-> I tried to do it with DT earlier, but we couldn't reach to an agreement on what
-> bindings to add and so this series started doing things the old way. The kernel
-> would have platform specific drivers, which would exactly know what constraints
-> to set and we wouldn't need the bootloaders to pass anything for now.
-
-Who couldn't reach an agreement?  So you gave up and decided to make a
-whole bunch of kernel code instead of just using new DT entries?  That's
-crazy...
-
-> > This is a lot of new code for no users,
+>> On 21.08.2017 22:35, Radim Kr?m?? wrote:
+>>> We can add a variable instead of scanning all online VCPUs to know how
+>>> many are started.  We can't trivially tell which VCPU is the last one,
+>>> though.  
+>>
+>> You could keep the started vcpus in a list. Then you might drop unsigned
+>> started_vcpus;
+>>
+>> No started vcpus: Start pointer NULL
+>> Single started vcpu: Only one element in the list (easy to check)
+>>> 1 started vcpus: More than one element int he list (easy to check)  
 > 
-> I agree and so added the patch 8/8 to show a real user. I will convert that to a
-> patch going forward, which can be merged along with this series.
+> I'm not sure the added complication of keeping a list buys us much
+> here: We only have the "look for the last vcpu not stopped" operation
+> for the 2->1 transition.
 > 
-> > I would like to see at least 3
-> > real drivers that are using it before we merge it, as then you have a
-> > chance of getting the user/kernel api correct.
-> 
-> Hmm, so I am quite sure that this is a fairly generic problem to solve,
-> specifically for all the handheld devices. I can get code for few of the Qcom
-> SoCs but they may end up using the same platform driver. Not sure if I can get
-> code for multiple SoC families in the beginning.
 
-Let's see a working system or two first here please.
+That is wrong, we also have to know the last remaining (started) VCPU.
+For that, right now we have to iterate over all VCPUs.
 
-But you are implying that existing handheld devices need this problem
-solved, how do they do it today without this code as obviously they are
-shipping working solutions.
+There shouldn't be much complexity. We already perform changes under a
+lock, so it is as simple as adding/removing from the list.
 
-thanks,
+Detecting the transitions boils down to looking at two pointers.
 
-greg k-h
+-- 
+
+Thanks,
+
+David
