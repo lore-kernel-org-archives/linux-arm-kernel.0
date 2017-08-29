@@ -1,63 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Aug 2017 10:29:55 -0700
-Subject: [PATCH 0/6] Drop omap hwmod legacy resources
-Message-ID: <20170829173001.20358-1-tony@atomide.com>
+Date: Tue, 29 Aug 2017 10:29:57 -0700
+Subject: [PATCH 2/6] ARM: OMAP3: Remove legacy IRQ for PRM
+In-Reply-To: <20170829173001.20358-1-tony@atomide.com>
+References: <20170829173001.20358-1-tony@atomide.com>
+Message-ID: <20170829173001.20358-3-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+We have this coming from device tree and legacy booting is
+no longer needed.
 
-Here are changes to drop hwmod legacy resources for dma, irq and io.
+Cc: Lokesh Vutla <lokeshvutla@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/prm3xxx.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-Note that these are against current next and needs the following
-two sets of fixes in preparation:
-
-[PATCH 00/17] Fix missing device tree hwmods and IO ranges omap variants
-[PATCH 0/5] Fixes for omap hwmod for dropping legacy data
-
-These are naturally too late for v4.14 merge window but might be
-doable for v4.15.
-
-Regards,
-
-Tony
-
-
-Tony Lindgren (6):
-  ARM: OMAP2+: Populate legacy resources for dma and smartreflex
-  ARM: OMAP3: Remove legacy IRQ for PRM
-  ARM: OMAP4: Remove legacy IRQ for PRM
-  ARM: OMAP2+: Drop omap_hwmod_irq_info
-  ARM: OMAP2+: Drop omap_hwmod_dma_info
-  ARM: OMAP2+: Drop legacy struct omap_hwmod_addr_space
-
- arch/arm/mach-omap2/Makefile                       |   1 -
- arch/arm/mach-omap2/common.h                       |   1 -
- arch/arm/mach-omap2/omap4-common.c                 |  24 -
- arch/arm/mach-omap2/omap_device.c                  | 269 ++++------
- arch/arm/mach-omap2/omap_device.h                  |   4 -
- arch/arm/mach-omap2/omap_hwmod.c                   | 444 +----------------
- arch/arm/mach-omap2/omap_hwmod.h                   |  62 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   2 -
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   2 -
- .../omap_hwmod_2xxx_3xxx_interconnect_data.c       |  27 -
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |  15 -
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   6 -
- .../omap_hwmod_33xx_43xx_interconnect_data.c       | 100 ----
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  39 --
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  43 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 548 ---------------------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  20 -
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  38 --
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  44 --
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |  41 --
- arch/arm/mach-omap2/prcm-common.h                  |   1 -
- arch/arm/mach-omap2/prm.h                          |   2 -
- arch/arm/mach-omap2/prm3xxx.c                      |  14 +-
- arch/arm/mach-omap2/prm44xx.c                      |  21 +-
- arch/arm/mach-omap2/prm_common.c                   |  12 +-
- 25 files changed, 107 insertions(+), 1673 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
-
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -704,12 +704,18 @@ static int omap3xxx_prm_late_init(void)
+ 			omap3430_pre_es3_1_reconfigure_io_chain;
+ 
+ 	np = of_find_matching_node(NULL, omap3_prm_dt_match_table);
+-	if (np) {
+-		irq_num = of_irq_get(np, 0);
+-		if (irq_num > 0)
+-			omap3_prcm_irq_setup.irq = irq_num;
++	if (!np) {
++		pr_err("PRM: no device tree node for interrupt?\n");
++
++		return -ENODEV;
+ 	}
+ 
++	irq_num = of_irq_get(np, 0);
++	if (irq_num == -EPROBE_DEFER)
++		return irq_num;
++
++	omap3_prcm_irq_setup.irq = irq_num;
++
+ 	omap3xxx_prm_enable_io_wakeup();
+ 
+ 	return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
 -- 
 2.14.1
