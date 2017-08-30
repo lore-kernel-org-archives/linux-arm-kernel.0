@@ -1,48 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 30 Aug 2017 11:28:39 +0200
-Subject: [PATCH 0/2] arm64: renesas: Add support for R-Car V3M
-In-Reply-To: <CAMuHMdWvRBH8ZNgQKDGS3Z41BN7_o_H=hN5aGdbK44YT8rusXw@mail.gmail.com>
-References: <1503665810-13945-1-git-send-email-geert+renesas@glider.be>
- <20170828074453.GA22421@verge.net.au>
- <20170830072644.GI10398@verge.net.au>
- <CAMuHMdWvRBH8ZNgQKDGS3Z41BN7_o_H=hN5aGdbK44YT8rusXw@mail.gmail.com>
-Message-ID: <20170830092838.GC5183@verge.net.au>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 30 Aug 2017 11:22:01 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
+References: <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com>
+ <20170829235310.GA20214@wunner.de>
+ <20170830060237.GA2782@kroah.com>
+ <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
+ <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
+Message-ID: <20170830092201.GB16835@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 10:21:46AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Wed, Aug 30, 2017 at 9:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Aug 28, 2017 at 09:44:54AM +0200, Simon Horman wrote:
-> >> On Fri, Aug 25, 2017 at 02:56:48PM +0200, Geert Uytterhoeven wrote:
-> >> > This patch series adds initial R-Car V3M infrastructure:
-> >> >   1. SoC DT bindings,
-> >> >   2. Main Kconfig symbol.
-> >> >
-> >> > Both follow the example set by R-Car D3 aka r8a77995, using 5-digit instead
-> >> > of 4-digit part numbers.
-> >> > Alternatively, we could stick to 4-digit part numbers if the fifth digit is
-> >> > a zero.
-> >> >
-> >> > For your convenience, a branch with more preliminary work (thanks Sergei,
-> >> > for posting the clock driver!) for testing on v3m/eagle is also available
-> >> > in the topic/r8a77970-integration branch of my renesas-drivers git
-> >> > repository at
-> >> > git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
-> >> >
-> >> > Thanks for your comments!
-> >>
-> >> This looks good to me.
-> >>
-> >> I am in favour of using the 5-digit scheme for all new R-Car Gen 3 SoCs
-> >> as it seems the safest option with regards to as yet unknown (to me) part
-> >> numbers.
+On Wed, Aug 30, 2017 at 10:07:59AM +0100, Ard Biesheuvel wrote:
+> On 30 August 2017 at 09:55, Mason <slash.tmp@free.fr> wrote:
+> > On 30/08/2017 08:02, Greg Kroah-Hartman wrote:
 > >
-> > Geert, any objections to me applying these?
-> > I'm happy to wait longer if you prefer.
+> >> To get back to the original issue here, the hardware seems to have died,
+> >> the driver stops talking to it, and all is good.  The "regression" here
+> >> is that we now properly can determine that the hardware is crap.
+> >
+> > Before 4.12, when I unplugged my USB3 Flash drive, Linux would
+> > detect a few "Uncorrected Non-Fatal errors" via AER, but it was
+> > still possible to plug the drive back in.
+> >
+> > Since 4.12, once I unplug the drive, the whole USB3 card is marked
+> > as dead (all 4 ports), and I can no longer plug anything in (not even
+> > the USB2 drive that didn't have any issues, IIRC).
+> >
+> > It seems a bit premature to "mark as dead" something that remains
+> > functional, doesn't it?
+> >
+> > Disclaimer, there are many variables in this setup, and I've only
+> > tested a small fraction of the problem space: only one system,
+> > only one USB3 board, only one USB3 Flash drive.
+> >
 > 
-> It would be good to have an ack from Rob.
-> No need to hurry.
+> Please don't forget to mention that this is quirky hardware that
+> depends on BROKEN because it multiplexes MMIO and config space
+> accesses in the same memory window without any locking whatsoever
+> (which would be difficult to do in the first place because we don't
+> use accessors for MMIO in the kernel).
+> 
+> So how likely is it that you are attempting to read from the xhci BAR
+> window while a config space access is in progress? Any way to
+> instrument this in your driver?
 
-Understood, I will wait.
+Seriously?  Ok, that's crap hardware, sorry, I don't feel bad at all
+here.  You are going to have worse problems than just a single USB
+controller issue if that's your hardware design, go kick some hardware
+engineers for me please.
+
+good luck, you are on your own :(
+
+greg k-h
