@@ -1,109 +1,77 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Aug 2017 21:04:49 +0200
-Subject: [PATCH] KVM: arm64: stop propagating DAIF flags between kernel
- and VHE's world switch
-In-Reply-To: <59A6FD83.2090904@arm.com>
-References: <20170810113021.1110-1-james.morse@arm.com>
- <20170824152304.GB2150@lvm> <59A5A021.1090102@arm.com>
- <20170830083317.GB24522@cbox> <59A6FD83.2090904@arm.com>
-Message-ID: <20170830190449.GI24522@cbox>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 30 Aug 2017 12:20:40 -0700
+Subject: [PATCH] nd_blk: Remove mmio_flush_range()
+In-Reply-To: <a8de5c42cbfcd467586d3f93adbbee877050b6b9.1504113975.git.robin.murphy@arm.com>
+References: <a8de5c42cbfcd467586d3f93adbbee877050b6b9.1504113975.git.robin.murphy@arm.com>
+Message-ID: <CAPcyv4hQbo+aGHYN8oDg8khsPPN8ao-fCYTjUvTtOxjSqthcxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 07:01:39PM +0100, James Morse wrote:
-> Hi Christoffer,
-> 
-> On 30/08/17 09:33, Christoffer Dall wrote:
-> > On Tue, Aug 29, 2017 at 06:10:57PM +0100, James Morse wrote:
-> >> On 24/08/17 16:23, Christoffer Dall wrote:
-> >>> On Thu, Aug 10, 2017 at 12:30:21PM +0100, James Morse wrote:
-> >>>> debug exceptions remain disabled due to the guest exit exception,
-> >>>> (as does SError: today this is the only time SError is unmasked in the
-> >>>> kernel). The flags stay in this state until we return to userspace.
-> >>>>
-> >>>> We have a __vhe_hyp_call() function that does the isb that we implicitly
-> >>>> have on non-vhe systems, add the DAIF save/restore here, instead of in
-> >>>> __sysreg_{save,restore}_host_state() which would require an extra isb()
-> >>>> between the hosts VBAR_EL1 being restored and DAIF being restored.
-> >>
-> >>> This also means that anyone else calling kvm_call_hyp(), which we are
-> >>> beginning to do more often, would also do this save/restore which
-> >>> shouldn't really be necessary, doesn't it?
-> >>
-> >> I think it is, its done implicitly via SPSR_EL2 by the HVC/ERET on non-VHE.
-> >> Does the HYP code on the other end of kvm_call_hyp() expect to be called with
-> >> DAIF masked? What about the other way, if the HYP code modifies the DAIF flags
-> >> should that spread back into the kernel?
-> > 
-> > Well, for VHE I don't think this is any different than any other
-> > function.  There really is no concept of 'hyp code' --- or we should aim
-> > for there not to be --- with VHE, so if some code expects interrupts
-> > disabled or other changes to the DAIF flags, that code should really do
-> > that for VHE.
-> 
-> Aha, this is where I see the world differently.
-> /me adjusts world-view,
-> 
-> I will scrap this patch and re-do it along these lines.
-> 
-> 
-> > The rationale being that in the long run we want to keep "jumping to
-> > hyp" the oddball legacy case, where everything else is just the
-> > kernel/hypervisor functionality.
-> 
-> This makes sense.
-> 
-> 
-> [ ... trims your excellent argument ... ]
-> 
-> 
-> > Have we actually looked at the places where we call kvm_call_hyp() and
-> > do they require a different setting of the DAIF flags from other kernel
-> > code running at EL2 with VHE ?
-> 
-> I can go through them, but I think its just world-switch as it modifies
-> debug-registers, vbar_el1 and enters/exits the guest.
-> 
-> 
-> > I understand that the behavior is currently different, but what I'm
-> > asking is, instead of having to save and restore anything to the stack,
-> > can you simply do:
-> > 
-> >      __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> >      {
-> >          if (has_vhe())
-> >              asm("msr     daifset, #0xf");
-> > 
-> > 	...
-> >         exit_code = __guest_enter(vcpu, host_ctxt);
-> > 	...
-> > 
-> > 	if (has_vhe())
-> >              asm("msr     daifclr, #0xd");
-> >      }
-> 
-> Sure, this can be done as late as setting vbar_el1 for VHE, at which point the
-> reason for masking these is clear. Before this point the hosts vectors will
-> happily handle debug/fiq/serror.
-> 
-> Your right KVM can 'just know' the values to set so the noise around
-> 
-> 
-> > (not sure about the FIQ flag - does the kernel usually 
-> 
-> This is some of the stuff we need to clear up. Today we never expect SError or
-> FIQ and should panic() if we get one. But these flags are largely ignored so
-> when the CPU masks them on exception we leave them like that.
-> After the SError rework process-context should have everything unmasked, today
-> its just debug+irqs unmasked.
-> 
-> 
-> Sorry if this email exchange has been frustrating, I didn't have your view of
-> where all this should end up.
-> 
+On Wed, Aug 30, 2017 at 11:19 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> mmio_flush_range() suffers from a lack of clearly-defined semantics,
+> and is somewhat ambiguous to port to other architectures where the
+> scope of the writeback implied by "flush" and ordering might matter,
+> but MMIO would tend to imply non-cacheable anyway. Per the rationale
+> in 67a3e8fe9015 ("nd_blk: change aperture mapping from WC to WB"), the
+> only existing use is actually to invalidate clean cache lines for
+> ARCH_MEMREMAP_PMEM type mappings *without* writeback. Since the recent
+> cleanup of the pmem API, that also now happens to be the exact purpose
+> of arch_invalidate_pmem(), which would be a far more well-defined tool
+> for the job.
+>
+> Rather than risk potentially inconsistent implementations of
+> mmio_flush_range() for the sake of one callsite, streamline things by
+> removing it entirely and instead move the ARCH_MEMREMAP_PMEM related
+> definitions up to the libnvdimm level, so they can be shared by NFIT
+> as well. This allows NFIT to be enabled for arm64.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/x86/Kconfig                  |  1 -
+>  arch/x86/include/asm/cacheflush.h |  2 --
+>  drivers/acpi/nfit/Kconfig         |  1 -
+>  drivers/acpi/nfit/core.c          |  2 +-
+>  drivers/nvdimm/pmem.h             | 14 --------------
+>  include/linux/libnvdimm.h         | 15 +++++++++++++++
+>  lib/Kconfig                       |  3 ---
+>  tools/testing/nvdimm/test/nfit.c  |  4 ++--
+>  8 files changed, 18 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index 781521b7cf9e..5f3b756ec0d3 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -53,7 +53,6 @@ config X86
+>         select ARCH_HAS_FORTIFY_SOURCE
+>         select ARCH_HAS_GCOV_PROFILE_ALL
+>         select ARCH_HAS_KCOV                    if X86_64
+> -       select ARCH_HAS_MMIO_FLUSH
+>         select ARCH_HAS_PMEM_API                if X86_64
+>         select ARCH_HAS_UACCESS_FLUSHCACHE      if X86_64
+>         select ARCH_HAS_SET_MEMORY
+> diff --git a/arch/x86/include/asm/cacheflush.h b/arch/x86/include/asm/cacheflush.h
+> index 8b4140f6724f..cb9a1af109b4 100644
+> --- a/arch/x86/include/asm/cacheflush.h
+> +++ b/arch/x86/include/asm/cacheflush.h
+> @@ -7,6 +7,4 @@
+>
+>  void clflush_cache_range(void *addr, unsigned int size);
+>
+> -#define mmio_flush_range(addr, size) clflush_cache_range(addr, size)
+> -
+>  #endif /* _ASM_X86_CACHEFLUSH_H */
+> diff --git a/drivers/acpi/nfit/Kconfig b/drivers/acpi/nfit/Kconfig
+> index 6d3351452ea2..97117ba582f3 100644
+> --- a/drivers/acpi/nfit/Kconfig
+> +++ b/drivers/acpi/nfit/Kconfig
+> @@ -2,7 +2,6 @@ config ACPI_NFIT
+>         tristate "ACPI NVDIMM Firmware Interface Table (NFIT)"
+>         depends on PHYS_ADDR_T_64BIT
+>         depends on BLK_DEV
+> -       depends on ARCH_HAS_MMIO_FLUSH
 
-Not frustrating at all, I should have explained my rationale in my
-initial reply.
+Lets add depends on ARCH_HAS_PMEM_API here since support for being to
+perform the invalidation is critical to the operation of the ND_BLK
+driver.
 
-Thanks,
--Christoffer
+...but this otherwise looks good to me.
