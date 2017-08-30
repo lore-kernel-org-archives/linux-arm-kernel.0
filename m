@@ -1,106 +1,55 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 30 Aug 2017 19:01:39 +0100
-Subject: [PATCH] KVM: arm64: stop propagating DAIF flags between kernel
- and VHE's world switch
-In-Reply-To: <20170830083317.GB24522@cbox>
-References: <20170810113021.1110-1-james.morse@arm.com>
- <20170824152304.GB2150@lvm> <59A5A021.1090102@arm.com>
- <20170830083317.GB24522@cbox>
-Message-ID: <59A6FD83.2090904@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 Aug 2017 20:07:04 +0200
+Subject: [PATCH 0/7] First set of PL111 enhancements
+Message-ID: <20170830180711.2791-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi folks,
 
-On 30/08/17 09:33, Christoffer Dall wrote:
-> On Tue, Aug 29, 2017 at 06:10:57PM +0100, James Morse wrote:
->> On 24/08/17 16:23, Christoffer Dall wrote:
->>> On Thu, Aug 10, 2017 at 12:30:21PM +0100, James Morse wrote:
->>>> debug exceptions remain disabled due to the guest exit exception,
->>>> (as does SError: today this is the only time SError is unmasked in the
->>>> kernel). The flags stay in this state until we return to userspace.
->>>>
->>>> We have a __vhe_hyp_call() function that does the isb that we implicitly
->>>> have on non-vhe systems, add the DAIF save/restore here, instead of in
->>>> __sysreg_{save,restore}_host_state() which would require an extra isb()
->>>> between the hosts VBAR_EL1 being restored and DAIF being restored.
->>
->>> This also means that anyone else calling kvm_call_hyp(), which we are
->>> beginning to do more often, would also do this save/restore which
->>> shouldn't really be necessary, doesn't it?
->>
->> I think it is, its done implicitly via SPSR_EL2 by the HVC/ERET on non-VHE.
->> Does the HYP code on the other end of kvm_call_hyp() expect to be called with
->> DAIF masked? What about the other way, if the HYP code modifies the DAIF flags
->> should that spread back into the kernel?
-> 
-> Well, for VHE I don't think this is any different than any other
-> function.  There really is no concept of 'hyp code' --- or we should aim
-> for there not to be --- with VHE, so if some code expects interrupts
-> disabled or other changes to the DAIF flags, that code should really do
-> that for VHE.
+here is the first few patches to enhance the PL111 with the following
+objectives:
 
-Aha, this is where I see the world differently.
-/me adjusts world-view,
+- Consolidation - use the panel bridge, which I figured out after some
+  tinkering (yes I will fix TVE200 too).
+- Handle the PL110 variant
+- Handle the power-on delay documented in both manuals
+- Add callbacks to handle subvariants, and a scratch implementation
+  of the Versatile extra register (no Nomadik yet).
 
-I will scrap this patch and re-do it along these lines.
+Next steps will be (I guess)
 
+- Make the driver also use the dumb VGA connector bridge for the platforms
+  that simply connects the PL11x to a DAC to VGA
+- Proper panel driver for the Versatile board
+- Nomadik and its panel
+- When things work, stepwise move the ARM platforms using this over to
+  the DRM PL111 driver
 
-> The rationale being that in the long run we want to keep "jumping to
-> hyp" the oddball legacy case, where everything else is just the
-> kernel/hypervisor functionality.
+Stuff that gets properly reviewed I can queue on drm-misc myself these days.
 
-This makes sense.
+Linus Walleij (7):
+  drm/pl111: Cleanup local header file
+  drm/pl111: Add all registers to debugfs
+  drm/pl111: Replace custom connector with panel bridge
+  drm/pl111: Enable PL110 variant
+  drm/pl111: Insert delay before powering up PL11x
+  drm/pl111: Add optional variant display en/disable callbacks
+  drm/pl111: Add handling of Versatile platforms
 
+ drivers/gpu/drm/pl111/Kconfig           |   3 +-
+ drivers/gpu/drm/pl111/Makefile          |   4 +-
+ drivers/gpu/drm/pl111/pl111_connector.c | 127 ---------------
+ drivers/gpu/drm/pl111/pl111_debugfs.c   |   6 +
+ drivers/gpu/drm/pl111/pl111_display.c   |  82 +++++-----
+ drivers/gpu/drm/pl111/pl111_drm.h       |  38 +++--
+ drivers/gpu/drm/pl111/pl111_drv.c       | 151 +++++++++++++++---
+ drivers/gpu/drm/pl111/pl111_versatile.c | 270 ++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/pl111/pl111_versatile.h |   9 ++
+ 9 files changed, 491 insertions(+), 199 deletions(-)
+ delete mode 100644 drivers/gpu/drm/pl111/pl111_connector.c
+ create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.c
+ create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.h
 
-[ ... trims your excellent argument ... ]
-
-
-> Have we actually looked at the places where we call kvm_call_hyp() and
-> do they require a different setting of the DAIF flags from other kernel
-> code running at EL2 with VHE ?
-
-I can go through them, but I think its just world-switch as it modifies
-debug-registers, vbar_el1 and enters/exits the guest.
-
-
-> I understand that the behavior is currently different, but what I'm
-> asking is, instead of having to save and restore anything to the stack,
-> can you simply do:
-> 
->      __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->      {
->          if (has_vhe())
->              asm("msr     daifset, #0xf");
-> 
-> 	...
->         exit_code = __guest_enter(vcpu, host_ctxt);
-> 	...
-> 
-> 	if (has_vhe())
->              asm("msr     daifclr, #0xd");
->      }
-
-Sure, this can be done as late as setting vbar_el1 for VHE, at which point the
-reason for masking these is clear. Before this point the hosts vectors will
-happily handle debug/fiq/serror.
-
-Your right KVM can 'just know' the values to set so the noise around
-
-
-> (not sure about the FIQ flag - does the kernel usually 
-
-This is some of the stuff we need to clear up. Today we never expect SError or
-FIQ and should panic() if we get one. But these flags are largely ignored so
-when the CPU masks them on exception we leave them like that.
-After the SError rework process-context should have everything unmasked, today
-its just debug+irqs unmasked.
-
-
-Sorry if this email exchange has been frustrating, I didn't have your view of
-where all this should end up.
-
-
-Thanks,
-
-James
+-- 
+2.13.5
