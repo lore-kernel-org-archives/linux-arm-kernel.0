@@ -1,299 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Aug 2017 18:57:19 +0100
-Subject: Applied "regulator: Add support for stm32-vrefbuf" to the regulator
- tree
-In-Reply-To: <1504108529-31727-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <E1dn7Et-0001GZ-Gr@debutante>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 30 Aug 2017 19:01:39 +0100
+Subject: [PATCH] KVM: arm64: stop propagating DAIF flags between kernel
+ and VHE's world switch
+In-Reply-To: <20170830083317.GB24522@cbox>
+References: <20170810113021.1110-1-james.morse@arm.com>
+ <20170824152304.GB2150@lvm> <59A5A021.1090102@arm.com>
+ <20170830083317.GB24522@cbox>
+Message-ID: <59A6FD83.2090904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Christoffer,
 
-   regulator: Add support for stm32-vrefbuf
+On 30/08/17 09:33, Christoffer Dall wrote:
+> On Tue, Aug 29, 2017 at 06:10:57PM +0100, James Morse wrote:
+>> On 24/08/17 16:23, Christoffer Dall wrote:
+>>> On Thu, Aug 10, 2017 at 12:30:21PM +0100, James Morse wrote:
+>>>> debug exceptions remain disabled due to the guest exit exception,
+>>>> (as does SError: today this is the only time SError is unmasked in the
+>>>> kernel). The flags stay in this state until we return to userspace.
+>>>>
+>>>> We have a __vhe_hyp_call() function that does the isb that we implicitly
+>>>> have on non-vhe systems, add the DAIF save/restore here, instead of in
+>>>> __sysreg_{save,restore}_host_state() which would require an extra isb()
+>>>> between the hosts VBAR_EL1 being restored and DAIF being restored.
+>>
+>>> This also means that anyone else calling kvm_call_hyp(), which we are
+>>> beginning to do more often, would also do this save/restore which
+>>> shouldn't really be necessary, doesn't it?
+>>
+>> I think it is, its done implicitly via SPSR_EL2 by the HVC/ERET on non-VHE.
+>> Does the HYP code on the other end of kvm_call_hyp() expect to be called with
+>> DAIF masked? What about the other way, if the HYP code modifies the DAIF flags
+>> should that spread back into the kernel?
+> 
+> Well, for VHE I don't think this is any different than any other
+> function.  There really is no concept of 'hyp code' --- or we should aim
+> for there not to be --- with VHE, so if some code expects interrupts
+> disabled or other changes to the DAIF flags, that code should really do
+> that for VHE.
 
-has been applied to the regulator tree at
+Aha, this is where I see the world differently.
+/me adjusts world-view,
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+I will scrap this patch and re-do it along these lines.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> The rationale being that in the long run we want to keep "jumping to
+> hyp" the oddball legacy case, where everything else is just the
+> kernel/hypervisor functionality.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+This makes sense.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+
+[ ... trims your excellent argument ... ]
+
+
+> Have we actually looked at the places where we call kvm_call_hyp() and
+> do they require a different setting of the DAIF flags from other kernel
+> code running at EL2 with VHE ?
+
+I can go through them, but I think its just world-switch as it modifies
+debug-registers, vbar_el1 and enters/exits the guest.
+
+
+> I understand that the behavior is currently different, but what I'm
+> asking is, instead of having to save and restore anything to the stack,
+> can you simply do:
+> 
+>      __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>      {
+>          if (has_vhe())
+>              asm("msr     daifset, #0xf");
+> 
+> 	...
+>         exit_code = __guest_enter(vcpu, host_ctxt);
+> 	...
+> 
+> 	if (has_vhe())
+>              asm("msr     daifclr, #0xd");
+>      }
+
+Sure, this can be done as late as setting vbar_el1 for VHE, at which point the
+reason for masking these is clear. Before this point the hosts vectors will
+happily handle debug/fiq/serror.
+
+Your right KVM can 'just know' the values to set so the noise around
+
+
+> (not sure about the FIQ flag - does the kernel usually 
+
+This is some of the stuff we need to clear up. Today we never expect SError or
+FIQ and should panic() if we get one. But these flags are largely ignored so
+when the CPU masks them on exception we leave them like that.
+After the SError rework process-context should have everything unmasked, today
+its just debug+irqs unmasked.
+
+
+Sorry if this email exchange has been frustrating, I didn't have your view of
+where all this should end up.
+
 
 Thanks,
-Mark
 
->From 0cdbf481e927278787042857e02c3944f588ad25 Mon Sep 17 00:00:00 2001
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-Date: Wed, 30 Aug 2017 17:55:28 +0200
-Subject: [PATCH] regulator: Add support for stm32-vrefbuf
-
-Add regulator driver for STM32 voltage reference buffer which can be
-used as voltage reference for ADCs, DACs and external components through
-dedicated VREF+ pin.
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/regulator/Kconfig         |  12 +++
- drivers/regulator/Makefile        |   1 +
- drivers/regulator/stm32-vrefbuf.c | 202 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 215 insertions(+)
- create mode 100644 drivers/regulator/stm32-vrefbuf.c
-
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 99b9362331b5..2cb2c6324480 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -746,6 +746,18 @@ config REGULATOR_SKY81452
- 	  This driver can also be built as a module. If so, the module
- 	  will be called sky81452-regulator.
- 
-+config REGULATOR_STM32_VREFBUF
-+	tristate "STMicroelectronics STM32 VREFBUF"
-+	depends on ARCH_STM32 || COMPILE_TEST
-+	help
-+	  This driver supports STMicroelectronics STM32 VREFBUF (voltage
-+	  reference buffer) which can be used as voltage reference for
-+	  internal ADCs, DACs and also for external components through
-+	  dedicated Vref+ pin.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called stm32-vrefbuf.
-+
- config REGULATOR_TI_ABB
- 	tristate "TI Adaptive Body Bias on-chip LDO"
- 	depends on ARCH_OMAP
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 95b1e86ae692..5af3788be631 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -94,6 +94,7 @@ obj-$(CONFIG_REGULATOR_S2MPA01) += s2mpa01.o
- obj-$(CONFIG_REGULATOR_S2MPS11) += s2mps11.o
- obj-$(CONFIG_REGULATOR_S5M8767) += s5m8767.o
- obj-$(CONFIG_REGULATOR_SKY81452) += sky81452-regulator.o
-+obj-$(CONFIG_REGULATOR_STM32_VREFBUF) += stm32-vrefbuf.o
- obj-$(CONFIG_REGULATOR_STW481X_VMMC) += stw481x-vmmc.o
- obj-$(CONFIG_REGULATOR_TI_ABB) += ti-abb-regulator.o
- obj-$(CONFIG_REGULATOR_TPS6105X) += tps6105x-regulator.o
-diff --git a/drivers/regulator/stm32-vrefbuf.c b/drivers/regulator/stm32-vrefbuf.c
-new file mode 100644
-index 000000000000..72c8b3e1022b
---- /dev/null
-+++ b/drivers/regulator/stm32-vrefbuf.c
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright (C) STMicroelectronics 2017
-+ *
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/bitfield.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
-+
-+/* STM32 VREFBUF registers */
-+#define STM32_VREFBUF_CSR		0x00
-+
-+/* STM32 VREFBUF CSR bitfields */
-+#define STM32_VRS			GENMASK(6, 4)
-+#define STM32_VRR			BIT(3)
-+#define STM32_HIZ			BIT(1)
-+#define STM32_ENVR			BIT(0)
-+
-+struct stm32_vrefbuf {
-+	void __iomem *base;
-+	struct clk *clk;
-+};
-+
-+static const unsigned int stm32_vrefbuf_voltages[] = {
-+	/* Matches resp. VRS = 000b, 001b, 010b, 011b */
-+	2500000, 2048000, 1800000, 1500000,
-+};
-+
-+static int stm32_vrefbuf_enable(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+	int ret;
-+
-+	val = (val & ~STM32_HIZ) | STM32_ENVR;
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	/*
-+	 * Vrefbuf startup time depends on external capacitor: wait here for
-+	 * VRR to be set. That means output has reached expected value.
-+	 * ~650us sleep should be enough for caps up to 1.5uF. Use 10ms as
-+	 * arbitrary timeout.
-+	 */
-+	ret = readl_poll_timeout(priv->base + STM32_VREFBUF_CSR, val,
-+				 !(val & STM32_VRR), 650, 10000);
-+	if (ret) {
-+		dev_err(&rdev->dev, "stm32 vrefbuf timed out!\n");
-+		val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+		val = (val & ~STM32_ENVR) | STM32_HIZ;
-+		writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+	}
-+
-+	return ret;
-+}
-+
-+static int stm32_vrefbuf_disable(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	val = (val & ~STM32_ENVR) | STM32_HIZ;
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	return 0;
-+}
-+
-+static int stm32_vrefbuf_is_enabled(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+
-+	return readl_relaxed(priv->base + STM32_VREFBUF_CSR) & STM32_ENVR;
-+}
-+
-+static int stm32_vrefbuf_set_voltage_sel(struct regulator_dev *rdev,
-+					 unsigned sel)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	val = (val & ~STM32_VRS) | FIELD_PREP(STM32_VRS, sel);
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	return 0;
-+}
-+
-+static int stm32_vrefbuf_get_voltage_sel(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	return FIELD_GET(STM32_VRS, val);
-+}
-+
-+static const struct regulator_ops stm32_vrefbuf_volt_ops = {
-+	.enable		= stm32_vrefbuf_enable,
-+	.disable	= stm32_vrefbuf_disable,
-+	.is_enabled	= stm32_vrefbuf_is_enabled,
-+	.get_voltage_sel = stm32_vrefbuf_get_voltage_sel,
-+	.set_voltage_sel = stm32_vrefbuf_set_voltage_sel,
-+	.list_voltage	= regulator_list_voltage_table,
-+};
-+
-+static const struct regulator_desc stm32_vrefbuf_regu = {
-+	.name = "vref",
-+	.supply_name = "vdda",
-+	.volt_table = stm32_vrefbuf_voltages,
-+	.n_voltages = ARRAY_SIZE(stm32_vrefbuf_voltages),
-+	.ops = &stm32_vrefbuf_volt_ops,
-+	.type = REGULATOR_VOLTAGE,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int stm32_vrefbuf_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct stm32_vrefbuf *priv;
-+	struct regulator_config config = { };
-+	struct regulator_dev *rdev;
-+	int ret;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
-+
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->clk))
-+		return PTR_ERR(priv->clk);
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "clk prepare failed with error %d\n", ret);
-+		return ret;
-+	}
-+
-+	config.dev = &pdev->dev;
-+	config.driver_data = priv;
-+	config.of_node = pdev->dev.of_node;
-+	config.init_data = of_get_regulator_init_data(&pdev->dev,
-+						      pdev->dev.of_node,
-+						      &stm32_vrefbuf_regu);
-+
-+	rdev = regulator_register(&stm32_vrefbuf_regu, &config);
-+	if (IS_ERR(rdev)) {
-+		ret = PTR_ERR(rdev);
-+		dev_err(&pdev->dev, "register failed with error %d\n", ret);
-+		goto err_clk_dis;
-+	}
-+	platform_set_drvdata(pdev, rdev);
-+
-+	return 0;
-+
-+err_clk_dis:
-+	clk_disable_unprepare(priv->clk);
-+
-+	return ret;
-+}
-+
-+static int stm32_vrefbuf_remove(struct platform_device *pdev)
-+{
-+	struct regulator_dev *rdev = platform_get_drvdata(pdev);
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+
-+	regulator_unregister(rdev);
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+};
-+
-+static const struct of_device_id stm32_vrefbuf_of_match[] = {
-+	{ .compatible = "st,stm32-vrefbuf", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stm32_vrefbuf_of_match);
-+
-+static struct platform_driver stm32_vrefbuf_driver = {
-+	.probe = stm32_vrefbuf_probe,
-+	.remove = stm32_vrefbuf_remove,
-+	.driver = {
-+		.name  = "stm32-vrefbuf",
-+		.of_match_table = of_match_ptr(stm32_vrefbuf_of_match),
-+	},
-+};
-+module_platform_driver(stm32_vrefbuf_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 VREFBUF driver");
-+MODULE_ALIAS("platform:stm32-vrefbuf");
--- 
-2.14.1
+James
