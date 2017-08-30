@@ -1,39 +1,44 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Wed, 30 Aug 2017 07:46:34 +0000
-Subject: [PATCH v2] ARM: dts: r8a7743: add IIC cores to dtsi
-In-Reply-To: <20170830073214.GL10398@verge.net.au>
-References: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
- <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
- <TY1PR06MB07027D9A55FBFE2D591CEDCFB7840@TY1PR06MB0702.apcprd06.prod.outlook.com>
- <b7434757-b151-5971-2b5f-525eeaf11467@cogentembedded.com>
- <20170830073214.GL10398@verge.net.au>
-Message-ID: <SG2PR06MB069465C0EF929D98E5FEC2D0B79C0@SG2PR06MB0694.apcprd06.prod.outlook.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Aug 2017 09:51:03 +0200
+Subject: [PATCH v2 1/3] ARM: Add definition for monitor mode
+In-Reply-To: <1500387987-9240-2-git-send-email-geert+renesas@glider.be>
+References: <1500387987-9240-1-git-send-email-geert+renesas@glider.be>
+ <1500387987-9240-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170830075103.GN10398@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: 30 August 2017 08:32
+On Tue, Jul 18, 2017 at 04:26:25PM +0200, Geert Uytterhoeven wrote:
+> <asm/ptrace.h> provides *_MODE definitions for the various processor
+> modes, but monitor mode was missing.
 > 
-> On Tue, Aug 22, 2017 at 03:23:39PM +0300, Sergei Shtylyov wrote:
-> > On 08/22/2017 12:10 PM, Chris Paterson wrote:
-> >
-> > >>From: Biju Das [mailto:biju.das at bp.renesas.com]
-> > >>Sent: 14 August 2017 10:53
-> > >>
-> > >>Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > >>---
-> > >>v1-->v2
-> > >>    Corrected the resets property for i2c6 device node.
-> > >
-> > >Are you happy with this version of the patch?
-> > >
-> > >Or is the discussion for moving to 'iic' still alive?
-> >
-> >    Yes, appears so. I'd like the labels to be named iic<n>.
+> Add MON_MODE to avoid code using the hardcoded value.
 > 
-> Chirs, I'm marking this as "Changes Requested" and expecting to see iic in v3
-> when you are ready.
+> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> ARM maintainers: Please provide your ack, as this is a dependency for a
+> mach-shmobile patch.
+> 
+> v2:
+>   - New.
+> ---
+>  arch/arm/include/uapi/asm/ptrace.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
+> index 5af0ed1b825a2aa9..70ff6bf489f31193 100644
+> --- a/arch/arm/include/uapi/asm/ptrace.h
+> +++ b/arch/arm/include/uapi/asm/ptrace.h
+> @@ -53,6 +53,7 @@
+>  #endif
+>  #define FIQ_MODE	0x00000011
+>  #define IRQ_MODE	0x00000012
+> +#define MON_MODE	0x00000016
+>  #define ABT_MODE	0x00000017
+>  #define HYP_MODE	0x0000001a
+>  #define UND_MODE	0x0000001b
 
-Sure, thanks.
+Coming back to this after somewhat of a hiatus.
+It seems that we are still waiting on an Ack to allow this
+series to proceed.
