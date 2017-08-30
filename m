@@ -1,44 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Aug 2017 15:56:57 +0100
-Subject: [PATCH v3 49/59] KVM: arm/arm64: GICv4: Propagate VLPI properties
- at map time
-In-Reply-To: <20170828181841.GJ24649@cbox>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-50-marc.zyngier@arm.com> <20170828181841.GJ24649@cbox>
-Message-ID: <60012f9d-7eb9-e8f4-a2c4-82e00ff52c0c@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 30 Aug 2017 16:50:52 +0200
+Subject: [PATCH v4] ARM: dts: stm32: change pinctrl bindings definition
+Message-ID: <1504104653-26804-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/17 19:18, Christoffer Dall wrote:
-> On Mon, Jul 31, 2017 at 06:26:27PM +0100, Marc Zyngier wrote:
->> When the VLPI gets mapped, it must inherit the configuration of
->> LPI configured at the vITS level. FOr that purpose, let's make
-> 
-> *the LPI
-> *For that
+Initially each pin was declared in "include/dt-bindings/stm32<SOC>-pinfunc.h"
+and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
+Since this approach was approved, the number of supported MCU has
+increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
+file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
+a new approach which consist to use a macro to define pin muxing in device
+tree. All STM32 DT will use the common macro to define pinmux. Furthermore, it
+will make maintenance and integration of new SOC easier.
 
-Will fix, thanks.
+I made only one patch to avoid dependencies. Let me know if you prefer that I
+split it.
 
-> 
->> update_lpi_config globally available and call it just after
->> having performed the VLPI map operation.
->>
-> 
-> I assume this means that the GIC compares the priorities of virtual
-> interrupts in the LRs with the priorities of the pending VLPIs and
-> figures out what to signal first?  I couldn't find anywhere in the spec
-> where this is explicitly stated.
+To check that patch generate same dtb than befrore I used dtc binary to (re)generate dts files
+(before and after apply the series).
 
-There is this mention in IHI0069D, 5.4 (Virtual LPI support):
+Example on stm32f469-disco:
 
-"The Redistributor associated with the PE on which the vPE is scheduled
-determines the highest priority pending vLPI, and forwards this to the
-virtual CPU interface of the vPE. This vLPI and the interrupts in the
-List register are then prioritized together to determine the highest
-priority pending virtual interrupt for the vPE."
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+stm32f469-disco-after.dtb
 
-Thanks,
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+stm32f469-disco-before.dtb
 
-	M.
+Then diff -u stm32f469-disco-before.dts stm32f469-disco-after.dts
+
+Changes since v3:
+ -Rewrite documentation part
+ -Simplify macro
+
+Changes since v2:
+ -Drop RFC tag
+ -Add reviewers
+ -Enhance modifications to all STM32 (F4/F7/H7)
+
+Changes since v1:
+ -According to Vikas Manocha review, use generic macro to define port.
+
+
+Regards
+Alex
+
+Alexandre Torgue (1):
+  ARM: dts: stm32: change pinctrl bindings definition
+
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |   22 +-
+ arch/arm/boot/dts/stm32f429.dtsi                   |  176 +--
+ arch/arm/boot/dts/stm32f746.dtsi                   |   10 +-
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |   10 +-
+ include/dt-bindings/pinctrl/stm32-pinfunc.h        |   30 +
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1239 ---------------
+ include/dt-bindings/pinctrl/stm32f746-pinfunc.h    | 1324 ----------------
+ include/dt-bindings/pinctrl/stm32h7-pinfunc.h      | 1612 --------------------
+ 8 files changed, 148 insertions(+), 4275 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/stm32-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32f746-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32h7-pinfunc.h
+
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
