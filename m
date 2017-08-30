@@ -1,65 +1,83 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 31 Aug 2017 03:21:48 +1000
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <CAOesGMg130BvqS1vGid9jm-G7-Gub+7bOQFKtaSg4qPTvosxcA@mail.gmail.com>
-References: <20170830230712.55db7911@canb.auug.org.au>
- <20170830131930.bvu6furm7dlhes3i@piout.net>
- <CAOesGMg130BvqS1vGid9jm-G7-Gub+7bOQFKtaSg4qPTvosxcA@mail.gmail.com>
-Message-ID: <20170831032148.3d2fa85b@canb.auug.org.au>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 30 Aug 2017 19:42:28 +0200
+Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
+In-Reply-To: <CABxcv=nqbNsTs7D57VOt1-Tav_3i9U=XKn=BV=hPr1tG68eE2g@mail.gmail.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170731153009.xkjknygpmckv2pfp@ninjato>
+ <CABxcv=mdbE0QGjoi3aLzxRqM3-MbkQ_Ai6fShcGVUGSNNqqrqw@mail.gmail.com>
+ <20170828160121.gu4wf7jqu4ditksc@ninjato>
+ <CABxcv=kSiqDN1=9fSfLkyW=uuXQZAoW4dhw=fco9RyOdDuPAdA@mail.gmail.com>
+ <20170829084831.hsdok3ksi7anxzuc@ninjato>
+ <CABxcv=nqbNsTs7D57VOt1-Tav_3i9U=XKn=BV=hPr1tG68eE2g@mail.gmail.com>
+Message-ID: <20170830174228.sx5jgtxxy56zq47t@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Wed, Aug 30, 2017 at 06:19:02PM +0200, Javier Martinez Canillas wrote:
+> Hello Wolfram,
+> 
+> On Tue, Aug 29, 2017 at 10:48 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> >
+> >> I don't have a DT based system at hand now, but I'll test it again and
+> >> let you know probably tomorrow.
+> >
+> > I will try again today, too. Thanks!
+> >
+> 
+> Ok, I had some time to do some tests again. I used an ARM Chromebook
+> (Exynos Peach Pi) that has an I2C touchpad (Atmel maXTouch).
 
-On Wed, 30 Aug 2017 09:21:47 -0700 Olof Johansson <olof@lixom.net> wrote:
->
-> Thanks for the heads up, Stephen. I presume you have a script that
-> checks this? It's something we should run too, do you keep it in a
-> shared location?
+I tried again as well and it still fails for me.
 
-Script below.
+> Tested the following cases:
 
--- 
-Cheers,
-Stephen Rothwell
+I think we should talk about the same case: Let me repeat what I did:
 
-#!/bin/bash
+1) I added your patch "eeprom: at24: Add OF device ID table"
+2) I added an EEPROM node to an I2C
 
-if [ "$#" -lt 1 ]; then
-	printf "Usage: %s <commit range>\n", "$0" 1>&2
-	exit 1
-fi
++       eeprom at 50 {
++               compatible = "renesas,24c01";
++               reg = <0x50>;
++       };
 
-for c in $(git rev-list --no-merges "$@"); do
-	ae=$(git log -1 --format='%ae' "$c")
-	aE=$(git log -1 --format='%aE' "$c")
-	an=$(git log -1 --format='%an' "$c")
-	aN=$(git log -1 --format='%aN' "$c")
-	ce=$(git log -1 --format='%ce' "$c")
-	cE=$(git log -1 --format='%cE' "$c")
-	cn=$(git log -1 --format='%cn' "$c")
-	cN=$(git log -1 --format='%cN' "$c")
-	sob=$(git log -1 --format='%b' "$c" | grep -i '^[[:space:]]*Signed-off-by:')
+-> no at24 binding to the device
 
-	am=false
-	cm=false
-	grep -i -q "<$ae>" <<<"$sob" ||
-		grep -i -q "<$aE>" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$an[[:space:]]*<" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$aN[[:space:]]*<" <<<"$sob" ||
-		am=true
-	grep -i -q "<$ce>" <<<"$sob" ||
-		grep -i -q "<$cE>" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$cn[[:space:]]*<" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$cN[[:space:]]*<" <<<"$sob" ||
-		cm=true
+3) I revert your patch
 
-	if "$am" || "$cm"; then
-		printf "Commit %s\n" "$c"
-		"$am" && printf "\tauthor SOB missing\n"
-		"$cm" && printf "\tcommitter SOB missing\n"
-		printf "%s %s\n%s\n" "$ae" "$ce" "$sob"
-	fi
-done
+-> at24 binding to the device
 
-exec gitk "$@"
+I think you should be able to test this DTS snipplet even without a real
+eeprom. Especially after applying this to the at24 driver.
+
+diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
+index 79c5c39be29cac..f9f547680c53db 100644
+--- a/drivers/misc/eeprom/at24.c
++++ b/drivers/misc/eeprom/at24.c
+@@ -805,11 +805,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 	 * Perform a one-byte test read to verify that the
+ 	 * chip is functional.
+ 	 */
+-	err = at24_read(at24, 0, &test_byte, 1);
+-	if (err) {
+-		err = -ENODEV;
+-		goto err_clients;
+-	}
+ 
+ 	at24->nvmem_config.name = dev_name(&client->dev);
+ 	at24->nvmem_config.dev = &client->dev;
+
+
+Can you check this?
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/ff0f0039/attachment.sig>
