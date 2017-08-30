@@ -1,60 +1,98 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 30 Aug 2017 11:22:01 +0200
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
-References: <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
- <59A3D6BF.7010400@linux.intel.com>
- <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
- <59A56C15.2000403@linux.intel.com>
- <20170829235310.GA20214@wunner.de>
- <20170830060237.GA2782@kroah.com>
- <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
- <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
-Message-ID: <20170830092201.GB16835@kroah.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 30 Aug 2017 11:36:41 +0200
+Subject: [PATCH v3 2/2] arm64: dts: marvell: mcbin: enable more
+ networking ports
+In-Reply-To: <20170824084639.19282-2-antoine.tenart@free-electrons.com>
+References: <20170824084639.19282-1-antoine.tenart@free-electrons.com>
+ <20170824084639.19282-2-antoine.tenart@free-electrons.com>
+Message-ID: <20170830093641.GH31552@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 10:07:59AM +0100, Ard Biesheuvel wrote:
-> On 30 August 2017 at 09:55, Mason <slash.tmp@free.fr> wrote:
-> > On 30/08/2017 08:02, Greg Kroah-Hartman wrote:
-> >
-> >> To get back to the original issue here, the hardware seems to have died,
-> >> the driver stops talking to it, and all is good.  The "regression" here
-> >> is that we now properly can determine that the hardware is crap.
-> >
-> > Before 4.12, when I unplugged my USB3 Flash drive, Linux would
-> > detect a few "Uncorrected Non-Fatal errors" via AER, but it was
-> > still possible to plug the drive back in.
-> >
-> > Since 4.12, once I unplug the drive, the whole USB3 card is marked
-> > as dead (all 4 ports), and I can no longer plug anything in (not even
-> > the USB2 drive that didn't have any issues, IIRC).
-> >
-> > It seems a bit premature to "mark as dead" something that remains
-> > functional, doesn't it?
-> >
-> > Disclaimer, there are many variables in this setup, and I've only
-> > tested a small fraction of the problem space: only one system,
-> > only one USB3 board, only one USB3 Flash drive.
-> >
+Hi Gregory,
+
+On Thu, Aug 24, 2017 at 10:46:39AM +0200, Antoine Tenart wrote:
+> This patch enables the two GE/SFP ports. They are configured in 10GKR
+> mode by default. To do this the cpm_xdmio is enabled as well, and two
+> phy descriptions are added.
 > 
-> Please don't forget to mention that this is quirky hardware that
-> depends on BROKEN because it multiplexes MMIO and config space
-> accesses in the same memory window without any locking whatsoever
-> (which would be difficult to do in the first place because we don't
-> use accessors for MMIO in the kernel).
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Tested-by: Marcin Wojtas <mw@semihalf.com>
+
+These DT changes (patches 1/2 and 2/2) came along a series with patches
+on the PPv2 driver. All the net part was merged in linux-next, but these
+two dt patches were not taken because we all were in holidays.
+
+I know it's very late, but it would be very nice to have these two
+patches merged for 4.14.
+
+Thanks!
+Antoine
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 30 +++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 > 
-> So how likely is it that you are attempting to read from the xhci BAR
-> window while a config space access is in progress? Any way to
-> instrument this in your driver?
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> index abd39d1c1739..9f0a00802452 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> @@ -127,6 +127,30 @@
+>  	};
+>  };
+>  
+> +&cpm_xmdio {
+> +	status = "okay";
+> +
+> +	phy0: ethernet-phy at 0 {
+> +		compatible = "ethernet-phy-ieee802.3-c45";
+> +		reg = <0>;
+> +	};
+> +
+> +	phy8: ethernet-phy at 8 {
+> +		compatible = "ethernet-phy-ieee802.3-c45";
+> +		reg = <8>;
+> +	};
+> +};
+> +
+> +&cpm_ethernet {
+> +	status = "okay";
+> +};
+> +
+> +&cpm_eth0 {
+> +	status = "okay";
+> +	phy = <&phy0>;
+> +	phy-mode = "10gbase-kr";
+> +};
+> +
+>  &cpm_sata0 {
+>  	/* CPM Lane 0 - U29 */
+>  	status = "okay";
+> @@ -154,6 +178,12 @@
+>  	status = "okay";
+>  };
+>  
+> +&cps_eth0 {
+> +	status = "okay";
+> +	phy = <&phy8>;
+> +	phy-mode = "10gbase-kr";
+> +};
+> +
+>  &cps_eth1 {
+>  	/* CPS Lane 0 - J5 (Gigabit RJ45) */
+>  	status = "okay";
+> -- 
+> 2.13.5
+> 
 
-Seriously?  Ok, that's crap hardware, sorry, I don't feel bad at all
-here.  You are going to have worse problems than just a single USB
-controller issue if that's your hardware design, go kick some hardware
-engineers for me please.
-
-good luck, you are on your own :(
-
-greg k-h
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/fc91ad9c/attachment-0001.sig>
