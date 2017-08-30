@@ -1,38 +1,60 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Wed, 30 Aug 2017 21:58:49 +0000
-Subject: [PATCH v2 0/5] make XIP kernel .data compressed in ROM
-In-Reply-To: <20170830025547.30347-1-nicolas.pitre@linaro.org>
-References: <20170830025547.30347-1-nicolas.pitre@linaro.org>
-Message-ID: <SG2PR06MB1165EF18A363D9CC4C5531FE8A9C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Aug 2017 15:15:05 -0700
+Subject: [GIT PULL] Allwinner fixes for 4.13, take 3
+In-Reply-To: <20170830064322.rloouj6tso65vbin@flea.lan>
+References: <20170828092651.xwrz6toedrmht5nh@flea.lan>
+ <20170830053759.GK14499@localhost>
+ <20170830064322.rloouj6tso65vbin@flea.lan>
+Message-ID: <CAOesGMjcWEjY+uj1cFWkeoL=OuR9q4E2uQbZ21HVxxDqgvUtCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 29, 2017 1, Nicolas Pitre wrote:
-> This patch series provides the ability to store the XIP kernel .data
-> segment compressed in ROM. It has to be copied to RAM anyway so
-> storing it uncompressed is arguably a waste of ROM resources.
-> 
-> While at it, the copying of .data (when not compressed) and the
-> clearing of .bss is now performed using optimized string routines
-> rather than doing it one word at a time.
+On Tue, Aug 29, 2017 at 11:43 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Olof,
+>
+> On Tue, Aug 29, 2017 at 10:37:59PM -0700, Olof Johansson wrote:
+>> On Mon, Aug 28, 2017 at 11:26:51AM +0200, Maxime Ripard wrote:
+>> > Hi,
+>> >
+>> > Here is a bunch of patches essentially reverting the EMAC bindings
+>> > additions. Indeed, it was discovered after the release of 4.13-rc1
+>> > that we overlooked some issues while reviewing the driver, and we
+>> > couldn't find a proper solution since then.
+>> >
+>> > Since the binding is as such not stable yet, we can't allow it to
+>> > reach a stable release.
+>> >
+>> > Maxime
+>> >
+>> > The following changes since commit d86e63e1f0b7868c55c8d4a54854b85e2bac690b:
+>> >
+>> >   arm64: allwinner: h5: fix pinctrl IRQs (2017-08-14 14:18:21 +0800)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.13-3
+>> >
+>> > for you to fetch changes up to fe45174b72aead678da581bab9e9a37c9b26a070:
+>> >
+>> >   arm: dts: sunxi: Revert EMAC changes (2017-08-28 11:11:24 +0200)
+>>
+>> Merged but unfortunately this introduces quite annoying conflicts with already
+>> queued up DT contents. Fixed up those as well.
+>
+> Yeah, sorry, I should have mentionned it. I didn't know what the best
+> strategy was in this case, since it was conflicting with some branches
+> you already had pulled. What would you have prefered ?
 
-Tested on my XIP system (Cortex-A9) and it seems to work OK.
+Just mentioning it would be appreciated to avoid surprises.
+
+The other part would be to make sure the fixes branch is based on an
+old enough release that we can just merge it into next/dt64 without
+bringing in a much newer upstream base. You've done that in this case,
+so what I'll do at our end is merge the fixes into next/dt64 to avoid
+this from bubbling up to Linus when it's a local issue to our tree.
 
 
-> This work highlighted some defficiencies in linker scripts, especially
-> the XIP one. So this also includes linker script cleanups and fixes.
+Thanks!
 
-Thank you for this!
-
-
-
-If you're curious, here are some numbers from my system:
-
-Original xipImage size: 4,190,068 bytes
-xipImage size with CONFIG_XIP_DEFLATED_DATA=y: 3,985,227 bytes
-
-A 204,841 byte reduction in image size (4.89%)
-
-
-
-Chris
+-Olof
