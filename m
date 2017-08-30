@@ -1,47 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Aug 2017 16:17:30 +0200
-Subject: linux-next regression caused by "gpiolib: request the gpio
- before querying its direction"
-In-Reply-To: <87ziah2m3f.fsf@free-electrons.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 30 Aug 2017 09:22:55 -0500
+Subject: linux-next regression caused by "gpiolib: request the gpio before
+ querying its direction"
+In-Reply-To: <20170830161730.41919554@windsurf.lan>
 References: <20170830112424.7a3a7c36@windsurf.lan>
  <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
- <87ziah2m3f.fsf@free-electrons.com>
-Message-ID: <20170830161730.41919554@windsurf.lan>
+ <87ziah2m3f.fsf@free-electrons.com> <20170830161730.41919554@windsurf.lan>
+Message-ID: <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 30 Aug 2017 15:59:00 +0200, Gregory CLEMENT wrote:
-
-> > When gpiochip_add_data() calls chip->request, what function is that
-> > calling?  
+On 8/30/17 9:17 AM, Thomas Petazzoni wrote:
+> So what Timur is saying perhaps is that
+> mvebu_pinmux_gpio_request_enable() shouldn't be changing the type of
+> muxing, and therefore shouldn't be calling mvebu_pinconf_group_set().
 > 
-> the request callback is gpiochip_generic_request so I would be surprised
-> that there was a bug in it.
+> However, even the "reference" pinctrl-single.c implementation does it,
+> in pcs_request_gpio().
+> 
+> Am I missing something ?
 
-The call chain leading to the problem is:
+No, that's it.  The question is, what exactly should the 'request' 
+function do?  Should it be modifying the hardware to satisfy the 
+request?  When I wrote my patch, I assumed that it wouldn't.  I thought 
+that request simply answered the question, "can I touch this GPIO"?
 
- gpiochip_add_data()
-  chip->request() == gpiochip_generic_request()
-   pinctrl_request_gpio()
-    pinmux_request_gpio()
-     pin_request()
-      ops->gpio_request_enable() == mvebu_pinmux_gpio_request_enable()
-       mvebu_pinconf_group_set()
-        grp->ctrl->mpp_set() == mvebu_regmap_mpp_ctrl_set()
-
-So what Timur is saying perhaps is that
-mvebu_pinmux_gpio_request_enable() shouldn't be changing the type of
-muxing, and therefore shouldn't be calling mvebu_pinconf_group_set().
-
-However, even the "reference" pinctrl-single.c implementation does it,
-in pcs_request_gpio().
-
-Am I missing something ?
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
