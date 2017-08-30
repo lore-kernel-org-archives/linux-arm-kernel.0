@@ -1,77 +1,42 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 30 Aug 2017 12:20:40 -0700
-Subject: [PATCH] nd_blk: Remove mmio_flush_range()
-In-Reply-To: <a8de5c42cbfcd467586d3f93adbbee877050b6b9.1504113975.git.robin.murphy@arm.com>
-References: <a8de5c42cbfcd467586d3f93adbbee877050b6b9.1504113975.git.robin.murphy@arm.com>
-Message-ID: <CAPcyv4hQbo+aGHYN8oDg8khsPPN8ao-fCYTjUvTtOxjSqthcxQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 30 Aug 2017 21:32:52 +0200
+Subject: [PATCH v2 5/5] thermal: Add Tegra BPMP thermal sensor driver
+In-Reply-To: <4315091f-03b1-2df6-b224-6a29d3261371@nvidia.com>
+References: <20170724162918.21050-1-mperttunen@nvidia.com>
+ <20170724162918.21050-5-mperttunen@nvidia.com>
+ <1502420276.2598.5.camel@intel.com>
+ <4315091f-03b1-2df6-b224-6a29d3261371@nvidia.com>
+Message-ID: <20170830193252.GA12761@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 11:19 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> mmio_flush_range() suffers from a lack of clearly-defined semantics,
-> and is somewhat ambiguous to port to other architectures where the
-> scope of the writeback implied by "flush" and ordering might matter,
-> but MMIO would tend to imply non-cacheable anyway. Per the rationale
-> in 67a3e8fe9015 ("nd_blk: change aperture mapping from WC to WB"), the
-> only existing use is actually to invalidate clean cache lines for
-> ARCH_MEMREMAP_PMEM type mappings *without* writeback. Since the recent
-> cleanup of the pmem API, that also now happens to be the exact purpose
-> of arch_invalidate_pmem(), which would be a far more well-defined tool
-> for the job.
->
-> Rather than risk potentially inconsistent implementations of
-> mmio_flush_range() for the sake of one callsite, streamline things by
-> removing it entirely and instead move the ARCH_MEMREMAP_PMEM related
-> definitions up to the libnvdimm level, so they can be shared by NFIT
-> as well. This allows NFIT to be enabled for arm64.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  arch/x86/Kconfig                  |  1 -
->  arch/x86/include/asm/cacheflush.h |  2 --
->  drivers/acpi/nfit/Kconfig         |  1 -
->  drivers/acpi/nfit/core.c          |  2 +-
->  drivers/nvdimm/pmem.h             | 14 --------------
->  include/linux/libnvdimm.h         | 15 +++++++++++++++
->  lib/Kconfig                       |  3 ---
->  tools/testing/nvdimm/test/nfit.c  |  4 ++--
->  8 files changed, 18 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index 781521b7cf9e..5f3b756ec0d3 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -53,7 +53,6 @@ config X86
->         select ARCH_HAS_FORTIFY_SOURCE
->         select ARCH_HAS_GCOV_PROFILE_ALL
->         select ARCH_HAS_KCOV                    if X86_64
-> -       select ARCH_HAS_MMIO_FLUSH
->         select ARCH_HAS_PMEM_API                if X86_64
->         select ARCH_HAS_UACCESS_FLUSHCACHE      if X86_64
->         select ARCH_HAS_SET_MEMORY
-> diff --git a/arch/x86/include/asm/cacheflush.h b/arch/x86/include/asm/cacheflush.h
-> index 8b4140f6724f..cb9a1af109b4 100644
-> --- a/arch/x86/include/asm/cacheflush.h
-> +++ b/arch/x86/include/asm/cacheflush.h
-> @@ -7,6 +7,4 @@
->
->  void clflush_cache_range(void *addr, unsigned int size);
->
-> -#define mmio_flush_range(addr, size) clflush_cache_range(addr, size)
-> -
->  #endif /* _ASM_X86_CACHEFLUSH_H */
-> diff --git a/drivers/acpi/nfit/Kconfig b/drivers/acpi/nfit/Kconfig
-> index 6d3351452ea2..97117ba582f3 100644
-> --- a/drivers/acpi/nfit/Kconfig
-> +++ b/drivers/acpi/nfit/Kconfig
-> @@ -2,7 +2,6 @@ config ACPI_NFIT
->         tristate "ACPI NVDIMM Firmware Interface Table (NFIT)"
->         depends on PHYS_ADDR_T_64BIT
->         depends on BLK_DEV
-> -       depends on ARCH_HAS_MMIO_FLUSH
+On Mon, Aug 21, 2017 at 10:40:44AM +0800, Wei Ni wrote:
+> 
+> 
+> On Friday, August 11, 2017 10:57 AM, Zhang Rui wrote:
+> > On Mon, 2017-07-24 at 19:29 +0300, Mikko Perttunen wrote:
+> >> On Tegra186, the BPMP (Boot and Power Management Processor) exposes
+> >> an
+> >> interface to thermal sensors on the system-on-chip. This driver
+> >> implements access to the interface. It supports reading the
+> >> temperature, setting trip points and receiving notification of a
+> >> tripped trip point.
+> >>
+> >> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> > 
+> > Wei Ni,
+> > 
+> > what do you think of this patch?
+> 
+> Reviewed this patch, it looked fine to me.
 
-Lets add depends on ARCH_HAS_PMEM_API here since support for being to
-perform the invalidation is critical to the operation of the ND_BLK
-driver.
+Can I take this as a Reviewed-by?
 
-...but this otherwise looks good to me.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/cc7fc6fb/attachment.sig>
