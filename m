@@ -1,49 +1,47 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 30 Aug 2017 09:19:14 +0800
-Subject: [PATCH] PCI: mediatek: take use of PCI_NUM_INTX
-Message-ID: <1504055954-31545-1-git-send-email-honghui.zhang@mediatek.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Wed, 30 Aug 2017 01:37:09 +0000
+Subject: [PATCHv2 0/2] PCI: add ls2088a and ls1088a support
+In-Reply-To: <20170829221954.GT8154@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <20170829221954.GT8154@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <VI1PR04MB1615F2A640C2FB89F5B56380E89C0@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi Bjorn,
 
-Switch from using a custom NUM_INTX macro to the generic PCI_NUM_INTX
-definition for the number of INTx interrupts.
+Thanks a lot.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index c567996..5c0ce9b 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -77,7 +77,6 @@
- #define PCIE_INT_MASK		0x420
- #define INTX_MASK		GENMASK(19, 16)
- #define INTX_SHIFT		16
--#define INTX_NUM		4
- #define PCIE_INT_STATUS		0x424
- #define MSI_STATUS		BIT(23)
- #define PCIE_IMSI_STATUS	0x42c
-@@ -576,7 +575,7 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
- 		return -ENODEV;
- 	}
- 
--	port->irq_domain = irq_domain_add_linear(pcie_intc_node, INTX_NUM,
-+	port->irq_domain = irq_domain_add_linear(pcie_intc_node, PCI_NUM_INTX,
- 						 &intx_domain_ops, port);
- 	if (!port->irq_domain) {
- 		dev_err(dev, "failed to get INTx IRQ domain\n");
-@@ -594,7 +593,7 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 	u32 bit = INTX_SHIFT;
- 
- 	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
--		for_each_set_bit_from(bit, &status, INTX_NUM + INTX_SHIFT) {
-+		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
- 			/* Clear the INTx */
- 			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 			virq = irq_find_mapping(port->irq_domain,
--- 
-2.6.4
+
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Wednesday, August 30, 2017 6:20 AM
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> bhelgaas at google.com; robh+dt at kernel.org; M.h. Lian
+> <minghuan.lian@nxp.com>; shawnguo at kernel.org; Minghuan Lian
+> <minghuan.Lian@freescale.com>; Mingkai Hu <mingkai.hu@freescale.com>;
+> Roy Zang <tie-fei.zang@freescale.com>
+> Subject: Re: [PATCHv2 0/2] PCI: add ls2088a and ls1088a support
+> 
+> [+cc Minghuan, Mingkai, Roy]
+> 
+> On Fri, Aug 04, 2017 at 02:41:32PM +0800, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > Hou Zhiqiang (2):
+> >   PCI: layerscape: Add support for ls2088a
+> >   PCI: layerscape: Add support for ls1088a
+> >
+> >  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  2 ++
+> >  drivers/pci/dwc/pci-layerscape.c                         | 10 ++++++++++
+> >  2 files changed, 12 insertions(+)
+> 
+> These still apply cleanly, but I haven't seen an ack from the driver maintainers.
+> 
+> Bjorn
