@@ -1,47 +1,49 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Wed, 30 Aug 2017 16:24:54 +0200
-Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
+Date: Wed, 30 Aug 2017 16:24:52 +0200
+Subject: [PATCH v3 1/3] PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on
+ bus device
 In-Reply-To: <20170830142454.10971-1-jglauber@cavium.com>
 References: <20170830142454.10971-1-jglauber@cavium.com>
-Message-ID: <20170830142454.10971-4-jglauber@cavium.com>
+Message-ID: <20170830142454.10971-2-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Root ports of cn8xxx do not function after a slot reset when used with
-some e1000e and LSI HBA devices. Add a quirk to prevent slot reset on
-these root ports.
+From: David Daney <david.daney@cavium.com>
 
+When checking to see if a PCI bus can safely be reset, we check to see
+if any of the children have their PCI_DEV_FLAGS_NO_BUS_RESET flag set.
+As these devices are known not to behave well after a bus reset.
+
+Some PCIe root port bridges also do not behave well after a bus reset,
+sometimes causing the devices behind the bridge to become unusable.
+
+Add a check for the PCI_DEV_FLAGS_NO_BUS_RESET flag being set in the
+bridge device to allow these bridges to be flagged, and prevent their
+buses from being reset.
+
+A follow on patch will add a quirk for this type of bridge.
+
+Signed-off-by: David Daney <david.daney@cavium.com>
+[jglauber at cavium.com: fixed typo]
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/pci/quirks.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/pci/pci.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 85191b8..6679971 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -845,6 +845,22 @@ static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
- DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
- #endif
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..d9abbc9 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4290,6 +4290,10 @@ static bool pci_bus_resetable(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
  
-+/*
-+ * Root port on some Cavium CN8xxx chips do not successfully complete
-+ * a bus reset when used with certain types of child devices. Config
-+ * space access to the child may quit responding. Flag all devices under
-+ * the secondary bus as non-resettable.
-+ */
-+static void quirk_CN8xxx_secondary_bus(struct pci_dev *dev)
-+{
-+	struct pci_dev *pdev;
 +
-+	dev_warn(&dev->dev, "Cavium CN8xxx quirk detected; reset for devices on secondary bus disabled\n");
-+	list_for_each_entry(pdev, &dev->subordinate->devices, bus_list)
-+		pdev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
-+}
-+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_CN8xxx_secondary_bus);
++	if (bus->self && (bus->self->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET))
++		return false;
 +
- /*
-  * Some settings of MMRBC can lead to data corruption so block changes.
-  * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		if (dev->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET ||
+ 		    (dev->subordinate && !pci_bus_resetable(dev->subordinate)))
 -- 
 2.9.0.rc0.21.g7777322
