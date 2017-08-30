@@ -1,31 +1,30 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 30 Aug 2017 22:17:51 +0530
-Subject: [PATCH] ARM: mxs: constify platform_suspend_ops
-Message-ID: <be1c12e8040201dcabec64561ec6e446e2111b1e.1504111357.git.arvind.yadav.cs@gmail.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Thu, 31 Aug 2017 01:00:44 +0800
+Subject: [RESENT PATCH v7 3/7] arm64: dts: rockchip: Update rt5514 devices'
+ compatible for Gru
+In-Reply-To: <1649093.IvC24TsujL@diego>
+References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
+ <20170824045227.15504-4-jeffy.chen@rock-chips.com> <1649093.IvC24TsujL@diego>
+Message-ID: <59A6EF3C.5090308@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_suspend_ops are not supposed to change at runtime.
-Functions suspend_set_ops working with const platform_suspend_ops.
-So mark the non-const structs as const.
+Hi Heiko,
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- arch/arm/mach-mxs/pm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+thanks for your reply.
 
-diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
-index 0170e99..6ae057c 100644
---- a/arch/arm/mach-mxs/pm.c
-+++ b/arch/arm/mach-mxs/pm.c
-@@ -30,7 +30,7 @@ static int mxs_suspend_enter(suspend_state_t state)
- 	return 0;
- }
- 
--static struct platform_suspend_ops mxs_suspend_ops = {
-+static const struct platform_suspend_ops mxs_suspend_ops = {
- 	.enter = mxs_suspend_enter,
- 	.valid = suspend_valid_only_mem,
- };
--- 
-2.7.4
+On 08/30/2017 09:30 PM, Heiko St?bner wrote:
+>> >-		compatible = "realtek,rt5514";
+>> >+		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
+> the rt5514-i2c and -spi compatibles should be documented in the binding-txt
+> of the chip, but I haven't found any mention of this.
+>
+>
+> Heiko
+
+these compatibles are only used for our snd driver to detect rt5514 i2c 
+driver and rt5514 spi driver, suggested by Matthias at 
+https://patchwork.kernel.org/patch/9904731/
+
+should i add it in the rockchip,rk3399-gru-sound.txt or rt5514 binding 
+document?
