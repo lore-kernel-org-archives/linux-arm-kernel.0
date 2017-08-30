@@ -1,55 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Aug 2017 22:23:38 -0700
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#3)
-In-Reply-To: <87d17ll6sc.fsf@free-electrons.com>
-References: <87d17ll6sc.fsf@free-electrons.com>
-Message-ID: <20170830052338.GE14499@localhost>
+Date: Tue, 29 Aug 2017 22:41:54 -0700
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.14
+In-Reply-To: <CAK7LNAQrKNRWTAe-bRU2UvE6fJPrrL0Vp-yGEKDeT+ktKu-ioQ@mail.gmail.com>
+References: <CAK7LNAQrKNRWTAe-bRU2UvE6fJPrrL0Vp-yGEKDeT+ktKu-ioQ@mail.gmail.com>
+Message-ID: <20170830054154.GL14499@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 10:16:35AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Tue, Aug 29, 2017 at 12:23:32AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-> Here is the third pull request for dt64 for mvebu for v4.14. There is
-> a single patch patch but an important one in it. It should have been
-> part of the previous PR but I missed the second version of this patch
-> as I was on the road for the holiday. Sorry for this late PR.
+> Sorry for my last-minute pull request.
+> Please pull a little more for the upcoming merge window.
+> Here are some trivial UniPhier DT (32bit) updates.  Please pull!
 > 
-> Gregory
 > 
-> The following changes since commit 0ea62502a5146cfe98696a152894ebb9afbee9d4:
 > 
->   ARM64: dts: marvell: enable USB host on Armada-8040-DB (2017-08-14 16:30:43 +0200)
+> The following changes since commit 69f9cdc63319e5ccc210b30d1cec1dfda7096b04:
+> 
+>   ARM: dts: uniphier: add Denali NAND controller node (2017-08-16
+> 01:47:01 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.14-3
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-dt-v4.14-2
 > 
-> for you to fetch changes up to bf32f2aeb2f73b7e5cee3c95f232ae5af97d45f6:
+> for you to fetch changes up to 8a7a516afaed2ee6b5da551a01c573eba3b69c16:
 > 
->   arm64: dts: marvell: add Device Tree files for Armada-8KP (2017-08-24 09:56:41 +0200)
-> 
-> ----------------------------------------------------------------
-> mvebu dt64 for 4.14 (part 3)
-> 
-> Add description for a new family SoC from Marvell: Armada-8KP.
+>   ARM: dts: uniphier: add pinctrl groups of ethernet phy mode
+> (2017-08-29 00:00:43 +0900)
 > 
 > ----------------------------------------------------------------
-> Hanna Hawa (1):
->       arm64: dts: marvell: add Device Tree files for Armada-8KP
+> UniPhier ARM SoC DT updates for v4.14 (2nd)
 > 
->  .../devicetree/bindings/arm/marvell/armada-8kp.txt |  15 ++
->  arch/arm64/boot/dts/marvell/Makefile               |   1 +
->  arch/arm64/boot/dts/marvell/armada-8080-db.dts     |  67 +++++++++
->  arch/arm64/boot/dts/marvell/armada-8080.dtsi       |  53 +++++++
->  .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 104 +++++++++++++
->  arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 163 +++++++++++++++++++++
->  6 files changed, 403 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-8kp.txt
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-8080-db.dts
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-8080.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap810-ap0-octa-core.dtsi
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi
+> - add AIDET irqchip device nodes
+> - fix size of sdctrl node
+> - add ethernet pinmux nodes
 
 Merged, thanks.
 
