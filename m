@@ -1,48 +1,71 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Aug 2017 22:12:25 +0200
-Subject: [PATCH v3 49/59] KVM: arm/arm64: GICv4: Propagate VLPI
- properties at map time
-In-Reply-To: <60012f9d-7eb9-e8f4-a2c4-82e00ff52c0c@arm.com>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-50-marc.zyngier@arm.com>
- <20170828181841.GJ24649@cbox>
- <60012f9d-7eb9-e8f4-a2c4-82e00ff52c0c@arm.com>
-Message-ID: <20170830201225.GM24522@cbox>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 30 Aug 2017 22:15:45 +0200
+Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
+In-Reply-To: <CABxcv==JFm0H_kB8LRyRpZNbajcO3UkxYOepkk=YUAaT1UH1gg@mail.gmail.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170731153009.xkjknygpmckv2pfp@ninjato>
+ <CABxcv=mdbE0QGjoi3aLzxRqM3-MbkQ_Ai6fShcGVUGSNNqqrqw@mail.gmail.com>
+ <20170828160121.gu4wf7jqu4ditksc@ninjato>
+ <CABxcv=kSiqDN1=9fSfLkyW=uuXQZAoW4dhw=fco9RyOdDuPAdA@mail.gmail.com>
+ <20170829084831.hsdok3ksi7anxzuc@ninjato>
+ <CABxcv=nqbNsTs7D57VOt1-Tav_3i9U=XKn=BV=hPr1tG68eE2g@mail.gmail.com>
+ <20170830174228.sx5jgtxxy56zq47t@ninjato>
+ <CABxcv==JFm0H_kB8LRyRpZNbajcO3UkxYOepkk=YUAaT1UH1gg@mail.gmail.com>
+Message-ID: <CAMuHMdXRVnHsvCNfRqRgTusdyhOYcV7bWconD99OgXmVcHT8yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 03:56:57PM +0100, Marc Zyngier wrote:
-> On 28/08/17 19:18, Christoffer Dall wrote:
-> > On Mon, Jul 31, 2017 at 06:26:27PM +0100, Marc Zyngier wrote:
-> >> When the VLPI gets mapped, it must inherit the configuration of
-> >> LPI configured at the vITS level. FOr that purpose, let's make
-> > 
-> > *the LPI
-> > *For that
-> 
-> Will fix, thanks.
-> 
-> > 
-> >> update_lpi_config globally available and call it just after
-> >> having performed the VLPI map operation.
-> >>
-> > 
-> > I assume this means that the GIC compares the priorities of virtual
-> > interrupts in the LRs with the priorities of the pending VLPIs and
-> > figures out what to signal first?  I couldn't find anywhere in the spec
-> > where this is explicitly stated.
-> 
-> There is this mention in IHI0069D, 5.4 (Virtual LPI support):
-> 
-> "The Redistributor associated with the PE on which the vPE is scheduled
-> determines the highest priority pending vLPI, and forwards this to the
-> virtual CPU interface of the vPE. This vLPI and the interrupts in the
-> List register are then prioritized together to determine the highest
-> priority pending virtual interrupt for the vPE."
-> 
+Hi Javier,
 
-Wow, I didn't find that staring at the manual for a considerable amount
-of time.  Thanks for the pointer.
+On Wed, Aug 30, 2017 at 9:57 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+>> I think we should talk about the same case: Let me repeat what I did:
+>>
+>> 1) I added your patch "eeprom: at24: Add OF device ID table"
+>> 2) I added an EEPROM node to an I2C
+>>
+>> +       eeprom at 50 {
+>> +               compatible = "renesas,24c01";
+>> +               reg = <0x50>;
+>> +       };
+>>
+>> -> no at24 binding to the device
+>>
+>> 3) I revert your patch
+>>
+>> -> at24 binding to the device
+>>
+>
+> I've tested this and you are right, it fails...
+>
+> The problem is that the patch also changes how the driver obtains the
+> EEPROM parameters (the magic value in the entry's data field).
+>
+> So even when module autoload and device / driver matching works, the
+> driver probe function fails because if (client->dev.of_node) the
+> driver attempts to get the entry data using
+> of_device_get_match_data(), which is obviously wrong since the
+> compatible string in the dev node isn't present in the OF table.
+>
+> The id->driver_data from the I2C table should be used instead since
+> that's the table that matches in this case.
+>
+> One option is to fallback to id->driver_data if
+> of_device_get_match_data() fails, but that's just an (ugly)
+> workaround. So I agree with you that the best option is to wait for
+> the DTS patches to land first.
 
-Thanks,
--Christoffer
+Which means new kernels won't work with old DTBs. Oops...
+I'm afraid that needs to be fixed.  People care about DTB backward
+compatibility on many platforms.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
