@@ -1,91 +1,78 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 Aug 2017 22:55:45 -0400
-Subject: [PATCH v2 3/5] ARM: vmlinux.lds.S: replace open coded .data sections
- with generic macros
+Date: Tue, 29 Aug 2017 22:55:44 -0400
+Subject: [PATCH v2 2/5] ARM: vmlinux*.lds.S: some decruftification
 In-Reply-To: <20170830025547.30347-1-nicolas.pitre@linaro.org>
 References: <20170830025547.30347-1-nicolas.pitre@linaro.org>
-Message-ID: <20170830025547.30347-4-nicolas.pitre@linaro.org>
+Message-ID: <20170830025547.30347-3-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our .data section is missing PAGE_ALIGNED_DATA() which contains,
-amongst other things, the vdso page. This creates a System.map that
-looks like this:
-
-c15769a8 D _edata
-c1577000 d vdso_data_store
-c1578000 D __start___bug_table
-c1580544 D __stop___bug_table
-c1580544 B __bss_start
-
-By using RW_DATA_SECTION() we pick whatever generic sections might be
-added in the future and have page-aligned data next to other strongly
-aligned data. Furthermore we now include the entire thing, including the
-bug table, in the data accounting surrounded by _sdata/_edata.
-
-While at it let's also remplace the open coded .init.data by its
-equivalent INIT_DATA_SECTION().
+Remove stuff from vmlinux.lds.S that is relevant only to the XIP build,
+and stuff from vmlinux-xip.lds.S related to self-modifying code that
+makes no sense in the XIP case.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/vmlinux.lds.S | 38 ++++++--------------------------------
- 1 file changed, 6 insertions(+), 32 deletions(-)
+ arch/arm/kernel/vmlinux-xip.lds.S | 14 --------------
+ arch/arm/kernel/vmlinux.lds.S     |  4 +---
+ 2 files changed, 1 insertion(+), 17 deletions(-)
 
+diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+index 1598caada3..88e8db3979 100644
+--- a/arch/arm/kernel/vmlinux-xip.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+@@ -77,9 +77,7 @@ SECTIONS
+ 		*(.text.fixup)
+ 		*(__ex_table)
+ #endif
+-#ifndef CONFIG_SMP_ON_UP
+ 		*(.alt.smp.init)
+-#endif
+ 		*(.discard)
+ 		*(.discard.*)
+ 	}
+@@ -181,18 +179,6 @@ SECTIONS
+ 		*(.taglist.init)
+ 		__tagtable_end = .;
+ 	}
+-#ifdef CONFIG_SMP_ON_UP
+-	.init.smpalt : {
+-		__smpalt_begin = .;
+-		*(.alt.smp.init)
+-		__smpalt_end = .;
+-	}
+-#endif
+-	.init.pv_table : {
+-		__pv_table_begin = .;
+-		*(.pv_table)
+-		__pv_table_end = .;
+-	}
+ 	.init.data : {
+ 		INIT_SETUP(16)
+ 		INIT_CALLS
 diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 4f86b4b7bd..f73ba564b5 100644
+index c83a7ba737..4f86b4b7bd 100644
 --- a/arch/arm/kernel/vmlinux.lds.S
 +++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -214,14 +214,9 @@ SECTIONS
- 		*(.pv_table)
- 		__pv_table_end = .;
- 	}
--	.init.data : {
--		INIT_DATA
--		INIT_SETUP(16)
--		INIT_CALLS
--		CON_INITCALL
--		SECURITY_INITCALL
--		INIT_RAM_FS
--	}
-+
-+	INIT_DATA_SECTION(16)
-+
- 	.exit.data : {
- 		ARM_EXIT_KEEP(EXIT_DATA)
- 	}
-@@ -237,30 +232,9 @@ SECTIONS
+@@ -236,9 +236,8 @@ SECTIONS
+ 	. = ALIGN(THREAD_SIZE);
  #endif
  	__init_end = .;
+-	__data_loc = .;
  
--	.data : {
--		_data = .;		/* address in memory */
--		_sdata = .;
--
--		/*
--		 * first, the init task union, aligned
--		 * to an 8192 byte boundary.
--		 */
--		INIT_TASK_DATA(THREAD_SIZE)
--
--		NOSAVE_DATA
--		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
--		READ_MOSTLY_DATA(L1_CACHE_BYTES)
--
--		/*
--		 * and the usual data section
--		 */
--		DATA_DATA
--		CONSTRUCTORS
--
--		_edata = .;
--	}
--
--	BUG_TABLE
-+	_sdata = .;
-+	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-+	_edata = .;
+-	.data : AT(__data_loc) {
++	.data : {
+ 		_data = .;		/* address in memory */
+ 		_sdata = .;
  
- #ifdef CONFIG_HAVE_TCM
-         /*
+@@ -260,7 +259,6 @@ SECTIONS
+ 
+ 		_edata = .;
+ 	}
+-	_edata_loc = __data_loc + SIZEOF(.data);
+ 
+ 	BUG_TABLE
+ 
 -- 
 2.9.5
