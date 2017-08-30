@@ -1,83 +1,58 @@
-From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Thu, 31 Aug 2017 01:06:37 +0200
-Subject: [PATCH v2] arm64: allwinner: a64: add SPI nodes
-Message-ID: <20170830230637.13010-1-stefan.bruens@rwth-aachen.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 31 Aug 2017 07:12:31 +0800
+Subject: [PATCH v7 08/11] mm: zero reserved and unavailable struct pages
+In-Reply-To: <1503972142-289376-9-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <201708310652.1lgOVyko%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 SPI controllers are register compatible to the h3/h5 SPI
-controllers.
+Hi Pavel,
 
-The A64 has two SPI controllers, each with a single chip select.
-The handles for the DMA channels (23/24 for SPI0/SPI1) are omitted,
-as the A64 DMA support is currently missing.
+[auto build test ERROR on sparc/master]
+[also build test ERROR on v4.13-rc7 next-20170829]
+[cannot apply to mmotm/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+url:    https://github.com/0day-ci/linux/commits/Pavel-Tatashin/complete-deferred-page-initialization/20170831-041021
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc.git master
+config: cris-allmodconfig (attached as .config)
+compiler: cris-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=cris 
+
+All errors (new ones prefixed by >>):
+
+   In file included from mm/page_alloc.c:18:0:
+   include/linux/mm.h:1974:33: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'zero_resv_unavail'
+    static inline void __paginginit zero_resv_unavail(void) {}
+                                    ^~~~~~~~~~~~~~~~~
+   mm/page_alloc.c: In function 'free_area_init':
+>> mm/page_alloc.c:6863:2: error: implicit declaration of function 'zero_resv_unavail' [-Werror=implicit-function-declaration]
+     zero_resv_unavail();
+     ^~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +/zero_resv_unavail +6863 mm/page_alloc.c
+
+  6858	
+  6859	void __init free_area_init(unsigned long *zones_size)
+  6860	{
+  6861		free_area_init_node(0, zones_size,
+  6862				__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
+> 6863		zero_resv_unavail();
+  6864	}
+  6865	
+
 ---
-v2: - order nodes by memory address
-    - drop enabling of spi nodes for Pine64, spi pins are on external
-      connector and some other function might be used
-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index bd0f33b77f57..7be9eb2ad83c 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -325,6 +325,16 @@
- 				drive-strength = <40>;
- 			};
- 
-+			spi0_pins: spi0 {
-+				pins = "PC0", "PC1", "PC2", "PC3";
-+				function = "spi0";
-+			};
-+
-+			spi1_pins: spi1 {
-+				pins = "PD0", "PD1", "PD2", "PD3";
-+				function = "spi1";
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
-@@ -469,6 +479,36 @@
- 			};
- 		};
- 
-+		spi0: spi at 01c68000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c68000 0x1000>;
-+			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
-+			clock-names = "ahb", "mod";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pins>;
-+			resets = <&ccu RST_BUS_SPI0>;
-+			status = "disabled";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		spi1: spi at 01c69000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c69000 0x1000>;
-+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
-+			clock-names = "ahb", "mod";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_pins>;
-+			resets = <&ccu RST_BUS_SPI1>;
-+			status = "disabled";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,gic-400";
- 			reg = <0x01c81000 0x1000>,
--- 
-2.14.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 42983 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/cef71a4d/attachment-0001.gz>
