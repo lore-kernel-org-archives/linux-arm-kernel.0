@@ -1,43 +1,73 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 30 Aug 2017 19:34:11 +0800
-Subject: [PATCH v3 3/3] dt-bindings: mt8173-mtu3: add generic compatible and
+Date: Wed, 30 Aug 2017 19:34:10 +0800
+Subject: [PATCH v3 2/3] dt-bindings: mt8173-xhci: add generic compatible and
  rename file
 In-Reply-To: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1504092763.git.chunfeng.yun@mediatek.com>
 References: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1504092763.git.chunfeng.yun@mediatek.com>
-Message-ID: <15a1cdc6e2e7da0f7a74b56794b74c2d258e1b88.1504092763.git.chunfeng.yun@mediatek.com>
+Message-ID: <0ef0bfd4f2544e57c7bdaea518c3fc75ae40b74f.1504092763.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mt8173-mtu3.txt actually holds the bindings for all mediatek
-SoCs with usb3 DRD IP, so add a generic compatible and change the
-name to mediatek,mtu3.txt.
+The mt8173-xhci.txt actually holds the bindings for all mediatek
+SoCs with xHCI controller, so add a generic compatible and change
+the name to mediatek,mtk-xhci.txt to reflect that.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../usb/{mt8173-mtu3.txt => mediatek,mtu3.txt}     |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
- rename Documentation/devicetree/bindings/usb/{mt8173-mtu3.txt => mediatek,mtu3.txt} (92%)
+ .../usb/{mt8173-xhci.txt => mediatek,mtk-xhci.txt} |   14 +++++++++++---
+ .../devicetree/bindings/usb/mt8173-mtu3.txt        |    2 +-
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+ rename Documentation/devicetree/bindings/usb/{mt8173-xhci.txt => mediatek,mtk-xhci.txt} (85%)
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-similarity index 92%
-rename from Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-rename to Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-index b8ea394..838ae48 100644
---- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-@@ -1,7 +1,11 @@
- The device node for Mediatek USB3.0 DRD controller
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+similarity index 85%
+rename from Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+rename to Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+index 0acfc8a..5611a2e 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+@@ -11,7 +11,11 @@ into two parts.
+ ------------------------------------------------------------------------
  
  Required properties:
-- - compatible : should be "mediatek,mt8173-mtu3"
-+ - compatible : should be "mediatek,<soc-model>-mtu3", "mediatek,mtu3",
-+	soc-model is the name of SoC, such as mt8173, mt2712 etc,
-+	when using "mediatek,mtu3" compatible string, you need SoC specific
-+	ones in addition, one of:
-+	- "mediatek,mt8173-mtu3"
+- - compatible : should contain "mediatek,mt8173-xhci"
++ - compatible : should be "mediatek,<soc-model>-xhci", "mediatek,mtk-xhci",
++	soc-model is the name of SoC, such as mt8173, mt2712 etc, when using
++	"mediatek,mtk-xhci" compatible string, you need SoC specific ones in
++	addition, one of:
++	- "mediatek,mt8173-xhci"
   - reg : specifies physical base address and size of the registers
-  - reg-names: should be "mac" for device IP and "ippc" for IP port control
-  - interrupts : interrupt used by the device IP
+  - reg-names: should be "mac" for xHCI MAC and "ippc" for IP port control
+  - interrupts : interrupt used by the controller
+@@ -68,10 +72,14 @@ usb30: usb at 11270000 {
+ 
+ In the case, xhci is added as subnode to mtu3. An example and the DT binding
+ details of mtu3 can be found in:
+-Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
++Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+ 
+ Required properties:
+- - compatible : should contain "mediatek,mt8173-xhci"
++ - compatible : should be "mediatek,<soc-model>-xhci", "mediatek,mtk-xhci",
++	soc-model is the name of SoC, such as mt8173, mt2712 etc, when using
++	"mediatek,mtk-xhci" compatible string, you need SoC specific ones in
++	addition, one of:
++	- "mediatek,mt8173-xhci"
+  - reg : specifies physical base address and size of the registers
+  - reg-names: should be "mac" for xHCI MAC
+  - interrupts : interrupt used by the host controller
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+index 1d7c3bc..b8ea394 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
++++ b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+@@ -44,7 +44,7 @@ Optional properties:
+ Sub-nodes:
+ The xhci should be added as subnode to mtu3 as shown in the following example
+ if host mode is enabled. The DT binding details of xhci can be found in:
+-Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+ 
+ Example:
+ ssusb: usb at 11271000 {
 -- 
 1.7.9.5
