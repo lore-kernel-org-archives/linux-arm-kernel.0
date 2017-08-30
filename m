@@ -1,68 +1,122 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Aug 2017 10:07:59 +0100
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
-References: <599D3410.9050504@intel.com>
- <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
- <599D62EA.7050100@linux.intel.com>
- <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
- <59A3D6BF.7010400@linux.intel.com>
- <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
- <59A56C15.2000403@linux.intel.com> <20170829235310.GA20214@wunner.de>
- <20170830060237.GA2782@kroah.com>
- <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
-Message-ID: <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Aug 2017 11:07:45 +0200
+Subject: [PATCH] arm64: dts: marvell: add TX interrupts for PPv2.2
+Message-ID: <20170830090745.24559-1-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 August 2017 at 09:55, Mason <slash.tmp@free.fr> wrote:
-> On 30/08/2017 08:02, Greg Kroah-Hartman wrote:
->
->> To get back to the original issue here, the hardware seems to have died,
->> the driver stops talking to it, and all is good.  The "regression" here
->> is that we now properly can determine that the hardware is crap.
->
-> Before 4.12, when I unplugged my USB3 Flash drive, Linux would
-> detect a few "Uncorrected Non-Fatal errors" via AER, but it was
-> still possible to plug the drive back in.
->
-> Since 4.12, once I unplug the drive, the whole USB3 card is marked
-> as dead (all 4 ports), and I can no longer plug anything in (not even
-> the USB2 drive that didn't have any issues, IIRC).
->
-> It seems a bit premature to "mark as dead" something that remains
-> functional, doesn't it?
->
-> Disclaimer, there are many variables in this setup, and I've only
-> tested a small fraction of the problem space: only one system,
-> only one USB3 board, only one USB3 Flash drive.
->
+This commit updates the Marvell Armada 7K/8K Device Tree to describe
+the TX interrupts of the Ethernet controllers, in both the master and
+slave CP110s.
 
-Please don't forget to mention that this is quirky hardware that
-depends on BROKEN because it multiplexes MMIO and config space
-accesses in the same memory window without any locking whatsoever
-(which would be difficult to do in the first place because we don't
-use accessors for MMIO in the kernel).
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+This DT change comes together with a number of changes that have been
+merged in net-next for the mvpp2 driver. It was originally part of the
+mvpp2 series, but because it was confusing Dave Miller to have driver
+and DT changes in the same patch series, I removed the DT changes from
+the series, and then forgot to send them again due to vacations.
 
-So how likely is it that you are attempting to read from the xhci BAR
-window while a config space access is in progress? Any way to
-instrument this in your driver?
+It would be really nice to have these changes in 4.14, otherwise the
+driver changes are somewhat useless :-/
 
->> So, how do you think we should proceed, delay a bit longer before saying
->> the device is gone?  How long is "long enough"?  How many bus errors are
->> we allowed to tolerate (hint, the PCI spec says none...)
->>
->> Maybe someone wants to get to the root problem here, why is the hardware
->> suddenly reporting all 1s?
->
-> I'm afraid I won't be able to make any progress on this front,
-> unless I can get my hands on a PCIe packet analyzer.
->
-> Regards.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 24 +++++++++++++++++++---
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 24 +++++++++++++++++++---
+ 2 files changed, 42 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 8b019a9..0bfd4f8 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -69,21 +69,39 @@
+ 				dma-coherent;
+ 
+ 				cpm_eth0: eth0 {
+-					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
++					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>;
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared";
+ 					port-id = <0>;
+ 					gop-port-id = <0>;
+ 					status = "disabled";
+ 				};
+ 
+ 				cpm_eth1: eth1 {
+-					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>;
++					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>;
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared";
+ 					port-id = <1>;
+ 					gop-port-id = <2>;
+ 					status = "disabled";
+ 				};
+ 
+ 				cpm_eth2: eth2 {
+-					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>;
++					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>;
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared";
+ 					port-id = <2>;
+ 					gop-port-id = <3>;
+ 					status = "disabled";
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 7c11001..a020e10 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -69,21 +69,39 @@
+ 				dma-coherent;
+ 
+ 				cps_eth0: eth0 {
+-					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
++					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>;
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared";
+ 					port-id = <0>;
+ 					gop-port-id = <0>;
+ 					status = "disabled";
+ 				};
+ 
+ 				cps_eth1: eth1 {
+-					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>;
++					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>;
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared";
+ 					port-id = <1>;
+ 					gop-port-id = <2>;
+ 					status = "disabled";
+ 				};
+ 
+ 				cps_eth2: eth2 {
+-					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>;
++					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>;
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared";
+ 					port-id = <2>;
+ 					gop-port-id = <3>;
+ 					status = "disabled";
+-- 
+2.9.4
