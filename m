@@ -1,21 +1,45 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 30 Aug 2017 10:46:08 -0700 (PDT)
-Subject: [PATCH v7 07/11] sparc64: optimized struct page zeroing
-In-Reply-To: <e07c05b1-c0be-bf7f-9a29-11dc41b79d10@oracle.com>
-References: <1503972142-289376-8-git-send-email-pasha.tatashin@oracle.com>
- <20170829.181208.171985548699678313.davem@davemloft.net>
- <e07c05b1-c0be-bf7f-9a29-11dc41b79d10@oracle.com>
-Message-ID: <20170830.104608.2080967179463692935.davem@davemloft.net>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 30 Aug 2017 19:54:06 +0200
+Subject: [RFC PATCH v9 1/7] edac: thunderx: Remove suspend/resume support
+In-Reply-To: <20170829131238.4988-2-jglauber@cavium.com>
+References: <20170829131238.4988-1-jglauber@cavium.com>
+ <20170829131238.4988-2-jglauber@cavium.com>
+Message-ID: <20170830175406.ygmathi3b5orzyqy@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pasha Tatashin <pasha.tatashin@oracle.com>
-Date: Wed, 30 Aug 2017 09:19:58 -0400
+On Tue, Aug 29, 2017 at 03:12:32PM +0200, Jan Glauber wrote:
+> The memory controller on ThunderX/OcteonTX systems does not
+> support power management. Therefore remove the suspend/resume
+> callbacks.
+> 
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> ---
+>  drivers/edac/thunderx_edac.c | 21 ---------------------
+>  1 file changed, 21 deletions(-)
 
-> The reason I am not doing initializing stores is because they require
-> a membar, even if only regular stores are following (I hoped to do a
-> membar before first load). This is something I was thinking was not
-> true, but after consulting with colleagues and checking processor
-> manual, I verified that it is the case.
+Just when I thought I'd pick that one up now because it is removing
+stuff:
 
-Oh yes, that's right, now I remember.
+drivers/edac/thunderx_edac.c:817:14: error: ?thunderx_lmc_suspend? undeclared here (not in a function)
+  .suspend  = thunderx_lmc_suspend,
+              ^~~~~~~~~~~~~~~~~~~~
+drivers/edac/thunderx_edac.c:818:14: error: ?thunderx_lmc_resume? undeclared here (not in a function)
+  .resume   = thunderx_lmc_resume,
+              ^~~~~~~~~~~~~~~~~~~
+scripts/Makefile.build:308: recipe for target 'drivers/edac/thunderx_edac.o' failed
+make[1]: *** [drivers/edac/thunderx_edac.o] Error 1
+make[1]: *** Waiting for unfinished jobs....
+Makefile:1682: recipe for target 'drivers/edac/' failed
+make: *** [drivers/edac/] Error 2
+
+Please make sure you build and test every patch before submitting.
+You're lucky I can at least build arm64 on my x86 workstation. :-)
+
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
