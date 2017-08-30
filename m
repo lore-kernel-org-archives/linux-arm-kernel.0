@@ -1,281 +1,196 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Wed, 30 Aug 2017 19:46:33 +0800
-Subject: [RFC/PATCH v3] arm64: define MODULES_VADDR by module_alloc_base
-Message-ID: <1504093593-2586-1-git-send-email-miles.chen@mediatek.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Aug 2017 13:55:10 +0200
+Subject: [PATCH v3 51/59] KVM: arm/arm64: GICv4: Add doorbell interrupt
+ handling
+In-Reply-To: <20170830103141.jarquijxzntv2feo@kamzik.brq.redhat.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-52-marc.zyngier@arm.com>
+ <8a35ee18-85a5-168b-b3d2-b9f51390b475@arm.com>
+ <20170828181850.GL24649@cbox>
+ <20170830103141.jarquijxzntv2feo@kamzik.brq.redhat.com>
+Message-ID: <20170830115510.GE24522@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the kernel ASLR, the module virtual address is moved to
-[module_alloc_base, module_alloc_base + MODULES_VSIZE).
-However, the MODULES_VADDR is still defined as a constant and functions
-like is_vmalloc_or_module_addr() or dump functions will not able to
-use correct module range information.
+On Wed, Aug 30, 2017 at 12:31:41PM +0200, Andrew Jones wrote:
+> On Mon, Aug 28, 2017 at 08:18:50PM +0200, Christoffer Dall wrote:
+> > On Fri, Aug 04, 2017 at 08:44:04AM +0100, Marc Zyngier wrote:
+> > > On 31/07/17 18:26, Marc Zyngier wrote:
+> > > > When a vPE is not running, a VLPI being made pending results in a
+> > > > doorbell interrupt being delivered. Let's handle this interrupt
+> > > > and update the pending_last flag that indicates that VLPIs are
+> > > > pending. The corresponding vcpu is also kicked into action.
+> > > > 
+> > > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > > ---
+> > > >  virt/kvm/arm/vgic/vgic-v4.c | 34 ++++++++++++++++++++++++++++++++++
+> > > >  1 file changed, 34 insertions(+)
+> > > > 
+> > > > diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> > > > index 534d3051a078..6af3cde6d7d4 100644
+> > > > --- a/virt/kvm/arm/vgic/vgic-v4.c
+> > > > +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> > > > @@ -21,6 +21,19 @@
+> > > >  
+> > > >  #include "vgic.h"
+> > > >  
+> > > > +static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+> > > > +{
+> > > > +	struct kvm_vcpu *vcpu = info;
+> > > > +
+> > > > +	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
+> > > > +		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+> > > > +		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+> > > > +		kvm_vcpu_kick(vcpu);
+> > > > +	}
+> > > 
+> > > This code is so obviously broken that I completely overlooked it.
+> > > 
+> > > If we have take a doorbell interrupt, then it means nothing was
+> > > otherwise pending (because we'd have been kicked out of the blocking
+> > > state, and will have masked the doorbell). So checking for pending
+> > > interrupts is pointless.
+> > > 
+> > > Furthermore, calling kvm_vgic_vcpu_pending_irq() takes the ap_list
+> > > lock. If we take a doorbell interrupt while injecting a virtual
+> > > interrupt (from userspace, for example) on the same CPU, we end-up
+> > > in deadlock land. This would be solved by Christoffer's latest
+> > > crop of timer patches, but there is no point getting there the first
+> > > place.
+> > > 
+> > > The patchlet below solves it:
+> > > 
+> > > diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> > > index 15feb1151797..48e4d6ebeaa8 100644
+> > > --- a/virt/kvm/arm/vgic/vgic-v4.c
+> > > +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> > > @@ -94,11 +94,9 @@ static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+> > >  {
+> > >  	struct kvm_vcpu *vcpu = info;
+> > >  
+> > > -	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
+> > > -		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+> > > -		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+> > > -		kvm_vcpu_kick(vcpu);
+> > > -	}
+> > > +	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+> > > +	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+> > > +	kvm_vcpu_kick(vcpu);
+> > 
+> > I don't think you need the request and kick, because if you're getting
+> > this doorbell, doesn't that also mean that the VCPU is not running in
+> > the guest and you simply need to make sure the VCPU thread gets
+> > scheduled again, so you could call kvm_vcpu_wake_up() instead.
+> 
+> While we do that in kvm_timer_inject_irq_work(), which is scheduled from
+> the same function that vgic_v4_doorbell_handler() would be enabled from
+> (kvm_vcpu_block->kvm_arch_vcpu_blocking), just a wake up isn't sufficient
+> in this case.
+> 
+> > 
+> > Unless the request is there to ensure proper memory barriers around
+> > setting pending_last?
+> 
+> Right, unlike pending timers, we need the barriers in this handler.
+> Pending timers are safe because their pending test compares state set by
+> the VCPU thread itself to state acquired by the VCPU thread reading a host
+> sysreg itself. IOW, handlers making "set vcpu timer pending requests"
+> don't need to do anything but wake up the VCPU. Handlers that set some
+> sort of irq pending state, like vgic_v4_doorbell_handler(), do need to
+> worry about the visibility of that state though.
+> 
+> > 
+> > In that case, is the read barrier taken care of by prepare_to_swait in
+> > kvm_vcpu_block()?
+> 
+> Thanks for the bug report :-)
+> 
+> There's a barrier, but it's not properly paired. Currently we have
+> 
+>  VCPU                                        handler
+>  ----                                        -------
+>  for (;;) {
+>    WRITE_ONCE(task->state, INTERRUPTIBLE);   pending=true;
+>    smp_mb();                                 smp_wmb(); // kvm_make_request()
+>    if (pending) {                            WRITE_ONCE(vcpu->state, NORMAL);
+>      ... stop waiting ...
+>    }
+>    schedule();
+>  }
+> 
+> Proper barrier use with swait/swake should instead look like this
+> 
+>  VCPU                                        handler
+>  ----                                        -------
+>  for (;;) {
+>    WRITE_ONCE(task->state, INTERRUPTIBLE);
+>    smp_mb();
+>    if (READ_ONCE(task->state) == NORMAL) {   pending=true;
+>      smp_rmb();                              smp_wmb();
+>      if (pending)                            WRITE_ONCE(vcpu->state, NORMAL);
+>        ... stop waiting ...
+>      else
+>        continue;
+>    }
+>    schedule();
+>  }
+> 
+> But checking task state adds complexity and would only cover a small
+> window anyway (the window between prepare_to_swait() and
+> kvm_vcpu_check_block()). We need to cover a larger window, for this
+> particular case it's from kvm_arch_vcpu_blocking() to
+> kvm_vcpu_check_block(). Better use of VCPU requests is the answer:
+> 
+>  VCPU                                        handler
+>  ----                                        -------
+>  kvm_arch_vcpu_blocking();
+>  for (;;) {
+>    prepare_to_swait(); 
+>    if (test_bit(IRQ_PENDING)) {              pending=true;
+>      smp_rmb();                              smp_wmb();
+>      if (pending)                            set_bit(IRQ_PENDING);
+>        ... stop waiting ...
+>      else
+>        continue;
+>    }
+>    schedule();
+>  }
+> 
+> The handler side is covered by kvm_make_request() and the vcpu kick, so
+> this patch looks good. However we need a patch to kvm_arch_vcpu_runnable()
+> to fix the VCPU side.
+> 
+>  int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+>  {
+> -       return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
+> -               && !v->arch.power_off && !v->arch.pause);
+> +       if (v->arch.power_off || v->arch.pause)
+> +               return false;
 
-The patch omits modules information in virtual kenrel memory layout if
-the modules area is fully mapped whitin vmalloc area.
+Why don't we need to ensure reads of these flags are observable when
+waking up, if the thread waking us up had se the variables prior to
+issuing the wake up call?
 
-Use module_alloc_base to define MODULES_VADDR. I tested the patch under
-three different conditions:
-1.CONFIG_RANDOMIZE_BASE=y, seed=0
-CONFIG_KASAN=n
-2.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333
-CONFIG_KASAN=n
-3.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333
-CONFIG_KASAN=y
+> +
+> +       if (kvm_test_request(KVM_REQ_IRQ_PENDING, vcpu)) {
+> +               smp_rmb();
 
-test log:
+This looks wrong.  What does this barrier ensure exactly?  Some kind of
+read following whoever called this function?
 
-1.CONFIG_RANDOMIZE_BASE=y, seed=0
-CONFIG_KASAN=n
+> +               return true;
+> +       }
+>  }
+> 
+> We can keep the kvm_vgic_vcpu_pending_irq() check, after the IRQ_PENDING
+> check, if there are cases where IRQ_PENDING wouldn't be set, but
+> kvm_vgic_vcpu_pending_irq() would return true. Either way we also get a
+> bit of an optimization with this fix.
+> 
+> I'll think/test some more, and then send a patch.
+> 
 
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     modules : 0xffffff8000550000 - 0xffffff8008550000   (   128 MB)
-[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbebfff0000   (   250 GB)
-[    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008550000   (  4928 KB)
-[    0.000000]     .rodata : 0xffffff8008550000 - 0xffffff80086a0000   (  1344 KB)
-[    0.000000]       .init : 0xffffff80086a0000 - 0xffffff8008a30000   (  3648 KB)
-[    0.000000]       .data : 0xffffff8008a30000 - 0xffffff8008ab9200   (   549 KB)
-[    0.000000]        .bss : 0xffffff8008ab9200 - 0xffffff8008b0b238   (   329 KB)
-[    0.000000]     fixed   : 0xffffffbefe7fd000 - 0xffffffbefec00000   (  4108 KB)
-[    0.000000]     PCI I/O : 0xffffffbefee00000 - 0xffffffbeffe00000   (    16 MB)
-[    0.000000]     vmemmap : 0xffffffbf00000000 - 0xffffffc000000000   (     4 GB maximum)
-[    0.000000]               0xffffffbf00000000 - 0xffffffbf02000000   (    32 MB actual)
-[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc080000000   (  2048 MB)
+I'll review it more thoroughly then.
 
-\# cat kernel_page_tables
----[ Modules start ]---
----[ Modules end ]---
----[ vmalloc() Area ]---
-0xffffff8008000000-0xffffff8008010000          64K PTE       RW NX SHD AF
-0xffffff8008015000-0xffffff8008016000           4K PTE       RW NX SHD AF
-...
-
-2.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333
-CONFIG_KASAN=n
-
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbebfff0000   (   250 GB)
-[    0.000000]       .text : 0xffffff902b280000 - 0xffffff902b750000   (  4928 KB)
-[    0.000000]     .rodata : 0xffffff902b750000 - 0xffffff902b8a0000   (  1344 KB)
-[    0.000000]       .init : 0xffffff902b8a0000 - 0xffffff902bc30000   (  3648 KB)
-[    0.000000]       .data : 0xffffff902bc30000 - 0xffffff902bcb9200   (   549 KB)
-[    0.000000]        .bss : 0xffffff902bcb9200 - 0xffffff902bd0b238   (   329 KB)
-[    0.000000]     fixed   : 0xffffffbefe7fd000 - 0xffffffbefec00000   (  4108 KB)
-[    0.000000]     PCI I/O : 0xffffffbefee00000 - 0xffffffbeffe00000   (    16 MB)
-[    0.000000]     vmemmap : 0xffffffbf00000000 - 0xffffffc000000000   (     4 GB maximum)
-[    0.000000]               0xffffffbf22000000 - 0xffffffbf24000000   (    32 MB actual)
-[    0.000000]     memory  : 0xffffffc880000000 - 0xffffffc900000000   (  2048 MB)
-
-\# cat kernel_page_tables
----[ vmalloc() Area ]---
-0xffffff8008000000-0xffffff8008010000          64K PTE       RW NX SHD AF
-0xffffff8008015000-0xffffff8008016000           4K PTE       RW NX SHD AF
-0xffffff8008020000-0xffffff8008030000          64K PTE       RW NX SHD AF
-0xffffff8008031000-0xffffff8008071000         256K PTE       RW NX SHD AF
-0xffffff800813a000-0xffffff800813d000          12K PTE       RW NX SHD AF
-...
-
-3.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333
-CONFIG_KASAN=y
-
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
-[    0.000000]     modules : 0xffffff9000560000 - 0xffffff9008560000   (   128 MB)
-[    0.000000]     vmalloc : 0xffffff9008560000 - 0xffffffbebfff0000   (   186 GB)
-[    0.000000]       .text : 0xffffffa02b280000 - 0xffffffa02b760000   (  4992 KB)
-[    0.000000]     .rodata : 0xffffffa02b760000 - 0xffffffa02b8b0000   (  1344 KB)
-[    0.000000]       .init : 0xffffffa02b8b0000 - 0xffffffa02bc40000   (  3648 KB)
-[    0.000000]       .data : 0xffffffa02bc40000 - 0xffffffa02bcc9200   (   549 KB)
-[    0.000000]        .bss : 0xffffffa02bcc9200 - 0xffffffa02c5342b8   (  8621 KB)
-[    0.000000]     fixed   : 0xffffffbefe7fd000 - 0xffffffbefec00000   (  4108 KB)
-[    0.000000]     PCI I/O : 0xffffffbefee00000 - 0xffffffbeffe00000   (    16 MB)
-[    0.000000]     vmemmap : 0xffffffbf00000000 - 0xffffffc000000000   (     4 GB maximum)
-[    0.000000]               0xffffffbf22000000 - 0xffffffbf24000000   (    32 MB actual)
-[    0.000000]     memory  : 0xffffffc880000000 - 0xffffffc900000000   (  2048 MB)
-
-\# cat kernel_page_tables
----[ Kasan shadow start ]---
-0xffffff8000000000-0xffffff82000ac000     8389296K PTE       ro NX SHD AF
-0xffffff82010ac000-0xffffff8405600000     8459600K PTE       ro NX SHD AF
-0xffffff8405600000-0xffffff8405a00000           4M PMD       RW NX SHD AF
-0xffffff8405a00000-0xffffff8800000000       16294M PTE       ro NX SHD AF
-0xffffff8910000000-0xffffff8920000000         256M PMD       RW NX SHD AF
----[ Kasan shadow end ]---
----[ Modules start ]---
----[ Modules end ]---
----[ vmalloc() Area ]---
-0xffffff9008560000-0xffffff9008570000          64K PTE       RW NX SHD AF
-0xffffff9008575000-0xffffff9008576000           4K PTE       RW NX SHD AF
-0xffffff9008580000-0xffffff9008590000          64K PTE       RW NX SHD AF
-0xffffff9008591000-0xffffff90085d1000         256K PTE       RW NX SHD AF
-...
-
-Signed-off-by: Miles Chen <miles.chen@mediatek.com>
----
- arch/arm64/include/asm/memory.h  | 12 +++++++--
- arch/arm64/include/asm/module.h  |  6 -----
- arch/arm64/include/asm/pgtable.h |  4 +++
- arch/arm64/mm/dump.c             | 53 ++++++++++++++++++++++++++++++++++++----
- arch/arm64/mm/init.c             |  6 +++--
- 5 files changed, 66 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index ef39dcb..41b885c 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -68,9 +68,11 @@
- 	(UL(1) << VA_BITS) + 1)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
- 	(UL(1) << (VA_BITS - 1)) + 1)
--#define KIMAGE_VADDR		(MODULES_END)
-+#define KIMAGE_VADDR		(STATIC_MODULES_END)
-+#define STATIC_MODULES_END	(STATIC_MODULES_VADDR + MODULES_VSIZE)
-+#define STATIC_MODULES_VADDR	(VA_START + KASAN_SHADOW_SIZE)
- #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
--#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-+#define MODULES_VADDR		((unsigned long)module_alloc_base)
- #define MODULES_VSIZE		(SZ_128M)
- #define VMEMMAP_START		(PAGE_OFFSET - VMEMMAP_SIZE)
- #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
-@@ -138,6 +140,12 @@
- #include <linux/bitops.h>
- #include <linux/mmdebug.h>
- 
-+#ifdef CONFIG_RANDOMIZE_BASE
-+extern u64 module_alloc_base;
-+#else
-+#define module_alloc_base	((u64)_etext - MODULES_VSIZE)
-+#endif
-+
- extern s64			memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
- #define PHYS_OFFSET		({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
-diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-index 19bd976..fdf0db4 100644
---- a/arch/arm64/include/asm/module.h
-+++ b/arch/arm64/include/asm/module.h
-@@ -39,10 +39,4 @@ struct mod_arch_specific {
- u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
- 			  Elf64_Sym *sym);
- 
--#ifdef CONFIG_RANDOMIZE_BASE
--extern u64 module_alloc_base;
--#else
--#define module_alloc_base	((u64)_etext - MODULES_VSIZE)
--#endif
--
- #endif /* __ASM_MODULE_H */
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 6eae342..6e309aa 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -30,7 +30,11 @@
-  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space
-  *	and fixed mappings
-  */
-+#ifdef CONFIG_KASAN
- #define VMALLOC_START		(MODULES_END)
-+#else
-+#define VMALLOC_START		(STATIC_MODULES_END)
-+#endif
- #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
- 
- #define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index ca74a2a..18be771 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -29,15 +29,36 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptdump.h>
- 
--static const struct addr_marker address_markers[] = {
-+enum marker {
-+#ifdef CONFIG_KASAN
-+	E_KASAN_SHADOW_START,
-+	E_KASAN_SHADOW_END,
-+#endif
-+	E_MODULES_VADDR,
-+	E_MODULES_END,
-+	E_VMALLOC_START,
-+	E_VMALLOC_END,
-+	E_FIXADDR_START,
-+	E_FIXADDR_TOP,
-+	E_PCI_IO_START,
-+	E_PCI_IO_END,
-+#ifdef CONFIG_SPARSEMEM_VMEMMAP
-+	E_VMEMMAP_START,
-+	E_VMEMMAP_END,
-+#endif
-+	E_PAGE_OFFSET,
-+	E_NR_MARKER,
-+};
-+
-+static struct addr_marker address_markers[] = {
- #ifdef CONFIG_KASAN
- 	{ KASAN_SHADOW_START,		"Kasan shadow start" },
- 	{ KASAN_SHADOW_END,		"Kasan shadow end" },
- #endif
--	{ MODULES_VADDR,		"Modules start" },
--	{ MODULES_END,			"Modules end" },
--	{ VMALLOC_START,		"vmalloc() Area" },
--	{ VMALLOC_END,			"vmalloc() End" },
-+	{ -1,				"Modules start" },
-+	{ -1,				"Modules end" },
-+	{ -1,				"vmalloc() Area" },
-+	{ -1,				"vmalloc() End" },
- 	{ FIXADDR_START,		"Fixmap start" },
- 	{ FIXADDR_TOP,			"Fixmap end" },
- 	{ PCI_IO_START,			"PCI I/O start" },
-@@ -362,10 +383,32 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
- 	note_page(&st, 0, 0, 0);
- }
- 
-+static void fixup_markers(void)
-+{
-+	int i;
-+
-+	address_markers[E_MODULES_VADDR].start_address = MODULES_VADDR;
-+	address_markers[E_MODULES_END].start_address = MODULES_END;
-+	address_markers[E_VMALLOC_START].start_address = VMALLOC_START;
-+	address_markers[E_VMALLOC_END].start_address = VMALLOC_END;
-+
-+	if (MODULES_VADDR < VMALLOC_START) {
-+		address_markers[E_MODULES_END].start_address =
-+			(MODULES_END < VMALLOC_START) ?
-+			MODULES_END : VMALLOC_START;
-+	} else {
-+		/* modules is contains in vamlloc area, don't show them */
-+		for (i = E_MODULES_VADDR; i <= E_NR_MARKER - 2; i++)
-+			address_markers[i] = address_markers[i + 2];
-+	}
-+}
-+
- static void ptdump_initialize(void)
- {
- 	unsigned i, j;
- 
-+	fixup_markers();
-+
- 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
- 		if (pg_level[i].bits)
- 			for (j = 0; j < pg_level[i].num; j++)
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5960bef..be77b26 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -609,8 +609,10 @@ void __init mem_init(void)
- 	pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
- 		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
- #endif
--	pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
--		MLM(MODULES_VADDR, MODULES_END));
-+	/* print modules info when it's not fully mapped within vamlloc */
-+	if (MODULES_VADDR < VMALLOC_START)
-+		pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-+			MLM(MODULES_VADDR, MODULES_END));
- 	pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
- 		MLG(VMALLOC_START, VMALLOC_END));
- 	pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--- 
-1.9.1
+Thanks,
+-Christoffer
