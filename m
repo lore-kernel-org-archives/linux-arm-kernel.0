@@ -1,59 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Aug 2017 11:52:48 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#4)
-Message-ID: <87k21l4c27.fsf@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Aug 2017 11:57:28 +0200
+Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path
+ for system sleep
+In-Reply-To: <1957183.ZU1CWrAZoR@aspire.rjw.lan>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+ <1957183.ZU1CWrAZoR@aspire.rjw.lan>
+Message-ID: <CAPDyKFosu8RYUUCiBn7+03b3TNmND-aCTqR=+svcvzCwhxw9+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 29 August 2017 at 22:19, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, August 29, 2017 4:56:42 PM CEST Ulf Hansson wrote:
+>> The i2c designware platform driver, drivers/i2c/busses/i2c-designware-platdrv.c,
+>> isn't well optimized for system sleep.
+>>
+>> What makes this driver particularly interesting is because it's a cross-SoC
+>> driver, which sometimes means there is an ACPI PM domain attached to the i2c
+>> device and sometimes not. The driver is being used on both x86 and ARM.
+>>
+>> In principle, to optimize the system sleep support in i2c driver, this series
+>> enables the proven runtime PM centric path for the i2c driver. However, to do
+>> that the ACPI PM domain also have to collaborate and understand this behaviour.
+>> From earlier versions, Rafael has also pointed out that also the PM core needs
+>> to be involved.
+>
+> Earlier today I realized that drivers pointing their ->suspend_late and
+> ->resume_early callbacks, respectively, to pm_runtime_force_suspend() and
+> pm_runtime_force_resume(), are fundamentally incompatible with any bus type
+> doing nontrivial PM and with almost any nontrivial PM domains, for two reasons.
+>
+> First, it basically requires the bus type or PM domain to expect that its
+> ->runtime_suspend callback may or may not be indirectly invoked from its
+> own ->suspend_late callback, depending on the driver (and analogously
+> for ->runtime_resume and ->resume early), which is insane.
+>
+> Second, it is a layering violation, because it makes the driver effectively
+> override the upper layer's decisions about what code to run.
 
-Here is the forth (and ultimate) pull request for dt64 for mvebu for v4.14.
+You are right that for more complex bus types and PM domains, those
+needs to play along. So that is what I am trying to implement for the
+ACPI PM domain in this series.
 
-I really hope it is not too late.
+The generic PM domain, is simple in this regards. There is only a
+minor adaptation for the ->runtime_suspend|resume() callbacks, which
+avoids validating dev_pm_qos constraints during system sleep. Nothing
+special is needed in ->suspend_late|noirq callbacks, etc.
 
-These patches were initially part of the netdev series but were
-removed from these series to avoid conflict in the device
-tree. Unfortunately this moved was done during the holiday time so
-it didn't happen smoothly. I will do better for the next release.
+For most other simple bus types, like the platform bus, spi, i2c,
+amba, no particular adoptions is needed at all. Instead those just
+trust the drivers to do the right thing.
 
-They really worth to be added because all the driver part were already
-there but as pointed by Thomas otherwise the driver changes are
-somewhat useless.
+Before we had the direct_complete path, using the
+pm_runtime_force_suspend|resume() helpers, was the only good way for
+these kind of drivers, to in an optimized manner, deal with system
+sleep when runtime PM also was enabled for their devices. Now this
+method has become widely deployed, unfortunate whether you like it or
+not.
 
-Thanks!
+Besides the slightly better optimizations you get when using
+pm_runtime_force_suspend|resume(), comparing to the direct_complete
+path - I think it's also worth to consider, how easy it becomes for
+drivers to deploy system sleep support. In many cases, only two lines
+of code is needed to add system sleep support in a driver.
 
+Now, some complex code always needs to be implemented somewhere. When
+using the runtime PM centric path, that code consist of the
+pm_runtime_force_suspend|resume() helpers itself - and some
+adaptations in buses/PM domains in cases when those needs special
+care.
 
-Gregory
+My point is, the runtime PM centric path, allows us to keep the
+complex part of the code at a few centralized places, instead of
+having it spread/duplicated into drivers.
 
-The following changes since commit bf32f2aeb2f73b7e5cee3c95f232ae5af97d45f6:
+So yes, you could consider it insane, but to me and many others, it
+seems to work out quite well.
 
-  arm64: dts: marvell: add Device Tree files for Armada-8KP (2017-08-24 09:56:41 +0200)
+Yeah, and the laying violation is undoubtedly the most controversial
+part of the runtime PM centric path - I agree to that! The
+direct_complete path don't have this, as you implemented it. :-)
 
-are available in the git repository at:
+On the other hand, one could consider that these upper layers, in many
+cases anyway needs to play along with the behavior of the driver. So,
+I guess it depends on how one see it.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.14-4
+>
+> That's why I'm afraid that we've reached a dead end here. :-(
 
-for you to fetch changes up to 72af17b9a8caa1fd373c7615cdfef5ee10e20577:
+That's said news. Is was really hoping I could find a way to move this
+forward. You don't have any other ideas on how I can adjust the series
+to make you happy?
 
-  arm64: dts: marvell: mcbin: enable more networking ports (2017-08-30 11:37:06 +0200)
+>
+> Thanks,
+> Rafael
+>
 
-----------------------------------------------------------------
-mvebu dt64 for 4.14 (part 4)
-
-Adding more resources on the network controller ppv2.2 on Armada 7K/8K
-allowing to use last improvement introduced in the driver.
-
-Also enabling more network ports on the mcbin (A8K base board)
-
-----------------------------------------------------------------
-Antoine Tenart (2):
-      arm64: dts: marvell: add a reference to the sysctrl syscon in the ppv2 node
-      arm64: dts: marvell: mcbin: enable more networking ports
-
-Thomas Petazzoni (1):
-      arm64: dts: marvell: add TX interrupts for PPv2.2
-
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 30 ++++++++++++++++++++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 25 +++++++++++++++---
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 25 +++++++++++++++---
- 3 files changed, 74 insertions(+), 6 deletions(-)
+Kind regards
+Uffe
