@@ -1,56 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 30 Aug 2017 17:19:42 +0200
-Subject: [net-next PATCHv6 1/2] dt-bindings: net: Add DT bindings for
- Socionext Netsec
-In-Reply-To: <1504088752-6204-1-git-send-email-jaswinder.singh@linaro.org>
-References: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
- <1504088752-6204-1-git-send-email-jaswinder.singh@linaro.org>
-Message-ID: <20170830151942.GB22289@lunn.ch>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 30 Aug 2017 17:23:26 +0200
+Subject: [RESEND PATCH 2/3] regulator: Add support for stm32-vrefbuf
+In-Reply-To: <20170830150249.5sofmjz3n2skzucq@sirena.org.uk>
+References: <1503925133-30722-1-git-send-email-fabrice.gasnier@st.com>
+ <1503925133-30722-3-git-send-email-fabrice.gasnier@st.com>
+ <20170829185719.h5fxvzmxbysyxwml@sirena.org.uk>
+ <fd883990-cc87-f8cb-ebe7-5c4c4e51d6f6@st.com>
+ <20170830150249.5sofmjz3n2skzucq@sirena.org.uk>
+Message-ID: <8777c604-e16c-4359-095d-b3bd6efab5e0@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 03:55:52PM +0530, Jassi Brar wrote:
-> This patch adds documentation for Device-Tree bindings for the
-> Socionext NetSec Controller driver.
+
+
+On 08/30/2017 05:02 PM, Mark Brown wrote:
+> On Wed, Aug 30, 2017 at 11:11:24AM +0200, Fabrice Gasnier wrote:
+>> On 08/29/2017 08:57 PM, Mark Brown wrote:
+>>> On Mon, Aug 28, 2017 at 02:58:52PM +0200, Fabrice Gasnier wrote:
 > 
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> ---
->  .../devicetree/bindings/net/socionext-netsec.txt   | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/socionext-netsec.txt
+>>>> +static int __init stm32_vrefbuf_init(void)
+>>>> +{
+>>>> +	return platform_driver_register(&stm32_vrefbuf_driver);
+>>>> +}
+>>>> +subsys_initcall(stm32_vrefbuf_init);
 > 
-> diff --git a/Documentation/devicetree/bindings/net/socionext-netsec.txt b/Documentation/devicetree/bindings/net/socionext-netsec.txt
-> new file mode 100644
-> index 0000000..12d596c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/socionext-netsec.txt
-> @@ -0,0 +1,46 @@
-> +* Socionext NetSec Ethernet Controller IP
-> +
-> +Required properties:
-> +- compatible: Should be "socionext,netsecv5"
-> +- reg: Address and length of the register sets, the first is the main
-> +	registers, then the rdlar and tdlar regions for the SoC
-> +- interrupts: Should contain ethernet controller interrupt
-> +- clocks: phandle to any clocks to be switched by runtime_pm
-> +- phy-mode: See ethernet.txt file in the same directory
+>>> Why is this at subsys_initcall()?
+> 
+>> Several consumers depend on it when it's being used, among which: STM32
+>> internal ADC and DAC, but also external components. Purpose is to ensure
+>> it's ready before these drivers gets probed, instead of being deferred.
+>> Is it ok to keep it ?
+> 
+> No, that's not OK - just let deferred probe handle it.  The same thing
+> applies to all regulator usage.
+> 
+Hi Mark,
+Ok, I'll update this in v2 as well.
 
-> +- max-speed: See ethernet.txt file in the same directory
-> +- max-frame-size: See ethernet.txt file in the same directory, if 9000 or
-> +	above jumbo frames are enabled
-> +- local-mac-address: See ethernet.txt file in the same directory
-
-These three are required, not optimal?
-
-> +- phy-handle: phandle to select child phy
-> +
-> +Optional properties:
-> +- use-jumbo: Boolean property to suggest if jumbo packets should be used or not
-> +
-> +For the child phy
-> +
-> +- compatible "ethernet-phy-ieee802.3-c22" is needed
-
-This is normally considered optional. Why require it?
-
-     Andrew
+Thanks,
+Fabrice
