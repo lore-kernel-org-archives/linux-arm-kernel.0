@@ -1,66 +1,65 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 30 Aug 2017 19:17:59 +0200
-Subject: [net-next PATCHv6 2/2] net: socionext: Add NetSec driver
-In-Reply-To: <1504088771-6255-1-git-send-email-jaswinder.singh@linaro.org>
-References: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
- <1504088771-6255-1-git-send-email-jaswinder.singh@linaro.org>
-Message-ID: <20170830171759.GC22289@lunn.ch>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 31 Aug 2017 03:21:48 +1000
+Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
+In-Reply-To: <CAOesGMg130BvqS1vGid9jm-G7-Gub+7bOQFKtaSg4qPTvosxcA@mail.gmail.com>
+References: <20170830230712.55db7911@canb.auug.org.au>
+ <20170830131930.bvu6furm7dlhes3i@piout.net>
+ <CAOesGMg130BvqS1vGid9jm-G7-Gub+7bOQFKtaSg4qPTvosxcA@mail.gmail.com>
+Message-ID: <20170831032148.3d2fa85b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static int netsec_mac_update_to_phy_state(struct netsec_priv *priv)
-> +{
-> +	struct phy_device *phydev = priv->ndev->phydev;
-> +	u32 value = 0;
-> +
-> +	value = phydev->duplex ? NETSEC_GMAC_MCR_REG_FULL_DUPLEX_COMMON :
-> +				       NETSEC_GMAC_MCR_REG_HALF_DUPLEX_COMMON;
-> +
-> +	if (phydev->speed != SPEED_1000)
-> +		value |= NETSEC_MCR_PS;
-> +
-> +	if ((priv->phy_interface != PHY_INTERFACE_MODE_GMII) &&
-> +	    (phydev->speed == SPEED_100))
-> +		value |= NETSEC_GMAC_MCR_REG_FES;
-> +
-> +	value |= NETSEC_GMAC_MCR_REG_CST | NETSEC_GMAC_MCR_REG_JE;
-> +
-> +	if (priv->phy_interface == PHY_INTERFACE_MODE_RGMII)
-> +		value |= NETSEC_GMAC_MCR_REG_IBN;
-> +
-> +	if (netsec_mac_write(priv, GMAC_REG_MCR, value))
-> +		return -ETIMEDOUT;
-> +
-> +	priv->actual_link_speed = phydev->speed;
-> +	priv->actual_duplex = phydev->duplex;
-> +	netif_info(priv, drv, priv->ndev, "%s: %uMbps, duplex:%d\n",
-> +		   __func__, phydev->speed, phydev->duplex);
+Hi Olof,
 
-phy_print_status()
+On Wed, 30 Aug 2017 09:21:47 -0700 Olof Johansson <olof@lixom.net> wrote:
+>
+> Thanks for the heads up, Stephen. I presume you have a script that
+> checks this? It's something we should run too, do you keep it in a
+> shared location?
 
-> +	mac = of_get_mac_address(pdev->dev.of_node);
-> +	if (mac)
-> +		ether_addr_copy(ndev->dev_addr, mac);
-> +
-> +	if (!is_valid_ether_addr(ndev->dev_addr)) {
-> +		eth_hw_addr_random(ndev);
-> +		dev_warn(&pdev->dev, "No MAC address found, using random\n");
-> +	}
+Script below.
 
-So the mac address is optional, unlike what the binding document says.
+-- 
+Cheers,
+Stephen Rothwell
 
-> +	priv->phy_np = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
-> +	if (!priv->phy_np) {
-> +		netif_err(priv, probe, ndev, "missing phy in DT\n");
+#!/bin/bash
 
-It is the phy-handle which is missing, not the phy.
+if [ "$#" -lt 1 ]; then
+	printf "Usage: %s <commit range>\n", "$0" 1>&2
+	exit 1
+fi
 
-> +
-> +	/* MTU range */
-> +	ndev->min_mtu = ETH_MIN_MTU;
+for c in $(git rev-list --no-merges "$@"); do
+	ae=$(git log -1 --format='%ae' "$c")
+	aE=$(git log -1 --format='%aE' "$c")
+	an=$(git log -1 --format='%an' "$c")
+	aN=$(git log -1 --format='%aN' "$c")
+	ce=$(git log -1 --format='%ce' "$c")
+	cE=$(git log -1 --format='%cE' "$c")
+	cn=$(git log -1 --format='%cn' "$c")
+	cN=$(git log -1 --format='%cN' "$c")
+	sob=$(git log -1 --format='%b' "$c" | grep -i '^[[:space:]]*Signed-off-by:')
 
-No need to set this, it is the default.
+	am=false
+	cm=false
+	grep -i -q "<$ae>" <<<"$sob" ||
+		grep -i -q "<$aE>" <<<"$sob" ||
+		grep -i -q ":[[:space:]]*$an[[:space:]]*<" <<<"$sob" ||
+		grep -i -q ":[[:space:]]*$aN[[:space:]]*<" <<<"$sob" ||
+		am=true
+	grep -i -q "<$ce>" <<<"$sob" ||
+		grep -i -q "<$cE>" <<<"$sob" ||
+		grep -i -q ":[[:space:]]*$cn[[:space:]]*<" <<<"$sob" ||
+		grep -i -q ":[[:space:]]*$cN[[:space:]]*<" <<<"$sob" ||
+		cm=true
 
-Otherwise, this looks good, in terms of phy and mdio.
+	if "$am" || "$cm"; then
+		printf "Commit %s\n" "$c"
+		"$am" && printf "\tauthor SOB missing\n"
+		"$cm" && printf "\tcommitter SOB missing\n"
+		printf "%s %s\n%s\n" "$ae" "$ce" "$sob"
+	fi
+done
 
-	   Andrew
+exec gitk "$@"
