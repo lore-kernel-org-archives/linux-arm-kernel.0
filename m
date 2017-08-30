@@ -1,71 +1,113 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Aug 2017 16:22:44 +0100
-Subject: Applied "ASoC: rockchip: constify snd_soc_ops structures" to the asoc
- tree
-In-Reply-To: <20170830095814.2030-1-jeffy.chen@rock-chips.com>
-Message-ID: <E1dn4pI-0003SU-7O@debutante>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 30 Aug 2017 15:31:38 +0000
+Subject: [PATCH] clk: bulk: call of_clk_get() when id is NULL
+In-Reply-To: <20170813141851.GD31819@dragon>
+References: <1502243442-28055-1-git-send-email-shawnguo@kernel.org>
+ <20170809173318.GD2146@codeaurora.org> <20170813141851.GD31819@dragon>
+Message-ID: <AM3PR04MB3064504A935B4AA0CBEE962809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Sunday, August 13, 2017 10:19 PM
+> To: Stephen Boyd
+> Cc: Michael Turquette; A.s. Dong; linux-clk at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Shawn Guo
+> Subject: Re: [PATCH] clk: bulk: call of_clk_get() when id is NULL
+> 
+> Hi Stephen,
+> 
+> On Wed, Aug 09, 2017 at 10:33:18AM -0700, Stephen Boyd wrote:
+> > > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c index
+> > > c834f5abfc49..65cee595a67e 100644
+> > > --- a/drivers/clk/clk-bulk.c
+> > > +++ b/drivers/clk/clk-bulk.c
+> > > @@ -39,7 +39,10 @@ int __must_check clk_bulk_get(struct device *dev,
+> int num_clks,
+> > >  		clks[i].clk = NULL;
+> > >
+> > >  	for (i = 0; i < num_clks; i++) {
+> > > -		clks[i].clk = clk_get(dev, clks[i].id);
+> > > +		if (clks[i].id)
+> > > +			clks[i].clk = clk_get(dev, clks[i].id);
+> > > +		else if (dev->of_node)
+> > > +			clks[i].clk = of_clk_get(dev->of_node, i);
+> >
+> > This seems a little too magical. The omission of an id in an array of
+> > clks would mean that only that one clk is acquired through
+> > of_clk_get(). We could have a mixture of ids and no ids for some
+> > device, and then do very odd things.
+> >
+> > How about we add a flag to clk_bulk_data that indicates we want it to
+> > use of_clk_get() instead of clk_get() for all of the clks?
+> > Then the id is ignored for the entire function.
+> 
+> I have sent v2 to add a flag to clk_bulk_data to address your comments.
+> But I just found it might not be what you want exactly, because the
+> current bulk clk APIs defines clk_bulk_data in a different way from what
+> you are asking here.
+> 
+> It seems that you think clk_bulk_data represents all the clocks that bulk
+> APIs manage, but actually it only represents one of the multiple clocks.
+> Callers need to prepare an array of clk_bulk_data to represent multiple
+> clocks.  That said, the flag we add to clk_bulk_data only affects one
+> clock instead of all clocks.
+> 
+> I feel this is something we can improve.  clk_bulk_data can be used to
+> represent all clocks, something like below.  In this case, bulk clk APIs
+> do not need to take num_clks as a separate parameter, and callers do not
+> need to maintain multiple clk_bulk_data instances.  Since we do not have
+> any in tree users of bulk clk APIs yet, we can make this semantic change
+> quickly.  Thoughts?
+> 
 
-   ASoC: rockchip: constify snd_soc_ops structures
+Flags may be better used for extending per clk feature support in the future.
 
-has been applied to the asoc tree at
+IMHO how about implement a of_clk_bulk_get() to handle this issue as we already
+have a of_clk_get?
+e.g.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+                              struct clk_bulk_data *clks)
+{
+        for (i = 0; i < num_clks; i++) {
+                clks[i].clk = of_clk_get(dev, clks[i].id);
+...
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+}
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Then it's less intrusive.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Regards
+Dong Aisheng
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 1fe165b7e9c3e1b1cfa98310979db0814c7445ea Mon Sep 17 00:00:00 2001
-From: Jeffy Chen <jeffy.chen@rock-chips.com>
-Date: Wed, 30 Aug 2017 17:58:14 +0800
-Subject: [PATCH] ASoC: rockchip: constify snd_soc_ops structures
-
-Add const to dp/dmic snd_soc_ops.
-
-Fixes: 626d84db64d7 (ASoC: rockchip: Add support for DMIC codec)
-Fixes: 3313faf1053e (ASoC: rockchip: Add support for DP codec)
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/rockchip/rk3399_gru_sound.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 5ab25962cabd..0513fe480353 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -301,11 +301,11 @@ static const struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
- 
--static struct snd_soc_ops rockchip_sound_cdndp_ops = {
-+static const struct snd_soc_ops rockchip_sound_cdndp_ops = {
- 	.hw_params = rockchip_sound_cdndp_hw_params,
- };
- 
--static struct snd_soc_ops rockchip_sound_dmic_ops = {
-+static const struct snd_soc_ops rockchip_sound_dmic_ops = {
- 	.hw_params = rockchip_sound_dmic_hw_params,
- };
- 
--- 
-2.14.1
+> diff --git a/include/linux/clk.h b/include/linux/clk.h index
+> 31fee2e8d4a2..ddc4812758f6 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -80,8 +80,10 @@ struct clk_notifier_data {
+>  /**
+>   * struct clk_bulk_data - Data used for bulk clk operations.
+>   *
+> - * @id: clock consumer ID
+> - * @clk: struct clk * to store the associated clock
+> + * @ids: array of clock consumer IDs which should be provided by caller.
+> + * @clks: array of struct clk * to store the associated clocks, which
+> will be
+> + *     allocated by clk_bulk_get() and freed by clk_bulk_put().
+> + * @num_clks: number of clocks that caller wants bulk API to manage.
+>   * @flags: bulk clk operation flags
+>   *
+>   * The CLK APIs provide a series of clk_bulk_() API calls as @@ -93,8
+> +95,9 @@ struct clk_notifier_data {
+>   *     clk_bulk_get() API will call of_clk_get() to find clock by index.
+>   */
+>  struct clk_bulk_data {
+> -       const char              *id;
+> -       struct clk              *clk;
+> +       const char              **ids;
+> +       struct clk              **clks;
+> +       unsigned int            num_clks;
+>         unsigned long           flags;
+>  };
