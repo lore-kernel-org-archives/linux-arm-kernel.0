@@ -1,35 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Aug 2017 22:17:44 -0700
-Subject: [PATCH] MAINTAINERS: Update Cavium ThunderX2 entry
-In-Reply-To: <20170808092913.GE17961@rric.localdomain>
-References: <1502154424-3429-1-git-send-email-jnair@caviumnetworks.com>
- <20170808092913.GE17961@rric.localdomain>
-Message-ID: <20170830051744.GA14499@localhost>
+Date: Tue, 29 Aug 2017 22:23:00 -0700
+Subject: [Resend GIT PULL] arm: mediatek: soc updates for v4.14
+In-Reply-To: <7b07d6c6-94ab-6cbd-0fea-7bc85a928f5a@gmail.com>
+References: <7b07d6c6-94ab-6cbd-0fea-7bc85a928f5a@gmail.com>
+Message-ID: <20170830052300.GD14499@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 11:29:13AM +0200, Robert Richter wrote:
-> On 08.08.17 01:07:04, Jayachandran C wrote:
-> > Add Robert Richter as the primary maintainer for this platform.
-> > 
-> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> > ---
-> >  MAINTAINERS | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 44cb004..f2d8963 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -3155,6 +3155,7 @@ S:	Supported
-> >  F:	drivers/crypto/cavium/cpt/
-> >  
-> >  CAVIUM THUNDERX2 ARM64 SOC
-> > +M:	Robert Richter <rric@kernel.org>
+On Thu, Aug 17, 2017 at 03:43:37PM +0200, Matthias Brugger wrote:
+> Hi Olof and Arnd,
 > 
-> I better want to use my Cavium's email address here, see patch below.
+> for v4.14 please take the following pull request into account.
+> 
+> I resend this message, because some problems in my mail setup made
+> linux+armsoc at armlinux.org.uk to reject my email.
+> 
+> Sorry for the inconvenience.
+> 
+> Thanks,
+> Matthias
+> 
+> ---
+> 
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> 
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-soc
+> 
+> for you to fetch changes up to 52510ee934885ec846faaa5d029329c9ba0e6ecc:
+> 
+>   soc: mediatek: add SCPSYS power domain driver for MediaTek MT7622 SoC
+> (2017-08-14 17:28:40 +0200)
 
-Applied. Thanks.
+Looks like this was already merged to next/drivers.
 
 
 -Olof
