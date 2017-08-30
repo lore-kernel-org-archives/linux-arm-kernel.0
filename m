@@ -1,51 +1,109 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 30 Aug 2017 12:03:43 -0700
-Subject: [PATCH v3 00/13] mmc: meson-gx: driver fixups and upgrades
-In-Reply-To: <CAPDyKFogy=L=BDKtMhKCN0nMLi-Yy5SHgAhB_=jog+CX91breA@mail.gmail.com>
- (Ulf Hansson's message of "Wed, 30 Aug 2017 15:13:57 +0200")
-References: <20170828142915.27020-1-jbrunet@baylibre.com>
- <CAPDyKFogy=L=BDKtMhKCN0nMLi-Yy5SHgAhB_=jog+CX91breA@mail.gmail.com>
-Message-ID: <7hr2vsdgj4.fsf@baylibre.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Aug 2017 21:04:49 +0200
+Subject: [PATCH] KVM: arm64: stop propagating DAIF flags between kernel
+ and VHE's world switch
+In-Reply-To: <59A6FD83.2090904@arm.com>
+References: <20170810113021.1110-1-james.morse@arm.com>
+ <20170824152304.GB2150@lvm> <59A5A021.1090102@arm.com>
+ <20170830083317.GB24522@cbox> <59A6FD83.2090904@arm.com>
+Message-ID: <20170830190449.GI24522@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wed, Aug 30, 2017 at 07:01:39PM +0100, James Morse wrote:
+> Hi Christoffer,
+> 
+> On 30/08/17 09:33, Christoffer Dall wrote:
+> > On Tue, Aug 29, 2017 at 06:10:57PM +0100, James Morse wrote:
+> >> On 24/08/17 16:23, Christoffer Dall wrote:
+> >>> On Thu, Aug 10, 2017 at 12:30:21PM +0100, James Morse wrote:
+> >>>> debug exceptions remain disabled due to the guest exit exception,
+> >>>> (as does SError: today this is the only time SError is unmasked in the
+> >>>> kernel). The flags stay in this state until we return to userspace.
+> >>>>
+> >>>> We have a __vhe_hyp_call() function that does the isb that we implicitly
+> >>>> have on non-vhe systems, add the DAIF save/restore here, instead of in
+> >>>> __sysreg_{save,restore}_host_state() which would require an extra isb()
+> >>>> between the hosts VBAR_EL1 being restored and DAIF being restored.
+> >>
+> >>> This also means that anyone else calling kvm_call_hyp(), which we are
+> >>> beginning to do more often, would also do this save/restore which
+> >>> shouldn't really be necessary, doesn't it?
+> >>
+> >> I think it is, its done implicitly via SPSR_EL2 by the HVC/ERET on non-VHE.
+> >> Does the HYP code on the other end of kvm_call_hyp() expect to be called with
+> >> DAIF masked? What about the other way, if the HYP code modifies the DAIF flags
+> >> should that spread back into the kernel?
+> > 
+> > Well, for VHE I don't think this is any different than any other
+> > function.  There really is no concept of 'hyp code' --- or we should aim
+> > for there not to be --- with VHE, so if some code expects interrupts
+> > disabled or other changes to the DAIF flags, that code should really do
+> > that for VHE.
+> 
+> Aha, this is where I see the world differently.
+> /me adjusts world-view,
+> 
+> I will scrap this patch and re-do it along these lines.
+> 
+> 
+> > The rationale being that in the long run we want to keep "jumping to
+> > hyp" the oddball legacy case, where everything else is just the
+> > kernel/hypervisor functionality.
+> 
+> This makes sense.
+> 
+> 
+> [ ... trims your excellent argument ... ]
+> 
+> 
+> > Have we actually looked at the places where we call kvm_call_hyp() and
+> > do they require a different setting of the DAIF flags from other kernel
+> > code running at EL2 with VHE ?
+> 
+> I can go through them, but I think its just world-switch as it modifies
+> debug-registers, vbar_el1 and enters/exits the guest.
+> 
+> 
+> > I understand that the behavior is currently different, but what I'm
+> > asking is, instead of having to save and restore anything to the stack,
+> > can you simply do:
+> > 
+> >      __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> >      {
+> >          if (has_vhe())
+> >              asm("msr     daifset, #0xf");
+> > 
+> > 	...
+> >         exit_code = __guest_enter(vcpu, host_ctxt);
+> > 	...
+> > 
+> > 	if (has_vhe())
+> >              asm("msr     daifclr, #0xd");
+> >      }
+> 
+> Sure, this can be done as late as setting vbar_el1 for VHE, at which point the
+> reason for masking these is clear. Before this point the hosts vectors will
+> happily handle debug/fiq/serror.
+> 
+> Your right KVM can 'just know' the values to set so the noise around
+> 
+> 
+> > (not sure about the FIQ flag - does the kernel usually 
+> 
+> This is some of the stuff we need to clear up. Today we never expect SError or
+> FIQ and should panic() if we get one. But these flags are largely ignored so
+> when the CPU masks them on exception we leave them like that.
+> After the SError rework process-context should have everything unmasked, today
+> its just debug+irqs unmasked.
+> 
+> 
+> Sorry if this email exchange has been frustrating, I didn't have your view of
+> where all this should end up.
+> 
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+Not frustrating at all, I should have explained my rationale in my
+initial reply.
 
-> On 28 August 2017 at 16:29, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> The patchset features several bugfixes, rework and upgrade for the
->> meson-gx MMC driver.
->>
->> The main goal is to improve readability and enable new high speed
->> modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
->>
->> SDR104 is not working with a few cards on the p200 and the
->> libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
->> of these boards, adding noise to the signal and eventually breaking
->> the communication with some cards. The same cards are working well on a
->> laptop or the nanopi-k2 at 200Mhz.
->>
->> This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
->> gxl-s905x-libretech-cc
->>
->> Changes since v2 [1]:
->> * Drop patches 1 to 3: Applied.
->> * Drop patch 4: Debug stuff which should not have been sent.
->> * Added fix to previous patch 3:
->>   If the clock register is not initialized before registering the clk
->>   with CCF, the framework will complain about an illegal divider value.
->>   This had gone unnoticed because it was later fixed by the clock init
->>   rework.
->>
->>   Ulf, I know it is getting late but it would be nice if patch #1 of
->>   this v3 could go with 3 patches you already applied. The rest can
->>   wait for the following cycle.
->
-> I decided to pick them all, so applied for next!
->
-
-Just to double-check, so I can plan for the DT patches
-accordingly... you are queuing this for v4.14, right?
-
-Kevin
+Thanks,
+-Christoffer
