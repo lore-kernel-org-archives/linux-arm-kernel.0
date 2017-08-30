@@ -1,41 +1,91 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 30 Aug 2017 17:23:26 +0200
-Subject: [RESEND PATCH 2/3] regulator: Add support for stm32-vrefbuf
-In-Reply-To: <20170830150249.5sofmjz3n2skzucq@sirena.org.uk>
-References: <1503925133-30722-1-git-send-email-fabrice.gasnier@st.com>
- <1503925133-30722-3-git-send-email-fabrice.gasnier@st.com>
- <20170829185719.h5fxvzmxbysyxwml@sirena.org.uk>
- <fd883990-cc87-f8cb-ebe7-5c4c4e51d6f6@st.com>
- <20170830150249.5sofmjz3n2skzucq@sirena.org.uk>
-Message-ID: <8777c604-e16c-4359-095d-b3bd6efab5e0@st.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 30 Aug 2017 15:26:43 +0000
+Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
+In-Reply-To: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
+References: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
+Message-ID: <AM3PR04MB306B15744B7A42B55A69C8A809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Leonard Crestez [mailto:leonard.crestez at nxp.com]
+> Sent: Monday, August 28, 2017 7:05 PM
+> To: Shawn Guo; Viresh Kumar; Rafael J. Wysocki
+> Cc: Anson Huang; Fabio Estevam; A.s. Dong; Lucas Stach; Jacky Bai;
+> kernel at pengutronix.de; linux-pm at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
+> 
+> This patch contains the minimal changes required to support imx6sx OPP of
+> 198 Mhz. Without this patch cpufreq still reports success but the
+> frequency is not changed, the "arm" clock will still be at 396000000 in
+> clk_summary.
+> 
+> In order to do this PLL1 needs to be still kept enabled while changing the
+> ARM clock. This is a hardware requirement: when ARM_PODF is changed in CCM
+> we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy, and this
+> bit is sync with PLL1 clock, so if PLL1 NOT enabled, this bit will never
+> get clear.
+> 
+> Keep pll1_sys explicitly enabled until after the rate is change to deal
+> with this. Otherwise from the clk framework perspective pll1_sys is unused
+> and gets turned off.
+> 
 
+Seems like a clever method to me.
+So:
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-On 08/30/2017 05:02 PM, Mark Brown wrote:
-> On Wed, Aug 30, 2017 at 11:11:24AM +0200, Fabrice Gasnier wrote:
->> On 08/29/2017 08:57 PM, Mark Brown wrote:
->>> On Mon, Aug 28, 2017 at 02:58:52PM +0200, Fabrice Gasnier wrote:
-> 
->>>> +static int __init stm32_vrefbuf_init(void)
->>>> +{
->>>> +	return platform_driver_register(&stm32_vrefbuf_driver);
->>>> +}
->>>> +subsys_initcall(stm32_vrefbuf_init);
-> 
->>> Why is this at subsys_initcall()?
-> 
->> Several consumers depend on it when it's being used, among which: STM32
->> internal ADC and DAC, but also external components. Purpose is to ensure
->> it's ready before these drivers gets probed, instead of being deferred.
->> Is it ok to keep it ?
-> 
-> No, that's not OK - just let deferred probe handle it.  The same thing
-> applies to all regulator usage.
-> 
-Hi Mark,
-Ok, I'll update this in v2 as well.
+Regards
+Dong Aisheng
 
-Thanks,
-Fabrice
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> ---
+> Changes since v1:
+>  - Link: https://lkml.org/lkml/2017/7/19/302
+>  - Only keep pll1_sys enabled until after ARM rate is changed.
+>  - Incorporate more elaborate explanation from Anson
+>  - Do not add new clocks or bypass PLL1. Just let it get disabled.
+> 
+>  drivers/cpufreq/imx6q-cpufreq.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-
+> cpufreq.c index b6edd3c..14466a9 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -47,6 +47,7 @@ static int imx6q_set_target(struct cpufreq_policy
+> *policy, unsigned int index)
+>  	struct dev_pm_opp *opp;
+>  	unsigned long freq_hz, volt, volt_old;
+>  	unsigned int old_freq, new_freq;
+> +	bool pll1_sys_temp_enabled = false;
+>  	int ret;
+> 
+>  	new_freq = freq_table[index].frequency; @@ -124,6 +125,10 @@ static
+> int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+>  			clk_set_rate(pll1_sys_clk, new_freq * 1000);
+>  			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> +		} else {
+> +			/* pll1_sys needs to be enabled for divider rate change
+> to work. */
+> +			pll1_sys_temp_enabled = true;
+> +			clk_prepare_enable(pll1_sys_clk);
+>  		}
+>  	}
+> 
+> @@ -135,6 +140,10 @@ static int imx6q_set_target(struct cpufreq_policy
+> *policy, unsigned int index)
+>  		return ret;
+>  	}
+> 
+> +	/* PLL1 is only needed until after ARM-PODF is set. */
+> +	if (pll1_sys_temp_enabled)
+> +		clk_disable_unprepare(pll1_sys_clk);
+> +
+>  	/* scaling down?  scale voltage after frequency */
+>  	if (new_freq < old_freq) {
+>  		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> --
+> 2.7.4
