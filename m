@@ -1,49 +1,42 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Wed, 30 Aug 2017 16:24:52 +0200
-Subject: [PATCH v3 1/3] PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on
- bus device
-In-Reply-To: <20170830142454.10971-1-jglauber@cavium.com>
-References: <20170830142454.10971-1-jglauber@cavium.com>
-Message-ID: <20170830142454.10971-2-jglauber@cavium.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Aug 2017 16:32:55 +0200
+Subject: linux-next regression caused by "gpiolib: request the gpio
+ before querying its direction"
+In-Reply-To: <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
+References: <20170830112424.7a3a7c36@windsurf.lan>
+ <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
+ <87ziah2m3f.fsf@free-electrons.com>
+ <20170830161730.41919554@windsurf.lan>
+ <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
+Message-ID: <20170830163255.4e7c1422@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Hello,
 
-When checking to see if a PCI bus can safely be reset, we check to see
-if any of the children have their PCI_DEV_FLAGS_NO_BUS_RESET flag set.
-As these devices are known not to behave well after a bus reset.
+On Wed, 30 Aug 2017 09:22:55 -0500, Timur Tabi wrote:
 
-Some PCIe root port bridges also do not behave well after a bus reset,
-sometimes causing the devices behind the bridge to become unusable.
+> No, that's it.  The question is, what exactly should the 'request' 
+> function do?  Should it be modifying the hardware to satisfy the 
+> request?  When I wrote my patch, I assumed that it wouldn't.  I thought 
+> that request simply answered the question, "can I touch this GPIO"?
 
-Add a check for the PCI_DEV_FLAGS_NO_BUS_RESET flag being set in the
-bridge device to allow these bridges to be flagged, and prevent their
-buses from being reset.
+No, it also muxes the pin in GPIO, and you can see the "reference"
+implementation pinctrl-single also does it.
 
-A follow on patch will add a quirk for this type of bridge.
+Let's see what Linus W. has to say about the semantic of the "request"
+operation.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
-[jglauber at cavium.com: fixed typo]
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
- drivers/pci/pci.c | 4 ++++
- 1 file changed, 4 insertions(+)
+But if we change the semantic of "request" to no longer mux the hardware
+as GPIO, then you will also have regressions, because there are plenty
+of GPIOs that are requested, but not explicitly muxed as GPIOs in the
+DT, precisely because today requesting a GPIO is sufficient to have it
+re-muxed as GPIO at the pinctrl level.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index af0cc34..d9abbc9 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4290,6 +4290,10 @@ static bool pci_bus_resetable(struct pci_bus *bus)
- {
- 	struct pci_dev *dev;
- 
-+
-+	if (bus->self && (bus->self->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET))
-+		return false;
-+
- 	list_for_each_entry(dev, &bus->devices, bus_list) {
- 		if (dev->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET ||
- 		    (dev->subordinate && !pci_bus_resetable(dev->subordinate)))
+Best regards,
+
+Thomas
 -- 
-2.9.0.rc0.21.g7777322
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
