@@ -1,56 +1,185 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 30 Aug 2017 08:40:12 -0600
-Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
-In-Reply-To: <20170830142454.10971-4-jglauber@cavium.com>
-References: <20170830142454.10971-1-jglauber@cavium.com>
- <20170830142454.10971-4-jglauber@cavium.com>
-Message-ID: <20170830084012.19d91759@w520.home>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Wed, 30 Aug 2017 15:41:18 +0100
+Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu capacity-dmips-mhz
+ information
+In-Reply-To: <20170830144120.9312-1-dietmar.eggemann@arm.com>
+References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
+Message-ID: <20170830144120.9312-3-dietmar.eggemann@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Aug 2017 16:24:54 +0200
-Jan Glauber <jglauber@cavium.com> wrote:
+The following 'capacity-dmips-mhz' dt property values are used:
 
-> Root ports of cn8xxx do not function after a slot reset when used with
-> some e1000e and LSI HBA devices. Add a quirk to prevent slot reset on
-> these root ports.
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->  drivers/pci/quirks.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index 85191b8..6679971 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -845,6 +845,22 @@ static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
->  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
->  #endif
->  
-> +/*
-> + * Root port on some Cavium CN8xxx chips do not successfully complete
-> + * a bus reset when used with certain types of child devices. Config
-> + * space access to the child may quit responding. Flag all devices under
-> + * the secondary bus as non-resettable.
-> + */
-> +static void quirk_CN8xxx_secondary_bus(struct pci_dev *dev)
-> +{
-> +	struct pci_dev *pdev;
-> +
-> +	dev_warn(&dev->dev, "Cavium CN8xxx quirk detected; reset for devices on secondary bus disabled\n");
-> +	list_for_each_entry(pdev, &dev->subordinate->devices, bus_list)
-> +		pdev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
-> +}
-> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_CN8xxx_secondary_bus);
-> +
->  /*
->   * Some settings of MMRBC can lead to data corruption so block changes.
->   * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide
+Cortex-A15: 1024, Cortex-A7: 539
 
+They have been derived from the cpu_efficiency values:
 
-This doesn't seem reliable, doesn't the user just need to remove and
-reprobe the slot and the device would re-appear without this flag set?
-Thanks,
+Cortex-A15: 3891, Cortex-A7: 2048
 
-Alex
+by scaling them so that the Cortex-A15s (big cores) use 1024.
+
+The cpu_efficiency values were originally derived from the "Big.LITTLE
+Processing with ARM Cortex?-A15 & Cortex-A7" white paper
+(http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
+(3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
+Dhrystone benchmark.
+
+The following platforms are affected once cpu-invariant accounting
+support is re-connected to the task scheduler:
+
+arndale-octa, peach-pi, peach-pit, smdk5420
+
+The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
+5800).
+
+$ cat /sys/devices/system/cpu/cpu*/cpu_capacity
+1024
+1024
+1024
+1024
+389
+389
+389
+389
+
+The Cortex-A15 vs Cortex-A7 performance ratio is 1024/389 = 2.63.
+
+The values derived with the 'cpu_efficiency/clock-frequency dt property'
+solution are:
+
+$ cat /sys/devices/system/cpu/cpu*/cpu_capacity
+1535
+1535
+1535
+1535
+448
+448
+448
+448
+
+The Cortex-A15 vs Cortex-A7 performance ratio is 1535/448 = 3.43.
+
+The discrepancy between 2.63 and 3.43 is due to the false assumption
+when using the 'cpu_efficiency/clock-frequency dt property' solution
+that the max cpu frequency of the little cpus is 1 GHZ and not 1.3 GHz.
+The Cortex-A7 cluster runs with a max cpu frequency of 1.3 GHZ whereas
+the 'clock-frequency' property value is set to 1 GHz.
+
+3.43/1.3 = 2.64
+
+$ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+1800000
+1800000
+1800000
+1800000
+1300000 <-- max cpu frequency of the Cortex-A7s (little cores)
+1300000
+1300000
+1300000
+
+Running another benchmark (single-threaded sysbench affine to the
+individual cpus) with performance cpufreq governor on the Samsung
+Chromebook 2 13" showed the following numbers:
+
+$ for i in `seq 0 7`; do taskset -c $i sysbench --test=cpu
+  --num-threads=1 --max-time=10 run | grep "total number of events:";
+  done
+
+total number of events: 1083
+total number of events: 1085
+total number of events: 1085
+total number of events: 1085
+total number of events: 454
+total number of events: 454
+total number of events: 454
+total number of events: 454
+
+The Cortex-A15 vs Cortex-A7 performance ratio is 2.39, i.e. very close
+to the one derived from the Dhrystone based one of the "Big.LITTLE
+Processing with ARM Cortex?-A15 & Cortex-A7" white paper (2.63).
+
+We don't aim for exact values for the cpu capacity values. Besides the
+CPI (Cycles Per Instruction), the instruction mix and whether the system
+runs cpu-bound or memory-bound has an impact on the cpu capacity values
+derived from these benchmark results.
+
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+---
+ arch/arm/boot/dts/exynos5420-cpus.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+index 5c052d7ff554..d7d703aa1699 100644
+--- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
++++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+@@ -36,6 +36,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <11>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -48,6 +49,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <11>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -60,6 +62,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <11>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -72,6 +75,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <11>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <1024>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -85,6 +89,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -97,6 +102,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -109,6 +115,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <539>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -121,6 +128,7 @@
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
++			capacity-dmips-mhz = <539>;
+ 		};
+ 	};
+ };
+-- 
+2.11.0
