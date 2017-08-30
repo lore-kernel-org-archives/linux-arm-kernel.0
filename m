@@ -1,59 +1,54 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 30 Aug 2017 12:21:36 +0200
-Subject: [PATCH] net: stmmac: dwmac-sun8i: Use reset exclusive
-In-Reply-To: <20170825171233.4xoihzakca3mqscd@flea.lan>
-References: <20170825143805.21733-1-clabbe.montjoie@gmail.com>
- <20170825144832.3w6izhri5vstbndp@flea.lan>
- <20170825151733.GB9475@Red>
- <20170825171233.4xoihzakca3mqscd@flea.lan>
-Message-ID: <20170830102136.GA21940@Red>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 30 Aug 2017 15:54:17 +0530
+Subject: [net-next PATCHv6 0/2] net: ethernet: Socionext Netsec
+Message-ID: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 25, 2017 at 07:12:33PM +0200, Maxime Ripard wrote:
-> On Fri, Aug 25, 2017 at 05:17:33PM +0200, Corentin Labbe wrote:
-> > On Fri, Aug 25, 2017 at 04:48:32PM +0200, Maxime Ripard wrote:
-> > > On Fri, Aug 25, 2017 at 04:38:05PM +0200, Corentin Labbe wrote:
-> > > > The current dwmac_sun8i module cannot be rmmod/modprobe due to that
-> > > > the reset controller was not released when removed.
-> > > > 
-> > > > This patch remove ambiguity, by using of_reset_control_get_exclusive and
-> > > > add the missing reset_control_put().
-> > > > 
-> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > ---
-> > > >  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 3 ++-
-> > > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> > > > index fffd6d5fc907..675a09629d85 100644
-> > > > --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> > > > +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> > > > @@ -782,6 +782,7 @@ static int sun8i_dwmac_unpower_internal_phy(struct sunxi_priv_data *gmac)
-> > > >  
-> > > >  	clk_disable_unprepare(gmac->ephy_clk);
-> > > >  	reset_control_assert(gmac->rst_ephy);
-> > > > +	reset_control_put(gmac->rst_ephy);
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > @@ -942,7 +943,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
-> > > >  			return -EINVAL;
-> > > >  		}
-> > > >  
-> > > > -		gmac->rst_ephy = of_reset_control_get(plat_dat->phy_node, NULL);
-> > > > +		gmac->rst_ephy = of_reset_control_get_exclusive(plat_dat->phy_node, NULL);
-> > > 
-> > > Why not just use devm_reset_control_get?
-> > > 
-> > 
-> > Because there no devm_ functions with of_
-> 
-> devm_reset_control_get uses of_reset_control_get internally.
+Hello,
 
-Hello
+  The OGMA/Netsec controller is used in latest SoC from Socionext/Fujitsu.
 
-You are right.
-But since the ephy reset is in a child node, devm_ does not find it.
+I am refreshing the patchset by basically using official name of the IP
+from 'OGMA' to 'Netsec'. And the company is renamed too, from Fujitsu
+to Socionext to better reflect the reality.
 
-Regards
+ I have addressed comments (that could be) on the last revision -->
+https://patchwork.kernel.org/patch/4540651/
+
+ Of course, I have scanned changes to the drivers/net/ethernet since
+last submission and integrated whichever applicable and rebased the
+driver on top of last rc.
+
+Thanks.
+
+Jassi Brar (2):
+  dt-bindings: net: Add DT bindings for Socionext Netsec
+  net: socionext: Add NetSec driver
+
+ .../devicetree/bindings/net/socionext-netsec.txt   |  46 ++
+ drivers/net/ethernet/Kconfig                       |   1 +
+ drivers/net/ethernet/Makefile                      |   1 +
+ drivers/net/ethernet/socionext/Kconfig             |  29 +
+ drivers/net/ethernet/socionext/Makefile            |   1 +
+ drivers/net/ethernet/socionext/netsec/Makefile     |   6 +
+ drivers/net/ethernet/socionext/netsec/netsec.h     | 386 +++++++++++++
+ .../socionext/netsec/netsec_desc_ring_access.c     | 618 +++++++++++++++++++++
+ .../net/ethernet/socionext/netsec/netsec_ethtool.c |  76 +++
+ .../ethernet/socionext/netsec/netsec_gmac_access.c | 329 +++++++++++
+ .../net/ethernet/socionext/netsec/netsec_netdev.c  | 558 +++++++++++++++++++
+ .../ethernet/socionext/netsec/netsec_platform.c    | 330 +++++++++++
+ 12 files changed, 2381 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/socionext-netsec.txt
+ create mode 100644 drivers/net/ethernet/socionext/Kconfig
+ create mode 100644 drivers/net/ethernet/socionext/Makefile
+ create mode 100644 drivers/net/ethernet/socionext/netsec/Makefile
+ create mode 100644 drivers/net/ethernet/socionext/netsec/netsec.h
+ create mode 100644 drivers/net/ethernet/socionext/netsec/netsec_desc_ring_access.c
+ create mode 100644 drivers/net/ethernet/socionext/netsec/netsec_ethtool.c
+ create mode 100644 drivers/net/ethernet/socionext/netsec/netsec_gmac_access.c
+ create mode 100644 drivers/net/ethernet/socionext/netsec/netsec_netdev.c
+ create mode 100644 drivers/net/ethernet/socionext/netsec/netsec_platform.c
+
+-- 
+2.7.4
