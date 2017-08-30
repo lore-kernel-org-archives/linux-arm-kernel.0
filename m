@@ -1,54 +1,35 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 30 Aug 2017 11:38:53 +0800
-Subject: [PATCH RESEND v2 3/3] dt-bindings: mt8173-mtu3: add generic
- compatible and rename file
-In-Reply-To: <1a489dcc-e95c-bfe3-8e2a-fe2591fe86d8@cogentembedded.com>
-References: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1503998338.git.chunfeng.yun@mediatek.com>
- <61060035e057b13f43d383645c53c8726b7e67ab.1503998339.git.chunfeng.yun@mediatek.com>
- <1a489dcc-e95c-bfe3-8e2a-fe2591fe86d8@cogentembedded.com>
-Message-ID: <1504064333.17567.9.camel@mhfsdcap03>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Aug 2017 22:17:44 -0700
+Subject: [PATCH] MAINTAINERS: Update Cavium ThunderX2 entry
+In-Reply-To: <20170808092913.GE17961@rric.localdomain>
+References: <1502154424-3429-1-git-send-email-jnair@caviumnetworks.com>
+ <20170808092913.GE17961@rric.localdomain>
+Message-ID: <20170830051744.GA14499@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-29 at 13:08 +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 8/29/2017 12:20 PM, Chunfeng Yun wrote:
-> 
-> > The mt8173-mtu3.txt actually holds the bindings for all mediatek
-> > SoCs with usb3 DRD IP, so add a generic compatible and change the
-> > name to mediatek,mtu3.txt.
+On Tue, Aug 08, 2017 at 11:29:13AM +0200, Robert Richter wrote:
+> On 08.08.17 01:07:04, Jayachandran C wrote:
+> > Add Robert Richter as the primary maintainer for this platform.
 > > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 > > ---
-> >   .../usb/{mt8173-mtu3.txt => mediatek,mtu3.txt}     |    6 +++++-
-> >   1 file changed, 5 insertions(+), 1 deletion(-)
-> >   rename Documentation/devicetree/bindings/usb/{mt8173-mtu3.txt => mediatek,mtu3.txt} (92%)
+> >  MAINTAINERS | 1 +
+> >  1 file changed, 1 insertion(+)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-> > similarity index 92%
-> > rename from Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-> > rename to Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-> > index b8ea394..722a029 100644
-> > --- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-> > +++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-> > @@ -1,7 +1,11 @@
-> >   The device node for Mediatek USB3.0 DRD controller
-> >   
-> >   Required properties:
-> > - - compatible : should be "mediatek,mt8173-mtu3"
-> > + - compatible : should be "mediatek,soc-model-mtu3", "mediatek,mtu3",
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 44cb004..f2d8963 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -3155,6 +3155,7 @@ S:	Supported
+> >  F:	drivers/crypto/cavium/cpt/
+> >  
+> >  CAVIUM THUNDERX2 ARM64 SOC
+> > +M:	Robert Richter <rric@kernel.org>
 > 
->     Worth enclosing soc-model in <>.
-Ok, I'll modify it, thanks
-> 
-> > +	soc-model is the name of SoC, such as mt8173, mt2712 etc,
-> > +	when using "mediatek,mtu3" compatible string, you need SoC specific
-> > +	ones in addition, one of:
-> > +	- "mediatek,mt8173-mtu3"
-> >    - reg : specifies physical base address and size of the registers
-> >    - reg-names: should be "mac" for device IP and "ippc" for IP port control
-> >    - interrupts : interrupt used by the device IP
-> 
-> MBR, Sergei
+> I better want to use my Cavium's email address here, see patch below.
+
+Applied. Thanks.
+
+
+-Olof
