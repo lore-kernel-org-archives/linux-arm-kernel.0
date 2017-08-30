@@ -1,91 +1,37 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 30 Aug 2017 18:19:02 +0200
-Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
-In-Reply-To: <20170829084831.hsdok3ksi7anxzuc@ninjato>
-References: <20170615185418.13980-1-javier@dowhile0.org>
- <20170731153009.xkjknygpmckv2pfp@ninjato>
- <CABxcv=mdbE0QGjoi3aLzxRqM3-MbkQ_Ai6fShcGVUGSNNqqrqw@mail.gmail.com>
- <20170828160121.gu4wf7jqu4ditksc@ninjato>
- <CABxcv=kSiqDN1=9fSfLkyW=uuXQZAoW4dhw=fco9RyOdDuPAdA@mail.gmail.com>
- <20170829084831.hsdok3ksi7anxzuc@ninjato>
-Message-ID: <CABxcv=nqbNsTs7D57VOt1-Tav_3i9U=XKn=BV=hPr1tG68eE2g@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Aug 2017 09:21:47 -0700
+Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
+In-Reply-To: <20170830131930.bvu6furm7dlhes3i@piout.net>
+References: <20170830230712.55db7911@canb.auug.org.au>
+ <20170830131930.bvu6furm7dlhes3i@piout.net>
+Message-ID: <CAOesGMg130BvqS1vGid9jm-G7-Gub+7bOQFKtaSg4qPTvosxcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
-
-On Tue, Aug 29, 2017 at 10:48 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+On Wed, Aug 30, 2017 at 6:19 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 30/08/2017 at 23:07:12 +1000, Stephen Rothwell wrote:
+>> Hi all,
+>>
+>> Commit
+>>
+>>   1a9f9af07e80 ("ARM: dts: at91: at91sam9g45: add AC97")
+>>
+>> is missing a Signed-off-by from its author.
+>>
 >
->> I don't have a DT based system at hand now, but I'll test it again and
->> let you know probably tomorrow.
+> Oh crap, it was the only one not in linux-next... iThe original
+> submission had the SoB:
+> https://patchwork.kernel.org/patch/9794803/
 >
-> I will try again today, too. Thanks!
->
+> Olof, how do you want to proceed?
 
-Ok, I had some time to do some tests again. I used an ARM Chromebook
-(Exynos Peach Pi) that has an I2C touchpad (Atmel maXTouch).
+Please prepare a new branch. I'll rebuild next/dt (and our for-next)
+to drop your previous version, and merge it when it's ready.
 
-Tested the following cases:
+Thanks for the heads up, Stephen. I presume you have a script that
+checks this? It's something we should run too, do you keep it in a
+shared location?
 
-1) Driver without OF device ID table (only a I2C table with a
-"maxtouch" entry) and DTS defining a device node with a
-"atmel,maxtouch" compatible string. This is the case without any of
-the patches in this series.
 
-$ modinfo drivers/input/touchscreen/atmel_mxt_ts.ko | grep maxtouch
-alias:          i2c:maxtouch
-
-$ grep maxtouch /sys/devices/platform/soc/12e00000.i2c/i2c-8/8-004b/uevent
-OF_COMPATIBLE_0=atmel,maxtouch
-MODALIAS=i2c:maxtouch
-
-2) Driver without OF device ID table (only a I2C table with a
-"maxtouch" entry) and DTS defining a device node with a
-"atmel,maxtouch", "generic,maxtouch" compatible string. This is the
-case when platform maintainers merge the DTS patches without the
-driver patch.
-
-$ modinfo drivers/input/touchscreen/atmel_mxt_ts.ko | grep maxtouch
-alias:          i2c:maxtouch
-
-$ grep maxtouch /sys/devices/platform/soc/12e00000.i2c/i2c-8/8-004b/uevent
-OF_COMPATIBLE_0=atmel,maxtouch
-OF_COMPATIBLE_1=generic,maxtouch
-MODALIAS=i2c:maxtouch
-
-3) Driver with an OF device ID table (with a "generic,maxtouch" entry)
-and DTS defining a device node with a "atmel,maxtouch" compatible
-string. This is the case when the driver patch is merged without the
-DTS patches.
-
-$ modinfo drivers/input/touchscreen/atmel_mxt_ts.ko | grep maxtouch
-alias:          of:N*T*Cgeneric,maxtouchC*
-alias:          of:N*T*Cgeneric,maxtouch
-alias:          i2c:maxtouch
-
-$ grep maxtouch /sys/devices/platform/soc/12e00000.i2c/i2c-8/8-004b/uevent
-OF_COMPATIBLE_0=atmel,maxtouch
-MODALIAS=i2c:maxtouch
-
-4) Driver with an OF device ID table (with a "generic,maxtouch" entry)
-and DTS defining a device node with a "atmel,maxtouch",
-"generic,maxtouch" compatible string. This is the case when both the
-DTS and driver patches are merged.
-
-$ modinfo drivers/input/touchscreen/atmel_mxt_ts.ko | grep maxtouch
-alias:          of:N*T*Cgeneric,maxtouchC*
-alias:          of:N*T*Cgeneric,maxtouch
-alias:          i2c:maxtouch
-
-$ grep maxtouch /sys/devices/platform/soc/12e00000.i2c/i2c-8/8-004b/uevent
-OF_COMPATIBLE_0=atmel,maxtouch
-OF_COMPATIBLE_1=generic,maxtouch
-MODALIAS=i2c:maxtouch
-
-For all cases module autoload, driver probe and evtest worked for me.
-
-You said that (3) doesn't work but I don't understand why is failing
-for you. Probably I'm missing something.
-
-Best regards,
-Javier
+-Olof
