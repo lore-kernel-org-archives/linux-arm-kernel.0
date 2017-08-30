@@ -1,34 +1,48 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 30 Aug 2017 17:55:26 +0200
-Subject: [PATCH v2 0/3] Add support for STM32 vrefbuf regulator
-Message-ID: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
+Date: Wed, 30 Aug 2017 17:55:27 +0200
+Subject: [PATCH v2 1/3] dt-bindings: regulator: Add STM32 Voltage Reference
+ Buffer
+In-Reply-To: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
+References: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1504108529-31727-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some STM32 devices embed a voltage reference buffer which can be used as
-voltage reference for ADCs, DACs and also as voltage reference
-for external components through the dedicated VREF+ pin.
+Document STM32 VREFBUF (voltage reference buffer) which can be used as
+voltage reference for ADCs, DACs and external components.
 
-This patchset adds vrefbuf regulator driver, device tree bindings and
-vrefbuf device tree node for STM32H7 SoC.
-
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
-Changes in v2:
-- Update regulator driver following Mark's remarks
-
-Fabrice Gasnier (3):
-  dt-bindings: regulator: Add STM32 Voltage Reference Buffer
-  regulator: Add support for stm32-vrefbuf
-  ARM: dts: stm32: add vrefbuf to stm32h743
-
- .../bindings/regulator/st,stm32-vrefbuf.txt        |  20 ++
- arch/arm/boot/dts/stm32h743.dtsi                   |   9 +
- drivers/regulator/Kconfig                          |  12 ++
- drivers/regulator/Makefile                         |   1 +
- drivers/regulator/stm32-vrefbuf.c                  | 202 +++++++++++++++++++++
- 5 files changed, 244 insertions(+)
+ .../bindings/regulator/st,stm32-vrefbuf.txt          | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
- create mode 100644 drivers/regulator/stm32-vrefbuf.c
 
+diff --git a/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+new file mode 100644
+index 0000000..3944ee3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+@@ -0,0 +1,20 @@
++STM32 VREFBUF - Voltage reference buffer
++
++Some STM32 devices embed a voltage reference buffer which can be used as
++voltage reference for ADCs, DACs and also as voltage reference for external
++components through the dedicated VREF+ pin.
++
++Required properties:
++- compatible:		Must be "st,stm32-vrefbuf".
++- reg:			Offset and length of VREFBUF register set.
++- clocks:		Must contain an entry for peripheral clock.
++
++Example:
++	vrefbuf: regulator at 58003C00 {
++		compatible = "st,stm32-vrefbuf";
++		reg = <0x58003C00 0x8>;
++		clocks = <&rcc VREF_CK>;
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <2500000>;
++		vdda-supply = <&vdda>;
++	};
 -- 
 1.9.1
