@@ -1,59 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Aug 2017 15:08:01 +0100
-Subject: [PATCH v3 44/59] KVM: arm/arm64: GICv4: Handle MOVI applied to a
- VLPI
-In-Reply-To: <20170828181817.GE24649@cbox>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-45-marc.zyngier@arm.com> <20170828181817.GE24649@cbox>
-Message-ID: <954a7441-c91e-5d1b-98b7-2978291c5259@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Aug 2017 16:17:30 +0200
+Subject: linux-next regression caused by "gpiolib: request the gpio
+ before querying its direction"
+In-Reply-To: <87ziah2m3f.fsf@free-electrons.com>
+References: <20170830112424.7a3a7c36@windsurf.lan>
+ <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
+ <87ziah2m3f.fsf@free-electrons.com>
+Message-ID: <20170830161730.41919554@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/17 19:18, Christoffer Dall wrote:
-> On Mon, Jul 31, 2017 at 06:26:22PM +0100, Marc Zyngier wrote:
->> When the guest issues a MOVI, we need to tell the physical ITS
->> that we're now targetting a new vcpu. This is done by extracting
->> the current mapping, updating the target, and reapplying the
->> mapping. The core ITS code should do the right thing.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 79bac93d3e7d..aaad577ce328 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -706,6 +706,19 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
->>  	ite->irq->target_vcpu = vcpu;
->>  	spin_unlock(&ite->irq->irq_lock);
->>  
->> +	if (ite->irq->hw) {
->> +		struct its_vlpi_map map;
->> +		int ret;
->> +
->> +		ret = its_get_vlpi(ite->irq->host_irq, &map);
->> +		if (ret)
->> +			return ret;
->> +
->> +		map.vpe_idx = vcpu->vcpu_id;
->> +
->> +		return its_map_vlpi(ite->irq->host_irq, &map);
+Hello,
+
+On Wed, 30 Aug 2017 15:59:00 +0200, Gregory CLEMENT wrote:
+
+> > When gpiochip_add_data() calls chip->request, what function is that
+> > calling?  
 > 
-> Since you're not holding the irq_lock across these two calls, would it
-> be possible that the forwarding was removed through some other call path
-> here, and could you end up passing an invalid host_irq to its_map_vlpi?
-I believe we should be OK here, as we hold the ITS mutex during any
-command processing, and both the forward/unforward paths take that same
-mutex.
+> the request callback is gpiochip_generic_request so I would be surprised
+> that there was a bug in it.
 
-On a slightly different note, it looks like the MOVI code could benefit
-from using vgic_its_resolve_lpi(), which has been introduce earlier in
-this series.
+The call chain leading to the problem is:
 
-Thanks,
+ gpiochip_add_data()
+  chip->request() == gpiochip_generic_request()
+   pinctrl_request_gpio()
+    pinmux_request_gpio()
+     pin_request()
+      ops->gpio_request_enable() == mvebu_pinmux_gpio_request_enable()
+       mvebu_pinconf_group_set()
+        grp->ctrl->mpp_set() == mvebu_regmap_mpp_ctrl_set()
 
-	M.
+So what Timur is saying perhaps is that
+mvebu_pinmux_gpio_request_enable() shouldn't be changing the type of
+muxing, and therefore shouldn't be calling mvebu_pinconf_group_set().
+
+However, even the "reference" pinctrl-single.c implementation does it,
+in pcs_request_gpio().
+
+Am I missing something ?
+
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
