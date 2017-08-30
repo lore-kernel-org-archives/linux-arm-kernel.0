@@ -1,37 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Aug 2017 09:21:47 -0700
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <20170830131930.bvu6furm7dlhes3i@piout.net>
-References: <20170830230712.55db7911@canb.auug.org.au>
- <20170830131930.bvu6furm7dlhes3i@piout.net>
-Message-ID: <CAOesGMg130BvqS1vGid9jm-G7-Gub+7bOQFKtaSg4qPTvosxcA@mail.gmail.com>
+From: jacopo@jmondi.org (jmondi)
+Date: Wed, 30 Aug 2017 18:24:40 +0200
+Subject: linux-next regression caused by "gpiolib: request the gpio
+ before querying its direction"
+In-Reply-To: <20170830163255.4e7c1422@windsurf.lan>
+References: <20170830112424.7a3a7c36@windsurf.lan>
+ <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
+ <87ziah2m3f.fsf@free-electrons.com>
+ <20170830161730.41919554@windsurf.lan>
+ <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
+ <20170830163255.4e7c1422@windsurf.lan>
+Message-ID: <20170830162440.GE1863@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 6:19 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 30/08/2017 at 23:07:12 +1000, Stephen Rothwell wrote:
->> Hi all,
->>
->> Commit
->>
->>   1a9f9af07e80 ("ARM: dts: at91: at91sam9g45: add AC97")
->>
->> is missing a Signed-off-by from its author.
->>
+Hello,
+
+On Wed, Aug 30, 2017 at 04:32:55PM +0200, Thomas Petazzoni wrote:
+> Hello,
 >
-> Oh crap, it was the only one not in linux-next... iThe original
-> submission had the SoB:
-> https://patchwork.kernel.org/patch/9794803/
+> On Wed, 30 Aug 2017 09:22:55 -0500, Timur Tabi wrote:
 >
-> Olof, how do you want to proceed?
+> > No, that's it.  The question is, what exactly should the 'request'
+> > function do?  Should it be modifying the hardware to satisfy the
+> > request?  When I wrote my patch, I assumed that it wouldn't.  I thought
+> > that request simply answered the question, "can I touch this GPIO"?
+>
+> No, it also muxes the pin in GPIO, and you can see the "reference"
+> implementation pinctrl-single also does it.
+>
+> Let's see what Linus W. has to say about the semantic of the "request"
+> operation.
+>
+> But if we change the semantic of "request" to no longer mux the hardware
+> as GPIO, then you will also have regressions, because there are plenty
+> of GPIOs that are requested, but not explicitly muxed as GPIOs in the
+> DT, precisely because today requesting a GPIO is sufficient to have it
+> re-muxed as GPIO at the pinctrl level.
 
-Please prepare a new branch. I'll rebuild next/dt (and our for-next)
-to drop your previous version, and merge it when it's ready.
+Just to point out one of Renesas' pin controller devices seems to
+suffer from the same problem, introduced by Timur's commit
 
-Thanks for the heads up, Stephen. I presume you have a script that
-checks this? It's something we should run too, do you keep it in a
-shared location?
+https://www.spinics.net/lists/linux-renesas-soc/msg17647.html
 
+This is indeed caused by the "request" introduced by the above said
+commit, that in rza1 pincontroller, actually muxes the requested
+pin as GPIO.
 
--Olof
+Reverting that commit solves all the issues in our case too.
+
+Thanks
+   j
+>
+> Best regards,
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
