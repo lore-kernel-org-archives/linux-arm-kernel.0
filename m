@@ -1,44 +1,148 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 30 Aug 2017 11:37:41 +0200
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
-References: <599D3410.9050504@intel.com>
- <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
- <599D62EA.7050100@linux.intel.com>
- <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
- <59A3D6BF.7010400@linux.intel.com>
- <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
- <59A56C15.2000403@linux.intel.com> <20170829235310.GA20214@wunner.de>
- <20170830060237.GA2782@kroah.com>
- <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
- <CAKv+Gu8QSWO8jYc1L6eJyMg58gtVsoa9zYuymSc-PdEm60HzxA@mail.gmail.com>
-Message-ID: <dd26cff3-83d9-851b-4b38-a947e6a41ddf@free.fr>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 30 Aug 2017 10:40:39 +0100
+Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
+ instructions
+In-Reply-To: <47f291c6-4e76-685b-b246-81bf04b410ff@arm.com>
+References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
+ <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
+ <47f291c6-4e76-685b-b246-81bf04b410ff@arm.com>
+Message-ID: <3c5bf8a6-dade-268c-83d3-7f3b31f4224f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/2017 11:07, Ard Biesheuvel wrote:
+Hi Marc,
 
-> Please don't forget to mention that this is quirky hardware that
-> depends on BROKEN because it multiplexes MMIO and config space
-> accesses in the same memory window without any locking whatsoever
-> (which would be difficult to do in the first place because we don't
-> use accessors for MMIO in the kernel).
+On 30/08/17 10:19, Marc Zyngier wrote:
+> Hi Julien,
+> 
+> On 30/08/17 10:01, Julien Thierry wrote:
+>> Software Step exception is missing after trapping instruction from the guest.
+>>
+>> We need to set the PSR.SS to 0 for the guest vcpu before resuming guest
+>> execution.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>>
+>> ---
+>>   arch/arm64/include/asm/kvm_asm.h     |  2 ++
+>>   arch/arm64/include/asm/kvm_emulate.h |  2 ++
+>>   arch/arm64/kvm/debug.c               | 12 +++++++++++-
+>>   arch/arm64/kvm/hyp/switch.c          | 12 ++++++++++++
+>>   4 files changed, 27 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>> index 26a64d0..398bbaa 100644
+>> --- a/arch/arm64/include/asm/kvm_asm.h
+>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>> @@ -32,6 +32,8 @@
+>>
+>>   #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+>>   #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+>> +#define KVM_ARM64_DEBUG_INST_SKIP_SHIFT	1
+>> +#define KVM_ARM64_DEBUG_INST_SKIP	(1 << KVM_ARM64_DEBUG_INST_SKIP_SHIFT)
+>>
+>>   #define kvm_ksym_ref(sym)						\
+>>   	({								\
+>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>> index fe39e68..d401c64 100644
+>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>> @@ -95,6 +95,8 @@ static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
+>>   		kvm_skip_instr32(vcpu, is_wide_instr);
+>>   	else
+>>   		*vcpu_pc(vcpu) += 4;
+>> +	/* Let debug engine know we skipped an instruction */
+>> +	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
+>>   }
+>>
+>>   static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
+>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+>> index dbadfaf..4806e6b 100644
+>> --- a/arch/arm64/kvm/debug.c
+>> +++ b/arch/arm64/kvm/debug.c
+>> @@ -151,12 +151,22 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>>   		 * debugging the system.
+>>   		 */
+>>   		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+>> -			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
+>> +			/*
+>> +			 * If we skipped an instruction while single stepping,
+>> +			 * spsr.ss needs to be 0 in order to trigger SS
+>> +			 * exception on return.
+>> +			 */
+>> +			if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_INST_SKIP))
+>> +				*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
+>> +			else
+>> +				*vcpu_cpsr(vcpu) &=  ~DBG_SPSR_SS;
+>>   			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
+>>   		} else {
+>>   			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
+>>   		}
+>>
+>> +		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_INST_SKIP;
+>> +
+>>   		trace_kvm_arm_set_dreg32("SPSR_EL2", *vcpu_cpsr(vcpu));
+>>
+>>   		/*
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index 945e79c..6030acd 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -22,6 +22,7 @@
+>>   #include <asm/kvm_emulate.h>
+>>   #include <asm/kvm_hyp.h>
+>>   #include <asm/fpsimd.h>
+>> +#include <asm/debug-monitors.h>
+>>
+>>   static bool __hyp_text __fpsimd_enabled_nvhe(void)
+>>   {
+>> @@ -276,6 +277,10 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>>   	}
+>>
+>>   	write_sysreg_el2(*vcpu_pc(vcpu), elr);
+>> +
+>> +	*vcpu_cpsr(vcpu) = read_sysreg_el2(spsr);
+>> +	*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+>> +	write_sysreg_el2(*vcpu_cpsr(vcpu), spsr);
+>>   }
+>>
+>>   int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>> @@ -343,6 +348,13 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>>   			if (ret == -1) {
+>>   				/* Promote an illegal access to an SError */
+>>   				__skip_instr(vcpu);
+>> +
+>> +				/*
+>> +				 * We're not jumping back, let debug setup know
+>> +				 * we skipped an instruction.
+>> +				 */
+>> +				vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
+>> +
+> 
+> This feels odd. You've already cleared the SS bit from the SPSR, and yet
+> you're setting that flag. What is the semantic of this?
 
-You're right, it was in the back of my mind, but I didn't state
-it explicitly for the benefit of linux-usb readers.
+The thing is that whenever you get out of __kvm_vcpu_run, 
+kvm_arm_setup_debug will get called before running a guest again. So my 
+idea is that kvm_arm_setup_debug needs to be aware whether SPSR.SS must 
+be set or not. Otherwise kvm_arm_setup_debug will always set the SPSR.SS 
+flag. So KVM_ARM64_DEBUG_INST_SKIP is to tell the debug setup that we 
+skipped an instruction (here as well as in kvm_skip_instr).
 
-> So how likely is it that you are attempting to read from the xhci BAR
-> window while a config space access is in progress? Any way to
-> instrument this in your driver?
+The fact that SPSR.SS is clear in the illegal access case is because it 
+uses __skip_instr instead of kvm_skip_instr because we have not saved 
+the guest state at that point. But the clearing of SPSR.SS in 
+__skip_instr is more targeted at cases that directly jump back into the 
+guest (trapped GICv2/3 CPUIF accesses).
 
-I logged config space accesses here:
+Let me know if you feel there is a cleaner way to do this or something 
+that would make this clearer.
 
-https://www.spinics.net/lists/arm-kernel/msg602832.html
+Thanks,
 
-IIRC, the config space accesses are generated by the AER ISR.
-So disabling the AER driver should guarantee that no config space
-accesses are occurring when the drive is unplugged.
-
-Regards.
+-- 
+Julien Thierry
