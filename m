@@ -1,64 +1,65 @@
-From: jacopo@jmondi.org (jmondi)
-Date: Wed, 30 Aug 2017 18:24:40 +0200
-Subject: linux-next regression caused by "gpiolib: request the gpio
- before querying its direction"
-In-Reply-To: <20170830163255.4e7c1422@windsurf.lan>
-References: <20170830112424.7a3a7c36@windsurf.lan>
- <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
- <87ziah2m3f.fsf@free-electrons.com>
- <20170830161730.41919554@windsurf.lan>
- <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
- <20170830163255.4e7c1422@windsurf.lan>
-Message-ID: <20170830162440.GE1863@w540>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 30 Aug 2017 18:39:05 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.14#2
+Message-ID: <20170830163905.x4kol7iyg466fzvz@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Olof,
 
-On Wed, Aug 30, 2017 at 04:32:55PM +0200, Thomas Petazzoni wrote:
-> Hello,
->
-> On Wed, 30 Aug 2017 09:22:55 -0500, Timur Tabi wrote:
->
-> > No, that's it.  The question is, what exactly should the 'request'
-> > function do?  Should it be modifying the hardware to satisfy the
-> > request?  When I wrote my patch, I assumed that it wouldn't.  I thought
-> > that request simply answered the question, "can I touch this GPIO"?
->
-> No, it also muxes the pin in GPIO, and you can see the "reference"
-> implementation pinctrl-single also does it.
->
-> Let's see what Linus W. has to say about the semantic of the "request"
-> operation.
->
-> But if we change the semantic of "request" to no longer mux the hardware
-> as GPIO, then you will also have regressions, because there are plenty
-> of GPIOs that are requested, but not explicitly muxed as GPIOs in the
-> DT, precisely because today requesting a GPIO is sufficient to have it
-> re-muxed as GPIO at the pinctrl level.
+As discussed, this replaces the previous pull request. The only change
+is the fixed up SoB.
 
-Just to point out one of Renesas' pin controller devices seems to
-suffer from the same problem, introduced by Timur's commit
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-https://www.spinics.net/lists/linux-renesas-soc/msg17647.html
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-This is indeed caused by the "request" introduced by the above said
-commit, that in rza1 pincontroller, actually muxes the requested
-pin as GPIO.
+are available in the git repository at:
 
-Reverting that commit solves all the issues in our case too.
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.14-dt2
 
-Thanks
-   j
->
-> Best regards,
->
-> Thomas
-> --
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+for you to fetch changes up to 2b17939d9ec4f5d8c50b6277a8e5c0e5a4a8c96b:
+
+  ARM: dts: at91: at91sam9g45: add AC97 (2017-08-30 18:30:56 +0200)
+
+----------------------------------------------------------------
+DT for 4.14
+
+ - sama5d2: add classD, ISC and QSPI
+ - New SoM and board: sama5d27 SoM1
+ - at91sam9g45: add AC97
+
+----------------------------------------------------------------
+Claudiu Beznea (2):
+      ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1 support
+      ARM: dts: at91: at91-sama5d27_som1_ek: Add sama5d27 SoM1 EK support
+
+Cyrille Pitchen (3):
+      ARM: dts: at91: sama5d2: add QSPI nodes
+      ARM: dts: at91: sama5d2: add classd nodes
+      ARM: dts: at91: sama5d2_xplained: add pin muxing and enable classd
+
+Dmitry Rezvanov (1):
+      ARM: dts: at91: at91sam9g45: add AC97
+
+Ludovic Desroches (1):
+      ARM: dts: at91: sama5d2_xplained: use pin macros instead of numbers
+
+Songjun Wu (1):
+      ARM: dts: at91: sama5d2: add isc node
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-sama5d27_som1.dtsi   | 102 ++++++
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 537 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts |  39 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi          |  21 ++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |   4 +
+ arch/arm/boot/dts/sama5d2.dtsi              |  77 +++-
+ 7 files changed, 769 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
