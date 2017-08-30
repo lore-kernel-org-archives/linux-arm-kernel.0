@@ -1,185 +1,180 @@
 From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 30 Aug 2017 15:41:18 +0100
-Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu capacity-dmips-mhz
- information
+Date: Wed, 30 Aug 2017 15:41:17 +0100
+Subject: [PATCH 1/4] arm: topology: remove cpu_efficiency
 In-Reply-To: <20170830144120.9312-1-dietmar.eggemann@arm.com>
 References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
-Message-ID: <20170830144120.9312-3-dietmar.eggemann@arm.com>
+Message-ID: <20170830144120.9312-2-dietmar.eggemann@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following 'capacity-dmips-mhz' dt property values are used:
+Remove the 'cpu_efficiency/clock-frequency dt property' based solution
+to set cpu capacity which was only working for Cortex-A15/A7 arm
+big.LITTLE systems.
 
-Cortex-A15: 1024, Cortex-A7: 539
+I.e. the 'capacity-dmips-mhz' based solution is now the only one. It is
+shared between arm and arm64 and works for every big.LITTLE system no
+matter which core types it consists of.
 
-They have been derived from the cpu_efficiency values:
-
-Cortex-A15: 3891, Cortex-A7: 2048
-
-by scaling them so that the Cortex-A15s (big cores) use 1024.
-
-The cpu_efficiency values were originally derived from the "Big.LITTLE
-Processing with ARM Cortex?-A15 & Cortex-A7" white paper
-(http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
-(3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
-Dhrystone benchmark.
-
-The following platforms are affected once cpu-invariant accounting
-support is re-connected to the task scheduler:
-
-arndale-octa, peach-pi, peach-pit, smdk5420
-
-The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
-5800).
-
-$ cat /sys/devices/system/cpu/cpu*/cpu_capacity
-1024
-1024
-1024
-1024
-389
-389
-389
-389
-
-The Cortex-A15 vs Cortex-A7 performance ratio is 1024/389 = 2.63.
-
-The values derived with the 'cpu_efficiency/clock-frequency dt property'
-solution are:
-
-$ cat /sys/devices/system/cpu/cpu*/cpu_capacity
-1535
-1535
-1535
-1535
-448
-448
-448
-448
-
-The Cortex-A15 vs Cortex-A7 performance ratio is 1535/448 = 3.43.
-
-The discrepancy between 2.63 and 3.43 is due to the false assumption
-when using the 'cpu_efficiency/clock-frequency dt property' solution
-that the max cpu frequency of the little cpus is 1 GHZ and not 1.3 GHz.
-The Cortex-A7 cluster runs with a max cpu frequency of 1.3 GHZ whereas
-the 'clock-frequency' property value is set to 1 GHz.
-
-3.43/1.3 = 2.64
-
-$ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
-1800000
-1800000
-1800000
-1800000
-1300000 <-- max cpu frequency of the Cortex-A7s (little cores)
-1300000
-1300000
-1300000
-
-Running another benchmark (single-threaded sysbench affine to the
-individual cpus) with performance cpufreq governor on the Samsung
-Chromebook 2 13" showed the following numbers:
-
-$ for i in `seq 0 7`; do taskset -c $i sysbench --test=cpu
-  --num-threads=1 --max-time=10 run | grep "total number of events:";
-  done
-
-total number of events: 1083
-total number of events: 1085
-total number of events: 1085
-total number of events: 1085
-total number of events: 454
-total number of events: 454
-total number of events: 454
-total number of events: 454
-
-The Cortex-A15 vs Cortex-A7 performance ratio is 2.39, i.e. very close
-to the one derived from the Dhrystone based one of the "Big.LITTLE
-Processing with ARM Cortex?-A15 & Cortex-A7" white paper (2.63).
-
-We don't aim for exact values for the cpu capacity values. Besides the
-CPI (Cycles Per Instruction), the instruction mix and whether the system
-runs cpu-bound or memory-bound has an impact on the cpu capacity values
-derived from these benchmark results.
-
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Vincent Guittot <vincent.guittot@linaro.org>
+Cc: Juri Lelli <juri.lelli@arm.com>
 Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 ---
- arch/arm/boot/dts/exynos5420-cpus.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/kernel/topology.c | 113 ++-------------------------------------------
+ 1 file changed, 3 insertions(+), 110 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-index 5c052d7ff554..d7d703aa1699 100644
---- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-@@ -36,6 +36,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <11>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <1024>;
- 		};
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index bf949a763dbe..04ccfdd94213 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -47,52 +47,10 @@
+  */
  
- 		cpu1: cpu at 1 {
-@@ -48,6 +49,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <11>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <1024>;
- 		};
+ #ifdef CONFIG_OF
+-struct cpu_efficiency {
+-	const char *compatible;
+-	unsigned long efficiency;
+-};
+-
+-/*
+- * Table of relative efficiency of each processors
+- * The efficiency value must fit in 20bit and the final
+- * cpu_scale value must be in the range
+- *   0 < cpu_scale < 3*SCHED_CAPACITY_SCALE/2
+- * in order to return@most 1 when DIV_ROUND_CLOSEST
+- * is used to compute the capacity of a CPU.
+- * Processors that are not defined in the table,
+- * use the default SCHED_CAPACITY_SCALE value for cpu_scale.
+- */
+-static const struct cpu_efficiency table_efficiency[] = {
+-	{"arm,cortex-a15", 3891},
+-	{"arm,cortex-a7",  2048},
+-	{NULL, },
+-};
+-
+-static unsigned long *__cpu_capacity;
+-#define cpu_capacity(cpu)	__cpu_capacity[cpu]
+-
+-static unsigned long middle_capacity = 1;
+-static bool cap_from_dt = true;
+-
+-/*
+- * Iterate all CPUs' descriptor in DT and compute the efficiency
+- * (as per table_efficiency). Also calculate a middle efficiency
+- * as close as possible to  (max{eff_i} - min{eff_i}) / 2
+- * This is later used to scale the cpu_capacity field such that an
+- * 'average' CPU is of middle capacity. Also see the comments near
+- * table_efficiency[] and update_cpu_capacity().
+- */
+ static void __init parse_dt_topology(void)
+ {
+-	const struct cpu_efficiency *cpu_eff;
+-	struct device_node *cn = NULL;
+-	unsigned long min_capacity = ULONG_MAX;
+-	unsigned long max_capacity = 0;
+-	unsigned long capacity = 0;
+-	int cpu = 0;
+-
+-	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
+-				 GFP_NOWAIT);
++	struct device_node *cn;
++	int cpu;
  
- 		cpu2: cpu at 2 {
-@@ -60,6 +62,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <11>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <1024>;
- 		};
+ 	cn = of_find_node_by_path("/cpus");
+ 	if (!cn) {
+@@ -101,9 +59,6 @@ static void __init parse_dt_topology(void)
+ 	}
  
- 		cpu3: cpu at 3 {
-@@ -72,6 +75,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <11>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <1024>;
- 		};
+ 	for_each_possible_cpu(cpu) {
+-		const u32 *rate;
+-		int len;
+-
+ 		/* too early to use cpu->of_node */
+ 		cn = of_get_cpu_node(cpu, NULL);
+ 		if (!cn) {
+@@ -115,73 +70,13 @@ static void __init parse_dt_topology(void)
+ 			of_node_put(cn);
+ 			continue;
+ 		}
+-
+-		cap_from_dt = false;
+-
+-		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
+-			if (of_device_is_compatible(cn, cpu_eff->compatible))
+-				break;
+-
+-		if (cpu_eff->compatible == NULL)
+-			continue;
+-
+-		rate = of_get_property(cn, "clock-frequency", &len);
+-		if (!rate || len != 4) {
+-			pr_err("%s missing clock-frequency property\n",
+-				cn->full_name);
+-			continue;
+-		}
+-
+-		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
+-
+-		/* Save min capacity of the system */
+-		if (capacity < min_capacity)
+-			min_capacity = capacity;
+-
+-		/* Save max capacity of the system */
+-		if (capacity > max_capacity)
+-			max_capacity = capacity;
+-
+-		cpu_capacity(cpu) = capacity;
+ 	}
  
- 		cpu4: cpu at 100 {
-@@ -85,6 +89,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <7>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <539>;
- 		};
+-	/* If min and max capacities are equals, we bypass the update of the
+-	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
+-	 * compute a middle_capacity factor that will ensure that the capacity
+-	 * of an 'average' CPU of the system will be as close as possible to
+-	 * SCHED_CAPACITY_SCALE, which is the default value, but with the
+-	 * constraint explained near table_efficiency[].
+-	 */
+-	if (4*max_capacity < (3*(max_capacity + min_capacity)))
+-		middle_capacity = (min_capacity + max_capacity)
+-				>> (SCHED_CAPACITY_SHIFT+1);
+-	else
+-		middle_capacity = ((max_capacity / 3)
+-				>> (SCHED_CAPACITY_SHIFT-1)) + 1;
+-
+-	if (cap_from_dt)
+-		topology_normalize_cpu_scale();
+-}
+-
+-/*
+- * Look for a customed capacity of a CPU in the cpu_capacity table during the
+- * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
+- * function returns directly for SMP system.
+- */
+-static void update_cpu_capacity(unsigned int cpu)
+-{
+-	if (!cpu_capacity(cpu) || cap_from_dt)
+-		return;
+-
+-	topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+-
+-	pr_info("CPU%u: update cpu_capacity %lu\n",
+-		cpu, topology_get_cpu_scale(NULL, cpu));
++	topology_normalize_cpu_scale();
+ }
  
- 		cpu5: cpu at 101 {
-@@ -97,6 +102,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <7>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <539>;
- 		};
+ #else
+ static inline void parse_dt_topology(void) {}
+-static inline void update_cpu_capacity(unsigned int cpuid) {}
+ #endif
  
- 		cpu6: cpu at 102 {
-@@ -109,6 +115,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <7>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <539>;
- 		};
+  /*
+@@ -277,8 +172,6 @@ void store_cpu_topology(unsigned int cpuid)
  
- 		cpu7: cpu at 103 {
-@@ -121,6 +128,7 @@
- 			cooling-min-level = <0>;
- 			cooling-max-level = <7>;
- 			#cooling-cells = <2>; /* min followed by max */
-+			capacity-dmips-mhz = <539>;
- 		};
- 	};
- };
+ 	update_siblings_masks(cpuid);
+ 
+-	update_cpu_capacity(cpuid);
+-
+ 	pr_info("CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
+ 		cpuid, cpu_topology[cpuid].thread_id,
+ 		cpu_topology[cpuid].core_id,
 -- 
 2.11.0
