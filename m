@@ -1,91 +1,71 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 30 Aug 2017 15:26:43 +0000
-Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
-In-Reply-To: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
-References: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
-Message-ID: <AM3PR04MB306B15744B7A42B55A69C8A809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Aug 2017 16:22:44 +0100
+Subject: Applied "ASoC: rockchip: constify snd_soc_ops structures" to the asoc
+ tree
+In-Reply-To: <20170830095814.2030-1-jeffy.chen@rock-chips.com>
+Message-ID: <E1dn4pI-0003SU-7O@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Leonard Crestez [mailto:leonard.crestez at nxp.com]
-> Sent: Monday, August 28, 2017 7:05 PM
-> To: Shawn Guo; Viresh Kumar; Rafael J. Wysocki
-> Cc: Anson Huang; Fabio Estevam; A.s. Dong; Lucas Stach; Jacky Bai;
-> kernel at pengutronix.de; linux-pm at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
-> 
-> This patch contains the minimal changes required to support imx6sx OPP of
-> 198 Mhz. Without this patch cpufreq still reports success but the
-> frequency is not changed, the "arm" clock will still be at 396000000 in
-> clk_summary.
-> 
-> In order to do this PLL1 needs to be still kept enabled while changing the
-> ARM clock. This is a hardware requirement: when ARM_PODF is changed in CCM
-> we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy, and this
-> bit is sync with PLL1 clock, so if PLL1 NOT enabled, this bit will never
-> get clear.
-> 
-> Keep pll1_sys explicitly enabled until after the rate is change to deal
-> with this. Otherwise from the clk framework perspective pll1_sys is unused
-> and gets turned off.
-> 
+The patch
 
-Seems like a clever method to me.
-So:
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+   ASoC: rockchip: constify snd_soc_ops structures
 
-Regards
-Dong Aisheng
+has been applied to the asoc tree at
 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> ---
-> Changes since v1:
->  - Link: https://lkml.org/lkml/2017/7/19/302
->  - Only keep pll1_sys enabled until after ARM rate is changed.
->  - Incorporate more elaborate explanation from Anson
->  - Do not add new clocks or bypass PLL1. Just let it get disabled.
-> 
->  drivers/cpufreq/imx6q-cpufreq.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-
-> cpufreq.c index b6edd3c..14466a9 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -47,6 +47,7 @@ static int imx6q_set_target(struct cpufreq_policy
-> *policy, unsigned int index)
->  	struct dev_pm_opp *opp;
->  	unsigned long freq_hz, volt, volt_old;
->  	unsigned int old_freq, new_freq;
-> +	bool pll1_sys_temp_enabled = false;
->  	int ret;
-> 
->  	new_freq = freq_table[index].frequency; @@ -124,6 +125,10 @@ static
-> int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
->  			clk_set_rate(pll1_sys_clk, new_freq * 1000);
->  			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +		} else {
-> +			/* pll1_sys needs to be enabled for divider rate change
-> to work. */
-> +			pll1_sys_temp_enabled = true;
-> +			clk_prepare_enable(pll1_sys_clk);
->  		}
->  	}
-> 
-> @@ -135,6 +140,10 @@ static int imx6q_set_target(struct cpufreq_policy
-> *policy, unsigned int index)
->  		return ret;
->  	}
-> 
-> +	/* PLL1 is only needed until after ARM-PODF is set. */
-> +	if (pll1_sys_temp_enabled)
-> +		clk_disable_unprepare(pll1_sys_clk);
-> +
->  	/* scaling down?  scale voltage after frequency */
->  	if (new_freq < old_freq) {
->  		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> --
-> 2.7.4
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 1fe165b7e9c3e1b1cfa98310979db0814c7445ea Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 30 Aug 2017 17:58:14 +0800
+Subject: [PATCH] ASoC: rockchip: constify snd_soc_ops structures
+
+Add const to dp/dmic snd_soc_ops.
+
+Fixes: 626d84db64d7 (ASoC: rockchip: Add support for DMIC codec)
+Fixes: 3313faf1053e (ASoC: rockchip: Add support for DP codec)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/rockchip/rk3399_gru_sound.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 5ab25962cabd..0513fe480353 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -301,11 +301,11 @@ static const struct snd_soc_ops rockchip_sound_da7219_ops = {
+ 	.hw_params = rockchip_sound_da7219_hw_params,
+ };
+ 
+-static struct snd_soc_ops rockchip_sound_cdndp_ops = {
++static const struct snd_soc_ops rockchip_sound_cdndp_ops = {
+ 	.hw_params = rockchip_sound_cdndp_hw_params,
+ };
+ 
+-static struct snd_soc_ops rockchip_sound_dmic_ops = {
++static const struct snd_soc_ops rockchip_sound_dmic_ops = {
+ 	.hw_params = rockchip_sound_dmic_hw_params,
+ };
+ 
+-- 
+2.14.1
