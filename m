@@ -1,78 +1,38 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Wed, 30 Aug 2017 05:01:06 +0200
-Subject: [PATCH 3/7] ARM: dts: sun8i: h3: Enable dwmac-sun8i on the Nanopi M1
- Plus
+Date: Wed, 30 Aug 2017 05:01:09 +0200
+Subject: [PATCH 6/7] ARM: dts: sun8i: h3: Adding UART3 RTS and CTS Pins
 In-Reply-To: <1504062070-13523-1-git-send-email-embed3d@gmail.com>
 References: <1504062070-13523-1-git-send-email-embed3d@gmail.com>
-Message-ID: <1504062070-13523-4-git-send-email-embed3d@gmail.com>
+Message-ID: <1504062070-13523-7-git-send-email-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philipp Rossak <embed3d@gmail.com>
 
-The dwmac-sun8i hardware is present on the Nanopi M1 Plus.
-It uses an external PHY.
+This node adds the definition for the UART3 RTS and CTS Pins
+
+That makes it able to use UART3 with RTS and CTS.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 32 +++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index ece275b..b9c6c27 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -45,6 +45,20 @@
- / {
- 	model = "FriendlyArm NanoPi M1 Plus";
- 	compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index d38282b..7f750ef 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -381,6 +381,11 @@
+ 				pins = "PA13", "PA14";
+ 				function = "uart3";
+ 			};
 +
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
-+	};
- };
++			uart3_rts_cts_pins: uart3_rts_cts {
++				pins = "PA15", "PA16";
++				function = "uart3";
++			};
+ 		};
  
- &ehci1 {
-@@ -55,12 +69,30 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+
-+	allwinner,leds-active-low;
-+	status = "okay";
-+};
-+
- &ir {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
- 	status = "okay";
- };
- 
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+	};
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
+ 		timer at 01c20c00 {
 -- 
 2.7.4
