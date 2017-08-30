@@ -1,117 +1,210 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 Aug 2017 10:58:54 +0100
-Subject: [RFC PATCH] arm64: move THREAD_* definitions to separated header
-In-Reply-To: <20170830092249.20638-1-ynorov@caviumnetworks.com>
-References: <20170830092249.20638-1-ynorov@caviumnetworks.com>
-Message-ID: <20170830095854.GA17353@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 30 Aug 2017 11:03:00 +0100
+Subject: [RFC PATCH v9 5/7] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170829131238.4988-6-jglauber@cavium.com>
+References: <20170829131238.4988-1-jglauber@cavium.com>
+ <20170829131238.4988-6-jglauber@cavium.com>
+Message-ID: <09997d9f-0003-0eb0-63d1-9b31e26e2229@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 12:22:49PM +0300, Yury Norov wrote:
-> Hi Mark, all.
-
-Hi Yury, 
-
-> In patch 'dbc9344a68e506f19f8 ("arm64: clean up THREAD_* definitions")'
-> you move THREAD_* definitions from arch/arm64/include/asm/thread_info.h
-> to asm/memory.h. After that asm/thread_info.h starts to depend on
-> asm/memory.h.
-> 
-> When I try to apply ilp32 series on top of it [1], it causes circular
-> dependencies like this one:
-> 
-> In file included from ./arch/arm64/include/asm/memory.h:30:0,
->                  from ./arch/arm64/include/asm/thread_info.h:30,
->                  from ./include/linux/thread_bits.h:20,
->                  from ./include/linux/thread_info.h:13,
->                  from ./include/asm-generic/preempt.h:4,
->                  from ./arch/arm64/include/generated/asm/preempt.h:1,
->                  from ./include/linux/preempt.h:80,
->                  from ./include/linux/rcupdate.h:40,
->                  from ./include/linux/rculist.h:10,
->                  from ./include/linux/pid.h:4,
->                  from ./include/linux/sched.h:13,
->                  from arch/arm64/kernel/asm-offsets.c:21:
-> ./arch/arm64/include/asm/is_compat.h: In function ?is_a32_compat_task?:
-> ./arch/arm64/include/asm/is_compat.h:25:9: error: implicit declaration of function ?test_thread_flag? [-Werror=implicit-function-declaration]
->   return test_thread_flag(TIF_32BIT);
->          ^~~~~~~~~~~~~~~~
-> 
-> The problem is that asm/memory.h depends on asm/is_compat.h to define
-> TASK_SIZE, which in turn requires asm/thread_info.h.
-
-... and <asm/thread_info.h> include <asm/memory.h>, giving a circular
-dependency.
-
-In other architectures, TASK_SIZE is defined in processor.h. Can we not
-move TASK_SIZE instead of THREAD_SIZE, given that TASK_SIZE is what
-causes the dependency?
-
-We'd need a new __ASSEMBLY__ guard, but otherwise it looks like that
-would solve the issue.
-
-> The most obvious solution for it is to create is_compat.c file and make
-> is_*_compat() real functions. The other option is to move THREAD_*
-> definitions to separated macro. I would prefer 2nd one because of following
-> reasons:
->  - TASK_SIZE macro is used many times in kernel, including hot paths;
->  - asm/memory.h is included widely, as well as asm/thread_info.h, and it's
->    better not to make them depend one from another;
->  - THREAD_SIZE etc are not memory-related definitions.
-
-I disagree with this last point. THREAD_SIZE is in <asm/memory.h>
-because it affects the kernel's memory layout, as with other definitions
-at the top of <asm/memory.h>.
-
-I would much prefer keeping those definitions together.
-
-> In this patch THREAD_* definitions moved to separated asm/thread_size.h
-> header. It's enough to resolve dependency above.
+On 29/08/17 14:12, Jan Glauber wrote:
+> Add support for the PMU counters on Cavium SOC memory controllers.
 >
-> If you find this approach useful, I can prepare other patch that moves
-> TASK_* definitions from asm/memory.h to new header to remove the dependency
-> from asm/is_compat.h.
+> This patch also adds generic functions to allow supporting more
+> devices with PMU counters.
+>
+> Properties of the LMC PMU counters:
+> - not stoppable
+> - fixed purpose
+> - read-only
+> - one PCI device per memory controller
+>
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
 
-I'd prefer that we moved the TASK_SIZE* definitions first, but if
-necessary, I'm ok with seeing the THREAD_SIZE* definitions move.
+Jan,
 
-[...]
+Some minor comments below.
 
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> +static void cvm_pmu_del(struct perf_event *event, int flags)
+> +{
+> +	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	int i;
+> +
+> +	event->pmu->stop(event, PERF_EF_UPDATE);
+> +
+> +	/*
+> +	 * For programmable counters we need to check where we installed it.
+> +	 * To keep this function generic always test the more complicated
+> +	 * case (free running counters won't need the loop).
+> +	 */
+> +	for (i = 0; i < pmu_dev->num_counters; i++)
+> +		if (cmpxchg(&pmu_dev->events[i], event, NULL) == event)
+> +			break;
 
-> -#include <asm/memory.h>
-> +#include <asm/thread_size.h>
->  #include <asm/stack_pointer.h>
->  #include <asm/types.h>
+Does this mean, it is the only way to map any given event (for programmable counters)
+to a hardware counter ? What do we store in hwc->idx ? We have 2 additional
+struct hw_perf_event_extra fields. We should be able to use one field to map it
+back to the counter, isn't it ?
 
-Nit: please keep includes ordered alphabetically.
+> +
+> +	perf_event_update_userpage(event);
+> +	hwc->idx = -1;
+> +}
+> +
 
-[...]
+...
 
-> diff --git a/arch/arm64/include/asm/thread_size.h b/arch/arm64/include/asm/thread_size.h
+> +/* LMC events */
+> +#define LMC_EVENT_IFB_CNT		0x1d0
+> +#define LMC_EVENT_OPS_CNT		0x1d8
+> +#define LMC_EVENT_DCLK_CNT		0x1e0
+> +#define LMC_EVENT_BANK_CONFLICT1	0x360
+> +#define LMC_EVENT_BANK_CONFLICT2	0x368
+> +
+> +#define CVM_PMU_LMC_EVENT_ATTR(_name, _id)						\
+> +	&((struct perf_pmu_events_attr[]) {						\
+> +		{									\
+> +			__ATTR(_name, S_IRUGO, cvm_pmu_event_sysfs_show, NULL),		\
+> +			_id,								\
+> +			"lmc_event=" __stringify(_id),					\
+> +		}									\
+> +	})[0].attr.attr
+> +
+> +/* map counter numbers to register offsets */
+> +static int lmc_events[] = {
+> +	LMC_EVENT_IFB_CNT,
+> +	LMC_EVENT_OPS_CNT,
+> +	LMC_EVENT_DCLK_CNT,
+> +	LMC_EVENT_BANK_CONFLICT1,
+> +	LMC_EVENT_BANK_CONFLICT2,
+> +};
+> +
+> +static int cvm_pmu_lmc_add(struct perf_event *event, int flags)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +
+> +	return cvm_pmu_add(event, flags, LMC_CONFIG_OFFSET,
+> +			   lmc_events[hwc->config]);
+> +}
+> +
 
-> +#ifdef __KERNEL__
+Is there any reason why we can't use the LMC event code directly
+here, avoiding the mapping altogether ?
 
-This can go. We haven't needed __KERNEL__ ifdefs for a long time now...
+> +PMU_FORMAT_ATTR(lmc_event, "config:0-2");
+> +
+> +static struct attribute *cvm_pmu_lmc_format_attr[] = {
+> +	&format_attr_lmc_event.attr,
+> +	NULL,
+> +};
+> +
+> +static struct attribute_group cvm_pmu_lmc_format_group = {
+> +	.name = "format",
+> +	.attrs = cvm_pmu_lmc_format_attr,
+> +};
+> +
+> +static struct attribute *cvm_pmu_lmc_events_attr[] = {
+> +	CVM_PMU_LMC_EVENT_ATTR(ifb_cnt,		0),
+> +	CVM_PMU_LMC_EVENT_ATTR(ops_cnt,		1),
+> +	CVM_PMU_LMC_EVENT_ATTR(dclk_cnt,	2),
+> +	CVM_PMU_LMC_EVENT_ATTR(bank_conflict1,	3),
+> +	CVM_PMU_LMC_EVENT_ATTR(bank_conflict2,	4),
+> +	NULL,
+> +};
+> +
+> +static struct attribute_group cvm_pmu_lmc_events_group = {
+> +	.name = "events",
+> +	.attrs = cvm_pmu_lmc_events_attr,
+> +};
+> +
+> +static const struct attribute_group *cvm_pmu_lmc_attr_groups[] = {
+> +	&cvm_pmu_attr_group,
+> +	&cvm_pmu_lmc_format_group,
+> +	&cvm_pmu_lmc_events_group,
+> +	NULL,
+> +};
+> +
+> +static bool cvm_pmu_lmc_event_valid(u64 config)
+> +{
+> +	return (config < ARRAY_SIZE(lmc_events));
+> +}
+> +
+> +int cvm_lmc_pmu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+> +{
+> +	struct cvm_pmu_dev *next, *lmc;
+> +	int nr = 0, ret = -ENOMEM;
+> +
+> +	lmc = kzalloc(sizeof(*lmc), GFP_KERNEL);
+> +	if (!lmc)
+> +		return -ENOMEM;
 
-[...]
+As Shaokun mentioned already, we could use devm_kzalloc() to avoid having to
+cleanup the memory explicitly upon error and during module unload.
 
-> diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
-> index e56d848b6466..46b91702ea26 100644
-> --- a/arch/arm64/kernel/hibernate-asm.S
-> +++ b/arch/arm64/kernel/hibernate-asm.S
-> @@ -22,7 +22,6 @@
->  #include <asm/asm-offsets.h>
->  #include <asm/assembler.h>
->  #include <asm/cputype.h>
-> -#include <asm/memory.h>
->  #include <asm/page.h>
->  #include <asm/virt.h>
+> +
+> +	lmc->map = ioremap(pci_resource_start(pdev, 0),
+> +			   pci_resource_len(pdev, 0));
 
-AFAICT, we can also lose <linux/errno.h>, <asm/cputype.h>, and
-<asm/virt.h>.
+Use devm_ioremap here. See below.
 
-Changes to this file might be better as a preparatory cleanup.
+> +	if (!lmc->map)
+> +		goto fail_ioremap;
+> +
+> +	list_for_each_entry(next, &cvm_pmu_lmcs, entry)
+> +		nr++;
+> +	lmc->pmu_name = kasprintf(GFP_KERNEL, "lmc%d", nr);
 
-Thanks,
-Mark.
+Again, you could remove the field and use devm_kasprintf() into a local
+variable for using it with pmu_register. It would be automatically free'd
+upon error or device removal.
+
+> +	if (!lmc->pmu_name)
+> +		goto fail_kasprintf;
+> +
+> +	lmc->pdev = pdev;
+> +	lmc->num_counters = ARRAY_SIZE(lmc_events);
+> +	lmc->pmu = (struct pmu) {
+> +		.task_ctx_nr    = perf_invalid_context,
+> +		.event_init	= cvm_pmu_event_init,
+> +		.add		= cvm_pmu_lmc_add,
+> +		.del		= cvm_pmu_del,
+> +		.start		= cvm_pmu_start,
+> +		.stop		= cvm_pmu_stop,
+> +		.read		= cvm_pmu_read,
+> +		.attr_groups	= cvm_pmu_lmc_attr_groups,
+> +	};
+> +
+> +	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CVM_ONLINE,
+> +					 &lmc->cpuhp_node);
+> +
+> +	/*
+> +	 * perf PMU is CPU dependent so pick a random CPU and migrate away
+> +	 * if it goes offline.
+> +	 */
+> +	cpumask_set_cpu(smp_processor_id(), &lmc->active_mask);
+> +
+> +	list_add(&lmc->entry, &cvm_pmu_lmcs);
+> +	lmc->event_valid = cvm_pmu_lmc_event_valid;
+> +
+> +	ret = perf_pmu_register(&lmc->pmu, lmc->pmu_name, -1);
+> +	if (ret)
+> +		goto fail_pmu;
+> +
+> +	dev_info(&pdev->dev, "Enabled %s PMU with %d counters\n",
+> +		 lmc->pmu_name, lmc->num_counters);
+> +	return 0;
+> +
+> +fail_pmu:
+> +	kfree(lmc->pmu_name);
+> +	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_CVM_ONLINE,
+> +				    &lmc->cpuhp_node);
+> +fail_kasprintf:
+> +	iounmap(lmc->map);
+> +fail_ioremap:
+> +	kfree(lmc);
+
+As mentioned above, if you switch to devm_* versions, you could get rid of this
+kfrees and iounmap.
