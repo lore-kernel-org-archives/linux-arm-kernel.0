@@ -1,112 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Aug 2017 14:28:45 +0200
-Subject: [PATCH v3 2/2] arm64: dts: marvell: mcbin: enable more networking
- ports
-In-Reply-To: <20170830093641.GH31552@kwain> (Antoine Tenart's message of "Wed,
- 30 Aug 2017 11:36:41 +0200")
-References: <20170824084639.19282-1-antoine.tenart@free-electrons.com>
- <20170824084639.19282-2-antoine.tenart@free-electrons.com>
- <20170830093641.GH31552@kwain>
-Message-ID: <87fuc944ua.fsf@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Aug 2017 14:29:24 +0200
+Subject: [PATCH 1/2] clk: sunxi-ng: Provide a default reset hook
+In-Reply-To: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
+References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAPDyKFonXp4Uqi=DLxKf=1ecOx-2E5mUkEXqnqJPE-J57xXQcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On mer., ao?t 30 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On 25 August 2017 at 11:49, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The reset hook was left implemented. Provide a dumb implementation so that
+> client drivers can depend on it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> Hi Gregory,
->
-> On Thu, Aug 24, 2017 at 10:46:39AM +0200, Antoine Tenart wrote:
->> This patch enables the two GE/SFP ports. They are configured in 10GKR
->> mode by default. To do this the cpm_xdmio is enabled as well, and two
->> phy descriptions are added.
->> 
->> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->> Tested-by: Marcin Wojtas <mw@semihalf.com>
->
-> These DT changes (patches 1/2 and 2/2) came along a series with patches
-> on the PPv2 driver. All the net part was merged in linux-next, but these
-> two dt patches were not taken because we all were in holidays.
->
-> I know it's very late, but it would be very nice to have these two
-> patches merged for 4.14.
+Do you want me to pick this up via my mmc tree? If so, is that okay by
+the clock maintainers?
 
-I added them to mvebu/dt64 and made a pull request with the patch from
-Thomas.
+Kind regards
+Uffe
 
-Thanks,
-
-Gregory
-
+> ---
+>  drivers/clk/sunxi-ng/ccu_reset.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 >
-> Thanks!
-> Antoine
+> diff --git a/drivers/clk/sunxi-ng/ccu_reset.c b/drivers/clk/sunxi-ng/ccu_reset.c
+> index 6c31d48783a7..1dc4e98ea802 100644
+> --- a/drivers/clk/sunxi-ng/ccu_reset.c
+> +++ b/drivers/clk/sunxi-ng/ccu_reset.c
+> @@ -8,6 +8,7 @@
+>   * the License, or (at your option) any later version.
+>   */
 >
->> ---
->>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 30 +++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->> 
->> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> index abd39d1c1739..9f0a00802452 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> @@ -127,6 +127,30 @@
->>  	};
->>  };
->>  
->> +&cpm_xmdio {
->> +	status = "okay";
->> +
->> +	phy0: ethernet-phy at 0 {
->> +		compatible = "ethernet-phy-ieee802.3-c45";
->> +		reg = <0>;
->> +	};
->> +
->> +	phy8: ethernet-phy at 8 {
->> +		compatible = "ethernet-phy-ieee802.3-c45";
->> +		reg = <8>;
->> +	};
->> +};
->> +
->> +&cpm_ethernet {
->> +	status = "okay";
->> +};
->> +
->> +&cpm_eth0 {
->> +	status = "okay";
->> +	phy = <&phy0>;
->> +	phy-mode = "10gbase-kr";
->> +};
->> +
->>  &cpm_sata0 {
->>  	/* CPM Lane 0 - U29 */
->>  	status = "okay";
->> @@ -154,6 +178,12 @@
->>  	status = "okay";
->>  };
->>  
->> +&cps_eth0 {
->> +	status = "okay";
->> +	phy = <&phy8>;
->> +	phy-mode = "10gbase-kr";
->> +};
->> +
->>  &cps_eth1 {
->>  	/* CPS Lane 0 - J5 (Gigabit RJ45) */
->>  	status = "okay";
->> -- 
->> 2.13.5
->> 
+> +#include <linux/delay.h>
+>  #include <linux/io.h>
+>  #include <linux/reset-controller.h>
 >
-> -- 
-> Antoine T?nart, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> @@ -49,7 +50,18 @@ static int ccu_reset_deassert(struct reset_controller_dev *rcdev,
+>         return 0;
+>  }
 >
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> +static int ccu_reset_reset(struct reset_controller_dev *rcdev,
+> +                          unsigned long id)
+> +{
+> +       ccu_reset_assert(rcdev, id);
+> +       udelay(10);
+> +       ccu_reset_deassert(rcdev, id);
+> +
+> +       return 0;
+> +}
+> +
+>  const struct reset_control_ops ccu_reset_ops = {
+>         .assert         = ccu_reset_assert,
+>         .deassert       = ccu_reset_deassert,
+> +       .reset          = ccu_reset_reset,
+>  };
+> --
+> 2.13.5
+>
