@@ -1,67 +1,38 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 30 Aug 2017 16:50:52 +0200
-Subject: [PATCH v4] ARM: dts: stm32: change pinctrl bindings definition
-Message-ID: <1504104653-26804-1-git-send-email-alexandre.torgue@st.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Aug 2017 16:02:49 +0100
+Subject: [RESEND PATCH 2/3] regulator: Add support for stm32-vrefbuf
+In-Reply-To: <fd883990-cc87-f8cb-ebe7-5c4c4e51d6f6@st.com>
+References: <1503925133-30722-1-git-send-email-fabrice.gasnier@st.com>
+ <1503925133-30722-3-git-send-email-fabrice.gasnier@st.com>
+ <20170829185719.h5fxvzmxbysyxwml@sirena.org.uk>
+ <fd883990-cc87-f8cb-ebe7-5c4c4e51d6f6@st.com>
+Message-ID: <20170830150249.5sofmjz3n2skzucq@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initially each pin was declared in "include/dt-bindings/stm32<SOC>-pinfunc.h"
-and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
-Since this approach was approved, the number of supported MCU has
-increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
-file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
-a new approach which consist to use a macro to define pin muxing in device
-tree. All STM32 DT will use the common macro to define pinmux. Furthermore, it
-will make maintenance and integration of new SOC easier.
+On Wed, Aug 30, 2017 at 11:11:24AM +0200, Fabrice Gasnier wrote:
+> On 08/29/2017 08:57 PM, Mark Brown wrote:
+> > On Mon, Aug 28, 2017 at 02:58:52PM +0200, Fabrice Gasnier wrote:
 
-I made only one patch to avoid dependencies. Let me know if you prefer that I
-split it.
+> >> +static int __init stm32_vrefbuf_init(void)
+> >> +{
+> >> +	return platform_driver_register(&stm32_vrefbuf_driver);
+> >> +}
+> >> +subsys_initcall(stm32_vrefbuf_init);
 
-To check that patch generate same dtb than befrore I used dtc binary to (re)generate dts files
-(before and after apply the series).
+> > Why is this at subsys_initcall()?
 
-Example on stm32f469-disco:
+> Several consumers depend on it when it's being used, among which: STM32
+> internal ADC and DAC, but also external components. Purpose is to ensure
+> it's ready before these drivers gets probed, instead of being deferred.
+> Is it ok to keep it ?
 
-./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
-stm32f469-disco-after.dtb
-
-./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
-stm32f469-disco-before.dtb
-
-Then diff -u stm32f469-disco-before.dts stm32f469-disco-after.dts
-
-Changes since v3:
- -Rewrite documentation part
- -Simplify macro
-
-Changes since v2:
- -Drop RFC tag
- -Add reviewers
- -Enhance modifications to all STM32 (F4/F7/H7)
-
-Changes since v1:
- -According to Vikas Manocha review, use generic macro to define port.
-
-
-Regards
-Alex
-
-Alexandre Torgue (1):
-  ARM: dts: stm32: change pinctrl bindings definition
-
- .../bindings/pinctrl/st,stm32-pinctrl.txt          |   22 +-
- arch/arm/boot/dts/stm32f429.dtsi                   |  176 +--
- arch/arm/boot/dts/stm32f746.dtsi                   |   10 +-
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |   10 +-
- include/dt-bindings/pinctrl/stm32-pinfunc.h        |   30 +
- include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1239 ---------------
- include/dt-bindings/pinctrl/stm32f746-pinfunc.h    | 1324 ----------------
- include/dt-bindings/pinctrl/stm32h7-pinfunc.h      | 1612 --------------------
- 8 files changed, 148 insertions(+), 4275 deletions(-)
- create mode 100644 include/dt-bindings/pinctrl/stm32-pinfunc.h
- delete mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
- delete mode 100644 include/dt-bindings/pinctrl/stm32f746-pinfunc.h
- delete mode 100644 include/dt-bindings/pinctrl/stm32h7-pinfunc.h
-
--- 
-2.7.4
+No, that's not OK - just let deferred probe handle it.  The same thing
+applies to all regulator usage.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/d47026aa/attachment.sig>
