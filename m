@@ -1,128 +1,57 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Aug 2017 23:00:27 +0200
-Subject: [PATCH v3 56/59] KVM: arm/arm64: GICv4: Prevent heterogenous
- systems from using GICv4
-In-Reply-To: <bcd17108-b035-a95f-67a4-4433e2be20ae@arm.com>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-57-marc.zyngier@arm.com>
- <20170828183550.GQ24649@cbox>
- <bcd17108-b035-a95f-67a4-4433e2be20ae@arm.com>
-Message-ID: <20170830210027.GO24522@cbox>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 31 Aug 2017 05:22:48 +0800
+Subject: [PATCH v7 08/11] mm: zero reserved and unavailable struct pages
+In-Reply-To: <1503972142-289376-9-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <201708310421.NmkLnF43%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 05:03:51PM +0100, Marc Zyngier wrote:
-> On 28/08/17 19:35, Christoffer Dall wrote:
-> > On Mon, Jul 31, 2017 at 06:26:34PM +0100, Marc Zyngier wrote:
-> >> The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
-> >> cohabit with CPUs limited to GICv3 in the same system.
-> >>
-> >> This is mad (the sheduler would have to be made aware of the v4
-> > 
-> > *scheduler
-> > 
-> >> capability), and we're certainly not going to support this any
-> >> time soon. So let's check that all online CPUs are GICv4 capable,
-> >> and disable the functionnality if not.
-> > 
-> > *functionality
-> > 
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  include/linux/irqchip/arm-gic-v3.h |  2 ++
-> >>  virt/kvm/arm/vgic/vgic-v3.c        | 22 +++++++++++++++++++++-
-> >>  2 files changed, 23 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> >> index 1ea576c8126f..dfa4a51643d6 100644
-> >> --- a/include/linux/irqchip/arm-gic-v3.h
-> >> +++ b/include/linux/irqchip/arm-gic-v3.h
-> >> @@ -532,6 +532,8 @@
-> >>  #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
-> >>  #define ICH_VTR_A3V_SHIFT		21
-> >>  #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
-> >> +#define ICH_VTR_nV4_SHIFT		20
-> >> +#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
-> >>  
-> >>  #define ICC_IAR1_EL1_SPURIOUS		0x3ff
-> >>  
-> >> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> >> index 405733678c2f..252268e83ade 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> >> @@ -466,6 +466,18 @@ static int __init early_gicv4_enable(char *buf)
-> >>  }
-> >>  early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
-> >>  
-> >> +static void vgic_check_v4_cpuif(void *param)
-> >> +{
-> >> +	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
-> >> +	bool *v4 = param, this_cpu_is_v4;
-> >> +
-> >> +	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
-> >> +	if (!this_cpu_is_v4)
-> >> +		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
-> >> +
-> >> +	*v4 &= this_cpu_is_v4;
-> > 
-> > nit: You could make this function look slightly less scary by declaring
-> > this_cpu_is_v4 on a separate line and not use a bitwise operator on a
-> > boolean type.  Actually, having a function called 'check' with a side
-> > effect is not the nicest thing either, so why not just return what this
-> > particular CPU does and do the comparison in the calling loop.
-> 
-> Fair enough.
-> 
-> > #bikeshedding
-> 
-> How about this on top:
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 01eaf4ee2f63..e471750dc0a1 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -469,18 +469,16 @@ early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
->  static void vgic_check_v4_cpuif(void *param)
->  {
->  	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
-> -	bool *v4 = param, this_cpu_is_v4;
-> +	bool *v4 = param;
->  
-> -	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
-> -	if (!this_cpu_is_v4)
-> +	*v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
-> +	if (!*v4)
->  		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
-> -
-> -	*v4 &= this_cpu_is_v4;
->  }
->  
->  /**
->   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-> - * @node:	pointer to the DT node
-> + * @info:	pointer to the firmware-agnostic GIC information
->   *
->   * Returns 0 if a GICv3 has been found, returns an error code otherwise
->   */
-> @@ -504,9 +502,14 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
->  	if (info->has_v4) {
->  		int cpu;
->  
-> -		for_each_online_cpu(cpu)
-> +		for_each_online_cpu(cpu) {
-> +			bool enable;
-> +
->  			smp_call_function_single(cpu, vgic_check_v4_cpuif,
-> -						 &gicv4_enable, 1);
-> +						 &enable, 1);
-> +			gicv4_enable = gicv4_enable && enable;
-> +		}
-> +
->  		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
->  		kvm_info("GICv4 support %sabled\n",
->  			 gicv4_enable ? "en" : "dis");
-> 
+Hi Pavel,
 
-Looks good to me, thanks!
--Christoffer
+[auto build test ERROR on sparc/master]
+[also build test ERROR on v4.13-rc7 next-20170829]
+[cannot apply to mmotm/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Pavel-Tatashin/complete-deferred-page-initialization/20170831-041021
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc.git master
+config: tile-allmodconfig (attached as .config)
+compiler: tilegx-linux-gcc (GCC) 4.6.2
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
+
+All errors (new ones prefixed by >>):
+
+   In file included from include/linux/pid_namespace.h:6:0,
+                    from include/linux/ptrace.h:9,
+                    from arch/tile/kernel/asm-offsets.c:35:
+>> include/linux/mm.h:1974:33: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'zero_resv_unavail'
+   make[2]: *** [arch/tile/kernel/asm-offsets.s] Error 1
+   make[2]: Target '__build' not remade because of errors.
+   make[1]: *** [prepare0] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
+
+vim +1974 include/linux/mm.h
+
+  1970	
+  1971	#ifdef CONFIG_HAVE_MEMBLOCK
+  1972	void zero_resv_unavail(void);
+  1973	#else
+> 1974	static inline void __paginginit zero_resv_unavail(void) {}
+  1975	#endif
+  1976	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49789 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/61f40b2f/attachment-0001.gz>
