@@ -1,45 +1,80 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 30 Aug 2017 19:54:06 +0200
-Subject: [RFC PATCH v9 1/7] edac: thunderx: Remove suspend/resume support
-In-Reply-To: <20170829131238.4988-2-jglauber@cavium.com>
-References: <20170829131238.4988-1-jglauber@cavium.com>
- <20170829131238.4988-2-jglauber@cavium.com>
-Message-ID: <20170830175406.ygmathi3b5orzyqy@pd.tnic>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Aug 2017 18:57:22 +0100
+Subject: Applied "regulator: Add STM32 Voltage Reference Buffer" to the
+ regulator tree
+In-Reply-To: <1499776233-29116-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <E1dn7Ew-0001IE-Tp@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 03:12:32PM +0200, Jan Glauber wrote:
-> The memory controller on ThunderX/OcteonTX systems does not
-> support power management. Therefore remove the suspend/resume
-> callbacks.
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->  drivers/edac/thunderx_edac.c | 21 ---------------------
->  1 file changed, 21 deletions(-)
+The patch
 
-Just when I thought I'd pick that one up now because it is removing
-stuff:
+   regulator: Add STM32 Voltage Reference Buffer
 
-drivers/edac/thunderx_edac.c:817:14: error: ?thunderx_lmc_suspend? undeclared here (not in a function)
-  .suspend  = thunderx_lmc_suspend,
-              ^~~~~~~~~~~~~~~~~~~~
-drivers/edac/thunderx_edac.c:818:14: error: ?thunderx_lmc_resume? undeclared here (not in a function)
-  .resume   = thunderx_lmc_resume,
-              ^~~~~~~~~~~~~~~~~~~
-scripts/Makefile.build:308: recipe for target 'drivers/edac/thunderx_edac.o' failed
-make[1]: *** [drivers/edac/thunderx_edac.o] Error 1
-make[1]: *** Waiting for unfinished jobs....
-Makefile:1682: recipe for target 'drivers/edac/' failed
-make: *** [drivers/edac/] Error 2
+has been applied to the regulator tree at
 
-Please make sure you build and test every patch before submitting.
-You're lucky I can at least build arm64 on my x86 workstation. :-)
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
 
-Thx.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From ef7bb293a670c7a81c7a5b8aad6b93ba32e0e9ec Mon Sep 17 00:00:00 2001
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
+Date: Wed, 30 Aug 2017 17:55:27 +0200
+Subject: [PATCH] regulator: Add STM32 Voltage Reference Buffer
+
+Document STM32 VREFBUF (voltage reference buffer) which can be used as
+voltage reference for ADCs, DACs and external components.
+
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ .../bindings/regulator/st,stm32-vrefbuf.txt          | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+
+diff --git a/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+new file mode 100644
+index 000000000000..3944ee3e731e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+@@ -0,0 +1,20 @@
++STM32 VREFBUF - Voltage reference buffer
++
++Some STM32 devices embed a voltage reference buffer which can be used as
++voltage reference for ADCs, DACs and also as voltage reference for external
++components through the dedicated VREF+ pin.
++
++Required properties:
++- compatible:		Must be "st,stm32-vrefbuf".
++- reg:			Offset and length of VREFBUF register set.
++- clocks:		Must contain an entry for peripheral clock.
++
++Example:
++	vrefbuf: regulator at 58003C00 {
++		compatible = "st,stm32-vrefbuf";
++		reg = <0x58003C00 0x8>;
++		clocks = <&rcc VREF_CK>;
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <2500000>;
++		vdda-supply = <&vdda>;
++	};
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+2.14.1
