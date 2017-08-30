@@ -1,148 +1,179 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 30 Aug 2017 10:40:39 +0100
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <47f291c6-4e76-685b-b246-81bf04b410ff@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
- <47f291c6-4e76-685b-b246-81bf04b410ff@arm.com>
-Message-ID: <3c5bf8a6-dade-268c-83d3-7f3b31f4224f@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Aug 2017 10:42:58 +0100
+Subject: [PATCH v3 41/59] KVM: arm/arm64: GICv4: Wire mapping/unmapping of
+ VLPIs in VFIO irq bypass
+In-Reply-To: <20170826194850.GB11074@cbox>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-42-marc.zyngier@arm.com> <20170826194850.GB11074@cbox>
+Message-ID: <53116ae6-fd94-2687-740f-5917e158eda7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 30/08/17 10:19, Marc Zyngier wrote:
-> Hi Julien,
-> 
-> On 30/08/17 10:01, Julien Thierry wrote:
->> Software Step exception is missing after trapping instruction from the guest.
+On 26/08/17 20:48, Christoffer Dall wrote:
+> On Mon, Jul 31, 2017 at 06:26:19PM +0100, Marc Zyngier wrote:
+>> Let's use the irq bypass mechanism introduced for platform device
+>> interrupts to intercept the virtual PCIe endpoint configuration
+>> and establish our LPI->VLPI mapping.
 >>
->> We need to set the PSR.SS to 0 for the guest vcpu before resuming guest
->> execution.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>   arch/arm64/include/asm/kvm_asm.h     |  2 ++
->>   arch/arm64/include/asm/kvm_emulate.h |  2 ++
->>   arch/arm64/kvm/debug.c               | 12 +++++++++++-
->>   arch/arm64/kvm/hyp/switch.c          | 12 ++++++++++++
->>   4 files changed, 27 insertions(+), 1 deletion(-)
+>>  include/kvm/arm_vgic.h      |   8 ++++
+>>  virt/kvm/arm/arm.c          |  27 ++++++++----
+>>  virt/kvm/arm/vgic/vgic-v4.c | 103 ++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 130 insertions(+), 8 deletions(-)
 >>
->> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->> index 26a64d0..398bbaa 100644
->> --- a/arch/arm64/include/asm/kvm_asm.h
->> +++ b/arch/arm64/include/asm/kvm_asm.h
->> @@ -32,6 +32,8 @@
->>
->>   #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
->>   #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
->> +#define KVM_ARM64_DEBUG_INST_SKIP_SHIFT	1
->> +#define KVM_ARM64_DEBUG_INST_SKIP	(1 << KVM_ARM64_DEBUG_INST_SKIP_SHIFT)
->>
->>   #define kvm_ksym_ref(sym)						\
->>   	({								\
->> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->> index fe39e68..d401c64 100644
->> --- a/arch/arm64/include/asm/kvm_emulate.h
->> +++ b/arch/arm64/include/asm/kvm_emulate.h
->> @@ -95,6 +95,8 @@ static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
->>   		kvm_skip_instr32(vcpu, is_wide_instr);
->>   	else
->>   		*vcpu_pc(vcpu) += 4;
->> +	/* Let debug engine know we skipped an instruction */
->> +	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
->>   }
->>
->>   static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
->> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
->> index dbadfaf..4806e6b 100644
->> --- a/arch/arm64/kvm/debug.c
->> +++ b/arch/arm64/kvm/debug.c
->> @@ -151,12 +151,22 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->>   		 * debugging the system.
->>   		 */
->>   		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
->> -			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
->> +			/*
->> +			 * If we skipped an instruction while single stepping,
->> +			 * spsr.ss needs to be 0 in order to trigger SS
->> +			 * exception on return.
->> +			 */
->> +			if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_INST_SKIP))
->> +				*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
->> +			else
->> +				*vcpu_cpsr(vcpu) &=  ~DBG_SPSR_SS;
->>   			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
->>   		} else {
->>   			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
->>   		}
->>
->> +		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_INST_SKIP;
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 359eeffe9857..050f78d4fb42 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -367,4 +367,12 @@ int kvm_vgic_set_forwarding(struct kvm *kvm, unsigned int host_irq,
+>>  void kvm_vgic_unset_forwarding(struct kvm *kvm, unsigned int host_irq,
+>>  			       unsigned int vintid);
+>>  
+>> +struct kvm_kernel_irq_routing_entry;
 >> +
->>   		trace_kvm_arm_set_dreg32("SPSR_EL2", *vcpu_cpsr(vcpu));
->>
->>   		/*
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 945e79c..6030acd 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -22,6 +22,7 @@
->>   #include <asm/kvm_emulate.h>
->>   #include <asm/kvm_hyp.h>
->>   #include <asm/fpsimd.h>
->> +#include <asm/debug-monitors.h>
->>
->>   static bool __hyp_text __fpsimd_enabled_nvhe(void)
->>   {
->> @@ -276,6 +277,10 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->>   	}
->>
->>   	write_sysreg_el2(*vcpu_pc(vcpu), elr);
+>> +int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
+>> +			       struct kvm_kernel_irq_routing_entry *irq_entry);
 >> +
->> +	*vcpu_cpsr(vcpu) = read_sysreg_el2(spsr);
->> +	*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
->> +	write_sysreg_el2(*vcpu_cpsr(vcpu), spsr);
->>   }
->>
->>   int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->> @@ -343,6 +348,13 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->>   			if (ret == -1) {
->>   				/* Promote an illegal access to an SError */
->>   				__skip_instr(vcpu);
+>> +int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
+>> +				 struct kvm_kernel_irq_routing_entry *irq_entry);
 >> +
->> +				/*
->> +				 * We're not jumping back, let debug setup know
->> +				 * we skipped an instruction.
->> +				 */
->> +				vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
+>>  #endif /* __KVM_ARM_VGIC_H */
+>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>> index ebab6c29e3be..6803ea27c47d 100644
+>> --- a/virt/kvm/arm/arm.c
+>> +++ b/virt/kvm/arm/arm.c
+>> @@ -1457,11 +1457,16 @@ int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
+>>  	struct kvm_kernel_irqfd *irqfd =
+>>  		container_of(cons, struct kvm_kernel_irqfd, consumer);
+>>  
+>> -	if (prod->type != IRQ_BYPASS_VFIO_PLATFORM)
+>> +	switch (prod->type) {
+>> +	case IRQ_BYPASS_VFIO_PLATFORM:
+>> +		return kvm_vgic_set_forwarding(irqfd->kvm, prod->irq,
+>> +					       irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
+>> +	case IRQ_BYPASS_VFIO_PCI_MSI:
+>> +		return kvm_vgic_v4_set_forwarding(irqfd->kvm, prod->irq,
+>> +						  &irqfd->irq_entry);
+>> +	default:
+>>  		return 0;
+>> -
+>> -	return kvm_vgic_set_forwarding(irqfd->kvm, prod->irq,
+>> -				       irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
+>> +	}
+>>  }
+>>  void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
+>>  				      struct irq_bypass_producer *prod)
+>> @@ -1469,11 +1474,17 @@ void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
+>>  	struct kvm_kernel_irqfd *irqfd =
+>>  		container_of(cons, struct kvm_kernel_irqfd, consumer);
+>>  
+>> -	if (prod->type != IRQ_BYPASS_VFIO_PLATFORM)
+>> -		return;
+>> +	switch (prod->type) {
+>> +	case IRQ_BYPASS_VFIO_PLATFORM:
+>> +		kvm_vgic_unset_forwarding(irqfd->kvm, prod->irq,
+>> +					  irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
+>> +		break;
+>>  
+>> -	kvm_vgic_unset_forwarding(irqfd->kvm, prod->irq,
+>> -				  irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
+>> +	case IRQ_BYPASS_VFIO_PCI_MSI:
+>> +		kvm_vgic_v4_unset_forwarding(irqfd->kvm, prod->irq,
+>> +					     &irqfd->irq_entry);
+>> +		break;
+>> +	}
+>>  }
+>>  
+>>  void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
+>> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+>> index 207e1fda0dcd..338c86c5159f 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v4.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+>> @@ -72,3 +72,106 @@ void vgic_v4_teardown(struct kvm *kvm)
+>>  	its_vm->nr_vpes = 0;
+>>  	its_vm->vpes = NULL;
+>>  }
 >> +
+>> +static struct vgic_its *vgic_get_its(struct kvm *kvm,
+>> +				     struct kvm_kernel_irq_routing_entry *irq_entry)
+>> +{
+>> +	struct kvm_msi msi  = (struct kvm_msi) {
+>> +		.address_lo	= irq_entry->msi.address_lo,
+>> +		.address_hi	= irq_entry->msi.address_hi,
+>> +		.data		= irq_entry->msi.data,
+>> +		.flags		= irq_entry->msi.flags,
+>> +		.devid		= irq_entry->msi.devid,
+>> +	};
+>> +
+>> +	/*
+>> +	 * Get a reference on the LPI. If NULL, this is not a valid
+>> +	 * translation for any of our vITSs.
+>> +	 */
+>> +	return vgic_msi_to_its(kvm, &msi);
+>> +}
+>> +
+>> +int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
+>> +			       struct kvm_kernel_irq_routing_entry *irq_entry)
+>> +{
+>> +	struct vgic_its *its;
+>> +	struct vgic_irq *irq;
+>> +	struct its_vlpi_map map;
+>> +	int ret;
+>> +
+>> +	if (!vgic_is_v4_capable(kvm))
+>> +		return 0;
+>> +
+>> +	/*
+>> +	 * Get the ITS, and escape early on error (not a valid
+>> +	 * doorbell for any of our vITSs).
+>> +	 */
+>> +	its = vgic_get_its(kvm, irq_entry);
+>> +	if (IS_ERR(its))
+>> +		return 0;
+>> +
+>> +	mutex_lock(&its->its_lock);
+>> +
+>> +	/* Perform then actual DevID/EventID -> LPI translation. */
+>> +	ret = vgic_its_resolve_lpi(kvm, its, irq_entry->msi.devid,
+>> +				   irq_entry->msi.data, &irq);
+>> +	if (ret)
+>> +		goto out;
+>> +
+>> +	/*
+>> +	 * Emit the mapping request. If it fails, the ITS probably
+>> +	 * isn't v4 compatible, so let's silently bail out. Holding
+>> +	 * the ITS lock should ensure that nothing can modify the
+>> +	 * target vcpu.
+>> +	 */
+>> +	map = (struct its_vlpi_map) {
+>> +		.vm		= &kvm->arch.vgic.its_vm,
+>> +		.vintid		= irq->intid,
+>> +		.db_enabled	= true,
+>> +		.vpe_idx	= irq->target_vcpu->vcpu_id,
+>> +	};
+>> +
+>> +	if (its_map_vlpi(virq, &map))
+>> +		goto out;
 > 
-> This feels odd. You've already cleared the SS bit from the SPSR, and yet
-> you're setting that flag. What is the semantic of this?
+> This seems to be able to return things like -ENOMEM, whould we really
+> not report this back to the caller in any way?
 
-The thing is that whenever you get out of __kvm_vcpu_run, 
-kvm_arm_setup_debug will get called before running a guest again. So my 
-idea is that kvm_arm_setup_debug needs to be aware whether SPSR.SS must 
-be set or not. Otherwise kvm_arm_setup_debug will always set the SPSR.SS 
-flag. So KVM_ARM64_DEBUG_INST_SKIP is to tell the debug setup that we 
-skipped an instruction (here as well as in kvm_skip_instr).
 
-The fact that SPSR.SS is clear in the illegal access case is because it 
-uses __skip_instr instead of kvm_skip_instr because we have not saved 
-the guest state at that point. But the clearing of SPSR.SS in 
-__skip_instr is more targeted at cases that directly jump back into the 
-guest (trapped GICv2/3 CPUIF accesses).
+That's a good question.
 
-Let me know if you feel there is a cleaner way to do this or something 
-that would make this clearer.
+If we return -ENOMEM, we'll probably end-up returning an error to
+userspace (as a result of the VFIO ioctl), which will in turn probably
+terminate the guest (I'm guessing, I haven't actually looked at what
+userspace does).
+
+If we don't return the error, then we have a chance to keep the guest
+running by sticking to software injection.
+
+I'm not sure what is preferable...
 
 Thanks,
 
+	M.
 -- 
-Julien Thierry
+Jazz is not dead. It just smells funny...
