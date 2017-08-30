@@ -1,47 +1,49 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Wed, 30 Aug 2017 05:01:10 +0200
-Subject: [PATCH 7/7] ARM: dts: sun8i: h3: Enable AP6212 BT on uart3 on Nanopi
- M1 Plus
-In-Reply-To: <1504062070-13523-1-git-send-email-embed3d@gmail.com>
-References: <1504062070-13523-1-git-send-email-embed3d@gmail.com>
-Message-ID: <1504062070-13523-8-git-send-email-embed3d@gmail.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Wed, 30 Aug 2017 11:15:00 +0800
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <20170829124730.GH17961@rric.localdomain>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+ <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+ <20170829124730.GH17961@rric.localdomain>
+Message-ID: <576d18ea-8fc3-9722-8cd7-b16d148211c0@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Rossak <embed3d@gmail.com>
+Hi Robert,
 
-The BT side of the AP6212 WiFi/BT combo module is connected to
-uart3.
+Got it and thanks your reply.
 
-Enable BT on this board by enabling uart3 with using additionally
-the cts and rts pins.
+Shaokun
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index 3054308..8c12419 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -49,6 +49,7 @@
- 	aliases {
- 		ethernet0 = &emac;
- 		ethernet1 = &ap6212;
-+		serial1 = &uart3;
- 	};
- 
- 	reg_gmac_3v3: gmac-3v3 {
-@@ -135,3 +136,9 @@
- 		function = "gpio_out";
- 	};
- };
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins>, <&uart3_rts_cts_pins>;
-+	status = "okay";
-+};
--- 
-2.7.4
+On 2017/8/29 20:47, Robert Richter wrote:
+> Shaokun,
+> 
+> On 29.08.17 17:26:00, Zhangshaokun wrote:
+>> On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+>>> This is not a full event list, but a short list of useful events.
+>>>
+>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>> ---
+>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+>>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>>>  2 files changed, 77 insertions(+)
+>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+>>>
+>>
+>> I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+>> that would use vendor sub-folder?
+>> Of course, appreciate maintainer's comments.
+> 
+> this would just add another level of subdirectories. I rather would
+> prefer to have a per platform dir comparable to what is listed in
+> 
+>  arch/arm64/Kconfig.platforms
+> 
+> This is the same as Ganapat has implemented it.
+> 
+> -Robert
+> 
+> 
