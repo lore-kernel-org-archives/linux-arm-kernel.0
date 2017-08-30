@@ -1,32 +1,33 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 30 Aug 2017 15:18:52 +0200
-Subject: [PATCH 2/3] iommu: mtk: constify iommu_ops
-In-Reply-To: <1503922346-25947-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1503922346-25947-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20170830131852.lpkixnpt2ei4lpka@8bytes.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 30 Aug 2017 15:19:30 +0200
+Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
+In-Reply-To: <20170830230712.55db7911@canb.auug.org.au>
+References: <20170830230712.55db7911@canb.auug.org.au>
+Message-ID: <20170830131930.bvu6furm7dlhes3i@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 05:42:26PM +0530, Arvind Yadav wrote:
-> iommu_ops are not supposed to change at runtime.
-> Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
-> const iommu_ops provided by <linux/iommu.h>. So mark the non-const
-> structs as const.
+On 30/08/2017 at 23:07:12 +1000, Stephen Rothwell wrote:
+> Hi all,
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/iommu/mtk_iommu.c    | 4 ++--
->  drivers/iommu/mtk_iommu_v1.c | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
+> Commit
+> 
+>   1a9f9af07e80 ("ARM: dts: at91: at91sam9g45: add AC97")
+> 
+> is missing a Signed-off-by from its author.
+> 
 
-This doesn't apply cleanly to the arm/mediatek branch in the iommu-tree.
-Please rebase it against that branch and update the subject to:
+Oh crap, it was the only one not in linux-next... iThe original
+submission had the SoB:
+https://patchwork.kernel.org/patch/9794803/
 
-	iommu/mediatek: Constify iommu_ops
+Olof, how do you want to proceed?
 
-to match the convention used in the iommu-tree and send it again.
+> -- 
+> Cheers,
+> Stephen Rothwell
 
-
-Thanks,
-
-	Joerg
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
