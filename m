@@ -1,50 +1,54 @@
-From: kassey1216@gmail.com (Kassey)
-Date: Wed, 30 Aug 2017 16:20:27 +0800
-Subject: kasan is not working on 3.18 kernel due to patch "BACKPORT: kernel:
- add kcov code coverage"
-Message-ID: <CAKwPUoxHDW4x=uqY5o2rimHDkDPqaN1GdUZ9=eHuP1hwsa7ngw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 30 Aug 2017 10:21:46 +0200
+Subject: [PATCH 0/2] arm64: renesas: Add support for R-Car V3M
+In-Reply-To: <20170830072644.GI10398@verge.net.au>
+References: <1503665810-13945-1-git-send-email-geert+renesas@glider.be>
+ <20170828074453.GA22421@verge.net.au> <20170830072644.GI10398@verge.net.au>
+Message-ID: <CAMuHMdWvRBH8ZNgQKDGS3Z41BN7_o_H=hN5aGdbK44YT8rusXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Dmitry:
-    with your change on 3.18 kernel,
+Hi Simon,
 
-     https://github.com/Elite-Kernels/HTC-10/commit/7c8e808c673b50a52e6b5db9bba54678386fa61b
+On Wed, Aug 30, 2017 at 9:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Aug 28, 2017 at 09:44:54AM +0200, Simon Horman wrote:
+>> On Fri, Aug 25, 2017 at 02:56:48PM +0200, Geert Uytterhoeven wrote:
+>> > This patch series adds initial R-Car V3M infrastructure:
+>> >   1. SoC DT bindings,
+>> >   2. Main Kconfig symbol.
+>> >
+>> > Both follow the example set by R-Car D3 aka r8a77995, using 5-digit instead
+>> > of 4-digit part numbers.
+>> > Alternatively, we could stick to 4-digit part numbers if the fifth digit is
+>> > a zero.
+>> >
+>> > For your convenience, a branch with more preliminary work (thanks Sergei,
+>> > for posting the clock driver!) for testing on v3m/eagle is also available
+>> > in the topic/r8a77970-integration branch of my renesas-drivers git
+>> > repository at
+>> > git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+>> >
+>> > Thanks for your comments!
+>>
+>> This looks good to me.
+>>
+>> I am in favour of using the 5-digit scheme for all new R-Car Gen 3 SoCs
+>> as it seems the safest option with regards to as yet unknown (to me) part
+>> numbers.
+>
+> Geert, any objections to me applying these?
+> I'm happy to wait longer if you prefer.
 
-    it was find that cflags for GCC with KASAN enabled is not working.
-    testing is doing arm64 platfrom with below configure and gcc 5.1.1
+It would be good to have an ack from Rob.
+No need to hurry.
 
-    +CONFIG_KASAN=y
-    +CONFIG_TEST_KASAN=m
+Gr{oetje,eeting}s,
 
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-    and the issue can be fixed by the change, would you please review ?
-
-Author: Kassey <kassey1216@gmail.com>
-Date:   Wed Aug 30 15:45:58 2017 +0800
-
-    scripts: correct cflags for kasan
-
-    Signed-off-by: Kassey<kassey1216@gmail.com>
-
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index cea530c..0f1d004 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -125,7 +125,7 @@ endif
- #
- ifeq ($(CONFIG_KASAN),y)
- _c_flags += $(if $(patsubst n%,, \
--
-$(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)$(CONFIG_KASAN_SANITIZE_ALL)),
-\
-+               $(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)y), \
-                $(CFLAGS_KASAN))
- endif
-
-
-
--- 
-Best regards
-Kassey
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
