@@ -1,62 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 30 Aug 2017 08:24:39 -0500
-Subject: [PATCH] PCI: mediatek: take use of PCI_NUM_INTX
-In-Reply-To: <1504055954-31545-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1504055954-31545-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20170830132439.GA15438@bhelgaas-glaptop.roam.corp.google.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Aug 2017 15:14:05 +0200
+Subject: [PATCH 1/2] clk: sunxi-ng: Provide a default reset hook
+In-Reply-To: <20170830123624.vurdnh6bojbtrjal@flea.lan>
+References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
+ <CAPDyKFonXp4Uqi=DLxKf=1ecOx-2E5mUkEXqnqJPE-J57xXQcw@mail.gmail.com>
+ <20170830123624.vurdnh6bojbtrjal@flea.lan>
+Message-ID: <CAPDyKFqw7PNs_GQXmbJx8doo-tGW6PsKSffJhzVgU3cX3-wvsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 09:19:14AM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> Switch from using a custom NUM_INTX macro to the generic PCI_NUM_INTX
-> definition for the number of INTx interrupts.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+On 30 August 2017 at 14:36, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Ulf,
+>
+> On Wed, Aug 30, 2017 at 02:29:24PM +0200, Ulf Hansson wrote:
+>> On 25 August 2017 at 11:49, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > The reset hook was left implemented. Provide a dumb implementation so that
+>> > client drivers can depend on it.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Do you want me to pick this up via my mmc tree? If so, is that okay by
+>> the clock maintainers?
+>
+> I also happen to be the maintainer of that part of the kernel
+> (reporting to Mike and Stephen of course). We don't have anything
+> touching that file in next, so unless they feel like it should go
+> through their tree, it would be easier to keep the two changes
+> together and merge them through your tree.
 
-I rebased pci/host-mediatek on top of pci/irq-intx (which adds
-PCI_NUM_INTX) and applied this for v4.14, thanks!
+Alright, I have picked it up for next!
 
-> ---
->  drivers/pci/host/pcie-mediatek.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index c567996..5c0ce9b 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -77,7 +77,6 @@
->  #define PCIE_INT_MASK		0x420
->  #define INTX_MASK		GENMASK(19, 16)
->  #define INTX_SHIFT		16
-> -#define INTX_NUM		4
->  #define PCIE_INT_STATUS		0x424
->  #define MSI_STATUS		BIT(23)
->  #define PCIE_IMSI_STATUS	0x42c
-> @@ -576,7 +575,7 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
->  		return -ENODEV;
->  	}
->  
-> -	port->irq_domain = irq_domain_add_linear(pcie_intc_node, INTX_NUM,
-> +	port->irq_domain = irq_domain_add_linear(pcie_intc_node, PCI_NUM_INTX,
->  						 &intx_domain_ops, port);
->  	if (!port->irq_domain) {
->  		dev_err(dev, "failed to get INTx IRQ domain\n");
-> @@ -594,7 +593,7 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
->  	u32 bit = INTX_SHIFT;
->  
->  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-> -		for_each_set_bit_from(bit, &status, INTX_NUM + INTX_SHIFT) {
-> +		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
->  			/* Clear the INTx */
->  			writel(1 << bit, port->base + PCIE_INT_STATUS);
->  			virq = irq_find_mapping(port->irq_domain,
-> -- 
-> 2.6.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Kind regards
+Uffe
