@@ -1,369 +1,164 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Aug 2017 20:07:11 +0200
-Subject: [PATCH 7/7] drm/pl111: Add handling of Versatile platforms
-In-Reply-To: <20170830180711.2791-1-linus.walleij@linaro.org>
-References: <20170830180711.2791-1-linus.walleij@linaro.org>
-Message-ID: <20170830180711.2791-8-linus.walleij@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 30 Aug 2017 19:19:01 +0100
+Subject: [PATCH] nd_blk: Remove mmio_flush_range()
+Message-ID: <a8de5c42cbfcd467586d3f93adbbee877050b6b9.1504113975.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM reference designs in the Versatile family: Integrator,
-Versatile and RealView can make use of the new DRM driver as well.
-We just need to create a bit of platform-specific code for them
-that we isolate to its own file.
+mmio_flush_range() suffers from a lack of clearly-defined semantics,
+and is somewhat ambiguous to port to other architectures where the
+scope of the writeback implied by "flush" and ordering might matter,
+but MMIO would tend to imply non-cacheable anyway. Per the rationale
+in 67a3e8fe9015 ("nd_blk: change aperture mapping from WC to WB"), the
+only existing use is actually to invalidate clean cache lines for
+ARCH_MEMREMAP_PMEM type mappings *without* writeback. Since the recent
+cleanup of the pmem API, that also now happens to be the exact purpose
+of arch_invalidate_pmem(), which would be a far more well-defined tool
+for the job.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Rather than risk potentially inconsistent implementations of
+mmio_flush_range() for the sake of one callsite, streamline things by
+removing it entirely and instead move the ARCH_MEMREMAP_PMEM related
+definitions up to the libnvdimm level, so they can be shared by NFIT
+as well. This allows NFIT to be enabled for arm64.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/gpu/drm/pl111/Makefile          |   1 +
- drivers/gpu/drm/pl111/pl111_display.c   |   7 -
- drivers/gpu/drm/pl111/pl111_drv.c       |   5 +
- drivers/gpu/drm/pl111/pl111_versatile.c | 270 ++++++++++++++++++++++++++++++++
- drivers/gpu/drm/pl111/pl111_versatile.h |   9 ++
- 5 files changed, 285 insertions(+), 7 deletions(-)
- create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.c
- create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.h
+ arch/x86/Kconfig                  |  1 -
+ arch/x86/include/asm/cacheflush.h |  2 --
+ drivers/acpi/nfit/Kconfig         |  1 -
+ drivers/acpi/nfit/core.c          |  2 +-
+ drivers/nvdimm/pmem.h             | 14 --------------
+ include/linux/libnvdimm.h         | 15 +++++++++++++++
+ lib/Kconfig                       |  3 ---
+ tools/testing/nvdimm/test/nfit.c  |  4 ++--
+ 8 files changed, 18 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
-index c5f8f9684848..fce1453a93e1 100644
---- a/drivers/gpu/drm/pl111/Makefile
-+++ b/drivers/gpu/drm/pl111/Makefile
-@@ -1,4 +1,5 @@
- pl111_drm-y +=	pl111_display.o \
-+		pl111_versatile.o \
- 		pl111_drv.o
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 781521b7cf9e..5f3b756ec0d3 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -53,7 +53,6 @@ config X86
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+ 	select ARCH_HAS_KCOV			if X86_64
+-	select ARCH_HAS_MMIO_FLUSH
+ 	select ARCH_HAS_PMEM_API		if X86_64
+ 	select ARCH_HAS_UACCESS_FLUSHCACHE	if X86_64
+ 	select ARCH_HAS_SET_MEMORY
+diff --git a/arch/x86/include/asm/cacheflush.h b/arch/x86/include/asm/cacheflush.h
+index 8b4140f6724f..cb9a1af109b4 100644
+--- a/arch/x86/include/asm/cacheflush.h
++++ b/arch/x86/include/asm/cacheflush.h
+@@ -7,6 +7,4 @@
  
- pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 37f409867934..f7b043f4fed6 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -454,13 +454,6 @@ int pl111_display_init(struct drm_device *drm)
- 	}
- 	of_node_put(endpoint);
+ void clflush_cache_range(void *addr, unsigned int size);
  
--	if (tft_r0b0g0[0] != 0 ||
--	    tft_r0b0g0[1] != 8 ||
--	    tft_r0b0g0[2] != 16) {
--		dev_err(dev, "arm,pl11x,tft-r0g0b0-pads != [0,8,16] not yet supported\n");
--		return -EINVAL;
--	}
+-#define mmio_flush_range(addr, size) clflush_cache_range(addr, size)
 -
- 	ret = pl111_init_clock_divider(drm);
- 	if (ret)
- 		return ret;
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index f6863c0fb809..b1759004269c 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -72,6 +72,7 @@
- #include <drm/drm_panel.h>
+ #endif /* _ASM_X86_CACHEFLUSH_H */
+diff --git a/drivers/acpi/nfit/Kconfig b/drivers/acpi/nfit/Kconfig
+index 6d3351452ea2..97117ba582f3 100644
+--- a/drivers/acpi/nfit/Kconfig
++++ b/drivers/acpi/nfit/Kconfig
+@@ -2,7 +2,6 @@ config ACPI_NFIT
+ 	tristate "ACPI NVDIMM Firmware Interface Table (NFIT)"
+ 	depends on PHYS_ADDR_T_64BIT
+ 	depends on BLK_DEV
+-	depends on ARCH_HAS_MMIO_FLUSH
+ 	select LIBNVDIMM
+ 	help
+ 	  Infrastructure to probe ACPI 6 compliant platforms for
+diff --git a/drivers/acpi/nfit/core.c b/drivers/acpi/nfit/core.c
+index 19182d091587..ee7726a16693 100644
+--- a/drivers/acpi/nfit/core.c
++++ b/drivers/acpi/nfit/core.c
+@@ -1930,7 +1930,7 @@ static int acpi_nfit_blk_single_io(struct nfit_blk *nfit_blk,
+ 			memcpy_flushcache(mmio->addr.aperture + offset, iobuf + copied, c);
+ 		else {
+ 			if (nfit_blk->dimm_flags & NFIT_BLK_READ_FLUSH)
+-				mmio_flush_range((void __force *)
++				arch_invalidate_pmem((void __force *)
+ 					mmio->addr.aperture + offset, c);
  
- #include "pl111_drm.h"
-+#include "pl111_versatile.h"
+ 			memcpy(iobuf + copied, mmio->addr.aperture + offset, c);
+diff --git a/drivers/nvdimm/pmem.h b/drivers/nvdimm/pmem.h
+index 5434321cad67..c5917f040fa7 100644
+--- a/drivers/nvdimm/pmem.h
++++ b/drivers/nvdimm/pmem.h
+@@ -5,20 +5,6 @@
+ #include <linux/pfn_t.h>
+ #include <linux/fs.h>
  
- #define DRIVER_DESC      "DRM module for PL111"
- 
-@@ -264,6 +265,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 		return ret;
- 	}
- 
-+	ret = pl111_versatile_init(dev, priv);
-+	if (ret)
-+		goto dev_unref;
+-#ifdef CONFIG_ARCH_HAS_PMEM_API
+-#define ARCH_MEMREMAP_PMEM MEMREMAP_WB
+-void arch_wb_cache_pmem(void *addr, size_t size);
+-void arch_invalidate_pmem(void *addr, size_t size);
+-#else
+-#define ARCH_MEMREMAP_PMEM MEMREMAP_WT
+-static inline void arch_wb_cache_pmem(void *addr, size_t size)
+-{
+-}
+-static inline void arch_invalidate_pmem(void *addr, size_t size)
+-{
+-}
+-#endif
+-
+ /* this definition is in it's own header for tools/testing/nvdimm to consume */
+ struct pmem_device {
+ 	/* One contiguous memory region per device */
+diff --git a/include/linux/libnvdimm.h b/include/linux/libnvdimm.h
+index f3d3e6af8838..d11bc9881206 100644
+--- a/include/linux/libnvdimm.h
++++ b/include/linux/libnvdimm.h
+@@ -173,4 +173,19 @@ u64 nd_fletcher64(void *addr, size_t len, bool le);
+ void nvdimm_flush(struct nd_region *nd_region);
+ int nvdimm_has_flush(struct nd_region *nd_region);
+ int nvdimm_has_cache(struct nd_region *nd_region);
 +
- 	ret = pl111_modeset_init(drm);
- 	if (ret != 0)
- 		goto dev_unref;
-diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-new file mode 100644
-index 000000000000..97d4af6925a3
---- /dev/null
-+++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-@@ -0,0 +1,270 @@
-+#include <linux/device.h>
-+#include <linux/of.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/bitops.h>
-+#include <linux/module.h>
-+#include <drm/drmP.h>
-+#include "pl111_versatile.h"
-+#include "pl111_drm.h"
-+
-+static struct regmap *versatile_syscon_map;
-+
-+/*
-+ * We detect the different syscon types from the compatible strings.
-+ */
-+enum versatile_clcd {
-+	INTEGRATOR_CLCD_CM,
-+	VERSATILE_CLCD,
-+	REALVIEW_CLCD_EB,
-+	REALVIEW_CLCD_PB1176,
-+	REALVIEW_CLCD_PB11MP,
-+	REALVIEW_CLCD_PBA8,
-+	REALVIEW_CLCD_PBX,
-+};
-+
-+static const struct of_device_id versatile_clcd_of_match[] = {
-+	{
-+		.compatible = "arm,core-module-integrator",
-+		.data = (void *)INTEGRATOR_CLCD_CM,
-+	},
-+	{
-+		.compatible = "arm,versatile-sysreg",
-+		.data = (void *)VERSATILE_CLCD,
-+	},
-+	{
-+		.compatible = "arm,realview-eb-syscon",
-+		.data = (void *)REALVIEW_CLCD_EB,
-+	},
-+	{
-+		.compatible = "arm,realview-pb1176-syscon",
-+		.data = (void *)REALVIEW_CLCD_PB1176,
-+	},
-+	{
-+		.compatible = "arm,realview-pb11mp-syscon",
-+		.data = (void *)REALVIEW_CLCD_PB11MP,
-+	},
-+	{
-+		.compatible = "arm,realview-pba8-syscon",
-+		.data = (void *)REALVIEW_CLCD_PBA8,
-+	},
-+	{
-+		.compatible = "arm,realview-pbx-syscon",
-+		.data = (void *)REALVIEW_CLCD_PBX,
-+	},
-+	{},
-+};
-+
-+/*
-+ * Core module CLCD control on the Integrator/CP, bits
-+ * 8 thru 19 of the CM_CONTROL register controls a bunch
-+ * of CLCD settings.
-+ */
-+#define INTEGRATOR_HDR_CTRL_OFFSET	0x0C
-+#define INTEGRATOR_CLCD_LCDBIASEN	BIT(8)
-+#define INTEGRATOR_CLCD_LCDBIASUP	BIT(9)
-+#define INTEGRATOR_CLCD_LCDBIASDN	BIT(10)
-+/* Bits 11,12,13 controls the LCD type */
-+#define INTEGRATOR_CLCD_LCDMUX_MASK	(BIT(11)|BIT(12)|BIT(13))
-+#define INTEGRATOR_CLCD_LCDMUX_LCD24	BIT(11)
-+#define INTEGRATOR_CLCD_LCDMUX_VGA565	BIT(12)
-+#define INTEGRATOR_CLCD_LCDMUX_SHARP	(BIT(11)|BIT(12))
-+#define INTEGRATOR_CLCD_LCDMUX_VGA555	BIT(13)
-+#define INTEGRATOR_CLCD_LCDMUX_VGA24	(BIT(11)|BIT(12)|BIT(13))
-+#define INTEGRATOR_CLCD_LCD0_EN		BIT(14)
-+#define INTEGRATOR_CLCD_LCD1_EN		BIT(15)
-+/* R/L flip on Sharp */
-+#define INTEGRATOR_CLCD_LCD_STATIC1	BIT(16)
-+/* U/D flip on Sharp */
-+#define INTEGRATOR_CLCD_LCD_STATIC2	BIT(17)
-+/* No connection on Sharp */
-+#define INTEGRATOR_CLCD_LCD_STATIC	BIT(18)
-+/* 0 = 24bit VGA, 1 = 18bit VGA */
-+#define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
-+
-+#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDBIASEN | \
-+					 INTEGRATOR_CLCD_LCDBIASUP | \
-+					 INTEGRATOR_CLCD_LCDBIASDN | \
-+					 INTEGRATOR_CLCD_LCDMUX_MASK | \
-+					 INTEGRATOR_CLCD_LCD0_EN | \
-+					 INTEGRATOR_CLCD_LCD1_EN | \
-+					 INTEGRATOR_CLCD_LCD_STATIC1 | \
-+					 INTEGRATOR_CLCD_LCD_STATIC2 | \
-+					 INTEGRATOR_CLCD_LCD_STATIC | \
-+					 INTEGRATOR_CLCD_LCD_N24BITEN)
-+
-+static void pl111_integrator_enable(struct drm_device *drm, u32 format)
++#ifdef CONFIG_ARCH_HAS_PMEM_API
++#define ARCH_MEMREMAP_PMEM MEMREMAP_WB
++void arch_wb_cache_pmem(void *addr, size_t size);
++void arch_invalidate_pmem(void *addr, size_t size);
++#else
++#define ARCH_MEMREMAP_PMEM MEMREMAP_WT
++static inline void arch_wb_cache_pmem(void *addr, size_t size)
 +{
-+	u32 val;
-+
-+	dev_info(drm->dev, "enable Integrator CLCD connectors\n");
-+
-+	/* FIXME: really needed? */
-+	val = INTEGRATOR_CLCD_LCD_STATIC1 | INTEGRATOR_CLCD_LCD_STATIC2 |
-+		INTEGRATOR_CLCD_LCD0_EN | INTEGRATOR_CLCD_LCD1_EN;
-+
-+	switch (format) {
-+	case DRM_FORMAT_XBGR8888:
-+	case DRM_FORMAT_XRGB8888:
-+		break;
-+	case DRM_FORMAT_BGR565:
-+	case DRM_FORMAT_RGB565:
-+		/* truecolor RGB565 */
-+		val |= INTEGRATOR_CLCD_LCDMUX_VGA565;
-+		break;
-+	case DRM_FORMAT_XBGR1555:
-+	case DRM_FORMAT_XRGB1555:
-+		/* Pseudocolor, RGB555, BGR555 */
-+		val |= INTEGRATOR_CLCD_LCDMUX_VGA555;
-+		break;
-+	default:
-+		dev_err(drm->dev, "unhandled format on Integrator 0x%08x\n",
-+			format);
-+		break;
-+	}
-+
-+	regmap_update_bits(versatile_syscon_map,
-+			   INTEGRATOR_HDR_CTRL_OFFSET,
-+			   INTEGRATOR_CLCD_MASK,
-+			   val);
 +}
-+
-+/*
-+ * This configuration register in the Versatile and RealView
-+ * family is uniformly present but appears more and more
-+ * unutilized starting with the RealView series.
-+ */
-+#define SYS_CLCD			0x50
-+#define SYS_CLCD_MODE_MASK		(BIT(0)|BIT(1))
-+#define SYS_CLCD_MODE_888		0
-+#define SYS_CLCD_MODE_5551		BIT(0)
-+#define SYS_CLCD_MODE_565_R_LSB		BIT(1)
-+#define SYS_CLCD_MODE_565_B_LSB		(BIT(0)|BIT(1))
-+#define SYS_CLCD_CONNECTOR_MASK		(BIT(2)|BIT(3)|BIT(4)|BIT(5))
-+#define SYS_CLCD_NLCDIOON		BIT(2)
-+#define SYS_CLCD_VDDPOSSWITCH		BIT(3)
-+#define SYS_CLCD_PWR3V5SWITCH		BIT(4)
-+#define SYS_CLCD_VDDNEGSWITCH		BIT(5)
-+
-+static void pl111_versatile_disable(struct drm_device *drm)
++static inline void arch_invalidate_pmem(void *addr, size_t size)
 +{
-+	dev_info(drm->dev, "disable Versatile CLCD connectors\n");
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   0);
 +}
-+
-+static void pl111_versatile_enable(struct drm_device *drm, u32 format)
-+{
-+	u32 val = 0;
-+
-+	dev_info(drm->dev, "enable Versatile CLCD connectors\n");
-+
-+	switch (format) {
-+	case DRM_FORMAT_ABGR8888:
-+	case DRM_FORMAT_XBGR8888:
-+	case DRM_FORMAT_ARGB8888:
-+	case DRM_FORMAT_XRGB8888:
-+		val |= SYS_CLCD_MODE_888;
-+		break;
-+	case DRM_FORMAT_BGR565:
-+		val |= SYS_CLCD_MODE_565_R_LSB;
-+		break;
-+	case DRM_FORMAT_RGB565:
-+		val |= SYS_CLCD_MODE_565_B_LSB;
-+		break;
-+	case DRM_FORMAT_ABGR1555:
-+	case DRM_FORMAT_XBGR1555:
-+	case DRM_FORMAT_ARGB1555:
-+	case DRM_FORMAT_XRGB1555:
-+		val |= SYS_CLCD_MODE_5551;
-+		break;
-+	default:
-+		dev_err(drm->dev, "unhandled format on Versatile 0x%08x\n",
-+			format);
-+		break;
-+	}
-+
-+	/* Set up the MUX */
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_MODE_MASK,
-+			   val);
-+
-+	/* Then enable the display */
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
-+}
-+
-+static void pl111_realview_clcd_disable(struct drm_device *drm)
-+{
-+	dev_info(drm->dev, "disable RealView CLCD connectors\n");
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   0);
-+}
-+
-+static void pl111_realview_clcd_enable(struct drm_device *drm, u32 format)
-+{
-+	dev_info(drm->dev, "enable RealView CLCD connectors\n");
-+	regmap_update_bits(versatile_syscon_map,
-+			   SYS_CLCD,
-+			   SYS_CLCD_CONNECTOR_MASK,
-+			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
-+}
-+
-+int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
-+{
-+	const struct of_device_id *clcd_id;
-+	enum versatile_clcd versatile_clcd_type;
-+	struct device_node *np;
-+	struct regmap *map;
-+
-+	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
-+					     &clcd_id);
-+	if (!np) {
-+		/* Non-ARM reference designs, just bail out */
-+		return 0;
-+	}
-+	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
-+
-+	map = syscon_node_to_regmap(np);
-+	if (IS_ERR(map)) {
-+		dev_err(dev, "no Versatile syscon regmap\n");
-+		return PTR_ERR(map);
-+	}
-+
-+	switch (versatile_clcd_type) {
-+	case INTEGRATOR_CLCD_CM:
-+		versatile_syscon_map = map;
-+		priv->variant_display_enable = pl111_integrator_enable;
-+		dev_info(dev, "set up callbacks for Integrator PL110\n");
-+		break;
-+	case VERSATILE_CLCD:
-+		versatile_syscon_map = map;
-+		priv->variant_display_enable = pl111_versatile_enable;
-+		priv->variant_display_disable = pl111_versatile_disable;
-+		dev_info(dev, "set up callbacks for Versatile PL110+\n");
-+		break;
-+	case REALVIEW_CLCD_EB:
-+	case REALVIEW_CLCD_PB1176:
-+	case REALVIEW_CLCD_PB11MP:
-+	case REALVIEW_CLCD_PBA8:
-+	case REALVIEW_CLCD_PBX:
-+		versatile_syscon_map = map;
-+		priv->variant_display_enable = pl111_realview_clcd_enable;
-+		priv->variant_display_disable = pl111_realview_clcd_disable;
-+		dev_info(dev, "set up callbacks for RealView PL111\n");
-+		break;
-+	default:
-+		dev_info(dev, "unknown Versatile system controller\n");
-+		break;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pl111_versatile_init);
-diff --git a/drivers/gpu/drm/pl111/pl111_versatile.h b/drivers/gpu/drm/pl111/pl111_versatile.h
-new file mode 100644
-index 000000000000..41aa6d969dc6
---- /dev/null
-+++ b/drivers/gpu/drm/pl111/pl111_versatile.h
-@@ -0,0 +1,9 @@
-+#include <linux/device.h>
-+#include "pl111_drm.h"
-+
-+#ifndef PL111_VERSATILE_H
-+#define PL111_VERSATILE_H
-+
-+int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv);
-+
 +#endif
++
+ #endif /* __LIBNVDIMM_H__ */
+diff --git a/lib/Kconfig b/lib/Kconfig
+index 6762529ad9e4..527da69e3be1 100644
+--- a/lib/Kconfig
++++ b/lib/Kconfig
+@@ -559,9 +559,6 @@ config ARCH_HAS_PMEM_API
+ config ARCH_HAS_UACCESS_FLUSHCACHE
+ 	bool
+ 
+-config ARCH_HAS_MMIO_FLUSH
+-	bool
+-
+ config STACKDEPOT
+ 	bool
+ 	select STACKTRACE
+diff --git a/tools/testing/nvdimm/test/nfit.c b/tools/testing/nvdimm/test/nfit.c
+index 4c2fa98ef39d..d20791c3f499 100644
+--- a/tools/testing/nvdimm/test/nfit.c
++++ b/tools/testing/nvdimm/test/nfit.c
+@@ -1546,8 +1546,8 @@ static int nfit_test_blk_do_io(struct nd_blk_region *ndbr, resource_size_t dpa,
+ 	else {
+ 		memcpy(iobuf, mmio->addr.base + dpa, len);
+ 
+-		/* give us some some coverage of the mmio_flush_range() API */
+-		mmio_flush_range(mmio->addr.base + dpa, len);
++		/* give us some some coverage of the arch_invalidate_pmem() API */
++		arch_invalidate_pmem(mmio->addr.base + dpa, len);
+ 	}
+ 	nd_region_release_lane(nd_region, lane);
+ 
 -- 
-2.13.5
+2.13.4.dirty
