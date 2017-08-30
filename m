@@ -1,52 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Aug 2017 15:59:00 +0200
-Subject: linux-next regression caused by "gpiolib: request the gpio before
- querying its direction"
-In-Reply-To: <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org> (Timur
- Tabi's message of "Wed, 30 Aug 2017 07:31:41 -0500")
-References: <20170830112424.7a3a7c36@windsurf.lan>
- <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
-Message-ID: <87ziah2m3f.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Aug 2017 15:08:01 +0100
+Subject: [PATCH v3 44/59] KVM: arm/arm64: GICv4: Handle MOVI applied to a
+ VLPI
+In-Reply-To: <20170828181817.GE24649@cbox>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-45-marc.zyngier@arm.com> <20170828181817.GE24649@cbox>
+Message-ID: <954a7441-c91e-5d1b-98b7-2978291c5259@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
- 
- On mer., ao?t 30 2017, Timur Tabi <timur@codeaurora.org> wrote:
+On 28/08/17 19:18, Christoffer Dall wrote:
+> On Mon, Jul 31, 2017 at 06:26:22PM +0100, Marc Zyngier wrote:
+>> When the guest issues a MOVI, we need to tell the physical ITS
+>> that we're now targetting a new vcpu. This is done by extracting
+>> the current mapping, updating the target, and reapplying the
+>> mapping. The core ITS code should do the right thing.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 13 +++++++++++++
+>>  1 file changed, 13 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 79bac93d3e7d..aaad577ce328 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -706,6 +706,19 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+>>  	ite->irq->target_vcpu = vcpu;
+>>  	spin_unlock(&ite->irq->irq_lock);
+>>  
+>> +	if (ite->irq->hw) {
+>> +		struct its_vlpi_map map;
+>> +		int ret;
+>> +
+>> +		ret = its_get_vlpi(ite->irq->host_irq, &map);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		map.vpe_idx = vcpu->vcpu_id;
+>> +
+>> +		return its_map_vlpi(ite->irq->host_irq, &map);
+> 
+> Since you're not holding the irq_lock across these two calls, would it
+> be possible that the forwarding was removed through some other call path
+> here, and could you end up passing an invalid host_irq to its_map_vlpi?
+I believe we should be OK here, as we hold the ITS mutex during any
+command processing, and both the forward/unforward paths take that same
+mutex.
 
-> On 8/30/17 4:24 AM, Thomas Petazzoni wrote:
->> Therefore, with Timur's commit applied, when the system boots, we get
->> serial output, up to the point where gpiochip_add_data() is called, and
->> requests all GPIOs. Since our UART pins are not requested at the
->> pinctrl level, the gpio_request succeeds and re-muxes those pins as
->> GPIOs: we lose the UART.
->
-> This part I don't understand.  My patch just only impacts the code
-> that queries the direction of the GPIO.  It does not set the
-> direction.
->
-> When gpiochip_add_data() calls chip->request, what function is that
-> calling?
+On a slightly different note, it looks like the MOVI code could benefit
+from using vgic_its_resolve_lpi(), which has been introduce earlier in
+this series.
 
-the request callback is gpiochip_generic_request so I would be surprised
-that there was a bug in it.
+Thanks,
 
->
-> The only thing I can think of is that the ->request function is not
-> just returning status, but is also muxing the GPIO.  If so, then I
-> think that's a bug.
-
-Gregory
-
->
-> -- 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the
-> Code Aurora Forum, hosted by The Linux Foundation.
->
-
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
