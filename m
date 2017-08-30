@@ -1,180 +1,101 @@
 From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 30 Aug 2017 15:41:17 +0100
-Subject: [PATCH 1/4] arm: topology: remove cpu_efficiency
-In-Reply-To: <20170830144120.9312-1-dietmar.eggemann@arm.com>
-References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
-Message-ID: <20170830144120.9312-2-dietmar.eggemann@arm.com>
+Date: Wed, 30 Aug 2017 15:41:16 +0100
+Subject: [PATCH 0/4] arm: remove cpu_efficiency
+Message-ID: <20170830144120.9312-1-dietmar.eggemann@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the 'cpu_efficiency/clock-frequency dt property' based solution
-to set cpu capacity which was only working for Cortex-A15/A7 arm
-big.LITTLE systems.
+For Cortex-A15/A7 arm big.LITTLE systems there are currently two ways to
+set the cpu capacity.
 
-I.e. the 'capacity-dmips-mhz' based solution is now the only one. It is
-shared between arm and arm64 and works for every big.LITTLE system no
-matter which core types it consists of.
+The first one (commit 06073ee26775 "ARM: 8621/3: parse cpu
+capacity-dmips-mhz from DT") is based on dt 'cpu capacity-dmips-mhz'
+bindings and the appropriate dt parsing code in
+drivers/base/arch_topology.c. It further takes differences in maximum
+cpu frequency values into consideration, normalizes the maximum cpu
+capacity to SCHED_CAPACITY_SCALE (1024) and scales all the cpus
+accordingly.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Cc: Juri Lelli <juri.lelli@arm.com>
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
----
- arch/arm/kernel/topology.c | 113 ++-------------------------------------------
- 1 file changed, 3 insertions(+), 110 deletions(-)
+  cpu capacity = (capacity-dmips-mhz * max cpu frequency) / 
+                 (max capacity-dmips-mhz * max (max cpu frequency)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index bf949a763dbe..04ccfdd94213 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -47,52 +47,10 @@
-  */
- 
- #ifdef CONFIG_OF
--struct cpu_efficiency {
--	const char *compatible;
--	unsigned long efficiency;
--};
--
--/*
-- * Table of relative efficiency of each processors
-- * The efficiency value must fit in 20bit and the final
-- * cpu_scale value must be in the range
-- *   0 < cpu_scale < 3*SCHED_CAPACITY_SCALE/2
-- * in order to return@most 1 when DIV_ROUND_CLOSEST
-- * is used to compute the capacity of a CPU.
-- * Processors that are not defined in the table,
-- * use the default SCHED_CAPACITY_SCALE value for cpu_scale.
-- */
--static const struct cpu_efficiency table_efficiency[] = {
--	{"arm,cortex-a15", 3891},
--	{"arm,cortex-a7",  2048},
--	{NULL, },
--};
--
--static unsigned long *__cpu_capacity;
--#define cpu_capacity(cpu)	__cpu_capacity[cpu]
--
--static unsigned long middle_capacity = 1;
--static bool cap_from_dt = true;
--
--/*
-- * Iterate all CPUs' descriptor in DT and compute the efficiency
-- * (as per table_efficiency). Also calculate a middle efficiency
-- * as close as possible to  (max{eff_i} - min{eff_i}) / 2
-- * This is later used to scale the cpu_capacity field such that an
-- * 'average' CPU is of middle capacity. Also see the comments near
-- * table_efficiency[] and update_cpu_capacity().
-- */
- static void __init parse_dt_topology(void)
- {
--	const struct cpu_efficiency *cpu_eff;
--	struct device_node *cn = NULL;
--	unsigned long min_capacity = ULONG_MAX;
--	unsigned long max_capacity = 0;
--	unsigned long capacity = 0;
--	int cpu = 0;
--
--	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
--				 GFP_NOWAIT);
-+	struct device_node *cn;
-+	int cpu;
- 
- 	cn = of_find_node_by_path("/cpus");
- 	if (!cn) {
-@@ -101,9 +59,6 @@ static void __init parse_dt_topology(void)
- 	}
- 
- 	for_each_possible_cpu(cpu) {
--		const u32 *rate;
--		int len;
--
- 		/* too early to use cpu->of_node */
- 		cn = of_get_cpu_node(cpu, NULL);
- 		if (!cn) {
-@@ -115,73 +70,13 @@ static void __init parse_dt_topology(void)
- 			of_node_put(cn);
- 			continue;
- 		}
--
--		cap_from_dt = false;
--
--		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
--			if (of_device_is_compatible(cn, cpu_eff->compatible))
--				break;
--
--		if (cpu_eff->compatible == NULL)
--			continue;
--
--		rate = of_get_property(cn, "clock-frequency", &len);
--		if (!rate || len != 4) {
--			pr_err("%s missing clock-frequency property\n",
--				cn->full_name);
--			continue;
--		}
--
--		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
--
--		/* Save min capacity of the system */
--		if (capacity < min_capacity)
--			min_capacity = capacity;
--
--		/* Save max capacity of the system */
--		if (capacity > max_capacity)
--			max_capacity = capacity;
--
--		cpu_capacity(cpu) = capacity;
- 	}
- 
--	/* If min and max capacities are equals, we bypass the update of the
--	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
--	 * compute a middle_capacity factor that will ensure that the capacity
--	 * of an 'average' CPU of the system will be as close as possible to
--	 * SCHED_CAPACITY_SCALE, which is the default value, but with the
--	 * constraint explained near table_efficiency[].
--	 */
--	if (4*max_capacity < (3*(max_capacity + min_capacity)))
--		middle_capacity = (min_capacity + max_capacity)
--				>> (SCHED_CAPACITY_SHIFT+1);
--	else
--		middle_capacity = ((max_capacity / 3)
--				>> (SCHED_CAPACITY_SHIFT-1)) + 1;
--
--	if (cap_from_dt)
--		topology_normalize_cpu_scale();
--}
--
--/*
-- * Look for a customed capacity of a CPU in the cpu_capacity table during the
-- * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
-- * function returns directly for SMP system.
-- */
--static void update_cpu_capacity(unsigned int cpu)
--{
--	if (!cpu_capacity(cpu) || cap_from_dt)
--		return;
--
--	topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
--
--	pr_info("CPU%u: update cpu_capacity %lu\n",
--		cpu, topology_get_cpu_scale(NULL, cpu));
-+	topology_normalize_cpu_scale();
- }
- 
- #else
- static inline void parse_dt_topology(void) {}
--static inline void update_cpu_capacity(unsigned int cpuid) {}
- #endif
- 
-  /*
-@@ -277,8 +172,6 @@ void store_cpu_topology(unsigned int cpuid)
- 
- 	update_siblings_masks(cpuid);
- 
--	update_cpu_capacity(cpuid);
--
- 	pr_info("CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
- 		cpuid, cpu_topology[cpuid].thread_id,
- 		cpu_topology[cpuid].core_id,
+This solution is shared between arm and arm64 and works for other
+combinations of big and little cpus (besides Cortex-A15/A7) as well.
+
+The second one (commit 339ca09d7ada "ARM: 7463/1: topology: Update
+cpu_power according to DT information" is based on the 'struct
+cpu_efficiency table_efficiency[]' and the dt parsing code in
+arch/arm/kernel/topology.c. It further requires a clock-frequency
+property per cpu node, calculates a so called middle frequency for an
+average cpu in the system which is as close as possible to
+SCHED_CAPACITY_SCALE (1024) and uses this to compute the cpu capacity
+values.
+
+  cpu capacity = (cpu efficiency * clock frequency) / middle capacity
+
+This solution only works for Cortex-A15/A7 arm big.LITTLE systems.
+
+The aim of this patch-set is to have only one solution for all arm and
+arm64 big.LITTLE platforms.
+
+(1) Therefore, it removes the code for the 'cpu_efficiency/
+    clock-frequency dt property' (second) solution [patch 01/04] and
+    migrates the arm big.LITTLE platforms currently using this approach
+    [patch 02-04/04] to use the 'cpu capacity-dmips-mhz' (first)
+    solution.
+
+(2) Moreover, it will also assure that the highest original cpu capacity
+    (rq->cpu_capacity_orig) in a non-smt system is SCHED_CAPACITY_SCALE
+    (1024).
+
+(3) And finally, another advantage is the dynamic detection of the max
+    cpu frequency which comes with the first solution instead of the
+    static clock-frequency dt property value.
+
+Currently, the arm dt parsing code in parse_dt_topology() checks if the
+dt uses the capacity-dmips-mhz property. If this is the case it uses
+the first, otherwise the second solution. This patch-set removes the
+code for the second solution from arch/arm/kernel/topology.c.
+
+The following arm big.LITTLE platforms which use cpu node descriptions
+with the 'compatible' properties "arm,cortex-a15" and "arm,cortex-a7"
+as well as the "clock-frequency" are (theoretically*) affected:
+
+(1) arndale-octa, peach-pi, peach-pit, smdk5420 (exynos5420-cpus.dtsi)
+
+(2) odroidxu3, odroidxu3-lite, odroidxu4 (exynos5422-cpus.dtsi)
+
+(3) r8a7790-lager (r8a7790.dtsi)
+
+TC2 (vexpress-v2p-ca15_a7.dts) already has the capacity-dmips-mhz
+properties (it never had "clock-frequency" properties per cpu node
+though).
+
+*Currently, these platforms are only theoretically affected. The reason
+is because heterogeneous cpu capacity support on arm stopped with commit
+8cd5601c5060 ("sched/fair: Convert arch_scale_cpu_capacity() from weak
+function to #define") because the arch never defined
+arch_scale_cpu_capacity so the task scheduler uses the default
+implementation in kernel/sched/sched.h. This will change as soon the
+patch "arm: wire cpu-invariant accounting support up to the task
+scheduler" [1] is in mainline.
+
+This patch-set has been tested on TC2 and Samsung Chromebook 2 13"
+(peach-pi, Exynos 5800).
+
+[1] https://marc.info/?l=linux-kernel&m=150367158111303&w=2
+
+Dietmar Eggemann (4):
+  arm: topology: remove cpu_efficiency
+  arm: dts: exynos: add exynos5420 cpu capacity-dmips-mhz information
+  arm: dts: exynos: add exynos5422 cpu capacity-dmips-mhz information
+  arm: dts: r8a7790: add cpu capacity-dmips-mhz information
+
+ arch/arm/boot/dts/exynos5420-cpus.dtsi |   8 +++
+ arch/arm/boot/dts/exynos5422-cpus.dtsi |   8 +++
+ arch/arm/boot/dts/r8a7790.dtsi         |   8 +++
+ arch/arm/kernel/topology.c             | 113 +--------------------------------
+ 4 files changed, 27 insertions(+), 110 deletions(-)
+
 -- 
 2.11.0
