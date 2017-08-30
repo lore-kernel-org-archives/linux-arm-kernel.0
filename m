@@ -1,39 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Aug 2017 22:37:59 -0700
-Subject: [GIT PULL] Allwinner fixes for 4.13, take 3
-In-Reply-To: <20170828092651.xwrz6toedrmht5nh@flea.lan>
-References: <20170828092651.xwrz6toedrmht5nh@flea.lan>
-Message-ID: <20170830053759.GK14499@localhost>
+Date: Tue, 29 Aug 2017 22:42:41 -0700
+Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for
+ v4.14 (2nd)
+In-Reply-To: <CAK7LNAS3D1pJrEXWLWL30FbLOA6rt65MYBiLKqB=jhhQRt4YZQ@mail.gmail.com>
+References: <CAK7LNAS3D1pJrEXWLWL30FbLOA6rt65MYBiLKqB=jhhQRt4YZQ@mail.gmail.com>
+Message-ID: <20170830054241.GM14499@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 11:26:51AM +0200, Maxime Ripard wrote:
-> Hi,
+On Tue, Aug 29, 2017 at 12:28:21AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-> Here is a bunch of patches essentially reverting the EMAC bindings
-> additions. Indeed, it was discovered after the release of 4.13-rc1
-> that we overlooked some issues while reviewing the driver, and we
-> couldn't find a proper solution since then.
 > 
-> Since the binding is as such not stable yet, we can't allow it to
-> reach a stable release.
+> Sorry for my last-minute pull request.
+> Please pull a little more for the upcoming merge window.
+> Here are some trivial + new SoC support for UniPhier DT (64bit).
+> Please pull!
 > 
-> Maxime
 > 
-> The following changes since commit d86e63e1f0b7868c55c8d4a54854b85e2bac690b:
+> The following changes since commit e5aefb380eafe176de066ddde1d354a167a9d474:
 > 
->   arm64: allwinner: h5: fix pinctrl IRQs (2017-08-14 14:18:21 +0800)
+>   arm64: dts: uniphier: add Denali NAND controller nodes (2017-08-13
+> 08:43:27 +0900)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.13-3
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-dt64-v4.14-2
 > 
-> for you to fetch changes up to fe45174b72aead678da581bab9e9a37c9b26a070:
+> for you to fetch changes up to c28adcb536109f54ddf349ee2fd9beef084d4d88:
 > 
->   arm: dts: sunxi: Revert EMAC changes (2017-08-28 11:11:24 +0200)
+>   arm64: dts: uniphier: add PXs3 SoC support (2017-08-29 00:13:53 +0900)
+> 
+> ----------------------------------------------------------------
+> UniPhier ARM64 SoC DT updates for v4.14 (2nd)
+> 
+> - add reset controller node of analog amplifier
+> - add AIDET irqchip device nodes
+> - fix size of sdctrl node
+> - support new SoC PXs3 and its reference development board
 
-Merged but unfortunately this introduces quite annoying conflicts with already
-queued up DT contents. Fixed up those as well.
+Merged, thanks.
 
 
 -Olof
