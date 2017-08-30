@@ -1,54 +1,78 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Aug 2017 12:15:37 +0200
-Subject: [PATCH] arm64: dts: marvell: fix number of GPIOs in Armada AP806
- description
-Message-ID: <20170830101537.8260-1-thomas.petazzoni@free-electrons.com>
+Date: Wed, 30 Aug 2017 12:16:06 +0200
+Subject: [PATCH] arm64: dts: marvell: add UART muxing on Armada 7K/8K
+Message-ID: <20170830101606.8339-1-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada AP806 has 20 pins, and therefore 20 GPIOs (from 0 to 19
-included) and not 19 pins. Therefore, we fix the Device Tree
-description for the GPIO controller.
+This commit adds the relevant details in the Armada 7K/8K Device Tree
+to properly mux the UART used for the serial console. Since there is
+basically only one possible muxing for the UART0 on the AP, the muxing
+configuration is described in armada-ap806.dtsi, and selected from the
+individual boards (other boards could be using a different UART).
 
-Before this patch:
-
-$ cat /sys/kernel/debug/pinctrl/f06f4000.system-controller:pinctrl/gpio-ranges
-GPIO ranges handled:
-0: mvebu-gpio GPIOS [0 - 19] PINS [0 - 19]
-0: f06f4000.system-controller:gpio GPIOS [0 - 18] PINS [0 - 18]
-
-After this patch:
-
-$ cat /sys/kernel/debug/pinctrl/f06f4000.system-controller:pinctrl/gpio-ranges
-GPIO ranges handled:
-0: mvebu-gpio GPIOS [0 - 19] PINS [0 - 19]
-0: f06f4000.system-controller:gpio GPIOS [0 - 19] PINS [0 - 19]
-
-Fixes: 63dac0f4924b9 ("arm64: dts: marvell: add gpio support for Armada 7K/8K")
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-Note: this is a fix, that should go in the 4.13 cycle, as
-63dac0f4924b9 was introduced in 4.13.
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts    | 2 ++
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts    | 2 ++
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 2 ++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi     | 5 +++++
+ 4 files changed, 11 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 9c3bdf8..64a8e02 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -124,6 +124,8 @@
+ 
+ &uart0 {
+ 	status = "okay";
++	pinctrl-0 = <&uart0_pins>;
++	pinctrl-names = "default";
+ };
+ 
+ 
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 0d7b2ae..2a9b68e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -139,6 +139,8 @@
+ /* Accessible over the mini-USB CON9 connector on the main board */
+ &uart0 {
+ 	status = "okay";
++	pinctrl-0 = <&uart0_pins>;
++	pinctrl-names = "default";
+ };
+ 
+ 
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index 21fb721..ac7438e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -101,6 +101,8 @@
+ 
+ &uart0 {
+ 	status = "okay";
++	pinctrl-0 = <&uart0_pins>;
++	pinctrl-names = "default";
+ };
+ 
+ &ap_sdhci0 {
 diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 1eb1f1e..4d36071 100644
+index 4d36071..1eb51e0 100644
 --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
 +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -268,10 +268,10 @@
- 				ap_gpio: gpio {
- 					compatible = "marvell,armada-8k-gpio";
- 					offset = <0x1040>;
--					ngpios = <19>;
-+					ngpios = <20>;
- 					gpio-controller;
- 					#gpio-cells = <2>;
--					gpio-ranges = <&ap_pinctrl 0 0 19>;
-+					gpio-ranges = <&ap_pinctrl 0 0 20>;
+@@ -263,6 +263,11 @@
+ 
+ 				ap_pinctrl: pinctrl {
+ 					compatible = "marvell,ap806-pinctrl";
++
++					uart0_pins: uart0-pins {
++						marvell,pins = "mpp11", "mpp19";
++						marvell,function = "uart0";
++					};
  				};
- 			};
- 		};
+ 
+ 				ap_gpio: gpio {
 -- 
 2.9.4
