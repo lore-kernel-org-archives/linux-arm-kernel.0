@@ -1,49 +1,21 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 30 Aug 2017 15:14:11 +0200
-Subject: [PATCH 2/2] mmc: sunxi: Reset the device at probe time
-In-Reply-To: <20170825094953.3247-2-maxime.ripard@free-electrons.com>
-References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
- <20170825094953.3247-2-maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFqAyhB1C096YjXNz2iAPL0Vrr5-hsyoiL8meho1b0qNPg@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 30 Aug 2017 15:14:24 +0200
+Subject: [PATCH 1/3] iommu: exynos: constify iommu_ops
+In-Reply-To: <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1503922325-25905-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20170830131424.2psz2gtgzlghzp5i@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2017 at 11:49, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> We might be into some troubles if the bootloader misconfigured the MMC
-> controller.
->
-> We currently only de-assert the reset line at probe time, which means that
-> if the device was already out of reset, we're going to keep whatever state
-> was set already.
->
-> Switch to a reset instead of the deassert to have a device in a pristine
-> state when we start operating.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks, applied for next!
-
-Kind regards
-Uffe
-
+On Mon, Aug 28, 2017 at 05:42:05PM +0530, Arvind Yadav wrote:
+> iommu_ops are not supposed to change at runtime.
+> Functions 'iommu_device_set_ops' and 'bus_set_iommu' working with
+> const iommu_ops provided by <linux/iommu.h>. So mark the non-const
+> structs as const.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
->  drivers/mmc/host/sunxi-mmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index da5f46a14497..53c970fe0873 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -1242,7 +1242,7 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->         }
->
->         if (!IS_ERR(host->reset)) {
-> -               ret = reset_control_deassert(host->reset);
-> +               ret = reset_control_reset(host->reset);
->                 if (ret) {
->                         dev_err(&pdev->dev, "reset err %d\n", ret);
->                         goto error_disable_clk_sample;
-> --
-> 2.13.5
->
+>  drivers/iommu/exynos-iommu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Applied, thanks.
