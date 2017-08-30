@@ -1,67 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 30 Aug 2017 16:40:54 +0200
-Subject: [PATCH] ARM: dts: sun7i: Enable power supplies on
- A20-OLinuxIno-Micro
-In-Reply-To: <20170829170810.1302-1-harald@ccbib.org>
-References: <20170829170810.1302-1-harald@ccbib.org>
-Message-ID: <20170830144054.36m6wfilwdztcfij@flea.lan>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 30 Aug 2017 08:40:12 -0600
+Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
+In-Reply-To: <20170830142454.10971-4-jglauber@cavium.com>
+References: <20170830142454.10971-1-jglauber@cavium.com>
+ <20170830142454.10971-4-jglauber@cavium.com>
+Message-ID: <20170830084012.19d91759@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 07:08:10PM +0200, Harald Geyer wrote:
-> The axp209.dtsi defines nodes for ac, usb and battery supplies for a
-> while now. This patch enables these nodes for the A20-Olinuxino-Micro,
-> which has connectors for all three of them.
+On Wed, 30 Aug 2017 16:24:54 +0200
+Jan Glauber <jglauber@cavium.com> wrote:
+
+> Root ports of cn8xxx do not function after a slot reset when used with
+> some e1000e and LSI HBA devices. Add a quirk to prevent slot reset on
+> these root ports.
 > 
-> The patch was run-tested against linux-next-20170825.
-> 
-> Signed-off-by: Harald Geyer <harald@ccbib.org>
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
 > ---
-> Note: I guess the same change is good for the olinuxino lime boards too.
-> However I don't have such boards to test, so I don't formally submit a
-> patch for them.
+>  drivers/pci/quirks.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
->  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-> index 0b7403e..64c993a 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-> @@ -256,6 +256,18 @@
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index 85191b8..6679971 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -845,6 +845,22 @@ static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
+>  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
+>  #endif
 >  
->  #include "axp209.dtsi"
->  
-> +&ac_power_supply {
-> +	status = "okay";
-> +};
+> +/*
+> + * Root port on some Cavium CN8xxx chips do not successfully complete
+> + * a bus reset when used with certain types of child devices. Config
+> + * space access to the child may quit responding. Flag all devices under
+> + * the secondary bus as non-resettable.
+> + */
+> +static void quirk_CN8xxx_secondary_bus(struct pci_dev *dev)
+> +{
+> +	struct pci_dev *pdev;
 > +
-> +&battery_power_supply {
-> +	status = "okay";
-> +};
+> +	dev_warn(&dev->dev, "Cavium CN8xxx quirk detected; reset for devices on secondary bus disabled\n");
+> +	list_for_each_entry(pdev, &dev->subordinate->devices, bus_list)
+> +		pdev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_CN8xxx_secondary_bus);
 > +
-> +&usb_power_supply {
-> +	status = "okay";
-> +};
-> +
+>  /*
+>   * Some settings of MMRBC can lead to data corruption so block changes.
+>   * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide
 
-We usually try to sort the nodes per alphabetical order (even though
-it's a bit difficult for the battery and AC-IN power supplies).
 
-I've moved the usb_power_supply node a bit below, where it belongs,
-and it will be part of 4.15.
+This doesn't seem reliable, doesn't the user just need to remove and
+reprobe the slot and the device would re-appear without this flag set?
+Thanks,
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/c01f4c47/attachment.sig>
+Alex
