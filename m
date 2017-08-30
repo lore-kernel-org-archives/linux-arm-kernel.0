@@ -1,48 +1,38 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 30 Aug 2017 17:55:27 +0200
-Subject: [PATCH v2 1/3] dt-bindings: regulator: Add STM32 Voltage Reference
- Buffer
+Date: Wed, 30 Aug 2017 17:55:29 +0200
+Subject: [PATCH v2 3/3] ARM: dts: stm32: add vrefbuf to stm32h743
 In-Reply-To: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
 References: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1504108529-31727-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1504108529-31727-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document STM32 VREFBUF (voltage reference buffer) which can be used as
-voltage reference for ADCs, DACs and external components.
+Add STM32H743 VREFBUF (Voltage Reference Buffer) definition.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/regulator/st,stm32-vrefbuf.txt          | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+ arch/arm/boot/dts/stm32h743.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
-new file mode 100644
-index 0000000..3944ee3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
-@@ -0,0 +1,20 @@
-+STM32 VREFBUF - Voltage reference buffer
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 36a99db..83ee8fe 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -82,6 +82,15 @@
+ 			interrupts = <50>;
+ 			clocks = <&timer_clk>;
+ 		};
 +
-+Some STM32 devices embed a voltage reference buffer which can be used as
-+voltage reference for ADCs, DACs and also as voltage reference for external
-+components through the dedicated VREF+ pin.
-+
-+Required properties:
-+- compatible:		Must be "st,stm32-vrefbuf".
-+- reg:			Offset and length of VREFBUF register set.
-+- clocks:		Must contain an entry for peripheral clock.
-+
-+Example:
-+	vrefbuf: regulator at 58003C00 {
-+		compatible = "st,stm32-vrefbuf";
-+		reg = <0x58003C00 0x8>;
-+		clocks = <&rcc VREF_CK>;
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <2500000>;
-+		vdda-supply = <&vdda>;
-+	};
++		vrefbuf: regulator at 58003C00 {
++			compatible = "st,stm32-vrefbuf";
++			reg = <0x58003C00 0x8>;
++			clocks = <&timer_clk>;
++			regulator-min-microvolt = <1500000>;
++			regulator-max-microvolt = <2500000>;
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
