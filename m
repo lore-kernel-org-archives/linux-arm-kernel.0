@@ -1,142 +1,117 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Aug 2017 10:59:46 +0100
-Subject: [PATCH v3 53/59] KVM: arm/arm64: GICv4: Hook vPE scheduling into
- vgic flush/sync
-In-Reply-To: <20170828181758.GA24649@cbox>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-54-marc.zyngier@arm.com> <20170828181758.GA24649@cbox>
-Message-ID: <4dcaea2f-f8b4-c12e-c3c1-b43a4e29279b@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Aug 2017 10:58:54 +0100
+Subject: [RFC PATCH] arm64: move THREAD_* definitions to separated header
+In-Reply-To: <20170830092249.20638-1-ynorov@caviumnetworks.com>
+References: <20170830092249.20638-1-ynorov@caviumnetworks.com>
+Message-ID: <20170830095854.GA17353@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/17 19:17, Christoffer Dall wrote:
-> On Mon, Jul 31, 2017 at 06:26:31PM +0100, Marc Zyngier wrote:
->> The redistributor needs to be told which vPE is about to be run,
->> and tells us whether there is any pending VLPI on exit.
->>
->> Let's add the scheduling calls to the vgic flush/sync functions,
->> allowing the VLPIs to be delivered to the guest.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-v4.c | 24 ++++++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic.c    |  4 ++++
->>  virt/kvm/arm/vgic/vgic.h    |  1 +
->>  3 files changed, 29 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
->> index 50721c4e3da5..0a8deefbcf1c 100644
->> --- a/virt/kvm/arm/vgic/vgic-v4.c
->> +++ b/virt/kvm/arm/vgic/vgic-v4.c
->> @@ -119,6 +119,30 @@ void vgic_v4_teardown(struct kvm *kvm)
->>  	its_vm->vpes = NULL;
->>  }
->>  
->> +int vgic_v4_schedule(struct kvm_vcpu *vcpu, bool on)
->> +{
->> +	int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
->> +
->> +	if (!vgic_is_v4_capable(vcpu->kvm) || !irq)
->> +		return 0;
-> 
-> why do we need to check the its_vpe.irq here?  This check is certainly
-> not untuitive, as I don't understand what happened on a v4 capable
-> system that somehow failed.  Is it because a specific VM is configured
-> to not use VLPIs, or?
+On Wed, Aug 30, 2017 at 12:22:49PM +0300, Yury Norov wrote:
+> Hi Mark, all.
 
-Hmm. I think that's a debug leftover from my early attempt at making
-things work with QEMU, which initializes things in the opposite order
-as kvmtool. It should be removed (or replaced by a fat WARN_ON).
+Hi Yury, 
 
->> +
->> +	/*
->> +	 * Before making the VPE resident, make sure the redistributor
->> +	 * expects us here.
->> +	 */
->> +	if (on) {
->> +		int err;
->> +
->> +		err = irq_set_affinity(irq, cpumask_of(smp_processor_id()));
+> In patch 'dbc9344a68e506f19f8 ("arm64: clean up THREAD_* definitions")'
+> you move THREAD_* definitions from arch/arm64/include/asm/thread_info.h
+> to asm/memory.h. After that asm/thread_info.h starts to depend on
+> asm/memory.h.
 > 
-> This is pretty unintuitive, and coming here without having read your
-> documentation may make people completely puzzled.  Could we provide a
-> pointer to the documentation that explains how the vpe irq hooks this
-> all together?
+> When I try to apply ilp32 series on top of it [1], it causes circular
+> dependencies like this one:
+> 
+> In file included from ./arch/arm64/include/asm/memory.h:30:0,
+>                  from ./arch/arm64/include/asm/thread_info.h:30,
+>                  from ./include/linux/thread_bits.h:20,
+>                  from ./include/linux/thread_info.h:13,
+>                  from ./include/asm-generic/preempt.h:4,
+>                  from ./arch/arm64/include/generated/asm/preempt.h:1,
+>                  from ./include/linux/preempt.h:80,
+>                  from ./include/linux/rcupdate.h:40,
+>                  from ./include/linux/rculist.h:10,
+>                  from ./include/linux/pid.h:4,
+>                  from ./include/linux/sched.h:13,
+>                  from arch/arm64/kernel/asm-offsets.c:21:
+> ./arch/arm64/include/asm/is_compat.h: In function ?is_a32_compat_task?:
+> ./arch/arm64/include/asm/is_compat.h:25:9: error: implicit declaration of function ?test_thread_flag? [-Werror=implicit-function-declaration]
+>   return test_thread_flag(TIF_32BIT);
+>          ^~~~~~~~~~~~~~~~
+> 
+> The problem is that asm/memory.h depends on asm/is_compat.h to define
+> TASK_SIZE, which in turn requires asm/thread_info.h.
 
-Sure, will do.
+... and <asm/thread_info.h> include <asm/memory.h>, giving a circular
+dependency.
 
-> 
->> +		if (err) {
->> +			kvm_err("failed irq_set_affinity IRQ%d (%d)\n", irq, err);
->> +			return err;
->> +		}
->> +	}
->> +
->> +	return its_schedule_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe, on);
->> +}
->> +
-> 
-> I'd prefer this function be split into two and follow the vgic notation
-> of having a flush and a sync function.
+In other architectures, TASK_SIZE is defined in processor.h. Can we not
+move TASK_SIZE instead of THREAD_SIZE, given that TASK_SIZE is what
+causes the dependency?
 
-Yes, makes sense.
+We'd need a new __ASSEMBLY__ guard, but otherwise it looks like that
+would solve the issue.
 
->>  static struct vgic_its *vgic_get_its(struct kvm *kvm,
->>  				     struct kvm_kernel_irq_routing_entry *irq_entry)
->>  {
->> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->> index dfac894f6f03..9ab52108989d 100644
->> --- a/virt/kvm/arm/vgic/vgic.c
->> +++ b/virt/kvm/arm/vgic/vgic.c
->> @@ -721,6 +721,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->>  {
->>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->>  
->> +	WARN_ON(vgic_v4_schedule(vcpu, false));
->> +
-> 
-> This is in the critical path, so would it be worth considering a static
-> key to cater for non-GICv4 systems here?
+> The most obvious solution for it is to create is_compat.c file and make
+> is_*_compat() real functions. The other option is to move THREAD_*
+> definitions to separated macro. I would prefer 2nd one because of following
+> reasons:
+>  - TASK_SIZE macro is used many times in kernel, including hot paths;
+>  - asm/memory.h is included widely, as well as asm/thread_info.h, and it's
+>    better not to make them depend one from another;
+>  - THREAD_SIZE etc are not memory-related definitions.
 
-Hey, for once I wasn't trying to optimize early! ;-) This would be
-useful indeed, as I expect GICv4 systems to be the absolute minority for
-the foreseeable future.
+I disagree with this last point. THREAD_SIZE is in <asm/memory.h>
+because it affects the kernel's memory layout, as with other definitions
+at the top of <asm/memory.h>.
 
-> 
->>  	/* An empty ap_list_head implies used_lrs == 0 */
->>  	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
->>  		return;
->> @@ -733,6 +735,8 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->>  /* Flush our emulation state into the GIC hardware before entering the guest. */
->>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
->>  {
->> +	WARN_ON(vgic_v4_schedule(vcpu, true));
->> +
->>  	/*
->>  	 * If there are no virtual interrupts active or pending for this
->>  	 * VCPU, then there is no work to do and we can bail out without
->> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->> index 1210bf4681dc..693b654acf4d 100644
->> --- a/virt/kvm/arm/vgic/vgic.h
->> +++ b/virt/kvm/arm/vgic/vgic.h
->> @@ -234,5 +234,6 @@ int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->>  bool vgic_is_v4_capable(struct kvm *kvm);
->>  int vgic_v4_init(struct kvm *kvm);
->>  void vgic_v4_teardown(struct kvm *kvm);
->> +int vgic_v4_schedule(struct kvm_vcpu *vcpu, bool on);
->>  
->>  #endif
->> -- 
->> 2.11.0
->>
-> Functionally, this looks correct.
-> 
-> Thanks,
-> -Christoffer
-> 
+I would much prefer keeping those definitions together.
+
+> In this patch THREAD_* definitions moved to separated asm/thread_size.h
+> header. It's enough to resolve dependency above.
+>
+> If you find this approach useful, I can prepare other patch that moves
+> TASK_* definitions from asm/memory.h to new header to remove the dependency
+> from asm/is_compat.h.
+
+I'd prefer that we moved the TASK_SIZE* definitions first, but if
+necessary, I'm ok with seeing the THREAD_SIZE* definitions move.
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+
+> -#include <asm/memory.h>
+> +#include <asm/thread_size.h>
+>  #include <asm/stack_pointer.h>
+>  #include <asm/types.h>
+
+Nit: please keep includes ordered alphabetically.
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/thread_size.h b/arch/arm64/include/asm/thread_size.h
+
+> +#ifdef __KERNEL__
+
+This can go. We haven't needed __KERNEL__ ifdefs for a long time now...
+
+[...]
+
+> diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+> index e56d848b6466..46b91702ea26 100644
+> --- a/arch/arm64/kernel/hibernate-asm.S
+> +++ b/arch/arm64/kernel/hibernate-asm.S
+> @@ -22,7 +22,6 @@
+>  #include <asm/asm-offsets.h>
+>  #include <asm/assembler.h>
+>  #include <asm/cputype.h>
+> -#include <asm/memory.h>
+>  #include <asm/page.h>
+>  #include <asm/virt.h>
+
+AFAICT, we can also lose <linux/errno.h>, <asm/cputype.h>, and
+<asm/virt.h>.
+
+Changes to this file might be better as a preparatory cleanup.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
