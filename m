@@ -1,21 +1,29 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 29 Aug 2017 21:57:10 -0500
-Subject: [PATCHv2 0/2] PCI: add ls2088a and ls1088a support
-In-Reply-To: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
-References: <1501828894-25598-1-git-send-email-Zhiqiang.Hou@nxp.com>
-Message-ID: <20170830025710.GA10338@bhelgaas-glaptop.roam.corp.google.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Wed, 30 Aug 2017 05:01:03 +0200
+Subject: [PATCH 0/7] [DTS] enable hardware for Nanopi M1 & Nanopi M1 Plus
+Message-ID: <1504062070-13523-1-git-send-email-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 02:41:32PM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> Hou Zhiqiang (2):
->   PCI: layerscape: Add support for ls2088a
->   PCI: layerscape: Add support for ls1088a
-> 
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  2 ++
->  drivers/pci/dwc/pci-layerscape.c                         | 10 ++++++++++
->  2 files changed, 12 insertions(+)
+From: Philipp Rossak <embed3d@gmail.com>
 
-Applied with Minghuan's ack to pci/host-layerscape for v4.14, thanks!
+This Patchseries enables the IR controller and the dwmac-sun8i
+on the Friendlyarm Nanopi M1 and Friendlyarm Nanopi M1 Plus boards.
+On the Nanopi M1 Plus additionally the BT/Wifi module is activated.
+
+Philipp Rossak (7):
+  ARM: dts: sun8i: h3: nanopi-m1: Enable IR controller
+  ARM: dts: sun8i: h3: nanopi-m1-plus: Enable IR controller
+  ARM: dts: sun8i: h3: Enable dwmac-sun8i on the Nanopi M1 Plus
+  ARM: dts: sun8i: h3: Enable AP6212 WiFi on mmc1 on Nanopi M1 Plus
+  ARM: dts: sun8i: h3: Enable dwmac-sun8i on the Nanopi M1
+  ARM: dts: sun8i: h3: Adding UART3 RTS and CTS Pins
+  ARM: dts: sun8i: h3: Enable AP6212 BT on uart3 on Nanopi M1 Plus
+
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 80 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts      | 17 ++++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi            |  5 ++
+ 3 files changed, 102 insertions(+)
+
+-- 
+2.7.4
