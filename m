@@ -1,49 +1,63 @@
 From: vviswana@codeaurora.org (Vijay Viswanath)
-Date: Wed, 30 Aug 2017 18:21:44 +0530
-Subject: [PATCH v1 0/5] mmc: sdhci-msm: Corrections to implementation of power
- irq
-Message-ID: <1504097509-58983-1-git-send-email-vviswana@codeaurora.org>
+Date: Wed, 30 Aug 2017 18:21:45 +0530
+Subject: [PATCH v1 1/5] mmc: sdhci-msm: fix issue with power irq
+In-Reply-To: <1504097509-58983-1-git-send-email-vviswana@codeaurora.org>
+References: <1504097509-58983-1-git-send-email-vviswana@codeaurora.org>
+Message-ID: <1504097509-58983-2-git-send-email-vviswana@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register writes which change voltage of IO lines or turn the IO bus on/off
-require sdhc controller to be ready before progressing further. Once a
-register write which affects IO lines is done, the driver should wait for
-power irq from controller. Once the irq comes, the driver should acknowledge
-the irq by writing to power control register. If the acknowledgement is not
-given to controller, the controller may not complete the corresponding
-register write action and this can mess up the controller if drivers proceeds
-without power irq completing.
+From: Subhash Jadavani <subhashj@codeaurora.org>
 
-Changes since RFC:
-	wait_for_completion_timeout replaced with wait_event_timeout when
-	waiting for power irq.
-	Removed the spinlock within power irq handler and API which waits
-	for power irq.
-	Added comments to sdhci msm register write functions, warning that they
-	can sleep.
-	Sdhci msm register write functions will do a memory barrier before
-	writing to the register if the particular register can trigger
-	power irq.
-	Instead of enabling SDHCI IO ACCESSORS config in arm64/defconfig, it
-	will be selected in mmc/host/Kconfig if the platform is MMC_SDHCI_MSM.
+SDCC controller reset (SW_RST) during probe may trigger power irq if
+previous status of PWRCTL was either BUS_ON or IO_HIGH_V. So before we
+enable the power irq interrupt in GIC (by registering the interrupt
+handler), we need to ensure that any pending power irq interrupt status
+is acknowledged otherwise power irq interrupt handler would be fired
+prematurely.
 
+Signed-off-by: Subhash Jadavani <subhashj@codeaurora.org>
+Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
+---
+ drivers/mmc/host/sdhci-msm.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Sahitya Tummala (2):
-  mmc: sdhci-msm: Fix HW issue with power IRQ handling during reset
-  mmc: sdhci-msm: Add support to wait for power irq
-
-Subhash Jadavani (1):
-  mmc: sdhci-msm: fix issue with power irq
-
-Vijay Viswanath (2):
-  mmc: sdhci-msm: Add ops to do sdhc register write
-  mmc: Kconfig: Enable CONFIG_MMC_SDHCI_IO_ACCESSORS
-
- drivers/mmc/host/Kconfig     |   1 +
- drivers/mmc/host/sdhci-msm.c | 253 ++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 249 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 9d601dc..d636251 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -1250,6 +1250,21 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 			       CORE_VENDOR_SPEC_CAPABILITIES0);
+ 	}
+ 
++	/*
++	 * Power on reset state may trigger power irq if previous status of
++	 * PWRCTL was either BUS_ON or IO_HIGH_V. So before enabling pwr irq
++	 * interrupt in GIC, any pending power irq interrupt should be
++	 * acknowledged. Otherwise power irq interrupt handler would be
++	 * fired prematurely.
++	 */
++	sdhci_msm_voltage_switch(host);
++
++	/*
++	 * Ensure that above writes are propogated before interrupt enablement
++	 * in GIC.
++	 */
++	mb();
++
+ 	/* Setup IRQ for handling power/voltage tasks with PMIC */
+ 	msm_host->pwr_irq = platform_get_irq_byname(pdev, "pwr_irq");
+ 	if (msm_host->pwr_irq < 0) {
+@@ -1259,6 +1274,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 		goto clk_disable;
+ 	}
+ 
++	/* Enable pwr irq interrupts */
++	writel_relaxed(INT_MASK, msm_host->core_mem + CORE_PWRCTL_MASK);
++
+ 	ret = devm_request_threaded_irq(&pdev->dev, msm_host->pwr_irq, NULL,
+ 					sdhci_msm_pwr_irq, IRQF_ONESHOT,
+ 					dev_name(&pdev->dev), host);
 -- 
  Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, Inc. 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
