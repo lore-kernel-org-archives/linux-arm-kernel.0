@@ -1,101 +1,97 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 30 Aug 2017 15:41:16 +0100
-Subject: [PATCH 0/4] arm: remove cpu_efficiency
-Message-ID: <20170830144120.9312-1-dietmar.eggemann@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 30 Aug 2017 16:44:09 +0200
+Subject: [RESEND PATCH 1/2] arm64: allwinner: a64: add SPI nodes
+In-Reply-To: <20170829202652.5476-2-stefan.bruens@rwth-aachen.de>
+References: <20170829202652.5476-1-stefan.bruens@rwth-aachen.de>
+ <20170829202652.5476-2-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170830144409.qtewwaffwof34hai@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Cortex-A15/A7 arm big.LITTLE systems there are currently two ways to
-set the cpu capacity.
+Hi Stefan,
 
-The first one (commit 06073ee26775 "ARM: 8621/3: parse cpu
-capacity-dmips-mhz from DT") is based on dt 'cpu capacity-dmips-mhz'
-bindings and the appropriate dt parsing code in
-drivers/base/arch_topology.c. It further takes differences in maximum
-cpu frequency values into consideration, normalizes the maximum cpu
-capacity to SCHED_CAPACITY_SCALE (1024) and scales all the cpus
-accordingly.
+On Tue, Aug 29, 2017 at 10:26:51PM +0200, Stefan Br?ns wrote:
+> The A64 SPI controllers are register compatible to the h3/h5 SPI
+> controllers.
+> 
+> The A64 has two SPI controllers, each with a single chip select.
+> The handles for the DMA channels (23/24 for SPI0/SPI1) are omitted,
+> as the A64 DMA controller node is currently missing.
+> 
+> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index bd0f33b77f57..373cd14f0206 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -325,6 +325,16 @@
+>  				drive-strength = <40>;
+>  			};
+>  
+> +			spi0_pins: spi0 {
+> +				pins = "PC0", "PC1", "PC2", "PC3";
+> +				function = "spi0";
+> +			};
+> +
+> +			spi1_pins: spi1 {
+> +				pins = "PD0", "PD1", "PD2", "PD3";
+> +				function = "spi1";
+> +			};
+> +
+>  			uart0_pins_a: uart0 at 0 {
+>  				pins = "PB8", "PB9";
+>  				function = "uart0";
+> @@ -527,5 +537,35 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  		};
+> +
+> +		spi0: spi at 01c68000 {
+> +			compatible = "allwinner,sun8i-h3-spi";
+> +			reg = <0x01c68000 0x1000>;
+> +			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
+> +			clock-names = "ahb", "mod";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&spi0_pins>;
+> +			resets = <&ccu RST_BUS_SPI0>;
+> +			status = "disabled";
+> +			num-cs = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		spi1: spi at 01c69000 {
+> +			compatible = "allwinner,sun8i-h3-spi";
+> +			reg = <0x01c69000 0x1000>;
+> +			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
+> +			clock-names = "ahb", "mod";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&spi1_pins>;
+> +			resets = <&ccu RST_BUS_SPI1>;
+> +			status = "disabled";
+> +			num-cs = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
 
-  cpu capacity = (capacity-dmips-mhz * max cpu frequency) / 
-                 (max capacity-dmips-mhz * max (max cpu frequency)
+Those nodes are ordered by ascending physical base address, so they
+belong a bit above were you placed them.
 
-This solution is shared between arm and arm64 and works for other
-combinations of big and little cpus (besides Cortex-A15/A7) as well.
-
-The second one (commit 339ca09d7ada "ARM: 7463/1: topology: Update
-cpu_power according to DT information" is based on the 'struct
-cpu_efficiency table_efficiency[]' and the dt parsing code in
-arch/arm/kernel/topology.c. It further requires a clock-frequency
-property per cpu node, calculates a so called middle frequency for an
-average cpu in the system which is as close as possible to
-SCHED_CAPACITY_SCALE (1024) and uses this to compute the cpu capacity
-values.
-
-  cpu capacity = (cpu efficiency * clock frequency) / middle capacity
-
-This solution only works for Cortex-A15/A7 arm big.LITTLE systems.
-
-The aim of this patch-set is to have only one solution for all arm and
-arm64 big.LITTLE platforms.
-
-(1) Therefore, it removes the code for the 'cpu_efficiency/
-    clock-frequency dt property' (second) solution [patch 01/04] and
-    migrates the arm big.LITTLE platforms currently using this approach
-    [patch 02-04/04] to use the 'cpu capacity-dmips-mhz' (first)
-    solution.
-
-(2) Moreover, it will also assure that the highest original cpu capacity
-    (rq->cpu_capacity_orig) in a non-smt system is SCHED_CAPACITY_SCALE
-    (1024).
-
-(3) And finally, another advantage is the dynamic detection of the max
-    cpu frequency which comes with the first solution instead of the
-    static clock-frequency dt property value.
-
-Currently, the arm dt parsing code in parse_dt_topology() checks if the
-dt uses the capacity-dmips-mhz property. If this is the case it uses
-the first, otherwise the second solution. This patch-set removes the
-code for the second solution from arch/arm/kernel/topology.c.
-
-The following arm big.LITTLE platforms which use cpu node descriptions
-with the 'compatible' properties "arm,cortex-a15" and "arm,cortex-a7"
-as well as the "clock-frequency" are (theoretically*) affected:
-
-(1) arndale-octa, peach-pi, peach-pit, smdk5420 (exynos5420-cpus.dtsi)
-
-(2) odroidxu3, odroidxu3-lite, odroidxu4 (exynos5422-cpus.dtsi)
-
-(3) r8a7790-lager (r8a7790.dtsi)
-
-TC2 (vexpress-v2p-ca15_a7.dts) already has the capacity-dmips-mhz
-properties (it never had "clock-frequency" properties per cpu node
-though).
-
-*Currently, these platforms are only theoretically affected. The reason
-is because heterogeneous cpu capacity support on arm stopped with commit
-8cd5601c5060 ("sched/fair: Convert arch_scale_cpu_capacity() from weak
-function to #define") because the arch never defined
-arch_scale_cpu_capacity so the task scheduler uses the default
-implementation in kernel/sched/sched.h. This will change as soon the
-patch "arm: wire cpu-invariant accounting support up to the task
-scheduler" [1] is in mainline.
-
-This patch-set has been tested on TC2 and Samsung Chromebook 2 13"
-(peach-pi, Exynos 5800).
-
-[1] https://marc.info/?l=linux-kernel&m=150367158111303&w=2
-
-Dietmar Eggemann (4):
-  arm: topology: remove cpu_efficiency
-  arm: dts: exynos: add exynos5420 cpu capacity-dmips-mhz information
-  arm: dts: exynos: add exynos5422 cpu capacity-dmips-mhz information
-  arm: dts: r8a7790: add cpu capacity-dmips-mhz information
-
- arch/arm/boot/dts/exynos5420-cpus.dtsi |   8 +++
- arch/arm/boot/dts/exynos5422-cpus.dtsi |   8 +++
- arch/arm/boot/dts/r8a7790.dtsi         |   8 +++
- arch/arm/kernel/topology.c             | 113 +--------------------------------
- 4 files changed, 27 insertions(+), 110 deletions(-)
+Maxime
 
 -- 
-2.11.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/535300e6/attachment.sig>
