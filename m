@@ -1,220 +1,67 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Aug 2017 12:22:49 +0300
-Subject: [RFC PATCH] arm64: move  THREAD_* definitions to separated header
-Message-ID: <20170830092249.20638-1-ynorov@caviumnetworks.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Aug 2017 11:24:24 +0200
+Subject: linux-next regression caused by "gpiolib: request the gpio before
+ querying its direction"
+Message-ID: <20170830112424.7a3a7c36@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, all.
+Hello,
 
-In patch 'dbc9344a68e506f19f8 ("arm64: clean up THREAD_* definitions")'
-you move THREAD_* definitions from arch/arm64/include/asm/thread_info.h
-to asm/memory.h. After that asm/thread_info.h starts to depend on
-asm/memory.h.
+Commit "gpiolib: request the gpio before querying its
+direction" (108d23e322a247d9f89ba2e2742520ead0944cc9) is causing a
+regression on Marvell platforms, and potentially other platforms as
+well. With this commit applied, we lose the serial console. Reverting
+this commit makes the serial console functional again.
 
-When I try to apply ilp32 series on top of it [1], it causes circular
-dependencies like this one:
+On the Marvell Armada 8K, the UART pins are pin-muxed, with the choice
+of GPIO or UART as functionality. Currently, the Armada 8K Device Tree
+do not have the pin-mux information for the UART, because the pinctrl
+driver didn't exist when we first added support for the platform, so we
+continue to rely on the bootloader having configured the UART muxing.
 
-In file included from ./arch/arm64/include/asm/memory.h:30:0,
-                 from ./arch/arm64/include/asm/thread_info.h:30,
-                 from ./include/linux/thread_bits.h:20,
-                 from ./include/linux/thread_info.h:13,
-                 from ./include/asm-generic/preempt.h:4,
-                 from ./arch/arm64/include/generated/asm/preempt.h:1,
-                 from ./include/linux/preempt.h:80,
-                 from ./include/linux/rcupdate.h:40,
-                 from ./include/linux/rculist.h:10,
-                 from ./include/linux/pid.h:4,
-                 from ./include/linux/sched.h:13,
-                 from arch/arm64/kernel/asm-offsets.c:21:
-./arch/arm64/include/asm/is_compat.h: In function ?is_a32_compat_task?:
-./arch/arm64/include/asm/is_compat.h:25:9: error: implicit declaration of function ?test_thread_flag? [-Werror=implicit-function-declaration]
-  return test_thread_flag(TIF_32BIT);
-         ^~~~~~~~~~~~~~~~
+Therefore, with Timur's commit applied, when the system boots, we get
+serial output, up to the point where gpiochip_add_data() is called, and
+requests all GPIOs. Since our UART pins are not requested at the
+pinctrl level, the gpio_request succeeds and re-muxes those pins as
+GPIOs: we lose the UART.
 
-The problem is that asm/memory.h depends on asm/is_compat.h to define
-TASK_SIZE, which in turn requires asm/thread_info.h.
+So, this is a clear regression, as with the current Device Tree for the
+Armada 8K platforms, linux-next has the serial console broken.
 
-The most obvious solution for it is to create is_compat.c file and make
-is_*_compat() real functions. The other option is to move THREAD_*
-definitions to separated macro. I would prefer 2nd one because of following
-reasons:
- - TASK_SIZE macro is used many times in kernel, including hot paths;
- - asm/memory.h is included widely, as well as asm/thread_info.h, and it's
-   better not to make them depend one from another;
- - THREAD_SIZE etc are not memory-related definitions.
- 
-In this patch THREAD_* definitions moved to separated asm/thread_size.h
-header. It's enough to resolve dependency above.
+If we add the relevant pinctrl muxing details in the DT, things are
+working again of course. *But* it is still not good, because there is a
+window of time during which we don't get serial port messages: between
+the moment the pins are muxed as GPIOs by gpiochip_add_data(), and the
+moment the UART driver probes, requests the pins, and they get remuxed
+as UART. With earlycon enabled, it means we loose kernel messages.
 
-If you find this approach useful, I can prepare other patch that moves
-TASK_* definitions from asm/memory.h to new header to remove the dependency
-from asm/is_compat.h.
+I believe the UART pins are quite critical, and therefore they
+shouldn't be remuxed as GPIOs automatically that early at boot time.
 
-Also, arch/arm64/kernel/entry.S and arch/arm64/kernel/hibernate-asm.S
-#includes list is cleaned.
+What do you suggest to fix this problem ?
 
-[1] https://github.com/norov/linux/tree/ilp32-next (still in progress)
+Some more details about the platform:
 
-CC: Will Deacon <will.deacon@arm.com>
-CC: Laura Abbott <labbott@redhat.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/include/asm/memory.h      | 30 +-------------------
- arch/arm64/include/asm/thread_info.h |  2 +-
- arch/arm64/include/asm/thread_size.h | 53 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/entry.S            |  2 +-
- arch/arm64/kernel/hibernate-asm.S    |  1 -
- 5 files changed, 56 insertions(+), 32 deletions(-)
- create mode 100644 arch/arm64/include/asm/thread_size.h
+ - DT is arch/arm64/boot/dts/marvell/armada-8040-db.dts
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 0c3ee6afda5b..bc7ec1930659 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -21,6 +21,7 @@
- #ifndef __ASM_MEMORY_H
- #define __ASM_MEMORY_H
- 
-+#include <asm/thread_size.h>
- #include <linux/compiler.h>
- #include <linux/const.h>
- #include <linux/types.h>
-@@ -105,35 +106,6 @@
- #define KASAN_SHADOW_SIZE	(0)
- #endif
- 
--#define MIN_THREAD_SHIFT	14
--
--/*
-- * VMAP'd stacks are allocated at page granularity, so we must ensure that such
-- * stacks are a multiple of page size.
-- */
--#if defined(CONFIG_VMAP_STACK) && (MIN_THREAD_SHIFT < PAGE_SHIFT)
--#define THREAD_SHIFT		PAGE_SHIFT
--#else
--#define THREAD_SHIFT		MIN_THREAD_SHIFT
--#endif
--
--#if THREAD_SHIFT >= PAGE_SHIFT
--#define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
--#endif
--
--#define THREAD_SIZE		(UL(1) << THREAD_SHIFT)
--
--/*
-- * By aligning VMAP'd stacks to 2 * THREAD_SIZE, we can detect overflow by
-- * checking sp & (1 << THREAD_SHIFT), which we can do cheaply in the entry
-- * assembly.
-- */
--#ifdef CONFIG_VMAP_STACK
--#define THREAD_ALIGN		(2 * THREAD_SIZE)
--#else
--#define THREAD_ALIGN		THREAD_SIZE
--#endif
--
- #define IRQ_STACK_SIZE		THREAD_SIZE
- 
- #define OVERFLOW_STACK_SIZE	SZ_4K
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 5d889c645321..6267ba7bd0e4 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -27,7 +27,7 @@
- 
- struct task_struct;
- 
--#include <asm/memory.h>
-+#include <asm/thread_size.h>
- #include <asm/stack_pointer.h>
- #include <asm/types.h>
- 
-diff --git a/arch/arm64/include/asm/thread_size.h b/arch/arm64/include/asm/thread_size.h
-new file mode 100644
-index 000000000000..dd0b8906f9de
---- /dev/null
-+++ b/arch/arm64/include/asm/thread_size.h
-@@ -0,0 +1,53 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ASM_THREAD_SIZE_H
-+#define __ASM_THREAD_SIZE_H
-+
-+#ifdef __KERNEL__
-+
-+#include <asm/page-def.h>
-+#include <linux/const.h>
-+
-+#define MIN_THREAD_SHIFT	14
-+
-+/*
-+ * VMAP'd stacks are allocated at page granularity, so we must ensure that such
-+ * stacks are a multiple of page size.
-+ */
-+#if defined(CONFIG_VMAP_STACK) && (MIN_THREAD_SHIFT < PAGE_SHIFT)
-+#define THREAD_SHIFT		PAGE_SHIFT
-+#else
-+#define THREAD_SHIFT		MIN_THREAD_SHIFT
-+#endif
-+
-+#if THREAD_SHIFT >= PAGE_SHIFT
-+#define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
-+#endif
-+
-+#define THREAD_SIZE		(_AC(1, UL) << THREAD_SHIFT)
-+
-+/*
-+ * By aligning VMAP'd stacks to 2 * THREAD_SIZE, we can detect overflow by
-+ * checking sp & (1 << THREAD_SHIFT), which we can do cheaply in the entry
-+ * assembly.
-+ */
-+#ifdef CONFIG_VMAP_STACK
-+#define THREAD_ALIGN		(2 * THREAD_SIZE)
-+#else
-+#define THREAD_ALIGN		THREAD_SIZE
-+#endif
-+
-+#endif /* __KERNEL__ */
-+#endif /*__ASM_THREAD_SIZE_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 84b9f1d235ba..43f8ea210bb3 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -28,7 +28,7 @@
- #include <asm/errno.h>
- #include <asm/esr.h>
- #include <asm/irq.h>
--#include <asm/memory.h>
-+#include <asm/thread_size.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
- #include <asm/asm-uaccess.h>
-diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
-index e56d848b6466..46b91702ea26 100644
---- a/arch/arm64/kernel/hibernate-asm.S
-+++ b/arch/arm64/kernel/hibernate-asm.S
-@@ -22,7 +22,6 @@
- #include <asm/asm-offsets.h>
- #include <asm/assembler.h>
- #include <asm/cputype.h>
--#include <asm/memory.h>
- #include <asm/page.h>
- #include <asm/virt.h>
- 
+ - Affected GPIO/pinctrl is described in
+   arch/arm64/boot/dts/marvell/armada-ap806.dtsi, nodes ap_pinctrl and
+   ap_gpio.
+
+ - The drivers/gpio/gpio-mvebu.c probe() function calls
+   devm_gpiochip_add_data(), which calls gpiochip_add_data(), which
+   iterates through all pins and requests them as GPIOs.
+
+ - The UART pins are described in the pinctrl driver
+   drivers/pinctrl/mvebu/pinctrl-armada-ap806.c. The most problematic
+   one is pin 11, which is UART0 TXD, and gets remuxed as GPIO, causing
+   the bug.
+
+Thanks!
+
+Thomas
 -- 
-2.11.0
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
