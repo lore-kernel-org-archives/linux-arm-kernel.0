@@ -1,42 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Aug 2017 16:32:55 +0200
-Subject: linux-next regression caused by "gpiolib: request the gpio
- before querying its direction"
-In-Reply-To: <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
-References: <20170830112424.7a3a7c36@windsurf.lan>
- <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
- <87ziah2m3f.fsf@free-electrons.com>
- <20170830161730.41919554@windsurf.lan>
- <442accaa-15a0-4efb-4e5c-cebca7140213@codeaurora.org>
-Message-ID: <20170830163255.4e7c1422@windsurf.lan>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 30 Aug 2017 16:37:28 +0200
+Subject: [PATCH v2 1/2] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for
+ LAN8710
+In-Reply-To: <1503901963-9457-2-git-send-email-stefan@olimex.com>
+References: <1503901963-9457-1-git-send-email-stefan@olimex.com>
+ <1503901963-9457-2-git-send-email-stefan@olimex.com>
+Message-ID: <20170830143728.friajjequvioqjpu@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Wed, 30 Aug 2017 09:22:55 -0500, Timur Tabi wrote:
+On Mon, Aug 28, 2017 at 09:32:42AM +0300, Stefan Mavrodiev wrote:
+> From revision J the board uses new phy chip LAN8710. Compared
+> with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
+> not to work. To fix this PA17 is muxed with GMAC function. This
+> makes the pin output-low.
+> 
+> This patch is compatible with earlier board revisions, since this
+> pin wasn't connected to phy.
+> 
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> index 0b7403e..cb1b081 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> @@ -102,7 +102,7 @@
+>  
+>  &gmac {
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&gmac_pins_mii_a>;
+> +	pinctrl-0 = <&gmac_pins_mii_a>,<&gmac_txerr>;
+>  	phy = <&phy1>;
+>  	phy-mode = "mii";
+>  	status = "okay";
+> @@ -229,6 +229,11 @@
+>  };
+>  
+>  &pio {
+> +	gmac_txerr: gmac_txerr at 0 {
+> +		pins = "PA17";
+> +		function = "gmac";
+> +	};
+> +
 
-> No, that's it.  The question is, what exactly should the 'request' 
-> function do?  Should it be modifying the hardware to satisfy the 
-> request?  When I wrote my patch, I assumed that it wouldn't.  I thought 
-> that request simply answered the question, "can I touch this GPIO"?
+The patch looks fine, I still have one question though.
 
-No, it also muxes the pin in GPIO, and you can see the "reference"
-implementation pinctrl-single also does it.
+Can a PHY operate without this signal? My real question is, would it
+make sense to mux that pin for all the users, or is it an optional
+signal that each board designer can choose to use or not?
 
-Let's see what Linus W. has to say about the semantic of the "request"
-operation.
+Thanks!
+Maxime
 
-But if we change the semantic of "request" to no longer mux the hardware
-as GPIO, then you will also have regressions, because there are plenty
-of GPIOs that are requested, but not explicitly muxed as GPIOs in the
-DT, precisely because today requesting a GPIO is sufficient to have it
-re-muxed as GPIO at the pinctrl level.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170830/5c95924a/attachment.sig>
