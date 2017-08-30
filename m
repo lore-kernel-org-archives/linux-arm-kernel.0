@@ -1,113 +1,75 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 30 Aug 2017 15:31:38 +0000
-Subject: [PATCH] clk: bulk: call of_clk_get() when id is NULL
-In-Reply-To: <20170813141851.GD31819@dragon>
-References: <1502243442-28055-1-git-send-email-shawnguo@kernel.org>
- <20170809173318.GD2146@codeaurora.org> <20170813141851.GD31819@dragon>
-Message-ID: <AM3PR04MB3064504A935B4AA0CBEE962809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed, 30 Aug 2017 16:17:14 +0100
+Subject: [PATCH ] ARM: dts: iwg22d-sodimm: Add Ethernet AVB support
+Message-ID: <1504106234-41450-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Sunday, August 13, 2017 10:19 PM
-> To: Stephen Boyd
-> Cc: Michael Turquette; A.s. Dong; linux-clk at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Shawn Guo
-> Subject: Re: [PATCH] clk: bulk: call of_clk_get() when id is NULL
-> 
-> Hi Stephen,
-> 
-> On Wed, Aug 09, 2017 at 10:33:18AM -0700, Stephen Boyd wrote:
-> > > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c index
-> > > c834f5abfc49..65cee595a67e 100644
-> > > --- a/drivers/clk/clk-bulk.c
-> > > +++ b/drivers/clk/clk-bulk.c
-> > > @@ -39,7 +39,10 @@ int __must_check clk_bulk_get(struct device *dev,
-> int num_clks,
-> > >  		clks[i].clk = NULL;
-> > >
-> > >  	for (i = 0; i < num_clks; i++) {
-> > > -		clks[i].clk = clk_get(dev, clks[i].id);
-> > > +		if (clks[i].id)
-> > > +			clks[i].clk = clk_get(dev, clks[i].id);
-> > > +		else if (dev->of_node)
-> > > +			clks[i].clk = of_clk_get(dev->of_node, i);
-> >
-> > This seems a little too magical. The omission of an id in an array of
-> > clks would mean that only that one clk is acquired through
-> > of_clk_get(). We could have a mixture of ids and no ids for some
-> > device, and then do very odd things.
-> >
-> > How about we add a flag to clk_bulk_data that indicates we want it to
-> > use of_clk_get() instead of clk_get() for all of the clks?
-> > Then the id is ignored for the entire function.
-> 
-> I have sent v2 to add a flag to clk_bulk_data to address your comments.
-> But I just found it might not be what you want exactly, because the
-> current bulk clk APIs defines clk_bulk_data in a different way from what
-> you are asking here.
-> 
-> It seems that you think clk_bulk_data represents all the clocks that bulk
-> APIs manage, but actually it only represents one of the multiple clocks.
-> Callers need to prepare an array of clk_bulk_data to represent multiple
-> clocks.  That said, the flag we add to clk_bulk_data only affects one
-> clock instead of all clocks.
-> 
-> I feel this is something we can improve.  clk_bulk_data can be used to
-> represent all clocks, something like below.  In this case, bulk clk APIs
-> do not need to take num_clks as a separate parameter, and callers do not
-> need to maintain multiple clk_bulk_data instances.  Since we do not have
-> any in tree users of bulk clk APIs yet, we can make this semantic change
-> quickly.  Thoughts?
-> 
+Define the iWave RainboW-G22D board dependent part of the Ethernet
+AVB device node.
 
-Flags may be better used for extending per clk feature support in the future.
+On some older versions of the platform (before R4.0) the phy address
+may be 1 or 3. The address is fixed to 3 for R4.0 onwards (which
+will be the first mainstream release), hence using 3 in the dts.
 
-IMHO how about implement a of_clk_bulk_get() to handle this issue as we already
-have a of_clk_get?
-e.g.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+This patch is tested against renesas-dev tag 20170830-v4.13-rc7
 
-int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-                              struct clk_bulk_data *clks)
-{
-        for (i = 0; i < num_clks; i++) {
-                clks[i].clk = of_clk_get(dev, clks[i].id);
-...
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-}
-
-Then it's less intrusive.
-
-Regards
-Dong Aisheng
-
-> diff --git a/include/linux/clk.h b/include/linux/clk.h index
-> 31fee2e8d4a2..ddc4812758f6 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -80,8 +80,10 @@ struct clk_notifier_data {
->  /**
->   * struct clk_bulk_data - Data used for bulk clk operations.
->   *
-> - * @id: clock consumer ID
-> - * @clk: struct clk * to store the associated clock
-> + * @ids: array of clock consumer IDs which should be provided by caller.
-> + * @clks: array of struct clk * to store the associated clocks, which
-> will be
-> + *     allocated by clk_bulk_get() and freed by clk_bulk_put().
-> + * @num_clks: number of clocks that caller wants bulk API to manage.
->   * @flags: bulk clk operation flags
->   *
->   * The CLK APIs provide a series of clk_bulk_() API calls as @@ -93,8
-> +95,9 @@ struct clk_notifier_data {
->   *     clk_bulk_get() API will call of_clk_get() to find clock by index.
->   */
->  struct clk_bulk_data {
-> -       const char              *id;
-> -       struct clk              *clk;
-> +       const char              **ids;
-> +       struct clk              **clks;
-> +       unsigned int            num_clks;
->         unsigned long           flags;
->  };
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+index 442a5cb..aac84c6 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+@@ -17,9 +17,11 @@
+ 
+ 	aliases {
+ 		serial0 = &scif4;
++		ethernet0 = &avb;
+ 	};
+ 
+ 	chosen {
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ };
+@@ -29,6 +31,11 @@
+ 		groups = "scif4_data_b";
+ 		function = "scif4";
+ 	};
++
++	avb_pins: avb {
++		groups = "avb_mdio", "avb_gmii";
++		function = "avb";
++	};
+ };
+ 
+ &scif4 {
+@@ -37,3 +44,22 @@
+ 
+ 	status = "okay";
+ };
++
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
++
++	phy-handle = <&phy3>;
++	phy-mode = "gmii";
++	renesas,no-ether-link;
++	status = "okay";
++
++	phy3: ethernet-phy at 3 {
++	/*
++	 * On some older versions of the platform (before R4.0) the phy address
++	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
++	 */
++		reg = <3>;
++		micrel,led-mode = <1>;
++	};
++};
+-- 
+1.9.1
