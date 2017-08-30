@@ -1,87 +1,128 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 30 Aug 2017 22:59:14 +0200
-Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
-In-Reply-To: <CAMuHMdXRVnHsvCNfRqRgTusdyhOYcV7bWconD99OgXmVcHT8yw@mail.gmail.com>
-References: <20170615185418.13980-1-javier@dowhile0.org>
- <20170731153009.xkjknygpmckv2pfp@ninjato>
- <CABxcv=mdbE0QGjoi3aLzxRqM3-MbkQ_Ai6fShcGVUGSNNqqrqw@mail.gmail.com>
- <20170828160121.gu4wf7jqu4ditksc@ninjato>
- <CABxcv=kSiqDN1=9fSfLkyW=uuXQZAoW4dhw=fco9RyOdDuPAdA@mail.gmail.com>
- <20170829084831.hsdok3ksi7anxzuc@ninjato>
- <CABxcv=nqbNsTs7D57VOt1-Tav_3i9U=XKn=BV=hPr1tG68eE2g@mail.gmail.com>
- <20170830174228.sx5jgtxxy56zq47t@ninjato>
- <CABxcv==JFm0H_kB8LRyRpZNbajcO3UkxYOepkk=YUAaT1UH1gg@mail.gmail.com>
- <CAMuHMdXRVnHsvCNfRqRgTusdyhOYcV7bWconD99OgXmVcHT8yw@mail.gmail.com>
-Message-ID: <CABxcv=kbnNY9wvcRDuK02f6s6kmqd3SFhjwVg8zikVDqtRU4Mw@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Aug 2017 23:00:27 +0200
+Subject: [PATCH v3 56/59] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <bcd17108-b035-a95f-67a4-4433e2be20ae@arm.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-57-marc.zyngier@arm.com>
+ <20170828183550.GQ24649@cbox>
+ <bcd17108-b035-a95f-67a4-4433e2be20ae@arm.com>
+Message-ID: <20170830210027.GO24522@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+On Wed, Aug 30, 2017 at 05:03:51PM +0100, Marc Zyngier wrote:
+> On 28/08/17 19:35, Christoffer Dall wrote:
+> > On Mon, Jul 31, 2017 at 06:26:34PM +0100, Marc Zyngier wrote:
+> >> The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
+> >> cohabit with CPUs limited to GICv3 in the same system.
+> >>
+> >> This is mad (the sheduler would have to be made aware of the v4
+> > 
+> > *scheduler
+> > 
+> >> capability), and we're certainly not going to support this any
+> >> time soon. So let's check that all online CPUs are GICv4 capable,
+> >> and disable the functionnality if not.
+> > 
+> > *functionality
+> > 
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  include/linux/irqchip/arm-gic-v3.h |  2 ++
+> >>  virt/kvm/arm/vgic/vgic-v3.c        | 22 +++++++++++++++++++++-
+> >>  2 files changed, 23 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> >> index 1ea576c8126f..dfa4a51643d6 100644
+> >> --- a/include/linux/irqchip/arm-gic-v3.h
+> >> +++ b/include/linux/irqchip/arm-gic-v3.h
+> >> @@ -532,6 +532,8 @@
+> >>  #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
+> >>  #define ICH_VTR_A3V_SHIFT		21
+> >>  #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
+> >> +#define ICH_VTR_nV4_SHIFT		20
+> >> +#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
+> >>  
+> >>  #define ICC_IAR1_EL1_SPURIOUS		0x3ff
+> >>  
+> >> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> >> index 405733678c2f..252268e83ade 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> >> @@ -466,6 +466,18 @@ static int __init early_gicv4_enable(char *buf)
+> >>  }
+> >>  early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
+> >>  
+> >> +static void vgic_check_v4_cpuif(void *param)
+> >> +{
+> >> +	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
+> >> +	bool *v4 = param, this_cpu_is_v4;
+> >> +
+> >> +	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
+> >> +	if (!this_cpu_is_v4)
+> >> +		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
+> >> +
+> >> +	*v4 &= this_cpu_is_v4;
+> > 
+> > nit: You could make this function look slightly less scary by declaring
+> > this_cpu_is_v4 on a separate line and not use a bitwise operator on a
+> > boolean type.  Actually, having a function called 'check' with a side
+> > effect is not the nicest thing either, so why not just return what this
+> > particular CPU does and do the comparison in the calling loop.
+> 
+> Fair enough.
+> 
+> > #bikeshedding
+> 
+> How about this on top:
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 01eaf4ee2f63..e471750dc0a1 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -469,18 +469,16 @@ early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
+>  static void vgic_check_v4_cpuif(void *param)
+>  {
+>  	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
+> -	bool *v4 = param, this_cpu_is_v4;
+> +	bool *v4 = param;
+>  
+> -	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
+> -	if (!this_cpu_is_v4)
+> +	*v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
+> +	if (!*v4)
+>  		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
+> -
+> -	*v4 &= this_cpu_is_v4;
+>  }
+>  
+>  /**
+>   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+> - * @node:	pointer to the DT node
+> + * @info:	pointer to the firmware-agnostic GIC information
+>   *
+>   * Returns 0 if a GICv3 has been found, returns an error code otherwise
+>   */
+> @@ -504,9 +502,14 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+>  	if (info->has_v4) {
+>  		int cpu;
+>  
+> -		for_each_online_cpu(cpu)
+> +		for_each_online_cpu(cpu) {
+> +			bool enable;
+> +
+>  			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+> -						 &gicv4_enable, 1);
+> +						 &enable, 1);
+> +			gicv4_enable = gicv4_enable && enable;
+> +		}
+> +
+>  		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
+>  		kvm_info("GICv4 support %sabled\n",
+>  			 gicv4_enable ? "en" : "dis");
+> 
 
-On Wed, Aug 30, 2017 at 10:15 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Javier,
->
-> On Wed, Aug 30, 2017 at 9:57 PM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
->>> I think we should talk about the same case: Let me repeat what I did:
->>>
->>> 1) I added your patch "eeprom: at24: Add OF device ID table"
->>> 2) I added an EEPROM node to an I2C
->>>
->>> +       eeprom at 50 {
->>> +               compatible = "renesas,24c01";
->>> +               reg = <0x50>;
->>> +       };
->>>
->>> -> no at24 binding to the device
->>>
->>> 3) I revert your patch
->>>
->>> -> at24 binding to the device
->>>
->>
->> I've tested this and you are right, it fails...
->>
->> The problem is that the patch also changes how the driver obtains the
->> EEPROM parameters (the magic value in the entry's data field).
->>
->> So even when module autoload and device / driver matching works, the
->> driver probe function fails because if (client->dev.of_node) the
->> driver attempts to get the entry data using
->> of_device_get_match_data(), which is obviously wrong since the
->> compatible string in the dev node isn't present in the OF table.
->>
->> The id->driver_data from the I2C table should be used instead since
->> that's the table that matches in this case.
->>
->> One option is to fallback to id->driver_data if
->> of_device_get_match_data() fails, but that's just an (ugly)
->> workaround. So I agree with you that the best option is to wait for
->> the DTS patches to land first.
->
-> Which means new kernels won't work with old DTBs. Oops...
-> I'm afraid that needs to be fixed.  People care about DTB backward
-> compatibility on many platforms.
->
-
-Right, I've yet to find one of those mythical platforms that ship old
-DTBs with new kernels, but I agree with you since people seem to care
-about backward compatibility (at least on theory).
-
-So I see two options then:
-
-1) Use the workaround I mentioned and lookup the I2C device ID table
-entry data if of_device_get_match_data() fails
-
-2) Only call of_device_get_match_data() if (dev->of_node &&
-of_match_device(dev->driver->of_match_table, dev))
-
-Not sure what's the preferred idiom for these cases.
-
-To good thing about keeping backward compatibility is that Wolfram
-would be able to pick the driver patch even before the DTS patches
-land.
-
-Best regards,
-Javier
+Looks good to me, thanks!
+-Christoffer
