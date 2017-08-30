@@ -1,24 +1,31 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 30 Aug 2017 09:30:51 +0200
-Subject: [PATCH ] ARM: dts: iwg22d-sodimm: Add pinctl support for scif4
-In-Reply-To: <1502982549-19429-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502982549-19429-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170830073051.GK10398@verge.net.au>
+Date: Wed, 30 Aug 2017 09:32:14 +0200
+Subject: [PATCH v2] ARM: dts: r8a7743: add IIC cores to dtsi
+In-Reply-To: <b7434757-b151-5971-2b5f-525eeaf11467@cogentembedded.com>
+References: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+ <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
+ <TY1PR06MB07027D9A55FBFE2D591CEDCFB7840@TY1PR06MB0702.apcprd06.prod.outlook.com>
+ <b7434757-b151-5971-2b5f-525eeaf11467@cogentembedded.com>
+Message-ID: <20170830073214.GL10398@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 04:09:09PM +0100, Biju Das wrote:
-> Adding pinctrl support for scif4 interface.
+On Tue, Aug 22, 2017 at 03:23:39PM +0300, Sergei Shtylyov wrote:
+> On 08/22/2017 12:10 PM, Chris Paterson wrote:
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> ---
-> This patch depends upon the below patch series
-> [PATCH  0/2] ARM: dts: Add iWave RZ/G1E board support
-> http://www.spinics.net/lists/devicetree/msg190513.html
+> >>From: Biju Das [mailto:biju.das at bp.renesas.com]
+> >>Sent: 14 August 2017 10:53
+> >>
+> >>Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> >>---
+> >>v1-->v2
+> >>    Corrected the resets property for i2c6 device node.
+> >
+> >Are you happy with this version of the patch?
+> >
+> >Or is the discussion for moving to 'iic' still alive?
 > 
-> This patch is tested against renesas-dev tag 
-> renesas-devel-20170815-v4.13-rc5 + above dependency patch.
+>    Yes, appears so. I'd like the labels to be named iic<n>.
 
-Thanks for the dependency and testing details, it is very helpful.
-
-I have applied this for v4.15.
+Chirs, I'm marking this as "Changes Requested" and expecting to see iic
+in v3 when you are ready.
