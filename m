@@ -1,120 +1,63 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 30 Aug 2017 10:01:28 +0100
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped instructions
-In-Reply-To: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 30 Aug 2017 11:06:33 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
+References: <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com>
+ <20170829235310.GA20214@wunner.de>
+ <20170830060237.GA2782@kroah.com>
+ <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
+Message-ID: <20170830090633.GA1208@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Software Step exception is missing after trapping instruction from the guest.
+On Wed, Aug 30, 2017 at 10:55:37AM +0200, Mason wrote:
+> On 30/08/2017 08:02, Greg Kroah-Hartman wrote:
+> 
+> > To get back to the original issue here, the hardware seems to have died,
+> > the driver stops talking to it, and all is good.  The "regression" here
+> > is that we now properly can determine that the hardware is crap.
+> 
+> Before 4.12, when I unplugged my USB3 Flash drive, Linux would
+> detect a few "Uncorrected Non-Fatal errors" via AER, but it was
+> still possible to plug the drive back in.
+> 
+> Since 4.12, once I unplug the drive, the whole USB3 card is marked
+> as dead (all 4 ports), and I can no longer plug anything in (not even
+> the USB2 drive that didn't have any issues, IIRC).
+> 
+> It seems a bit premature to "mark as dead" something that remains
+> functional, doesn't it?
 
-We need to set the PSR.SS to 0 for the guest vcpu before resuming guest
-execution.
+I agree, but if the device sends all ones, it's a good indication it is
+really dead, right?  Or something is wrong with it.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+> Disclaimer, there are many variables in this setup, and I've only
+> tested a small fraction of the problem space: only one system,
+> only one USB3 board, only one USB3 Flash drive.
 
----
- arch/arm64/include/asm/kvm_asm.h     |  2 ++
- arch/arm64/include/asm/kvm_emulate.h |  2 ++
- arch/arm64/kvm/debug.c               | 12 +++++++++++-
- arch/arm64/kvm/hyp/switch.c          | 12 ++++++++++++
- 4 files changed, 27 insertions(+), 1 deletion(-)
+Did you ever happen to narrow this down to a single git commit using
+'git bisect'?  I can't remember what happened in the beginning of this
+thread...
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 26a64d0..398bbaa 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -32,6 +32,8 @@
+> > So, how do you think we should proceed, delay a bit longer before saying
+> > the device is gone?  How long is "long enough"?  How many bus errors are
+> > we allowed to tolerate (hint, the PCI spec says none...)
+> > 
+> > Maybe someone wants to get to the root problem here, why is the hardware
+> > suddenly reporting all 1s?
+> 
+> I'm afraid I won't be able to make any progress on this front,
+> unless I can get my hands on a PCIe packet analyzer.
 
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
-+#define KVM_ARM64_DEBUG_INST_SKIP_SHIFT	1
-+#define KVM_ARM64_DEBUG_INST_SKIP	(1 << KVM_ARM64_DEBUG_INST_SKIP_SHIFT)
+Odds of that happening are pretty rare, right?  I've never even seen one
+of those...
 
- #define kvm_ksym_ref(sym)						\
- 	({								\
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index fe39e68..d401c64 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -95,6 +95,8 @@ static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
- 		kvm_skip_instr32(vcpu, is_wide_instr);
- 	else
- 		*vcpu_pc(vcpu) += 4;
-+	/* Let debug engine know we skipped an instruction */
-+	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
- }
+thanks,
 
- static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index dbadfaf..4806e6b 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -151,12 +151,22 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 		 * debugging the system.
- 		 */
- 		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
--			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-+			/*
-+			 * If we skipped an instruction while single stepping,
-+			 * spsr.ss needs to be 0 in order to trigger SS
-+			 * exception on return.
-+			 */
-+			if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_INST_SKIP))
-+				*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-+			else
-+				*vcpu_cpsr(vcpu) &=  ~DBG_SPSR_SS;
- 			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
- 		} else {
- 			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
- 		}
-
-+		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_INST_SKIP;
-+
- 		trace_kvm_arm_set_dreg32("SPSR_EL2", *vcpu_cpsr(vcpu));
-
- 		/*
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 945e79c..6030acd 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -22,6 +22,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
- #include <asm/fpsimd.h>
-+#include <asm/debug-monitors.h>
-
- static bool __hyp_text __fpsimd_enabled_nvhe(void)
- {
-@@ -276,6 +277,10 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
-
- 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
-+
-+	*vcpu_cpsr(vcpu) = read_sysreg_el2(spsr);
-+	*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-+	write_sysreg_el2(*vcpu_cpsr(vcpu), spsr);
- }
-
- int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-@@ -343,6 +348,13 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 			if (ret == -1) {
- 				/* Promote an illegal access to an SError */
- 				__skip_instr(vcpu);
-+
-+				/*
-+				 * We're not jumping back, let debug setup know
-+				 * we skipped an instruction.
-+				 */
-+				vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
-+
- 				exit_code = ARM_EXCEPTION_EL1_SERROR;
- 			}
-
---
-1.9.1
+greg k-h
