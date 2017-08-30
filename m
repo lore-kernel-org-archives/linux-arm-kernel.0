@@ -1,89 +1,39 @@
-From: jacopo@jmondi.org (jmondi)
-Date: Wed, 30 Aug 2017 09:35:28 +0200
-Subject: [PATCH 3/4] arm: dts: gr-peach: Add ETHER pin group
-In-Reply-To: <20170830072542.GH10398@verge.net.au>
-References: <1503564523-31899-1-git-send-email-jacopo+renesas@jmondi.org>
- <1503564523-31899-4-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdUoMU=qN3Qjoqmf6uxcS3j5hqthhuBDMPZzA+wSD_BH5A@mail.gmail.com>
- <20170824114656.GA3905@w540>
- <CAMuHMdU5Vep+m7XtjcbSvyXUzD_Pn2crcQ68VRmS4bgY44ut0w@mail.gmail.com>
- <20170824125359.GB3905@w540> <20170830072542.GH10398@verge.net.au>
-Message-ID: <20170830073528.GB5584@w540>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Wed, 30 Aug 2017 07:46:34 +0000
+Subject: [PATCH v2] ARM: dts: r8a7743: add IIC cores to dtsi
+In-Reply-To: <20170830073214.GL10398@verge.net.au>
+References: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+ <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
+ <TY1PR06MB07027D9A55FBFE2D591CEDCFB7840@TY1PR06MB0702.apcprd06.prod.outlook.com>
+ <b7434757-b151-5971-2b5f-525eeaf11467@cogentembedded.com>
+ <20170830073214.GL10398@verge.net.au>
+Message-ID: <SG2PR06MB069465C0EF929D98E5FEC2D0B79C0@SG2PR06MB0694.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-On Wed, Aug 30, 2017 at 09:25:42AM +0200, Simon Horman wrote:
-> On Thu, Aug 24, 2017 at 02:53:59PM +0200, jmondi wrote:
-> > Thanks Geert,
+
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 30 August 2017 08:32
+> 
+> On Tue, Aug 22, 2017 at 03:23:39PM +0300, Sergei Shtylyov wrote:
+> > On 08/22/2017 12:10 PM, Chris Paterson wrote:
 > >
-> > On Thu, Aug 24, 2017 at 01:56:16PM +0200, Geert Uytterhoeven wrote:
-> > > Hi Jacopo,
+> > >>From: Biju Das [mailto:biju.das at bp.renesas.com]
+> > >>Sent: 14 August 2017 10:53
+> > >>
+> > >>Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > >>---
+> > >>v1-->v2
+> > >>    Corrected the resets property for i2c6 device node.
 > > >
-> >
-> > [snip]
-> >
-> > > > I haven't find any mention in device tree bindings documentation of a
-> > > > "reset-gpio" property for sh_eth, in the code examples I've seen in
-> > > > u-boot and mbed, the interface is reset before any actual
-> > > > configuration is performed. I feel like that should be the place where
-> > > > that gpio is requested and cycled...
+> > >Are you happy with this version of the patch?
 > > >
-> > > Documentation/devicetree/bindings/net/mdio.txt says
-> > >
-> > > These are generic properties that can apply to any MDIO bus.
-> > >
+> > >Or is the discussion for moving to 'iic' still alive?
 > >
-> > I have now used mdio defined generic properties
-> >
-> > &ether {
-> > 	pinctrl-names = "default";
-> > 	pinctrl-0 = <&ether_pins>;
-> >
-> > 	status = "okay";
-> >
-> > 	reset-gpios = <&port4 2 GPIO_ACTIVE_LOW>;
-> > 	reset-delay-us = <5>;
-> >
-> > 	renesas,no-ether-link;
-> > 	phy-handle = <&phy0>;
-> > 	phy0: ethernet-phy at 0 {
-> >                reg = <0>;
-> > 	};
-> > };
-> >
-> > I see the gpio being cycled, but same results as before: device gets
-> > probed, address set, but I cannot ping, device gets probed, address
-> > gets set, but I cannot ping
-> >
-> > --- target ---
-> > [    0.000000] libphy: sh_mii: probed
-> > [    0.000000] sh-eth e8203000.ethernet eth0: Base address at 0xe8203000, 68:14:97:20:97:00, IRQ 22.
-> >
-> > # ifconfig eth0 192.168.100.50
-> > [    0.000000] Generic PHY e8203000.ethernet-ffffffff:00: attached PHY driver [Generic PHY] (mii_bus:phy_addr=e8203000.ethernet-f)
-> >
-> > --- host ---
-> > $ping 192.168.100.50
-> > PING 192.168.100.50 (192.168.100.50) 56(84) bytes of data.
-> > >From 192.168.100.18 icmp_seq=1 Destination Host Unreachable
-> > >From 192.168.100.18 icmp_seq=1 Destination Host Unreachable
-> > >From 192.168.100.18 icmp_seq=1 Destination Host Unreachable
-> >
-> >
-> > Let's leave this out of the DTS series I've just sent for now, ok?
->
-> I'm a little confused by this. Am I right in thinking that you don't want
-> this patch applied at this time and may resubmit it or an updated version
-> later? With that understanding I have marked it as "Rejected" for now. Feel
-> free to resubmit when you are ready.
+> >    Yes, appears so. I'd like the labels to be named iic<n>.
+> 
+> Chirs, I'm marking this as "Changes Requested" and expecting to see iic in v3
+> when you are ready.
 
-Yes please, you got me right here.
-
-Even if pix muxing is performed "correctly", and I can set ip address
-and probe the interface, not traffic can be exchanged on it.
-
-For this reason, let's not enable it at this time
-
-Is this fine?
+Sure, thanks.
