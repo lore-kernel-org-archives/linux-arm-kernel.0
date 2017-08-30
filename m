@@ -1,197 +1,94 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 30 Aug 2017 22:26:50 +0200
-Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu
- capacity-dmips-mhz information
-In-Reply-To: <20170830144120.9312-3-dietmar.eggemann@arm.com>
-References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
- <20170830144120.9312-3-dietmar.eggemann@arm.com>
-Message-ID: <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Wed, 30 Aug 2017 13:45:57 -0700
+Subject: [PATCH v2 3/3] arm64: dts: qcom: Collapse usb support into one
+ node
+In-Reply-To: <20170817064347.GA7608@dragon>
+References: <20170714214005.14967-1-stephen.boyd@linaro.org>
+ <20170714214005.14967-4-stephen.boyd@linaro.org>
+ <20170817064347.GA7608@dragon>
+Message-ID: <150412595705.25571.14450869244494720536@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 03:41:18PM +0100, Dietmar Eggemann wrote:
-> The following 'capacity-dmips-mhz' dt property values are used:
+Quoting Shawn Guo (2017-08-16 23:43:49)
+> Hi Stephen,
 > 
-> Cortex-A15: 1024, Cortex-A7: 539
+> On Fri, Jul 14, 2017 at 02:40:05PM -0700, Stephen Boyd wrote:
+> > We currently have three device nodes for the same USB hardware
+> > block, as evident by the reuse of the same reg address multiple
+> > times. Now that the chipidea driver fully supports OTG with the
+> > MSM wrapper we can collapse all these nodes into one USB device
+> > node, reflecting the true nature of the hardware.
+> > 
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 38 ++++++++++---------
+> >  arch/arm64/boot/dts/qcom/msm8916.dtsi     | 62 +++++++++++++++----------------
+> >  2 files changed, 50 insertions(+), 50 deletions(-)
+> > 
+> > diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > index f326f4fb4d72..494560a1a6ef 100644
+> > --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > @@ -213,24 +213,20 @@
+> >               };
+> >  
+> >               usb at 78d9000 {
+> > -                     extcon = <&usb_id>, <&usb_id>;
+> > +                     extcon = <&usb_id>;
 > 
-> They have been derived from the cpu_efficiency values:
+> I'm trying to play the series on db410c, and it doesn't seem to work as
+> expected.  Here is basically what I did:
 > 
-> Cortex-A15: 3891, Cortex-A7: 2048
+> - Revert ed75d6a96905, and apply the series.
+> - Turn on the following options:
+>         CONFIG_USB_CHIPIDEA_ULPI
+>         CONFIG_USB_ULPI_BUS
+>         CONFIG_PHY_QCOM_USB_HS
+>         CONFIG_MUX_GPIO
 > 
-> by scaling them so that the Cortex-A15s (big cores) use 1024.
-> 
-> The cpu_efficiency values were originally derived from the "Big.LITTLE
-> Processing with ARM Cortex?-A15 & Cortex-A7" white paper
-> (http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
-> (3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
-> Dhrystone benchmark.
-> 
-> The following platforms are affected once cpu-invariant accounting
-> support is re-connected to the task scheduler:
-> 
-> arndale-octa, peach-pi, peach-pit, smdk5420
-> 
-> The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
-> 5800).
-> 
-> $ cat /sys/devices/system/cpu/cpu*/cpu_capacity
-> 1024
-> 1024
-> 1024
-> 1024
-> 389
-> 389
-> 389
-> 389
+> The role switching doesn't happen when I connect/disconnect cable
+> to/from micro-usb port.
 
-I am missing something... shouldn't this be 539? Or is it scaled with
-the clock-frequency (1 GHz) value?
+Good. That's expected.
 
+> But if I revert above extcon change (keep two
+> usb_id phandle for extcon), the role switching happens.  However, host
+> driver still fails to enumerate the usb mouse attached to Type-A port.
+> 
+> [   15.400074] ci_hdrc ci_hdrc.0: EHCI Host Controller
+> [   15.400119] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+> [   15.419847] ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
+> [   15.420700] hub 1-0:1.0: USB hub found
+> [   15.425820] hub 1-0:1.0: 1 port detected
+> [   15.759862] usb 1-1: new high-speed USB device number 2 using ci_hdrc
+> [   31.943942] usb 1-1: device not accepting address 2, error -110
+> [   32.063938] usb 1-1: new high-speed USB device number 3 using ci_hdrc
+> [   48.071943] usb 1-1: device not accepting address 3, error -110
+> [   48.191935] usb 1-1: new high-speed USB device number 4 using ci_hdrc
+> [   58.823934] usb 1-1: device not accepting address 4, error -110
+> [   58.943936] usb 1-1: new high-speed USB device number 5 using ci_hdrc
+> [   69.575935] usb 1-1: device not accepting address 5, error -110
+> [   69.576001] usb usb1-port1: unable to enumerate USB device
+> 
+> I must have missed something.  Can you please advice?  Thanks.
 
-Best regards,
-Krzysztof
+Yes. The role switch happens now by userspace writing different values
+to the chipidea node sysfs file. For db410c it's located at
+/sys/bus/platform/devices/ci_hdrc.0/role and by echoing 'host' or
+'gadget' into that file you can change the role. Unplugging the cable
+won't do anything anymore, because the micro-usb port is only indicating
+vbus presence, and not the ID pin. At least that is my reading of the
+schematic.
 
-
-> 
-> The Cortex-A15 vs Cortex-A7 performance ratio is 1024/389 = 2.63.
-> 
-> The values derived with the 'cpu_efficiency/clock-frequency dt property'
-> solution are:
-> 
-> $ cat /sys/devices/system/cpu/cpu*/cpu_capacity
-> 1535
-> 1535
-> 1535
-> 1535
-> 448
-> 448
-> 448
-> 448
-> 
-> The Cortex-A15 vs Cortex-A7 performance ratio is 1535/448 = 3.43.
-> 
-> The discrepancy between 2.63 and 3.43 is due to the false assumption
-> when using the 'cpu_efficiency/clock-frequency dt property' solution
-> that the max cpu frequency of the little cpus is 1 GHZ and not 1.3 GHz.
-> The Cortex-A7 cluster runs with a max cpu frequency of 1.3 GHZ whereas
-> the 'clock-frequency' property value is set to 1 GHz.
-> 
-> 3.43/1.3 = 2.64
-> 
-> $ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
-> 1800000
-> 1800000
-> 1800000
-> 1800000
-> 1300000 <-- max cpu frequency of the Cortex-A7s (little cores)
-> 1300000
-> 1300000
-> 1300000
-> 
-> Running another benchmark (single-threaded sysbench affine to the
-> individual cpus) with performance cpufreq governor on the Samsung
-> Chromebook 2 13" showed the following numbers:
-> 
-> $ for i in `seq 0 7`; do taskset -c $i sysbench --test=cpu
->   --num-threads=1 --max-time=10 run | grep "total number of events:";
->   done
-> 
-> total number of events: 1083
-> total number of events: 1085
-> total number of events: 1085
-> total number of events: 1085
-> total number of events: 454
-> total number of events: 454
-> total number of events: 454
-> total number of events: 454
-> 
-> The Cortex-A15 vs Cortex-A7 performance ratio is 2.39, i.e. very close
-> to the one derived from the Dhrystone based one of the "Big.LITTLE
-> Processing with ARM Cortex?-A15 & Cortex-A7" white paper (2.63).
-> 
-> We don't aim for exact values for the cpu capacity values. Besides the
-> CPI (Cycles Per Instruction), the instruction mix and whether the system
-> runs cpu-bound or memory-bound has an impact on the cpu capacity values
-> derived from these benchmark results.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> ---
->  arch/arm/boot/dts/exynos5420-cpus.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> index 5c052d7ff554..d7d703aa1699 100644
-> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> @@ -36,6 +36,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <11>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <1024>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -48,6 +49,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <11>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <1024>;
->  		};
->  
->  		cpu2: cpu at 2 {
-> @@ -60,6 +62,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <11>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <1024>;
->  		};
->  
->  		cpu3: cpu at 3 {
-> @@ -72,6 +75,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <11>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <1024>;
->  		};
->  
->  		cpu4: cpu at 100 {
-> @@ -85,6 +89,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <7>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <539>;
->  		};
->  
->  		cpu5: cpu at 101 {
-> @@ -97,6 +102,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <7>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <539>;
->  		};
->  
->  		cpu6: cpu at 102 {
-> @@ -109,6 +115,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <7>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <539>;
->  		};
->  
->  		cpu7: cpu at 103 {
-> @@ -121,6 +128,7 @@
->  			cooling-min-level = <0>;
->  			cooling-max-level = <7>;
->  			#cooling-cells = <2>; /* min followed by max */
-> +			capacity-dmips-mhz = <539>;
->  		};
->  	};
->  };
-> -- 
-> 2.11.0
-> 
+Obviously, this changes behavior from previous designs where
+disconnecting the cable changed the role, but I don't know if we want to
+support this method via the kernel alone. Instead, it seems simpler to
+have userspace decide to change the role whenever it wants with some
+policy. Do you have any suggestion on how this can be integrated into
+userspace so we write this file at boot? That way, we can switch to host
+mode by default on db410c and then users can decide to make a gadget if
+they want to lose the host ports while the gadget is active. We could
+probably have an extcon event handler in userspace as well to change the
+role when the micro-usb cable is disconnected. That way, old behavior
+could be maintained but it would be a pure policy decision in userspace.
