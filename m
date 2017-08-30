@@ -1,49 +1,53 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Wed, 30 Aug 2017 11:15:00 +0800
-Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
- implementation defined pmu core events
-In-Reply-To: <20170829124730.GH17961@rric.localdomain>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
- <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
- <20170829124730.GH17961@rric.localdomain>
-Message-ID: <576d18ea-8fc3-9722-8cd7-b16d148211c0@hisilicon.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 29 Aug 2017 23:16:13 -0400 (EDT)
+Subject: [PULL REQUEST v2] FDPIC ELF support for ARM
+Message-ID: <nycvar.YSQ.7.76.1708292307400.2606@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Russell, could you please pull the following:
 
-Got it and thanks your reply.
+  http://git.linaro.org/people/nicolas.pitre/linux fdpic
 
-Shaokun
+This series provides the needed changes to suport the ELF_FDPIC binary
+format on ARM. Both MMU and non-MMU systems are supported. This format
+has many advantages over the BFLT format used on MMU-less systems, such
+as being real ELF that can be parsed by standard tools, can support
+shared dynamic libs, etc.
 
-On 2017/8/29 20:47, Robert Richter wrote:
-> Shaokun,
-> 
-> On 29.08.17 17:26:00, Zhangshaokun wrote:
->> On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
->>> This is not a full event list, but a short list of useful events.
->>>
->>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>> ---
->>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->>>  2 files changed, 77 insertions(+)
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>>
->>
->> I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
->> that would use vendor sub-folder?
->> Of course, appreciate maintainer's comments.
-> 
-> this would just add another level of subdirectories. I rather would
-> prefer to have a per platform dir comparable to what is listed in
-> 
->  arch/arm64/Kconfig.platforms
-> 
-> This is the same as Ganapat has implemented it.
-> 
-> -Robert
-> 
-> 
+This is based on v4.13-rc4 not to conflict with changes to signal.c
+that happened in v4.13-rc3.
+
+A complete toolchain and prebuilt packages can be obtained here:
+
+https://github.com/mickael-guene/fdpic_manifest
+
+Changes from v1:
+
+- Reworked the signal return code to be compatible with a non-executable
+  stack.
+- Rebased on v4.13-rc4 to pick up latest signal changes.
+- Added MMU support.
+- Fixed crash in the ELF-FDPIC loader when loading an executable with
+  shared libs on a system with an MMU.
+- Made the regular ELF loader reject FDPIC binaries.
+- Added ACKs and Reviewed-bys.
+
+diffstat:
+
+ arch/arm/include/asm/elf.h         | 16 +++++++--
+ arch/arm/include/asm/mmu.h         |  8 +++++
+ arch/arm/include/asm/processor.h   | 22 +++++++++----
+ arch/arm/include/asm/ucontext.h    |  1 +
+ arch/arm/include/uapi/asm/ptrace.h |  4 +++
+ arch/arm/include/uapi/asm/unistd.h |  1 +
+ arch/arm/kernel/asm-offsets.c      |  4 +++
+ arch/arm/kernel/elf.c              | 24 +++++++++++++-
+ arch/arm/kernel/signal.c           | 53 +++++++++++++++++++++---------
+ arch/arm/kernel/signal.h           | 11 +++++++
+ arch/arm/kernel/sigreturn_codes.S  | 56 +++++++++++++++++++++++++++++---
+ arch/arm/kernel/traps.c            |  3 ++
+ fs/Kconfig.binfmt                  |  4 +--
+ fs/binfmt_elf.c                    | 15 +++++++--
+ fs/binfmt_elf_fdpic.c              | 13 ++++++--
+ 15 files changed, 199 insertions(+), 36 deletions(-)
