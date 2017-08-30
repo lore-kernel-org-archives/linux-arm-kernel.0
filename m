@@ -1,33 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Aug 2017 22:43:47 -0700
-Subject: [GIT PULL] ARM: at91: DT for 4.14
-In-Reply-To: <20170829205234.fovfblt4l6gkex64@piout.net>
-References: <20170829205234.fovfblt4l6gkex64@piout.net>
-Message-ID: <20170830054347.GN14499@localhost>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 30 Aug 2017 08:02:37 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <20170829235310.GA20214@wunner.de>
+References: <599D3410.9050504@intel.com>
+ <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+ <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com>
+ <20170829235310.GA20214@wunner.de>
+Message-ID: <20170830060237.GA2782@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 10:52:34PM +0200, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Wed, Aug 30, 2017 at 01:53:10AM +0200, Lukas Wunner wrote:
+> On Tue, Aug 29, 2017 at 04:28:53PM +0300, Mathias Nyman wrote:
+> > This tight check was originally done to detect pci hotplug removed
+> > hosts as soon as possible.
 > 
-> I understand this is very late in the cycle but I completely forgot to
-> send that pull request alongside the 4.13 fixes.
-> Most of the patches have been included in linux-next for a while so I
-> don't this it is too risky to take it now.
+> In Mason's case, the parent of the XHCI controller isn't a hotplug port,
+> see this lspci output:
 > 
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> https://www.spinics.net/lists/linux-usb/msg160010.html
 > 
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.14-dt
-> 
-> for you to fetch changes up to 1a9f9af07e806dd4d5df109c61ac0d5c74fe9b32:
-> 
->   ARM: dts: at91: at91sam9g45: add AC97 (2017-07-30 00:48:20 +0200)
+> Please check is_hotplug_bridge in the parent's struct pci_dev before
+> assuming that the XHCI controller was unplugged.
 
-Merged, thanks!
+How can you guarantee that this is set on some systems?  Will it be set
+on cardbus devices?  What about on a "normal" system where I can just go
+and yank out a PCI card at will?
 
+I don't think this is a valid thing to check, and again, why are we
+arguing this point?  It's been this way since the 1990's, this isn't a
+new thing...
 
--Olof
+To get back to the original issue here, the hardware seems to have died,
+the driver stops talking to it, and all is good.  The "regression" here
+is that we now properly can determine that the hardware is crap.
+
+So, how do you think we should proceed, delay a bit longer before saying
+the device is gone?  How long is "long enough"?  How many bus errors are
+we allowed to tolerate (hint, the PCI spec says none...)
+
+Maybe someone wants to get to the root problem here, why is the hardware
+suddenly reporting all 1s?
+
+thanks,
+
+greg k-h
