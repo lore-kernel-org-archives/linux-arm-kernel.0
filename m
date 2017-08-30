@@ -1,271 +1,127 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 30 Aug 2017 17:55:28 +0200
-Subject: [PATCH v2 2/3] regulator: Add support for stm32-vrefbuf
-In-Reply-To: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
-References: <1504108529-31727-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1504108529-31727-3-git-send-email-fabrice.gasnier@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Aug 2017 17:03:51 +0100
+Subject: [PATCH v3 56/59] KVM: arm/arm64: GICv4: Prevent heterogenous
+ systems from using GICv4
+In-Reply-To: <20170828183550.GQ24649@cbox>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-57-marc.zyngier@arm.com> <20170828183550.GQ24649@cbox>
+Message-ID: <bcd17108-b035-a95f-67a4-4433e2be20ae@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add regulator driver for STM32 voltage reference buffer which can be
-used as voltage reference for ADCs, DACs and external components through
-dedicated VREF+ pin.
+On 28/08/17 19:35, Christoffer Dall wrote:
+> On Mon, Jul 31, 2017 at 06:26:34PM +0100, Marc Zyngier wrote:
+>> The GICv4 architecture doesn't prevent CPUs implementing GICv4 to
+>> cohabit with CPUs limited to GICv3 in the same system.
+>>
+>> This is mad (the sheduler would have to be made aware of the v4
+> 
+> *scheduler
+> 
+>> capability), and we're certainly not going to support this any
+>> time soon. So let's check that all online CPUs are GICv4 capable,
+>> and disable the functionnality if not.
+> 
+> *functionality
+> 
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h |  2 ++
+>>  virt/kvm/arm/vgic/vgic-v3.c        | 22 +++++++++++++++++++++-
+>>  2 files changed, 23 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 1ea576c8126f..dfa4a51643d6 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -532,6 +532,8 @@
+>>  #define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
+>>  #define ICH_VTR_A3V_SHIFT		21
+>>  #define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
+>> +#define ICH_VTR_nV4_SHIFT		20
+>> +#define ICH_VTR_nV4_MASK		(1 << ICH_VTR_nV4_SHIFT)
+>>  
+>>  #define ICC_IAR1_EL1_SPURIOUS		0x3ff
+>>  
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index 405733678c2f..252268e83ade 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -466,6 +466,18 @@ static int __init early_gicv4_enable(char *buf)
+>>  }
+>>  early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
+>>  
+>> +static void vgic_check_v4_cpuif(void *param)
+>> +{
+>> +	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
+>> +	bool *v4 = param, this_cpu_is_v4;
+>> +
+>> +	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
+>> +	if (!this_cpu_is_v4)
+>> +		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
+>> +
+>> +	*v4 &= this_cpu_is_v4;
+> 
+> nit: You could make this function look slightly less scary by declaring
+> this_cpu_is_v4 on a separate line and not use a bitwise operator on a
+> boolean type.  Actually, having a function called 'check' with a side
+> effect is not the nicest thing either, so why not just return what this
+> particular CPU does and do the comparison in the calling loop.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
-Changes in v2:
-- Remarks from Mark: include error codes when printing errors, remove noisy
-  info, remove subsys_initcall(), replace it with regular
-  module_platform_driver().
----
- drivers/regulator/Kconfig         |  12 +++
- drivers/regulator/Makefile        |   1 +
- drivers/regulator/stm32-vrefbuf.c | 202 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 215 insertions(+)
- create mode 100644 drivers/regulator/stm32-vrefbuf.c
+Fair enough.
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 99b9362..2cb2c63 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -746,6 +746,18 @@ config REGULATOR_SKY81452
- 	  This driver can also be built as a module. If so, the module
- 	  will be called sky81452-regulator.
+> #bikeshedding
+
+How about this on top:
+
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 01eaf4ee2f63..e471750dc0a1 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -469,18 +469,16 @@ early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
+ static void vgic_check_v4_cpuif(void *param)
+ {
+ 	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
+-	bool *v4 = param, this_cpu_is_v4;
++	bool *v4 = param;
  
-+config REGULATOR_STM32_VREFBUF
-+	tristate "STMicroelectronics STM32 VREFBUF"
-+	depends on ARCH_STM32 || COMPILE_TEST
-+	help
-+	  This driver supports STMicroelectronics STM32 VREFBUF (voltage
-+	  reference buffer) which can be used as voltage reference for
-+	  internal ADCs, DACs and also for external components through
-+	  dedicated Vref+ pin.
+-	this_cpu_is_v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
+-	if (!this_cpu_is_v4)
++	*v4 = !(ich_vtr_el2 & ICH_VTR_nV4_MASK);
++	if (!*v4)
+ 		kvm_info("CPU%d is not GICv4 capable\n", smp_processor_id());
+-
+-	*v4 &= this_cpu_is_v4;
+ }
+ 
+ /**
+  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+- * @node:	pointer to the DT node
++ * @info:	pointer to the firmware-agnostic GIC information
+  *
+  * Returns 0 if a GICv3 has been found, returns an error code otherwise
+  */
+@@ -504,9 +502,14 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	if (info->has_v4) {
+ 		int cpu;
+ 
+-		for_each_online_cpu(cpu)
++		for_each_online_cpu(cpu) {
++			bool enable;
 +
-+	  This driver can also be built as a module. If so, the module
-+	  will be called stm32-vrefbuf.
+ 			smp_call_function_single(cpu, vgic_check_v4_cpuif,
+-						 &gicv4_enable, 1);
++						 &enable, 1);
++			gicv4_enable = gicv4_enable && enable;
++		}
 +
- config REGULATOR_TI_ABB
- 	tristate "TI Adaptive Body Bias on-chip LDO"
- 	depends on ARCH_OMAP
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 95b1e86..5af3788 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -94,6 +94,7 @@ obj-$(CONFIG_REGULATOR_S2MPA01) += s2mpa01.o
- obj-$(CONFIG_REGULATOR_S2MPS11) += s2mps11.o
- obj-$(CONFIG_REGULATOR_S5M8767) += s5m8767.o
- obj-$(CONFIG_REGULATOR_SKY81452) += sky81452-regulator.o
-+obj-$(CONFIG_REGULATOR_STM32_VREFBUF) += stm32-vrefbuf.o
- obj-$(CONFIG_REGULATOR_STW481X_VMMC) += stw481x-vmmc.o
- obj-$(CONFIG_REGULATOR_TI_ABB) += ti-abb-regulator.o
- obj-$(CONFIG_REGULATOR_TPS6105X) += tps6105x-regulator.o
-diff --git a/drivers/regulator/stm32-vrefbuf.c b/drivers/regulator/stm32-vrefbuf.c
-new file mode 100644
-index 0000000..72c8b3e
---- /dev/null
-+++ b/drivers/regulator/stm32-vrefbuf.c
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright (C) STMicroelectronics 2017
-+ *
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/bitfield.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
-+
-+/* STM32 VREFBUF registers */
-+#define STM32_VREFBUF_CSR		0x00
-+
-+/* STM32 VREFBUF CSR bitfields */
-+#define STM32_VRS			GENMASK(6, 4)
-+#define STM32_VRR			BIT(3)
-+#define STM32_HIZ			BIT(1)
-+#define STM32_ENVR			BIT(0)
-+
-+struct stm32_vrefbuf {
-+	void __iomem *base;
-+	struct clk *clk;
-+};
-+
-+static const unsigned int stm32_vrefbuf_voltages[] = {
-+	/* Matches resp. VRS = 000b, 001b, 010b, 011b */
-+	2500000, 2048000, 1800000, 1500000,
-+};
-+
-+static int stm32_vrefbuf_enable(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+	int ret;
-+
-+	val = (val & ~STM32_HIZ) | STM32_ENVR;
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	/*
-+	 * Vrefbuf startup time depends on external capacitor: wait here for
-+	 * VRR to be set. That means output has reached expected value.
-+	 * ~650us sleep should be enough for caps up to 1.5uF. Use 10ms as
-+	 * arbitrary timeout.
-+	 */
-+	ret = readl_poll_timeout(priv->base + STM32_VREFBUF_CSR, val,
-+				 !(val & STM32_VRR), 650, 10000);
-+	if (ret) {
-+		dev_err(&rdev->dev, "stm32 vrefbuf timed out!\n");
-+		val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+		val = (val & ~STM32_ENVR) | STM32_HIZ;
-+		writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+	}
-+
-+	return ret;
-+}
-+
-+static int stm32_vrefbuf_disable(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	val = (val & ~STM32_ENVR) | STM32_HIZ;
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	return 0;
-+}
-+
-+static int stm32_vrefbuf_is_enabled(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+
-+	return readl_relaxed(priv->base + STM32_VREFBUF_CSR) & STM32_ENVR;
-+}
-+
-+static int stm32_vrefbuf_set_voltage_sel(struct regulator_dev *rdev,
-+					 unsigned sel)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	val = (val & ~STM32_VRS) | FIELD_PREP(STM32_VRS, sel);
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	return 0;
-+}
-+
-+static int stm32_vrefbuf_get_voltage_sel(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	return FIELD_GET(STM32_VRS, val);
-+}
-+
-+static const struct regulator_ops stm32_vrefbuf_volt_ops = {
-+	.enable		= stm32_vrefbuf_enable,
-+	.disable	= stm32_vrefbuf_disable,
-+	.is_enabled	= stm32_vrefbuf_is_enabled,
-+	.get_voltage_sel = stm32_vrefbuf_get_voltage_sel,
-+	.set_voltage_sel = stm32_vrefbuf_set_voltage_sel,
-+	.list_voltage	= regulator_list_voltage_table,
-+};
-+
-+static const struct regulator_desc stm32_vrefbuf_regu = {
-+	.name = "vref",
-+	.supply_name = "vdda",
-+	.volt_table = stm32_vrefbuf_voltages,
-+	.n_voltages = ARRAY_SIZE(stm32_vrefbuf_voltages),
-+	.ops = &stm32_vrefbuf_volt_ops,
-+	.type = REGULATOR_VOLTAGE,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int stm32_vrefbuf_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct stm32_vrefbuf *priv;
-+	struct regulator_config config = { };
-+	struct regulator_dev *rdev;
-+	int ret;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
-+
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->clk))
-+		return PTR_ERR(priv->clk);
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "clk prepare failed with error %d\n", ret);
-+		return ret;
-+	}
-+
-+	config.dev = &pdev->dev;
-+	config.driver_data = priv;
-+	config.of_node = pdev->dev.of_node;
-+	config.init_data = of_get_regulator_init_data(&pdev->dev,
-+						      pdev->dev.of_node,
-+						      &stm32_vrefbuf_regu);
-+
-+	rdev = regulator_register(&stm32_vrefbuf_regu, &config);
-+	if (IS_ERR(rdev)) {
-+		ret = PTR_ERR(rdev);
-+		dev_err(&pdev->dev, "register failed with error %d\n", ret);
-+		goto err_clk_dis;
-+	}
-+	platform_set_drvdata(pdev, rdev);
-+
-+	return 0;
-+
-+err_clk_dis:
-+	clk_disable_unprepare(priv->clk);
-+
-+	return ret;
-+}
-+
-+static int stm32_vrefbuf_remove(struct platform_device *pdev)
-+{
-+	struct regulator_dev *rdev = platform_get_drvdata(pdev);
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+
-+	regulator_unregister(rdev);
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+};
-+
-+static const struct of_device_id stm32_vrefbuf_of_match[] = {
-+	{ .compatible = "st,stm32-vrefbuf", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stm32_vrefbuf_of_match);
-+
-+static struct platform_driver stm32_vrefbuf_driver = {
-+	.probe = stm32_vrefbuf_probe,
-+	.remove = stm32_vrefbuf_remove,
-+	.driver = {
-+		.name  = "stm32-vrefbuf",
-+		.of_match_table = of_match_ptr(stm32_vrefbuf_of_match),
-+	},
-+};
-+module_platform_driver(stm32_vrefbuf_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 VREFBUF driver");
-+MODULE_ALIAS("platform:stm32-vrefbuf");
+ 		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
+ 		kvm_info("GICv4 support %sabled\n",
+ 			 gicv4_enable ? "en" : "dis");
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
