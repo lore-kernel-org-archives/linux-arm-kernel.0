@@ -1,192 +1,127 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Aug 2017 11:42:46 +0100
-Subject: [PATCH v3 41/59] KVM: arm/arm64: GICv4: Wire mapping/unmapping of
- VLPIs in VFIO irq bypass
-In-Reply-To: <a6f5aa8e-e4ab-4a9d-3b86-0dd5d0c8c745@redhat.com>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-42-marc.zyngier@arm.com> <20170826194850.GB11074@cbox>
- <53116ae6-fd94-2687-740f-5917e158eda7@arm.com>
- <a6f5aa8e-e4ab-4a9d-3b86-0dd5d0c8c745@redhat.com>
-Message-ID: <6c6aad59-8e36-dc7e-1aef-8f95de7d7eef@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 30 Aug 2017 13:48:05 +0300
+Subject: [RFC PATCH] arm64: move THREAD_* definitions to separated header
+In-Reply-To: <20170830095854.GA17353@leverpostej>
+References: <20170830092249.20638-1-ynorov@caviumnetworks.com>
+ <20170830095854.GA17353@leverpostej>
+Message-ID: <20170830104805.cl44gwqslocnr5w4@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 30/08/17 11:20, Auger Eric wrote:
-> Hi Marc,
+On Wed, Aug 30, 2017 at 10:58:54AM +0100, Mark Rutland wrote:
+> On Wed, Aug 30, 2017 at 12:22:49PM +0300, Yury Norov wrote:
+> > Hi Mark, all.
 > 
-> On 30/08/2017 11:42, Marc Zyngier wrote:
->> On 26/08/17 20:48, Christoffer Dall wrote:
->>> On Mon, Jul 31, 2017 at 06:26:19PM +0100, Marc Zyngier wrote:
->>>> Let's use the irq bypass mechanism introduced for platform device
->>>> interrupts to intercept the virtual PCIe endpoint configuration
->>>> and establish our LPI->VLPI mapping.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  include/kvm/arm_vgic.h      |   8 ++++
->>>>  virt/kvm/arm/arm.c          |  27 ++++++++----
->>>>  virt/kvm/arm/vgic/vgic-v4.c | 103 ++++++++++++++++++++++++++++++++++++++++++++
->>>>  3 files changed, 130 insertions(+), 8 deletions(-)
->>>>
->>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>> index 359eeffe9857..050f78d4fb42 100644
->>>> --- a/include/kvm/arm_vgic.h
->>>> +++ b/include/kvm/arm_vgic.h
->>>> @@ -367,4 +367,12 @@ int kvm_vgic_set_forwarding(struct kvm *kvm, unsigned int host_irq,
->>>>  void kvm_vgic_unset_forwarding(struct kvm *kvm, unsigned int host_irq,
->>>>  			       unsigned int vintid);
->>>>  
->>>> +struct kvm_kernel_irq_routing_entry;
->>>> +
->>>> +int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
->>>> +			       struct kvm_kernel_irq_routing_entry *irq_entry);
->>>> +
->>>> +int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
->>>> +				 struct kvm_kernel_irq_routing_entry *irq_entry);
->>>> +
->>>>  #endif /* __KVM_ARM_VGIC_H */
->>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->>>> index ebab6c29e3be..6803ea27c47d 100644
->>>> --- a/virt/kvm/arm/arm.c
->>>> +++ b/virt/kvm/arm/arm.c
->>>> @@ -1457,11 +1457,16 @@ int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
->>>>  	struct kvm_kernel_irqfd *irqfd =
->>>>  		container_of(cons, struct kvm_kernel_irqfd, consumer);
->>>>  
->>>> -	if (prod->type != IRQ_BYPASS_VFIO_PLATFORM)
->>>> +	switch (prod->type) {
->>>> +	case IRQ_BYPASS_VFIO_PLATFORM:
->>>> +		return kvm_vgic_set_forwarding(irqfd->kvm, prod->irq,
->>>> +					       irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
->>>> +	case IRQ_BYPASS_VFIO_PCI_MSI:
->>>> +		return kvm_vgic_v4_set_forwarding(irqfd->kvm, prod->irq,
->>>> +						  &irqfd->irq_entry);
->>>> +	default:
->>>>  		return 0;
->>>> -
->>>> -	return kvm_vgic_set_forwarding(irqfd->kvm, prod->irq,
->>>> -				       irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
->>>> +	}
->>>>  }
->>>>  void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
->>>>  				      struct irq_bypass_producer *prod)
->>>> @@ -1469,11 +1474,17 @@ void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
->>>>  	struct kvm_kernel_irqfd *irqfd =
->>>>  		container_of(cons, struct kvm_kernel_irqfd, consumer);
->>>>  
->>>> -	if (prod->type != IRQ_BYPASS_VFIO_PLATFORM)
->>>> -		return;
->>>> +	switch (prod->type) {
->>>> +	case IRQ_BYPASS_VFIO_PLATFORM:
->>>> +		kvm_vgic_unset_forwarding(irqfd->kvm, prod->irq,
->>>> +					  irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
->>>> +		break;
->>>>  
->>>> -	kvm_vgic_unset_forwarding(irqfd->kvm, prod->irq,
->>>> -				  irqfd->gsi + VGIC_NR_PRIVATE_IRQS);
->>>> +	case IRQ_BYPASS_VFIO_PCI_MSI:
->>>> +		kvm_vgic_v4_unset_forwarding(irqfd->kvm, prod->irq,
->>>> +					     &irqfd->irq_entry);
->>>> +		break;
->>>> +	}
->>>>  }
->>>>  
->>>>  void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
->>>> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
->>>> index 207e1fda0dcd..338c86c5159f 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-v4.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-v4.c
->>>> @@ -72,3 +72,106 @@ void vgic_v4_teardown(struct kvm *kvm)
->>>>  	its_vm->nr_vpes = 0;
->>>>  	its_vm->vpes = NULL;
->>>>  }
->>>> +
->>>> +static struct vgic_its *vgic_get_its(struct kvm *kvm,
->>>> +				     struct kvm_kernel_irq_routing_entry *irq_entry)
->>>> +{
->>>> +	struct kvm_msi msi  = (struct kvm_msi) {
->>>> +		.address_lo	= irq_entry->msi.address_lo,
->>>> +		.address_hi	= irq_entry->msi.address_hi,
->>>> +		.data		= irq_entry->msi.data,
->>>> +		.flags		= irq_entry->msi.flags,
->>>> +		.devid		= irq_entry->msi.devid,
->>>> +	};
->>>> +
->>>> +	/*
->>>> +	 * Get a reference on the LPI. If NULL, this is not a valid
->>>> +	 * translation for any of our vITSs.
->>>> +	 */
->>>> +	return vgic_msi_to_its(kvm, &msi);
->>>> +}
->>>> +
->>>> +int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
->>>> +			       struct kvm_kernel_irq_routing_entry *irq_entry)
->>>> +{
->>>> +	struct vgic_its *its;
->>>> +	struct vgic_irq *irq;
->>>> +	struct its_vlpi_map map;
->>>> +	int ret;
->>>> +
->>>> +	if (!vgic_is_v4_capable(kvm))
->>>> +		return 0;
->>>> +
->>>> +	/*
->>>> +	 * Get the ITS, and escape early on error (not a valid
->>>> +	 * doorbell for any of our vITSs).
->>>> +	 */
->>>> +	its = vgic_get_its(kvm, irq_entry);
->>>> +	if (IS_ERR(its))
->>>> +		return 0;
->>>> +
->>>> +	mutex_lock(&its->its_lock);
->>>> +
->>>> +	/* Perform then actual DevID/EventID -> LPI translation. */
->>>> +	ret = vgic_its_resolve_lpi(kvm, its, irq_entry->msi.devid,
->>>> +				   irq_entry->msi.data, &irq);
->>>> +	if (ret)
->>>> +		goto out;
->>>> +
->>>> +	/*
->>>> +	 * Emit the mapping request. If it fails, the ITS probably
->>>> +	 * isn't v4 compatible, so let's silently bail out. Holding
->>>> +	 * the ITS lock should ensure that nothing can modify the
->>>> +	 * target vcpu.
->>>> +	 */
->>>> +	map = (struct its_vlpi_map) {
->>>> +		.vm		= &kvm->arch.vgic.its_vm,
->>>> +		.vintid		= irq->intid,
->>>> +		.db_enabled	= true,
->>>> +		.vpe_idx	= irq->target_vcpu->vcpu_id,
->>>> +	};
->>>> +
->>>> +	if (its_map_vlpi(virq, &map))
->>>> +		goto out;
->>>
->>> This seems to be able to return things like -ENOMEM, whould we really
->>> not report this back to the caller in any way?
->>
->>
->> That's a good question.
->>
->> If we return -ENOMEM, we'll probably end-up returning an error to
->> userspace (as a result of the VFIO ioctl), which will in turn probably
->> terminate the guest (I'm guessing, I haven't actually looked at what
->> userspace does).
->>
->> If we don't return the error, then we have a chance to keep the guest
->> running by sticking to software injection.
-> I have not read the whole stuff yet but userspace is not aware of this
-> negotiation. Everything happens under the hood in kernel, see
-> virt/lib/irqbypass.c __connect(): if add_producer() fails
-> prod->del_consumer() is called and we should return to the not optimized
-> injection.
+> Hi Yury, 
+> 
+> > In patch 'dbc9344a68e506f19f8 ("arm64: clean up THREAD_* definitions")'
+> > you move THREAD_* definitions from arch/arm64/include/asm/thread_info.h
+> > to asm/memory.h. After that asm/thread_info.h starts to depend on
+> > asm/memory.h.
+> > 
+> > When I try to apply ilp32 series on top of it [1], it causes circular
+> > dependencies like this one:
+> > 
+> > In file included from ./arch/arm64/include/asm/memory.h:30:0,
+> >                  from ./arch/arm64/include/asm/thread_info.h:30,
+> >                  from ./include/linux/thread_bits.h:20,
+> >                  from ./include/linux/thread_info.h:13,
+> >                  from ./include/asm-generic/preempt.h:4,
+> >                  from ./arch/arm64/include/generated/asm/preempt.h:1,
+> >                  from ./include/linux/preempt.h:80,
+> >                  from ./include/linux/rcupdate.h:40,
+> >                  from ./include/linux/rculist.h:10,
+> >                  from ./include/linux/pid.h:4,
+> >                  from ./include/linux/sched.h:13,
+> >                  from arch/arm64/kernel/asm-offsets.c:21:
+> > ./arch/arm64/include/asm/is_compat.h: In function ?is_a32_compat_task?:
+> > ./arch/arm64/include/asm/is_compat.h:25:9: error: implicit declaration of function ?test_thread_flag? [-Werror=implicit-function-declaration]
+> >   return test_thread_flag(TIF_32BIT);
+> >          ^~~~~~~~~~~~~~~~
+> > 
+> > The problem is that asm/memory.h depends on asm/is_compat.h to define
+> > TASK_SIZE, which in turn requires asm/thread_info.h.
+> 
+> ... and <asm/thread_info.h> include <asm/memory.h>, giving a circular
+> dependency.
+> 
+> In other architectures, TASK_SIZE is defined in processor.h. Can we not
+> move TASK_SIZE instead of THREAD_SIZE, given that TASK_SIZE is what
+> causes the dependency?
+> 
+> We'd need a new __ASSEMBLY__ guard, but otherwise it looks like that
+> would solve the issue.
+> 
+> > The most obvious solution for it is to create is_compat.c file and make
+> > is_*_compat() real functions. The other option is to move THREAD_*
+> > definitions to separated macro. I would prefer 2nd one because of following
+> > reasons:
+> >  - TASK_SIZE macro is used many times in kernel, including hot paths;
+> >  - asm/memory.h is included widely, as well as asm/thread_info.h, and it's
+> >    better not to make them depend one from another;
+> >  - THREAD_SIZE etc are not memory-related definitions.
+> 
+> I disagree with this last point. THREAD_SIZE is in <asm/memory.h>
+> because it affects the kernel's memory layout, as with other definitions
+> at the top of <asm/memory.h>.
+> 
+> I would much prefer keeping those definitions together.
+> 
+> > In this patch THREAD_* definitions moved to separated asm/thread_size.h
+> > header. It's enough to resolve dependency above.
+> >
+> > If you find this approach useful, I can prepare other patch that moves
+> > TASK_* definitions from asm/memory.h to new header to remove the dependency
+> > from asm/is_compat.h.
+> 
+> I'd prefer that we moved the TASK_SIZE* definitions first, but if
+> necessary, I'm ok with seeing the THREAD_SIZE* definitions move.
 
-Ah, fair enough. I guess del_consumer() does nothing on PCI?
+OK, I will try this, and if it's be enough will send new patch. If not -
+I'll resend this patch and one that moves TASK_SIZE* together in series.
 
-Thanks,
+> [...]
+> 
+> > diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> 
+> > -#include <asm/memory.h>
+> > +#include <asm/thread_size.h>
+> >  #include <asm/stack_pointer.h>
+> >  #include <asm/types.h>
+> 
+> Nit: please keep includes ordered alphabetically.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+OK
+
+> [...]
+> 
+> > diff --git a/arch/arm64/include/asm/thread_size.h b/arch/arm64/include/asm/thread_size.h
+> 
+> > +#ifdef __KERNEL__
+> 
+> This can go. We haven't needed __KERNEL__ ifdefs for a long time now...
+
+OK
+
+> [...]
+> 
+> > diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+> > index e56d848b6466..46b91702ea26 100644
+> > --- a/arch/arm64/kernel/hibernate-asm.S
+> > +++ b/arch/arm64/kernel/hibernate-asm.S
+> > @@ -22,7 +22,6 @@
+> >  #include <asm/asm-offsets.h>
+> >  #include <asm/assembler.h>
+> >  #include <asm/cputype.h>
+> > -#include <asm/memory.h>
+> >  #include <asm/page.h>
+> >  #include <asm/virt.h>
+> 
+> AFAICT, we can also lose <linux/errno.h>, <asm/cputype.h>, and
+> <asm/virt.h>.
+> 
+> Changes to this file might be better as a preparatory cleanup.
+
+OK.
+
+Yury
