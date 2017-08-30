@@ -1,50 +1,65 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 30 Aug 2017 18:40:14 +1000
-Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
-In-Reply-To: <20170829100112.GC2901@leverpostej>
-References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-15-takahiro.akashi@linaro.org>
- <20170824173049.GG29665@leverpostej> <20170829100112.GC2901@leverpostej>
-Message-ID: <87ziah1ma9.fsf@concordia.ellerman.id.au>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Wed, 30 Aug 2017 10:50:22 +0200
+Subject: kasan is not working on 3.18 kernel due to patch "BACKPORT:
+ kernel: add kcov code coverage"
+In-Reply-To: <CAKwPUoxHDW4x=uqY5o2rimHDkDPqaN1GdUZ9=eHuP1hwsa7ngw@mail.gmail.com>
+References: <CAKwPUoxHDW4x=uqY5o2rimHDkDPqaN1GdUZ9=eHuP1hwsa7ngw@mail.gmail.com>
+Message-ID: <CACT4Y+aMFp47QecE6QeY-K6kFz9pnJ+YT0xHo+5vO8qvjN7Cuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
-
-> On Thu, Aug 24, 2017 at 06:30:50PM +0100, Mark Rutland wrote:
->> On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
->> > The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
->> > will be loaded at the offset of TEXT_OFFSET from the begining of system
->> > memory. The other PT_LOAD segments are placed relative to the first one.
->> 
->> I really don't like assuming things about the vmlinux ELF file.
->> 
->> > Regarding kernel verification, since there is no standard way to contain
->> > a signature within elf binary, we follow PowerPC's (not yet upstreamed)
->> > approach, that is, appending a signature right after the kernel binary
->> > itself like module signing.
->> 
->> I also *really* don't like this. It's a bizarre in-band mechanism,
->> without explcit information. It's not a nice ABI.
->> 
->> If we can load an Image, why do we need to be able to load a vmlinux?
+On Wed, Aug 30, 2017 at 10:20 AM, Kassey <kassey1216@gmail.com> wrote:
+> hi, Dmitry:
+>     with your change on 3.18 kernel,
 >
-> So IIUC, the whole point of this is to be able to kexec_file_load() a
-> vmlinux + signature bundle, for !CONFIG_EFI kernels.
+>      https://github.com/Elite-Kernels/HTC-10/commit/7c8e808c673b50a52e6b5db9bba54678386fa61b
 >
-> For that, I think that we actually need a new kexec_file_load${N}
-> syscall, where we can pass the signature for the kernel as a separate
-> file. Ideally also with a flags argument and perhaps the ability to sign
-> the initrd too.
+>     it was find that cflags for GCC with KASAN enabled is not working.
+>     testing is doing arm64 platfrom with below configure and gcc 5.1.1
 >
-> That way we don't ahve to come up with a magic vmlinux+signature format,
+>     +CONFIG_KASAN=y
+>     +CONFIG_TEST_KASAN=m
+>
+>
+>
+>     and the issue can be fixed by the change, would you please review ?
+>
+> Author: Kassey <kassey1216@gmail.com>
+> Date:   Wed Aug 30 15:45:58 2017 +0800
+>
+>     scripts: correct cflags for kasan
+>
+>     Signed-off-by: Kassey<kassey1216@gmail.com>
+>
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index cea530c..0f1d004 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -125,7 +125,7 @@ endif
+>  #
+>  ifeq ($(CONFIG_KASAN),y)
+>  _c_flags += $(if $(patsubst n%,, \
+> -
+> $(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)$(CONFIG_KASAN_SANITIZE_ALL)),
+> \
+> +               $(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)y), \
+>                 $(CFLAGS_KASAN))
+>  endif
 
-You don't have to come up with one, it already exists. We've been using
-it for signed modules for ~5 years.
 
-It also has the advantages of being a signature of the entire ELF, no
-silly games about which sections are included, and it's attached to the
-vmlinux so you don't have to remember to copy it around. And the code to
-produce it and verify it already exists.
+Hi Kassey,
 
-cheers
+This is a patch on top of what?
+
+It does not look like the KCOV patch has any relation to this. It did
+not touch KASAN stuff in scripts/Makefile.lib.
+
+Do you know who backported the KCOV patch? The backport mentions some
+conflicts, maybe that's the problem. But I don't know what were the
+conflicts.
+
+What's the current failure mode?
+
+Why does upstream work? What's different in your tree?
+
+I don't feel that I have enough information to say anything regarding the patch.
