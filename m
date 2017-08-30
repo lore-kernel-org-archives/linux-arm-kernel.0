@@ -1,30 +1,66 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 31 Aug 2017 01:00:44 +0800
-Subject: [RESENT PATCH v7 3/7] arm64: dts: rockchip: Update rt5514 devices'
- compatible for Gru
-In-Reply-To: <1649093.IvC24TsujL@diego>
-References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
- <20170824045227.15504-4-jeffy.chen@rock-chips.com> <1649093.IvC24TsujL@diego>
-Message-ID: <59A6EF3C.5090308@rock-chips.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 30 Aug 2017 19:17:59 +0200
+Subject: [net-next PATCHv6 2/2] net: socionext: Add NetSec driver
+In-Reply-To: <1504088771-6255-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
+ <1504088771-6255-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <20170830171759.GC22289@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+> +static int netsec_mac_update_to_phy_state(struct netsec_priv *priv)
+> +{
+> +	struct phy_device *phydev = priv->ndev->phydev;
+> +	u32 value = 0;
+> +
+> +	value = phydev->duplex ? NETSEC_GMAC_MCR_REG_FULL_DUPLEX_COMMON :
+> +				       NETSEC_GMAC_MCR_REG_HALF_DUPLEX_COMMON;
+> +
+> +	if (phydev->speed != SPEED_1000)
+> +		value |= NETSEC_MCR_PS;
+> +
+> +	if ((priv->phy_interface != PHY_INTERFACE_MODE_GMII) &&
+> +	    (phydev->speed == SPEED_100))
+> +		value |= NETSEC_GMAC_MCR_REG_FES;
+> +
+> +	value |= NETSEC_GMAC_MCR_REG_CST | NETSEC_GMAC_MCR_REG_JE;
+> +
+> +	if (priv->phy_interface == PHY_INTERFACE_MODE_RGMII)
+> +		value |= NETSEC_GMAC_MCR_REG_IBN;
+> +
+> +	if (netsec_mac_write(priv, GMAC_REG_MCR, value))
+> +		return -ETIMEDOUT;
+> +
+> +	priv->actual_link_speed = phydev->speed;
+> +	priv->actual_duplex = phydev->duplex;
+> +	netif_info(priv, drv, priv->ndev, "%s: %uMbps, duplex:%d\n",
+> +		   __func__, phydev->speed, phydev->duplex);
 
-thanks for your reply.
+phy_print_status()
 
-On 08/30/2017 09:30 PM, Heiko St?bner wrote:
->> >-		compatible = "realtek,rt5514";
->> >+		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
-> the rt5514-i2c and -spi compatibles should be documented in the binding-txt
-> of the chip, but I haven't found any mention of this.
->
->
-> Heiko
+> +	mac = of_get_mac_address(pdev->dev.of_node);
+> +	if (mac)
+> +		ether_addr_copy(ndev->dev_addr, mac);
+> +
+> +	if (!is_valid_ether_addr(ndev->dev_addr)) {
+> +		eth_hw_addr_random(ndev);
+> +		dev_warn(&pdev->dev, "No MAC address found, using random\n");
+> +	}
 
-these compatibles are only used for our snd driver to detect rt5514 i2c 
-driver and rt5514 spi driver, suggested by Matthias at 
-https://patchwork.kernel.org/patch/9904731/
+So the mac address is optional, unlike what the binding document says.
 
-should i add it in the rockchip,rk3399-gru-sound.txt or rt5514 binding 
-document?
+> +	priv->phy_np = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
+> +	if (!priv->phy_np) {
+> +		netif_err(priv, probe, ndev, "missing phy in DT\n");
+
+It is the phy-handle which is missing, not the phy.
+
+> +
+> +	/* MTU range */
+> +	ndev->min_mtu = ETH_MIN_MTU;
+
+No need to set this, it is the default.
+
+Otherwise, this looks good, in terms of phy and mdio.
+
+	   Andrew
