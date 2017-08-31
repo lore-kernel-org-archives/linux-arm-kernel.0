@@ -1,24 +1,82 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Aug 2017 10:36:46 +0200
-Subject: [PATCH] arm64: dts: r8a7795: Drop bogus HDMI node names suffixes
-In-Reply-To: <3276171.anaVMsVBRO@avalon>
-References: <1504087397-6211-1-git-send-email-geert+renesas@glider.be>
- <3276171.anaVMsVBRO@avalon>
-Message-ID: <20170831083645.GE29946@verge.net.au>
+Date: Thu, 31 Aug 2017 10:45:34 +0200
+Subject: [PATCH ] ARM: dts: iwg22d-sodimm: Add Ethernet AVB support
+In-Reply-To: <1504106234-41450-1-git-send-email-biju.das@bp.renesas.com>
+References: <1504106234-41450-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170831084534.GF29946@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 01:10:58PM +0300, Laurent Pinchart wrote:
-> Hi Geert,
+On Wed, Aug 30, 2017 at 04:17:14PM +0100, Biju Das wrote:
+> Define the iWave RainboW-G22D board dependent part of the Ethernet
+> AVB device node.
 > 
-> Thank you for the patch.
+> On some older versions of the platform (before R4.0) the phy address
+> may be 1 or 3. The address is fixed to 3 for R4.0 onwards (which
+> will be the first mainstream release), hence using 3 in the dts.
 > 
-> On Wednesday, 30 August 2017 13:03:17 EEST Geert Uytterhoeven wrote:
-> > Node names should not use numerical suffixes if the nodes can be
-> > distinguished by unit-address.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> ---
+> This patch is tested against renesas-dev tag 20170830-v4.13-rc7
 > 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>  arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+> index 442a5cb..aac84c6 100644
+> --- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+> +++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+> @@ -17,9 +17,11 @@
+>  
+>  	aliases {
+>  		serial0 = &scif4;
+> +		ethernet0 = &avb;
+>  	};
+>  
+>  	chosen {
+> +		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  };
+> @@ -29,6 +31,11 @@
+>  		groups = "scif4_data_b";
+>  		function = "scif4";
+>  	};
+> +
+> +	avb_pins: avb {
+> +		groups = "avb_mdio", "avb_gmii";
+> +		function = "avb";
+> +	};
+>  };
+>  
+>  &scif4 {
+> @@ -37,3 +44,22 @@
+>  
+>  	status = "okay";
+>  };
+> +
+> +&avb {
+> +	pinctrl-0 = <&avb_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	phy-handle = <&phy3>;
+> +	phy-mode = "gmii";
+> +	renesas,no-ether-link;
+> +	status = "okay";
+> +
+> +	phy3: ethernet-phy at 3 {
+> +	/*
+> +	 * On some older versions of the platform (before R4.0) the phy address
+> +	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
+> +	 */
+> +		reg = <3>;
+> +		micrel,led-mode = <1>;
 
-Thanks, applied.
+Does the phy have an interrupt?
+
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
