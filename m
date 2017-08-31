@@ -1,81 +1,223 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Thu, 31 Aug 2017 13:44:05 +0200
-Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
-In-Reply-To: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
-References: <20170830233609.13855-1-stefan.bruens@rwth-aachen.de>
- <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
-Message-ID: <CAEKpxB=_CbbBem6EhA32P80esRhfCFoRPEv_rKKQauhzAdw_4Q@mail.gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 31 Aug 2017 19:43:57 +0800
+Subject: [PATCH RESEND 1/1] cpufreq: imx6q: switch to Use clk_bulk_get to
+ refine clk operations
+Message-ID: <1504179837-18842-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 August 2017 at 01:36, Stefan Br?ns <stefan.bruens@rwth-aachen.de> wrote:
-> The A64 SoC has the same dma engine as the H3 (sun8i), with a
-> reduced amount of physical channels. Add the proper config data
-> and compatible string to support it.
->
-> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++++
->  drivers/dma/sun6i-dma.c                       | 7 +++++++
->  2 files changed, 11 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index f96287d3043a..b86019238b77 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -494,6 +494,8 @@
->                         interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
->                         clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 23>, <&dma 23>;
-> +                       dma-names = "rx", "tx";
-Hi Stefan,
-the dtsi parts should be in a separate patch
+Use clk_bulk_get to ease the driver clocks handling.
 
->                         pinctrl-names = "default";
->                         pinctrl-0 = <&spi0_pins>;
->                         resets = <&ccu RST_BUS_SPI0>;
-> @@ -509,6 +511,8 @@
->                         interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
->                         clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 24>, <&dma 24>;
-> +                       dma-names = "rx", "tx";
->                         pinctrl-names = "default";
->                         pinctrl-0 = <&spi1_pins>;
->                         resets = <&ccu RST_BUS_SPI1>;
-> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index 5f4eee4513e5..6a17c5d63582 100644
-> --- a/drivers/dma/sun6i-dma.c
-> +++ b/drivers/dma/sun6i-dma.c
-> @@ -1068,6 +1068,12 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
->         .nr_max_vchans   = 34,
->         .dmac_variant    = DMAC_VARIANT_H3,
->  };
-> +
-> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
-> +       .nr_max_channels = 8,
-> +       .nr_max_requests = 27,
-> +       .nr_max_vchans   = 38,
-> +       .dmac_variant    = DMAC_VARIANT_H3,
->  };
->
->  static const struct of_device_id sun6i_dma_match[] = {
-> @@ -1075,6 +1081,7 @@ static const struct of_device_id sun6i_dma_match[] = {
->         { .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
->         { .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
->         { .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-> +       { .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
-This all looks fine...it's similar to my patch here
-https://github.com/codekipper/linux-sunxi/commit/8c54d9852dfad6ceb478c579a1213f38fb12fa80
-which I've been too lazy to post. I think the binding documentation
-should go with this patch and this should also be the 1st patch in the
-series, followed by the dtsi changes.
-BR,
-CK
->         { /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
-> --
-> 2.14.1
->
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Anson Huang <anson.huang@nxp.com>
+Cc: Leonard Crestez <leonard.crestez@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+--
+The original one is here which depends on clk_bulk APIs.
+https://patchwork.kernel.org/patch/9737337/
+Now the clk_bulk APIs are already in kernel, so resend the patch.
+(Patch title changed a bit to be more specific.)
+---
+ drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
+ 1 file changed, 56 insertions(+), 69 deletions(-)
+
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 14466a9..c5c0af3 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -24,15 +24,29 @@ static struct regulator *arm_reg;
+ static struct regulator *pu_reg;
+ static struct regulator *soc_reg;
+ 
+-static struct clk *arm_clk;
+-static struct clk *pll1_sys_clk;
+-static struct clk *pll1_sw_clk;
+-static struct clk *step_clk;
+-static struct clk *pll2_pfd2_396m_clk;
+-
+-/* clk used by i.MX6UL */
+-static struct clk *pll2_bus_clk;
+-static struct clk *secondary_sel_clk;
++enum IMX6_CPUFREQ_CLKS {
++	ARM,
++	PLL1_SYS,
++	STEP,
++	PLL1_SW,
++	PLL2_PFD2_396M,
++	/* MX6UL requires two more clks */
++	PLL2_BUS,
++	SECONDARY_SEL,
++};
++#define IMX6Q_CPUFREQ_CLK_NUM		5
++#define IMX6UL_CPUFREQ_CLK_NUM		7
++
++static int num_clks;
++static struct clk_bulk_data clks[] = {
++	{ .id = "arm" },
++	{ .id = "pll1_sys" },
++	{ .id = "step" },
++	{ .id = "pll1_sw" },
++	{ .id = "pll2_pfd2_396m" },
++	{ .id = "pll2_bus" },
++	{ .id = "secondary_sel" },
++};
+ 
+ static struct device *cpu_dev;
+ static bool free_opp;
+@@ -52,7 +66,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 
+ 	new_freq = freq_table[index].frequency;
+ 	freq_hz = new_freq * 1000;
+-	old_freq = clk_get_rate(arm_clk) / 1000;
++	old_freq = clk_get_rate(clks[ARM].clk) / 1000;
+ 
+ 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
+ 	if (IS_ERR(opp)) {
+@@ -111,29 +125,31 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		 * voltage of 528MHz, so lower the CPU frequency to one
+ 		 * half before changing CPU frequency.
+ 		 */
+-		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
+-		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+-		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
+-			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
++		clk_set_rate(clks[ARM].clk, (old_freq >> 1) * 1000);
++		clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
++		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk))
++			clk_set_parent(clks[SECONDARY_SEL].clk,
++				       clks[PLL2_BUS].clk);
+ 		else
+-			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
+-		clk_set_parent(step_clk, secondary_sel_clk);
+-		clk_set_parent(pll1_sw_clk, step_clk);
++			clk_set_parent(clks[SECONDARY_SEL].clk,
++				       clks[PLL2_PFD2_396M].clk);
++		clk_set_parent(clks[STEP].clk, clks[SECONDARY_SEL].clk);
++		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
+ 	} else {
+-		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+-		clk_set_parent(pll1_sw_clk, step_clk);
+-		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+-			clk_set_rate(pll1_sys_clk, new_freq * 1000);
+-			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
++		clk_set_parent(clks[STEP].clk, clks[PLL2_PFD2_396M].clk);
++		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
++		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk)) {
++			clk_set_rate(clks[PLL1_SYS].clk, new_freq * 1000);
++			clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
+ 		} else {
+ 			/* pll1_sys needs to be enabled for divider rate change to work. */
+ 			pll1_sys_temp_enabled = true;
+-			clk_prepare_enable(pll1_sys_clk);
++			clk_prepare_enable(clks[PLL1_SYS].clk);
+ 		}
+ 	}
+ 
+ 	/* Ensure the arm clock divider is what we expect */
+-	ret = clk_set_rate(arm_clk, new_freq * 1000);
++	ret = clk_set_rate(clks[ARM].clk, new_freq * 1000);
+ 	if (ret) {
+ 		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+ 		regulator_set_voltage_tol(arm_reg, volt_old, 0);
+@@ -142,7 +158,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 
+ 	/* PLL1 is only needed until after ARM-PODF is set. */
+ 	if (pll1_sys_temp_enabled)
+-		clk_disable_unprepare(pll1_sys_clk);
++		clk_disable_unprepare(clks[PLL1_SYS].clk);
+ 
+ 	/* scaling down?  scale voltage after frequency */
+ 	if (new_freq < old_freq) {
+@@ -173,7 +189,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ {
+ 	int ret;
+ 
+-	policy->clk = arm_clk;
++	policy->clk = clks[ARM].clk;
+ 	ret = cpufreq_generic_init(policy, freq_table, transition_latency);
+ 	policy->suspend_freq = policy->max;
+ 
+@@ -213,28 +229,15 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	arm_clk = clk_get(cpu_dev, "arm");
+-	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
+-	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
+-	step_clk = clk_get(cpu_dev, "step");
+-	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
+-	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+-	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+-		dev_err(cpu_dev, "failed to get clocks\n");
+-		ret = -ENOENT;
+-		goto put_clk;
+-	}
+-
+ 	if (of_machine_is_compatible("fsl,imx6ul") ||
+-	    of_machine_is_compatible("fsl,imx6ull")) {
+-		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+-		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+-		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+-			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
+-			ret = -ENOENT;
+-			goto put_clk;
+-		}
+-	}
++	    of_machine_is_compatible("fsl,imx6ull"))
++		num_clks = IMX6UL_CPUFREQ_CLK_NUM;
++	else
++		num_clks = IMX6Q_CPUFREQ_CLK_NUM;
++
++	ret = clk_bulk_get(cpu_dev, num_clks, clks);
++	if (ret)
++		goto put_node;
+ 
+ 	arm_reg = regulator_get(cpu_dev, "arm");
+ 	pu_reg = regulator_get_optional(cpu_dev, "pu");
+@@ -378,22 +381,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		regulator_put(pu_reg);
+ 	if (!IS_ERR(soc_reg))
+ 		regulator_put(soc_reg);
+-put_clk:
+-	if (!IS_ERR(arm_clk))
+-		clk_put(arm_clk);
+-	if (!IS_ERR(pll1_sys_clk))
+-		clk_put(pll1_sys_clk);
+-	if (!IS_ERR(pll1_sw_clk))
+-		clk_put(pll1_sw_clk);
+-	if (!IS_ERR(step_clk))
+-		clk_put(step_clk);
+-	if (!IS_ERR(pll2_pfd2_396m_clk))
+-		clk_put(pll2_pfd2_396m_clk);
+-	if (!IS_ERR(pll2_bus_clk))
+-		clk_put(pll2_bus_clk);
+-	if (!IS_ERR(secondary_sel_clk))
+-		clk_put(secondary_sel_clk);
++
++	clk_bulk_put(num_clks, clks);
++put_node:
+ 	of_node_put(np);
++
+ 	return ret;
+ }
+ 
+@@ -407,13 +399,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
+ 	if (!IS_ERR(pu_reg))
+ 		regulator_put(pu_reg);
+ 	regulator_put(soc_reg);
+-	clk_put(arm_clk);
+-	clk_put(pll1_sys_clk);
+-	clk_put(pll1_sw_clk);
+-	clk_put(step_clk);
+-	clk_put(pll2_pfd2_396m_clk);
+-	clk_put(pll2_bus_clk);
+-	clk_put(secondary_sel_clk);
++
++	clk_bulk_put(num_clks, clks);
+ 
+ 	return 0;
+ }
+-- 
+2.7.4
