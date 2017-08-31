@@ -1,95 +1,31 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 Aug 2017 14:44:26 +0100
-Subject: [PATCH v2 2/4] iommu/arm-smmu-v3: Forget about cmdq-sync interrupt
-In-Reply-To: <cover.1504182142.git.robin.murphy@arm.com>
-References: <cover.1504182142.git.robin.murphy@arm.com>
-Message-ID: <6af39e135a84fdc1047f93b55b927ebbc5281bad.1504182142.git.robin.murphy@arm.com>
+Date: Thu, 31 Aug 2017 14:44:24 +0100
+Subject: [PATCH v2 0/4] SMMUv3 CMD_SYNC optimisation
+Message-ID: <cover.1504182142.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cmdq-sync interrupt is never going to be particularly useful, since
-for stage 1 DMA at least we'll often need to wait for sync completion
-within someone else's IRQ handler, thus have to implement polling
-anyway. Beyond that, the overhead of taking an interrupt, then still
-having to grovel around in the queue to figure out *which* sync command
-completed, doesn't seem much more attractive than simple polling either.
+Hi all,
 
-Furthermore, if an implementation both has wired interrupts and supports
-MSIs, then we don't want to be taking the IRQ unnecessarily if we're
-using the MSI write to update memory. Let's just make life simpler by
-not even bothering to claim it in the first place.
+Since Nate reported a reasonable performance boost from the out-of-line
+MSI polling in v1 [1], I've now implemented the equivalent for cons
+polling as well - that has been boot-tested on D05 with some trivial I/O
+and at least doesn't seem to lock up or explode. There's also a little
+cosmetic tweaking to make the patches a bit cleaner as a series.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Robin.
 
-v2: No change
+[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg19657.html
 
- drivers/iommu/arm-smmu-v3.c | 24 +-----------------------
- 1 file changed, 1 insertion(+), 23 deletions(-)
+Robin Murphy (5):
+  iommu/arm-smmu-v3: Specialise CMD_SYNC handling
+  iommu/arm-smmu-v3: Forget about cmdq-sync interrupt
+  iommu/arm-smmu-v3: Use CMD_SYNC completion interrupt
+  iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq lock
+  iommu/arm-smmu-v3: Use burst-polling for sync completion
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 91f28aca72c0..f066725298cd 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1296,12 +1296,6 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
--static irqreturn_t arm_smmu_cmdq_sync_handler(int irq, void *dev)
--{
--	/* We don't actually use CMD_SYNC interrupts for anything */
--	return IRQ_HANDLED;
--}
--
- static int arm_smmu_device_disable(struct arm_smmu_device *smmu);
- 
- static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
-@@ -1334,10 +1328,8 @@ static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
- 	if (active & GERROR_MSI_EVTQ_ABT_ERR)
- 		dev_warn(smmu->dev, "EVTQ MSI write aborted\n");
- 
--	if (active & GERROR_MSI_CMDQ_ABT_ERR) {
-+	if (active & GERROR_MSI_CMDQ_ABT_ERR)
- 		dev_warn(smmu->dev, "CMDQ MSI write aborted\n");
--		arm_smmu_cmdq_sync_handler(irq, smmu->dev);
--	}
- 
- 	if (active & GERROR_PRIQ_ABT_ERR)
- 		dev_err(smmu->dev, "PRIQ write aborted -- events may have been lost\n");
-@@ -1366,7 +1358,6 @@ static irqreturn_t arm_smmu_combined_irq_thread(int irq, void *dev)
- static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
- {
- 	arm_smmu_gerror_handler(irq, dev);
--	arm_smmu_cmdq_sync_handler(irq, dev);
- 	return IRQ_WAKE_THREAD;
- }
- 
-@@ -2283,15 +2274,6 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
- 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
- 	}
- 
--	irq = smmu->cmdq.q.irq;
--	if (irq) {
--		ret = devm_request_irq(smmu->dev, irq,
--				       arm_smmu_cmdq_sync_handler, 0,
--				       "arm-smmu-v3-cmdq-sync", smmu);
--		if (ret < 0)
--			dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
--	}
--
- 	irq = smmu->gerr_irq;
- 	if (irq) {
- 		ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
-@@ -2799,10 +2781,6 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 		if (irq > 0)
- 			smmu->priq.q.irq = irq;
- 
--		irq = platform_get_irq_byname(pdev, "cmdq-sync");
--		if (irq > 0)
--			smmu->cmdq.q.irq = irq;
--
- 		irq = platform_get_irq_byname(pdev, "gerror");
- 		if (irq > 0)
- 			smmu->gerr_irq = irq;
+ drivers/iommu/arm-smmu-v3.c | 194 ++++++++++++++++++++++++++++++--------------
+ 1 file changed, 135 insertions(+), 59 deletions(-)
+
 -- 
 2.13.4.dirty
