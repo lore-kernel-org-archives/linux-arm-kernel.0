@@ -1,34 +1,118 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Aug 2017 21:02:27 -0400 (EDT)
-Subject: [PATCH v2 0/5] make XIP kernel .data compressed in ROM
-In-Reply-To: <SG2PR06MB11652EB1FEDDE2F40AE763B18A9D0@SG2PR06MB1165.apcprd06.prod.outlook.com>
-References: <20170830025547.30347-1-nicolas.pitre@linaro.org>
- <SG2PR06MB1165EF18A363D9CC4C5531FE8A9C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1708301951330.2606@knanqh.ubzr>
- <SG2PR06MB11652EB1FEDDE2F40AE763B18A9D0@SG2PR06MB1165.apcprd06.prod.outlook.com>
-Message-ID: <nycvar.YSQ.7.76.1708302058520.2606@knanqh.ubzr>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 31 Aug 2017 08:04:51 +0530
+Subject: [PATCH 03/14] resource: add walk_system_ram_res_rev()
+In-Reply-To: <20170824081811.19299-4-takahiro.akashi@linaro.org>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-4-takahiro.akashi@linaro.org>
+Message-ID: <5b6a0f9a-839a-ed57-e78e-88dbc9a7361c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Aug 2017, Chris Brandt wrote:
 
-> On Wednesday, August 30, 2017, Nicolas Pitre wrote:
-> > > > This work highlighted some defficiencies in linker scripts, especially
-> > > > the XIP one. So this also includes linker script cleanups and fixes.
-> > >
-> > > Thank you for this!
-> > 
-> > More will come eventually.
-> > 
-> > Did this fix your cramfs issue with 4.13-rc7?
+
+On Thursday 24 August 2017 01:48 PM, AKASHI Takahiro wrote:
+> This function, being a variant of walk_system_ram_res() introduced in
+> commit 8c86e70acead ("resource: provide new functions to walk through
+> resources"), walks through a list of all the resources of System RAM
+> in reversed order, i.e., from higher to lower.
 > 
-> Yes!
-> I just stacked on your latest set of cramfs XIP patches on top of these 
-> and now magically it boots again.
-> Thank you!
+> It will be used in kexec_file implementation on arm64.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> ---
+>   include/linux/ioport.h |  3 +++
+>   kernel/resource.c      | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 51 insertions(+)
+> 
+> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+> index 6230064d7f95..9a212266299f 100644
+> --- a/include/linux/ioport.h
+> +++ b/include/linux/ioport.h
+> @@ -271,6 +271,9 @@ extern int
+>   walk_system_ram_res(u64 start, u64 end, void *arg,
+>   		    int (*func)(u64, u64, void *));
+>   extern int
+> +walk_system_ram_res_rev(u64 start, u64 end, void *arg,
+> +			int (*func)(u64, u64, void *));
+> +extern int
+>   walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start, u64 end,
+>   		    void *arg, int (*func)(u64, u64, void *));
+>   
+> diff --git a/kernel/resource.c b/kernel/resource.c
+> index 9b5f04404152..1d6d734c75ac 100644
+> --- a/kernel/resource.c
+> +++ b/kernel/resource.c
+> @@ -23,6 +23,7 @@
+>   #include <linux/pfn.h>
+>   #include <linux/mm.h>
+>   #include <linux/resource_ext.h>
+> +#include <linux/vmalloc.h>
+>   #include <asm/io.h>
+>   
+>   
+> @@ -469,6 +470,53 @@ int walk_system_ram_res(u64 start, u64 end, void *arg,
+>   	return ret;
+>   }
+>   
+> +int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
+> +				int (*func)(u64, u64, void *))
+> +{
+> +	struct resource res, *rams;
+> +	u64 orig_end;
+> +	int count, i;
+> +	int ret = -1;
+> +
+> +	count = 16; /* initial */
+> +again:
+> +	/* create a list */
+> +	rams = vmalloc(sizeof(struct resource) * count);
+> +	if (!rams)
+> +		return ret;
+> +
+> +	res.start = start;
+> +	res.end = end;
+> +	res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> +	orig_end = res.end;
+> +	i = 0;
+> +	while ((res.start < res.end) &&
+> +		(!find_next_iomem_res(&res, IORES_DESC_NONE, true))) {
+> +		if (i >= count) {
+> +			/* unlikely but */
+> +			vfree(rams);
+> +			count += 16;
+> +			goto again;
 
-Excellent! If you could post this conclusion and your Tested-by in the 
-cramfs thread for the benefit of that audience there that'd be helpful.
+Wounld't it be better to re-alloc a bigger space,copy previous values and free 
+the previous pointer, instead of going *again*.
 
+> +		}
+> +
+> +		rams[i].start = res.start;
+> +		rams[i++].end = res.end;
+> +
+> +		res.start = res.end + 1;
+> +		res.end = orig_end;
+> +	}
+> +
+> +	/* go reverse */
+> +	for (i--; i >= 0; i--) {
+> +		ret = (*func)(rams[i].start, rams[i].end, arg);
+> +		if (ret)
+> +			break;
+> +	}
+> +
+> +	vfree(rams);
+> +	return ret;
+> +}
+> +
+>   #if !defined(CONFIG_ARCH_HAS_WALK_MEMORY)
+>   
+>   /*
+> 
 
-Nicolas
+-- 
+Regards
+Pratyush
