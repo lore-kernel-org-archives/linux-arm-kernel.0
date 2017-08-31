@@ -1,277 +1,123 @@
-From: eric.engestrom@imgtec.com (Eric Engestrom)
-Date: Thu, 31 Aug 2017 11:19:13 +0100
-Subject: [PATCH 4/7] drm/pl111: Enable PL110 variant
-In-Reply-To: <20170830180711.2791-5-linus.walleij@linaro.org>
-References: <20170830180711.2791-1-linus.walleij@linaro.org>
- <20170830180711.2791-5-linus.walleij@linaro.org>
-Message-ID: <20170831101913.sjs32rsmbfal5xj3@imgtec.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 31 Aug 2017 15:48:44 +0530
+Subject: [PATCH v2 1/6] mmc: host: omap_hsmmc: Remove setting PBIAS voltage
+In-Reply-To: <20170831101849.9489-1-kishon@ti.com>
+References: <20170831101849.9489-1-kishon@ti.com>
+Message-ID: <20170831101849.9489-2-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, 2017-08-30 20:07:08 +0200, Linus Walleij wrote:
-> We detect and enable the use of the PL110 variant, an earlier
-> incarnation of PL111. The only real difference is that the
-> control and interrupt enable registers have swapped place.
-> The Versatile AB and Versatile PB have a variant inbetween
-> PL110 and PL111, it is PL110 but they have already swapped the
-> two registers so those two need a bit of special handling.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/gpu/drm/pl111/pl111_display.c | 27 +++--------
->  drivers/gpu/drm/pl111/pl111_drm.h     | 17 +++++++
->  drivers/gpu/drm/pl111/pl111_drv.c     | 84 ++++++++++++++++++++++++++++++++++-
->  3 files changed, 105 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-> index ef86ef60aed1..6447f36c243a 100644
-> --- a/drivers/gpu/drm/pl111/pl111_display.c
-> +++ b/drivers/gpu/drm/pl111/pl111_display.c
-> @@ -201,7 +201,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
->  		break;
->  	}
->  
-> -	writel(cntl, priv->regs + CLCD_PL111_CNTL);
-> +	writel(cntl, priv->regs + priv->ctrl);
->  
->  	drm_panel_enable(priv->panel);
->  
-> @@ -219,7 +219,7 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
->  	drm_panel_disable(priv->panel);
->  
->  	/* Disable and Power Down */
-> -	writel(0, priv->regs + CLCD_PL111_CNTL);
-> +	writel(0, priv->regs + priv->ctrl);
->  
->  	drm_panel_unprepare(priv->panel);
->  
-> @@ -259,7 +259,7 @@ int pl111_enable_vblank(struct drm_device *drm, unsigned int crtc)
->  {
->  	struct pl111_drm_dev_private *priv = drm->dev_private;
->  
-> -	writel(CLCD_IRQ_NEXTBASE_UPDATE, priv->regs + CLCD_PL111_IENB);
-> +	writel(CLCD_IRQ_NEXTBASE_UPDATE, priv->regs + priv->ienb);
->  
->  	return 0;
->  }
-> @@ -268,7 +268,7 @@ void pl111_disable_vblank(struct drm_device *drm, unsigned int crtc)
->  {
->  	struct pl111_drm_dev_private *priv = drm->dev_private;
->  
-> -	writel(0, priv->regs + CLCD_PL111_IENB);
-> +	writel(0, priv->regs + priv->ienb);
->  }
->  
->  static int pl111_display_prepare_fb(struct drm_simple_display_pipe *pipe,
-> @@ -412,22 +412,6 @@ int pl111_display_init(struct drm_device *drm)
->  	struct device_node *endpoint;
->  	u32 tft_r0b0g0[3];
->  	int ret;
-> -	static const u32 formats[] = {
-> -		DRM_FORMAT_ABGR8888,
-> -		DRM_FORMAT_XBGR8888,
-> -		DRM_FORMAT_ARGB8888,
-> -		DRM_FORMAT_XRGB8888,
-> -		DRM_FORMAT_BGR565,
-> -		DRM_FORMAT_RGB565,
-> -		DRM_FORMAT_ABGR1555,
-> -		DRM_FORMAT_XBGR1555,
-> -		DRM_FORMAT_ARGB1555,
-> -		DRM_FORMAT_XRGB1555,
-> -		DRM_FORMAT_ABGR4444,
-> -		DRM_FORMAT_XBGR4444,
-> -		DRM_FORMAT_ARGB4444,
-> -		DRM_FORMAT_XRGB4444,
-> -	};
->  
->  	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
->  	if (!endpoint)
-> @@ -456,7 +440,8 @@ int pl111_display_init(struct drm_device *drm)
->  
->  	ret = drm_simple_display_pipe_init(drm, &priv->pipe,
->  					   &pl111_display_funcs,
-> -					   formats, ARRAY_SIZE(formats),
-> +					   priv->variant->formats,
-> +					   priv->variant->nformats,
->  					   priv->connector);
->  	if (ret)
->  		return ret;
-> diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-> index 8804af0f8997..b316a8a0fbc0 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drm.h
-> +++ b/drivers/gpu/drm/pl111/pl111_drm.h
-> @@ -31,6 +31,20 @@
->  
->  struct drm_minor;
->  
-> +/**
-> + * struct pl111_variant_data - encodes IP differences
-> + * @name: the name of this variant
-> + * @is_pl110: this is the early PL110 variant
-> + * @formats: array of supported pixel formats on this variant
-> + * @nformats: the length of the array of supported pixel formats
-> + */
-> +struct pl111_variant_data {
-> +	const char *name;
-> +	bool is_pl110;
-> +	const u32 *formats;
-> +	unsigned int nformats;
-> +};
-> +
->  struct pl111_drm_dev_private {
->  	struct drm_device *drm;
->  
-> @@ -42,6 +56,8 @@ struct pl111_drm_dev_private {
->  	struct drm_fbdev_cma *fbdev;
->  
->  	void *regs;
-> +	u32 ienb;
-> +	u32 ctrl;
->  	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
->  	struct clk *clk;
->  	/* pl111's internal clock divider. */
-> @@ -50,6 +66,7 @@ struct pl111_drm_dev_private {
->  	 * subsystem and pl111_display_enable().
->  	 */
->  	spinlock_t tim2_lock;
-> +	struct pl111_variant_data *variant;
->  };
->  
->  int pl111_display_init(struct drm_device *dev);
-> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-> index e66cbf202e17..f6863c0fb809 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drv.c
-> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-> @@ -206,6 +206,7 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  {
->  	struct device *dev = &amba_dev->dev;
->  	struct pl111_drm_dev_private *priv;
-> +	struct pl111_variant_data *variant = id->data;
->  	struct drm_device *drm;
->  	int ret;
->  
-> @@ -219,6 +220,33 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  	amba_set_drvdata(amba_dev, drm);
->  	priv->drm = drm;
->  	drm->dev_private = priv;
-> +	priv->variant = variant;
-> +
-> +	/*
-> +	 * The PL110 and PL111 variants have two registers
-> +	 * swapped: interrupt enable and control. For this reason
-> +	 * we use offsets that we can change per variant.
-> +	 */
-> +	if (variant->is_pl110) {
-> +		/*
-> +		 * The ARM Versatile boards are even more special:
-> +		 * their PrimeCell ID say they are PL110 but the
-> +		 * control and interrupt enable registers are anyway
-> +		 * swapped to the PL111 order so they are not following
-> +		 * the PL110 datasheet.
-> +		 */
-> +		if (of_machine_is_compatible("arm,versatile-ab") ||
-> +		    of_machine_is_compatible("arm,versatile-pb")) {
-> +			priv->ienb = CLCD_PL111_IENB;
-> +			priv->ctrl = CLCD_PL111_CNTL;
-> +		} else {
-> +			priv->ienb = CLCD_PL110_IENB;
-> +			priv->ctrl = CLCD_PL110_CNTL;
-> +		}
-> +	} else {
-> +		priv->ienb = CLCD_PL111_IENB;
-> +		priv->ctrl = CLCD_PL111_CNTL;
-> +	}
->  
->  	priv->regs = devm_ioremap_resource(dev, &amba_dev->res);
->  	if (IS_ERR(priv->regs)) {
-> @@ -227,10 +255,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  	}
->  
->  	/* turn off interrupts before requesting the irq */
-> -	writel(0, priv->regs + CLCD_PL111_IENB);
-> +	writel(0, priv->regs + priv->ienb);
->  
->  	ret = devm_request_irq(dev, amba_dev->irq[0], pl111_irq, 0,
-> -			       "pl111", priv);
-> +			       variant->name, priv);
->  	if (ret != 0) {
->  		dev_err(dev, "%s failed irq %d\n", __func__, ret);
->  		return ret;
-> @@ -269,10 +297,62 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
->  	return 0;
->  }
->  
-> +/*
-> + * This variant exist in early versions like the ARM Integrator
-> + * and this version lacks the 565 and 444 pixel formats.
-> + */
-> +static const u32 pl110_pixel_formats[] = {
-> +	DRM_FORMAT_ABGR8888,
-> +	DRM_FORMAT_XBGR8888,
-> +	DRM_FORMAT_ARGB8888,
-> +	DRM_FORMAT_XRGB8888,
-> +	DRM_FORMAT_ABGR1555,
-> +	DRM_FORMAT_XBGR1555,
-> +	DRM_FORMAT_ARGB1555,
-> +	DRM_FORMAT_XRGB1555,
-> +};
-> +
-> +struct pl111_variant_data pl110_variant = {
+PBIAS voltage should be set along with setting vqmmc voltage and
+these voltages should be set as part of start_signal_voltage_switch
+callback. However since omap_hsmmc is about to be deprecated,
+remove setting of PBIAS voltage leaving the PBIAS voltage to be
+at the reset value of 3.3V (we'll never have to change this to 1.8V
+since UHS mode support will not be added to omap_hsmmc). This will
+let pbias regulator driver to be fixed to support a maximum voltage of
+3.3V.
 
-I think this (and `pl111_variant` below) can be `static const`, right?
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c | 33 ++++++++-------------------------
+ 1 file changed, 8 insertions(+), 25 deletions(-)
 
-> +	.name = "PL110",
-> +	.is_pl110 = true,
-> +	.formats = pl110_pixel_formats,
-> +	.nformats = ARRAY_SIZE(pl110_pixel_formats),
-> +};
-> +
-> +/* RealView, Versatile Express etc use this modern variant */
-> +static const u32 pl111_pixel_formats[] = {
-> +	DRM_FORMAT_ABGR8888,
-> +	DRM_FORMAT_XBGR8888,
-> +	DRM_FORMAT_ARGB8888,
-> +	DRM_FORMAT_XRGB8888,
-> +	DRM_FORMAT_BGR565,
-> +	DRM_FORMAT_RGB565,
-> +	DRM_FORMAT_ABGR1555,
-> +	DRM_FORMAT_XBGR1555,
-> +	DRM_FORMAT_ARGB1555,
-> +	DRM_FORMAT_XRGB1555,
-> +	DRM_FORMAT_ABGR4444,
-> +	DRM_FORMAT_XBGR4444,
-> +	DRM_FORMAT_ARGB4444,
-> +	DRM_FORMAT_XRGB4444,
-> +};
-> +
-> +struct pl111_variant_data pl111_variant = {
-> +	.name = "PL111",
-> +	.formats = pl111_pixel_formats,
-> +	.nformats = ARRAY_SIZE(pl111_pixel_formats),
-> +};
-> +
->  static struct amba_id pl111_id_table[] = {
-
-Not 100% sure on this one, but I think it can also be `const`, as
-amba_lookup() and pl111_amba_probe() are the only users I could find and
-both take a `const struct amba_id *` (and pl111_amba_probe() doesn't
-even use it).
-
-(Just a couple drive-by comments, I don't know enough for an actual
-review, sorry...)
-
->  	{
-> +		.id = 0x00041110,
-> +		.mask = 0x000fffff,
-> +		.data = &pl110_variant,
-> +	},
-> +	{
->  		.id = 0x00041111,
->  		.mask = 0x000fffff,
-> +		.data = &pl111_variant,
->  	},
->  	{0, 0},
->  };
-> -- 
-> 2.13.5
-> 
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 3b5e6d11069b..f2a1137be8bc 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -147,10 +147,6 @@
+ #define OMAP_MMC_MAX_CLOCK	52000000
+ #define DRIVER_NAME		"omap_hsmmc"
+ 
+-#define VDD_1V8			1800000		/* 180000 uV */
+-#define VDD_3V0			3000000		/* 300000 uV */
+-#define VDD_165_195		(ffs(MMC_VDD_165_195) - 1)
+-
+ /*
+  * One controller can have multiple slots, like on some omap boards using
+  * omap.c controller driver. Luckily this is not currently done on any known
+@@ -308,8 +304,7 @@ static int omap_hsmmc_disable_supply(struct mmc_host *mmc)
+ 	return ret;
+ }
+ 
+-static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+-				int vdd)
++static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on)
+ {
+ 	int ret;
+ 
+@@ -317,17 +312,6 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+ 		return 0;
+ 
+ 	if (power_on) {
+-		if (vdd <= VDD_165_195)
+-			ret = regulator_set_voltage(host->pbias, VDD_1V8,
+-						    VDD_1V8);
+-		else
+-			ret = regulator_set_voltage(host->pbias, VDD_3V0,
+-						    VDD_3V0);
+-		if (ret < 0) {
+-			dev_err(host->dev, "pbias set voltage fail\n");
+-			return ret;
+-		}
+-
+ 		if (host->pbias_enabled == 0) {
+ 			ret = regulator_enable(host->pbias);
+ 			if (ret) {
+@@ -350,8 +334,7 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+ 	return 0;
+ }
+ 
+-static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+-				int vdd)
++static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on)
+ {
+ 	struct mmc_host *mmc = host->mmc;
+ 	int ret = 0;
+@@ -363,7 +346,7 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+ 	if (IS_ERR(mmc->supply.vmmc))
+ 		return 0;
+ 
+-	ret = omap_hsmmc_set_pbias(host, false, 0);
++	ret = omap_hsmmc_set_pbias(host, false);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -385,7 +368,7 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+ 		if (ret)
+ 			return ret;
+ 
+-		ret = omap_hsmmc_set_pbias(host, true, vdd);
++		ret = omap_hsmmc_set_pbias(host, true);
+ 		if (ret)
+ 			goto err_set_voltage;
+ 	} else {
+@@ -1220,11 +1203,11 @@ static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
+ 		clk_disable_unprepare(host->dbclk);
+ 
+ 	/* Turn the power off */
+-	ret = omap_hsmmc_set_power(host, 0, 0);
++	ret = omap_hsmmc_set_power(host, 0);
+ 
+ 	/* Turn the power ON with given VDD 1.8 or 3.0v */
+ 	if (!ret)
+-		ret = omap_hsmmc_set_power(host, 1, vdd);
++		ret = omap_hsmmc_set_power(host, 1);
+ 	if (host->dbclk)
+ 		clk_prepare_enable(host->dbclk);
+ 
+@@ -1621,10 +1604,10 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	if (ios->power_mode != host->power_mode) {
+ 		switch (ios->power_mode) {
+ 		case MMC_POWER_OFF:
+-			omap_hsmmc_set_power(host, 0, 0);
++			omap_hsmmc_set_power(host, 0);
+ 			break;
+ 		case MMC_POWER_UP:
+-			omap_hsmmc_set_power(host, 1, ios->vdd);
++			omap_hsmmc_set_power(host, 1);
+ 			break;
+ 		case MMC_POWER_ON:
+ 			do_send_init_stream = 1;
+-- 
+2.11.0
