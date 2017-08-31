@@ -1,74 +1,31 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 31 Aug 2017 18:50:09 +0100
-Subject: [PATCH v6 3/7] acpi: apei: remove the unused code
-In-Reply-To: <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <59A84C51.3000506@arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 31 Aug 2017 10:46:39 -0700
+Subject: [PATCH 4/7] drm/pl111: Enable PL110 variant
+In-Reply-To: <20170830180711.2791-5-linus.walleij@linaro.org>
+References: <20170830180711.2791-1-linus.walleij@linaro.org>
+ <20170830180711.2791-5-linus.walleij@linaro.org>
+Message-ID: <87bmmvzl34.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu Geng,
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-On 28/08/17 11:38, Dongjiu Geng wrote:
-> In current code logic, the two functions ghes_sea_add() and
-> ghes_sea_remove() are only called when CONFIG_ACPI_APEI_SEA
-> is defined. If not, it will return errors in the ghes_probe()
-> and not contiue. Hence, remove the unnecessary handling when
-> CONFIG_ACPI_APEI_SEI is not defined.
-
-This doesn't match what the patch does. I get this feeling this is needed for
-some future patch you haven't included.
-
-
-> change since v5:
-> 1. remove the SEI notification type handling, because the SEI is
->    asynchronous exception and the address is not accurate. so
->    not call memory_failure() to handle it.
-
-Setting NOTIFY_SEI as the GHES entry's notification type means the OS should
-check the GHES->ErrorStatusAddress for CPER records when it receives an
-SError-Interrupt, as it may be a notification of an error from this error source.
-
-If you aren't handling the notification, why is this is in the HEST at all?
-(and if its not: its not firmware-first)
-
-
-James
-
-
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index d661d452b238..c15a08db2c7c 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -813,7 +813,6 @@ static struct notifier_block ghes_notifier_hed = {
->  	.notifier_call = ghes_notify_hed,
->  };
+> We detect and enable the use of the PL110 variant, an earlier
+> incarnation of PL111. The only real difference is that the
+> control and interrupt enable registers have swapped place.
+> The Versatile AB and Versatile PB have a variant inbetween
+> PL110 and PL111, it is PL110 but they have already swapped the
+> two registers so those two need a bit of special handling.
 >
-> -#ifdef CONFIG_ACPI_APEI_SEA
->  static LIST_HEAD(ghes_sea);
->
->  /*
-> @@ -848,19 +847,6 @@ static void ghes_sea_remove(struct ghes *ghes)
->  	mutex_unlock(&ghes_list_mutex);
->  	synchronize_rcu();
->  }
-> -#else /* CONFIG_ACPI_APEI_SEA */
-> -static inline void ghes_sea_add(struct ghes *ghes)
-> -{
-> -	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not
-supported\n",
-> -	       ghes->generic->header.source_id);
-> -}
-> -
-> -static inline void ghes_sea_remove(struct ghes *ghes)
-> -{
-> -	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not
-supported\n",
-> -	       ghes->generic->header.source_id);
-> -}
-> -#endif /* CONFIG_ACPI_APEI_SEA */
->
->  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->  /*
->
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+With the other Eric's little const fixes,
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/2778e092/attachment.sig>
