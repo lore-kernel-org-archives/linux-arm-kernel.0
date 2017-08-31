@@ -1,21 +1,43 @@
 From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 31 Aug 2017 15:53:57 -0700
-Subject: [PATCH v2 0/3] arm: npcm: add basic support for Nuvoton BMCs
-Message-ID: <20170831225400.19756-1-brendanhiggins@google.com>
+Date: Thu, 31 Aug 2017 15:54:00 -0700
+Subject: [PATCH v2 3/3] MAINTAINERS: Add entry for the Nuvoton NPCM
+ architecture
+In-Reply-To: <20170831225400.19756-1-brendanhiggins@google.com>
+References: <20170831225400.19756-1-brendanhiggins@google.com>
+Message-ID: <20170831225400.19756-4-brendanhiggins@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add maintainers and reviewers for the Nuvoton NPCM architecture.
 
-Addressed comments from:
-  - Rob: http://www.spinics.net/lists/devicetree/msg192130.html
-  - kbuild test robot: http://www.spinics.net/lists/devicetree/msg191902.html
-  - kbuild test robot: http://www.spinics.net/lists/devicetree/msg191902.html
+Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+---
+ MAINTAINERS | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Changes since previous update:
-  - Added dependency for !CPU_V6 and !CPU_V6K since headsmp.S depends on v7
-    instructions
-  - Dropped errata that depend on !ARCH_MULTIPLATFORM
-  - Removed custom smp_init_cpus from smp_operations
-  - Numerous changes to device tree support
-
-Changes have been tested on the NPCM750 evaluation board.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 44cb004c765d..67064bf11904 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1598,6 +1598,19 @@ F:	drivers/pinctrl/nomadik/
+ F:	drivers/i2c/busses/i2c-nomadik.c
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+ 
++ARM/NUVOTON NPCM ARCHITECTURE
++M:	Avi Fishman <avifishman70@gmail.com>
++M:	Tomer Maimon <tmaimon77@gmail.com>
++R:	Brendan Higgins <brendanhiggins@google.com>
++R:	Rick Altherr <raltherr@google.com>
++L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-npcm/
++F:	arch/arm/boot/dts/nuvoton-npcm*
++F:	include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
++F:	drivers/*/*npcm*
++F:	Documentation/*/*npcm*
++
+ ARM/NUVOTON W90X900 ARM ARCHITECTURE
+ M:	Wan ZongShun <mcuos.com@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+2.14.1.581.gf28d330327-goog
