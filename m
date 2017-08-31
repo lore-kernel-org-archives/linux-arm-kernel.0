@@ -1,38 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 31 Aug 2017 07:02:21 -0700
-Subject: Regression in next with gpiolib
-In-Reply-To: <CACRpkdYUd2+FjhL_koEYjJXnci+khSOM9H6ahpXnzJoiYFCJdQ@mail.gmail.com>
-References: <20170830214127.GJ6008@atomide.com>
- <CACRpkdYUd2+FjhL_koEYjJXnci+khSOM9H6ahpXnzJoiYFCJdQ@mail.gmail.com>
-Message-ID: <20170831140221.GK6008@atomide.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Aug 2017 15:03:32 +0100
+Subject: [PATCH v3 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170724212454.27574-3-d-gerlach@ti.com>
+References: <20170724212454.27574-1-d-gerlach@ti.com>
+ <20170724212454.27574-3-d-gerlach@ti.com>
+Message-ID: <20170831140332.GD23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [170830 22:59]:
-> On Wed, Aug 30, 2017 at 11:41 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > Hi Timur, Linus & Grygorii,
-> >
-> > Looks like commit 108d23e322a2 ("gpiolib: request the gpio before
-> > querying its direction") caused a regression on at least pandaboard
-> > es with booting hanging shortly after gpio init.
-> >
-> > It seems to be that we're now calling request and free on all gpios
-> > before they are properly configured?
-> >
-> > I narrowed the hang down to gpio bank1 lines 7 and possibly 8 where
-> > not calling omap_gpio_free() on them makes the system boot again.
-> >
-> > These lines are used for the leds in omap4-panda-common.dtsi, and
-> > omap_gpio_free() will by default set the unused lines for input
-> > and bad things happen. I guess hardware failure could also happen
-> > although I have not seen it here.
-> >
-> > It seems a similar issue can exist on other platforms too,
-> > so it's probably a good idea to revert this for now.
-> 
-> I reverted it for now.
+On Mon, Jul 24, 2017 at 04:24:54PM -0500, Dave Gerlach wrote:
+> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> index 608008229c7d..46a7a6c41db7 100644
+> --- a/arch/arm/kernel/asm-offsets.c
+> +++ b/arch/arm/kernel/asm-offsets.c
+> @@ -28,6 +28,7 @@
+>  #include <asm/vdso_datapage.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <linux/kbuild.h>
+> +#include <linux/ti-emif-sram.h>
+>  
+>  /*
+>   * Make sure that the compiler and target are compatible.
+> @@ -183,5 +184,8 @@ int main(void)
+>  #ifdef CONFIG_VDSO
+>    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
+>  #endif
+> +  BLANK();
+> +  ti_emif_offsets();
+> +
+>    return 0; 
+>  }
 
-OK thanks!
+This doesn't make me happy - I've been thinking about this for some time,
+and I think it's completely wrong for drivers to hook into asm-offsets.
 
-Tony
+Looking at the top-level Kbuild file, it looks like it would be easy
+for emif to auto-generate its own offsets.h header - it looks like it's
+a matter of using linux/kbuild.h to get the definitions, compiling to
+assembly (using $(call if_changed_dep,cc_s_c)) and then converting the
+assembly to the header file format ( using
+$(call filechk,offsets,__ASM_OFFSETS_H__), replacing __ASM_OFFSETS_H__
+with a more appropriate symbol.)
+
+Could you please check whether this is possible, so we don't end up
+needing to hook lots of driver-specific assembly offsets stuff into
+the arch files?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
