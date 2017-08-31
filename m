@@ -1,24 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Aug 2017 09:12:13 +0200
-Subject: [PATCH 3/4] arm: dts: mt7623: add display related nodes
-In-Reply-To: <42a9db86b49834188bd680d0144e639c98aafaa2.1503222289.git.ryder.lee@mediatek.com>
-References: <9c4a8be621ac76594fad303d5d49ed32bd530605.1503222289.git.ryder.lee@mediatek.com>
- <42a9db86b49834188bd680d0144e639c98aafaa2.1503222289.git.ryder.lee@mediatek.com>
-Message-ID: <CACRpkdZi1o6Vj=WoZBhS5DCW5=ctsCHu35jHBvHQMhFkQKB_Og@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Aug 2017 09:18:12 +0200
+Subject: linux-next regression caused by "gpiolib: request the gpio
+ before querying its direction"
+In-Reply-To: <CACRpkdbxdkHukALfYMrM7w=1KNJKLBhGebbkEpMb3C3+nCfWOA@mail.gmail.com>
+References: <20170830112424.7a3a7c36@windsurf.lan>
+ <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
+ <87ziah2m3f.fsf@free-electrons.com>
+ <20170830161730.41919554@windsurf.lan>
+ <CACRpkdbxdkHukALfYMrM7w=1KNJKLBhGebbkEpMb3C3+nCfWOA@mail.gmail.com>
+Message-ID: <20170831091812.6f7d417e@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 20, 2017 at 11:46 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+Hello,
 
-> This patch adds the device nodes for the display function block.
-> Also, we add some missing pin macros in mt7623-pinfunc.h.
->
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> CC: Linus Walleij <linus.walleij@linaro.org>
+On Thu, 31 Aug 2017 09:08:45 +0200, Linus Walleij wrote:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > However, even the "reference" pinctrl-single.c implementation does it,
+> > in pcs_request_gpio().  
+> 
+> Yeah so we have unclear semantics on this and that is just a fact of
+> life. It's a bit of pain as maintainer because I sometimes don't know
+> what to do when something makes superficial sense and the only thing
+> I can do is to toss it into linux-next and see what happens.
+> 
+> Look what happened :D
+> 
+> If the semantics should be changed, all drivers must be changed consistently
+> in a larger patch series, so until then, we revert this and leave it as it is.
+> 
+> Now this is reverted anyways.
 
-Please take this through the ARM SoC tree.
+Thanks for taking action on this. Regarding the semantics, the
+kerneldoc comment says:
 
-Yours,
-Linus Walleij
+ * @gpio_request_enable: requests and enables GPIO on a certain pin.
+ *      Implement this only if you can mux every pin individually as GPIO. The
+ *      affected GPIO range is passed along with an offset(pin number) into that
+ *      specific GPIO range - function selectors and pin groups are orthogonal
+ *      to this, the core will however make sure the pins do not collide.
+ * @gpio_disable_free: free up GPIO muxing on a certain pin, the reverse of
+ *      @gpio_request_enable
+
+So the ->gpio_request_enable() comment is not super clear, but the
+->gpio_disable_free() explicitly says "free up GPIO muxing", which
+would mean the ->gpio_request_enable() hook has muxed the pin as GPIO.
+Things could be clearer, but I believe it's quite clear the intent is
+that the ->gpio_request_enable() should mux the pin as a GPIO at the HW
+level.
+
+Note that on my side, I've however not been convinced by this semantic:
+I find it weird that when you request a GPIO, it gets automatically
+muxed as such, without an explicit pinctrl configuration in the DT.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
