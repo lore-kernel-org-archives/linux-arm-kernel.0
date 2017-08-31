@@ -1,71 +1,35 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 31 Aug 2017 13:44:00 +0800
-Subject: [PATCH] arm64: dts: mediatek: Add cpuidle support for MT2712
-Message-ID: <1504158240-12639-1-git-send-email-jamesjj.liao@mediatek.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 31 Aug 2017 07:59:29 +0200
+Subject: Regression in next with gpiolib
+In-Reply-To: <20170830214127.GJ6008@atomide.com>
+References: <20170830214127.GJ6008@atomide.com>
+Message-ID: <CACRpkdYUd2+FjhL_koEYjJXnci+khSOM9H6ahpXnzJoiYFCJdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CPU idle state nodes to enable C1/C2 idle states.
+On Wed, Aug 30, 2017 at 11:41 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
----
-This patch bases on latest Matthias v4.13-next/dts64 branch [1],
-add CPU idle states for MT2712.
+> Hi Timur, Linus & Grygorii,
+>
+> Looks like commit 108d23e322a2 ("gpiolib: request the gpio before
+> querying its direction") caused a regression on at least pandaboard
+> es with booting hanging shortly after gpio init.
+>
+> It seems to be that we're now calling request and free on all gpios
+> before they are properly configured?
+>
+> I narrowed the hang down to gpio bank1 lines 7 and possibly 8 where
+> not calling omap_gpio_free() on them makes the system boot again.
+>
+> These lines are used for the leds in omap4-panda-common.dtsi, and
+> omap_gpio_free() will by default set the unused lines for input
+> and bad things happen. I guess hardware failure could also happen
+> although I have not seen it here.
+>
+> It seems a similar issue can exist on other platforms too,
+> so it's probably a good idea to revert this for now.
 
-[1] https://github.com/mbgg/linux-mediatek.git
+I reverted it for now.
 
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index 57d0396..5d4e406 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -39,6 +39,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a35";
- 			reg = <0x000>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -46,6 +47,7 @@
- 			compatible = "arm,cortex-a35";
- 			reg = <0x001>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		cpu2: cpu at 200 {
-@@ -53,6 +55,29 @@
- 			compatible = "arm,cortex-a72";
- 			reg = <0x200>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-+		};
-+
-+		idle-states {
-+			entry-method = "arm,psci";
-+
-+			CPU_SLEEP_0: cpu-sleep-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				entry-latency-us = <100>;
-+				exit-latency-us = <80>;
-+				min-residency-us = <2000>;
-+				arm,psci-suspend-param = <0x0010000>;
-+			};
-+
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				entry-latency-us = <350>;
-+				exit-latency-us = <80>;
-+				min-residency-us = <3000>;
-+				arm,psci-suspend-param = <0x1010000>;
-+			};
- 		};
- 	};
- 
--- 
-1.9.1
+Yours,
+Linus Walleij
