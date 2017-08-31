@@ -1,214 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Aug 2017 10:54:41 +0200
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
-Message-ID: <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 31 Aug 2017 11:03:14 +0200
+Subject: [PATCH 5/5] arm: dts: sun8i: Add the TBS A711 tablet devicetree
+In-Reply-To: <CAGb2v65Y5E=jQo7MbpTKip8nAR4MMx5B+_8K1Wt_c7E+NXB+PA@mail.gmail.com>
+References: <20170825092617.32533-1-maxime.ripard@free-electrons.com>
+ <20170825092617.32533-5-maxime.ripard@free-electrons.com>
+ <CAGb2v65Y5E=jQo7MbpTKip8nAR4MMx5B+_8K1Wt_c7E+NXB+PA@mail.gmail.com>
+Message-ID: <20170831090314.ubfn3csgp5svtlih@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 10:45 AM, Julien Thierry <julien.thierry@arm.com> wrote:
-> Hi Christoffer,
->
->
-> On 30/08/17 19:53, Christoffer Dall wrote:
->>
->> Hi Julien,
->>
->> [cc'ing Alex Benn?e here who wrote the debug code for arm64]
->>
->> On Wed, Aug 30, 2017 at 11:01 AM, Julien Thierry <julien.thierry@arm.com>
->> wrote:
->>>
->>> Software Step exception is missing after trapping instruction from the
->>> guest.
->>>
->>> We need to set the PSR.SS to 0 for the guest vcpu before resuming guest
->>> execution.
->>>
->>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>>
->>> ---
->>>   arch/arm64/include/asm/kvm_asm.h     |  2 ++
->>>   arch/arm64/include/asm/kvm_emulate.h |  2 ++
->>>   arch/arm64/kvm/debug.c               | 12 +++++++++++-
->>>   arch/arm64/kvm/hyp/switch.c          | 12 ++++++++++++
->>>   4 files changed, 27 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_asm.h
->>> b/arch/arm64/include/asm/kvm_asm.h
->>> index 26a64d0..398bbaa 100644
->>> --- a/arch/arm64/include/asm/kvm_asm.h
->>> +++ b/arch/arm64/include/asm/kvm_asm.h
->>> @@ -32,6 +32,8 @@
->>>
->>>   #define KVM_ARM64_DEBUG_DIRTY_SHIFT    0
->>>   #define KVM_ARM64_DEBUG_DIRTY          (1 <<
->>> KVM_ARM64_DEBUG_DIRTY_SHIFT)
->>> +#define KVM_ARM64_DEBUG_INST_SKIP_SHIFT        1
->>> +#define KVM_ARM64_DEBUG_INST_SKIP      (1 <<
->>> KVM_ARM64_DEBUG_INST_SKIP_SHIFT)
->>>
->>>   #define kvm_ksym_ref(sym)
->>> \
->>>          ({
->>> \
->>> diff --git a/arch/arm64/include/asm/kvm_emulate.h
->>> b/arch/arm64/include/asm/kvm_emulate.h
->>> index fe39e68..d401c64 100644
->>> --- a/arch/arm64/include/asm/kvm_emulate.h
->>> +++ b/arch/arm64/include/asm/kvm_emulate.h
->>> @@ -95,6 +95,8 @@ static inline void kvm_skip_instr(struct kvm_vcpu
->>> *vcpu, bool is_wide_instr)
->>>                  kvm_skip_instr32(vcpu, is_wide_instr);
->>>          else
->>>                  *vcpu_pc(vcpu) += 4;
->>> +       /* Let debug engine know we skipped an instruction */
->>> +       vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
->>
->>
->> Why do we need to defer this action until later?
->>
->> Can't we simply do clear DBG_SPSR_SS here?
->>
->
-> That was my first intention, but it turns out that the current state of
-> things (without this patch) is that every time we enter a guest,
-> kvm_arm_setup_debug gets called and if single step is requested for the
-> guest it will set the flag in the SPSR (ignoring the fact that we cleared
-> it).
+Hi,
 
-Ah, right, duh.
+On Thu, Aug 31, 2017 at 02:52:43PM +0800, Chen-Yu Tsai wrote:
+> > +       non-removable;
+> > +       wakeup-source;
+> > +       status = "okay";
+> > +
+> > +       brcmf: wifi at 1 {
+> > +               reg = <1>;
+> > +               compatible = "brcm,bcm4329-fmac";
+> > +               interrupt-parent = <&r_pio>;
+> > +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 WL_WAKE_UP */
+> > +               interrupt-names = "host-wake";
+> > +       };
+> > +};
+> > +
+> > +&mmc2 {
+> > +       pinctrl-0 = <&mmc2_8bit_emmc_pins>;
+> > +       pinctrl-names = "default";
+> > +       vmmc-supply = <&reg_vcc3v3>;
+> 
+> emmc has separate vddq lines. vqmmc-supply should be provided even though it
+> may be the same as vmmc-supply. The two refer to different things at the board
+> level.
 
-> This happens even if we exit the guest because of a data abort.
->
-> For normal single step execution, we do need to reset SPSR.SS to 1 before
-> running the guest since completion of a step should clear that bit before
-> taking a software step exception. So what kvm_arm_setup_debug does seems
-> correct to me but missed the case for trapped/emulated instructions.
->
-> So even if we just clear DBG_SPSR_SS here, we would still need to tell
-> kvm_arm_setup_debug not to change the bit. Or resetting SPSR.SS to 1 for
-> normal single stepping needs to be done before we skip instructions in KVM
-> but that doesn't sound right to me...
->
+My understanding was that vqmmc wasn't needed if it was the same
+regulator than vmmc.
 
-So I'm wondering if we're going about this wrong.  Perhaps we need to
-discover at the end of the run loop that we were asked to single step
-execution and simply return to userspace, setting the debug exit
-reason etc., instead of entering the guest with PSTATE.SS==0 and
-relying on another trap back in to the guest just to set two fields on
-the kvm_run structure and exit to user space ?
+> > +/* There's the BT part of the AP6210 connected to that UART */
+> > +&uart1 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&uart1_pg_pins &uart1_rtscts_pins>;
+> 
+> Splitting it as separate phandles ( <&...> ) would make it more readable.
+> Also the rx/tx pingroup name should be changed
 
->
->
->> I think even if the guest kernel is single-stepping guest userspace,
->> you're still safe because you'll take another debug exception from
->> having 'executed' (read: emulated) this instruction in the hypervisor.
->>
->>>   }
->>>
->>>   static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
->>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
->>> index dbadfaf..4806e6b 100644
->>> --- a/arch/arm64/kvm/debug.c
->>> +++ b/arch/arm64/kvm/debug.c
->>> @@ -151,12 +151,22 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->>>                   * debugging the system.
->>>                   */
->>>                  if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
->>> -                       *vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
->>> +                       /*
->>> +                        * If we skipped an instruction while single
->>> stepping,
->>> +                        * spsr.ss needs to be 0 in order to trigger SS
->>> +                        * exception on return.
->>> +                        */
->>> +                       if (!(vcpu->arch.debug_flags &
->>> KVM_ARM64_DEBUG_INST_SKIP))
->>> +                               *vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
->>> +                       else
->>> +                               *vcpu_cpsr(vcpu) &=  ~DBG_SPSR_SS;
->>
->>
->> Then you wouldn't need this.
->>
->>>                          vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
->>>                  } else {
->>>                          vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
->>>                  }
->>>
->>> +               vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_INST_SKIP;
->>> +
->>>                  trace_kvm_arm_set_dreg32("SPSR_EL2", *vcpu_cpsr(vcpu));
->>>
->>>                  /*
->>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->>> index 945e79c..6030acd 100644
->>> --- a/arch/arm64/kvm/hyp/switch.c
->>> +++ b/arch/arm64/kvm/hyp/switch.c
->>> @@ -22,6 +22,7 @@
->>>   #include <asm/kvm_emulate.h>
->>>   #include <asm/kvm_hyp.h>
->>>   #include <asm/fpsimd.h>
->>> +#include <asm/debug-monitors.h>
->>>
->>>   static bool __hyp_text __fpsimd_enabled_nvhe(void)
->>>   {
->>> @@ -276,6 +277,10 @@ static void __hyp_text __skip_instr(struct kvm_vcpu
->>> *vcpu)
->>>          }
->>>
->>>          write_sysreg_el2(*vcpu_pc(vcpu), elr);
->>> +
->>> +       *vcpu_cpsr(vcpu) = read_sysreg_el2(spsr);
->>> +       *vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
->>> +       write_sysreg_el2(*vcpu_cpsr(vcpu), spsr);
->>
->>
->> I don't think you really need to use *vcpu_cpsr(vcpu) here, I think
->> you can just use a temporary variable, which may make the flow a bit
->> easier to read actually.
->>
->
-> Good point, I'll do that.
->
->>>   }
->>>
->>>   int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->>> @@ -343,6 +348,13 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->>>                          if (ret == -1) {
->>>                                  /* Promote an illegal access to an
->>> SError */
->>>                                  __skip_instr(vcpu);
->>> +
->>> +                               /*
->>> +                                * We're not jumping back, let debug
->>> setup know
->>> +                                * we skipped an instruction.
->>> +                                */
->>> +                               vcpu->arch.debug_flags |=
->>> KVM_ARM64_DEBUG_INST_SKIP;
->>
->>
->> I agree with Marc, I don't think you need this, because you have
->> modified the hardware spsr_el2, which you're going to read back in
->> __sysreg_save_guest_state().
->>
->
-> We are exiting the guest, so it is the same case as kvm_skip_instr.
->
-ok, I see this now, you're right.  Thanks for explaining it.  For some
-reason, this code is just really hard to understand, so I wonder if
-the suggested approach above is better.
+Ack.
 
-Thanks,
--Christoffer
+> 
+> > +       status = "okay";
+> > +};
+> > +
+> > +&usbphy {
+> 
+> No VBUS?
+
+Argh, I forgot them. I'll add them, obviously.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/9e7f4950/attachment-0001.sig>
