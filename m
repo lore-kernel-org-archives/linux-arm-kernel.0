@@ -1,366 +1,380 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 31 Aug 2017 23:17:49 +0200
-Subject: [PATCH v4 2/3] thermal: hisilicon: add thermal sensor driver for
- Hi3660
-In-Reply-To: <1503994666-13954-3-git-send-email-kevin.wangtao@hisilicon.com>
-References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
- <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1503994666-13954-3-git-send-email-kevin.wangtao@hisilicon.com>
-Message-ID: <77ceb395-57bb-8de7-7b1a-3218baa5d5f3@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 31 Aug 2017 23:35:14 +0200
+Subject: [PATCH] drm/tve200: Replace custom connector with panel bridge
+Message-ID: <20170831213514.29267-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This replaces the custom connector in the TVE200 with the
+panel bridge helper. As long as we're just using panels
+and no other bridges, this works just fine.
 
-Hi Kevin,
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpu/drm/tve200/Kconfig            |   3 +-
+ drivers/gpu/drm/tve200/Makefile           |   3 +-
+ drivers/gpu/drm/tve200/tve200_connector.c | 125 ------------------------------
+ drivers/gpu/drm/tve200/tve200_display.c   |  15 ++--
+ drivers/gpu/drm/tve200/tve200_drm.h       |  14 ++--
+ drivers/gpu/drm/tve200/tve200_drv.c       |  66 +++++++++++-----
+ 6 files changed, 63 insertions(+), 163 deletions(-)
+ delete mode 100644 drivers/gpu/drm/tve200/tve200_connector.c
 
-
-On 29/08/2017 10:17, Tao Wang wrote:
-> From: Tao Wang <kevin.wangtao@linaro.org>
-> 
-> This patch adds the support for thermal sensor of Hi3660 SoC.
-
-for the Hi3660 SoC thermal sensor.
-
-> this will register sensors for thermal framework and use device
-> tree to bind cooling device.
-
-Is it possible to give a pointer to some documentation or to describe
-the hardware?
-
-An explanation of the adc min max coef[] range[] conversion would be nice.
-
-In addition, having the rational behind the average and the max would be
-nice. Do we really need both avg and max as virtual sensor?
-
-> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  drivers/thermal/Kconfig        |  13 +++
->  drivers/thermal/Makefile       |   1 +
->  drivers/thermal/hisi_tsensor.c | 209 +++++++++++++++++++++++++++++++++++++++++
-
-
-IMO, we don't need a new file, but merge this code with the current
-hisi_thermal.c driver. BTW, the hi6220 has also a tsensor which is
-different from this one.
-
-I suggest to base the hi3660 thermal driver on top of the cleanup I sent
-for the hi6220.
-
->  3 files changed, 223 insertions(+)
->  create mode 100644 drivers/thermal/hisi_tsensor.c
-> 
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index b5b5fac..32f582d 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -203,6 +203,19 @@ config HISI_THERMAL
->  	  thermal framework. cpufreq is used as the cooling device to throttle
->  	  CPUs when the passive trip is crossed.
->  
-> +config HISI_TSENSOR
-> +	tristate "Hisilicon tsensor driver"
-> +	depends on ARCH_HISI || COMPILE_TEST
-> +	depends on HAS_IOMEM
-> +	depends on OF
-> +	default y
-> +	help
-> +	  Enable this to plug Hisilicon's tsensor driver into the Linux thermal
-> +	  framework. Besides all the hardware sensors, this also support two
-> +	  virtual sensors, one for maximum of all the hardware sensor, and
-> +	  one for average of all the hardware sensor.
-> +	  Compitable with Hi3660 or higher.
-
-s/Compitable/Compatible/
-
-> +
->  config IMX_THERMAL
->  	tristate "Temperature sensor driver for Freescale i.MX SoCs"
->  	depends on (ARCH_MXC && CPU_THERMAL) || COMPILE_TEST
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 094d703..8a16bd4 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -56,6 +56,7 @@ obj-$(CONFIG_ST_THERMAL)	+= st/
->  obj-$(CONFIG_QCOM_TSENS)	+= qcom/
->  obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra/
->  obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-> +obj-$(CONFIG_HISI_TSENSOR)	+= hisi_tsensor.o
->  obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
->  obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
->  obj-$(CONFIG_ZX2967_THERMAL)	+= zx2967_thermal.o
-> diff --git a/drivers/thermal/hisi_tsensor.c b/drivers/thermal/hisi_tsensor.c
-> new file mode 100644
-> index 0000000..34cf2ba
-> --- /dev/null
-> +++ b/drivers/thermal/hisi_tsensor.c
-> @@ -0,0 +1,209 @@
-> +/*
-> + *  linux/drivers/thermal/hisi_tsensor.c
-> + *
-> + *  Copyright (c) 2017 Hisilicon Limited.
-> + *  Copyright (c) 2017 Linaro Limited.
-> + *
-> + *  Author: Tao Wang <kevin.wangtao@linaro.org>
-> + *  Author: Leo Yan <leo.yan@linaro.org>
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License as published by
-> + *  the Free Software Foundation; version 2 of the License.
-> + *
-> + *  This program is distributed in the hope that it will be useful,
-> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
-> + *
-> + *  You should have received a copy of the GNU General Public License
-> + *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#include "thermal_core.h"
-> +
-> +#define VIRTUAL_SENSORS		2
-> +
-> +/* hisi Thermal Sensor Dev Structure */
-> +struct hisi_thermal_sensor {
-> +	struct hisi_thermal_data *thermal;
-> +	struct thermal_zone_device *tzd;
-> +	void __iomem *sensor_reg;
-> +	unsigned int id;
-> +};
-> +
-> +struct hisi_thermal_data {
-> +	struct platform_device *pdev;
-> +	struct hisi_thermal_sensor *sensors;
-> +	unsigned int range[2];
-> +	unsigned int coef[2];
-> +	unsigned int max_hw_sensor;
-> +};
-> +
-> +static int hisi_thermal_get_temp(void *_sensor, int *temp)
-> +{
-> +	struct hisi_thermal_sensor *sensor = _sensor;
-> +	struct hisi_thermal_data *data = sensor->thermal;
-> +	unsigned int idx, adc_min, adc_max, max_sensor;
-> +	int val, average = 0, max = 0;
-> +
-> +	adc_min = data->range[0];
-> +	adc_max = data->range[1];
-> +	max_sensor = data->max_hw_sensor;
-> +
-> +	if (sensor->id < max_sensor) {
-> +		val = readl(sensor->sensor_reg);
-> +		val = clamp_val(val, adc_min, adc_max);
-
-That looks a bit fuzzy. Why not create a get_temp for physical sensor
-and another one for the virtual? So there will be a clear distinction
-between both.
-
-> +	} else {
-> +		for (idx = 0; idx < max_sensor; idx++) {
-> +			val = readl(data->sensors[idx].sensor_reg);
-
-Below, it is assumed thermal_zone_of_sensor_register() can fail and
-sensor->tzd becomes NULL. But no check is done here with the sensor's
-tzd. Shall the code assume we take all the sensors even if a thermal
-zone failed to register ?
-
-> +			val = clamp_val(val, adc_min, adc_max);
-> +			average += val;
-> +			if (val > max)
-> +				max = val;
-> +		}
-> +
-> +		if (sensor->id == max_sensor)
-> +			val = max;
-> +		else
-> +			val = average / max_sensor;
-> +	}
->
-> +	*temp = ((val - adc_min) * data->coef[0]) / (adc_max - adc_min)
-> +		+ data->coef[1];
-
-Pre-compute (adc_max - adc_min) at init time and check it is greater
-than zero, otherwise for a bad DT configuration we can end up with
-division by zero and crash the kernel (assuming having adc ranges in the
-DT is what we want).
-
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_of_device_ops hisi_of_thermal_ops = {
-> +	.get_temp = hisi_thermal_get_temp,
-> +};
-> +
-> +static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
-> +				       bool on)
-> +{
-> +	struct thermal_zone_device *tzd = sensor->tzd;
-> +
-> +	tzd->ops->set_mode(tzd,
-> +		on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
-> +}
-> +
-> +static int hisi_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct hisi_thermal_data *data;
-> +	struct hisi_thermal_sensor *sensor;
-> +	struct resource *res;
-> +	unsigned int max_sensor;
-> +	int ret, i;
-> +
-> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	data->pdev = pdev;
-> +	ret = of_property_read_u32(np, "hisi,tsensors", &max_sensor);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to get max sensor\n");
-> +		return -EINVAL;
-> +	}
-> +	data->max_hw_sensor = max_sensor;
-
-Do we really need a max sensor definition in the DT? Isn't it something
-we can deduce by looping with platform_get_resource below ?
-
-eg.
-
-while ((res = platform_get_resource(..., num_sensor++)) {
-	...
-}
-
-That said, I think we can assume there are 3 sensors always, no?
-
-> +	data->sensors = devm_kzalloc(dev,
-> +		sizeof(*data->sensors) * (max_sensor + VIRTUAL_SENSORS),
-> +		GFP_KERNEL);
-> +	if (IS_ERR(data->sensors)) {
-
-s/IS_ERR(data->sensors)/!data->sensors/
-
-> +		dev_err(dev, "failed to alloc sensors\n");
-
-No message on memory allocation failure, there is already one from the
-mm framework.
-
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ret = of_property_read_u32_array(np, "hisi,coef", data->coef, 2);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to get coef\n");
-> +		return -EINVAL;
-
-return ret;
-
-> +	}
-> +
-> +	ret = of_property_read_u32_array(np, "hisi,adc-range", data->range, 2);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to get range\n");
-> +		return -EINVAL;
-
-return ret;
-
-> +	}
-
-Are these data really needed through DT? Isn't it something we can hardcode?
-
-> +	platform_set_drvdata(pdev, data);
-> +
-> +	for (i = 0; i < max_sensor + VIRTUAL_SENSORS; ++i) {
-> +		sensor = &data->sensors[i];
-> +		if (i < max_sensor) {
-> +			res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-
-Error check?
-
-> +			sensor->sensor_reg = devm_ioremap_resource(dev, res);
-> +			if (IS_ERR(sensor->sensor_reg)) {
-> +				dev_err(dev, "failed to get reg base\n");
-> +				return -ENOMEM;
-
-s/-ENOMEM/PTR_ERR(sensor->sensor_reg)/
-
-> +			}
-> +		}
-> +
-> +		sensor->id = i;
-
-How can we deal with holes in the DT?
-
-> +		sensor->thermal = data;
-> +		sensor->tzd = thermal_zone_of_sensor_register(dev,
-> +				i, sensor, &hisi_of_thermal_ops);
-> +		if (IS_ERR(sensor->tzd)) {
-> +			sensor->tzd = NULL;
-> +		} else {
-> +			hisi_thermal_toggle_sensor(sensor, true);
-> +			dev_info(dev, "thermal sensor%d registered\n", i);
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int hisi_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct hisi_thermal_data *data = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = 0; i < data->max_hw_sensor + VIRTUAL_SENSORS; i++) {
-> +		struct hisi_thermal_sensor *sensor = &data->sensors[i];
-> +
-> +		if (!sensor->tzd)
-> +			continue;
-> +
-> +		hisi_thermal_toggle_sensor(sensor, false);
-> +		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id hisi_thermal_id_table[] = {
-> +	{ .compatible = "hisilicon,hi3660-tsensor" },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, hisi_thermal_id_table);
-> +
-> +static struct platform_driver hisi_thermal_driver = {
-> +	.probe = hisi_thermal_probe,
-> +	.remove = hisi_thermal_exit,
-> +	.driver = {
-> +		.name = "hisi_tsensor",
-> +		.of_match_table = hisi_thermal_id_table,
-> +	},
-> +};
-> +
-> +module_platform_driver(hisi_thermal_driver);
-> +
-> +MODULE_AUTHOR("Tao Wang <kevin.wangtao@linaro.org>");
-> +MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-> +MODULE_DESCRIPTION("hisi tsensor driver");
-> +MODULE_LICENSE("GPL v2");
-> 
-
-
+diff --git a/drivers/gpu/drm/tve200/Kconfig b/drivers/gpu/drm/tve200/Kconfig
+index 21d9841ddb88..c5f03bf4570c 100644
+--- a/drivers/gpu/drm/tve200/Kconfig
++++ b/drivers/gpu/drm/tve200/Kconfig
+@@ -4,7 +4,8 @@ config DRM_TVE200
+ 	depends on CMA
+ 	depends on ARM || COMPILE_TEST
+ 	depends on OF
+-	select DRM_PANEL
++	select DRM_BRIDGE
++	select DRM_PANEL_BRIDGE
+ 	select DRM_KMS_HELPER
+ 	select DRM_KMS_CMA_HELPER
+ 	select DRM_GEM_CMA_HELPER
+diff --git a/drivers/gpu/drm/tve200/Makefile b/drivers/gpu/drm/tve200/Makefile
+index a9dba54f7ee5..6b7a6a1dcbf8 100644
+--- a/drivers/gpu/drm/tve200/Makefile
++++ b/drivers/gpu/drm/tve200/Makefile
+@@ -1,5 +1,4 @@
+-tve200_drm-y +=	tve200_connector.o \
+-		tve200_display.o \
++tve200_drm-y +=	tve200_display.o \
+ 		tve200_drv.o
+ 
+ obj-$(CONFIG_DRM_TVE200) += tve200_drm.o
+diff --git a/drivers/gpu/drm/tve200/tve200_connector.c b/drivers/gpu/drm/tve200/tve200_connector.c
+deleted file mode 100644
+index 5e6c20b57d6d..000000000000
+--- a/drivers/gpu/drm/tve200/tve200_connector.c
++++ /dev/null
+@@ -1,125 +0,0 @@
+-/*
+- * Copyright (C) 2017 Linus Walleij <linus.walleij@linaro.org>
+- * Parts of this file were based on sources as follows:
+- *
+- * Copyright (C) 2006-2008 Intel Corporation
+- * Copyright (C) 2007 Amos Lee <amos_lee@storlinksemi.com>
+- * Copyright (C) 2007 Dave Airlie <airlied@linux.ie>
+- * Copyright (C) 2011 Texas Instruments
+- * Copyright (C) 2017 Eric Anholt
+- *
+- * This program is free software and is provided to you under the terms of the
+- * GNU General Public License version 2 as published by the Free Software
+- * Foundation, and any use by you of this program is subject to the terms of
+- * such GNU licence.
+- */
+-
+-/**
+- * tve200_drm_connector.c
+- * Implementation of the connector functions for the Faraday TV Encoder
+- */
+-#include <linux/version.h>
+-#include <linux/shmem_fs.h>
+-#include <linux/dma-buf.h>
+-
+-#include <drm/drmP.h>
+-#include <drm/drm_atomic_helper.h>
+-#include <drm/drm_crtc_helper.h>
+-#include <drm/drm_of.h>
+-#include <drm/drm_panel.h>
+-
+-#include "tve200_drm.h"
+-
+-static void tve200_connector_destroy(struct drm_connector *connector)
+-{
+-	struct tve200_drm_connector *tve200con =
+-		to_tve200_connector(connector);
+-
+-	if (tve200con->panel)
+-		drm_panel_detach(tve200con->panel);
+-
+-	drm_connector_unregister(connector);
+-	drm_connector_cleanup(connector);
+-}
+-
+-static enum drm_connector_status tve200_connector_detect(struct drm_connector
+-							*connector, bool force)
+-{
+-	struct tve200_drm_connector *tve200con =
+-		to_tve200_connector(connector);
+-
+-	return (tve200con->panel ?
+-		connector_status_connected :
+-		connector_status_disconnected);
+-}
+-
+-static int tve200_connector_helper_get_modes(struct drm_connector *connector)
+-{
+-	struct tve200_drm_connector *tve200con =
+-		to_tve200_connector(connector);
+-
+-	if (!tve200con->panel)
+-		return 0;
+-
+-	return drm_panel_get_modes(tve200con->panel);
+-}
+-
+-static const struct drm_connector_funcs connector_funcs = {
+-	.fill_modes = drm_helper_probe_single_connector_modes,
+-	.destroy = tve200_connector_destroy,
+-	.detect = tve200_connector_detect,
+-	.reset = drm_atomic_helper_connector_reset,
+-	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+-	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+-};
+-
+-static const struct drm_connector_helper_funcs connector_helper_funcs = {
+-	.get_modes = tve200_connector_helper_get_modes,
+-};
+-
+-/*
+- * Walks the OF graph to find the panel node and then asks DRM to look
+- * up the panel.
+- */
+-static struct drm_panel *tve200_get_panel(struct device *dev)
+-{
+-	struct device_node *endpoint, *panel_node;
+-	struct device_node *np = dev->of_node;
+-	struct drm_panel *panel;
+-
+-	endpoint = of_graph_get_next_endpoint(np, NULL);
+-	if (!endpoint) {
+-		dev_err(dev, "no endpoint to fetch panel\n");
+-		return NULL;
+-	}
+-
+-	/* Don't proceed if we have an endpoint but no panel_node tied to it */
+-	panel_node = of_graph_get_remote_port_parent(endpoint);
+-	of_node_put(endpoint);
+-	if (!panel_node) {
+-		dev_err(dev, "no valid panel node\n");
+-		return NULL;
+-	}
+-
+-	panel = of_drm_find_panel(panel_node);
+-	of_node_put(panel_node);
+-
+-	return panel;
+-}
+-
+-int tve200_connector_init(struct drm_device *dev)
+-{
+-	struct tve200_drm_dev_private *priv = dev->dev_private;
+-	struct tve200_drm_connector *tve200con = &priv->connector;
+-	struct drm_connector *connector = &tve200con->connector;
+-
+-	drm_connector_init(dev, connector, &connector_funcs,
+-			   DRM_MODE_CONNECTOR_DPI);
+-	drm_connector_helper_add(connector, &connector_helper_funcs);
+-
+-	tve200con->panel = tve200_get_panel(dev->dev);
+-	if (tve200con->panel)
+-		drm_panel_attach(tve200con->panel, connector);
+-
+-	return 0;
+-}
+diff --git a/drivers/gpu/drm/tve200/tve200_display.c b/drivers/gpu/drm/tve200/tve200_display.c
+index 37fb333331f3..cfdffc15a2ce 100644
+--- a/drivers/gpu/drm/tve200/tve200_display.c
++++ b/drivers/gpu/drm/tve200/tve200_display.c
+@@ -127,7 +127,7 @@ static void tve200_display_enable(struct drm_simple_display_pipe *pipe,
+ 	struct tve200_drm_dev_private *priv = drm->dev_private;
+ 	const struct drm_display_mode *mode = &cstate->mode;
+ 	struct drm_framebuffer *fb = plane->state->fb;
+-	struct drm_connector *connector = &priv->connector.connector;
++	struct drm_connector *connector = priv->connector;
+ 	u32 format = fb->format->format;
+ 	u32 ctrl1 = 0;
+ 
+@@ -215,13 +215,9 @@ static void tve200_display_enable(struct drm_simple_display_pipe *pipe,
+ 
+ 	ctrl1 |= TVE200_TVEEN;
+ 
+-	drm_panel_prepare(priv->connector.panel);
+-
+ 	/* Turn it on */
+ 	writel(ctrl1, priv->regs + TVE200_CTRL);
+ 
+-	drm_panel_enable(priv->connector.panel);
+-
+ 	drm_crtc_vblank_on(crtc);
+ }
+ 
+@@ -233,13 +229,9 @@ void tve200_display_disable(struct drm_simple_display_pipe *pipe)
+ 
+ 	drm_crtc_vblank_off(crtc);
+ 
+-	drm_panel_disable(priv->connector.panel);
+-
+ 	/* Disable and Power Down */
+ 	writel(0, priv->regs + TVE200_CTRL);
+ 
+-	drm_panel_unprepare(priv->connector.panel);
+-
+ 	clk_disable_unprepare(priv->clk);
+ }
+ 
+@@ -336,9 +328,12 @@ int tve200_display_init(struct drm_device *drm)
+ 	ret = drm_simple_display_pipe_init(drm, &priv->pipe,
+ 					   &tve200_display_funcs,
+ 					   formats, ARRAY_SIZE(formats),
+-					   &priv->connector.connector);
++					   priv->connector);
+ 	if (ret)
+ 		return ret;
+ 
++	/* We need the encoder to attach the bridge */
++	priv->encoder = &priv->pipe.encoder;
++
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/tve200/tve200_drm.h b/drivers/gpu/drm/tve200/tve200_drm.h
+index f00fc47a6bd1..c7acfaa1a2c5 100644
+--- a/drivers/gpu/drm/tve200/tve200_drm.h
++++ b/drivers/gpu/drm/tve200/tve200_drm.h
+@@ -95,16 +95,18 @@
+ 
+ #include <drm/drm_gem.h>
+ #include <drm/drm_simple_kms_helper.h>
+-
+-struct tve200_drm_connector {
+-	struct drm_connector connector;
+-	struct drm_panel *panel;
+-};
++#include <drm/drm_connector.h>
++#include <drm/drm_encoder.h>
++#include <drm/drm_panel.h>
++#include <drm/drm_bridge.h>
+ 
+ struct tve200_drm_dev_private {
+ 	struct drm_device *drm;
+ 
+-	struct tve200_drm_connector connector;
++	struct drm_connector *connector;
++	struct drm_encoder *encoder;
++	struct drm_panel *panel;
++	struct drm_bridge *bridge;
+ 	struct drm_simple_display_pipe pipe;
+ 	struct drm_fbdev_cma *fbdev;
+ 
+diff --git a/drivers/gpu/drm/tve200/tve200_drv.c b/drivers/gpu/drm/tve200/tve200_drv.c
+index fe742106db4e..c22644692a88 100644
+--- a/drivers/gpu/drm/tve200/tve200_drv.c
++++ b/drivers/gpu/drm/tve200/tve200_drv.c
+@@ -47,6 +47,8 @@
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
+ #include <drm/drm_panel.h>
++#include <drm/drm_of.h>
++#include <drm/drm_bridge.h>
+ 
+ #include "tve200_drm.h"
+ 
+@@ -62,6 +64,8 @@ static int tve200_modeset_init(struct drm_device *dev)
+ {
+ 	struct drm_mode_config *mode_config;
+ 	struct tve200_drm_dev_private *priv = dev->dev_private;
++	struct drm_panel *panel;
++	struct drm_bridge *bridge;
+ 	int ret = 0;
+ 
+ 	drm_mode_config_init(dev);
+@@ -72,35 +76,51 @@ static int tve200_modeset_init(struct drm_device *dev)
+ 	mode_config->min_height = 240;
+ 	mode_config->max_height = 576;
+ 
+-	ret = tve200_connector_init(dev);
++	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
++					  0, 0, &panel, &bridge);
++	if (ret && ret != -ENODEV)
++		return ret;
++	if (panel) {
++		bridge = drm_panel_bridge_add(panel,
++					      DRM_MODE_CONNECTOR_Unknown);
++		if (IS_ERR(bridge)) {
++			ret = PTR_ERR(bridge);
++			goto out_bridge;
++		}
++	}
++
++	ret = tve200_display_init(dev);
+ 	if (ret) {
+-		dev_err(dev->dev, "Failed to create tve200_drm_connector\n");
+-		goto out_config;
++		dev_err(dev->dev, "failed to init display\n");
++		goto out_bridge;
++	}
++
++	if (bridge) {
++		ret = drm_bridge_attach(priv->encoder, bridge, NULL);
++		if (ret)
++			goto out_bridge;
+ 	}
+ 
+ 	/*
+-	 * Don't actually attach if we didn't find a drm_panel
+-	 * attached to us.
++	 * TODO: when we are using a different bridge than a panel
++	 * (such as a dumb VGA connector) we need to devise a different
++	 * method to get the connector out of the bridge.
+ 	 */
+-	if (!priv->connector.panel) {
+-		dev_info(dev->dev,
+-			 "deferring due to lack of DRM panel device\n");
+-		ret = -EPROBE_DEFER;
+-		goto out_config;
++	if (!panel) {
++		dev_err(dev->dev, "the bridge is not a panel\n");
++		goto out_bridge;
+ 	}
+-	dev_info(dev->dev, "attached to panel %s\n",
+-		 dev_name(priv->connector.panel->dev));
++	priv->panel = panel;
++	priv->connector = panel->connector;
++	priv->bridge = bridge;
+ 
+-	ret = tve200_display_init(dev);
+-	if (ret) {
+-		dev_err(dev->dev, "failed to init display\n");
+-		goto out_config;
+-	}
++	dev_info(dev->dev, "attached to panel %s\n",
++		 dev_name(panel->dev));
+ 
+ 	ret = drm_vblank_init(dev, 1);
+ 	if (ret) {
+ 		dev_err(dev->dev, "failed to init vblank\n");
+-		goto out_config;
++		goto out_bridge;
+ 	}
+ 
+ 	drm_mode_config_reset(dev);
+@@ -115,7 +135,11 @@ static int tve200_modeset_init(struct drm_device *dev)
+ 
+ 	goto finish;
+ 
+-out_config:
++out_bridge:
++	if (panel)
++		drm_panel_bridge_remove(bridge);
++	else
++		drm_bridge_remove(bridge);
+ 	drm_mode_config_cleanup(dev);
+ finish:
+ 	return ret;
+@@ -249,6 +273,10 @@ static int tve200_remove(struct platform_device *pdev)
+ 	drm_dev_unregister(drm);
+ 	if (priv->fbdev)
+ 		drm_fbdev_cma_fini(priv->fbdev);
++	if (priv->panel)
++		drm_panel_bridge_remove(priv->bridge);
++	else
++		drm_bridge_remove(priv->bridge);
+ 	drm_mode_config_cleanup(drm);
+ 	clk_disable_unprepare(priv->pclk);
+ 	drm_dev_unref(drm);
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.13.5
