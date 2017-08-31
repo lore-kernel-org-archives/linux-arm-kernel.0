@@ -1,25 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Aug 2017 14:50:50 +0100
-Subject: Applied "regulator: pbias: Select voltage table based on
- max-voltage" to the regulator tree
-In-Reply-To: <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
-References: <E1dnO3z-0000tI-7K@debutante>
- <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
-Message-ID: <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 31 Aug 2017 15:52:17 +0200
+Subject: [PATCH v3 0/9] ARM64: dts: meson: update around mmc
+Message-ID: <20170831135226.19784-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
+This patchset feature updates around mmc. It is linked to this series [0]
+but does not strictly depends on it. It adds:
 
-> This patch should be merged along with the 1st patch of the series "mmc: host:
-> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
-> omap_hsmmc driver.
+* The regulator settling times for the gpio regulator of nanopi-k2 and
+  the libretech-cc.
+* UHS modes for the p20x, nanopi-k2 and the libretech-cc
+* clk-gate pins: these are the pinmuxes used for the clk-stop work
+  around explained here [1]
 
-I can sign a tag if it's needed for a cross tree merge.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/64436f03/attachment.sig>
+It also removes cap-sd-highspeed from eMMC nodes.
+
+Special note on SDR104:
+While the PCB of the p200 and the libretech-cc does not seems to handle
+SDR104 completely, the nanopi-k2 seems to be handling it correctly.
+
+The patch enabling this mode on the nanopi-k2 is the last one of this
+series. It should propabably be left out until more people can test
+sdr104 on the nanopi-k2
+
+This series has been tested on the gxbb-200, the gxbb-nanopi-k2 and the
+gxl-s905x-libretech-cc
+
+Changes since v2 [3]:
+* Rebase on Kevin's v4.14/dt64 branch
+
+Changes since v1 [2]:
+* Reorder patches to put fixes first, then enhancements
+* Fix error in the SDIO clk_gate pins (GPIOX_5 instead GPIOX_4)
+
+[0]: https://lkml.kernel.org/r/20170828142915.27020-1-jbrunet at baylibre.com
+[1]: https://lkml.kernel.org/r/20170821160301.21899-11-jbrunet at baylibre.com
+[2]: https://lkml.kernel.org/r/20170804180816.18737-1-jbrunet at baylibre.com
+[3]: https://lkml.kernel.org/r/20170821160637.22456-1-jbrunet at baylibre.com
+
+Jerome Brunet (9):
+  ARM64: dts: meson-gx: Use correct mmc clock source 0
+  ARM64: dts: meson: remove cap-sd-highspeed from emmc nodes
+  ARM64: dts: meson: add mmc clk gate pins
+  ARM64: dts: meson-gxbb: nanopi-k2: add card regulator settle times
+  ARM64: dts: meson-gxl: libretech-cc: add card regulator settle times
+  ARM64: dts: meson-gxl: libretech-cc: enable high speed modes
+  ARM64: dts: meson-gxbb: p20x: enable sdcard UHS modes
+  ARM64: dts: meson-gxbb: nanopi-k2: enable sdcard UHS modes
+  ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode
+
+ .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 10 +++---
+ .../boot/dts/amlogic/meson-gxbb-nanopi-k2.dts      | 19 ++++++++---
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 12 ++++---
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  9 ++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 13 +++++---
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 10 +++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 39 ++++++++++++++++++++--
+ .../dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts |  7 ++--
+ .../dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 13 ++++++--
+ .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 10 +++---
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     | 10 +++---
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 39 ++++++++++++++++++++--
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  7 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts |  1 -
+ 14 files changed, 150 insertions(+), 49 deletions(-)
+
+-- 
+2.9.5
