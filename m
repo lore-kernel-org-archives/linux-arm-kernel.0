@@ -1,81 +1,90 @@
-From: stefan.mavrodiev@gmail.com (Stefan Mavrodiev)
-Date: Thu, 31 Aug 2017 08:20:18 +0300
-Subject: [PATCH v2 1/2] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for
- LAN8710
-In-Reply-To: <20170830143728.friajjequvioqjpu@flea.lan>
-References: <1503901963-9457-1-git-send-email-stefan@olimex.com>
- <1503901963-9457-2-git-send-email-stefan@olimex.com>
- <20170830143728.friajjequvioqjpu@flea.lan>
-Message-ID: <e7e61776-b8d7-c42f-4e9e-04da835374a9@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 Aug 2017 22:26:30 -0700
+Subject: [PATCH] clk: bulk: call of_clk_get() when id is NULL
+In-Reply-To: <AM3PR04MB3064504A935B4AA0CBEE962809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1502243442-28055-1-git-send-email-shawnguo@kernel.org>
+ <20170809173318.GD2146@codeaurora.org>
+ <20170813141851.GD31819@dragon>
+ <AM3PR04MB3064504A935B4AA0CBEE962809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170831052630.GU21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2017 05:37 PM, Maxime Ripard wrote:
-> Hi,
->
-> On Mon, Aug 28, 2017 at 09:32:42AM +0300, Stefan Mavrodiev wrote:
->>  From revision J the board uses new phy chip LAN8710. Compared
->> with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
->> not to work. To fix this PA17 is muxed with GMAC function. This
->> makes the pin output-low.
->>
->> This patch is compatible with earlier board revisions, since this
->> pin wasn't connected to phy.
->>
->> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
->> ---
->>   arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
->> index 0b7403e..cb1b081 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
->> @@ -102,7 +102,7 @@
->>   
->>   &gmac {
->>   	pinctrl-names = "default";
->> -	pinctrl-0 = <&gmac_pins_mii_a>;
->> +	pinctrl-0 = <&gmac_pins_mii_a>,<&gmac_txerr>;
->>   	phy = <&phy1>;
->>   	phy-mode = "mii";
->>   	status = "okay";
->> @@ -229,6 +229,11 @@
->>   };
->>   
->>   &pio {
->> +	gmac_txerr: gmac_txerr at 0 {
->> +		pins = "PA17";
->> +		function = "gmac";
->> +	};
->> +
-> The patch looks fine, I still have one question though.
->
-> Can a PHY operate without this signal? My real question is, would it
-> make sense to mux that pin for all the users, or is it an optional
-> signal that each board designer can choose to use or not?
->
-> Thanks!
-> Maxime
->
-This phy (LAN8710) cannot work without this pin. Part of the problem is in that we've replaced
-without paying attention to this signal.
+On 08/30, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > Sent: Sunday, August 13, 2017 10:19 PM
+> > To: Stephen Boyd
+> > Cc: Michael Turquette; A.s. Dong; linux-clk at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; Shawn Guo
+> > Subject: Re: [PATCH] clk: bulk: call of_clk_get() when id is NULL
+> > 
+> > Hi Stephen,
+> > 
+> > On Wed, Aug 09, 2017 at 10:33:18AM -0700, Stephen Boyd wrote:
+> > > > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c index
+> > > > c834f5abfc49..65cee595a67e 100644
+> > > > --- a/drivers/clk/clk-bulk.c
+> > > > +++ b/drivers/clk/clk-bulk.c
+> > > > @@ -39,7 +39,10 @@ int __must_check clk_bulk_get(struct device *dev,
+> > int num_clks,
+> > > >  		clks[i].clk = NULL;
+> > > >
+> > > >  	for (i = 0; i < num_clks; i++) {
+> > > > -		clks[i].clk = clk_get(dev, clks[i].id);
+> > > > +		if (clks[i].id)
+> > > > +			clks[i].clk = clk_get(dev, clks[i].id);
+> > > > +		else if (dev->of_node)
+> > > > +			clks[i].clk = of_clk_get(dev->of_node, i);
+> > >
+> > > This seems a little too magical. The omission of an id in an array of
+> > > clks would mean that only that one clk is acquired through
+> > > of_clk_get(). We could have a mixture of ids and no ids for some
+> > > device, and then do very odd things.
+> > >
+> > > How about we add a flag to clk_bulk_data that indicates we want it to
+> > > use of_clk_get() instead of clk_get() for all of the clks?
+> > > Then the id is ignored for the entire function.
+> > 
+> > I have sent v2 to add a flag to clk_bulk_data to address your comments.
+> > But I just found it might not be what you want exactly, because the
+> > current bulk clk APIs defines clk_bulk_data in a different way from what
+> > you are asking here.
+> > 
+> > It seems that you think clk_bulk_data represents all the clocks that bulk
+> > APIs manage, but actually it only represents one of the multiple clocks.
+> > Callers need to prepare an array of clk_bulk_data to represent multiple
+> > clocks.  That said, the flag we add to clk_bulk_data only affects one
+> > clock instead of all clocks.
+> > 
+> > I feel this is something we can improve.  clk_bulk_data can be used to
+> > represent all clocks, something like below.  In this case, bulk clk APIs
+> > do not need to take num_clks as a separate parameter, and callers do not
+> > need to maintain multiple clk_bulk_data instances.  Since we do not have
+> > any in tree users of bulk clk APIs yet, we can make this semantic change
+> > quickly.  Thoughts?
+> > 
+> 
+> Flags may be better used for extending per clk feature support in the future.
+> 
+> IMHO how about implement a of_clk_bulk_get() to handle this issue as we already
+> have a of_clk_get?
+> e.g.
+> 
+> int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+>                               struct clk_bulk_data *clks)
+> {
+>         for (i = 0; i < num_clks; i++) {
+>                 clks[i].clk = of_clk_get(dev, clks[i].id);
+> ...
+> 
+> }
+> 
+> Then it's less intrusive.
+> 
 
-RTL8201 has no TXERR pin. The pin PA17 is used as reset signal and therefore is pulled up with
-resistor. However on old revisions this option (there is jumper pad between SOC and PHY).
+This looks ok too. Go ahead and send this version instead.
 
-As I said, LAN8710 cannot work without this signal. In the datasheet is written:
-	...
-	The controller drives TXER high when a transmit error is detected.
-	...
-
-In the current variant of the dts, all data is threated as error.
-
-So to answer you question. This is feature only on our board and highly depends on the chosen PHY.
-I don't think this should be muxed for all users.
-
-
-
-Best regards,
-Stefan Mavrodiev,
-Olimex Ltd.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
