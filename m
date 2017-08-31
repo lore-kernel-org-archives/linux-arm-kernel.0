@@ -1,43 +1,98 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 31 Aug 2017 17:37:34 +0530
-Subject: Applied "regulator: pbias: Select voltage table based on
- max-voltage" to the regulator tree
-In-Reply-To: <E1dnO3z-0000tI-7K@debutante>
-References: <E1dnO3z-0000tI-7K@debutante>
-Message-ID: <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 31 Aug 2017 13:18:20 +0100
+Subject: [PATCH v3 51/59] KVM: arm/arm64: GICv4: Add doorbell interrupt
+ handling
+In-Reply-To: <20170828181850.GL24649@cbox>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+ <20170731172637.29355-52-marc.zyngier@arm.com>
+ <8a35ee18-85a5-168b-b3d2-b9f51390b475@arm.com> <20170828181850.GL24649@cbox>
+Message-ID: <52621c50-d367-26a1-89da-36cd158523e0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 28/08/17 19:18, Christoffer Dall wrote:
+> On Fri, Aug 04, 2017 at 08:44:04AM +0100, Marc Zyngier wrote:
+>> On 31/07/17 18:26, Marc Zyngier wrote:
+>>> When a vPE is not running, a VLPI being made pending results in a
+>>> doorbell interrupt being delivered. Let's handle this interrupt
+>>> and update the pending_last flag that indicates that VLPIs are
+>>> pending. The corresponding vcpu is also kicked into action.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  virt/kvm/arm/vgic/vgic-v4.c | 34 ++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 34 insertions(+)
+>>>
+>>> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+>>> index 534d3051a078..6af3cde6d7d4 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-v4.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+>>> @@ -21,6 +21,19 @@
+>>>  
+>>>  #include "vgic.h"
+>>>  
+>>> +static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+>>> +{
+>>> +	struct kvm_vcpu *vcpu = info;
+>>> +
+>>> +	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
+>>> +		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+>>> +		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+>>> +		kvm_vcpu_kick(vcpu);
+>>> +	}
+>>
+>> This code is so obviously broken that I completely overlooked it.
+>>
+>> If we have take a doorbell interrupt, then it means nothing was
+>> otherwise pending (because we'd have been kicked out of the blocking
+>> state, and will have masked the doorbell). So checking for pending
+>> interrupts is pointless.
+>>
+>> Furthermore, calling kvm_vgic_vcpu_pending_irq() takes the ap_list
+>> lock. If we take a doorbell interrupt while injecting a virtual
+>> interrupt (from userspace, for example) on the same CPU, we end-up
+>> in deadlock land. This would be solved by Christoffer's latest
+>> crop of timer patches, but there is no point getting there the first
+>> place.
+>>
+>> The patchlet below solves it:
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+>> index 15feb1151797..48e4d6ebeaa8 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v4.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+>> @@ -94,11 +94,9 @@ static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+>>  {
+>>  	struct kvm_vcpu *vcpu = info;
+>>  
+>> -	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
+>> -		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+>> -		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+>> -		kvm_vcpu_kick(vcpu);
+>> -	}
+>> +	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
+>> +	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+>> +	kvm_vcpu_kick(vcpu);
+> 
+> I don't think you need the request and kick, because if you're getting
+> this doorbell, doesn't that also mean that the VCPU is not running in
+> the guest and you simply need to make sure the VCPU thread gets
+> scheduled again, so you could call kvm_vcpu_wake_up() instead.
+> 
+> Unless the request is there to ensure proper memory barriers around
+> setting pending_last?
 
-On Thursday 31 August 2017 05:25 PM, Mark Brown wrote:
-> The patch
-> 
->    regulator: pbias: Select voltage table based on max-voltage
-> 
-> has been applied to the regulator tree at
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
-> 
-> All being well this means that it will be integrated into the linux-next
-> tree (usually sometime in the next 24 hours) and sent to Linus during
-> the next merge window (or sooner if it is a bug fix), however if
-> problems are discovered then the patch may be dropped or reverted.  
-> 
-> You may get further e-mails resulting from automated or manual testing
-> and review of the tree, please engage with people reporting problems and
-> send followup patches addressing any issues that are reported if needed.
-> 
-> If any updates are required or you are submitting further changes they
-> should be sent as incremental updates against current git, existing
-> patches will not be replaced.
-> 
-> Please add any relevant lists and maintainers to the CCs when replying
-> to this mail.
+We definitely need some form of barrier here (the write needs to be
+observed on the CPU we're waking up on), and I wanted to model this in a
+similar way to our injection path (where we do have the make_request +
+kick pattern).
 
-This patch should be merged along with the 1st patch of the series "mmc: host:
-omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
-omap_hsmmc driver.
+After all, we really have an interrupt pending that deserves attention.
+Is there any reason why we'd want to model it differently from the rest
+of the injection path?
 
-Thanks
-Kishon
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
