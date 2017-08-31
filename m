@@ -1,46 +1,64 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 31 Aug 2017 18:00:45 +0100
-Subject: [PATCH v2 13/28] arm64/sve: Signal handling support
+Date: Thu, 31 Aug 2017 18:00:43 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
 In-Reply-To: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
 References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1504198860-12951-14-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements support for saving and restoring the SVE
-registers around signals.
+This patch adds the core support for switching and managing the SVE
+architectural state of user tasks.
 
-A fixed-size header struct sve_context is always included in the
-signal frame encoding the thread's vector length at the time of
-signal delivery, optionally followed by a variable-layout structure
-encoding the SVE registers.
+Calls to the existing FPSIMD low-level save/restore functions are
+factored out as new functions task_fpsimd_{save,load}(), since SVE
+now dynamically may or may not need to be handled at these points
+depending on the kernel configuration, hardware features discovered
+at boot, and the runtime state of the task.  To make these
+decisions as fast as possible, const cpucaps are used where
+feasible, via the system_supports_sve() helper.
 
-Because of the need to preserve backwards compatibility, the FPSIMD
-view of the SVE registers is always dumped as a struct
-fpsimd_context in the usual way, in addition to any sve_context.
+The SVE registers are only tracked for threads that have explicitly
+used SVE, indicated by the new thread flag TIF_SVE.  Otherwise, the
+FPSIMD view of the architectural state is stored in
+thread.fpsimd_state as usual.
 
-The SVE vector registers are dumped in full, including bits 127:0
-of each register which alias the corresponding FPSIMD vector
-registers in the hardware.  To avoid any ambiguity about which
-alias to restore during sigreturn, the kernel always restores bits
-127:0 of each SVE vector register from the fpsimd_context in the
-signal frame (which must be present): userspace needs to take this
-into account if it wants to modify the SVE vector register contents
-on return from a signal.
+When in use, the SVE registers are not stored directly in
+thread_struct due to their potentially large and variable size.
+Because the task_struct slab allocator must be configured very
+early during kernel boot, it is also tricky to configure it
+correctly to match the maximum vector length provided by the
+hardware, since this depends on examining secondary CPUs as well as
+the primary.  Instead, a pointer sve_state in thread_struct points
+to a dynamically allocated buffer containing the SVE register data,
+and code is added to allocate, duplicate and free this buffer at
+appropriate times.
 
-FPSR and FPCR, which are used by both FPSIMD and SVE, are not
-included in sve_context because they are always present in
-fpsimd_context anyway.
+TIF_SVE is set when taking an SVE access trap from userspace, if
+suitable hardware support has been detected.  This enables SVE for
+the thread: a subsequent return to userspace will disable the trap
+accordingly.  If such a trap is taken without sufficient hardware
+support, SIGILL is sent to the thread instead as if an undefined
+instruction had been executed: this may happen if userspace tries
+to use SVE in a system where not all CPUs support it for example.
 
-For signal delivery, a new helper
-fpsimd_signal_preserve_current_state() is added to update _both_
-the FPSIMD and SVE views in the task struct, to make it easier to
-populate this information into the signal frame.  Because of the
-redundancy between the two views of the state, only one is updated
-otherwise.  In order to avoid racing with a pending discard of the
-SVE state, this flush is hoisted before the sigframe layout phase,
-so that the layout and population phases see a consistent view of
-the thread.
+The kernel may clear TIF_SVE and disable SVE for the thread
+whenever an explicit syscall is made by userspace, though this is
+considered an optimisation opportunity rather than a deterministic
+guarantee: the kernel may not do this on every syscall, but it is
+permitted to do so.  For backwards compatibility reasons and
+conformance with the spirit of the base AArch64 procedure call
+standard, the subset of the SVE register state that aliases the
+FPSIMD registers is still preserved across a syscall even if this
+happens.
+
+TIF_SVE is also cleared, and SVE disabled, on exec: this is an
+obvious slow path and a hint that we are running a new binary that
+may not use SVE.
+
+Code is added to sync data between thread.fpsimd_state and
+thread.sve_state whenever enabling/disabling SVE, in a manner
+consistent with the SVE architectural programmer's model.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -53,375 +71,483 @@ Changes since v1
 
 Requested by Ard Biesheuvel:
 
-* Fix unbalanced ifelse bracing to conform to the kernel coding style.
+* Fix unbalanced ifelse bracing to match kernel coding style.
+* Improve abstraction of change_cpacr to be a bit less clunky.
+* Rearrange task_fpsimd_{load,save}() and friends to eliminate
+forward declarations.
+
+Changes related to Ard Biesheuvel's comments:
+
+* Undo suprious replacement of assignment by memset in
+arch_dup_task_struct().
 
 Requested by Alex Benn?e:
 
-* Add comments to explain the barrier()s when writing thread.sve_state
-in  restore_sve_fpsimd_context().
+* Add missing include of <linux/compat.h>.
+* Make thread_struct.sve_vl an unsigned int: that's the type used
+virtually everywhere else, and the memory saving is too minor to be
+interesting.
 
 * Thin out BUG_ON()s:
 Redundant BUG_ON()s and ones that just check invariants are removed.
 Important sanity-checks are migrated to WARN_ON()s, with some
-minimal best-effort patch-up code.
+minimal best-effort patch-up code.  The fpsimd_dup_sve() case is changed
+to a WARN_ON, for user threads only, and only if actually clearing
+TIF_SVE.
 
 Other:
 
-* Delete spurious barrier() from restore_sve_fpsimd_context().
-
-Once TIF_FOREIGN_FPSTATE is set, context switch won't write to
-thread_struct any more, so it doesn't matter what TIF_SVE is until the
-next ret_to_user or ptrace interaction, neither of which can race
-with this function.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+* [bugfix] Unconditionally drop child task's reference to the parent's
+SVE state on fork.  Otherwise we can end up with it aliased, which is
+bad.
 ---
- arch/arm64/include/asm/fpsimd.h |   1 +
- arch/arm64/kernel/fpsimd.c      |  23 ++++--
- arch/arm64/kernel/signal.c      | 173 ++++++++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/signal32.c    |   2 +-
- 4 files changed, 183 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/fpsimd.h      |  19 +++
+ arch/arm64/include/asm/processor.h   |   2 +
+ arch/arm64/include/asm/thread_info.h |   1 +
+ arch/arm64/include/asm/traps.h       |   2 +
+ arch/arm64/kernel/entry.S            |  14 ++-
+ arch/arm64/kernel/fpsimd.c           | 227 ++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/process.c          |   4 +
+ arch/arm64/kernel/traps.c            |   4 +-
+ 8 files changed, 265 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 72090a1..7efd04e 100644
+index 026a7c7..72090a1 100644
 --- a/arch/arm64/include/asm/fpsimd.h
 +++ b/arch/arm64/include/asm/fpsimd.h
-@@ -63,6 +63,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
+@@ -20,6 +20,8 @@
  
-+extern void fpsimd_signal_preserve_current_state(void);
- extern void fpsimd_preserve_current_state(void);
- extern void fpsimd_restore_current_state(void);
- extern void fpsimd_update_current_state(struct fpsimd_state *state);
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e20b44d..f82cde8 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -205,8 +205,6 @@ static void fpsimd_to_sve(struct task_struct *task)
- 		       sizeof(fst->vregs[i]));
- }
+ #ifndef __ASSEMBLY__
  
--#ifdef CONFIG_ARM64_SVE
--
- static void sve_to_fpsimd(struct task_struct *task)
- {
- 	unsigned int vq;
-@@ -223,6 +221,8 @@ static void sve_to_fpsimd(struct task_struct *task)
- 		       sizeof(fst->vregs[i]));
- }
- 
-+#ifdef CONFIG_ARM64_SVE
-+
- size_t sve_state_size(struct task_struct const *task)
- {
- 	return SVE_SIG_REGS_SIZE(sve_vq_from_vl(task->thread.sve_vl));
-@@ -414,13 +414,17 @@ void fpsimd_preserve_current_state(void)
- 		return;
- 
- 	local_bh_disable();
--
--	if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
--
-+	task_fpsimd_save();
- 	local_bh_enable();
- }
- 
-+void fpsimd_signal_preserve_current_state(void)
-+{
-+	fpsimd_preserve_current_state();
-+	if (system_supports_sve() && test_thread_flag(TIF_SVE))
-+		sve_to_fpsimd(current);
-+}
++#include <linux/stddef.h>
 +
  /*
-  * Load the userland FPSIMD state of 'current' from memory, but only if the
-  * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
-@@ -456,7 +460,12 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
- 
- 	local_bh_disable();
- 
--	fpsimd_load_state(state);
-+	if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
-+		current->thread.fpsimd_state = *state;
-+		fpsimd_to_sve(current);
-+	}
-+	task_fpsimd_load();
-+
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 4991e87..c3f94cf 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -62,6 +62,7 @@ struct rt_sigframe_user_layout {
- 
- 	unsigned long fpsimd_offset;
- 	unsigned long esr_offset;
-+	unsigned long sve_offset;
- 	unsigned long extra_offset;
- 	unsigned long end_offset;
- };
-@@ -178,9 +179,6 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
- 	int err;
- 
--	/* dump the hardware registers to the fpsimd_state structure */
--	fpsimd_preserve_current_state();
--
- 	/* copy the FP and status/control registers */
- 	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
- 	__put_user_error(fpsimd->fpsr, &ctx->fpsr, err);
-@@ -213,6 +211,8 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	__get_user_error(fpsimd.fpsr, &ctx->fpsr, err);
- 	__get_user_error(fpsimd.fpcr, &ctx->fpcr, err);
- 
-+	clear_thread_flag(TIF_SVE);
-+
- 	/* load the hardware registers from the fpsimd_state structure */
- 	if (!err)
- 		fpsimd_update_current_state(&fpsimd);
-@@ -220,10 +220,118 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	return err ? -EFAULT : 0;
- }
- 
-+
- struct user_ctxs {
- 	struct fpsimd_context __user *fpsimd;
-+	struct sve_context __user *sve;
- };
+  * FP/SIMD storage area has:
+  *  - FPSR and FPCR
+@@ -72,6 +74,23 @@ extern void sve_load_state(void const *state, u32 const *pfpsr,
+ 			   unsigned long vq_minus_1);
+ extern unsigned int sve_get_vl(void);
  
 +#ifdef CONFIG_ARM64_SVE
 +
-+static int preserve_sve_context(struct sve_context __user *ctx)
-+{
-+	int err = 0;
-+	u16 reserved[ARRAY_SIZE(ctx->__reserved)];
-+	unsigned int vl = current->thread.sve_vl;
-+	unsigned int vq = 0;
++extern size_t sve_state_size(struct task_struct const *task);
 +
-+	if (test_thread_flag(TIF_SVE))
-+		vq = sve_vq_from_vl(vl);
-+
-+	memset(reserved, 0, sizeof(reserved));
-+
-+	__put_user_error(SVE_MAGIC, &ctx->head.magic, err);
-+	__put_user_error(round_up(SVE_SIG_CONTEXT_SIZE(vq), 16),
-+			 &ctx->head.size, err);
-+	__put_user_error(vl, &ctx->vl, err);
-+	BUILD_BUG_ON(sizeof(ctx->__reserved) != sizeof(reserved));
-+	err |= copy_to_user(&ctx->__reserved, reserved, sizeof(reserved));
-+
-+	if (vq) {
-+		/*
-+		 * This assumes that the SVE state has already been saved to
-+		 * the task struct by calling preserve_fpsimd_context().
-+		 */
-+		err |= copy_to_user((char __user *)ctx + SVE_SIG_REGS_OFFSET,
-+				    current->thread.sve_state,
-+				    SVE_SIG_REGS_SIZE(vq));
-+	}
-+
-+	return err ? -EFAULT : 0;
-+}
-+
-+static int restore_sve_fpsimd_context(struct user_ctxs *user)
-+{
-+	int err;
-+	unsigned int vq;
-+	struct fpsimd_state fpsimd;
-+	struct sve_context sve;
-+
-+	if (__copy_from_user(&sve, user->sve, sizeof(sve)))
-+		return -EFAULT;
-+
-+	if (sve.vl != current->thread.sve_vl)
-+		return -EINVAL;
-+
-+	if (sve.head.size <= sizeof(*user->sve)) {
-+		clear_thread_flag(TIF_SVE);
-+		goto fpsimd_only;
-+	}
-+
-+	vq = sve_vq_from_vl(sve.vl);
-+
-+	if (sve.head.size < SVE_SIG_CONTEXT_SIZE(vq))
-+		return -EINVAL;
-+
-+	/*
-+	 * Careful: we are about __copy_from_user() directly into
-+	 * thread.sve_state with preemption enabled, so protection is
-+	 * needed to prevent a racing context switch from writing stale
-+	 * registers back over the new data.
-+	 */
-+
-+	fpsimd_flush_task_state(current);
-+	barrier();
-+	/* From now, fpsimd_thread_switch() won't clear TIF_FOREIGN_FPSTATE */
-+
-+	set_thread_flag(TIF_FOREIGN_FPSTATE);
-+	barrier();
-+	/* From now, fpsimd_thread_switch() won't touch thread.sve_state */
-+
-+	sve_alloc(current);
-+	err = __copy_from_user(current->thread.sve_state,
-+			       (char __user const *)user->sve +
-+					SVE_SIG_REGS_OFFSET,
-+			       SVE_SIG_REGS_SIZE(vq));
-+	if (err)
-+		return err;
-+
-+	set_thread_flag(TIF_SVE);
-+
-+fpsimd_only:
-+	/* copy the FP and status/control registers */
-+	/* restore_sigframe() already checked that user->fpsimd != NULL. */
-+	err = __copy_from_user(fpsimd.vregs, user->fpsimd->vregs,
-+			       sizeof(fpsimd.vregs));
-+	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
-+	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
-+
-+	/* load the hardware registers from the fpsimd_state structure */
-+	if (!err)
-+		fpsimd_update_current_state(&fpsimd);
-+
-+	return err;
-+}
++extern void sve_alloc(struct task_struct *task);
++extern void fpsimd_release_thread(struct task_struct *task);
++extern void fpsimd_dup_sve(struct task_struct *dst,
++			   struct task_struct const *src);
 +
 +#else /* ! CONFIG_ARM64_SVE */
 +
-+/* Turn any non-optimised out attempts to use these into a link error: */
-+extern int preserve_sve_context(void __user *ctx);
-+extern int restore_sve_fpsimd_context(struct user_ctxs *user);
-+
++static void __maybe_unused sve_alloc(struct task_struct *task) { }
++static void __maybe_unused fpsimd_release_thread(struct task_struct *task) { }
++static void __maybe_unused fpsimd_dup_sve(struct task_struct *dst,
++					  struct task_struct const *src) { }
 +#endif /* ! CONFIG_ARM64_SVE */
 +
-+
- static int parse_user_sigframe(struct user_ctxs *user,
- 			       struct rt_sigframe __user *sf)
- {
-@@ -236,6 +344,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 	char const __user *const sfp = (char const __user *)sf;
+ /* For use by EFI runtime services calls only */
+ extern void __efi_fpsimd_begin(void);
+ extern void __efi_fpsimd_end(void);
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 29adab8..4831d28 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -85,6 +85,8 @@ struct thread_struct {
+ 	unsigned long		tp2_value;
+ #endif
+ 	struct fpsimd_state	fpsimd_state;
++	void			*sve_state;	/* SVE registers, if any */
++	unsigned int		sve_vl;		/* SVE vector length */
+ 	unsigned long		fault_address;	/* fault info */
+ 	unsigned long		fault_code;	/* ESR_EL1 value */
+ 	struct debug_info	debug;		/* debugging */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 2eca178..f0880fc 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -91,6 +91,7 @@ void arch_setup_new_exec(void);
+ #define TIF_RESTORE_SIGMASK	20
+ #define TIF_SINGLESTEP		21
+ #define TIF_32BIT		22	/* 32bit process */
++#define TIF_SVE			23	/* Scalable Vector Extension in use */
  
- 	user->fpsimd = NULL;
-+	user->sve = NULL;
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 4136168..282163f 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -34,6 +34,8 @@ struct undef_hook {
  
- 	if (!IS_ALIGNED((unsigned long)base, 16))
- 		goto invalid;
-@@ -286,6 +395,19 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			/* ignore */
- 			break;
+ void register_undef_hook(struct undef_hook *hook);
+ void unregister_undef_hook(struct undef_hook *hook);
++void force_signal_inject(int signal, int code, struct pt_regs *regs,
++			 unsigned long address);
  
-+		case SVE_MAGIC:
-+			if (!system_supports_sve())
-+				goto invalid;
-+
-+			if (user->sve)
-+				goto invalid;
-+
-+			if (size < sizeof(*user->sve))
-+				goto invalid;
-+
-+			user->sve = (struct sve_context __user *)head;
-+			break;
-+
- 		case EXTRA_MAGIC:
- 			if (have_extra_context)
- 				goto invalid;
-@@ -358,9 +480,6 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 	}
+ void arm64_notify_segfault(struct pt_regs *regs, unsigned long addr);
  
- done:
--	if (!user->fpsimd)
--		goto invalid;
--
- 	return 0;
- 
- invalid:
-@@ -394,8 +513,19 @@ static int restore_sigframe(struct pt_regs *regs,
- 	if (err == 0)
- 		err = parse_user_sigframe(&user, sf);
- 
--	if (err == 0)
--		err = restore_fpsimd_context(user.fpsimd);
-+	if (err == 0) {
-+		if (!user.fpsimd)
-+			return -EINVAL;
-+
-+		if (user.sve) {
-+			if (!system_supports_sve())
-+				return -EINVAL;
-+
-+			err = restore_sve_fpsimd_context(&user);
-+		} else {
-+			err = restore_fpsimd_context(user.fpsimd);
-+		}
-+	}
- 
- 	return err;
- }
-@@ -454,6 +584,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 			return err;
- 	}
- 
-+	if (system_supports_sve()) {
-+		unsigned int vq = 0;
-+
-+		if (test_thread_flag(TIF_SVE))
-+			vq = sve_vq_from_vl(current->thread.sve_vl);
-+
-+		err = sigframe_alloc(user, &user->sve_offset,
-+				     SVE_SIG_CONTEXT_SIZE(vq));
-+		if (err)
-+			return err;
-+	}
-+
- 	return sigframe_alloc_end(user);
- }
- 
-@@ -495,6 +637,13 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
- 	}
- 
-+	/* Scalable Vector Extension state, if present */
-+	if (system_supports_sve() && err == 0 && user->sve_offset) {
-+		struct sve_context __user *sve_ctx =
-+			apply_user_offset(user, user->sve_offset);
-+		err |= preserve_sve_context(sve_ctx);
-+	}
-+
- 	if (err == 0 && user->extra_offset) {
- 		char __user *sfp = (char __user *)user->sigframe;
- 		char __user *userp =
-@@ -594,6 +743,14 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 	struct rt_sigframe __user *frame;
- 	int err = 0;
- 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e1c59d4..e57020f 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -607,6 +607,8 @@ el0_sync:
+ 	b.eq	el0_ia
+ 	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
+ 	b.eq	el0_fpsimd_acc
++	cmp	x24, #ESR_ELx_EC_SVE		// SVE access
++	b.eq	el0_sve_acc
+ 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+@@ -705,9 +707,19 @@ el0_fpsimd_acc:
+ 	mov	x1, sp
+ 	bl	do_fpsimd_acc
+ 	b	ret_to_user
++el0_sve_acc:
 +	/*
-+	 * Ensure FPSIMD/SVE state in task_struct is up-to-date.
-+	 * This is needed here in order to complete any pending SVE discard:
-+	 * otherwise, discard may occur between deciding on the sigframe
-+	 * layout and dumping the register data.
++	 * Scalable Vector Extension access
 +	 */
-+	fpsimd_signal_preserve_current_state();
-+
- 	if (get_sigframe(&user, ksig, regs))
- 		return 1;
- 
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 4e5a664..202337d 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -244,7 +244,7 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
- 	 * Note that this also saves V16-31, which aren't visible
- 	 * in AArch32.
++	enable_dbg
++	ct_user_exit
++	mov	x0, x25
++	mov	x1, sp
++	bl	do_sve_acc
++	b	ret_to_user
+ el0_fpsimd_exc:
+ 	/*
+-	 * Floating Point or Advanced SIMD exception
++	 * Floating Point, Advanced SIMD or SVE exception
  	 */
--	fpsimd_preserve_current_state();
-+	fpsimd_signal_preserve_current_state();
+ 	enable_dbg
+ 	ct_user_exit
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 9d762dd..9b1ebd7 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -18,18 +18,25 @@
+  */
  
- 	/* Place structure header on the stack */
- 	__put_user_error(magic, &frame->magic, err);
+ #include <linux/bottom_half.h>
++#include <linux/bug.h>
++#include <linux/compat.h>
+ #include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/percpu.h>
+ #include <linux/preempt.h>
++#include <linux/ptrace.h>
+ #include <linux/sched/signal.h>
+ #include <linux/signal.h>
++#include <linux/slab.h>
+ 
+ #include <asm/fpsimd.h>
+ #include <asm/cputype.h>
+ #include <asm/simd.h>
++#include <asm/sigcontext.h>
++#include <asm/sysreg.h>
++#include <asm/traps.h>
+ 
+ #define FPEXC_IOF	(1 << 0)
+ #define FPEXC_DZF	(1 << 1)
+@@ -99,6 +106,190 @@
+  */
+ static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+ 
++static void sve_free(struct task_struct *task)
++{
++	kfree(task->thread.sve_state);
++	task->thread.sve_state = NULL;
++}
++
++/* Offset of FFR in the SVE register dump */
++static size_t sve_ffr_offset(int vl)
++{
++	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
++}
++
++static void *sve_pffr(struct task_struct *task)
++{
++	return (char *)task->thread.sve_state +
++		sve_ffr_offset(task->thread.sve_vl);
++}
++
++static void change_cpacr(u64 val, u64 mask)
++{
++	u64 cpacr = read_sysreg(CPACR_EL1);
++	u64 new = (cpacr & ~mask) | val;
++
++	if (new != cpacr)
++		write_sysreg(new, CPACR_EL1);
++}
++
++static void sve_user_disable(void)
++{
++	change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
++}
++
++static void sve_user_enable(void)
++{
++	change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
++}
++
++static void task_fpsimd_load(void)
++{
++	if (system_supports_sve() && test_thread_flag(TIF_SVE))
++		sve_load_state(sve_pffr(current),
++			       &current->thread.fpsimd_state.fpsr,
++			       sve_vq_from_vl(current->thread.sve_vl) - 1);
++	else
++		fpsimd_load_state(&current->thread.fpsimd_state);
++
++	if (system_supports_sve()) {
++		/* Toggle SVE trapping for userspace if needed */
++		if (test_thread_flag(TIF_SVE))
++			sve_user_enable();
++		else
++			sve_user_disable();
++
++		/* Serialised by exception return to user */
++	}
++}
++
++static void task_fpsimd_save(void)
++{
++	if (system_supports_sve() &&
++	    in_syscall(current_pt_regs()) &&
++	    test_thread_flag(TIF_SVE)) {
++		clear_thread_flag(TIF_SVE);
++
++		/* Trap if the task tries to use SVE again: */
++		sve_user_disable();
++	}
++
++	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
++		if (system_supports_sve() && test_thread_flag(TIF_SVE))
++			sve_save_state(sve_pffr(current),
++				       &current->thread.fpsimd_state.fpsr);
++		else
++			fpsimd_save_state(&current->thread.fpsimd_state);
++	}
++}
++
++#define ZREG(sve_state, vq, n) ((char *)(sve_state) +		\
++	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
++
++static void fpsimd_to_sve(struct task_struct *task)
++{
++	unsigned int vq;
++	void *sst = task->thread.sve_state;
++	struct fpsimd_state const *fst = &task->thread.fpsimd_state;
++	unsigned int i;
++
++	if (!system_supports_sve())
++		return;
++
++	vq = sve_vq_from_vl(task->thread.sve_vl);
++	for (i = 0; i < 32; ++i)
++		memcpy(ZREG(sst, vq, i), &fst->vregs[i],
++		       sizeof(fst->vregs[i]));
++}
++
++#ifdef CONFIG_ARM64_SVE
++
++static void sve_to_fpsimd(struct task_struct *task)
++{
++	unsigned int vq;
++	void const *sst = task->thread.sve_state;
++	struct fpsimd_state *fst = &task->thread.fpsimd_state;
++	unsigned int i;
++
++	if (!system_supports_sve())
++		return;
++
++	vq = sve_vq_from_vl(task->thread.sve_vl);
++	for (i = 0; i < 32; ++i)
++		memcpy(&fst->vregs[i], ZREG(sst, vq, i),
++		       sizeof(fst->vregs[i]));
++}
++
++size_t sve_state_size(struct task_struct const *task)
++{
++	return SVE_SIG_REGS_SIZE(sve_vq_from_vl(task->thread.sve_vl));
++}
++
++void sve_alloc(struct task_struct *task)
++{
++	if (task->thread.sve_state) {
++		memset(task->thread.sve_state, 0, sve_state_size(current));
++		return;
++	}
++
++	/* This is a small allocation (maximum ~8KB) and Should Not Fail. */
++	task->thread.sve_state =
++		kzalloc(sve_state_size(task), GFP_KERNEL);
++
++	/*
++	 * If future SVE revisions can have larger vectors though,
++	 * this may cease to be true:
++	 */
++	BUG_ON(!task->thread.sve_state);
++}
++
++/*
++ * Handle SVE state across fork():
++ *
++ * dst and src must not end up with aliases of the same sve_state.
++ * Because a task cannot fork except in a syscall, we can discard SVE
++ * state for dst here, so long as we take care to retain the FPSIMD
++ * subset of the state if SVE is in use.  Reallocation of the SVE state
++ * will be deferred until dst tries to use SVE.
++ */
++void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
++{
++	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
++		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
++		sve_to_fpsimd(dst);
++	}
++
++	dst->thread.sve_state = NULL;
++}
++
++void fpsimd_release_thread(struct task_struct *dead_task)
++{
++	sve_free(dead_task);
++}
++
++#endif /* CONFIG_ARM64_SVE */
++
++/*
++ * Trapped SVE access
++ */
++void do_sve_acc(unsigned int esr, struct pt_regs *regs)
++{
++	/* Even if we chose not to use SVE, the hardware could still trap: */
++	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
++		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
++		return;
++	}
++
++	task_fpsimd_save();
++
++	sve_alloc(current);
++	fpsimd_to_sve(current);
++	if (test_and_set_thread_flag(TIF_SVE))
++		WARN_ON(1); /* SVE access shouldn't have trapped */
++
++	task_fpsimd_load();
++}
++
+ /*
+  * Trapped FP/ASIMD access.
+  */
+@@ -144,8 +335,8 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 	 * the registers is in fact the most recent userland FPSIMD state of
+ 	 * 'current'.
+ 	 */
+-	if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+-		fpsimd_save_state(&current->thread.fpsimd_state);
++	if (current->mm)
++		task_fpsimd_save();
+ 
+ 	if (next->mm) {
+ 		/*
+@@ -167,6 +358,8 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 
+ void fpsimd_flush_thread(void)
+ {
++	int vl;
++
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 
+@@ -174,6 +367,30 @@ void fpsimd_flush_thread(void)
+ 
+ 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+ 	fpsimd_flush_task_state(current);
++
++	if (system_supports_sve()) {
++		clear_thread_flag(TIF_SVE);
++		sve_free(current);
++
++		/*
++		 * Reset the task vector length as required.
++		 * This is where we ensure that all user tasks have a valid
++		 * vector length configured: no kernel task can become a user
++		 * task without an exec and hence a call to this function.
++		 * If a bug causes this to go wrong, we make some noise and
++		 * try to fudge thread.sve_vl to a safe value here.
++		 */
++		vl = current->thread.sve_vl;
++
++		if (vl == 0)
++			vl = SVE_VL_MIN;
++
++		if (WARN_ON(!sve_vl_valid(vl)))
++			vl = SVE_VL_MIN;
++
++		current->thread.sve_vl = vl;
++	}
++
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 
+ 	local_bh_enable();
+@@ -211,7 +428,7 @@ void fpsimd_restore_current_state(void)
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		struct fpsimd_state *st = &current->thread.fpsimd_state;
+ 
+-		fpsimd_load_state(st);
++		task_fpsimd_load();
+ 		__this_cpu_write(fpsimd_last_state, st);
+ 		st->cpu = smp_processor_id();
+ 	}
+@@ -376,8 +593,8 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ {
+ 	switch (cmd) {
+ 	case CPU_PM_ENTER:
+-		if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+-			fpsimd_save_state(&current->thread.fpsimd_state);
++		if (current->mm)
++			task_fpsimd_save();
+ 		this_cpu_write(fpsimd_last_state, NULL);
+ 		break;
+ 	case CPU_PM_EXIT:
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index e6bf19c..eb1cae7 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -239,6 +239,7 @@ void flush_thread(void)
+ 
+ void release_thread(struct task_struct *dead_task)
+ {
++	fpsimd_release_thread(dead_task);
+ }
+ 
+ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+@@ -246,6 +247,9 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+ 	if (current->mm)
+ 		fpsimd_preserve_current_state();
+ 	*dst = *src;
++
++	fpsimd_dup_sve(dst, src);
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index f202932..7f3b5c6 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -358,8 +358,8 @@ static int call_undef_hook(struct pt_regs *regs)
+ 	return fn ? fn(regs, instr) : 1;
+ }
+ 
+-static void force_signal_inject(int signal, int code, struct pt_regs *regs,
+-				unsigned long address)
++void force_signal_inject(int signal, int code, struct pt_regs *regs,
++			 unsigned long address)
+ {
+ 	siginfo_t info;
+ 	void __user *pc = (void __user *)instruction_pointer(regs);
 -- 
 2.1.4
