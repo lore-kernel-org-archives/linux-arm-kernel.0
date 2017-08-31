@@ -1,70 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 31 Aug 2017 09:19:15 +0100
-Subject: [PATCH v3 51/59] KVM: arm/arm64: GICv4: Add doorbell interrupt
- handling
-In-Reply-To: <20170830205828.GN24522@cbox>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
- <20170731172637.29355-52-marc.zyngier@arm.com> <20170828181855.GM24649@cbox>
- <6d825d0f-eb99-8c9f-77f7-ab313e17a2cd@arm.com> <20170830205828.GN24522@cbox>
-Message-ID: <8b7c5a40-96b5-591f-a31f-b96fb03f507f@arm.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 31 Aug 2017 16:20:42 +0800
+Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
+ STE.S1STALLD and CD.S
+In-Reply-To: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
+References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/17 21:58, Christoffer Dall wrote:
-> On Wed, Aug 30, 2017 at 04:36:06PM +0100, Marc Zyngier wrote:
->> On 28/08/17 19:18, Christoffer Dall wrote:
->>> On Mon, Jul 31, 2017 at 06:26:29PM +0100, Marc Zyngier wrote:
->>>> When a vPE is not running, a VLPI being made pending results in a
->>>> doorbell interrupt being delivered. Let's handle this interrupt
->>>> and update the pending_last flag that indicates that VLPIs are
->>>> pending. The corresponding vcpu is also kicked into action.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  virt/kvm/arm/vgic/vgic-v4.c | 34 ++++++++++++++++++++++++++++++++++
->>>>  1 file changed, 34 insertions(+)
->>>>
->>>> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
->>>> index 534d3051a078..6af3cde6d7d4 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-v4.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-v4.c
->>>> @@ -21,6 +21,19 @@
->>>>  
->>>>  #include "vgic.h"
->>>>  
->>>> +static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
->>>> +{
->>>> +	struct kvm_vcpu *vcpu = info;
->>>> +
->>>> +	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
->>>> +		vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
->>>> +		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
->>>> +		kvm_vcpu_kick(vcpu);
->>>> +	}
->>>
->>> Can this ever fire while vgic_v4_init() is running and before te rest of
->>> the system has been properly initialized with some entertaining results
->>> to follow?  (I'm not sure if spurious doorbell non-resident vPE
->>> interrupts is a thing or not).
->>
->> It could if you only had this patch. The following patch makes sure that
->> the interrupt does not get enabled at request time, meaning it will only
->> get enabled when the vcpu will eventually block.
->>
->> And yes, spurious doorbells are a real thing. And they suck.
->>
-> 
-> Ah, my abilities to forward read on a patch series are quite poor.
-Not quite. It indicates that the patch split is a bit wrong, and that
+It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
+means we should not disable stall mode if stall/terminate mode is not
+configuable.
 
-	irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
+Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
+means if stall mode is force we should always set CD.S.
 
-should really be in this patch and not the following one.
+This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
+TERMINATE feature checking to ensue above ILLEGAL cases from happening.
 
-I'll fix that as I rebase the whole thing.
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index dbda2eb..0745522 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -55,6 +55,7 @@
+ #define IDR0_STALL_MODEL_SHIFT		24
+ #define IDR0_STALL_MODEL_MASK		0x3
+ #define IDR0_STALL_MODEL_STALL		(0 << IDR0_STALL_MODEL_SHIFT)
++#define IDR0_STALL_MODEL_NS		(1 << IDR0_STALL_MODEL_SHIFT)
+ #define IDR0_STALL_MODEL_FORCE		(2 << IDR0_STALL_MODEL_SHIFT)
+ #define IDR0_TTENDIAN_SHIFT		21
+ #define IDR0_TTENDIAN_MASK		0x3
+@@ -766,6 +767,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_SVM		(1 << 15)
+ #define ARM_SMMU_FEAT_HA		(1 << 16)
+ #define ARM_SMMU_FEAT_HD		(1 << 17)
++#define ARM_SMMU_FEAT_TERMINATE		(1 << 18)
+ 	u32				features;
+ 
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+@@ -1402,6 +1404,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_domain *smmu_domain,
+ 	u64 val;
+ 	bool cd_live;
+ 	__u64 *cdptr = arm_smmu_get_cd_ptr(smmu_domain, ssid);
++	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 
+ 	/*
+ 	 * This function handles the following cases:
+@@ -1468,9 +1471,11 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_domain *smmu_domain,
+ 		      CTXDESC_CD_0_V;
+ 
+ 		/*
+-		 * FIXME: STALL_MODEL==0b10 && CD.S==0 is ILLEGAL
++		 * STALL_MODEL==0b10 && CD.S==0 is ILLEGAL
+ 		 */
+-		if (ssid && smmu_domain->s1_cfg.can_stall)
++		if ((ssid && smmu_domain->s1_cfg.can_stall) ||
++		    (!(smmu->features & ARM_SMMU_FEAT_TERMINATE) &&
++		    smmu->features & ARM_SMMU_FEAT_STALLS))
+ 			val |= CTXDESC_CD_0_S;
+ 
+ 		cdptr[0] = cpu_to_le64(val);
+@@ -1690,12 +1695,13 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 			dst[1] |= STRTAB_STE_1_PPAR;
+ 
+ 		/*
+-		 * FIXME: it is illegal to set S1STALLD if STALL_MODEL=0b10
+-		 * (force). But according to the spec, it *must* be set for
++		 * According to spec, it is illegal to set S1STALLD if
++		 * STALL_MODEL is not 0b00. And it *must* be set for
+ 		 * devices that aren't capable of stalling (notably pci!)
+-		 * So we need a "STALL_MODEL=0b00" feature bit.
+ 		 */
+-		if (smmu->features & ARM_SMMU_FEAT_STALLS && !ste->can_stall)
++		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
++		    smmu->features & ARM_SMMU_FEAT_TERMINATE &&
++		    !ste->can_stall)
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+ 
+ 		val |= (s1ctxptr & STRTAB_STE_0_S1CTXPTR_MASK
+@@ -4577,9 +4583,13 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ 
+ 	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
+ 	case IDR0_STALL_MODEL_STALL:
++		smmu->features |= ARM_SMMU_FEAT_TERMINATE;
+ 		/* Fallthrough */
+ 	case IDR0_STALL_MODEL_FORCE:
+ 		smmu->features |= ARM_SMMU_FEAT_STALLS;
++		break;
++	case IDR0_STALL_MODEL_NS:
++		smmu->features |= ARM_SMMU_FEAT_TERMINATE;
+ 	}
+ 
+ 	if (reg & IDR0_S1P)
 -- 
-Jazz is not dead. It just smells funny...
+1.7.12.4
