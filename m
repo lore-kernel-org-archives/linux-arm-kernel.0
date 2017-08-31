@@ -1,23 +1,16 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Aug 2017 22:28:53 -0700
-Subject: [PATCH 3/3] clk: ux500: prcc: constify clk_ops.
-In-Reply-To: <1503903761-21730-4-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1503903761-21730-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1503903761-21730-4-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20170831052853.GX21656@codeaurora.org>
+Date: Wed, 30 Aug 2017 22:29:35 -0700
+Subject: [PATCH] clk: uniphier: add ethernet clock control support
+In-Reply-To: <1503914243-24518-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1503914243-24518-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20170831052935.GZ21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28, Arvind Yadav wrote:
-> clk_ops are not supposed to change at runtime. All functions
-> working with clk_ops provided by <linux/clk-provider.h> work
-> with const clk_ops. So mark the non-const clk_ops as const.
+On 08/28, Kunihiko Hayashi wrote:
+> Add clock control for ethernet controller on Pro4, PXs2, LD11 and LD20.
 > 
-> Here, Function "clk_reg_prcc" is used to initialized clk_init_data.
-> clk_init_data is working with const clk_ops. So make clk_reg_prcc
-> non-const clk_ops argument as const.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > ---
 
 Applied to clk-next
