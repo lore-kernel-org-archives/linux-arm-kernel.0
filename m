@@ -1,39 +1,28 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 31 Aug 2017 11:54:16 -0700
-Subject: [PATCH 2/2] ARM: dts: Add the PWM node to Cygnus
-In-Reply-To: <20170831185416.8181-1-eric@anholt.net>
-References: <20170831185416.8181-1-eric@anholt.net>
-Message-ID: <20170831185416.8181-2-eric@anholt.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 31 Aug 2017 20:21:54 +0100
+Subject: [PATCH 0/3] pci: add support for firmware initialized designware
+ RCs
+In-Reply-To: <20170824164633.GI31858@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170821192907.8695-1-ard.biesheuvel@linaro.org>
+ <20170824164633.GI31858@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAKv+Gu_=utJ0vrWqgKq4Nrfg0AHb00tkM-0KO2UgGFu1VHdmvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is connected up to the backlight on 911360_entphn, which we'll
-need for a panel driver.  For now, leave the node disabled in the
-shared dtsi.
+On 24 August 2017 at 17:46, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Mon, Aug 21, 2017 at 08:29:04PM +0100, Ard Biesheuvel wrote:
+>> UEFI based systems incorporating a Synopsys Designware PCIe controller
+>> in RC mode will typically configure it before entering the OS. If this
+>> configuration is fully static and ECAM compliant, there is no need to
+>> expose particulars of the device to the OS, and we can simply describe
+>> it as "pci-host-ecam-generic".
+>
+> I *love* the idea of moving more of this to firmware.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Enough to consider the v3 of this series for v4.14? Rob has acked the
+binding, and as far as I am aware. it is ultimately up to you whether
+and when you take them as a pair. Also, I don't mind being listed as
+maintainer and/or reviewer either if it helps.
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 74f73ff24aec..b9a654d733ae 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -585,6 +585,14 @@
- 			status = "disabled";
- 		};
- 
-+		pwm: pwm at 180aa500 {
-+			compatible = "brcm,kona-pwm";
-+			reg = <0x180aa500 0xc4>;
-+			#pwm-cells = <3>;
-+			clocks = <&asiu_clks BCM_CYGNUS_ASIU_PWM_CLK>;
-+			status = "disabled";
-+		};
-+
- 		keypad: keypad at 180ac000 {
- 			compatible = "brcm,bcm-keypad";
- 			reg = <0x180ac000 0x14c>;
--- 
-2.14.1
+Thanks,
+Ard.
