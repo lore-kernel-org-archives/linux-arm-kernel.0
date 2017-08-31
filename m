@@ -1,23 +1,21 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Thu, 31 Aug 2017 08:27:40 +0200
-Subject: [PATCH v2 2/7] memory: atmel-ebi: Simplify SMC config code
-In-Reply-To: <7c857a5fb2c61109d5db9e185f60741a@dedf.co.uk>
-References: <7c857a5fb2c61109d5db9e185f60741a@dedf.co.uk>
-Message-ID: <16716411.UiFsKmejXl@ada>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 31 Aug 2017 14:45:28 +0800
+Subject: [PATCH 1/5] dt-bindings: add vendor prefix for Touchless
+ Biometric Systems AG
+In-Reply-To: <20170825092617.32533-1-maxime.ripard@free-electrons.com>
+References: <20170825092617.32533-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67rKLUKai48A9MKm5K8vOmrurL0akqoQusb0aTioPqNfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ian,
+On Fri, Aug 25, 2017 at 5:26 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> From: Tomas Novotny <tomas@novotny.cz>
+>
+> Signed-off-by: Tomas Novotny <tomas@novotny.cz>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Am Mittwoch, 30. August 2017, 13:53:57 schrieb ian.eperson at dedf.co.uk:
-> My understanding is that atmel_ebi_xslate_smc_timings() returns true
-> (>0), false (0) or error (<0) so the first test here should be:
-> 
-> 	if(ret<0)
+A description of the vendor would be nice (though the name
+pretty much says it all).
 
-I came to the same conclusions in July and sent a patch which was 
-already applied with commit bc9b934b2fbbd51008a1b52c0cd1b457e6440736 on 
-master.
-
-Greets
-Alex
+Acked-by: Chen-Yu Tsai <wens@csie.org>
