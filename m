@@ -1,29 +1,22 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 31 Aug 2017 10:56:59 -0700
-Subject: [PATCH] clk: sunxi: fix uninitialized access
-In-Reply-To: <20170823143937.2176025-1-arnd@arndb.de>
-References: <20170823143937.2176025-1-arnd@arndb.de>
-Message-ID: <20170831175659.GE21656@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 31 Aug 2017 12:57:27 -0500
+Subject: [PATCH ] phy: rcar-gen2: Add r8a7743/5 support
+In-Reply-To: <1503568773-41410-1-git-send-email-biju.das@bp.renesas.com>
+References: <1503568773-41410-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170831175727.tjncwk2c2gvzmlzb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23, Arnd Bergmann wrote:
-> gcc-8 reports an uninitialized variable access in a code path
-> that we would see with incorrect DTB input:
+On Thu, Aug 24, 2017 at 10:59:33AM +0100, Biju Das wrote:
+> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
+> USB PHY is identical to the R-Car Gen2 family.
 > 
-> drivers/clk/sunxi/clk-sun8i-bus-gates.c: In function 'sun8i_h3_bus_gates_init':
-> drivers/clk/sunxi/clk-sun8i-bus-gates.c:85:27: error: 'clk_parent' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> 
-> This works around by skipping invalid input and printing a warning
-> instead if it ever happens. The problem was apparently part of the
-> initiali driver submission, but older compilers don't notice it.
-> 
-> Fixes: ab6e23a4e388 ("clk: sunxi: Add H3 clocks support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 > ---
+> This patch is tested against Linux next tag next-20170824 and 
+> renesas-dev branch renesas-devel-20170822-v4.13-rc6. 
+> 
+>  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 
-Applied to clk-next
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Rob Herring <robh@kernel.org>
