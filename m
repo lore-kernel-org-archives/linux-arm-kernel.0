@@ -1,66 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Aug 2017 18:47:54 +0100
-Subject: [PATCH v2] arm64: acpi/gtdt: validate CNTFRQ after having
- enabled the frame
-In-Reply-To: <20170821095623.27691-1-ard.biesheuvel@linaro.org>
-References: <20170821095623.27691-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170831174754.GB28341@leverpostej>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 31 Aug 2017 18:50:09 +0100
+Subject: [PATCH v6 3/7] acpi: apei: remove the unused code
+In-Reply-To: <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <59A84C51.3000506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Dongjiu Geng,
 
-Thanks for respinning this, and apologies for the delay.
+On 28/08/17 11:38, Dongjiu Geng wrote:
+> In current code logic, the two functions ghes_sea_add() and
+> ghes_sea_remove() are only called when CONFIG_ACPI_APEI_SEA
+> is defined. If not, it will return errors in the ghes_probe()
+> and not contiue. Hence, remove the unnecessary handling when
+> CONFIG_ACPI_APEI_SEI is not defined.
 
-On Mon, Aug 21, 2017 at 10:56:23AM +0100, Ard Biesheuvel wrote:
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index aae87c4c546e..c16fa694a47b 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1217,7 +1217,8 @@ arch_timer_mem_frame_get_cntfrq(struct arch_timer_mem_frame *frame)
+This doesn't match what the patch does. I get this feeling this is needed for
+some future patch you haven't included.
+
+
+> change since v5:
+> 1. remove the SEI notification type handling, because the SEI is
+>    asynchronous exception and the address is not accurate. so
+>    not call memory_failure() to handle it.
+
+Setting NOTIFY_SEI as the GHES entry's notification type means the OS should
+check the GHES->ErrorStatusAddress for CPER records when it receives an
+SError-Interrupt, as it may be a notification of an error from this error source.
+
+If you aren't handling the notification, why is this is in the HEST at all?
+(and if its not: its not firmware-first)
+
+
+James
+
+
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index d661d452b238..c15a08db2c7c 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -813,7 +813,6 @@ static struct notifier_block ghes_notifier_hed = {
+>  	.notifier_call = ghes_notify_hed,
+>  };
+>
+> -#ifdef CONFIG_ACPI_APEI_SEA
+>  static LIST_HEAD(ghes_sea);
+>
+>  /*
+> @@ -848,19 +847,6 @@ static void ghes_sea_remove(struct ghes *ghes)
+>  	mutex_unlock(&ghes_list_mutex);
+>  	synchronize_rcu();
 >  }
->  
->  static struct arch_timer_mem_frame * __init
-> -arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
-> +arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem,
-> +			       bool verify_freq)
->  {
->  	struct arch_timer_mem_frame *frame, *best_frame = NULL;
->  	void __iomem *cntctlbase;
-> @@ -1259,6 +1260,11 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
->  		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
->  			continue;
->  
-> +		if (verify_freq &&
-> +		    arch_timer_mem_frame_get_cntfrq(frame) != arch_timer_rate) {
-> +			pr_err(FW_BUG "Ignoring MMIO timer frame with incorrect CNTFRQ\n");
-> +			continue;
-> +		}
-
-I don't think this is quite right, since we only check this after
-skipping over frames (which are valid, but don't match our preferences
-w.r.t. the timer and counter).
-
-Can we move this before checking the CNTACR_RWPT and CNTACR_RPCT bits?
-
-I's still prefer that we give up (as we previously did), rather than
-skipping timers with bad CNTFRQ values, but I guess that really depends
-on whether we think we'll use more than one MMIO timer in future. Maybe
-we'll want to use one per socket or something like that.
-
-> @@ -1443,7 +1414,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->  	for (i = i; i < timer_count; i++) {
->  		timer = &timers[i];
->  
-> -		frame = arch_timer_mem_find_best_frame(timer);
-> +		frame = arch_timer_mem_find_best_frame(timer, true);
->  		if (frame)
->  			break;
-
-Previously we'd have checked all timers, then chosen the best one,
-whereas now we bail out once we find a timer with a usable frame.
-
-Is there any way we can make this check the remaining timers?
-
-Thanks,
-Mark.
+> -#else /* CONFIG_ACPI_APEI_SEA */
+> -static inline void ghes_sea_add(struct ghes *ghes)
+> -{
+> -	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not
+supported\n",
+> -	       ghes->generic->header.source_id);
+> -}
+> -
+> -static inline void ghes_sea_remove(struct ghes *ghes)
+> -{
+> -	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not
+supported\n",
+> -	       ghes->generic->header.source_id);
+> -}
+> -#endif /* CONFIG_ACPI_APEI_SEA */
+>
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>  /*
+>
