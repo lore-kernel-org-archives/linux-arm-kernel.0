@@ -1,16 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Aug 2017 22:29:35 -0700
-Subject: [PATCH] clk: uniphier: add ethernet clock control support
-In-Reply-To: <1503914243-24518-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1503914243-24518-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20170831052935.GZ21656@codeaurora.org>
+Date: Wed, 30 Aug 2017 22:29:21 -0700
+Subject: [PATCH] clk: gemini: hands off PCI OE bit
+In-Reply-To: <20170808190818.11740-1-linus.walleij@linaro.org>
+References: <20170808190818.11740-1-linus.walleij@linaro.org>
+Message-ID: <20170831052921.GY21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28, Kunihiko Hayashi wrote:
-> Add clock control for ethernet controller on Pro4, PXs2, LD11 and LD20.
+On 08/08, Linus Walleij wrote:
+> This bit is pin control, and needs to be carefully managed by the
+> new pin control driver.
 > 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
 
 Applied to clk-next
