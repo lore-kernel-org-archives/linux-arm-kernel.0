@@ -1,52 +1,67 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Thu, 31 Aug 2017 18:29:01 +0800
-Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
- implementation defined pmu core events
-In-Reply-To: <20170829124730.GH17961@rric.localdomain>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
- <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
- <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
- <20170829124730.GH17961@rric.localdomain>
-Message-ID: <b7c40672-8997-c202-7cc2-35b8bc79ecda@hisilicon.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 31 Aug 2017 11:36:07 +0100
+Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu
+ capacity-dmips-mhz information
+In-Reply-To: <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
+References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
+ <20170830144120.9312-3-dietmar.eggemann@arm.com>
+ <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
+Message-ID: <94c1d6c6-655a-2a63-1f01-06ac45990388@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-On 2017/8/29 20:47, Robert Richter wrote:
-> Shaokun,
-> 
-> On 29.08.17 17:26:00, Zhangshaokun wrote:
->> On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
->>> This is not a full event list, but a short list of useful events.
->>>
->>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>> ---
->>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->>>  2 files changed, 77 insertions(+)
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>>
+On 30/08/17 21:26, Krzysztof Kozlowski wrote:
+> On Wed, Aug 30, 2017 at 03:41:18PM +0100, Dietmar Eggemann wrote:
+>> The following 'capacity-dmips-mhz' dt property values are used:
 >>
->> I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
->> that would use vendor sub-folder?
->> Of course, appreciate maintainer's comments.
+>> Cortex-A15: 1024, Cortex-A7: 539
+>>
+>> They have been derived from the cpu_efficiency values:
+>>
+>> Cortex-A15: 3891, Cortex-A7: 2048
+>>
+>> by scaling them so that the Cortex-A15s (big cores) use 1024.
+>>
+>> The cpu_efficiency values were originally derived from the "Big.LITTLE
+>> Processing with ARM Cortex?-A15 & Cortex-A7" white paper
+>> (http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
+>> (3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
+>> Dhrystone benchmark.
+>>
+>> The following platforms are affected once cpu-invariant accounting
+>> support is re-connected to the task scheduler:
+>>
+>> arndale-octa, peach-pi, peach-pit, smdk5420
+>>
+>> The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
+>> 5800).
+>>
+>> $ cat /sys/devices/system/cpu/cpu*/cpu_capacity
+>> 1024
+>> 1024
+>> 1024
+>> 1024
+>> 389
+>> 389
+>> 389
+>> 389
 > 
-> this would just add another level of subdirectories. I rather would
-> prefer to have a per platform dir comparable to what is listed in
-> 
->  arch/arm64/Kconfig.platforms
-> 
+> I am missing something... shouldn't this be 539? Or is it scaled with
+> the clock-frequency (1 GHz) value?
 
-Check it again that not all vendors have specific platform config per SoC family,
-so this would not work for us (HiSilicon) and maybe some other vendors.
+Yeah, the capacity-dmips-mhz dt value of 539 for the little cpus is
+scaled by 1.3/1.8 (max cpu capacity/ system wide max cpu capacity):
 
-Thanks,
-Shaokun
+539 * 1.3/1.8 = 389
 
-> This is the same as Ganapat has implemented it.
-> 
-> -Robert
-> 
-> 
+This max cpu capacity scaling is part of both solutions, the 'cpu
+capacity-dmips-mhz' and the 'cpu_efficiency/clock-frequency dt property'
+one.
+
+The (original*) cpu capacity on a heterogeneous platform expresses uArch
+and max cpu frequency differences between the (logical) cpus of the
+system.
+
+* not further reduced by rt and/or irq pressure.
+
+[...]
