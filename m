@@ -1,49 +1,43 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 31 Aug 2017 18:56:23 +0900
-Subject: [PATCH] arm64: relax assembly code alignment from 16 byte to 4 byte
-Message-ID: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Aug 2017 11:39:35 +0200
+Subject: linux-next regression caused by "gpiolib: request the gpio
+ before querying its direction"
+In-Reply-To: <20170831092211.GP20805@n2100.armlinux.org.uk>
+References: <20170830112424.7a3a7c36@windsurf.lan>
+ <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
+ <87ziah2m3f.fsf@free-electrons.com>
+ <20170830161730.41919554@windsurf.lan>
+ <CACRpkdbxdkHukALfYMrM7w=1KNJKLBhGebbkEpMb3C3+nCfWOA@mail.gmail.com>
+ <20170831091812.6f7d417e@windsurf.lan>
+ <CAMuHMdVGkTQ0vnOg5o+t1J9qe79ySm0R8aE4msyuNLoVGHLD6A@mail.gmail.com>
+ <20170831092211.GP20805@n2100.armlinux.org.uk>
+Message-ID: <20170831113935.38028ff8@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aarch64 instructions must be word aligned.  The current 16 byte
-alignment is more than enough.  Relax it into 4 byte alignment.
+Hello,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On Thu, 31 Aug 2017 10:22:12 +0100, Russell King - ARM Linux wrote:
 
-I do not know why arm64 Linux requires 16 byte alignment.
+> What about hardware which you can configure for some alternate function
+> but still monitor the pin via GPIO, even though it's not mux'd as GPIO.
+> 
+> For instance, you may have a timer block which can capture on both
+> edges of an external event signal, which needs the pin to be muxed for
+> that function.  However, you need to read the state of the pin, and
+> that is only available through GPIO.  Muxing the pin to be a GPIO just
+> because someone requests the GPIO is, imho, ill thought-out and breaks
+> some use cases.
+> 
+> IMHO, the pinmux settings should always be specified in DT, and that's
+> what we should be using everywhere, not doing broken backdoor games like
+> "the gpio is being requested, it's obvious that we want this pin to be
+> a gpio" - that really doesn't follow.
 
-I dug git-history of arch/arm64/include/asm/linkage.h
-and the only commit I see is:
+Agreed.
 
-  commit aeed41a9371ee02257b608eb06a9058507a7d0f4
-  Author: Marc Zyngier <Marc.Zyngier@arm.com>
-  Date:   Fri Oct 19 17:33:27 2012 +0100
-
-      arm64: fix alignment padding in assembly code
-
-It just opt out of the asm-generic variant to remove 0x90.
-So, the amount of alignment might not be not optimized yet.
-
-Please correct me if I am missing something.
-
-
- arch/arm64/include/asm/linkage.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/linkage.h b/arch/arm64/include/asm/linkage.h
-index 636c1bc..1b26629 100644
---- a/arch/arm64/include/asm/linkage.h
-+++ b/arch/arm64/include/asm/linkage.h
-@@ -1,7 +1,7 @@
- #ifndef __ASM_LINKAGE_H
- #define __ASM_LINKAGE_H
- 
--#define __ALIGN		.align 4
--#define __ALIGN_STR	".align 4"
-+#define __ALIGN		.align 2
-+#define __ALIGN_STR	".align 2"
- 
- #endif
+Thomas
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
