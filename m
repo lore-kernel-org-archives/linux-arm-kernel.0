@@ -1,11 +1,12 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 31 Aug 2017 14:48:20 +0200
-Subject: [PATCH] usb: gadget: udc: atmel: set vbus irqflags explicitly
-Message-ID: <20170831124820.21423-1-nicolas.ferre@microchip.com>
+Date: Thu, 31 Aug 2017 14:51:40 +0200
+Subject: [PATCH RESEND new email address] usb: gadget: udc: atmel: set vbus
+ irqflags explicitly
+In-Reply-To: <20170831124820.21423-1-nicolas.ferre@microchip.com>
+References: <20170831124820.21423-1-nicolas.ferre@microchip.com>
+Message-ID: <20170831125140.21600-1-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 The driver triggers actions on both edges of the vbus signal.
 
@@ -16,7 +17,7 @@ IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING.
 Without this patch we may trigger the connection with host but only on some
 bouncing signal conditions and thus lose connecting events.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 Cc: stable <stable@vger.kernel.org> # v4.4+
 ---
  drivers/usb/gadget/udc/atmel_usba_udc.c | 4 +++-
