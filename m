@@ -1,81 +1,124 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Thu, 31 Aug 2017 16:20:41 +0800
-Subject: [RFC PATCH 5/6] iommu/arm-smmu-v3: fix panic when handle stall mode
- irq
-In-Reply-To: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
-References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1504167642-14922-6-git-send-email-xieyisheng1@huawei.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 31 Aug 2017 11:30:50 +0300
+Subject: [PATCH] arm64: move  TASK_* definitions to <asm/processor.h>
+Message-ID: <20170831083050.15396-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When SMMU do not support SVM feature, however the master support SVM,
-which means matser can stall and with mult-pasid number, then the user
-can bind a task to device using API like iommu_bind_task(). however,
-when device trigger a stall mode fault i will cause panic:
+ILP32 series [1] introduces the dependency on <asm/is_compat.h> for
+TASK_SIZE macro. Which in turn requires <asm/thread_info.h>, and
+<asm/thread_info.h> include <asm/memory.h>, giving a circular dependency,
+because TASK_SIZE is currently located in <asm/memory.h>.
 
-[  106.996087] Unable to handle kernel NULL pointer dereference at virtual address 00000100
-[  106.996122] user pgtable: 4k pages, 48-bit VAs, pgd = ffff80003e023000
-[  106.996150] [0000000000000100] *pgd=000000003e04a003, *pud=000000003e04b003, *pmd=0000000000000000
-[  106.996201] Internal error: Oops: 96000006 [#1] PREEMPT SM
-[  106.996224] Modules linked in:
-[  106.996256] CPU: 0 PID: 916 Comm: irq/14-arm-smmu Not tainted 4.13.0-rc5-00035-g1235ddd-dirty #67
-[  106.996288] Hardware name: Hisilicon PhosphorHi1383 ESL (DT)
-[  106.996317] task: ffff80003adc1c00 task.stack: ffff80003a9f8000
-[  106.996347] PC is at __queue_work+0x30/0x3a8
-[  106.996374] LR is at queue_work_on+0x60/0x78
-[  106.996401] pc : [<ffff0000080d7d10>] lr : [<ffff0000080d80e8>] pstate: 40c001c9
-[  106.996430] sp : ffff80003a9fbc20
-[  106.996451] x29: ffff80003a9fbc20 x28: ffff80003adc1c00
-[  106.996488] x27: ffff000008d05080 x26: ffff80003ab0e028
-[  106.996526] x25: ffff80003a9900ac x24: 0000000000000001
-[  106.996562] x23: 0000000000000040 x22: 0000000000000000
-[  106.996598] x21: 0000000000000000 x20: 0000000000000140
-[  106.996634] x19: ffff80003ab0e028 x18: 0000000000000010
-[  106.996670] x17: 0000ffffa52a5040 x16: ffff00000820f260
-[  106.996708] x15: 00000018e97629e0 x14: ffff80003fb89468
-[  106.996744] x13: 0000000000000000 x12: ffff80003abb0600
-[  106.996781] x11: 0000000000000000 x10: 0000010100000100
-[  106.996817] x9 : 0000ffff85de5010 x8 : 00000000e4830001
-[  106.996854] x7 : ffff80003a9fbcf8 x6 : 0000000fffffffe0
-[  106.996890] x5 : 0000000000000000 x4 : 0000000000000001
-[  106.996926] x3 : 0000000000000000 x2 : ffff80003ab0e028
-[  106.996962] x1 : 0000000000000000 x0 : 00000000000001c0
-[  106.997002] Process irq/14-arm-smmu (pid: 916, stack limit =0xffff80003a9f8000)
-[  106.997035] Stack: (0xffff80003a9fbc20 to 0xffff80003a9fc000)
-[...]
-[  106.998366] Call trace:
-[  106.998842] [<ffff0000080d7d10>] __queue_work+0x30/0x3a8
-[  106.998874] [<ffff0000080d80e8>] queue_work_on+0x60/0x78
-[  106.998912] [<ffff00000857aae4>] arm_smmu_handle_stall+0x104/0x138
-[  106.998952] [<ffff00000857b150>] arm_smmu_evtq_thread+0xc0/0x158
-[  106.998989] [<ffff000008112128>] irq_thread_fn+0x28/0x68
-[  106.999025] [<ffff0000081123e0>] irq_thread+0x128/0x1d0
-[  106.999060] [<ffff0000080df6bc>] kthread+0xfc/0x128
-[  106.999093] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
-[  106.999130] Code: a90153f3 a90573fb d53b4220 363814c0 (b94102a0)
-[  106.999159] ---[ end trace 7e5c9f0cb1f2fecd ]---
+In other architectures, TASK_SIZE is defined in <asm/processor.h>, and
+moving TASK_SIZE there fixes the problem. 
 
-And the resean is we donot init fault_queue while the fault handle need
-to use it. Fix by return -EINVAL in arm_smmu_bind_task() when smmu do not
-support the feature of SVM.
+Discussion: https://patchwork.kernel.org/patch/9929107/
 
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+[1] https://github.com/norov/linux/tree/ilp32-next
+
+CC: Will Deacon <will.deacon@arm.com>
+CC: Laura Abbott <labbott@redhat.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/memory.h    | 15 ---------------
+ arch/arm64/include/asm/processor.h | 21 +++++++++++++++++++++
+ arch/arm64/kernel/entry.S          |  2 +-
+ 3 files changed, 22 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index d44256a..dbda2eb 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2922,6 +2922,8 @@ static int arm_smmu_bind_task(struct device *dev, struct task_struct *task,
- 		return -EINVAL;
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 3585a5e26151..87296a6ed1b3 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -61,8 +61,6 @@
+  * KIMAGE_VADDR - the virtual address of the start of the kernel image
+  * VA_BITS - the maximum number of bits for virtual addresses.
+  * VA_START - the first kernel virtual address.
+- * TASK_SIZE - the maximum size of a user space task.
+- * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+  */
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) - \
+@@ -77,19 +75,6 @@
+ #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+-#define TASK_SIZE_64		(UL(1) << VA_BITS)
+-
+-#ifdef CONFIG_COMPAT
+-#define TASK_SIZE_32		UL(0x100000000)
+-#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
+-				TASK_SIZE_32 : TASK_SIZE_64)
+-#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+-				TASK_SIZE_32 : TASK_SIZE_64)
+-#else
+-#define TASK_SIZE		TASK_SIZE_64
+-#endif /* CONFIG_COMPAT */
+-
+-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
  
- 	smmu = master->smmu;
-+	if (!(smmu->features & ARM_SMMU_FEAT_SVM))
-+		return -EINVAL;
+ #define KERNEL_START      _text
+ #define KERNEL_END        _end
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 29adab8138c3..7dddca21fc64 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -19,6 +19,10 @@
+ #ifndef __ASM_PROCESSOR_H
+ #define __ASM_PROCESSOR_H
  
- 	domain = iommu_get_domain_for_dev(dev);
- 	if (WARN_ON(!domain))
++#define TASK_SIZE_64		(UL(1) << VA_BITS)
++
++#ifndef __ASSEMBLY__
++
+ /*
+  * Default implementation of macro that returns current
+  * instruction pointer ("program counter").
+@@ -37,6 +41,22 @@
+ #include <asm/ptrace.h>
+ #include <asm/types.h>
+ 
++/*
++ * TASK_SIZE - the maximum size of a user space task.
++ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
++ */
++#ifdef CONFIG_COMPAT
++#define TASK_SIZE_32		UL(0x100000000)
++#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
++				TASK_SIZE_32 : TASK_SIZE_64)
++#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
++				TASK_SIZE_32 : TASK_SIZE_64)
++#else
++#define TASK_SIZE		TASK_SIZE_64
++#endif /* CONFIG_COMPAT */
++
++#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
++
+ #define STACK_TOP_MAX		TASK_SIZE_64
+ #ifdef CONFIG_COMPAT
+ #define AARCH32_VECTORS_BASE	0xffff0000
+@@ -194,4 +214,5 @@ static inline void spin_lock_prefetch(const void *ptr)
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
+ 
++#endif /* __ASSEMBLY__ */
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e1c59d4008a8..f5e851eeda4b 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -28,7 +28,7 @@
+ #include <asm/errno.h>
+ #include <asm/esr.h>
+ #include <asm/irq.h>
+-#include <asm/memory.h>
++#include <asm/processor.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ #include <asm/asm-uaccess.h>
 -- 
-1.7.12.4
+2.11.0
