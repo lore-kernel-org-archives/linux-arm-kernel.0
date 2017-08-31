@@ -1,165 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 Aug 2017 12:27:09 +0100
-Subject: [PATCH v2] nd_blk: Remove mmio_flush_range()
-Message-ID: <c92a50f21a01a0c1c809c3910251f596ddbc3acd.1504178199.git.robin.murphy@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Aug 2017 12:30:39 +0100
+Subject: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
+In-Reply-To: <10be1849-8071-64fc-5ee2-b6e429c64b9e@arm.com>
+References: <1504171424-15536-1-git-send-email-Bharat.Bhushan@nxp.com>
+ <06c57ca4-edaa-df26-b1d9-1906141c5065@arm.com>
+ <AM5PR0401MB2545B7C55F634D7B9CABAE629A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+ <10be1849-8071-64fc-5ee2-b6e429c64b9e@arm.com>
+Message-ID: <20170831113039.GF15031@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmio_flush_range() suffers from a lack of clearly-defined semantics,
-and is somewhat ambiguous to port to other architectures where the
-scope of the writeback implied by "flush" and ordering might matter,
-but MMIO would tend to imply non-cacheable anyway. Per the rationale
-in 67a3e8fe9015 ("nd_blk: change aperture mapping from WC to WB"), the
-only existing use is actually to invalidate clean cache lines for
-ARCH_MEMREMAP_PMEM type mappings *without* writeback. Since the recent
-cleanup of the pmem API, that also now happens to be the exact purpose
-of arch_invalidate_pmem(), which would be a far more well-defined tool
-for the job.
+On Thu, Aug 31, 2017 at 11:49:37AM +0100, Marc Zyngier wrote:
+> [Fixing Mark's address...]
 
-Rather than risk potentially inconsistent implementations of
-mmio_flush_range() for the sake of one callsite, streamline things by
-removing it entirely and instead move the ARCH_MEMREMAP_PMEM related
-definitions up to the libnvdimm level, so they can be shared by NFIT
-as well. This allows NFIT to be enabled for arm64.
+Thanks!
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/x86/Kconfig                  |  1 -
- arch/x86/include/asm/cacheflush.h |  2 --
- drivers/acpi/nfit/Kconfig         |  2 +-
- drivers/acpi/nfit/core.c          |  2 +-
- drivers/nvdimm/pmem.h             | 14 --------------
- include/linux/libnvdimm.h         | 15 +++++++++++++++
- lib/Kconfig                       |  3 ---
- tools/testing/nvdimm/test/nfit.c  |  4 ++--
- 8 files changed, 19 insertions(+), 24 deletions(-)
+> On 31/08/17 11:41, Bharat Bhushan wrote:
+> > 
+> >> -----Original Message-----
+> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> >> Sent: Thursday, August 31, 2017 3:02 PM
+> >> To: Bharat Bhushan <bharat.bhushan@nxp.com>; robh+dt at kernel.org;
+> >> ark.rutland at arm.com; will.deacon at arm.com; oss at buserror.net; Gang Liu
+> >> <gang.liu@nxp.com>; devicetree at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> >> catalin.marinas at arm.com
+> >> Subject: Re: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
+> >>
+> >> On 31/08/17 10:23, Bharat Bhushan wrote:
+> >>> This patch adds iommu-map property for PCIe, which enables SMMU for
+> >>> these devices on LS208xA devices.
+> >>>
+> >>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
+> >>> ---
+> >>>  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++++
+> >>>  1 file changed, 4 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> index 94cdd30..67cf605 100644
+> >>> --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> @@ -606,6 +606,7 @@
+> >>>  			num-lanes = <4>;
+> >>>  			bus-range = <0x0 0xff>;
+> >>>  			msi-parent = <&its>;
+> >>> +			iommu-map = <0 &smmu 0 1>;	/* This is fixed-up by
+> >> u-boot */
+> >>
+> >> What does this do when your version of u-boot doesn't fill this in for you?
+> > 
+> > Good question, frankly I have not thought of this case before.
+> > But if we pass length = 0 in above property then no fixup happen with
+> > happen with older u-boot. In this case of_iommu_configure() will
+> > return NULL iommu-ops and it switch to swio-tlb. Will that work?
+> I really don't like this. You rely on having invalid data in the DT, and
+> that seems just wrong.
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 781521b7cf9e..5f3b756ec0d3 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -53,7 +53,6 @@ config X86
- 	select ARCH_HAS_FORTIFY_SOURCE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_KCOV			if X86_64
--	select ARCH_HAS_MMIO_FLUSH
- 	select ARCH_HAS_PMEM_API		if X86_64
- 	select ARCH_HAS_UACCESS_FLUSHCACHE	if X86_64
- 	select ARCH_HAS_SET_MEMORY
-diff --git a/arch/x86/include/asm/cacheflush.h b/arch/x86/include/asm/cacheflush.h
-index 8b4140f6724f..cb9a1af109b4 100644
---- a/arch/x86/include/asm/cacheflush.h
-+++ b/arch/x86/include/asm/cacheflush.h
-@@ -7,6 +7,4 @@
- 
- void clflush_cache_range(void *addr, unsigned int size);
- 
--#define mmio_flush_range(addr, size) clflush_cache_range(addr, size)
--
- #endif /* _ASM_X86_CACHEFLUSH_H */
-diff --git a/drivers/acpi/nfit/Kconfig b/drivers/acpi/nfit/Kconfig
-index 6d3351452ea2..929ba4da0b30 100644
---- a/drivers/acpi/nfit/Kconfig
-+++ b/drivers/acpi/nfit/Kconfig
-@@ -2,7 +2,7 @@ config ACPI_NFIT
- 	tristate "ACPI NVDIMM Firmware Interface Table (NFIT)"
- 	depends on PHYS_ADDR_T_64BIT
- 	depends on BLK_DEV
--	depends on ARCH_HAS_MMIO_FLUSH
-+	depends on ARCH_HAS_PMEM_API
- 	select LIBNVDIMM
- 	help
- 	  Infrastructure to probe ACPI 6 compliant platforms for
-diff --git a/drivers/acpi/nfit/core.c b/drivers/acpi/nfit/core.c
-index 19182d091587..ee7726a16693 100644
---- a/drivers/acpi/nfit/core.c
-+++ b/drivers/acpi/nfit/core.c
-@@ -1930,7 +1930,7 @@ static int acpi_nfit_blk_single_io(struct nfit_blk *nfit_blk,
- 			memcpy_flushcache(mmio->addr.aperture + offset, iobuf + copied, c);
- 		else {
- 			if (nfit_blk->dimm_flags & NFIT_BLK_READ_FLUSH)
--				mmio_flush_range((void __force *)
-+				arch_invalidate_pmem((void __force *)
- 					mmio->addr.aperture + offset, c);
- 
- 			memcpy(iobuf + copied, mmio->addr.aperture + offset, c);
-diff --git a/drivers/nvdimm/pmem.h b/drivers/nvdimm/pmem.h
-index 5434321cad67..c5917f040fa7 100644
---- a/drivers/nvdimm/pmem.h
-+++ b/drivers/nvdimm/pmem.h
-@@ -5,20 +5,6 @@
- #include <linux/pfn_t.h>
- #include <linux/fs.h>
- 
--#ifdef CONFIG_ARCH_HAS_PMEM_API
--#define ARCH_MEMREMAP_PMEM MEMREMAP_WB
--void arch_wb_cache_pmem(void *addr, size_t size);
--void arch_invalidate_pmem(void *addr, size_t size);
--#else
--#define ARCH_MEMREMAP_PMEM MEMREMAP_WT
--static inline void arch_wb_cache_pmem(void *addr, size_t size)
--{
--}
--static inline void arch_invalidate_pmem(void *addr, size_t size)
--{
--}
--#endif
--
- /* this definition is in it's own header for tools/testing/nvdimm to consume */
- struct pmem_device {
- 	/* One contiguous memory region per device */
-diff --git a/include/linux/libnvdimm.h b/include/linux/libnvdimm.h
-index f3d3e6af8838..d11bc9881206 100644
---- a/include/linux/libnvdimm.h
-+++ b/include/linux/libnvdimm.h
-@@ -173,4 +173,19 @@ u64 nd_fletcher64(void *addr, size_t len, bool le);
- void nvdimm_flush(struct nd_region *nd_region);
- int nvdimm_has_flush(struct nd_region *nd_region);
- int nvdimm_has_cache(struct nd_region *nd_region);
-+
-+#ifdef CONFIG_ARCH_HAS_PMEM_API
-+#define ARCH_MEMREMAP_PMEM MEMREMAP_WB
-+void arch_wb_cache_pmem(void *addr, size_t size);
-+void arch_invalidate_pmem(void *addr, size_t size);
-+#else
-+#define ARCH_MEMREMAP_PMEM MEMREMAP_WT
-+static inline void arch_wb_cache_pmem(void *addr, size_t size)
-+{
-+}
-+static inline void arch_invalidate_pmem(void *addr, size_t size)
-+{
-+}
-+#endif
-+
- #endif /* __LIBNVDIMM_H__ */
-diff --git a/lib/Kconfig b/lib/Kconfig
-index 6762529ad9e4..527da69e3be1 100644
---- a/lib/Kconfig
-+++ b/lib/Kconfig
-@@ -559,9 +559,6 @@ config ARCH_HAS_PMEM_API
- config ARCH_HAS_UACCESS_FLUSHCACHE
- 	bool
- 
--config ARCH_HAS_MMIO_FLUSH
--	bool
--
- config STACKDEPOT
- 	bool
- 	select STACKTRACE
-diff --git a/tools/testing/nvdimm/test/nfit.c b/tools/testing/nvdimm/test/nfit.c
-index 4c2fa98ef39d..d20791c3f499 100644
---- a/tools/testing/nvdimm/test/nfit.c
-+++ b/tools/testing/nvdimm/test/nfit.c
-@@ -1546,8 +1546,8 @@ static int nfit_test_blk_do_io(struct nd_blk_region *ndbr, resource_size_t dpa,
- 	else {
- 		memcpy(iobuf, mmio->addr.base + dpa, len);
- 
--		/* give us some some coverage of the mmio_flush_range() API */
--		mmio_flush_range(mmio->addr.base + dpa, len);
-+		/* give us some some coverage of the arch_invalidate_pmem() API */
-+		arch_invalidate_pmem(mmio->addr.base + dpa, len);
- 	}
- 	nd_region_release_lane(nd_region, lane);
- 
--- 
-2.13.4.dirty
+Indeed.
+
+Either the property should be valid (and correctly representing the HW),
+or it shouldn't be present. Relying on kernel implementation details is
+*not* OK.
+
+Thanks,
+Mark.
