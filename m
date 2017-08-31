@@ -1,10 +1,10 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Aug 2017 22:32:18 -0700
-Subject: [PATCH 1/2] clk: imx: constify clk_div_table
-In-Reply-To: <1503898133-10862-2-git-send-email-arvind.yadav.cs@gmail.com>
+Date: Wed, 30 Aug 2017 22:32:22 -0700
+Subject: [PATCH 2/2] clk: zte: constify clk_div_table
+In-Reply-To: <1503898133-10862-3-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1503898133-10862-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1503898133-10862-2-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20170831053218.GA21656@codeaurora.org>
+ <1503898133-10862-3-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20170831053222.GB21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
