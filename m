@@ -1,51 +1,91 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Thu, 31 Aug 2017 13:18:27 +0200
-Subject: [RFC PATCH v9 5/7] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170831103119.GC15031@leverpostej>
-References: <20170829131238.4988-1-jglauber@cavium.com>
- <20170829131238.4988-6-jglauber@cavium.com>
- <a89f597e-885d-a8bd-f6ce-452d7025cb20@hisilicon.com>
- <20170831095746.GB15906@hc> <20170831103119.GC15031@leverpostej>
-Message-ID: <20170831111827.GD15906@hc>
+From: bharat.bhushan@nxp.com (Bharat Bhushan)
+Date: Thu, 31 Aug 2017 11:22:31 +0000
+Subject: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
+In-Reply-To: <10be1849-8071-64fc-5ee2-b6e429c64b9e@arm.com>
+References: <1504171424-15536-1-git-send-email-Bharat.Bhushan@nxp.com>
+ <06c57ca4-edaa-df26-b1d9-1906141c5065@arm.com>
+ <AM5PR0401MB2545B7C55F634D7B9CABAE629A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+ <10be1849-8071-64fc-5ee2-b6e429c64b9e@arm.com>
+Message-ID: <AM5PR0401MB2545043022CAE0CDECA6267E9A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 11:31:20AM +0100, Mark Rutland wrote:
-> On Thu, Aug 31, 2017 at 11:57:46AM +0200, Jan Glauber wrote:
-> > On Wed, Aug 30, 2017 at 10:54:03AM +0800, Zhangshaokun wrote:
-> > > On 2017/8/29 21:12, Jan Glauber wrote:
 
-[...]
 
-> > > > diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> > > > index 82b30e6..ca84ac8 100644
-> > > > --- a/include/linux/cpuhotplug.h
-> > > > +++ b/include/linux/cpuhotplug.h
-> > > > @@ -139,6 +139,7 @@ enum cpuhp_state {
-> > > >  	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
-> > > >  	CPUHP_AP_WORKQUEUE_ONLINE,
-> > > >  	CPUHP_AP_RCUTREE_ONLINE,
-> > > > +	CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> > > 
-> > > Alphabetic order?
-> > 
-> > These don't look alphabetically ordered to me.
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Thursday, August 31, 2017 4:20 PM
+> To: Bharat Bhushan <bharat.bhushan@nxp.com>; robh+dt at kernel.org;
+> Mark Rutland <mark.rutland@arm.com>; will.deacon at arm.com;
+> oss at buserror.net; Gang Liu <gang.liu@nxp.com>;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; catalin.marinas at arm.com
+> Subject: Re: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
 > 
-> Sure, the full list is ordered by dependency.
+> [Fixing Mark's address...]
 > 
-> However, we've generally kept the uncore PMUs together, and within the
-> group of system PMU CPUHP_AP_PERF_ARM_* callbacks, we've retained
-> alphabetical order.
+> On 31/08/17 11:41, Bharat Bhushan wrote:
+> >
+> >> -----Original Message-----
+> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> >> Sent: Thursday, August 31, 2017 3:02 PM
+> >> To: Bharat Bhushan <bharat.bhushan@nxp.com>; robh+dt at kernel.org;
+> >> ark.rutland at arm.com; will.deacon at arm.com; oss at buserror.net; Gang
+> Liu
+> >> <gang.liu@nxp.com>; devicetree at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> >> catalin.marinas at arm.com
+> >> Subject: Re: [PATCH] RM64: dts: ls208xa: Add iommu-map property for
+> >> pci
+> >>
+> >> On 31/08/17 10:23, Bharat Bhushan wrote:
+> >>> This patch adds iommu-map property for PCIe, which enables SMMU for
+> >>> these devices on LS208xA devices.
+> >>>
+> >>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
+> >>> ---
+> >>>  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++++
+> >>>  1 file changed, 4 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> index 94cdd30..67cf605 100644
+> >>> --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> >>> @@ -606,6 +606,7 @@
+> >>>  			num-lanes = <4>;
+> >>>  			bus-range = <0x0 0xff>;
+> >>>  			msi-parent = <&its>;
+> >>> +			iommu-map = <0 &smmu 0 1>;	/* This is fixed-up by
+> >> u-boot */
+> >>
+> >> What does this do when your version of u-boot doesn't fill this in for you?
+> >
+> > Good question, frankly I have not thought of this case before.
+> > But if we pass length = 0 in above property then no fixup happen with
+> > happen with older u-boot. In this case of_iommu_configure() will
+> > return NULL iommu-ops and it switch to swio-tlb. Will that work?
+> I really don't like this. You rely on having invalid data in the DT, and that
+> seems just wrong.
 > 
-> Does this PMU need workqueues and RCU up before its HP callback is
-> invoked? Or can this be moved into the group of CPUHP_AP_PERF_ARM_*
-> above CPUHP_AP_WORKQUEUE_ONLINE and CPUHP_AP_RCUTREE_ONLINE? i.e.
-> between CPUHP_AP_PERF_ARM_CCN_ONLINE and CPUHP_AP_PERF_ARM_L2X0_ONLINE.
+> Why can't u-boot just generate that property, and we leave the DT alone?
 
-I think I can move it inside the CPUHP_AP_PERF_ARM_* group.
+We do not have smmu phandle allowing uboot to generate this.
 
---Jan
+> Or even better, you provide the right information for the few boards that are
+> based on this SoC, not relying on u-boot for anything that is in the kernel
+> tree?
 
-> THanks,
-> Mark.
+On our platforms we have a h/w table which converts RID->Device-Id. I will check what will happen if that table is not initialized, can RID be equal to device-id is that case.
+If that will be allowed than we can give right information that will work with u-boot not updating this property.
+
+Will revert after confirming this.
+
+Thanks
+-Bharat
+> 
+> Thanks,
+> 
+> M.
+> --
+> Jazz is not dead. It just smells funny...
