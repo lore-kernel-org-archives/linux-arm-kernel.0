@@ -1,101 +1,66 @@
 From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Thu, 31 Aug 2017 16:20:42 +0800
-Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
- STE.S1STALLD and CD.S
-In-Reply-To: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
-References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
+Date: Thu, 31 Aug 2017 16:20:36 +0800
+Subject: [RFC PATCH 0/6] Add platform device SVM support for ARM SMMUv3
+Message-ID: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
-means we should not disable stall mode if stall/terminate mode is not
-configuable.
+Jean-Philippe has post a patchset for Adding PCIe SVM support to ARM SMMUv3:
+https://www.spinics.net/lists/arm-kernel/msg565155.html
 
-Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
-means if stall mode is force we should always set CD.S.
+But for some platform devices(aka on-chip integrated devices), there is also
+SVM requirement, which works based on the SMMU stall mode.
+Jean-Philippe has prepared a prototype patchset to support it:
+git://linux-arm.org/linux-jpb.git svm/stall
 
-This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
-TERMINATE feature checking to ensue above ILLEGAL cases from happening.
+We tested this patchset with some fixes on a on-chip integrated device. The
+basic function is ok, so I just send them out for review, although this
+patchset heavily depends on the former patchset (PCIe SVM support for ARM
+SMMUv3), which is still under discussion.
 
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+Patch Overview:
+*1 to 3 prepare for device tree or acpi get the device stall ability and pasid bits
+*4 is to realise the SVM function for platform device
+*5 is fix a bug when test SVM function while SMMU donnot support this feature
+*6 avoid ILLEGAL setting of STE and CD entry about stall
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index dbda2eb..0745522 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -55,6 +55,7 @@
- #define IDR0_STALL_MODEL_SHIFT		24
- #define IDR0_STALL_MODEL_MASK		0x3
- #define IDR0_STALL_MODEL_STALL		(0 << IDR0_STALL_MODEL_SHIFT)
-+#define IDR0_STALL_MODEL_NS		(1 << IDR0_STALL_MODEL_SHIFT)
- #define IDR0_STALL_MODEL_FORCE		(2 << IDR0_STALL_MODEL_SHIFT)
- #define IDR0_TTENDIAN_SHIFT		21
- #define IDR0_TTENDIAN_MASK		0x3
-@@ -766,6 +767,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_SVM		(1 << 15)
- #define ARM_SMMU_FEAT_HA		(1 << 16)
- #define ARM_SMMU_FEAT_HD		(1 << 17)
-+#define ARM_SMMU_FEAT_TERMINATE		(1 << 18)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -1402,6 +1404,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_domain *smmu_domain,
- 	u64 val;
- 	bool cd_live;
- 	__u64 *cdptr = arm_smmu_get_cd_ptr(smmu_domain, ssid);
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 
- 	/*
- 	 * This function handles the following cases:
-@@ -1468,9 +1471,11 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_domain *smmu_domain,
- 		      CTXDESC_CD_0_V;
- 
- 		/*
--		 * FIXME: STALL_MODEL==0b10 && CD.S==0 is ILLEGAL
-+		 * STALL_MODEL==0b10 && CD.S==0 is ILLEGAL
- 		 */
--		if (ssid && smmu_domain->s1_cfg.can_stall)
-+		if ((ssid && smmu_domain->s1_cfg.can_stall) ||
-+		    (!(smmu->features & ARM_SMMU_FEAT_TERMINATE) &&
-+		    smmu->features & ARM_SMMU_FEAT_STALLS))
- 			val |= CTXDESC_CD_0_S;
- 
- 		cdptr[0] = cpu_to_le64(val);
-@@ -1690,12 +1695,13 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 			dst[1] |= STRTAB_STE_1_PPAR;
- 
- 		/*
--		 * FIXME: it is illegal to set S1STALLD if STALL_MODEL=0b10
--		 * (force). But according to the spec, it *must* be set for
-+		 * According to spec, it is illegal to set S1STALLD if
-+		 * STALL_MODEL is not 0b00. And it *must* be set for
- 		 * devices that aren't capable of stalling (notably pci!)
--		 * So we need a "STALL_MODEL=0b00" feature bit.
- 		 */
--		if (smmu->features & ARM_SMMU_FEAT_STALLS && !ste->can_stall)
-+		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
-+		    smmu->features & ARM_SMMU_FEAT_TERMINATE &&
-+		    !ste->can_stall)
- 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
- 
- 		val |= (s1ctxptr & STRTAB_STE_0_S1CTXPTR_MASK
-@@ -4577,9 +4583,13 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 
- 	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
- 	case IDR0_STALL_MODEL_STALL:
-+		smmu->features |= ARM_SMMU_FEAT_TERMINATE;
- 		/* Fallthrough */
- 	case IDR0_STALL_MODEL_FORCE:
- 		smmu->features |= ARM_SMMU_FEAT_STALLS;
-+		break;
-+	case IDR0_STALL_MODEL_NS:
-+		smmu->features |= ARM_SMMU_FEAT_TERMINATE;
- 	}
- 
- 	if (reg & IDR0_S1P)
--- 
+Acctually here, I also have a question about SVM on SMMUv3:
+
+1. Why the SVM feature on SMMUv3 depends on BTM feature? when bind a task to device,
+   it will register a mmu_notify. Therefore, when a page range is invalid, we can
+   send TLBI or ATC invalid without BTM?
+
+2. According to ACPI IORT spec, named component specific data has a node flags field
+   whoes bit0 is for Stall support. However, it do not have any field for pasid bit.
+   Can we use other 5 bits[5:1] for pasid bit numbers, so we can have 32 pasid bit for
+   a single platform device which should be enough, because SMMU only support 20 bit pasid
+
+3. Presently, the pasid is allocate for a task but not for a context, if a task is trying
+   to bind to 2 device A and B:
+     a) A support 5 pasid bits
+     b) B support 2 pasid bits
+     c) when the task bind to device A, it allocate pasid = 16
+     d) then it must be fail when trying to bind to task B, for its highest pasid is 4.
+   So it should allocate a single pasid for a context to avoid this?
+
+
+Jean-Philippe Brucker (3):
+  dt-bindings: document stall and PASID properties for IOMMU masters
+  iommu/of: Add stall and pasid properties to iommu_fwspec
+  iommu/arm-smmu-v3: Add SVM support for platform devices
+
+Yisheng Xie (3):
+  ACPI: IORT: Add stall and pasid properties to iommu_fwspec
+  iommu/arm-smmu-v3: fix panic when handle stall mode irq
+  iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD and CD.S
+
+ Documentation/devicetree/bindings/iommu/iommu.txt |  13 ++
+ drivers/acpi/arm64/iort.c                         |  20 ++
+ drivers/iommu/arm-smmu-v3.c                       | 230 ++++++++++++++++++----
+ drivers/iommu/of_iommu.c                          |  11 +
+ include/acpi/actbl2.h                             |   5 +
+ include/linux/iommu.h                             |   2 +
+ 6 files changed, 244 insertions(+), 37 deletions(-)
+
+--
 1.7.12.4
