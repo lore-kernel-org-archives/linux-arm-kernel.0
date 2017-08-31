@@ -1,55 +1,66 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 31 Aug 2017 12:01:40 -0500
-Subject: [PATCH] scripts/dtc: fix '%zx' warning
-In-Reply-To: <20170831161611.GT20805@n2100.armlinux.org.uk>
-References: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
- <20170726013004.GJ8978@umbus.fritz.box>
- <20170808112818.GC20805@n2100.armlinux.org.uk>
- <20170809040642.GG13670@umbus.fritz.box>
- <CAL_JsqKiM_T-ftd8NvHmzcRsirRWTe34jZRjZ=3NGSgb4HGncQ@mail.gmail.com>
- <20170831161611.GT20805@n2100.armlinux.org.uk>
-Message-ID: <CAL_Jsq+1gMR2MCEXA6UOiK+4NpxT4k71YGqWzW7hZNCWnRg0hw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Aug 2017 18:47:54 +0100
+Subject: [PATCH v2] arm64: acpi/gtdt: validate CNTFRQ after having
+ enabled the frame
+In-Reply-To: <20170821095623.27691-1-ard.biesheuvel@linaro.org>
+References: <20170821095623.27691-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170831174754.GB28341@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 11:16 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Thu, Aug 31, 2017 at 10:58:12AM -0500, Rob Herring wrote:
->> On Tue, Aug 8, 2017 at 11:06 PM, David Gibson
->> <david@gibson.dropbear.id.au> wrote:
->> > On Tue, Aug 08, 2017 at 12:28:19PM +0100, Russell King - ARM Linux wrote:
->> >> On Wed, Jul 26, 2017 at 11:30:04AM +1000, David Gibson wrote:
->> >> > On Tue, Jul 25, 2017 at 05:20:09PM +0100, Russell King wrote:
->> >> > > dtc uses an incorrect format specifier for printing a uint64_t value.
->> >> > > uint64_t may be either 'unsigned long' or 'unsigned long long' depending
->> >> > > on the host architecture.
->> >> > >
->> >> > > Fix this by using %llx and casting to unsigned long long, which ensures
->> >> > > that we always have a wide enough variable to print 64 bits of hex.
->> >> > >
->> >> > >   HOSTCC  scripts/dtc/checks.o
->> >> > > scripts/dtc/checks.c: In function 'check_simple_bus_reg':
->> >> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
->> >> > >   snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
->> >> > >   ^
->> >> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
->> >> > >
->> >> > > Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
->> >> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> >> >
->> >> > This (embarrassing) error is already fixed in upstream dtc.
->> >>
->> >> It remains unfixed in 4.13-rc4.  How do we get this fixed in the
->> >> kernel's dtc?  From what I can see, sending a patch to fix stuff
->> >> doesn't work.
->>
->> Sorry, didn't see this until Andrew M picked it up.
->
-> How do we know whether whatever is in upstream dtc fixes the problem
-> that I'm seeing?
+Hi Ard,
 
-Build upstream dtc or here's a branch[1] with the cherry-picked fix.
+Thanks for respinning this, and apologies for the delay.
 
-Rob
+On Mon, Aug 21, 2017 at 10:56:23AM +0100, Ard Biesheuvel wrote:
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index aae87c4c546e..c16fa694a47b 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1217,7 +1217,8 @@ arch_timer_mem_frame_get_cntfrq(struct arch_timer_mem_frame *frame)
+>  }
+>  
+>  static struct arch_timer_mem_frame * __init
+> -arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+> +arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem,
+> +			       bool verify_freq)
+>  {
+>  	struct arch_timer_mem_frame *frame, *best_frame = NULL;
+>  	void __iomem *cntctlbase;
+> @@ -1259,6 +1260,11 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+>  		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
+>  			continue;
+>  
+> +		if (verify_freq &&
+> +		    arch_timer_mem_frame_get_cntfrq(frame) != arch_timer_rate) {
+> +			pr_err(FW_BUG "Ignoring MMIO timer frame with incorrect CNTFRQ\n");
+> +			continue;
+> +		}
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git dt/testing
+I don't think this is quite right, since we only check this after
+skipping over frames (which are valid, but don't match our preferences
+w.r.t. the timer and counter).
+
+Can we move this before checking the CNTACR_RWPT and CNTACR_RPCT bits?
+
+I's still prefer that we give up (as we previously did), rather than
+skipping timers with bad CNTFRQ values, but I guess that really depends
+on whether we think we'll use more than one MMIO timer in future. Maybe
+we'll want to use one per socket or something like that.
+
+> @@ -1443,7 +1414,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>  	for (i = i; i < timer_count; i++) {
+>  		timer = &timers[i];
+>  
+> -		frame = arch_timer_mem_find_best_frame(timer);
+> +		frame = arch_timer_mem_find_best_frame(timer, true);
+>  		if (frame)
+>  			break;
+
+Previously we'd have checked all timers, then chosen the best one,
+whereas now we bail out once we find a timer with a usable frame.
+
+Is there any way we can make this check the remaining timers?
+
+Thanks,
+Mark.
