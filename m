@@ -1,42 +1,44 @@
 From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 31 Aug 2017 10:20:26 +0530
-Subject: [PATCH v6 0/3] PCI hotplug feature
-Message-ID: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
+Date: Thu, 31 Aug 2017 10:20:27 +0530
+Subject: [PATCH v6 1/3] dt-bindings: PCI: Add PCI hotplug property
+In-Reply-To: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
+References: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
+Message-ID: <1504155029-24729-2-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches bring in PCI hotplug support for iproc family chipsets.
+Host drivers have the requirement of implementing PCI hotplug
+based on the how their SOC supports it.
 
-It includes DT binding documentation and, the implementation in
-iproc pcie RC driver.
+Couple of properties have been added. the one to enable
+the hotplug feature itself, and the other caters to
+the PCI hotplug implementation with the use of gpios.
 
-Changes since v5:
-[RESEND]
+Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
-Changes since v4:
-Rebased to pci-next
-Added; Acked-by: Rob Herring <robh@kernel.org>
-
-Changes since v3:
-Resend. just to be in sync previous in-flight patches.
-
-Changes since v2:
-Addressed Rob Herring's comments.
-Changed subject to "dt-bindings: PCI:..."
-Made generic PCI hotplug properties 'slot-pluggable' and 'prsnt-gpios'
-Rebased the patches on top of Lorenzo's patches.
-
-Oza Pawandeep (3):
-  dt-bindings: PCI: Add PCI hotplug property
-  dt-bindings: PCI iproc: Implement optional property prsnt-gpios
-  PCI: iproc: Implement PCI hotplug support
-
- .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |  14 ++
- Documentation/devicetree/bindings/pci/pci.txt      |  15 ++
- drivers/pci/host/pcie-iproc-platform.c             |   3 +
- drivers/pci/host/pcie-iproc.c                      | 166 ++++++++++++++++++---
- drivers/pci/host/pcie-iproc.h                      |   7 +
- 5 files changed, 187 insertions(+), 18 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
+index 50f9e2c..0bf25a1 100644
+--- a/Documentation/devicetree/bindings/pci/pci.txt
++++ b/Documentation/devicetree/bindings/pci/pci.txt
+@@ -24,3 +24,18 @@ driver implementation may support the following properties:
+    unsupported link speed, for instance, trying to do training for
+    unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
+    for gen2, and '1' for gen1. Any other values are invalid.
++
++- slot-pluggable:
++   PCI hotplug feature is supported.
++   PCI hotplug implementation is SOC/Board specific, and also it depends on
++   how add-in card is designed (e.g. how many present pins are implemented).
++   If the slot-pluggable property is present, the following propertey could
++   become effective.
++   - prsnt-gpios:
++      Array of gpios, could be present if hotplug is supported.
++      This property defines gpio based hotplug implementation.
++      Example:
++      If x8 card is connected, then it might be possible that all the
++      3 present pins could go low, or at least one pin goes low.
++      If x4 card is connected, then it might be possible that 2 present
++      pins go low, or at least one pin goes low.
 -- 
 1.9.1
