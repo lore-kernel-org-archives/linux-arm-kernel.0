@@ -1,65 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 31 Aug 2017 11:49:37 +0100
-Subject: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
-In-Reply-To: <AM5PR0401MB2545B7C55F634D7B9CABAE629A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
-References: <1504171424-15536-1-git-send-email-Bharat.Bhushan@nxp.com>
- <06c57ca4-edaa-df26-b1d9-1906141c5065@arm.com>
- <AM5PR0401MB2545B7C55F634D7B9CABAE629A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
-Message-ID: <10be1849-8071-64fc-5ee2-b6e429c64b9e@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 31 Aug 2017 12:53:17 +0200
+Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <b7c40672-8997-c202-7cc2-35b8bc79ecda@hisilicon.com>
+References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
+ <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+ <43dcc107-263a-5429-73d4-a5290c6610d6@hisilicon.com>
+ <20170829124730.GH17961@rric.localdomain>
+ <b7c40672-8997-c202-7cc2-35b8bc79ecda@hisilicon.com>
+Message-ID: <20170831105317.GQ17961@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Fixing Mark's address...]
+Shaokun,
 
-On 31/08/17 11:41, Bharat Bhushan wrote:
+On 31.08.17 18:29:01, Zhangshaokun wrote:
+> On 2017/8/29 20:47, Robert Richter wrote:
+> > On 29.08.17 17:26:00, Zhangshaokun wrote:
+> >> On 2017/8/24 20:03, Ganapatrao Kulkarni wrote:
+> >>> This is not a full event list, but a short list of useful events.
+> >>>
+> >>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> >>> ---
+> >>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+> >>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+> >>>  2 files changed, 77 insertions(+)
+> >>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+> >>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> >>>
+> >>
+> >> I saw you also used thunderx2 in tools/perf/pmu-events/arch/arm64/, how about John's suggestion
+> >> that would use vendor sub-folder?
+> >> Of course, appreciate maintainer's comments.
+> > 
+> > this would just add another level of subdirectories. I rather would
+> > prefer to have a per platform dir comparable to what is listed in
+> > 
+> >  arch/arm64/Kconfig.platforms
+> > 
 > 
->> -----Original Message-----
->> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> Sent: Thursday, August 31, 2017 3:02 PM
->> To: Bharat Bhushan <bharat.bhushan@nxp.com>; robh+dt at kernel.org;
->> ark.rutland at arm.com; will.deacon at arm.com; oss at buserror.net; Gang Liu
->> <gang.liu@nxp.com>; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->> catalin.marinas at arm.com
->> Subject: Re: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
->>
->> On 31/08/17 10:23, Bharat Bhushan wrote:
->>> This patch adds iommu-map property for PCIe, which enables SMMU for
->>> these devices on LS208xA devices.
->>>
->>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
->>> ---
->>>  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++++
->>>  1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
->>> b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
->>> index 94cdd30..67cf605 100644
->>> --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
->>> +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
->>> @@ -606,6 +606,7 @@
->>>  			num-lanes = <4>;
->>>  			bus-range = <0x0 0xff>;
->>>  			msi-parent = <&its>;
->>> +			iommu-map = <0 &smmu 0 1>;	/* This is fixed-up by
->> u-boot */
->>
->> What does this do when your version of u-boot doesn't fill this in for you?
-> 
-> Good question, frankly I have not thought of this case before.
-> But if we pass length = 0 in above property then no fixup happen with
-> happen with older u-boot. In this case of_iommu_configure() will
-> return NULL iommu-ops and it switch to swio-tlb. Will that work?
-I really don't like this. You rely on having invalid data in the DT, and
-that seems just wrong.
+> Check it again that not all vendors have specific platform config per SoC family,
+> so this would not work for us (HiSilicon) and maybe some other vendors.
 
-Why can't u-boot just generate that property, and we leave the DT alone?
-Or even better, you provide the right information for the few boards
-that are based on this SoC, not relying on u-boot for anything that is
-in the kernel tree?
+Even if there is no specific platform defined in Kconfig, you still
+could create a platform dir in tools/perf/. There must not be a 1:1
+mapping. DT compatible strings may give a hint for naming then.
 
-Thanks,
-	
-M.
--- 
-Jazz is not dead. It just smells funny...
+-Robert
