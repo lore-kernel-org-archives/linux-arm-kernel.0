@@ -1,134 +1,145 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 Aug 2017 14:44:25 +0100
-Subject: [PATCH v2 1/4] iommu/arm-smmu-v3: Specialise CMD_SYNC handling
+Date: Thu, 31 Aug 2017 14:44:27 +0100
+Subject: [PATCH v2 3/4] iommu/arm-smmu-v3: Use CMD_SYNC completion MSI
 In-Reply-To: <cover.1504182142.git.robin.murphy@arm.com>
 References: <cover.1504182142.git.robin.murphy@arm.com>
-Message-ID: <7a945bee1b3c6a314668fe1079c38da82fca7590.1504182142.git.robin.murphy@arm.com>
+Message-ID: <dbf0ce00f8e249c64f3d2041acd8d91818178e52.1504182142.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CMD_SYNC already has a bit of special treatment here and there, but as
-we're about to extend it with more functionality for completing outside
-the CMDQ lock, things are going to get rather messy if we keep trying to
-cram everything into a single generic command interface. Instead, let's
-break out the issuing of CMD_SYNC into its own specific helper where
-upcoming changes will have room to breathe.
+As an IRQ, the CMD_SYNC interrupt is not particularly useful, not least
+because we often need to wait for sync completion within someone else's
+IRQ handler anyway. However, when the SMMU is both coherent and supports
+MSIs, we can have a lot more fun by not using it as an interrupt at all.
+Following the example suggested in the architecture and using a write
+targeting normal memory, we can let callers wait on a status variable
+outside the lock instead of having to stall the entire queue or even
+touch MMIO registers. Since multiple sync commands are guaranteed to
+complete in order, a simple incrementing sequence count is all we need
+to unambiguously support any realistic number of overlapping waiters.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-v2: Cosmetic changes to reduce churn in later patches
+v2: Remove redundant 'bool msi' command member, other cosmetic tweaks
 
- drivers/iommu/arm-smmu-v3.c | 54 +++++++++++++++++++++++++++++----------------
- 1 file changed, 35 insertions(+), 19 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 47 +++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 45 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 568c400eeaed..91f28aca72c0 100644
+index f066725298cd..311f482b93d5 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -936,13 +936,22 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
- 	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
- }
+@@ -377,7 +377,16 @@
  
-+static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
-+{
-+	struct arm_smmu_queue *q = &smmu->cmdq.q;
-+	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+ #define CMDQ_SYNC_0_CS_SHIFT		12
+ #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
++#define CMDQ_SYNC_0_CS_IRQ		(1UL << CMDQ_SYNC_0_CS_SHIFT)
+ #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
++#define CMDQ_SYNC_0_MSH_SHIFT		22
++#define CMDQ_SYNC_0_MSH_ISH		(3UL << CMDQ_SYNC_0_MSH_SHIFT)
++#define CMDQ_SYNC_0_MSIATTR_SHIFT	24
++#define CMDQ_SYNC_0_MSIATTR_OIWB	(0xfUL << CMDQ_SYNC_0_MSIATTR_SHIFT)
++#define CMDQ_SYNC_0_MSIDATA_SHIFT	32
++#define CMDQ_SYNC_0_MSIDATA_MASK	0xffffffffUL
++#define CMDQ_SYNC_1_MSIADDR_SHIFT	0
++#define CMDQ_SYNC_1_MSIADDR_MASK	0xffffffffffffcUL
+ 
+ /* Event queue */
+ #define EVTQ_ENT_DWORDS			4
+@@ -409,6 +418,7 @@
+ /* High-level queue structures */
+ #define ARM_SMMU_POLL_TIMEOUT_US	100
+ #define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
++#define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
+ 
+ #define MSI_IOVA_BASE			0x8000000
+ #define MSI_IOVA_LENGTH			0x100000
+@@ -504,6 +514,10 @@ struct arm_smmu_cmdq_ent {
+ 		} pri;
+ 
+ 		#define CMDQ_OP_CMD_SYNC	0x46
++		struct {
++			u32			msidata;
++			u64			msiaddr;
++		} sync;
+ 	};
+ };
+ 
+@@ -617,6 +631,9 @@ struct arm_smmu_device {
+ 	int				gerr_irq;
+ 	int				combined_irq;
+ 
++	atomic_t			sync_nr;
++	u32				sync_count;
 +
-+	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-+		if (queue_poll_cons(q, false, wfe))
-+			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
-+	}
-+}
-+
- static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 				    struct arm_smmu_cmdq_ent *ent)
- {
- 	u64 cmd[CMDQ_ENT_DWORDS];
- 	unsigned long flags;
--	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
--	struct arm_smmu_queue *q = &smmu->cmdq.q;
- 
- 	if (arm_smmu_cmdq_build_cmd(cmd, ent)) {
- 		dev_warn(smmu->dev, "ignoring unknown CMDQ opcode 0x%x\n",
-@@ -951,16 +960,29 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 	}
- 
- 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
--	while (queue_insert_raw(q, cmd) == -ENOSPC) {
--		if (queue_poll_cons(q, false, wfe))
--			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
--	}
--
--	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, true, wfe))
--		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
-+	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+ 	unsigned long			ias; /* IPA */
+ 	unsigned long			oas; /* PA */
+ 	unsigned long			pgsize_bitmap;
+@@ -878,7 +895,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+ 		}
+ 		break;
+ 	case CMDQ_OP_CMD_SYNC:
+-		cmd[0] |= CMDQ_SYNC_0_CS_SEV;
++		if (ent->sync.msiaddr)
++			cmd[0] |= CMDQ_SYNC_0_CS_IRQ;
++		else
++			cmd[0] |= CMDQ_SYNC_0_CS_SEV;
++		cmd[0] |= CMDQ_SYNC_0_MSH_ISH | CMDQ_SYNC_0_MSIATTR_OIWB;
++		cmd[0] |= (u64)ent->sync.msidata << CMDQ_SYNC_0_MSIDATA_SHIFT;
++		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
+ 		break;
+ 	default:
+ 		return -ENOENT;
+@@ -964,21 +987,40 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
  }
  
-+static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
++static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
 +{
-+	u64 cmd[CMDQ_ENT_DWORDS];
-+	unsigned long flags;
-+	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-+	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-+	int ret;
++	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
++	u32 val = smp_cond_load_acquire(&smmu->sync_count,
++					(int)(VAL - sync_idx) >= 0 ||
++					!ktime_before(ktime_get(), timeout));
 +
-+	arm_smmu_cmdq_build_cmd(cmd, &ent);
-+
-+	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-+	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-+	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-+	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-+
-+	if (ret)
-+		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
++	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
 +}
 +
- /* Context descriptor manipulation functions */
- static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
+ static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
  {
-@@ -1029,8 +1051,7 @@ static void arm_smmu_sync_ste_for_sid(struct arm_smmu_device *smmu, u32 sid)
- 	};
+ 	u64 cmd[CMDQ_ENT_DWORDS];
+ 	unsigned long flags;
+ 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
++	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
++		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+ 	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+ 	int ret;
  
- 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
--	cmd.opcode = CMDQ_OP_CMD_SYNC;
--	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+	arm_smmu_cmdq_issue_sync(smmu);
++	if (msi) {
++		ent.sync.msidata = atomic_inc_return(&smmu->sync_nr);
++		ent.sync.msiaddr = virt_to_phys(&smmu->sync_count);
++	}
+ 	arm_smmu_cmdq_build_cmd(cmd, &ent);
+ 
+ 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+ 	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+-	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
++	if (!msi)
++		ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+ 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+ 
++	if (msi)
++		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+ 	if (ret)
+ 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
  }
- 
- static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
-@@ -1352,10 +1373,7 @@ static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
- /* IO_PGTABLE API */
- static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+@@ -2156,6 +2198,7 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
  {
--	struct arm_smmu_cmdq_ent cmd;
--
--	cmd.opcode = CMDQ_OP_CMD_SYNC;
--	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+	arm_smmu_cmdq_issue_sync(smmu);
- }
+ 	int ret;
  
- static void arm_smmu_tlb_sync(void *cookie)
-@@ -2399,8 +2417,7 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 	/* Invalidate any cached configuration */
- 	cmd.opcode = CMDQ_OP_CFGI_ALL;
- 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
--	cmd.opcode = CMDQ_OP_CMD_SYNC;
--	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+	arm_smmu_cmdq_issue_sync(smmu);
- 
- 	/* Invalidate any stale TLB entries */
- 	if (smmu->features & ARM_SMMU_FEAT_HYP) {
-@@ -2410,8 +2427,7 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 
- 	cmd.opcode = CMDQ_OP_TLBI_NSNH_ALL;
- 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
--	cmd.opcode = CMDQ_OP_CMD_SYNC;
--	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+	arm_smmu_cmdq_issue_sync(smmu);
- 
- 	/* Event queue */
- 	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
++	atomic_set(&smmu->sync_nr, 0);
+ 	ret = arm_smmu_init_queues(smmu);
+ 	if (ret)
+ 		return ret;
 -- 
 2.13.4.dirty
