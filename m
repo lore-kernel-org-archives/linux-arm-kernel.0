@@ -1,68 +1,123 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Aug 2017 11:31:20 +0100
-Subject: [RFC PATCH v9 5/7] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170831095746.GB15906@hc>
-References: <20170829131238.4988-1-jglauber@cavium.com>
- <20170829131238.4988-6-jglauber@cavium.com>
- <a89f597e-885d-a8bd-f6ce-452d7025cb20@hisilicon.com>
- <20170831095746.GB15906@hc>
-Message-ID: <20170831103119.GC15031@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 31 Aug 2017 11:32:54 +0100
+Subject: [PATCH v2] of: Restrict DMA configuration
+Message-ID: <5fc6930c9645c934de2586179ca3f80a055689cb.1504175330.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 11:57:46AM +0200, Jan Glauber wrote:
-> On Wed, Aug 30, 2017 at 10:54:03AM +0800, Zhangshaokun wrote:
-> > On 2017/8/29 21:12, Jan Glauber wrote:
-> > > Add support for the PMU counters on Cavium SOC memory controllers.
-> > > 
-> > > This patch also adds generic functions to allow supporting more
-> > > devices with PMU counters.
+Moving DMA configuration to happen later at driver probe time had the
+unnoticed side-effect that we now perform DMA configuration for *every*
+device represented in DT, rather than only those explicitly created by
+the of_platform and PCI code.
 
-> > > +/* generic struct to cover the different pmu types */
-> > > +struct cvm_pmu_dev {
-> > > +	struct pmu pmu;
-> > > +	const char *pmu_name;
-> > 
-> > It seems that pmu_name is redundant since struct pmu has a name field,
-> > Mark has mentioned it in HiSilicon uncore PMU driver, Link:
-> > https://patchwork.kernel.org/patch/9861821/
-> 
-> I don't get it. perf_pmu_register() just copies the char* from the
-> argument into pmu->name. Somewhere the string must be allocated.
-> That's why I have cvm_pmu_dev->pmu_name.
+As Christoph points out, this is not really the best thing to do. Whilst
+there may well be other DMA-capable buses that can benefit from having
+their children automatically configured after the bridge has probed,
+there are also plenty of others like USB, MDIO, etc. that definitely do
+not support DMA and should not be indiscriminately processed.
 
-I'm not sure I follow. cvm_pmu_dev->pmu_name is just a char *, so what
-does that have to do with allocation?
+The good news is that in most cases the DT "dma-ranges" property serves
+as an appropriate indicator - per a strict interpretation of the spec,
+anything lacking a "dma-ranges" property should be considered not to
+have a mapping of DMA address space from its children to its parent,
+thus anything for which of_dma_get_range() does not succeed does not
+need DMA configuration. Certain bus types have a general expectation of
+DMA capability and carry a well-established precedent that an absent
+"dma-ranges" implies the same as the empty property, so we automatically
+opt those in to DMA configuration regardless, to avoid regressing most
+existing platforms.
 
-... unless you mean you want to allocate this in some variant-specific
-code prior to passing it to code which calls perf_pmu_register(), and
-you just need a place to stash it in the mean time?
+Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for platform/amba/pci bus devices")
+Reported-by: Christoph Hellwig <hch@lst.de>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-> > > diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> > > index 82b30e6..ca84ac8 100644
-> > > --- a/include/linux/cpuhotplug.h
-> > > +++ b/include/linux/cpuhotplug.h
-> > > @@ -139,6 +139,7 @@ enum cpuhp_state {
-> > >  	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
-> > >  	CPUHP_AP_WORKQUEUE_ONLINE,
-> > >  	CPUHP_AP_RCUTREE_ONLINE,
-> > > +	CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> > 
-> > Alphabetic order?
-> 
-> These don't look alphabetically ordered to me.
+v2: Updated commit message to be more reasonable
 
-Sure, the full list is ordered by dependency.
+ drivers/of/device.c | 48 ++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 32 insertions(+), 16 deletions(-)
 
-However, we've generally kept the uncore PMUs together, and within the
-group of system PMU CPUHP_AP_PERF_ARM_* callbacks, we've retained
-alphabetical order.
-
-Does this PMU need workqueues and RCU up before its HP callback is
-invoked? Or can this be moved into the group of CPUHP_AP_PERF_ARM_*
-above CPUHP_AP_WORKQUEUE_ONLINE and CPUHP_AP_RCUTREE_ONLINE? i.e.
-between CPUHP_AP_PERF_ARM_CCN_ONLINE and CPUHP_AP_PERF_ARM_L2X0_ONLINE.
-
-THanks,
-Mark.
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index e0a28ea341fe..04c4c952dc57 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -9,6 +9,9 @@
+ #include <linux/module.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/slab.h>
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/amba/bus.h>
+ 
+ #include <asm/errno.h>
+ #include "of_private.h"
+@@ -84,31 +87,28 @@ int of_device_add(struct platform_device *ofdev)
+  */
+ int of_dma_configure(struct device *dev, struct device_node *np)
+ {
+-	u64 dma_addr, paddr, size;
++	u64 dma_addr, paddr, size = 0;
+ 	int ret;
+ 	bool coherent;
+ 	unsigned long offset;
+ 	const struct iommu_ops *iommu;
+ 	u64 mask;
+ 
+-	/*
+-	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+-	 * setup the correct supported mask.
+-	 */
+-	if (!dev->coherent_dma_mask)
+-		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+-
+-	/*
+-	 * Set it to coherent_dma_mask by default if the architecture
+-	 * code has not set it.
+-	 */
+-	if (!dev->dma_mask)
+-		dev->dma_mask = &dev->coherent_dma_mask;
+-
+ 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+ 	if (ret < 0) {
++		/*
++		 * For legacy reasons, we have to assume some devices need
++		 * DMA configuration regardless of whether "dma-ranges" is
++		 * correctly specified or not.
++		 */
++		if (!dev_is_pci(dev) &&
++#ifdef CONFIG_ARM_AMBA
++		    dev->bus != &amba_bustype &&
++#endif
++		    dev->bus != &platform_bus_type)
++			return ret == -ENODEV ? 0 : ret;
++
+ 		dma_addr = offset = 0;
+-		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+ 	} else {
+ 		offset = PFN_DOWN(paddr - dma_addr);
+ 
+@@ -129,6 +129,22 @@ int of_dma_configure(struct device *dev, struct device_node *np)
+ 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+ 	}
+ 
++	/*
++	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
++	 * setup the correct supported mask.
++	 */
++	if (!dev->coherent_dma_mask)
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++
++	if (!size)
++		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
++
+ 	dev->dma_pfn_offset = offset;
+ 
+ 	/*
+-- 
+2.13.4.dirty
