@@ -1,48 +1,83 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 31 Aug 2017 00:43:28 +0000
-Subject: [PATCH v2 0/5] make XIP kernel .data compressed in ROM
-In-Reply-To: <nycvar.YSQ.7.76.1708301951330.2606@knanqh.ubzr>
-References: <20170830025547.30347-1-nicolas.pitre@linaro.org>
- <SG2PR06MB1165EF18A363D9CC4C5531FE8A9C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <nycvar.YSQ.7.76.1708301951330.2606@knanqh.ubzr>
-Message-ID: <SG2PR06MB11652EB1FEDDE2F40AE763B18A9D0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: kassey1216@gmail.com (Kassey)
+Date: Thu, 31 Aug 2017 08:56:20 +0800
+Subject: kasan is not working on 3.18 kernel due to patch "BACKPORT:
+ kernel: add kcov code coverage"
+In-Reply-To: <CACT4Y+aMFp47QecE6QeY-K6kFz9pnJ+YT0xHo+5vO8qvjN7Cuw@mail.gmail.com>
+References: <CAKwPUoxHDW4x=uqY5o2rimHDkDPqaN1GdUZ9=eHuP1hwsa7ngw@mail.gmail.com>
+ <CACT4Y+aMFp47QecE6QeY-K6kFz9pnJ+YT0xHo+5vO8qvjN7Cuw@mail.gmail.com>
+Message-ID: <CAKwPUozYTTqZhvdFxOQ5jqUR+k2622WWzcyp6BhZs=DGhx5NWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 30, 2017, Nicolas Pitre wrote:
-> > > This work highlighted some defficiencies in linker scripts, especially
-> > > the XIP one. So this also includes linker script cleanups and fixes.
-> >
-> > Thank you for this!
-> 
-> More will come eventually.
-> 
-> Did this fix your cramfs issue with 4.13-rc7?
+hi, Dmitry:
+      you are right. upstream kernel did not touch the
+      scripts/Makefile.lib for kasan, I am checking my internel tree now.
 
-Yes!
-I just stacked on your latest set of cramfs XIP patches on top of these 
-and now magically it boots again.
-Thank you!
-
-Notice that busybox, libc and ld have physical addresses in Flash (ie, XIP)
-
-$ cat /proc/self/maps
-00008000-000a1000 r-xp 1b005000 00:0c 18192      /bin/busybox
-000a9000-000aa000 rw-p 00099000 00:0c 18192      /bin/busybox
-000aa000-000ac000 rw-p 00000000 00:00 0          [heap]
-b6eed000-b6fc6000 r-xp 1b0bc000 00:0c 766540     /lib/libc-2.18-2013.10.so
-b6fc6000-b6fce000 ---p 1b195000 00:0c 766540     /lib/libc-2.18-2013.10.so
-b6fce000-b6fd0000 r--p 000d9000 00:0c 766540     /lib/libc-2.18-2013.10.so
-b6fd0000-b6fd1000 rw-p 000db000 00:0c 766540     /lib/libc-2.18-2013.10.so
-b6fd1000-b6fd4000 rw-p 00000000 00:00 0
-b6fd4000-b6feb000 r-xp 1b0a4000 00:0c 670372     /lib/ld-2.18-2013.10.so
-b6fee000-b6fef000 rw-p 00000000 00:00 0
-b6ff0000-b6ff2000 rw-p 00000000 00:00 0
-b6ff2000-b6ff3000 r--p 00016000 00:0c 670372     /lib/ld-2.18-2013.10.so
-b6ff3000-b6ff4000 rw-p 00017000 00:0c 670372     /lib/ld-2.18-2013.10.so
-bee27000-bee48000 rw-p 00000000 00:00 0          [stack]
-beea4000-beea5000 r-xp 00000000 00:00 0          [sigpage]
-ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]
+     thanks for your kind remind.
 
 
-Chris
+BR
+Kassey
+
+On Wed, Aug 30, 2017 at 4:50 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Wed, Aug 30, 2017 at 10:20 AM, Kassey <kassey1216@gmail.com> wrote:
+>> hi, Dmitry:
+>>     with your change on 3.18 kernel,
+>>
+>>      https://github.com/Elite-Kernels/HTC-10/commit/7c8e808c673b50a52e6b5db9bba54678386fa61b
+>>
+>>     it was find that cflags for GCC with KASAN enabled is not working.
+>>     testing is doing arm64 platfrom with below configure and gcc 5.1.1
+>>
+>>     +CONFIG_KASAN=y
+>>     +CONFIG_TEST_KASAN=m
+>>
+>>
+>>
+>>     and the issue can be fixed by the change, would you please review ?
+>>
+>> Author: Kassey <kassey1216@gmail.com>
+>> Date:   Wed Aug 30 15:45:58 2017 +0800
+>>
+>>     scripts: correct cflags for kasan
+>>
+>>     Signed-off-by: Kassey<kassey1216@gmail.com>
+>>
+>> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+>> index cea530c..0f1d004 100644
+>> --- a/scripts/Makefile.lib
+>> +++ b/scripts/Makefile.lib
+>> @@ -125,7 +125,7 @@ endif
+>>  #
+>>  ifeq ($(CONFIG_KASAN),y)
+>>  _c_flags += $(if $(patsubst n%,, \
+>> -
+>> $(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)$(CONFIG_KASAN_SANITIZE_ALL)),
+>> \
+>> +               $(KASAN_SANITIZE_$(basetarget).o)$(KASAN_SANITIZE)y), \
+>>                 $(CFLAGS_KASAN))
+>>  endif
+>
+>
+> Hi Kassey,
+>
+> This is a patch on top of what?
+>
+> It does not look like the KCOV patch has any relation to this. It did
+> not touch KASAN stuff in scripts/Makefile.lib.
+>
+> Do you know who backported the KCOV patch? The backport mentions some
+> conflicts, maybe that's the problem. But I don't know what were the
+> conflicts.
+>
+> What's the current failure mode?
+>
+> Why does upstream work? What's different in your tree?
+>
+> I don't feel that I have enough information to say anything regarding the patch.
+
+
+
+-- 
+Best regards
+Kassey
