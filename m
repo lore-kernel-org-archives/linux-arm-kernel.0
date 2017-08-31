@@ -1,70 +1,44 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Fri,  1 Sep 2017 08:20:18 +0900
-Subject: [PATCH v1 1/3] dt-bindings: nvmem: add description for UniPhier eFuse
+Date: Fri,  1 Sep 2017 08:20:20 +0900
+Subject: [PATCH v1 3/3] arm64: dts: uniphier: add efuse node for LD20
 In-Reply-To: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
 References: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1504221620-358-2-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1504221620-358-4-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add uniphier-efuse dt-bindings documentation.
+Add efuse node for UniPhier LD20 SoC.
+This efuse node is included in soc-glue.
 
 Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 ---
- .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
-new file mode 100644
-index 0000000..09024a2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
-@@ -0,0 +1,45 @@
-+= UniPhier eFuse device tree bindings =
-+
-+This UniPhier eFuse must be under soc-glue.
-+
-+Required properties:
-+- compatible: should be "socionext,uniphier-efuse"
-+- reg: should contain the register base and length
-+
-+= Data cells =
-+Are child nodes of efuse, bindings of which as described in
-+bindings/nvmem/nvmem.txt
-+
-+Example:
-+
-+	soc-glue at 5f900000 {
-+		compatible = "socionext,uniphier-ld20-soc-glue-debug",
-+			     "simple-mfd";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x5f900000 0x2000>;
-+
-+		efuse {
-+			compatible = "socionext,uniphier-efuse",
-+				     "syscon";
-+			reg = <0x100 0xf00>;
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index de1e753..8a1f5af 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -365,6 +365,20 @@
+ 			};
+ 		};
+ 
++		soc-glue at 5f900000 {
++			compatible = "socionext,uniphier-ld20-soc-glue-debug",
++				     "simple-mfd";
 +			#address-cells = <1>;
 +			#size-cells = <1>;
++			ranges = <0x0 0x5f900000 0x2000>;
 +
-+			/* Data cells */
-+			usb_mon: usb_mon {
-+				reg = <0x154 0xc>;
++			efuse {
++				compatible = "socionext,uniphier-efuse",
++					     "syscon";
++				reg = <0x100 0xf00>;
 +			};
 +		};
-+	};
 +
-+= Data consumers =
-+Are device nodes which consume nvmem data cells.
-+
-+Example:
-+
-+	usb {
-+		...
-+		nvmem-cells = <&usb_mon>;
-+		nvmem-cell-names = "usb_mon";
-+	}
+ 		gic: interrupt-controller at 5fe00000 {
+ 			compatible = "arm,gic-v3";
+ 			reg = <0x5fe00000 0x10000>,	/* GICD */
 -- 
 2.7.4
