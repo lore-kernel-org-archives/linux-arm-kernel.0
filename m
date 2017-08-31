@@ -1,89 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 31 Aug 2017 20:24:23 +0200
-Subject: [PATCH v4 1/3] dt-bindings: Document the hi3660 thermal sensor
- bindings
-In-Reply-To: <1503994666-13954-2-git-send-email-kevin.wangtao@hisilicon.com>
-References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
- <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1503994666-13954-2-git-send-email-kevin.wangtao@hisilicon.com>
-Message-ID: <d56428a6-ef27-4424-3ce5-4610fef3ac15@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 31 Aug 2017 11:31:38 -0700
+Subject: [PATCH] clk: imx51: propagate rate across ipu_di*_sel
+In-Reply-To: <20170818163058.22252-1-l.stach@pengutronix.de>
+References: <20170818163058.22252-1-l.stach@pengutronix.de>
+Message-ID: <20170831183138.GG21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/2017 10:17, Tao Wang wrote:
-> From: Tao Wang <kevin.wangtao@linaro.org>
+On 08/18, Lucas Stach wrote:
+> This propagates rate requests from the display interface to the divider
+> or PLL output, allowing to hit the required display rate in many more
+> cases.
 > 
-> This adds documentation of device tree bindings for the
-> thermal sensor controller of hi3660 SoC.
-> 
-> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > ---
->  .../devicetree/bindings/thermal/hisi-tsensor.txt   | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
-> new file mode 100644
-> index 0000000..4643dbe
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
-> @@ -0,0 +1,37 @@
-> +* Temperature Sensor on hisilicon SoC
-> +
-> +Hisilicon SoC supplies temperature sensor feature, each CPU cluster and G3D
-> +area contains a temperture sensor. The temperture sensor produces an output
-> +value which has a linear relationship with the temperture of the area.
-> +
 
-s/temperture/temperature/
-
-> +for Hi3660,
-> +sensor0 monitors the temperture of A53;
-> +sensor1 monitors the temperture of A72;
-> +sensor2 monitors the temperture of GPU;
-> +sensor3 is a virtual sensor, which produces the maximum value of all sensors;
-> +sensor4 is a virtual sensor, which produces the average value of all sensors.
-
-I don't think we need to escribe the virtual sensors in the DT bindings.
-
-> +** Required properties :
-> +- compatible: "hisilicon,thermal-tsensor".
-> +- reg: physical reg address of thermal sensor and length of memory mapped
-> +  region.
-> +- hisi,tsensors: number of hardware tsensors
-> +- hisi,coef:	An array of integers (one signed cell) containing
-> +		coefficients to turn adc value to temperture.
-> +- hisi,adc-range: adc value range, minimum value is followed by maximum value.
-> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
-> +
-> +Example :
-> +Hi3660:
-> +tsensor: tsensor at fff30000 {
-> +	compatible = "hisilicon,hi3660-tsensor";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	reg = <0x0 0xfff3001c 0x0 0x4>,
-> +		<0x0 0xfff3005c 0x0 0x4>,
-> +		<0x0 0xfff3009c 0x0 0x4>;
-> +	hisi,tsensors = <HISI_MAX_TSENSORS>;
-> +	hisi,coef = <165000 (-40000)>;
-> +	hisi,adc-range = <0x74 0x39A>;
-
-Do we really need max sensors, coef and adc range to be specified in the DT?
-
-Can't we assume the hi3660-tsensor has 3 sensors, and hard-code the
-coef, adc, in the driver itself?
-
-Can't this binding be merged with the hisilicon-thermal.txt?
-
-Thanks.
-
-  -- Daniel
-
+Applied to clk-next
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
