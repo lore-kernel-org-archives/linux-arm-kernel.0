@@ -1,47 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Aug 2017 09:08:45 +0200
-Subject: linux-next regression caused by "gpiolib: request the gpio before
- querying its direction"
-In-Reply-To: <20170830161730.41919554@windsurf.lan>
-References: <20170830112424.7a3a7c36@windsurf.lan>
- <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
- <87ziah2m3f.fsf@free-electrons.com> <20170830161730.41919554@windsurf.lan>
-Message-ID: <CACRpkdbxdkHukALfYMrM7w=1KNJKLBhGebbkEpMb3C3+nCfWOA@mail.gmail.com>
+Date: Thu, 31 Aug 2017 09:11:11 +0200
+Subject: [PATCH] pinctrl: mediatek: update PCIe mux data for MT7623
+In-Reply-To: <ddbc91742005abfc9083876fb976ecc511be98fd.1503026874.git.ryder.lee@mediatek.com>
+References: <ddbc91742005abfc9083876fb976ecc511be98fd.1503026874.git.ryder.lee@mediatek.com>
+Message-ID: <CACRpkdY6kiPRC9tD3joNwdcj63La06eKnFe_D7s4bpP4a=CO5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 4:17 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Fri, Aug 18, 2017 at 5:48 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
 
-> The call chain leading to the problem is:
+> MT2701 shares the same driver with MT7623, but there is a slight difference
+> between their pin functions (e.g., PCIe), so we update the different parts
+> in pinmux table.
 >
->  gpiochip_add_data()
->   chip->request() == gpiochip_generic_request()
->    pinctrl_request_gpio()
->     pinmux_request_gpio()
->      pin_request()
->       ops->gpio_request_enable() == mvebu_pinmux_gpio_request_enable()
->        mvebu_pinconf_group_set()
->         grp->ctrl->mpp_set() == mvebu_regmap_mpp_ctrl_set()
+> Doing so, SoC could choose the correct mux setting via their own pinfun.h.
 >
-> So what Timur is saying perhaps is that
-> mvebu_pinmux_gpio_request_enable() shouldn't be changing the type of
-> muxing, and therefore shouldn't be calling mvebu_pinconf_group_set().
->
-> However, even the "reference" pinctrl-single.c implementation does it,
-> in pcs_request_gpio().
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> CC: Biao Huang <biao.huang@mediatek.com>
 
-Yeah so we have unclear semantics on this and that is just a fact of
-life. It's a bit of pain as maintainer because I sometimes don't know
-what to do when something makes superficial sense and the only thing
-I can do is to toss it into linux-next and see what happens.
-
-Look what happened :D
-
-If the semantics should be changed, all drivers must be changed consistently
-in a larger patch series, so until then, we revert this and leave it as it is.
-
-Now this is reverted anyways.
+No reaction in 13 days from any maintainer.
+Patch applied.
 
 Yours,
 Linus Walleij
