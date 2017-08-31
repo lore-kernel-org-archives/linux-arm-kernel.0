@@ -1,305 +1,430 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 31 Aug 2017 10:20:29 +0530
-Subject: [PATCH v6 3/3] PCI: iproc: Implement PCI hotplug support
-In-Reply-To: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
-References: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1504155029-24729-4-git-send-email-oza.oza@broadcom.com>
+From: sriram.dash@nxp.com (Sriram Dash)
+Date: Thu, 31 Aug 2017 05:16:09 +0000
+Subject: [PATCH] arm64: dts: Add support for NXP's LX2160A SoC
+In-Reply-To: <20170823001414.ovvgwqhwvisuqea2@rob-hp-laptop>
+References: <1503053736-18232-1-git-send-email-sriram.dash@nxp.com>
+ <20170823001414.ovvgwqhwvisuqea2@rob-hp-laptop>
+Message-ID: <DB5PR04MB1207827A3BC47E422B4B7CA1F59D0@DB5PR04MB1207.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements PCI hotplug support for iproc family chipsets.
+>From: Rob Herring [mailto:robh at kernel.org]
+>Subject: Re: [PATCH] arm64: dts: Add support for NXP's LX2160A SoC
+>
+>On Fri, Aug 18, 2017 at 04:25:36PM +0530, Sriram Dash wrote:
+>> The QorIQ LX2160A processor is built in the 16FFC process on the
+>> Layerscape architecture combining sixteen ARM A72 processor cores with
+>> advanced, high-performance datapath acceleration and network,
+>> peripheral interfaces required for networking, wireless
+>> infrastructure, storage, and general-purpose embedded applications.
+>>
+>> Features summary:
+>>     - Sixteen 32-bit / 64-bit ARM v8 A72 CPUs
+>>     - Cache Coherent Interconnect Fabric (CCN508 aka ?Eliot?)
+>>     - Two 64-bit 3.2GT/s DDR4 SDRAM memory controllers with ECC.
+>>     - Data path acceleration architecture (DPAA2)
+>>     - 24 Serdes lanes at up to 25 GHz
+>>     - Ethernet interfaces
+>>       Single WRIOP tile supporting 130Gbps using 18 MACs
+>>       Support for 10G-SXGMII (aka USXGMII).
+>>       Support for SGMII (and 1000Base-KX)
+>>       Support for XFI (and 10GBase-KR)
+>>       Support for CAUI4 (100G); CAUI2 (50G) and 25G-AUI(25G).
+>>       Support for XLAUI4 (and 40GBase-KR4) for 40G.
+>>       Support for two RGMII parallel interfaces.
+>>       Energy efficient Ethernet support (802.3az)
+>>       IEEE 1588 support.
+>>     - High-speed peripheral interfaces
+>>       Two PCIe Gen 4.0 8-lane controllers supporting SR-IOV,
+>>       Four PCIe Gen 4.0 4-lane controllers.
+>>       Four serial ATA (SATA 3.0) controllers.
+>>       Two USB 3.0 controllers with integrated PHY
+>>       Two Enhanced secure digital host controllers
+>>       Two Controller Area Network (CAN) modules
+>>       Flexible Serial peripheral interface (FlexSPI) controller.
+>>       Three Serial peripheral interface (SPI) controllers.
+>>       Nine I2C Controllers.
+>>       Four UARTs supporting two 4-pin UART ports or four 2-pin UART ports.
+>>       General Purpose IO (GPIO)
+>>     - Support for hardware virtualization and partitioning (ARM MMU-500)
+>>     - Support for GIC (ARM GIC-500)
+>>     - QorIQ platform Trust Architecture 3.0
+>>     - One Secure WatchDog timer and one Non-Secure Watchdog timer.
+>>     - ARM Generic Timer
+>>     - Two Flextimers
+>>     - Debug supporting run control, data acquisition, high-speed trace,
+>>       performance/event monitoring
+>>     - Thermal Monitor Unit (TMU) with +/- 2C accuracy
+>>     - Support for Voltage ID (VID) for yield improvement
+>>
+>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/fsl.txt  |   8 +
+>>  arch/arm64/boot/dts/freescale/Makefile         |   1 +
+>>  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 240
+>> +++++++++++++++++++++++++
+>> arch/arm64/boot/dts/freescale/fsl-lx2qds1.dts  |  54 ++++++
+>>  4 files changed, 303 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+>>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2qds1.dts
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+>> b/Documentation/devicetree/bindings/arm/fsl.txt
+>> index cdb9dd7..6069434 100644
+>> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+>> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+>> @@ -218,3 +218,11 @@ Required root node properties:
+>>  LS2088A ARMv8 based RDB Board
+>>  Required root node properties:
+>>      - compatible = "fsl,ls2088a-rdb", "fsl,ls2088a";
+>> +
+>> +LX2160A SoC
+>> +Required root node properties:
+>> +    - compatible = "fsl,lx2160a";
+>> +
+>> +LX2160A ARMv8 based QDS Board
+>> +Required root node properties:
+>> +    - compatible = "fsl,lx2qds1", "fsl,lx2160a";
+>> diff --git a/arch/arm64/boot/dts/freescale/Makefile
+>> b/arch/arm64/boot/dts/freescale/Makefile
+>> index 72c4b52..634f6d4 100644
+>> --- a/arch/arm64/boot/dts/freescale/Makefile
+>> +++ b/arch/arm64/boot/dts/freescale/Makefile
+>> @@ -12,6 +12,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+>>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+>>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+>>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+>> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2qds1.dtb
+>>
+>>  always		:= $(dtb-y)
+>>  subdir-y	:= $(dts-dirs)
+>> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+>> b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+>> new file mode 100644
+>> index 0000000..48874cf
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+>> @@ -0,0 +1,240 @@
+>> +/*
+>> + * Device Tree Include file for Layerscape-LX2160A family SoC.
+>> + *
+>> + * Copyright 2017 NXP
+>> + *
+>> + * Sriram Dash <sriram.dash@nxp.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPLv2 or the X11 license, at your option. Note that this
+>> +dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This library is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This library is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +
+>> +/memreserve/ 0x80000000 0x00010000;
+>> +
+>> +/ {
+>> +	compatible = "fsl,lx2160a";
+>> +	interrupt-parent = <&gic>;
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
+>> +
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		/* We have 8 clusters having 2 Cortex-A72 cores each */
+>> +		cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x0>;
+>> +		};
+>> +
+>> +		cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x1>;
+>> +		};
+>> +
+>> +		cpu at 100 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x100>;
+>> +		};
+>> +
+>> +		cpu at 101 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x101>;
+>> +		};
+>> +
+>> +		cpu at 200 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x200>;
+>> +		};
+>> +
+>> +		cpu at 201 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x201>;
+>> +		};
+>> +
+>> +		cpu at 300 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x300>;
+>> +		};
+>> +
+>> +		cpu at 301 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x301>;
+>> +		};
+>> +
+>> +		cpu at 400 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x400>;
+>> +		};
+>> +
+>> +		cpu at 401 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x401>;
+>> +		};
+>> +
+>> +		cpu at 500 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x500>;
+>> +		};
+>> +
+>> +		cpu at 501 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x501>;
+>> +		};
+>> +
+>> +		cpu at 600 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x600>;
+>> +		};
+>> +
+>> +		cpu at 601 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x601>;
+>> +		};
+>> +
+>> +		cpu at 700 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x700>;
+>> +		};
+>> +
+>> +		cpu at 701 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x701>;
+>> +		};
+>> +
+>> +	};
+>> +
+>> +	memory at 80000000 {
+>> +		device_type = "memory";
+>> +		reg = <0x00000000 0x80000000 0 0x80000000>;
+>> +		      /* DRAM space - 1, size : 2 GB DRAM */
+>> +	};
+>> +
+>> +	sysclk: sysclk {
+>> +		compatible = "fixed-clock";
+>> +		#clock-cells = <0>;
+>> +		clock-frequency = <100000000>;
+>> +		clock-output-names = "sysclk";
+>> +	};
+>> +
+>> +	gic: interrupt-controller at 6000000 {
+>> +		compatible = "arm,gic-v3";
+>> +		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
+>> +		      <0x0 0x06200000 0 0x200000>, /*GICR(RD_base + SGI_base)*/
+>> +		      <0x0 0x0c0c0000 0 0x2000>, /* GICC */
+>> +		      <0x0 0x0c0d0000 0 0x1000>, /* GICH */
+>> +		      <0x0 0x0c0e0000 0 0x20000>; /* GICV */
+>> +		#interrupt-cells = <3>;
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>
+>Both of these can be 1.
+>
 
-iproc based SOC (e.g. Stingray) does not have hotplug controller
-integrated.
-Hence, standard PCI hotplug framework hooks can-not be used.
-e.g. controlled power up/down of slot.
+Ok. Will update in next rev.
 
-The mechanism, for e.g. Stingray has adopted for PCI hotplug is as follows:
-PCI present lines are input to GPIOs depending on the type of
-connector (x2, x4, x8).
+>> +		ranges;
+>
+>It's preferred to have a value here.
+>
+>> +		interrupt-controller;
+>> +		interrupts = <1 9 0x4>;
+>> +
+>> +		its: gic-its at 6020000 {
+>> +			compatible = "arm,gic-v3-its";
+>> +			msi-controller;
+>> +			reg = <0x0 0x6020000 0 0x20000>;
+>> +		};
+>> +	};
+>> +
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupts = <1 13 4>, /* Physical Secure PPI, active-low */
+>> +			     <1 14 4>, /* Physical Non-Secure PPI, active-low */
+>> +			     <1 11 4>, /* Virtual PPI, active-low */
+>> +			     <1 10 4>; /* Hypervisor PPI, active-low */
+>> +	};
+>> +
+>> +	soc {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>
+>These can be 1 if the I/O devices fit into 4GB space.
+>
 
-GPIO array needs to be present if hotplug is supported.
-HW implementation is SOC/Board specific, and also it depends on how
-add-in card is designed
-(e.g. how many present pins are implemented).
+Ok. I checked, it can be be 1. Will update in next version.
 
-If x8 card is connected, then it might be possible that all the
-3 present pins could go low, or at least one pin goes low.
-If x4 card is connected, then it might be possible that 2 present
-pins go low, or at least one pin goes low.
-
-The implementation essentially takes care of following:
-> Initializing hotplug irq thread.
-> Detecting the endpoint device based on link state.
-> Handling PERST and detecting the plugged devices.
-> Ordered Hot plug-out, where User is expected
-  to write 1 to /sys/bus/pci/devices/<pci_dev>/remove
-> Handling spurious interrupt
-> Handling multiple interrupts and makes sure that card is
-  enumerated only once.
-
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-
-diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-index a5073a9..6287a43 100644
---- a/drivers/pci/host/pcie-iproc-platform.c
-+++ b/drivers/pci/host/pcie-iproc-platform.c
-@@ -92,6 +92,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
- 		pcie->need_ob_cfg = true;
- 	}
- 
-+	if (of_property_read_bool(np, "slot-pluggable"))
-+		pcie->enable_hotplug = true;
-+
- 	/* PHY use is optional */
- 	pcie->phy = devm_phy_get(dev, "pcie-phy");
- 	if (IS_ERR(pcie->phy)) {
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 8bd5e54..2b4d830 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -28,6 +28,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/phy/phy.h>
-+#include <linux/gpio.h>
- 
- #include "pcie-iproc.h"
- 
-@@ -65,6 +66,17 @@
- #define PCIE_DL_ACTIVE_SHIFT         2
- #define PCIE_DL_ACTIVE               BIT(PCIE_DL_ACTIVE_SHIFT)
- 
-+#define CFG_RC_LTSSM                 0x1cf8
-+#define CFG_RC_PHY_CTL               0x1804
-+#define CFG_RC_LTSSM_TIMEOUT         1000
-+#define CFG_RC_LTSSM_STATE_MASK      0xff
-+#define CFG_RC_LTSSM_STATE_L1        0x1
-+
-+#define CFG_RC_CLR_LTSSM_HIST_SHIFT  29
-+#define CFG_RC_CLR_LTSSM_HIST_MASK   BIT(CFG_RC_CLR_LTSSM_HIST_SHIFT)
-+#define CFG_RC_CLR_RECOV_HIST_SHIFT  31
-+#define CFG_RC_CLR_RECOV_HIST_MASK   BIT(CFG_RC_CLR_RECOV_HIST_SHIFT)
-+
- #define APB_ERR_EN_SHIFT             0
- #define APB_ERR_EN                   BIT(APB_ERR_EN_SHIFT)
- 
-@@ -1354,13 +1366,107 @@ static int iproc_pcie_rev_init(struct iproc_pcie *pcie)
- 	return 0;
- }
- 
-+static bool iproc_pci_hp_check_ltssm(struct iproc_pcie *pcie)
-+{
-+	struct pci_bus *bus = pcie->root_bus;
-+	u32 val, timeout = CFG_RC_LTSSM_TIMEOUT;
-+
-+	/* Clear LTSSM history. */
-+	pci_bus_read_config_dword(pcie->root_bus, 0,
-+				  CFG_RC_PHY_CTL, &val);
-+	pci_bus_write_config_dword(bus, 0, CFG_RC_PHY_CTL,
-+				   val | CFG_RC_CLR_RECOV_HIST_MASK |
-+				   CFG_RC_CLR_LTSSM_HIST_MASK);
-+	/* write back the origional value. */
-+	pci_bus_write_config_dword(bus, 0, CFG_RC_PHY_CTL, val);
-+
-+	do {
-+		pci_bus_read_config_dword(pcie->root_bus, 0,
-+					  CFG_RC_LTSSM, &val);
-+		/* check link state to see if link moved to L1 state. */
-+		if ((val & CFG_RC_LTSSM_STATE_MASK) ==
-+		     CFG_RC_LTSSM_STATE_L1)
-+			return true;
-+		timeout--;
-+		usleep_range(500, 1000);
-+	} while (timeout);
-+
-+	return false;
-+}
-+
-+static irqreturn_t iproc_pci_hotplug_thread(int irq, void *data)
-+{
-+	struct iproc_pcie *pcie = data;
-+	struct pci_bus *bus = pcie->root_bus, *child;
-+	bool link_status;
-+
-+	iproc_pcie_perst_ctrl(pcie, true);
-+	iproc_pcie_perst_ctrl(pcie, false);
-+
-+	link_status = iproc_pci_hp_check_ltssm(pcie);
-+
-+	if (link_status &&
-+	    !iproc_pcie_check_link(pcie) &&
-+	    !pcie->ep_is_present) {
-+		pci_rescan_bus(bus);
-+		list_for_each_entry(child, &bus->children, node)
-+			pcie_bus_configure_settings(child);
-+		pcie->ep_is_present = true;
-+		dev_info(pcie->dev,
-+			 "PCI Hotplug: <device detected and enumerated>\n");
-+	} else if (link_status && pcie->ep_is_present)
-+		/*
-+		 * ep_is_present makes sure, enumuration done only once.
-+		 * So it can handle spurious intrrupts, and also if we
-+		 * get multiple interrupts for all the implemented pins,
-+		 * we handle it only once.
-+		 */
-+		dev_info(pcie->dev,
-+			 "PCI Hotplug: <device already present>\n");
-+	else {
-+		iproc_pcie_perst_ctrl(pcie, true);
-+		pcie->ep_is_present = false;
-+		dev_info(pcie->dev,
-+			 "PCI Hotplug: <device removed>\n");
-+	}
-+	return IRQ_HANDLED;
-+}
-+
-+static int iproc_pci_hp_gpio_irq_get(struct iproc_pcie *pcie)
-+{
-+	struct gpio_descs *hp_gpiod;
-+	struct device *dev = pcie->dev;
-+	int i;
-+
-+	hp_gpiod = devm_gpiod_get_array(dev, "prsnt", GPIOD_IN);
-+	if (PTR_ERR(hp_gpiod) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+
-+	if (!IS_ERR(hp_gpiod) && (hp_gpiod->ndescs > 0)) {
-+		for (i = 0; i < hp_gpiod->ndescs; ++i) {
-+			gpiod_direction_input(hp_gpiod->desc[i]);
-+			if (request_threaded_irq(gpiod_to_irq
-+						 (hp_gpiod->desc[i]),
-+						 NULL, iproc_pci_hotplug_thread,
-+						 IRQF_TRIGGER_FALLING,
-+						 "PCI-hotplug", pcie))
-+				dev_err(dev,
-+					"PCI hotplug prsnt: request irq failed\n");
-+			}
-+	}
-+	pcie->ep_is_present = false;
-+
-+	return 0;
-+}
-+
- int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- {
- 	struct device *dev;
- 	int ret;
- 	void *sysdata;
--	struct pci_bus *child;
-+	struct pci_bus *bus, *child;
- 	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-+	bool link_not_active;
- 
- 	dev = pcie->dev;
- 
-@@ -1386,6 +1492,12 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 		goto err_exit_phy;
- 	}
- 
-+	if (pcie->enable_hotplug) {
-+		ret = iproc_pci_hp_gpio_irq_get(pcie);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
- 	iproc_pcie_perst_ctrl(pcie, true);
- 	iproc_pcie_perst_ctrl(pcie, false);
- 
-@@ -1408,8 +1520,16 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 	sysdata = pcie;
- #endif
- 
--	ret = iproc_pcie_check_link(pcie);
--	if (ret) {
-+	link_not_active = iproc_pcie_check_link(pcie);
-+	if (link_not_active && pcie->enable_hotplug) {
-+		/*
-+		 * When link is not active and PCI hotplug
-+		 * is supported, do not turn off phy, let probe
-+		 * go ahead.
-+		 */
-+		dev_err(dev, "no PCIe EP device detected\n");
-+		iproc_pcie_perst_ctrl(pcie, true);
-+	} else if (link_not_active) {
- 		dev_err(dev, "no PCIe EP device detected\n");
- 		goto err_power_off_phy;
- 	}
-@@ -1420,24 +1540,34 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 		if (iproc_pcie_msi_enable(pcie))
- 			dev_info(dev, "not using iProc MSI\n");
- 
--	list_splice_init(res, &host->windows);
--	host->busnr = 0;
--	host->dev.parent = dev;
--	host->ops = &iproc_pcie_ops;
--	host->sysdata = sysdata;
--	host->map_irq = pcie->map_irq;
--	host->swizzle_irq = pci_common_swizzle;
-+	if (!link_not_active) {
-+		list_splice_init(res, &host->windows);
-+		host->busnr = 0;
-+		host->dev.parent = dev;
-+		host->ops = &iproc_pcie_ops;
-+		host->sysdata = sysdata;
-+		host->map_irq = pcie->map_irq;
-+		host->swizzle_irq = pci_common_swizzle;
-+
-+		ret = pci_scan_root_bus_bridge(host);
-+		if (ret < 0) {
-+			dev_err(dev, "failed to scan host: %d\n", ret);
-+			goto err_power_off_phy;
-+		}
- 
--	ret = pci_scan_root_bus_bridge(host);
--	if (ret < 0) {
--		dev_err(dev, "failed to scan host: %d\n", ret);
--		goto err_power_off_phy;
-+		pci_assign_unassigned_bus_resources(host->bus);
-+		pcie->root_bus = host->bus;
-+	} else {
-+		bus = pci_create_root_bus(dev, 0,
-+					  &iproc_pcie_ops, sysdata, res);
-+		if (!bus) {
-+			dev_err(dev, "unable to create PCI root bus\n");
-+			ret = -ENOMEM;
-+			goto err_power_off_phy;
-+		}
-+		pcie->root_bus = bus;
- 	}
- 
--	pci_assign_unassigned_bus_resources(host->bus);
--
--	pcie->root_bus = host->bus;
--
- 	list_for_each_entry(child, &host->bus->children, node)
- 		pcie_bus_configure_settings(child);
- 
-diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-index a6b55ce..e5d0cd4 100644
---- a/drivers/pci/host/pcie-iproc.h
-+++ b/drivers/pci/host/pcie-iproc.h
-@@ -77,6 +77,10 @@ struct iproc_pcie_ib {
-  * @ib: inbound mapping related parameters
-  * @ib_map: outbound mapping region related parameters
-  *
-+ * @enable_hotplug: indicates PCI hotplug feature is enabled
-+ * @ep_is_present: when PCIe hotplug is enabled, this flag is used to
-+ * indicate whether or not the endpoint device is present
-+ *
-  * @need_msi_steer: indicates additional configuration of the iProc PCIe
-  * controller is required to steer MSI writes to external interrupt controller
-  * @msi: MSI data
-@@ -104,6 +108,9 @@ struct iproc_pcie {
- 	struct iproc_pcie_ib ib;
- 	const struct iproc_pcie_ib_map *ib_map;
- 
-+	bool enable_hotplug;
-+	bool ep_is_present;
-+
- 	bool need_msi_steer;
- 	struct iproc_msi *msi;
- };
--- 
-1.9.1
+>> +		ranges;
+>> +
+>> +		uart0: serial at 21c0000 {
+>> +			device_type = "serial";
+>> +			compatible = "arm,pl011","arm,sbsa-uart";
+>> +			reg = <0x0 0x21c0000 0x0 0x1000>;
+>> +			interrupts = <0 32 0x4>;
+>> +			current-speed = <115200>;
+>> +		};
+>> +
+>> +		uart1: serial at 21d0000 {
+>> +			device_type = "serial";
+>> +			compatible = "arm,pl011","arm,sbsa-uart";
+>> +			reg = <0x0 0x21d0000 0x0 0x1000>;
+>> +			interrupts = <0 33 0x4>;
+>> +			current-speed = <115200>;
+>> +		};
+>> +
+>> +		uart2: serial at 21e0000 {
+>> +			device_type = "serial";
+>> +			compatible = "arm,pl011","arm,sbsa-uart";
+>> +			reg = <0x0 0x21e0000 0x0 0x1000>;
+>> +			interrupts = <0 72 0x4>;
+>> +			current-speed = <115200>;
+>> +		};
+>> +
+>> +		uart3: serial at 21f0000 {
+>> +			device_type = "serial";
+>> +			compatible = "arm,pl011","arm,sbsa-uart";
+>> +			reg = <0x0 0x21f0000 0x0 0x1000>;
+>> +			interrupts = <0 73 0x4>;
+>> +			current-speed = <115200>;
+>> +		};
+>> +	};
+>> +};
+>> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2qds1.dts
+>> b/arch/arm64/boot/dts/freescale/fsl-lx2qds1.dts
+>> new file mode 100644
+>> index 0000000..0a8f525
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2qds1.dts
+>> @@ -0,0 +1,54 @@
+>> +/*
+>> + * Device Tree file for LX2 QDS1 Board
+>> + *
+>> + * Copyright 2017 NXP
+>> + *
+>> + * Sriram Dash <sriram.dash@nxp.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This library is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This library is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "fsl-lx2160a.dtsi"
+>> +
+>> +/ {
+>> +	model = "NXP Layerscape LX2 QDS1 Board";
+>> +	compatible = "fsl,lx2qds1", "fsl,lx2160a"; };
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree"
+>> in the body of a message to majordomo at vger.kernel.org More majordomo
+>> info at  http://vger.kernel.org/majordomo-info.html
