@@ -1,73 +1,176 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 31 Aug 2017 11:03:14 +0200
-Subject: [PATCH 5/5] arm: dts: sun8i: Add the TBS A711 tablet devicetree
-In-Reply-To: <CAGb2v65Y5E=jQo7MbpTKip8nAR4MMx5B+_8K1Wt_c7E+NXB+PA@mail.gmail.com>
-References: <20170825092617.32533-1-maxime.ripard@free-electrons.com>
- <20170825092617.32533-5-maxime.ripard@free-electrons.com>
- <CAGb2v65Y5E=jQo7MbpTKip8nAR4MMx5B+_8K1Wt_c7E+NXB+PA@mail.gmail.com>
-Message-ID: <20170831090314.ubfn3csgp5svtlih@flea.lan>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 31 Aug 2017 11:06:05 +0200
+Subject: [PATCH v3 1/8] PM / Sleep: Make the runtime PM centric path known
+ to the PM core
+In-Reply-To: <2403318.HVB4k3qRsK@aspire.rjw.lan>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+ <13933269.sbLfAJfmVU@aspire.rjw.lan>
+ <CAPDyKFqujAbw9RAxG-kRhgnhEtAZeojBiL=v5F+JS3T9eaxfgQ@mail.gmail.com>
+ <2403318.HVB4k3qRsK@aspire.rjw.lan>
+Message-ID: <CAPDyKFoOJzciMNMWkc+ci+Fn2iD8vwsg25TQjcx=xw2ftg5rug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[...]
 
-On Thu, Aug 31, 2017 at 02:52:43PM +0800, Chen-Yu Tsai wrote:
-> > +       non-removable;
-> > +       wakeup-source;
-> > +       status = "okay";
-> > +
-> > +       brcmf: wifi at 1 {
-> > +               reg = <1>;
-> > +               compatible = "brcm,bcm4329-fmac";
-> > +               interrupt-parent = <&r_pio>;
-> > +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 WL_WAKE_UP */
-> > +               interrupt-names = "host-wake";
-> > +       };
-> > +};
-> > +
-> > +&mmc2 {
-> > +       pinctrl-0 = <&mmc2_8bit_emmc_pins>;
-> > +       pinctrl-names = "default";
-> > +       vmmc-supply = <&reg_vcc3v3>;
-> 
-> emmc has separate vddq lines. vqmmc-supply should be provided even though it
-> may be the same as vmmc-supply. The two refer to different things at the board
-> level.
+>> >> diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
+>> >> index ea1732e..865737a 100644
+>> >> --- a/drivers/base/power/main.c
+>> >> +++ b/drivers/base/power/main.c
+>> >> @@ -1549,14 +1549,16 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
+>> >>               if (parent) {
+>> >>                       spin_lock_irq(&parent->power.lock);
+>> >>
+>> >> -                     dev->parent->power.direct_complete = false;
+>> >> +                     if (!dev->power.is_rpm_sleep)
+>> >> +                             dev->parent->power.direct_complete = false;
+>> >
+>> > This doesn't look good to me at all.
+>> >
+>> > It potentially breaks the fundamental assumption of the direct_complete
+>> > mechanism that no devices with that flag set will ever be runtime resumed
+>> > during system suspend.
+>> >
+>> > Which can happen with this change if a device with power.is_rpm_sleep is
+>> > resumed causing the parent to be resumed too.
+>>
+>> Doesn't the exact same problem you describe, already exist prior my change!?
+>
+> No, it doesn't.
+>
+>> That is, if the current device is runtime suspended and the
+>> direct_complete flag is set for it, then __device_suspend() has
+>> already disabled runtime PM for the device, when we reach this point.
+>> That means, a following attempts to runtime resume the device will
+>> fail and thus also to runtime resume its parent.
+>
+> That's because any devices with direct_complete set *cannot* be runtime
+> resumed after __device_suspend().  That's intentional and how the thing
+> is designed.  It cannot work differently, sorry.
+>
+>> So to me, this is a different problem, related how to work out the
+>> correct order of how to suspend devices.
+>
+> The ordering matters here, but it is not the problem.
+>
+> Setting direct_complete means that PM callbacks for this device won't be
+> invoked going forward.  However, if the state of the device was to change
+> (like as a result of runtime PM resume), it would be necessary to run those
+> callbacks after all, but after __device_suspend() it may be too late for
+> that, because the ->suspend callback may have been skipped already.
+>
+> The only way to address that is to prevent runtime PM resume of the device
+> from happening at the point the PM core decides to use direct_complete for it,
+> but that requires runtime PM to be disabled for it.  Moreover, since the
+> device is now suspended with runtime PM disabled and its children might rely
+> on it if they were active, the children must be suspended with runtime PM
+> disabled at this point too.  That's why direct_complete can only be set
+> for a device if it is set for the entire hierarchy below it.
 
-My understanding was that vqmmc wasn't needed if it was the same
-regulator than vmmc.
+Thanks, this was a very nice description of the direct_complete path!
 
-> > +/* There's the BT part of the AP6210 connected to that UART */
-> > +&uart1 {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&uart1_pg_pins &uart1_rtscts_pins>;
-> 
-> Splitting it as separate phandles ( <&...> ) would make it more readable.
-> Also the rx/tx pingroup name should be changed
+>
+> Summary: If you allow a device to be runtime resumed during system susped,
+> direct_complete cannot be set for it and it cannot be set for its parent and
+> so on.
 
-Ack.
+Yes, this is what it seems to boils done to!
 
-> 
-> > +       status = "okay";
-> > +};
-> > +
-> > +&usbphy {
-> 
-> No VBUS?
+Perhaps the ACPI PM domain is special in this case, because in its
+->prepare() callback it asks the ACPI FW about whether the
+direct_complete path is possible for a device. In other words, the
+ACPI FW seems to be capable of providing information about if a device
+may become runtime resumed during system suspend. But, really, isn't
+that just a best guess? No?
 
-Argh, I forgot them. I'll add them, obviously.
+On those ARM SoCs I am working on, non-ACPI, the information about
+whether a device may become runtime resumed during system suspend,
+most often can't be find out in a deterministic way. That's because
+this information depends on how a device is being used by other
+devices, which changes dynamically and from one system suspend
+sequence to another. In cases like the i2c-designware-plat driver used
+in Hikey (ARM64 board), it can't ever know before hand, if someone is
+going to request an i2c transfer during system suspend or not.
 
-Thanks!
-Maxime
+To really deal with these devices properly, we have to suspend them in
+the correct order.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/9e7f4950/attachment-0001.sig>
+My point is, doesn't the ordering problem exists also for a device,
+which the PM core runs the direct_complete path for, even if the ACPI
+PM domain is attached to the device? Just because runtime PM is
+disabled for a device, doesn't mean the ordering issue disappears,
+right?
+
+>
+> [cut]
+>
+>> >> @@ -1709,11 +1711,14 @@ static int device_prepare(struct device *dev, pm_message_t state)
+>> >>        * A positive return value from ->prepare() means "this device appears
+>> >>        * to be runtime-suspended and its state is fine, so if it really is
+>> >>        * runtime-suspended, you can leave it in that state provided that you
+>> >> -      * will do the same thing with all of its descendants".  This only
+>> >> -      * applies to suspend transitions, however.
+>> >> +      * will do the same thing with all of its descendants". To allow this,
+>> >> +      * the is_rpm_sleep flag must not be set, which is default false, but
+>> >> +      * may have been changed by a driver. This only applies to suspend
+>> >> +      * transitions, however.
+>> >>        */
+>> >>       spin_lock_irq(&dev->power.lock);
+>> >> -     dev->power.direct_complete = ret > 0 && state.event == PM_EVENT_SUSPEND;
+>> >> +     dev->power.direct_complete = ret > 0 && !dev->power.is_rpm_sleep &&
+>> >> +                             state.event == PM_EVENT_SUSPEND;
+>> >
+>> > The only problem addressed by avoiding direct_complete is when runtime PM needs
+>> > to work during __device_suspend() for devices with direct_complete set.  You
+>> > said that this was not the case with the i2c designware driver, so I'm not sure
+>> > what the purpose of this is.
+>>
+>> I should probably work more on my changelog, because I tried to
+>> explain it there.
+>>
+>> Anyway, let me quote the important parts, and this is not specific for
+>> the i2c-designware-driver, but generic to drivers using
+>> pm_runtime_force_suspend|resume().
+>>
+>> "In the runtime PM centric path, the driver is expected to make use of
+>> the pm_runtime_force_suspend|resume() helpers, to deploy system sleep
+>> support. More precisely it may assign the system sleep callbacks to
+>> these helpers or may call them from its own callbacks, in case it
+>> needs to perform additional actions during system sleep.
+>>
+>> In other words, the PM core must always invoke the system sleep
+>> callbacks for the device when they are present, to allow the driver to
+>> deal with the system sleep operations."
+>>
+>> A concrete example is drivers/spi/spi-fsl-espi.c, but one can easily find more.
+>
+> In fact, the new flag introduced here means "assume that that the driver of this
+> device points ->late_suspend and ->early_resume to pm_runtime_force_suspend()
+> and pm_runtime_force_resume(), respectively."  Which then implies that
+> direct_complete cannot be used with it and (and with its parent and so on)
+> and that it is not necessary to runtime resume it during system suspend.
+>
+> However, there are (or at least there may be) devices that need not be
+> runtime resumed during system suspend even though their drivers don't use
+> _force_suspend/resume().
+>
+> Also there are devices whose drivers don't want direct_complete to be used with
+> them, even though they don't use _force_suspend/resume() and they *do* need
+> their devices to be runtime resumed during system suspend.
+>
+> Moreover, some drivers may not mind direct_complete even though their devices
+> need not be runtime resumed during system suspend.  All of that doesn't have
+> to be related to using _force_suspend/resume() at all.
+>
+> So I don't see any reason whatever for combining all of these three *different*
+> conditions under one flag.
+
+Okay!
+
+>
+> Thanks,
+> Rafael
+>
+
+Kind regards
+Uffe
