@@ -1,126 +1,63 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Thu, 31 Aug 2017 13:35:08 +0200
-Subject: [RFC PATCH v9 5/7] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <09997d9f-0003-0eb0-63d1-9b31e26e2229@arm.com>
-References: <20170829131238.4988-1-jglauber@cavium.com>
- <20170829131238.4988-6-jglauber@cavium.com>
- <09997d9f-0003-0eb0-63d1-9b31e26e2229@arm.com>
-Message-ID: <20170831113508.GE15906@hc>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Thu, 31 Aug 2017 14:40:33 +0300
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <1e3bde27-5597-41ed-11d1-0450b17f2344@free.fr>
+References: <599D62EA.7050100@linux.intel.com>
+ <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
+ <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
+ <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
+ <59A3D6BF.7010400@linux.intel.com>
+ <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
+ <59A56C15.2000403@linux.intel.com> <20170829235310.GA20214@wunner.de>
+ <20170830060237.GA2782@kroah.com>
+ <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
+ <20170830090633.GA1208@kroah.com>
+ <1e3bde27-5597-41ed-11d1-0450b17f2344@free.fr>
+Message-ID: <59A7F5B1.7060501@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 11:03:00AM +0100, Suzuki K Poulose wrote:
-> On 29/08/17 14:12, Jan Glauber wrote:
-> >Add support for the PMU counters on Cavium SOC memory controllers.
-> >
-> >This patch also adds generic functions to allow supporting more
-> >devices with PMU counters.
-> >
-> >Properties of the LMC PMU counters:
-> >- not stoppable
-> >- fixed purpose
-> >- read-only
-> >- one PCI device per memory controller
-> >
-> >Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> 
-> Jan,
-> 
-> Some minor comments below.
-> 
-> >+static void cvm_pmu_del(struct perf_event *event, int flags)
-> >+{
-> >+	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> >+	struct hw_perf_event *hwc = &event->hw;
-> >+	int i;
-> >+
-> >+	event->pmu->stop(event, PERF_EF_UPDATE);
-> >+
-> >+	/*
-> >+	 * For programmable counters we need to check where we installed it.
-> >+	 * To keep this function generic always test the more complicated
-> >+	 * case (free running counters won't need the loop).
-> >+	 */
-> >+	for (i = 0; i < pmu_dev->num_counters; i++)
-> >+		if (cmpxchg(&pmu_dev->events[i], event, NULL) == event)
-> >+			break;
-> 
-> Does this mean, it is the only way to map any given event (for programmable counters)
-> to a hardware counter ? What do we store in hwc->idx ? We have 2 additional
-> struct hw_perf_event_extra fields. We should be able to use one field to map it
-> back to the counter, isn't it ?
+On 31.08.2017 12:39, Mason wrote:
+> On 30/08/2017 11:06, Greg Kroah-Hartman wrote:
+>
+>> On Wed, Aug 30, 2017 at 10:55:37AM +0200, Mason wrote:
+>>
+>>> On 30/08/2017 08:02, Greg Kroah-Hartman wrote:
+>>>
+>>>> To get back to the original issue here, the hardware seems to have died,
+>>>> the driver stops talking to it, and all is good.  The "regression" here
+>>>> is that we now properly can determine that the hardware is crap.
+>>>
+>>> Before 4.12, when I unplugged my USB3 Flash drive, Linux would
+>>> detect a few "Uncorrected Non-Fatal errors" via AER, but it was
+>>> still possible to plug the drive back in.
+>>>
+>>> Since 4.12, once I unplug the drive, the whole USB3 card is marked
+>>> as dead (all 4 ports), and I can no longer plug anything in (not even
+>>> the USB2 drive that didn't have any issues, IIRC).
+>>>
+>>> It seems a bit premature to "mark as dead" something that remains
+>>> functional, doesn't it?
+>>
+>> I agree, but if the device sends all ones, it's a good indication it is
+>> really dead, right?  Or something is wrong with it.
+>
+> I wouldn't call it dead if I can plug the drive back in, and have
+> it working... But I agree that something fishy is happening...
+>
+>>> Disclaimer, there are many variables in this setup, and I've only
+>>> tested a small fraction of the problem space: only one system,
+>>> only one USB3 board, only one USB3 Flash drive.
+>>
+>> Did you ever happen to narrow this down to a single git commit using
+>> 'git bisect'?  I can't remember what happened in the beginning of this
+>> thread...
+>
+> Mathias pointed out d9f11ba9f107aa335091ab8d7ba5eea714e46e8b
+>
 
-Hmm, I might be able to use hwc-idx directly instead of the loop, will
-check that.
+That patch only changes how xhci reacts to reading 0xffffffff.
+we used to just returned -ENODEV, but after patch we assume
+hardware is broken or removed.
 
-> >+
-> >+	perf_event_update_userpage(event);
-> >+	hwc->idx = -1;
-> >+}
-> >+
-> 
-> ...
-> 
-> >+/* LMC events */
-> >+#define LMC_EVENT_IFB_CNT		0x1d0
-> >+#define LMC_EVENT_OPS_CNT		0x1d8
-> >+#define LMC_EVENT_DCLK_CNT		0x1e0
-> >+#define LMC_EVENT_BANK_CONFLICT1	0x360
-> >+#define LMC_EVENT_BANK_CONFLICT2	0x368
-> >+
-> >+#define CVM_PMU_LMC_EVENT_ATTR(_name, _id)						\
-> >+	&((struct perf_pmu_events_attr[]) {						\
-> >+		{									\
-> >+			__ATTR(_name, S_IRUGO, cvm_pmu_event_sysfs_show, NULL),		\
-> >+			_id,								\
-> >+			"lmc_event=" __stringify(_id),					\
-> >+		}									\
-> >+	})[0].attr.attr
-> >+
-> >+/* map counter numbers to register offsets */
-> >+static int lmc_events[] = {
-> >+	LMC_EVENT_IFB_CNT,
-> >+	LMC_EVENT_OPS_CNT,
-> >+	LMC_EVENT_DCLK_CNT,
-> >+	LMC_EVENT_BANK_CONFLICT1,
-> >+	LMC_EVENT_BANK_CONFLICT2,
-> >+};
-> >+
-> >+static int cvm_pmu_lmc_add(struct perf_event *event, int flags)
-> >+{
-> >+	struct hw_perf_event *hwc = &event->hw;
-> >+
-> >+	return cvm_pmu_add(event, flags, LMC_CONFIG_OFFSET,
-> >+			   lmc_events[hwc->config]);
-> >+}
-> >+
-> 
-> Is there any reason why we can't use the LMC event code directly
-> here, avoiding the mapping altogether ?
-
-I wanted to avoid exposing the raw numbers (0x1d0 - 0x368) here.
-
-thanks,
-Jan
-
-> >+PMU_FORMAT_ATTR(lmc_event, "config:0-2");
-> >+
-> >+static struct attribute *cvm_pmu_lmc_format_attr[] = {
-> >+	&format_attr_lmc_event.attr,
-> >+	NULL,
-> >+};
-> >+
-> >+static struct attribute_group cvm_pmu_lmc_format_group = {
-> >+	.name = "format",
-> >+	.attrs = cvm_pmu_lmc_format_attr,
-> >+};
-> >+
-> >+static struct attribute *cvm_pmu_lmc_events_attr[] = {
-> >+	CVM_PMU_LMC_EVENT_ATTR(ifb_cnt,		0),
-> >+	CVM_PMU_LMC_EVENT_ATTR(ops_cnt,		1),
-> >+	CVM_PMU_LMC_EVENT_ATTR(dclk_cnt,	2),
-> >+	CVM_PMU_LMC_EVENT_ATTR(bank_conflict1,	3),
-> >+	CVM_PMU_LMC_EVENT_ATTR(bank_conflict2,	4),
-> >+	NULL,
-> >+};
+-Mathias
