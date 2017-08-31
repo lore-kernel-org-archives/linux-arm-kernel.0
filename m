@@ -1,27 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 31 Aug 2017 16:52:46 +0200
-Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
-In-Reply-To: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
-References: <20170830233609.13855-1-stefan.bruens@rwth-aachen.de>
- <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170831145246.p4k3uakbn67na3pv@flea.lan>
+Date: Thu, 31 Aug 2017 16:53:57 +0200
+Subject: [PATCH v2] arm64: allwinner: a64: add SPI nodes
+In-Reply-To: <20170830230637.13010-1-stefan.bruens@rwth-aachen.de>
+References: <20170830230637.13010-1-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170831145357.eyezfjgzvic6e6vq@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 01:36:09AM +0200, Stefan Br?ns wrote:
-> The A64 SoC has the same dma engine as the H3 (sun8i), with a
-> reduced amount of physical channels. Add the proper config data
-> and compatible string to support it.
+1;4803;0c
+On Thu, Aug 31, 2017 at 01:06:37AM +0200, Stefan Br?ns wrote:
+> The A64 SPI controllers are register compatible to the h3/h5 SPI
+> controllers.
+> 
+> The A64 has two SPI controllers, each with a single chip select.
+> The handles for the DMA channels (23/24 for SPI0/SPI1) are omitted,
+> as the A64 DMA support is currently missing.
 > 
 > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++++
->  drivers/dma/sun6i-dma.c                       | 7 +++++++
->  2 files changed, 11 insertions(+)
 
-With what device did you test this? As far as I know, the SPI driver
-doesn't use DMA at all.
-
+Queued for 4.15, thanks!
 Maxime
 
 -- 
@@ -34,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/ed943cf9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/16625da3/attachment.sig>
