@@ -1,52 +1,75 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 31 Aug 2017 10:58:12 -0500
-Subject: [PATCH] scripts/dtc: fix '%zx' warning
-In-Reply-To: <20170809040642.GG13670@umbus.fritz.box>
-References: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
- <20170726013004.GJ8978@umbus.fritz.box>
- <20170808112818.GC20805@n2100.armlinux.org.uk>
- <20170809040642.GG13670@umbus.fritz.box>
-Message-ID: <CAL_JsqKiM_T-ftd8NvHmzcRsirRWTe34jZRjZ=3NGSgb4HGncQ@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 31 Aug 2017 10:01:30 -0600
+Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
+In-Reply-To: <20170831094052.GA15906@hc>
+References: <20170830142454.10971-1-jglauber@cavium.com>
+ <20170830142454.10971-4-jglauber@cavium.com>
+ <20170830084012.19d91759@w520.home> <20170831094052.GA15906@hc>
+Message-ID: <20170831100130.5c8a922e@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 8, 2017 at 11:06 PM, David Gibson
-<david@gibson.dropbear.id.au> wrote:
-> On Tue, Aug 08, 2017 at 12:28:19PM +0100, Russell King - ARM Linux wrote:
->> On Wed, Jul 26, 2017 at 11:30:04AM +1000, David Gibson wrote:
->> > On Tue, Jul 25, 2017 at 05:20:09PM +0100, Russell King wrote:
->> > > dtc uses an incorrect format specifier for printing a uint64_t value.
->> > > uint64_t may be either 'unsigned long' or 'unsigned long long' depending
->> > > on the host architecture.
->> > >
->> > > Fix this by using %llx and casting to unsigned long long, which ensures
->> > > that we always have a wide enough variable to print 64 bits of hex.
->> > >
->> > >   HOSTCC  scripts/dtc/checks.o
->> > > scripts/dtc/checks.c: In function 'check_simple_bus_reg':
->> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
->> > >   snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
->> > >   ^
->> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
->> > >
->> > > Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
->> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> >
->> > This (embarrassing) error is already fixed in upstream dtc.
->>
->> It remains unfixed in 4.13-rc4.  How do we get this fixed in the
->> kernel's dtc?  From what I can see, sending a patch to fix stuff
->> doesn't work.
+On Thu, 31 Aug 2017 11:40:52 +0200
+Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
 
-Sorry, didn't see this until Andrew M picked it up.
+> On Wed, Aug 30, 2017 at 08:40:12AM -0600, Alex Williamson wrote:
+> > On Wed, 30 Aug 2017 16:24:54 +0200
+> > Jan Glauber <jglauber@cavium.com> wrote:
+> >   
+> > > Root ports of cn8xxx do not function after a slot reset when used with
+> > > some e1000e and LSI HBA devices. Add a quirk to prevent slot reset on
+> > > these root ports.
+> > > 
+> > > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > > ---
+> > >  drivers/pci/quirks.c | 16 ++++++++++++++++
+> > >  1 file changed, 16 insertions(+)
+> > > 
+> > > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> > > index 85191b8..6679971 100644
+> > > --- a/drivers/pci/quirks.c
+> > > +++ b/drivers/pci/quirks.c
+> > > @@ -845,6 +845,22 @@ static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
+> > >  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
+> > >  #endif
+> > >  
+> > > +/*
+> > > + * Root port on some Cavium CN8xxx chips do not successfully complete
+> > > + * a bus reset when used with certain types of child devices. Config
+> > > + * space access to the child may quit responding. Flag all devices under
+> > > + * the secondary bus as non-resettable.
+> > > + */
+> > > +static void quirk_CN8xxx_secondary_bus(struct pci_dev *dev)
+> > > +{
+> > > +	struct pci_dev *pdev;
+> > > +
+> > > +	dev_warn(&dev->dev, "Cavium CN8xxx quirk detected; reset for devices on secondary bus disabled\n");
+> > > +	list_for_each_entry(pdev, &dev->subordinate->devices, bus_list)
+> > > +		pdev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
+> > > +}
+> > > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_CN8xxx_secondary_bus);
+> > > +
+> > >  /*
+> > >   * Some settings of MMRBC can lead to data corruption so block changes.
+> > >   * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide  
+> > 
+> > 
+> > This doesn't seem reliable, doesn't the user just need to remove and
+> > reprobe the slot and the device would re-appear without this flag set?  
+> 
+> No, I tried before to disable the slot with "echo 0 > /sys/bus/pci/slots/3/power"
+> but that does not work as it is not supported.
+> 
+> I'm not familiar with the quirk types, would another one be better
+> suited here (even if we don't have the problem you descibed)?
 
-> Um.. I don't know.  I haven't been the person doing updates of the
-> kernel dtc to match upstream dtc for ages.
+The scenario I'm mentioning is to "echo 1 > /sys/bus/pci/devices/<some
+device under the slot>/remove", then "echo <that device address> >
+/sys/bus/pci/rescan".  This would break the ordering implicit in using
+a fixup defined for the root port.  It seems like it'd make a lot more
+sense to add a test on the parent bridge more similar to how the bus
+reset works.  It's not the subordinate devices imposing the
+no-bus-reset flag, it's the bridge device and the objects and code
+should support and reflect that.  Thanks,
 
-The flow is submit a patch to upstream dtc on
-devicetree-compiler at vger.kernel.org and then bug me to cherry-pick or
-sync dtc.
-
-I will cherry-pick the upstream version.
-
-Rob
+Alex
