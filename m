@@ -1,73 +1,89 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 31 Aug 2017 19:04:13 +0100
-Subject: [PATCH v6 4/7] arm64: kvm: support user space to query RAS
- extension feature
-In-Reply-To: <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <59A84F9D.8030309@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 31 Aug 2017 20:24:23 +0200
+Subject: [PATCH v4 1/3] dt-bindings: Document the hi3660 thermal sensor
+ bindings
+In-Reply-To: <1503994666-13954-2-git-send-email-kevin.wangtao@hisilicon.com>
+References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
+ <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1503994666-13954-2-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <d56428a6-ef27-4424-3ce5-4610fef3ac15@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu Geng,
+On 29/08/2017 10:17, Tao Wang wrote:
+> From: Tao Wang <kevin.wangtao@linaro.org>
+> 
+> This adds documentation of device tree bindings for the
+> thermal sensor controller of hi3660 SoC.
+> 
+> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+> ---
+>  .../devicetree/bindings/thermal/hisi-tsensor.txt   | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+> new file mode 100644
+> index 0000000..4643dbe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+> @@ -0,0 +1,37 @@
+> +* Temperature Sensor on hisilicon SoC
+> +
+> +Hisilicon SoC supplies temperature sensor feature, each CPU cluster and G3D
+> +area contains a temperture sensor. The temperture sensor produces an output
+> +value which has a linear relationship with the temperture of the area.
+> +
 
-On 28/08/17 11:38, Dongjiu Geng wrote:
-> In ARMV8.2 RAS extension, a virtual SError exception syndrome
-> register(VSESR_EL2) is added.  This value may be specified from
-> userspace.
+s/temperture/temperature/
 
-I agree that the CPU support for injecting SErrors with a specified ESR should
-be exposed to KVM's user space...
+> +for Hi3660,
+> +sensor0 monitors the temperture of A53;
+> +sensor1 monitors the temperture of A72;
+> +sensor2 monitors the temperture of GPU;
+> +sensor3 is a virtual sensor, which produces the maximum value of all sensors;
+> +sensor4 is a virtual sensor, which produces the average value of all sensors.
 
+I don't think we need to escribe the virtual sensors in the DT bindings.
 
-> Userspace will want to check if the CPU has the RAS
-> extension. 
+> +** Required properties :
+> +- compatible: "hisilicon,thermal-tsensor".
+> +- reg: physical reg address of thermal sensor and length of memory mapped
+> +  region.
+> +- hisi,tsensors: number of hardware tsensors
+> +- hisi,coef:	An array of integers (one signed cell) containing
+> +		coefficients to turn adc value to temperture.
+> +- hisi,adc-range: adc value range, minimum value is followed by maximum value.
+> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
+> +
+> +Example :
+> +Hi3660:
+> +tsensor: tsensor at fff30000 {
+> +	compatible = "hisilicon,hi3660-tsensor";
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +	reg = <0x0 0xfff3001c 0x0 0x4>,
+> +		<0x0 0xfff3005c 0x0 0x4>,
+> +		<0x0 0xfff3009c 0x0 0x4>;
+> +	hisi,tsensors = <HISI_MAX_TSENSORS>;
+> +	hisi,coef = <165000 (-40000)>;
+> +	hisi,adc-range = <0x74 0x39A>;
 
-... but user-space wants to know if it can inject SErrors with a specified ESR.
+Do we really need max sensors, coef and adc range to be specified in the DT?
 
-What if we gain another way of doing this that isn't via the RAS-extensions, now
-user-space has to check for two capabilities.
+Can't we assume the hi3660-tsensor has 3 sensors, and hard-code the
+coef, adc, in the driver itself?
 
+Can't this binding be merged with the hisilicon-thermal.txt?
 
-> If it has, it wil specify the virtual SError syndrome
-> value, otherwise it will not be set. This patch adds support for
-> querying the availability of this extension.
+Thanks.
 
-I'm against telling user-space what features the CPU has unless it can use them
-directly. In this case we are talking about a KVM API, so we should describe the
-API not the CPU.
-
-
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 3256b9228e75..b7313ee028e9 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PMU_V3:
->  		r = kvm_arm_support_pmu_v3();
->  		break;
-> +	case KVM_CAP_ARM_RAS_EXTENSION:
-
-This should be called something more like 'KVM_CAP_ARM_INJECT_SERROR_ESR'
-
-
-> +		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-> +		break;
->  	case KVM_CAP_SET_GUEST_DEBUG:
->  	case KVM_CAP_VCPU_ATTRIBUTES:
->  		r = 1;
-
-
-We can inject SError on systems without the RAS extensions using just the
-HCR_EL2.VSE bit. We may want to make the 'ESR' part of the API optional, or
-expose '1' for the without-ESR version and '2 for with-ESR, (however we choose
-to implement that).
-
-The risk is if we want to add a without-ESR version later, and the name we make
-ABI now turned out to be a mistake. Marc or Christoffer probably have the best
-view of this. (no-one has needed it so far...)
+  -- Daniel
 
 
-Thanks,
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-James
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
