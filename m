@@ -1,45 +1,24 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 31 Aug 2017 07:12:06 +0000
-Subject: [PATCH] clk: bulk: call of_clk_get() when id is NULL
-In-Reply-To: <20170831070118.GA3328@dragon>
-References: <1502243442-28055-1-git-send-email-shawnguo@kernel.org>
- <20170809173318.GD2146@codeaurora.org> <20170813141851.GD31819@dragon>
- <AM3PR04MB3064504A935B4AA0CBEE962809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
- <20170831070118.GA3328@dragon>
-Message-ID: <AM3PR04MB306B791472D5AB2BF12730F809D0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 31 Aug 2017 09:12:13 +0200
+Subject: [PATCH 3/4] arm: dts: mt7623: add display related nodes
+In-Reply-To: <42a9db86b49834188bd680d0144e639c98aafaa2.1503222289.git.ryder.lee@mediatek.com>
+References: <9c4a8be621ac76594fad303d5d49ed32bd530605.1503222289.git.ryder.lee@mediatek.com>
+ <42a9db86b49834188bd680d0144e639c98aafaa2.1503222289.git.ryder.lee@mediatek.com>
+Message-ID: <CACRpkdZi1o6Vj=WoZBhS5DCW5=ctsCHu35jHBvHQMhFkQKB_Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Thursday, August 31, 2017 3:01 PM
-> To: A.s. Dong
-> Cc: Stephen Boyd; Michael Turquette; linux-clk at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Shawn Guo
-> Subject: Re: [PATCH] clk: bulk: call of_clk_get() when id is NULL
-> 
-> On Wed, Aug 30, 2017 at 03:31:38PM +0000, A.s. Dong wrote:
-> > IMHO how about implement a of_clk_bulk_get() to handle this issue as
-> > we already have a of_clk_get?
-> > e.g.
-> >
-> > int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-> >                               struct clk_bulk_data *clks) {
-> >         for (i = 0; i < num_clks; i++) {
-> >                 clks[i].clk = of_clk_get(dev, clks[i].id);
-> 
-> The of_clk_get() takes clock index rather than name/id as the second
-> parameter.
-> 
+On Sun, Aug 20, 2017 at 11:46 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
 
-You're right.
-It's for only an idea demonstration, so sent too quick! :-)
+> This patch adds the device nodes for the display function block.
+> Also, we add some missing pin macros in mt7623-pinfunc.h.
+>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> CC: Linus Walleij <linus.walleij@linaro.org>
 
-Regards
-Dong Aisheng
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> Shawn
-> 
-> > ...
-> >
-> > }
+Please take this through the ARM SoC tree.
+
+Yours,
+Linus Walleij
