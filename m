@@ -1,87 +1,129 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 1 Sep 2017 00:36:27 +0900
-Subject: [PATCH v3] gpio: uniphier: add UniPhier GPIO controller driver
-In-Reply-To: <CACRpkdYG3BFhhpouwAkQN+x0YpC5EhsVhTkqyuNdRd26Ne-r9A@mail.gmail.com>
-References: <1503418601-9728-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdYG3BFhhpouwAkQN+x0YpC5EhsVhTkqyuNdRd26Ne-r9A@mail.gmail.com>
-Message-ID: <CAK7LNAQz_mGUo71-FvchPrp_B6+A+74t=LDaZdGE7Bzxpeh9Mg@mail.gmail.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Fri, 1 Sep 2017 01:05:16 +0900
+Subject: [PATCH] scripts: make extract-vmlinux support armel/armhf
+In-Reply-To: <20170831154941.GS20805@n2100.armlinux.org.uk>
+References: <20170831153631.31026-1-rogershimizu@gmail.com>
+ <20170831154941.GS20805@n2100.armlinux.org.uk>
+Message-ID: <CAEQ9gEmBv-fb2MbedSzs+dWtrq-ChXwiMrisyofZ7zfu+jADYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Dear Russell,
 
+Thanks for your review!
 
-2017-08-31 22:41 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Aug 22, 2017 at 6:16 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->
->> This GPIO controller device is used on UniPhier SoCs.
+On Fri, Sep 1, 2017 at 12:49 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Fri, Sep 01, 2017 at 12:36:31AM +0900, Roger Shimizu wrote:
+>> vmlinux/zImage on armel/armhf seems not an ELF, so update the script
+>> scripts/extract-vmlinux to support such case.
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> This fix is tested on Debian amd64, armel, and armhf platform, with
+>> Debian kernels.
+>>
+>> Fixes: 09d481270d44 ("scripts: add extract-vmlinux")
+>> Cc: Corentin Chary <corentincj@iksaif.net>
+>> Cc: Michal Marek <mmarek@suse.com>
+>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kbuild at vger.kernel.org
+>> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 >> ---
 >>
->> Changes in v3:
->>   - Add .irq_set_affinity() hook
->>   - Use irq_domain_create_hierarchy() instead of legacy
->>     irq_domain_add_hierarchy().
+>> Dear Michal, Masahiro-san, and Russell,
+>>
+>> I posted this patch before [0] but didn't get positive response.
+>> Recently when I trace a Debian kernel issue, I still find this patch
+>> useful to locate the root cause [1].
+>>
+>> Besides, it's a well known bug confuses other developers [2][3].
+>> So I decide to submit the patch again.
+>>
+>> [0]: https://patchwork.kernel.org/patch/8120831/
+>> [1]: https://bugs.debian.org/870185#50
+>> [2]: https://bugs.launchpad.net/linaro-ubuntu/+bug/1050453
+>> [3]: https://bugs.linaro.org/show_bug.cgi?id=461
+>>
+>> Please kindly help to review. Thank you!
 >
-> This is getting better and better.
+> I don't think this makes sense.  This script claims to extract a "vmlinux"
+> from a compressed kernel image.  "vmlinux" is normally the term of the
+> ELF object, and indeed as the script currently stands, it always guarantees
+> to output an ELF file.
+
+If you think creating a new "scripts/extract-zImage" file is more
+proper way, we can do it.
+
+> However, ARM zImage does not store a compressed ELF object, it stores a
+> compressed binary image of the executable in memory, so what you get out
+> of this script is not an ELF file, but the binary image (iow, what
+> arch/arm/boot/Image is.)
 >
->> +static const u32 uniphier_gpio_irq_parent_hwirqs[] = {
->> +       48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
->> +       154, 155, 156, 157, 158, 217, 218, 219,
->> +};
+> What's the use case - what are you using the output of this script with?
+
+I already provided a use case, to trace a Debian kernel issue caused
+by kernel size.
+- https://bugs.debian.org/870185#50
+
+I also see other people complaining this issue:
+ - https://bugs.launchpad.net/linaro-ubuntu/+bug/1050453
+ - https://bugs.linaro.org/show_bug.cgi?id=461
+
+By a random web search, I find another blog post on how to dissamble the kernel.
+ - https://blog.packagecloud.io/eng/2016/03/08/how-to-extract-and-disassmble-a-linux-kernel-image-vmlinuz/
+
+
 >
-> This array which is used when allocating the hierarchical domain
-> looks like configuration data. Why is it not in the device tree?
+>> diff --git a/scripts/extract-vmlinux b/scripts/extract-vmlinux
+>> index 5061abcc2540..0c72ecd24969 100755
+>> --- a/scripts/extract-vmlinux
+>> +++ b/scripts/extract-vmlinux
+>> @@ -6,6 +6,7 @@
+>>  # (c) 2009,2010 Dick Streefland <dick@streefland.net>
+>>  #
+>>  # (c) 2011      Corentin Chary <corentin.chary@gmail.com>
+>> +# (c) 2016      Roger Shimizu <rogershimizu@gmail.com>
+>>  #
+>>  # Licensed under the GNU General Public License, version 2 (GPLv2).
+>>  # ----------------------------------------------------------------------
+>> @@ -15,7 +16,14 @@ check_vmlinux()
+>>       # Use readelf to check if it's a valid ELF
+>>       # TODO: find a better to way to check that it's really vmlinux
+>>       #       and not just an elf
+>> -     readelf -h $1 > /dev/null 2>&1 || return 1
+>> +     case "$2" in
+>> +     0|"")
+>> +             readelf -h $1 > /dev/null 2>&1 || return 1
+>> +             ;;
+>> +     1)
+>> +     # For ARCH like armel/armhf, vmlinux is not ELF, so we skip the check
+>> +             ;;
+>> +     esac
+>
+> Right, so passing the second argument as 1 bypasses the "is it ELF" check.
+>
+>> @@ -31,7 +39,7 @@ try_decompress()
+>>       do
+>>               pos=${pos%%:*}
+>>               tail -c+$pos "$img" | $3 > $tmp 2> /dev/null
+>> -             check_vmlinux $tmp
+>> +             test $? -eq 0 && check_vmlinux $tmp 1
+>
+> and here you always pass '1', thereby bypassing the ELF check for every
 
+There's another call without parameter "1", which handles the ELF's case.
 
-The same comment as in v1.
+> architecture.  What if some architecture stores another compressed
+> object in the same compressed image?  I suspect the check is there to
+> ensure that it works on architectures where the compressed kernel image
+> contains other compressed objects.
 
-There is no systematic way to map hwirqs to the parent
-for irqdomain hierarchy:
-https://lkml.org/lkml/2017/7/6/758
+The output of this script is output the first compressed object.
+If there's need to process the 2nd, it should be handled separately.
+I don't think it's a blocker to this patch.
 
-
-
-If you see irqchip drivers using domain hierarchy,
-many drivers hard-code
-
-    parent_fwspec.param_count = 3;
-
-without parsing #interrupt-cells property of the parent.
-
-It is hard-coded configuration data, isn't it?
-
-
-
-The array of parent hwirqs is more or less SoC specific data.
-
-
-This is just a matter of taste, but
-if you like, I can move the array to the SoC data associated
-with compatible.
-
-
-.ngpio is already associated with compatible,
-so adding more data would not hurt...
-
-
-static const u32 uniphier_pxs2_gpio_irqs[] = {
-        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-        154, 155, 156, 157, 158, 217, 218, 219,
-};
-
-static const struct uniphier_gpio_socdata uniphier_pxs2_gpio_data = {
-        .ngpio = 232,
-        .irqs = uniphier_pxs2_gpio_irqs,
-        .nirqs = ARRAY_SIZE(uniphier_pxs2_gpio_irqs),
-};
-
-
-
-
-
+Cheers,
 -- 
-Best Regards
-Masahiro Yamada
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 4096R/6C6ACD6417B3ACB1
