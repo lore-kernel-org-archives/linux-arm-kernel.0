@@ -1,88 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 31 Aug 2017 15:18:03 -0500
-Subject: [PATCH v4 4/5] net: stmmac: dwmac-sun8i: choose internal PHY via
- phy-is-integrated
-In-Reply-To: <20170826212051.GA10418@lunn.ch>
-References: <20170826073311.25612-1-clabbe.montjoie@gmail.com>
- <20170826073311.25612-5-clabbe.montjoie@gmail.com>
- <20170826212051.GA10418@lunn.ch>
-Message-ID: <20170831201803.x6vwftfcllrfpk6q@rob-hp-laptop>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 31 Aug 2017 22:24:36 +0200
+Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
+Message-ID: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 26, 2017 at 11:20:51PM +0200, Andrew Lunn wrote:
-> Hi Corentin
-> 
-> I think we have now all agreed this is an mdio-mux, plus it is also an
-> MII mux. We should represent that in device tree. This patchset does
-> this. However, as it is now, the mux structure in DT is ignored. All
-> it does is search for the phy-is-integrated flags and goes on that.
-> 
-> I made the comment that the device tree representation cannot be
-> implemented using an MDIO mux driver, because of driver loading
-> issues.  However, the core of the MDIO mux code is just a library,
-> symbols exported as GPL, free for anything to use.
-> 
-> What i think should happen is the mdio-mux is implemented inside the
-> MAC driver, using the mux-core as a library. The device tree structure
-> of a mix is then reflected within Linux. The mux switch callback is
-> implemented within the MAC driver. So it can reset the MAC when the
-> mux is switched. The 'phy-is-integrated' property is then no longer
-> needed.
-> 
-> I would suggest a binding something like:
+In case there are no DT idle states defined or
+cpuidle_register_driver() fails, the copy of the idle driver is leaked:
 
-This is looks better to me, but...
+    unreferenced object 0xede0dc00 (size 1024):
+    comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
+    hex dump (first 32 bytes):
+    94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
+    57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
+    backtrace:
+    [<c1295f04>] arm_idle_init+0x44/0x1ac
+    [<c0301e6c>] do_one_initcall+0x3c/0x16c
+    [<c1200d70>] kernel_init_freeable+0x110/0x1d0
+    [<c0cb3624>] kernel_init+0x8/0x114
+    [<c0307a98>] ret_from_fork+0x14/0x3c
+
+So fix this by freeing the unregistered copy in error case.
+
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
+---
+ drivers/cpuidle/cpuidle-arm.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 7080c38..52a7505 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
+ 		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
+ 		if (ret <= 0) {
+ 			ret = ret ? : -ENODEV;
+-			goto out_fail;
++			goto init_fail;
+ 		}
  
-> emac: ethernet at 1c0b000 {
->         compatible = "allwinner,sun8i-h3-emac";
->         syscon = <&syscon>;
->         reg = <0x01c0b000 0x104>;
->         interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
->         interrupt-names = "macirq";
->         resets = <&ccu RST_BUS_EMAC>;
->         reset-names = "stmmaceth";
->         clocks = <&ccu CLK_BUS_EMAC>;
->         clock-names = "stmmaceth";
->         #address-cells = <1>;
->         #size-cells = <0>;
-> 
->         phy-handle = <&int_mii_phy>;
->         phy-mode = "mii";
->         allwinner,leds-active-low;
-> 
->         mdio: mdio {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> 	}
-
-Why do you need this node still?
-
-> 
-> 	mdio-mux {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> 
-> 		mdio at 0 {
-> 			reg = <0>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> 
->                         int_mii_phy: ethernet-phy at 1 {
->                                 reg = <1>;
->                                 clocks = <&ccu CLK_BUS_EPHY>;
->                                 resets = <&ccu RST_BUS_EPHY>;
->                         };
->                 };
->                 ext_mdio: mdio at 0 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> 
->                         ext_rgmii_phy: ethernet-phy at 1 {
->                                 reg = <1>;
->                         };
->                 };
->        };
-> };
-> 
-> 	Andrew
+ 		ret = cpuidle_register_driver(drv);
+ 		if (ret) {
+ 			pr_err("Failed to register cpuidle driver\n");
+-			goto out_fail;
++			goto init_fail;
+ 		}
+ 
+ 		/*
+@@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
+ 	}
+ 
+ 	return 0;
++init_fail:
++	kfree(drv);
+ out_fail:
+ 	while (--cpu >= 0) {
+ 		dev = per_cpu(cpuidle_devices, cpu);
+-- 
+2.7.4
