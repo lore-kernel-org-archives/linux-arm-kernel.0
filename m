@@ -1,36 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Aug 2017 23:27:53 -0400 (EDT)
-Subject: [PULL REQUEST] boot and linker script stuff
-Message-ID: <nycvar.YSQ.7.76.1708302312230.2606@knanqh.ubzr>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 30 Aug 2017 21:06:25 -0700
+Subject: [net-next PATCHv6 0/2] net: ethernet: Socionext Netsec
+In-Reply-To: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <27A7C5A5-AFF4-49F3-B0DF-7F53283EC2A4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, please pull the following:
+On August 30, 2017 3:24:17 AM PDT, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>Hello,
+>
+>The OGMA/Netsec controller is used in latest SoC from
+>Socionext/Fujitsu.
+>
+>I am refreshing the patchset by basically using official name of the IP
+>from 'OGMA' to 'Netsec'. And the company is renamed too, from Fujitsu
+>to Socionext to better reflect the reality.
+>
+> I have addressed comments (that could be) on the last revision -->
+>https://patchwork.kernel.org/patch/4540651/
+>
+> Of course, I have scanned changes to the drivers/net/ethernet since
+>last submission and integrated whichever applicable and rebased the
+>driver on top of last rc.
 
-  http://git.linaro.org/people/nicolas.pitre/linux xip_zdata
+It does not appear to be at first glance, but I will just ask anyways, this is not yet another variant of stmmac glued just a little bit differently into the SoC right?
 
-This contains important fixes to the XIP linker script, some more linker 
-script cleanups, .bss clearing and .data copying speedups related to the 
-above, and an opt-in config option for XIP kernels that allows for 
-compressing .data in ROM that depend on those other patches to work 
-properly.
+Will take a closer look at the register set and driver tomorrow. Thanks
 
-This is the same patches as the series titled "[PATCH v2 0/5] make XIP 
-kernel .data compressed in ROM" plus some ACKs and Tested-bys.
-
-The diffstat against v4.13-rc4 is:
-
- arch/arm/Kconfig                    | 11 ++++
- arch/arm/boot/Makefile              | 13 ++++-
- arch/arm/boot/deflate_xip_data.sh   | 64 +++++++++++++++++++++
- arch/arm/kernel/Makefile            |  5 ++
- arch/arm/kernel/head-common.S       | 85 +++++++++++++++++-----------
- arch/arm/kernel/head-inflate-data.c | 62 ++++++++++++++++++++
- arch/arm/kernel/vmlinux-xip.lds.S   | 94 ++++++++++++++-----------------
- arch/arm/kernel/vmlinux.lds.S       | 40 ++-----------
- 8 files changed, 256 insertions(+), 118 deletions(-)
-
-Thanks.
-
-
-Nicolas
+-- 
+Florian
