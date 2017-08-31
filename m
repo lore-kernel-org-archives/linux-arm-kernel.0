@@ -1,45 +1,65 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 31 Aug 2017 18:00:37 +0100
-Subject: [PATCH v2 05/28] arm64: fpsimd: Simplify uses of {set,
- clear}_ti_thread_flag()
+Date: Thu, 31 Aug 2017 18:00:40 +0100
+Subject: [PATCH v2 08/28] arm64/sve: Kconfig update and conditional
+ compilation support
 In-Reply-To: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
 References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1504198860-12951-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1504198860-12951-9-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing FPSIMD context switch code contains a couple of
-instances of {set,clear}_ti_thread(task_thread_info(task)).  Since
-there are thread flag manipulators that operate directly on
-task_struct, this verbosity isn't strictly needed.
+This patch adds CONFIG_ARM64_SVE to control building of SVE support
+into the kernel, and adds a stub predicate system_supports_sve() to
+control conditional compilation and runtime SVE support.
 
-For consistency, this patch simplifies the affected calls.  This
-should have no impact on behaviour.
+system_supports_sve() just returns false for now: it will be
+replaced with a non-trivial implementation in a later patch, once
+SVE support is complete enough to be enabled safely.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/fpsimd.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig                  | 11 +++++++++++
+ arch/arm64/include/asm/cpufeature.h |  5 +++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 3a68cf3..9d762dd 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -159,11 +159,9 @@ void fpsimd_thread_switch(struct task_struct *next)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ca711ac..9b3a50e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -975,6 +975,17 @@ config ARM64_PMEM
  
- 		if (__this_cpu_read(fpsimd_last_state) == st
- 		    && st->cpu == smp_processor_id())
--			clear_ti_thread_flag(task_thread_info(next),
--					     TIF_FOREIGN_FPSTATE);
-+			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 		else
--			set_ti_thread_flag(task_thread_info(next),
--					   TIF_FOREIGN_FPSTATE);
-+			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 	}
+ endmenu
+ 
++config ARM64_SVE
++	bool "ARM Scalable Vector Extension support"
++	default y
++	help
++	  The Scalable Vector Extension (SVE) is an extension to the AArch64
++	  execution state which complements and extends the SIMD functionality
++	  of the base architecture to support much larger vectors and to enable
++	  additional vectorisation opportunities.
++
++	  To enable use of this extension on CPUs that implement it, say Y.
++
+ config ARM64_MODULE_CMODEL_LARGE
+ 	bool
+ 
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 428ee1f..4ea3441 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -262,6 +262,11 @@ static inline bool system_uses_ttbr0_pan(void)
+ 		!cpus_have_const_cap(ARM64_HAS_PAN);
  }
  
++static inline bool system_supports_sve(void)
++{
++	return false;
++}
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
 -- 
 2.1.4
