@@ -1,63 +1,78 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Thu, 31 Aug 2017 14:40:33 +0300
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <1e3bde27-5597-41ed-11d1-0450b17f2344@free.fr>
-References: <599D62EA.7050100@linux.intel.com>
- <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
- <8ac92197-907a-282b-2165-f50d1b09bd55@free.fr>
- <61d34811-f17c-6faf-252f-c4c81feb9e89@free.fr>
- <59A3D6BF.7010400@linux.intel.com>
- <0b089b17-00fc-5a7c-baa3-e6141029b191@free.fr>
- <59A56C15.2000403@linux.intel.com> <20170829235310.GA20214@wunner.de>
- <20170830060237.GA2782@kroah.com>
- <678490ce-9381-e63e-7a12-33d3eff7f894@free.fr>
- <20170830090633.GA1208@kroah.com>
- <1e3bde27-5597-41ed-11d1-0450b17f2344@free.fr>
-Message-ID: <59A7F5B1.7060501@linux.intel.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Thu, 31 Aug 2017 13:38:03 +0200
+Subject: [RFC PATCH v9 0/7] Cavium ARM64 uncore PMU support
+In-Reply-To: <20170829131238.4988-1-jglauber@cavium.com>
+References: <20170829131238.4988-1-jglauber@cavium.com>
+Message-ID: <20170831113803.GF15906@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.08.2017 12:39, Mason wrote:
-> On 30/08/2017 11:06, Greg Kroah-Hartman wrote:
->
->> On Wed, Aug 30, 2017 at 10:55:37AM +0200, Mason wrote:
->>
->>> On 30/08/2017 08:02, Greg Kroah-Hartman wrote:
->>>
->>>> To get back to the original issue here, the hardware seems to have died,
->>>> the driver stops talking to it, and all is good.  The "regression" here
->>>> is that we now properly can determine that the hardware is crap.
->>>
->>> Before 4.12, when I unplugged my USB3 Flash drive, Linux would
->>> detect a few "Uncorrected Non-Fatal errors" via AER, but it was
->>> still possible to plug the drive back in.
->>>
->>> Since 4.12, once I unplug the drive, the whole USB3 card is marked
->>> as dead (all 4 ports), and I can no longer plug anything in (not even
->>> the USB2 drive that didn't have any issues, IIRC).
->>>
->>> It seems a bit premature to "mark as dead" something that remains
->>> functional, doesn't it?
->>
->> I agree, but if the device sends all ones, it's a good indication it is
->> really dead, right?  Or something is wrong with it.
->
-> I wouldn't call it dead if I can plug the drive back in, and have
-> it working... But I agree that something fishy is happening...
->
->>> Disclaimer, there are many variables in this setup, and I've only
->>> tested a small fraction of the problem space: only one system,
->>> only one USB3 board, only one USB3 Flash drive.
->>
->> Did you ever happen to narrow this down to a single git commit using
->> 'git bisect'?  I can't remember what happened in the beginning of this
->> thread...
->
-> Mathias pointed out d9f11ba9f107aa335091ab8d7ba5eea714e46e8b
->
+So what about the general idea with the wrapper, does this look sane?
+Any objections to that?
 
-That patch only changes how xhci reacts to reading 0xffffffff.
-we used to just returned -ENODEV, but after patch we assume
-hardware is broken or removed.
+thanks,
+Jan
 
--Mathias
+On Tue, Aug 29, 2017 at 03:12:31PM +0200, Jan Glauber wrote:
+> I'm posting this as RFC following this discussion:
+> https://marc.info/?l=linux-arm-kernel&m=150099526923838&w=2
+> 
+> I've implemented the wrapper for the PCI devices and put it under
+> drivers/soc/cavium which I found more appropriate than drivers/misc.
+> 
+> I was not able to find a way to build the EDAC driver and the PMU driver
+> with all combinations (builtin and module) so I limited the build options
+> to module only. The problem is that the select from EDAC or PMU
+> sets the wrappers build type to whatever EDAC or PMU choose.
+> But all parts must be either built-in or modules, having the wrapper
+> builtin and calling into module code will not work. If there is a better
+> solution please let me know.
+> 
+> The PMU code is the same as in v8.
+> 
+> Add support for various PMU counters found on the Cavium ThunderX and
+> OcteonTx SoC.
+> 
+> The PMU driver provides common "uncore" functions to avoid code duplication
+> and support adding more device PMUs (like L2 cache) in the future.
+> 
+> Changes to v8:
+> - Wrapper for PCI devices
+> 
+> Jan Glauber (7):
+>   edac: thunderx: Remove suspend/resume support
+>   edac,soc: thunderx: Add wrapper for EDAC LMC PCI device
+>   edac,soc: thunderx: Add wrapper for EDAC OCX PCI device
+>   perf: export perf_event_update_userpage()
+>   perf: cavium: Support memory controller PMU counters
+>   perf: cavium: Support transmit-link PMU counters
+>   perf: cavium: Add Documentation
+> 
+>  Documentation/perf/cavium-pmu.txt |  75 +++++
+>  drivers/edac/Kconfig              |   3 +
+>  drivers/edac/thunderx_edac.c      |  92 +-----
+>  drivers/perf/Kconfig              |  15 +
+>  drivers/perf/Makefile             |   1 +
+>  drivers/perf/cavium_pmu.c         | 680 ++++++++++++++++++++++++++++++++++++++
+>  drivers/soc/Kconfig               |   1 +
+>  drivers/soc/Makefile              |   1 +
+>  drivers/soc/cavium/Kconfig        |  14 +
+>  drivers/soc/cavium/Makefile       |   2 +
+>  drivers/soc/cavium/cavium_lmc.c   |  53 +++
+>  drivers/soc/cavium/cavium_ocx.c   |  49 +++
+>  include/linux/cpuhotplug.h        |   1 +
+>  include/linux/soc/cavium/lmc.h    |  12 +
+>  include/linux/soc/cavium/ocx.h    |  12 +
+>  kernel/events/core.c              |   1 +
+>  16 files changed, 933 insertions(+), 79 deletions(-)
+>  create mode 100644 Documentation/perf/cavium-pmu.txt
+>  create mode 100644 drivers/perf/cavium_pmu.c
+>  create mode 100644 drivers/soc/cavium/Kconfig
+>  create mode 100644 drivers/soc/cavium/Makefile
+>  create mode 100644 drivers/soc/cavium/cavium_lmc.c
+>  create mode 100644 drivers/soc/cavium/cavium_ocx.c
+>  create mode 100644 include/linux/soc/cavium/lmc.h
+>  create mode 100644 include/linux/soc/cavium/ocx.h
+> 
+> -- 
+> 2.9.0.rc0.21.g7777322
