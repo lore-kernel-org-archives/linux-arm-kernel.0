@@ -1,246 +1,138 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Aug 2017 16:01:19 +0200
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
- <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
- <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
- <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
- <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
- <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
- <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
-Message-ID: <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 31 Aug 2017 15:23:33 +0100
+Subject: [PATCH v2] arm64: acpi/gtdt: validate CNTFRQ after having enabled
+ the frame
+In-Reply-To: <20170821095623.27691-1-ard.biesheuvel@linaro.org>
+References: <20170821095623.27691-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8sLoQkLg6Hg6_yzDBqP+EPwqamHN1VDr-64Ws39K-oOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 3:57 PM, Julien Thierry <julien.thierry@arm.com> wrote:
+On 21 August 2017 at 10:56, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
+> frame against the CNTFRQ system register of the current CPU, to
+> ensure that they are equal, which is mandated by the architecture.
 >
+> However, reading the CNTFRQ field of a frame is not possible until
+> the RFRQ bit in the frame's CNTACRn register is set, and doing so
+> before that willl produce the following error:
 >
-> On 31/08/17 14:28, Christoffer Dall wrote:
->>
->> On Thu, Aug 31, 2017 at 2:56 PM, Julien Thierry <julien.thierry@arm.com>
->> wrote:
->>>
->>>
->>>
->>> On 31/08/17 11:53, Christoffer Dall wrote:
->>>>
->>>>
->>>> On Thu, Aug 31, 2017 at 11:37 AM, Julien Thierry
->>>> <julien.thierry@arm.com>
->>>> wrote:
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> On 31/08/17 09:54, Christoffer Dall wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> On Thu, Aug 31, 2017 at 10:45 AM, Julien Thierry
->>>>>> <julien.thierry@arm.com>
->>>>>> wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Hi Christoffer,
->>>>>>>
->>>>>>>
->>>>>>> On 30/08/17 19:53, Christoffer Dall wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> Hi Julien,
->>>>>>>>
->>>>>>>> [cc'ing Alex Benn?e here who wrote the debug code for arm64]
->>>>>>>>
->>>>>>>> On Wed, Aug 30, 2017 at 11:01 AM, Julien Thierry
->>>>>>>> <julien.thierry@arm.com>
->>>>>>>> wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Software Step exception is missing after trapping instruction from
->>>>>>>>> the
->>>>>>>>> guest.
->>>>>>>>>
->>>>>>>>> We need to set the PSR.SS to 0 for the guest vcpu before resuming
->>>>>>>>> guest
->>>>>>>>> execution.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>>>>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>>>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>>>>>>
->>>>>>>>> ---
->>>>>>>>>      arch/arm64/include/asm/kvm_asm.h     |  2 ++
->>>>>>>>>      arch/arm64/include/asm/kvm_emulate.h |  2 ++
->>>>>>>>>      arch/arm64/kvm/debug.c               | 12 +++++++++++-
->>>>>>>>>      arch/arm64/kvm/hyp/switch.c          | 12 ++++++++++++
->>>>>>>>>      4 files changed, 27 insertions(+), 1 deletion(-)
->>>>>>>>>
->>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_asm.h
->>>>>>>>> b/arch/arm64/include/asm/kvm_asm.h
->>>>>>>>> index 26a64d0..398bbaa 100644
->>>>>>>>> --- a/arch/arm64/include/asm/kvm_asm.h
->>>>>>>>> +++ b/arch/arm64/include/asm/kvm_asm.h
->>>>>>>>> @@ -32,6 +32,8 @@
->>>>>>>>>
->>>>>>>>>      #define KVM_ARM64_DEBUG_DIRTY_SHIFT    0
->>>>>>>>>      #define KVM_ARM64_DEBUG_DIRTY          (1 <<
->>>>>>>>> KVM_ARM64_DEBUG_DIRTY_SHIFT)
->>>>>>>>> +#define KVM_ARM64_DEBUG_INST_SKIP_SHIFT        1
->>>>>>>>> +#define KVM_ARM64_DEBUG_INST_SKIP      (1 <<
->>>>>>>>> KVM_ARM64_DEBUG_INST_SKIP_SHIFT)
->>>>>>>>>
->>>>>>>>>      #define kvm_ksym_ref(sym)
->>>>>>>>> \
->>>>>>>>>             ({
->>>>>>>>> \
->>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h
->>>>>>>>> b/arch/arm64/include/asm/kvm_emulate.h
->>>>>>>>> index fe39e68..d401c64 100644
->>>>>>>>> --- a/arch/arm64/include/asm/kvm_emulate.h
->>>>>>>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
->>>>>>>>> @@ -95,6 +95,8 @@ static inline void kvm_skip_instr(struct kvm_vcpu
->>>>>>>>> *vcpu, bool is_wide_instr)
->>>>>>>>>                     kvm_skip_instr32(vcpu, is_wide_instr);
->>>>>>>>>             else
->>>>>>>>>                     *vcpu_pc(vcpu) += 4;
->>>>>>>>> +       /* Let debug engine know we skipped an instruction */
->>>>>>>>> +       vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> Why do we need to defer this action until later?
->>>>>>>>
->>>>>>>> Can't we simply do clear DBG_SPSR_SS here?
->>>>>>>>
->>>>>>>
->>>>>>> That was my first intention, but it turns out that the current state
->>>>>>> of
->>>>>>> things (without this patch) is that every time we enter a guest,
->>>>>>> kvm_arm_setup_debug gets called and if single step is requested for
->>>>>>> the
->>>>>>> guest it will set the flag in the SPSR (ignoring the fact that we
->>>>>>> cleared
->>>>>>> it).
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> Ah, right, duh.
->>>>>>
->>>>>>> This happens even if we exit the guest because of a data abort.
->>>>>>>
->>>>>>> For normal single step execution, we do need to reset SPSR.SS to 1
->>>>>>> before
->>>>>>> running the guest since completion of a step should clear that bit
->>>>>>> before
->>>>>>> taking a software step exception. So what kvm_arm_setup_debug does
->>>>>>> seems
->>>>>>> correct to me but missed the case for trapped/emulated instructions.
->>>>>>>
->>>>>>> So even if we just clear DBG_SPSR_SS here, we would still need to
->>>>>>> tell
->>>>>>> kvm_arm_setup_debug not to change the bit. Or resetting SPSR.SS to 1
->>>>>>> for
->>>>>>> normal single stepping needs to be done before we skip instructions
->>>>>>> in
->>>>>>> KVM
->>>>>>> but that doesn't sound right to me...
->>>>>>>
->>>>>>
->>>>>> So I'm wondering if we're going about this wrong.  Perhaps we need to
->>>>>> discover at the end of the run loop that we were asked to single step
->>>>>> execution and simply return to userspace, setting the debug exit
->>>>>> reason etc., instead of entering the guest with PSTATE.SS==0 and
->>>>>> relying on another trap back in to the guest just to set two fields on
->>>>>> the kvm_run structure and exit to user space ?
->>>>>>
->>>>>
->>>>> So if I understand correctly, the suggestion is that when we trap an
->>>>> instruction we check whether it was supposed to be single stepped, if
->>>>> it
->>>>> was
->>>>> we set up the vcpu registers as if it had taken a software step
->>>>> exception
->>>>> and return from kvm_arch_vcpu_ioctl_run. Is that right?
->>>>
->>>>
->>>>
->>>> yes, that's the idea.  If there's a lot of complexity in setting up
->>>> CPU register state, then it may not be a good idea, but if it's
->>>> relatively clean, I think it can be preferred over the "let's keep a
->>>> flag aroudn for later" approach.
->>>>
->>>
->>> So I looked a bit into it.
->>>
->>> One annoying thing is that the single step mechanic is specific to arm64.
->>> MMU and MMIO code is shared between arm and arm64 and do some handling of
->>> traps.
->>>
->>> So cleanest way I can think of doing this would be to clear SPSR.SS in
->>> arm64::kvm_skip_instr, then have some function (e.g.
->>> kvm_handle/manage_debug_state) at the end of the run loop. For arm, the
->>> function is empty. For arm64, the function,  if we are in an active
->>> pending
->>> state (SPSR.D == 0 && SPSR.SS == 0 && MDSCR_EL1.SS == 1) and not about to
->>> return to userland, returns with a "fake debug exception".
->>>
->>> So instead of a flag, we would just use SPSR.SS (or more generally the
->>> vcpu
->>> state) to know if we need to exit with a debug exception or not. And the
->>> kvm_arm_setup_debug would be left untouched (always setting SPSR.SS when
->>> requested by userland).
->>>
->>> Does that sound like what you had in mind? Or does it seem better than
->>> the
->>> current patch?
->>>
->> I was thinking to change the skip_instruction function to return an
->> int, and then call kvm_handle_debug_ss() from skip_instruction, which
->> would update the kvm_run structure and exit here and then.
->>
+>   arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
+>   arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
+>   arch_timer: Failed to initialize memory-mapped timer.
 >
-> Setting up the debug exception from within kvm_skip_instruction seem to
-> change a bit too much its semantic from arm to arm64. I would find this
-> easily confusing.
+> The reason is that the CNTFRQ field is RES0 if access is not enabled.
 >
->> However, I'm now thinking that this doesn't really work either,
->> because we could have to emulate a trapped MMIO instruction in user
->> space, and then it's not clear how to exit with a debug exception at
->> the same time.
->>
->> So perhaps we should stick with your original approach.
->>
+> So move the validation of CNTFRQ into the loop that iterates over the
+> timers to find the best frame, and disregard the frame if its CNTFRQ
+> field differs from the CPU timer's CNTFRQ value. Even though the
+> architecture suggests that the CNTFRQ field of each frame should simply
+> reflect the CNTFRQ value of the base frame, in reality we cannot rule
+> out the possibility that there is another frame available that does
+> have the correct value, and so it makes sense to inspect any remaining
+> frames in this case.
 >
-> I had not realized that was possible. This makes things more complicated for
-> avoiding a back and forth with the guest for trapped exceptions. Out of
-> luck, having the debug flag does look like single stepping would work as
-> expected for userland MMIOs.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Yes, I think your approach is the best choice now, considering.
+Ping?
 
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 47 +++++++-----------------------------
+>  1 file changed, 9 insertions(+), 38 deletions(-)
 >
-> I can try to detail the comment in kvm_arm_setup_debug when we set SPSR,
-> hopefully making things clearer when seeing that part of the code.
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index aae87c4c546e..c16fa694a47b 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1217,7 +1217,8 @@ arch_timer_mem_frame_get_cntfrq(struct arch_timer_mem_frame *frame)
+>  }
 >
-
-I also think we need to improve the comment in the world-switch return
-path, and I'd like Alex to weigh in here before we merge this.   He's
-back from holiday on Monday.
-
-Thanks,
--Christoffer
+>  static struct arch_timer_mem_frame * __init
+> -arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+> +arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem,
+> +                              bool verify_freq)
+>  {
+>         struct arch_timer_mem_frame *frame, *best_frame = NULL;
+>         void __iomem *cntctlbase;
+> @@ -1259,6 +1260,11 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+>                 if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
+>                         continue;
+>
+> +               if (verify_freq &&
+> +                   arch_timer_mem_frame_get_cntfrq(frame) != arch_timer_rate) {
+> +                       pr_err(FW_BUG "Ignoring MMIO timer frame with incorrect CNTFRQ\n");
+> +                       continue;
+> +               }
+>                 best_frame = frame;
+>         }
+>
+> @@ -1366,7 +1372,7 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
+>                 frame->valid = true;
+>         }
+>
+> -       frame = arch_timer_mem_find_best_frame(timer_mem);
+> +       frame = arch_timer_mem_find_best_frame(timer_mem, false);
+>         if (!frame) {
+>                 ret = -EINVAL;
+>                 goto out;
+> @@ -1386,33 +1392,6 @@ TIMER_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+>                        arch_timer_mem_of_init);
+>
+>  #ifdef CONFIG_ACPI_GTDT
+> -static int __init
+> -arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
+> -{
+> -       struct arch_timer_mem_frame *frame;
+> -       u32 rate;
+> -       int i;
+> -
+> -       for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
+> -               frame = &timer_mem->frame[i];
+> -
+> -               if (!frame->valid)
+> -                       continue;
+> -
+> -               rate = arch_timer_mem_frame_get_cntfrq(frame);
+> -               if (rate == arch_timer_rate)
+> -                       continue;
+> -
+> -               pr_err(FW_BUG "CNTFRQ mismatch: frame @ %pa: (0x%08lx), CPU: (0x%08lx)\n",
+> -                       &frame->cntbase,
+> -                       (unsigned long)rate, (unsigned long)arch_timer_rate);
+> -
+> -               return -EINVAL;
+> -       }
+> -
+> -       return 0;
+> -}
+> -
+>  static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>  {
+>         struct arch_timer_mem *timers, *timer;
+> @@ -1428,14 +1407,6 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>         if (ret || !timer_count)
+>                 goto out;
+>
+> -       for (i = 0; i < timer_count; i++) {
+> -               ret = arch_timer_mem_verify_cntfrq(&timers[i]);
+> -               if (ret) {
+> -                       pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
+> -                       goto out;
+> -               }
+> -       }
+> -
+>         /*
+>          * While unlikely, it's theoretically possible that none of the frames
+>          * in a timer expose the combination of feature we want.
+> @@ -1443,7 +1414,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>         for (i = i; i < timer_count; i++) {
+>                 timer = &timers[i];
+>
+> -               frame = arch_timer_mem_find_best_frame(timer);
+> +               frame = arch_timer_mem_find_best_frame(timer, true);
+>                 if (frame)
+>                         break;
+>         }
+> --
+> 2.11.0
+>
