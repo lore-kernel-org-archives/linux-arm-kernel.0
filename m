@@ -1,17 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Aug 2017 22:29:21 -0700
-Subject: [PATCH] clk: gemini: hands off PCI OE bit
-In-Reply-To: <20170808190818.11740-1-linus.walleij@linaro.org>
-References: <20170808190818.11740-1-linus.walleij@linaro.org>
-Message-ID: <20170831052921.GY21656@codeaurora.org>
+Date: Wed, 30 Aug 2017 22:32:18 -0700
+Subject: [PATCH 1/2] clk: imx: constify clk_div_table
+In-Reply-To: <1503898133-10862-2-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1503898133-10862-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1503898133-10862-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20170831053218.GA21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08, Linus Walleij wrote:
-> This bit is pin control, and needs to be carefully managed by the
-> new pin control driver.
+On 08/28, Arvind Yadav wrote:
+> clk_div_table are not supposed to change at runtime. All functions
+> working with clk_div_table provided by <linux/clk-provider.h> work
+> with const clk_div_table. So mark the non-const structs as const.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
 
 Applied to clk-next
