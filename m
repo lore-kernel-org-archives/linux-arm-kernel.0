@@ -1,62 +1,36 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 31 Aug 2017 08:43:03 +0530
-Subject: [net-next PATCHv6 1/2] dt-bindings: net: Add DT bindings for
- Socionext Netsec
-In-Reply-To: <20170830151942.GB22289@lunn.ch>
-References: <1504088657-6102-1-git-send-email-jaswinder.singh@linaro.org>
- <1504088752-6204-1-git-send-email-jaswinder.singh@linaro.org>
- <20170830151942.GB22289@lunn.ch>
-Message-ID: <CABb+yY1+oOvWS5aBHvQQmjPOQEEKfWFguCW1-SQeG339fKfBpw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Aug 2017 23:27:53 -0400 (EDT)
+Subject: [PULL REQUEST] boot and linker script stuff
+Message-ID: <nycvar.YSQ.7.76.1708302312230.2606@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 8:49 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Aug 30, 2017 at 03:55:52PM +0530, Jassi Brar wrote:
->> This patch adds documentation for Device-Tree bindings for the
->> Socionext NetSec Controller driver.
->>
->> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->> ---
->>  .../devicetree/bindings/net/socionext-netsec.txt   | 46 ++++++++++++++++++++++
->>  1 file changed, 46 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/socionext-netsec.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/socionext-netsec.txt b/Documentation/devicetree/bindings/net/socionext-netsec.txt
->> new file mode 100644
->> index 0000000..12d596c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/socionext-netsec.txt
->> @@ -0,0 +1,46 @@
->> +* Socionext NetSec Ethernet Controller IP
->> +
->> +Required properties:
->> +- compatible: Should be "socionext,netsecv5"
->> +- reg: Address and length of the register sets, the first is the main
->> +     registers, then the rdlar and tdlar regions for the SoC
->> +- interrupts: Should contain ethernet controller interrupt
->> +- clocks: phandle to any clocks to be switched by runtime_pm
->> +- phy-mode: See ethernet.txt file in the same directory
->
->> +- max-speed: See ethernet.txt file in the same directory
->> +- max-frame-size: See ethernet.txt file in the same directory, if 9000 or
->> +     above jumbo frames are enabled
->> +- local-mac-address: See ethernet.txt file in the same directory
->
-> These three are required, not optimal?
->
-optional :)
+Russell, please pull the following:
 
->> +- phy-handle: phandle to select child phy
->> +
->> +Optional properties:
->> +- use-jumbo: Boolean property to suggest if jumbo packets should be used or not
->> +
->> +For the child phy
->> +
->> +- compatible "ethernet-phy-ieee802.3-c22" is needed
->
-> This is normally considered optional. Why require it?
->
-Yes, will do.
+  http://git.linaro.org/people/nicolas.pitre/linux xip_zdata
+
+This contains important fixes to the XIP linker script, some more linker 
+script cleanups, .bss clearing and .data copying speedups related to the 
+above, and an opt-in config option for XIP kernels that allows for 
+compressing .data in ROM that depend on those other patches to work 
+properly.
+
+This is the same patches as the series titled "[PATCH v2 0/5] make XIP 
+kernel .data compressed in ROM" plus some ACKs and Tested-bys.
+
+The diffstat against v4.13-rc4 is:
+
+ arch/arm/Kconfig                    | 11 ++++
+ arch/arm/boot/Makefile              | 13 ++++-
+ arch/arm/boot/deflate_xip_data.sh   | 64 +++++++++++++++++++++
+ arch/arm/kernel/Makefile            |  5 ++
+ arch/arm/kernel/head-common.S       | 85 +++++++++++++++++-----------
+ arch/arm/kernel/head-inflate-data.c | 62 ++++++++++++++++++++
+ arch/arm/kernel/vmlinux-xip.lds.S   | 94 ++++++++++++++-----------------
+ arch/arm/kernel/vmlinux.lds.S       | 40 ++-----------
+ 8 files changed, 256 insertions(+), 118 deletions(-)
 
 Thanks.
+
+
+Nicolas
