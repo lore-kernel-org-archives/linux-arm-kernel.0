@@ -1,7 +1,7 @@
 From: Bharat.Bhushan@nxp.com (Bharat Bhushan)
-Date: Thu, 31 Aug 2017 14:53:44 +0530
-Subject: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
-Message-ID: <1504171424-15536-1-git-send-email-Bharat.Bhushan@nxp.com>
+Date: Thu, 31 Aug 2017 14:57:17 +0530
+Subject: [PATCH v2] ARM64: dts: ls208xa: Add iommu-map property for pci
+Message-ID: <1504171637-15670-1-git-send-email-Bharat.Bhushan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,6 +10,9 @@ SMMU for these devices on LS208xA devices.
 
 Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
 ---
+v1->v2
+ - Corrected "RM64" to "ARM64"
+
  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++++
  1 file changed, 4 insertions(+)
 
