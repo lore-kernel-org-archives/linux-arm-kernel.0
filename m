@@ -1,23 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 31 Aug 2017 14:32:55 -0300
-Subject: [PATCH 1/3] PCI: designware: only register MSI controller when
- MSI irq line is valid
-In-Reply-To: <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170828142307.30061-1-l.stach@pengutronix.de>
- <20170828142307.30061-2-l.stach@pengutronix.de>
- <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAOMZO5DuFiCTMCdw8SNY9QBXFDVFbPa9wagwiJvsZOwYeBTeNw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 31 Aug 2017 12:39:20 -0500
+Subject: [PATCH 2/7] dt-bindings: PM / OPP: add clocks per OPP node support
+In-Reply-To: <1503504610-12880-3-git-send-email-aisheng.dong@nxp.com>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+ <1503504610-12880-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170831173920.4emtr5vkgvjcx6ac@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Thu, Aug 24, 2017 at 12:10:05AM +0800, Dong Aisheng wrote:
+> It's used for platforms where different OPPs may use different clocks.
+> With this extended binding, user could specify the correct clock for each
+> OPP node.
+> 
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Frank Rowand <frowand.list@gmail.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/opp/opp.txt | 52 +++++++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+> index e36d261..40a4340 100644
+> --- a/Documentation/devicetree/bindings/opp/opp.txt
+> +++ b/Documentation/devicetree/bindings/opp/opp.txt
+> @@ -152,6 +152,11 @@ Optional properties:
+>    hierarchy can be contained in multiple 32 bit values. i.e. <X Y Z1 Z2> in the
+>    above example, Z1 & Z2 refer to the version hierarchy Z.
+>  
+> +- clocks: Clock phandle and specifier used for this opp.
+> +
+> +- clock-names: clock names for this opp. The valid clock names are platform
+> +	       specific.
 
-On Thu, Aug 31, 2017 at 1:58 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+You don't need -names if there's only 1 clock. But then how long until 
+we have a list of any random clocks some how associated with an OPP.
 
-> Incidental observations not strictly related to this series:
->
->   - It looks like exynos_add_pcie_port() incorrectly assumes
->     platform_get_irq() returns zero on failure (twice).
+I think this should really be solved within the clock framework. What 
+you really need is "set my parent clock to the source that can provide X 
+Hz". Could the assigned-clocks property work here (in the OPP nodes 
+rather than the cpu nodes)?
 
-I will send a series cleaning up the error handling in
-platform_get_irq() for the various PCI drivers.
+> +
+>  - status: Marks the node enabled/disabled.
+>  
+>  Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
+> @@ -528,3 +533,50 @@ Example 6: opp-microvolt-<name>, opp-microamp-<name>:
+>  		};
+>  	};
+>  };
+> +
+> +Example 7: Single core ARM cortex A7, switch separate clocks for each OPP:
+
+Can't you add this to an existing example? We don't need to enumerate 
+every possible option.
+
+Rob
