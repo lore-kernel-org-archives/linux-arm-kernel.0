@@ -1,32 +1,51 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 31 Aug 2017 01:31:38 +0200
-Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
-In-Reply-To: <1503922071.2347.0.camel@pengutronix.de>
-References: <4304e578a343c9acaed46b7e205d49bb63323f80.1503918257.git.leonard.crestez@nxp.com>
- <1503922071.2347.0.camel@pengutronix.de>
-Message-ID: <1559706.kkUfkg9agS@aspire.rjw.lan>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Aug 2017 20:04:33 -0400 (EDT)
+Subject: [PATCH v2 0/5] make XIP kernel .data compressed in ROM
+In-Reply-To: <SG2PR06MB1165EF18A363D9CC4C5531FE8A9C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <20170830025547.30347-1-nicolas.pitre@linaro.org>
+ <SG2PR06MB1165EF18A363D9CC4C5531FE8A9C0@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <nycvar.YSQ.7.76.1708301951330.2606@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 28, 2017 2:07:51 PM CEST Lucas Stach wrote:
-> Am Montag, den 28.08.2017, 14:05 +0300 schrieb Leonard Crestez:
-> > This patch contains the minimal changes required to support imx6sx OPP
-> > of 198 Mhz. Without this patch cpufreq still reports success but the
-> > frequency is not changed, the "arm" clock will still be at 396000000 in
-> > clk_summary.
-> > 
-> > In order to do this PLL1 needs to be still kept enabled while changing
-> > the ARM clock. This is a hardware requirement: when ARM_PODF is changed
-> > in CCM we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy,
-> > and this bit is sync with PLL1 clock, so if PLL1 NOT enabled, this
-> > bit will never get clear.
-> > 
-> > Keep pll1_sys explicitly enabled until after the rate is change to deal
-> > with this. Otherwise from the clk framework perspective pll1_sys is
-> > unused and gets turned off.
-> > 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> 
-> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+On Wed, 30 Aug 2017, Chris Brandt wrote:
 
-Patch applied, thanks!
+> On Tuesday, August 29, 2017 1, Nicolas Pitre wrote:
+> > This patch series provides the ability to store the XIP kernel .data
+> > segment compressed in ROM. It has to be copied to RAM anyway so
+> > storing it uncompressed is arguably a waste of ROM resources.
+> > 
+> > While at it, the copying of .data (when not compressed) and the
+> > clearing of .bss is now performed using optimized string routines
+> > rather than doing it one word at a time.
+> 
+> Tested on my XIP system (Cortex-A9) and it seems to work OK.
+
+Good, thanks for testing.
+
+> > This work highlighted some defficiencies in linker scripts, especially
+> > the XIP one. So this also includes linker script cleanups and fixes.
+> 
+> Thank you for this!
+
+More will come eventually.
+
+Did this fix your cramfs issue with 4.13-rc7?
+
+> If you're curious, here are some numbers from my system:
+> 
+> Original xipImage size: 4,190,068 bytes
+> xipImage size with CONFIG_XIP_DEFLATED_DATA=y: 3,985,227 bytes
+> 
+> A 204,841 byte reduction in image size (4.89%)
+
+In my case it is 1195492 vs 1111632, or a 7% reduction.
+
+This could be improved further by locating most of init.data and 
+init.text into the compressed zone even if it is read-only. The 
+decompressed form would be located in RAM temporarily and discarded 
+after boot. Right now it is left uncompressed in ROM forever. But that's 
+for a later round.
+
+
+Nicolas
