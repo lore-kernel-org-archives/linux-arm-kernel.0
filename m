@@ -1,64 +1,21 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 31 Aug 2017 14:44:29 +0100
-Subject: [RFT] iommu/arm-smmu-v3: Use burst-polling for sync completion
-In-Reply-To: <cover.1504182142.git.robin.murphy@arm.com>
-References: <cover.1504182142.git.robin.murphy@arm.com>
-Message-ID: <7cd12324a5c67138bc79fef0e778bfbd39703197.1504182142.git.robin.murphy@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 31 Aug 2017 15:51:05 +0200
+Subject: [PATCH] pinctrl: uniphier: fix members of rmii group for Pro4
+In-Reply-To: <1503886886-30065-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1503886886-30065-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CACRpkdZ6Db=FivejdqG=WHbwot80Jq9xEeF58F1h9n7EuL94Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While CMD_SYNC is unlikely to complete immediately such that we never go
-round the polling loop, with a lightly-loaded queue it may still do so
-long before the delay period is up. If we have no better completion
-notifier, use similar logic as we have for SMMUv2 to spin a number of
-times before each backoff, so that we have more chance of catching syncs
-which complete relatively quickly and avoid delaying unnecessarily.
+On Mon, Aug 28, 2017 at 4:21 AM, Kunihiko Hayashi
+<hayashi.kunihiko@socionext.com> wrote:
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+> The ether_rmii_groups should have "ether_rmii" and "ether_rmiib" as
+> members. This patch replaces to them.
+>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 
-This is mostly here for theoretical completeness - unless it proves to
-actually give a measurable benefit (I have no idea), I'd be inclined
-not to consider it for merging.
+Patch applied with Fixes: tag and ACKs.
 
- drivers/iommu/arm-smmu-v3.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index f5c5da553803..b92cd65f43f8 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -418,6 +418,7 @@
- /* High-level queue structures */
- #define ARM_SMMU_POLL_TIMEOUT_US	100
- #define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
-+#define ARM_SMMU_SYNC_SPIN_COUNT	10
- 
- #define MSI_IOVA_BASE			0x8000000
- #define MSI_IOVA_LENGTH			0x100000
-@@ -998,7 +999,7 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
- 	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
- 	struct arm_smmu_queue *q = &smmu->cmdq.q;
- 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
--	unsigned int delay = 1;
-+	unsigned int delay = 1, spin_cnt = 0;
- 
- 	do {
- 		queue_sync_cons(q);
-@@ -1022,10 +1023,13 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
- 
- 		if (wfe) {
- 			wfe();
--		} else {
-+		} else if (++spin_cnt < ARM_SMMU_SYNC_SPIN_COUNT) {
- 			cpu_relax();
-+			continue;
-+		} else {
- 			udelay(delay);
- 			delay *= 2;
-+			spin_cnt = 0;
- 		}
- 	} while (ktime_before(ktime_get(), timeout));
- 
--- 
-2.13.4.dirty
+Yours,
+Linus Walleij
