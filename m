@@ -1,75 +1,46 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 31 Aug 2017 10:01:30 -0600
-Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
-In-Reply-To: <20170831094052.GA15906@hc>
-References: <20170830142454.10971-1-jglauber@cavium.com>
- <20170830142454.10971-4-jglauber@cavium.com>
- <20170830084012.19d91759@w520.home> <20170831094052.GA15906@hc>
-Message-ID: <20170831100130.5c8a922e@w520.home>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 31 Aug 2017 18:03:43 +0200
+Subject: [PATCH v2 2/4] usb: xhci-mtk: add generic compatible string
+In-Reply-To: <1503443673.17567.8.camel@mhfsdcap03>
+References: <670f9ce1ecaec5859006b6f02b45cfc72c3cca2c.1502854628.git.chunfeng.yun@mediatek.com>
+ <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1502854628.git.chunfeng.yun@mediatek.com>
+ <1503443673.17567.8.camel@mhfsdcap03>
+Message-ID: <20170831160343.GA11200@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Aug 2017 11:40:52 +0200
-Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
-
-> On Wed, Aug 30, 2017 at 08:40:12AM -0600, Alex Williamson wrote:
-> > On Wed, 30 Aug 2017 16:24:54 +0200
-> > Jan Glauber <jglauber@cavium.com> wrote:
-> >   
-> > > Root ports of cn8xxx do not function after a slot reset when used with
-> > > some e1000e and LSI HBA devices. Add a quirk to prevent slot reset on
-> > > these root ports.
-> > > 
-> > > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > > ---
-> > >  drivers/pci/quirks.c | 16 ++++++++++++++++
-> > >  1 file changed, 16 insertions(+)
-> > > 
-> > > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> > > index 85191b8..6679971 100644
-> > > --- a/drivers/pci/quirks.c
-> > > +++ b/drivers/pci/quirks.c
-> > > @@ -845,6 +845,22 @@ static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
-> > >  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
-> > >  #endif
-> > >  
-> > > +/*
-> > > + * Root port on some Cavium CN8xxx chips do not successfully complete
-> > > + * a bus reset when used with certain types of child devices. Config
-> > > + * space access to the child may quit responding. Flag all devices under
-> > > + * the secondary bus as non-resettable.
-> > > + */
-> > > +static void quirk_CN8xxx_secondary_bus(struct pci_dev *dev)
-> > > +{
-> > > +	struct pci_dev *pdev;
-> > > +
-> > > +	dev_warn(&dev->dev, "Cavium CN8xxx quirk detected; reset for devices on secondary bus disabled\n");
-> > > +	list_for_each_entry(pdev, &dev->subordinate->devices, bus_list)
-> > > +		pdev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
-> > > +}
-> > > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_CN8xxx_secondary_bus);
-> > > +
-> > >  /*
-> > >   * Some settings of MMRBC can lead to data corruption so block changes.
-> > >   * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide  
-> > 
-> > 
-> > This doesn't seem reliable, doesn't the user just need to remove and
-> > reprobe the slot and the device would re-appear without this flag set?  
+On Wed, Aug 23, 2017 at 07:14:33AM +0800, Chunfeng Yun wrote:
+> Hi, Mathias
 > 
-> No, I tried before to disable the slot with "echo 0 > /sys/bus/pci/slots/3/power"
-> but that does not work as it is not supported.
+> On Wed, 2017-08-16 at 14:08 +0800, Chunfeng Yun wrote:
+> > The xhci-mtk driver is a generic driver for MediaTek xHCI IP, add
+> > a generic compatible to avoid confusion when support new SoCs but
+> > use a compatible with specific SoC's name "mt8173".
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  drivers/usb/host/xhci-mtk.c |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> > index 67d5dc7..8fb6065 100644
+> > --- a/drivers/usb/host/xhci-mtk.c
+> > +++ b/drivers/usb/host/xhci-mtk.c
+> > @@ -795,6 +795,7 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
+> >  #ifdef CONFIG_OF
+> >  static const struct of_device_id mtk_xhci_of_match[] = {
+> >  	{ .compatible = "mediatek,mt8173-xhci"},
+> > +	{ .compatible = "mediatek,mtk-xhci"},
+> >  	{ },
+> >  };
+> >  MODULE_DEVICE_TABLE(of, mtk_xhci_of_match);
 > 
-> I'm not familiar with the quirk types, would another one be better
-> suited here (even if we don't have the problem you descibed)?
+> Do you have any comment about this patch?
+> Thanks.
 
-The scenario I'm mentioning is to "echo 1 > /sys/bus/pci/devices/<some
-device under the slot>/remove", then "echo <that device address> >
-/sys/bus/pci/rescan".  This would break the ordering implicit in using
-a fixup defined for the root port.  It seems like it'd make a lot more
-sense to add a test on the parent bridge more similar to how the bus
-reset works.  It's not the subordinate devices imposing the
-no-bus-reset flag, it's the bridge device and the objects and code
-should support and reflect that.  Thanks,
+We need an ack from the device-tree maintainers before we can take
+them...
 
-Alex
+thanks,
+
+greg k-h
