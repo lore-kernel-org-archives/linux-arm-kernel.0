@@ -1,56 +1,55 @@
-From: bharat.bhushan@nxp.com (Bharat Bhushan)
-Date: Thu, 31 Aug 2017 10:41:38 +0000
-Subject: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
-In-Reply-To: <06c57ca4-edaa-df26-b1d9-1906141c5065@arm.com>
-References: <1504171424-15536-1-git-send-email-Bharat.Bhushan@nxp.com>
- <06c57ca4-edaa-df26-b1d9-1906141c5065@arm.com>
-Message-ID: <AM5PR0401MB2545B7C55F634D7B9CABAE629A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 31 Aug 2017 12:46:12 +0200
+Subject: [PATCH v3 00/13] mmc: meson-gx: driver fixups and upgrades
+In-Reply-To: <7hr2vsdgj4.fsf@baylibre.com>
+References: <20170828142915.27020-1-jbrunet@baylibre.com>
+ <CAPDyKFogy=L=BDKtMhKCN0nMLi-Yy5SHgAhB_=jog+CX91breA@mail.gmail.com>
+ <7hr2vsdgj4.fsf@baylibre.com>
+Message-ID: <CAPDyKFpTkqH4qvLAraWxfxm=LOuWZv7P9nrznJ+o81y+9hDjjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30 August 2017 at 21:03, Kevin Hilman <khilman@baylibre.com> wrote:
+> Hi Ulf,
+>
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> On 28 August 2017 at 16:29, Jerome Brunet <jbrunet@baylibre.com> wrote:
+>>> The patchset features several bugfixes, rework and upgrade for the
+>>> meson-gx MMC driver.
+>>>
+>>> The main goal is to improve readability and enable new high speed
+>>> modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
+>>>
+>>> SDR104 is not working with a few cards on the p200 and the
+>>> libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
+>>> of these boards, adding noise to the signal and eventually breaking
+>>> the communication with some cards. The same cards are working well on a
+>>> laptop or the nanopi-k2 at 200Mhz.
+>>>
+>>> This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
+>>> gxl-s905x-libretech-cc
+>>>
+>>> Changes since v2 [1]:
+>>> * Drop patches 1 to 3: Applied.
+>>> * Drop patch 4: Debug stuff which should not have been sent.
+>>> * Added fix to previous patch 3:
+>>>   If the clock register is not initialized before registering the clk
+>>>   with CCF, the framework will complain about an illegal divider value.
+>>>   This had gone unnoticed because it was later fixed by the clock init
+>>>   rework.
+>>>
+>>>   Ulf, I know it is getting late but it would be nice if patch #1 of
+>>>   this v3 could go with 3 patches you already applied. The rest can
+>>>   wait for the following cycle.
+>>
+>> I decided to pick them all, so applied for next!
+>>
+>
+> Just to double-check, so I can plan for the DT patches
+> accordingly... you are queuing this for v4.14, right?
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Thursday, August 31, 2017 3:02 PM
-> To: Bharat Bhushan <bharat.bhushan@nxp.com>; robh+dt at kernel.org;
-> ark.rutland at arm.com; will.deacon at arm.com; oss at buserror.net; Gang Liu
-> <gang.liu@nxp.com>; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> catalin.marinas at arm.com
-> Subject: Re: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
-> 
-> On 31/08/17 10:23, Bharat Bhushan wrote:
-> > This patch adds iommu-map property for PCIe, which enables SMMU for
-> > these devices on LS208xA devices.
-> >
-> > Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
-> > ---
-> >  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > index 94cdd30..67cf605 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > @@ -606,6 +606,7 @@
-> >  			num-lanes = <4>;
-> >  			bus-range = <0x0 0xff>;
-> >  			msi-parent = <&its>;
-> > +			iommu-map = <0 &smmu 0 1>;	/* This is fixed-up by
-> u-boot */
-> 
-> What does this do when your version of u-boot doesn't fill this in for you?
+Yes, correct!
 
-Good question, frankly I have not thought of this case before.
-But if we pass length = 0 in above property then no fixup happen with happen with older u-boot. In this case of_iommu_configure() will return NULL iommu-ops and it switch to swio-tlb. Will that work?
-
-Thanks
--Bharat
-
-> 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+Kind regards
+Uffe
