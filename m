@@ -1,64 +1,356 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 31 Aug 2017 16:54:37 +0200
-Subject: [GIT PULL] Allwinner fixes for 4.13, take 3
-In-Reply-To: <CAOesGMjcWEjY+uj1cFWkeoL=OuR9q4E2uQbZ21HVxxDqgvUtCw@mail.gmail.com>
-References: <20170828092651.xwrz6toedrmht5nh@flea.lan>
- <20170830053759.GK14499@localhost>
- <20170830064322.rloouj6tso65vbin@flea.lan>
- <CAOesGMjcWEjY+uj1cFWkeoL=OuR9q4E2uQbZ21HVxxDqgvUtCw@mail.gmail.com>
-Message-ID: <20170831145437.gmglnaq2hr4a7fnl@flea.lan>
+Date: Thu, 31 Aug 2017 16:58:59 +0200
+Subject: [PATCH v5] arm64: allwinner: h5: add support for NanoPi NEO Plus2
+In-Reply-To: <20170830125057.38529-1-antony@phenome.org>
+References: <20170824231716.2623-1-antony@phenome.org>
+ <20170830125057.38529-1-antony@phenome.org>
+Message-ID: <20170831145859.rief3fqo36ns23rm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Aug 30, 2017 at 03:15:05PM -0700, Olof Johansson wrote:
-> On Tue, Aug 29, 2017 at 11:43 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Olof,
-> >
-> > On Tue, Aug 29, 2017 at 10:37:59PM -0700, Olof Johansson wrote:
-> >> On Mon, Aug 28, 2017 at 11:26:51AM +0200, Maxime Ripard wrote:
-> >> > Hi,
-> >> >
-> >> > Here is a bunch of patches essentially reverting the EMAC bindings
-> >> > additions. Indeed, it was discovered after the release of 4.13-rc1
-> >> > that we overlooked some issues while reviewing the driver, and we
-> >> > couldn't find a proper solution since then.
-> >> >
-> >> > Since the binding is as such not stable yet, we can't allow it to
-> >> > reach a stable release.
-> >> >
-> >> > Maxime
-> >> >
-> >> > The following changes since commit d86e63e1f0b7868c55c8d4a54854b85e2bac690b:
-> >> >
-> >> >   arm64: allwinner: h5: fix pinctrl IRQs (2017-08-14 14:18:21 +0800)
-> >> >
-> >> > are available in the git repository at:
-> >> >
-> >> >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.13-3
-> >> >
-> >> > for you to fetch changes up to fe45174b72aead678da581bab9e9a37c9b26a070:
-> >> >
-> >> >   arm: dts: sunxi: Revert EMAC changes (2017-08-28 11:11:24 +0200)
-> >>
-> >> Merged but unfortunately this introduces quite annoying conflicts with already
-> >> queued up DT contents. Fixed up those as well.
-> >
-> > Yeah, sorry, I should have mentionned it. I didn't know what the best
-> > strategy was in this case, since it was conflicting with some branches
-> > you already had pulled. What would you have prefered ?
-> 
-> Just mentioning it would be appreciated to avoid surprises.
-> 
-> The other part would be to make sure the fixes branch is based on an
-> old enough release that we can just merge it into next/dt64 without
-> bringing in a much newer upstream base. You've done that in this case,
-> so what I'll do at our end is merge the fixes into next/dt64 to avoid
-> this from bubbling up to Linus when it's a local issue to our tree.
+On Wed, Aug 30, 2017 at 02:50:57PM +0200, Antony Antony wrote:
+> 	Add initial DT support for NanoPi NEO Plus2 by FriendlyARM
+> 		Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
+> 		1 GB DDR3 RAM
+> 		8GB eMMC flash (Samsung KLM8G1WEPD-B031)
+> 		micro SD card slot
+> 		Gigabit Ethernet (external RTL8211E-VB-CG chip)
+> 		802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
+> 		2x USB 2.0 host ports & 2x USB via headers
 
-Ok, thanks, and sorry for that.
+This indendation is weird
+
+>     The DTS is based on OrangePi PC 2, sun50i-h5-orangepi-pc2
+>     Added dwmac-sun8i Gigabit Ethernet support based on
+>     Nano Pi Neo2 DT and the schematics.
+
+And that's outdated.
+
+> Signed-off-by: Antony Antony <antony@phenome.org>
+> ---
+>  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+>  .../dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 262 +++++++++++++++++++++
+>  2 files changed, 263 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+> 
+> ---
+> Changes
+> v1 -> v2
+>  add wifi power controller,  mmc1, mmc2
+>  remove reg_usb0_vbus
+> v2 -> v3
+> fix typo s/orangepi/nanopi/, s/pus/plus/
+>  usb_otg set to host mode
+>  wifi fix, based on commit 442e1f7e brcm,bcm43xx-fmac.txt
+>  remove functions on header pins: spi, ir, ehci 1&2, ohci 1&2, uart 1&2
+>  remove hdmi, de2, r-gpio-keys, mixer - not supported the board
+> v3->v4 update WiFi chip compatible to bcm43430-fmac
+> v4->v5 back to bcm4329-fmac bcm43430-fmac is the wrong way.
+>  
+> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+> index 108f12c..e6810c8 100644
+> --- a/arch/arm64/boot/dts/allwinner/Makefile
+> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+> @@ -6,6 +6,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
+>  
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+> new file mode 100644
+> index 0000000..a6687db
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+> @@ -0,0 +1,262 @@
+> +/*
+> + * Copyright (C) 2017 Antony Antony <antony@phenome.org>
+> + * Copyright (C) 2016 ARM Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun50i-h5.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "FriendlyARM NanoPi NEO Plus2";
+> +	compatible = "friendlyarm,nanopi-neo-plus2", "allwinner,sun50i-h5";
+> +
+> +	reg_vcc3v3: vcc3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	aliases {
+> +		ethernet0 = &emac;
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		pwr {
+> +			label = "nanopi:green:pwr";
+> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +
+> +		status {
+> +			label = "nanopi:red:status";
+> +			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	reg_gmac_3v3: gmac-3v3 {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&gmac_power_pin_nanopi>;
+> +		regulator-name = "gmac-3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <100000>;
+> +		enable-active-high;
+> +		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	vdd_cpux: gpio-regulator {
+> +		compatible = "regulator-gpio";
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&vdd_cpux_r_npi>;
+> +
+> +		regulator-name = "vdd-cpux";
+> +		regulator-type = "voltage";
+> +		regulator-boot-on;
+> +		regulator-always-on;
+> +		regulator-min-microvolt = <1100000>;
+> +		regulator-max-microvolt = <1300000>;
+> +		regulator-ramp-delay = <50>; /* 4ms */
+> +
+> +		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>;
+> +		gpios-states = <0x1>;
+> +		states = <1100000 0x0
+> +			  1300000 0x1>;
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&wifi_en_npi>;
+> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+> +		post-power-on-delay-ms = <200>;
+> +	};
+
+You should order these nodes alphabetically.
+
+> +&codec {
+> +	allwinner,audio-routing =
+> +		"Line Out", "LINEOUT",
+> +		"MIC1", "Mic",
+> +		"Mic",  "MBIAS";
+> +	status = "okay";
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci3 {
+> +	status = "okay";
+> +};
+> +
+> +&emac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_rgmii_pins>;
+> +	phy-supply = <&reg_gmac_3v3>;
+> +	phy-handle = <&ext_rgmii_phy>;
+> +	phy-mode = "rgmii";
+> +	status = "okay";
+> +};
+> +
+> +&mdio {
+> +	ext_rgmii_phy: ethernet-phy at 7 {
+> +		compatible = "ethernet-phy-ieee802.3-c22";
+> +		reg = <7>;
+> +	};
+> +};
+
+This will not compile.
+
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
+> +	status = "okay";
+> +};
+> +
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	vqmmc-supply = <&reg_vcc3v3>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	boot_device = <0>;
+
+This property is not documented anywhere, I'm not sure what it's here
+for.
+
+> +	status = "okay";
+> +
+> +	/*
+> +	 * AMPAK AP6212A WiFi module with BCM43430, rev=1 inside
+> +	 * sdio vendor ID: 0x02d0, sdio device ID: 0xa9a6
+> +	 * There is no specific Documentation: dt-binding for BCM43430
+> +	 * brcm,bcm4329-fmac compatible can initialize this module
+> +	 */
+
+This is not really relevant.
+
+> +	brcmf: wifi at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +	};
+> +};
+> +
+> +&mmc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc2_8bit_pins>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	cap-mmc-hw-reset;
+> +	boot_device = <0>;
+> +	status = "okay";
+> +};
+> +
+> +&mmc2_8bit_pins {
+> +	/* Increase drive strength for DDR modes */
+> +	drive-strength = <40>;
+
+It's very likely that you actually don't need 40mA
+
+> +	/* eMMC is missing pull-ups */
+> +	bias-pull-up;
+> +};
+
+And that one is already here by default.
+
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci3 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	leds_npi: led_pins at 0 {
+> +		pins = "PA10";
+> +		function = "gpio_out";
+> +	};
+> +	gmac_power_pin_nanopi: gmac_power_pin at 0 {
+> +			pins = "PD6";
+> +			function = "gpio_out";
+> +	};
+> +};
+
+You don't need these nodes
+
+> +
+> +&r_pio {
+> +	leds_r_npi: led_pins at 0 {
+> +		pins = "PL10";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	vdd_cpux_r_npi: regulator_pins at 0 {
+> +		allwinner,pins = "PL6";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	wifi_en_npi: wifi_en_pin {
+> +		pins = "PL7";
+> +		function = "gpio_out";
+> +	};
+> +};
+
+Or those.
+
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&usb_otg {
+> +	dr_mode = "host";
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	/* USB Type-A ports' VBUS is always on */
+> +	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
+
+If it has an ID-detect pin, then it's not a host-only USB OTG
+controller. dr_mode should be set to otg.
 
 Maxime
 
@@ -72,4 +364,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/670a6d11/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/f66fad99/attachment-0001.sig>
