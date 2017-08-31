@@ -1,145 +1,139 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Aug 2017 12:55:11 +0100
-Subject: Applied "regulator: pbias: Select voltage table based on max-voltage"
- to the regulator tree
-In-Reply-To: <20170831101849.9489-3-kishon@ti.com>
-Message-ID: <E1dnO3z-0000tI-7K@debutante>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 31 Aug 2017 21:03:36 +0900
+Subject: [PATCH] clk: uniphier: add PXs3 clock data
+Message-ID: <1504181016-16457-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Add basic clock data for Socionext's new SoC PXs3.
 
-   regulator: pbias: Select voltage table based on max-voltage
-
-has been applied to the regulator tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 27eae9d4b9d4cd9c204ef81f46078d91362ed41c Mon Sep 17 00:00:00 2001
-From: Ravikumar Kattekola <rk@ti.com>
-Date: Thu, 31 Aug 2017 15:48:45 +0530
-Subject: [PATCH] regulator: pbias: Select voltage table based on max-voltage
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Reference manuals of OMAP5x and DRA7x have been updated to reflect
-the PBIAS regulator max-voltage as 3.3V instead of 3.0V, while OMAP3x
-and OMAP4x are still quoting 3.0V. So, as of now, the pbias driver
-needs to support both 3.0V and 3.3V IO voltage based on the max-voltage
-supported by the PBIAS regulator.
-
-Document reference:
-SWPU249AF - OMAP543x Technical reference manual - August 2016
-SPRUI30C ??? DRA75x, DRA74x Technical reference manual November 2016
-
-Tested on:
-DRA75x PG 2.0 REV H EVM
-
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/regulator/pbias-regulator.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/pbias-regulator.c b/drivers/regulator/pbias-regulator.c
-index 0cb76ba29e84..8f782d22fdbe 100644
---- a/drivers/regulator/pbias-regulator.c
-+++ b/drivers/regulator/pbias-regulator.c
-@@ -34,6 +34,8 @@ struct pbias_reg_info {
- 	u32 vmode;
- 	unsigned int enable_time;
- 	char *name;
-+	const unsigned int *pbias_volt_table;
-+	int n_voltages;
+I confirmed this patch can be cleanly applied on clk-next branch
+(commit 69a6beab085264)
+
+
+ .../devicetree/bindings/clock/uniphier-clock.txt   |  3 +++
+ drivers/clk/uniphier/clk-uniphier-core.c           | 12 +++++++++
+ drivers/clk/uniphier/clk-uniphier-sys.c            | 30 ++++++++++++++++++++++
+ drivers/clk/uniphier/clk-uniphier.h                |  1 +
+ 4 files changed, 46 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/uniphier-clock.txt b/Documentation/devicetree/bindings/clock/uniphier-clock.txt
+index 2aec32d..7b5f602 100644
+--- a/Documentation/devicetree/bindings/clock/uniphier-clock.txt
++++ b/Documentation/devicetree/bindings/clock/uniphier-clock.txt
+@@ -13,6 +13,7 @@ Required properties:
+     "socionext,uniphier-pxs2-clock" - for PXs2/LD6b SoC.
+     "socionext,uniphier-ld11-clock" - for LD11 SoC.
+     "socionext,uniphier-ld20-clock" - for LD20 SoC.
++    "socionext,uniphier-pxs3-clock" - for PXs3 SoC
+ - #clock-cells: should be 1.
+ 
+ Example:
+@@ -54,6 +55,7 @@ Required properties:
+     "socionext,uniphier-pxs2-sd-clock"  - for PXs2/LD6b SoC.
+     "socionext,uniphier-ld11-mio-clock" - for LD11 SoC.
+     "socionext,uniphier-ld20-sd-clock"  - for LD20 SoC.
++    "socionext,uniphier-pxs3-sd-clock"  - for PXs3 SoC
+ - #clock-cells: should be 1.
+ 
+ Example:
+@@ -97,6 +99,7 @@ Required properties:
+     "socionext,uniphier-pxs2-peri-clock" - for PXs2/LD6b SoC.
+     "socionext,uniphier-ld11-peri-clock" - for LD11 SoC.
+     "socionext,uniphier-ld20-peri-clock" - for LD20 SoC.
++    "socionext,uniphier-pxs3-peri-clock" - for PXs3 SoC
+ - #clock-cells: should be 1.
+ 
+ Example:
+diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
+index cb6ae26..e09f3dd46 100644
+--- a/drivers/clk/uniphier/clk-uniphier-core.c
++++ b/drivers/clk/uniphier/clk-uniphier-core.c
+@@ -138,6 +138,10 @@ static const struct of_device_id uniphier_clk_match[] = {
+ 		.compatible = "socionext,uniphier-ld20-clock",
+ 		.data = uniphier_ld20_sys_clk_data,
+ 	},
++	{
++		.compatible = "socionext,uniphier-pxs3-clock",
++		.data = uniphier_pxs3_sys_clk_data,
++	},
+ 	/* Media I/O clock, SD clock */
+ 	{
+ 		.compatible = "socionext,uniphier-ld4-mio-clock",
+@@ -167,6 +171,10 @@ static const struct of_device_id uniphier_clk_match[] = {
+ 		.compatible = "socionext,uniphier-ld20-sd-clock",
+ 		.data = uniphier_pro5_sd_clk_data,
+ 	},
++	{
++		.compatible = "socionext,uniphier-pxs3-sd-clock",
++		.data = uniphier_pro5_sd_clk_data,
++	},
+ 	/* Peripheral clock */
+ 	{
+ 		.compatible = "socionext,uniphier-ld4-peri-clock",
+@@ -196,6 +204,10 @@ static const struct of_device_id uniphier_clk_match[] = {
+ 		.compatible = "socionext,uniphier-ld20-peri-clock",
+ 		.data = uniphier_pro4_peri_clk_data,
+ 	},
++	{
++		.compatible = "socionext,uniphier-pxs3-peri-clock",
++		.data = uniphier_pro4_peri_clk_data,
++	},
+ 	{ /* sentinel */ }
  };
  
- struct pbias_regulator_data {
-@@ -49,11 +51,16 @@ struct pbias_of_data {
- 	unsigned int offset;
+diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
+index 6fcf781..7e77b09 100644
+--- a/drivers/clk/uniphier/clk-uniphier-sys.c
++++ b/drivers/clk/uniphier/clk-uniphier-sys.c
+@@ -195,3 +195,33 @@ const struct uniphier_clk_data uniphier_ld20_sys_clk_data[] = {
+ 			     "spll/4", "spll/8", "s2pll/4", "s2pll/8"),
+ 	{ /* sentinel */ }
  };
- 
--static const unsigned int pbias_volt_table[] = {
-+static const unsigned int pbias_volt_table_3_0V[] = {
- 	1800000,
- 	3000000
- };
- 
-+static const unsigned int pbias_volt_table_3_3V[] = {
-+	1800000,
-+	3300000
-+};
 +
- static const struct regulator_ops pbias_regulator_voltage_ops = {
- 	.list_voltage = regulator_list_voltage_table,
- 	.get_voltage_sel = regulator_get_voltage_sel_regmap,
-@@ -69,6 +76,8 @@ static const struct pbias_reg_info pbias_mmc_omap2430 = {
- 	.vmode = BIT(0),
- 	.disable_val = 0,
- 	.enable_time = 100,
-+	.pbias_volt_table = pbias_volt_table_3_0V,
-+	.n_voltages = 2,
- 	.name = "pbias_mmc_omap2430"
- };
- 
-@@ -77,6 +86,8 @@ static const struct pbias_reg_info pbias_sim_omap3 = {
- 	.enable_mask = BIT(9),
- 	.vmode = BIT(8),
- 	.enable_time = 100,
-+	.pbias_volt_table = pbias_volt_table_3_0V,
-+	.n_voltages = 2,
- 	.name = "pbias_sim_omap3"
- };
- 
-@@ -86,6 +97,8 @@ static const struct pbias_reg_info pbias_mmc_omap4 = {
- 	.disable_val = BIT(25),
- 	.vmode = BIT(21),
- 	.enable_time = 100,
-+	.pbias_volt_table = pbias_volt_table_3_0V,
-+	.n_voltages = 2,
- 	.name = "pbias_mmc_omap4"
- };
- 
-@@ -95,6 +108,8 @@ static const struct pbias_reg_info pbias_mmc_omap5 = {
- 	.disable_val = BIT(25),
- 	.vmode = BIT(21),
- 	.enable_time = 100,
-+	.pbias_volt_table = pbias_volt_table_3_3V,
-+	.n_voltages = 2,
- 	.name = "pbias_mmc_omap5"
- };
- 
-@@ -199,8 +214,8 @@ static int pbias_regulator_probe(struct platform_device *pdev)
- 		drvdata[data_idx].desc.owner = THIS_MODULE;
- 		drvdata[data_idx].desc.type = REGULATOR_VOLTAGE;
- 		drvdata[data_idx].desc.ops = &pbias_regulator_voltage_ops;
--		drvdata[data_idx].desc.volt_table = pbias_volt_table;
--		drvdata[data_idx].desc.n_voltages = 2;
-+		drvdata[data_idx].desc.volt_table = info->pbias_volt_table;
-+		drvdata[data_idx].desc.n_voltages = info->n_voltages;
- 		drvdata[data_idx].desc.enable_time = info->enable_time;
- 		drvdata[data_idx].desc.vsel_reg = offset;
- 		drvdata[data_idx].desc.vsel_mask = info->vmode;
++const struct uniphier_clk_data uniphier_pxs3_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("cpll", -1, "ref", 104, 1),		/* ARM: 2600 MHz */
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 80, 1),		/* 2000 MHz */
++	UNIPHIER_CLK_FACTOR("s2pll", -1, "ref", 88, 1),		/* IPP: 2400 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 34),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 40),
++	UNIPHIER_LD20_SYS_CLK_SD,
++	UNIPHIER_LD11_SYS_CLK_NAND(2),
++	UNIPHIER_LD11_SYS_CLK_EMMC(4),
++	UNIPHIER_CLK_GATE("usb30", 12, NULL, 0x2104, 4),	/* =GIO0 */
++	UNIPHIER_CLK_GATE("usb31-0", 13, NULL, 0x2104, 5),	/* =GIO1 */
++	UNIPHIER_CLK_GATE("usb31-1", 14, NULL, 0x2104, 6),	/* =GIO1-1 */
++	UNIPHIER_CLK_GATE("usb30-phy0", 16, NULL, 0x210c, 16),
++	UNIPHIER_CLK_GATE("usb30-phy1", 17, NULL, 0x210c, 18),
++	UNIPHIER_CLK_GATE("usb30-phy2", 18, NULL, 0x210c, 20),
++	UNIPHIER_CLK_GATE("usb31-phy0", 20, NULL, 0x210c, 17),
++	UNIPHIER_CLK_GATE("usb31-phy1", 21, NULL, 0x210c, 19),
++	/* CPU gears */
++	UNIPHIER_CLK_DIV4("cpll", 2, 3, 4, 8),
++	UNIPHIER_CLK_DIV4("spll", 2, 3, 4, 8),
++	UNIPHIER_CLK_DIV4("s2pll", 2, 3, 4, 8),
++	UNIPHIER_CLK_CPUGEAR("cpu-ca53", 33, 0x8080, 0xf, 8,
++			     "cpll/2", "spll/2", "cpll/3", "spll/3",
++			     "spll/4", "spll/8", "cpll/4", "cpll/8"),
++	UNIPHIER_CLK_CPUGEAR("cpu-ipp", 34, 0x8100, 0xf, 8,
++			     "s2pll/2", "spll/2", "s2pll/3", "spll/3",
++			     "spll/4", "spll/8", "s2pll/4", "s2pll/8"),
++	{ /* sentinel */ }
++};
+diff --git a/drivers/clk/uniphier/clk-uniphier.h b/drivers/clk/uniphier/clk-uniphier.h
+index 8271640..d10a009 100644
+--- a/drivers/clk/uniphier/clk-uniphier.h
++++ b/drivers/clk/uniphier/clk-uniphier.h
+@@ -154,6 +154,7 @@ extern const struct uniphier_clk_data uniphier_pro5_sys_clk_data[];
+ extern const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[];
+ extern const struct uniphier_clk_data uniphier_ld11_sys_clk_data[];
+ extern const struct uniphier_clk_data uniphier_ld20_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_pxs3_sys_clk_data[];
+ extern const struct uniphier_clk_data uniphier_ld4_mio_clk_data[];
+ extern const struct uniphier_clk_data uniphier_pro5_sd_clk_data[];
+ extern const struct uniphier_clk_data uniphier_ld4_peri_clk_data[];
 -- 
-2.14.1
+2.7.4
