@@ -1,22 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 31 Aug 2017 12:57:27 -0500
-Subject: [PATCH ] phy: rcar-gen2: Add r8a7743/5 support
-In-Reply-To: <1503568773-41410-1-git-send-email-biju.das@bp.renesas.com>
-References: <1503568773-41410-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170831175727.tjncwk2c2gvzmlzb@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 31 Aug 2017 10:59:01 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.14, take 3
+In-Reply-To: <20170824083620.b5cq4qtyr3cqtpjx@flea.lan>
+References: <20170824083620.b5cq4qtyr3cqtpjx@flea.lan>
+Message-ID: <20170831175901.GF21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 10:59:33AM +0100, Biju Das wrote:
-> Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
-> USB PHY is identical to the R-Car Gen2 family.
+On 08/24, Maxime Ripard wrote:
+> Hi,
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> ---
-> This patch is tested against Linux next tag next-20170824 and 
-> renesas-dev branch renesas-devel-20170822-v4.13-rc6. 
+> Here is a quite late PR, but this also something we've been waiting
+> for for quite some time already.
 > 
->  Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> These patches convert our last users of the old clock framework to the
+> new one. We still have some marginal users of the old clock drivers,
+> but they shouldn't prevent the fix for the orphans clocks we hold back
+> to work.
+> 
 
-Acked-by: Rob Herring <robh@kernel.org>
+Great. Thanks. Pulled into clk-next.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
