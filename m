@@ -1,60 +1,81 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 31 Aug 2017 12:23:28 +0200
-Subject: [PATCH] arm64: relax assembly code alignment from 16 byte to 4
- byte
-In-Reply-To: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170831122328.2334a4de@karo-electronics.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 31 Aug 2017 15:48:43 +0530
+Subject: [PATCH v2 0/6] mmc: Add OMAP SDHCI driver
+Message-ID: <20170831101849.9489-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is the first step in deprecating omap_hsmmc driver completely
+and moving to sdhci-omap driver which uses the sdhci library.
 
-On Thu, 31 Aug 2017 18:56:23 +0900 Masahiro Yamada wrote:
-> Aarch64 instructions must be word aligned.  The current 16 byte
-> alignment is more than enough.  Relax it into 4 byte alignment.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> I do not know why arm64 Linux requires 16 byte alignment.
-> 
-> I dug git-history of arch/arm64/include/asm/linkage.h
-> and the only commit I see is:
-> 
->   commit aeed41a9371ee02257b608eb06a9058507a7d0f4
->   Author: Marc Zyngier <Marc.Zyngier@arm.com>
->   Date:   Fri Oct 19 17:33:27 2012 +0100
-> 
->       arm64: fix alignment padding in assembly code
-> 
-> It just opt out of the asm-generic variant to remove 0x90.
-> So, the amount of alignment might not be not optimized yet.
-> 
-> Please correct me if I am missing something.
-> 
-> 
->  arch/arm64/include/asm/linkage.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/linkage.h b/arch/arm64/include/asm/linkage.h
-> index 636c1bc..1b26629 100644
-> --- a/arch/arm64/include/asm/linkage.h
-> +++ b/arch/arm64/include/asm/linkage.h
-> @@ -1,7 +1,7 @@
->  #ifndef __ASM_LINKAGE_H
->  #define __ASM_LINKAGE_H
->  
-> -#define __ALIGN		.align 4
-> -#define __ALIGN_STR	".align 4"
-> +#define __ALIGN		.align 2
-> +#define __ALIGN_STR	".align 2"
->  
->  #endif
->
-My math tells me, that 2 is one half of 4 but 4 is one fourth of 16, so
-this change doesn't line up with your commit message, or am I missing
-something?
+This patch that adds a new SDHCI quirk "MMC_RSP_136" has already been
+merged and hence removed it in this revision.
 
+Apart from the quirk, sdhci-omap has it's own callbacks
+to set_clock (clock divider programming is different from generic sdhci)
+, set_power, set_bus_width, set_bus_mode and platform_send_init_74_clocks.
+These callback functions are implemented based on omap_hsmmc driver.
+Since sdhci-omap driver requires pbias regulator fixes to be present, I've
+sent them as part of this series.
 
-Lothar Wa?mann
+The sdhci-omap driver supports only the high speed mode and UHS/HS200
+mode will be added in a later series.
+
+It has been tested only in boards having DRA7 SoCs like dra7-evm, dra72-evm,
+am571x-idk, am572x-idk, am57xx-evm. (Tested only eMMC and SD.
+SDIO support will be added later). The plan is to fully convert DRA7
+SoC to use SDHCI driver and then convert other legacy platforms to use
+SDHCI.
+
+The first 3 patches have also been verified not to cause any regression.
+
+Next Steps:
+*) Add UHS support to sdhci-omap
+*) Add SDIO support
+*) Add support for older TI platforms
+
+Changes from v2:
+*) Rebased on git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
+*) Included a couple of patches from Ravikumar to fix pbias-regulator driver
+   to support max-voltage of 3.3V. This is required for sdhci-omap driver.
+*) Create sdhci-omap as a new driver with MMC generic bindings and hence doesn't
+   have bindings like ti,dual-volt added for omap-hsmmc. (Instead of
+   ti,dual-volt, sdhci-omap driver uses the supported regulator voltage to
+   set controller IO voltage capabilities).
+   When omap-hsmmc driver is deprecated, support for these properties will
+   be added to sdhci-omap.
+*) Fixed minor comments from Adrian).
+
+Changes from v1:
+*) Remove the quirks and instead use sdhci_omap specific callbacks for
+   set_power, set_busmode etc.
+*) Add a patch from Adrian to tidy reading 136-bit responses
+
+I've also pushed the entire series along with dependent dt patches @
+https://github.com/kishon/linux-wip.git ulf_next (in case someone
+wants to test)
+
+Kishon Vijay Abraham I (4):
+  mmc: host: omap_hsmmc: Remove setting PBIAS voltage
+  dt-bindings: sdhci-omap: Add bindings for the sdhci-omap controller
+  mmc: sdhci-omap: Add OMAP SDHCI driver
+  MAINTAINERS: Add TI OMAP SDHCI Maintainer
+
+Ravikumar Kattekola (2):
+  regulator: pbias: Select voltage table based on max-voltage
+  ARM: dts: dra7: Increase max-voltage of pbias regulator
+
+ .../devicetree/bindings/mmc/sdhci-omap.txt         |  16 +
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/dra7.dtsi                        |   2 +-
+ drivers/mmc/host/Kconfig                           |  12 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/omap_hsmmc.c                      |  33 +-
+ drivers/mmc/host/sdhci-omap.c                      | 604 +++++++++++++++++++++
+ drivers/regulator/pbias-regulator.c                |  21 +-
+ 8 files changed, 666 insertions(+), 29 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+ create mode 100644 drivers/mmc/host/sdhci-omap.c
+
+-- 
+2.11.0
