@@ -1,25 +1,26 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 31 Aug 2017 15:52:25 +0200
-Subject: [PATCH v3 8/9] ARM64: dts: meson-gxbb: nanopi-k2: enable sdcard UHS
- modes
+Date: Thu, 31 Aug 2017 15:52:24 +0200
+Subject: [PATCH v3 7/9] ARM64: dts: meson-gxbb: p20x: enable sdcard UHS modes
 In-Reply-To: <20170831135226.19784-1-jbrunet@baylibre.com>
 References: <20170831135226.19784-1-jbrunet@baylibre.com>
-Message-ID: <20170831135226.19784-9-jbrunet@baylibre.com>
+Message-ID: <20170831135226.19784-8-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable UHS modes, up to SDR50, on the nanopi-k2 SBC.
+Enable sdcard UHS modes, up to SDR50, on p20x based boards.
+While the s905 supports SDR104 mode, it appears that the PCB of p20x
+based boards can't cope with a rate as high as 200Mhz.
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts | 3 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-index acb6797756e5..4c1320a93fef 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-@@ -285,6 +285,9 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index 704b214e8894..23c08c3afd0a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -226,6 +226,9 @@
  
  	bus-width = <4>;
  	cap-sd-highspeed;
