@@ -1,45 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 31 Aug 2017 18:03:43 +0200
-Subject: [PATCH v2 2/4] usb: xhci-mtk: add generic compatible string
-In-Reply-To: <1503443673.17567.8.camel@mhfsdcap03>
-References: <670f9ce1ecaec5859006b6f02b45cfc72c3cca2c.1502854628.git.chunfeng.yun@mediatek.com>
- <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1502854628.git.chunfeng.yun@mediatek.com>
- <1503443673.17567.8.camel@mhfsdcap03>
-Message-ID: <20170831160343.GA11200@kroah.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 31 Aug 2017 18:04:30 +0200
+Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
+References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
+Message-ID: <20170831160430.GB11200@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 07:14:33AM +0800, Chunfeng Yun wrote:
-> Hi, Mathias
+On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
+> From: Stuart Yoder <stuart.yoder@nxp.com>
 > 
-> On Wed, 2017-08-16 at 14:08 +0800, Chunfeng Yun wrote:
-> > The xhci-mtk driver is a generic driver for MediaTek xHCI IP, add
-> > a generic compatible to avoid confusion when support new SoCs but
-> > use a compatible with specific SoC's name "mt8173".
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/usb/host/xhci-mtk.c |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> > index 67d5dc7..8fb6065 100644
-> > --- a/drivers/usb/host/xhci-mtk.c
-> > +++ b/drivers/usb/host/xhci-mtk.c
-> > @@ -795,6 +795,7 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
-> >  #ifdef CONFIG_OF
-> >  static const struct of_device_id mtk_xhci_of_match[] = {
-> >  	{ .compatible = "mediatek,mt8173-xhci"},
-> > +	{ .compatible = "mediatek,mtk-xhci"},
-> >  	{ },
-> >  };
-> >  MODULE_DEVICE_TABLE(of, mtk_xhci_of_match);
+> Move the source files out of staging into their final locations:
+>   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+>   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+>   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+>   -README.txt, providing and overview of DPAA goes to
+>    Documentation/dpaa2/overview.txt
 > 
-> Do you have any comment about this patch?
-> Thanks.
+> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+> Update dpaa2_eth and dpio staging drivers.
+> 
+> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-We need an ack from the device-tree maintainers before we can take
-them...
+This is going to have to wait until I get a chunk of time to do the
+review.  Probably after 4.13-final is out.
 
 thanks,
 
