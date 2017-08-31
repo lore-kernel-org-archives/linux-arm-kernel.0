@@ -1,89 +1,59 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 31 Aug 2017 11:58:17 -0500
-Subject: [PATCH 1/3] PCI: designware: only register MSI controller when
- MSI irq line is valid
-In-Reply-To: <20170828142307.30061-2-l.stach@pengutronix.de>
-References: <20170828142307.30061-1-l.stach@pengutronix.de>
- <20170828142307.30061-2-l.stach@pengutronix.de>
-Message-ID: <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
+From: oza.pawandeep@gmail.com (Oza Pawandeep)
+Date: Thu, 31 Aug 2017 22:29:01 +0530
+Subject: [PATCH v6 0/3] PCI hotplug feature
+In-Reply-To: <20170831133951.GA8154@bhelgaas-glaptop.roam.corp.google.com>
+References: <1504155029-24729-1-git-send-email-oza.oza@broadcom.com>
+ <20170831133951.GA8154@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAK1A=4wznHsh=drYNrEEhaaJQrksWjkB8K_mOutgxFPh1CVdPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Kishon, Thomas, Niklas, Jesper, Zhou, Gabriele, Xiaowei, Binghui,
-Stanimir, Pratyush, Kukjin, Krzysztof, Richard, Murali, Minghuan, Mingkai,
-Roy]
+On Thu, Aug 31, 2017 at 7:09 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Aug 31, 2017 at 10:20:26AM +0530, Oza Pawandeep wrote:
+>> These patches bring in PCI hotplug support for iproc family chipsets.
+>>
+>> It includes DT binding documentation and, the implementation in
+>> iproc pcie RC driver.
+>>
+>> Changes since v5:
+>> [RESEND]
+>
+> Not sure what the point of resending this as v6 was, since v5 was
+> posted 6 minutes earlier and you don't mention any changes in v6?
 
-Sorry about the unwieldy cc list.  It seems like this affects every
-DesignWare-based driver.
+My apologies,
+It looked to me that v5 went out twice, might be confusing.
 
-On Mon, Aug 28, 2017 at 04:23:05PM +0200, Lucas Stach wrote:
-> The MSI part of the controller isn't essential, so the host controller can
-> be registered without the MSI controller being present. This allows the
-> host to work in PCIe legancy interrupt only mode, if the IRQ line for the
+Hence sent out v6.
 
-s/legancy/legacy/
-
-> MSI controller is missing.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  drivers/pci/dwc/pcie-designware-host.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-> index d29c020da082..8494089f088d 100644
-> --- a/drivers/pci/dwc/pcie-designware-host.c
-> +++ b/drivers/pci/dwc/pcie-designware-host.c
-> @@ -381,7 +381,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	if (ret)
->  		pci->num_viewport = 2;
->  
-> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
->  		if (!pp->ops->msi_host_init) {
->  			pp->irq_domain = irq_domain_add_linear(dev->of_node,
->  						MAX_MSI_IRQS, &msi_domain_ops,
-> @@ -412,7 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	bridge->ops = &dw_pcie_ops;
->  	bridge->map_irq = of_irq_parse_and_map_pci;
->  	bridge->swizzle_irq = pci_common_swizzle;
-> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
->  		bridge->msi = &dw_pcie_msi_chip;
->  		dw_pcie_msi_chip.dev = dev;
->  	}
-
-Here are the callers of dw_pcie_host_init():
-
-  armada8k_add_pcie_port
-  artpec6_add_pcie_port       # sets pp->msi_irq
-  dra7xx_add_pcie_port
-  dw_plat_add_pcie_port       # sets pp->msi_irq
-  exynos_add_pcie_port        # sets pp->msi_irq
-  hisi_add_pcie_port
-  imx6_add_pcie_port          # sets pp->msi_irq
-  kirin_add_pcie_port
-  ks_dw_pcie_host_init        # sets pp->ops->msi_host_init
-  ls_add_pcie_port            # sets pp->ops->msi_host_init
-  qcom_pcie_probe             # sets pp->msi_irq
-  spear13xx_add_pcie_port
-
-For the drivers that set pp->msi_irq (artpec6, dw_plat, exynos, imx6,
-qcom), it seems like you'd want a similar follow-up change for all of
-them to make the MSI IRQ optional, but you only changed imx6.  What
-about the others?
-
-For the drivers that don't set pp->msi_irq and don't set
-pp->ops->msi_host_init (armada8k, dra7xx, hisi, kirin, spear13xx),
-this patch means they no longer set up pp->irq_domain.  Do you intend
-that?
-
-Incidental observations not strictly related to this series:
-
-  - It looks like exynos_add_pcie_port() incorrectly assumes
-    platform_get_irq() returns zero on failure (twice).
-
-  - It'd be nice if qcom_pcie_probe() followed the same
-    add_pcie_port() structure as the other drivers.
-
-Bjorn
+Regards,
+Oza.
+>
+>> Changes since v4:
+>> Rebased to pci-next
+>> Added; Acked-by: Rob Herring <robh@kernel.org>
+>>
+>> Changes since v3:
+>> Resend. just to be in sync previous in-flight patches.
+>>
+>> Changes since v2:
+>> Addressed Rob Herring's comments.
+>> Changed subject to "dt-bindings: PCI:..."
+>> Made generic PCI hotplug properties 'slot-pluggable' and 'prsnt-gpios'
+>> Rebased the patches on top of Lorenzo's patches.
+>>
+>> Oza Pawandeep (3):
+>>   dt-bindings: PCI: Add PCI hotplug property
+>>   dt-bindings: PCI iproc: Implement optional property prsnt-gpios
+>>   PCI: iproc: Implement PCI hotplug support
+>>
+>>  .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |  14 ++
+>>  Documentation/devicetree/bindings/pci/pci.txt      |  15 ++
+>>  drivers/pci/host/pcie-iproc-platform.c             |   3 +
+>>  drivers/pci/host/pcie-iproc.c                      | 166 ++++++++++++++++++---
+>>  drivers/pci/host/pcie-iproc.h                      |   7 +
+>>  5 files changed, 187 insertions(+), 18 deletions(-)
+>>
+>> --
+>> 1.9.1
+>>
