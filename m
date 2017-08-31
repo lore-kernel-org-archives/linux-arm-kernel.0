@@ -1,54 +1,98 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 31 Aug 2017 10:38:20 -0700
-Subject: [PATCH 3/7] drm/pl111: Replace custom connector with panel bridge
-In-Reply-To: <20170830180711.2791-4-linus.walleij@linaro.org>
-References: <20170830180711.2791-1-linus.walleij@linaro.org>
- <20170830180711.2791-4-linus.walleij@linaro.org>
-Message-ID: <87h8wnzlgz.fsf@anholt.net>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 31 Aug 2017 18:43:39 +0100
+Subject: [PATCH v6 0/7] Add RAS virtualization support for SEA/SEI
+ notification type in KVM
+In-Reply-To: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <59A84ACB.7030808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi Dongjiu Geng,
 
-> This replaces the custom connector in the PL111 with the
-> panel bridge helper.
->
-> This works nicely for all standard panels, but since there
-> are several PL11x-based systems that will need to use the dumb
-> VGA connector bridge we use drm_of_find_panel_or_bridge()
-> and make some headroom for dealing with bridges that are
-> not panels as well, and drop a TODO in the code.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On 28/08/17 11:38, Dongjiu Geng wrote:
+> In the firmware-first RAS solution, corrupt data is detected in a
+> memory location when guest OS application software executing at EL0
+> or guest OS kernel El1 software are reading from the memory. The
+> memory node records errors in an error record accessible using
+> system registers.
+> 
+> Because SCR_EL3.EA is 1, then CPU will trap to El3 firmware, EL3
+> firmware records the error to APEI table through reading system
+> register.
 
-> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-> index c6ca4f1bbd49..ef86ef60aed1 100644
-> --- a/drivers/gpu/drm/pl111/pl111_display.c
-> +++ b/drivers/gpu/drm/pl111/pl111_display.c
-> @@ -93,7 +93,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
->  	struct pl111_drm_dev_private *priv = drm->dev_private;
->  	const struct drm_display_mode *mode = &cstate->mode;
->  	struct drm_framebuffer *fb = plane->state->fb;
-> -	struct drm_connector *connector = &priv->connector.connector;
-> +	struct drm_connector *connector = priv->connector;
->  	u32 cntl;
->  	u32 ppl, hsw, hfp, hbp;
->  	u32 lpp, vsw, vfp, vbp;
-> @@ -155,7 +155,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
->  
->  	writel(0, priv->regs + CLCD_TIM3);
->  
-> -	drm_panel_prepare(priv->connector.panel);
-> +	drm_panel_prepare(priv->panel);
+Strictly speaking these are CPER records in a memory region pointed to by the
+HEST->GHES ACPI table.
 
-If we're moving to panel-bridge, then we should drop our manual panel
-prepare/enable/disable calls -- the panel-bridge will have already
-panel_prepare()d before our encoder's enable, and will panel_enable()
-after we finish.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/a301ad01/attachment.sig>
+
+> Because the error was taken from a lower Exception level, if the
+> exception is SEA/SEI and HCR_EL2.TEA/HCR_EL2.AMO is 1, firmware
+> sets ESR_EL2/FAR_EL2 to fake a exception trap to EL2, then
+> transfers to hypervisor.
+
+What happens if you took an SError from EL2 and EL2 has PSTATE.A set masking
+SError? (this is very common today: all kernel code runs like this).
+
+What happens if the hypervisor then executes an ESB with PSTATE.A set? It
+expects to see any pending SError deferred and its syndrome written to DISR_EL1,
+but this register is RAZ/WI when you set SCR_EL3.EA. '4.4.2' of [0]
+
+
+> For the synchronous external abort(SEA), Hypervisor calls the
+> ghes_handle_memory_failure() to deal with this error,
+> ghes_handle_memory_failure() function reads the APEI table and 
+> callls memory_failure() to decide whether it needs to deliver
+> SIGBUS signal to user space, the advantage of using SIGBUS signal
+> to notify user space is that it can be compatible with Non-Kvm users.
+> 
+> For the SError Interrupt(SEI),KVM firstly classified the error.
+
+KVM can't parse the CPER records, nor does it know where to look to find them.
+KVM should call out to the APEI code so the host kernel can handle the error.
+
+User-space may be signalled by the memory_failure() helper, and user-space may
+choose to notify the guest about the memory-failure, but this would be a new error.
+
+
+> Not call memory_failure() to handle it. Because the error address recorded
+> by APEI is not accurated, so can not identify the address to hwpoison
+> memory.
+
+This looks like a firmware bug, what address do you get in your CPER records? It
+should be a physical address.
+
+To report a memory-error you must have an address.
+
+If the error wasn't detected as a synchronous access then delivering a
+synchronous-external-abort is inappropriate (I think we both agree on this), and
+SError-interrupt doesn't have a way of specifying an address ... but the CPER
+records do.
+
+For firmware-first your SError-interrupt is just a notification, its the CPER
+records the OS uses to handle the error.
+
+
+> If the SError error comes from guest user mode and is not propagated,
+> then signal user space to handle it, otherwise, directly injects virtual
+> SError, or panic if the error is fatal.
+
+What do you mean by propagated?
+
+I don't think we should ever hand RAS notifications to user-space, the host
+kernel should handle them, then describe the symptom (e.g. this region of your
+va space is gone) to user-space.
+
+
+> when user space handles the error,
+> it will specify syndrome for the injected virtual SError. This syndrome value
+> is set to the VSESR_EL2. VSESR_EL2 is a new ARMv8.2 RAS extensions register
+> which provides the syndrome value reported to software on taking a virtual
+> SError interrupt exception.
+
+
+Thanks,
+
+James
+
+[0]
+https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
