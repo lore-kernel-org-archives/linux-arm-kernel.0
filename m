@@ -1,21 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Aug 2017 15:51:05 +0200
-Subject: [PATCH] pinctrl: uniphier: fix members of rmii group for Pro4
-In-Reply-To: <1503886886-30065-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1503886886-30065-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CACRpkdZ6Db=FivejdqG=WHbwot80Jq9xEeF58F1h9n7EuL94Hg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 Aug 2017 14:50:50 +0100
+Subject: Applied "regulator: pbias: Select voltage table based on
+ max-voltage" to the regulator tree
+In-Reply-To: <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+References: <E1dnO3z-0000tI-7K@debutante>
+ <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+Message-ID: <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 4:21 AM, Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
+On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
 
-> The ether_rmii_groups should have "ether_rmii" and "ether_rmiib" as
-> members. This patch replaces to them.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> This patch should be merged along with the 1st patch of the series "mmc: host:
+> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
+> omap_hsmmc driver.
 
-Patch applied with Fixes: tag and ACKs.
-
-Yours,
-Linus Walleij
+I can sign a tag if it's needed for a cross tree merge.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/64436f03/attachment.sig>
