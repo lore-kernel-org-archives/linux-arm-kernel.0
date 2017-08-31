@@ -1,42 +1,44 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 31 Aug 2017 15:48:47 +0530
-Subject: [PATCH v2 4/6] dt-bindings: sdhci-omap: Add bindings for the
- sdhci-omap controller
+Date: Thu, 31 Aug 2017 15:48:46 +0530
+Subject: [PATCH v2 3/6] ARM: dts: dra7: Increase max-voltage of pbias regulator
 In-Reply-To: <20170831101849.9489-1-kishon@ti.com>
 References: <20170831101849.9489-1-kishon@ti.com>
-Message-ID: <20170831101849.9489-5-kishon@ti.com>
+Message-ID: <20170831101849.9489-4-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding for the TI's sdhci-omap controller.
+From: Ravikumar Kattekola <rk@ti.com>
 
+As per recent TRM, PBIAS cell on dra7 devices supports
+3.3V and not 3.0V as documented earlier.
+
+Update PBIAS regulator max voltage to match this.
+
+Document reference:
+SPRUI30C ? DRA75x, DRA74x Technical reference manual- November 2016
+
+Tested on:
+DRA75x PG 2.0 REV H EVM
+
+Signed-off-by: Ravikumar Kattekola <rk@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/mmc/sdhci-omap.txt | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+ arch/arm/boot/dts/dra7.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
-new file mode 100644
-index 000000000000..66b5517d79d7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
-@@ -0,0 +1,16 @@
-+* TI OMAP SDHCI Controller
-+
-+Refer to mmc.txt for standard MMC bindings.
-+
-+Required properties:
-+- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
-+- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
-+
-+Example:
-+	mmc1: mmc at 0x4809c000 {
-+		compatible = "ti,dra7-sdhci";
-+		reg = <0x4809c000 0x400>;
-+		ti,hwmods = "mmc1";
-+		bus-width = <4>;
-+		vmmc-supply = <&vmmc>; /* phandle to regulator node */
-+	};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 0f0f6f58bd18..fc14e48b482e 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -170,7 +170,7 @@
+ 						pbias_mmc_reg: pbias_mmc_omap5 {
+ 							regulator-name = "pbias_mmc_omap5";
+ 							regulator-min-microvolt = <1800000>;
+-							regulator-max-microvolt = <3000000>;
++							regulator-max-microvolt = <3300000>;
+ 						};
+ 					};
+ 
 -- 
 2.11.0
