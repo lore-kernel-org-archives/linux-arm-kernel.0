@@ -1,67 +1,76 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu, 31 Aug 2017 11:36:07 +0100
-Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu
- capacity-dmips-mhz information
-In-Reply-To: <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
-References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
- <20170830144120.9312-3-dietmar.eggemann@arm.com>
- <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
-Message-ID: <94c1d6c6-655a-2a63-1f01-06ac45990388@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 31 Aug 2017 11:38:50 +0100
+Subject: [PATCH] arm64: relax assembly code alignment from 16 byte to 4
+ byte
+In-Reply-To: <20170831122328.2334a4de@karo-electronics.de>
+References: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
+ <20170831122328.2334a4de@karo-electronics.de>
+Message-ID: <ca2a3738-1c88-7e89-fffa-ba3b0fbc0e5b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/17 21:26, Krzysztof Kozlowski wrote:
-> On Wed, Aug 30, 2017 at 03:41:18PM +0100, Dietmar Eggemann wrote:
->> The following 'capacity-dmips-mhz' dt property values are used:
->>
->> Cortex-A15: 1024, Cortex-A7: 539
->>
->> They have been derived from the cpu_efficiency values:
->>
->> Cortex-A15: 3891, Cortex-A7: 2048
->>
->> by scaling them so that the Cortex-A15s (big cores) use 1024.
->>
->> The cpu_efficiency values were originally derived from the "Big.LITTLE
->> Processing with ARM Cortex?-A15 & Cortex-A7" white paper
->> (http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
->> (3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
->> Dhrystone benchmark.
->>
->> The following platforms are affected once cpu-invariant accounting
->> support is re-connected to the task scheduler:
->>
->> arndale-octa, peach-pi, peach-pit, smdk5420
->>
->> The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
->> 5800).
->>
->> $ cat /sys/devices/system/cpu/cpu*/cpu_capacity
->> 1024
->> 1024
->> 1024
->> 1024
->> 389
->> 389
->> 389
->> 389
+On 31/08/17 11:23, Lothar Wa?mann wrote:
+> Hi,
 > 
-> I am missing something... shouldn't this be 539? Or is it scaled with
-> the clock-frequency (1 GHz) value?
+> On Thu, 31 Aug 2017 18:56:23 +0900 Masahiro Yamada wrote:
+>> Aarch64 instructions must be word aligned.  The current 16 byte
+>> alignment is more than enough.  Relax it into 4 byte alignment.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>> I do not know why arm64 Linux requires 16 byte alignment.
+>>
+>> I dug git-history of arch/arm64/include/asm/linkage.h
+>> and the only commit I see is:
+>>
+>>   commit aeed41a9371ee02257b608eb06a9058507a7d0f4
+>>   Author: Marc Zyngier <Marc.Zyngier@arm.com>
+>>   Date:   Fri Oct 19 17:33:27 2012 +0100
+>>
+>>       arm64: fix alignment padding in assembly code
+>>
+>> It just opt out of the asm-generic variant to remove 0x90.
+>> So, the amount of alignment might not be not optimized yet.
+>>
+>> Please correct me if I am missing something.
+>>
+>>
+>>  arch/arm64/include/asm/linkage.h | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/linkage.h b/arch/arm64/include/asm/linkage.h
+>> index 636c1bc..1b26629 100644
+>> --- a/arch/arm64/include/asm/linkage.h
+>> +++ b/arch/arm64/include/asm/linkage.h
+>> @@ -1,7 +1,7 @@
+>>  #ifndef __ASM_LINKAGE_H
+>>  #define __ASM_LINKAGE_H
+>>  
+>> -#define __ALIGN		.align 4
+>> -#define __ALIGN_STR	".align 4"
+>> +#define __ALIGN		.align 2
+>> +#define __ALIGN_STR	".align 2"
+>>  
+>>  #endif
+>>
+> My math tells me, that 2 is one half of 4 but 4 is one fourth of 16, so
+> this change doesn't line up with your commit message, or am I missing
+> something?
 
-Yeah, the capacity-dmips-mhz dt value of 539 for the little cpus is
-scaled by 1.3/1.8 (max cpu capacity/ system wide max cpu capacity):
+2^4 = 16
+2^2 = 4
 
-539 * 1.3/1.8 = 389
+The ARM behaviour of the .align directive is a bit funky...
 
-This max cpu capacity scaling is part of both solutions, the 'cpu
-capacity-dmips-mhz' and the 'cpu_efficiency/clock-frequency dt property'
-one.
+Robin.
 
-The (original*) cpu capacity on a heterogeneous platform expresses uArch
-and max cpu frequency differences between the (logical) cpus of the
-system.
-
-* not further reduced by rt and/or irq pressure.
-
-[...]
+> 
+> 
+> Lothar Wa?mann
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
