@@ -1,24 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Aug 2017 15:52:39 +0200
-Subject: [PATCH] Revert "pinctrl: sunxi: Don't enforce bias disable (for
- now)"
-In-Reply-To: <20170827125523.29208-1-plaes@plaes.org>
-References: <20170827125523.29208-1-plaes@plaes.org>
-Message-ID: <CACRpkdbNexCr-o1YozD4OaTivptV+W+ow8LpL7m5z+qvVvVP+A@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 31 Aug 2017 15:52:21 +0200
+Subject: [PATCH v3 4/9] ARM64: dts: meson-gxbb: nanopi-k2: add card regulator
+ settle times
+In-Reply-To: <20170831135226.19784-1-jbrunet@baylibre.com>
+References: <20170831135226.19784-1-jbrunet@baylibre.com>
+Message-ID: <20170831135226.19784-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 27, 2017 at 2:55 PM, Priit Laes <plaes@plaes.org> wrote:
+Changing the card voltage on the nanopi-k2 is not instantaneous,
+especially when switching from 3.3v to 1.8v.
 
-> This reverts commit 2154d94b40ea2a5de05245521371d0461bb0d669.
->
-> The original patch was intented to avoid some issues with the sunxi
-> gpio rework and was supposed to be reverted after all the required
-> DT bits had been merged around v4.10.
->
-> Signed-off-by: Priit Laes <plaes@plaes.org>
+It take at least 3ms for the regulator to go from 3.3v to 1.8v. Add
+margin to that to make sure we don't upset the sdcard during the voltage
+switch
 
-Patch applied with Maxime's ACK.
+Fixes: 9bc7ffb08daf ("arm64: dts: amlogic: Add NanoPi K2")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+index 60d5f2da6916..acb6797756e5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+@@ -107,6 +107,9 @@
+ 
+ 		states = <3300000 0>,
+ 		         <1800000 1>;
++
++		regulator-settling-time-up-us = <100>;
++		regulator-settling-time-down-us = <5000>;
+ 	};
+ 
+ 	wifi_32k: wifi-32k {
+-- 
+2.9.5
