@@ -1,35 +1,32 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 31 Aug 2017 08:05:14 -0500
-Subject: linux-next regression caused by "gpiolib: request the gpio before
- querying its direction"
-In-Reply-To: <CAMuHMdXeWBbSkvwh_hpGhPe_s-GA8BptQPJWG_bu0Ln12N93Aw@mail.gmail.com>
-References: <20170830112424.7a3a7c36@windsurf.lan>
- <3cce6903-d167-1bfc-38b4-1fdd7b3ff24b@codeaurora.org>
- <87ziah2m3f.fsf@free-electrons.com> <20170830161730.41919554@windsurf.lan>
- <CACRpkdbxdkHukALfYMrM7w=1KNJKLBhGebbkEpMb3C3+nCfWOA@mail.gmail.com>
- <20170831091812.6f7d417e@windsurf.lan>
- <CAMuHMdVGkTQ0vnOg5o+t1J9qe79ySm0R8aE4msyuNLoVGHLD6A@mail.gmail.com>
- <20170831092211.GP20805@n2100.armlinux.org.uk>
- <CAMuHMdXeWBbSkvwh_hpGhPe_s-GA8BptQPJWG_bu0Ln12N93Aw@mail.gmail.com>
-Message-ID: <4f39d450-bc9c-b9a9-e3f8-b350e1770479@codeaurora.org>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 31 Aug 2017 16:02:23 +0300
+Subject: [PATCH 4/5] mmc: sdhci-omap: Add OMAP SDHCI driver
+In-Reply-To: <c7972f00-ef62-1736-822f-ebf6822b6d33@ti.com>
+References: <20170821074132.4622-1-kishon@ti.com>
+ <20170821074132.4622-5-kishon@ti.com>
+ <4f0a7225-1843-b353-1a2a-9adcb49554d3@intel.com>
+ <c7972f00-ef62-1736-822f-ebf6822b6d33@ti.com>
+Message-ID: <dfe1b4e2-bcb5-c969-efe6-7cddd0eb0bf9@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2017 04:50 AM, Geert Uytterhoeven wrote:
->> For instance, you may have a timer block which can capture on both
->> edges of an external event signal, which needs the pin to be muxed for
->> that function.  However, you need to read the state of the pin, and
->> that is only available through GPIO.  Muxing the pin to be a GPIO just
->> because someone requests the GPIO is, imho, ill thought-out and breaks
->> some use cases.
+On 30/08/17 16:53, Kishon Vijay Abraham I wrote:
+> On Monday 28 August 2017 02:36 PM, Adrian Hunter wrote:
+>> On 21/08/17 10:41, Kishon Vijay Abraham I wrote:
+>>> +
+>>> +static void sdhci_omap_set_clock(struct sdhci_host *host, unsigned int clock)
+>>> +{
+>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>> +	struct sdhci_omap_host *omap_host = sdhci_pltfm_priv(pltfm_host);
+>>> +	unsigned long clkdiv;
+>>> +
+>>> +	if (!clock)
+>>> +		return;
+>>
+>> Are you sure you don't want to stop the clock.
+> 
+> There is never a case where the MMC core sends a request to stop the clock.
+> Maybe this check is not required at all.
 
-> Yes, reading from the GPIO can work if the pin is muxed to another function.
-
-Well that depends on the hardware.  On Qualcomm chips, the you can 
-technically still read and write from/to the GPIO if it's muxed to some 
-other function, but the results are meaningless.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+It does when voltage switching e.g. mmc_set_uhs_voltage(), but host drivers
+should support the possibility anyway.
