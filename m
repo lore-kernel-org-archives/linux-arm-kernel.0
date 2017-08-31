@@ -1,71 +1,73 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 31 Aug 2017 10:58:44 -0700
-Subject: [PATCH 7/7] drm/pl111: Add handling of Versatile platforms
-In-Reply-To: <20170830180711.2791-8-linus.walleij@linaro.org>
-References: <20170830180711.2791-1-linus.walleij@linaro.org>
- <20170830180711.2791-8-linus.walleij@linaro.org>
-Message-ID: <878thzzkiz.fsf@anholt.net>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 31 Aug 2017 19:04:13 +0100
+Subject: [PATCH v6 4/7] arm64: kvm: support user space to query RAS
+ extension feature
+In-Reply-To: <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <59A84F9D.8030309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi Dongjiu Geng,
 
-> The ARM reference designs in the Versatile family: Integrator,
-> Versatile and RealView can make use of the new DRM driver as well.
-> We just need to create a bit of platform-specific code for them
-> that we isolate to its own file.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/gpu/drm/pl111/Makefile          |   1 +
->  drivers/gpu/drm/pl111/pl111_display.c   |   7 -
->  drivers/gpu/drm/pl111/pl111_drv.c       |   5 +
->  drivers/gpu/drm/pl111/pl111_versatile.c | 270 ++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/pl111/pl111_versatile.h |   9 ++
->  5 files changed, 285 insertions(+), 7 deletions(-)
->  create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.c
->  create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.h
->
-> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
-> index c5f8f9684848..fce1453a93e1 100644
-> --- a/drivers/gpu/drm/pl111/Makefile
-> +++ b/drivers/gpu/drm/pl111/Makefile
-> @@ -1,4 +1,5 @@
->  pl111_drm-y +=	pl111_display.o \
-> +		pl111_versatile.o \
->  		pl111_drv.o
->  
->  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
-> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-> index 37f409867934..f7b043f4fed6 100644
-> --- a/drivers/gpu/drm/pl111/pl111_display.c
-> +++ b/drivers/gpu/drm/pl111/pl111_display.c
-> @@ -454,13 +454,6 @@ int pl111_display_init(struct drm_device *drm)
->  	}
->  	of_node_put(endpoint);
->  
-> -	if (tft_r0b0g0[0] != 0 ||
-> -	    tft_r0b0g0[1] != 8 ||
-> -	    tft_r0b0g0[2] != 16) {
-> -		dev_err(dev, "arm,pl11x,tft-r0g0b0-pads != [0,8,16] not yet supported\n");
-> -		return -EINVAL;
-> -	}
+On 28/08/17 11:38, Dongjiu Geng wrote:
+> In ARMV8.2 RAS extension, a virtual SError exception syndrome
+> register(VSESR_EL2) is added.  This value may be specified from
+> userspace.
 
-I had a note in the DOC section of pl111_drv.c about needing to filter
-available formats based on this property.  Could you update that with
-some explanation of the new state of things?  (Do we actually need to
-filter the formats?)
+I agree that the CPU support for injecting SErrors with a specified ESR should
+be exposed to KVM's user space...
 
-I haven't verified that we get the same pin routing setup as the fbdev
-driver did for these platforms, but even if they don't match yet this
-seems like an excellent start and we can make sure we sort them out as
-we add panel drivers.
 
-I've verified that my Cygnus board continues working with your series.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170831/7da51f1b/attachment.sig>
+> Userspace will want to check if the CPU has the RAS
+> extension. 
+
+... but user-space wants to know if it can inject SErrors with a specified ESR.
+
+What if we gain another way of doing this that isn't via the RAS-extensions, now
+user-space has to check for two capabilities.
+
+
+> If it has, it wil specify the virtual SError syndrome
+> value, otherwise it will not be set. This patch adds support for
+> querying the availability of this extension.
+
+I'm against telling user-space what features the CPU has unless it can use them
+directly. In this case we are talking about a KVM API, so we should describe the
+API not the CPU.
+
+
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 3256b9228e75..b7313ee028e9 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_ARM_PMU_V3:
+>  		r = kvm_arm_support_pmu_v3();
+>  		break;
+> +	case KVM_CAP_ARM_RAS_EXTENSION:
+
+This should be called something more like 'KVM_CAP_ARM_INJECT_SERROR_ESR'
+
+
+> +		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
+> +		break;
+>  	case KVM_CAP_SET_GUEST_DEBUG:
+>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>  		r = 1;
+
+
+We can inject SError on systems without the RAS extensions using just the
+HCR_EL2.VSE bit. We may want to make the 'ESR' part of the API optional, or
+expose '1' for the without-ESR version and '2 for with-ESR, (however we choose
+to implement that).
+
+The risk is if we want to add a without-ESR version later, and the name we make
+ABI now turned out to be a mistake. Marc or Christoffer probably have the best
+view of this. (no-one has needed it so far...)
+
+
+Thanks,
+
+James
