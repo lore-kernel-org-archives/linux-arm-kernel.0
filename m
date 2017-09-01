@@ -1,73 +1,47 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 Sep 2017 10:42:44 +0200
-Subject: [PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2
-In-Reply-To: <1504255066-5103-1-git-send-email-geert+renesas@glider.be>
-References: <1504255066-5103-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170901084243.GB14918@verge.net.au>
+Date: Fri, 1 Sep 2017 10:49:23 +0200
+Subject: [PATCH ] ARM: dts: iwg22d-sodimm: Add Ethernet AVB support
+In-Reply-To: <TY1PR06MB07029D315FC6EE500D1EEA55B79D0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+References: <1504106234-41450-1-git-send-email-biju.das@bp.renesas.com>
+ <20170831084534.GF29946@verge.net.au>
+ <KL1PR06MB170280A3D466C9B35AF73939B89D0@KL1PR06MB1702.apcprd06.prod.outlook.com>
+ <TY1PR06MB07029D315FC6EE500D1EEA55B79D0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+Message-ID: <20170901084923.GC14918@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 10:37:43AM +0200, Geert Uytterhoeven wrote:
->         Hi all,
+On Thu, Aug 31, 2017 at 09:32:25AM +0000, Chris Paterson wrote:
+> Hello,
 > 
-> This patch series enables SMP on R-Car E2 (r8a7794).
-> The main hurdle here is that R-Car Gen2 boot loaders do not initialize the
-> arch_timer CNTVOFF register, which thus needs workarounds on Linux.
+> > From: Biju Das
+> > Sent: 31 August 2017 10:24
+> > 
+> > > From: Simon Horman [mailto:horms at verge.net.au]
+> > > Sent: 31 August 2017 09:46
 > 
->   - The first patch adds a definition for MON_MODE, as suggested by Marc
->     Zyngier,
->   - The second patch makes sure CNTVOFF is initialized for boot and
->     secondary Cortex-A15 and Cortex-A7 CPU cores, like is already done
->     for the boot Cortex-A7 CPU core.  Without this, the ARM arch timer
->     does not work on secondary CPU cores.
->     This patch depends on "[PATCH v2] ARM: shmobile: rcar-gen2: Correct
->     arch timer frequency on RZ/G1E".
->   - The third patch adds the required infrastructure (APMU device node
->     and corresponding enable-method) to DT.
->     Obviously this must not be applied on a branch that does not contain
->     the first two patches!
+> <snip>
 > 
-> Due to dependencies, I think it is easiest if the ARM maintainers provide
-> their Acked-by for patch 1, so the whole series can go in through Simon's
-> Renesas tree.
+> > > > +	phy3: ethernet-phy at 3 {
+> > > > +	/*
+> > > > +	 * On some older versions of the platform (before R4.0) the phy
+> > > address
+> > > > +	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
+> > > > +	 */
+> > > > +		reg = <3>;
+> > > > +		micrel,led-mode = <1>;
+> > >
+> > > Does the phy have an interrupt?
+> > 
+> > The current board doesn't support interrupt . But there is a plan to support this
+> > in future board variants through (GPIO3_28).
+> 
+> Actually, the plan has recently changed and at the moment interrupt support will not be added in the production version of the board.
+> 
+> If in the end the plan changes again and the actual hardware does add interrupt support we'll submit a new patch accordingly.
 
-Thanks Geert, this merge strategy is fine by me.
+Thanks for following-up on this. I'm still surprised there is no interrupt
+- does link speed renegotiation initiated by the other end of the link work
+in a timely manner? - but if its not there and my wishful thinking won't
+make it so.
 
-> 
-> Changes compared to v2:
->   - Replace "isb" by "instr_sync" to fix the arm v6 build (e.g.
->     allmodconfig),
-> 
-> Changes compared to v1:
->   - New patch "[PATCH v2 1/3] ARM: Add definition for monitor mode",
->   - Initialize CNTVOFF on Cortex-A15, too,
->   - Use *_MODE definitions instead of hardcoded values,
->   - Reduce duplication by calling the asm version from C,
->   - Always build headsmp-apmu.o on R-Car Gen2.
-> 
-> This has been tested on r8a7794/alt (dual Cortex-A7), and regression-tested
-> on r8a7790/lager (quad Cortex-A15), and r8a7791/koelsch, r8a7791/porter,
-> r8a7792/blanche, and r8a7793/gose (dual Cortex-A15).
-> 
-> Thanks!
-> 
-> Geert Uytterhoeven (2):
->   ARM: Add definition for monitor mode
->   ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15
-> 
-> Sergei Shtylyov (1):
->   ARM: dts: r8a7794: Add SMP support
-> 
->  arch/arm/boot/dts/r8a7794.dtsi           |  7 ++++++
->  arch/arm/include/uapi/asm/ptrace.h       |  1 +
->  arch/arm/mach-shmobile/Makefile          |  1 +
->  arch/arm/mach-shmobile/common.h          |  2 ++
->  arch/arm/mach-shmobile/headsmp-apmu.S    | 37 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/platsmp-apmu.c    |  2 +-
->  arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++---------------
->  7 files changed, 51 insertions(+), 19 deletions(-)
->  create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
-> 
-> -- 
-> 2.7.4
-> 
+I have applied this patch for v4.15.
