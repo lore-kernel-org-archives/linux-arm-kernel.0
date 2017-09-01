@@ -1,150 +1,65 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  1 Sep 2017 11:40:58 +0200
-Subject: [PATCH 2/2] drm: bridge: Add THS8134A/B support to dumb VGA DAC
-Message-ID: <20170901094058.4387-1-linus.walleij@linaro.org>
+Date: Fri,  1 Sep 2017 11:46:22 +0200
+Subject: [PATCH 1/2] RFC: drm: bridge: Add API to fetch connector
+Message-ID: <20170901094622.6519-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extends the dumb VGA DAC bridge to handle the THS8134A
-and THS8134B VGA DACs in addition to those already handled.
+We need to be able to get the connector out of a dumb VGA
+for the PL111 driver. This is because we are using the
+connector in the driver when initializing the display
+pipe.
 
-The THS8134A, THS8134B and as it turns out also THS8135 need to
-have data clocked out at the negative edge of the clock pulse,
-since they clock it into the DAC at the positive edge (so by
-then it needs to be stable) so we need some extra logic to flag
-this on the connector to the driver.
-
-The semantics of the flag DRM_BUS_FLAG_PIXDATA_NEGEDGE in
-<drm/drm_connector.h> clearly indicates that this flag tells
-when to *drive* the data, not when the receiver *reads* it,
-so the TI variants needs to be handled like this.
-
-Introduce a variant struct and contain the information there,
-and add a bit of helpful comments about how this works so
-people will get it right when adding new DACs or connectiong
-new display drivers to DACs.
-
-The fact that THS8135 might be working on some systems today
-is probably due to the fact that the display driver cannot
-configure when the data is clocked out and the electronics
-have simply been designed around it so it works anyways.
-
-The phenomenon is very real on the ARM reference designs using
-PL111 where the hardware can control which edge to push out
-the data.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpu/drm/bridge/dumb-vga-dac.c | 62 +++++++++++++++++++++++++++++++++--
- 1 file changed, 59 insertions(+), 3 deletions(-)
+This is a bit ugly but not uglier than how we are reaching
+into the connector of the panels in several drivers. I don't
+know any better idea, advice welcome.
+---
+ drivers/gpu/drm/bridge/dumb-vga-dac.c | 7 +++++++
+ include/drm/dumb_vga_dac.h            | 9 +++++++++
+ 2 files changed, 16 insertions(+)
+ create mode 100644 include/drm/dumb_vga_dac.h
 
 diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-index 831a606c4706..6c2fdcb4fde1 100644
+index 6c2fdcb4fde1..c0d46ab7fde0 100644
 --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
 +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/module.h>
- #include <linux/of_graph.h>
-+#include <linux/of_device.h>
- #include <linux/regulator/consumer.h>
- 
- #include <drm/drmP.h>
-@@ -19,9 +20,20 @@
+@@ -19,6 +19,7 @@
+ #include <drm/drm_atomic_helper.h>
  #include <drm/drm_crtc.h>
  #include <drm/drm_crtc_helper.h>
++#include <drm/dumb_vga_dac.h>
  
-+/**
-+ * struct vga_dac_variant - characteristics of the DAC
-+ * @posedge_clk: this DAC latches data into the DAC on the positive
-+ *	edge of the clock pulse, which means that display controllers
-+ *	need to clock it out on the negative edge
-+ */
-+struct vga_dac_variant {
-+	bool posedge_clk;
-+};
-+
- struct dumb_vga {
- 	struct drm_bridge	bridge;
- 	struct drm_connector	connector;
-+	struct vga_dac_variant const *variant;
- 
- 	struct i2c_adapter	*ddc;
- 	struct regulator	*vdd;
-@@ -67,6 +79,18 @@ static int dumb_vga_get_modes(struct drm_connector *connector)
- 	/* And prefer a mode pretty much anyone can handle */
- 	drm_set_preferred_mode(connector, 1024, 768);
- 
-+	if (vga->variant->posedge_clk)
-+		/*
-+		 * If the DAC latches the data into its registers on the
-+		 * positive edge of the clock, the display driver needs to
-+		 * drive the data out on the negative edge so it is
-+		 * stable at the positive edge, so as to avoid flicker.
-+		 *
-+		 * Tell the driver that we want data on the negative edge
-+		 */
-+		connector->display_info.bus_flags |=
-+			DRM_BUS_FLAG_PIXDATA_NEGEDGE;
-+
- 	return ret;
+ /**
+  * struct vga_dac_variant - characteristics of the DAC
+@@ -51,6 +52,12 @@ drm_connector_to_dumb_vga(struct drm_connector *connector)
+ 	return container_of(connector, struct dumb_vga, connector);
  }
  
-@@ -183,6 +207,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
- 	if (!vga)
- 		return -ENOMEM;
- 	platform_set_drvdata(pdev, vga);
-+	vga->variant = of_device_get_match_data(&pdev->dev);
- 
- 	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
- 	if (IS_ERR(vga->vdd)) {
-@@ -226,10 +251,41 @@ static int dumb_vga_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct vga_dac_variant default_dac_variant = {
-+	/*
-+	 * These DACs read data on the negative edge. For example in the
-+	 * ADV7123 datasheet (revision D, page 8) there is a timing diagram
-+	 * making this clear.
-+	 */
-+	.posedge_clk = false,
-+};
++struct drm_connector *drm_dumb_vga_get_connector(struct drm_bridge *bridge)
++{
++	return &drm_bridge_to_dumb_vga(bridge)->connector;
++}
++EXPORT_SYMBOL_GPL(drm_dumb_vga_get_connector);
 +
-+static const struct vga_dac_variant ti_ths_dac_variant = {
-+	/* The TI DACs read the data on the positive edge of the CLK */
-+	.posedge_clk = true,
-+};
+ static int dumb_vga_get_modes(struct drm_connector *connector)
+ {
+ 	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+diff --git a/include/drm/dumb_vga_dac.h b/include/drm/dumb_vga_dac.h
+new file mode 100644
+index 000000000000..b7117222054d
+--- /dev/null
++++ b/include/drm/dumb_vga_dac.h
+@@ -0,0 +1,9 @@
++#ifndef _DUMB_VGA_DAC_H_
++#define _DUMB_VGA_DAC_H_
 +
- static const struct of_device_id dumb_vga_match[] = {
--	{ .compatible = "dumb-vga-dac" },
--	{ .compatible = "adi,adv7123" },
--	{ .compatible = "ti,ths8135" },
-+	{
-+		.compatible = "dumb-vga-dac",
-+		.data = &default_dac_variant,
-+	},
-+	{
-+		.compatible = "adi,adv7123",
-+		.data = &default_dac_variant,
-+	},
-+	{
-+		.compatible = "ti,ths8134a",
-+		.data = &ti_ths_dac_variant,
-+	},
-+	{
-+		.compatible = "ti,ths8134b",
-+		.data = &ti_ths_dac_variant,
-+	},
-+	{
-+		.compatible = "ti,ths8135",
-+		.data = &ti_ths_dac_variant,
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dumb_vga_match);
++struct drm_connector;
++struct drm_bridge;
++
++struct drm_connector *drm_dumb_vga_get_connector(struct drm_bridge *bridge);
++
++#endif
 -- 
 2.13.5
