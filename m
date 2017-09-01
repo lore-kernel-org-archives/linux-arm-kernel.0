@@ -1,29 +1,40 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 1 Sep 2017 10:16:33 +0800
-Subject: [PATCH 1/2] clk: hi6220: change watchdog clock source
-In-Reply-To: <20170901013240.GM21656@codeaurora.org>
-References: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
- <20170901013240.GM21656@codeaurora.org>
-Message-ID: <20170901021633.GC516@leoy-ThinkPad-T440>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Fri, 1 Sep 2017 02:50:43 +0000
+Subject: [PATCHv4 1/9] irqchip/ls-scfg-msi: fix typo of MSI compatible
+ strings
+In-Reply-To: <722dbe2c-86d5-36b2-2551-903d01bee86b@arm.com>
+References: <1499237943-24203-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <722dbe2c-86d5-36b2-2551-903d01bee86b@arm.com>
+Message-ID: <AM5PR0402MB27718868EA92AA536E5BB89084920@AM5PR0402MB2771.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 06:32:40PM -0700, Stephen Boyd wrote:
-> On 08/29, Leo Yan wrote:
-> > The old code uses tcxo (19.2MHz) as watchdog clock but actually the
-> > watchdog uses 32K clock, as result the watchdog timeout cannot be set
-> > correctly and delay long time to reset SoC.
-> > 
-> > So this patch is to use 'ref32k' as clock source for watchdog.
-> > 
-> > Fixes: 72ea48610d43 ("clk: hi6220: Clock driver support for Hisilicon hi6220 SoC")
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
+Hi Marc,
+
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: 2017?8?31? 23:16
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; tglx at linutronix.de;
+> jason at lakedaemon.net; robh+dt at kernel.org; mark.rutland at arm.com;
+> linux at armlinux.org.uk; shawnguo at kernel.org; M.h. Lian
+> <minghuan.lian@nxp.com>
+> Subject: Re: [PATCHv4 1/9] irqchip/ls-scfg-msi: fix typo of MSI compatible
+> strings
 > 
-> Applied to clk-next
+> On 05/07/17 07:58, Zhiqiang Hou wrote:
+> > From: Minghuan Lian <Minghuan.Lian@nxp.com>
+> >
+> > The patch is to fix typo of the Layerscape SCFG MSI dts compatible
+> > strings. "1" is replaced by "l".
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> I've queued this series.
 
-Thanks, Stephen.
+Thanks a lot!
 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Thanks,
+Zhiqiang
