@@ -1,39 +1,42 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  1 Sep 2017 11:36:30 +0200
-Subject: [PATCH 0/7 v2] First set of PL111 enhancements
-Message-ID: <20170901093637.4041-1-linus.walleij@linaro.org>
+Date: Fri,  1 Sep 2017 11:36:32 +0200
+Subject: [PATCH 2/7 v2] drm/pl111: Add all registers to debugfs
+In-Reply-To: <20170901093637.4041-1-linus.walleij@linaro.org>
+References: <20170901093637.4041-1-linus.walleij@linaro.org>
+Message-ID: <20170901093637.4041-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the v2 patch set fixing the review comments (hopefully).
+This adds all the main control registers to the debugfs
+register file. This was helpful for my debugging so it will
+likely help others as well.
 
-Mainly I had to drop the cleverness of wrapping power enablement
-inside the panel prepare/enable pair and fall back to a 20ms
-delay as in the framebuffer driver. I hope everyone survives
-this.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Collect Eric's ACK.
+---
+ drivers/gpu/drm/pl111/pl111_debugfs.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Linus Walleij (7):
-  drm/pl111: Cleanup local header file
-  drm/pl111: Add all registers to debugfs
-  drm/pl111: Replace custom connector with panel bridge
-  drm/pl111: Enable PL110 variant
-  drm/pl111: Insert delay before powering up PL11x
-  drm/pl111: Add optional variant display en/disable callbacks
-  drm/pl111: Add handling of Versatile platforms
-
- drivers/gpu/drm/pl111/Kconfig           |   3 +-
- drivers/gpu/drm/pl111/Makefile          |   4 +-
- drivers/gpu/drm/pl111/pl111_connector.c | 127 ---------------
- drivers/gpu/drm/pl111/pl111_debugfs.c   |   6 +
- drivers/gpu/drm/pl111/pl111_display.c   |  81 +++++-----
- drivers/gpu/drm/pl111/pl111_drm.h       |  38 +++--
- drivers/gpu/drm/pl111/pl111_drv.c       | 156 +++++++++++++++---
- drivers/gpu/drm/pl111/pl111_versatile.c | 270 ++++++++++++++++++++++++++++++++
- drivers/gpu/drm/pl111/pl111_versatile.h |   9 ++
- 9 files changed, 489 insertions(+), 205 deletions(-)
- delete mode 100644 drivers/gpu/drm/pl111/pl111_connector.c
- create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.c
- create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.h
-
+diff --git a/drivers/gpu/drm/pl111/pl111_debugfs.c b/drivers/gpu/drm/pl111/pl111_debugfs.c
+index 0d9dee199b2c..7ddc7e3b9e7d 100644
+--- a/drivers/gpu/drm/pl111/pl111_debugfs.c
++++ b/drivers/gpu/drm/pl111/pl111_debugfs.c
+@@ -22,8 +22,14 @@ static const struct {
+ 	REGDEF(CLCD_TIM2),
+ 	REGDEF(CLCD_TIM3),
+ 	REGDEF(CLCD_UBAS),
++	REGDEF(CLCD_LBAS),
+ 	REGDEF(CLCD_PL111_CNTL),
+ 	REGDEF(CLCD_PL111_IENB),
++	REGDEF(CLCD_PL111_RIS),
++	REGDEF(CLCD_PL111_MIS),
++	REGDEF(CLCD_PL111_ICR),
++	REGDEF(CLCD_PL111_UCUR),
++	REGDEF(CLCD_PL111_LCUR),
+ };
+ 
+ int pl111_debugfs_regs(struct seq_file *m, void *unused)
 -- 
 2.13.5
