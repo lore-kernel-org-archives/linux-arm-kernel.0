@@ -1,381 +1,257 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 31 Aug 2017 15:53:59 -0700
-Subject: [PATCH v2 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <20170831225400.19756-1-brendanhiggins@google.com>
-References: <20170831225400.19756-1-brendanhiggins@google.com>
-Message-ID: <20170831225400.19756-3-brendanhiggins@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 31 Aug 2017 17:19:01 -0700
+Subject: [PATCH v2 15/18] clk: add support for clocks provided by SCMI
+In-Reply-To: <1501857104-11279-16-git-send-email-sudeep.holla@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-16-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20170901001901.GJ21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM750 BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+On 08/04, Sudeep Holla wrote:
+> diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+> new file mode 100644
+> index 000000000000..37f98a6439a0
+> --- /dev/null
+> +++ b/drivers/clk/clk-scmi.c
+> @@ -0,0 +1,216 @@
+> +/*
+> + * System Control and Power Interface (SCMI) Protocol based clock driver
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
 
-Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
----
- .../arm/cpu-enable-method/nuvoton,npcm7xx-smp      |  42 +++++
- .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  59 +++++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 177 +++++++++++++++++++++
- include/dt-bindings/clock/nuvoton,npcm7xx-clks.h   |  39 +++++
- 5 files changed, 323 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
- create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
- create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+Is this include used?
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
-new file mode 100644
-index 000000000000..e81f85b400cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
-@@ -0,0 +1,42 @@
-+=========================================================
-+Secondary CPU enable-method "nuvoton,npcm7xx-smp" binding
-+=========================================================
-+
-+To apply to all CPUs, a single "nuvoton,npcm7xx-smp" enable method should be
-+defined in the "cpus" node.
-+
-+Enable method name:	"nuvoton,npcm7xx-smp"
-+Compatible machines:	"nuvoton,npcm750"
-+Compatible CPUs:	"arm,cortex-a9"
-+Related properties:	(none)
-+
-+Note:
-+This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
-+"nuvoton,npcm750-gcr".
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm7xx-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-new file mode 100644
-index 000000000000..2d87d9ecea85
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-@@ -0,0 +1,6 @@
-+NPCM Platforms Device Tree Bindings
-+-----------------------------------
-+NPCM750 SoC
-+Required root node properties:
-+	- compatible = "nuvoton,npcm750";
-+
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..54df32cff21b
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,59 @@
-+/*
-+ * DTS file for all NPCM750 SoCs
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
-+
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+
-+	chosen {
-+		stdout-path = &serial3;
-+		bootargs = "earlyprintk=serial,serial3,115200";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	cpus {
-+		enable-method = "nuvoton,npcm7xx-smp";
-+	};
-+
-+	clk: clock-controller at f0801000 {
-+		status = "okay";
-+	};
-+
-+	apb {
-+		watchdog1: watchdog at f0009000 {
-+			status = "okay";
-+		};
-+
-+		serial0: serial0 at f0001000 {
-+			status = "okay";
-+		};
-+
-+		serial1: serial1 at f0002000 {
-+			status = "okay";
-+		};
-+
-+		serial2: serial2 at f0003000 {
-+			status = "okay";
-+		};
-+
-+		serial3: serial3 at f0004000 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..bca96b3ae9d3
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,177 @@
-+/*
-+ * DTSi file for the NPCM750 SoC
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	gcr: gcr at f0800000 {
-+		compatible = "nuvoton,npcm750-gcr", "syscon",
-+			"simple-mfd";
-+		reg = <0xf0800000 0x1000>;
-+	};
-+
-+	scu: scu at f03fe000 {
-+		compatible = "arm,cortex-a9-scu";
-+		reg = <0xf03fe000 0x1000>;
-+	};
-+
-+	l2: l2-cache at f03fc000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf03fc000 0x1000>;
-+		interrupts = <0 21 4>;
-+		cache-unified;
-+		cache-level = <2>;
-+		clocks = <&clk NPCM7XX_CLK_AXI>;
-+	};
-+
-+	gic: interrupt-controller at f03ff000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0xf03ff000 0x1000>,
-+		    <0xf03fe100 0x100>;
-+	};
-+
-+	clk: clock-controller at f0801000 {
-+		compatible = "nuvoton,npcm750-clk";
-+		#clock-cells = <1>;
-+		reg = <0xf0801000 0x1000>;
-+	};
-+
-+	/* external clock signal rg1refck, supplied by the phy */
-+	clk-rg1refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	/* external clock signal rg2refck, supplied by the phy */
-+	clk-rg2refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	clk-xin {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+	};
-+
-+	timer at f03fe600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xf03fe600 0x20>;
-+		interrupts = <1 13 0x304>;
-+		clocks = <&clk NPCM7XX_CLK_TIMER>;
-+	};
-+
-+	apb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		timer0: timer at f0000000 {
-+			compatible = "nuvoton,npcm750-timer";
-+			interrupts = <0 32 4>;
-+			reg = <0xf0000000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog0: watchdog at f0008000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 47 4>;
-+			reg = <0xf0008000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog1: watchdog at f0009000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 48 4>;
-+			reg = <0xf0009000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog2: watchdog at f000a000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 49 4>;
-+			reg = <0xf000a000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		serial0: serial0 at f0001000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0001000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 2 4>;
-+			status = "disabled";
-+		};
-+
-+		serial1: serial1 at f0002000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0002000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 3 4>;
-+			status = "disabled";
-+		};
-+
-+		serial2: serial2 at f0003000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0003000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 4 4>;
-+			status = "disabled";
-+		};
-+
-+		serial3: serial3 at f0004000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0004000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 5 4>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-new file mode 100644
-index 000000000000..c69d3bbf7e42
---- /dev/null
-+++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2016 Nuvoton Technologies,  tali.perry at nuvoton.com
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_NPCM7XX_H
-+#define _DT_BINDINGS_CLK_NPCM7XX_H
-+
-+#define NPCM7XX_CLK_PLL0	0
-+#define NPCM7XX_CLK_PLL1	1
-+#define NPCM7XX_CLK_PLL2	2
-+#define NPCM7XX_CLK_GFX		3
-+#define NPCM7XX_CLK_APB1	4
-+#define NPCM7XX_CLK_APB2	5
-+#define NPCM7XX_CLK_APB3	6
-+#define NPCM7XX_CLK_APB4	7
-+#define NPCM7XX_CLK_APB5	8
-+#define NPCM7XX_CLK_MC		9
-+#define NPCM7XX_CLK_CPU		10
-+#define NPCM7XX_CLK_SPI0	11
-+#define NPCM7XX_CLK_SPI3	12
-+#define NPCM7XX_CLK_SPIX	13
-+#define NPCM7XX_CLK_UART_CORE	14
-+#define NPCM7XX_CLK_TIMER	15
-+#define NPCM7XX_CLK_HOST_UART	16
-+#define NPCM7XX_CLK_MMC		17
-+#define NPCM7XX_CLK_SDHC	18
-+#define NPCM7XX_CLK_ADC		19
-+#define NPCM7XX_CLK_GFX_MEM	20
-+#define NPCM7XX_CLK_USB_BRIDGE	21
-+#define NPCM7XX_CLK_AXI		22
-+#define NPCM7XX_CLK_AHB		23
-+#define NPCM7XX_CLK_EMC		24
-+#define NPCM7XX_CLK_GMAC	25
-+
-+#endif
+> +#include <linux/platform_device.h>
+> +#include <linux/scmi_protocol.h>
+> +
+> +struct scmi_clk {
+> +	u32 id;
+> +	struct clk_hw hw;
+> +	const struct scmi_clock_info *info;
+> +	const struct scmi_handle *handle;
+> +};
+> +
+> +#define to_scmi_clk(clk) container_of(clk, struct scmi_clk, hw)
+> +
+> +static unsigned long scmi_clk_recalc_rate(struct clk_hw *hw,
+> +					  unsigned long parent_rate)
+> +{
+> +	int ret;
+> +	u64 rate;
+> +	struct scmi_clk *clk = to_scmi_clk(hw);
+> +
+> +	ret = clk->handle->clk_ops->rate_get(clk->handle, clk->id, &rate);
+> +	if (ret)
+> +		return 0;
+> +	return rate;
+> +}
+> +
+> +static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				unsigned long *parent_rate)
+> +{
+> +	u64 fmin, fmax, ftmp;
+> +	struct scmi_clk *clk = to_scmi_clk(hw);
+> +
+> +	/*
+> +	 * We can't figure out what rate it will be, so just return the
+> +	 * rate back to the caller. scmi_clk_recalc_rate() will be called
+> +	 * after the rate is set and we'll know what rate the clock is
+> +	 * running at then.
+> +	 */
+> +	if (clk->info->rate_discrete)
+> +		return rate;
+> +
+> +	fmin = clk->info->range.min_rate;
+> +	fmax = clk->info->range.max_rate;
+> +	for (ftmp = fmin; ftmp <= fmax; ftmp += clk->info->range.step_size) {
+> +		if (ftmp >= rate) {
+> +			if (ftmp <= fmax)
+> +				fmax = ftmp;
+> +			break;
+> +		} else if (ftmp >= fmin) {
+> +			fmin = ftmp;
+> +		}
+> +	}
+
+Are the max_rate and min_rate potentially unaligned with the
+step_size? Do any of these things change at runtime? It seems
+like we could do some simple math instead of this for loop unless
+I missed something.
+
+> +	return fmax != clk->info->range.max_rate ? fmax : fmin;
+> +}
+> +
+> +static int scmi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+> +			     unsigned long parent_rate)
+> +{
+> +	struct scmi_clk *clk = to_scmi_clk(hw);
+> +
+> +	return clk->handle->clk_ops->rate_set(clk->handle, clk->id, 0, rate);
+> +}
+> +
+> +static int scmi_clk_enable(struct clk_hw *hw)
+> +{
+> +	struct scmi_clk *clk = to_scmi_clk(hw);
+> +
+> +	return clk->handle->clk_ops->enable(clk->handle, clk->id);
+> +}
+> +
+> +static void scmi_clk_disable(struct clk_hw *hw)
+> +{
+> +	struct scmi_clk *clk = to_scmi_clk(hw);
+> +
+> +	clk->handle->clk_ops->disable(clk->handle, clk->id);
+> +}
+> +
+> +static const struct clk_ops scmi_clk_ops = {
+> +	.recalc_rate = scmi_clk_recalc_rate,
+> +	.round_rate = scmi_clk_round_rate,
+> +	.set_rate = scmi_clk_set_rate,
+> +	/*
+> +	 * We can't provide enable/disable callback as we can't perform the same
+> +	 * in atomic context. Since the clock framework provides standard API
+> +	 * clk_prepare_enable that helps cases using clk_enable in non-atomic
+> +	 * context, it should be fine providing prepare/unprepare.
+> +	 */
+> +	.prepare = scmi_clk_enable,
+> +	.unprepare = scmi_clk_disable,
+> +};
+> +
+> +static int scmi_clk_ops_init(struct device *dev, struct scmi_clk *sclk)
+> +{
+> +	int ret;
+> +	struct clk_init_data init;
+
+Best to do = { } here in case we add something else to the init
+structure in future.
+
+> +
+> +	init.flags = CLK_GET_RATE_NOCACHE;
+> +	init.num_parents = 0;
+> +	init.ops = &scmi_clk_ops;
+> +	init.name = sclk->info->name;
+> +	sclk->hw.init = &init;
+> +
+> +	ret = devm_clk_hw_register(dev, &sclk->hw);
+> +	if (!ret)
+> +		clk_hw_set_rate_range(&sclk->hw, sclk->info->range.min_rate,
+> +				      sclk->info->range.max_rate);
+> +	return ret;
+> +}
+> +
+> +static int scmi_clk_add(struct device *dev, struct device_node *np,
+> +			const struct scmi_handle *handle)
+> +{
+> +	int idx, count, err;
+> +	struct clk_hw **hws;
+> +	struct clk_hw_onecell_data *clk_data;
+> +
+> +	count = handle->clk_ops->count_get(handle);
+> +	if (count < 0) {
+> +		dev_err(dev, "%s: invalid clock output count\n", np->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
+> +				sizeof(*clk_data->hws) * count, GFP_KERNEL);
+> +	if (!clk_data)
+> +		return -ENOMEM;
+> +
+> +	clk_data->num = count;
+> +	hws = clk_data->hws;
+> +
+> +	for (idx = 0; idx < count; idx++) {
+> +		struct scmi_clk *sclk;
+> +
+> +		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
+> +		if (!sclk)
+> +			return -ENOMEM;
+> +
+> +		sclk->info = handle->clk_ops->info_get(handle, idx);
+> +		if (!sclk->info) {
+> +			dev_dbg(dev, "invalid clock info for idx %d\n", idx);
+> +			continue;
+> +		}
+> +
+> +		sclk->id = idx;
+> +		sclk->handle = handle;
+> +
+> +		err = scmi_clk_ops_init(dev, sclk);
+> +		if (err) {
+> +			dev_err(dev, "failed to register clock %d\n", idx);
+> +			devm_kfree(dev, sclk);
+> +			hws[idx] = NULL;
+> +		} else {
+> +			dev_dbg(dev, "Registered clock:%s\n", sclk->info->name);
+> +			hws[idx] = &sclk->hw;
+> +		}
+> +	}
+> +
+> +	return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
+> +}
+> +
+> +static int scmi_clocks_remove(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +
+> +	of_clk_del_provider(np);
+> +	return 0;
+> +}
+> +
+> +static int scmi_clocks_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	const struct scmi_handle *handle = devm_scmi_handle_get(dev);
+> +
+> +	if (IS_ERR_OR_NULL(handle) || !handle->clk_ops)
+> +		return -EPROBE_DEFER;
+> +
+> +	return scmi_clk_add(dev, np, handle);
+
+Why the function? We support more than just platform devices?
+Just fold scmi_clk_add() into this function instead please.
+
+> +}
+> +
+> +static struct platform_driver scmi_clocks_driver = {
+> +	.driver	= {
+> +		.name = "scmi-clocks",
+> +	},
+> +	.probe = scmi_clocks_probe,
+> +	.remove = scmi_clocks_remove,
+> +};
+> +module_platform_driver(scmi_clocks_driver);
+> +
+> +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
+> +MODULE_DESCRIPTION("ARM SCMI clock driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.7.4
+> 
+
 -- 
-2.14.1.581.gf28d330327-goog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
