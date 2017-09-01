@@ -1,42 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  1 Sep 2017 11:36:32 +0200
-Subject: [PATCH 2/7 v2] drm/pl111: Add all registers to debugfs
+Date: Fri,  1 Sep 2017 11:36:31 +0200
+Subject: [PATCH 1/7 v2] drm/pl111: Cleanup local header file
 In-Reply-To: <20170901093637.4041-1-linus.walleij@linaro.org>
 References: <20170901093637.4041-1-linus.walleij@linaro.org>
-Message-ID: <20170901093637.4041-3-linus.walleij@linaro.org>
+Message-ID: <20170901093637.4041-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds all the main control registers to the debugfs
-register file. This was helpful for my debugging so it will
-likely help others as well.
+The header file contains prototypes for two nonexisting
+functions. Get rid of them.
 
+Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v1->v2:
 - Collect Eric's ACK.
 ---
- drivers/gpu/drm/pl111/pl111_debugfs.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/gpu/drm/pl111/pl111_drm.h | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/pl111_debugfs.c b/drivers/gpu/drm/pl111/pl111_debugfs.c
-index 0d9dee199b2c..7ddc7e3b9e7d 100644
---- a/drivers/gpu/drm/pl111/pl111_debugfs.c
-+++ b/drivers/gpu/drm/pl111/pl111_debugfs.c
-@@ -22,8 +22,14 @@ static const struct {
- 	REGDEF(CLCD_TIM2),
- 	REGDEF(CLCD_TIM3),
- 	REGDEF(CLCD_UBAS),
-+	REGDEF(CLCD_LBAS),
- 	REGDEF(CLCD_PL111_CNTL),
- 	REGDEF(CLCD_PL111_IENB),
-+	REGDEF(CLCD_PL111_RIS),
-+	REGDEF(CLCD_PL111_MIS),
-+	REGDEF(CLCD_PL111_ICR),
-+	REGDEF(CLCD_PL111_UCUR),
-+	REGDEF(CLCD_PL111_LCUR),
- };
+diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+index 5c685bfc8fdc..a97f303f6833 100644
+--- a/drivers/gpu/drm/pl111/pl111_drm.h
++++ b/drivers/gpu/drm/pl111/pl111_drm.h
+@@ -58,10 +58,6 @@ int pl111_enable_vblank(struct drm_device *drm, unsigned int crtc);
+ void pl111_disable_vblank(struct drm_device *drm, unsigned int crtc);
+ irqreturn_t pl111_irq(int irq, void *data);
+ int pl111_connector_init(struct drm_device *dev);
+-int pl111_encoder_init(struct drm_device *dev);
+-int pl111_dumb_create(struct drm_file *file_priv,
+-		      struct drm_device *dev,
+-		      struct drm_mode_create_dumb *args);
+ int pl111_debugfs_init(struct drm_minor *minor);
  
- int pl111_debugfs_regs(struct seq_file *m, void *unused)
+ #endif /* _PL111_DRM_H_ */
 -- 
 2.13.5
