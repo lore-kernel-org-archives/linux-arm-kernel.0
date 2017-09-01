@@ -1,28 +1,31 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 1 Sep 2017 13:27:13 -0500
-Subject: [PATCH 1/3] of/pci: Add dma-ranges parsing support
-In-Reply-To: <0d4313c7-6595-a7fb-680a-e231dc9c0902@sigmadesigns.com>
-References: <f10055cc-4430-ff30-f892-3d3d6f24354c@sigmadesigns.com>
- <0d4313c7-6595-a7fb-680a-e231dc9c0902@sigmadesigns.com>
-Message-ID: <CAL_JsqJjNMKLk56CB2i57URYB_9wjuO4opod9xXztmr+MaJnvQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 01 Sep 2017 11:31:07 -0700
+Subject: [PATCH 6/7 v2] drm/pl111: Add optional variant display en/disable
+ callbacks
+In-Reply-To: <20170901093637.4041-7-linus.walleij@linaro.org>
+References: <20170901093637.4041-1-linus.walleij@linaro.org>
+ <20170901093637.4041-7-linus.walleij@linaro.org>
+Message-ID: <87h8wml190.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 9:25 AM, Marc Gonzalez
-<marc_gonzalez@sigmadesigns.com> wrote:
-> Several host bridge drivers duplicate of_pci_range_parser_init()
-> in order to parse their dma-ranges property.
->
-> Provide of_pci_dma_range_parser_init() for that use-case.
->
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
->  drivers/of/address.c       | 19 ++++++++++++++++---
->  include/linux/of_address.h | 10 +++++++++-
->  2 files changed, 25 insertions(+), 4 deletions(-)
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+> The silcon and components around the PL111 may require some
 
-I'm assuming this will go thru the PCI tree.
+"silicon"
 
-Rob
+Other than that, while I'm still a little concerned about exposing too
+many DRM formats on these boards, I think this is all worth landing at
+this point.  Series is:
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+
+Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/0336215c/attachment.sig>
