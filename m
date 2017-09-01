@@ -1,34 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 1 Sep 2017 15:00:32 +0200
-Subject: [PATCH 4/7] ARM: dts: sun8i: h3: Enable AP6212 WiFi on mmc1 on
- Nanopi M1 Plus
-In-Reply-To: <89e3d5f8-1b31-bf86-4a6b-aee454c0b85f@gmail.com>
-References: <1504062070-13523-1-git-send-email-embed3d@gmail.com>
- <1504062070-13523-5-git-send-email-embed3d@gmail.com>
- <20170830145211.snicbwdytobtd7ro@flea.lan>
- <89e3d5f8-1b31-bf86-4a6b-aee454c0b85f@gmail.com>
-Message-ID: <20170901130032.2zifl3hsxabzsxrc@flea>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 1 Sep 2017 21:01:32 +0800
+Subject: [PATCH 2/7] dt-bindings: PM / OPP: add clocks per OPP node support
+In-Reply-To: <20170831173920.4emtr5vkgvjcx6ac@rob-hp-laptop>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+ <1503504610-12880-3-git-send-email-aisheng.dong@nxp.com>
+ <20170831173920.4emtr5vkgvjcx6ac@rob-hp-laptop>
+Message-ID: <20170901130132.GA22788@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 11:51:37PM +0200, Philipp Rossak wrote:
-> Hi,
-> thanks for the feedback I will rework the patch.
-> Should I also update the sun8i-h3-bananapi-m2-plus.dts? It uses also the
-> AP6212 and it is done in the same way like in this patch.
+On Thu, Aug 31, 2017 at 12:39:20PM -0500, Rob Herring wrote:
+> On Thu, Aug 24, 2017 at 12:10:05AM +0800, Dong Aisheng wrote:
+> > It's used for platforms where different OPPs may use different clocks.
+> > With this extended binding, user could specify the correct clock for each
+> > OPP node.
+> > 
+> > Cc: Viresh Kumar <vireshk@kernel.org>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Frank Rowand <frowand.list@gmail.com>
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/opp/opp.txt | 52 +++++++++++++++++++++++++++
+> >  1 file changed, 52 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+> > index e36d261..40a4340 100644
+> > --- a/Documentation/devicetree/bindings/opp/opp.txt
+> > +++ b/Documentation/devicetree/bindings/opp/opp.txt
+> > @@ -152,6 +152,11 @@ Optional properties:
+> >    hierarchy can be contained in multiple 32 bit values. i.e. <X Y Z1 Z2> in the
+> >    above example, Z1 & Z2 refer to the version hierarchy Z.
+> >  
+> > +- clocks: Clock phandle and specifier used for this opp.
+> > +
+> > +- clock-names: clock names for this opp. The valid clock names are platform
+> > +	       specific.
+> 
+> You don't need -names if there's only 1 clock.
 
-Yes, please.
+Got it, will remove -name.
 
-Maxime
+> But then how long until 
+> we have a list of any random clocks some how associated with an OPP.
+> 
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/c0d69e5c/attachment.sig>
+Not sure whether it will really happen in the future. Even it happens,
+as we usually only need the device parent clock, then probably better to
+handle the left complicated things in clock driver or OPP device driver.
+
+> I think this should really be solved within the clock framework. What 
+> you really need is "set my parent clock to the source that can provide X 
+> Hz". Could the assigned-clocks property work here (in the OPP nodes 
+> rather than the cpu nodes)?
+> 
+
+I'm not quite sure i got your point. assigned-clocks seems a bit like function
+the same as clocks property here, both are used to specifying the device
+parent clock which provide X hz.
+
+Or are you suggesting using assigned-clocks/assigned-clocks-rates instread
+of clocks/opp-hz? Would you please clarify a bit more?
+
+> > +
+> >  - status: Marks the node enabled/disabled.
+> >  
+> >  Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
+> > @@ -528,3 +533,50 @@ Example 6: opp-microvolt-<name>, opp-microamp-<name>:
+> >  		};
+> >  	};
+> >  };
+> > +
+> > +Example 7: Single core ARM cortex A7, switch separate clocks for each OPP:
+> 
+> Can't you add this to an existing example? We don't need to enumerate 
+> every possible option.
+
+Okay, Will merge it.
+
+Thanks
+
+Regards
+Dong Aisheng
+
+> 
+> Rob
