@@ -1,28 +1,29 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Sep 2017 15:55:09 -0700
-Subject: [PATCH v5 1/7] clk: at91: clk-generated: remove useless divisor
- loop
-In-Reply-To: <fe26a470c87e39b5e07fbada6ce7020a6b65429b.1502346448.git-series.quentin.schulz@free-electrons.com>
+Date: Fri, 1 Sep 2017 15:55:14 -0700
+Subject: [PATCH v5 3/7] clk: at91: add audio pll clock drivers
+In-Reply-To: <f1c7acbfec384c2c33bf340464a98b731dac8c0c.1502346448.git-series.quentin.schulz@free-electrons.com>
 References: <cover.ada7bc60e0b3a0f7429afc6ea9e4869131d1b757.1502346448.git-series.quentin.schulz@free-electrons.com>
- <fe26a470c87e39b5e07fbada6ce7020a6b65429b.1502346448.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <20170901225509.GC21656@codeaurora.org>
+ <f1c7acbfec384c2c33bf340464a98b731dac8c0c.1502346448.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20170901225514.GE21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/10, Quentin Schulz wrote:
-> The driver requests the current clk rate of each of its parent clocks to
-> decide whether a clock rate is suitable or not. It does not request
-> determine_rate from a parent clock which could request a rate change in
-> parent clock (i.e. there is no parent rate propagation).
+> This new clock driver set allows to have a fractional divided clock that
+> would generate a precise clock particularly suitable for audio
+> applications.
 > 
-> We know the rate we want (passed along req argument of the function) and
-> the parent clock rate, thus we know the closest rounded divisor, we
-> don't need to iterate over the available divisors to find the best one
-> for a given clock.
+> The main audio pll clock has two children clocks: one that is connected
+> to the PMC, the other that can directly drive a pad. As these two routes
+> have different enable bits and different dividers and divider formulas,
+> they are handled by two different drivers. Each of them could modify the
+> rate of the main audio pll parent.
 > 
+> The main audio pll clock can output 620MHz to 700MHz.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > ---
 
 Applied to clk-next
