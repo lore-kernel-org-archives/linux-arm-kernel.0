@@ -1,115 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  1 Sep 2017 11:35:33 +0100
-Subject: [PATCH v3] arm64: acpi/gtdt: validate CNTFRQ after having enabled the
- frame
-Message-ID: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 1 Sep 2017 11:35:19 +0100
+Subject: [PATCH 2/2] arm64: dts: hi6220: enable watchdog
+In-Reply-To: <20170901013233.GL21656@codeaurora.org>
+References: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
+ <1503993518-24428-2-git-send-email-leo.yan@linaro.org>
+ <20170901013233.GL21656@codeaurora.org>
+Message-ID: <59A937E7.2060303@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
-frame against the CNTFRQ system register of the current CPU, to
-ensure that they are equal, which is mandated by the architecture.
+Hi Stephen,
 
-However, reading the CNTFRQ field of a frame is not possible until
-the RFRQ bit in the frame's CNTACRn register is set, and doing so
-before that willl produce the following error:
+On 2017/9/1 2:32, Stephen Boyd wrote:
+> On 08/29, Leo Yan wrote:
+>> From: Dmitry Shmidt <dimitrysh@google.com>
+>>
+>> This patch is to add watchdog binding for Hi6220 on Hikey board.
+>>
+>> Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+>> ---
+> 
+> This will go through arm-soc?
+> 
 
-  arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
-  arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
-  arch_timer: Failed to initialize memory-mapped timer.
+Can you pick up it for v4.14?
+Otherwise I am fine to pick up it and queue for v4.15.
+Thanks!
 
-The reason is that the CNTFRQ field is RES0 if access is not enabled.
-
-So move the validation of CNTFRQ into the loop that iterates over the
-timers to find the best frame, but defer it until after we have selected
-the best frame, which should also have enabled the RFRQ bit.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v3: - preserve existing logic as much as possible wrt verifying all frames of
-      all timers before selecting a suitable one
-
- drivers/clocksource/arm_arch_timer.c | 38 +++++++++++---------
- 1 file changed, 21 insertions(+), 17 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 72bbfccef113..30071cdea846 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1264,10 +1264,6 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
- 
- 	iounmap(cntctlbase);
- 
--	if (!best_frame)
--		pr_err("Unable to find a suitable frame in timer @ %pa\n",
--			&timer_mem->cntctlbase);
--
- 	return best_frame;
- }
- 
-@@ -1368,6 +1364,8 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
- 
- 	frame = arch_timer_mem_find_best_frame(timer_mem);
- 	if (!frame) {
-+		pr_err("Unable to find a suitable frame in timer @ %pa\n",
-+			&timer_mem->cntctlbase);
- 		ret = -EINVAL;
- 		goto out;
- 	}
-@@ -1416,7 +1414,7 @@ arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
- static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- {
- 	struct arch_timer_mem *timers, *timer;
--	struct arch_timer_mem_frame *frame;
-+	struct arch_timer_mem_frame *frame, *best_frame = NULL;
- 	int timer_count, i, ret = 0;
- 
- 	timers = kcalloc(platform_timer_count, sizeof(*timers),
-@@ -1428,14 +1426,6 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- 	if (ret || !timer_count)
- 		goto out;
- 
--	for (i = 0; i < timer_count; i++) {
--		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
--		if (ret) {
--			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
--			goto out;
--		}
--	}
--
- 	/*
- 	 * While unlikely, it's theoretically possible that none of the frames
- 	 * in a timer expose the combination of feature we want.
-@@ -1444,12 +1434,26 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- 		timer = &timers[i];
- 
- 		frame = arch_timer_mem_find_best_frame(timer);
--		if (frame)
--			break;
-+		if (!best_frame)
-+			best_frame = frame;
-+
-+		ret = arch_timer_mem_verify_cntfrq(timer);
-+		if (ret) {
-+			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-+			goto out;
-+		}
-+
-+		if (!best_frame) /* implies !frame */
-+			/*
-+			 * Only complain about missing suitable frames if we
-+			 * haven't already found one in a previous iteration.
-+			 */
-+			pr_err("Unable to find a suitable frame in timer @ %pa\n",
-+				&timer->cntctlbase);
- 	}
- 
--	if (frame)
--		ret = arch_timer_mem_frame_register(frame);
-+	if (best_frame)
-+		ret = arch_timer_mem_frame_register(best_frame);
- out:
- 	kfree(timers);
- 	return ret;
--- 
-2.11.0
+Best Regards,
+Wei
