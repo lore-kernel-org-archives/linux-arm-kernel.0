@@ -1,34 +1,34 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 1 Sep 2017 10:22:05 +0100
-Subject: [PATCH] arm64: efi: Don't include EFI fpsimd save/restore code
- in non-EFI kernels
-In-Reply-To: <CAKv+Gu-L0gWGc-EGviDhXimv8zm9hqLuiFjWE-e5__mQGTR+zg@mail.gmail.com>
-References: <1504193606-14461-1-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu-L0gWGc-EGviDhXimv8zm9hqLuiFjWE-e5__mQGTR+zg@mail.gmail.com>
-Message-ID: <20170901092203.GD6321@e103592.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 1 Sep 2017 11:22:19 +0200
+Subject: [PATCH 4/7] drm/pl111: Enable PL110 variant
+In-Reply-To: <CACvgo51zbo1vA6s+c9db9yS-8L=fpQUGDptk7XjxjXUY8ZndqA@mail.gmail.com>
+References: <20170830180711.2791-1-linus.walleij@linaro.org>
+ <20170830180711.2791-5-linus.walleij@linaro.org>
+ <20170831101913.sjs32rsmbfal5xj3@imgtec.com>
+ <CACvgo51zbo1vA6s+c9db9yS-8L=fpQUGDptk7XjxjXUY8ZndqA@mail.gmail.com>
+Message-ID: <CACRpkdZL=j1zPqX4zfqpepBsDuxsiu0jDUsezJOsqi_j_DeQ0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 04:46:32PM +0100, Ard Biesheuvel wrote:
-> On 31 August 2017 at 16:33, Dave Martin <Dave.Martin@arm.com> wrote:
-> > __efi_fpsimd_begin()/__efi_fpsimd_end() are for use when making EFI
-> > calls only, so using them in non-EFI kernels is not allowed.
-> >
-> > This patch compiles them out if CONFIG_EFI is not set.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Sep 1, 2017 at 10:23 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
 
-Thanks
+>>Eric E:
+>>> +struct pl111_variant_data pl110_variant = {
+>>
+>> I think this (and `pl111_variant` below) can be `static const`, right?
+>>
+> Static - yes, const - I don't think so.
+> Struct amba_id::data lacks the constness, so the const qualifier will
+> get discarded.
 
-> I suppose we could also move these into arch/arm64/kernel/efi.c
+I fixed it with a (void*) cast so we can have it right in the driver.
 
-Could do, though I initially preferred to keep them in fpsimd.c due to
-the interactions with kernel-mode NEON.
+> In practise everyone considers/uses ::data as const, so that could be
+> tweaked with separate patch.
 
-I'll probably leave them where they are for now unless someone has a
-strong view on it.
+I think it is not necessarily possible to make that const since the amba_id
+is used in several dynamically generated board files. But I may
+be wrong.
 
-Cheers
----Dave
+Yours,
+Linus Walleij
