@@ -1,292 +1,151 @@
-From: antony@phenome.org (Antony Antony)
-Date: Fri,  1 Sep 2017 12:58:05 +0200
-Subject: [PATCH] arm64: allwinner: h5: add NanoPi NEO Plus2 DT support
-In-Reply-To: <20170824231716.2623-1-antony@phenome.org>
-References: <20170824231716.2623-1-antony@phenome.org>
-Message-ID: <20170901105805.96922-1-antony@phenome.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 1 Sep 2017 11:58:37 +0100
+Subject: [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
+In-Reply-To: <AM5PR0401MB2545BB069D90520FFE9CD3499A920@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+References: <1504171424-15536-1-git-send-email-Bharat.Bhushan@nxp.com>
+ <06c57ca4-edaa-df26-b1d9-1906141c5065@arm.com>
+ <AM5PR0401MB2545B7C55F634D7B9CABAE629A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+ <10be1849-8071-64fc-5ee2-b6e429c64b9e@arm.com>
+ <AM5PR0401MB2545043022CAE0CDECA6267E9A9D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+ <AM5PR0401MB2545BB069D90520FFE9CD3499A920@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+Message-ID: <901dee07-d1ee-63cc-59a0-bdf37cd7d937@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial DT for NanoPi NEO Plus2 by FriendlyARM
-- Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
-- 1 GB DDR3 RAM
-- 8GB eMMC flash (Samsung KLM8G1WEPD-B031)
-- micro SD card slot
-- Gigabit Ethernet (external RTL8211E-VB-CG chip)
-- 802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
-- 2x USB 2.0 host ports & 2x USB via headers
+On 01/09/17 11:13, Bharat Bhushan wrote:
+> 
+> 
+>> -----Original Message----- From: linux-kernel-owner at vger.kernel.org
+>> [mailto:linux-kernel- owner at vger.kernel.org] On Behalf Of Bharat
+>> Bhushan Sent: Thursday, August 31, 2017 4:53 PM To: Marc Zyngier
+>> <marc.zyngier@arm.com>; robh+dt at kernel.org; Mark Rutland
+>> <mark.rutland@arm.com>; will.deacon at arm.com; oss at buserror.net; Gang
+>> Liu <gang.liu@nxp.com>; devicetree at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org; linux- 
+>> kernel at vger.kernel.org; catalin.marinas at arm.com Subject: RE:
+>> [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
+>> 
+>> 
+>> 
+>>> -----Original Message----- From: Marc Zyngier
+>>> [mailto:marc.zyngier at arm.com] Sent: Thursday, August 31, 2017
+>>> 4:20 PM To: Bharat Bhushan <bharat.bhushan@nxp.com>;
+>>> robh+dt at kernel.org;
+>> Mark
+>>> Rutland <mark.rutland@arm.com>; will.deacon at arm.com;
+>> oss at buserror.net;
+>>> Gang Liu <gang.liu@nxp.com>; devicetree at vger.kernel.org; 
+>>> linux-arm-kernel at lists.infradead.org; linux-
+>>> kernel at vger.kernel.org; catalin.marinas at arm.com Subject: Re:
+>>> [PATCH] RM64: dts: ls208xa: Add iommu-map property for pci
+>>> 
+>>> [Fixing Mark's address...]
+>>> 
+>>> On 31/08/17 11:41, Bharat Bhushan wrote:
+>>>> 
+>>>>> -----Original Message----- From: Marc Zyngier
+>>>>> [mailto:marc.zyngier at arm.com] Sent: Thursday, August 31, 2017
+>>>>> 3:02 PM To: Bharat Bhushan <bharat.bhushan@nxp.com>;
+>>>>> robh+dt at kernel.org; ark.rutland at arm.com; will.deacon at arm.com;
+>>>>> oss at buserror.net; Gang
+>>> Liu
+>>>>> <gang.liu@nxp.com>; devicetree at vger.kernel.org; linux-arm- 
+>>>>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; 
+>>>>> catalin.marinas at arm.com Subject: Re: [PATCH] RM64: dts:
+>>>>> ls208xa: Add iommu-map property for pci
+>>>>> 
+>>>>> On 31/08/17 10:23, Bharat Bhushan wrote:
+>>>>>> This patch adds iommu-map property for PCIe, which enables
+>>>>>> SMMU for these devices on LS208xA devices.
+>>>>>> 
+>>>>>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com> --- 
+>>>>>> arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++++ 1
+>>>>>> file changed, 4 insertions(+)
+>>>>>> 
+>>>>>> diff --git
+>>>>>> a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi 
+>>>>>> b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi index
+>>>>>> 94cdd30..67cf605 100644 ---
+>>>>>> a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi +++
+>>>>>> b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi @@ -606,6
+>>>>>> +606,7 @@ num-lanes = <4>; bus-range = <0x0 0xff>; 
+>>>>>> msi-parent = <&its>; +			iommu-map = <0 &smmu 0 1>;	/* This
+>>>>>> is fixed-up by
+>>>>> u-boot */
+>>>>> 
+>>>>> What does this do when your version of u-boot doesn't fill
+>>>>> this in for
+>> you?
+>>>> 
+>>>> Good question, frankly I have not thought of this case before. 
+>>>> But if we pass length = 0 in above property then no fixup
+>>>> happen with happen with older u-boot. In this case
+>>>> of_iommu_configure() will return NULL iommu-ops and it switch
+>>>> to swio-tlb. Will that work?
+>>> I really don't like this. You rely on having invalid data in the
+>>> DT, and that seems just wrong.
+>>> 
+>>> Why can't u-boot just generate that property, and we leave the DT
+>>> alone?
+>> 
+>> We do not have smmu phandle allowing uboot to generate this.
+>> 
+>>> Or even better, you provide the right information for the few
+>>> boards that are based on this SoC, not relying on u-boot for
+>>> anything that is in the kernel tree?
+>> 
+>> On our platforms we have a h/w table which converts RID->Device-Id.
+>> I will check what will happen if that table is not initialized, can
+>> RID be equal to device-id is that case. If that will be allowed
+>> than we can give right information that will work with u-boot not
+>> updating this property.
+> 
+> U-boot uses a stream-id allocator and programs the h/w mapping table
+> (rid to sid mapping table). Also it updates iommu-map property
+> accordingly. But If u-boot does not update iommu-map than we cannot
+> have a valid full proof solution as stream-id allocation can change
+> in u-boot.
+> 
+> So the other option of u-boot generating this entry seems correct
+> solution. This requires u-boot to know iommu-phandle, something
+> similar to "msi-parent" used for "msi-map" Device-tree binding need
+> change to add iommu-phandle/iommu-parent for this.
 
-Signed-off-by: Antony Antony <antony@phenome.org>
----
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 230 +++++++++++++++++++++
- 2 files changed, 231 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
----
-Changes
-v1 -> v2
- add wifi power controller,  mmc1, mmc2
- remove reg_usb0_vbus
-v2 -> v3
-fix typo s/orangepi/nanopi/, s/pus/plus/
- usb_otg set to host mode
- wifi fix, based on commit 442e1f7e brcm,bcm43xx-fmac.txt
- remove functions on header pins: spi, ir, ehci 1&2, ohci 1&2, uart 1&2
- remove hdmi, de2, r-gpio-keys, mixer - not supported the board
-v3->v4 update WiFi chip compatible to bcm43430-fmac
-v4->v5 back to bcm4329-fmac bcm43430-fmac is the wrong way.
-v5-->v6
-  sorted nodes
-  removed usb0_id_det-gpios,boot_device, drive-strength = <40>; boot_device
-  delete nodes which are same as the defaults.
+>From what I know of this hardware, it's going to be rather difficult to
+concoct a DT which reflects the initial hardware state accurately *and*
+works correctly without updating u-boot in lockstep. IIRC, I believe the
+accurate description for an unprogrammed LUT would be "everything comes
+out on the default ID, which defaults to 0", i.e.:
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 108f12c..e6810c8 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -6,6 +6,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-new file mode 100644
-index 0000000..f37df3a
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-@@ -0,0 +1,230 @@
-+/*
-+ * Copyright (C) 2017 Antony Antony <antony@phenome.org>
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "FriendlyARM NanoPi NEO Plus2";
-+	compatible = "friendlyarm,nanopi-neo-plus2", "allwinner,sun50i-h5";
-+
-+	aliases {
-+		ethernet0 = &emac;
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr {
-+			label = "nanopi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "nanopi:red:status";
-+			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+
-+	vdd_cpux: gpio-regulator {
-+		compatible = "regulator-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vdd_cpux_r_npi>;
-+		regulator-name = "vdd-cpux";
-+		regulator-type = "voltage";
-+		regulator-boot-on;
-+		regulator-always-on;
-+		regulator-min-microvolt = <1100000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-ramp-delay = <50>; /* 4ms */
-+		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <0x1>;
-+		states = <1100000 0x0
-+			  1300000 0x1>;
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
-+		post-power-on-delay-ms = <200>;
-+	};
-+};
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Line Out", "LINEOUT",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 7 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <7>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	vqmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+	/*
-+	 * AMPAK AP6212A WiFi module with BCM43430, rev=1 inside
-+	 * sdio vendor ID: 0x02d0, sdio device ID: 0xa9a6
-+	 */
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	boot_device = <0>;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&r_pio {
-+	leds_r_npi: led_pins at 0 {
-+		pins = "PL10";
-+		function = "gpio_out";
-+	};
-+
-+	vdd_cpux_r_npi: regulator_pins at 0 {
-+		allwinner,pins = "PL6";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB Type-A ports' VBUS is always on */
-+	status = "okay";
-+};
--- 
-2.9.3
+	iommu-map-mask = <0x0>;
+	iommu-map = <0x0 &smmu 0x0 0x1>;
+
+(assuming the SMMU has stream-id-mask set appropriately too)
+
+That's OK except if u-boot updates the map without removing the mask,
+whereupon things will go wrong, and I guess that would be the case with
+current u-boot :(
+
+However, the existing MSI description is already bogus - if u-boot
+didn't program the LUT, the ITS driver would treat the invalid
+"msi-parent" property as this:
+
+	msi-map = <0x0 &its 0x0 0xffff>;
+
+which means that nobody other than 0:0.0 has working MSIs anyway.
+
+If you want an obviously-invalid placeholder equivalent to the use of
+"msi-parent" then I'd suggest just:
+
+	iommus = <&smmu>;
+
+which would be ignored by Linux for PCI devices, so provided you didn't
+disable bypass at the SMMU things might in theory still work in the
+"u-boot does nothing" case. Otherwise, the implied identity map is
+probably slightly preferable to the unit-length map, i.e.:
+
+	iommu-map = <0x0 &smmu 0x0 0xffff>;
+
+which is at least equally broken as MSIs in the same situation.
+
+Robin.
