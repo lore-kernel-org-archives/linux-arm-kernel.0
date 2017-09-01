@@ -1,51 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 1 Sep 2017 15:16:24 +0200
-Subject: [PATCH 4/5] arm: dts: sun8i: a83t: Add the UART1 controller
-In-Reply-To: <CAGb2v64q8prGOAP_5g3PxTs1La0662kpETy2BTr60Ak4FbrY6Q@mail.gmail.com>
-References: <20170825092617.32533-1-maxime.ripard@free-electrons.com>
- <20170825092617.32533-4-maxime.ripard@free-electrons.com>
- <CAGb2v64q8prGOAP_5g3PxTs1La0662kpETy2BTr60Ak4FbrY6Q@mail.gmail.com>
-Message-ID: <20170901131624.zl3os327ock2qtyy@flea>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 1 Sep 2017 15:18:03 +0200
+Subject: Applied "regulator: pbias: Select voltage table based on
+ max-voltage" to the regulator tree
+In-Reply-To: <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
+References: <E1dnO3z-0000tI-7K@debutante>
+ <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+ <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
+Message-ID: <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 02:48:20PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Aug 25, 2017 at 5:26 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The A83T has an UART1 controller, with the RTS and CTS pins routed so it
-> > can be used for devices with hardware flow control, like a bluetooth chip.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-a83t.dtsi | 21 +++++++++++++++++++++
-> >  1 file changed, 21 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > index 91dee798f3ca..f6aaaa9a1fe2 100644
-> > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > @@ -373,6 +373,16 @@
-> >                                 pins = "PF2", "PF4";
-> >                                 function = "uart0";
-> >                         };
-> > +
-> > +                       uart1_pg_pins: uart1-pg-pins {
-> 
-> Since uart1 is only available on the PG pin group, this name
-> doesn't provide much info. Instead lets name it uart1_rxtx_pins.
-> This matches the naming scheme for the rts/cts pingroup.
+On 31 August 2017 at 15:50, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
+>
+>> This patch should be merged along with the 1st patch of the series "mmc: host:
+>> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
+>> omap_hsmmc driver.
+>
+> I can sign a tag if it's needed for a cross tree merge.
 
-I've fixed it and applied, thanks!
-Maxime
+Easier if you could drop it and instead just provide an ack.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/2d7c2229/attachment.sig>
+Unless you believes there may conflict in your regulator tree?
+
+Kind regards
+Uffe
