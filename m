@@ -1,91 +1,88 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 1 Sep 2017 07:49:29 +0200 (CEST)
-Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
-In-Reply-To: <20170901013317.GA516@leoy-ThinkPad-T440>
-References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
- <20170901013317.GA516@leoy-ThinkPad-T440>
-Message-ID: <1186423751.115248.1504244969355@email.1und1.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 1 Sep 2017 08:04:45 +0200
+Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
+In-Reply-To: <20170901003135.10058-1-andre.przywara@arm.com>
+References: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
+ <20170901003135.10058-1-andre.przywara@arm.com>
+Message-ID: <20170901060445.vboici7qxfkztp3s@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
-
-> Leo Yan <leo.yan@linaro.org> hat am 1. September 2017 um 03:33 geschrieben:
+On Fri, Sep 01, 2017 at 01:31:35AM +0100, Andre Przywara wrote:
+> Hi,
 > 
+> On 31/08/17 00:36, Stefan Br?ns wrote:
+> > The A64 SoC has the same dma engine as the H3 (sun8i), with a
+> > reduced amount of physical channels. Add the proper config data
+> > and compatible string to support it.
 > 
-> Hi Stefan,
+> ...
 > 
-> On Thu, Aug 31, 2017 at 10:24:36PM +0200, Stefan Wahren wrote:
-> > In case there are no DT idle states defined or
-> > cpuidle_register_driver() fails, the copy of the idle driver is leaked:
-> > 
-> >     unreferenced object 0xede0dc00 (size 1024):
-> >     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
-> >     hex dump (first 32 bytes):
-> >     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
-> >     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
-> >     backtrace:
-> >     [<c1295f04>] arm_idle_init+0x44/0x1ac
-> >     [<c0301e6c>] do_one_initcall+0x3c/0x16c
-> >     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
-> >     [<c0cb3624>] kernel_init+0x8/0x114
-> >     [<c0307a98>] ret_from_fork+0x14/0x3c
-> > 
-> > So fix this by freeing the unregistered copy in error case.
-> > 
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
-> > ---
-> >  drivers/cpuidle/cpuidle-arm.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> > index 7080c38..52a7505 100644
-> > --- a/drivers/cpuidle/cpuidle-arm.c
-> > +++ b/drivers/cpuidle/cpuidle-arm.c
-> > @@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
-> >  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
-> >  		if (ret <= 0) {
-> >  			ret = ret ? : -ENODEV;
-> > -			goto out_fail;
-> > +			goto init_fail;
-> >  		}
+> > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> > index 5f4eee4513e5..6a17c5d63582 100644
+> > --- a/drivers/dma/sun6i-dma.c
+> > +++ b/drivers/dma/sun6i-dma.c
+> > @@ -1068,6 +1068,12 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+> >  	.nr_max_vchans   = 34,
+> >  	.dmac_variant    = DMAC_VARIANT_H3,
+> >  };
+> > +
+> > +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
+> > +	.nr_max_channels = 8,
+> > +	.nr_max_requests = 27,
+> > +	.nr_max_vchans   = 38,
+> > +	.dmac_variant    = DMAC_VARIANT_H3,
+> >  };
 > >  
-> >  		ret = cpuidle_register_driver(drv);
-> >  		if (ret) {
-> >  			pr_err("Failed to register cpuidle driver\n");
-> > -			goto out_fail;
-> > +			goto init_fail;
-> >  		}
-> >  
-> >  		/*
-> > @@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
-> >  	}
-> >  
-> >  	return 0;
-> > +init_fail:
-> > +	kfree(drv);
+> >  static const struct of_device_id sun6i_dma_match[] = {
+> > @@ -1075,6 +1081,7 @@ static const struct of_device_id sun6i_dma_match[] = {
+> >  	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+> >  	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+> >  	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
+> > +	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
+> >  	{ /* sentinel */ }
+> >  };
+> >  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
 > 
-> The below loop only releases resource for previous CPUs, so should check
-> two variables 'drv' and 'dev'. If 'dev != NULL', we also need to release
-> it.
+> I was wondering if should use the opportunity to expose those values as
+> DT properties instead of hard-wiring them to a compatible string in the
+> driver every time we add support for a new SoC?
+> We could introduce a new compatible string (say: "allwinner,sunxi-dma"),
+> then describe properties for the number of channels and requests and
+> vchans and parse those from the DT at probe time.
+> With this we might be able to support future SoCs without Linux *driver*
+> changes, by just providing the right DT. This would have worked already
+> for instance for the A83T support, which just changed those values.
+> 
+> For instance with this quick patch below (just compile tested, and without
+> your refactoring).
+> The DT node would then read something like:
+> 	dma: dma-controller at 01c02000 {
+> 		compatible = "allwinner,sun50i-a64-dma",
+> 			     "allwinner,sunxi-dma";
+> 		reg = <0x01c02000 0x1000>;
+> 		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+> 		clocks = <&ccu CLK_BUS_DMA>;
+> 		resets = <&ccu RST_BUS_DMA>;
+> 		#dma-cells = <1>;
+> 		allwinner,max_channels = <8>;
+> 		allwinner,max_requests = <27>;
+> 		allwinner,max_vchans = <38>;
+> 	};
 
-i cannot see a leak for 'dev', because this is already handled in the error case of cpuidle_register_device before jumping to out_fail. I agree this isn't consistent, but this is a fix which should go to stable. So only necessary changes.
+We're still going to need a different compatible anyway, so it's not
+really like it would change anything.
 
-Stefan
+Maxime
 
-> 
-> Thanks,
-> Leo Yan
-> 
-> >  out_fail:
-> >  	while (--cpu >= 0) {
-> >  		dev = per_cpu(cpuidle_devices, cpu);
-> > -- 
-> > 2.7.4
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/a5b2b784/attachment-0001.sig>
