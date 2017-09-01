@@ -1,88 +1,54 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 1 Sep 2017 10:27:05 +0200
-Subject: [PATCH v3 6/8] PM / ACPI: Enable the runtime PM centric approach
- for system sleep
-In-Reply-To: <2855684.NY3Ly9PzrE@aspire.rjw.lan>
-References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
- <1504018610-10822-7-git-send-email-ulf.hansson@linaro.org>
- <2855684.NY3Ly9PzrE@aspire.rjw.lan>
-Message-ID: <CAPDyKFq5ic+bAVRoEC58oSO-8VTGnfipJndLmR6YLXgEhZ+RWw@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  1 Sep 2017 10:37:46 +0200
+Subject: [PATCH v3 3/3] ARM: dts: r8a7794: Add SMP support
+In-Reply-To: <1504255066-5103-1-git-send-email-geert+renesas@glider.be>
+References: <1504255066-5103-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1504255066-5103-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2017 at 17:27, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Tuesday, August 29, 2017 4:56:48 PM CEST Ulf Hansson wrote:
->> This change enables the ACPI PM domain to cope with drivers that deploys
->> the runtime PM centric path for system sleep.
->
-> [cut]
->
->> @@ -1052,11 +1066,20 @@ EXPORT_SYMBOL_GPL(acpi_subsys_complete);
->>   * @dev: Device to handle.
->>   *
->>   * Follow PCI and resume devices suspended at run time before running their
->> - * system suspend callbacks.
->> + * system suspend callbacks. However, try to avoid it in case the runtime PM
->> + * centric path is used for the device and then trust the driver to do the
->> + * right thing.
->>   */
->>  int acpi_subsys_suspend(struct device *dev)
->>  {
->> -     pm_runtime_resume(dev);
->> +     struct acpi_device *adev = ACPI_COMPANION(dev);
->> +
->> +     if (!adev)
->> +             return 0;
->> +
->> +     if (!dev_pm_is_rpm_sleep(dev) || acpi_dev_needs_resume(dev, adev))
->> +             pm_runtime_resume(dev);
->> +
->>       return pm_generic_suspend(dev);
->>  }
->>  EXPORT_SYMBOL_GPL(acpi_subsys_suspend);
->
-> Well, I tried to avoid calling acpi_dev_needs_resume() for multiple times
-> and that's why I added the update_state thing.
->
-> Moreover, the is_rpm_sleep flag here has to mean not only that
-> direct_complete should not be used with the device, but also that its driver
-> is fine with not resuming it.
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Let me try to explain this better. I realize the changelog is
-misleading around this particular section! Huh, apologize for that!
+Add the device tree node for the Advanced Power Management Unit (APMU).
+Use the "enable-method" prop to  point out that the APMU should be used
+for the SMP support.
 
-First, patch1 makes the PM core treat the is_rpm_sleep flag as the
-direct_complete isn't allowed for the device.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3:
+  - No changes,
 
-For that reason, when the is_rpm_sleep is set, there is no point
-calling acpi_dev_needs_resume() from acpi_subsys_prepare(), but
-instead that can be deferred to acpi_subsys_suspend() - because it
-doesn't matter if acpi_subsys_prepare() returns 0 or 1, in either case
-the acpi_subsys_suspend() will be called. That's really what goes on
-here.
+v2:
+  - No changes.
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The end result is the same. If the acpi_dev_needs_resume() thinks that
-the device needs to be runtime resumed, pm_runtime_resume() is called
-for the device in acpi_subsys_suspend().
-
-So, this has nothing to do with whether the driver "is fine with not
-resuming it" thing.
-
->
-> IMO it is not a good idea to use one flag for these two different things at the
-> same time at all.
-
-Yeah, I guess my upper comment addresses your immediate concern here?
-
-However, there is one other thing the is_rpm_flag means. That is that
-the driver has informed the ACPI PM domain, to trust the driver to
-deal with system sleep, via re-using the runtime PM callbacks.
-So the flag does still have two meanings, but that we can change - of course.
-
->
-> Thanks,
-> Rafael
->
-
-Kind regards
-Uffe
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index a4c35d29f77c16dc..8d70e860468c5603 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -37,6 +37,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "renesas,apmu";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -65,6 +66,12 @@
+ 		};
+ 	};
+ 
++	apmu at e6151000 {
++		compatible = "renesas,r8a7794-apmu", "renesas,apmu";
++		reg = <0 0xe6151000 0 0x188>;
++		cpus = <&cpu0 &cpu1>;
++	};
++
+ 	gic: interrupt-controller at f1001000 {
+ 		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+-- 
+2.7.4
