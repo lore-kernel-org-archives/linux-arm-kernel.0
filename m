@@ -1,34 +1,82 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Sep 2017 11:22:19 +0200
-Subject: [PATCH 4/7] drm/pl111: Enable PL110 variant
-In-Reply-To: <CACvgo51zbo1vA6s+c9db9yS-8L=fpQUGDptk7XjxjXUY8ZndqA@mail.gmail.com>
+Date: Fri, 1 Sep 2017 11:27:05 +0200
+Subject: [PATCH 7/7] drm/pl111: Add handling of Versatile platforms
+In-Reply-To: <878thzzkiz.fsf@anholt.net>
 References: <20170830180711.2791-1-linus.walleij@linaro.org>
- <20170830180711.2791-5-linus.walleij@linaro.org>
- <20170831101913.sjs32rsmbfal5xj3@imgtec.com>
- <CACvgo51zbo1vA6s+c9db9yS-8L=fpQUGDptk7XjxjXUY8ZndqA@mail.gmail.com>
-Message-ID: <CACRpkdZL=j1zPqX4zfqpepBsDuxsiu0jDUsezJOsqi_j_DeQ0w@mail.gmail.com>
+ <20170830180711.2791-8-linus.walleij@linaro.org> <878thzzkiz.fsf@anholt.net>
+Message-ID: <CACRpkdZnXJHx6P+YqAuDo8G5RC9+2pa9-2jhZp5HH-oKnHM+sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 1, 2017 at 10:23 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-
->>Eric E:
->>> +struct pl111_variant_data pl110_variant = {
+On Thu, Aug 31, 2017 at 7:58 PM, Eric Anholt <eric@anholt.net> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>> The ARM reference designs in the Versatile family: Integrator,
+>> Versatile and RealView can make use of the new DRM driver as well.
+>> We just need to create a bit of platform-specific code for them
+>> that we isolate to its own file.
 >>
->> I think this (and `pl111_variant` below) can be `static const`, right?
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>>  drivers/gpu/drm/pl111/Makefile          |   1 +
+>>  drivers/gpu/drm/pl111/pl111_display.c   |   7 -
+>>  drivers/gpu/drm/pl111/pl111_drv.c       |   5 +
+>>  drivers/gpu/drm/pl111/pl111_versatile.c | 270 ++++++++++++++++++++++++++++++++
+>>  drivers/gpu/drm/pl111/pl111_versatile.h |   9 ++
+>>  5 files changed, 285 insertions(+), 7 deletions(-)
+>>  create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.c
+>>  create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.h
 >>
-> Static - yes, const - I don't think so.
-> Struct amba_id::data lacks the constness, so the const qualifier will
-> get discarded.
+>> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
+>> index c5f8f9684848..fce1453a93e1 100644
+>> --- a/drivers/gpu/drm/pl111/Makefile
+>> +++ b/drivers/gpu/drm/pl111/Makefile
+>> @@ -1,4 +1,5 @@
+>>  pl111_drm-y +=       pl111_display.o \
+>> +             pl111_versatile.o \
+>>               pl111_drv.o
+>>
+>>  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
+>> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+>> index 37f409867934..f7b043f4fed6 100644
+>> --- a/drivers/gpu/drm/pl111/pl111_display.c
+>> +++ b/drivers/gpu/drm/pl111/pl111_display.c
+>> @@ -454,13 +454,6 @@ int pl111_display_init(struct drm_device *drm)
+>>       }
+>>       of_node_put(endpoint);
+>>
+>> -     if (tft_r0b0g0[0] != 0 ||
+>> -         tft_r0b0g0[1] != 8 ||
+>> -         tft_r0b0g0[2] != 16) {
+>> -             dev_err(dev, "arm,pl11x,tft-r0g0b0-pads != [0,8,16] not yet supported\n");
+>> -             return -EINVAL;
+>> -     }
+>
+> I had a note in the DOC section of pl111_drv.c about needing to filter
+> available formats based on this property.  Could you update that with
+> some explanation of the new state of things?  (Do we actually need to
+> filter the formats?)
 
-I fixed it with a (void*) cast so we can have it right in the driver.
+No we don't need to filter it really, only the Nomadik makes use of this
+property and I haven't come to adding support for that yet.
 
-> In practise everyone considers/uses ::data as const, so that could be
-> tweaked with separate patch.
+> I haven't verified that we get the same pin routing setup as the fbdev
+> driver did for these platforms, but even if they don't match yet this
+> seems like an excellent start and we can make sure we sort them out as
+> we add panel drivers.
 
-I think it is not necessarily possible to make that const since the amba_id
-is used in several dynamically generated board files. But I may
-be wrong.
+This should be fine with panels I think, the problem is how the
+CLCD/PL11x is integrated with the silicon, as sometimes the VHDL
+coders just arbitrarily manage to switch things around. It should
+be handled entirely in the PL11x driver.
+
+> I've verified that my Cygnus board continues working with your series.
+
+Nice! I have graphics working on the RealView machines.
+
+Now I just need to figure out a few minor things like augmenting the
+list of resolutions from the panel for the bus bandwidth and
+some dumb VGA bridge business.
 
 Yours,
 Linus Walleij
