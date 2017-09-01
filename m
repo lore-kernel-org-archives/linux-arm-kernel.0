@@ -1,115 +1,91 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri,  1 Sep 2017 11:18:47 +0530
-Subject: [PATCH v2] arm64: fix unwind_frame() for filtered out fn for function
- graph tracing
-Message-ID: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 1 Sep 2017 07:49:29 +0200 (CEST)
+Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
+In-Reply-To: <20170901013317.GA516@leoy-ThinkPad-T440>
+References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
+ <20170901013317.GA516@leoy-ThinkPad-T440>
+Message-ID: <1186423751.115248.1504244969355@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_task_stat() calls get_wchan(), which further does unbind_frame().
-unbind_frame() restores frame->pc to original value in case function
-graph tracer has modified a return address (LR) in a stack frame to hook
-a function return. However, if function graph tracer has hit a filtered
-function, then we can't unwind it as ftrace_push_return_trace() has
-biased the index(frame->graph) with a 'huge negative'
-offset(-FTRACE_NOTRACE_DEPTH).
+Hi Leo,
 
-Moreover, arm64 stack walker defines index(frame->graph) as unsigned
-int, which can not compare a -ve number.
+> Leo Yan <leo.yan@linaro.org> hat am 1. September 2017 um 03:33 geschrieben:
+> 
+> 
+> Hi Stefan,
+> 
+> On Thu, Aug 31, 2017 at 10:24:36PM +0200, Stefan Wahren wrote:
+> > In case there are no DT idle states defined or
+> > cpuidle_register_driver() fails, the copy of the idle driver is leaked:
+> > 
+> >     unreferenced object 0xede0dc00 (size 1024):
+> >     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
+> >     hex dump (first 32 bytes):
+> >     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
+> >     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
+> >     backtrace:
+> >     [<c1295f04>] arm_idle_init+0x44/0x1ac
+> >     [<c0301e6c>] do_one_initcall+0x3c/0x16c
+> >     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
+> >     [<c0cb3624>] kernel_init+0x8/0x114
+> >     [<c0307a98>] ret_from_fork+0x14/0x3c
+> > 
+> > So fix this by freeing the unregistered copy in error case.
+> > 
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
+> > ---
+> >  drivers/cpuidle/cpuidle-arm.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> > index 7080c38..52a7505 100644
+> > --- a/drivers/cpuidle/cpuidle-arm.c
+> > +++ b/drivers/cpuidle/cpuidle-arm.c
+> > @@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
+> >  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
+> >  		if (ret <= 0) {
+> >  			ret = ret ? : -ENODEV;
+> > -			goto out_fail;
+> > +			goto init_fail;
+> >  		}
+> >  
+> >  		ret = cpuidle_register_driver(drv);
+> >  		if (ret) {
+> >  			pr_err("Failed to register cpuidle driver\n");
+> > -			goto out_fail;
+> > +			goto init_fail;
+> >  		}
+> >  
+> >  		/*
+> > @@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
+> >  	}
+> >  
+> >  	return 0;
+> > +init_fail:
+> > +	kfree(drv);
+> 
+> The below loop only releases resource for previous CPUs, so should check
+> two variables 'drv' and 'dev'. If 'dev != NULL', we also need to release
+> it.
 
-Similar problem we can have with calling of walk_stackframe() from
-save_stack_trace_tsk() or dump_backtrace().
+i cannot see a leak for 'dev', because this is already handled in the error case of cpuidle_register_device before jumping to out_fail. I agree this isn't consistent, but this is a fix which should go to stable. So only necessary changes.
 
-This patch fixes unwind_frame() to test the index for -ve value and
-restore index accordingly before we can restore frame->pc.
+Stefan
 
-Reproducer:
-
-cd /sys/kernel/debug/tracing/
-echo schedule > set_graph_notrace
-echo 1 > options/display-graph
-echo wakeup > current_tracer
-ps -ef | grep -i agent
-
-Above commands result in:
-Unable to handle kernel paging request at virtual address ffff801bd3d1e000
-pgd = ffff8003cbe97c00
-[ffff801bd3d1e000] *pgd=0000000000000000, *pud=0000000000000000
-Internal error: Oops: 96000006 [#1] SMP
-[...]
-CPU: 5 PID: 11696 Comm: ps Not tainted 4.11.0+ #33
-[...]
-task: ffff8003c21ba000 task.stack: ffff8003cc6c0000
-PC is at unwind_frame+0x12c/0x180
-LR is at get_wchan+0xd4/0x134
-pc : [<ffff00000808892c>] lr : [<ffff0000080860b8>] pstate: 60000145
-sp : ffff8003cc6c3ab0
-x29: ffff8003cc6c3ab0 x28: 0000000000000001
-x27: 0000000000000026 x26: 0000000000000026
-x25: 00000000000012d8 x24: 0000000000000000
-x23: ffff8003c1c04000 x22: ffff000008c83000
-x21: ffff8003c1c00000 x20: 000000000000000f
-x19: ffff8003c1bc0000 x18: 0000fffffc593690
-x17: 0000000000000000 x16: 0000000000000001
-x15: 0000b855670e2b60 x14: 0003e97f22cf1d0f
-x13: 0000000000000001 x12: 0000000000000000
-x11: 00000000e8f4883e x10: 0000000154f47ec8
-x9 : 0000000070f367c0 x8 : 0000000000000000
-x7 : 00008003f7290000 x6 : 0000000000000018
-x5 : 0000000000000000 x4 : ffff8003c1c03cb0
-x3 : ffff8003c1c03ca0 x2 : 00000017ffe80000
-x1 : ffff8003cc6c3af8 x0 : ffff8003d3e9e000
-
-Process ps (pid: 11696, stack limit = 0xffff8003cc6c0000)
-Stack: (0xffff8003cc6c3ab0 to 0xffff8003cc6c4000)
-[...]
-[<ffff00000808892c>] unwind_frame+0x12c/0x180
-[<ffff000008305008>] do_task_stat+0x864/0x870
-[<ffff000008305c44>] proc_tgid_stat+0x3c/0x48
-[<ffff0000082fde0c>] proc_single_show+0x5c/0xb8
-[<ffff0000082b27e0>] seq_read+0x160/0x414
-[<ffff000008289e6c>] __vfs_read+0x58/0x164
-[<ffff00000828b164>] vfs_read+0x88/0x144
-[<ffff00000828c2e8>] SyS_read+0x60/0xc0
-[<ffff0000080834a0>] __sys_trace_return+0x0/0x4
-
-fixes: 20380bb390a4 (arm64: ftrace: fix a stack tracer's output under function graph tracer)
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
-v1 -> v2:
-	- improved commit log
-	- now index is restored and thereafter frame->pc as well.
-
- arch/arm64/include/asm/stacktrace.h | 2 +-
- arch/arm64/kernel/stacktrace.c      | 3 +++
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 5b6eafccc5d8..816db5b9b874 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -23,7 +23,7 @@ struct stackframe {
- 	unsigned long sp;
- 	unsigned long pc;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	unsigned int graph;
-+	int graph;
- #endif
- };
- 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 09d37d66b630..4c47147d0554 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -75,6 +75,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk->ret_stack &&
- 			(frame->pc == (unsigned long)return_to_handler)) {
-+		if (frame->graph < 0)
-+			frame->graph += FTRACE_NOTRACE_DEPTH;
-+
- 		/*
- 		 * This is a case where function graph tracer has
- 		 * modified a return address (LR) in a stack frame
--- 
-2.9.4
+> 
+> Thanks,
+> Leo Yan
+> 
+> >  out_fail:
+> >  	while (--cpu >= 0) {
+> >  		dev = per_cpu(cpuidle_devices, cpu);
+> > -- 
+> > 2.7.4
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
