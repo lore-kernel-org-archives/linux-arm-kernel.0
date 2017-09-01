@@ -1,91 +1,89 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 1 Sep 2017 18:03:00 +0100
-Subject: [PATCH] KVM: arm/arm64: vITS: Drop its_ite->lpi field
-In-Reply-To: <20170901165156.30775-1-marc.zyngier@arm.com>
-References: <20170901165156.30775-1-marc.zyngier@arm.com>
-Message-ID: <956fab56-0d64-6c36-183c-11b43d0fabd9@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 1 Sep 2017 17:04:17 +0000
+Subject: [PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2
+In-Reply-To: <1504255066-5103-1-git-send-email-geert+renesas@glider.be>
+References: <1504255066-5103-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <TY1PR06MB0895EB3FDC2C1A9647C51D80C0920@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> -----Original Message-----
+> From: linux-renesas-soc-owner at vger.kernel.org [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Geert
+> Uytterhoeven
+> Sent: 01 September 2017 09:38
+> To: Simon Horman <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>; Russell King <linux@armlinux.org.uk>;
+> Catalin Marinas <catalin.marinas@arm.com>; Marc Zyngier <marc.zyngier@arm.com>; Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-renesas-soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Geert Uytterhoeven <geert+renesas@glider.be>
+> Subject: [PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2
+>
+>         Hi all,
+>
+> This patch series enables SMP on R-Car E2 (r8a7794).
+> The main hurdle here is that R-Car Gen2 boot loaders do not initialize the arch_timer CNTVOFF register, which thus needs
+> workarounds on Linux.
+>
+>   - The first patch adds a definition for MON_MODE, as suggested by Marc
+>     Zyngier,
+>   - The second patch makes sure CNTVOFF is initialized for boot and
+>     secondary Cortex-A15 and Cortex-A7 CPU cores, like is already done
+>     for the boot Cortex-A7 CPU core.  Without this, the ARM arch timer
+>     does not work on secondary CPU cores.
+>     This patch depends on "[PATCH v2] ARM: shmobile: rcar-gen2: Correct
+>     arch timer frequency on RZ/G1E".
+>   - The third patch adds the required infrastructure (APMU device node
+>     and corresponding enable-method) to DT.
+>     Obviously this must not be applied on a branch that does not contain
+>     the first two patches!
+>
+> Due to dependencies, I think it is easiest if the ARM maintainers provide their Acked-by for patch 1, so the whole series can go in
+> through Simon's Renesas tree.
+>
+> Changes compared to v2:
+>   - Replace "isb" by "instr_sync" to fix the arm v6 build (e.g.
+>     allmodconfig),
+>
+> Changes compared to v1:
+>   - New patch "[PATCH v2 1/3] ARM: Add definition for monitor mode",
+>   - Initialize CNTVOFF on Cortex-A15, too,
+>   - Use *_MODE definitions instead of hardcoded values,
+>   - Reduce duplication by calling the asm version from C,
+>   - Always build headsmp-apmu.o on R-Car Gen2.
+>
+> This has been tested on r8a7794/alt (dual Cortex-A7), and regression-tested on r8a7790/lager (quad Cortex-A15), and
+> r8a7791/koelsch, r8a7791/porter, r8a7792/blanche, and r8a7793/gose (dual Cortex-A15).
 
-On 01/09/17 17:51, Marc Zyngier wrote:
-> For unknown reasons, the its_ite data structure carries an "lpi" field
-> which contains the intid of the LPI. This is an obvious duplication
-> of the vgic_irq->intid field, so let's fix the only user and remove
-> the now useless field.
+Hello Geert,
 
-Interesting, I guess that comes from the dawn of time, before we had
-struct vgic_irq. And since the architecture says that the LPI ID is the
-actual information stored in the ITE, I never revisited this again.
-
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Looks good to me!
-
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+last week we tried to enable APMU/SMP on the iWave RZG1E (r8a7745, dual Cortex-A7) G22D-SODIMM board unsuccessfully, this patch series fixes the problems we have been experiencing.
 
 Thanks,
-Andre.
+Fabrizio
 
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index dd85817a9b29..01aa4d9d405e 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -142,7 +142,6 @@ struct its_ite {
->  
->  	struct vgic_irq *irq;
->  	struct its_collection *collection;
-> -	u32 lpi;
->  	u32 event_id;
->  };
->  
-> @@ -851,7 +850,7 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
->  /* Must be called with its_lock mutex held */
->  static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
->  					  struct its_collection *collection,
-> -					  u32 lpi_id, u32 event_id)
-> +					  u32 event_id)
->  {
->  	struct its_ite *ite;
->  
-> @@ -861,7 +860,6 @@ static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
->  
->  	ite->event_id	= event_id;
->  	ite->collection = collection;
-> -	ite->lpi = lpi_id;
->  
->  	list_add_tail(&ite->ite_list, &device->itt_head);
->  	return ite;
-> @@ -911,7 +909,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  		new_coll = collection;
->  	}
->  
-> -	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
-> +	ite = vgic_its_alloc_ite(device, collection, event_id);
->  	if (IS_ERR(ite)) {
->  		if (new_coll)
->  			vgic_its_free_collection(its, coll_id);
-> @@ -1902,7 +1900,7 @@ static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
->  
->  	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
->  	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
-> -	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
-> +	       ((u64)ite->irq->intid << KVM_ITS_ITE_PINTID_SHIFT) |
->  		ite->collection->collection_id;
->  	val = cpu_to_le64(val);
->  	return kvm_write_guest(kvm, gpa, &val, ite_esz);
-> @@ -1949,7 +1947,7 @@ static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
->  	if (!collection)
->  		return -EINVAL;
->  
-> -	ite = vgic_its_alloc_ite(dev, collection, lpi_id, event_id);
-> +	ite = vgic_its_alloc_ite(dev, collection, event_id);
->  	if (IS_ERR(ite))
->  		return PTR_ERR(ite);
->  
-> 
+Tested-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+
+>
+> Thanks!
+>
+> Geert Uytterhoeven (2):
+>   ARM: Add definition for monitor mode
+>   ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15
+>
+> Sergei Shtylyov (1):
+>   ARM: dts: r8a7794: Add SMP support
+>
+>  arch/arm/boot/dts/r8a7794.dtsi           |  7 ++++++
+>  arch/arm/include/uapi/asm/ptrace.h       |  1 +
+>  arch/arm/mach-shmobile/Makefile          |  1 +
+>  arch/arm/mach-shmobile/common.h          |  2 ++
+>  arch/arm/mach-shmobile/headsmp-apmu.S    | 37 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/platsmp-apmu.c    |  2 +-
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++---------------
+>  7 files changed, 51 insertions(+), 19 deletions(-)  create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
+>
+> --
+> 2.7.4
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
