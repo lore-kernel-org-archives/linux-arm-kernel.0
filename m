@@ -1,28 +1,62 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Fri, 01 Sep 2017 21:34:03 +1000
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <CAKv+Gu84njSF5uOvNtknGdOd5auU7zw9scFeTq5v-=OhExgOqA@mail.gmail.com>
-References: <20170901072744.2409-1-dja@axtens.net>
- <CAKv+Gu84njSF5uOvNtknGdOd5auU7zw9scFeTq5v-=OhExgOqA@mail.gmail.com>
-Message-ID: <877exi4pqs.fsf@linkitivity.dja.id.au>
+From: imammedo@redhat.com (Igor Mammedov)
+Date: Fri, 1 Sep 2017 13:51:21 +0200
+Subject: [Qemu-devel] [PATCH v11 2/6] ACPI: Add APEI GHES Table
+ Generation support
+In-Reply-To: <dfaeb539-8006-85d6-35b2-0af31f5a0675@huawei.com>
+References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
+ <1503066227-18251-3-git-send-email-gengdongjiu@huawei.com>
+ <20170829122053.36cf550c@nial.brq.redhat.com>
+ <dfaeb539-8006-85d6-35b2-0af31f5a0675@huawei.com>
+Message-ID: <20170901135121.57ca6a04@nial.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Fri, 1 Sep 2017 17:58:55 +0800
+gengdongjiu <gengdongjiu@huawei.com> wrote:
 
-> If we are all in agreement that fixing X is not an option, I think
-> this is a reasonable approach
+> Hi Igor,
+> 
+> On 2017/8/29 18:20, Igor Mammedov wrote:
+> > On Fri, 18 Aug 2017 22:23:43 +0800
+> > Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+[...]
+> >   
+> >> +void ghes_build_acpi(GArray *table_data, GArray *hardware_error,
+> >> +                                            BIOSLinker *linker)
+> >> +{
+> >> +    uint32_t ghes_start = table_data->len;
+> >> +    uint32_t address_size, error_status_address_offset;
+> >> +    uint32_t read_ack_register_offset, i;
+> >> +
+> >> +    address_size = sizeof(struct AcpiGenericAddress) -
+> >> +        offsetof(struct AcpiGenericAddress, address);  
+> > it's confusing name for var,
+> > AcpiGenericAddress::address is fixed unsigned 64 bit integer per spec
+> > also, I'm not sure why it's needed at all.  
+>  it is because other people have concern about where does the "unsigned 64 bit integer"
+>  come from, they are confused about the "unsigned 64 bit integer"
+>  so they suggested use sizeof. anyway I will directly use unsigned 64 bit integer.
+Maybe properly named macro instead of sizeof(foo) would do the job
 
-This did come up in discussion at some earlier point in one of the many
-spins we've done of this - I don't remember if you brought it up or
-someone else did - but my concern was this: If it were just X we would
-be fine, but if we go down that path I'm worried about also having to
-fix Mir/Wayland/whatever-the-new-exciting-display-server-is-this-week,
-ad nauseum.
 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+[...]
+> >> +
+> >> +        /* Build error status address*/
+> >> +        build_address(table_data, linker, error_status_address_offset + i *
+> >> +            sizeof(AcpiGenericHardwareErrorSourceV2), i * address_size,
+> >> +            AML_SYSTEM_MEMORY, 0x40, 0, 4 /* QWord access */);  
+> > just do something like this instead of build_address():
+> > build_append_gas()
+> > bios_linker_loader_add_pointer()  
+> Thanks for the suggestion.
+> 
+> > 
+> > also register width 0x40 looks suspicious, where does it come from?
+> > While at it do you have a real hardware which has HEST table that you re trying to model after?
+> > I'd like to see HEST and other related tables from it.  
+> 
+> Igor, what is your suspicious point? The register width 0x40 come from our host BIOS record to the System Memory space.
 
-Thanks!
+maybe s/0x40/ERROR_STATUS_BLOCK_POINTER_SIZE/
 
-Regards,
-Daniel
+[...]
