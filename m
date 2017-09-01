@@ -1,75 +1,81 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 1 Sep 2017 09:33:17 +0800
-Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
-In-Reply-To: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
-References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20170901013317.GA516@leoy-ThinkPad-T440>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Fri, 1 Sep 2017 10:00:05 +0800
+Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+ <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
+ <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
+Message-ID: <1504231205.15359.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Thu, 2017-08-31 at 14:52 -0500, Rob Herring wrote:
+> On Fri, Aug 25, 2017 at 02:32:30PM +0800, Chen Zhong wrote:
+> > This patch adds the device tree binding documentation for the MediaTek
+> > pmic keys found on PMIC MT6397/MT6323.
+> > 
+> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > new file mode 100644
+> > index 0000000..100ec44
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > @@ -0,0 +1,38 @@
+> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
+> > +
+> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
+> > +and homekey. The key functions are defined as the subnode of the function
+> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
+> > +of Muti-Function Device (MFD)
+> > +
+> > +For MT6397/MT6323 MFD bindings see:
+> > +Documentation/devicetree/bindings/mfd/mt6397.txt
+> > +
+> > +Required properties:
+> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
+> > +- linux,keycodes: Specifies the numeric keycode values to
+> > +	be used for reporting keys presses. The array can
+> > +	contain up to 2 entries.
+> > +
+> > +Optional Properties:
+> > +- wakeup-source: each key can be used as a wakeup source.
+> 
+> wakeup-source is defined as a boolean.
 
-On Thu, Aug 31, 2017 at 10:24:36PM +0200, Stefan Wahren wrote:
-> In case there are no DT idle states defined or
-> cpuidle_register_driver() fails, the copy of the idle driver is leaked:
-> 
->     unreferenced object 0xede0dc00 (size 1024):
->     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
->     hex dump (first 32 bytes):
->     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
->     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
->     backtrace:
->     [<c1295f04>] arm_idle_init+0x44/0x1ac
->     [<c0301e6c>] do_one_initcall+0x3c/0x16c
->     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
->     [<c0cb3624>] kernel_init+0x8/0x114
->     [<c0307a98>] ret_from_fork+0x14/0x3c
-> 
-> So fix this by freeing the unregistered copy in error case.
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 7080c38..52a7505 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
->  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
->  		if (ret <= 0) {
->  			ret = ret ? : -ENODEV;
-> -			goto out_fail;
-> +			goto init_fail;
->  		}
->  
->  		ret = cpuidle_register_driver(drv);
->  		if (ret) {
->  			pr_err("Failed to register cpuidle driver\n");
-> -			goto out_fail;
-> +			goto init_fail;
->  		}
->  
->  		/*
-> @@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
->  	}
->  
->  	return 0;
-> +init_fail:
-> +	kfree(drv);
+Hi Rob,
 
-The below loop only releases resource for previous CPUs, so should check
-two variables 'drv' and 'dev'. If 'dev != NULL', we also need to release
-it.
+We have two keys, maybe one key can be used as a wakeup source, another
+not.Since wakeup-source is defined as a boolean, we cannot distinguish
+the behavior of the two keys. May i know the better way to do this?
 
-Thanks,
-Leo Yan
-
->  out_fail:
->  	while (--cpu >= 0) {
->  		dev = per_cpu(cpuidle_devices, cpu);
-> -- 
-> 2.7.4
+Thank you.
 > 
+> > +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
+> > +	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
+> > +- debounce-interval: Long press key shutdown debouncing interval time
+> > +	in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
+> > +
+> > +Example:
+> > +
+> > +	pmic: mt6397 {
+> > +		compatible = "mediatek,mt6397";
+> > +
+> > +		...
+> > +
+> > +		mt6397keys: mt6397keys {
+> > +			compatible = "mediatek,mt6397-keys";
+> > +			linux,keycodes = <KEY_POWER>, <KEY_VOLUMEDOWN>;
+> > +			wakeup-source = <1>, <0>;
+> > +			mediatek,long-press-mode = <1>;
+> > +			debounce-interval = <0>;
+> > +		};
+> > +	};
+> > -- 
+> > 1.7.9.5
+> > 
