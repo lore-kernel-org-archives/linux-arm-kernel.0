@@ -1,23 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 31 Aug 2017 18:33:01 -0700
-Subject: [PATCH 0/2] Add support for Hi6220 coresight
-In-Reply-To: <1504226835-2115-1-git-send-email-leo.yan@linaro.org>
-References: <1504226835-2115-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170901013301.GN21656@codeaurora.org>
+Date: Thu, 31 Aug 2017 18:34:42 -0700
+Subject: [PATCH] clk: uniphier: add PXs3 clock data
+In-Reply-To: <1504181016-16457-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1504181016-16457-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170901013442.GO21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01, Leo Yan wrote:
-> This patch series adds support for coresight on Hi6220; the first patch
-> is to fix coresight PLL so can avoid system hang after we enable
-> coresight, the second patch is to add DT binding according to coresight
-> topology.
+On 08/31, Masahiro Yamada wrote:
+> Add basic clock data for Socionext's new SoC PXs3.
 > 
-> The patch has been tested on Hikey; By using OpenCSD snapshot mode, it
-> can successfully decode ETF and ETB trace data.
-> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-I can take the first one and second one goes through arm-soc?
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
