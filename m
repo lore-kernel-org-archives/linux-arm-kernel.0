@@ -1,26 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 1 Sep 2017 15:08:54 +0200
-Subject: [PATCH v2 1/2] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for
- LAN8710
-In-Reply-To: <1503901963-9457-2-git-send-email-stefan@olimex.com>
-References: <1503901963-9457-1-git-send-email-stefan@olimex.com>
- <1503901963-9457-2-git-send-email-stefan@olimex.com>
-Message-ID: <20170901130854.iasjz4eqsvkt6r6z@flea>
+Date: Fri, 1 Sep 2017 15:11:00 +0200
+Subject: [PATCH 5/5] arm: dts: sun8i: Add the TBS A711 tablet devicetree
+In-Reply-To: <CAGb2v640L3L_reAY+n0Cm=KjHSR=pNmRueXAVf-gzE=F9T7_cA@mail.gmail.com>
+References: <20170825092617.32533-1-maxime.ripard@free-electrons.com>
+ <20170825092617.32533-5-maxime.ripard@free-electrons.com>
+ <CAGb2v65Y5E=jQo7MbpTKip8nAR4MMx5B+_8K1Wt_c7E+NXB+PA@mail.gmail.com>
+ <20170831090314.ubfn3csgp5svtlih@flea.lan>
+ <CAGb2v640L3L_reAY+n0Cm=KjHSR=pNmRueXAVf-gzE=F9T7_cA@mail.gmail.com>
+Message-ID: <20170901131100.5btriy53swiic5um@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 09:32:42AM +0300, Stefan Mavrodiev wrote:
-> From revision J the board uses new phy chip LAN8710. Compared
-> with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
-> not to work. To fix this PA17 is muxed with GMAC function. This
-> makes the pin output-low.
+On Thu, Aug 31, 2017 at 05:14:14PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Aug 31, 2017 at 5:03 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Thu, Aug 31, 2017 at 02:52:43PM +0800, Chen-Yu Tsai wrote:
+> >> > +       non-removable;
+> >> > +       wakeup-source;
+> >> > +       status = "okay";
+> >> > +
+> >> > +       brcmf: wifi at 1 {
+> >> > +               reg = <1>;
+> >> > +               compatible = "brcm,bcm4329-fmac";
+> >> > +               interrupt-parent = <&r_pio>;
+> >> > +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 WL_WAKE_UP */
+> >> > +               interrupt-names = "host-wake";
+> >> > +       };
+> >> > +};
+> >> > +
+> >> > +&mmc2 {
+> >> > +       pinctrl-0 = <&mmc2_8bit_emmc_pins>;
+> >> > +       pinctrl-names = "default";
+> >> > +       vmmc-supply = <&reg_vcc3v3>;
+> >>
+> >> emmc has separate vddq lines. vqmmc-supply should be provided even though it
+> >> may be the same as vmmc-supply. The two refer to different things at the board
+> >> level.
+> >
+> > My understanding was that vqmmc wasn't needed if it was the same
+> > regulator than vmmc.
 > 
-> This patch is compatible with earlier board revisions, since this
-> pin wasn't connected to phy.
-> 
-> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> It doesn't say so in the binding, so that's probably only true for Linux.
 
-Applied for 4.15, thanks!
+Ok... I've only said that to a couple of patches this week :)
+
+I guess I'll have to ask to revert that change :/
+
 Maxime
 
 -- 
@@ -33,4 +60,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/21e85cd8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/1ca6224d/attachment.sig>
