@@ -1,68 +1,54 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri,  1 Sep 2017 18:30:00 +0200
-Subject: [PATCH v2 1/2] ARM: dts: sun8i: h3: Enable AP6212 WiFi on mmc1 on
- Nanopi M1 Plus
+Date: Fri,  1 Sep 2017 18:30:01 +0200
+Subject: [PATCH v2 2/2] ARM: dts: sun8i: h3: Improved Wifi bindings on
+ Bananapi M2 Plus
 In-Reply-To: <1504283401-4263-1-git-send-email-embed3d@gmail.com>
 References: <1504283401-4263-1-git-send-email-embed3d@gmail.com>
-Message-ID: <1504283401-4263-2-git-send-email-embed3d@gmail.com>
+Message-ID: <1504283401-4263-3-git-send-email-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philipp Rossak <embed3d@gmail.com>
 
-The WiFi side of the AP6212 WiFi/BT combo module is connected to
-mmc1. There are also GPIOs for enable and interrupts.
-
-Enable WiFi on this board by enabling mmc1 and adding the power
-sequencing clocks and GPIO, as well as the chip's interrupt line.
+* vqmmc is in this case not needed
+* no need for pincontrol nodes when the pin is set to a GPIO
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index 6256f55..7d18c35 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -48,6 +48,13 @@
- 
- 	aliases {
- 		serial1 = &uart3;
-+		ethernet1 = &sdio_wifi;
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index d756ff8..f7e5d8a 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -98,7 +98,6 @@
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&wifi_en_bpi_m2p>;
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
  	};
  };
- 
-@@ -65,6 +72,24 @@
- 	status = "okay";
+@@ -153,7 +152,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+-	vqmmc-supply = <&reg_vcc3v3>;
+ 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	non-removable;
+@@ -200,11 +198,6 @@
+ 		pins = "PL3";
+ 		function = "gpio_in";
+ 	};
+-
+-	wifi_en_bpi_m2p: wifi_en_pin {
+-		pins = "PL7";
+-		function = "gpio_out";
+-	};
  };
  
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	sdio_wifi: sdio_wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&pio>;
-+		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
+ &reg_usb0_vbus {
 -- 
 2.7.4
