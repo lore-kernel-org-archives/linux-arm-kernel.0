@@ -1,53 +1,75 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 01 Sep 2017 10:47:55 +0900
-Subject: [PATCH 2/3] arm64: dts: exynos: Add the hardware rotation limits
- for gsc
-In-Reply-To: <1504230476-1878-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <1504230476-1878-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170901014758epcas2p201036a38e7d079e10732d1c43c6248d7@epcas2p2.samsung.com>
-Message-ID: <1504230476-1878-3-git-send-email-hoegeun.kwon@samsung.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 1 Sep 2017 09:33:17 +0800
+Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
+In-Reply-To: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
+References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20170901013317.GA516@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gscaler has maximum size of input or output rotation. Add the
-hardware limits property for the gscaler rotation in the exynos5433
-dts.
+Hi Stefan,
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Thu, Aug 31, 2017 at 10:24:36PM +0200, Stefan Wahren wrote:
+> In case there are no DT idle states defined or
+> cpuidle_register_driver() fails, the copy of the idle driver is leaked:
+> 
+>     unreferenced object 0xede0dc00 (size 1024):
+>     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
+>     hex dump (first 32 bytes):
+>     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
+>     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
+>     backtrace:
+>     [<c1295f04>] arm_idle_init+0x44/0x1ac
+>     [<c0301e6c>] do_one_initcall+0x3c/0x16c
+>     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
+>     [<c0cb3624>] kernel_init+0x8/0x114
+>     [<c0307a98>] ret_from_fork+0x14/0x3c
+> 
+> So fix this by freeing the unregistered copy in error case.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 7080c38..52a7505 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
+>  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
+>  		if (ret <= 0) {
+>  			ret = ret ? : -ENODEV;
+> -			goto out_fail;
+> +			goto init_fail;
+>  		}
+>  
+>  		ret = cpuidle_register_driver(drv);
+>  		if (ret) {
+>  			pr_err("Failed to register cpuidle driver\n");
+> -			goto out_fail;
+> +			goto init_fail;
+>  		}
+>  
+>  		/*
+> @@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
+>  	}
+>  
+>  	return 0;
+> +init_fail:
+> +	kfree(drv);
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 7fe994b..57c9997 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -891,6 +891,8 @@
- 				 <&cmu_gscl CLK_ACLK_GSCL0>,
- 				 <&cmu_gscl CLK_ACLK_XIU_GSCLX>,
- 				 <&cmu_gscl CLK_ACLK_GSCLBEND_333>;
-+			rot-max-hsize = <2047>;
-+			rot-max-vsize = <2047>;
- 			iommus = <&sysmmu_gscl0>;
- 		};
- 
-@@ -904,6 +906,8 @@
- 				 <&cmu_gscl CLK_ACLK_GSCL1>,
- 				 <&cmu_gscl CLK_ACLK_XIU_GSCLX>,
- 				 <&cmu_gscl CLK_ACLK_GSCLBEND_333>;
-+			rot-max-hsize = <2047>;
-+			rot-max-vsize = <2047>;
- 			iommus = <&sysmmu_gscl1>;
- 		};
- 
-@@ -917,6 +921,8 @@
- 				 <&cmu_gscl CLK_ACLK_GSCL2>,
- 				 <&cmu_gscl CLK_ACLK_XIU_GSCLX>,
- 				 <&cmu_gscl CLK_ACLK_GSCLBEND_333>;
-+			rot-max-hsize = <2047>;
-+			rot-max-vsize = <2047>;
- 			iommus = <&sysmmu_gscl2>;
- 		};
- 
--- 
-1.9.1
+The below loop only releases resource for previous CPUs, so should check
+two variables 'drv' and 'dev'. If 'dev != NULL', we also need to release
+it.
+
+Thanks,
+Leo Yan
+
+>  out_fail:
+>  	while (--cpu >= 0) {
+>  		dev = per_cpu(cpuidle_devices, cpu);
+> -- 
+> 2.7.4
+> 
