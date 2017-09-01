@@ -1,31 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 1 Sep 2017 16:37:17 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.13 (#3)
-In-Reply-To: <87wp5io3f5.fsf@free-electrons.com>
-References: <87wp5io3f5.fsf@free-electrons.com>
-Message-ID: <20170901233717.GA15825@localhost>
+Date: Fri, 1 Sep 2017 16:43:53 -0700
+Subject: [GIT PULL] Allwinner DT changes for 4.14, take 3
+In-Reply-To: <20170901132012.x2wqwaxdprsdnooj@flea>
+References: <20170828092246.h66hjoqmv3r3kpes@flea.lan>
+ <20170901132012.x2wqwaxdprsdnooj@flea>
+Message-ID: <20170901234353.GB15825@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 05:15:58PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Sep 01, 2017 at 03:20:12PM +0200, Maxime Ripard wrote:
+> Hi
 > 
-> Here is the third pull request for fixes for mvebu for v4.13.
+> On Mon, Aug 28, 2017 at 11:22:46AM +0200, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > Here is a late pull request for the 4.14 merge window.
+> > 
+> > Along with the fixes pull request I'm about to change, this should be
+> > our last pull request for the next release.
 > 
-> Gregory
-> 
-> The following changes since commit d7a65c4905bc9c304ecf3d8aa566802f6119480f:
-> 
->   ARM64: dts: marvell: armada-37xx: Fix the number of GPIO on south bridge (2017-08-02 16:00:00 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.13-3
-> 
-> for you to fetch changes up to a0ac89b57207ccc87d76f4e6aa9a83026743861b:
-> 
->   arm64: dts: marvell: fix number of GPIOs in Armada AP806 description (2017-08-30 15:50:13 +0200)
+> Since you merged the fixes that remove the EMAC nodes for 4.13
+> already, we really need to have that merged in 4.14, otherwise we'll
+> end up with a build breakage of the beelink device tree.
 
-Merged, thanks.
+This was already merged, but I might have missed to reply to the email.
+
 
 -Olof
