@@ -1,65 +1,54 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  1 Sep 2017 11:46:22 +0200
-Subject: [PATCH 1/2] RFC: drm: bridge: Add API to fetch connector
-Message-ID: <20170901094622.6519-1-linus.walleij@linaro.org>
+Date: Fri,  1 Sep 2017 11:46:29 +0200
+Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as fallback
+Message-ID: <20170901094629.6566-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to be able to get the connector out of a dumb VGA
-for the PL111 driver. This is because we are using the
-connector in the driver when initializing the display
-pipe.
+If we cannot find a panel, assume that the output from the
+PL111 is connected directly to a "dumb" VGA connector,
+so look up the connector from that bridge.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-This is a bit ugly but not uglier than how we are reaching
-into the connector of the panels in several drivers. I don't
-know any better idea, advice welcome.
+This is how the new API is used in the PL111.
 ---
- drivers/gpu/drm/bridge/dumb-vga-dac.c | 7 +++++++
- include/drm/dumb_vga_dac.h            | 9 +++++++++
- 2 files changed, 16 insertions(+)
- create mode 100644 include/drm/dumb_vga_dac.h
+ drivers/gpu/drm/pl111/Kconfig     | 1 +
+ drivers/gpu/drm/pl111/pl111_drv.c | 3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-index 6c2fdcb4fde1..c0d46ab7fde0 100644
---- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-+++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-@@ -19,6 +19,7 @@
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
+diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
+index e5e2abd66491..82cb3e60ddc8 100644
+--- a/drivers/gpu/drm/pl111/Kconfig
++++ b/drivers/gpu/drm/pl111/Kconfig
+@@ -8,6 +8,7 @@ config DRM_PL111
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_BRIDGE
+ 	select DRM_PANEL_BRIDGE
++	select DRM_DUMB_VGA_DAC
+ 	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
+ 	help
+ 	  Choose this option for DRM support for the PL111 CLCD controller.
+diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+index f5bc6f160e60..6db423bbd84e 100644
+--- a/drivers/gpu/drm/pl111/pl111_drv.c
++++ b/drivers/gpu/drm/pl111/pl111_drv.c
+@@ -67,6 +67,7 @@
+ #include <drm/drm_of.h>
+ #include <drm/drm_bridge.h>
+ #include <drm/drm_panel.h>
 +#include <drm/dumb_vga_dac.h>
  
- /**
-  * struct vga_dac_variant - characteristics of the DAC
-@@ -51,6 +52,12 @@ drm_connector_to_dumb_vga(struct drm_connector *connector)
- 	return container_of(connector, struct dumb_vga, connector);
- }
+ #include "pl111_drm.h"
+ #include "pl111_versatile.h"
+@@ -128,6 +129,8 @@ static int pl111_modeset_init(struct drm_device *dev)
+ 	if (panel) {
+ 		priv->panel = panel;
+ 		priv->connector = panel->connector;
++	} else {
++		priv->connector = drm_dumb_vga_get_connector(bridge);
+ 	}
+ 	priv->bridge = bridge;
  
-+struct drm_connector *drm_dumb_vga_get_connector(struct drm_bridge *bridge)
-+{
-+	return &drm_bridge_to_dumb_vga(bridge)->connector;
-+}
-+EXPORT_SYMBOL_GPL(drm_dumb_vga_get_connector);
-+
- static int dumb_vga_get_modes(struct drm_connector *connector)
- {
- 	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
-diff --git a/include/drm/dumb_vga_dac.h b/include/drm/dumb_vga_dac.h
-new file mode 100644
-index 000000000000..b7117222054d
---- /dev/null
-+++ b/include/drm/dumb_vga_dac.h
-@@ -0,0 +1,9 @@
-+#ifndef _DUMB_VGA_DAC_H_
-+#define _DUMB_VGA_DAC_H_
-+
-+struct drm_connector;
-+struct drm_bridge;
-+
-+struct drm_connector *drm_dumb_vga_get_connector(struct drm_bridge *bridge);
-+
-+#endif
 -- 
 2.13.5
