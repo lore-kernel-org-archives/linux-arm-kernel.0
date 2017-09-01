@@ -1,27 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 1 Sep 2017 15:18:03 +0200
-Subject: Applied "regulator: pbias: Select voltage table based on
- max-voltage" to the regulator tree
-In-Reply-To: <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
-References: <E1dnO3z-0000tI-7K@debutante>
- <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
- <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
-Message-ID: <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 1 Sep 2017 15:20:12 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.14, take 3
+In-Reply-To: <20170828092246.h66hjoqmv3r3kpes@flea.lan>
+References: <20170828092246.h66hjoqmv3r3kpes@flea.lan>
+Message-ID: <20170901132012.x2wqwaxdprsdnooj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 August 2017 at 15:50, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
->
->> This patch should be merged along with the 1st patch of the series "mmc: host:
->> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
->> omap_hsmmc driver.
->
-> I can sign a tag if it's needed for a cross tree merge.
+Hi
 
-Easier if you could drop it and instead just provide an ack.
+On Mon, Aug 28, 2017 at 11:22:46AM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> Here is a late pull request for the 4.14 merge window.
+> 
+> Along with the fixes pull request I'm about to change, this should be
+> our last pull request for the next release.
 
-Unless you believes there may conflict in your regulator tree?
+Since you merged the fixes that remove the EMAC nodes for 4.13
+already, we really need to have that merged in 4.14, otherwise we'll
+end up with a build breakage of the beelink device tree.
 
-Kind regards
-Uffe
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/40cc6a84/attachment.sig>
