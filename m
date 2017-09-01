@@ -1,59 +1,93 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 1 Sep 2017 09:08:24 -0500
-Subject: [PATCH] scripts/dtc: fix '%zx' warning
-In-Reply-To: <CAL_Jsq+1gMR2MCEXA6UOiK+4NpxT4k71YGqWzW7hZNCWnRg0hw@mail.gmail.com>
-References: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
- <20170726013004.GJ8978@umbus.fritz.box>
- <20170808112818.GC20805@n2100.armlinux.org.uk>
- <20170809040642.GG13670@umbus.fritz.box>
- <CAL_JsqKiM_T-ftd8NvHmzcRsirRWTe34jZRjZ=3NGSgb4HGncQ@mail.gmail.com>
- <20170831161611.GT20805@n2100.armlinux.org.uk>
- <CAL_Jsq+1gMR2MCEXA6UOiK+4NpxT4k71YGqWzW7hZNCWnRg0hw@mail.gmail.com>
-Message-ID: <CAL_Jsq+xwu8obB5RHkcHYXPJ_+3mU5gz88ZDGF8NKQZT4BtaTQ@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 1 Sep 2017 15:17:24 +0100
+Subject: [PATCH v2 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <7cd7cb6f-b4d5-ab71-12c3-e025c99efb90@st.com>
+References: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
+ <7cd7cb6f-b4d5-ab71-12c3-e025c99efb90@st.com>
+Message-ID: <7d309b1f-00d4-be6c-773c-94c7b0087abb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 12:01 PM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Thu, Aug 31, 2017 at 11:16 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Thu, Aug 31, 2017 at 10:58:12AM -0500, Rob Herring wrote:
->>> On Tue, Aug 8, 2017 at 11:06 PM, David Gibson
->>> <david@gibson.dropbear.id.au> wrote:
->>> > On Tue, Aug 08, 2017 at 12:28:19PM +0100, Russell King - ARM Linux wrote:
->>> >> On Wed, Jul 26, 2017 at 11:30:04AM +1000, David Gibson wrote:
->>> >> > On Tue, Jul 25, 2017 at 05:20:09PM +0100, Russell King wrote:
->>> >> > > dtc uses an incorrect format specifier for printing a uint64_t value.
->>> >> > > uint64_t may be either 'unsigned long' or 'unsigned long long' depending
->>> >> > > on the host architecture.
->>> >> > >
->>> >> > > Fix this by using %llx and casting to unsigned long long, which ensures
->>> >> > > that we always have a wide enough variable to print 64 bits of hex.
->>> >> > >
->>> >> > >   HOSTCC  scripts/dtc/checks.o
->>> >> > > scripts/dtc/checks.c: In function 'check_simple_bus_reg':
->>> >> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
->>> >> > >   snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
->>> >> > >   ^
->>> >> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
->>> >> > >
->>> >> > > Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
->>> >> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> >> >
->>> >> > This (embarrassing) error is already fixed in upstream dtc.
->>> >>
->>> >> It remains unfixed in 4.13-rc4.  How do we get this fixed in the
->>> >> kernel's dtc?  From what I can see, sending a patch to fix stuff
->>> >> doesn't work.
->>>
->>> Sorry, didn't see this until Andrew M picked it up.
+On 01/09/17 14:45, Alexandre Torgue wrote:
+> Hi Vlad
+> 
+> On 07/21/2017 03:12 PM, Vladimir Murzin wrote:
+>> Hi,
 >>
->> How do we know whether whatever is in upstream dtc fixes the problem
->> that I'm seeing?
->
-> Build upstream dtc or here's a branch[1] with the cherry-picked fix.
+>> This is an update of the existent MPU code which consist set of
+>> clean-ups and enhancements. The most significant changes are in the
+>> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+>> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+>> 8/8). Since there is no in-tree user of MPU, support for M-class has
+>> been added (PATCH 6/8).
+>>
+>> There is also practical benefit of patch set:
+>>
+>> "These MPU patches introduce a nice feature that it simplifies the
+>> bootloader: do not need to setup the MPU, for example for coherent DMA
+>> region, which is described in device-tree too." Andr?s Szemz?
+>>
+>> Changelog:
+>>             v1 -> v2
+>>                - support for XIP (PATCH 7/8)
+>>           - rebased on 4.13-rc1
+>>
+>>          RFC v2 -> v1
+>>                 - dropped RFC tag
+>>            - Tested-by from Andr?s
+>>            - rebased on 4.12-rc5
+>>
+>>             RFC -> RFC v2
+>>            - fixed MPU enable for v7m (PATCH 6/7)
+>>
+>> Thanks!
+>>
+>> Vladimir Murzin (8):
+>>    ARM: NOMMU: Move out MPU setup in separate module
+>>    ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>>    ARM: NOMMU: Rework MPU to be mostly done in C
+>>    ARM: NOMMU: Disallow MPU for XIP
+>>    ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>>    ARM: V7M: Add support for MPU to M-class
+>>    ARM: NOMMU: Use more MPU regions to cover memory
+>>    ARM: NOMMU: Support MPU in XIP configuration
+>>
+> 
+> For no-XIP patches:
+> 
+> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Well, your fix went in before I got the cherry-pick sent to Linus.
-Still, let me know if there's any issue with the upstream fix because
-when I sync dtc this fix is going to be overwritten with upstream.
+Thanks!
 
-Rob
+> 
+> I still have issue with XIP ones, then I continue to analysis ans let you know asap.
+
+Russell, are you happy to take patches modulo XIP one? Alex and I are working
+on XIP side and hope we can sort it out around rc1 time frame...
+
+Cheers
+Vladimir
+
+> 
+> Regards
+> Alex
+> 
+> 
+> 
+>>   arch/arm/Kconfig                  |   9 -
+>>   arch/arm/Kconfig-nommu            |  17 +-
+>>   arch/arm/include/asm/cputype.h    |  10 +
+>>   arch/arm/include/asm/mpu.h        |  24 +-
+>>   arch/arm/include/asm/smp.h        |   2 +-
+>>   arch/arm/include/asm/v7m.h        |  10 +
+>>   arch/arm/kernel/asm-offsets.c     |  11 +
+>>   arch/arm/kernel/head-nommu.S      | 138 ++++++++---
+>>   arch/arm/kernel/smp.c             |   2 +-
+>>   arch/arm/kernel/vmlinux-xip.lds.S |   3 +
+>>   arch/arm/mm/Makefile              |   1 +
+>>   arch/arm/mm/nommu.c               | 254 +-------------------
+>>   arch/arm/mm/pmsa-v7.c             | 471 ++++++++++++++++++++++++++++++++++++++
+>>   13 files changed, 651 insertions(+), 301 deletions(-)
+>>   create mode 100644 arch/arm/mm/pmsa-v7.c
+>>
+> 
