@@ -1,224 +1,62 @@
-From: guenter@roeck-us.net (Guenter Roeck)
-Date: Fri, 1 Sep 2017 09:22:00 -0700
-Subject: [PATCH 2/3] watchdog: Add Realtek RTD1295
-In-Reply-To: <20170828113532.32627-3-afaerber@suse.de>
-References: <20170828113532.32627-1-afaerber@suse.de>
- <20170828113532.32627-3-afaerber@suse.de>
-Message-ID: <4bb73834-e548-f1db-7aa4-dbc9a1019894@roeck-us.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 Sep 2017 17:23:22 +0100
+Subject: Applied "regulator: pbias: Select voltage table based on
+ max-voltage" to the regulator tree
+In-Reply-To: <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
+References: <E1dnO3z-0000tI-7K@debutante>
+ <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+ <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
+ <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
+Message-ID: <20170901162322.xrjnim4khn3wfslj@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2017 04:35 AM, Andreas F?rber wrote:
-> Add a watchdog driver for the Realtek RTD1295 SoC.
-> 
-> Based on QNAP's arch/arm/mach-rtk119x/driver/rtk_watchdog.c code and
-> mach-rtk119x/driver/dc2vo/fpga/include/iso_reg.h register defines.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->   drivers/watchdog/Kconfig       |  10 +++
->   drivers/watchdog/Makefile      |   1 +
->   drivers/watchdog/rtd119x_wdt.c | 152 +++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 163 insertions(+)
->   create mode 100644 drivers/watchdog/rtd119x_wdt.c
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index c722cbfdc7e6..8fa81518c3fa 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -787,6 +787,16 @@ config UNIPHIER_WATCHDOG
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called uniphier_wdt.
->   
-> +config RTD119X_WATCHDOG
-> +	bool "Realtek RTD119x/RTD129x watchdog support"
-> +	depends on ARCH_REALTEK || COMPILE_TEST
-> +	depends on OF
-> +	select WATCHDOG_CORE
-> +	default ARCH_REALTEK
-> +	help
-> +	  Say Y here to include support for the watchdog timer in
-> +	  Realtek RTD1295 SoCs.
-> +
->   # AVR32 Architecture
->   
->   config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 56adf9fa67d0..63cb3ed8117d 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -87,6 +87,7 @@ obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
->   obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
->   obj-$(CONFIG_STM32_WATCHDOG) += stm32_iwdg.o
->   obj-$(CONFIG_UNIPHIER_WATCHDOG) += uniphier_wdt.o
-> +obj-$(CONFIG_RTD119X_WATCHDOG) += rtd119x_wdt.o
->   
->   # AVR32 Architecture
->   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/rtd119x_wdt.c b/drivers/watchdog/rtd119x_wdt.c
-> new file mode 100644
-> index 000000000000..1bd2e86509a7
-> --- /dev/null
-> +++ b/drivers/watchdog/rtd119x_wdt.c
-> @@ -0,0 +1,152 @@
-> +/*
-> + * Realtek RTD129x watchdog
-> + *
-> + * Copyright (c) 2017 Andreas F?rber
-> + *
-> + * SPDX-License-Identifier: GPL-2.0+
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define RTD_TCWCR		0x0
-> +#define RTD_TCWTR		0x4
-> +#define RTD_TCWOV		0xc
-> +
-> +#define RTD_TCWCR_WDEN_DISABLED		0xa5
-> +#define RTD_TCWCR_WDEN_ENABLED		0xff
-> +#define RTD_TCWCR_WDEN_MASK		0xff
-> +
-> +#define RTD_TCWTR_WDCLR			BIT(0)
-> +
+On Fri, Sep 01, 2017 at 03:18:03PM +0200, Ulf Hansson wrote:
+> On 31 August 2017 at 15:50, Mark Brown <broonie@kernel.org> wrote:
+> > On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
 
-need to include bitops.h.
+> >> This patch should be merged along with the 1st patch of the series "mmc: host:
+> >> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
+> >> omap_hsmmc driver.
 
-> +struct rtd119x_watchdog_device {
-> +	struct watchdog_device wdt_dev;
-> +	void __iomem *base;
-> +	struct clk *clk;
-> +};
-> +
-> +static int rtd119x_wdt_start(struct watchdog_device *wdev)
-> +{
-> +	struct rtd119x_watchdog_device *data = watchdog_get_drvdata(wdev);
-> +	u32 val;
-> +
-> +	val = readl_relaxed(data->base + RTD_TCWCR);
-> +	val &= ~RTD_TCWCR_WDEN_MASK;
-> +	val |= RTD_TCWCR_WDEN_ENABLED;
-> +	writel(val, data->base + RTD_TCWCR);
-> +
-> +	return 0;
-> +}
-> +
-> +static int rtd119x_wdt_stop(struct watchdog_device *wdev)
-> +{
-> +	struct rtd119x_watchdog_device *data = watchdog_get_drvdata(wdev);
-> +	u32 val;
-> +
-> +	val = readl_relaxed(data->base + RTD_TCWCR);
-> +	val &= ~RTD_TCWCR_WDEN_MASK;
-> +	val |= RTD_TCWCR_WDEN_DISABLED;
-> +	writel(val, data->base + RTD_TCWCR);
-> +
-> +	return 0;
-> +}
-> +
-> +static int rtd119x_wdt_ping(struct watchdog_device *wdev)
-> +{
-> +	struct rtd119x_watchdog_device *data = watchdog_get_drvdata(wdev);
-> +
-> +	writel_relaxed(RTD_TCWTR_WDCLR, data->base + RTD_TCWTR);
-> +
-> +	return rtd119x_wdt_start(wdev);
-> +}
-> +
-> +static int rtd119x_wdt_set_timeout(struct watchdog_device *wdev, unsigned int val)
-> +{
-> +	struct rtd119x_watchdog_device *data = watchdog_get_drvdata(wdev);
-> +
-> +	writel(val * 27000000, data->base + RTD_TCWOV);
-> +
+Hang on, how can this break anything?  If it breaks things shouldn't
+there be bugfixes for incorrect constraints somewhere?
 
-This also needs to set wdev->timeout.
+> > I can sign a tag if it's needed for a cross tree merge.
 
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_ops rtd119x_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start		= rtd119x_wdt_start,
-> +	.stop		= rtd119x_wdt_stop,
-> +	.ping		= rtd119x_wdt_ping,
-> +	.set_timeout	= rtd119x_wdt_set_timeout,
-> +};
-> +
-> +static const struct watchdog_info rtd119x_wdt_info = {
-> +	.identity = "rtd119x-wdt",
-> +	.options = 0,
-> +};
-> +
-> +static const struct of_device_id rtd_wdt_dt_ids[] = {
-> +	 { .compatible = "realtek,rtd1295-watchdog" },
-> +	 { }
-> +};
-> +
-> +static int rtd_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct rtd119x_watchdog_device *data;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(data->base))
-> +		return PTR_ERR(data->base);
-> +
-> +	data->clk = of_clk_get(pdev->dev.of_node, 0);
-> +	if (IS_ERR(data->clk))
-> +		return PTR_ERR(data->clk);
-> +
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret) {
-> +		clk_put(data->clk);
-> +		return ret;
-> +	}
-> +
-> +	data->wdt_dev.info = &rtd119x_wdt_info;
-> +	data->wdt_dev.ops = &rtd119x_wdt_ops;
-> +	data->wdt_dev.timeout = 120;
-> +	data->wdt_dev.max_timeout = 0xffffffff / clk_get_rate(data->clk);
-> +	data->wdt_dev.min_timeout = 1;
-> +	data->wdt_dev.parent = &pdev->dev;
-> +
-> +	watchdog_stop_on_reboot(&data->wdt_dev);
-> +	watchdog_set_drvdata(&data->wdt_dev, data);
-> +	platform_set_drvdata(pdev, data);
-> +
-Not needed since there is no remove function.
+> Easier if you could drop it and instead just provide an ack.
 
-> +	writel_relaxed(RTD_TCWTR_WDCLR, data->base + RTD_TCWTR);
-> +	rtd119x_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
-> +	rtd119x_wdt_stop(&data->wdt_dev);
-> +
-> +	ret = devm_watchdog_register_device(&pdev->dev, &data->wdt_dev);
-> +	if (ret) {
-> +		clk_disable_unprepare(data->clk);
-> +		clk_put(data->clk);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver rtd_wdt_driver = {
-> +	.probe = rtd_wdt_probe,
-> +	.driver = {
-> +		.name = "rtd1295-watchdog",
-> +		.of_match_table	= rtd_wdt_dt_ids,
-> +	},
-> +};
-> +builtin_platform_driver(rtd_wdt_driver);
-> 
+> Unless you believes there may conflict in your regulator tree?
+
+My main goal is to get it in during this merge window, this way either
+it goes in via my tree and the rest of the series can go in the next
+release or the whole thing makes this merge window.
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/regulator-pbias-variants
+
+for you to fetch changes up to 27eae9d4b9d4cd9c204ef81f46078d91362ed41c:
+
+  regulator: pbias: Select voltage table based on max-voltage (2017-08-31 11:55:40 +0100)
+
+----------------------------------------------------------------
+regulator: Add support for different OMAP variants in the pbias regulator
+
+----------------------------------------------------------------
+Ravikumar Kattekola (1):
+      regulator: pbias: Select voltage table based on max-voltage
+
+ drivers/regulator/pbias-regulator.c | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/e81509a3/attachment.sig>
