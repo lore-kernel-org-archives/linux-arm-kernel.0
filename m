@@ -1,32 +1,39 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 01 Sep 2017 11:42:11 -0700
-Subject: [PATCH] drm/tve200: Replace custom connector with panel bridge
-In-Reply-To: <20170831213514.29267-1-linus.walleij@linaro.org>
-References: <20170831213514.29267-1-linus.walleij@linaro.org>
-Message-ID: <87bmmul0qk.fsf@anholt.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 1 Sep 2017 13:26:26 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.14, take 3
+In-Reply-To: <20170901061706.varrjekvcuymqzx2@flea>
+References: <20170824083620.b5cq4qtyr3cqtpjx@flea.lan>
+ <20170831175901.GF21656@codeaurora.org>
+ <20170901061706.varrjekvcuymqzx2@flea>
+Message-ID: <20170901202626.GY21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On 09/01, Maxime Ripard wrote:
+> Hi Stephen,
+> 
+> On Thu, Aug 31, 2017 at 10:59:01AM -0700, Stephen Boyd wrote:
+> > On 08/24, Maxime Ripard wrote:
+> > > Hi,
+> > > 
+> > > Here is a quite late PR, but this also something we've been waiting
+> > > for for quite some time already.
+> > > 
+> > > These patches convert our last users of the old clock framework to the
+> > > new one. We still have some marginal users of the old clock drivers,
+> > > but they shouldn't prevent the fix for the orphans clocks we hold back
+> > > to work.
+> > > 
+> > 
+> > Great. Thanks. Pulled into clk-next.
+> 
+> Just so you know, since we haven't heard from you about this one, we
+> didn't send the DT bits. So the conversion of our DTs will happen in
+> 4.15.
+> 
 
-> This replaces the custom connector in the TVE200 with the
-> panel bridge helper. As long as we're just using panels
-> and no other bridges, this works just fine.
+Ok, sounds good.
 
-Yeah, we definitely need a way to get the bus_flags/bus_formats from the
-next link in the bridge chain in general, rather than needing to reach
-into the panel's connector (or being just out of luck in a 2-bridge
-chain).  That seems like it'll be straightforward to do later, and this
-is a good start.
-
-I don't think you need the new #includes in tve200_drm.h, but other than
-maybe that change:
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/428fc4cd/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
