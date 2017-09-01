@@ -1,108 +1,115 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Fri, 1 Sep 2017 11:09:34 +0800
-Subject: [PATCH 3/4] media: atmel-isc: Enable the clocks during probe
-In-Reply-To: <20170901030935.29717-1-wenyou.yang@microchip.com>
-References: <20170901030935.29717-1-wenyou.yang@microchip.com>
-Message-ID: <20170901030935.29717-4-wenyou.yang@microchip.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri,  1 Sep 2017 11:18:47 +0530
+Subject: [PATCH v2] arm64: fix unwind_frame() for filtered out fn for function
+ graph tracing
+Message-ID: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To meet the relationship, enable the HCLOCK and ispck during the
-device probe, "isc_pck frequency is less than or equal to isc_ispck,
-and isc_ispck is greater than or equal to HCLOCK."
-Meanwhile, call the pm_runtime_enable() in the right place.
+do_task_stat() calls get_wchan(), which further does unbind_frame().
+unbind_frame() restores frame->pc to original value in case function
+graph tracer has modified a return address (LR) in a stack frame to hook
+a function return. However, if function graph tracer has hit a filtered
+function, then we can't unwind it as ftrace_push_return_trace() has
+biased the index(frame->graph) with a 'huge negative'
+offset(-FTRACE_NOTRACE_DEPTH).
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+Moreover, arm64 stack walker defines index(frame->graph) as unsigned
+int, which can not compare a -ve number.
+
+Similar problem we can have with calling of walk_stackframe() from
+save_stack_trace_tsk() or dump_backtrace().
+
+This patch fixes unwind_frame() to test the index for -ve value and
+restore index accordingly before we can restore frame->pc.
+
+Reproducer:
+
+cd /sys/kernel/debug/tracing/
+echo schedule > set_graph_notrace
+echo 1 > options/display-graph
+echo wakeup > current_tracer
+ps -ef | grep -i agent
+
+Above commands result in:
+Unable to handle kernel paging request at virtual address ffff801bd3d1e000
+pgd = ffff8003cbe97c00
+[ffff801bd3d1e000] *pgd=0000000000000000, *pud=0000000000000000
+Internal error: Oops: 96000006 [#1] SMP
+[...]
+CPU: 5 PID: 11696 Comm: ps Not tainted 4.11.0+ #33
+[...]
+task: ffff8003c21ba000 task.stack: ffff8003cc6c0000
+PC is at unwind_frame+0x12c/0x180
+LR is at get_wchan+0xd4/0x134
+pc : [<ffff00000808892c>] lr : [<ffff0000080860b8>] pstate: 60000145
+sp : ffff8003cc6c3ab0
+x29: ffff8003cc6c3ab0 x28: 0000000000000001
+x27: 0000000000000026 x26: 0000000000000026
+x25: 00000000000012d8 x24: 0000000000000000
+x23: ffff8003c1c04000 x22: ffff000008c83000
+x21: ffff8003c1c00000 x20: 000000000000000f
+x19: ffff8003c1bc0000 x18: 0000fffffc593690
+x17: 0000000000000000 x16: 0000000000000001
+x15: 0000b855670e2b60 x14: 0003e97f22cf1d0f
+x13: 0000000000000001 x12: 0000000000000000
+x11: 00000000e8f4883e x10: 0000000154f47ec8
+x9 : 0000000070f367c0 x8 : 0000000000000000
+x7 : 00008003f7290000 x6 : 0000000000000018
+x5 : 0000000000000000 x4 : ffff8003c1c03cb0
+x3 : ffff8003c1c03ca0 x2 : 00000017ffe80000
+x1 : ffff8003cc6c3af8 x0 : ffff8003d3e9e000
+
+Process ps (pid: 11696, stack limit = 0xffff8003cc6c0000)
+Stack: (0xffff8003cc6c3ab0 to 0xffff8003cc6c4000)
+[...]
+[<ffff00000808892c>] unwind_frame+0x12c/0x180
+[<ffff000008305008>] do_task_stat+0x864/0x870
+[<ffff000008305c44>] proc_tgid_stat+0x3c/0x48
+[<ffff0000082fde0c>] proc_single_show+0x5c/0xb8
+[<ffff0000082b27e0>] seq_read+0x160/0x414
+[<ffff000008289e6c>] __vfs_read+0x58/0x164
+[<ffff00000828b164>] vfs_read+0x88/0x144
+[<ffff00000828c2e8>] SyS_read+0x60/0xc0
+[<ffff0000080834a0>] __sys_trace_return+0x0/0x4
+
+fixes: 20380bb390a4 (arm64: ftrace: fix a stack tracer's output under function graph tracer)
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
+v1 -> v2:
+	- improved commit log
+	- now index is restored and thereafter frame->pc as well.
 
- drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/stacktrace.h | 2 +-
+ arch/arm64/kernel/stacktrace.c      | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index 80968f7d79f2..bc3098982d12 100644
---- a/drivers/media/platform/atmel/atmel-isc.c
-+++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -1595,6 +1595,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 	struct isc_subdev_entity *sd_entity;
- 	struct video_device *vdev = &isc->video_dev;
- 	struct vb2_queue *q = &isc->vb2_vidq;
-+	struct device *dev = isc->dev;
- 	int ret;
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 5b6eafccc5d8..816db5b9b874 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -23,7 +23,7 @@ struct stackframe {
+ 	unsigned long sp;
+ 	unsigned long pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	unsigned int graph;
++	int graph;
+ #endif
+ };
  
- 	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
-@@ -1678,6 +1679,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 		return ret;
- 	}
- 
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+	pm_request_idle(dev);
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 09d37d66b630..4c47147d0554 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -75,6 +75,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	if (tsk->ret_stack &&
+ 			(frame->pc == (unsigned long)return_to_handler)) {
++		if (frame->graph < 0)
++			frame->graph += FTRACE_NOTRACE_DEPTH;
 +
- 	return 0;
- }
- 
-@@ -1857,25 +1862,37 @@ static int atmel_isc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	ret = clk_prepare_enable(isc->hclock);
-+	if (ret) {
-+		dev_err(dev, "failed to enable hclock: %d\n", ret);
-+		return ret;
-+	}
-+
- 	ret = isc_clk_init(isc);
- 	if (ret) {
- 		dev_err(dev, "failed to init isc clock: %d\n", ret);
--		goto clean_isc_clk;
-+		goto unprepare_hclk;
- 	}
- 
- 	isc->ispck = isc->isc_clks[ISC_ISPCK].clk;
- 
-+	ret = clk_prepare_enable(isc->ispck);
-+	if (ret) {
-+		dev_err(dev, "failed to enable ispck: %d\n", ret);
-+		goto unprepare_hclk;
-+	}
-+
- 	/* ispck should be greater or equal to hclock */
- 	ret = clk_set_rate(isc->ispck, clk_get_rate(isc->hclock));
- 	if (ret) {
- 		dev_err(dev, "failed to set ispck rate: %d\n", ret);
--		goto clean_isc_clk;
-+		goto unprepare_clk;
- 	}
- 
- 	ret = v4l2_device_register(dev, &isc->v4l2_dev);
- 	if (ret) {
- 		dev_err(dev, "unable to register v4l2 device.\n");
--		goto clean_isc_clk;
-+		goto unprepare_clk;
- 	}
- 
- 	ret = isc_parse_dt(dev, isc);
-@@ -1908,8 +1925,6 @@ static int atmel_isc_probe(struct platform_device *pdev)
- 			break;
- 	}
- 
--	pm_runtime_enable(dev);
--
- 	return 0;
- 
- cleanup_subdev:
-@@ -1918,7 +1933,11 @@ static int atmel_isc_probe(struct platform_device *pdev)
- unregister_v4l2_device:
- 	v4l2_device_unregister(&isc->v4l2_dev);
- 
--clean_isc_clk:
-+unprepare_clk:
-+	clk_disable_unprepare(isc->ispck);
-+unprepare_hclk:
-+	clk_disable_unprepare(isc->hclock);
-+
- 	isc_clk_cleanup(isc);
- 
- 	return ret;
+ 		/*
+ 		 * This is a case where function graph tracer has
+ 		 * modified a return address (LR) in a stack frame
 -- 
-2.13.0
+2.9.4
