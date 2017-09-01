@@ -1,175 +1,132 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Fri,  1 Sep 2017 08:20:19 +0900
-Subject: [PATCH v1 2/3] nvmem: uniphier: add UniPhier eFuse driver
-In-Reply-To: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1504221620-358-3-git-send-email-hayashibara.keiji@socionext.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri,  1 Sep 2017 01:31:35 +0100
+Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
+In-Reply-To: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
+References: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170901003135.10058-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add eFuse driver for Socionext UniPhier series SoC.
-Note that eFuse device is under soc-glue and this register
-implements as read only.
+Hi,
 
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- arch/arm64/configs/defconfig   |  1 +
- drivers/nvmem/Kconfig          | 11 +++++
- drivers/nvmem/Makefile         |  2 +
- drivers/nvmem/uniphier-efuse.c | 98 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 112 insertions(+)
- create mode 100644 drivers/nvmem/uniphier-efuse.c
+On 31/08/17 00:36, Stefan Br?ns wrote:
+> The A64 SoC has the same dma engine as the H3 (sun8i), with a
+> reduced amount of physical channels. Add the proper config data
+> and compatible string to support it.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6c7d147..5c38b4a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -514,6 +514,7 @@ CONFIG_PHY_XGENE=y
- CONFIG_PHY_TEGRA_XUSB=y
- CONFIG_QCOM_L2_PMU=y
- CONFIG_QCOM_L3_PMU=y
-+CONFIG_UNIPHIER_EFUSE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
- CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EFI_CAPSULE_LOADER=y
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 101ced4..aaeaebe 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -123,6 +123,17 @@ config NVMEM_SUNXI_SID
- 	  This driver can also be built as a module. If so, the module
- 	  will be called nvmem_sunxi_sid.
+...
+
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index 5f4eee4513e5..6a17c5d63582 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -1068,6 +1068,12 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+>  	.nr_max_vchans   = 34,
+>  	.dmac_variant    = DMAC_VARIANT_H3,
+>  };
+> +
+> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
+> +	.nr_max_channels = 8,
+> +	.nr_max_requests = 27,
+> +	.nr_max_vchans   = 38,
+> +	.dmac_variant    = DMAC_VARIANT_H3,
+>  };
+>  
+>  static const struct of_device_id sun6i_dma_match[] = {
+> @@ -1075,6 +1081,7 @@ static const struct of_device_id sun6i_dma_match[] = {
+>  	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+>  	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+>  	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
+> +	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+
+I was wondering if should use the opportunity to expose those values as
+DT properties instead of hard-wiring them to a compatible string in the
+driver every time we add support for a new SoC?
+We could introduce a new compatible string (say: "allwinner,sunxi-dma"),
+then describe properties for the number of channels and requests and
+vchans and parse those from the DT at probe time.
+With this we might be able to support future SoCs without Linux *driver*
+changes, by just providing the right DT. This would have worked already
+for instance for the A83T support, which just changed those values.
+
+For instance with this quick patch below (just compile tested, and without
+your refactoring).
+The DT node would then read something like:
+	dma: dma-controller at 01c02000 {
+		compatible = "allwinner,sun50i-a64-dma",
+			     "allwinner,sunxi-dma";
+		reg = <0x01c02000 0x1000>;
+		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&ccu CLK_BUS_DMA>;
+		resets = <&ccu RST_BUS_DMA>;
+		#dma-cells = <1>;
+		allwinner,max_channels = <8>;
+		allwinner,max_requests = <27>;
+		allwinner,max_vchans = <38>;
+	};
+
+Cheers,
+Andre.
+
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index a2358780ab2c..5ae8032f2065 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -1033,6 +1033,7 @@ static const struct of_device_id sun6i_dma_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
++	{ .compatible = "allwinner,sunxi-dma", .data = NULL },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+@@ -1051,7 +1052,43 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	device = of_match_device(sun6i_dma_match, &pdev->dev);
+ 	if (!device)
+ 		return -ENODEV;
+-	sdc->cfg = device->data;
++	if (!device->data) {
++		struct sun6i_dma_config *config;
++
++		config = devm_kmalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
++		if (!config)
++			return -ENOMEM;
++
++		ret = of_property_read_u32(pdev->dev.of_node,
++					   "allwinner,max_channels",
++					   &config->nr_max_channels);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"missing allwinner,max_channels property\n");
++			return ret;
++		}
++
++		ret = of_property_read_u32(pdev->dev.of_node,
++					   "allwinner,max_requests",
++					   &config->nr_max_requests);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"missing allwinner,max_requests property\n");
++			return ret;
++		}
++
++		ret = of_property_read_u32(pdev->dev.of_node,
++					   "allwinner,max_vchans",
++					   &config->nr_max_vchans);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"missing allwinner,max_vchans property\n");
++			return ret;
++		}
++		sdc->cfg = config;
++	} else {
++		sdc->cfg = device->data;
++	}
  
-+config UNIPHIER_EFUSE
-+	tristate "UniPhier SoCs eFuse support"
-+	depends on ARCH_UNIPHIER || COMPILE_TEST
-+	depends on OF && MFD_SYSCON
-+	help
-+	  This is a simple drive to dump specified values of UniPhier SoC
-+	  from eFuse.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called nvmem_uniphier-efuse.
-+
- config NVMEM_VF610_OCOTP
- 	tristate "VF610 SoC OCOTP support"
- 	depends on SOC_VF610 || COMPILE_TEST
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 1731406..f5277c3 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -26,6 +26,8 @@ obj-$(CONFIG_ROCKCHIP_EFUSE)	+= nvmem_rockchip_efuse.o
- nvmem_rockchip_efuse-y		:= rockchip-efuse.o
- obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
- nvmem_sunxi_sid-y		:= sunxi_sid.o
-+obj-$(CONFIG_UNIPHIER_EFUSE)	+= nvmem_uniphier-efuse.o
-+nvmem_uniphier-efuse-y		:= uniphier-efuse.o
- obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
- nvmem-vf610-ocotp-y		:= vf610-ocotp.o
- obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
-diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
-new file mode 100644
-index 0000000..d553fa3
---- /dev/null
-+++ b/drivers/nvmem/uniphier-efuse.c
-@@ -0,0 +1,98 @@
-+/*
-+ * UniPhier eFuse driver
-+ *
-+ * Copyright (C) 2017 Socionext Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+#define UNIPHIER_EFUSE_WORD_SIZE	4
-+#define UNIPHIER_EFUSE_STRIDE		4
-+
-+static int uniphier_reg_read(void *context,
-+			     unsigned int offset, void *val, size_t bytes)
-+{
-+	int words = bytes / UNIPHIER_EFUSE_WORD_SIZE;
-+
-+	return regmap_bulk_read(context, offset, val, words);
-+}
-+
-+static struct nvmem_config econfig = {
-+	.name = "uniphier-efuse",
-+	.owner = THIS_MODULE,
-+	.read_only = true,
-+	.reg_read = uniphier_reg_read,
-+	.word_size = UNIPHIER_EFUSE_WORD_SIZE,
-+	.stride = UNIPHIER_EFUSE_STRIDE,
-+};
-+
-+static int uniphier_efuse_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct nvmem_device *nvmem;
-+	struct regmap *regmap;
-+	struct resource res;
-+	int ret;
-+
-+	ret = of_address_to_resource(dev->of_node, 0, &res);
-+	if (ret)
-+		return ret;
-+
-+	regmap = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
-+	econfig.size = resource_size(&res);
-+	econfig.priv = regmap;
-+	econfig.dev = dev;
-+
-+	nvmem = nvmem_register(&econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int uniphier_efuse_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static const struct of_device_id uniphier_efuse_of_match[] = {
-+	{ .compatible = "socionext,uniphier-efuse",},
-+	{/* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_efuse_of_match);
-+
-+static struct platform_driver uniphier_efuse_driver = {
-+	.probe = uniphier_efuse_probe,
-+	.remove = uniphier_efuse_remove,
-+	.driver = {
-+		.name = "uniphier-efuse",
-+		.of_match_table = uniphier_efuse_of_match,
-+	},
-+};
-+module_platform_driver(uniphier_efuse_driver);
-+
-+MODULE_AUTHOR("Keiji Hayashibara <hayashibara.keiji@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier eFuse driver");
-+MODULE_LICENSE("GPL v2");
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	sdc->base = devm_ioremap_resource(&pdev->dev, res);
 -- 
-2.7.4
+2.14.1
