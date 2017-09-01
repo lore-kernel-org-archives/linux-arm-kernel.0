@@ -1,46 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Sep 2017 10:21:28 +0100
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <20170901072744.2409-1-dja@axtens.net>
-References: <20170901072744.2409-1-dja@axtens.net>
-Message-ID: <CAKv+Gu84njSF5uOvNtknGdOd5auU7zw9scFeTq5v-=OhExgOqA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 1 Sep 2017 10:22:05 +0100
+Subject: [PATCH] arm64: efi: Don't include EFI fpsimd save/restore code
+ in non-EFI kernels
+In-Reply-To: <CAKv+Gu-L0gWGc-EGviDhXimv8zm9hqLuiFjWE-e5__mQGTR+zg@mail.gmail.com>
+References: <1504193606-14461-1-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu-L0gWGc-EGviDhXimv8zm9hqLuiFjWE-e5__mQGTR+zg@mail.gmail.com>
+Message-ID: <20170901092203.GD6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2017 at 08:27, Daniel Axtens <dja@axtens.net> wrote:
-> This patch set:
->
->  - splits the default display handling out from VGA arbiter, into its
->    own file and behind its own Kconfig option (and gives the functions
->    better names).
->
->  - adds extra detection of default devices. To be nominated, the vga
->    arbiter and platform hooks must not have nominated a default. A
->    card will then only be nominated if it has a driver attached and
->    has IO or memory decoding enabled.
->
->  - adds relevant documentation.
->
-> The practical impact of this is improved X autoconfiguration on some
-> arm64 systems.
->
-> Changes in v3:
->
->  - Add documentation - thanks Daniel Vetter for pointing it out.
->
->  - Clarify explanations. Thanks to everyone for continuing to bear
->    with my incomplete understanding of PCI and provide some clarity.
->
->  - Split refactoring and adding functionality.
->
-> Changes in v2: https://www.spinics.net/lists/linux-pci/msg64007.html
->
-> Drop all the powerpc patches. [explanation snipped]
->
-> v1: https://www.spinics.net/lists/linux-pci/msg63581.html
->
+On Thu, Aug 31, 2017 at 04:46:32PM +0100, Ard Biesheuvel wrote:
+> On 31 August 2017 at 16:33, Dave Martin <Dave.Martin@arm.com> wrote:
+> > __efi_fpsimd_begin()/__efi_fpsimd_end() are for use when making EFI
+> > calls only, so using them in non-EFI kernels is not allowed.
+> >
+> > This patch compiles them out if CONFIG_EFI is not set.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-If we are all in agreement that fixing X is not an option, I think
-this is a reasonable approach
+Thanks
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> I suppose we could also move these into arch/arm64/kernel/efi.c
+
+Could do, though I initially preferred to keep them in fpsimd.c due to
+the interactions with kernel-mode NEON.
+
+I'll probably leave them where they are for now unless someone has a
+strong view on it.
+
+Cheers
+---Dave
