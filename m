@@ -1,23 +1,27 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 31 Aug 2017 18:36:42 -0700
-Subject: [RESEND PATCH v8 2/3] clk: gate: expose clk_gate_ops::is_enabled
-In-Reply-To: <1503316742-22145-3-git-send-email-gabriel.fernandez@st.com>
+Date: Thu, 31 Aug 2017 18:36:39 -0700
+Subject: [RESEND PATCH v8 1/3] clk: nxp: clk-lpc32xx: rename
+ clk_gate_is_enabled()
+In-Reply-To: <1503316742-22145-2-git-send-email-gabriel.fernandez@st.com>
 References: <1503316742-22145-1-git-send-email-gabriel.fernandez@st.com>
- <1503316742-22145-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20170901013642.GQ21656@codeaurora.org>
+ <1503316742-22145-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20170901013639.GP21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/21, gabriel.fernandez at st.com wrote:
 > From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> This patch exposes clk_gate_ops::is_enabled as functions
-> that can be directly called and assigned in places like this so
-> we don't need wrapper functions that do nothing besides forward
-> the call.
+> We need to export clk_gate_is_enabled() from clk framework, then
+> to avoid compilation issue we have to rename clk_gate_is_enabled()
+> in NXP LPC32xx clock driver.
+> We changed all gate op with 'lpc32xx_' prefix:
+> lpc32xx_clk_gate_enable(),
+> lpc32xx_clk_gate_disable(),
+> lpc32xx_clk_gate_is_enabled().
 > 
 > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Acked-by: Vladimir Zapolskiy <vz@mleia.com>
 > ---
 
 Applied to clk-next
