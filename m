@@ -1,93 +1,24 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 1 Sep 2017 15:17:24 +0100
-Subject: [PATCH v2 0/8] ARM: NOMMU: MPU updates
-In-Reply-To: <7cd7cb6f-b4d5-ab71-12c3-e025c99efb90@st.com>
-References: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
- <7cd7cb6f-b4d5-ab71-12c3-e025c99efb90@st.com>
-Message-ID: <7d309b1f-00d4-be6c-773c-94c7b0087abb@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 1 Sep 2017 09:30:13 -0500
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Add Realtek
+ RTD1295
+In-Reply-To: <20170828105344.8338-2-afaerber@suse.de>
+References: <20170828105344.8338-1-afaerber@suse.de>
+ <20170828105344.8338-2-afaerber@suse.de>
+Message-ID: <20170901143013.oe5frfvxlnppn6v4@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/17 14:45, Alexandre Torgue wrote:
-> Hi Vlad
+On Mon, Aug 28, 2017 at 12:53:42PM +0200, Andreas F?rber wrote:
+> Add binding for Realtek RTD1295 IRQ mux.
 > 
-> On 07/21/2017 03:12 PM, Vladimir Murzin wrote:
->> Hi,
->>
->> This is an update of the existent MPU code which consist set of
->> clean-ups and enhancements. The most significant changes are in the
->> way how MPU settings sync-up for secondaries (PATCH 3/8), more
->> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
->> 8/8). Since there is no in-tree user of MPU, support for M-class has
->> been added (PATCH 6/8).
->>
->> There is also practical benefit of patch set:
->>
->> "These MPU patches introduce a nice feature that it simplifies the
->> bootloader: do not need to setup the MPU, for example for coherent DMA
->> region, which is described in device-tree too." Andr?s Szemz?
->>
->> Changelog:
->>             v1 -> v2
->>                - support for XIP (PATCH 7/8)
->>           - rebased on 4.13-rc1
->>
->>          RFC v2 -> v1
->>                 - dropped RFC tag
->>            - Tested-by from Andr?s
->>            - rebased on 4.12-rc5
->>
->>             RFC -> RFC v2
->>            - fixed MPU enable for v7m (PATCH 6/7)
->>
->> Thanks!
->>
->> Vladimir Murzin (8):
->>    ARM: NOMMU: Move out MPU setup in separate module
->>    ARM: NOMMU: Update MPU accessors to use cp15 helpers
->>    ARM: NOMMU: Rework MPU to be mostly done in C
->>    ARM: NOMMU: Disallow MPU for XIP
->>    ARM: Kconfig: Kill CONFIG_VECTORS_BASE
->>    ARM: V7M: Add support for MPU to M-class
->>    ARM: NOMMU: Use more MPU regions to cover memory
->>    ARM: NOMMU: Support MPU in XIP configuration
->>
-> 
-> For no-XIP patches:
-> 
-> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v1 -> v2:
+>  * Dropped reference to common interrupt.txt bindings (Rob)
+>  
+>  .../interrupt-controller/realtek,rtd119x-mux.txt   | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/realtek,rtd119x-mux.txt
 
-Thanks!
-
-> 
-> I still have issue with XIP ones, then I continue to analysis ans let you know asap.
-
-Russell, are you happy to take patches modulo XIP one? Alex and I are working
-on XIP side and hope we can sort it out around rc1 time frame...
-
-Cheers
-Vladimir
-
-> 
-> Regards
-> Alex
-> 
-> 
-> 
->>   arch/arm/Kconfig                  |   9 -
->>   arch/arm/Kconfig-nommu            |  17 +-
->>   arch/arm/include/asm/cputype.h    |  10 +
->>   arch/arm/include/asm/mpu.h        |  24 +-
->>   arch/arm/include/asm/smp.h        |   2 +-
->>   arch/arm/include/asm/v7m.h        |  10 +
->>   arch/arm/kernel/asm-offsets.c     |  11 +
->>   arch/arm/kernel/head-nommu.S      | 138 ++++++++---
->>   arch/arm/kernel/smp.c             |   2 +-
->>   arch/arm/kernel/vmlinux-xip.lds.S |   3 +
->>   arch/arm/mm/Makefile              |   1 +
->>   arch/arm/mm/nommu.c               | 254 +-------------------
->>   arch/arm/mm/pmsa-v7.c             | 471 ++++++++++++++++++++++++++++++++++++++
->>   13 files changed, 651 insertions(+), 301 deletions(-)
->>   create mode 100644 arch/arm/mm/pmsa-v7.c
->>
-> 
+Acked-by: Rob Herring <robh@kernel.org>
