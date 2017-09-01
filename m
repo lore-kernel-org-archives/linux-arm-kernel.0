@@ -1,38 +1,36 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri,  1 Sep 2017 10:07:24 -0500
-Subject: [PATCH] ARM: dts: da850-evm: add chosen and SPI alias
-Message-ID: <1504278444-13265-1-git-send-email-aford173@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 01 Sep 2017 17:15:58 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.13 (#3)
+Message-ID: <87wp5io3f5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the request of Sekhar Nori from TI, this is a follow-up to
-pending ("ARM: dts: da850-evm: add serial and ethernet aliases")
+Hi,
 
-This patch will add the chosen container to point stdout-path to serial2
-and set the alias for spi0 to spi1 since the SPI NOR flash exists on SPI1.
+Here is the third pull request for fixes for mvebu for v4.13.
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+Gregory
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index c755079..3962fa4 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -15,11 +15,16 @@
- 	compatible = "ti,da850-evm", "ti,da850";
- 	model = "DA850/AM1808/OMAP-L138 EVM";
- 
-+	chosen {
-+		stdout-path = &serial2;
-+	};
-+
- 	aliases {
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 		serial2 = &serial2;
- 		ethernet0 = &eth0;
-+		spi0 = &spi1;
- 	};
- 
- 	soc at 1c00000 {
--- 
-2.7.4
+The following changes since commit d7a65c4905bc9c304ecf3d8aa566802f6119480f:
+
+  ARM64: dts: marvell: armada-37xx: Fix the number of GPIO on south bridge (2017-08-02 16:00:00 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.13-3
+
+for you to fetch changes up to a0ac89b57207ccc87d76f4e6aa9a83026743861b:
+
+  arm64: dts: marvell: fix number of GPIOs in Armada AP806 description (2017-08-30 15:50:13 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.13 (part 3)
+
+Fix number of GPIOs in AP806 description for Armada 7K/8K
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      arm64: dts: marvell: fix number of GPIOs in Armada AP806 description
+
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
