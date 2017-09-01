@@ -1,155 +1,46 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 1 Sep 2017 12:26:46 +0200
-Subject: [PATCH v3 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170724212454.27574-3-d-gerlach@ti.com>
-References: <20170724212454.27574-1-d-gerlach@ti.com>
- <20170724212454.27574-3-d-gerlach@ti.com>
-Message-ID: <20170901102646.GQ20634@localhost>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Fri, 1 Sep 2017 18:31:58 +0800
+Subject: [RFC PATCH v1 0/3] arm64/ras: support sea error recovery
+Message-ID: <1504261921-39308-1-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 04:24:54PM -0500, Dave Gerlach wrote:
-> Certain SoCs like Texas Instruments AM335x and AM437x require parts
-> of the EMIF PM code to run late in the suspend sequence from SRAM,
-> such as saving and restoring the EMIF context and placing the memory
-> into self-refresh.
-> 
-> One requirement for these SoCs to suspend and enter its lowest power
-> mode, called DeepSleep0, is that the PER power domain must be shut off.
-> Because the EMIF (DDR Controller) resides within this power domain, it
-> will lose context during a suspend operation, so we must save it so we
-> can restore once we resume. However, we cannot execute this code from
-> external memory, as it is not available at this point, so the code must
-> be executed late in the suspend path from SRAM.
-> 
-> This patch introduces a ti-emif-sram driver that includes several
-> functions written in ARM ASM that are relocatable so the PM SRAM
-> code can use them. It also allocates a region of writable SRAM to
-> be used by the code running in the executable region of SRAM to save
-> and restore the EMIF context. It can export a table containing the
-> absolute addresses of the available PM functions so that other SRAM
-> code can branch to them. This code is required for suspend/resume on
-> AM335x and AM437x to work.
-> 
-> In addition to this, to be able to share data structures between C and
-> the ti-emif-sram-pm assembly code, we can automatically generate all of
-> the C struct member offsets and sizes as macros by making use of the ARM
-> asm-offsets file. In the same header that we define our data structures
-> in we also define all the macros in an inline function and by adding a
-> call to this in the asm_offsets file all macros are properly generated
-> and available to the assembly code without cluttering up the asm-offsets
-> file.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v2->v3:
-> * Move all static vars into common struct and instead point to one static
->   instance of this struct and pass this struct around for internal calls.
-> * Rename ti_emif_prepare_push_sram to ti_emif_alloc_sram
-> * Clean up probe path to avoid leftover vairable values from being used
->   after probe defer or failure.
-> * Fix mistake in ASM code that stored EMIF_POWER_MANAGEMENT_CONTROL into
->   location for shadow register.
-> * Avoid extern definition for asm-offsets definition and use a stub instead
->   of defining out in asm-offsets.
-> * A few general fixups to code.
+With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
+are consumed. In some cases, if the error address is in a clean page or a
+read-only page, there is a chance to recover. Such as error occurs in a
+instruction page, we can reread this page from disk instead of killing process.
 
-Just got back from my vacation this week, so sorry about the late reply.
+Because memory_failure() may sleep, we can not call it directly in SEA exception
+context. So we saved faulting physical address associated with a process in the
+ghes handler and set __TIF_SEA_NOTIFY. When we return from SEA exception context
+and get into do_notify_resume() before the process running, we could check it
+and call memory_failure() to do recovery. It's safe, because we are in process
+context.
 
-It indeed looks like you've addressed my comments on v2, but I still
-have few comments below. Just minor nits.
+In some platform, when SEA triggerred, physical address could be
+reported by memory section or by processor section, so we save 
+address at this two place.
 
-> +	/* Save physical address to calculate resume offset during pm init */
-> +	emif_data->ti_emif_sram_data_phys =
-> +		gen_pool_virt_to_phys(emif_data->sram_pool_data,
+Xie XiuQi (3):
+  arm64/ras: support sea error recovery
+  apei: add ghes param for arch_apei_report_mem_error
+  arm64/apei: get error address from memory section for recovery
 
-I try to indent continuation lines at least two tabs further (at least
-when not matching open parentheses) which tends to improve readability
-and conforms better to the coding standard.
+ arch/arm64/Kconfig                   |  11 +++
+ arch/arm64/include/asm/ras.h         |  27 ++++++
+ arch/arm64/include/asm/thread_info.h |   4 +-
+ arch/arm64/kernel/Makefile           |   1 +
+ arch/arm64/kernel/ras.c              | 155 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal.c           |   8 ++
+ arch/arm64/mm/fault.c                |  27 ++++--
+ arch/x86/kernel/acpi/apei.c          |   2 +-
+ drivers/acpi/apei/apei-base.c        |   4 +-
+ drivers/acpi/apei/ghes.c             |   4 +-
+ include/acpi/apei.h                  |   4 +-
+ include/acpi/ghes.h                  |   3 +-
+ 12 files changed, 236 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ras.h
+ create mode 100644 arch/arm64/kernel/ras.c
 
-> +				      emif_data->ti_emif_sram_data_virt);
-
-> +/**
-> + * ti_emif_copy_pm_function_table - copy mapping of pm funcs in sram
-> + * @sram_pool: pointer to struct gen_pool where dst resides
-> + * @dst: void * to address that table should be copied
-> + *
-> + * Returns 0 if success other error code if table is not available
-> + */
-> +int ti_emif_copy_pm_function_table(struct gen_pool *sram_pool, void *dst)
-> +{
-> +	void *copy_addr;
-> +
-> +	if (!(emif_instance && emif_instance->ti_emif_sram_virt))
-> +		return -EINVAL;
-
-Perhaps this can now be simplified as 
-
-	if (!emif_instance)
-		return -EINVAL;
-
-since when the driver has been successfully bound all fields would have
-been initialised.
-
-Use -ENODEV for consistency?
-
-> +
-> +	copy_addr = sram_exec_copy(sram_pool, dst,
-> +				   &emif_instance->pm_functions,
-> +				   sizeof(emif_instance->pm_functions));
-> +	if (!copy_addr)
-> +		return -ENODEV;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(ti_emif_copy_pm_function_table);
-> +
-> +/**
-> + * ti_emif_get_mem_type - return type for memory type in use
-> + *
-> + * Returns memory type value read from EMIF or error code if fails
-> + */
-> +int ti_emif_get_mem_type(void)
-> +{
-> +	unsigned long temp;
-> +
-> +	if (!(emif_instance &&
-> +	      !IS_ERR_OR_NULL(emif_instance->pm_data.ti_emif_base_addr_virt)))
-
-And this would also be more readable as simply !emif_instance.
-
-> +		return -ENODEV;
-> +
-> +	temp = readl(emif_instance->pm_data.ti_emif_base_addr_virt +
-> +		     EMIF_SDRAM_CONFIG);
-> +
-> +	temp = (temp & SDRAM_TYPE_MASK) >> SDRAM_TYPE_SHIFT;
-> +	return temp;
-> +}
-> +EXPORT_SYMBOL_GPL(ti_emif_get_mem_type);
-
-> +static int ti_emif_remove(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +
-> +	pm_runtime_put_sync(dev);
-> +	pm_runtime_disable(dev);
-> +
-> +	ti_emif_free_sram(emif_instance);
-> +
-> +	emif_instance = NULL;
-
-Nothing is of course preventing the remove() callback from racing with
-the global functions above, but I'd still prefer to reset emif_instance
-before releasing the memory.
-
-In fact, given the register access in ti_emif_get_mem_type() you may
-even want to clear emif_instance before the pm_runtime_put_sync().
-
-> +
-> +	return 0;
-> +}
-
-Thanks,
-Johan
+-- 
+1.8.3.1
