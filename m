@@ -1,34 +1,58 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 1 Sep 2017 07:23:38 -0500
-Subject: [PATCH 1/2] of: Add vendor prefix for Amarula Solutions
-In-Reply-To: <1633009.GLYYEVNxi7@phil>
-References: <1503730303-11422-1-git-send-email-jteki@openedev.com>
- <20170831200855.db654hikvddf7prz@rob-hp-laptop> <1633009.GLYYEVNxi7@phil>
-Message-ID: <CAL_Jsq+4cnY_4O_QVdkF=ZL8Ty1k_2cTBhb7uoVVxwM8QkcLUQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Sep 2017 13:30:26 +0100
+Subject: [PATCH] ARM: Kconfig: fix example for ARM_APPENDED_DTB
+In-Reply-To: <1504268120-17237-1-git-send-email-vladimir.murzin@arm.com>
+References: <1504268120-17237-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20170901123026.GD1933@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 4:54 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Rob,
->
-> Am Donnerstag, 31. August 2017, 15:08:55 CEST schrieb Rob Herring:
->> On Sat, Aug 26, 2017 at 12:21:42PM +0530, Jagan Teki wrote:
->> > From: Jagan Teki <jagan@amarulasolutions.com>
->> >
->> > Added 'amarula' as a vendor prefix for Amarula Solutions,
->> > specialist in Embedded and Opensource solutions.
->> >
->> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> > ---
->> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->> >  1 file changed, 1 insertion(+)
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> just to clarify ... you did apply the last vendor-prefixes yourself
-> to prevent conflicts. From the Ack, I assume I should merge that
-> with the devicetree itself, right?
+Hi Vladimir,
 
-I have not applied. You can apply it.
+On Fri, Sep 01, 2017 at 01:15:20PM +0100, Vladimir Murzin wrote:
+> Help message for config ARM_APPENDED_DTB suggests following example to
+> append dtb to zImage:
+> 
+> cat zImage <filename>.dtb > zImage_w_dtb
+> 
+> and that makes unaware user wondering why Linux doesn't boot.
+> 
+> So fix example with ">>". Unfortunately, the same example is present in
+> message to commit e2a6a3aafa98 ("ARM: zImage: Allow the appending of a
+> device tree binary").
 
-Rob
+I think that as-is, the example is correct, as `zImage_w_dtb` is a
+different file to `zImage`.
+
+... but perhaps the wording could be updated to make that clearer.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 61a0cb1..756f50f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1893,7 +1893,7 @@ config ARM_APPENDED_DTB
+>  	help
+>  	  With this option, the boot code will look for a device tree binary
+>  	  (DTB) appended to zImage
+> -	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+> +	  (e.g. cat zImage <filename>.dtb >> zImage_w_dtb).
+>  
+>  	  This is meant as a backward compatibility convenience for those
+>  	  systems with a bootloader that can't be upgraded to accommodate
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
