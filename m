@@ -1,81 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 1 Sep 2017 09:04:46 -0500
-Subject: [PATCH v4 4/5] net: stmmac: dwmac-sun8i: choose internal PHY via
- phy-is-integrated
-In-Reply-To: <20170831205928.GS22289@lunn.ch>
-References: <20170826073311.25612-1-clabbe.montjoie@gmail.com>
- <20170826073311.25612-5-clabbe.montjoie@gmail.com>
- <20170826212051.GA10418@lunn.ch>
- <20170831201803.x6vwftfcllrfpk6q@rob-hp-laptop>
- <20170831205928.GS22289@lunn.ch>
-Message-ID: <CAL_JsqJMZG-X7erY_87mS7N+RfPLdL2VPBaAMBhVYxNCGhbrrA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 1 Sep 2017 09:08:24 -0500
+Subject: [PATCH] scripts/dtc: fix '%zx' warning
+In-Reply-To: <CAL_Jsq+1gMR2MCEXA6UOiK+4NpxT4k71YGqWzW7hZNCWnRg0hw@mail.gmail.com>
+References: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
+ <20170726013004.GJ8978@umbus.fritz.box>
+ <20170808112818.GC20805@n2100.armlinux.org.uk>
+ <20170809040642.GG13670@umbus.fritz.box>
+ <CAL_JsqKiM_T-ftd8NvHmzcRsirRWTe34jZRjZ=3NGSgb4HGncQ@mail.gmail.com>
+ <20170831161611.GT20805@n2100.armlinux.org.uk>
+ <CAL_Jsq+1gMR2MCEXA6UOiK+4NpxT4k71YGqWzW7hZNCWnRg0hw@mail.gmail.com>
+Message-ID: <CAL_Jsq+xwu8obB5RHkcHYXPJ_+3mU5gz88ZDGF8NKQZT4BtaTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 3:59 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Thu, Aug 31, 2017 at 03:18:03PM -0500, Rob Herring wrote:
->> On Sat, Aug 26, 2017 at 11:20:51PM +0200, Andrew Lunn wrote:
->> > Hi Corentin
->> >
->> > I think we have now all agreed this is an mdio-mux, plus it is also an
->> > MII mux. We should represent that in device tree. This patchset does
->> > this. However, as it is now, the mux structure in DT is ignored. All
->> > it does is search for the phy-is-integrated flags and goes on that.
->> >
->> > I made the comment that the device tree representation cannot be
->> > implemented using an MDIO mux driver, because of driver loading
->> > issues.  However, the core of the MDIO mux code is just a library,
->> > symbols exported as GPL, free for anything to use.
->> >
->> > What i think should happen is the mdio-mux is implemented inside the
->> > MAC driver, using the mux-core as a library. The device tree structure
->> > of a mix is then reflected within Linux. The mux switch callback is
->> > implemented within the MAC driver. So it can reset the MAC when the
->> > mux is switched. The 'phy-is-integrated' property is then no longer
->> > needed.
->> >
->> > I would suggest a binding something like:
+On Thu, Aug 31, 2017 at 12:01 PM, Rob Herring <robh+dt@kernel.org> wrote:
+> On Thu, Aug 31, 2017 at 11:16 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Thu, Aug 31, 2017 at 10:58:12AM -0500, Rob Herring wrote:
+>>> On Tue, Aug 8, 2017 at 11:06 PM, David Gibson
+>>> <david@gibson.dropbear.id.au> wrote:
+>>> > On Tue, Aug 08, 2017 at 12:28:19PM +0100, Russell King - ARM Linux wrote:
+>>> >> On Wed, Jul 26, 2017 at 11:30:04AM +1000, David Gibson wrote:
+>>> >> > On Tue, Jul 25, 2017 at 05:20:09PM +0100, Russell King wrote:
+>>> >> > > dtc uses an incorrect format specifier for printing a uint64_t value.
+>>> >> > > uint64_t may be either 'unsigned long' or 'unsigned long long' depending
+>>> >> > > on the host architecture.
+>>> >> > >
+>>> >> > > Fix this by using %llx and casting to unsigned long long, which ensures
+>>> >> > > that we always have a wide enough variable to print 64 bits of hex.
+>>> >> > >
+>>> >> > >   HOSTCC  scripts/dtc/checks.o
+>>> >> > > scripts/dtc/checks.c: In function 'check_simple_bus_reg':
+>>> >> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+>>> >> > >   snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
+>>> >> > >   ^
+>>> >> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+>>> >> > >
+>>> >> > > Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
+>>> >> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>> >> >
+>>> >> > This (embarrassing) error is already fixed in upstream dtc.
+>>> >>
+>>> >> It remains unfixed in 4.13-rc4.  How do we get this fixed in the
+>>> >> kernel's dtc?  From what I can see, sending a patch to fix stuff
+>>> >> doesn't work.
+>>>
+>>> Sorry, didn't see this until Andrew M picked it up.
 >>
->> This is looks better to me, but...
->>
->> > emac: ethernet at 1c0b000 {
->> >         compatible = "allwinner,sun8i-h3-emac";
->> >         syscon = <&syscon>;
->> >         reg = <0x01c0b000 0x104>;
->> >         interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
->> >         interrupt-names = "macirq";
->> >         resets = <&ccu RST_BUS_EMAC>;
->> >         reset-names = "stmmaceth";
->> >         clocks = <&ccu CLK_BUS_EMAC>;
->> >         clock-names = "stmmaceth";
->> >         #address-cells = <1>;
->> >         #size-cells = <0>;
->> >
->> >         phy-handle = <&int_mii_phy>;
->> >         phy-mode = "mii";
->> >         allwinner,leds-active-low;
->> >
->> >         mdio: mdio {
->> >                 #address-cells = <1>;
->> >                 #size-cells = <0>;
->> >     }
->>
->> Why do you need this node still?
+>> How do we know whether whatever is in upstream dtc fixes the problem
+>> that I'm seeing?
 >
-> Hi Rob
->
-> It might not be needed, depending on how it is implemented. But:
->
-> Documentation/devicetree/bindings/net/mdio-mux.txt
->
-> It is normal for an mdio bus mux to have a phandle back to the parent
-> mdio bus.  Also, i think the stmmac driver will only instantiate the
-> mdio bus if there is a node for it in the device tree.
+> Build upstream dtc or here's a branch[1] with the cherry-picked fix.
 
-You don't have a phandle to the parent mdio bus though.
-
-I think we should allow for both case. The mux could be within the bus
-hierarchy. Depends where the controls are. Another alternative someone
-will try sooner or later is using the new mux control binding.
+Well, your fix went in before I got the cherry-pick sent to Linus.
+Still, let me know if there's any issue with the upstream fix because
+when I sync dtc this fix is going to be overwritten with upstream.
 
 Rob
