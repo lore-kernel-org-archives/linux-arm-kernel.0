@@ -1,29 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 1 Sep 2017 16:45:12 -0700
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#4)
-In-Reply-To: <87k21l4c27.fsf@free-electrons.com>
-References: <87k21l4c27.fsf@free-electrons.com>
-Message-ID: <20170901234512.GC15825@localhost>
+Date: Fri, 1 Sep 2017 16:45:59 -0700
+Subject: [GIT PULL] ARM: at91: DT for 4.14#2
+In-Reply-To: <20170830163905.x4kol7iyg466fzvz@piout.net>
+References: <20170830163905.x4kol7iyg466fzvz@piout.net>
+Message-ID: <20170901234559.GD15825@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 11:52:48AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Wed, Aug 30, 2017 at 06:39:05PM +0200, Alexandre Belloni wrote:
+> Hi Olof,
 > 
-> Here is the forth (and ultimate) pull request for dt64 for mvebu for v4.14.
+> As discussed, this replaces the previous pull request. The only change
+> is the fixed up SoB.
 > 
-> I really hope it is not too late.
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 > 
-> These patches were initially part of the netdev series but were
-> removed from these series to avoid conflict in the device
-> tree. Unfortunately this moved was done during the holiday time so
-> it didn't happen smoothly. I will do better for the next release.
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 > 
-> They really worth to be added because all the driver part were already
-> there but as pointed by Thomas otherwise the driver changes are
-> somewhat useless.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.14-dt2
 
-Yep, makes sense to pick up. Merged now, thanks.
+Merged now, thanks.
 
 
 -Olof
