@@ -1,235 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 1 Sep 2017 15:35:49 +0200
-Subject: [PATCH 1/3] dmaengine: sun6i: Correct DMA support on H3
-In-Reply-To: <a649f98d4ac44abc873c5110ce9363e5@rwthex-w2-b.rwth-ad.de>
-References: <20170830233609.13855-1-stefan.bruens@rwth-aachen.de>
- <20170830233609.13855-2-stefan.bruens@rwth-aachen.de>
- <20170831145135.c6a2wubcf6xu34tz@flea.lan>
- <a649f98d4ac44abc873c5110ce9363e5@rwthex-w2-b.rwth-ad.de>
-Message-ID: <20170901133549.cr2ivmfr5mnrdujg@flea>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 1 Sep 2017 15:45:15 +0200
+Subject: [PATCH v2 0/8] ARM: NOMMU: MPU updates
+In-Reply-To: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
+References: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <7cd7cb6f-b4d5-ab71-12c3-e025c99efb90@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 05:04:54AM +0200, Stefan Bruens wrote:
-> On Donnerstag, 31. August 2017 16:51:35 CEST Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Thu, Aug 31, 2017 at 01:36:07AM +0200, Stefan Br?ns wrote:
-> > > +/* Between SoC generations, there are some significant differences:
-> > > + * - A23 added a clock gate register
-> > > + * - the H3 burst length field has a different offset
-> > > + */
-> > 
-> > This is not the proper comment style.
-> > 
-> > > +enum dmac_variant {
-> > > +	DMAC_VARIANT_A31,
-> > > +	DMAC_VARIANT_A23,
-> > > +	DMAC_VARIANT_H3,
-> > > +};
-> > > +
-> > 
-> > And this is redundant with what we already have in our structures.
+Hi Vlad
+
+On 07/21/2017 03:12 PM, Vladimir Murzin wrote:
+> Hi,
 > 
-> Actually, its not. For H3, there are currently at least 3 register compatible 
-> SoCs: H5 is identical, R40 has 16 dma channels, A64 has 8 channels. So if the 
-> current config structure is kept, we need 3 different compatible strings. Same 
-> for the A23, which is register compatible to e.g. A83t and V3s, but with 
-> different numbers of DMA channels.
+> This is an update of the existent MPU code which consist set of
+> clean-ups and enhancements. The most significant changes are in the
+> way how MPU settings sync-up for secondaries (PATCH 3/8), more
+> flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+> 8/8). Since there is no in-tree user of MPU, support for M-class has
+> been added (PATCH 6/8).
 > 
-> So either you decorate the code with a cascade of
+> There is also practical benefit of patch set:
 > 
-> if ((of_is_compatible(..A23..) || of_is_compatible(..A83T..) || ...) {
-> } else if ((of_is_compatible(..H3..) || of_is_compatible(..A64..) || ...) {
-> } else { /* A31 */
-> }
+> "These MPU patches introduce a nice feature that it simplifies the
+> bootloader: do not need to setup the MPU, for example for coherent DMA
+> region, which is described in device-tree too." Andr?s Szemz?
 > 
-> in a number of places, or you do it just once.
-
-That's not how you retrieve the structures. They are already
-associated to the compatible, and you need to do a single lookup to
-get them. So that's nowhere near what you're suggesting. You can have
-a look at the of_match_device in the probe function.
-
+> Changelog:
+>             v1 -> v2
+>                - support for XIP (PATCH 7/8)
+> 	      - rebased on 4.13-rc1
 > 
-> > 
-> > >  /*
-> > >  
-> > >   * Hardware channels / ports representation
-> > >   *
-> > > 
-> > > @@ -101,6 +116,7 @@ struct sun6i_dma_config {
-> > > 
-> > >  	u32 nr_max_channels;
-> > >  	u32 nr_max_requests;
-> > >  	u32 nr_max_vchans;
-> > > 
-> > > +	enum dmac_variant dmac_variant;
-> > > 
-> > >  };
-> > >  
-> > >  /*
-> > > 
-> > > @@ -240,8 +256,12 @@ static inline s8 convert_burst(u32 maxburst)
-> > > 
-> > >  	switch (maxburst) {
-> > >  	
-> > >  	case 1:
-> > >  		return 0;
-> > > 
-> > > +	case 4:
-> > > +		return 1;
-> > > 
-> > >  	case 8:
-> > >  		return 2;
-> > > 
-> > > +	case 16:
-> > > +		return 3;
-> > > 
-> > >  	default:
-> > >  		return -EINVAL;
-> > >  	
-> > >  	}
-> > > 
-> > > @@ -249,11 +269,7 @@ static inline s8 convert_burst(u32 maxburst)
-> > > 
-> > >  static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
-> > >  {
-> > > 
-> > > -	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
-> > > -	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
-> > > -		return -EINVAL;
-> > > -
-> > > -	return addr_width >> 1;
-> > > +	return ilog2(addr_width);
-> > > 
-> > >  }
-> > 
-> > This isn't really the same operation. There should be some explanation
-> > about why it's the right thing to do.
+>          RFC v2 -> v1
+>                 - dropped RFC tag
+> 	       - Tested-by from Andr?s
+> 	       - rebased on 4.12-rc5
 > 
-> For 1, 2 and 4 it is the same. The correct register value for 8 bytes, 
-> supported by H3, H5, A64 and R40, is 3.
-
-That should be in a separate patch, with that in the commit log.
-
-> > >  static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
-> > > 
-> > > @@ -499,45 +515,58 @@ static int set_config(struct sun6i_dma_dev *sdev,
-> > > 
-> > >  			enum dma_transfer_direction direction,
-> > >  			u32 *p_cfg)
-> > >  
-> > >  {
-> > > 
-> > > +	enum dma_slave_buswidth src_addr_width, dst_addr_width;
-> > > +	u32 src_maxburst, dst_maxburst, supported_burst_length;
-> > > 
-> > >  	s8 src_width, dst_width, src_burst, dst_burst;
-> > > 
-> > > +	src_addr_width = sconfig->src_addr_width;
-> > > +	dst_addr_width = sconfig->dst_addr_width;
-> > > +	src_maxburst = sconfig->src_maxburst;
-> > > +	dst_maxburst = sconfig->dst_maxburst;
-> > > +
-> > > +	if (sdev->cfg->dmac_variant == DMAC_VARIANT_H3)
-> > > +		supported_burst_length = BIT(1) | BIT(4) | BIT(8) | BIT(16);
-> > > +	else
-> > > +		supported_burst_length = BIT(1) | BIT(8);
-> > 
-> > This could be stored in the structure for example.
+>             RFC -> RFC v2
+> 	       - fixed MPU enable for v7m (PATCH 6/7)
 > 
-> Which one? sun6i_dma_dev? sun6i_dma_config?
-
-The one associated with the compatible, so sun6i_dma_config.
-
->  
-> > >  	switch (direction) {
-> > > 
-> > >  	case DMA_MEM_TO_DEV:
-> > > -		src_burst = convert_burst(sconfig->src_maxburst ?
-> > > -					sconfig->src_maxburst : 8);
-> > > -		src_width = convert_buswidth(sconfig->src_addr_width !=
-> > > -						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
-> > > -				sconfig->src_addr_width :
-> > > -				DMA_SLAVE_BUSWIDTH_4_BYTES);
-> > > -		dst_burst = convert_burst(sconfig->dst_maxburst);
-> > > -		dst_width = convert_buswidth(sconfig->dst_addr_width);
-> > > +		if (src_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
-> > > +			src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> > > +		src_maxburst = src_maxburst ? src_maxburst : 8;
-> > > 
-> > >  		break;
-> > >  	
-> > >  	case DMA_DEV_TO_MEM:
-> > > -		src_burst = convert_burst(sconfig->src_maxburst);
-> > > -		src_width = convert_buswidth(sconfig->src_addr_width);
-> > > -		dst_burst = convert_burst(sconfig->dst_maxburst ?
-> > > -					sconfig->dst_maxburst : 8);
-> > > -		dst_width = convert_buswidth(sconfig->dst_addr_width !=
-> > > -						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
-> > > -				sconfig->dst_addr_width :
-> > > -				DMA_SLAVE_BUSWIDTH_4_BYTES);
-> > > +		if (dst_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
-> > > +			dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> > > +		dst_maxburst = dst_maxburst ? dst_maxburst : 8;
-> > > 
-> > >  		break;
-> > >  	
-> > >  	default:
-> > >  		return -EINVAL;
-> > >  	
-> > >  	}
-> > > 
-> > > -	if (src_burst < 0)
-> > > -		return src_burst;
-> > > -	if (src_width < 0)
-> > > -		return src_width;
-> > > -	if (dst_burst < 0)
-> > > -		return dst_burst;
-> > > -	if (dst_width < 0)
-> > > -		return dst_width;
-> > > -
-> > > -	*p_cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
-> > > -		DMA_CHAN_CFG_SRC_WIDTH(src_width) |
-> > > -		DMA_CHAN_CFG_DST_BURST(dst_burst) |
-> > > +	if (!(BIT(src_addr_width) & sdev->slave.src_addr_widths))
-> > > +		return -EINVAL;
-> > > +	if (!(BIT(dst_addr_width) & sdev->slave.dst_addr_widths))
-> > > +		return -EINVAL;
-> > > +	if (!(BIT(src_maxburst) & supported_burst_length))
-> > > +		return -EINVAL;
-> > > +	if (!(BIT(dst_maxburst) & supported_burst_length))
-> > > +		return -EINVAL;
-> > > +
-> > > +	src_width = convert_buswidth(src_addr_width);
-> > > +	dst_width = convert_buswidth(dst_addr_width);
-> > > +	dst_burst = convert_burst(dst_maxburst);
-> > > +	src_burst = convert_burst(src_maxburst);
-> > 
-> > I'm not sure what you're trying to do here. Could you split your patch
-> > by logical change, this doesn't seem related to just supporting the
-> > H3, but a heavier refactoring.
+> Thanks!
 > 
-> Untangling 3 independent steps - handling of DMA_SLAVE_BUSWIDTH_UNDEFINED, 
-> range checking, and conversion to register value. As the valid ranges depend 
-> on the controller, the code is much easier to read if the range check is done 
-> first, and then the conversion.
+> Vladimir Murzin (8):
+>    ARM: NOMMU: Move out MPU setup in separate module
+>    ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>    ARM: NOMMU: Rework MPU to be mostly done in C
+>    ARM: NOMMU: Disallow MPU for XIP
+>    ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>    ARM: V7M: Add support for MPU to M-class
+>    ARM: NOMMU: Use more MPU regions to cover memory
+>    ARM: NOMMU: Support MPU in XIP configuration
+> 
 
-Please make separate patches as well for the splitting up of each of
-those steps.
+For no-XIP patches:
 
-Thanks!
-Maxime
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/926b1635/attachment-0001.sig>
+I still have issue with XIP ones, then I continue to analysis ans let 
+you know asap.
+
+Regards
+Alex
+
+
+
+>   arch/arm/Kconfig                  |   9 -
+>   arch/arm/Kconfig-nommu            |  17 +-
+>   arch/arm/include/asm/cputype.h    |  10 +
+>   arch/arm/include/asm/mpu.h        |  24 +-
+>   arch/arm/include/asm/smp.h        |   2 +-
+>   arch/arm/include/asm/v7m.h        |  10 +
+>   arch/arm/kernel/asm-offsets.c     |  11 +
+>   arch/arm/kernel/head-nommu.S      | 138 ++++++++---
+>   arch/arm/kernel/smp.c             |   2 +-
+>   arch/arm/kernel/vmlinux-xip.lds.S |   3 +
+>   arch/arm/mm/Makefile              |   1 +
+>   arch/arm/mm/nommu.c               | 254 +-------------------
+>   arch/arm/mm/pmsa-v7.c             | 471 ++++++++++++++++++++++++++++++++++++++
+>   13 files changed, 651 insertions(+), 301 deletions(-)
+>   create mode 100644 arch/arm/mm/pmsa-v7.c
+> 
