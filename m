@@ -1,45 +1,57 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Sep 2017 13:30:36 -0700
-Subject: [PATCH 1/2] clk: sunxi-ng: Provide a default reset hook
-In-Reply-To: <CAPDyKFqw7PNs_GQXmbJx8doo-tGW6PsKSffJhzVgU3cX3-wvsg@mail.gmail.com>
-References: <20170825094953.3247-1-maxime.ripard@free-electrons.com>
- <CAPDyKFonXp4Uqi=DLxKf=1ecOx-2E5mUkEXqnqJPE-J57xXQcw@mail.gmail.com>
- <20170830123624.vurdnh6bojbtrjal@flea.lan>
- <CAPDyKFqw7PNs_GQXmbJx8doo-tGW6PsKSffJhzVgU3cX3-wvsg@mail.gmail.com>
-Message-ID: <20170901203036.GA21656@codeaurora.org>
+Date: Fri, 1 Sep 2017 13:32:01 -0700
+Subject: [PATCH v2] clk: mb86s7x: Drop non-building driver
+In-Reply-To: <20170824225237.21485-1-afaerber@suse.de>
+References: <20170824225237.21485-1-afaerber@suse.de>
+Message-ID: <20170901203201.GB21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30, Ulf Hansson wrote:
-> On 30 August 2017 at 14:36, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Ulf,
-> >
-> > On Wed, Aug 30, 2017 at 02:29:24PM +0200, Ulf Hansson wrote:
-> >> On 25 August 2017 at 11:49, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > The reset hook was left implemented. Provide a dumb implementation so that
-> >> > client drivers can depend on it.
-> >> >
-> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>
-> >> Do you want me to pick this up via my mmc tree? If so, is that okay by
-> >> the clock maintainers?
-> >
-> > I also happen to be the maintainer of that part of the kernel
-> > (reporting to Mike and Stephen of course). We don't have anything
-> > touching that file in next, so unless they feel like it should go
-> > through their tree, it would be easier to keep the two changes
-> > together and merge them through your tree.
+On 08/25, Andreas F?rber wrote:
+> It fails to build once we introduce the ARCH_MB86S7X Kconfig symbol:
 > 
-> Alright, I have picked it up for next!
+>   drivers/clk/clk-mb86s7x.c:27:10: fatal error: soc/mb86s7x/scb_mhu.h: No such file or directory
+>    #include <soc/mb86s7x/scb_mhu.h>
+>             ^~~~~~~~~~~~~~~~~~~~~~~
+>   compilation terminated.
 > 
+> And when commenting out that line, we get:
+> 
+>   drivers/clk/clk-mb86s7x.c: In function 'crg_gate_control':
+>   drivers/clk/clk-mb86s7x.c:72:8: error: implicit declaration of function 'mb86s7x_send_packet' [-Werror=implicit-function-declaration]
+>     ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
+>           ^~~~~~~~~~~~~~~~~~~
+>   drivers/clk/clk-mb86s7x.c:72:28: error: 'CMD_PERI_CLOCK_GATE_SET_REQ' undeclared (first use in this function)
+>     ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
+>                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+>   drivers/clk/clk-mb86s7x.c:72:28: note: each undeclared identifier is reported only once for each function it appears in
+>   drivers/clk/clk-mb86s7x.c: In function 'crg_rate_control':
+>   drivers/clk/clk-mb86s7x.c:116:10: error: 'CMD_PERI_CLOCK_RATE_SET_REQ' undeclared (first use in this function)
+>      code = CMD_PERI_CLOCK_RATE_SET_REQ;
+>             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+>   drivers/clk/clk-mb86s7x.c:121:10: error: 'CMD_PERI_CLOCK_RATE_GET_REQ' undeclared (first use in this function); did you mean 'CMD_PERI_CLOCK_RATE_SET_REQ'?
+>      code = CMD_PERI_CLOCK_RATE_GET_REQ;
+>             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+>             CMD_PERI_CLOCK_RATE_SET_REQ
+>   drivers/clk/clk-mb86s7x.c: In function 'mhu_cluster_rate':
+>   drivers/clk/clk-mb86s7x.c:276:10: error: 'CMD_CPU_CLOCK_RATE_GET_REQ' undeclared (first use in this function)
+>      code = CMD_CPU_CLOCK_RATE_GET_REQ;
+>             ^~~~~~~~~~~~~~~~~~~~~~~~~~
+>   drivers/clk/clk-mb86s7x.c:278:10: error: 'CMD_CPU_CLOCK_RATE_SET_REQ' undeclared (first use in this function); did you mean 'CMD_CPU_CLOCK_RATE_GET_REQ'?
+>      code = CMD_CPU_CLOCK_RATE_SET_REQ;
+>             ^~~~~~~~~~~~~~~~~~~~~~~~~~
+>             CMD_CPU_CLOCK_RATE_GET_REQ
+>   cc1: some warnings being treated as errors
+>   scripts/Makefile.build:302: recipe for target
+>   'drivers/clk/clk-mb86s7x.o' failed
+>   make[2]: *** [drivers/clk/clk-mb86s7x.o] Error 1
+> 
+> Remove the driver for now.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
 
-Thanks!
-
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-
-if that helps.
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
