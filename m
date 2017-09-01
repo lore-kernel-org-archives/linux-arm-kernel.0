@@ -1,29 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 1 Sep 2017 16:43:53 -0700
-Subject: [GIT PULL] Allwinner DT changes for 4.14, take 3
-In-Reply-To: <20170901132012.x2wqwaxdprsdnooj@flea>
-References: <20170828092246.h66hjoqmv3r3kpes@flea.lan>
- <20170901132012.x2wqwaxdprsdnooj@flea>
-Message-ID: <20170901234353.GB15825@localhost>
+Date: Fri, 1 Sep 2017 16:45:12 -0700
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#4)
+In-Reply-To: <87k21l4c27.fsf@free-electrons.com>
+References: <87k21l4c27.fsf@free-electrons.com>
+Message-ID: <20170901234512.GC15825@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 03:20:12PM +0200, Maxime Ripard wrote:
-> Hi
+On Wed, Aug 30, 2017 at 11:52:48AM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> On Mon, Aug 28, 2017 at 11:22:46AM +0200, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > Here is a late pull request for the 4.14 merge window.
-> > 
-> > Along with the fixes pull request I'm about to change, this should be
-> > our last pull request for the next release.
+> Here is the forth (and ultimate) pull request for dt64 for mvebu for v4.14.
 > 
-> Since you merged the fixes that remove the EMAC nodes for 4.13
-> already, we really need to have that merged in 4.14, otherwise we'll
-> end up with a build breakage of the beelink device tree.
+> I really hope it is not too late.
+> 
+> These patches were initially part of the netdev series but were
+> removed from these series to avoid conflict in the device
+> tree. Unfortunately this moved was done during the holiday time so
+> it didn't happen smoothly. I will do better for the next release.
+> 
+> They really worth to be added because all the driver part were already
+> there but as pointed by Thomas otherwise the driver changes are
+> somewhat useless.
 
-This was already merged, but I might have missed to reply to the email.
+Yep, makes sense to pick up. Merged now, thanks.
 
 
 -Olof
