@@ -1,57 +1,30 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 01 Sep 2017 09:23:44 +0800
-Subject: [PATCH v2 5/5] thermal: Add Tegra BPMP thermal sensor driver
-In-Reply-To: <20170831124506.GA16437@ulmo.fritz.box>
-References: <20170724162918.21050-1-mperttunen@nvidia.com>
- <20170724162918.21050-5-mperttunen@nvidia.com>
- <1502420276.2598.5.camel@intel.com>
- <4315091f-03b1-2df6-b224-6a29d3261371@nvidia.com>
- <20170831124506.GA16437@ulmo.fritz.box>
-Message-ID: <1504229024.2638.10.camel@intel.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 01 Sep 2017 10:47:53 +0900
+Subject: [PATCH 0/3] drm/exynos/gsc: Support the rotate hardware limits of gsc
+References: <CGME20170901014757epcas1p19de712f2cea2e48b3d42b878743dd9f8@epcas1p1.samsung.com>
+Message-ID: <1504230476-1878-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-31 at 14:45 +0200, Thierry Reding wrote:
-> On Mon, Aug 21, 2017 at 10:40:44AM +0800, Wei Ni wrote:
-> > 
-> > 
-> > 
-> > On Friday, August 11, 2017 10:57 AM, Zhang Rui wrote:
-> > > 
-> > > On Mon, 2017-07-24 at 19:29 +0300, Mikko Perttunen wrote:
-> > > > 
-> > > > On Tegra186, the BPMP (Boot and Power Management Processor)
-> > > > exposes
-> > > > an
-> > > > interface to thermal sensors on the system-on-chip. This driver
-> > > > implements access to the interface. It supports reading the
-> > > > temperature, setting trip points and receiving notification of
-> > > > a
-> > > > tripped trip point.
-> > > > 
-> > > > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Hello all,
 
-Acked-by: Zhang Rui <rui.zhang@intel.com>
-for this patch and patch 1/5.
+The gscaler has hardware rotation limits. So this patch set support
+the rotate hardware limits of gsc.
 
+Best regards,
+Hoegeun
 
-> > > Wei Ni,
-> > > 
-> > > what do you think of this patch?
-> > Reviewed this patch, it looked fine to me.
-> Hi Zhang,
-> 
-> given the build-time dependencies, how about if I take this into the
-> Tegra tree with an Acked-by from you?
+Hoegeun Kwon (3):
+  ARM: dts: exynos: Add the hardware rotation limits for gsc
+  arm64: dts: exynos: Add the hardware rotation limits for gsc
+  drm/exynos/gsc: Add rotation hardware limits of gscaler
 
-Sounds okay to me. Done. :)
+ arch/arm/boot/dts/exynos5250.dtsi          |  8 ++++
+ arch/arm/boot/dts/exynos5420.dtsi          |  4 ++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi |  6 +++
+ drivers/gpu/drm/exynos/exynos_drm_gsc.c    | 63 +++++++++++++++++++-----------
+ include/uapi/drm/exynos_drm.h              |  2 +
+ 5 files changed, 60 insertions(+), 23 deletions(-)
 
-thanks,
-rui
-
->  I can provide a stable branch with
-> the dependencies included if you want to pull it into your tree in
-> order
-> to resolve dependencies.
-> 
-> Thierry
+-- 
+1.9.1
