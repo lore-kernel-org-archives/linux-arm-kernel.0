@@ -1,62 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 1 Sep 2017 17:23:22 +0100
-Subject: Applied "regulator: pbias: Select voltage table based on
- max-voltage" to the regulator tree
-In-Reply-To: <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
-References: <E1dnO3z-0000tI-7K@debutante>
- <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
- <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
- <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
-Message-ID: <20170901162322.xrjnim4khn3wfslj@sirena.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 1 Sep 2017 18:27:37 +0200
+Subject: [PATCH] arm64: fpsimd: Prevent registers leaking across exec
+In-Reply-To: <20170901161611.GE6321@e103592.cambridge.arm.com>
+References: <1504025374-17068-1-git-send-email-Dave.Martin@arm.com>
+ <20170831060201.GA7325@kroah.com>
+ <20170901161611.GE6321@e103592.cambridge.arm.com>
+Message-ID: <20170901162737.GB4650@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 03:18:03PM +0200, Ulf Hansson wrote:
-> On 31 August 2017 at 15:50, Mark Brown <broonie@kernel.org> wrote:
-> > On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
+On Fri, Sep 01, 2017 at 05:16:15PM +0100, Dave Martin wrote:
+> On Thu, Aug 31, 2017 at 08:02:01AM +0200, Greg KH wrote:
+> > On Tue, Aug 29, 2017 at 05:49:34PM +0100, Dave Martin wrote:
+> > > commit 096622104e14d8a1db4860bd557717067a0515d2 upstream.
+> > > 
+> > > There are some tricky dependencies between the different stages of
+> > > flushing the FPSIMD register state during exec, and these can race
+> > > with context switch in ways that can cause the old task's regs to
+> > > leak across.  In particular, a context switch during the memset() can
+> > > cause some of the task's old FPSIMD registers to reappear.
+> > > 
+> > > Disabling preemption for this small window would be no big deal for
+> > > performance: preemption is already disabled for similar scenarios
+> > > like updating the FPSIMD registers in sigreturn.
+> > > 
+> > > So, instead of rearranging things in ways that might swap existing
+> > > subtle bugs for new ones, this patch just disables preemption
+> > > around the FPSIMD state flushing so that races of this type can't
+> > > occur here.  This brings fpsimd_flush_thread() into line with other
+> > > code paths.
+> > > 
+> > > Cc: <stable@vger.kernel.org> # 3.16.x
+> > > Cc: <stable@vger.kernel.org> # 4.1.x-4.9.x
+> > > Fixes: 674c242c9323 ("arm64: flush FP/SIMD state correctly after execve()")
+> > > Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > > 
+> > > For stable only.
+> > > 
+> > > 3.17.x-4.0.x don't appear active, and this patch isn't sufficient to fix
+> > > them (they would need 674c242c9323 also).
+> > 
+> > 3.18 is "semi-active" in that I'm trying to keep it alive for the
+> > millions of devices that rely on it out in the world at the moment...
+> 
+> Fair enough, I'll bear that in mind for future fixes.
+> 
+> Any ideas how long it's likely to linger for?
 
-> >> This patch should be merged along with the 1st patch of the series "mmc: host:
-> >> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
-> >> omap_hsmmc driver.
+No idea, probably until I get really sick of it.  If you, or any company
+you know, relies on it, please let me know and I'll be glad to talk
+about it with you...
 
-Hang on, how can this break anything?  If it breaks things shouldn't
-there be bugfixes for incorrect constraints somewhere?
+thanks,
 
-> > I can sign a tag if it's needed for a cross tree merge.
-
-> Easier if you could drop it and instead just provide an ack.
-
-> Unless you believes there may conflict in your regulator tree?
-
-My main goal is to get it in during this merge window, this way either
-it goes in via my tree and the rest of the series can go in the next
-release or the whole thing makes this merge window.
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/regulator-pbias-variants
-
-for you to fetch changes up to 27eae9d4b9d4cd9c204ef81f46078d91362ed41c:
-
-  regulator: pbias: Select voltage table based on max-voltage (2017-08-31 11:55:40 +0100)
-
-----------------------------------------------------------------
-regulator: Add support for different OMAP variants in the pbias regulator
-
-----------------------------------------------------------------
-Ravikumar Kattekola (1):
-      regulator: pbias: Select voltage table based on max-voltage
-
- drivers/regulator/pbias-regulator.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170901/e81509a3/attachment.sig>
+greg k-h
