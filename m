@@ -1,82 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Sep 2017 11:27:05 +0200
-Subject: [PATCH 7/7] drm/pl111: Add handling of Versatile platforms
-In-Reply-To: <878thzzkiz.fsf@anholt.net>
-References: <20170830180711.2791-1-linus.walleij@linaro.org>
- <20170830180711.2791-8-linus.walleij@linaro.org> <878thzzkiz.fsf@anholt.net>
-Message-ID: <CACRpkdZnXJHx6P+YqAuDo8G5RC9+2pa9-2jhZp5HH-oKnHM+sQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 1 Sep 2017 11:30:33 +0200
+Subject: [PATCH ] ARM: dts: iwg22d-sodimm: Add Ethernet AVB support
+In-Reply-To: <20170901084923.GC14918@verge.net.au>
+References: <1504106234-41450-1-git-send-email-biju.das@bp.renesas.com>
+ <20170831084534.GF29946@verge.net.au>
+ <KL1PR06MB170280A3D466C9B35AF73939B89D0@KL1PR06MB1702.apcprd06.prod.outlook.com>
+ <TY1PR06MB07029D315FC6EE500D1EEA55B79D0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+ <20170901084923.GC14918@verge.net.au>
+Message-ID: <CAMuHMdXFO+oirricuB2prtm2ca1AyMLDgx6ib5cVNRK0=7T+5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 7:58 PM, Eric Anholt <eric@anholt.net> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
+Hi Simon,
+
+On Fri, Sep 1, 2017 at 10:49 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Aug 31, 2017 at 09:32:25AM +0000, Chris Paterson wrote:
+>> > From: Biju Das
+>> > > From: Simon Horman [mailto:horms at verge.net.au]
+>> > > > +       phy3: ethernet-phy at 3 {
+>> > > > +       /*
+>> > > > +        * On some older versions of the platform (before R4.0) the phy
+>> > > address
+>> > > > +        * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
+>> > > > +        */
+>> > > > +               reg = <3>;
+>> > > > +               micrel,led-mode = <1>;
+>> > >
+>> > > Does the phy have an interrupt?
+>> >
+>> > The current board doesn't support interrupt . But there is a plan to support this
+>> > in future board variants through (GPIO3_28).
+>>
+>> Actually, the plan has recently changed and at the moment interrupt support will not be added in the production version of the board.
+>>
+>> If in the end the plan changes again and the actual hardware does add interrupt support we'll submit a new patch accordingly.
 >
->> The ARM reference designs in the Versatile family: Integrator,
->> Versatile and RealView can make use of the new DRM driver as well.
->> We just need to create a bit of platform-specific code for them
->> that we isolate to its own file.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>  drivers/gpu/drm/pl111/Makefile          |   1 +
->>  drivers/gpu/drm/pl111/pl111_display.c   |   7 -
->>  drivers/gpu/drm/pl111/pl111_drv.c       |   5 +
->>  drivers/gpu/drm/pl111/pl111_versatile.c | 270 ++++++++++++++++++++++++++++++++
->>  drivers/gpu/drm/pl111/pl111_versatile.h |   9 ++
->>  5 files changed, 285 insertions(+), 7 deletions(-)
->>  create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.c
->>  create mode 100644 drivers/gpu/drm/pl111/pl111_versatile.h
->>
->> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
->> index c5f8f9684848..fce1453a93e1 100644
->> --- a/drivers/gpu/drm/pl111/Makefile
->> +++ b/drivers/gpu/drm/pl111/Makefile
->> @@ -1,4 +1,5 @@
->>  pl111_drm-y +=       pl111_display.o \
->> +             pl111_versatile.o \
->>               pl111_drv.o
->>
->>  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
->> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
->> index 37f409867934..f7b043f4fed6 100644
->> --- a/drivers/gpu/drm/pl111/pl111_display.c
->> +++ b/drivers/gpu/drm/pl111/pl111_display.c
->> @@ -454,13 +454,6 @@ int pl111_display_init(struct drm_device *drm)
->>       }
->>       of_node_put(endpoint);
->>
->> -     if (tft_r0b0g0[0] != 0 ||
->> -         tft_r0b0g0[1] != 8 ||
->> -         tft_r0b0g0[2] != 16) {
->> -             dev_err(dev, "arm,pl11x,tft-r0g0b0-pads != [0,8,16] not yet supported\n");
->> -             return -EINVAL;
->> -     }
->
-> I had a note in the DOC section of pl111_drv.c about needing to filter
-> available formats based on this property.  Could you update that with
-> some explanation of the new state of things?  (Do we actually need to
-> filter the formats?)
+> Thanks for following-up on this. I'm still surprised there is no interrupt
+> - does link speed renegotiation initiated by the other end of the link work
+> in a timely manner? - but if its not there and my wishful thinking won't
+> make it so.
 
-No we don't need to filter it really, only the Nomadik makes use of this
-property and I haven't come to adding support for that yet.
+I guess it behaves similar to Koelsch using the new CPG/MSSR driver, and
+without the probe deferral fix for of_mdio, where it also falls back to polling.
+Cfr. the figures in
+https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg17422.html
 
-> I haven't verified that we get the same pin routing setup as the fbdev
-> driver did for these platforms, but even if they don't match yet this
-> seems like an excellent start and we can make sure we sort them out as
-> we add panel drivers.
+Gr{oetje,eeting}s,
 
-This should be fine with panels I think, the problem is how the
-CLCD/PL11x is integrated with the silicon, as sometimes the VHDL
-coders just arbitrarily manage to switch things around. It should
-be handled entirely in the PL11x driver.
+                        Geert
 
-> I've verified that my Cygnus board continues working with your series.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Nice! I have graphics working on the RealView machines.
-
-Now I just need to figure out a few minor things like augmenting the
-list of resolutions from the panel for the bus bandwidth and
-some dumb VGA bridge business.
-
-Yours,
-Linus Walleij
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
