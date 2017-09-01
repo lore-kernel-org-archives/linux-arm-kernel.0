@@ -1,30 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Sep 2017 15:55:23 -0700
-Subject: [PATCH v5 6/7] ASoC: atmel-classd: remove aclk clock from DT
- binding
-In-Reply-To: <baa9ebcc16cba5f41ee5b01895ec7cfce60a8ddc.1502346448.git-series.quentin.schulz@free-electrons.com>
-References: <cover.ada7bc60e0b3a0f7429afc6ea9e4869131d1b757.1502346448.git-series.quentin.schulz@free-electrons.com>
- <baa9ebcc16cba5f41ee5b01895ec7cfce60a8ddc.1502346448.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <20170901225523.GH21656@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 2 Sep 2017 00:05:41 +0100
+Subject: [PATCH] ARM: Remove leftover of fixmap_page_table
+In-Reply-To: <0a7e5d42-de9a-6424-7976-e2240da182de@arm.com>
+References: <1502700269-24384-1-git-send-email-vladimir.murzin@arm.com>
+ <0a7e5d42-de9a-6424-7976-e2240da182de@arm.com>
+Message-ID: <20170901230541.GV20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10, Quentin Schulz wrote:
-> Since gclk (generated-clk) is now able to determine the rate of the
-> audio_pll, there is no need for classd to have a direct phandle to the
-> audio_pll while already having a phandle to gclk.
+On Fri, Sep 01, 2017 at 11:34:23AM +0100, Vladimir Murzin wrote:
+> On 14/08/17 09:44, Vladimir Murzin wrote:
+> > fixmap_page_table was removed by commit 836a24183273 (ARM: expand
+> > fixmap region to 3MB), but some traces are still there - get rid of
+> > them.
+> >
+> > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> > ---
+> >  arch/arm/include/asm/highmem.h | 1 -
+> >  1 file changed, 1 deletion(-)
+> >
+> > diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+> > index 0a0e2d1..61736fd 100644
+> > --- a/arch/arm/include/asm/highmem.h
+> > +++ b/arch/arm/include/asm/highmem.h
+> > @@ -18,7 +18,6 @@
+> >       } while (0)
+> >
+> >  extern pte_t *pkmap_page_table;
+> > -extern pte_t *fixmap_page_table;
+> >
+> >  extern void *kmap_high(struct page *page);
+> >  extern void kunmap_high(struct page *page);
+> >
 > 
-> This binding is used by no board in mainline so it is safe to be
-> modified.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Mark Brown <broonie@kernel.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> ---
+> Ok for patch tracker?
 
-Applied to clk-next
+Yep.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
