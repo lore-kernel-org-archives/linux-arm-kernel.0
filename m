@@ -1,165 +1,85 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Fri, 1 Sep 2017 14:49:16 +0800
-Subject: [PATCH v7 1/3] dt-bindings: display: Add Document for Rockchip
- Soc LVDS
-In-Reply-To: <150421032.ptNih2SRiG@phil>
-References: <1503469615-39406-1-git-send-email-hjc@rock-chips.com>
- <1503469622-39462-1-git-send-email-hjc@rock-chips.com>
- <59A53F27.2010308@rock-chips.com> <150421032.ptNih2SRiG@phil>
-Message-ID: <8578950f-74a9-6fa7-5530-70f4b41a5a8f@rock-chips.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 1 Sep 2017 14:56:04 +0800
+Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
+In-Reply-To: <1186423751.115248.1504244969355@email.1und1.de>
+References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
+ <20170901013317.GA516@leoy-ThinkPad-T440>
+ <1186423751.115248.1504244969355@email.1und1.de>
+Message-ID: <20170901065604.GA22838@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi heiko,
+On Fri, Sep 01, 2017 at 07:49:29AM +0200, Stefan Wahren wrote:
+> Hi Leo,
+> 
+> > Leo Yan <leo.yan@linaro.org> hat am 1. September 2017 um 03:33 geschrieben:
+> > 
+> > 
+> > Hi Stefan,
+> > 
+> > On Thu, Aug 31, 2017 at 10:24:36PM +0200, Stefan Wahren wrote:
+> > > In case there are no DT idle states defined or
+> > > cpuidle_register_driver() fails, the copy of the idle driver is leaked:
+> > > 
+> > >     unreferenced object 0xede0dc00 (size 1024):
+> > >     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
+> > >     hex dump (first 32 bytes):
+> > >     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
+> > >     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
+> > >     backtrace:
+> > >     [<c1295f04>] arm_idle_init+0x44/0x1ac
+> > >     [<c0301e6c>] do_one_initcall+0x3c/0x16c
+> > >     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
+> > >     [<c0cb3624>] kernel_init+0x8/0x114
+> > >     [<c0307a98>] ret_from_fork+0x14/0x3c
+> > > 
+> > > So fix this by freeing the unregistered copy in error case.
+> > > 
+> > > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > > Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
+> > > ---
+> > >  drivers/cpuidle/cpuidle-arm.c | 6 ++++--
+> > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> > > index 7080c38..52a7505 100644
+> > > --- a/drivers/cpuidle/cpuidle-arm.c
+> > > +++ b/drivers/cpuidle/cpuidle-arm.c
+> > > @@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
+> > >  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
+> > >  		if (ret <= 0) {
+> > >  			ret = ret ? : -ENODEV;
+> > > -			goto out_fail;
+> > > +			goto init_fail;
+> > >  		}
+> > >  
+> > >  		ret = cpuidle_register_driver(drv);
+> > >  		if (ret) {
+> > >  			pr_err("Failed to register cpuidle driver\n");
+> > > -			goto out_fail;
+> > > +			goto init_fail;
+> > >  		}
+> > >  
+> > >  		/*
+> > > @@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
+> > >  	}
+> > >  
+> > >  	return 0;
+> > > +init_fail:
+> > > +	kfree(drv);
+> > 
+> > The below loop only releases resource for previous CPUs, so should check
+> > two variables 'drv' and 'dev'. If 'dev != NULL', we also need to release
+> > it.
+> 
+> i cannot see a leak for 'dev', because this is already handled in the error case of cpuidle_register_device before jumping to out_fail. I agree this isn't consistent, but this is a fix which should go to stable. So only necessary changes.
 
-? 2017/8/29 18:29, Heiko Stuebner ??:
-> Am Dienstag, 29. August 2017, 18:17:11 CEST schrieb Mark yao:
->> On 2017?08?23? 14:26, Sandy Huang wrote:
->>> This patch add Document for Rockchip Soc RK3288 LVDS,
->>> This based on the patches from Mark yao and Heiko Stuebner.
->>>
->>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->>> Signed-off-by: Mark yao <mark.yao@rock-chips.com>
->>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
->> Looks good for me:
->>
->> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
-> 
-> Signed-off ordering is wrong though ... you add a Signed-off below
-> all others and you could also drop the one from me, as I don't
-> think I did provide to much value between Mark's and Sandy's variant
-> of the patches :-)
-> 
-> 
-> Heiko
-> 
-> 
-I will change the Singed off order as bellow at next version.
+You are right, so please ignore my comment.
 
-Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+BTW, to avoid missing anything, are you working on the second
+fixing to correct the previous CPU resourcee releasing? Actually
+I think you are welcome to work on the second fixing, but if
+not I will take the second fixing with rebasing your patch.
 
->>> Changes according to Rob Herring's review.
->>>
->>>    .../bindings/display/rockchip/rockchip-lvds.txt    | 99 ++++++++++++++++++++++
->>>    1 file changed, 99 insertions(+)
->>>    create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
->>> new file mode 100644
->>> index 0000000..da6939e
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
->>> @@ -0,0 +1,99 @@
->>> +Rockchip RK3288 LVDS interface
->>> +================================
->>> +
->>> +Required properties:
->>> +- compatible: matching the soc type, one of
->>> +	- "rockchip,rk3288-lvds";
->>> +
->>> +- reg: physical base address of the controller and length
->>> +	of memory mapped region.
->>> +- clocks: must include clock specifiers corresponding to entries in the
->>> +	clock-names property.
->>> +- clock-names: must contain "pclk_lvds"
->>> +
->>> +- avdd1v0-supply: regulator phandle for 1.0V analog power
->>> +- avdd1v8-supply: regulator phandle for 1.8V analog power
->>> +- avdd3v3-supply: regulator phandle for 3.3V analog power
->>> +
->>> +- rockchip,grf: phandle to the general register files syscon
->>> +- rockchip,output: "rgb", "lvds" or "duallvds", This describes the output interface
->>> +
->>> +Optional properties:
->>> +- pinctrl-names: must contain a "lcdc" entry.
->>> +- pinctrl-0: pin control group to be used for this controller.
->>> +
->>> +Required nodes:
->>> +
->>> +The lvds has two video ports as described by
->>> +	Documentation/devicetree/bindings/media/video-interfaces.txt
->>> +Their connections are modeled using the OF graph bindings specified in
->>> +	Documentation/devicetree/bindings/graph.txt.
->>> +
->>> +- video port 0 for the VOP input, the remote endpoint maybe vopb or vopl
->>> +- video port 1 for either a panel or subsequent encoder
->>> +
->>> +the lvds panel described by
->>> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
->>> +
->>> +Panel required properties:
->>> +- ports for remote LVDS output
->>> +
->>> +Panel optional properties:
->>> +- data-mapping: should be "vesa-24","jeida-24" or "jeida-18".
->>> +This describes decribed by:
->>> +	Documentation/devicetree/bindings/display/panel/panel-lvds.txt
->>> +
->>> +Example:
->>> +
->>> +lvds_panel: lvds-panel {
->>> +	compatible = "auo,b101ean01";
->>> +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
->>> +	data-mapping = "jeida-24";
->>> +
->>> +	ports {
->>> +		panel_in_lvds: endpoint {
->>> +			remote-endpoint = <&lvds_out_panel>;
->>> +		};
->>> +	};
->>> +};
->>> +
->>> +For Rockchip RK3288:
->>> +
->>> +	lvds: lvds at ff96c000 {
->>> +		compatible = "rockchip,rk3288-lvds";
->>> +		rockchip,grf = <&grf>;
->>> +		reg = <0xff96c000 0x4000>;
->>> +		clocks = <&cru PCLK_LVDS_PHY>;
->>> +		clock-names = "pclk_lvds";
->>> +		pinctrl-names = "lcdc";
->>> +		pinctrl-0 = <&lcdc_ctl>;
->>> +		avdd1v0-supply = <&vdd10_lcd>;
->>> +		avdd1v8-supply = <&vcc18_lcd>;
->>> +		avdd3v3-supply = <&vcca_33>;
->>> +		rockchip,output = "rgb";
->>> +		ports {
->>> +			#address-cells = <1>;
->>> +			#size-cells = <0>;
->>> +
->>> +			lvds_in: port at 0 {
->>> +				reg = <0>;
->>> +
->>> +				lvds_in_vopb: endpoint at 0 {
->>> +					reg = <0>;
->>> +					remote-endpoint = <&vopb_out_lvds>;
->>> +				};
->>> +				lvds_in_vopl: endpoint at 1 {
->>> +					reg = <1>;
->>> +					remote-endpoint = <&vopl_out_lvds>;
->>> +				};
->>> +			};
->>> +
->>> +			lvds_out: port at 1 {
->>> +				reg = <1>;
->>> +
->>> +				lvds_out_panel: endpoint {
->>> +					remote-endpoint = <&panel_in_lvds>;
->>> +				};
->>> +			};
->>> +		};
->>> +	};
->>
->>
->>
-> 
-> 
-> 
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> 
+Thanks,
+Leo Yan
