@@ -1,39 +1,28 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Fri, 1 Sep 2017 13:16:48 +0200
-Subject: [RFC PATCH v1 1/3] arm64/ras: support sea error recovery
-In-Reply-To: <1504261921-39308-2-git-send-email-xiexiuqi@huawei.com>
-References: <1504261921-39308-1-git-send-email-xiexiuqi@huawei.com>
- <1504261921-39308-2-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <20170901111648.jrb3picf5m4clu3s@pd.tnic>
+From: dja@axtens.net (Daniel Axtens)
+Date: Fri, 01 Sep 2017 21:34:03 +1000
+Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
+In-Reply-To: <CAKv+Gu84njSF5uOvNtknGdOd5auU7zw9scFeTq5v-=OhExgOqA@mail.gmail.com>
+References: <20170901072744.2409-1-dja@axtens.net>
+ <CAKv+Gu84njSF5uOvNtknGdOd5auU7zw9scFeTq5v-=OhExgOqA@mail.gmail.com>
+Message-ID: <877exi4pqs.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 06:31:59PM +0800, Xie XiuQi wrote:
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index d661d45..fa9400d 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -52,6 +52,7 @@
->  #include <acpi/ghes.h>
->  #include <acpi/apei.h>
->  #include <asm/tlbflush.h>
-> +#include <asm/ras.h>
->  #include <ras/ras_event.h>
->  
->  #include "apei-internal.h"
-> @@ -520,6 +521,7 @@ static void ghes_do_proc(struct ghes *ghes,
->  		else if (guid_equal(sec_type, &CPER_SEC_PROC_ARM)) {
->  			struct cper_sec_proc_arm *err = acpi_hest_get_payload(gdata);
->  
-> +			arm_proc_error_check(ghes, err);
->  			log_arm_hw_error(err);
+Hi Ard,
 
-Wrap those two in a single arm_process_error() which does everything
-needed on ARM.
+> If we are all in agreement that fixing X is not an option, I think
+> this is a reasonable approach
 
--- 
-Regards/Gruss,
-    Boris.
+This did come up in discussion at some earlier point in one of the many
+spins we've done of this - I don't remember if you brought it up or
+someone else did - but my concern was this: If it were just X we would
+be fine, but if we go down that path I'm worried about also having to
+fix Mir/Wayland/whatever-the-new-exciting-display-server-is-this-week,
+ad nauseum.
 
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Thanks!
+
+Regards,
+Daniel
