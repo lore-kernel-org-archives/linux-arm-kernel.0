@@ -1,22 +1,24 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 31 Aug 2017 18:32:33 -0700
-Subject: [PATCH 2/2] arm64: dts: hi6220: enable watchdog
-In-Reply-To: <1503993518-24428-2-git-send-email-leo.yan@linaro.org>
+Date: Thu, 31 Aug 2017 18:32:40 -0700
+Subject: [PATCH 1/2] clk: hi6220: change watchdog clock source
+In-Reply-To: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
 References: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
- <1503993518-24428-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170901013233.GL21656@codeaurora.org>
+Message-ID: <20170901013240.GM21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/29, Leo Yan wrote:
-> From: Dmitry Shmidt <dimitrysh@google.com>
+> The old code uses tcxo (19.2MHz) as watchdog clock but actually the
+> watchdog uses 32K clock, as result the watchdog timeout cannot be set
+> correctly and delay long time to reset SoC.
 > 
-> This patch is to add watchdog binding for Hi6220 on Hikey board.
+> So this patch is to use 'ref32k' as clock source for watchdog.
 > 
-> Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+> Fixes: 72ea48610d43 ("clk: hi6220: Clock driver support for Hisilicon hi6220 SoC")
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
 
-This will go through arm-soc?
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
