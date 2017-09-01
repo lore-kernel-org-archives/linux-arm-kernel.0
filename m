@@ -1,73 +1,70 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 1 Sep 2017 10:53:19 -0500
-Subject: [PATCH v3 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-In-Reply-To: <20170829084116.106695-3-liwei213@huawei.com>
-References: <20170829084116.106695-1-liwei213@huawei.com>
- <20170829084116.106695-3-liwei213@huawei.com>
-Message-ID: <20170901155319.zk7wdvysqzit7mog@rob-hp-laptop>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Fri,  1 Sep 2017 19:06:06 +0300
+Subject: [patch v7 4/4] Documentation: jtag: Add ABI documentation
+In-Reply-To: <1504281966-6199-1-git-send-email-oleksandrs@mellanox.com>
+References: <1504281966-6199-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1504281966-6199-5-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 04:41:13PM +0800, Li Wei wrote:
-> add ufs node document for Hisilicon
-> 
-> Signed-off-by: Li Wei <liwei213@huawei.com>
-> ---
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> new file mode 100644
-> index 000000000000..cfc84c821d50
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> @@ -0,0 +1,35 @@
-> +* Hisilicon Universal Flash Storage (UFS) Host Controller
-> +
-> +UFS nodes are defined to describe on-chip UFS hardware macro.
-> +Each UFS Host Controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains one of the following -
-> +			"hisilicon,hi3660-ufs" for hisi ufs host controller
-> +			 present on Hi3660 chipset.
-> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-> +- interrupt-parent  : interrupt device
-> +- interrupts        : interrupt number
-> +- clocks	        : List of phandle and clock specifier pairs
-> +- clock-names       : List of clock input name strings sorted in the same
-> +		      order as the clocks property. "clk_ref", "clk_phy" is optional
-> +
-> +Optional properties for board device:
-> +- reset-gpio			: specifies to reset devices
+Added document that describe the ABI for JTAG class drivrer
 
-reset-gpios
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+---
+v6->v7
+Comments pointed by Pavel Machek <pavel@ucw.cz>
+- Added jtag-cdev documentation to Documentation/ABI/testing folder
+---
+ Documentation/ABI/testing/jatg-cdev |   27 +++++++++++++++++++++++++++
+ MAINTAINERS                         |    1 +
+ 2 files changed, 28 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/ABI/testing/jatg-cdev
 
-Really, this is should be in a sub node representing the device. It's 
-fine if this is it, but if we start adding power supplies and other 
-properties it should be a separate node.
-
-> +
-> +Example:
-> +
-> +	ufs: ufs at ff3b0000 {
-> +		compatible = "jedec,ufs-1.1", "hisilicon,hi3660-ufs";
-
-Need to reverse the order here. Most specific first.
-
-> +		/* 0: HCI standard */
-> +		/* 1: UFS SYS CTRL */
-> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
-> +			<0x0 0xff3b1000 0x0 0x1000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-> +		clock-names = "clk_ref", "clk_phy";
-> +		freq-table-hz = <0 0>, <0 0>;
-> +		reset-gpio = <&gpio18 1 0>;
-> +	}
-> -- 
-> 2.11.0
-> 
+diff --git a/Documentation/ABI/testing/jatg-cdev b/Documentation/ABI/testing/jatg-cdev
+new file mode 100644
+index 0000000..14a3610
+--- /dev/null
++++ b/Documentation/ABI/testing/jatg-cdev
+@@ -0,0 +1,27 @@
++What:		/dev/jtag[0-9]+
++Date:		September 2017
++KernelVersion:	4.14
++Contact:	oleksandrs at mellanox.com
++Description:
++		The character device files /dev/jtag* are the interface
++		between JTAG master interfase and userspace.
++
++		The ioctl(2)-based ABI is defined and documented in
++		[include/uapi]<linux/jtag.h>.
++
++		The following file operations are supported:
++
++		open(2)
++		The argument flag currently support only one access
++		mode O_RDWR.
++
++		ioctl(2)
++		Initiate various actions.
++		See the inline documentation in [include/uapi]<linux/jtag.h>
++		for descriptions of all ioctls.
++
++		close(2)
++		Stops and free up the I/O contexts that was associated
++		with the file descriptor.
++
++Users:		TBD
+\ No newline at end of file
+diff --git a/MAINTAINERS b/MAINTAINERS
+index bfdfa94..dfcf49c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7300,6 +7300,7 @@ F:	include/linux/jtag.h
+ F:	include/uapi/linux/jtag.h
+ F:	drivers/jtag/
+ F:	Documentation/devicetree/bindings/jtag/
++F:	Documentation/ABI/testing/jtag-cdev
+ 
+ K10TEMP HARDWARE MONITORING DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
+-- 
+1.7.1
