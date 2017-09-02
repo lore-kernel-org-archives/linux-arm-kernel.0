@@ -1,82 +1,89 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Sat, 2 Sep 2017 10:16:23 +0800
-Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
- mtk-pmic-keys
-In-Reply-To: <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
-References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
- <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
- <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
-Message-ID: <1504318583.15359.12.camel@mhfsdcap03>
+From: liwei213@huawei.com (liwei (CM))
+Date: Sat, 2 Sep 2017 03:35:41 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYzIDIvNV0gZHQtYmluZGluZ3M6IHNjc2k6IHVmczog?=
+ =?gb2312?Q?add_document_for_hisi-ufs?=
+In-Reply-To: <20170901155319.zk7wdvysqzit7mog@rob-hp-laptop>
+References: <20170829084116.106695-1-liwei213@huawei.com>
+ <20170829084116.106695-3-liwei213@huawei.com>
+ <20170901155319.zk7wdvysqzit7mog@rob-hp-laptop>
+Message-ID: <1699CE87DE933F49876AD744B5DC140FA187B7@DGGEMM506-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-31 at 14:52 -0500, Rob Herring wrote:
-> On Fri, Aug 25, 2017 at 02:32:30PM +0800, Chen Zhong wrote:
-> > This patch adds the device tree binding documentation for the MediaTek
-> > pmic keys found on PMIC MT6397/MT6323.
-> > 
-> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> > new file mode 100644
-> > index 0000000..100ec44
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> > @@ -0,0 +1,38 @@
-> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
-> > +
-> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
-> > +and homekey. The key functions are defined as the subnode of the function
-> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
-> > +of Muti-Function Device (MFD)
-> > +
-> > +For MT6397/MT6323 MFD bindings see:
-> > +Documentation/devicetree/bindings/mfd/mt6397.txt
-> > +
-> > +Required properties:
-> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-> > +- linux,keycodes: Specifies the numeric keycode values to
-> > +	be used for reporting keys presses. The array can
-> > +	contain up to 2 entries.
-> > +
-> > +Optional Properties:
-> > +- wakeup-source: each key can be used as a wakeup source.
+Hi, Rob
+
+Thanks for your advises, I will fix them in the next patch.
+
+Thank you.
+
+-----????-----
+???: Rob Herring [mailto:robh at kernel.org] 
+????: 2017?9?1? 23:53
+???: liwei (CM)
+??: mark.rutland at arm.com; xuwei (O); catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; eric at anholt.net; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org; guodong.xu at linaro.org; Fengbaopeng (kevin, Kirin Solution Dept)
+??: Re: [PATCH v3 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+
+On Tue, Aug 29, 2017 at 04:41:13PM +0800, Li Wei wrote:
+> add ufs node document for Hisilicon
 > 
-> wakeup-source is defined as a boolean.
-
-Hi Rob,
-
-Could I modify it as this?
-
-mediatek,wakeup-keys = <1>, <0>;
-wakeup-source;
-
-Thanks.
+> Signed-off-by: Li Wei <liwei213@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 35 
+> ++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 > 
-> > +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
-> > +	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
-> > +- debounce-interval: Long press key shutdown debouncing interval time
-> > +	in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
-> > +
-> > +Example:
-> > +
-> > +	pmic: mt6397 {
-> > +		compatible = "mediatek,mt6397";
-> > +
-> > +		...
-> > +
-> > +		mt6397keys: mt6397keys {
-> > +			compatible = "mediatek,mt6397-keys";
-> > +			linux,keycodes = <KEY_POWER>, <KEY_VOLUMEDOWN>;
-> > +			wakeup-source = <1>, <0>;
-> > +			mediatek,long-press-mode = <1>;
-> > +			debounce-interval = <0>;
-> > +		};
-> > +	};
-> > -- 
-> > 1.7.9.5
-> > 
+> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt 
+> b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> new file mode 100644
+> index 000000000000..cfc84c821d50
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> @@ -0,0 +1,35 @@
+> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+> +
+> +UFS nodes are defined to describe on-chip UFS hardware macro.
+> +Each UFS Host Controller should have its own node.
+> +
+> +Required properties:
+> +- compatible        : compatible list, contains one of the following -
+> +			"hisilicon,hi3660-ufs" for hisi ufs host controller
+> +			 present on Hi3660 chipset.
+> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+> +- interrupt-parent  : interrupt device
+> +- interrupts        : interrupt number
+> +- clocks	        : List of phandle and clock specifier pairs
+> +- clock-names       : List of clock input name strings sorted in the same
+> +		      order as the clocks property. "clk_ref", "clk_phy" is 
+> +optional
+> +
+> +Optional properties for board device:
+> +- reset-gpio			: specifies to reset devices
+
+reset-gpios
+
+Really, this is should be in a sub node representing the device. It's fine if this is it, but if we start adding power supplies and other properties it should be a separate node.
+
+> +
+> +Example:
+> +
+> +	ufs: ufs at ff3b0000 {
+> +		compatible = "jedec,ufs-1.1", "hisilicon,hi3660-ufs";
+
+Need to reverse the order here. Most specific first.
+
+> +		/* 0: HCI standard */
+> +		/* 1: UFS SYS CTRL */
+> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
+> +			<0x0 0xff3b1000 0x0 0x1000>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
+> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
+> +		clock-names = "clk_ref", "clk_phy";
+> +		freq-table-hz = <0 0>, <0 0>;
+> +		reset-gpio = <&gpio18 1 0>;
+> +	}
+> --
+> 2.11.0
+> 
