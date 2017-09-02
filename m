@@ -1,35 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun,  3 Sep 2017 02:26:18 +0900
-Subject: [PATCH] pinctrl: uniphier: include <linux/build_bug.h> instead of
- <linux/bug.h>
-Message-ID: <1504373178-1022-1-git-send-email-yamada.masahiro@socionext.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat,  2 Sep 2017 21:54:05 +0200
+Subject: [PATCH v6 03/12] ASoC: add new ac97 bus support
+In-Reply-To: <20170902195414.3699-1-robert.jarzmik@free.fr>
+References: <20170902195414.3699-1-robert.jarzmik@free.fr>
+Message-ID: <20170902195414.3699-4-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The #includes <linux/bug.h> is here to use BUILD_BUG_ON_ZERO().
+Add the new ac97 bus support, with ac97 bus automatic probing.
 
-Thanks to commit bc6245e5efd7 ("bug: split BUILD_BUG stuff out into
-<linux/build_bug.h>"), it is now possible to reduce the number of
-headers pulled in.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 ---
+ sound/Kconfig  | 2 ++
+ sound/Makefile | 1 +
+ 2 files changed, 3 insertions(+)
 
- drivers/pinctrl/uniphier/pinctrl-uniphier.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier.h b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-index c075ecb8e5db..0a3d2ac27503 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-@@ -17,7 +17,7 @@
- #define __PINCTRL_UNIPHIER_H__
+diff --git a/sound/Kconfig b/sound/Kconfig
+index ee2e69a9ecd1..141b145c4195 100644
+--- a/sound/Kconfig
++++ b/sound/Kconfig
+@@ -80,6 +80,8 @@ source "sound/hda/Kconfig"
  
- #include <linux/bitops.h>
--#include <linux/bug.h>
-+#include <linux/build_bug.h>
- #include <linux/kernel.h>
- #include <linux/types.h>
+ source "sound/ppc/Kconfig"
  
++source "sound/ac97/Kconfig"
++
+ source "sound/aoa/Kconfig"
+ 
+ source "sound/arm/Kconfig"
+diff --git a/sound/Makefile b/sound/Makefile
+index 6de45d2c32f7..c03b0bed65d5 100644
+--- a/sound/Makefile
++++ b/sound/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_SND_AOA) += aoa/
+ 
+ # This one must be compilable even if sound is configured out
+ obj-$(CONFIG_AC97_BUS) += ac97_bus.o
++obj-$(CONFIG_AC97_BUS_NEW) += ac97/
+ 
+ ifeq ($(CONFIG_SND),y)
+   obj-y += last.o
 -- 
-2.7.4
+2.11.0
