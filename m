@@ -1,99 +1,140 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Sat, 2 Sep 2017 20:08:08 +0800
-Subject: [I2C] About warning 'DMA-API: device driver maps memory from stack'
-Message-ID: <1504354088.31793.48.camel@mhfsdcap03>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 02 Sep 2017 16:48:26 +0200
+Subject: [PATCH v3 1/8] PM / Sleep: Make the runtime PM centric path known
+ to the PM core
+In-Reply-To: <CAPDyKFoOJzciMNMWkc+ci+Fn2iD8vwsg25TQjcx=xw2ftg5rug@mail.gmail.com>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+ <2403318.HVB4k3qRsK@aspire.rjw.lan>
+ <CAPDyKFoOJzciMNMWkc+ci+Fn2iD8vwsg25TQjcx=xw2ftg5rug@mail.gmail.com>
+Message-ID: <1702559.yU4llTGfcI@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram,
+On Thursday, August 31, 2017 11:06:05 AM CEST Ulf Hansson wrote:
+> [...]
+> 
+> >> >> diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
+> >> >> index ea1732e..865737a 100644
+> >> >> --- a/drivers/base/power/main.c
+> >> >> +++ b/drivers/base/power/main.c
+> >> >> @@ -1549,14 +1549,16 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
+> >> >>               if (parent) {
+> >> >>                       spin_lock_irq(&parent->power.lock);
+> >> >>
+> >> >> -                     dev->parent->power.direct_complete = false;
+> >> >> +                     if (!dev->power.is_rpm_sleep)
+> >> >> +                             dev->parent->power.direct_complete = false;
+> >> >
+> >> > This doesn't look good to me at all.
+> >> >
+> >> > It potentially breaks the fundamental assumption of the direct_complete
+> >> > mechanism that no devices with that flag set will ever be runtime resumed
+> >> > during system suspend.
+> >> >
+> >> > Which can happen with this change if a device with power.is_rpm_sleep is
+> >> > resumed causing the parent to be resumed too.
+> >>
+> >> Doesn't the exact same problem you describe, already exist prior my change!?
+> >
+> > No, it doesn't.
+> >
+> >> That is, if the current device is runtime suspended and the
+> >> direct_complete flag is set for it, then __device_suspend() has
+> >> already disabled runtime PM for the device, when we reach this point.
+> >> That means, a following attempts to runtime resume the device will
+> >> fail and thus also to runtime resume its parent.
+> >
+> > That's because any devices with direct_complete set *cannot* be runtime
+> > resumed after __device_suspend().  That's intentional and how the thing
+> > is designed.  It cannot work differently, sorry.
+> >
+> >> So to me, this is a different problem, related how to work out the
+> >> correct order of how to suspend devices.
+> >
+> > The ordering matters here, but it is not the problem.
+> >
+> > Setting direct_complete means that PM callbacks for this device won't be
+> > invoked going forward.  However, if the state of the device was to change
+> > (like as a result of runtime PM resume), it would be necessary to run those
+> > callbacks after all, but after __device_suspend() it may be too late for
+> > that, because the ->suspend callback may have been skipped already.
+> >
+> > The only way to address that is to prevent runtime PM resume of the device
+> > from happening at the point the PM core decides to use direct_complete for it,
+> > but that requires runtime PM to be disabled for it.  Moreover, since the
+> > device is now suspended with runtime PM disabled and its children might rely
+> > on it if they were active, the children must be suspended with runtime PM
+> > disabled at this point too.  That's why direct_complete can only be set
+> > for a device if it is set for the entire hierarchy below it.
+> 
+> Thanks, this was a very nice description of the direct_complete path!
+> 
+> >
+> > Summary: If you allow a device to be runtime resumed during system susped,
+> > direct_complete cannot be set for it and it cannot be set for its parent and
+> > so on.
+> 
+> Yes, this is what it seems to boils done to!
+> 
+> Perhaps the ACPI PM domain is special in this case, because in its
+> ->prepare() callback it asks the ACPI FW about whether the
+> direct_complete path is possible for a device. In other words, the
+> ACPI FW seems to be capable of providing information about if a device
+> may become runtime resumed during system suspend. But, really, isn't
+> that just a best guess? No?
 
-When we use i2c-tools command 'i2cset -y -f 0 0x50 0x00 0x11'(0:i2c bus
-number; 0x50:eeprom device addr; 0x00:device register addr; 0x11:write
-data)to write data, a warning appears as below if enable kernel config
-CONFIG_DMA_API_DEBUG=y.
+I wouldn't call it a guess, but it may go too far.
 
-[   11.872860] i2c-mt65xx 11007000.i2c: DMA-API: device driver maps
-memory from stack [addr=ffff80007a21fb88]
-[   11.874104] ------------[ cut here ]------------
-[   11.874703] WARNING: CPU: 1 PID: 1232
-at /proj/user/kernel_only_dev_4.13_rc1/kernel/mediatek/lib/dma-debug.c:1188 check_for_stack+0xb0/0x100
-[   11.876337] Modules linked in:
-[   11.876735] CPU: 1 PID: 1232 Comm: sh Not tainted
-4.13.0-rc1-221494-g28b31c4-dirty #1
-[   11.877729] Hardware name: MediaTek MT8173 evaluation board (DT)
-[   11.878490] task: ffff80007b3cb600 task.stack: ffff80007a21c000
-[   11.879242] PC is at check_for_stack+0xb0/0x100
-[   11.879821] LR is at check_for_stack+0xb0/0x100
-...
-[   11.902642] [<ffff0000083c72b8>] check_for_stack+0xb0/0x100
-[   11.903352] [<ffff0000083c8050>] debug_dma_map_page+0xf8/0x130
-[   11.904097] [<ffff000008792bcc>] mtk_i2c_transfer+0x834/0xa90
-[   11.904826] [<ffff0000087870cc>] __i2c_transfer+0x11c/0x278
-[   11.905535] [<ffff00000878728c>] i2c_transfer+0x64/0xb8
-[   11.906200] [<ffff00000878852c>] i2c_smbus_xfer_emulated+0x114/0x518
-[   11.907006] [<ffff000008788a48>] i2c_smbus_xfer+0x118/0x180
-...
+The part that the ACPI PM domain can figure out is whether or not the power
+state of the device needs to be updated due to differences between runtime
+PM and system suspend configuration requirements.  If it doesn't need to be
+updated, acpi_subsys_prepare() returns 1 which may me overoptimistic.
 
+For many devices that works, because the only possible reason why they may
+need to be accessed during system suspend is to update their power state.
 
-Reason:
-i2c-tools command will call ioctl(file,I2C_SMBUS,&args) ->
-i2cdev_ioctl_smbus(...) -> i2c_smbus_xfer(...) ->
-i2c_smbus_xfer_emulated(...).
-Local variables were used as data buf of struct i2c_msg in function
-i2c_smbus_xfer_emulated(...) as below, but we default use DMA mode in
-mtk i2c driver(drivers/i2c/busses/i2c-mt65xx.c) with
-dma_map_single(...).
-Then 'DMA-API: device driver maps memory from stack' warning appeared.
+It may not work for some devices, though, because there may be other reasons
+for accessing them during system suspend and that's where some opt-out way
+is needed.
 
-static s32 i2c_smbus_xfer_emulated(...)
-{
-...
+> On those ARM SoCs I am working on, non-ACPI, the information about
+> whether a device may become runtime resumed during system suspend,
+> most often can't be find out in a deterministic way. That's because
+> this information depends on how a device is being used by other
+> devices, which changes dynamically and from one system suspend
+> sequence to another. In cases like the i2c-designware-plat driver used
+> in Hikey (ARM64 board), it can't ever know before hand, if someone is
+> going to request an i2c transfer during system suspend or not.
 
-        unsigned char msgbuf0[I2C_SMBUS_BLOCK_MAX+3];
-        unsigned char msgbuf1[I2C_SMBUS_BLOCK_MAX+2];
-        int num = read_write == I2C_SMBUS_READ ? 2 : 1;
-        int i;
-        u8 partial_pec = 0;
-        int status;
-        struct i2c_msg msg[2] = {
-                {
-                        .addr = addr,
-                        .flags = flags,
-                        .len = 1,
-                        .buf = msgbuf0,
-                }, {
-                        .addr = addr,
-                        .flags = flags | I2C_M_RD,
-                        .len = 0,
-                        .buf = msgbuf1,
-                },
-        };
+Well, I2C is somewhat special in that respect, because dependencies between
+devices in there are not tracked AFAICS. 
 
-...
+> To really deal with these devices properly, we have to suspend them in
+> the correct order.
 
-        status = i2c_transfer(adapter, msg, num);
-        if (status < 0)
-                return status;
-...
-}
+Right, but in order to achieve that the right ordering actually needs
+to be known.  If it is not known, there is no way to get that right in
+general. :-)
 
+The problem basically is that during system suspend you need to disable
+the controller at one point, sooner or later, and keep it disabled from
+that point on.   Of course, that should happen when it is guaranteed that
+there won't be any new transactions going forward, but you cannot actually
+guaranee that without knowing that all of its "consumers" have already
+been suspended.
 
-Solution:
-modify i2c-mt65xx.c
-1. kmalloc and memcpy buffer for struct i2c_msg buf every time in
-i2c-mt65xx.c
-2. use FIFO mode when length<=fifo_depth(mtk i2c fifo_depth=8), use
-solution 1 for DMA mode when length>fifo_depth in i2c-mt65xx.c . Because
-i2c-tools command write/read length<8 in most cases, this solution may
-be better than solution 1 in performance.
+> My point is, doesn't the ordering problem exists also for a device,
+> which the PM core runs the direct_complete path for, even if the ACPI
+> PM domain is attached to the device? Just because runtime PM is
+> disabled for a device, doesn't mean the ordering issue disappears,
+> right?
 
-modify function i2c_smbus_xfer_emulated(...)
-3. kmalloc data buffer instead of local variables buf in function
-i2c_smbus_xfer_emulated(...)
+The ordering issue is there if there are dependencies between devices the
+PM core doesn't know about.  Otherwise, the rule that direct_complete can
+only be used for a given device if it also is used for the entire hierarchy
+below it (and for all of the device's "consumers" and everything that depends
+on them too for that matter) makes it go away (it serves as a guarantee that
+all of the device's "consumers" have already been suspended).
 
-
-Which solution is better? Could you give some suggestions?
-Thanks!
-
-Best Regards
-Jun
+Thanks,
+Rafael
