@@ -1,1057 +1,491 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat,  2 Sep 2017 21:54:04 +0200
-Subject: [PATCH v6 02/12] ALSA: ac97: add an ac97 bus
+Date: Sat,  2 Sep 2017 21:54:08 +0200
+Subject: [PATCH v6 06/12] mfd: wm97xx-core: core support for wm97xx Codec
 In-Reply-To: <20170902195414.3699-1-robert.jarzmik@free.fr>
 References: <20170902195414.3699-1-robert.jarzmik@free.fr>
-Message-ID: <20170902195414.3699-3-robert.jarzmik@free.fr>
+Message-ID: <20170902195414.3699-7-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AC97 is a bus for sound usage. It enables for a AC97 AC-Link to link one
-controller to 0 to 4 AC97 codecs.
+The WM9705, WM9712 and WM9713 are highly integrated codecs, with an
+audio codec, DAC and ADC, GPIO unit and a touchscreen interface.
 
-The goal of this new implementation is to implement a device/driver
-model for AC97, with an automatic scan of the bus and automatic
-discovery of AC97 codec devices.
+Historically the support was spread across drivers/input/touchscreen and
+sound/soc/codecs. The sharing was done through ac97 bus sharing. This
+model will not withstand the new AC97 bus model, where codecs are
+discovered on runtime.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 ---
-Since RFCv1:
- - Takashi's review
-   - changed the codec.h guard ... a better name could be found ...
-   - added the AC97_* macros missing parenthesis
-   - constantified the id_table in the codec driver structure
-   - changed the 4 codecs linked list into an array
-   - enabled the ac97 bus to be a module
-   - added a slots_available to snd_ac97_controller_register() to have a
-     way to prevent scanning and probing of unconnected codecs
-   - removed useless ac97 bus index
-   - all exported functions begin with snd_ac97_*()
-   - change bus operations to controller+slot parameters instead of
-     codec device
-
- - Mark's review
-   - changed ac97_digital_controller into ac97_controller
-   - rename ac97_digital_controller_*() into ac97_controller_*()
-   - add the ac97 ac-link clock to the codec device (ie. the AC'97
-     BIT_CLK)
-
-Since RFCv2:
- - more snd_ac97 namespace review
- - change the compat allocation prototype to force the user to provide
-   and ac97_codec_device structure pointer
-
-Since v1:
- - took into account all Lars comments
-
 Since v3:
- - took into account Takashi's comments (ac97bus naming and module_exit)
-
+ - added a "depends on AC97_BUS_NEW" Kconfig statement
+ - added default values for wm9705, wm9712 per Charles's comment
 Since v4:
- - took into account Takashi's comments (GPL, mask match on warm reset,
-   device_put(), warnings)
+ - added Charles's ack
+Since v5:
+ - took into account Lee's comments
 ---
- include/sound/ac97/codec.h      | 118 +++++++++
- include/sound/ac97/compat.h     |  20 ++
- include/sound/ac97/controller.h |  85 +++++++
- sound/ac97/Kconfig              |  19 ++
- sound/ac97/Makefile             |   8 +
- sound/ac97/ac97_core.h          |  16 ++
- sound/ac97/bus.c                | 539 ++++++++++++++++++++++++++++++++++++++++
- sound/ac97/codec.c              |  15 ++
- sound/ac97/snd_ac97_compat.c    | 108 ++++++++
- 9 files changed, 928 insertions(+)
- create mode 100644 include/sound/ac97/codec.h
- create mode 100644 include/sound/ac97/compat.h
- create mode 100644 include/sound/ac97/controller.h
- create mode 100644 sound/ac97/Kconfig
- create mode 100644 sound/ac97/Makefile
- create mode 100644 sound/ac97/ac97_core.h
- create mode 100644 sound/ac97/bus.c
- create mode 100644 sound/ac97/codec.c
- create mode 100644 sound/ac97/snd_ac97_compat.c
+ drivers/mfd/Kconfig        |  14 ++
+ drivers/mfd/Makefile       |   1 +
+ drivers/mfd/wm97xx-core.c  | 379 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/wm97xx.h |  25 +++
+ 4 files changed, 419 insertions(+)
+ create mode 100644 drivers/mfd/wm97xx-core.c
+ create mode 100644 include/linux/mfd/wm97xx.h
 
-diff --git a/include/sound/ac97/codec.h b/include/sound/ac97/codec.h
-new file mode 100644
-index 000000000000..ec04be9ab119
---- /dev/null
-+++ b/include/sound/ac97/codec.h
-@@ -0,0 +1,118 @@
-+/*
-+ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __SOUND_AC97_CODEC2_H
-+#define __SOUND_AC97_CODEC2_H
-+
-+#include <linux/device.h>
-+
-+#define AC97_ID(vendor_id1, vendor_id2) \
-+	((((vendor_id1) & 0xffff) << 16) | ((vendor_id2) & 0xffff))
-+#define AC97_DRIVER_ID(vendor_id1, vendor_id2, mask_id1, mask_id2, _data) \
-+	{ .id = (((vendor_id1) & 0xffff) << 16) | ((vendor_id2) & 0xffff), \
-+	  .mask = (((mask_id1) & 0xffff) << 16) | ((mask_id2) & 0xffff), \
-+	  .data = (_data) }
-+
-+struct ac97_controller;
-+struct clk;
-+
-+/**
-+ * struct ac97_id - matches a codec device and driver on an ac97 bus
-+ * @id: The significant bits if the codec vendor ID1 and ID2
-+ * @mask: Bitmask specifying which bits of the id field are significant when
-+ *	  matching. A driver binds to a device when :
-+ *        ((vendorID1 << 8 | vendorID2) & (mask_id1 << 8 | mask_id2)) == id.
-+ * @data: Private data used by the driver.
-+ */
-+struct ac97_id {
-+	unsigned int		id;
-+	unsigned int		mask;
-+	void			*data;
-+};
-+
-+/**
-+ * ac97_codec_device - a ac97 codec
-+ * @dev: the core device
-+ * @vendor_id: the vendor_id of the codec, as sensed on the AC-link
-+ * @num: the codec number, 0 is primary, 1 is first slave, etc ...
-+ * @clk: the clock BIT_CLK provided by the codec
-+ * @ac97_ctrl: ac97 digital controller on the same AC-link
-+ *
-+ * This is the device instantiated for each codec living on a AC-link. There are
-+ * normally 0 to 4 codec devices per AC-link, and all of them are controlled by
-+ * an AC97 digital controller.
-+ */
-+struct ac97_codec_device {
-+	struct device		dev;
-+	unsigned int		vendor_id;
-+	unsigned int		num;
-+	struct clk		*clk;
-+	struct ac97_controller	*ac97_ctrl;
-+};
-+
-+/**
-+ * ac97_codec_driver - a ac97 codec driver
-+ * @driver: the device driver structure
-+ * @probe: the function called when a ac97_codec_device is matched
-+ * @remove: the function called when the device is unbound/removed
-+ * @shutdown: shutdown function (might be NULL)
-+ * @id_table: ac97 vendor_id match table, { } member terminated
-+ */
-+struct ac97_codec_driver {
-+	struct device_driver	driver;
-+	int			(*probe)(struct ac97_codec_device *);
-+	int			(*remove)(struct ac97_codec_device *);
-+	void			(*shutdown)(struct ac97_codec_device *);
-+	const struct ac97_id	*id_table;
-+};
-+
-+static inline struct ac97_codec_device *to_ac97_device(struct device *d)
-+{
-+	return container_of(d, struct ac97_codec_device, dev);
-+}
-+
-+static inline struct ac97_codec_driver *to_ac97_driver(struct device_driver *d)
-+{
-+	return container_of(d, struct ac97_codec_driver, driver);
-+}
-+
-+#if IS_ENABLED(CONFIG_AC97_BUS_NEW)
-+int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv);
-+void snd_ac97_codec_driver_unregister(struct ac97_codec_driver *drv);
-+#else
-+static inline int
-+snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
-+{
-+	return 0;
-+}
-+static inline void
-+snd_ac97_codec_driver_unregister(struct ac97_codec_driver *drv)
-+{
-+}
-+#endif
-+
-+
-+static inline struct device *
-+ac97_codec_dev2dev(struct ac97_codec_device *adev)
-+{
-+	return &adev->dev;
-+}
-+
-+static inline void *ac97_get_drvdata(struct ac97_codec_device *adev)
-+{
-+	return dev_get_drvdata(ac97_codec_dev2dev(adev));
-+}
-+
-+static inline void ac97_set_drvdata(struct ac97_codec_device *adev,
-+				    void *data)
-+{
-+	dev_set_drvdata(ac97_codec_dev2dev(adev), data);
-+}
-+
-+void *snd_ac97_codec_get_platdata(const struct ac97_codec_device *adev);
-+
-+#endif
-diff --git a/include/sound/ac97/compat.h b/include/sound/ac97/compat.h
-new file mode 100644
-index 000000000000..1351cba40048
---- /dev/null
-+++ b/include/sound/ac97/compat.h
-@@ -0,0 +1,20 @@
-+/*
-+ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This file is for backward compatibility with snd_ac97 structure and its
-+ * multiple usages, such as the snd_ac97_bus and snd_ac97_build_ops.
-+ *
-+ */
-+#ifndef AC97_COMPAT_H
-+#define AC97_COMPAT_H
-+
-+#include <sound/ac97_codec.h>
-+
-+struct snd_ac97 *snd_ac97_compat_alloc(struct ac97_codec_device *adev);
-+void snd_ac97_compat_release(struct snd_ac97 *ac97);
-+
-+#endif
-diff --git a/include/sound/ac97/controller.h b/include/sound/ac97/controller.h
-new file mode 100644
-index 000000000000..b36ecdd64f14
---- /dev/null
-+++ b/include/sound/ac97/controller.h
-@@ -0,0 +1,85 @@
-+/*
-+ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef AC97_CONTROLLER_H
-+#define AC97_CONTROLLER_H
-+
-+#include <linux/device.h>
-+#include <linux/list.h>
-+
-+#define AC97_BUS_MAX_CODECS 4
-+#define AC97_SLOTS_AVAILABLE_ALL 0xf
-+
-+struct ac97_controller_ops;
-+
-+/**
-+ * struct ac97_controller - The AC97 controller of the AC-Link
-+ * @ops:		the AC97 operations.
-+ * @controllers:	linked list of all existing controllers.
-+ * @adap:		the shell device ac97-%d, ie. ac97 adapter
-+ * @nr:			the number of the shell device
-+ * @slots_available:	the mask of accessible/scanable codecs.
-+ * @parent:		the device providing the AC97 controller.
-+ * @codecs:		the 4 possible AC97 codecs (NULL if none found).
-+ * @codecs_pdata:	platform_data for each codec (NULL if no pdata).
-+ *
-+ * This structure is internal to AC97 bus, and should not be used by the
-+ * controllers themselves, excepting for using @dev.
-+ */
-+struct ac97_controller {
-+	const struct ac97_controller_ops *ops;
-+	struct list_head controllers;
-+	struct device adap;
-+	int nr;
-+	unsigned short slots_available;
-+	struct device *parent;
-+	struct ac97_codec_device *codecs[AC97_BUS_MAX_CODECS];
-+	void *codecs_pdata[AC97_BUS_MAX_CODECS];
-+};
-+
-+/**
-+ * struct ac97_controller_ops - The AC97 operations
-+ * @reset:	Cold reset of the AC97 AC-Link.
-+ * @warm_reset:	Warm reset of the AC97 AC-Link.
-+ * @read:	Read of a single AC97 register.
-+ *		Returns the register value or a negative error code.
-+ * @write:	Write of a single AC97 register.
-+ *
-+ * These are the basic operation an AC97 controller must provide for an AC97
-+ * access functions. Amongst these, all but the last 2 are mandatory.
-+ * The slot number is also known as the AC97 codec number, between 0 and 3.
-+ */
-+struct ac97_controller_ops {
-+	void (*reset)(struct ac97_controller *adrv);
-+	void (*warm_reset)(struct ac97_controller *adrv);
-+	int (*write)(struct ac97_controller *adrv, int slot,
-+		     unsigned short reg, unsigned short val);
-+	int (*read)(struct ac97_controller *adrv, int slot, unsigned short reg);
-+};
-+
-+#if IS_ENABLED(CONFIG_AC97_BUS_NEW)
-+struct ac97_controller *snd_ac97_controller_register(
-+	const struct ac97_controller_ops *ops, struct device *dev,
-+	unsigned short slots_available, void **codecs_pdata);
-+void snd_ac97_controller_unregister(struct ac97_controller *ac97_ctrl);
-+#else
-+static inline struct ac97_controller *
-+snd_ac97_controller_register(const struct ac97_controller_ops *ops,
-+			     struct device *dev,
-+			     unsigned short slots_available,
-+			     void **codecs_pdata)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
-+
-+static inline void
-+snd_ac97_controller_unregister(struct ac97_controller *ac97_ctrl)
-+{
-+}
-+#endif
-+
-+#endif
-diff --git a/sound/ac97/Kconfig b/sound/ac97/Kconfig
-new file mode 100644
-index 000000000000..f8a64e15e5bf
---- /dev/null
-+++ b/sound/ac97/Kconfig
-@@ -0,0 +1,19 @@
-+#
-+# AC97 configuration
-+#
-+
-+
-+config AC97_BUS_NEW
-+	tristate
-+	select AC97
-+	help
-+	  This is the new AC97 bus type, successor of AC97_BUS. The ported
-+	  drivers which benefit from the AC97 automatic probing should "select"
-+	  this instead of the AC97_BUS.
-+	  Say Y here if you want to have AC97 devices, which are sound oriented
-+	  devices around an AC-Link.
-+
-+config AC97_BUS_COMPAT
-+	bool
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 55ecdfb74d31..6d175698a49a 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1628,6 +1628,20 @@ config MFD_WM8994
+ 	  core support for the WM8994, in order to use the actual
+ 	  functionaltiy of the device other drivers must be enabled.
+ 
++config MFD_WM97xx
++	tristate "Wolfson Microelectronics WM97xx"
++	select MFD_CORE
++	select REGMAP_AC97
++	select AC97_BUS_COMPAT
 +	depends on AC97_BUS_NEW
-+	depends on !AC97_BUS
-diff --git a/sound/ac97/Makefile b/sound/ac97/Makefile
-new file mode 100644
-index 000000000000..f9c2640bfb59
---- /dev/null
-+++ b/sound/ac97/Makefile
-@@ -0,0 +1,8 @@
-+#
-+# make for AC97 bus drivers
-+#
++	help
++	  The WM9705, WM9712 and WM9713 is a highly integrated hi-fi CODEC
++	  designed for smartphone applications.  As well as audio functionality
++	  it has on board GPIO and a touchscreen functionality which is
++	  supported via the relevant subsystems.  This driver provides core
++	  support for the WM97xx, in order to use the actual functionaltiy of
++	  the device other drivers must be enabled.
 +
-+obj-$(CONFIG_AC97_BUS_NEW)	+= ac97.o
-+
-+ac97-y				+= bus.o codec.o
-+ac97-$(CONFIG_AC97_BUS_COMPAT)	+= snd_ac97_compat.o
-diff --git a/sound/ac97/ac97_core.h b/sound/ac97/ac97_core.h
+ config MFD_STW481X
+ 	tristate "Support for ST Microelectronics STw481x"
+ 	depends on I2C && (ARCH_NOMADIK || COMPILE_TEST)
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 31ce07611a6f..902c2e46f310 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -69,6 +69,7 @@ obj-$(CONFIG_MFD_WM8350)	+= wm8350.o
+ obj-$(CONFIG_MFD_WM8350_I2C)	+= wm8350-i2c.o
+ wm8994-objs			:= wm8994-core.o wm8994-irq.o wm8994-regmap.o
+ obj-$(CONFIG_MFD_WM8994)	+= wm8994.o
++obj-$(CONFIG_MFD_WM97xx)	+= wm97xx-core.o
+ 
+ obj-$(CONFIG_TPS6105X)		+= tps6105x.o
+ obj-$(CONFIG_TPS65010)		+= tps65010.o
+diff --git a/drivers/mfd/wm97xx-core.c b/drivers/mfd/wm97xx-core.c
 new file mode 100644
-index 000000000000..08441a4fda7c
+index 000000000000..66e477fffd43
 --- /dev/null
-+++ b/sound/ac97/ac97_core.h
-@@ -0,0 +1,16 @@
++++ b/drivers/mfd/wm97xx-core.c
+@@ -0,0 +1,379 @@
 +/*
-+ * Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ * Wolfson WM97xx -- Core device
++ *
++ * Copyright (C) 2017 Robert Jarzmik
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+unsigned int snd_ac97_bus_scan_one(struct ac97_controller *ac97,
-+				   unsigned int codec_num);
-+
-+static inline bool ac97_ids_match(unsigned int id1, unsigned int id2,
-+				  unsigned int mask)
-+{
-+	return (id1 & mask) == (id2 & mask);
-+}
-diff --git a/sound/ac97/bus.c b/sound/ac97/bus.c
-new file mode 100644
-index 000000000000..31f858eceffc
---- /dev/null
-+++ b/sound/ac97/bus.c
-@@ -0,0 +1,539 @@
-+/*
-+ * Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Features:
++ *  - an AC97 audio codec
++ *  - a touchscreen driver
++ *  - a GPIO block
 + */
 +
++#include <linux/device.h>
++#include <linux/mfd/core.h>
++#include <linux/mfd/wm97xx.h>
 +#include <linux/module.h>
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/idr.h>
-+#include <linux/list.h>
-+#include <linux/mutex.h>
-+#include <linux/pm.h>
-+#include <linux/pm_runtime.h>
++#include <linux/regmap.h>
 +#include <linux/slab.h>
-+#include <linux/sysfs.h>
-+#include <sound/ac97/codec.h>
-+#include <sound/ac97/controller.h>
-+#include <sound/ac97/regs.h>
-+
-+#include "ac97_core.h"
-+
-+/*
-+ * Protects ac97_controllers and each ac97_controller structure.
-+ */
-+static DEFINE_MUTEX(ac97_controllers_mutex);
-+static DEFINE_IDR(ac97_adapter_idr);
-+static LIST_HEAD(ac97_controllers);
-+
-+static struct bus_type ac97_bus_type;
-+
-+static inline struct ac97_controller*
-+to_ac97_controller(struct device *ac97_adapter)
-+{
-+	return container_of(ac97_adapter, struct ac97_controller, adap);
-+}
-+
-+static int ac97_unbound_ctrl_write(struct ac97_controller *adrv, int slot,
-+		     unsigned short reg, unsigned short val)
-+{
-+	return -ENODEV;
-+}
-+
-+static int ac97_unbound_ctrl_read(struct ac97_controller *adrv, int slot,
-+				  unsigned short reg)
-+{
-+	return -ENODEV;
-+}
-+
-+static const struct ac97_controller_ops ac97_unbound_ctrl_ops = {
-+	.write = ac97_unbound_ctrl_write,
-+	.read = ac97_unbound_ctrl_read,
-+};
-+
-+static struct ac97_controller ac97_unbound_ctrl = {
-+	.ops = &ac97_unbound_ctrl_ops,
-+};
-+
-+static struct ac97_codec_device *
-+ac97_codec_find(struct ac97_controller *ac97_ctrl, unsigned int codec_num)
-+{
-+	if (codec_num >= AC97_BUS_MAX_CODECS)
-+		return ERR_PTR(-EINVAL);
-+
-+	return ac97_ctrl->codecs[codec_num];
-+}
-+
-+static void ac97_codec_release(struct device *dev)
-+{
-+	struct ac97_codec_device *adev;
-+	struct ac97_controller *ac97_ctrl;
-+
-+	adev = to_ac97_device(dev);
-+	ac97_ctrl = adev->ac97_ctrl;
-+	ac97_ctrl->codecs[adev->num] = NULL;
-+	kfree(adev);
-+}
-+
-+static int ac97_codec_add(struct ac97_controller *ac97_ctrl, int idx,
-+		   unsigned int vendor_id)
-+{
-+	struct ac97_codec_device *codec;
-+	int ret;
-+
-+	codec = kzalloc(sizeof(*codec), GFP_KERNEL);
-+	if (!codec)
-+		return -ENOMEM;
-+	ac97_ctrl->codecs[idx] = codec;
-+	codec->vendor_id = vendor_id;
-+	codec->dev.release = ac97_codec_release;
-+	codec->dev.bus = &ac97_bus_type;
-+	codec->dev.parent = &ac97_ctrl->adap;
-+	codec->num = idx;
-+	codec->ac97_ctrl = ac97_ctrl;
-+
-+	device_initialize(&codec->dev);
-+	dev_set_name(&codec->dev, "%s:%u", dev_name(ac97_ctrl->parent), idx);
-+
-+	ret = device_add(&codec->dev);
-+	if (ret)
-+		goto err_free_codec;
-+
-+	return 0;
-+err_free_codec:
-+	put_device(&codec->dev);
-+	kfree(codec);
-+	ac97_ctrl->codecs[idx] = NULL;
-+
-+	return ret;
-+}
-+
-+unsigned int snd_ac97_bus_scan_one(struct ac97_controller *adrv,
-+				   unsigned int codec_num)
-+{
-+	unsigned short vid1, vid2;
-+	int ret;
-+
-+	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID1);
-+	vid1 = (ret & 0xffff);
-+	if (ret < 0)
-+		return 0;
-+
-+	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID2);
-+	vid2 = (ret & 0xffff);
-+	if (ret < 0)
-+		return 0;
-+
-+	dev_dbg(&adrv->adap, "%s(codec_num=%u): vendor_id=0x%08x\n",
-+		__func__, codec_num, AC97_ID(vid1, vid2));
-+	return AC97_ID(vid1, vid2);
-+}
-+
-+static int ac97_bus_scan(struct ac97_controller *ac97_ctrl)
-+{
-+	int ret, i;
-+	unsigned int vendor_id;
-+
-+	for (i = 0; i < AC97_BUS_MAX_CODECS; i++) {
-+		if (ac97_codec_find(ac97_ctrl, i))
-+			continue;
-+		if (!(ac97_ctrl->slots_available & BIT(i)))
-+			continue;
-+		vendor_id = snd_ac97_bus_scan_one(ac97_ctrl, i);
-+		if (!vendor_id)
-+			continue;
-+
-+		ret = ac97_codec_add(ac97_ctrl, i, vendor_id);
-+		if (ret < 0)
-+			return ret;
-+	}
-+	return 0;
-+}
-+
-+static int ac97_bus_reset(struct ac97_controller *ac97_ctrl)
-+{
-+	ac97_ctrl->ops->reset(ac97_ctrl);
-+
-+	return 0;
-+}
-+
-+/**
-+ * snd_ac97_codec_driver_register - register an AC97 codec driver
-+ * @dev: AC97 driver codec to register
-+ *
-+ * Register an AC97 codec driver to the ac97 bus driver, aka. the AC97 digital
-+ * controller.
-+ *
-+ * Returns 0 on success or error code
-+ */
-+int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
-+{
-+	drv->driver.bus = &ac97_bus_type;
-+	return driver_register(&drv->driver);
-+}
-+EXPORT_SYMBOL_GPL(snd_ac97_codec_driver_register);
-+
-+/**
-+ * snd_ac97_codec_driver_unregister - unregister an AC97 codec driver
-+ * @dev: AC97 codec driver to unregister
-+ *
-+ * Unregister a previously registered ac97 codec driver.
-+ */
-+void snd_ac97_codec_driver_unregister(struct ac97_codec_driver *drv)
-+{
-+	driver_unregister(&drv->driver);
-+}
-+EXPORT_SYMBOL_GPL(snd_ac97_codec_driver_unregister);
-+
-+/**
-+ * snd_ac97_codec_get_platdata - get platform_data
-+ * @adev: the ac97 codec device
-+ *
-+ * For legacy platforms, in order to have platform_data in codec drivers
-+ * available, while ac97 device are auto-created upon probe, this retrieves the
-+ * platdata which was setup on ac97 controller registration.
-+ *
-+ * Returns the platform data pointer
-+ */
-+void *snd_ac97_codec_get_platdata(const struct ac97_codec_device *adev)
-+{
-+	struct ac97_controller *ac97_ctrl = adev->ac97_ctrl;
-+
-+	return ac97_ctrl->codecs_pdata[adev->num];
-+}
-+EXPORT_SYMBOL_GPL(snd_ac97_codec_get_platdata);
-+
-+static void ac97_ctrl_codecs_unregister(struct ac97_controller *ac97_ctrl)
-+{
-+	int i;
-+
-+	for (i = 0; i < AC97_BUS_MAX_CODECS; i++)
-+		if (ac97_ctrl->codecs[i]) {
-+			ac97_ctrl->codecs[i]->ac97_ctrl = &ac97_unbound_ctrl;
-+			device_unregister(&ac97_ctrl->codecs[i]->dev);
-+		}
-+}
-+
-+static ssize_t cold_reset_store(struct device *dev,
-+				struct device_attribute *attr, const char *buf,
-+				size_t len)
-+{
-+	struct ac97_controller *ac97_ctrl;
-+
-+	mutex_lock(&ac97_controllers_mutex);
-+	ac97_ctrl = to_ac97_controller(dev);
-+	ac97_ctrl->ops->reset(ac97_ctrl);
-+	mutex_unlock(&ac97_controllers_mutex);
-+	return len;
-+}
-+static DEVICE_ATTR_WO(cold_reset);
-+
-+static ssize_t warm_reset_store(struct device *dev,
-+				struct device_attribute *attr, const char *buf,
-+				size_t len)
-+{
-+	struct ac97_controller *ac97_ctrl;
-+
-+	if (!dev)
-+		return -ENODEV;
-+
-+	mutex_lock(&ac97_controllers_mutex);
-+	ac97_ctrl = to_ac97_controller(dev);
-+	ac97_ctrl->ops->warm_reset(ac97_ctrl);
-+	mutex_unlock(&ac97_controllers_mutex);
-+	return len;
-+}
-+static DEVICE_ATTR_WO(warm_reset);
-+
-+static struct attribute *ac97_controller_device_attrs[] = {
-+	&dev_attr_cold_reset.attr,
-+	&dev_attr_warm_reset.attr,
-+	NULL
-+};
-+
-+static struct attribute_group ac97_adapter_attr_group = {
-+	.name	= "ac97_operations",
-+	.attrs	= ac97_controller_device_attrs,
-+};
-+
-+static const struct attribute_group *ac97_adapter_groups[] = {
-+	&ac97_adapter_attr_group,
-+	NULL,
-+};
-+
-+static void ac97_del_adapter(struct ac97_controller *ac97_ctrl)
-+{
-+	mutex_lock(&ac97_controllers_mutex);
-+	ac97_ctrl_codecs_unregister(ac97_ctrl);
-+	list_del(&ac97_ctrl->controllers);
-+	mutex_unlock(&ac97_controllers_mutex);
-+
-+	device_unregister(&ac97_ctrl->adap);
-+}
-+
-+static void ac97_adapter_release(struct device *dev)
-+{
-+	struct ac97_controller *ac97_ctrl;
-+
-+	ac97_ctrl = to_ac97_controller(dev);
-+	idr_remove(&ac97_adapter_idr, ac97_ctrl->nr);
-+	dev_dbg(&ac97_ctrl->adap, "adapter unregistered by %s\n",
-+		dev_name(ac97_ctrl->parent));
-+}
-+
-+static const struct device_type ac97_adapter_type = {
-+	.groups		= ac97_adapter_groups,
-+	.release	= ac97_adapter_release,
-+};
-+
-+static int ac97_add_adapter(struct ac97_controller *ac97_ctrl)
-+{
-+	int ret;
-+
-+	mutex_lock(&ac97_controllers_mutex);
-+	ret = idr_alloc(&ac97_adapter_idr, ac97_ctrl, 0, 0, GFP_KERNEL);
-+	ac97_ctrl->nr = ret;
-+	if (ret >= 0) {
-+		dev_set_name(&ac97_ctrl->adap, "ac97-%d", ret);
-+		ac97_ctrl->adap.type = &ac97_adapter_type;
-+		ac97_ctrl->adap.parent = ac97_ctrl->parent;
-+		ret = device_register(&ac97_ctrl->adap);
-+		if (ret)
-+			put_device(&ac97_ctrl->adap);
-+	}
-+	if (!ret)
-+		list_add(&ac97_ctrl->controllers, &ac97_controllers);
-+	mutex_unlock(&ac97_controllers_mutex);
-+
-+	if (!ret)
-+		dev_dbg(&ac97_ctrl->adap, "adapter registered by %s\n",
-+			dev_name(ac97_ctrl->parent));
-+	return ret;
-+}
-+
-+/**
-+ * snd_ac97_controller_register - register an ac97 controller
-+ * @ops: the ac97 bus operations
-+ * @dev: the device providing the ac97 DC function
-+ * @slots_available: mask of the ac97 codecs that can be scanned and probed
-+ *                   bit0 => codec 0, bit1 => codec 1 ... bit 3 => codec 3
-+ *
-+ * Register a digital controller which can control up to 4 ac97 codecs. This is
-+ * the controller side of the AC97 AC-link, while the slave side are the codecs.
-+ *
-+ * Returns a valid controller upon success, negative pointer value upon error
-+ */
-+struct ac97_controller *snd_ac97_controller_register(
-+	const struct ac97_controller_ops *ops, struct device *dev,
-+	unsigned short slots_available, void **codecs_pdata)
-+{
-+	struct ac97_controller *ac97_ctrl;
-+	int ret, i;
-+
-+	ac97_ctrl = kzalloc(sizeof(*ac97_ctrl), GFP_KERNEL);
-+	if (!ac97_ctrl)
-+		return ERR_PTR(-ENOMEM);
-+
-+	for (i = 0; i < AC97_BUS_MAX_CODECS && codecs_pdata; i++)
-+		ac97_ctrl->codecs_pdata[i] = codecs_pdata[i];
-+
-+	ac97_ctrl->ops = ops;
-+	ac97_ctrl->slots_available = slots_available;
-+	ac97_ctrl->parent = dev;
-+	ret = ac97_add_adapter(ac97_ctrl);
-+
-+	if (ret)
-+		goto err;
-+	ac97_bus_reset(ac97_ctrl);
-+	ac97_bus_scan(ac97_ctrl);
-+
-+	return ac97_ctrl;
-+err:
-+	kfree(ac97_ctrl);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(snd_ac97_controller_register);
-+
-+/**
-+ * snd_ac97_controller_unregister - unregister an ac97 controller
-+ * @ac97_ctrl: the device previously provided to ac97_controller_register()
-+ *
-+ */
-+void snd_ac97_controller_unregister(struct ac97_controller *ac97_ctrl)
-+{
-+	ac97_del_adapter(ac97_ctrl);
-+}
-+EXPORT_SYMBOL_GPL(snd_ac97_controller_unregister);
-+
-+#ifdef CONFIG_PM
-+static int ac97_pm_runtime_suspend(struct device *dev)
-+{
-+	struct ac97_codec_device *codec = to_ac97_device(dev);
-+	int ret = pm_generic_runtime_suspend(dev);
-+
-+	if (ret == 0 && dev->driver) {
-+		if (pm_runtime_is_irq_safe(dev))
-+			clk_disable(codec->clk);
-+		else
-+			clk_disable_unprepare(codec->clk);
-+	}
-+
-+	return ret;
-+}
-+
-+static int ac97_pm_runtime_resume(struct device *dev)
-+{
-+	struct ac97_codec_device *codec = to_ac97_device(dev);
-+	int ret;
-+
-+	if (dev->driver) {
-+		if (pm_runtime_is_irq_safe(dev))
-+			ret = clk_enable(codec->clk);
-+		else
-+			ret = clk_prepare_enable(codec->clk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return pm_generic_runtime_resume(dev);
-+}
-+#endif /* CONFIG_PM */
-+
-+static const struct dev_pm_ops ac97_pm = {
-+	.suspend	= pm_generic_suspend,
-+	.resume		= pm_generic_resume,
-+	.freeze		= pm_generic_freeze,
-+	.thaw		= pm_generic_thaw,
-+	.poweroff	= pm_generic_poweroff,
-+	.restore	= pm_generic_restore,
-+	SET_RUNTIME_PM_OPS(
-+		ac97_pm_runtime_suspend,
-+		ac97_pm_runtime_resume,
-+		NULL)
-+};
-+
-+static int ac97_get_enable_clk(struct ac97_codec_device *adev)
-+{
-+	int ret;
-+
-+	adev->clk = clk_get(&adev->dev, "ac97_clk");
-+	if (IS_ERR(adev->clk))
-+		return PTR_ERR(adev->clk);
-+
-+	ret = clk_prepare_enable(adev->clk);
-+	if (ret)
-+		clk_put(adev->clk);
-+
-+	return ret;
-+}
-+
-+static void ac97_put_disable_clk(struct ac97_codec_device *adev)
-+{
-+	clk_disable_unprepare(adev->clk);
-+	clk_put(adev->clk);
-+}
-+
-+static ssize_t vendor_id_show(struct device *dev,
-+			      struct device_attribute *attr, char *buf)
-+{
-+	struct ac97_codec_device *codec = to_ac97_device(dev);
-+
-+	return sprintf(buf, "%08x", codec->vendor_id);
-+}
-+DEVICE_ATTR_RO(vendor_id);
-+
-+static struct attribute *ac97_dev_attrs[] = {
-+	&dev_attr_vendor_id.attr,
-+	NULL,
-+};
-+ATTRIBUTE_GROUPS(ac97_dev);
-+
-+static int ac97_bus_match(struct device *dev, struct device_driver *drv)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(dev);
-+	struct ac97_codec_driver *adrv = to_ac97_driver(drv);
-+	const struct ac97_id *id = adrv->id_table;
-+	int i = 0;
-+
-+	if (adev->vendor_id == 0x0 || adev->vendor_id == 0xffffffff)
-+		return false;
-+
-+	do {
-+		if (ac97_ids_match(id[i].id, adev->vendor_id, id[i].mask))
-+			return true;
-+	} while (id[i++].id);
-+
-+	return false;
-+}
-+
-+static int ac97_bus_probe(struct device *dev)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(dev);
-+	struct ac97_codec_driver *adrv = to_ac97_driver(dev->driver);
-+	int ret;
-+
-+	ret = ac97_get_enable_clk(adev);
-+	if (ret)
-+		return ret;
-+
-+	pm_runtime_get_noresume(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+
-+	ret = adrv->probe(adev);
-+	if (ret == 0)
-+		return 0;
-+
-+	pm_runtime_disable(dev);
-+	pm_runtime_set_suspended(dev);
-+	pm_runtime_put_noidle(dev);
-+	ac97_put_disable_clk(adev);
-+
-+	return ret;
-+}
-+
-+static int ac97_bus_remove(struct device *dev)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(dev);
-+	struct ac97_codec_driver *adrv = to_ac97_driver(dev->driver);
-+	int ret;
-+
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret)
-+		return ret;
-+
-+	ret = adrv->remove(adev);
-+	pm_runtime_put_noidle(dev);
-+	if (ret == 0)
-+		ac97_put_disable_clk(adev);
-+
-+	return ret;
-+}
-+
-+static struct bus_type ac97_bus_type = {
-+	.name		= "ac97bus",
-+	.dev_groups	= ac97_dev_groups,
-+	.match		= ac97_bus_match,
-+	.pm		= &ac97_pm,
-+	.probe		= ac97_bus_probe,
-+	.remove		= ac97_bus_remove,
-+};
-+
-+static int __init ac97_bus_init(void)
-+{
-+	return bus_register(&ac97_bus_type);
-+}
-+subsys_initcall(ac97_bus_init);
-+
-+static void __exit ac97_bus_exit(void)
-+{
-+	bus_unregister(&ac97_bus_type);
-+}
-+module_exit(ac97_bus_exit);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-diff --git a/sound/ac97/codec.c b/sound/ac97/codec.c
-new file mode 100644
-index 000000000000..a835f03744bf
---- /dev/null
-+++ b/sound/ac97/codec.c
-@@ -0,0 +1,15 @@
-+/*
-+ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <sound/ac97_codec.h>
-+#include <sound/ac97/codec.h>
-+#include <sound/ac97/controller.h>
-+#include <linux/device.h>
-+#include <linux/slab.h>
-+#include <sound/soc.h>	/* For compat_ac97_* */
-+
-diff --git a/sound/ac97/snd_ac97_compat.c b/sound/ac97/snd_ac97_compat.c
-new file mode 100644
-index 000000000000..61544e0d8de4
---- /dev/null
-+++ b/sound/ac97/snd_ac97_compat.c
-@@ -0,0 +1,108 @@
-+/*
-+ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/list.h>
-+#include <linux/slab.h>
++#include <linux/wm97xx.h>
 +#include <sound/ac97/codec.h>
 +#include <sound/ac97/compat.h>
-+#include <sound/ac97/controller.h>
-+#include <sound/soc.h>
 +
-+#include "ac97_core.h"
++#define WM9705_VENDOR_ID 0x574d4c05
++#define WM9712_VENDOR_ID 0x574d4c12
++#define WM9713_VENDOR_ID 0x574d4c13
++#define WM97xx_VENDOR_ID_MASK 0xffffffff
 +
-+static void compat_ac97_reset(struct snd_ac97 *ac97)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
-+	struct ac97_controller *actrl = adev->ac97_ctrl;
-+
-+	if (actrl->ops->reset)
-+		actrl->ops->reset(actrl);
-+}
-+
-+static void compat_ac97_warm_reset(struct snd_ac97 *ac97)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
-+	struct ac97_controller *actrl = adev->ac97_ctrl;
-+
-+	if (actrl->ops->warm_reset)
-+		actrl->ops->warm_reset(actrl);
-+}
-+
-+static void compat_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
-+			      unsigned short val)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
-+	struct ac97_controller *actrl = adev->ac97_ctrl;
-+
-+	actrl->ops->write(actrl, ac97->num, reg, val);
-+}
-+
-+static unsigned short compat_ac97_read(struct snd_ac97 *ac97,
-+				       unsigned short reg)
-+{
-+	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
-+	struct ac97_controller *actrl = adev->ac97_ctrl;
-+
-+	return actrl->ops->read(actrl, ac97->num, reg);
-+}
-+
-+static struct snd_ac97_bus_ops compat_snd_ac97_bus_ops = {
-+	.reset = compat_ac97_reset,
-+	.warm_reset = compat_ac97_warm_reset,
-+	.write = compat_ac97_write,
-+	.read = compat_ac97_read,
-+};
-+
-+static struct snd_ac97_bus compat_soc_ac97_bus = {
-+	.ops = &compat_snd_ac97_bus_ops,
-+};
-+
-+struct snd_ac97 *snd_ac97_compat_alloc(struct ac97_codec_device *adev)
-+{
++struct wm97xx_priv {
++	struct regmap *regmap;
 +	struct snd_ac97 *ac97;
++	struct device *dev;
++	struct wm97xx_platform_data codec_pdata;
++};
 +
-+	ac97 = kzalloc(sizeof(struct snd_ac97), GFP_KERNEL);
-+	if (ac97 == NULL)
-+		return ERR_PTR(-ENOMEM);
-+
-+	ac97->dev = adev->dev;
-+	ac97->private_data = adev;
-+	ac97->bus = &compat_soc_ac97_bus;
-+	return ac97;
-+}
-+EXPORT_SYMBOL_GPL(snd_ac97_compat_alloc);
-+
-+void snd_ac97_compat_release(struct snd_ac97 *ac97)
++static bool wm97xx_readable_reg(struct device *dev, unsigned int reg)
 +{
-+	kfree(ac97);
++	switch (reg) {
++	case AC97_RESET ... AC97_PCM_SURR_DAC_RATE:
++	case AC97_PCM_LR_ADC_RATE:
++	case AC97_CENTER_LFE_MASTER:
++	case AC97_SPDIF ... AC97_LINE1_LEVEL:
++	case AC97_GPIO_CFG ... 0x5c:
++	case AC97_CODEC_CLASS_REV ... AC97_PCI_SID:
++	case 0x74 ... AC97_VENDOR_ID2:
++		return true;
++	default:
++		return false;
++	}
 +}
-+EXPORT_SYMBOL_GPL(snd_ac97_compat_release);
 +
-+int snd_ac97_reset(struct snd_ac97 *ac97, bool try_warm, unsigned int id,
-+	unsigned int id_mask)
++static bool wm97xx_writeable_reg(struct device *dev, unsigned int reg)
 +{
-+	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
-+	struct ac97_controller *actrl = adev->ac97_ctrl;
-+	unsigned int scanned;
++	switch (reg) {
++	case AC97_VENDOR_ID1:
++	case AC97_VENDOR_ID2:
++		return false;
++	default:
++		return wm97xx_readable_reg(dev, reg);
++	}
++}
 +
-+	if (try_warm) {
-+		compat_ac97_warm_reset(ac97);
-+		scanned = snd_ac97_bus_scan_one(actrl, adev->num);
-+		if (ac97_ids_match(scanned, adev->vendor_id, id_mask))
-+			return 1;
++static const struct reg_default wm9705_reg_defaults[] = {
++	{ 0x02, 0x8000 },
++	{ 0x04, 0x8000 },
++	{ 0x06, 0x8000 },
++	{ 0x0a, 0x8000 },
++	{ 0x0c, 0x8008 },
++	{ 0x0e, 0x8008 },
++	{ 0x10, 0x8808 },
++	{ 0x12, 0x8808 },
++	{ 0x14, 0x8808 },
++	{ 0x16, 0x8808 },
++	{ 0x18, 0x8808 },
++	{ 0x1a, 0x0000 },
++	{ 0x1c, 0x8000 },
++	{ 0x20, 0x0000 },
++	{ 0x22, 0x0000 },
++	{ 0x26, 0x000f },
++	{ 0x28, 0x0605 },
++	{ 0x2a, 0x0000 },
++	{ 0x2c, 0xbb80 },
++	{ 0x32, 0xbb80 },
++	{ 0x34, 0x2000 },
++	{ 0x5a, 0x0000 },
++	{ 0x5c, 0x0000 },
++	{ 0x72, 0x0808 },
++	{ 0x74, 0x0000 },
++	{ 0x76, 0x0006 },
++	{ 0x78, 0x0000 },
++	{ 0x7a, 0x0000 },
++};
++
++static const struct regmap_config wm9705_regmap_config = {
++	.reg_bits = 16,
++	.reg_stride = 2,
++	.val_bits = 16,
++	.max_register = 0x7e,
++	.cache_type = REGCACHE_RBTREE,
++
++	.reg_defaults = wm9705_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(wm9705_reg_defaults),
++	.volatile_reg = regmap_ac97_default_volatile,
++	.readable_reg = wm97xx_readable_reg,
++	.writeable_reg = wm97xx_writeable_reg,
++};
++
++static struct mfd_cell wm9705_cells[] = {
++	{
++		.name = "wm9705-codec",
++	},
++	{
++		.name = "wm97xx-ts",
++	},
++};
++
++static bool wm9712_volatile_reg(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case AC97_REC_GAIN:
++		return true;
++	default:
++		return regmap_ac97_default_volatile(dev, reg);
++	}
++}
++
++static const struct reg_default wm9712_reg_defaults[] = {
++	{ 0x02, 0x8000 },
++	{ 0x04, 0x8000 },
++	{ 0x06, 0x8000 },
++	{ 0x08, 0x0f0f },
++	{ 0x0a, 0xaaa0 },
++	{ 0x0c, 0xc008 },
++	{ 0x0e, 0x6808 },
++	{ 0x10, 0xe808 },
++	{ 0x12, 0xaaa0 },
++	{ 0x14, 0xad00 },
++	{ 0x16, 0x8000 },
++	{ 0x18, 0xe808 },
++	{ 0x1a, 0x3000 },
++	{ 0x1c, 0x8000 },
++	{ 0x20, 0x0000 },
++	{ 0x22, 0x0000 },
++	{ 0x26, 0x000f },
++	{ 0x28, 0x0605 },
++	{ 0x2a, 0x0410 },
++	{ 0x2c, 0xbb80 },
++	{ 0x2e, 0xbb80 },
++	{ 0x32, 0xbb80 },
++	{ 0x34, 0x2000 },
++	{ 0x4c, 0xf83e },
++	{ 0x4e, 0xffff },
++	{ 0x50, 0x0000 },
++	{ 0x52, 0x0000 },
++	{ 0x56, 0xf83e },
++	{ 0x58, 0x0008 },
++	{ 0x5c, 0x0000 },
++	{ 0x60, 0xb032 },
++	{ 0x62, 0x3e00 },
++	{ 0x64, 0x0000 },
++	{ 0x76, 0x0006 },
++	{ 0x78, 0x0001 },
++	{ 0x7a, 0x0000 },
++};
++
++static const struct regmap_config wm9712_regmap_config = {
++	.reg_bits = 16,
++	.reg_stride = 2,
++	.val_bits = 16,
++	.max_register = 0x7e,
++	.cache_type = REGCACHE_RBTREE,
++
++	.reg_defaults = wm9712_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(wm9712_reg_defaults),
++	.volatile_reg = wm9712_volatile_reg,
++	.readable_reg = wm97xx_readable_reg,
++	.writeable_reg = wm97xx_writeable_reg,
++};
++
++static struct mfd_cell wm9712_cells[] = {
++	{
++		.name = "wm9712-codec",
++	},
++	{
++		.name = "wm97xx-ts",
++	},
++};
++
++static const struct reg_default wm9713_reg_defaults[] = {
++	{ 0x02, 0x8080 },	/* Speaker Output Volume */
++	{ 0x04, 0x8080 },	/* Headphone Output Volume */
++	{ 0x06, 0x8080 },	/* Out3/OUT4 Volume */
++	{ 0x08, 0xc880 },	/* Mono Volume */
++	{ 0x0a, 0xe808 },	/* LINEIN Volume */
++	{ 0x0c, 0xe808 },	/* DAC PGA Volume */
++	{ 0x0e, 0x0808 },	/* MIC PGA Volume */
++	{ 0x10, 0x00da },	/* MIC Routing Control */
++	{ 0x12, 0x8000 },	/* Record PGA Volume */
++	{ 0x14, 0xd600 },	/* Record Routing */
++	{ 0x16, 0xaaa0 },	/* PCBEEP Volume */
++	{ 0x18, 0xaaa0 },	/* VxDAC Volume */
++	{ 0x1a, 0xaaa0 },	/* AUXDAC Volume */
++	{ 0x1c, 0x0000 },	/* Output PGA Mux */
++	{ 0x1e, 0x0000 },	/* DAC 3D control */
++	{ 0x20, 0x0f0f },	/* DAC Tone Control*/
++	{ 0x22, 0x0040 },	/* MIC Input Select & Bias */
++	{ 0x24, 0x0000 },	/* Output Volume Mapping & Jack */
++	{ 0x26, 0x7f00 },	/* Powerdown Ctrl/Stat*/
++	{ 0x28, 0x0405 },	/* Extended Audio ID */
++	{ 0x2a, 0x0410 },	/* Extended Audio Start/Ctrl */
++	{ 0x2c, 0xbb80 },	/* Audio DACs Sample Rate */
++	{ 0x2e, 0xbb80 },	/* AUXDAC Sample Rate */
++	{ 0x32, 0xbb80 },	/* Audio ADCs Sample Rate */
++	{ 0x36, 0x4523 },	/* PCM codec control */
++	{ 0x3a, 0x2000 },	/* SPDIF control */
++	{ 0x3c, 0xfdff },	/* Powerdown 1 */
++	{ 0x3e, 0xffff },	/* Powerdown 2 */
++	{ 0x40, 0x0000 },	/* General Purpose */
++	{ 0x42, 0x0000 },	/* Fast Power-Up Control */
++	{ 0x44, 0x0080 },	/* MCLK/PLL Control */
++	{ 0x46, 0x0000 },	/* MCLK/PLL Control */
++
++	{ 0x4c, 0xfffe },	/* GPIO Pin Configuration */
++	{ 0x4e, 0xffff },	/* GPIO Pin Polarity / Type */
++	{ 0x50, 0x0000 },	/* GPIO Pin Sticky */
++	{ 0x52, 0x0000 },	/* GPIO Pin Wake-Up */
++				/* GPIO Pin Status */
++	{ 0x56, 0xfffe },	/* GPIO Pin Sharing */
++	{ 0x58, 0x4000 },	/* GPIO PullUp/PullDown */
++	{ 0x5a, 0x0000 },	/* Additional Functions 1 */
++	{ 0x5c, 0x0000 },	/* Additional Functions 2 */
++	{ 0x60, 0xb032 },	/* ALC Control */
++	{ 0x62, 0x3e00 },	/* ALC / Noise Gate Control */
++	{ 0x64, 0x0000 },	/* AUXDAC input control */
++	{ 0x74, 0x0000 },	/* Digitiser Reg 1 */
++	{ 0x76, 0x0006 },	/* Digitiser Reg 2 */
++	{ 0x78, 0x0001 },	/* Digitiser Reg 3 */
++	{ 0x7a, 0x0000 },	/* Digitiser Read Back */
++};
++
++static const struct regmap_config wm9713_regmap_config = {
++	.reg_bits = 16,
++	.reg_stride = 2,
++	.val_bits = 16,
++	.max_register = 0x7e,
++	.cache_type = REGCACHE_RBTREE,
++
++	.reg_defaults = wm9713_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(wm9713_reg_defaults),
++	.volatile_reg = regmap_ac97_default_volatile,
++	.readable_reg = wm97xx_readable_reg,
++	.writeable_reg = wm97xx_writeable_reg,
++};
++
++static struct mfd_cell wm9713_cells[] = {
++	{
++		.name = "wm9713-codec",
++	},
++	{
++		.name = "wm97xx-ts",
++	},
++};
++
++static int wm97xx_ac97_probe(struct ac97_codec_device *adev)
++{
++	struct wm97xx_priv *wm97xx;
++	const struct regmap_config *config;
++	struct wm97xx_platform_data *codec_pdata;
++	struct mfd_cell *cells;
++	int ret = 0, nb_cells, i;
++	struct wm97xx_pdata *pdata = snd_ac97_codec_get_platdata(adev);
++
++	wm97xx = devm_kzalloc(ac97_codec_dev2dev(adev),
++			      sizeof(*wm97xx), GFP_KERNEL);
++	if (!wm97xx)
++		return -ENOMEM;
++
++	wm97xx->dev = ac97_codec_dev2dev(adev);
++	wm97xx->ac97 = snd_ac97_compat_alloc(adev);
++	if (IS_ERR(wm97xx->ac97))
++		return PTR_ERR(wm97xx->ac97);
++
++
++	ac97_set_drvdata(adev, wm97xx);
++	dev_info(wm97xx->dev, "wm97xx core found, id=0x%x\n",
++		 adev->vendor_id);
++
++	codec_pdata = &wm97xx->codec_pdata;
++	codec_pdata->ac97 = wm97xx->ac97;
++	codec_pdata->batt_pdata = pdata->batt_pdata;
++
++	switch (adev->vendor_id) {
++	case WM9705_VENDOR_ID:
++		config = &wm9705_regmap_config;
++		cells = wm9705_cells;
++		nb_cells = ARRAY_SIZE(wm9705_cells);
++		break;
++	case WM9712_VENDOR_ID:
++		config = &wm9712_regmap_config;
++		cells = wm9712_cells;
++		nb_cells = ARRAY_SIZE(wm9712_cells);
++		break;
++	case WM9713_VENDOR_ID:
++		config = &wm9713_regmap_config;
++		cells = wm9713_cells;
++		nb_cells = ARRAY_SIZE(wm9713_cells);
++		break;
++	default:
++		config = NULL;
 +	}
 +
-+	compat_ac97_reset(ac97);
-+	compat_ac97_warm_reset(ac97);
-+	scanned = snd_ac97_bus_scan_one(actrl, adev->num);
-+	if (ac97_ids_match(scanned, adev->vendor_id, id_mask))
-+		return 0;
++	for (i = 0; i < nb_cells; i++) {
++		cells[i].platform_data = codec_pdata;
++		cells[i].pdata_size = sizeof(*codec_pdata);
++	}
 +
-+	return -ENODEV;
++	if (config) {
++		codec_pdata->regmap =
++			devm_regmap_init_ac97(wm97xx->ac97, config);
++		if (IS_ERR(codec_pdata->regmap))
++			ret = PTR_ERR(codec_pdata->regmap);
++	} else {
++		ret = -ENODEV;
++	}
++
++	if (!ret)
++		ret = devm_mfd_add_devices(wm97xx->dev, PLATFORM_DEVID_NONE,
++					   cells, nb_cells, NULL, 0, NULL);
++
++	if (ret)
++		snd_ac97_compat_release(wm97xx->ac97);
++
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(snd_ac97_reset);
++
++static int wm97xx_ac97_remove(struct ac97_codec_device *adev)
++{
++	struct wm97xx_priv *wm97xx = ac97_get_drvdata(adev);
++
++	snd_ac97_compat_release(wm97xx->ac97);
++
++	return 0;
++}
++
++static const struct ac97_id wm97xx_ac97_ids[] = {
++	{ .id = WM9705_VENDOR_ID, .mask = WM97xx_VENDOR_ID_MASK },
++	{ .id = WM9712_VENDOR_ID, .mask = WM97xx_VENDOR_ID_MASK },
++	{ .id = WM9713_VENDOR_ID, .mask = WM97xx_VENDOR_ID_MASK },
++	{ }
++};
++
++static struct ac97_codec_driver wm97xx_ac97_driver = {
++	.driver = {
++		.name = "wm97xx-core",
++	},
++	.probe		= wm97xx_ac97_probe,
++	.remove		= wm97xx_ac97_remove,
++	.id_table	= wm97xx_ac97_ids,
++};
++
++static int __init wm97xx_module_init(void)
++{
++	return snd_ac97_codec_driver_register(&wm97xx_ac97_driver);
++}
++module_init(wm97xx_module_init);
++
++static void __exit wm97xx_module_exit(void)
++{
++	snd_ac97_codec_driver_unregister(&wm97xx_ac97_driver);
++}
++module_exit(wm97xx_module_exit);
++
++MODULE_DESCRIPTION("WM9712, WM9713 core driver");
++MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
++MODULE_LICENSE("GPL");
++
+diff --git a/include/linux/mfd/wm97xx.h b/include/linux/mfd/wm97xx.h
+new file mode 100644
+index 000000000000..45fb54f19d09
+--- /dev/null
++++ b/include/linux/mfd/wm97xx.h
+@@ -0,0 +1,25 @@
++/*
++ * wm97xx client interface
++ *
++ * Copyright (C) 2017 Robert Jarzmik
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __LINUX_MFD_WM97XX_H
++#define __LINUX_MFD_WM97XX_H
++
++struct regmap;
++struct wm97xx_batt_pdata;
++struct snd_ac97;
++
++struct wm97xx_platform_data {
++	struct snd_ac97 *ac97;
++	struct regmap *regmap;
++	struct wm97xx_batt_pdata *batt_pdata;
++};
++
++#endif
 -- 
 2.11.0
