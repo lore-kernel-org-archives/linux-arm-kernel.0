@@ -1,89 +1,74 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Sat, 2 Sep 2017 03:35:41 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYzIDIvNV0gZHQtYmluZGluZ3M6IHNjc2k6IHVmczog?=
- =?gb2312?Q?add_document_for_hisi-ufs?=
-In-Reply-To: <20170901155319.zk7wdvysqzit7mog@rob-hp-laptop>
-References: <20170829084116.106695-1-liwei213@huawei.com>
- <20170829084116.106695-3-liwei213@huawei.com>
- <20170901155319.zk7wdvysqzit7mog@rob-hp-laptop>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA187B7@DGGEMM506-MBX.china.huawei.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Sat, 02 Sep 2017 15:01:57 +0800
+Subject: [PATCH v2 1/2] ARM: dts: sun8i: h3: Enable AP6212 WiFi on mmc1 on
+ Nanopi M1 Plus
+In-Reply-To: <1504283401-4263-2-git-send-email-embed3d@gmail.com>
+References: <1504283401-4263-1-git-send-email-embed3d@gmail.com>
+ <1504283401-4263-2-git-send-email-embed3d@gmail.com>
+Message-ID: <495813cc0e2ea09e495bfe14d595b926@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rob
-
-Thanks for your advises, I will fix them in the next patch.
-
-Thank you.
-
------????-----
-???: Rob Herring [mailto:robh at kernel.org] 
-????: 2017?9?1? 23:53
-???: liwei (CM)
-??: mark.rutland at arm.com; xuwei (O); catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; eric at anholt.net; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org; guodong.xu at linaro.org; Fengbaopeng (kevin, Kirin Solution Dept)
-??: Re: [PATCH v3 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-
-On Tue, Aug 29, 2017 at 04:41:13PM +0800, Li Wei wrote:
-> add ufs node document for Hisilicon
+? 2017-09-02 00:30?Philipp Rossak ???
+> From: Philipp Rossak <embed3d@gmail.com>
 > 
-> Signed-off-by: Li Wei <liwei213@huawei.com>
+> The WiFi side of the AP6212 WiFi/BT combo module is connected to
+> mmc1. There are also GPIOs for enable and interrupts.
+> 
+> Enable WiFi on this board by enabling mmc1 and adding the power
+> sequencing clocks and GPIO, as well as the chip's interrupt line.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 35 
-> ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+>  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 25 
+> +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt 
-> b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> new file mode 100644
-> index 000000000000..cfc84c821d50
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> @@ -0,0 +1,35 @@
-> +* Hisilicon Universal Flash Storage (UFS) Host Controller
-> +
-> +UFS nodes are defined to describe on-chip UFS hardware macro.
-> +Each UFS Host Controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains one of the following -
-> +			"hisilicon,hi3660-ufs" for hisi ufs host controller
-> +			 present on Hi3660 chipset.
-> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-> +- interrupt-parent  : interrupt device
-> +- interrupts        : interrupt number
-> +- clocks	        : List of phandle and clock specifier pairs
-> +- clock-names       : List of clock input name strings sorted in the same
-> +		      order as the clocks property. "clk_ref", "clk_phy" is 
-> +optional
-> +
-> +Optional properties for board device:
-> +- reset-gpio			: specifies to reset devices
-
-reset-gpios
-
-Really, this is should be in a sub node representing the device. It's fine if this is it, but if we start adding power supplies and other properties it should be a separate node.
-
-> +
-> +Example:
-> +
-> +	ufs: ufs at ff3b0000 {
-> +		compatible = "jedec,ufs-1.1", "hisilicon,hi3660-ufs";
-
-Need to reverse the order here. Most specific first.
-
-> +		/* 0: HCI standard */
-> +		/* 1: UFS SYS CTRL */
-> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
-> +			<0x0 0xff3b1000 0x0 0x1000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-> +		clock-names = "clk_ref", "clk_phy";
-> +		freq-table-hz = <0 0>, <0 0>;
-> +		reset-gpio = <&gpio18 1 0>;
-> +	}
-> --
-> 2.11.0
+> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> index 6256f55..7d18c35 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> @@ -48,6 +48,13 @@
 > 
+>  	aliases {
+>  		serial1 = &uart3;
+> +		ethernet1 = &sdio_wifi;
+
+When the Wi-Fi module itself has fixed MAC address, there's
+no need for such an alias.
+
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+>  	};
+>  };
+> 
+> @@ -65,6 +72,24 @@
+>  	status = "okay";
+>  };
+> 
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
+> +
+> +	sdio_wifi: sdio_wifi at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
+> +		interrupt-names = "host-wake";
+> +	};
+> +};
+> +
+>  &ohci1 {
+>  	status = "okay";
+>  };
