@@ -1,55 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Sep 2017 23:21:52 +0100
-Subject: [PATCH -tip 2/4] arm: Cleanup in_exception_text() and move it in
- asm/sections.h
-In-Reply-To: <150295409062.14424.11976553130089631456.stgit@devbox>
-References: <150295395797.14424.968407208436624832.stgit@devbox>
- <150295409062.14424.11976553130089631456.stgit@devbox>
-Message-ID: <20170903222152.GA25743@n2100.armlinux.org.uk>
+From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
+Date: Mon, 4 Sep 2017 00:40:55 +0200
+Subject: [PATCH 04/10] dmaengine: sun6i: Enable additional burst
+ lengths/widths on H3
+In-Reply-To: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
+References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170903224100.17893-5-stefan.bruens@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 04:15:00PM +0900, Masami Hiramatsu wrote:
-> Cleanup in_exception_text() using memory_contains() and
-> move it in asm/sections.h from asm/trap.h because
-> section symbols and memory_contains() are defined in
-> asm/sections.h.
-> 
-> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> ---
->  arch/arm/include/asm/sections.h |   17 +++++++++++++++++
->  arch/arm/include/asm/traps.h    |   22 +---------------------
->  2 files changed, 18 insertions(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
-> index 803bbf2b20b8..76791cfc7619 100644
-> --- a/arch/arm/include/asm/sections.h
-> +++ b/arch/arm/include/asm/sections.h
-> @@ -4,5 +4,22 @@
->  #include <asm-generic/sections.h>
->  
->  extern char _exiprom[];
-> +extern char __exception_text_start[], __exception_text_end[];
-> +
-> +/**
-> + * in_exception_text - check if an address is in exception_text or
-> + *			irqentry_text
-> + * @addr: virtual address to be checked
-> + *
-> + * Returns: true if the address specified by @addr is in the exception_text or
-> + * irqentry_text, false otherwise.
-> + */
-> +static inline bool in_exception_text(unsigned long addr)
-> +{
-> +	return memory_contains(__exception_text_start, __exception_text_end,
-> +			       (void *)addr, 0) ||
-> +		memory_contains(__irqentry_text_start, __irqentry_text_end,
-> +				(void *)addr, 0);
+The H3 supports bursts lengths of 1, 4, 8 and 16 transfers, each with
+a width of 1, 2, 4 or 8 bytes.
 
-Patch looks buggy - where is __irqentry_text_start and __irqentry_text_end
-declared?
+The register value for the the width is log2-encoded, change the
+conversion function to provide the correct value for width == 8.
 
+Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+---
+ drivers/dma/sun6i-dma.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index c5644bd0f91a..335a8ec88b0b 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -263,8 +263,12 @@ static inline s8 convert_burst(u32 maxburst)
+ 	switch (maxburst) {
+ 	case 1:
+ 		return 0;
++	case 4:
++		return 1;
+ 	case 8:
+ 		return 2;
++	case 16:
++		return 3;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -272,7 +276,7 @@ static inline s8 convert_burst(u32 maxburst)
+ 
+ static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
+ {
+-	return addr_width >> 1;
++	return ilog2(addr_width);
+ }
+ 
+ static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
+@@ -1152,6 +1156,12 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+ 	sdc->src_burst_lengths			= BIT(1) | BIT(8);
+ 	sdc->dst_burst_lengths			= BIT(1) | BIT(8);
++	if (sdc->cfg->dmac_variant == DMAC_VARIANT_H3) {
++		sdc->slave.src_addr_widths |= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
++		sdc->slave.dst_addr_widths |= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
++		sdc->src_burst_lengths     |= BIT(4) | BIT(16);
++		sdc->dst_burst_lengths     |= BIT(4) | BIT(16);
++	}
+ 	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
+ 						  BIT(DMA_MEM_TO_DEV);
+ 	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.1
