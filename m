@@ -1,136 +1,277 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  3 Sep 2017 13:07:57 +0100
-Subject: [PATCH v2 29/29] efi/libstub: arm: implement KASLR
-In-Reply-To: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170903120757.14968-30-ard.biesheuvel@linaro.org>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Sun, 3 Sep 2017 18:19:34 +0530
+Subject: [PATCH] rtc: remove cast to void pointer
+In-Reply-To: <1504017543-19720-1-git-send-email-himanshujha199640@gmail.com>
+References: <1504017543-19720-1-git-send-email-himanshujha199640@gmail.com>
+Message-ID: <20170903124934.GA5972@himanshu-Vostro-3559>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This wires up the new KASLR implementation for ARM to the random number
-generator and memory allocation routines in the UEFI stub.
+On Tue, Aug 29, 2017 at 08:09:03PM +0530, Himanshu Jha wrote:
+> casting to void pointer from any pointer type and vice-versa is done
+> implicitly and therefore casting is not needed in such a case.
+>
 
-Given how the UEFI stub keeps track of the placement of the DTB and
-potentially an initrd via its memory map, we can quite simply use
-efi_random_alloc() to carve out a window for the kernel proper, and
-inform the decompressor about this by setting the kaslr_offset variable
-directly.
+I hope my patch is in your queue, got no reply till now.
 
-Since the presence of a vmalloc= command line option complicates the
-calculations involved, let's just disable KASLR for now if a vmalloc=
-command line argument was provided.
+Thanks
 
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/boot/compressed/head.S           | 12 ++++-
- drivers/firmware/efi/libstub/arm32-stub.c | 47 +++++++++++++++++++-
- 2 files changed, 56 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 79b4033b0ed4..68d803dfdf3f 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -203,6 +203,15 @@ not_angel:
- 		 */
- 		mov	r4, pc
- 		and	r4, r4, #0xf8000000
-+#if defined(CONFIG_RANDOMIZE_BASE) && defined(CONFIG_EFI_STUB)
-+		/*
-+		 * The KASLR randomization may have already been performed by
-+		 * the UEFI stub, in which case kaslr_offset will already have
-+		 * a value.
-+		 */
-+		ldr	r0, kaslr_offset
-+		add	r4, r4, r0
-+#endif
- 		/* Determine final kernel image address. */
- 		add	r4, r4, #TEXT_OFFSET
- #else
-@@ -1428,7 +1437,8 @@ ENTRY(__crc16)
- ENDPROC(__crc16)
- 
- 		.align	2
--kaslr_offset:	.long	0
-+ENTRY(kaslr_offset)
-+		.long	0
- #ifdef CONFIG_EFI_STUB
- __efi_boot:	.long	0
- #endif
-diff --git a/drivers/firmware/efi/libstub/arm32-stub.c b/drivers/firmware/efi/libstub/arm32-stub.c
-index becbda445913..73d3694d2fbb 100644
---- a/drivers/firmware/efi/libstub/arm32-stub.c
-+++ b/drivers/firmware/efi/libstub/arm32-stub.c
-@@ -8,9 +8,12 @@
-  */
- #include <linux/efi.h>
- #include <asm/efi.h>
-+#include <asm/pgtable.h>
- 
- #include "efistub.h"
- 
-+extern u32 kaslr_offset;
-+
- efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
- {
- 	int block;
-@@ -200,6 +203,29 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
- 				 efi_loaded_image_t *image)
- {
- 	efi_status_t status;
-+	u32 phys_seed = 0;
-+
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-+		if (have_vmalloc()) {
-+			pr_efi(sys_table,
-+			       "vmalloc= command line argument found, disabling KASLR\n");
-+		} else if (!nokaslr()) {
-+			status = efi_get_random_bytes(sys_table,
-+						      sizeof(phys_seed),
-+						      (u8 *)&phys_seed);
-+			if (status == EFI_NOT_FOUND) {
-+				pr_efi(sys_table,
-+				       "EFI_RNG_PROTOCOL unavailable, no randomness supplied\n");
-+			} else if (status != EFI_SUCCESS) {
-+				pr_efi_err(sys_table,
-+					   "efi_get_random_bytes() failed\n");
-+				return status;
-+			}
-+		} else {
-+			pr_efi(sys_table,
-+			       "KASLR disabled on kernel command line\n");
-+		}
-+	}
- 
- 	/*
- 	 * Verify that the DRAM base address is compatible with the ARM
-@@ -210,8 +236,25 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
- 	 */
- 	dram_base = round_up(dram_base, SZ_128M);
- 
--	status = reserve_kernel_base(sys_table, dram_base, reserve_addr,
--				     reserve_size);
-+	if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE) || phys_seed == 0) {
-+		status = reserve_kernel_base(sys_table, dram_base, reserve_addr,
-+					     reserve_size);
-+	} else {
-+		/* the end of the lowmem region */
-+		unsigned long max = dram_base + VMALLOC_DEFAULT_BASE
-+				    - PAGE_OFFSET - 1;
-+		/*
-+		 * The DTB and initrd are covered by allocations in the UEFI
-+		 * memory map, so we can create a random allocation for the
-+		 * uncompressed kernel, and inform the decompressor about the
-+		 * offset with respect to the base of memory.
-+		 */
-+		*reserve_size = MAX_UNCOMP_KERNEL_SIZE;
-+		status = efi_random_alloc(sys_table, *reserve_size, SZ_2M,
-+					  reserve_addr, phys_seed, max);
-+		kaslr_offset = *reserve_addr - dram_base;
-+	}
-+
- 	if (status != EFI_SUCCESS) {
- 		pr_efi_err(sys_table, "Unable to allocate memory for uncompressed kernel.\n");
- 		return status;
--- 
-2.11.0
+> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+> ---
+>  drivers/rtc/interface.c      | 4 ++--
+>  drivers/rtc/rtc-88pm80x.c    | 2 +-
+>  drivers/rtc/rtc-88pm860x.c   | 2 +-
+>  drivers/rtc/rtc-at32ap700x.c | 2 +-
+>  drivers/rtc/rtc-hym8563.c    | 2 +-
+>  drivers/rtc/rtc-m48t59.c     | 2 +-
+>  drivers/rtc/rtc-max8925.c    | 2 +-
+>  drivers/rtc/rtc-pic32.c      | 2 +-
+>  drivers/rtc/rtc-s3c.c        | 4 ++--
+>  drivers/rtc/rtc-st-lpc.c     | 2 +-
+>  drivers/rtc/rtc-stm32.c      | 2 +-
+>  drivers/rtc/rtc-sun6i.c      | 2 +-
+>  drivers/rtc/rtc-sunxi.c      | 2 +-
+>  drivers/rtc/rtc-vr41xx.c     | 4 ++--
+>  drivers/rtc/rtc-xgene.c      | 2 +-
+>  drivers/rtc/rtc-zynqmp.c     | 2 +-
+>  16 files changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+> index 8cec9a0..81c85d2 100644
+> --- a/drivers/rtc/interface.c
+> +++ b/drivers/rtc/interface.c
+> @@ -528,7 +528,7 @@ void rtc_handle_legacy_irq(struct rtc_device *rtc, int num, int mode)
+>   */
+>  void rtc_aie_update_irq(void *private)
+>  {
+> -	struct rtc_device *rtc = (struct rtc_device *)private;
+> +	struct rtc_device *rtc = private;
+>  	rtc_handle_legacy_irq(rtc, 1, RTC_AF);
+>  }
+>  
+> @@ -541,7 +541,7 @@ void rtc_aie_update_irq(void *private)
+>   */
+>  void rtc_uie_update_irq(void *private)
+>  {
+> -	struct rtc_device *rtc = (struct rtc_device *)private;
+> +	struct rtc_device *rtc = private;
+>  	rtc_handle_legacy_irq(rtc, 1,  RTC_UF);
+>  }
+>  
+> diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
+> index 466bf7f..819612e 100644
+> --- a/drivers/rtc/rtc-88pm80x.c
+> +++ b/drivers/rtc/rtc-88pm80x.c
+> @@ -60,7 +60,7 @@ struct pm80x_rtc_info {
+>  
+>  static irqreturn_t rtc_update_handler(int irq, void *data)
+>  {
+> -	struct pm80x_rtc_info *info = (struct pm80x_rtc_info *)data;
+> +	struct pm80x_rtc_info *info = data;
+>  	int mask;
+>  
+>  	mask = PM800_ALARM | PM800_ALARM_WAKEUP;
+> diff --git a/drivers/rtc/rtc-88pm860x.c b/drivers/rtc/rtc-88pm860x.c
+> index 19e53b3..67f7fa3 100644
+> --- a/drivers/rtc/rtc-88pm860x.c
+> +++ b/drivers/rtc/rtc-88pm860x.c
+> @@ -59,7 +59,7 @@ struct pm860x_rtc_info {
+>  
+>  static irqreturn_t rtc_update_handler(int irq, void *data)
+>  {
+> -	struct pm860x_rtc_info *info = (struct pm860x_rtc_info *)data;
+> +	struct pm860x_rtc_info *info = data;
+>  	int mask;
+>  
+>  	mask = ALARM | ALARM_WAKEUP;
+> diff --git a/drivers/rtc/rtc-at32ap700x.c b/drivers/rtc/rtc-at32ap700x.c
+> index de8bf56..f603f99 100644
+> --- a/drivers/rtc/rtc-at32ap700x.c
+> +++ b/drivers/rtc/rtc-at32ap700x.c
+> @@ -164,7 +164,7 @@ static int at32_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+>  
+>  static irqreturn_t at32_rtc_interrupt(int irq, void *dev_id)
+>  {
+> -	struct rtc_at32ap700x *rtc = (struct rtc_at32ap700x *)dev_id;
+> +	struct rtc_at32ap700x *rtc = dev_id;
+>  	unsigned long isr = rtc_readl(rtc, ISR);
+>  	unsigned long events = 0;
+>  	int ret = IRQ_NONE;
+> diff --git a/drivers/rtc/rtc-hym8563.c b/drivers/rtc/rtc-hym8563.c
+> index e5ad527..0709968 100644
+> --- a/drivers/rtc/rtc-hym8563.c
+> +++ b/drivers/rtc/rtc-hym8563.c
+> @@ -436,7 +436,7 @@ static struct clk *hym8563_clkout_register_clk(struct hym8563 *hym8563)
+>   */
+>  static irqreturn_t hym8563_irq(int irq, void *dev_id)
+>  {
+> -	struct hym8563 *hym8563 = (struct hym8563 *)dev_id;
+> +	struct hym8563 *hym8563 = dev_id;
+>  	struct i2c_client *client = hym8563->client;
+>  	struct mutex *lock = &hym8563->rtc->ops_lock;
+>  	int data, ret;
+> diff --git a/drivers/rtc/rtc-m48t59.c b/drivers/rtc/rtc-m48t59.c
+> index d99a705..2e35f73 100644
+> --- a/drivers/rtc/rtc-m48t59.c
+> +++ b/drivers/rtc/rtc-m48t59.c
+> @@ -302,7 +302,7 @@ static int m48t59_rtc_proc(struct device *dev, struct seq_file *seq)
+>   */
+>  static irqreturn_t m48t59_rtc_interrupt(int irq, void *dev_id)
+>  {
+> -	struct device *dev = (struct device *)dev_id;
+> +	struct device *dev = dev_id;
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct m48t59_plat_data *pdata = dev_get_platdata(&pdev->dev);
+>  	struct m48t59_private *m48t59 = platform_get_drvdata(pdev);
+> diff --git a/drivers/rtc/rtc-max8925.c b/drivers/rtc/rtc-max8925.c
+> index 67d6fc2..45d7e40 100644
+> --- a/drivers/rtc/rtc-max8925.c
+> +++ b/drivers/rtc/rtc-max8925.c
+> @@ -74,7 +74,7 @@ struct max8925_rtc_info {
+>  
+>  static irqreturn_t rtc_update_handler(int irq, void *data)
+>  {
+> -	struct max8925_rtc_info *info = (struct max8925_rtc_info *)data;
+> +	struct max8925_rtc_info *info = data;
+>  
+>  	/* disable ALARM0 except for 1SEC alarm */
+>  	max8925_set_bits(info->rtc, MAX8925_ALARM0_CNTL, 0x7f, 0);
+> diff --git a/drivers/rtc/rtc-pic32.c b/drivers/rtc/rtc-pic32.c
+> index 5cfb6df..04788c3 100644
+> --- a/drivers/rtc/rtc-pic32.c
+> +++ b/drivers/rtc/rtc-pic32.c
+> @@ -92,7 +92,7 @@ static void pic32_rtc_alarm_clk_enable(struct pic32_rtc_dev *pdata,
+>  
+>  static irqreturn_t pic32_rtc_alarmirq(int irq, void *id)
+>  {
+> -	struct pic32_rtc_dev *pdata = (struct pic32_rtc_dev *)id;
+> +	struct pic32_rtc_dev *pdata = id;
+>  
+>  	clk_enable(pdata->clk);
+>  	rtc_update_irq(pdata->rtc, 1, RTC_AF | RTC_IRQF);
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index a8992c2..8e8a815 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -113,7 +113,7 @@ static void s3c_rtc_disable_clk(struct s3c_rtc *info)
+>  /* IRQ Handlers */
+>  static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
+>  {
+> -	struct s3c_rtc *info = (struct s3c_rtc *)id;
+> +	struct s3c_rtc *info = id;
+>  
+>  	if (info->data->irq_handler)
+>  		info->data->irq_handler(info, S3C2410_INTP_TIC);
+> @@ -123,7 +123,7 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
+>  
+>  static irqreturn_t s3c_rtc_alarmirq(int irq, void *id)
+>  {
+> -	struct s3c_rtc *info = (struct s3c_rtc *)id;
+> +	struct s3c_rtc *info = id;
+>  
+>  	if (info->data->irq_handler)
+>  		info->data->irq_handler(info, S3C2410_INTP_ALM);
+> diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
+> index 82b0af1..75eb92c 100644
+> --- a/drivers/rtc/rtc-st-lpc.c
+> +++ b/drivers/rtc/rtc-st-lpc.c
+> @@ -74,7 +74,7 @@ static void st_rtc_set_hw_alarm(struct st_rtc *rtc,
+>  
+>  static irqreturn_t st_rtc_handler(int this_irq, void *data)
+>  {
+> -	struct st_rtc *rtc = (struct st_rtc *)data;
+> +	struct st_rtc *rtc = data;
+>  
+>  	rtc_update_irq(rtc->rtc_dev, 1, RTC_AF);
+>  
+> diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
+> index 3a5c3d7..66fc7ba 100644
+> --- a/drivers/rtc/rtc-stm32.c
+> +++ b/drivers/rtc/rtc-stm32.c
+> @@ -169,7 +169,7 @@ static int stm32_rtc_wait_sync(struct stm32_rtc *rtc)
+>  
+>  static irqreturn_t stm32_rtc_alarm_irq(int irq, void *dev_id)
+>  {
+> -	struct stm32_rtc *rtc = (struct stm32_rtc *)dev_id;
+> +	struct stm32_rtc *rtc = dev_id;
+>  	unsigned int isr, cr;
+>  
+>  	mutex_lock(&rtc->rtc_dev->ops_lock);
+> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+> index 305c4d0..496a8dd 100644
+> --- a/drivers/rtc/rtc-sun6i.c
+> +++ b/drivers/rtc/rtc-sun6i.c
+> @@ -256,7 +256,7 @@ CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
+>  
+>  static irqreturn_t sun6i_rtc_alarmirq(int irq, void *id)
+>  {
+> -	struct sun6i_rtc_dev *chip = (struct sun6i_rtc_dev *) id;
+> +	struct sun6i_rtc_dev *chip = id;
+>  	irqreturn_t ret = IRQ_NONE;
+>  	u32 val;
+>  
+> diff --git a/drivers/rtc/rtc-sunxi.c b/drivers/rtc/rtc-sunxi.c
+> index abada60..f1f7fd7 100644
+> --- a/drivers/rtc/rtc-sunxi.c
+> +++ b/drivers/rtc/rtc-sunxi.c
+> @@ -158,7 +158,7 @@ struct sunxi_rtc_dev {
+>  
+>  static irqreturn_t sunxi_rtc_alarmirq(int irq, void *id)
+>  {
+> -	struct sunxi_rtc_dev *chip = (struct sunxi_rtc_dev *) id;
+> +	struct sunxi_rtc_dev *chip = id;
+>  	u32 val;
+>  
+>  	val = readl(chip->base + SUNXI_ALRM_IRQ_STA);
+> diff --git a/drivers/rtc/rtc-vr41xx.c b/drivers/rtc/rtc-vr41xx.c
+> index 7ce2296..a0aa377 100644
+> --- a/drivers/rtc/rtc-vr41xx.c
+> +++ b/drivers/rtc/rtc-vr41xx.c
+> @@ -228,7 +228,7 @@ static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+>  
+>  static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
+>  {
+> -	struct platform_device *pdev = (struct platform_device *)dev_id;
+> +	struct platform_device *pdev = dev_id;
+>  	struct rtc_device *rtc = platform_get_drvdata(pdev);
+>  
+>  	rtc2_write(RTCINTREG, ELAPSEDTIME_INT);
+> @@ -240,7 +240,7 @@ static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
+>  
+>  static irqreturn_t rtclong1_interrupt(int irq, void *dev_id)
+>  {
+> -	struct platform_device *pdev = (struct platform_device *)dev_id;
+> +	struct platform_device *pdev = dev_id;
+>  	struct rtc_device *rtc = platform_get_drvdata(pdev);
+>  	unsigned long count = periodic_count;
+>  
+> diff --git a/drivers/rtc/rtc-xgene.c b/drivers/rtc/rtc-xgene.c
+> index 65b432a..2b8247d 100644
+> --- a/drivers/rtc/rtc-xgene.c
+> +++ b/drivers/rtc/rtc-xgene.c
+> @@ -131,7 +131,7 @@ static const struct rtc_class_ops xgene_rtc_ops = {
+>  
+>  static irqreturn_t xgene_rtc_interrupt(int irq, void *id)
+>  {
+> -	struct xgene_rtc_dev *pdata = (struct xgene_rtc_dev *) id;
+> +	struct xgene_rtc_dev *pdata = id;
+>  
+>  	/* Check if interrupt asserted */
+>  	if (!(readl(pdata->csr_base + RTC_STAT) & RTC_STAT_BIT))
+> diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
+> index da18a8a..f2f8a2d 100644
+> --- a/drivers/rtc/rtc-zynqmp.c
+> +++ b/drivers/rtc/rtc-zynqmp.c
+> @@ -193,7 +193,7 @@ static const struct rtc_class_ops xlnx_rtc_ops = {
+>  
+>  static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
+>  {
+> -	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *)id;
+> +	struct xlnx_rtc_dev *xrtcdev = id;
+>  	unsigned int status;
+>  
+>  	status = readl(xrtcdev->reg_base + RTC_INT_STS);
+> -- 
+> 2.7.4
+> 
