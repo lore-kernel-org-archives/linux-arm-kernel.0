@@ -1,74 +1,77 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun,  3 Sep 2017 10:43:46 -0700
-Subject: [PATCH v2 3/4] ARM: ep93xx: tidy up TS-72xx Watchdog resources
+Date: Sun,  3 Sep 2017 10:43:47 -0700
+Subject: [PATCH v2 4/4] ARM: ep93xx: Add lm70 HWMON sensor to TS-72xx boards
 In-Reply-To: <20170903174347.6148-1-f.fainelli@gmail.com>
 References: <20170903174347.6148-1-f.fainelli@gmail.com>
-Message-ID: <20170903174347.6148-4-f.fainelli@gmail.com>
+Message-ID: <20170903174347.6148-5-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-The ts-72xx watchdog uses two byte sized registers. Tidy up the resource
-declaration so that the proper information is shown in /proc/iomem.
+Register the TI TMP122 (lm70) temperature sensor driver for the TS-72xx
+boards.
+
+Originaly from Florian Fainelli. Updated to the new spi-ep93xx chip select
+method.
 
 Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mach-ep93xx/ts72xx.c | 20 +++++++++-----------
- arch/arm/mach-ep93xx/ts72xx.h |  3 ---
- 2 files changed, 9 insertions(+), 14 deletions(-)
+ arch/arm/mach-ep93xx/ts72xx.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 55b186ef863a..55ca3b375952 100644
+index 55ca3b375952..4b8fefbf62dd 100644
 --- a/arch/arm/mach-ep93xx/ts72xx.c
 +++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -186,24 +186,22 @@ static struct platform_device ts72xx_rtc_device = {
- 	.num_resources 	= ARRAY_SIZE(ts72xx_rtc_resources),
- };
+@@ -18,7 +18,10 @@
+ #include <linux/io.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/spi/spi.h>
++#include <linux/platform_data/spi-ep93xx.h>
+ 
++#include <mach/gpio-ep93xx.h>
+ #include <mach/hardware.h>
+ 
+ #include <asm/mach-types.h>
+@@ -230,6 +233,27 @@ static struct platform_device ts73xx_fpga_device = {
+ 
+ #endif
  
 +/*************************************************************************
-+ * Watchdog (in CPLD)
++ * SPI Bus
 + *************************************************************************/
-+#define TS72XX_WDT_CONTROL_PHYS_BASE	(EP93XX_CS2_PHYS_BASE + 0x03800000)
-+#define TS72XX_WDT_FEED_PHYS_BASE	(EP93XX_CS2_PHYS_BASE + 0x03c00000)
++static struct spi_board_info ts72xx_spi_devices[] __initdata = {
++	{
++		.modalias		= "tmp122",
++		.max_speed_hz		= 2 * 1000 * 1000,
++		.bus_num		= 0,
++		.chip_select		= 0,
++	},
++};
 +
- static struct resource ts72xx_wdt_resources[] = {
--	{
--		.start	= TS72XX_WDT_CONTROL_PHYS_BASE,
--		.end	= TS72XX_WDT_CONTROL_PHYS_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= TS72XX_WDT_FEED_PHYS_BASE,
--		.end	= TS72XX_WDT_FEED_PHYS_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, 0x01),
-+	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, 0x01),
- };
++static int ts72xx_spi_chipselects[] __initdata = {
++	EP93XX_GPIO_LINE_F(2),		/* DIO_17 */
++};
++
++static struct ep93xx_spi_info ts72xx_spi_info __initdata = {
++	.chipselect	= ts72xx_spi_chipselects,
++	.num_chipselect	= ARRAY_SIZE(ts72xx_spi_chipselects),
++};
++
+ static void __init ts72xx_init_machine(void)
+ {
+ 	ep93xx_init_devices();
+@@ -242,6 +266,8 @@ static void __init ts72xx_init_machine(void)
+ 	if (board_is_ts7300())
+ 		platform_device_register(&ts73xx_fpga_device);
+ #endif
++	ep93xx_register_spi(&ts72xx_spi_info, ts72xx_spi_devices,
++			    ARRAY_SIZE(ts72xx_spi_devices));
+ }
  
- static struct platform_device ts72xx_wdt_device = {
- 	.name		= "ts72xx-wdt",
- 	.id		= -1,
--	.num_resources 	= ARRAY_SIZE(ts72xx_wdt_resources),
- 	.resource	= ts72xx_wdt_resources,
-+	.num_resources	= ARRAY_SIZE(ts72xx_wdt_resources),
- };
- 
- static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
-diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
-index 2255ba29fdd6..4e6519b2a3c4 100644
---- a/arch/arm/mach-ep93xx/ts72xx.h
-+++ b/arch/arm/mach-ep93xx/ts72xx.h
-@@ -38,9 +38,6 @@
- #define TS72XX_OPTIONS2_TS9420		0x04
- #define TS72XX_OPTIONS2_TS9420_BOOT	0x02
- 
--#define TS72XX_WDT_CONTROL_PHYS_BASE	0x23800000
--#define TS72XX_WDT_FEED_PHYS_BASE	0x23c00000
--
- #ifndef __ASSEMBLY__
- 
- static inline int ts72xx_model(void)
+ MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
 -- 
 2.11.0
