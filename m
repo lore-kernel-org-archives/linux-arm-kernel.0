@@ -1,29 +1,75 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  3 Sep 2017 13:07:41 +0100
-Subject: [PATCH v2 13/29] arm-soc: exynos: replace open coded VA->PA
- conversions
+Date: Sun,  3 Sep 2017 13:07:43 +0100
+Subject: [PATCH v2 15/29] arm-soc: various: replace open coded VA->PA
+ calculation of pen_release
 In-Reply-To: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
 References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170903120757.14968-14-ard.biesheuvel@linaro.org>
+Message-ID: <20170903120757.14968-16-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces a couple of open coded calculations to obtain the
-physical address of a far symbol with calls to the new adr_l etc
-macros.
+This replaces a few copies of the open coded calculations of the
+physical address of 'pen_release' in the secondary startup code
+of a couple of platforms. This ensures these quantities are invariant
+under runtime relocation.
 
+Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-exynos/headsmp.S |  9 +------
- arch/arm/mach-exynos/sleep.S   | 26 ++++----------------
- 2 files changed, 6 insertions(+), 29 deletions(-)
+ arch/arm/mach-prima2/headsmp.S    | 11 +++--------
+ arch/arm/mach-spear/headsmp.S     | 11 +++--------
+ arch/arm/mach-sti/headsmp.S       | 10 +++-------
+ arch/arm/plat-versatile/headsmp.S |  9 +--------
+ 4 files changed, 10 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-index d3d24ab351ae..25de5aff1c41 100644
---- a/arch/arm/mach-exynos/headsmp.S
-+++ b/arch/arm/mach-exynos/headsmp.S
-@@ -23,10 +23,7 @@ ENTRY(exynos4_secondary_startup)
- ARM_BE8(setend	be)
+diff --git a/arch/arm/mach-prima2/headsmp.S b/arch/arm/mach-prima2/headsmp.S
+index 209d9fc5c16c..070df700bb38 100644
+--- a/arch/arm/mach-prima2/headsmp.S
++++ b/arch/arm/mach-prima2/headsmp.S
+@@ -9,6 +9,8 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
++
+ /*
+  * SIRFSOC specific entry point for secondary CPUs.  This provides
+  * a "holding pen" into which all secondary cores are held until we're
+@@ -17,10 +19,7 @@
+ ENTRY(sirfsoc_secondary_startup)
+         mrc     p15, 0, r0, c0, c0, 5
+         and     r0, r0, #15
+-        adr     r4, 1f
+-        ldmia   r4, {r5, r6}
+-        sub     r4, r4, r5
+-        add     r6, r6, r4
++        adr_l   r6, pen_release
+ pen:    ldr     r7, [r6]
+         cmp     r7, r0
+         bne     pen
+@@ -31,7 +30,3 @@ pen:    ldr     r7, [r6]
+          */
+         b       secondary_startup
+ ENDPROC(sirfsoc_secondary_startup)
+-
+-        .align
+-1:      .long   .
+-        .long   pen_release
+diff --git a/arch/arm/mach-spear/headsmp.S b/arch/arm/mach-spear/headsmp.S
+index c52192dc3d9f..4da01b103f33 100644
+--- a/arch/arm/mach-spear/headsmp.S
++++ b/arch/arm/mach-spear/headsmp.S
+@@ -13,6 +13,8 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
++
+ 	__INIT
+ 
+ /*
+@@ -23,10 +25,7 @@
+ ENTRY(spear13xx_secondary_startup)
  	mrc	p15, 0, r0, c0, c0, 5
  	and	r0, r0, #15
 -	adr	r4, 1f
@@ -34,75 +80,71 @@ index d3d24ab351ae..25de5aff1c41 100644
  pen:	ldr	r7, [r6]
  	cmp	r7, r0
  	bne	pen
-@@ -37,7 +34,3 @@ pen:	ldr	r7, [r6]
+@@ -40,8 +39,4 @@ pen:	ldr	r7, [r6]
+ 	 * should now contain the SVC stack for this core
  	 */
  	b	secondary_startup
- ENDPROC(exynos4_secondary_startup)
 -
--	.align 2
+-	.align
 -1:	.long	.
 -	.long	pen_release
-diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
-index cf950790fbdc..003465699263 100644
---- a/arch/arm/mach-exynos/sleep.S
-+++ b/arch/arm/mach-exynos/sleep.S
-@@ -17,6 +17,7 @@
- 
+ ENDPROC(spear13xx_secondary_startup)
+diff --git a/arch/arm/mach-sti/headsmp.S b/arch/arm/mach-sti/headsmp.S
+index e0ad451700d5..cdf3442f397b 100644
+--- a/arch/arm/mach-sti/headsmp.S
++++ b/arch/arm/mach-sti/headsmp.S
+@@ -16,6 +16,8 @@
  #include <linux/linkage.h>
- #include <asm/asm-offsets.h>
+ #include <linux/init.h>
+ 
 +#include <asm/assembler.h>
- #include <asm/hardware/cache-l2x0.h>
- #include "smc.h"
- 
-@@ -62,19 +63,13 @@ ENTRY(exynos_cpu_resume_ns)
- 	cmp	r0, r1
- 	bne	skip_cp15
- 
--	adr	r0, _cp15_save_power
--	ldr	r1, [r0]
--	ldr	r1, [r0, r1]
--	adr	r0, _cp15_save_diag
--	ldr	r2, [r0]
--	ldr	r2, [r0, r2]
-+	ldr_l	r1, cp15_save_power
-+	ldr_l	r2, cp15_save_diag
- 	mov	r0, #SMC_CMD_C15RESUME
- 	dsb
- 	smc	#0
- #ifdef CONFIG_CACHE_L2X0
--	adr	r0, 1f
--	ldr	r2, [r0]
--	add	r0, r2, r0
-+	adr_l	r0, l2x0_saved_regs
- 
- 	/* Check that the address has been initialised. */
- 	ldr	r1, [r0, #L2X0_R_PHY_BASE]
-@@ -93,9 +88,7 @@ ENTRY(exynos_cpu_resume_ns)
- 	smc	#0
- 
- 	/* Reload saved regs pointer because smc corrupts registers. */
--	adr	r0, 1f
--	ldr	r2, [r0]
--	add	r0, r2, r0
-+	adr_l	r0, l2x0_saved_regs
- 
- 	ldr	r1, [r0, #L2X0_R_PWR_CTRL]
- 	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
-@@ -114,15 +107,6 @@ skip_cp15:
- 	b	cpu_resume
- ENDPROC(exynos_cpu_resume_ns)
- 
--	.align
--_cp15_save_power:
--	.long	cp15_save_power - .
--_cp15_save_diag:
--	.long	cp15_save_diag - .
--#ifdef CONFIG_CACHE_L2X0
--1:	.long	l2x0_saved_regs - .
--#endif /* CONFIG_CACHE_L2X0 */
++
+ /*
+  * ST specific entry point for secondary CPUs.  This provides
+  * a "holding pen" into which all secondary cores are held until we're
+@@ -24,10 +26,7 @@
+ ENTRY(sti_secondary_startup)
+ 	mrc	p15, 0, r0, c0, c0, 5
+ 	and	r0, r0, #15
+-	adr	r4, 1f
+-	ldmia	r4, {r5, r6}
+-	sub	r4, r4, r5
+-	add	r6, r6, r4
++	adr_l	r6, pen_release
+ pen:	ldr	r7, [r6]
+ 	cmp	r7, r0
+ 	bne	pen
+@@ -38,6 +37,3 @@ pen:	ldr	r7, [r6]
+ 	 */
+ 	b	secondary_startup
+ ENDPROC(sti_secondary_startup)
 -
- 	.data
- 	.globl cp15_save_diag
- cp15_save_diag:
+-1:	.long	.
+-	.long	pen_release
+diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+index 40f27e52de75..0f2a5eddac5a 100644
+--- a/arch/arm/plat-versatile/headsmp.S
++++ b/arch/arm/plat-versatile/headsmp.S
+@@ -21,10 +21,7 @@ ENTRY(versatile_secondary_startup)
+  ARM_BE8(setend	be)
+ 	mrc	p15, 0, r0, c0, c0, 5
+ 	bic	r0, #0xff000000
+-	adr	r4, 1f
+-	ldmia	r4, {r5, r6}
+-	sub	r4, r4, r5
+-	add	r6, r6, r4
++	adr_l	r6, pen_release
+ pen:	ldr	r7, [r6]
+ 	cmp	r7, r0
+ 	bne	pen
+@@ -34,8 +31,4 @@ pen:	ldr	r7, [r6]
+ 	 * should now contain the SVC stack for this core
+ 	 */
+ 	b	secondary_startup
+-
+-	.align
+-1:	.long	.
+-	.long	pen_release
+ ENDPROC(versatile_secondary_startup)
 -- 
 2.11.0
