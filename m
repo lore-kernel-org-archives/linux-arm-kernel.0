@@ -1,37 +1,55 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Sun, 3 Sep 2017 15:13:51 -0700
-Subject: [PATCH V13 1/4] PCI: Don't ignore valid response before CRS
- timeout
-In-Reply-To: <20170829195322.GB2304@bhelgaas-glaptop.roam.corp.google.com>
-References: <1503855651-17409-1-git-send-email-okaya@codeaurora.org>
- <20170829195322.GB2304@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAE9FiQWyuW_ukTiYR+Kb1ZoqK7cZSeUE7f8TYRh4B6cF=XywUA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 3 Sep 2017 23:21:52 +0100
+Subject: [PATCH -tip 2/4] arm: Cleanup in_exception_text() and move it in
+ asm/sections.h
+In-Reply-To: <150295409062.14424.11976553130089631456.stgit@devbox>
+References: <150295395797.14424.968407208436624832.stgit@devbox>
+ <150295409062.14424.11976553130089631456.stgit@devbox>
+Message-ID: <20170903222152.GA25743@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 29, 2017 at 12:53 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+On Thu, Aug 17, 2017 at 04:15:00PM +0900, Masami Hiramatsu wrote:
+> Cleanup in_exception_text() using memory_contains() and
+> move it in asm/sections.h from asm/trap.h because
+> section symbols and memory_contains() are defined in
+> asm/sections.h.
+> 
+> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> ---
+>  arch/arm/include/asm/sections.h |   17 +++++++++++++++++
+>  arch/arm/include/asm/traps.h    |   22 +---------------------
+>  2 files changed, 18 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
+> index 803bbf2b20b8..76791cfc7619 100644
+> --- a/arch/arm/include/asm/sections.h
+> +++ b/arch/arm/include/asm/sections.h
+> @@ -4,5 +4,22 @@
+>  #include <asm-generic/sections.h>
+>  
+>  extern char _exiprom[];
+> +extern char __exception_text_start[], __exception_text_end[];
+> +
+> +/**
+> + * in_exception_text - check if an address is in exception_text or
+> + *			irqentry_text
+> + * @addr: virtual address to be checked
+> + *
+> + * Returns: true if the address specified by @addr is in the exception_text or
+> + * irqentry_text, false otherwise.
+> + */
+> +static inline bool in_exception_text(unsigned long addr)
+> +{
+> +	return memory_contains(__exception_text_start, __exception_text_end,
+> +			       (void *)addr, 0) ||
+> +		memory_contains(__irqentry_text_start, __irqentry_text_end,
+> +				(void *)addr, 0);
 
->
-> Applied this series to pci/enumeration for v4.14.  You didn't include a
-> cover letter, but the series includes:
->
->   [V13 1/4] PCI: Don't ignore valid response before CRS timeout
->   [V13 2/4] PCI: Factor out pci_bus_wait_crs()
->   [V13 3/4] PCI: Handle CRS ('device not ready') returned by device af
->   [V13 4/4] PCI: Warn periodically while waiting for device to become
->
-> I made some changes:
->
->   - Renamed pci_bus_crs_visibility_pending() to pci_bus_crs_vendor_id()
->     because the CRS completion is not "pending".  It is not waiting
->     somewhere for us to do something about it.  The CRS completion has
->     already occurred and is over.  All we have now is a magic Vendor ID
->     value that tells us that it happened.
->
->   - Split addition of pci_bus_crs_vendor_id() to a separate patch, move
->     it to probe.c, and make it static.
+Patch looks buggy - where is __irqentry_text_start and __irqentry_text_end
+declared?
 
-the calling of pci_bus_crs_vendor_id() in pci_bus_read_dev_vendor_id()
-could be removed. pci_bus_wait_crs() have that calling inside.
-
--Yinghai
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
