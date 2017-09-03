@@ -1,83 +1,75 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Sun, 3 Sep 2017 19:59:03 +0200
-Subject: [PATCH v2 4/4] ARM: ep93xx: Add lm70 HWMON sensor to TS-72xx
- boards
-In-Reply-To: <20170903174347.6148-5-f.fainelli@gmail.com>
-References: <20170903174347.6148-1-f.fainelli@gmail.com>
- <20170903174347.6148-5-f.fainelli@gmail.com>
-Message-ID: <ac6dcd4b-3595-58ca-cda7-03b4290b8965@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 3 Sep 2017 21:56:14 +0200
+Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu
+ capacity-dmips-mhz information
+In-Reply-To: <94c1d6c6-655a-2a63-1f01-06ac45990388@arm.com>
+References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
+ <20170830144120.9312-3-dietmar.eggemann@arm.com>
+ <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
+ <94c1d6c6-655a-2a63-1f01-06ac45990388@arm.com>
+Message-ID: <20170903195614.iwe7v6g3xsg7p6nf@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Thu, Aug 31, 2017 at 11:36:07AM +0100, Dietmar Eggemann wrote:
+> On 30/08/17 21:26, Krzysztof Kozlowski wrote:
+> > On Wed, Aug 30, 2017 at 03:41:18PM +0100, Dietmar Eggemann wrote:
+> >> The following 'capacity-dmips-mhz' dt property values are used:
+> >>
+> >> Cortex-A15: 1024, Cortex-A7: 539
+> >>
+> >> They have been derived from the cpu_efficiency values:
+> >>
+> >> Cortex-A15: 3891, Cortex-A7: 2048
+> >>
+> >> by scaling them so that the Cortex-A15s (big cores) use 1024.
+> >>
+> >> The cpu_efficiency values were originally derived from the "Big.LITTLE
+> >> Processing with ARM Cortex?-A15 & Cortex-A7" white paper
+> >> (http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
+> >> (3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
+> >> Dhrystone benchmark.
+> >>
+> >> The following platforms are affected once cpu-invariant accounting
+> >> support is re-connected to the task scheduler:
+> >>
+> >> arndale-octa, peach-pi, peach-pit, smdk5420
+> >>
+> >> The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
+> >> 5800).
+> >>
+> >> $ cat /sys/devices/system/cpu/cpu*/cpu_capacity
+> >> 1024
+> >> 1024
+> >> 1024
+> >> 1024
+> >> 389
+> >> 389
+> >> 389
+> >> 389
+> > 
+> > I am missing something... shouldn't this be 539? Or is it scaled with
+> > the clock-frequency (1 GHz) value?
+> 
+> Yeah, the capacity-dmips-mhz dt value of 539 for the little cpus is
+> scaled by 1.3/1.8 (max cpu capacity/ system wide max cpu capacity):
+> 
+> 539 * 1.3/1.8 = 389
+> 
+> This max cpu capacity scaling is part of both solutions, the 'cpu
+> capacity-dmips-mhz' and the 'cpu_efficiency/clock-frequency dt property'
+> one.
+> 
+> The (original*) cpu capacity on a heterogeneous platform expresses uArch
+> and max cpu frequency differences between the (logical) cpus of the
+> system.
+> 
+> * not further reduced by rt and/or irq pressure.
+> 
+> [...]
 
-On 03/09/17 19:43, Florian Fainelli wrote:
-> From: H Hartley Sweeten <hsweeten@visionengravers.com>
-> 
-> Register the TI TMP122 (lm70) temperature sensor driver for the TS-72xx
-> boards.
-> 
-> Originaly from Florian Fainelli. Updated to the new spi-ep93xx chip select
-> method.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Thanks for explanation, looks fine for me. I'll take it after merge
+window.
 
-Reviewed-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-
-> ---
->  arch/arm/mach-ep93xx/ts72xx.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-> index 55ca3b375952..4b8fefbf62dd 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.c
-> +++ b/arch/arm/mach-ep93xx/ts72xx.c
-> @@ -18,7 +18,10 @@
->  #include <linux/io.h>
->  #include <linux/mtd/nand.h>
->  #include <linux/mtd/partitions.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/platform_data/spi-ep93xx.h>
->  
-> +#include <mach/gpio-ep93xx.h>
->  #include <mach/hardware.h>
->  
->  #include <asm/mach-types.h>
-> @@ -230,6 +233,27 @@ static struct platform_device ts73xx_fpga_device = {
->  
->  #endif
->  
-> +/*************************************************************************
-> + * SPI Bus
-> + *************************************************************************/
-> +static struct spi_board_info ts72xx_spi_devices[] __initdata = {
-> +	{
-> +		.modalias		= "tmp122",
-> +		.max_speed_hz		= 2 * 1000 * 1000,
-> +		.bus_num		= 0,
-> +		.chip_select		= 0,
-> +	},
-> +};
-> +
-> +static int ts72xx_spi_chipselects[] __initdata = {
-> +	EP93XX_GPIO_LINE_F(2),		/* DIO_17 */
-> +};
-> +
-> +static struct ep93xx_spi_info ts72xx_spi_info __initdata = {
-> +	.chipselect	= ts72xx_spi_chipselects,
-> +	.num_chipselect	= ARRAY_SIZE(ts72xx_spi_chipselects),
-> +};
-> +
->  static void __init ts72xx_init_machine(void)
->  {
->  	ep93xx_init_devices();
-> @@ -242,6 +266,8 @@ static void __init ts72xx_init_machine(void)
->  	if (board_is_ts7300())
->  		platform_device_register(&ts73xx_fpga_device);
->  #endif
-> +	ep93xx_register_spi(&ts72xx_spi_info, ts72xx_spi_devices,
-> +			    ARRAY_SIZE(ts72xx_spi_devices));
->  }
->  
->  MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
+Best regards,
+Krzysztof
