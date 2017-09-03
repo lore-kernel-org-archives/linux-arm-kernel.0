@@ -1,79 +1,48 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Sun, 03 Sep 2017 18:35:06 +0200
-Subject: [linux-sunxi][PATCH] ARM: dts: sunxi: h3/h5 :Add DAI nodes
-In-Reply-To: <20170903150806.3451-1-codekipper@gmail.com>
-References: <20170903150806.3451-1-codekipper@gmail.com>
-Message-ID: <2581170.20QKPVRcId@jernej-laptop>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun,  3 Sep 2017 10:43:43 -0700
+Subject: [PATCH v2 0/4] ARM: ep93xx: various updates
+Message-ID: <20170903174347.6148-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcus!
+Hi all,
 
-Dne nedelja, 03. september 2017 ob 17:08:06 CEST je codekipper at gmail.com 
-napisal(a):
-> From: Marcus Cooper <codekipper@gmail.com>
-> 
-> Add the new DAI blocks to the device tree. I2S0 and I2S1 are for
-> connecting to an external codec whereas I2S2 is used for HDMI
-> audio.
-> 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> ---
->  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 39
-> ++++++++++++++++++++++++++++++++++++++ 1 file changed, 39 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> b/arch/arm/boot/dts/sunxi-h3-h5.dtsi index 11240a8313c2..cf6fcc857324
-> 100644
-> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> @@ -450,6 +450,45 @@
->  			status = "disabled";
->  		};
-> 
-> +		i2s0: i2s at 01c22000 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "allwinner,sun8i-h3-i2s";
-> +			reg = <0x01c22000 0x400>;
-> +			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_I2S0>, <&ccu CLK_I2S0>;
-> +			clock-names = "apb", "mod";
-> +			dmas = <&dma 3>, <&dma 3>;
-> +			resets = <&ccu RST_BUS_I2S0>;
-> +			dma-names = "rx", "tx";
-> +			status = "disabled";
-> +		};
-> +
-> +		i2s1: i2s at 01c22400 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "allwinner,sun8i-h3-i2s";
-> +			reg = <0x01c22400 0x400>;
-> +			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_I2S1>, <&ccu CLK_I2S1>;
-> +			clock-names = "apb", "mod";
-> +			dmas = <&dma 4>, <&dma 4>;
-> +			resets = <&ccu RST_BUS_I2S1>;
-> +			dma-names = "rx", "tx";
-> +			status = "disabled";
-> +		};
-> +
-> +		i2s2: i2s at 01c22800 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "allwinner,sun8i-h3-i2s";
-> +			reg = <0x01c22800 0x400>;
-> +			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_I2S2>, <&ccu CLK_I2S2>;
-> +			clock-names = "apb", "mod";
-> +			dmas = <&dma 5>, <&dma 5>;
-> +			resets = <&ccu RST_BUS_I2S2>;
-> +			dma-names = "rx", "tx";
-> +			status = "disabled";
-> +		};
-> +
+This is a rebase of Hartley's original submission:
 
-I don't want to be a pain, but shouldn't we skip this one for now? It is only 
-for HDMI and has different capabilities (8 channels supported and slighlty 
-different formula to calculate oversample rate.
+https://www.spinics.net/lists/arm-kernel/msg564135.html
 
-Best regards,
-Jernej
+rebased against v4.13-rc1, I have been using these patches on a TS-7300 board
+with 32MB of RAM and everything works fine here as well.
+
+Here is what Hartley wrote in v1:
+
+Here are a couple mach-ep93xx patches that I have been holding on to.
+Some of these have been previously posted.
+
+The first patch is needed for 128 MiB version of the TS-7300 board.
+That board uses multiple chip selects for the SDRAM and does not boot
+with the previous flatmem setup. With the switch, all the other ep93xx
+boards I have still work properly.
+
+The second patch has been rebased due to the chip select change in
+the spi-ep93xx driver which has been merged.
+
+Patch 3 is just a cosmetic change.
+
+Patch 4 was originally from Florian Fainelli's github ts72xx branch.
+It has been updated to the new spi-ep93xx chip select method.
+
+H Hartley Sweeten (4):
+  ARM: ep93xx: switch to SPARSEMEM
+  ARM: ep93xx: simone: let the mmc_spi driver handle the card detect
+  ARM: ep93xx: tidy up TS-72xx Watchdog resources
+  ARM: ep93xx: Add lm70 HWMON sensor to TS-72xx boards
+
+ arch/arm/Kconfig              |  2 +-
+ arch/arm/mach-ep93xx/simone.c | 54 +++----------------------------------------
+ arch/arm/mach-ep93xx/ts72xx.c | 46 +++++++++++++++++++++++++++---------
+ arch/arm/mach-ep93xx/ts72xx.h |  3 ---
+ 4 files changed, 39 insertions(+), 66 deletions(-)
+
+-- 
+2.11.0
