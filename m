@@ -1,83 +1,155 @@
 From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Mon, 4 Sep 2017 00:14:22 +0100
-Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
-In-Reply-To: <2607878.Us0MSlEf6n@pebbles.site>
-References: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
- <1837534.s5pz9jWHnV@pebbles.site>
- <d397d87b-5004-c8af-e590-037befc9b2b6@arm.com>
- <2607878.Us0MSlEf6n@pebbles.site>
-Message-ID: <de04a144-ba07-00df-c684-d7db8956a94f@arm.com>
+Date: Mon, 4 Sep 2017 00:23:09 +0100
+Subject: [PATCH 01/10] dmaengine: sun6i: Correct setting of clock
+ autogating register for A83T/H3
+In-Reply-To: <20170903224100.17893-2-stefan.bruens@rwth-aachen.de>
+References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
+ <20170903224100.17893-2-stefan.bruens@rwth-aachen.de>
+Message-ID: <b88769ec-a42d-6b8e-d211-8f1cea139254@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/17 03:02, Stefan Bruens wrote:
-> On Samstag, 2. September 2017 00:32:50 CEST Andr? Przywara wrote:
->> Hi,
->>
->> On 01/09/17 02:19, Stefan Bruens wrote:
->>> On Freitag, 1. September 2017 02:31:35 CEST Andre Przywara wrote:
->>>> Hi,
->>>>
->>>> On 31/08/17 00:36, Stefan Br?ns wrote:
->>>>> The A64 SoC has the same dma engine as the H3 (sun8i), with a
->>>>> reduced amount of physical channels. Add the proper config data
->>>>> and compatible string to support it.
->>>>
->>>> ...
->>>>
->>>>> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
->>>>> index 5f4eee4513e5..6a17c5d63582 100644
->>>>> --- a/drivers/dma/sun6i-dma.c
->>>>> +++ b/drivers/dma/sun6i-dma.c
->>>>> @@ -1068,6 +1068,12 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg =
->>>>> {
->>>>>
->>>>>  	.nr_max_vchans   = 34,
->>>>>  	.dmac_variant    = DMAC_VARIANT_H3,
->>>>>  
->>>>>  };
->>>>>
->>>>> +
->>>>> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
->>>>> +	.nr_max_channels = 8,
->>>>> +	.nr_max_requests = 27,
->>>>> +	.nr_max_vchans   = 38,
->>>>> +	.dmac_variant    = DMAC_VARIANT_H3,
->>>>>
->>>>>  };
->>>>>  
-> [...]
->>> There are also the incompatibilities in the "DMA channel configuration
->>> register" (burst length; burst width; burst length field offset).
->>>
->>> We can either have 3 different compatible strings, or another property for
->>> the register model.
->>
->> The latter is usually frowned upon, using separate compatible strings
->> for each group of SoCs is the way to go here.
+On 03/09/17 23:40, Stefan Br?ns wrote:
+> The H83T uses a compatible string different from the A23, but requires
+
+      A83T
+
+> the same clock autogating register setting.
 > 
-> Just for clarification, I was not talking about a property in the devicetree, 
-> but about a struct member in the config data, i.e. the .dmac_variant above.
+> The H3 also requires setting the clock autogating register, but has
+> the register at a different offset.
+> 
+> Some currently available SoCs not yet supported by the sun6i-dma driver
+> will require new compatible strings. These SoCs either follow the A23
+> register model (e.g. V3s) or the H3 register model (A64, R40), so a new
+> variable is added to the config struct to group SoCs with common register
+> models.
 
-Ah, I see. I was indeed talking about device tree nodes.
+As mentioned in that other mail, using the actual properties as names
+here instead of grouping them to rather arbitrary groups seems more
+useful and future-proof to me and should be easier to read.
+In this case this should simplify this patch:
+sun8i_a23_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 24,
+ 	.nr_max_vchans   = 37,
++	.auto_clock_gate = 0x20,
+...
+-	if (of_device_is_compatible(pdev->dev.of_node,
+-				    "allwinner,sun8i-a23-dma"))
+-		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
++	if (sdc->cfg->auto_clock_gate)
++		writel(SUN8I_DMA_GATE_ENABLE,
++		       sdc->base + sdc->cfg->auto_clock_gate);
 
-So in this case I would lean towards mapping the actual properties to
-member names in struct sun6i_dma_config, in this case something like:
-	.auto_clock_gate = 0x28;
-	.max_burst_width = 16;
+> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> ---
+>  drivers/dma/sun6i-dma.c | 34 +++++++++++++++++++++++++++++++---
+>  1 file changed, 31 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index a2358780ab2c..1d9b3be30d22 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -48,6 +48,9 @@
+>  #define SUN8I_DMA_GATE		0x20
+>  #define SUN8I_DMA_GATE_ENABLE	0x4
+>  
+> +#define SUNXI_H3_SECURITE_REG		0x20
 
-This looks more flexible to me and avoids hard to read code where
-property A is used in SoC X and Y, but property B in SoC X and Z, for
-instance.
-In the auto clock gate case this would result in an easy-to-read:
-	writel(SUN8I_DMA_GATE_ENABLE,
-	       sdc->base + sdc->cfg->auto_clock_gate);
-(possibly guarded somehow to catch that A31 case)
-
-Sorry for the delay in this answer, I see that you kept the
-DMAC_VARIANT_ style for your new post, and the end result doesn't look
-too bad. But maybe still changing this is not too hard now that you have
-more fine grained patches?
+typo?	   SUNXI_H3_SECURITY_REG ?
 
 Cheers,
 Andre.
+
+> +#define SUNXI_H3_DMA_GATE		0x28
+> +#define SUNXI_H3_DMA_GATE_ENABLE	0x4
+>  /*
+>   * Channels specific registers
+>   */
+> @@ -90,6 +93,21 @@
+>  #define NORMAL_WAIT	8
+>  #define DRQ_SDRAM	1
+>  
+> +/*
+> + * DMA Controller generations
+> + *
+> + * Newer SoC generations changed or added some register definitions:
+> + * - A23 added a clock gate register
+> + * - H3 has a different offset for the clock gating register,
+> + *   the burst length field has a different offset in the channel
+> + *   configuration register, also additional burst lengths/widths.
+> + */
+> +enum dmac_variant {
+> +	DMAC_VARIANT_A31,
+> +	DMAC_VARIANT_A23,
+> +	DMAC_VARIANT_H3,
+> +};
+> +
+>  /*
+>   * Hardware channels / ports representation
+>   *
+> @@ -101,6 +119,7 @@ struct sun6i_dma_config {
+>  	u32 nr_max_channels;
+>  	u32 nr_max_requests;
+>  	u32 nr_max_vchans;
+> +	enum dmac_variant dmac_variant;
+>  };
+>  
+>  /*
+> @@ -998,6 +1017,7 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
+>  	.nr_max_channels = 16,
+>  	.nr_max_requests = 30,
+>  	.nr_max_vchans   = 53,
+> +	.dmac_variant    = DMAC_VARIANT_A31,
+>  };
+>  
+>  /*
+> @@ -1009,23 +1029,29 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+>  	.nr_max_channels = 8,
+>  	.nr_max_requests = 24,
+>  	.nr_max_vchans   = 37,
+> +	.dmac_variant    = DMAC_VARIANT_A23,
+>  };
+>  
+>  static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+>  	.nr_max_channels = 8,
+>  	.nr_max_requests = 28,
+>  	.nr_max_vchans   = 39,
+> +	.dmac_variant    = DMAC_VARIANT_A23,
+>  };
+>  
+>  /*
+>   * The H3 has 12 physical channels, a maximum DRQ port id of 27,
+>   * and a total of 34 usable source and destination endpoints.
+> + * It also supports additional burst lengths and bus widths,
+> + * and the burst length fields have different offsets.
+>   */
+>  
+>  static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+>  	.nr_max_channels = 12,
+>  	.nr_max_requests = 27,
+>  	.nr_max_vchans   = 34,
+> +	.dmac_variant    = DMAC_VARIANT_H3,
+> +};
+>  };
+>  
+>  static const struct of_device_id sun6i_dma_match[] = {
+> @@ -1177,11 +1203,13 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+>  	/*
+>  	 * sun8i variant requires us to toggle a dma gating register,
+>  	 * as seen in Allwinner's SDK. This register is not documented
+> -	 * in the A23 user manual.
+> +	 * in the A23 user manual, but appears in e.g. the H83T manual.
+> +	 * For the H3, H5 and A64, the register has a different location
+>  	 */
+> -	if (of_device_is_compatible(pdev->dev.of_node,
+> -				    "allwinner,sun8i-a23-dma"))
+> +	if (sdc->cfg->dmac_variant == DMAC_VARIANT_A23)
+>  		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
+> +	else if (sdc->cfg->dmac_variant == DMAC_VARIANT_H3)
+> +		writel(SUNXI_H3_DMA_GATE_ENABLE, sdc->base + SUNXI_H3_DMA_GATE);
+>  
+>  	return 0;
+>  
+> 
