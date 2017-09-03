@@ -1,47 +1,42 @@
-From: colin.king@canonical.com (Colin King)
-Date: Sun,  3 Sep 2017 14:16:19 +0100
-Subject: [PATCH][thermal-next] thermal: brcmstb: remove two redundant integer
- range checks
-Message-ID: <20170903131619.6857-1-colin.king@canonical.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Sun,  3 Sep 2017 16:50:18 +0300
+Subject: [PATCH 3/3] ARM: dts: sun4i: Add i2s0 block to dtsi
+In-Reply-To: <cover.28f5be8e511ad74e9ae3f573891882e62bebdb7b.1504446535.git-series.plaes@plaes.org>
+References: <cover.28f5be8e511ad74e9ae3f573891882e62bebdb7b.1504446535.git-series.plaes@plaes.org>
+Message-ID: <795031fd20e33b17db89947d12d83d01c78f62f0.1504446535.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+sun4i-a10.dtsi was missing i2s0 block. Add it.
 
-The comparisons for integer low on low > INT_MAX and also
-integer high > INT_MAX are never going to be true since an
-int type cannot be greater than INT_MAX.  Remove these redundant
-checks.
-
-Detected by: CoverityScan CID#1455245, 1455248 ("Operands don't affect
-  result (CONSTANT_EXPRESSION_RESULT)")
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Priit Laes <plaes@plaes.org>
 ---
- drivers/thermal/broadcom/brcmstb_thermal.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
-index 87b8e7a86ee3..bcb3945feea6 100644
---- a/drivers/thermal/broadcom/brcmstb_thermal.c
-+++ b/drivers/thermal/broadcom/brcmstb_thermal.c
-@@ -278,8 +278,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
- 	dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index c5efd53..9899ecd 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -670,6 +670,19 @@
+ 			status = "disabled";
+ 		};
  
- 	if (low) {
--		if (low > INT_MAX)
--			low = INT_MAX;
- 		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
- 		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
- 	} else {
-@@ -287,8 +285,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
- 	}
- 
- 	if (high < ULONG_MAX) {
--		if (high > INT_MAX)
--			high = INT_MAX;
- 		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
- 		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
- 	} else {
++		i2s0: i2s at 01c22400 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun4i-a10-i2s";
++			reg = <0x01c22400 0x400>;
++			interrupts = <16>;
++			clocks = <&ccu CLK_APB0_I2S0>, <&ccu CLK_I2S0>;
++			clock-names = "apb", "mod";
++			dmas = <&dma SUN4I_DMA_NORMAL 3>,
++			       <&dma SUN4I_DMA_NORMAL 3>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
+ 		lradc: lradc at 01c22800 {
+ 			compatible = "allwinner,sun4i-a10-lradc-keys";
+ 			reg = <0x01c22800 0x100>;
 -- 
-2.14.1
+git-series 0.9.1
