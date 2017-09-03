@@ -1,156 +1,88 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  3 Sep 2017 13:07:46 +0100
-Subject: [PATCH v2 18/29] arm-soc: tegra: make sleep asm code runtime
- relocatable
+Date: Sun,  3 Sep 2017 13:07:48 +0100
+Subject: [PATCH v2 20/29] ARM: kernel: use PC-relative symbol references in
+ MMU switch code
 In-Reply-To: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
 References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170903120757.14968-19-ard.biesheuvel@linaro.org>
+Message-ID: <20170903120757.14968-21-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PIE kernel build does not allow absolute references encoded in
-movw/movt instruction pairs, so use our mov_l macro instead (which
-will still use such a pair unless CONFIG_RELOCATABLE is defined)
+To prepare for adding support for KASLR, which relocates all absolute
+symbol references at runtime after the caches have been enabled,
+update the MMU switch code to avoid using absolute symbol references
+where possible. This ensures these quantities are invariant under
+runtime relocation.
 
-Also, avoid 32-bit absolute literals to refer to absolute symbols.
-Instead, use a 16 bit reference so that PIE linker cannot get
-confused whether the symbol reference is subject to relocation at
-runtime.
-
+Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
- arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
- arch/arm/mach-tegra/sleep.S         |  4 ++--
- 3 files changed, 18 insertions(+), 14 deletions(-)
+ arch/arm/kernel/head-common.S | 39 ++++++++------------
+ 1 file changed, 15 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-index 5c8e638ee51a..cab95de5c8f1 100644
---- a/arch/arm/mach-tegra/sleep-tegra20.S
-+++ b/arch/arm/mach-tegra/sleep-tegra20.S
-@@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
- 	cmp	r0, #0
- 	reteq	lr			@ must not be called for CPU 0
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, 0f
- 	mov	r12, #CPU_RESETTABLE
- 	strb	r12, [r1, r2]
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 06035488130c..b74477507a12 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -79,9 +79,10 @@ ENDPROC(__vet_atags)
+  */
+ 	__INIT
+ __mmap_switched:
+-	adr	r3, __mmap_switched_data
+-
+-	ldmia	r3!, {r4, r5, r6, r7}
++	adr_l	r4, __data_loc
++	adr_l	r5, _sdata
++	adr_l	r6, __bss_start
++	adr_l	r7, _end
+ 	cmp	r4, r5				@ Copy data segment if needed
+ 1:	cmpne	r5, r6
+ 	ldrne	fp, [r4], #4
+@@ -93,9 +94,17 @@ __mmap_switched:
+ 	strcc	fp, [r6],#4
+ 	bcc	1b
  
-@@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
- 	beq	.
- 	ret	lr
- ENDPROC(tegra20_cpu_shutdown)
-+0:	.short	__tegra20_cpu1_resettable_status_offset
- #endif
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
- 	ret     lr
- ENDPROC(tegra_pen_unlock)
- 
-+.L__tegra20_cpu1_resettable_status_offset:
-+	.short	__tegra20_cpu1_resettable_status_offset
+- ARM(	ldmia	r3, {r4, r5, r6, r7, sp})
+- THUMB(	ldmia	r3, {r4, r5, r6, r7}	)
+- THUMB(	ldr	sp, [r3, #16]		)
++	adr_l	r3, init_thread_union + THREAD_START_SP
++	mov	sp, r3
++	adr_l	r4, processor_id
++	adr_l	r5, __machine_arch_type
++	adr_l	r6, __atags_pointer
++#ifdef CONFIG_CPU_CP15
++	adr_l	r7, cr_alignment
++#else
++	mov	r7, #0
++#endif
 +
+ 	str	r9, [r4]			@ Save processor ID
+ 	str	r1, [r5]			@ Save machine type
+ 	str	r2, [r6]			@ Save atags pointer
+@@ -104,24 +113,6 @@ __mmap_switched:
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
+-	.align	2
+-	.type	__mmap_switched_data, %object
+-__mmap_switched_data:
+-	.long	__data_loc			@ r4
+-	.long	_sdata				@ r5
+-	.long	__bss_start			@ r6
+-	.long	_end				@ r7
+-	.long	processor_id			@ r4
+-	.long	__machine_arch_type		@ r5
+-	.long	__atags_pointer			@ r6
+-#ifdef CONFIG_CPU_CP15
+-	.long	cr_alignment			@ r7
+-#else
+-	.long	0				@ r7
+-#endif
+-	.long	init_thread_union + THREAD_START_SP @ sp
+-	.size	__mmap_switched_data, . - __mmap_switched_data
+-
  /*
-  * tegra20_cpu_clear_resettable(void)
-  *
-@@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
+  * This provides a C-API version of __lookup_processor_type
   */
- ENTRY(tegra20_cpu_clear_resettable)
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r12, #CPU_NOT_RESETTABLE
- 	strb	r12, [r1, r2]
- 	ret	lr
-@@ -203,7 +207,7 @@ ENDPROC(tegra20_cpu_clear_resettable)
-  */
- ENTRY(tegra20_cpu_set_resettable_soon)
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r12, #CPU_RESETTABLE_SOON
- 	strb	r12, [r1, r2]
- 	ret	lr
-@@ -217,7 +221,7 @@ ENDPROC(tegra20_cpu_set_resettable_soon)
-  */
- ENTRY(tegra20_cpu_is_resettable_soon)
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
- 	ldrb	r12, [r1, r2]
- 	cmp	r12, #CPU_RESETTABLE_SOON
- 	moveq	r0, #1
-@@ -238,11 +242,11 @@ ENTRY(tegra20_sleep_core_finish)
- 	bl	tegra_disable_clean_inv_dcache
- 	mov     r0, r4
- 
--	mov32	r3, tegra_shut_off_mmu
-+	mov_l	r3, tegra_shut_off_mmu
- 	add	r3, r3, r0
- 
--	mov32	r0, tegra20_tear_down_core
--	mov32	r1, tegra20_iram_start
-+	mov_l	r0, tegra20_tear_down_core
-+	mov_l	r1, tegra20_iram_start
- 	sub	r0, r0, r1
- 	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
- 	add	r0, r0, r1
-@@ -265,7 +269,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
- 	bl	tegra_disable_clean_inv_dcache
- 
- 	mov32	r0, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r4, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r4, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r3, #CPU_RESETTABLE
- 	strb	r3, [r0, r4]
- 
-@@ -284,7 +288,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
- 	bl	tegra_pen_lock
- 
- 	mov32	r0, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r4, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r4, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r3, #CPU_NOT_RESETTABLE
- 	strb	r3, [r0, r4]
- 
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index dd4a67dabd91..478b2ca3ef6e 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -261,11 +261,11 @@ ENTRY(tegra30_sleep_core_finish)
- 	mov32	r6, TEGRA_FLOW_CTRL_BASE
- 	mov32	r7, TEGRA_TMRUS_BASE
- 
--	mov32	r3, tegra_shut_off_mmu
-+	mov_l	r3, tegra_shut_off_mmu
- 	add	r3, r3, r0
- 
--	mov32	r0, tegra30_tear_down_core
--	mov32	r1, tegra30_iram_start
-+	mov_l	r0, tegra30_tear_down_core
-+	mov_l	r1, tegra30_iram_start
- 	sub	r0, r0, r1
- 	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
- 	add	r0, r0, r1
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 5e3496753df1..785df3edc767 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -101,11 +101,11 @@ ENTRY(tegra_sleep_cpu_finish)
- 	bl	tegra_disable_clean_inv_dcache
- 
- 	mov	r0, r4
--	mov32	r6, tegra_tear_down_cpu
-+	mov_l	r6, tegra_tear_down_cpu
- 	ldr	r1, [r6]
- 	add	r1, r1, r0
- 
--	mov32	r3, tegra_shut_off_mmu
-+	mov_l	r3, tegra_shut_off_mmu
- 	add	r3, r3, r0
- 	mov	r0, r1
- 
 -- 
 2.11.0
