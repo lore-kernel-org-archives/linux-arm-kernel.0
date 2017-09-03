@@ -1,74 +1,98 @@
 From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Mon, 4 Sep 2017 00:37:58 +0100
-Subject: [PATCH 08/10] dmaengine: sun6i: Add support for Allwinner A64 and
- compatibles
-In-Reply-To: <20170903224100.17893-9-stefan.bruens@rwth-aachen.de>
+Date: Mon, 4 Sep 2017 00:44:54 +0100
+Subject: [PATCH 07/10] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <20170903224100.17893-8-stefan.bruens@rwth-aachen.de>
 References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
- <20170903224100.17893-9-stefan.bruens@rwth-aachen.de>
-Message-ID: <1526a6b4-1962-256d-1ada-ef9c7d95e6b1@arm.com>
+ <20170903224100.17893-8-stefan.bruens@rwth-aachen.de>
+Message-ID: <d211b11c-09f6-8a69-2560-6be89f3b9c3c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On 03/09/17 23:40, Stefan Br?ns wrote:
-> The A64 SoC has the same dma engine as the H3 (sun8i), with a
-> reduced amount of physical channels. To allow future reuse of the
-> compatible, leave the channel count etc. in the config data blank
-> and retrieve it from the devicetree.
+> To avoid introduction of a new compatible for each small SoC/DMA controller
+> variation, move the definition of the channel count to the devicetree.
+> 
+> The number of vchans is no longer explicit, but limited by the highest
+> port/DMA request number. The result is a slight overallocation for SoCs
+> with a sparse port mapping.
 > 
 > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 > ---
->  drivers/dma/sun6i-dma.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  drivers/dma/sun6i-dma.c | 35 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 34 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index bd4c2e4a759b..4fae7ffad549 100644
+> index c69dadb853d2..bd4c2e4a759b 100644
 > --- a/drivers/dma/sun6i-dma.c
 > +++ b/drivers/dma/sun6i-dma.c
-> @@ -1076,6 +1076,16 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
->  	.nr_max_vchans   = 34,
->  	.dmac_variant    = DMAC_VARIANT_H3,
->  };
-> +
-> +/*
-> + * The A64 binding uses the number of dma channels from the
-> + * device tree node.
-> + */
-> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
-> +	.nr_max_channels = 0,
-> +	.nr_max_requests = 0,
-
-But this does not work with the "dma-requests" property being optional
-according to the binding spec? Either we put the value for the A64 in
-here (and thus force the R40 and others to specify this in the DT) or we
-map the "0" from struct config to DMA_CHAN_MAX_DRQ in the probe function.
-
-> +	.nr_max_vchans   = 0,
-> +	.dmac_variant    = DMAC_VARIANT_H3,
->  };
+> @@ -42,6 +42,9 @@
 >  
->  static const struct of_device_id sun6i_dma_match[] = {
-> @@ -1083,6 +1093,7 @@ static const struct of_device_id sun6i_dma_match[] = {
->  	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
->  	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
->  	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-> +	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
-> @@ -1090,6 +1101,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
->  static int sun6i_dma_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *device;
-> +	struct device_node *np = pdev->dev.of_node;
+>  #define DMA_STAT		0x30
+>  
+> +/* Offset between DMA_IRQ_EN and DMA_IRQ_STAT limits number of channels */
+> +#define DMA_MAX_CHANNELS	(DMA_IRQ_CHAN_NR * 0x10 / 4)
+> +
+>  /*
+>   * sun8i specific registers
+>   */
+> @@ -65,7 +68,8 @@
+>  #define DMA_CHAN_LLI_ADDR	0x08
+>  
+>  #define DMA_CHAN_CUR_CFG	0x0c
+> -#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
+> +#define DMA_CHAN_MAX_DRQ		0x1f
+> +#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & DMA_CHAN_MAX_DRQ)
+>  #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
+>  #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
+>  #define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
+> @@ -1173,6 +1177,35 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+>  	sdc->num_vchans = sdc->cfg->nr_max_vchans;
+>  	sdc->max_request = sdc->cfg->nr_max_requests;
+>  
+> +	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
+> +	if (ret && !sdc->num_pchans) {
+> +		dev_err(&pdev->dev, "Can't get dma-channels.\n");
+> +		return ret;
+> +	}
+> +
+> +	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
+> +		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
+> +	if (ret && !sdc->max_request) {
+> +		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
+> +			 DMA_CHAN_MAX_DRQ);
 
-Is this some rebase/split artefact?
+Mmmh, is this mapping of "!sdc->max_request" -> DMA_CHAN_MAX_DRQ
+implemented somewhere else? Or is it just missing here:
+		sdc->max_request = DMA_CHAN_MAX_DRQ;
+
+Otherwise this is looking good, thanks for picking up the DT property
+approach!
 
 Cheers,
 Andre.
 
->  	struct sun6i_dma_dev *sdc;
->  	struct resource *res;
->  	int ret, i;
+> +	}
+> +
+> +	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
+> +		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * If the number of vchans is not specified, derive it from the
+> +	 * highest port number, at most one channel per port and direction.
+> +	 */
+> +	if (!sdc->num_vchans)
+> +		sdc->num_vchans = 2 * (sdc->max_request + 1);
+> +
+>  	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
+>  				   sizeof(struct sun6i_pchan), GFP_KERNEL);
+>  	if (!sdc->pchans)
 > 
