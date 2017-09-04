@@ -1,11 +1,11 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 4 Sep 2017 10:00:35 -0700
+Date: Mon, 4 Sep 2017 10:00:45 -0700
 Subject: [PATCH 1/1] net: mdio-mux: add mdio_mux parameter to
  mdio_mux_init()
 In-Reply-To: <20170904163014.955-2-clabbe.montjoie@gmail.com>
 References: <20170904163014.955-1-clabbe.montjoie@gmail.com>
  <20170904163014.955-2-clabbe.montjoie@gmail.com>
-Message-ID: <db7325bd-aee0-a920-a60c-6ce113f833c0@gmail.com>
+Message-ID: <ff3b2326-81ea-76ca-d737-11f27eef75cb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
