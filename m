@@ -1,52 +1,129 @@
-From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Mon, 4 Sep 2017 17:25:11 +0300
-Subject: [PATCH v2 3/3] MAINTAINERS: Add entry for the Nuvoton NPCM
- architecture
-In-Reply-To: <20170831225400.19756-4-brendanhiggins@google.com>
-References: <20170831225400.19756-1-brendanhiggins@google.com>
- <20170831225400.19756-4-brendanhiggins@google.com>
-Message-ID: <CAP6Zq1husO0G+Prjn4Fge8icDhfO-kw0TdHDZ=wxFcpagD-6VA@mail.gmail.com>
+From: antony@phenome.org (Antony Antony)
+Date: Mon, 4 Sep 2017 16:26:19 +0200
+Subject: [PATCH v5] arm64: allwinner: h5: add support for NanoPi NEO Plus2
+In-Reply-To: <20170904082732.g2q2tjd6qlvhaea7@flea>
+References: <20170824231716.2623-1-antony@phenome.org>
+ <20170830125057.38529-1-antony@phenome.org>
+ <20170831145859.rief3fqo36ns23rm@flea>
+ <20170901105313.m26y2re3ulskua43@AntonyAntony.local>
+ <20170904082732.g2q2tjd6qlvhaea7@flea>
+Message-ID: <20170904142619.zq4x2l2qwtpukdc7@AntonyAntony.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2017 at 01:54, Brendan Higgins <brendanhiggins@google.com> wrote:
-> Add maintainers and reviewers for the Nuvoton NPCM architecture.
->
-> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-> ---
->  MAINTAINERS | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 44cb004c765d..67064bf11904 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1598,6 +1598,19 @@ F:       drivers/pinctrl/nomadik/
->  F:     drivers/i2c/busses/i2c-nomadik.c
->  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
->
-> +ARM/NUVOTON NPCM ARCHITECTURE
-> +M:     Avi Fishman <avifishman70@gmail.com>
-> +M:     Tomer Maimon <tmaimon77@gmail.com>
-> +R:     Brendan Higgins <brendanhiggins@google.com>
-> +R:     Rick Altherr <raltherr@google.com>
-> +L:     openbmc at lists.ozlabs.org (moderated for non-subscribers)
-> +S:     Maintained
-> +F:     arch/arm/mach-npcm/
-> +F:     arch/arm/boot/dts/nuvoton-npcm*
-> +F:     include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-> +F:     drivers/*/*npcm*
-> +F:     Documentation/*/*npcm*
-> +
->  ARM/NUVOTON W90X900 ARM ARCHITECTURE
->  M:     Wan ZongShun <mcuos.com@gmail.com>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> --
-> 2.14.1.581.gf28d330327-goog
->
+Hi Maxime,
 
-Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+On Mon, Sep 04, 2017 at 10:27:32AM +0200, Maxime Ripard wrote:
+> On Fri, Sep 01, 2017 at 12:53:13PM +0200, Antony Antony wrote:
+> > > > +&emac {
+> > > > +	pinctrl-names = "default";
+> > > > +	pinctrl-0 = <&emac_rgmii_pins>;
+> > > > +	phy-supply = <&reg_gmac_3v3>;
+> > > > +	phy-handle = <&ext_rgmii_phy>;
+> > > > +	phy-mode = "rgmii";
+> > > > +	status = "okay";
+> > > > +};
+> > > > +
+> > > > +&mdio {
+> > > > +	ext_rgmii_phy: ethernet-phy at 7 {
+> > > > +		compatible = "ethernet-phy-ieee802.3-c22";
+> > > > +		reg = <7>;
+> > > > +	};
+> > > > +};
+> > > 
+> > > This will not compile.
+> > 
+> > I don't understand you, because, v5 file compiled for me. Here is output 
+> > from running system, just the relevant part.  using dtc -I fs 
+> > /proc/device-tree
+> > 
+> > ext_rgmii_phy = "/soc/ethernet at 1c30000/mdio/ethernet-phy at 7";
+> > 
+> > ethernet at 1c30000 {
+> > 	mdio {
+> > 	..
+> > 		ethernet-phy at 7 {
+> > 			compatible = "ethernet-phy-ieee802.3-c22";
+> > 			phandle = <0x1c>;
+> > 			reg = <0x7>;
+> > 			linux,phandle = <0x1c>;
+> > 		};
+> > };
+> > 
+> > Is this what you expect?
+> 
+> The bindings have been reverted recently, so if you based your work on
+> a version between 4.13-rc1 and 4.13-rc6 it will work, but anything
+> more recent will not compile anymore.
 
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-Tested-by: Avi Fishman <avifishman70@gmail.com>
+I deleted emc and related node.
+I see. I hope stmmac: sun8i come back soon. It works well well on this 
+board, running 4.13-rc6
+
+> > > > +	status = "okay";
+> > > > +
+> > > > +	/*
+> > > > +	 * AMPAK AP6212A WiFi module with BCM43430, rev=1 inside
+> > > > +	 * sdio vendor ID: 0x02d0, sdio device ID: 0xa9a6
+> > > > +	 * There is no specific Documentation: dt-binding for BCM43430
+> > > > +	 * brcm,bcm4329-fmac compatible can initialize this module
+> > > > +	 */
+> > > 
+> > > This is not really relevant.
+> > 
+> > would you prefer no comment or a rewrite? How does this look?
+> > 
+> > /*
+> >  * AMPAK AP6212A WiFi module with BCM43430, rev=1 inside
+> >  * sdio vendor ID: 0x02d0, sdio device ID: 0xa9a6
+> >  */
+> > 
+> > I am afraid a casual reader would think "brcm,bcm4329-fmac" is wrong, 
+> > because that is not the actual chip inside the module.
+> 
+> No comment is fine, and I'm not sure the casual reader will ever read
+> this :)
+
+Deleted.
+
+> > > > +&usb_otg {
+> > > > +	dr_mode = "host";
+> > > > +	status = "okay";
+> > > > +};
+> > > > +
+> > > > +&usbphy {
+> > > > +	/* USB Type-A ports' VBUS is always on */
+> > > > +	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
+> > > 
+> > > If it has an ID-detect pin, then it's not a host-only USB OTG
+> > > controller. dr_mode should be set to otga 
+> > 
+> > good point. I don't see an ID-detect connected in the schematic. The 
+> > previous generation had. 
+> > 
+> > I will leave 
+> > &usb_otg {
+> >   dr_mode = "host";
+> >   status = "okay";
+> > };
+> > 
+> > &usbphy {
+> > 	/* USB Type-A ports' VBUS is always on */
+> > 	status = "okay";
+> > };
+> 
+> Looking at the schematics, it seems that the micro USB isn't even
+> wired to a bus but is only used to power the board. If so, you can
+> even remove the usb_otg node.
+
+Yes, the Micro USB data pins are not connected. However, it there is a 
+second USB A port connected to the processor. If I remove &usb_otg node, in 
+4.13-rc6, the second port goes to disabled.
+
+BTW would this work s/brcm,bcm4329-fmac/brcm/ or should I revert it?
+
+I will send an updated version, v8, soon.
+
+thanks,
+
+-antony
