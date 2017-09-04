@@ -1,33 +1,20 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Sep 2017 08:25:26 +0200
-Subject: [GIT PULL] Allwinner DT changes for 4.14, take 3
-In-Reply-To: <20170901234353.GB15825@localhost>
-References: <20170828092246.h66hjoqmv3r3kpes@flea.lan>
- <20170901132012.x2wqwaxdprsdnooj@flea>
- <20170901234353.GB15825@localhost>
-Message-ID: <20170904062526.taygf4tw6bmb4hds@flea>
+Date: Mon, 4 Sep 2017 08:26:50 +0200
+Subject: [linux-sunxi][PATCH] ARM: dts: sun6i: a31: Add DAI nodes
+In-Reply-To: <20170903150852.3548-1-codekipper@gmail.com>
+References: <20170903150852.3548-1-codekipper@gmail.com>
+Message-ID: <20170904062650.we6sczux7gp4qitt@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 04:43:53PM -0700, Olof Johansson wrote:
-> On Fri, Sep 01, 2017 at 03:20:12PM +0200, Maxime Ripard wrote:
-> > Hi
-> > 
-> > On Mon, Aug 28, 2017 at 11:22:46AM +0200, Maxime Ripard wrote:
-> > > Hi,
-> > > 
-> > > Here is a late pull request for the 4.14 merge window.
-> > > 
-> > > Along with the fixes pull request I'm about to change, this should be
-> > > our last pull request for the next release.
-> > 
-> > Since you merged the fixes that remove the EMAC nodes for 4.13
-> > already, we really need to have that merged in 4.14, otherwise we'll
-> > end up with a build breakage of the beelink device tree.
+On Sun, Sep 03, 2017 at 05:08:52PM +0200, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> This was already merged, but I might have missed to reply to the email.
+> Add the new DAI blocks to the device tree.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Oh, sorry, I should have checked. Thanks!
+Applied for 4.15, thanks!
 Maxime
 
 -- 
@@ -40,4 +27,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/5e1a6df2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/0e2d2bb1/attachment-0001.sig>
