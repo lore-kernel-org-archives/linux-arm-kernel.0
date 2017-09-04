@@ -1,29 +1,31 @@
 From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 4 Sep 2017 15:23:07 +1000
-Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
-In-Reply-To: <20170822105534.7f52bda0@canb.auug.org.au>
-References: <20170822105534.7f52bda0@canb.auug.org.au>
-Message-ID: <20170904152307.33f9ba2a@canb.auug.org.au>
+Date: Mon, 4 Sep 2017 15:26:09 +1000
+Subject: linux-next: manual merge of the net-next tree with the rockchip
+ tree
+In-Reply-To: <20170822112414.06f3b00f@canb.auug.org.au>
+References: <20170822112414.06f3b00f@canb.auug.org.au>
+Message-ID: <20170904152609.72aa1b9e@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-On Tue, 22 Aug 2017 10:55:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+On Tue, 22 Aug 2017 11:24:14 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 >
-> Today's linux-next merge of the v4l-dvb tree got a conflict in:
+> Today's linux-next merge of the net-next tree got a conflict in:
 > 
->   arch/arm/configs/imx_v6_v7_defconfig
+>   arch/arm64/boot/dts/rockchip/rk3328-evb.dts
 > 
-> between commit:
+> between commits:
 > 
->   b834bc1c52b8 ("ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers")
+>   ab78718bda79 ("arm64: dts: rockchip: Enable tsadc module on RK3328 eavluation board")
+>   1e28037ec88e ("arm64: dts: rockchip: add rk805 node for rk3328-evb")
 > 
-> from the arm-soc tree and commit:
+> from the rockchip tree and commit:
 > 
->   b9e1486e0e4b ("media: rc-core: do not depend on MEDIA_SUPPORT")
+>   4b05bc6157eb ("ARM64: dts: rockchip: Enable gmac2phy for rk3328-evb")
 > 
-> from the v4l-dvb tree.
+> from the net-next tree.
 > 
 > I fixed it up (see below) and can carry the fix as necessary. This
 > is now fixed as far as linux-next is concerned, but any non trivial
@@ -36,23 +38,177 @@ On Tue, 22 Aug 2017 10:55:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote
 > Cheers,
 > Stephen Rothwell
 > 
-> diff --cc arch/arm/configs/imx_v6_v7_defconfig
-> index 3a48ad809731,1736813bdea7..000000000000
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@@ -230,9 -226,7 +230,9 @@@ CONFIG_REGULATOR_MC13892=
->   CONFIG_REGULATOR_PFUZE100=y
->   CONFIG_MEDIA_SUPPORT=y
->   CONFIG_MEDIA_CAMERA_SUPPORT=y
-> - CONFIG_MEDIA_RC_SUPPORT=y
-> + CONFIG_RC_CORE=y
->  +CONFIG_MEDIA_CONTROLLER=y
->  +CONFIG_VIDEO_V4L2_SUBDEV_API=y
->   CONFIG_RC_DEVICES=y
->   CONFIG_IR_GPIO_CIR=y
->   CONFIG_MEDIA_USB_SUPPORT=y
+> diff --cc arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+> index 86605ae7b6f5,b9f36dad17e6..000000000000
+> --- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+> @@@ -51,147 -51,24 +51,164 @@@
+>   		stdout-path = "serial2:1500000n8";
+>   	};
+>   
+>  +	dc_12v: dc-12v {
+>  +		compatible = "regulator-fixed";
+>  +		regulator-name = "dc_12v";
+>  +		regulator-always-on;
+>  +		regulator-boot-on;
+>  +		regulator-min-microvolt = <12000000>;
+>  +		regulator-max-microvolt = <12000000>;
+>  +	};
+>  +
+> + 	vcc_phy: vcc-phy-regulator {
+> + 		compatible = "regulator-fixed";
+> + 		regulator-name = "vcc_phy";
+> + 		regulator-always-on;
+> + 		regulator-boot-on;
+> + 	};
+> ++
+>  +	vcc_sys: vcc-sys {
+>  +		compatible = "regulator-fixed";
+>  +		regulator-name = "vcc_sys";
+>  +		regulator-always-on;
+>  +		regulator-boot-on;
+>  +		regulator-min-microvolt = <5000000>;
+>  +		regulator-max-microvolt = <5000000>;
+>  +		vin-supply = <&dc_12v>;
+>  +	};
+>   };
+>   
+> + &gmac2phy {
+> + 	phy-supply = <&vcc_phy>;
+> + 	clock_in_out = "output";
+> + 	assigned-clocks = <&cru SCLK_MAC2PHY_SRC>;
+> + 	assigned-clock-rate = <50000000>;
+> + 	assigned-clocks = <&cru SCLK_MAC2PHY>;
+> + 	assigned-clock-parents = <&cru SCLK_MAC2PHY_SRC>;
+> + 	status = "okay";
+> + };
+> + 
+>  +&i2c1 {
+>  +	status = "okay";
+>  +
+>  +	rk805: rk805 at 18 {
+>  +		compatible = "rockchip,rk805";
+>  +		reg = <0x18>;
+>  +		interrupt-parent = <&gpio2>;
+>  +		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+>  +		#clock-cells = <1>;
+>  +		clock-output-names = "xin32k", "rk805-clkout2";
+>  +		gpio-controller;
+>  +		#gpio-cells = <2>;
+>  +		pinctrl-names = "default";
+>  +		pinctrl-0 = <&pmic_int_l>;
+>  +		rockchip,system-power-controller;
+>  +		wakeup-source;
+>  +
+>  +		vcc1-supply = <&vcc_sys>;
+>  +		vcc2-supply = <&vcc_sys>;
+>  +		vcc3-supply = <&vcc_sys>;
+>  +		vcc4-supply = <&vcc_sys>;
+>  +		vcc5-supply = <&vcc_io>;
+>  +		vcc6-supply = <&vcc_io>;
+>  +
+>  +		regulators {
+>  +			vdd_logic: DCDC_REG1 {
+>  +				regulator-name = "vdd_logic";
+>  +				regulator-min-microvolt = <712500>;
+>  +				regulator-max-microvolt = <1450000>;
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +					regulator-suspend-microvolt = <1000000>;
+>  +				};
+>  +			};
+>  +
+>  +			vdd_arm: DCDC_REG2 {
+>  +				regulator-name = "vdd_arm";
+>  +				regulator-min-microvolt = <712500>;
+>  +				regulator-max-microvolt = <1450000>;
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +					regulator-suspend-microvolt = <950000>;
+>  +				};
+>  +			};
+>  +
+>  +			vcc_ddr: DCDC_REG3 {
+>  +				regulator-name = "vcc_ddr";
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +				};
+>  +			};
+>  +
+>  +			vcc_io: DCDC_REG4 {
+>  +				regulator-name = "vcc_io";
+>  +				regulator-min-microvolt = <3300000>;
+>  +				regulator-max-microvolt = <3300000>;
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +					regulator-suspend-microvolt = <3300000>;
+>  +				};
+>  +			};
+>  +
+>  +			vcc_18: LDO_REG1 {
+>  +				regulator-name = "vcc_18";
+>  +				regulator-min-microvolt = <1800000>;
+>  +				regulator-max-microvolt = <1800000>;
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +					regulator-suspend-microvolt = <1800000>;
+>  +				};
+>  +			};
+>  +
+>  +			vcc18_emmc: LDO_REG2 {
+>  +				regulator-name = "vcc18_emmc";
+>  +				regulator-min-microvolt = <1800000>;
+>  +				regulator-max-microvolt = <1800000>;
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +					regulator-suspend-microvolt = <1800000>;
+>  +				};
+>  +			};
+>  +
+>  +			vdd_10: LDO_REG3 {
+>  +				regulator-name = "vdd_10";
+>  +				regulator-min-microvolt = <1000000>;
+>  +				regulator-max-microvolt = <1000000>;
+>  +				regulator-always-on;
+>  +				regulator-boot-on;
+>  +				regulator-state-mem {
+>  +					regulator-on-in-suspend;
+>  +					regulator-suspend-microvolt = <1000000>;
+>  +				};
+>  +			};
+>  +		};
+>  +	};
+>  +};
+>  +
+>  +&pinctrl {
+>  +	pmic {
+>  +		pmic_int_l: pmic-int-l {
+>  +			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
+>  +		};
+>  +	};
+>  +};
+>  +
+>  +&tsadc {
+>  +	status = "okay";
+>  +};
+>  +
+>   &uart2 {
+>   	status = "okay";
+>   };
 
-Just a reminder that this conflict still exists.
+Just a reminder that these conflicts still exist.
 
 -- 
 Cheers,
