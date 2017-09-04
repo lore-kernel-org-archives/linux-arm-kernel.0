@@ -1,91 +1,106 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Sep 2017 08:50:27 +0200
-Subject: [PATCH 1/3] dmaengine: sun6i: Correct DMA support on H3
-In-Reply-To: <5722405.lpx0YHbn2k@sbruens-linux>
-References: <20170830233609.13855-1-stefan.bruens@rwth-aachen.de>
- <a649f98d4ac44abc873c5110ce9363e5@rwthex-w2-b.rwth-ad.de>
- <20170901133549.cr2ivmfr5mnrdujg@flea>
- <5722405.lpx0YHbn2k@sbruens-linux>
-Message-ID: <20170904065027.7splxlgxhpu5nj56@flea>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon,  4 Sep 2017 15:58:37 +0900
+Subject: [RESEND PATCH v4 2/2] arm64: dts: uniphier: add nodes of thermal
+ monitor and thermal zone for LD20
+In-Reply-To: <1504508317-12076-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1504508317-12076-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1504508317-12076-3-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 02:42:47PM +0000, Br?ns, Stefan wrote:
-> On Freitag, 1. September 2017 15:35:49 CEST Maxime Ripard wrote:
-> > On Fri, Sep 01, 2017 at 05:04:54AM +0200, Stefan Bruens wrote:
-> > > On Donnerstag, 31. August 2017 16:51:35 CEST Maxime Ripard wrote:
-> > > > Hi,
-> > > > 
-> > > > On Thu, Aug 31, 2017 at 01:36:07AM +0200, Stefan Br?ns wrote:
-> > > > > +/* Between SoC generations, there are some significant differences:
-> > > > > + * - A23 added a clock gate register
-> > > > > + * - the H3 burst length field has a different offset
-> > > > > + */
-> > > > 
-> > > > This is not the proper comment style.
-> > > > 
-> > > > > +enum dmac_variant {
-> > > > > +	DMAC_VARIANT_A31,
-> > > > > +	DMAC_VARIANT_A23,
-> > > > > +	DMAC_VARIANT_H3,
-> > > > > +};
-> > > > > +
-> > > > 
-> > > > And this is redundant with what we already have in our structures.
-> > > 
-> > > Actually, its not. For H3, there are currently at least 3 register
-> > > compatible SoCs: H5 is identical, R40 has 16 dma channels, A64 has 8
-> > > channels. So if the current config structure is kept, we need 3 different
-> > > compatible strings. Same for the A23, which is register compatible to
-> > > e.g. A83t and V3s, but with different numbers of DMA channels.
-> > > 
-> > > So either you decorate the code with a cascade of
-> > > 
-> > > if ((of_is_compatible(..A23..) || of_is_compatible(..A83T..) || ...) {
-> > > } else if ((of_is_compatible(..H3..) || of_is_compatible(..A64..) || ...)
-> > > {
-> > > } else { /* A31 */
-> > > }
-> > > 
-> > > in a number of places, or you do it just once.
-> > 
-> > That's not how you retrieve the structures. They are already
-> > associated to the compatible, and you need to do a single lookup to
-> > get them. So that's nowhere near what you're suggesting. You can have
-> > a look at the of_match_device in the probe function.
-> 
-> Please have a look at the current implementation of how the clock autogating 
-> in the probe function is done - it matches with the compatible string.
+Add nodes of thermal monitor and thermal zone for UniPhier LD20 SoC.
+The thermal monitor node is included in sysctrl. Since the efuse might not
+have a calibrated value of thermal monitor, this patch gives the default
+value for LD20.
 
-Yeah, and we should get rid of that as well.
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 45 ++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-> Of course we can replace this with a match between sdev->config and the 
-> various sun6i_dma_config instances, but we would still have to do 3 matches 
-> for the A23 register configuration (A23 || A83T || V3s) and 3 matches for the 
-> H3 register configuration (H3 || R40 || A64). There are currently *7* 
-> different configs (V3s, R40 and A64 taken into account), but only 3 different 
-> register variants.
-> 
-> This is the same rationale as the "gate_needed" boolean property proposed by 
-> Icenowy Zheng in the "Allwinner V3s DMA support" patch series. Obviously we 
-> don't need a boolean, but a ternary option to cater for the gate_needed 
-> differences - "NO_GATE", "A23_STYLE_GATE", "H3_STYLE_GATE".
-
-Or we can just have an extra field in sun6i_dma_config that would set
-the gate register offset? If it's non-zero, use whatever you have set
-there, and then you just have to care about two cases, no matter how
-many offsets we'll have in the wild.
-
-Maxime
-
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index a29c279..59e5ae6 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -7,6 +7,8 @@
+  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
++#include <dt-bindings/thermal/thermal.h>
++
+ /memreserve/ 0x80000000 0x02000000;
+ 
+ / {
+@@ -46,6 +48,7 @@
+ 			clocks = <&sys_clk 32>;
+ 			enable-method = "psci";
+ 			operating-points-v2 = <&cluster0_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -64,6 +67,7 @@
+ 			clocks = <&sys_clk 33>;
+ 			enable-method = "psci";
+ 			operating-points-v2 = <&cluster1_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu3: cpu at 101 {
+@@ -173,6 +177,40 @@
+ 			     <1 10 4>;
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal {
++			polling-delay-passive = <250>;	/* 250ms */
++			polling-delay = <1000>;		/* 1000ms */
++			thermal-sensors = <&pvtctl>;
++
++			trips {
++				cpu_crit: cpu_crit {
++					temperature = <110000>;	/* 110C */
++					hysteresis = <2000>;
++					type = "critical";
++				};
++				cpu_alert: cpu_alert {
++					temperature = <100000>;	/* 100C */
++					hysteresis = <2000>;
++					type = "passive";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert>;
++					cooling-device = <&cpu0
++					    THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++				map1 {
++					trip = <&cpu_alert>;
++					cooling-device = <&cpu2
++					    THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
++	};
++
+ 	soc at 0 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -410,6 +448,13 @@
+ 			watchdog {
+ 				compatible = "socionext,uniphier-wdt";
+ 			};
++
++			pvtctl: pvtctl {
++				compatible = "socionext,uniphier-ld20-thermal";
++				interrupts = <0 3 4>;
++				#thermal-sensor-cells = <0>;
++				socionext,tmod-calibration = <0x0f22 0x68ee>;
++			};
+ 		};
+ 
+ 		nand: nand at 68000000 {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/ee8a13b2/attachment.sig>
+2.7.4
