@@ -1,127 +1,32 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  4 Sep 2017 18:30:14 +0200
-Subject: [PATCH 1/1] net: mdio-mux: add mdio_mux parameter to mdio_mux_init()
-In-Reply-To: <20170904163014.955-1-clabbe.montjoie@gmail.com>
-References: <20170904163014.955-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170904163014.955-2-clabbe.montjoie@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Sep 2017 17:42:35 +0100
+Subject: [PATCH v6 09/12] ASoC: wm9712: add ac97 new bus support
+In-Reply-To: <8760cyppvj.fsf@belgarion.home>
+References: <20170902195414.3699-1-robert.jarzmik@free.fr>
+ <20170902195414.3699-10-robert.jarzmik@free.fr>
+ <20170904101849.7uefwhuqz4vtntrp@localhost.localdomain>
+ <8760cyppvj.fsf@belgarion.home>
+Message-ID: <20170904164235.dkw7ngqmycg7k3tl@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mdio_mux_init() use the parameter dev for two distinct thing:
-1) Have a device for all devm_ functions
-2) Get device_node from it
+On Mon, Sep 04, 2017 at 03:14:40PM +0200, Robert Jarzmik wrote:
+> Charles Keepax <ckeepax@opensource.cirrus.com> writes:
 
-Since it is two distinct purpose, this patch add a parameter mdio_mux
-that is linked to task 2.
+> > This bit is still missing the ifdef it has in the preceeding
+> > patch.
 
-This will also permit to register an of_node mdio-mux that lacks a direct
-owning device.
-For example a mdio-mux which is a subnode of a real device.
+> Damn, you're right, it's missing in both wm9705 and wm9712, but not in wm9713.
+> That will be for the hopefully last volley of this serie.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/net/phy/mdio-mux-bcm-iproc.c | 2 +-
- drivers/net/phy/mdio-mux-gpio.c      | 2 +-
- drivers/net/phy/mdio-mux-mmioreg.c   | 3 ++-
- drivers/net/phy/mdio-mux.c           | 7 ++++---
- include/linux/mdio-mux.h             | 9 +++++++++
- 5 files changed, 17 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-index 0a5f62e0efcc..0831b7142df7 100644
---- a/drivers/net/phy/mdio-mux-bcm-iproc.c
-+++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-@@ -199,7 +199,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, md);
- 
--	rc = mdio_mux_init(md->dev, mdio_mux_iproc_switch_fn,
-+	rc = mdio_mux_init(md->dev, md->dev->of_node, mdio_mux_iproc_switch_fn,
- 			   &md->mux_handle, md, md->mii_bus);
- 	if (rc) {
- 		dev_info(md->dev, "mdiomux initialization failed\n");
-diff --git a/drivers/net/phy/mdio-mux-gpio.c b/drivers/net/phy/mdio-mux-gpio.c
-index 919949960a10..082ffef0dec4 100644
---- a/drivers/net/phy/mdio-mux-gpio.c
-+++ b/drivers/net/phy/mdio-mux-gpio.c
-@@ -54,7 +54,7 @@ static int mdio_mux_gpio_probe(struct platform_device *pdev)
- 	if (IS_ERR(s->gpios))
- 		return PTR_ERR(s->gpios);
- 
--	r = mdio_mux_init(&pdev->dev,
-+	r = mdio_mux_init(&pdev->dev, pdev->dev.of_node,
- 			  mdio_mux_gpio_switch_fn, &s->mux_handle, s, NULL);
- 
- 	if (r != 0) {
-diff --git a/drivers/net/phy/mdio-mux-mmioreg.c b/drivers/net/phy/mdio-mux-mmioreg.c
-index c3825c7da038..2573ab012f16 100644
---- a/drivers/net/phy/mdio-mux-mmioreg.c
-+++ b/drivers/net/phy/mdio-mux-mmioreg.c
-@@ -159,7 +159,8 @@ static int mdio_mux_mmioreg_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	ret = mdio_mux_init(&pdev->dev, mdio_mux_mmioreg_switch_fn,
-+	ret = mdio_mux_init(&pdev->dev, pdev->dev.of_node,
-+			    mdio_mux_mmioreg_switch_fn,
- 			    &s->mux_handle, s, NULL);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register mdio-mux bus %pOF\n",
-diff --git a/drivers/net/phy/mdio-mux.c b/drivers/net/phy/mdio-mux.c
-index 6f75e9f27fed..0a86f1e4c02f 100644
---- a/drivers/net/phy/mdio-mux.c
-+++ b/drivers/net/phy/mdio-mux.c
-@@ -86,6 +86,7 @@ static int mdio_mux_write(struct mii_bus *bus, int phy_id,
- static int parent_count;
- 
- int mdio_mux_init(struct device *dev,
-+		  struct device_node *mux_node,
- 		  int (*switch_fn)(int cur, int desired, void *data),
- 		  void **mux_handle,
- 		  void *data,
-@@ -98,11 +99,11 @@ int mdio_mux_init(struct device *dev,
- 	struct mdio_mux_parent_bus *pb;
- 	struct mdio_mux_child_bus *cb;
- 
--	if (!dev->of_node)
-+	if (!mux_node)
- 		return -ENODEV;
- 
- 	if (!mux_bus) {
--		parent_bus_node = of_parse_phandle(dev->of_node,
-+		parent_bus_node = of_parse_phandle(mux_node,
- 						   "mdio-parent-bus", 0);
- 
- 		if (!parent_bus_node)
-@@ -132,7 +133,7 @@ int mdio_mux_init(struct device *dev,
- 	pb->mii_bus = parent_bus;
- 
- 	ret_val = -ENODEV;
--	for_each_available_child_of_node(dev->of_node, child_bus_node) {
-+	for_each_available_child_of_node(mux_node, child_bus_node) {
- 		int v;
- 
- 		r = of_property_read_u32(child_bus_node, "reg", &v);
-diff --git a/include/linux/mdio-mux.h b/include/linux/mdio-mux.h
-index 61f5b21b31c7..a5d58f221939 100644
---- a/include/linux/mdio-mux.h
-+++ b/include/linux/mdio-mux.h
-@@ -12,7 +12,16 @@
- #include <linux/device.h>
- #include <linux/phy.h>
- 
-+/* mdio_mux_init() - Initialize a MDIO mux
-+ * @dev		The device owning the MDIO mux
-+ * @mux_node	The device node of the MDIO mux
-+ * @switch_fn	The function called for switching target MDIO child
-+ * mux_handle	A pointer to a (void *) used internaly by mdio-mux
-+ * @data	Private data used by switch_fn()
-+ * @mux_bus	An optional parent bus (Other case are to use parent_bus property)
-+ */
- int mdio_mux_init(struct device *dev,
-+		  struct device_node *mux_node,
- 		  int (*switch_fn) (int cur, int desired, void *data),
- 		  void **mux_handle,
- 		  void *data,
--- 
-2.13.5
+Given that this just missed the merge window but has now been reviewed
+by Takashi as well what I'm thinking is that it's going to be easiest to
+apply the start of it now so hopefully no need to respin the whole
+series so often.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/f87ef0ad/attachment-0001.sig>
