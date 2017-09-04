@@ -1,223 +1,111 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Sep 2017 12:24:53 +0200
-Subject: [PATCH v2 3/6] KVM: arm/arm64: vgic: Support level-triggered mapped
- interrupts
-In-Reply-To: <20170904102456.9025-1-cdall@linaro.org>
-References: <20170904102456.9025-1-cdall@linaro.org>
-Message-ID: <20170904102456.9025-4-cdall@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 4 Sep 2017 12:36:25 +0200
+Subject: [PATCH v4 1/3] dt-bindings: Document the hi3660 thermal sensor
+ bindings
+In-Reply-To: <38fdf052-97be-1b54-5e7d-9dd0bc11e9b4@hisilicon.com>
+References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
+ <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1503994666-13954-2-git-send-email-kevin.wangtao@hisilicon.com>
+ <d56428a6-ef27-4424-3ce5-4610fef3ac15@linaro.org>
+ <38fdf052-97be-1b54-5e7d-9dd0bc11e9b4@hisilicon.com>
+Message-ID: <4416373c-5269-d201-7db7-3fb39cc423a0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Level-triggered mapped IRQs are special because we only observe rising
-edges as input to the VGIC, and we don't set the EOI flag and therefore
-are not told when the level goes down, so that we can re-queue a new
-interrupt when the level goes up.
+On 04/09/2017 08:39, Wangtao (Kevin, Kirin) wrote:
+> 
+> 
+> ? 2017/9/1 2:24, Daniel Lezcano ??:
+>> On 29/08/2017 10:17, Tao Wang wrote:
+>>> From: Tao Wang <kevin.wangtao@linaro.org>
+>>>
+>>> This adds documentation of device tree bindings for the
+>>> thermal sensor controller of hi3660 SoC.
+>>>
+>>> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+>>> ---
+>>>   .../devicetree/bindings/thermal/hisi-tsensor.txt   | 37
+>>> ++++++++++++++++++++++
+>>>   1 file changed, 37 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>>> b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>>> new file mode 100644
+>>> index 0000000..4643dbe
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>>> @@ -0,0 +1,37 @@
+>>> +* Temperature Sensor on hisilicon SoC
+>>> +
+>>> +Hisilicon SoC supplies temperature sensor feature, each CPU cluster
+>>> and G3D
+>>> +area contains a temperture sensor. The temperture sensor produces an
+>>> output
+>>> +value which has a linear relationship with the temperture of the area.
+>>> +
+>>
+>> s/temperture/temperature/
+> THX
+>>
+>>> +for Hi3660,
+>>> +sensor0 monitors the temperture of A53;
+>>> +sensor1 monitors the temperture of A72;
+>>> +sensor2 monitors the temperture of GPU;
+>>> +sensor3 is a virtual sensor, which produces the maximum value of all
+>>> sensors;
+>>> +sensor4 is a virtual sensor, which produces the average value of all
+>>> sensors.
+>>
+>> I don't think we need to escribe the virtual sensors in the DT bindings.
+> I just want to let user know the sensor id of virtual sensor, I also
+> define it in header file, so the header file is enough?
 
-One way to solve this problem is to side-step the logic of the VGIC and
-special case the validation in the injection path, but it has the
-unfortunate drawback of having to peak into the physical GIC state
-whenever we want to know if the interrupt is pending on the virtual
-distributor.
+The virtual sensor (or something else) should be a separate, generic
+thing to be used for anyone.
 
-Instead, we can maintain the current semantics of a level triggered
-interrupt by sort of treating it as an edge-triggered interrupt,
-following from the fact that we only observe an asserting edge.  This
-requires us to be a bit careful when populating the LRs and when folding
-the state back in though:
+>>> +** Required properties :
+>>> +- compatible: "hisilicon,thermal-tsensor".
+>>> +- reg: physical reg address of thermal sensor and length of memory
+>>> mapped
+>>> +  region.
+>>> +- hisi,tsensors: number of hardware tsensors
+>>> +- hisi,coef:    An array of integers (one signed cell) containing
+>>> +        coefficients to turn adc value to temperture.
+>>> +- hisi,adc-range: adc value range, minimum value is followed by
+>>> maximum value.
+>>> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a
+>>> description.
+>>> +
+>>> +Example :
+>>> +Hi3660:
+>>> +tsensor: tsensor at fff30000 {
+>>> +    compatible = "hisilicon,hi3660-tsensor";
+>>> +    #address-cells = <2>;
+>>> +    #size-cells = <2>;
+>>> +    reg = <0x0 0xfff3001c 0x0 0x4>,
+>>> +        <0x0 0xfff3005c 0x0 0x4>,
+>>> +        <0x0 0xfff3009c 0x0 0x4>;
+>>> +    hisi,tsensors = <HISI_MAX_TSENSORS>;
+>>> +    hisi,coef = <165000 (-40000)>;
+>>> +    hisi,adc-range = <0x74 0x39A>;
+>>
+>> Do we really need max sensors, coef and adc range to be specified in
+>> the DT?
+>>
+>> Can't we assume the hi3660-tsensor has 3 sensors, and hard-code the
+>> coef, adc, in the driver itself?
+> My purpose is to make the driver be compitable with our future platform.
 
- * We lower the line level when populating the LR, so that when
-   subsequently observing an asserting edge, the VGIC will do the right
-   thing.
+I don't see the point. The compatibility could be handled in the driver
+itself, no?
 
- * If the guest never acked the interrupt while running (for example if
-   it had masked interrupts at the CPU level while running), we have
-   to preserve the pending state of the LR and move it back to the
-   line_level field of the struct irq when folding LR state.
 
-   If the guest never acked the interrupt while running, but changed the
-   device state and lowered the line (again with interrupts masked) then
-   we need to observe this change in the line_level.
-
-   Both of the above situations are solved by sampling the physical line
-   and set the line level when folding the LR back.
-
- * Finally, if the guest never acked the interrupt while running and
-   sampling the line reveals that the device state has changed and the
-   line has been lowered, we must clear the physical active state, since
-   we will otherwise never be told when the interrupt becomes asserted
-   again.
-
-This has the added benefit of making the timer optimization patches
-(https://lists.cs.columbia.edu/pipermail/kvmarm/2017-July/026343.html) a
-bit simpler, because the timer code doesn't have to clear the active
-state on the sync anymore.  It also potentially improves the performance
-of the timer implementation because the GIC knows the state or the LR
-and only needs to clear the
-active state when the pending bit in the LR is still set, where the
-timer has to always clear it when returning from running the guest with
-an injected timer interrupt.
-
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c | 29 +++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c    | 23 +++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h    |  7 +++++++
- 4 files changed, 88 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index e4187e5..618ed3f 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -104,6 +104,26 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 				irq->pending_latch = false;
- 		}
- 
-+		/*
-+		 * Level-triggered mapped IRQs are special because we only
-+		 * observe rising edges as input to the VGIC.
-+		 *
-+		 * If the guest never acked the interrupt we have to sample
-+		 * the physical line and set the line level, because the
-+		 * device state could have changed or we simply need to
-+		 * process the still pending interrupt later.
-+		 *
-+		 * If this causes us to lower the level, we have to also clear
-+		 * the physical active state, since we will otherwise never be
-+		 * told when the interrupt becomes asserted again.
-+		 */
-+		if (vgic_irq_is_mapped_level(irq) && (val & GICH_LR_PENDING_BIT)) {
-+			irq->line_level = vgic_get_phys_line_level(irq);
-+
-+			if (!irq->line_level)
-+				vgic_irq_set_phys_active(irq, false);
-+		}
-+
- 		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-@@ -161,6 +181,15 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 			val |= GICH_LR_EOI;
- 	}
- 
-+	/*
-+	 * Level-triggered mapped IRQs are special because we only observe
-+	 * rising edges as input to the VGIC.  We therefore lower the line
-+	 * level here, so that we can take new virtual IRQs.  See
-+	 * vgic_v2_fold_lr_state for more info.
-+	 */
-+	if (vgic_irq_is_mapped_level(irq) && (val & GICH_LR_PENDING_BIT))
-+		irq->line_level = false;
-+
- 	/* The GICv2 LR only holds five bits of priority. */
- 	val |= (irq->priority >> 3) << GICH_LR_PRIORITY_SHIFT;
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 96ea597..0f72bcb 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -94,6 +94,26 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 				irq->pending_latch = false;
- 		}
- 
-+		/*
-+		 * Level-triggered mapped IRQs are special because we only
-+		 * observe rising edges as input to the VGIC.
-+		 *
-+		 * If the guest never acked the interrupt we have to sample
-+		 * the physical line and set the line level, because the
-+		 * device state could have changed or we simply need to
-+		 * process the still pending interrupt later.
-+		 *
-+		 * If this causes us to lower the level, we have to also clear
-+		 * the physical active state, since we will otherwise never be
-+		 * told when the interrupt becomes asserted again.
-+		 */
-+		if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT)) {
-+			irq->line_level = vgic_get_phys_line_level(irq);
-+
-+			if (!irq->line_level)
-+				vgic_irq_set_phys_active(irq, false);
-+		}
-+
- 		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-@@ -144,6 +164,15 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 	}
- 
- 	/*
-+	 * Level-triggered mapped IRQs are special because we only observe
-+	 * rising edges as input to the VGIC.  We therefore lower the line
-+	 * level here, so that we can take new virtual IRQs.  See
-+	 * vgic_v3_fold_lr_state for more info.
-+	 */
-+	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
-+		irq->line_level = false;
-+
-+	/*
- 	 * We currently only support Group1 interrupts, which is a
- 	 * known defect. This needs to be addressed at some point.
- 	 */
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 9d557efd..8072969 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -140,6 +140,29 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- 	kfree(irq);
- }
- 
-+/* Get the input level of a mapped IRQ directly from the physical GIC */
-+bool vgic_get_phys_line_level(struct vgic_irq *irq)
-+{
-+	bool line_level;
-+
-+	BUG_ON(!irq->hw);
-+
-+	WARN_ON(irq_get_irqchip_state(irq->host_irq,
-+				      IRQCHIP_STATE_PENDING,
-+				      &line_level));
-+	return line_level;
-+}
-+
-+/* Set/Clear the physical active state */
-+void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
-+{
-+
-+	BUG_ON(!irq->hw);
-+	WARN_ON(irq_set_irqchip_state(irq->host_irq,
-+				      IRQCHIP_STATE_ACTIVE,
-+				      active));
-+}
-+
- /**
-  * kvm_vgic_target_oracle - compute the target vcpu for an irq
-  *
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index bba7fa2..7bdcda2 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -104,6 +104,11 @@ static inline bool irq_is_pending(struct vgic_irq *irq)
- 		return irq->pending_latch || irq->line_level;
- }
- 
-+static inline bool vgic_irq_is_mapped_level(struct vgic_irq *irq)
-+{
-+	return irq->config == VGIC_CONFIG_LEVEL && irq->hw;
-+}
-+
- /*
-  * This struct provides an intermediate representation of the fields contained
-  * in the GICH_VMCR and ICH_VMCR registers, such that code exporting the GIC
-@@ -140,6 +145,8 @@ vgic_get_mmio_region(struct kvm_vcpu *vcpu, struct vgic_io_device *iodev,
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
-+bool vgic_get_phys_line_level(struct vgic_irq *irq);
-+void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
- bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
- void vgic_kick_vcpus(struct kvm *kvm);
- 
 -- 
-2.9.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
