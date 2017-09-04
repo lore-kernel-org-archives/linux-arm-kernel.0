@@ -1,168 +1,162 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 4 Sep 2017 10:00:45 -0700
-Subject: [PATCH 1/1] net: mdio-mux: add mdio_mux parameter to
- mdio_mux_init()
-In-Reply-To: <20170904163014.955-2-clabbe.montjoie@gmail.com>
-References: <20170904163014.955-1-clabbe.montjoie@gmail.com>
- <20170904163014.955-2-clabbe.montjoie@gmail.com>
-Message-ID: <ff3b2326-81ea-76ca-d737-11f27eef75cb@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 4 Sep 2017 18:09:28 +0100
+Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <47b8bf19-abad-3503-2e1c-b9d1304a157e@huawei.com>
+References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
+ <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
+ <20170810172723.GD9980@arm.com>
+ <47b8bf19-abad-3503-2e1c-b9d1304a157e@huawei.com>
+Message-ID: <20170904170928.GB20601@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2017 09:30 AM, Corentin Labbe wrote:
-> mdio_mux_init() use the parameter dev for two distinct thing:
-> 1) Have a device for all devm_ functions
-> 2) Get device_node from it
+On Fri, Sep 01, 2017 at 09:46:00AM +0100, John Garry wrote:
+> On 10/08/2017 18:27, Will Deacon wrote:
+> >On Wed, Aug 09, 2017 at 11:07:15AM +0100, Shameer Kolothum wrote:
+> >>The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> >>platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
+> >>
+> >>On these platforms GICv3 ITS translator is presented with the deviceID
+> >>by extending the MSI payload data to 64 bits to include the deviceID.
+> >>Hence, the PCIe controller on this platforms has to differentiate the
+> >>MSI payload against other DMA payload and has to modify the MSI payload.
+> >>This basically makes it difficult for this platforms to have a SMMU
+> >>translation for MSI.
+> >>
+> >>This patch implements a ACPI table based quirk to reserve the hw msi
+> >>regions in the smmu-v3 driver which means these address regions will
+> >>not be translated and will be excluded from iova allocations.
+> >>
+> >>Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> >>---
+> >> drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
+> >> 1 file changed, 22 insertions(+), 5 deletions(-)
+> >
+> >Please can you also add a devicetree binding with corresponding
+> >documentation to enable this workaround on non-ACPI based systems too? It
+> >should be straightforward if you update the arm_smmu_options table.
+> >
 > 
-> Since it is two distinct purpose, this patch add a parameter mdio_mux
-> that is linked to task 2.
+> Hi Will, Lorenzo, Robin,
 > 
-> This will also permit to register an of_node mdio-mux that lacks a direct
-> owning device.
-> For example a mdio-mux which is a subnode of a real device.
-
-This looks fine, I was going to suggest introducing a wrapper around
-mdio_mux_init() which does something along the lines below, but
-considering the number of users of mdio_mux_init() within the kernel
-tree, it's reasonably easy to audit those, therefore:
-
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-
-diff --git a/include/linux/mdio-mux.h b/include/linux/mdio-mux.h
-index 61f5b21b31c7..0316186c91b5 100644
---- a/include/linux/mdio-mux.h
-+++ b/include/linux/mdio-mux.h
-@@ -12,11 +12,19 @@
- #include <linux/device.h>
- #include <linux/phy.h>
-
--int mdio_mux_init(struct device *dev,
--                 int (*switch_fn) (int cur, int desired, void *data),
--                 void **mux_handle,
--                 void *data,
--                 struct mii_bus *mux_bus);
-+int mdio_mux_init_dn(struct device *dev, struct device_node *mux_node,
-+                    int (*switch_fn)(int cur, int desired, void *data),
-+                    void **mux_handle, void *data,
-+                    struct mii_bus *mux_bus);
-+
-+static inline int mdio_mux_init(struct device *dev,
-+                               int (*switch_fn)(int cur, int desired,
-void *data),
-+                               void **mux_handle, void *data,
-+                               struct mii_bus *mux_bus)
-+{
-+       return mdio_mux_init_dn(dev, dev->of_node, switch_fn,
-+                               mux_handle, data, mux_bus);
-+}
-
+> I have created the patch to add DT support for this erratum.
+> However, currently I have only added support for pci-based devices.
+> I'm a bit stumped on how to add platform device support, or if we
+> should also add support at all. And I would rather ask before
+> sending the patches.
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  drivers/net/phy/mdio-mux-bcm-iproc.c | 2 +-
->  drivers/net/phy/mdio-mux-gpio.c      | 2 +-
->  drivers/net/phy/mdio-mux-mmioreg.c   | 3 ++-
->  drivers/net/phy/mdio-mux.c           | 7 ++++---
->  include/linux/mdio-mux.h             | 9 +++++++++
->  5 files changed, 17 insertions(+), 6 deletions(-)
+> The specific issue is that I know of no platform device with an ITS
+> msi-parent which we would want reserve, i.e. do not translate msi.
+> And, if there were, how to do it.
 > 
-> diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-> index 0a5f62e0efcc..0831b7142df7 100644
-> --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
-> +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-> @@ -199,7 +199,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, md);
->  
-> -	rc = mdio_mux_init(md->dev, mdio_mux_iproc_switch_fn,
-> +	rc = mdio_mux_init(md->dev, md->dev->of_node, mdio_mux_iproc_switch_fn,
->  			   &md->mux_handle, md, md->mii_bus);
->  	if (rc) {
->  		dev_info(md->dev, "mdiomux initialization failed\n");
-> diff --git a/drivers/net/phy/mdio-mux-gpio.c b/drivers/net/phy/mdio-mux-gpio.c
-> index 919949960a10..082ffef0dec4 100644
-> --- a/drivers/net/phy/mdio-mux-gpio.c
-> +++ b/drivers/net/phy/mdio-mux-gpio.c
-> @@ -54,7 +54,7 @@ static int mdio_mux_gpio_probe(struct platform_device *pdev)
->  	if (IS_ERR(s->gpios))
->  		return PTR_ERR(s->gpios);
->  
-> -	r = mdio_mux_init(&pdev->dev,
-> +	r = mdio_mux_init(&pdev->dev, pdev->dev.of_node,
->  			  mdio_mux_gpio_switch_fn, &s->mux_handle, s, NULL);
->  
->  	if (r != 0) {
-> diff --git a/drivers/net/phy/mdio-mux-mmioreg.c b/drivers/net/phy/mdio-mux-mmioreg.c
-> index c3825c7da038..2573ab012f16 100644
-> --- a/drivers/net/phy/mdio-mux-mmioreg.c
-> +++ b/drivers/net/phy/mdio-mux-mmioreg.c
-> @@ -159,7 +159,8 @@ static int mdio_mux_mmioreg_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> -	ret = mdio_mux_init(&pdev->dev, mdio_mux_mmioreg_switch_fn,
-> +	ret = mdio_mux_init(&pdev->dev, pdev->dev.of_node,
-> +			    mdio_mux_mmioreg_switch_fn,
->  			    &s->mux_handle, s, NULL);
->  	if (ret) {
->  		dev_err(&pdev->dev, "failed to register mdio-mux bus %pOF\n",
-> diff --git a/drivers/net/phy/mdio-mux.c b/drivers/net/phy/mdio-mux.c
-> index 6f75e9f27fed..0a86f1e4c02f 100644
-> --- a/drivers/net/phy/mdio-mux.c
-> +++ b/drivers/net/phy/mdio-mux.c
-> @@ -86,6 +86,7 @@ static int mdio_mux_write(struct mii_bus *bus, int phy_id,
->  static int parent_count;
->  
->  int mdio_mux_init(struct device *dev,
-> +		  struct device_node *mux_node,
->  		  int (*switch_fn)(int cur, int desired, void *data),
->  		  void **mux_handle,
->  		  void *data,
-> @@ -98,11 +99,11 @@ int mdio_mux_init(struct device *dev,
->  	struct mdio_mux_parent_bus *pb;
->  	struct mdio_mux_child_bus *cb;
->  
-> -	if (!dev->of_node)
-> +	if (!mux_node)
->  		return -ENODEV;
->  
->  	if (!mux_bus) {
-> -		parent_bus_node = of_parse_phandle(dev->of_node,
-> +		parent_bus_node = of_parse_phandle(mux_node,
->  						   "mdio-parent-bus", 0);
->  
->  		if (!parent_bus_node)
-> @@ -132,7 +133,7 @@ int mdio_mux_init(struct device *dev,
->  	pb->mii_bus = parent_bus;
->  
->  	ret_val = -ENODEV;
-> -	for_each_available_child_of_node(dev->of_node, child_bus_node) {
-> +	for_each_available_child_of_node(mux_node, child_bus_node) {
->  		int v;
->  
->  		r = of_property_read_u32(child_bus_node, "reg", &v);
-> diff --git a/include/linux/mdio-mux.h b/include/linux/mdio-mux.h
-> index 61f5b21b31c7..a5d58f221939 100644
-> --- a/include/linux/mdio-mux.h
-> +++ b/include/linux/mdio-mux.h
-> @@ -12,7 +12,16 @@
->  #include <linux/device.h>
->  #include <linux/phy.h>
->  
-> +/* mdio_mux_init() - Initialize a MDIO mux
-> + * @dev		The device owning the MDIO mux
-> + * @mux_node	The device node of the MDIO mux
-> + * @switch_fn	The function called for switching target MDIO child
-> + * mux_handle	A pointer to a (void *) used internaly by mdio-mux
-> + * @data	Private data used by switch_fn()
-> + * @mux_bus	An optional parent bus (Other case are to use parent_bus property)
-> + */
->  int mdio_mux_init(struct device *dev,
-> +		  struct device_node *mux_node,
->  		  int (*switch_fn) (int cur, int desired, void *data),
->  		  void **mux_handle,
->  		  void *data,
+> The only platform devices I know off with msi ITS parents are SMMUv3
+> and mbigen. For mbigen, the msi are not translated. Actually, as I
+> see under IORT solution, for mbigen we don't reserve the hw msi
+> region as the SMMUv3 does not have an ID mapping. And we have no
+> equivalent ID mapping property for DT SMMUv3, so cannot create an
+> equivalent check.
 > 
+> So here is how the DT iommu get reserved region function with only
+> pci device support looks:
+> 
+> /**
+>  * of_iommu_its_get_resv_regions - Reserved region driver helper
+>  * @dev: Device from iommu_get_resv_regions()
+>  * @list: Reserved region list from iommu_get_resv_regions()
+>  *
+>  * Returns: Number of reserved regions on success(0 if no associated ITS),
+>  *          appropriate error value otherwise.
+>  */
+> int of_iommu_its_get_resv_regions(struct device *dev, struct
+> list_head *head)
+> {
+>     struct device_node *of_node = NULL;
+>     struct device *parent_dev;
+>     const __be32 *msi_map;
+>     int num_mappings, i, err, len, resv = 0;
+> 
+>     /* walk up to find the parent with a msi-map property */
+>     for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
+>         if (!parent_dev->of_node)
+>             continue;
+> 
+>         /*
+>          * Current logic to reserve ITS regions for only PCI root
+>          * complex.
+>          */
+>         msi_map = of_get_property(parent_dev->of_node, "msi-map", &len);
+>         if (msi_map) {
+>             of_node = parent_dev->of_node;
+>             break;
+>         }
+>     }
+> 
+>     if (!of_node)
+>         return 0;
+> 
+>     num_mappings = of_count_phandle_with_args(of_node, "msi-map",
+> NULL) / 4;
+> 
+>     for (i = 0; i < num_mappings; i++) {
+>         int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+>         struct iommu_resv_region *region;
+>         struct device_node *msi_node;
+>         struct resource resource;
+>         u32 phandle;
+> 
+>         phandle = be32_to_cpup(msi_map + 1);
+>         msi_node = of_find_node_by_phandle(phandle);
+>         if (!msi_node)
+>             return -ENODEV;
+> 
+>         /*
+>          * There may be different types of msi-controller, so check
+>          * for ITS.
+>          */
+>         if (!of_device_is_compatible(msi_node, "arm,gic-v3-its")) {
+>             of_node_put(msi_node);
+>             continue;
+>         }
+> 
+>         err = of_address_to_resource(msi_node, 0, &resource);
+> 
+>         of_node_put(msi_node);
+>         if (err)
+>             return err;
+> 
+>         region = iommu_alloc_resv_region(resource.start, SZ_128K, prot,
+>                          IOMMU_RESV_MSI);
+>         if (region) {
+>             list_add_tail(&region->list, head);
+>             resv++;
+>         }
+>     }
+> 
+>     return (resv == num_mappings) ? resv : -ENODEV;
+> }
+> 
+> Any feedback is appreciated.
 
--- 
-Florian
+Hi John,
+
+I appreciate it is not trivial to make the code generic, part of the
+snippet above can be shared between ACPI/IORT and OF, the only sticking
+point is probably the "compatible" string that has to be parameterized
+since having this code in generic IOMMU layer is a bit horrible to
+have it ITS specific (and it is a problem that was existing already
+in the original patch with the hardcoded ITS node type or function
+name).
+
+To sum it up the hook:
+
+- has to be called from SMMU driver in a firmware agnostic way
+- somehow it has to ascertain which interrupt controller "compatible"
+  (which in IORT is a node type) to match against so the hook has to
+  take an id of sorts
+
+I need to go back and have a look at the original patch to see how
+we can accommodate both OF/ACPI - certainly the region reservations
+code can and should be shared.
+
+Lorenzo
