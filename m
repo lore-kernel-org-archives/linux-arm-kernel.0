@@ -1,77 +1,158 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 04 Sep 2017 18:25:29 +0100
-Subject: Applied "ASoC: add new ac97 bus support" to the asoc tree
-In-Reply-To: <20170724204928.29505-4-robert.jarzmik@free.fr>
-Message-ID: <E1dov7p-0003uP-6C@debutante>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Sep 2017 13:01:33 -0400 (EDT)
+Subject: [PATCH v2 15/29] arm-soc: various: replace open coded VA->PA
+ calculation of pen_release
+In-Reply-To: <20170903120757.14968-16-ard.biesheuvel@linaro.org>
+References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
+ <20170903120757.14968-16-ard.biesheuvel@linaro.org>
+Message-ID: <nycvar.YSQ.7.76.1709041301250.8603@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Sun, 3 Sep 2017, Ard Biesheuvel wrote:
 
-   ASoC: add new ac97 bus support
+> This replaces a few copies of the open coded calculations of the
+> physical address of 'pen_release' in the secondary startup code
+> of a couple of platforms. This ensures these quantities are invariant
+> under runtime relocation.
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-has been applied to the asoc tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 8d43344108c9945456128b75b69beee594b64ed6 Mon Sep 17 00:00:00 2001
-From: Robert Jarzmik <robert.jarzmik@free.fr>
-Date: Sat, 2 Sep 2017 21:54:05 +0200
-Subject: [PATCH] ASoC: add new ac97 bus support
-
-Add the new ac97 bus support, with ac97 bus automatic probing.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/Kconfig  | 2 ++
- sound/Makefile | 1 +
- 2 files changed, 3 insertions(+)
-
-diff --git a/sound/Kconfig b/sound/Kconfig
-index d7d2aac9542e..ed34218d38b8 100644
---- a/sound/Kconfig
-+++ b/sound/Kconfig
-@@ -80,6 +80,8 @@ source "sound/hda/Kconfig"
- 
- source "sound/ppc/Kconfig"
- 
-+source "sound/ac97/Kconfig"
-+
- source "sound/aoa/Kconfig"
- 
- source "sound/arm/Kconfig"
-diff --git a/sound/Makefile b/sound/Makefile
-index 6de45d2c32f7..c03b0bed65d5 100644
---- a/sound/Makefile
-+++ b/sound/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_SND_AOA) += aoa/
- 
- # This one must be compilable even if sound is configured out
- obj-$(CONFIG_AC97_BUS) += ac97_bus.o
-+obj-$(CONFIG_AC97_BUS_NEW) += ac97/
- 
- ifeq ($(CONFIG_SND),y)
-   obj-y += last.o
--- 
-2.14.1
+> ---
+>  arch/arm/mach-prima2/headsmp.S    | 11 +++--------
+>  arch/arm/mach-spear/headsmp.S     | 11 +++--------
+>  arch/arm/mach-sti/headsmp.S       | 10 +++-------
+>  arch/arm/plat-versatile/headsmp.S |  9 +--------
+>  4 files changed, 10 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/mach-prima2/headsmp.S b/arch/arm/mach-prima2/headsmp.S
+> index 209d9fc5c16c..070df700bb38 100644
+> --- a/arch/arm/mach-prima2/headsmp.S
+> +++ b/arch/arm/mach-prima2/headsmp.S
+> @@ -9,6 +9,8 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>  
+> +#include <asm/assembler.h>
+> +
+>  /*
+>   * SIRFSOC specific entry point for secondary CPUs.  This provides
+>   * a "holding pen" into which all secondary cores are held until we're
+> @@ -17,10 +19,7 @@
+>  ENTRY(sirfsoc_secondary_startup)
+>          mrc     p15, 0, r0, c0, c0, 5
+>          and     r0, r0, #15
+> -        adr     r4, 1f
+> -        ldmia   r4, {r5, r6}
+> -        sub     r4, r4, r5
+> -        add     r6, r6, r4
+> +        adr_l   r6, pen_release
+>  pen:    ldr     r7, [r6]
+>          cmp     r7, r0
+>          bne     pen
+> @@ -31,7 +30,3 @@ pen:    ldr     r7, [r6]
+>           */
+>          b       secondary_startup
+>  ENDPROC(sirfsoc_secondary_startup)
+> -
+> -        .align
+> -1:      .long   .
+> -        .long   pen_release
+> diff --git a/arch/arm/mach-spear/headsmp.S b/arch/arm/mach-spear/headsmp.S
+> index c52192dc3d9f..4da01b103f33 100644
+> --- a/arch/arm/mach-spear/headsmp.S
+> +++ b/arch/arm/mach-spear/headsmp.S
+> @@ -13,6 +13,8 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>  
+> +#include <asm/assembler.h>
+> +
+>  	__INIT
+>  
+>  /*
+> @@ -23,10 +25,7 @@
+>  ENTRY(spear13xx_secondary_startup)
+>  	mrc	p15, 0, r0, c0, c0, 5
+>  	and	r0, r0, #15
+> -	adr	r4, 1f
+> -	ldmia	r4, {r5, r6}
+> -	sub	r4, r4, r5
+> -	add	r6, r6, r4
+> +	adr_l	r6, pen_release
+>  pen:	ldr	r7, [r6]
+>  	cmp	r7, r0
+>  	bne	pen
+> @@ -40,8 +39,4 @@ pen:	ldr	r7, [r6]
+>  	 * should now contain the SVC stack for this core
+>  	 */
+>  	b	secondary_startup
+> -
+> -	.align
+> -1:	.long	.
+> -	.long	pen_release
+>  ENDPROC(spear13xx_secondary_startup)
+> diff --git a/arch/arm/mach-sti/headsmp.S b/arch/arm/mach-sti/headsmp.S
+> index e0ad451700d5..cdf3442f397b 100644
+> --- a/arch/arm/mach-sti/headsmp.S
+> +++ b/arch/arm/mach-sti/headsmp.S
+> @@ -16,6 +16,8 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>  
+> +#include <asm/assembler.h>
+> +
+>  /*
+>   * ST specific entry point for secondary CPUs.  This provides
+>   * a "holding pen" into which all secondary cores are held until we're
+> @@ -24,10 +26,7 @@
+>  ENTRY(sti_secondary_startup)
+>  	mrc	p15, 0, r0, c0, c0, 5
+>  	and	r0, r0, #15
+> -	adr	r4, 1f
+> -	ldmia	r4, {r5, r6}
+> -	sub	r4, r4, r5
+> -	add	r6, r6, r4
+> +	adr_l	r6, pen_release
+>  pen:	ldr	r7, [r6]
+>  	cmp	r7, r0
+>  	bne	pen
+> @@ -38,6 +37,3 @@ pen:	ldr	r7, [r6]
+>  	 */
+>  	b	secondary_startup
+>  ENDPROC(sti_secondary_startup)
+> -
+> -1:	.long	.
+> -	.long	pen_release
+> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+> index 40f27e52de75..0f2a5eddac5a 100644
+> --- a/arch/arm/plat-versatile/headsmp.S
+> +++ b/arch/arm/plat-versatile/headsmp.S
+> @@ -21,10 +21,7 @@ ENTRY(versatile_secondary_startup)
+>   ARM_BE8(setend	be)
+>  	mrc	p15, 0, r0, c0, c0, 5
+>  	bic	r0, #0xff000000
+> -	adr	r4, 1f
+> -	ldmia	r4, {r5, r6}
+> -	sub	r4, r4, r5
+> -	add	r6, r6, r4
+> +	adr_l	r6, pen_release
+>  pen:	ldr	r7, [r6]
+>  	cmp	r7, r0
+>  	bne	pen
+> @@ -34,8 +31,4 @@ pen:	ldr	r7, [r6]
+>  	 * should now contain the SVC stack for this core
+>  	 */
+>  	b	secondary_startup
+> -
+> -	.align
+> -1:	.long	.
+> -	.long	pen_release
+>  ENDPROC(versatile_secondary_startup)
+> -- 
+> 2.11.0
+> 
+> 
