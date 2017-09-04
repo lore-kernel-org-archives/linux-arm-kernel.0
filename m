@@ -1,99 +1,82 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Sep 2017 12:24:55 +0200
-Subject: [PATCH v2 5/6] KVM: arm/arm64: Rearrange kvm_vgic_[un]map_phys code
- in vgic.c
+Date: Mon,  4 Sep 2017 12:24:51 +0200
+Subject: [PATCH v2 1/6] KVM: arm/arm64: Don't cache the timer IRQ level
 In-Reply-To: <20170904102456.9025-1-cdall@linaro.org>
 References: <20170904102456.9025-1-cdall@linaro.org>
-Message-ID: <20170904102456.9025-6-cdall@linaro.org>
+Message-ID: <20170904102456.9025-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The small indirection of a static function made the locking very obvious
-but becomes pretty ugly as we start passing function pointer around.
-Let's inline these two functions first to make the following patch more
-readable.
+The timer was modeled after a strict idea of modelling an interrupt line
+level in software, meaning that only transitions in the level needed to
+be reported to the VGIC.  This works well for the timer, because the
+arch timer code is in complete control of the device and can track the
+transitions of the line.
+
+However, as we are about to support using the HW bit in the VGIC not
+just for the timer, but also for VFIO which cannot track transitions of
+the interrupt line, we have to decide on an interface for level
+triggered mapped interrupts to the GIC, which both the timer and VFIO
+can use.
+
+VFIO only sees an asserting transition of the physical interrupt line,
+and tells the VGIC when that happens.  That means that part of the
+interrupt flow is offloaded to the hardware.
+
+To use the same interface for VFIO devices and the timer, we therefore
+have to change the timer (we cannot change VFIO because it doesn't know
+the details of the device it is assigning to a VM).
+
+Luckily, changing the timer is simple, we just need to stop 'caching'
+the line level, but instead let the VGIC know the state of the timer on
+every entry to the guest, and the VGIC can ignore notifications using
+its validate mechanism.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 38 +++++++++++++-------------------------
- 1 file changed, 13 insertions(+), 25 deletions(-)
+ virt/kvm/arm/arch_timer.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 7aec730..b704ff5 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -435,12 +435,17 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 	return 0;
- }
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 8e89d63..2a5f877 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -219,9 +219,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	int ret;
  
--/* @irq->irq_lock must be held */
--static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
--			    unsigned int host_irq)
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
-+			  u32 vintid)
- {
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	struct irq_desc *desc;
- 	struct irq_data *data;
-+	int ret = 0;
-+
-+	BUG_ON(!irq);
-+
-+	spin_lock(&irq->irq_lock);
+ 	timer_ctx->active_cleared_last = false;
++	if (timer_ctx->irq.level != new_level)
++		trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
++					   new_level);
+ 	timer_ctx->irq.level = new_level;
+-	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+-				   timer_ctx->irq.level);
+ 
+ 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
+ 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+@@ -241,6 +242,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
++	bool level;
  
  	/*
- 	 * Find the physical IRQ number corresponding to @host_irq
-@@ -448,7 +453,8 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	desc = irq_to_desc(host_irq);
- 	if (!desc) {
- 		kvm_err("%s: no interrupt descriptor\n", __func__);
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto out;
- 	}
- 	data = irq_desc_get_irq_data(desc);
- 	while (data->parent_data)
-@@ -457,29 +463,10 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	irq->hw = true;
- 	irq->host_irq = host_irq;
- 	irq->hwintid = data->hwirq;
--	return 0;
--}
--
--/* @irq->irq_lock must be held */
--static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
--{
--	irq->hw = false;
--	irq->hwintid = 0;
--}
--
--int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid)
--{
--	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
--	int ret;
+ 	 * If userspace modified the timer registers via SET_ONE_REG before
+@@ -251,11 +253,11 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	if (unlikely(!timer->enabled))
+ 		return;
  
--	BUG_ON(!irq);
--
--	spin_lock(&irq->irq_lock);
--	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
-+out:
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
--
- 	return ret;
+-	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
++	level = kvm_timer_should_fire(vtimer);
++	kvm_timer_update_irq(vcpu, level, vtimer);
+ 
+-	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
++	level = kvm_timer_should_fire(ptimer);
++	kvm_timer_update_irq(vcpu, level, ptimer);
  }
  
-@@ -494,7 +481,8 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
- 	BUG_ON(!irq);
- 
- 	spin_lock(&irq->irq_lock);
--	kvm_vgic_unmap_irq(irq);
-+	irq->hw = false;
-+	irq->hwintid = 0;
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
+ /* Schedule the background timer for the emulated timer. */
 -- 
 2.9.0
