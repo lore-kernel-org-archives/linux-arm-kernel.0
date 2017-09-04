@@ -1,71 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 4 Sep 2017 17:46:18 +0200
-Subject: [PATCH v2] clk: mb86s7x: Drop non-building driver
-In-Reply-To: <20170901203201.GB21656@codeaurora.org>
-References: <20170824225237.21485-1-afaerber@suse.de>
- <20170901203201.GB21656@codeaurora.org>
-Message-ID: <8601a2ec-33dc-0024-55ce-963f05faca75@suse.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 4 Sep 2017 16:59:48 +0100
+Subject: [Question] PCI ACS is broken for ARM SMMU v3?
+In-Reply-To: <59AD4812.3020602@hisilicon.com>
+References: <59A81B4C.3020402@hisilicon.com> <59AD4812.3020602@hisilicon.com>
+Message-ID: <20170904155948.GA20601@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-Am 01.09.2017 um 22:32 schrieb Stephen Boyd:
-> On 08/25, Andreas F?rber wrote:
->> It fails to build once we introduce the ARCH_MB86S7X Kconfig symbol:
->>
->>   drivers/clk/clk-mb86s7x.c:27:10: fatal error: soc/mb86s7x/scb_mhu.h: No such file or directory
->>    #include <soc/mb86s7x/scb_mhu.h>
->>             ^~~~~~~~~~~~~~~~~~~~~~~
->>   compilation terminated.
->>
->> And when commenting out that line, we get:
->>
->>   drivers/clk/clk-mb86s7x.c: In function 'crg_gate_control':
->>   drivers/clk/clk-mb86s7x.c:72:8: error: implicit declaration of function 'mb86s7x_send_packet' [-Werror=implicit-function-declaration]
->>     ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
->>           ^~~~~~~~~~~~~~~~~~~
->>   drivers/clk/clk-mb86s7x.c:72:28: error: 'CMD_PERI_CLOCK_GATE_SET_REQ' undeclared (first use in this function)
->>     ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
->>                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~
->>   drivers/clk/clk-mb86s7x.c:72:28: note: each undeclared identifier is reported only once for each function it appears in
->>   drivers/clk/clk-mb86s7x.c: In function 'crg_rate_control':
->>   drivers/clk/clk-mb86s7x.c:116:10: error: 'CMD_PERI_CLOCK_RATE_SET_REQ' undeclared (first use in this function)
->>      code = CMD_PERI_CLOCK_RATE_SET_REQ;
->>             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
->>   drivers/clk/clk-mb86s7x.c:121:10: error: 'CMD_PERI_CLOCK_RATE_GET_REQ' undeclared (first use in this function); did you mean 'CMD_PERI_CLOCK_RATE_SET_REQ'?
->>      code = CMD_PERI_CLOCK_RATE_GET_REQ;
->>             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
->>             CMD_PERI_CLOCK_RATE_SET_REQ
->>   drivers/clk/clk-mb86s7x.c: In function 'mhu_cluster_rate':
->>   drivers/clk/clk-mb86s7x.c:276:10: error: 'CMD_CPU_CLOCK_RATE_GET_REQ' undeclared (first use in this function)
->>      code = CMD_CPU_CLOCK_RATE_GET_REQ;
->>             ^~~~~~~~~~~~~~~~~~~~~~~~~~
->>   drivers/clk/clk-mb86s7x.c:278:10: error: 'CMD_CPU_CLOCK_RATE_SET_REQ' undeclared (first use in this function); did you mean 'CMD_CPU_CLOCK_RATE_GET_REQ'?
->>      code = CMD_CPU_CLOCK_RATE_SET_REQ;
->>             ^~~~~~~~~~~~~~~~~~~~~~~~~~
->>             CMD_CPU_CLOCK_RATE_GET_REQ
->>   cc1: some warnings being treated as errors
->>   scripts/Makefile.build:302: recipe for target
->>   'drivers/clk/clk-mb86s7x.o' failed
->>   make[2]: *** [drivers/clk/clk-mb86s7x.o] Error 1
->>
->> Remove the driver for now.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
+On Mon, Sep 04, 2017 at 08:33:22PM +0800, Zhou Wang wrote:
+> +to: Lorenzo
 > 
-> Applied to clk-next
+> On 2017/8/31 22:21, Zhou Wang wrote:
+> > Hi Will and Alex,
+> > 
+> > pci_request_acs is called in drivers/iommu/arm-smmu-v3.c to set pci_acs_enable.
+> > 
+> > PCI subsystem tries to enable ACS as below:
+> > 
+> > 	pci_device_add
+> > 		--> pci_init_capabilities
+> > 			--> pci_enable_acs
+> > 
+> > in ACPI PCI driver. However, ACPI PCI driver will be called before SMMU v3 driver,
+> > which will lead pci_enable_acs to return directly as pci_acs_enable is not set
+> > before SMMU v3 driver loading.
+> > 
+> > I think this is a bug, what do you think about this problem?
 
-Thanks. Is this 4.14 or 4.15 material at this point? In particular I
-wonder which release I can proceed to introduce ARCH_MB86S7X in - I'm
-assuming we need to wait for this one to get merged, so 4.15 or 4.16
-respectively?
+I think that it is a bug that affects OF/ACPI alike. One way of solving
+it is requesting ACS at IORT init following appropriate checks (ie
+mappings PCI->IOMMU - that would not solve the OF path though). I can
+put together a quick fix, the overall problem needs some thinking
+though.
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Lorenzo
