@@ -1,74 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Sep 2017 10:05:19 +0200
-Subject: [PATCH v2 2/2] ARM: dts: sun8i: h3: Improved Wifi bindings on
- Bananapi M2 Plus
-In-Reply-To: <1504283401-4263-3-git-send-email-embed3d@gmail.com>
-References: <1504283401-4263-1-git-send-email-embed3d@gmail.com>
- <1504283401-4263-3-git-send-email-embed3d@gmail.com>
-Message-ID: <20170904080519.mec6ypjei7uvo5k7@flea>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Sep 2017 10:14:42 +0200
+Subject: [PATCH v2] drm/tve200: Replace custom connector with panel bridge
+In-Reply-To: <20170904075255.oy5gc5ggxpjhbisk@phenom.ffwll.local>
+References: <20170902200711.29298-1-linus.walleij@linaro.org>
+ <20170904075255.oy5gc5ggxpjhbisk@phenom.ffwll.local>
+Message-ID: <CACRpkdb-v71qOWLdU=64D8Y7yhAF2i6XnWCAwD3x5BYcfORAtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Mon, Sep 4, 2017 at 9:52 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Sat, Sep 02, 2017 at 10:07:11PM +0200, Linus Walleij wrote:
+>> This replaces the custom connector in the TVE200 with the
+>> panel bridge helper. As long as we're just using panels
+>> and no other bridges, this works just fine.
+>>
+>> Reviewed-by: Eric Anholt <eric@anholt.net>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ChangeLog v1->v2:
+>> - Drop a few surplus #includes
+>> - Collect Eric's review tag
 
-On Fri, Sep 01, 2017 at 06:30:01PM +0200, Philipp Rossak wrote:
-> From: Philipp Rossak <embed3d@gmail.com>
-> 
-> * vqmmc is in this case not needed
-> * no need for pincontrol nodes when the pin is set to a GPIO
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 7 -------
->  1 file changed, 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> index d756ff8..f7e5d8a 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-> @@ -98,7 +98,6 @@
->  	wifi_pwrseq: wifi_pwrseq {
->  		compatible = "mmc-pwrseq-simple";
->  		pinctrl-names = "default";
-> -		pinctrl-0 = <&wifi_en_bpi_m2p>;
->  		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
->  	};
->  };
-> @@ -153,7 +152,6 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&mmc1_pins_a>;
->  	vmmc-supply = <&reg_vcc3v3>;
-> -	vqmmc-supply = <&reg_vcc3v3>;
+>> +     /* We need the encoder to attach the bridge */
+>> +     priv->encoder = &priv->pipe.encoder;
+>
+> drm_simple_display_pipe_attach_bridge(). Fairly new addition, would be
+> great if you can also fix up wherever you copy-pasted this from :-)
 
-So we actually need this one.
+The horrible truth is that I did not copy-paste it, I came up with
+this for PL111 but using a v4.13 tree and then forward-patching
+on top of drm-next.
 
->  	mmc-pwrseq = <&wifi_pwrseq>;
->  	bus-width = <4>;
->  	non-removable;
-> @@ -200,11 +198,6 @@
->  		pins = "PL3";
->  		function = "gpio_in";
->  	};
-> -
-> -	wifi_en_bpi_m2p: wifi_en_pin {
-> -		pins = "PL7";
-> -		function = "gpio_out";
-> -	};
+> I didn't check all the details, but lgtm otherwise. With this nit
+> addressed:
+>
+> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-And there's also other GPIO pins here, I'd prefer if you could tackle
-them all at once.
+Gnah I already pushed it after Eric's review, but I can make
+a follow-up patch, I will also try to get it right in PL111.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/fdf0632a/attachment.sig>
+Yours,
+Linus Walleij
