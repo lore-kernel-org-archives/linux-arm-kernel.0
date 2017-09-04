@@ -1,39 +1,35 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Mon, 04 Sep 2017 16:32:02 +0800
-Subject: [PATCH v2 1/3] dt-bindings: add compatible string for Allwinner
- V3s SoC
-In-Reply-To: <20170822052322.15338-1-icenowy@aosc.io>
-References: <20170822052322.15338-1-icenowy@aosc.io>
-Message-ID: <69e65e1018ccb64573ad7ec864ab9fa5@aosc.io>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Mon,  4 Sep 2017 10:51:15 +0200
+Subject: [PATCH v2 0/4] rockchip: Add efuse support for RK3368 SoCs
+Message-ID: <20170904085119.25981-1-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-22 13:23?Icenowy Zheng ???
-> The compatible string for Allwinner V3s SoC used to be missing.
-> 
-> Add it to the binding document.
-> 
-> Fixes: b074fede01c0 ("arm: sunxi: add support for V3s SoC")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+This set of patches exports the right clocks, add required functions
+and data, and definition for enabling and supporting eFuse on RK3368
+SoCs.
 
-Maxime, Chen-Yu, ping.
+Note: On my geekbox rk3368, I was unable to flash a working upstream ATF
+or upstream uboot (missing support for LPDDR3 init and timping). I cannot
+test the driver without the secure mode for this efuse on my hardware.So
+I am asking for testing. I think that it should work like on rk3288
 
-Could you queue this patchset to 4.15?
+Changes in v2:
+- Removed ARM SMC calls for efuse, we need to do as upstream ATF and
+  uboot mainline do, so no secure-regs for efuse
 
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt
-> b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index d2c46449b4eb..f35c6ada5a65 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -14,6 +14,7 @@ using one of the following compatible strings:
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h2-plus
->    allwinner,sun8i-h3
-> +  allwinner,sun8i-v3s
->    allwinner,sun9i-a80
->    allwinner,sun50i-a64
->    nextthing,gr8
+Romain Perier (4):
+  clk: rockchip: add clock id for PCLK_EFUSE256 of RK3368 SoCs
+  clk: rockchip: export clock pclk_efuse_256 for RK3368 SoCs
+  nvmem: rockchip: add support for RK3368
+  arm64: dts: rockchip: add efuse for RK3368 SoCs
+
+ Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt |  1 +
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi                   | 14 ++++++++++++++
+ drivers/clk/rockchip/clk-rk3368.c                          |  2 +-
+ drivers/nvmem/rockchip-efuse.c                             |  4 ++++
+ include/dt-bindings/clock/rk3368-cru.h                     |  1 +
+ 5 files changed, 21 insertions(+), 1 deletion(-)
+
+-- 
+2.11.0
