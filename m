@@ -1,36 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Sep 2017 18:30:26 +0100
-Subject: [PATCH v2 16/29] ARM: kernel: switch to relative exception tables
-In-Reply-To: <nycvar.YSQ.7.76.1709041311230.8603@knanqh.ubzr>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
- <20170903120757.14968-17-ard.biesheuvel@linaro.org>
- <nycvar.YSQ.7.76.1709041311230.8603@knanqh.ubzr>
-Message-ID: <CAKv+Gu_wgTk0GdPiR5qvTDXqiX+ZUJ_s7Zs68i2Z4VHW+CcXyQ@mail.gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Mon,  4 Sep 2017 19:47:21 +0200
+Subject: [linux-sunxi][PATCH v2] ARM: dts: sunxi: h3/h5 :Add DAI nodes
+Message-ID: <20170904174721.21985-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2017 at 18:17, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Sun, 3 Sep 2017, Ard Biesheuvel wrote:
->
->> To avoid having to relocate the contents of extable entries at
->> runtime when running with KASLR enabled, wire up the existing
->> support for emitting them as relative references. This ensures
->> these quantities are invariant under runtime relocation.
->>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Could it be better to have a macro that encapsulates exception entries
-> e.g.:
->
->         .macro ex_entry insn fixup
->         .long   \insn - ., \fixup - .
->         .endif
->
-> so that if ever this changes again or for whatever reason someone needs
-> absolute entries then this won't have to be done everywhere. The section
-> switch could be included in such a macro too. And it is so easy to
-> forget to do the "- ." when adding new entries.
->
+From: Marcus Cooper <codekipper@gmail.com>
 
-Good point. I will change that.
+Add the new DAI blocks to the device tree. I2S0 and I2S1 are for
+connecting to an external codec.
+
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+v2 changes compared to v1 are:
+- removed i2s2 which is used for HDMI audio
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 11240a8313c2..ef87d29036d9 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -450,6 +450,32 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2s0: i2s at 01c22000 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-h3-i2s";
++			reg = <0x01c22000 0x400>;
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_I2S0>, <&ccu CLK_I2S0>;
++			clock-names = "apb", "mod";
++			dmas = <&dma 3>, <&dma 3>;
++			resets = <&ccu RST_BUS_I2S0>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
++		i2s1: i2s at 01c22400 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-h3-i2s";
++			reg = <0x01c22400 0x400>;
++			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_I2S1>, <&ccu CLK_I2S1>;
++			clock-names = "apb", "mod";
++			dmas = <&dma 4>, <&dma 4>;
++			resets = <&ccu RST_BUS_I2S1>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
+ 		codec: codec at 01c22c00 {
+ 			#sound-dai-cells = <0>;
+ 			compatible = "allwinner,sun8i-h3-codec";
+-- 
+2.14.1
