@@ -1,43 +1,121 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Sep 2017 10:14:42 +0200
-Subject: [PATCH v2] drm/tve200: Replace custom connector with panel bridge
-In-Reply-To: <20170904075255.oy5gc5ggxpjhbisk@phenom.ffwll.local>
-References: <20170902200711.29298-1-linus.walleij@linaro.org>
- <20170904075255.oy5gc5ggxpjhbisk@phenom.ffwll.local>
-Message-ID: <CACRpkdb-v71qOWLdU=64D8Y7yhAF2i6XnWCAwD3x5BYcfORAtw@mail.gmail.com>
+From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
+Date: Mon, 4 Sep 2017 16:11:12 +0800
+Subject: [PATCH v4 3/3] arm64: dts: register Hi3660's thermal sensor
+In-Reply-To: <4e819928-9544-e7a1-b8ff-09ebee07f32b@linaro.org>
+References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
+ <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1503994666-13954-4-git-send-email-kevin.wangtao@hisilicon.com>
+ <4e819928-9544-e7a1-b8ff-09ebee07f32b@linaro.org>
+Message-ID: <c7b85592-1bca-6a31-c652-011ac6f86a2a@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 4, 2017 at 9:52 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Sat, Sep 02, 2017 at 10:07:11PM +0200, Linus Walleij wrote:
->> This replaces the custom connector in the TVE200 with the
->> panel bridge helper. As long as we're just using panels
->> and no other bridges, this works just fine.
+
+
+? 2017/9/1 5:13, Daniel Lezcano ??:
+> On 29/08/2017 10:17, Tao Wang wrote:
+>> From: Tao Wang <kevin.wangtao@linaro.org>
 >>
->> Reviewed-by: Eric Anholt <eric@anholt.net>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> Bind thermal sensor driver for Hi3660.
+> 
+> The description is a bit light :)
+All right
+> 
+> 
+>> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 >> ---
->> ChangeLog v1->v2:
->> - Drop a few surplus #includes
->> - Collect Eric's review tag
-
->> +     /* We need the encoder to attach the bridge */
->> +     priv->encoder = &priv->pipe.encoder;
->
-> drm_simple_display_pipe_attach_bridge(). Fairly new addition, would be
-> great if you can also fix up wherever you copy-pasted this from :-)
-
-The horrible truth is that I did not copy-paste it, I came up with
-this for PL111 but using a v4.13 tree and then forward-patching
-on top of drm-next.
-
-> I didn't check all the details, but lgtm otherwise. With this nit
-> addressed:
->
-> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-
-Gnah I already pushed it after Eric's review, but I can make
-a follow-up patch, I will also try to get it right in PL111.
-
-Yours,
-Linus Walleij
+>>   arch/arm64/boot/dts/hisilicon/hi3660.dtsi    | 14 +++++++++++++
+>>   include/dt-bindings/thermal/hi3660-thermal.h | 31 ++++++++++++++++++++++++++++
+>>   2 files changed, 45 insertions(+)
+>>   create mode 100644 include/dt-bindings/thermal/hi3660-thermal.h
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> index c6a1961..1ee6084 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> @@ -6,6 +6,7 @@
+>>   
+>>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>   #include <dt-bindings/clock/hi3660-clock.h>
+>> +#include <dt-bindings/thermal/hi3660-thermal.h>
+>>   
+>>   / {
+>>   	compatible = "hisilicon,hi3660";
+>> @@ -848,5 +849,18 @@
+>>   				     &sdio_cfg_func>;
+>>   			status = "disabled";
+>>   		};
+>> +
+>> +		tsensor: tsensor at fff30000 {
+>> +			compatible = "hisilicon,hi3660-tsensor";
+>> +			#address-cells = <2>;
+>> +			#size-cells = <2>;
+>> +			reg = <0x0 0xfff3001c 0x0 0x4>,
+>> +				<0x0 0xfff3005c 0x0 0x4>,
+>> +				<0x0 0xfff3009c 0x0 0x4>;
+>> +			hisi,tsensors = <HISI_MAX_TSENSORS>;
+>> +			hisi,coef = <165000 (-40000)>;
+>> +			hisi,adc-range = <0x74 0x39A>;
+>> +			#thermal-sensor-cells = <1>;
+>> +		};
+>>   	};
+>>   };
+>> diff --git a/include/dt-bindings/thermal/hi3660-thermal.h b/include/dt-bindings/thermal/hi3660-thermal.h
+>> new file mode 100644
+>> index 0000000..d9d9b6a
+>> --- /dev/null
+>> +++ b/include/dt-bindings/thermal/hi3660-thermal.h
+>> @@ -0,0 +1,31 @@
+>> +/*
+>> + *  Copyright (c) 2017 Hisilicon Limited.
+>> + *  Copyright (c) 2017 Linaro Limited.
+>> + *
+>> + *  This program is free software; you can redistribute it and/or modify
+>> + *  it under the terms of the GNU General Public License as published by
+>> + *  the Free Software Foundation; version 2 of the License.
+>> + *
+>> + *  This program is distributed in the hope that it will be useful,
+>> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *  GNU General Public License for more details.
+>> + *
+>> + *  You should have received a copy of the GNU General Public License
+>> + *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#ifndef __DTS_HI3660_THERMAL_H
+>> +#define __DTS_HI3660_THERMAL_H
+>> +
+>> +/* sensor id */
+>> +#define LITTLE_CPU_TEMP		0
+>> +#define BIG_CPU_TEMP		1
+>> +#define GPU_TEMP		2
+> 
+> Is it possible to stick to the sensor description?
+OK
+> 
+> eg.
+> 
+> #define HI3660_A53_TEMP	0
+> #define HI3660_A72_TEMP 1
+> #define HI3660_GPU_TEMP 2
+> 
+>> +#define MAX_TEMP		3
+>> +#define AVG_TEMP		4
+> 
+> It does not make sense to define AVG and MAX, they describe how is
+> computed the temperature. It makes more sense to define the group eg.
+> SOC_TEMP and add an attribute to the virtual sensor telling how you want
+> the temperature to be computed. That will make the code in the driver
+> much more simple, clear and clean.
+You inspired me, actually the thermal zone just want the SoC temp, my driver only need to offer one virtual sensor, we don't need the sensor id any more
+> 
+>> +#define HISI_MAX_TSENSORS		3> +#define THERMAL_NO_LIMIT		(~0)
+> 
+> Already defined in dt-bindings/thermal.h
+> 
+>> +#endif
+> 
+> 
+> 
