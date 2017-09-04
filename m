@@ -1,44 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 4 Sep 2017 11:15:47 +0200
-Subject: [PATCH V3 1/8] drivers: Add boot constraints core
-In-Reply-To: <20170829120343.GA4321@kroah.com>
-References: <cover.1501578037.git.viresh.kumar@linaro.org>
- <1a844e27ee7e0b22acf8ea582bf4e8d35f54c84a.1501578037.git.viresh.kumar@linaro.org>
- <20170829063923.GD12198@kroah.com> <20170829095217.GA3101@ubuntu>
- <20170829120343.GA4321@kroah.com>
-Message-ID: <20170904091522.GA2816@ubuntu>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 4 Sep 2017 10:21:00 +0100
+Subject: [PATCH 2/2] arm64: dts: hi6220: enable watchdog
+In-Reply-To: <20170901202816.GZ21656@codeaurora.org>
+References: <1503993518-24428-1-git-send-email-leo.yan@linaro.org>
+ <1503993518-24428-2-git-send-email-leo.yan@linaro.org>
+ <20170901013233.GL21656@codeaurora.org> <59A937E7.2060303@hisilicon.com>
+ <20170901202816.GZ21656@codeaurora.org>
+Message-ID: <59AD1AFC.8060600@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-08-17, 14:03, Greg Kroah-Hartman wrote:
-> Who couldn't reach an agreement?
+Hi Stephen,
 
-Rob Herring (DT Maintainer) didn't like the first set of bindings and wasn't
-convinced that we need any new bindings for this purpose to begin with.
+On 2017/9/1 21:28, Stephen Boyd wrote:
+> On 09/01, Wei Xu wrote:
+>> Hi Stephen,
+>>
+>> On 2017/9/1 2:32, Stephen Boyd wrote:
+>>> On 08/29, Leo Yan wrote:
+>>>> From: Dmitry Shmidt <dimitrysh@google.com>
+>>>>
+>>>> This patch is to add watchdog binding for Hi6220 on Hikey board.
+>>>>
+>>>> Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+>>>> ---
+>>>
+>>> This will go through arm-soc?
+>>>
+>>
+>> Can you pick up it for v4.14?
+>> Otherwise I am fine to pick up it and queue for v4.15.
+> 
+> Sounds like it will go for v4.15. Otherwise, you can send it to
+> arm-soc with the raw number instead of #define number and then
+> fix it up to use the #define later.
+> 
 
-> So you gave up and decided to make a
-> whole bunch of kernel code instead of just using new DT entries?  That's
-> crazy...
+I did not get your meaning.
+Do you mean the "HI6220_WDT0/1/2_PCLK" in the patch 1 that
+we need to replace with raw number?
+They are already in the mainline.
 
-Its not a lot really. Most of the code is anyways required, the only extra part
-is the platform specific drivers, which are replacing what the DT would have
-done. So, it shouldn't be that big of a deal I suppose.
-
-> Let's see a working system or two first here please.
-
-Sure, I will get as many converted as possible.
-
-> But you are implying that existing handheld devices need this problem
-> solved, how do they do it today without this code as obviously they are
-> shipping working solutions.
-
-So yeah, LCD is a common usecase but the configurations aren't always shared. It
-may not be an issue with private clock/regulator resources, but with shared
-ones.
-
-Though even with the private resources, we may want the clock/domains/regulators
-to stay powered on and I assume that the platforms would be doing hacky stuff to
-get that all working right now.
-
--- 
-viresh
+Best Regards,
+Wei
