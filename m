@@ -1,45 +1,36 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 4 Sep 2017 18:26:02 +0200
-Subject: [PATCH 1/2] mtd: spi-nor: add an option to force 3byte adressing
- mode
-In-Reply-To: <1503954854-30963-2-git-send-email-mw@semihalf.com>
-References: <1503954854-30963-1-git-send-email-mw@semihalf.com>
- <1503954854-30963-2-git-send-email-mw@semihalf.com>
-Message-ID: <20170904162602.GC21849@amd>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon,  4 Sep 2017 18:30:13 +0200
+Subject: [PATCH 0/1] net: mdio-mux: add mdio_mux parameter to mdio_mux_init()
+Message-ID: <20170904163014.955-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello
 
-> index 1413828..029c87d 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -2002,7 +2002,17 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
->  		if (JEDEC_MFR(info) == SNOR_MFR_SPANSION ||
->  		    info->flags & SPI_NOR_4B_OPCODES)
->  			spi_nor_set_4byte_opcodes(nor, info);
-> -		else
-> +		else if (of_property_read_bool(np, "spi-3byte-addressing")) {
-> +			/*
-> +			 * Do not enter 4byte mode in order to prevent
-> +			 * the early bootloader to come up on non-default
-> +			 * SPI NOR memory during boot. Limit accessible
-> +			 * size to 16MiB.
-> +			 */
-> +			nor->addr_width = 3;
-> +			mtd->size = 0x1000000;
-> +			dev_info(dev, "Force 3B addressing mode\n");
+For dwmac-sun8i, we need to set a MDIO mux which is not itself a device
+(it is part of a device but have its own DT node)
 
-I'd append "limiting access to first 16MiB" .. because otherwise
-people will wonder where their flash went.
-									Pavel
+This patch permit to use a MDIO mux for such case.
+See agreement at https://lkml.org/lkml/2017/8/29/407
+
+Since all mdio_mux_init() users are within drivers/net/phy/ and the changes are
+trivial, I have done all in one patch, instead of having a complex series of
+patch converting one by one callers.
+
+This patch is a dependency for restoring dwmac-sun8i so it is why I target "net:"
+But I send it alone, for be sure that this conversion in one patch is acceptable.
+
+Regards
+
+Corentin Labbe (1):
+  net: mdio-mux: add mdio_mux parameter to mdio_mux_init()
+
+ drivers/net/phy/mdio-mux-bcm-iproc.c | 2 +-
+ drivers/net/phy/mdio-mux-gpio.c      | 2 +-
+ drivers/net/phy/mdio-mux-mmioreg.c   | 3 ++-
+ drivers/net/phy/mdio-mux.c           | 7 ++++---
+ include/linux/mdio-mux.h             | 9 +++++++++
+ 5 files changed, 17 insertions(+), 6 deletions(-)
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/88a55ffc/attachment.sig>
+2.13.5
