@@ -1,96 +1,67 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 4 Sep 2017 23:06:21 +0800
-Subject: [PATCH v4 2/3] thermal: hisilicon: add thermal sensor driver for
- Hi3660
-In-Reply-To: <8fe3ad22-59db-40c6-18db-7b6859f05a95@linaro.org>
-References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
- <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1503994666-13954-3-git-send-email-kevin.wangtao@hisilicon.com>
- <77ceb395-57bb-8de7-7b1a-3218baa5d5f3@linaro.org>
- <b884f2ca-86e1-0df3-0cbf-99b13232ee03@hisilicon.com>
- <8fe3ad22-59db-40c6-18db-7b6859f05a95@linaro.org>
-Message-ID: <20170904150621.GC24156@leoy-ThinkPad-T440>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 5 Sep 2017 00:22:27 +0900
+Subject: [PATCH -tip 2/4] arm: Cleanup in_exception_text() and move it
+ in asm/sections.h
+In-Reply-To: <20170903222152.GA25743@n2100.armlinux.org.uk>
+References: <150295395797.14424.968407208436624832.stgit@devbox>
+ <150295409062.14424.11976553130089631456.stgit@devbox>
+ <20170903222152.GA25743@n2100.armlinux.org.uk>
+Message-ID: <20170905002227.066c6d44386f881a99ccc620@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 01:06:39PM +0200, Daniel Lezcano wrote:
-> 
-> Hi Kevin,
-> 
-> 
-> On 04/09/2017 09:56, Wangtao (Kevin, Kirin) wrote:
+Hi Russell,
+
+On Sun, 3 Sep 2017 23:21:52 +0100
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+
+> On Thu, Aug 17, 2017 at 04:15:00PM +0900, Masami Hiramatsu wrote:
+> > Cleanup in_exception_text() using memory_contains() and
+> > move it in asm/sections.h from asm/trap.h because
+> > section symbols and memory_contains() are defined in
+> > asm/sections.h.
 > > 
+> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> > ---
+> >  arch/arm/include/asm/sections.h |   17 +++++++++++++++++
+> >  arch/arm/include/asm/traps.h    |   22 +---------------------
+> >  2 files changed, 18 insertions(+), 21 deletions(-)
 > > 
-> > ? 2017/9/1 5:17, Daniel Lezcano ??:
-> >>
-> >> Hi Kevin,
-> >>
-> >>
-> >> On 29/08/2017 10:17, Tao Wang wrote:
-> >>> From: Tao Wang <kevin.wangtao@linaro.org>
-> >>>
-> >>> This patch adds the support for thermal sensor of Hi3660 SoC.
-> >>
-> >> for the Hi3660 SoC thermal sensor.
-> >>
-> >>> this will register sensors for thermal framework and use device
-> >>> tree to bind cooling device.
-> >>
-> >> Is it possible to give a pointer to some documentation or to describe
-> >> the hardware?
-> > Yes, there used to be on patch V3, I removed it on V4.
-> >>
-> >> An explanation of the adc min max coef[] range[] conversion would be
-> >> nice.
-> > OK
-> >>
-> >> In addition, having the rational behind the average and the max would be
-> >> nice. Do we really need both avg and max as virtual sensor?
-> > We only need max currently.
-> >>
-> >>> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
-> >>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> >>> ---
-> >>>   drivers/thermal/Kconfig        |  13 +++
-> >>>   drivers/thermal/Makefile       |   1 +
-> >>>   drivers/thermal/hisi_tsensor.c | 209
-> >>> +++++++++++++++++++++++++++++++++++++++++
-> >>
-> >>
-> >> IMO, we don't need a new file, but merge this code with the current
-> >> hisi_thermal.c driver. BTW, the hi6220 has also a tsensor which is
-> >> different from this one.
-> >>
-> >> I suggest to base the hi3660 thermal driver on top of the cleanup I sent
-> >> for the hi6220.
-> > The tsensor of hi3660 is a different one, merging the code with hi6220
-> > will need a lot of change.
+> > diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
+> > index 803bbf2b20b8..76791cfc7619 100644
+> > --- a/arch/arm/include/asm/sections.h
+> > +++ b/arch/arm/include/asm/sections.h
+> > @@ -4,5 +4,22 @@
+> >  #include <asm-generic/sections.h>
+> >  
+> >  extern char _exiprom[];
+> > +extern char __exception_text_start[], __exception_text_end[];
+> > +
+> > +/**
+> > + * in_exception_text - check if an address is in exception_text or
+> > + *			irqentry_text
+> > + * @addr: virtual address to be checked
+> > + *
+> > + * Returns: true if the address specified by @addr is in the exception_text or
+> > + * irqentry_text, false otherwise.
+> > + */
+> > +static inline bool in_exception_text(unsigned long addr)
+> > +{
+> > +	return memory_contains(__exception_text_start, __exception_text_end,
+> > +			       (void *)addr, 0) ||
+> > +		memory_contains(__irqentry_text_start, __irqentry_text_end,
+> > +				(void *)addr, 0);
 > 
-> Have a look at the hisi_thermal.c at:
-> 
-> https://git.linaro.org/people/daniel.lezcano/linux.git/tree/drivers/thermal/hisi_thermal.c?h=thermal/hikey-4.14
-> 
-> after the cleanup I recently sent.
-> 
-> I'm pretty sure, with a little effort, we can merge both.
-> 
-> Especially if the virtual things is separated.
-> 
-> At the end, what do we do ? Read a register.
+> Patch looks buggy - where is __irqentry_text_start and __irqentry_text_end
+> declared?
 
-Just more input at here. I agree currently Hi3660 thermal driver
-is quite similiar with Hi6220, before we wrote a dedicated Hi3660
-thermal driver due we used mailbox method rather than shared
-memory mode.
+Those are declared in asm-generic/sections.h by below patch (on -tip tree)
 
-If we merge two thermal drivers, this means Hi3660 register layout
-should be adjusted as same with Hi6220; I am not sure if this is
-feasible and need Kevin to confirm for this.
+https://patchwork.kernel.org/patch/9878033/
 
-And does this mean we need provide interrupt mode for Hi3660? Or
-we can extend the driver to only support pollig mode?
+So, I thougt it was a good time to clean up related code.
 
-[...]
+Thank you,
 
-Thanks,
-Leo Yan
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
