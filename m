@@ -1,30 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 4 Sep 2017 14:00:51 +0530
-Subject: [PATCH] ARM: dts: da850-evm: add chosen and SPI alias
-In-Reply-To: <1504278444-13265-1-git-send-email-aford173@gmail.com>
-References: <1504278444-13265-1-git-send-email-aford173@gmail.com>
-Message-ID: <3fe3b2c0-b658-7b32-f5ea-2b41ca3dd19c@ti.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Mon, 04 Sep 2017 16:32:02 +0800
+Subject: [PATCH v2 1/3] dt-bindings: add compatible string for Allwinner
+ V3s SoC
+In-Reply-To: <20170822052322.15338-1-icenowy@aosc.io>
+References: <20170822052322.15338-1-icenowy@aosc.io>
+Message-ID: <69e65e1018ccb64573ad7ec864ab9fa5@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 September 2017 08:37 PM, Adam Ford wrote:
-> At the request of Sekhar Nori from TI, this is a follow-up to
-
-This can be:
-
-Suggested-by: Sekhar Nori <nsekhar@ti.com>
-
-> pending ("ARM: dts: da850-evm: add serial and ethernet aliases")
-
-Any patch dependency references need to go below the tear line ("---")
-so they don't become part of commit text.
-
-> This patch will add the chosen container to point stdout-path to serial2
-> and set the alias for spi0 to spi1 since the SPI NOR flash exists on SPI1.
+? 2017-08-22 13:23?Icenowy Zheng ???
+> The compatible string for Allwinner V3s SoC used to be missing.
 > 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+> Add it to the binding document.
+> 
+> Fixes: b074fede01c0 ("arm: sunxi: add support for V3s SoC")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Can you please re-spin with commit message corrected?
+Maxime, Chen-Yu, ping.
 
-Thanks,
-Sekhar
+Could you queue this patchset to 4.15?
+
+> ---
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt
+> b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index d2c46449b4eb..f35c6ada5a65 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -14,6 +14,7 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h2-plus
+>    allwinner,sun8i-h3
+> +  allwinner,sun8i-v3s
+>    allwinner,sun9i-a80
+>    allwinner,sun50i-a64
+>    nextthing,gr8
