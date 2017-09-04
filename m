@@ -1,61 +1,80 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Sep 2017 09:06:20 +0200
-Subject: [PATCH 01/10] dmaengine: sun6i: Correct setting of clock
- autogating register for A83T/H3
-In-Reply-To: <b88769ec-a42d-6b8e-d211-8f1cea139254@arm.com>
-References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
- <20170903224100.17893-2-stefan.bruens@rwth-aachen.de>
- <b88769ec-a42d-6b8e-d211-8f1cea139254@arm.com>
-Message-ID: <20170904070620.3lpkmq6nt2qrgwah@flea>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 4 Sep 2017 09:43:55 +0200
+Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as
+ fallback
+In-Reply-To: <20170901094629.6566-1-linus.walleij@linaro.org>
+References: <20170901094629.6566-1-linus.walleij@linaro.org>
+Message-ID: <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 12:23:09AM +0100, Andr? Przywara wrote:
-> On 03/09/17 23:40, Stefan Br?ns wrote:
-> > The H83T uses a compatible string different from the A23, but requires
+On Fri, Sep 01, 2017 at 11:46:29AM +0200, Linus Walleij wrote:
+> If we cannot find a panel, assume that the output from the
+> PL111 is connected directly to a "dumb" VGA connector,
+> so look up the connector from that bridge.
 > 
->       A83T
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> This is how the new API is used in the PL111.
+> ---
+>  drivers/gpu/drm/pl111/Kconfig     | 1 +
+>  drivers/gpu/drm/pl111/pl111_drv.c | 3 +++
+>  2 files changed, 4 insertions(+)
 > 
-> > the same clock autogating register setting.
-> > 
-> > The H3 also requires setting the clock autogating register, but has
-> > the register at a different offset.
-> > 
-> > Some currently available SoCs not yet supported by the sun6i-dma driver
-> > will require new compatible strings. These SoCs either follow the A23
-> > register model (e.g. V3s) or the H3 register model (A64, R40), so a new
-> > variable is added to the config struct to group SoCs with common register
-> > models.
-> 
-> As mentioned in that other mail, using the actual properties as names
-> here instead of grouping them to rather arbitrary groups seems more
-> useful and future-proof to me and should be easier to read.
-> In this case this should simplify this patch:
-> sun8i_a23_dma_cfg = {
->  	.nr_max_channels = 8,
->  	.nr_max_requests = 24,
->  	.nr_max_vchans   = 37,
-> +	.auto_clock_gate = 0x20,
-> ...
-> -	if (of_device_is_compatible(pdev->dev.of_node,
-> -				    "allwinner,sun8i-a23-dma"))
-> -		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
-> +	if (sdc->cfg->auto_clock_gate)
-> +		writel(SUN8I_DMA_GATE_ENABLE,
-> +		       sdc->base + sdc->cfg->auto_clock_gate);
+> diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
+> index e5e2abd66491..82cb3e60ddc8 100644
+> --- a/drivers/gpu/drm/pl111/Kconfig
+> +++ b/drivers/gpu/drm/pl111/Kconfig
+> @@ -8,6 +8,7 @@ config DRM_PL111
+>  	select DRM_GEM_CMA_HELPER
+>  	select DRM_BRIDGE
+>  	select DRM_PANEL_BRIDGE
+> +	select DRM_DUMB_VGA_DAC
+>  	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
+>  	help
+>  	  Choose this option for DRM support for the PL111 CLCD controller.
+> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+> index f5bc6f160e60..6db423bbd84e 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drv.c
+> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
+> @@ -67,6 +67,7 @@
+>  #include <drm/drm_of.h>
+>  #include <drm/drm_bridge.h>
+>  #include <drm/drm_panel.h>
+> +#include <drm/dumb_vga_dac.h>
+>  
+>  #include "pl111_drm.h"
+>  #include "pl111_versatile.h"
+> @@ -128,6 +129,8 @@ static int pl111_modeset_init(struct drm_device *dev)
+>  	if (panel) {
+>  		priv->panel = panel;
+>  		priv->connector = panel->connector;
+> +	} else {
+> +		priv->connector = drm_dumb_vga_get_connector(bridge);
 
-I agree.
+Why do you need to set this? The only code I could find tries to set
+polarity values from bus_flags, and for VGA I'd assume you want to instead
+key this off the mode?
 
-Maxime
+Wrt the more general problem: They way we solve this in the i915 atomic
+framework is that the various ->fixup calls fill out relevant fields in
+the drm_crtc_state. I guess we could add an ->atomic_check to bridges, add
+a bus_flags to drm_crtc_state (or maybe just let everyone patch up
+adjusted_mode->flags) instead?
+
+Cheers, Daniel
+>  	}
+>  	priv->bridge = bridge;
+>  
+> -- 
+> 2.13.5
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/858b1032/attachment.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
