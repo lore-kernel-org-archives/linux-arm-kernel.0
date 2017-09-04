@@ -1,101 +1,120 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Sep 2017 13:40:59 +0200
-Subject: [linux-sunxi][PATCH] ARM: dts: sunxi: h3/h5 :Add DAI nodes
-In-Reply-To: <CAEKpxB=MF-8BPS_Jc=qgj9sTCfn9EKWxdtJQD4goRGSv0xnHMw@mail.gmail.com>
-References: <20170903150806.3451-1-codekipper@gmail.com>
- <2581170.20QKPVRcId@jernej-laptop>
- <CAEKpxB=MF-8BPS_Jc=qgj9sTCfn9EKWxdtJQD4goRGSv0xnHMw@mail.gmail.com>
-Message-ID: <20170904114059.cqvs4kh4esrzfxo5@flea>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 4 Sep 2017 19:43:59 +0800
+Subject: [PATCH v6 3/7] acpi: apei: remove the unused code
+In-Reply-To: <59A84C51.3000506@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
+ <59A84C51.3000506@arm.com>
+Message-ID: <45c69f99-61dd-e847-368b-20acb61b4d50@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 12:51:38PM +0200, Code Kipper wrote:
-> On 3 September 2017 at 18:35, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> > Hi Marcus!
-> >
-> > Dne nedelja, 03. september 2017 ob 17:08:06 CEST je codekipper at gmail.com
-> > napisal(a):
-> >> From: Marcus Cooper <codekipper@gmail.com>
-> >>
-> >> Add the new DAI blocks to the device tree. I2S0 and I2S1 are for
-> >> connecting to an external codec whereas I2S2 is used for HDMI
-> >> audio.
-> >>
-> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> >> ---
-> >>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 39
-> >> ++++++++++++++++++++++++++++++++++++++ 1 file changed, 39 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >> b/arch/arm/boot/dts/sunxi-h3-h5.dtsi index 11240a8313c2..cf6fcc857324
-> >> 100644
-> >> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >> @@ -450,6 +450,45 @@
-> >>                       status = "disabled";
-> >>               };
-> >>
-> >> +             i2s0: i2s at 01c22000 {
-> >> +                     #sound-dai-cells = <0>;
-> >> +                     compatible = "allwinner,sun8i-h3-i2s";
-> >> +                     reg = <0x01c22000 0x400>;
-> >> +                     interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                     clocks = <&ccu CLK_BUS_I2S0>, <&ccu CLK_I2S0>;
-> >> +                     clock-names = "apb", "mod";
-> >> +                     dmas = <&dma 3>, <&dma 3>;
-> >> +                     resets = <&ccu RST_BUS_I2S0>;
-> >> +                     dma-names = "rx", "tx";
-> >> +                     status = "disabled";
-> >> +             };
-> >> +
-> >> +             i2s1: i2s at 01c22400 {
-> >> +                     #sound-dai-cells = <0>;
-> >> +                     compatible = "allwinner,sun8i-h3-i2s";
-> >> +                     reg = <0x01c22400 0x400>;
-> >> +                     interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                     clocks = <&ccu CLK_BUS_I2S1>, <&ccu CLK_I2S1>;
-> >> +                     clock-names = "apb", "mod";
-> >> +                     dmas = <&dma 4>, <&dma 4>;
-> >> +                     resets = <&ccu RST_BUS_I2S1>;
-> >> +                     dma-names = "rx", "tx";
-> >> +                     status = "disabled";
-> >> +             };
-> >> +
-> >> +             i2s2: i2s at 01c22800 {
-> >> +                     #sound-dai-cells = <0>;
-> >> +                     compatible = "allwinner,sun8i-h3-i2s";
-> >> +                     reg = <0x01c22800 0x400>;
-> >> +                     interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                     clocks = <&ccu CLK_BUS_I2S2>, <&ccu CLK_I2S2>;
-> >> +                     clock-names = "apb", "mod";
-> >> +                     dmas = <&dma 5>, <&dma 5>;
-> >> +                     resets = <&ccu RST_BUS_I2S2>;
-> >> +                     dma-names = "rx", "tx";
-> >> +                     status = "disabled";
-> >> +             };
-> >> +
-> >
-> > I don't want to be a pain, but shouldn't we skip this one for now? It is only
-> > for HDMI and has different capabilities (8 channels supported and slighlty
-> > different formula to calculate oversample rate.
-> I'll have a look into this..maybe this can be handled by the
-> simple-audio-card binding that we use. The other thing with the
-> padding which you mentioned I can add a field for. Maxime, what's your
-> thoughts on this?..I can re-submit without i2s2.
+Hi James,
 
-Yes, please do so.
+On 2017/9/1 1:50, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 28/08/17 11:38, Dongjiu Geng wrote:
+>> In current code logic, the two functions ghes_sea_add() and
+>> ghes_sea_remove() are only called when CONFIG_ACPI_APEI_SEA
+>> is defined. If not, it will return errors in the ghes_probe()
+>> and not contiue. Hence, remove the unnecessary handling when
+>> CONFIG_ACPI_APEI_SEI is not defined.
+> 
+> This doesn't match what the patch does. I get this feeling this is needed for
+> some future patch you haven't included.
 
-Thanks!
-Maxime
+James, let check the code, when the ghes_probe, if the CONFIG_ACPI_APEI_SEA is not defined.
+it will return -ENOTSUPP and goto error, and the ghes_sea_add has no chance to execute.
+similar, if the probe is failed, it should not have chance to execute ghes_sea_remove.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/de4520fc/attachment.sig>
+static int ghes_probe(struct platform_device *ghes_dev)
+{
+	struct acpi_hest_generic *generic;
+	struct ghes *ghes = NULL;
+
+	int rc = -EINVAL;
+
+	generic = *(struct acpi_hest_generic **)ghes_dev->dev.platform_data;
+	if (!generic->enabled)
+		return -ENODEV;
+
+	switch (generic->notify.type) {
+	case ACPI_HEST_NOTIFY_POLLED:
+	case ACPI_HEST_NOTIFY_EXTERNAL:
+	case ACPI_HEST_NOTIFY_SCI:
+	case ACPI_HEST_NOTIFY_GSIV:
+	case ACPI_HEST_NOTIFY_GPIO:
+		break;
+
+	case ACPI_HEST_NOTIFY_SEA:
+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+				generic->header.source_id);
+			rc = -ENOTSUPP;
+			goto err;
+		}
+		break;
+
+> 
+> 
+>> change since v5:
+>> 1. remove the SEI notification type handling, because the SEI is
+>>    asynchronous exception and the address is not accurate. so
+>>    not call memory_failure() to handle it.
+> 
+> Setting NOTIFY_SEI as the GHES entry's notification type means the OS should
+> check the GHES->ErrorStatusAddress for CPER records when it receives an
+> SError-Interrupt, as it may be a notification of an error from this error source.
+previously I added the NOTIFY_SEI support, but consider the error address in CPER is not accurate and calling memory_failure() may not make sense.
+so I remove it.
+
+> 
+> If you aren't handling the notification, why is this is in the HEST at all?
+> (and if its not: its not firmware-first)
+For the SEI notification, may be we can parse and handle the CPER record other than the Error physical address
+
+> 
+> 
+> James
+> 
+> 
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index d661d452b238..c15a08db2c7c 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -813,7 +813,6 @@ static struct notifier_block ghes_notifier_hed = {
+>>  	.notifier_call = ghes_notify_hed,
+>>  };
+>>
+>> -#ifdef CONFIG_ACPI_APEI_SEA
+>>  static LIST_HEAD(ghes_sea);
+>>
+>>  /*
+>> @@ -848,19 +847,6 @@ static void ghes_sea_remove(struct ghes *ghes)
+>>  	mutex_unlock(&ghes_list_mutex);
+>>  	synchronize_rcu();
+>>  }
+>> -#else /* CONFIG_ACPI_APEI_SEA */
+>> -static inline void ghes_sea_add(struct ghes *ghes)
+>> -{
+>> -	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not
+> supported\n",
+>> -	       ghes->generic->header.source_id);
+>> -}
+>> -
+>> -static inline void ghes_sea_remove(struct ghes *ghes)
+>> -{
+>> -	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not
+> supported\n",
+>> -	       ghes->generic->header.source_id);
+>> -}
+>> -#endif /* CONFIG_ACPI_APEI_SEA */
+>>
+>>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>  /*
+>>
+> 
+> 
+> .
+> 
