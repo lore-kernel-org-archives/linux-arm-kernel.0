@@ -1,44 +1,65 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  5 Sep 2017 00:53:24 +0200
-Subject: [PATCH v4 3/3] arm64: dts: realtek: Add RTD1295 RTC node
-In-Reply-To: <20170904225324.29138-1-afaerber@suse.de>
-References: <20170904225324.29138-1-afaerber@suse.de>
-Message-ID: <20170904225324.29138-4-afaerber@suse.de>
+Date: Tue,  5 Sep 2017 00:53:21 +0200
+Subject: [PATCH v4 0/3] arm64: Realtek RTD1295 RTC
+Message-ID: <20170904225324.29138-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add RTC node to the Realtek RTD1295 Device Tree.
+Hello,
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v3 -> v4: Unchanged
- 
- v2 -> v3:
- * Rebased to no longer depend on reset controller series
- 
- v1 -> v2: Unchanged
- 
- Depends on the pending clock bindings.
- 
- arch/arm64/boot/dts/realtek/rtd1295.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+This series adds the RTC for the Realtek RTD1295 SoC.
+Based on my RTD1295 clk series.
 
-diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-index ab72255f843f..fbbd6456079e 100644
---- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-+++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-@@ -164,6 +164,12 @@
- 			status = "disabled";
- 		};
- 
-+		rtc at 9801b600 {
-+			compatible = "realtek,rtd1295-rtc";
-+			reg = <0x9801b600 0x100>;
-+			clocks = <&clkc RTD1295_CLK_EN_MISC_RTC>;
-+		};
-+
- 		gic: interrupt-controller at ff011000 {
- 			compatible = "arm,gic-400";
- 			reg = <0xff011000 0x1000>,
+There being no public source code for RTD1295, the implementation is based on
+register offsets seen in the vendor DT, as well as older mach-rtk119x code
+published by QNAP.
+
+v4 adds a missing clk_put().
+
+The DT node depends on the clk series for clock index and header.
+
+More experimental patches at:
+https://github.com/afaerber/linux/commits/rtd1295-next
+
+Have a lot of fun!
+
+Cheers,
+Andreas
+
+v3 -> v4:
+* Added clk_put() (Alexandre)
+
+v2 -> v3:
+* Dropped spinlock (Andrew)
+* Improved year_days vs. days_in_year readability
+
+v1 -> v2:
+* Updated rtc driver to no longer use open/release (Alexandre)
+* Cleaned up debug output (Andrew)
+* Avoided COMPILE_TEST division errors (kbuild)
+* Various cleanups and extensions
+
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: linux-rtc at vger.kernel.org
+Cc: Roc He <hepeng@zidoo.tv>
+Cc: ??? <jiang.liqin@geniatech.com>
+Cc: devicetree at vger.kernel.org
+Cc: Andrew Lunn <andrew@lunn.ch>
+
+Andreas F?rber (3):
+  dt-bindings: rtc: Add Realtek RTD1295
+  rtc: Add Realtek RTD1295
+  arm64: dts: realtek: Add RTD1295 RTC node
+
+ .../devicetree/bindings/rtc/realtek,rtd119x.txt    |  16 ++
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi           |   6 +
+ drivers/rtc/Kconfig                                |   8 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-rtd119x.c                          | 242 +++++++++++++++++++++
+ 5 files changed, 273 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/realtek,rtd119x.txt
+ create mode 100644 drivers/rtc/rtc-rtd119x.c
+
 -- 
 2.13.5
