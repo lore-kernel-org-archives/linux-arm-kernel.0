@@ -1,89 +1,37 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 4 Sep 2017 12:47:16 -0400 (EDT)
-Subject: [PATCH v2 10/29] ARM: head.S: use PC-relative insn sequences
- for __fixup_pv_table
-In-Reply-To: <20170903120757.14968-11-ard.biesheuvel@linaro.org>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
- <20170903120757.14968-11-ard.biesheuvel@linaro.org>
-Message-ID: <nycvar.YSQ.7.76.1709041246410.8603@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Sep 2017 17:48:09 +0100
+Subject: Applied "regulator: pbias: Select voltage table based on
+ max-voltage" to the regulator tree
+In-Reply-To: <f50319d6-9b18-0538-4eb1-6ff4226cac02@ti.com>
+References: <E1dnO3z-0000tI-7K@debutante>
+ <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+ <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
+ <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
+ <20170901162322.xrjnim4khn3wfslj@sirena.org.uk>
+ <f50319d6-9b18-0538-4eb1-6ff4226cac02@ti.com>
+Message-ID: <20170904164809.5coe6vhgyc7iwy6q@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 3 Sep 2017, Ard Biesheuvel wrote:
+On Mon, Sep 04, 2017 at 11:16:54AM +0530, Kishon Vijay Abraham I wrote:
+> On Friday 01 September 2017 09:53 PM, Mark Brown wrote:
 
-> Replace the open coded PC relative offset calculations with adr_l
-> and mov_l invocations. This ensures these quantities are invariant
-> under runtime relocation.
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Hang on, how can this break anything?  If it breaks things shouldn't
+> > there be bugfixes for incorrect constraints somewhere?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+> omap_hsmmc sets the pbias voltage to 3V. But here we program the volt table to
+> support either 1.8V or 3.3V (Initially the volt table was programmed to support
+> 3V because of a bug in TRM). So set_voltage of pbias voltage in omap_hsmmc will
+> fail.
 
-
-> ---
->  arch/arm/kernel/head.S | 27 ++++++--------------
->  1 file changed, 8 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index db6b823f20a4..f607e290ef4b 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -578,14 +578,11 @@ ENDPROC(fixup_smp)
->   */
->  	__HEAD
->  __fixup_pv_table:
-> -	adr	r0, 1f
-> -	ldmia	r0, {r3-r7}
-> +	adr_l	r6, __pv_phys_pfn_offset
-> +	adr_l	r7, __pv_offset			@ __pa(__pv_offset)
-> +	mov_l	r3, __pv_offset			@ __va(__pv_offset)
->  	mvn	ip, #0
-> -	subs	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
-> -	add	r4, r4, r3	@ adjust table start address
-> -	add	r5, r5, r3	@ adjust table end address
-> -	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
-> -	add	r7, r7, r3	@ adjust __pv_offset address
-> +	subs	r3, r7, r3	@ PHYS_OFFSET - PAGE_OFFSET
->  	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN
->  	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
->  	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
-> @@ -594,20 +591,15 @@ __fixup_pv_table:
->  THUMB(	it	ne		@ cross section branch )
->  	bne	__error
->  	str	r3, [r7, #LOW_OFFSET]	@ save to __pv_offset low bits
-> +	adr_l	r4, __pv_table_begin
-> +	adr_l	r5, __pv_table_end
->  	b	__fixup_a_pv_table
->  ENDPROC(__fixup_pv_table)
-> -
-> -	.align
-> -1:	.long	.
-> -	.long	__pv_table_begin
-> -	.long	__pv_table_end
-> -2:	.long	__pv_phys_pfn_offset
-> -	.long	__pv_offset
-> +	.ltorg
->  
->  	.text
->  __fixup_a_pv_table:
-> -	adr	r0, 3f
-> -	ldr	r6, [r0]
-> +	mov_l	r6, __pv_offset
->  	add	r6, r6, r3
->  	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word
->  	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word
-> @@ -676,9 +668,6 @@ ARM_BE8(rev16	ip, ip)
->  #endif
->  ENDPROC(__fixup_a_pv_table)
->  
-> -	.align
-> -3:	.long __pv_offset
-> -
->  ENTRY(fixup_pv_table)
->  	stmfd	sp!, {r4 - r7, lr}
->  	mov	r3, #0			@ no offset
-> -- 
-> 2.11.0
-> 
-> 
+Oh, that's appauling.  I guess this is some voltage that doesn't get
+presented to cards because otherwise I'm surprised nobody noticed.
+Anyway I've dropped the commit from my pull request for now, it'll not
+go for v4.14, but the pull request is still there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/c97db2b6/attachment.sig>
