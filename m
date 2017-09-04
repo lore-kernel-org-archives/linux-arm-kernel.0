@@ -1,83 +1,55 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 4 Sep 2017 10:55:51 +0200
-Subject: [PATCH] KVM: arm/arm64: vITS: Drop its_ite->lpi field
-In-Reply-To: <20170901165156.30775-1-marc.zyngier@arm.com>
-References: <20170901165156.30775-1-marc.zyngier@arm.com>
-Message-ID: <20170904085551.GJ13572@cbox>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 4 Sep 2017 11:06:14 +0200
+Subject: [PATCH v2] drm/tve200: Replace custom connector with panel bridge
+In-Reply-To: <CACRpkdb-v71qOWLdU=64D8Y7yhAF2i6XnWCAwD3x5BYcfORAtw@mail.gmail.com>
+References: <20170902200711.29298-1-linus.walleij@linaro.org>
+ <20170904075255.oy5gc5ggxpjhbisk@phenom.ffwll.local>
+ <CACRpkdb-v71qOWLdU=64D8Y7yhAF2i6XnWCAwD3x5BYcfORAtw@mail.gmail.com>
+Message-ID: <20170904090614.fzt3nr4ebgydlyto@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 05:51:56PM +0100, Marc Zyngier wrote:
-> For unknown reasons, the its_ite data structure carries an "lpi" field
-> which contains the intid of the LPI. This is an obvious duplication
-> of the vgic_irq->intid field, so let's fix the only user and remove
-> the now useless field.
+On Mon, Sep 04, 2017 at 10:14:42AM +0200, Linus Walleij wrote:
+> On Mon, Sep 4, 2017 at 9:52 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > On Sat, Sep 02, 2017 at 10:07:11PM +0200, Linus Walleij wrote:
+> >> This replaces the custom connector in the TVE200 with the
+> >> panel bridge helper. As long as we're just using panels
+> >> and no other bridges, this works just fine.
+> >>
+> >> Reviewed-by: Eric Anholt <eric@anholt.net>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >> ChangeLog v1->v2:
+> >> - Drop a few surplus #includes
+> >> - Collect Eric's review tag
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> +     /* We need the encoder to attach the bridge */
+> >> +     priv->encoder = &priv->pipe.encoder;
+> >
+> > drm_simple_display_pipe_attach_bridge(). Fairly new addition, would be
+> > great if you can also fix up wherever you copy-pasted this from :-)
+> 
+> The horrible truth is that I did not copy-paste it, I came up with
+> this for PL111 but using a v4.13 tree and then forward-patching
+> on top of drm-next.
 
-Applied, thanks.
--Christoffer
+drm moves fast, developing on anything older than drm-tip/linux-next
+considered harmful :-)
 
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
+I know that this is a problem for many arm-soc boards where lots of stuff
+isn't in upstream, but that's not really something we can fix in drm.
+
+> > I didn't check all the details, but lgtm otherwise. With this nit
+> > addressed:
+> >
+> > Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index dd85817a9b29..01aa4d9d405e 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -142,7 +142,6 @@ struct its_ite {
->  
->  	struct vgic_irq *irq;
->  	struct its_collection *collection;
-> -	u32 lpi;
->  	u32 event_id;
->  };
->  
-> @@ -851,7 +850,7 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
->  /* Must be called with its_lock mutex held */
->  static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
->  					  struct its_collection *collection,
-> -					  u32 lpi_id, u32 event_id)
-> +					  u32 event_id)
->  {
->  	struct its_ite *ite;
->  
-> @@ -861,7 +860,6 @@ static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
->  
->  	ite->event_id	= event_id;
->  	ite->collection = collection;
-> -	ite->lpi = lpi_id;
->  
->  	list_add_tail(&ite->ite_list, &device->itt_head);
->  	return ite;
-> @@ -911,7 +909,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  		new_coll = collection;
->  	}
->  
-> -	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
-> +	ite = vgic_its_alloc_ite(device, collection, event_id);
->  	if (IS_ERR(ite)) {
->  		if (new_coll)
->  			vgic_its_free_collection(its, coll_id);
-> @@ -1902,7 +1900,7 @@ static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
->  
->  	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
->  	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
-> -	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
-> +	       ((u64)ite->irq->intid << KVM_ITS_ITE_PINTID_SHIFT) |
->  		ite->collection->collection_id;
->  	val = cpu_to_le64(val);
->  	return kvm_write_guest(kvm, gpa, &val, ite_esz);
-> @@ -1949,7 +1947,7 @@ static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
->  	if (!collection)
->  		return -EINVAL;
->  
-> -	ite = vgic_its_alloc_ite(dev, collection, lpi_id, event_id);
-> +	ite = vgic_its_alloc_ite(dev, collection, event_id);
->  	if (IS_ERR(ite))
->  		return PTR_ERR(ite);
->  
-> -- 
-> 2.11.0
-> 
+> Gnah I already pushed it after Eric's review, but I can make
+> a follow-up patch, I will also try to get it right in PL111.
+
+nw, I'll look at those patches as soon as the fly by.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
