@@ -1,65 +1,61 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Sep 2017 10:00:25 +0200
-Subject: [PATCH 04/10] dmaengine: sun6i: Enable additional burst
- lengths/widths on H3
-In-Reply-To: <20170903224100.17893-5-stefan.bruens@rwth-aachen.de>
-References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
- <20170903224100.17893-5-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170904080025.eilcinu4ennj5fmb@flea>
+Date: Mon, 4 Sep 2017 10:02:55 +0200
+Subject: [PATCH v2 1/2] ARM: dts: sun8i: h3: Enable AP6212 WiFi on mmc1
+ on Nanopi M1 Plus
+In-Reply-To: <1504283401-4263-2-git-send-email-embed3d@gmail.com>
+References: <1504283401-4263-1-git-send-email-embed3d@gmail.com>
+ <1504283401-4263-2-git-send-email-embed3d@gmail.com>
+Message-ID: <20170904080255.3aywcccu4io2fvxi@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 12:40:55AM +0200, Stefan Br?ns wrote:
-> The H3 supports bursts lengths of 1, 4, 8 and 16 transfers, each with
-> a width of 1, 2, 4 or 8 bytes.
-> 
-> The register value for the the width is log2-encoded, change the
-> conversion function to provide the correct value for width == 8.
-> 
-> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-> ---
->  drivers/dma/sun6i-dma.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index c5644bd0f91a..335a8ec88b0b 100644
-> --- a/drivers/dma/sun6i-dma.c
-> +++ b/drivers/dma/sun6i-dma.c
-> @@ -263,8 +263,12 @@ static inline s8 convert_burst(u32 maxburst)
->  	switch (maxburst) {
->  	case 1:
->  		return 0;
-> +	case 4:
-> +		return 1;
->  	case 8:
->  		return 2;
-> +	case 16:
-> +		return 3;
->  	default:
->  		return -EINVAL;
->  	}
-> @@ -272,7 +276,7 @@ static inline s8 convert_burst(u32 maxburst)
->  
->  static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
->  {
-> -	return addr_width >> 1;
-> +	return ilog2(addr_width);
->  }
->  
->  static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
-> @@ -1152,6 +1156,12 @@ static int sun6i_dma_probe(struct platform_device *pdev)
->  						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
->  	sdc->src_burst_lengths			= BIT(1) | BIT(8);
->  	sdc->dst_burst_lengths			= BIT(1) | BIT(8);
-> +	if (sdc->cfg->dmac_variant == DMAC_VARIANT_H3) {
-> +		sdc->slave.src_addr_widths |= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-> +		sdc->slave.dst_addr_widths |= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-> +		sdc->src_burst_lengths     |= BIT(4) | BIT(16);
-> +		sdc->dst_burst_lengths     |= BIT(4) | BIT(16);
-> +	}
+Hi Philipp,
 
-The rest looks good, but that should be stored in the sun6i_dma_config
-structure too.
+On Fri, Sep 01, 2017 at 06:30:00PM +0200, Philipp Rossak wrote:
+> From: Philipp Rossak <embed3d@gmail.com>
+> 
+> The WiFi side of the AP6212 WiFi/BT combo module is connected to
+> mmc1. There are also GPIOs for enable and interrupts.
+> 
+> Enable WiFi on this board by enabling mmc1 and adding the power
+> sequencing clocks and GPIO, as well as the chip's interrupt line.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> index 6256f55..7d18c35 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> @@ -48,6 +48,13 @@
+>  
+>  	aliases {
+>  		serial1 = &uart3;
+> +		ethernet1 = &sdio_wifi;
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+>  	};
+>  };
+>  
+> @@ -65,6 +72,24 @@
+>  	status = "okay";
+>  };
+>  
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+
+I know I told you you weren't needing vqmmc, but Chen-Yu later told me
+that I was wrong about this.
+
+I've added vqmmc back, and applied your patch.
 
 Thanks!
 Maxime
@@ -74,4 +70,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/61f302d8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/799b5641/attachment.sig>
