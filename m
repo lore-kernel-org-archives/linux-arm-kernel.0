@@ -1,374 +1,322 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 4 Sep 2017 13:17:40 -0400 (EDT)
-Subject: [PATCH v2 16/29] ARM: kernel: switch to relative exception tables
-In-Reply-To: <20170903120757.14968-17-ard.biesheuvel@linaro.org>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
- <20170903120757.14968-17-ard.biesheuvel@linaro.org>
-Message-ID: <nycvar.YSQ.7.76.1709041311230.8603@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 04 Sep 2017 18:25:23 +0100
+Subject: Applied "ASoC: arm: make pxa2xx-ac97-lib ac97 codec agnostic" to the
+ asoc tree
+In-Reply-To: <1497857229-12049-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <E1dov7j-0003t9-FM@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 3 Sep 2017, Ard Biesheuvel wrote:
+The patch
 
-> To avoid having to relocate the contents of extable entries at
-> runtime when running with KASLR enabled, wire up the existing
-> support for emitting them as relative references. This ensures
-> these quantities are invariant under runtime relocation.
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+   ASoC: arm: make pxa2xx-ac97-lib ac97 codec agnostic
 
-Could it be better to have a macro that encapsulates exception entries 
-e.g.:
+has been applied to the asoc tree at
 
-	.macro ex_entry insn fixup
-	.long	\insn - ., \fixup - .
-	.endif
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-so that if ever this changes again or for whatever reason someone needs 
-absolute entries then this won't have to be done everywhere. The section 
-switch could be included in such a macro too. And it is so easy to 
-forget to do the "- ." when adding new entries.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
+Thanks,
+Mark
 
-> ---
->  arch/arm/include/asm/Kbuild           |  1 -
->  arch/arm/include/asm/assembler.h      |  6 +++---
->  arch/arm/include/asm/extable.h        | 19 +++++++++++++++++
->  arch/arm/include/asm/futex.h          |  2 +-
->  arch/arm/include/asm/uaccess.h        |  8 +++----
->  arch/arm/include/asm/word-at-a-time.h |  2 +-
->  arch/arm/kernel/entry-armv.S          |  6 +++---
->  arch/arm/kernel/swp_emulate.c         |  4 ++--
->  arch/arm/lib/backtrace.S              |  8 +++----
->  arch/arm/lib/getuser.S                | 22 ++++++++++----------
->  arch/arm/lib/putuser.S                | 12 +++++------
->  arch/arm/mm/alignment.c               | 14 ++++++-------
->  arch/arm/mm/extable.c                 |  2 +-
->  arch/arm/nwfpe/entry.S                |  2 +-
->  scripts/sortextable.c                 |  2 +-
->  15 files changed, 64 insertions(+), 46 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-> index 721ab5ecfb9b..f2d67fa34eb3 100644
-> --- a/arch/arm/include/asm/Kbuild
-> +++ b/arch/arm/include/asm/Kbuild
-> @@ -3,7 +3,6 @@ generic-y += current.h
->  generic-y += early_ioremap.h
->  generic-y += emergency-restart.h
->  generic-y += exec.h
-> -generic-y += extable.h
->  generic-y += irq_regs.h
->  generic-y += kdebug.h
->  generic-y += local.h
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index a0906c1fc65d..ae43859a9000 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -247,7 +247,7 @@
->  9999:	x;					\
->  	.pushsection __ex_table,"a";		\
->  	.align	3;				\
-> -	.long	9999b,9001f;			\
-> +	.long	9999b - ., 9001f - .;		\
->  	.popsection
->  
->  #ifdef CONFIG_SMP
-> @@ -383,7 +383,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  
->  	.pushsection __ex_table,"a"
->  	.align	3
-> -	.long	9999b, \abort
-> +	.long	9999b - ., \abort - .
->  	.popsection
->  	.endm
->  
-> @@ -424,7 +424,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  
->  	.pushsection __ex_table,"a"
->  	.align	3
-> -	.long	9999b, \abort
-> +	.long	9999b - ., \abort - .
->  	.popsection
->  	.endr
->  	.endm
-> diff --git a/arch/arm/include/asm/extable.h b/arch/arm/include/asm/extable.h
-> new file mode 100644
-> index 000000000000..c85d1f4404b7
-> --- /dev/null
-> +++ b/arch/arm/include/asm/extable.h
-> @@ -0,0 +1,19 @@
-> +#ifndef __ASM_EXTABLE_H
-> +#define __ASM_EXTABLE_H
-> +
-> +/*
-> + * The exception table consists of pairs of relative offsets: the first
-> + * is the relative offset to an instruction that is allowed to fault,
-> + * and the second is the relative offset at which the program should
-> + * continue. No registers are modified, so it is entirely up to the
-> + * continuation code to figure out what to do.
-> + */
-> +
-> +struct exception_table_entry {
-> +	int insn, fixup;
-> +};
-> +
-> +#define ARCH_HAS_RELATIVE_EXTABLE
-> +
-> +extern int fixup_exception(struct pt_regs *regs);
-> +#endif
-> diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
-> index 6795368ad023..31760d0ab76b 100644
-> --- a/arch/arm/include/asm/futex.h
-> +++ b/arch/arm/include/asm/futex.h
-> @@ -11,7 +11,7 @@
->  	"3:\n"							\
->  	"	.pushsection __ex_table,\"a\"\n"		\
->  	"	.align	3\n"					\
-> -	"	.long	1b, 4f, 2b, 4f\n"			\
-> +	"	.long	1b - ., 4f - ., 2b - ., 4f - .\n"	\
->  	"	.popsection\n"					\
->  	"	.pushsection .text.fixup,\"ax\"\n"		\
->  	"	.align	2\n"					\
-> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-> index 0bf2347495f1..62b9bb7d991a 100644
-> --- a/arch/arm/include/asm/uaccess.h
-> +++ b/arch/arm/include/asm/uaccess.h
-> @@ -295,7 +295,7 @@ do {									\
->  	"	.popsection\n"					\
->  	"	.pushsection __ex_table,\"a\"\n"		\
->  	"	.align	3\n"					\
-> -	"	.long	1b, 3b\n"				\
-> +	"	.long	1b - ., 3b - .\n"			\
->  	"	.popsection"					\
->  	: "+r" (err), "=&r" (x)					\
->  	: "r" (addr), "i" (-EFAULT)				\
-> @@ -385,7 +385,7 @@ do {									\
->  	"	.popsection\n"					\
->  	"	.pushsection __ex_table,\"a\"\n"		\
->  	"	.align	3\n"					\
-> -	"	.long	1b, 3b\n"				\
-> +	"	.long	1b - ., 3b - .\n"			\
->  	"	.popsection"					\
->  	: "+r" (err)						\
->  	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
-> @@ -435,8 +435,8 @@ do {									\
->  	"	.popsection\n"					\
->  	"	.pushsection __ex_table,\"a\"\n"		\
->  	"	.align	3\n"					\
-> -	"	.long	1b, 4b\n"				\
-> -	"	.long	2b, 4b\n"				\
-> +	"	.long	1b - ., 4b - .\n"			\
-> +	"	.long	2b - ., 4b - .\n"			\
->  	"	.popsection"					\
->  	: "+r" (err), "+r" (__pu_addr)				\
->  	: "r" (x), "i" (-EFAULT)				\
-> diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
-> index 5831dce4b51c..d433c686d9ca 100644
-> --- a/arch/arm/include/asm/word-at-a-time.h
-> +++ b/arch/arm/include/asm/word-at-a-time.h
-> @@ -86,7 +86,7 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
->  	"	.popsection\n"
->  	"	.pushsection __ex_table,\"a\"\n"
->  	"	.align	3\n"
-> -	"	.long	1b, 3b\n"
-> +	"	.long	1b - ., 3b - .\n"
->  	"	.popsection"
->  	: "=&r" (ret), "=&r" (offset)
->  	: "r" (addr), "Qo" (*(unsigned long *)addr));
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index c731f0d2b2af..1c7c12123b18 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -570,10 +570,10 @@ ENDPROC(__und_usr)
->  	ret	r9
->  	.popsection
->  	.pushsection __ex_table,"a"
-> -	.long	1b, 4b
-> +	.long	1b - ., 4b - .
->  #if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
-> -	.long	2b, 4b
-> -	.long	3b, 4b
-> +	.long	2b - ., 4b - .
-> +	.long	3b - ., 4b - .
->  #endif
->  	.popsection
->  
-> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-> index 3bda08bee674..a783e9c0b266 100644
-> --- a/arch/arm/kernel/swp_emulate.c
-> +++ b/arch/arm/kernel/swp_emulate.c
-> @@ -50,8 +50,8 @@
->  	"	.previous\n"					\
->  	"	.section	 __ex_table,\"a\"\n"		\
->  	"	.align		3\n"				\
-> -	"	.long		0b, 3b\n"			\
-> -	"	.long		1b, 3b\n"			\
-> +	"	.long		0b - ., 3b - .\n"		\
-> +	"	.long		1b - ., 3b - .\n"		\
->  	"	.previous"					\
->  	: "=&r" (res), "+r" (data), "=&r" (temp)		\
->  	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
-> diff --git a/arch/arm/lib/backtrace.S b/arch/arm/lib/backtrace.S
-> index 7d7952e5a3b1..84a8df7aa63c 100644
-> --- a/arch/arm/lib/backtrace.S
-> +++ b/arch/arm/lib/backtrace.S
-> @@ -107,10 +107,10 @@ ENDPROC(c_backtrace)
->  		
->  		.pushsection __ex_table,"a"
->  		.align	3
-> -		.long	1001b, 1006b
-> -		.long	1002b, 1006b
-> -		.long	1003b, 1006b
-> -		.long	1004b, 1006b
-> +		.long	1001b - ., 1006b - .
-> +		.long	1002b - ., 1006b - .
-> +		.long	1003b - ., 1006b - .
-> +		.long	1004b - ., 1006b - .
->  		.popsection
->  
->  .Lbad:		.asciz	"Backtrace aborted due to bad frame pointer <%p>\n"
-> diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-> index df73914e81c8..d47b4776d308 100644
-> --- a/arch/arm/lib/getuser.S
-> +++ b/arch/arm/lib/getuser.S
-> @@ -133,17 +133,17 @@ ENDPROC(__get_user_bad)
->  ENDPROC(__get_user_bad8)
->  
->  .pushsection __ex_table, "a"
-> -	.long	1b, __get_user_bad
-> -	.long	2b, __get_user_bad
-> -	.long	3b, __get_user_bad
-> -	.long	4b, __get_user_bad
-> -	.long	5b, __get_user_bad8
-> -	.long	6b, __get_user_bad8
-> +	.long	1b - ., __get_user_bad - .
-> +	.long	2b - ., __get_user_bad - .
-> +	.long	3b - ., __get_user_bad - .
-> +	.long	4b - ., __get_user_bad - .
-> +	.long	5b - ., __get_user_bad8 - .
-> +	.long	6b - ., __get_user_bad8 - .
->  #ifdef __ARMEB__
-> -	.long   7b, __get_user_bad
-> -	.long	8b, __get_user_bad8
-> -	.long	9b, __get_user_bad8
-> -	.long	10b, __get_user_bad8
-> -	.long	11b, __get_user_bad8
-> +	.long   7b - ., __get_user_bad - .
-> +	.long	8b - ., __get_user_bad8 - .
-> +	.long	9b - ., __get_user_bad8 - .
-> +	.long	10b - ., __get_user_bad8 - .
-> +	.long	11b - ., __get_user_bad8 - .
->  #endif
->  .popsection
-> diff --git a/arch/arm/lib/putuser.S b/arch/arm/lib/putuser.S
-> index 38d660d3705f..6b854197ff48 100644
-> --- a/arch/arm/lib/putuser.S
-> +++ b/arch/arm/lib/putuser.S
-> @@ -89,10 +89,10 @@ __put_user_bad:
->  ENDPROC(__put_user_bad)
->  
->  .pushsection __ex_table, "a"
-> -	.long	1b, __put_user_bad
-> -	.long	2b, __put_user_bad
-> -	.long	3b, __put_user_bad
-> -	.long	4b, __put_user_bad
-> -	.long	5b, __put_user_bad
-> -	.long	6b, __put_user_bad
-> +	.long	1b - ., __put_user_bad - .
-> +	.long	2b - ., __put_user_bad - .
-> +	.long	3b - ., __put_user_bad - .
-> +	.long	4b - ., __put_user_bad - .
-> +	.long	5b - ., __put_user_bad - .
-> +	.long	6b - ., __put_user_bad - .
->  .popsection
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 2c96190e018b..2c74cb826b6a 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -209,7 +209,7 @@ union offset_union {
->  	"	.popsection\n"				\
->  	"	.pushsection __ex_table,\"a\"\n"	\
->  	"	.align	3\n"				\
-> -	"	.long	1b, 3b\n"			\
-> +	"	.long	1b - ., 3b - .\n"		\
->  	"	.popsection\n"				\
->  	: "=r" (err), "=&r" (val), "=r" (addr)		\
->  	: "0" (err), "2" (addr))
-> @@ -269,8 +269,8 @@ union offset_union {
->  		"	.popsection\n"				\
->  		"	.pushsection __ex_table,\"a\"\n"	\
->  		"	.align	3\n"				\
-> -		"	.long	1b, 4b\n"			\
-> -		"	.long	2b, 4b\n"			\
-> +		"	.long	1b - ., 4b - .\n"		\
-> +		"	.long	2b - ., 4b - .\n"		\
->  		"	.popsection\n"				\
->  		: "=r" (err), "=&r" (v), "=&r" (a)		\
->  		: "0" (err), "1" (v), "2" (a));			\
-> @@ -309,10 +309,10 @@ union offset_union {
->  		"	.popsection\n"				\
->  		"	.pushsection __ex_table,\"a\"\n"	\
->  		"	.align	3\n"				\
-> -		"	.long	1b, 6b\n"			\
-> -		"	.long	2b, 6b\n"			\
-> -		"	.long	3b, 6b\n"			\
-> -		"	.long	4b, 6b\n"			\
-> +		"	.long	1b - ., 6b - .\n"		\
-> +		"	.long	2b - ., 6b - .\n"		\
-> +		"	.long	3b - ., 6b - .\n"		\
-> +		"	.long	4b - ., 6b - .\n"		\
->  		"	.popsection\n"				\
->  		: "=r" (err), "=&r" (v), "=&r" (a)		\
->  		: "0" (err), "1" (v), "2" (a));			\
-> diff --git a/arch/arm/mm/extable.c b/arch/arm/mm/extable.c
-> index f436f7439e46..6a8b85bf0cac 100644
-> --- a/arch/arm/mm/extable.c
-> +++ b/arch/arm/mm/extable.c
-> @@ -10,7 +10,7 @@ int fixup_exception(struct pt_regs *regs)
->  
->  	fixup = search_exception_tables(instruction_pointer(regs));
->  	if (fixup) {
-> -		regs->ARM_pc = fixup->fixup;
-> +		regs->ARM_pc = (unsigned long)&fixup->fixup + fixup->fixup;
->  #ifdef CONFIG_THUMB2_KERNEL
->  		/* Clear the IT state to avoid nasty surprises in the fixup */
->  		regs->ARM_cpsr &= ~PSR_IT_MASK;
-> diff --git a/arch/arm/nwfpe/entry.S b/arch/arm/nwfpe/entry.S
-> index 39c20afad7ed..c4fe13b31705 100644
-> --- a/arch/arm/nwfpe/entry.S
-> +++ b/arch/arm/nwfpe/entry.S
-> @@ -121,5 +121,5 @@ next:
->  
->  	.pushsection __ex_table,"a"
->  	.align	3
-> -	.long	.Lx1, .Lfix
-> +	.long	.Lx1 - ., .Lfix - .
->  	.popsection
-> diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-> index 365a907f98b3..56a4c6714da7 100644
-> --- a/scripts/sortextable.c
-> +++ b/scripts/sortextable.c
-> @@ -314,6 +314,7 @@ do_file(char const *const fname)
->  		break;
->  
->  	case EM_S390:
-> +	case EM_ARM:
->  	case EM_AARCH64:
->  	case EM_PARISC:
->  	case EM_PPC:
-> @@ -322,7 +323,6 @@ do_file(char const *const fname)
->  		break;
->  	case EM_ARCOMPACT:
->  	case EM_ARCV2:
-> -	case EM_ARM:
->  	case EM_MICROBLAZE:
->  	case EM_MIPS:
->  	case EM_XTENSA:
-> -- 
-> 2.11.0
-> 
-> 
+>From 6f8acad646d29fbf5665a6e0c9adae71c3c2131e Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Sat, 2 Sep 2017 21:54:06 +0200
+Subject: [PATCH] ASoC: arm: make pxa2xx-ac97-lib ac97 codec agnostic
+
+All pxa library functions don't use the input parameters for nothing but
+slot number. This simplifies their prototypes, and makes them usable by
+both the legacy ac97 bus and the new ac97 bus.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ include/sound/pxa2xx-lib.h  | 15 +++++++++------
+ sound/arm/pxa2xx-ac97-lib.c | 37 +++++++++++++++++++++----------------
+ sound/arm/pxa2xx-ac97.c     | 35 +++++++++++++++++++++++++++--------
+ sound/soc/pxa/pxa2xx-ac97.c | 32 ++++++++++++++++++++++++++------
+ 4 files changed, 83 insertions(+), 36 deletions(-)
+
+diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
+index 6ef629bde164..85352becec7c 100644
+--- a/include/sound/pxa2xx-lib.h
++++ b/include/sound/pxa2xx-lib.h
+@@ -1,10 +1,13 @@
+ #ifndef PXA2XX_LIB_H
+ #define PXA2XX_LIB_H
+ 
++#include <uapi/sound/asound.h>
+ #include <linux/platform_device.h>
+-#include <sound/ac97_codec.h>
+ 
+ /* PCM */
++struct snd_pcm_substream;
++struct snd_pcm_hw_params;
++struct snd_pcm;
+ 
+ extern int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
+ 				struct snd_pcm_hw_params *params);
+@@ -21,12 +24,12 @@ extern void pxa2xx_pcm_free_dma_buffers(struct snd_pcm *pcm);
+ 
+ /* AC97 */
+ 
+-extern unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg);
+-extern void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg, unsigned short val);
++extern int pxa2xx_ac97_read(int slot, unsigned short reg);
++extern int pxa2xx_ac97_write(int slot, unsigned short reg, unsigned short val);
+ 
+-extern bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97);
+-extern bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97);
+-extern void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97);
++extern bool pxa2xx_ac97_try_warm_reset(void);
++extern bool pxa2xx_ac97_try_cold_reset(void);
++extern void pxa2xx_ac97_finish_reset(void);
+ 
+ extern int pxa2xx_ac97_hw_suspend(void);
+ extern int pxa2xx_ac97_hw_resume(void);
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 39c3969ac1c7..5950a9e218d9 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -20,7 +20,6 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ 
+-#include <sound/ac97_codec.h>
+ #include <sound/pxa2xx-lib.h>
+ 
+ #include <mach/irqs.h>
+@@ -46,38 +45,41 @@ extern void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio);
+  * 1 jiffy timeout if interrupt never comes).
+  */
+ 
+-unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
++int pxa2xx_ac97_read(int slot, unsigned short reg)
+ {
+-	unsigned short val = -1;
++	int val = -ENODEV;
+ 	volatile u32 *reg_addr;
+ 
++	if (slot > 0)
++		return -ENODEV;
++
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	/* start read access across the ac97 link */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	if (reg == AC97_GPIO_STATUS)
+ 		goto out;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1) <= 0 &&
+ 	    !((GSR | gsr_bits) & GSR_SDONE)) {
+ 		printk(KERN_ERR "%s: read error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
+-		val = -1;
++		val = -ETIMEDOUT;
+ 		goto out;
+ 	}
+ 
+ 	/* valid data now */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	/* but we've just started another cycle... */
+ 	wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1);
+ 
+@@ -86,29 +88,32 @@ out:	mutex_unlock(&car_mutex);
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_read);
+ 
+-void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
+-			unsigned short val)
++int pxa2xx_ac97_write(int slot, unsigned short reg, unsigned short val)
+ {
+ 	volatile u32 *reg_addr;
++	int ret = 0;
+ 
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+ 	*reg_addr = val;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_CDONE, 1) <= 0 &&
+-	    !((GSR | gsr_bits) & GSR_CDONE))
++	    !((GSR | gsr_bits) & GSR_CDONE)) {
+ 		printk(KERN_ERR "%s: write error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
++		ret = -EIO;
++	}
+ 
+ 	mutex_unlock(&car_mutex);
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_write);
+ 
+@@ -188,7 +193,7 @@ static inline void pxa_ac97_cold_pxa3xx(void)
+ }
+ #endif
+ 
+-bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_warm_reset(void)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 100;
+@@ -225,7 +230,7 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
+ 
+-bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_cold_reset(void)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 1000;
+@@ -263,7 +268,7 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_cold_reset);
+ 
+ 
+-void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97)
++void pxa2xx_ac97_finish_reset(void)
+ {
+ 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
+ 	GCR |= GCR_SDONE_IE|GCR_CDONE_IE;
+diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
+index fbd5dad0c484..4bc244c40f80 100644
+--- a/sound/arm/pxa2xx-ac97.c
++++ b/sound/arm/pxa2xx-ac97.c
+@@ -29,19 +29,38 @@
+ 
+ #include "pxa2xx-pcm.h"
+ 
+-static void pxa2xx_ac97_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_legacy_reset(struct snd_ac97 *ac97)
+ {
+-	if (!pxa2xx_ac97_try_cold_reset(ac97)) {
+-		pxa2xx_ac97_try_warm_reset(ac97);
+-	}
++	if (!pxa2xx_ac97_try_cold_reset())
++		pxa2xx_ac97_try_warm_reset();
++
++	pxa2xx_ac97_finish_reset();
++}
++
++static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
++					      unsigned short reg)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_read(ac97->num, reg);
++	if (ret < 0)
++		return 0;
++	else
++		return (unsigned short)(ret & 0xffff);
++}
++
++static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
++				     unsigned short reg, unsigned short val)
++{
++	int __always_unused ret;
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	ret = pxa2xx_ac97_write(ac97->num, reg, val);
+ }
+ 
+ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_read,
+-	.write	= pxa2xx_ac97_write,
+-	.reset	= pxa2xx_ac97_reset,
++	.read	= pxa2xx_ac97_legacy_read,
++	.write	= pxa2xx_ac97_legacy_write,
++	.reset	= pxa2xx_ac97_legacy_reset,
+ };
+ 
+ static struct pxad_param pxa2xx_ac97_pcm_out_req = {
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index f49bf02e5ec2..803818aabee9 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -29,21 +29,41 @@
+ 
+ static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
+ {
+-	pxa2xx_ac97_try_warm_reset(ac97);
++	pxa2xx_ac97_try_warm_reset();
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset();
+ }
+ 
+ static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
+ {
+-	pxa2xx_ac97_try_cold_reset(ac97);
++	pxa2xx_ac97_try_cold_reset();
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset();
++}
++
++static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
++					      unsigned short reg)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_read(ac97->num, reg);
++	if (ret < 0)
++		return 0;
++	else
++		return (unsigned short)(ret & 0xffff);
++}
++
++static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
++				     unsigned short reg, unsigned short val)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_write(ac97->num, reg, val);
+ }
+ 
+ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_read,
+-	.write	= pxa2xx_ac97_write,
++	.read	= pxa2xx_ac97_legacy_read,
++	.write	= pxa2xx_ac97_legacy_write,
+ 	.warm_reset	= pxa2xx_ac97_warm_reset,
+ 	.reset	= pxa2xx_ac97_cold_reset,
+ };
+-- 
+2.14.1
