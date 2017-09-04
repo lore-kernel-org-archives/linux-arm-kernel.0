@@ -1,43 +1,120 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 04 Sep 2017 15:14:40 +0200
-Subject: [PATCH v6 09/12] ASoC: wm9712: add ac97 new bus support
-In-Reply-To: <20170904101849.7uefwhuqz4vtntrp@localhost.localdomain> (Charles
- Keepax's message of "Mon, 4 Sep 2017 11:18:49 +0100")
-References: <20170902195414.3699-1-robert.jarzmik@free.fr>
- <20170902195414.3699-10-robert.jarzmik@free.fr>
- <20170904101849.7uefwhuqz4vtntrp@localhost.localdomain>
-Message-ID: <8760cyppvj.fsf@belgarion.home>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 4 Sep 2017 15:21:15 +0200
+Subject: [PATCH v3 6/8] PM / ACPI: Enable the runtime PM centric approach
+ for system sleep
+In-Reply-To: <2209426.5Z3u1iKN4i@aspire.rjw.lan>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+ <2855684.NY3Ly9PzrE@aspire.rjw.lan>
+ <CAPDyKFq5ic+bAVRoEC58oSO-8VTGnfipJndLmR6YLXgEhZ+RWw@mail.gmail.com>
+ <2209426.5Z3u1iKN4i@aspire.rjw.lan>
+Message-ID: <CAPDyKFoTz3fFJwpJgmmwLfHQTzmWpyZL+NcVPY8D254nR2Mzag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Charles Keepax <ckeepax@opensource.cirrus.com> writes:
-
-> On Sat, Sep 02, 2017 at 09:54:11PM +0200, Robert Jarzmik wrote:
->> Add support for the new ac97 bus model, where devices are automatically
->> discovered on AC-Links.
->> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->> ---
->> Since v4:
->>  - added #ifdef spotted by Charles
->> ---
->>  	snd_soc_codec_init_regmap(codec, regmap);
->> @@ -666,7 +677,8 @@ static int wm9712_soc_remove(struct snd_soc_codec *codec)
->>  	struct wm9712_priv *wm9712 = snd_soc_codec_get_drvdata(codec);
->>  
->>  	snd_soc_codec_exit_regmap(codec);
->> -	snd_soc_free_ac97_codec(wm9712->ac97);
->> +	if (!wm9712->mfd_pdata)
->> +		snd_soc_free_ac97_codec(wm9712->ac97);
+On 2 September 2017 at 17:38, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, September 1, 2017 10:27:05 AM CEST Ulf Hansson wrote:
+>> On 29 August 2017 at 17:27, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Tuesday, August 29, 2017 4:56:48 PM CEST Ulf Hansson wrote:
+>> >> This change enables the ACPI PM domain to cope with drivers that deploys
+>> >> the runtime PM centric path for system sleep.
+>> >
+>> > [cut]
+>> >
+>> >> @@ -1052,11 +1066,20 @@ EXPORT_SYMBOL_GPL(acpi_subsys_complete);
+>> >>   * @dev: Device to handle.
+>> >>   *
+>> >>   * Follow PCI and resume devices suspended at run time before running their
+>> >> - * system suspend callbacks.
+>> >> + * system suspend callbacks. However, try to avoid it in case the runtime PM
+>> >> + * centric path is used for the device and then trust the driver to do the
+>> >> + * right thing.
+>> >>   */
+>> >>  int acpi_subsys_suspend(struct device *dev)
+>> >>  {
+>> >> -     pm_runtime_resume(dev);
+>> >> +     struct acpi_device *adev = ACPI_COMPANION(dev);
+>> >> +
+>> >> +     if (!adev)
+>> >> +             return 0;
+>> >> +
+>> >> +     if (!dev_pm_is_rpm_sleep(dev) || acpi_dev_needs_resume(dev, adev))
+>> >> +             pm_runtime_resume(dev);
+>> >> +
+>> >>       return pm_generic_suspend(dev);
+>> >>  }
+>> >>  EXPORT_SYMBOL_GPL(acpi_subsys_suspend);
+>> >
+>> > Well, I tried to avoid calling acpi_dev_needs_resume() for multiple times
+>> > and that's why I added the update_state thing.
+>> >
+>> > Moreover, the is_rpm_sleep flag here has to mean not only that
+>> > direct_complete should not be used with the device, but also that its driver
+>> > is fine with not resuming it.
+>>
+>> Let me try to explain this better. I realize the changelog is
+>> misleading around this particular section! Huh, apologize for that!
+>>
+>> First, patch1 makes the PM core treat the is_rpm_sleep flag as the
+>> direct_complete isn't allowed for the device.
+>>
+>> For that reason, when the is_rpm_sleep is set, there is no point
+>> calling acpi_dev_needs_resume() from acpi_subsys_prepare(), but
+>> instead that can be deferred to acpi_subsys_suspend() - because it
+>> doesn't matter if acpi_subsys_prepare() returns 0 or 1, in either case
+>> the acpi_subsys_suspend() will be called. That's really what goes on
+>> here.
+>>
+>> The end result is the same. If the acpi_dev_needs_resume() thinks that
+>> the device needs to be runtime resumed, pm_runtime_resume() is called
+>> for the device in acpi_subsys_suspend().
+>>
+>> So, this has nothing to do with whether the driver "is fine with not
+>> resuming it" thing.
 >
-> This bit is still missing the ifdef it has in the preceeding
-> patch.
-Damn, you're right, it's missing in both wm9705 and wm9712, but not in wm9713.
-That will be for the hopefully last volley of this serie.
+> No, sorry.
+>
+> If is_rpm_sleep was not set, the ACPI PM domain would resume the device in
+> acpi_subsys_suspend() regardless of the acpi_dev_needs_resume() return value.
 
-Thanks for spotting that.
+Yes, I believe I forgot about one scenario, when the direct_complete
+path has been abandoned by the PM core, because a child device was
+suspend before and it couldn't run the direct_complete path for it?
 
-Cheers.
+Just to be sure, that's the case you also had in mind?
 
--- 
-Robert
+> That's what's there in the patch.  So clearly, setting is_rpm_sleep means
+> "this device does not need to be resumed in acpi_subsys_suspend() unless
+> acpi_dev_needs_resume() returns true".  Which clearly means that the driver
+> *is* fine with not resuming it, because if is_rpm_sleep is set, the device
+> in fact may not be resumed and then the driver will need to cope with that.
+
+Yes, I understand your concern, because we may break the default
+behavior of the ACPI PM domain.
+
+So, *if* there will be a next version, I will make sure to be better
+safe than sorry, and add one flag per use case.
+
+>
+> And note that this meaning of is_rpm_sleep is different from what it is
+> expected to mean to the core.
+>
+>> >
+>> > IMO it is not a good idea to use one flag for these two different things at the
+>> > same time at all.
+>>
+>> Yeah, I guess my upper comment addresses your immediate concern here?
+>
+> No, they don't.
+>
+>> However, there is one other thing the is_rpm_flag means. That is that
+>> the driver has informed the ACPI PM domain, to trust the driver to
+>> deal with system sleep, via re-using the runtime PM callbacks.
+>> So the flag does still have two meanings, but that we can change - of course.
+>
+> I guess that you are referring to the use of dev_pm_is_rpm_sleep() in
+> acpi_subsys_suspend_late()?  That's the third thing this flag means ...
+
+Yes.
+
+Kind regards
+Uffe
