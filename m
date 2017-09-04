@@ -1,252 +1,235 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 4 Sep 2017 13:06:39 +0200
-Subject: [PATCH v4 2/3] thermal: hisilicon: add thermal sensor driver for
- Hi3660
-In-Reply-To: <b884f2ca-86e1-0df3-0cbf-99b13232ee03@hisilicon.com>
-References: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
- <1503994666-13954-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1503994666-13954-3-git-send-email-kevin.wangtao@hisilicon.com>
- <77ceb395-57bb-8de7-7b1a-3218baa5d5f3@linaro.org>
- <b884f2ca-86e1-0df3-0cbf-99b13232ee03@hisilicon.com>
-Message-ID: <8fe3ad22-59db-40c6-18db-7b6859f05a95@linaro.org>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 4 Sep 2017 19:10:27 +0800
+Subject: [PATCH v6 0/7] Add RAS virtualization support for SEA/SEI
+ notification type in KVM
+In-Reply-To: <59A84ACB.7030808@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <59A84ACB.7030808@arm.com>
+Message-ID: <61d15c7d-803b-15b2-78e1-637fdb9396d6@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi James
 
-Hi Kevin,
+On 2017/9/1 1:43, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 28/08/17 11:38, Dongjiu Geng wrote:
+>> In the firmware-first RAS solution, corrupt data is detected in a
+>> memory location when guest OS application software executing at EL0
+>> or guest OS kernel El1 software are reading from the memory. The
+>> memory node records errors in an error record accessible using
+>> system registers.
+>>
+>> Because SCR_EL3.EA is 1, then CPU will trap to El3 firmware, EL3
+>> firmware records the error to APEI table through reading system
+>> register.
+> 
+> Strictly speaking these are CPER records in a memory region pointed to by the
+> HEST->GHES ACPI table.
+yes, Here I mean EL3 firmware reads the RAS Error record register ERXxxx_EL1, such as
+ERXADDR_EL1/ERXMISC0_EL1, to get the detailed error info, then record them to
+HEST->GHES ACPI table in a memory region.
 
-
-On 04/09/2017 09:56, Wangtao (Kevin, Kirin) wrote:
 > 
 > 
-> ? 2017/9/1 5:17, Daniel Lezcano ??:
+>> Because the error was taken from a lower Exception level, if the
+>> exception is SEA/SEI and HCR_EL2.TEA/HCR_EL2.AMO is 1, firmware
+>> sets ESR_EL2/FAR_EL2 to fake a exception trap to EL2, then
+>> transfers to hypervisor.
+> 
+> What happens if you took an SError from EL2 and EL2 has PSTATE.A set masking
+> SError? (this is very common today: all kernel code runs like this).
+Firstly, the guest OS usually runs in the El1 or El0, not El2.
+if El2 happens an SError, it will trap to EL3 firmware even though the PSTATE.A is set.
+Because the PSTATE.A can not mask it if the SError is trapped to EL3.
+
+> 
+> What happens if the hypervisor then executes an ESB with PSTATE.A set? It
+> expects to see any pending SError deferred and its syndrome written to DISR_EL1,
+> but this register is RAZ/WI when you set SCR_EL3.EA. '4.4.2' of [0]
+>From my understand, if the SCR_EL3.EA is set, the Abort can not mask, it always happen and
+take to EL3, DISR_El1 can not record the syndrome. DISR_El1 is only recorded when
+the External Abort is masked, but when SCR_EL3.EA is set, the pstate.A can not mask the Error.
+
+
+> 
+> 
+>> For the synchronous external abort(SEA), Hypervisor calls the
+>> ghes_handle_memory_failure() to deal with this error,
+>> ghes_handle_memory_failure() function reads the APEI table and 
+>> callls memory_failure() to decide whether it needs to deliver
+>> SIGBUS signal to user space, the advantage of using SIGBUS signal
+>> to notify user space is that it can be compatible with Non-Kvm users.
 >>
->> Hi Kevin,
->>
->>
->> On 29/08/2017 10:17, Tao Wang wrote:
->>> From: Tao Wang <kevin.wangtao@linaro.org>
->>>
->>> This patch adds the support for thermal sensor of Hi3660 SoC.
->>
->> for the Hi3660 SoC thermal sensor.
->>
->>> this will register sensors for thermal framework and use device
->>> tree to bind cooling device.
->>
->> Is it possible to give a pointer to some documentation or to describe
->> the hardware?
-> Yes, there used to be on patch V3, I removed it on V4.
->>
->> An explanation of the adc min max coef[] range[] conversion would be
->> nice.
-> OK
->>
->> In addition, having the rational behind the average and the max would be
->> nice. Do we really need both avg and max as virtual sensor?
-> We only need max currently.
->>
->>> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
->>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
->>> ---
->>>   drivers/thermal/Kconfig        |  13 +++
->>>   drivers/thermal/Makefile       |   1 +
->>>   drivers/thermal/hisi_tsensor.c | 209
->>> +++++++++++++++++++++++++++++++++++++++++
->>
->>
->> IMO, we don't need a new file, but merge this code with the current
->> hisi_thermal.c driver. BTW, the hi6220 has also a tsensor which is
->> different from this one.
->>
->> I suggest to base the hi3660 thermal driver on top of the cleanup I sent
->> for the hi6220.
-> The tsensor of hi3660 is a different one, merging the code with hi6220
-> will need a lot of change.
+>> For the SError Interrupt(SEI),KVM firstly classified the error.
+> 
+> KVM can't parse the CPER records, nor does it know where to look to find them.
+> KVM should call out to the APEI code so the host kernel can handle the error.
+KVM does not parse the CPER records, I mean KVM classified the error according to the esr_el2.AET.
 
-Have a look at the hisi_thermal.c at:
+As shown below:
 
-https://git.linaro.org/people/daniel.lezcano/linux.git/tree/drivers/thermal/hisi_thermal.c?h=thermal/hikey-4.14
+AET, bits [12:10], when categorized
+Asynchronous Error Type. Describes the state of the PE after taking the SError interrupt exception.
+Software might use the information in the syndrome registers to determine what recovery might be
+possible. See Architecturally consumed errors. The possible values of this field are:
+0b000 Uncontainable error (UC).
+0b001 Unrecoverable error (UEU).
+0b010 Restartable error (UEO).
+0b011 Recoverable error (UER).
+0b110 Corrected error (CE).
 
-after the cleanup I recently sent.
+I pasted the code here:
++static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu)
++{
++	unsigned int esr = kvm_vcpu_get_hsr(vcpu);
++	bool impdef_syndrome =  esr & ESR_ELx_ISV;	/* aka IDS */
++	unsigned int aet = esr & ESR_ELx_AET;
++
++	/*
++	 * In below three conditions, it will directly inject the virtual SError.
++	 * 1. Not support RAS extension; the Syndrome is IMPLEMENTATION DEFINED;
++	 * AET is RES0 if 'the value returned in the DFSC field is not
++	 * [ESR_ELx_FSC_SERROR]'
++	 */
++	if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN) || impdef_syndrome ||
++			((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR)) {
++		kvm_inject_vabt(vcpu);
++		return 1;
++	}
++
++	switch (aet) {
++	case ESR_ELx_AET_CE:	/* corrected error */
++	case ESR_ELx_AET_UEO:	/* restartable error, not yet consumed */
++		return 0;	/* continue processing the guest exit */
++	case ESR_ELx_AET_UEU:  /* The error has not been propagated */
++	/*
++	 * Only handle the guest user mode SEI if the error has not been propagated
++	 */
++	if ((!vcpu_mode_priv(vcpu)) && !handle_guest_sei(kvm_vcpu_get_hsr(vcpu)))
++		return 1;
++
++	/* If SError handling is failed, continue run */
++	default:
++		/*
++		 * Until now, the CPU supports RAS and SEI is fatal, or user space
++		 * does not support to handle the SError.
++		 */
++		panic("This Asynchronous SError interrupt is dangerous, panic");
++	}
++}
++
 
-I'm pretty sure, with a little effort, we can merge both.
+I have called the kernel code to handle the SError.
 
-Especially if the virtual things is separated.
++/*
++ * Handle SError interrupt that occur in guest OS.
++ *
++ * The return value will be zero if the SEI was successfully handled
++ * and non-zero if handling is failed.
++ */
++int handle_guest_sei(unsigned int esr)
++{
++	int ret = 0;
++
++	struct siginfo info;
++
++	pr_alert("Asynchronous SError interrupt detected on CPU: %d, esr: %x\n",
++		smp_processor_id(), esr);
++
++	info.si_signo = SIGBUS;
++	info.si_errno = 0;
++	info.si_code  = BUS_MCEERR_AR;
++	/*
++	 * Because the address is not accurate for Asynchronous Aborts, so set
++	 * NULL for the fault address
++	 */
++	info.si_addr = NULL;
++
++	ret = force_sig_info(SIGBUS, &info, current);
++	if (ret < 0)
++		pr_info("Handle guest SEI: Error sending signal to %s:%d: %d\n",
++			current->comm, current->pid, ret);
++	else
++		ret = 0;
++
++	 return ret;
++}
++
 
-At the end, what do we do ? Read a register.
+> 
+> User-space may be signalled by the memory_failure() helper, and user-space may
+> choose to notify the guest about the memory-failure, but this would be a new error.
+For the SError, it is asynchronous abort. so it is not better to call memory_failure() helper, because the error
+address is not accurate. memory_failure() will offline or poison the address, but the address is not accurate. so it is
+dangerous
 
->>>   3 files changed, 223 insertions(+)
->>>   create mode 100644 drivers/thermal/hisi_tsensor.c
->>>
->>> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->>> index b5b5fac..32f582d 100644
->>> --- a/drivers/thermal/Kconfig
->>> +++ b/drivers/thermal/Kconfig
->>> @@ -203,6 +203,19 @@ config HISI_THERMAL
->>>         thermal framework. cpufreq is used as the cooling device to
->>> throttle
->>>         CPUs when the passive trip is crossed.
->>>   +config HISI_TSENSOR
->>> +    tristate "Hisilicon tsensor driver"
->>> +    depends on ARCH_HISI || COMPILE_TEST
->>> +    depends on HAS_IOMEM
->>> +    depends on OF
->>> +    default y
->>> +    help
->>> +      Enable this to plug Hisilicon's tsensor driver into the Linux
->>> thermal
->>> +      framework. Besides all the hardware sensors, this also support
->>> two
->>> +      virtual sensors, one for maximum of all the hardware sensor, and
->>> +      one for average of all the hardware sensor.
->>> +      Compitable with Hi3660 or higher.
->>
->> s/Compitable/Compatible/
-> OK
->>
->>> +
->>>   config IMX_THERMAL
->>>       tristate "Temperature sensor driver for Freescale i.MX SoCs"
->>>       depends on (ARCH_MXC && CPU_THERMAL) || COMPILE_TEST
->>> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
->>> index 094d703..8a16bd4 100644
->>> --- a/drivers/thermal/Makefile
->>> +++ b/drivers/thermal/Makefile
->>> @@ -56,6 +56,7 @@ obj-$(CONFIG_ST_THERMAL)    += st/
->>>   obj-$(CONFIG_QCOM_TSENS)    += qcom/
->>>   obj-$(CONFIG_TEGRA_SOCTHERM)    += tegra/
->>>   obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
->>> +obj-$(CONFIG_HISI_TSENSOR)    += hisi_tsensor.o
->>>   obj-$(CONFIG_MTK_THERMAL)    += mtk_thermal.o
->>>   obj-$(CONFIG_GENERIC_ADC_THERMAL)    += thermal-generic-adc.o
->>>   obj-$(CONFIG_ZX2967_THERMAL)    += zx2967_thermal.o
->>> diff --git a/drivers/thermal/hisi_tsensor.c
->>> b/drivers/thermal/hisi_tsensor.c
->>> new file mode 100644
->>> index 0000000..34cf2ba
->>> --- /dev/null
->>> +++ b/drivers/thermal/hisi_tsensor.c
->>> @@ -0,0 +1,209 @@
->>> +/*
->>> + *  linux/drivers/thermal/hisi_tsensor.c
->>> + *
->>> + *  Copyright (c) 2017 Hisilicon Limited.
->>> + *  Copyright (c) 2017 Linaro Limited.
->>> + *
->>> + *  Author: Tao Wang <kevin.wangtao@linaro.org>
->>> + *  Author: Leo Yan <leo.yan@linaro.org>
->>> + *
->>> + *  This program is free software; you can redistribute it and/or
->>> modify
->>> + *  it under the terms of the GNU General Public License as
->>> published by
->>> + *  the Free Software Foundation; version 2 of the License.
->>> + *
->>> + *  This program is distributed in the hope that it will be useful,
->>> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *  GNU General Public License for more details.
->>> + *
->>> + *  You should have received a copy of the GNU General Public License
->>> + *  along with this program.  If not, see
->>> <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/clk.h>
->>> +#include <linux/device.h>
->>> +#include <linux/err.h>
->>> +#include <linux/io.h>
->>> +#include <linux/kernel.h>
->>> +#include <linux/of.h>
->>> +#include <linux/module.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/thermal.h>
->>> +
->>> +#include "thermal_core.h"
->>> +
->>> +#define VIRTUAL_SENSORS        2
->>> +
->>> +/* hisi Thermal Sensor Dev Structure */
->>> +struct hisi_thermal_sensor {
->>> +    struct hisi_thermal_data *thermal;
->>> +    struct thermal_zone_device *tzd;
->>> +    void __iomem *sensor_reg;
->>> +    unsigned int id;
->>> +};
->>> +
->>> +struct hisi_thermal_data {
->>> +    struct platform_device *pdev;
->>> +    struct hisi_thermal_sensor *sensors;
->>> +    unsigned int range[2];
->>> +    unsigned int coef[2];
->>> +    unsigned int max_hw_sensor;
->>> +};
->>> +
->>> +static int hisi_thermal_get_temp(void *_sensor, int *temp)
->>> +{
->>> +    struct hisi_thermal_sensor *sensor = _sensor;
->>> +    struct hisi_thermal_data *data = sensor->thermal;
->>> +    unsigned int idx, adc_min, adc_max, max_sensor;
->>> +    int val, average = 0, max = 0;
->>> +
->>> +    adc_min = data->range[0];
->>> +    adc_max = data->range[1];
->>> +    max_sensor = data->max_hw_sensor;
->>> +
->>> +    if (sensor->id < max_sensor) {
->>> +        val = readl(sensor->sensor_reg);
->>> +        val = clamp_val(val, adc_min, adc_max);
->>
->> That looks a bit fuzzy. Why not create a get_temp for physical sensor
->> and another one for the virtual? So there will be a clear distinction
->> between both.
-> make sense
-
-After thinking about it. I think it virtual sensor should be a separate
-driver.
-
-[ ... ]
-
->> Do we really need a max sensor definition in the DT? Isn't it something
->> we can deduce by looping with platform_get_resource below ?
->>
->> eg.
->>
->> while ((res = platform_get_resource(..., num_sensor++)) {
->>     ...
->> }
->>
->> That said, I think we can assume there are 3 sensors always, no?
-> If we have three CPU cluster or two cluster share the same sensor in
-> future, that number is certain on hi3660
-
-Do you mean, it is always 3 ?
-
->>> +    data->sensors = devm_kzalloc(dev,
->>> +        sizeof(*data->sensors) * (max_sensor + VIRTUAL_SENSORS),
->>> +        GFP_KERNEL);
->>> +    if (IS_ERR(data->sensors)) {
-
-[ ... ]
-
->>> +            }
->>> +        }
->>> +
->>> +        sensor->id = i;
->>
->> How can we deal with holes in the DT?Do you mean the holes of sensor id?
-
-Yes.
-
-[ ... ]
+> 
+> 
+>> Not call memory_failure() to handle it. Because the error address recorded
+>> by APEI is not accurated, so can not identify the address to hwpoison
+>> memory.
+> 
+> This looks like a firmware bug, what address do you get in your CPER records? It
+> should be a physical address.
+No, not firmware bug. At least in the armv8.0 CPU and huawei's armv8.2 CPU, the architecture
+decided it is not accurate, this abort is asynchronous not synchronous.
 
 
-  -- Daniel
+> 
+> To report a memory-error you must have an address.
+maybe we can not get the accurate error address, can you get it in your armv8 platform?
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> If the error wasn't detected as a synchronous access then delivering a
+> synchronous-external-abort is inappropriate (I think we both agree on this), and
+> SError-interrupt doesn't have a way of specifying an address ... but the CPER
+> records do.
+In our platform, the physical address in CPER records also does not accurate for SEI. do you have accurate error physical address
+for the SEI?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+
+> 
+> For firmware-first your SError-interrupt is just a notification, its the CPER
+> records the OS uses to handle the error.
+I can call APEI kernel driver to parse the severity except doing recovery for the address.
+May be it is not better handle the physical address that recorded in the CPER, because the error address is not accurate
+
+
+> 
+> 
+>> If the SError error comes from guest user mode and is not propagated,
+>> then signal user space to handle it, otherwise, directly injects virtual
+>> SError, or panic if the error is fatal.
+> 
+> What do you mean by propagated?
+That is, the error was detected but not consumed
+
+> 
+> I don't think we should ever hand RAS notifications to user-space, the host
+> kernel should handle them, then describe the symptom (e.g. this region of your
+> va space is gone) to user-space.
+For guest OS user space SError, if it is not propagated. let guest OS handles, for example,killing
+this APP is better, which can avoid terminate the whole guest OS.
+if only host kernel handle them, it can not kill guest os APP.
+
+> 
+> 
+>> when user space handles the error,
+>> it will specify syndrome for the injected virtual SError. This syndrome value
+>> is set to the VSESR_EL2. VSESR_EL2 is a new ARMv8.2 RAS extensions register
+>> which provides the syndrome value reported to software on taking a virtual
+>> SError interrupt exception.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> [0]
+> https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+> 
+> 
+> .
+> 
