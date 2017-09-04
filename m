@@ -1,68 +1,59 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 4 Sep 2017 13:17:40 +0800
-Subject: [PATCH] binder: fix "cast to pointer from integer of different size"
- warning
-Message-ID: <20170904051740.2636-1-jszhang@marvell.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 4 Sep 2017 15:23:07 +1000
+Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
+In-Reply-To: <20170822105534.7f52bda0@canb.auug.org.au>
+References: <20170822105534.7f52bda0@canb.auug.org.au>
+Message-ID: <20170904152307.33f9ba2a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binder driver now could cause warnings as below on 32bit platforms
-if ANDROID_BINDER_IPC_32BIT is unselected:
+Hi all,
 
-drivers/android/binder.c:1550:15: warning: cast to pointer from integer
-of different size [-Wint-to-pointer-cast]
+On Tue, 22 Aug 2017 10:55:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the v4l-dvb tree got a conflict in:
+> 
+>   arch/arm/configs/imx_v6_v7_defconfig
+> 
+> between commit:
+> 
+>   b834bc1c52b8 ("ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers")
+> 
+> from the arm-soc tree and commit:
+> 
+>   b9e1486e0e4b ("media: rc-core: do not depend on MEDIA_SUPPORT")
+> 
+> from the v4l-dvb tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell
+> 
+> diff --cc arch/arm/configs/imx_v6_v7_defconfig
+> index 3a48ad809731,1736813bdea7..000000000000
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@@ -230,9 -226,7 +230,9 @@@ CONFIG_REGULATOR_MC13892=
+>   CONFIG_REGULATOR_PFUZE100=y
+>   CONFIG_MEDIA_SUPPORT=y
+>   CONFIG_MEDIA_CAMERA_SUPPORT=y
+> - CONFIG_MEDIA_RC_SUPPORT=y
+> + CONFIG_RC_CORE=y
+>  +CONFIG_MEDIA_CONTROLLER=y
+>  +CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>   CONFIG_RC_DEVICES=y
+>   CONFIG_IR_GPIO_CIR=y
+>   CONFIG_MEDIA_USB_SUPPORT=y
 
-This patch fix all of them.
+Just a reminder that this conflict still exists.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/android/binder.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/android/binder.c b/drivers/android/binder.c
-index f7665c31feca..2812586bfae5 100644
---- a/drivers/android/binder.c
-+++ b/drivers/android/binder.c
-@@ -1547,7 +1547,8 @@ static void binder_transaction_buffer_release(struct binder_proc *proc,
- 				       debug_id, (u64)fda->num_fds);
- 				continue;
- 			}
--			fd_array = (u32 *)(parent_buffer + fda->parent_offset);
-+			fd_array = (u32 *)(parent_buffer +
-+					   (uintptr_t)fda->parent_offset);
- 			for (fd_index = 0; fd_index < fda->num_fds; fd_index++)
- 				task_close_fd(proc, fd_array[fd_index]);
- 		} break;
-@@ -1751,7 +1752,7 @@ static int binder_translate_fd_array(struct binder_fd_array_object *fda,
- 	 * back to the kernel address space to access it
- 	 */
- 	parent_buffer = parent->buffer - target_proc->user_buffer_offset;
--	fd_array = (u32 *)(parent_buffer + fda->parent_offset);
-+	fd_array = (u32 *)(parent_buffer + (uintptr_t)fda->parent_offset);
- 	if (!IS_ALIGNED((unsigned long)fd_array, sizeof(u32))) {
- 		binder_user_error("%d:%d parent offset not aligned correctly.\n",
- 				  proc->pid, thread->pid);
-@@ -1786,7 +1787,7 @@ static int binder_fixup_parent(struct binder_transaction *t,
- 			       binder_size_t last_fixup_min_off)
- {
- 	struct binder_buffer_object *parent;
--	u8 *parent_buffer;
-+	uintptr_t parent_buffer;
- 	struct binder_buffer *b = t->buffer;
- 	struct binder_proc *proc = thread->proc;
- 	struct binder_proc *target_proc = t->to_proc;
-@@ -1817,9 +1818,9 @@ static int binder_fixup_parent(struct binder_transaction *t,
- 				  proc->pid, thread->pid);
- 		return -EINVAL;
- 	}
--	parent_buffer = (u8 *)(parent->buffer -
--			       target_proc->user_buffer_offset);
--	*(binder_uintptr_t *)(parent_buffer + bp->parent_offset) = bp->buffer;
-+	parent_buffer = parent->buffer - target_proc->user_buffer_offset;
-+	*(binder_uintptr_t *)(parent_buffer +
-+			      (uintptr_t)bp->parent_offset) = bp->buffer;
- 
- 	return 0;
- }
 -- 
-2.14.1
+Cheers,
+Stephen Rothwell
