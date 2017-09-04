@@ -1,79 +1,68 @@
-From: hayashi.kunihiko@socionext.com (hayashi.kunihiko at socionext.com)
-Date: Mon, 4 Sep 2017 03:55:03 +0000
-Subject: [PATCH v4 0/2] add thermal nodes for UniPhier SoCs
-In-Reply-To: <CAK7LNARpzTVBZEzy5pxT+oOgJQK0RFgDeYzxZLp+Fy5xDPuRqQ@mail.gmail.com>
-References: <1504487791-20582-1-git-send-email-hayashi.kunihiko@socionext.com>
- <CAK7LNARpzTVBZEzy5pxT+oOgJQK0RFgDeYzxZLp+Fy5xDPuRqQ@mail.gmail.com>
-Message-ID: <20170904125502.9FE8.4A936039@socionext.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon, 04 Sep 2017 13:43:46 +0900
+Subject: [PATCH v3 1/2] ARM: dts: uniphier: add nodes of thermal monitor
+ and thermal zone for PXs2
+In-Reply-To: <CAK7LNAS2chLuW_PzeghNCTYf038qS_BgxMqJ6FoQbqT6hRJYSQ@mail.gmail.com>
+References: <1499255595-31805-2-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAK7LNAS2chLuW_PzeghNCTYf038qS_BgxMqJ6FoQbqT6hRJYSQ@mail.gmail.com>
+Message-ID: <20170904134345.9FEF.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Yamada-san,
 
-On Mon, 4 Sep 2017 11:09:51 +0900 <yamada.masahiro@socionext.com> wrote:
+On Thu, 10 Aug 2017 19:44:38 +0900 <yamada.masahiro@socionext.com> wrote:
 
-> Hi.
+> Hayashi-san
 > 
 > 
-> 
-> 2017-09-04 10:16 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> > This series adds thermal nodes for UniPhier PXs2 and LD20 SoCs.
+> 2017-07-05 20:53 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> > Add nodes of thermal monitor and thermal zone for UniPhier PXs2 SoC.
+> > The thermal monitor is included in sysctrl.
+> > Furthermore, add cpuN labels for reference in cooling-device property.
 > >
-> > Changes since v3:
-> > - rebase on top of linux-next
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > ---
 > 
 > 
-> This repost is a spam.
-> 
-> I left some comments in v3,
-> but no response from you
-> nothing was reflected in v4.
+> Please add socionext,tmod-calibration
+> in case the efuse is not brown.
 
-Sorry I missed them. I'll reflect your comments and repost them.
+I see.
+I'll include it to the pvtctl node in uniphier-pxs2.dtsi.
 
-Thank you,
+> >
+> > +       thermal-zones {
+> > +               cpu_thermal {
+> > +                       polling-delay-passive = <250>;  /* 250ms */
+> > +                       polling-delay = <1000>;         /* 1000ms */
+> > +                       thermal-sensors = <&pvtctl>;
+> > +
+> > +                       trips {
+> > +                               cpu_crit: cpu_crit {
+> > +                                       temperature = <95000>;  /* 95C */
+> > +                                       hysteresis = <2000>;
+> > +                                       type = "critical";
+> > +                               };
+> > +                               cpu_alert: cpu_alert {
+> > +                                       temperature = <85000>;  /* 85C */
+> > +                                       hysteresis = <2000>;
+> > +                                       type = "passive";
+> > +                               };
+> > +                       };
+> > +
+> > +                       cooling-maps {
+> > +                               map {
+> > +                                       trip = <&cpu_alert>;
+> > +                                       cooling-device = <&cpu0 (-1) (-1)>;
+> > +                               };
+> 
+> 
+> After all, I decided to use dt-bindings headers.
+> Could you use THERMAL_NO_LIMIT for clarification?
 
-> 
-> 
-> 
-> 
-> > Changes since v2:
-> > - add the calibration value to device tree for LD20 reference board
-> >
-> > Changes since v1:
-> > - separate from driver's patchset[1]
-> > - add cooling-maps nodes on the device tree
-> > - fix an interrupt trigger to set 'level-triggered' according to
-> >   hardware specification
-> > - bring up threshold temperature for LD20 according to the spec sheet
-> > - add cpuN labels for reference in cooling-device property on PXs2 dts
-> >
-> > [1] https://lkml.org/lkml/2017/6/28/170
-> >
-> > Kunihiko Hayashi (2):
-> >   ARM: dts: uniphier: add nodes of thermal monitor and thermal zone for
-> >     PXs2
-> >   arm64: dts: uniphier: add nodes of thermal monitor and thermal zone
-> >     for LD20
-> >
-> >  arch/arm/boot/dts/uniphier-pxs2.dtsi               | 43 ++++++++++++++++++++--
-> >  .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts |  4 ++
-> >  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 40 ++++++++++++++++++++
-> >  3 files changed, 83 insertions(+), 4 deletions(-)
-> >
-> > --
-> > 2.7.4
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
-> -- 
-> Best Regards
-> Masahiro Yamada
+Okay, I'll replace '(-1)' to THERMAL_NO_LIMIT and add the '#include' directive.
 
 ---
+Best Regards,
 Kunihiko Hayashi
-: hayashi.kunihiko at socionext.com
