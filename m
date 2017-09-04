@@ -1,67 +1,74 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 5 Sep 2017 00:22:27 +0900
-Subject: [PATCH -tip 2/4] arm: Cleanup in_exception_text() and move it
- in asm/sections.h
-In-Reply-To: <20170903222152.GA25743@n2100.armlinux.org.uk>
-References: <150295395797.14424.968407208436624832.stgit@devbox>
- <150295409062.14424.11976553130089631456.stgit@devbox>
- <20170903222152.GA25743@n2100.armlinux.org.uk>
-Message-ID: <20170905002227.066c6d44386f881a99ccc620@kernel.org>
+From: niklas.cassel@axis.com (Niklas Cassel)
+Date: Mon, 4 Sep 2017 17:23:55 +0200
+Subject: [PATCH] arm: boot: dts: artpec6: Remove unnecessary
+ interrupt-parent property from sub-nodes
+In-Reply-To: <8475266d-de55-0760-7ae4-9fcafead36e4@techveda.org>
+References: <1498565735-8208-1-git-send-email-surenderp@techveda.org>
+ <d582c742-4bf9-c658-d105-572d180222a4@axis.com>
+ <8475266d-de55-0760-7ae4-9fcafead36e4@techveda.org>
+Message-ID: <5310134e-c371-d43f-175f-a3a9cdc5b657@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Sun, 3 Sep 2017 23:21:52 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-
-> On Thu, Aug 17, 2017 at 04:15:00PM +0900, Masami Hiramatsu wrote:
-> > Cleanup in_exception_text() using memory_contains() and
-> > move it in asm/sections.h from asm/trap.h because
-> > section symbols and memory_contains() are defined in
-> > asm/sections.h.
-> > 
-> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > ---
-> >  arch/arm/include/asm/sections.h |   17 +++++++++++++++++
-> >  arch/arm/include/asm/traps.h    |   22 +---------------------
-> >  2 files changed, 18 insertions(+), 21 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
-> > index 803bbf2b20b8..76791cfc7619 100644
-> > --- a/arch/arm/include/asm/sections.h
-> > +++ b/arch/arm/include/asm/sections.h
-> > @@ -4,5 +4,22 @@
-> >  #include <asm-generic/sections.h>
-> >  
-> >  extern char _exiprom[];
-> > +extern char __exception_text_start[], __exception_text_end[];
-> > +
-> > +/**
-> > + * in_exception_text - check if an address is in exception_text or
-> > + *			irqentry_text
-> > + * @addr: virtual address to be checked
-> > + *
-> > + * Returns: true if the address specified by @addr is in the exception_text or
-> > + * irqentry_text, false otherwise.
-> > + */
-> > +static inline bool in_exception_text(unsigned long addr)
-> > +{
-> > +	return memory_contains(__exception_text_start, __exception_text_end,
-> > +			       (void *)addr, 0) ||
-> > +		memory_contains(__irqentry_text_start, __irqentry_text_end,
-> > +				(void *)addr, 0);
+On 08/11/2017 09:56 AM, Surender Polsani wrote:
+> On Tuesday 27 June 2017 05:57 PM, Niklas Cassel wrote:
+>> Acked-by: Niklas Cassel <niklas.cassel@axis.com>
 > 
-> Patch looks buggy - where is __irqentry_text_start and __irqentry_text_end
-> declared?
+> Hi Nik, This patch has been Acknowledged but is not getting added / applied to the
+> respective git source tree. Please let me know if there is any problem.
 
-Those are declared in asm-generic/sections.h by below patch (on -tip tree)
+Hello Surender,
 
-https://patchwork.kernel.org/patch/9878033/
+Sorry for the delay.
 
-So, I thougt it was a good time to clean up related code.
+Could you please resend your patch,
+add "To: arm at kernel.org", together with my Ack.
 
-Thank you,
+Best regards,
+Niklas
 
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+> 
+> Thanks
+> Surender
+>>
+>> On 06/27/2017 02:15 PM, surenderp at techveda.org wrote:
+>>> From: Surender Polsani <surenderp@techveda.org>
+>>>
+>>> "interrupt-parent" property is declared in root node, so it is global
+>>> to all nodes. This property is re-declared in few sub-nodes. To avoid
+>>> duplication this property is removed from following sub-nodes:
+>>> pmu, amba at 0, amba at 0/ethernet.
+>>>
+>>> Signed-off-by: Surender Polsani <surenderp@techveda.org>
+>>> ---
+>>> ? arch/arm/boot/dts/artpec6.dtsi | 3 ---
+>>> ? 1 file changed, 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+>>> index 767cbe8..2ed1177 100644
+>>> --- a/arch/arm/boot/dts/artpec6.dtsi
+>>> +++ b/arch/arm/boot/dts/artpec6.dtsi
+>>> @@ -151,7 +151,6 @@
+>>> ????????? interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+>>> ????????????? <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+>>> ????????? interrupt-affinity = <&cpu0>, <&cpu1>;
+>>> -??????? interrupt-parent = <&intc>;
+>>> ????? };
+>>> ? ????? pcie: pcie at f8050000 {
+>>> @@ -185,7 +184,6 @@
+>>> ????????? compatible = "simple-bus";
+>>> ????????? #address-cells = <0x1>;
+>>> ????????? #size-cells = <0x1>;
+>>> -??????? interrupt-parent = <&intc>;
+>>> ????????? ranges;
+>>> ????????? dma-ranges = <0x80000000 0x00000000 0x40000000>;
+>>> ????????? dma-coherent;
+>>> @@ -195,7 +193,6 @@
+>>> ????????????? clocks = <&eth_phy_ref_clk>,
+>>> ????????????????? <&clkctrl ARTPEC6_CLK_ETH_ACLK>;
+>>> ????????????? compatible = "snps,dwc-qos-ethernet-4.10";
+>>> -??????????? interrupt-parent = <&intc>;
+>>> ????????????? interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>>> ????????????? reg = <0xf8010000 0x4000>;
+>>> ?
+> 
