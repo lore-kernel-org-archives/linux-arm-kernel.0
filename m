@@ -1,35 +1,44 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 05 Sep 2017 00:33:47 +0200
-Subject: [RESENT PATCH v7 3/7] arm64: dts: rockchip: Update rt5514
- devices' compatible for Gru
-In-Reply-To: <59A6EF3C.5090308@rock-chips.com>
-References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
- <1649093.IvC24TsujL@diego> <59A6EF3C.5090308@rock-chips.com>
-Message-ID: <3717071.LIWpZa6hqd@diego>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue,  5 Sep 2017 00:53:24 +0200
+Subject: [PATCH v4 3/3] arm64: dts: realtek: Add RTD1295 RTC node
+In-Reply-To: <20170904225324.29138-1-afaerber@suse.de>
+References: <20170904225324.29138-1-afaerber@suse.de>
+Message-ID: <20170904225324.29138-4-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 31. August 2017, 01:00:44 CEST schrieb jeffy:
-> On 08/30/2017 09:30 PM, Heiko St?bner wrote:
-> >> >-		compatible = "realtek,rt5514";
-> >> >+		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
-> > 
-> > the rt5514-i2c and -spi compatibles should be documented in the
-> > binding-txt
-> > of the chip, but I haven't found any mention of this.
-> > 
-> > 
-> > Heiko
-> 
-> these compatibles are only used for our snd driver to detect rt5514 i2c
-> driver and rt5514 spi driver, suggested by Matthias at
-> https://patchwork.kernel.org/patch/9904731/
-> 
-> should i add it in the rockchip,rk3399-gru-sound.txt or rt5514 binding
-> document?
+Add RTC node to the Realtek RTD1295 Device Tree.
 
-You're introducing new bindings for the codec, so they should of course
-part of the rt5514 binding.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v3 -> v4: Unchanged
+ 
+ v2 -> v3:
+ * Rebased to no longer depend on reset controller series
+ 
+ v1 -> v2: Unchanged
+ 
+ Depends on the pending clock bindings.
+ 
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-
-Heiko
+diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
+index ab72255f843f..fbbd6456079e 100644
+--- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
++++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
+@@ -164,6 +164,12 @@
+ 			status = "disabled";
+ 		};
+ 
++		rtc at 9801b600 {
++			compatible = "realtek,rtd1295-rtc";
++			reg = <0x9801b600 0x100>;
++			clocks = <&clkc RTD1295_CLK_EN_MISC_RTC>;
++		};
++
+ 		gic: interrupt-controller at ff011000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0xff011000 0x1000>,
+-- 
+2.13.5
