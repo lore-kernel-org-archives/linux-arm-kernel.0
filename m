@@ -1,120 +1,65 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Mon, 4 Sep 2017 19:43:59 +0800
-Subject: [PATCH v6 3/7] acpi: apei: remove the unused code
-In-Reply-To: <59A84C51.3000506@arm.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
- <59A84C51.3000506@arm.com>
-Message-ID: <45c69f99-61dd-e847-368b-20acb61b4d50@huawei.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 4 Sep 2017 14:54:50 +0300
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+In-Reply-To: <20170821102124.xcqnzdzhs73gzbcf@yury-thinkpad>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
+ <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+ <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
+ <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+ <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
+ <20170821102124.xcqnzdzhs73gzbcf@yury-thinkpad>
+Message-ID: <20170904115450.fv5fyvmwlbo5nxra@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Mon, Aug 21, 2017 at 01:21:24PM +0300, Yury Norov wrote:
+> On Tue, Aug 08, 2017 at 02:34:11PM +0100, Catalin Marinas wrote:
+> > On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
+> > > This is the 4.12 and linux-next - based kernel patches:
+> > > https://github.com/norov/linux/tree/ilp32-4.12
+> > > https://github.com/norov/linux/tree/ilp32-20170724
+> > 
+> > I published the 4.12 branch here:
+> > 
+> > https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.12
+> > 
+> > (or git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git staging/ilp32-4.12)
+> > 
+> > There are two patches on top, one to fix SET_PERSONALITY and the other
+> > to make ILP32 default y since you'd expect people using this branch to
+> > need such option enabled.
+> > 
+> > I'll publish a 4.13-based branch when the corresponding kernel version
+> > is released.
+> 
+> Hi Catalin,
+> 
+> This is the rc-6 based ilp32 series:
+> https://github.com/norov/linux/tree/ilp32-4.13-rc6
+> 
+> It includes latest version of SET_PERSONALITY() rework:
+> https://www.spinics.net/lists/arm-kernel/msg602005.html
+> 
+> All patches prior to 3fc85ee96eb8 ("arm64: ilp32: add documentation on
+> the ILP32 ABI for ARM64") are looking not ilp32-specific and may be
+> applied independently.
+> 
+> It also includes your patch "arm64: ilp32: Make the Kconfig option
+> default y" on the top of series.
+> 
+> Yury
 
-On 2017/9/1 1:50, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 28/08/17 11:38, Dongjiu Geng wrote:
->> In current code logic, the two functions ghes_sea_add() and
->> ghes_sea_remove() are only called when CONFIG_ACPI_APEI_SEA
->> is defined. If not, it will return errors in the ghes_probe()
->> and not contiue. Hence, remove the unnecessary handling when
->> CONFIG_ACPI_APEI_SEI is not defined.
-> 
-> This doesn't match what the patch does. I get this feeling this is needed for
-> some future patch you haven't included.
+Hi Catalin, all,
 
-James, let check the code, when the ghes_probe, if the CONFIG_ACPI_APEI_SEA is not defined.
-it will return -ENOTSUPP and goto error, and the ghes_sea_add has no chance to execute.
-similar, if the probe is failed, it should not have chance to execute ghes_sea_remove.
+This is 4.13-based and next-20170901-based ilp32 patches. 
+https://github.com/norov/linux/tree/ilp32-4.13
+https://github.com/norov/linux/tree/ilp32-20170901
 
-static int ghes_probe(struct platform_device *ghes_dev)
-{
-	struct acpi_hest_generic *generic;
-	struct ghes *ghes = NULL;
+Next-based series includes the patch that moves TASK_* definitions to
+<asm/processor.h>
 
-	int rc = -EINVAL;
+Also, Szabolcs has created arm/ilp32 branch for glibc.
+https://sourceware.org/glibc/wiki/GlibcGit/arm_namespace
 
-	generic = *(struct acpi_hest_generic **)ghes_dev->dev.platform_data;
-	if (!generic->enabled)
-		return -ENODEV;
-
-	switch (generic->notify.type) {
-	case ACPI_HEST_NOTIFY_POLLED:
-	case ACPI_HEST_NOTIFY_EXTERNAL:
-	case ACPI_HEST_NOTIFY_SCI:
-	case ACPI_HEST_NOTIFY_GSIV:
-	case ACPI_HEST_NOTIFY_GPIO:
-		break;
-
-	case ACPI_HEST_NOTIFY_SEA:
-		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
-				generic->header.source_id);
-			rc = -ENOTSUPP;
-			goto err;
-		}
-		break;
-
-> 
-> 
->> change since v5:
->> 1. remove the SEI notification type handling, because the SEI is
->>    asynchronous exception and the address is not accurate. so
->>    not call memory_failure() to handle it.
-> 
-> Setting NOTIFY_SEI as the GHES entry's notification type means the OS should
-> check the GHES->ErrorStatusAddress for CPER records when it receives an
-> SError-Interrupt, as it may be a notification of an error from this error source.
-previously I added the NOTIFY_SEI support, but consider the error address in CPER is not accurate and calling memory_failure() may not make sense.
-so I remove it.
-
-> 
-> If you aren't handling the notification, why is this is in the HEST at all?
-> (and if its not: its not firmware-first)
-For the SEI notification, may be we can parse and handle the CPER record other than the Error physical address
-
-> 
-> 
-> James
-> 
-> 
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index d661d452b238..c15a08db2c7c 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -813,7 +813,6 @@ static struct notifier_block ghes_notifier_hed = {
->>  	.notifier_call = ghes_notify_hed,
->>  };
->>
->> -#ifdef CONFIG_ACPI_APEI_SEA
->>  static LIST_HEAD(ghes_sea);
->>
->>  /*
->> @@ -848,19 +847,6 @@ static void ghes_sea_remove(struct ghes *ghes)
->>  	mutex_unlock(&ghes_list_mutex);
->>  	synchronize_rcu();
->>  }
->> -#else /* CONFIG_ACPI_APEI_SEA */
->> -static inline void ghes_sea_add(struct ghes *ghes)
->> -{
->> -	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not
-> supported\n",
->> -	       ghes->generic->header.source_id);
->> -}
->> -
->> -static inline void ghes_sea_remove(struct ghes *ghes)
->> -{
->> -	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not
-> supported\n",
->> -	       ghes->generic->header.source_id);
->> -}
->> -#endif /* CONFIG_ACPI_APEI_SEA */
->>
->>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->>  /*
->>
-> 
-> 
-> .
-> 
+Yury
