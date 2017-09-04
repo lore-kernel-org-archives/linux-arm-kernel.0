@@ -1,29 +1,35 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Mon, 4 Sep 2017 07:46:37 +0200
-Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path
- for system sleep
-In-Reply-To: <1668277.7DWLdgHGid@aspire.rjw.lan>
-References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
- <3033151.kbPpEQGlRq@aspire.rjw.lan>
- <CAPDyKFqAqiDcdwEOwEu1m7icnP8MijYf4UNrMqN9YhNbug_upg@mail.gmail.com>
- <1668277.7DWLdgHGid@aspire.rjw.lan>
-Message-ID: <20170904054637.GA23707@wunner.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 4 Sep 2017 11:16:54 +0530
+Subject: Applied "regulator: pbias: Select voltage table based on
+ max-voltage" to the regulator tree
+In-Reply-To: <20170901162322.xrjnim4khn3wfslj@sirena.org.uk>
+References: <E1dnO3z-0000tI-7K@debutante>
+ <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
+ <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
+ <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
+ <20170901162322.xrjnim4khn3wfslj@sirena.org.uk>
+Message-ID: <f50319d6-9b18-0538-4eb1-6ff4226cac02@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 02:17:21AM +0200, Rafael J. Wysocki wrote:
-> OTOH I'm starting to think that direct_complete is only theoretically
-> useful and may not be actually set very often in practice, whereas it
-> adds significant complexity to the code, so I'm not sure about it any
-> more.
+Hi Mark,
 
-That makes me come out of the woodwork as a direct_complete fan:
+On Friday 01 September 2017 09:53 PM, Mark Brown wrote:
+> On Fri, Sep 01, 2017 at 03:18:03PM +0200, Ulf Hansson wrote:
+>> On 31 August 2017 at 15:50, Mark Brown <broonie@kernel.org> wrote:
+>>> On Thu, Aug 31, 2017 at 05:37:34PM +0530, Kishon Vijay Abraham I wrote:
+> 
+>>>> This patch should be merged along with the 1st patch of the series "mmc: host:
+>>>> omap_hsmmc: Remove setting PBIAS voltage". Or else it'll break MMC with
+>>>> omap_hsmmc driver.
+> 
+> Hang on, how can this break anything?  If it breaks things shouldn't
+> there be bugfixes for incorrect constraints somewhere?
 
-Runtime resuming a discrete GPU on a modern dual GPU laptop takes about
-1.5 sec, runtime resuming Thunderbolt controllers more than 2 sec.
-A discrete GPU easily consumes 10W, a Thunderbolt controller 2W.
+omap_hsmmc sets the pbias voltage to 3V. But here we program the volt table to
+support either 1.8V or 3.3V (Initially the volt table was programmed to support
+3V because of a bug in TRM). So set_voltage of pbias voltage in omap_hsmmc will
+fail.
 
-So not having direct_complete would noticeably delay system suspend and
-resume as well as reduce battery life.
-
-Lukas
+Thanks
+Kishon
