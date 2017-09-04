@@ -1,55 +1,52 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 04 Sep 2017 15:26:55 +0200
-Subject: [PATCH] video: fbdev: make fb_videomode const
-In-Reply-To: <1503761137-25263-1-git-send-email-bhumirks@gmail.com>
-References: <CGME20170826152551epcas3p129fba70a978dca27cfe64d86ecefd404@epcas3p1.samsung.com>
- <1503761137-25263-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <2256568.NTq7reR8tp@amdc3058>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 04 Sep 2017 15:34:25 +0200
+Subject: rk3288: Enable HDMI hang boot and no Linux log
+In-Reply-To: <CAD6G_RQqVJbPHosWV1YUf86-pK1YzvEYzy4=WG948iiXqbZw-w@mail.gmail.com>
+References: <CAD6G_RQqVJbPHosWV1YUf86-pK1YzvEYzy4=WG948iiXqbZw-w@mail.gmail.com>
+Message-ID: <2008140.oetUxFhdGh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, August 26, 2017 08:55:37 PM Bhumika Goyal wrote:
-> Make these const as they are only passed to a const argument of the
-> function fb_find_mode.
-> Done using Coccinelle.
-> 
-> @match disable optional_qualifier@
-> identifier s;
-> @@
-> static struct fb_videomode s = {...};
-> 
-> @ref@
-> position p;
-> identifier match.s;
-> @@
-> s at p
-> 
-> @good1@
-> identifier match.s;
-> expression list[5] es;
-> position ref.p;
-> @@
-> fb_find_mode(es,&s at p,...)
-> 
-> @bad depends on  !good1@
-> position ref.p;
-> identifier match.s;
-> @@
-> s at p
-> 
-> @depends on forall !bad disable optional_qualifier@
-> identifier match.s;
-> @@
-> static
-> + const
-> struct fb_videomode s;
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+Hi,
 
-Patch queued for 4.14, thanks.
+Am Montag, 4. September 2017, 18:14:56 CEST schrieb Jagan Teki:
+> Is linux-next support HDMI on rk3288? I'm trying to enable hdmi (with
+> ddc-i2c-bus) statically along with Linux boot logo. Observed an kernel
+> boot hang, didn't find whats wrong because DWC MHL PHY as detected
+> from the log.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+FWIW just checked something based on 4.13-rc7 on a rk3288-firefly and hdmi
+is working nicely - as expected.
+
+Also your kernel seems to stop at the stage where it hands over to the rootfs, 
+so I'd guess your issue might be found in that area. The hdmi looks innocent 
+regarding your issue.
+
+
+Heiko
+
+
+> Here is the full log[1] please let me know if I miss any?
+> 
+> Log:
+> -----
+> [    1.983832] rockchip-drm display-subsystem: bound ff930000.vop (ops
+> 0xc0f53418)
+> [    1.992170] rockchip-drm display-subsystem: bound ff940000.vop (ops
+> 0xc0f53418)
+> [    2.000416] dwhdmi-rockchip ff980000.hdmi: Detected HDMI TX
+> controller v2.00a with HDCP (DWC MHL PHY)
+> [    2.011210] rockchip-drm display-subsystem: bound ff980000.hdmi
+> (ops 0xc0f551f4)
+> [    2.019490] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [    2.026888] [drm] No driver support for vblank timestamp query.
+> [    2.033516] [drm] Cannot find any crtc or sizes
+> [    2.038731] [drm] Initialized rockchip 1.0.0 20140818 for
+> display-subsystem on minor 0
+> [    2.047818] hctosys: unable to open rtc device (rtc0)
+> [    2.053958]  mmcblk0: p1
+> [    2.057009] ttyS2 - failed to request DMA
+> 
+> [1] https://paste.ubuntu.com/25464674/
+> 
+> thanks!
