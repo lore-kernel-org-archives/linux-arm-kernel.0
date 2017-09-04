@@ -1,75 +1,30 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 4 Sep 2017 18:19:23 +0200
-Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues in
- zImage with Linux 4.12, LZ4 and GCC5.3)
-Message-ID: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 4 Sep 2017 17:20:21 +0100
+Subject: [PATCH v2 08/29] ARM: head: use PC-relative insn sequence for
+ __smp_alt
+In-Reply-To: <nycvar.YSQ.7.76.1709041215450.8603@knanqh.ubzr>
+References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
+ <20170903120757.14968-9-ard.biesheuvel@linaro.org>
+ <nycvar.YSQ.7.76.1709041215450.8603@knanqh.ubzr>
+Message-ID: <CAKv+Gu9=kZr9xf7x3wj3XArrVESMT5jz3CixG-3_1+JYGqmqmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-24 13:07 GMT+02:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
-> On 24 July 2017 at 11:57, Romain Izard <romain.izard.pro@gmail.com> wrote:
->>
->> While upgrading the kernel from 4.9 to 4.12 for a custom board with a
->> Cortex-A5 based CPU, I have encountered a compilation issue that leads to
->> a data abort during the execution of the LZ4 decompression code in
->> zImage.
->>
->> [...]
->>
->> The compilation options are a little different between both cases:
->> The library is built with -O3, whereas the zImage decompressor is built
->> with -O2, -DDISABLE_BRANCH_PROFILING, -fpic, -mno-single-pic-base,
->> -fno-builtin. All other compilation options are shared in both cases.
->>
-
-This is a red herring: the critical option here is '-fno-builtin'. If it is
-not set, the bug disappears. It also disappears if we replace it with
-'-fno-builtin-putc'. But it only changes the optimizations applied by
-the compiler itself, and cannot explain the issue.
-
-Before updating the LZ4 decompressor, the LZ4 header contained specific
-code for handling alignment issues, which has been changed.
-
->> For Linux 4.9, the LZ4 decompressor code is completely different, which
->> explains why the issue appeared when changing kernel versions.
->>
+On 4 September 2017 at 17:19, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Sun, 3 Sep 2017, Ard Biesheuvel wrote:
 >
-> I see some void* to u32* casts in the new code, which makes me think
-> that it is perhaps not valid C, and has maybe not been tested on an
-> architecture that has stricter alignment requirements than x86?
+>> Replace the open coded PC relative offset calculations with a pair
+>> of adr_l invocations. This ensures these quantities are invariant
+>> under runtime relocation.
+>
+> You probably should add that this patch must be applied on top of "ARM:
+> kernel: use relative references for UP/SMP alternatives" because of the
+> expected r3 value prior to that patch.
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 >
 
-I can reproduce it easily on v4.13 with GCC6.3:
-- Configure with allnoconfig
-- Enable CONFIG_MMU, CONFIG_KERNEL_LZ4
-- Check the generated assembly for arch/arm/boot/compressed/decompress.o:
-In the LZ4_decompress_fast function, the memory access after the third
-branch uses ldm and stm. This is invalid, as the addresses can be unaligned.
+Yes, that is why I needed to reorder them. I will add a mention to the
+commit log.
 
-With this configuration, HAVE_EFFICIENT_UNALIGNED_ACCESS is set, but this is
-wrong. On 32-bit ARM, the compiler is free to generate LDM or LDRD access
-that will always fail on unaligned addresses. In this case, we have two
-LDR/STR access to adjascent addresses that appear in inline code. The
-get_unaligned functions in "include/linux/unaligned/access_ok.h" cast the
-pointers directly as regular 32-bit access, and as those are by default
-aligned, the compiler will optimise and combine the access.
-
-If we use the functions from "include/linux/unaligned/le_struct.h", the
-get_unaligned() function correctly tells the compiler that the access is
-special, and that it should not merge memory access. But we do not fall back
-to byte-by-byte access, as the compiler itself knows how to use 32-bit
-access when -funaligned-access is set (by default for ARMv7).
-
-The issue is probably hidden by the kernel fault handler in normal kernel
-code, but for this case it does nothing as we are working in the boot
-decompressor, that cannot use the fault handler. But it should have a
-performance inpact.
-
-As a result, this means that HAVE_EFFICIENT_UNALIGNED_ACCESS should not
-be set at least in the context of "include/asm-generic/unaligned.h". But
-as this option is also used in other places, where it is not related to
-the get_unaligned functions, it is not possible to remove it on ARM 32-bit
-without further study.
-
--- 
-Romain Izard
+Thanks,
