@@ -1,41 +1,35 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Mon,  4 Sep 2017 17:12:04 -0500
-Subject: [PATCH V2] ARM: dts: da850-evm: add chosen and SPI alias
-Message-ID: <1504563124-25568-1-git-send-email-aford173@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 05 Sep 2017 00:33:47 +0200
+Subject: [RESENT PATCH v7 3/7] arm64: dts: rockchip: Update rt5514
+ devices' compatible for Gru
+In-Reply-To: <59A6EF3C.5090308@rock-chips.com>
+References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
+ <1649093.IvC24TsujL@diego> <59A6EF3C.5090308@rock-chips.com>
+Message-ID: <3717071.LIWpZa6hqd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will add the chosen container to point stdout-path to serial2
-and set the alias for spi0 to spi1 since the SPI NOR flash exists on SPI1.
+Am Donnerstag, 31. August 2017, 01:00:44 CEST schrieb jeffy:
+> On 08/30/2017 09:30 PM, Heiko St?bner wrote:
+> >> >-		compatible = "realtek,rt5514";
+> >> >+		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
+> > 
+> > the rt5514-i2c and -spi compatibles should be documented in the
+> > binding-txt
+> > of the chip, but I haven't found any mention of this.
+> > 
+> > 
+> > Heiko
+> 
+> these compatibles are only used for our snd driver to detect rt5514 i2c
+> driver and rt5514 spi driver, suggested by Matthias at
+> https://patchwork.kernel.org/patch/9904731/
+> 
+> should i add it in the rockchip,rk3399-gru-sound.txt or rt5514 binding
+> document?
 
-Suggested-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Adam Ford <aford173@gmail.com>
----
-Changes in V2:
-  Reword the comment code without any actual change to the code.
+You're introducing new bindings for the codec, so they should of course
+part of the rt5514 binding.
 
-Requires pending patch ("ARM: dts: da850-evm: add serial and ethernet aliases")
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index c755079..3962fa4 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -15,11 +15,16 @@
- 	compatible = "ti,da850-evm", "ti,da850";
- 	model = "DA850/AM1808/OMAP-L138 EVM";
- 
-+	chosen {
-+		stdout-path = &serial2;
-+	};
-+
- 	aliases {
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 		serial2 = &serial2;
- 		ethernet0 = &eth0;
-+		spi0 = &spi1;
- 	};
- 
- 	soc at 1c00000 {
--- 
-2.7.4
+Heiko
