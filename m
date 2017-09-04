@@ -1,126 +1,116 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon,  4 Sep 2017 15:58:36 +0900
-Subject: [RESEND PATCH v4 1/2] ARM: dts: uniphier: add nodes of thermal
- monitor and thermal zone for PXs2
-In-Reply-To: <1504508317-12076-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1504508317-12076-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1504508317-12076-2-git-send-email-hayashi.kunihiko@socionext.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 4 Sep 2017 09:04:15 +0200
+Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
+In-Reply-To: <743ae23a-372a-762b-c345-b914f09fd718@arm.com>
+References: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
+ <20170901003135.10058-1-andre.przywara@arm.com>
+ <20170901060445.vboici7qxfkztp3s@flea>
+ <743ae23a-372a-762b-c345-b914f09fd718@arm.com>
+Message-ID: <20170904070415.e6nclz5n23bo7f4v@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes of thermal monitor and thermal zone for UniPhier PXs2 SoC.
-The thermal monitor node is included in sysctrl. Since the efuse might not
-have a calibrated value of thermal monitor, this patch gives the default
-value for PXs2.
+On Fri, Sep 01, 2017 at 11:35:40PM +0100, Andr? Przywara wrote:
+> On 01/09/17 07:04, Maxime Ripard wrote:
+> > On Fri, Sep 01, 2017 at 01:31:35AM +0100, Andre Przywara wrote:
+> >> Hi,
+> >>
+> >> On 31/08/17 00:36, Stefan Br?ns wrote:
+> >>> The A64 SoC has the same dma engine as the H3 (sun8i), with a
+> >>> reduced amount of physical channels. Add the proper config data
+> >>> and compatible string to support it.
+> >>
+> >> ...
+> >>
+> >>> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> >>> index 5f4eee4513e5..6a17c5d63582 100644
+> >>> --- a/drivers/dma/sun6i-dma.c
+> >>> +++ b/drivers/dma/sun6i-dma.c
+> >>> @@ -1068,6 +1068,12 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+> >>>  	.nr_max_vchans   = 34,
+> >>>  	.dmac_variant    = DMAC_VARIANT_H3,
+> >>>  };
+> >>> +
+> >>> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
+> >>> +	.nr_max_channels = 8,
+> >>> +	.nr_max_requests = 27,
+> >>> +	.nr_max_vchans   = 38,
+> >>> +	.dmac_variant    = DMAC_VARIANT_H3,
+> >>>  };
+> >>>  
+> >>>  static const struct of_device_id sun6i_dma_match[] = {
+> >>> @@ -1075,6 +1081,7 @@ static const struct of_device_id sun6i_dma_match[] = {
+> >>>  	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+> >>>  	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+> >>>  	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
+> >>> +	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
+> >>>  	{ /* sentinel */ }
+> >>>  };
+> >>>  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+> >>
+> >> I was wondering if should use the opportunity to expose those values as
+> >> DT properties instead of hard-wiring them to a compatible string in the
+> >> driver every time we add support for a new SoC?
+> >> We could introduce a new compatible string (say: "allwinner,sunxi-dma"),
+> >> then describe properties for the number of channels and requests and
+> >> vchans and parse those from the DT at probe time.
+> >> With this we might be able to support future SoCs without Linux *driver*
+> >> changes, by just providing the right DT. This would have worked already
+> >> for instance for the A83T support, which just changed those values.
+> >>
+> >> For instance with this quick patch below (just compile tested, and without
+> >> your refactoring).
+> >> The DT node would then read something like:
+> >> 	dma: dma-controller at 01c02000 {
+> >> 		compatible = "allwinner,sun50i-a64-dma",
+> >> 			     "allwinner,sunxi-dma";
+> >> 		reg = <0x01c02000 0x1000>;
+> >> 		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+> >> 		clocks = <&ccu CLK_BUS_DMA>;
+> >> 		resets = <&ccu RST_BUS_DMA>;
+> >> 		#dma-cells = <1>;
+> >> 		allwinner,max_channels = <8>;
+> >> 		allwinner,max_requests = <27>;
+> >> 		allwinner,max_vchans = <38>;
+> >> 	};
+> > 
+> > We're still going to need a different compatible anyway, so it's not
+> > really like it would change anything.
+> 
+> Well, not for now, but possibly in the future. And we should start with
+> this at one point. If we would have had this type of binding already for
+> H3, we could have added the A64 support without driver changes just by a
+> DT change.
 
-Furthermore, add cpuN labels for reference in cooling-device property.
+That's not true. As usual with these kinds of generic binding
+arguments (it's definitely not personal, you're far from the only one
+making them), it completely ignores the fact that the IP itself might
+change from one revision to another, and its behaviour might too.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- arch/arm/boot/dts/uniphier-pxs2.dtsi | 47 +++++++++++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 4 deletions(-)
+The A64 for example moved at least one register off, and has a
+different set of burst size / width.
 
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index 90b020c..f2dfebe 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -7,6 +7,8 @@
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
-+#include <dt-bindings/thermal/thermal.h>
-+
- / {
- 	compatible = "socionext,uniphier-pxs2";
- 	#address-cells = <1>;
-@@ -16,7 +18,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
-@@ -24,9 +26,10 @@
- 			enable-method = "psci";
- 			next-level-cache = <&l2>;
- 			operating-points-v2 = <&cpu_opp>;
-+			#cooling-cells = <2>;
- 		};
- 
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <1>;
-@@ -36,7 +39,7 @@
- 			operating-points-v2 = <&cpu_opp>;
- 		};
- 
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <2>;
-@@ -46,7 +49,7 @@
- 			operating-points-v2 = <&cpu_opp>;
- 		};
- 
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <3>;
-@@ -114,6 +117,35 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal {
-+			polling-delay-passive = <250>;	/* 250ms */
-+			polling-delay = <1000>;		/* 1000ms */
-+			thermal-sensors = <&pvtctl>;
-+
-+			trips {
-+				cpu_crit: cpu_crit {
-+					temperature = <95000>;	/* 95C */
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+				cpu_alert: cpu_alert {
-+					temperature = <85000>;	/* 85C */
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map {
-+					trip = <&cpu_alert>;
-+					cooling-device = <&cpu0
-+					    THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -358,6 +390,13 @@
- 				compatible = "socionext,uniphier-pxs2-reset";
- 				#reset-cells = <1>;
- 			};
-+
-+			pvtctl: pvtctl {
-+				compatible = "socionext,uniphier-pxs2-thermal";
-+				interrupts = <0 3 4>;
-+				#thermal-sensor-cells = <0>;
-+				socionext,tmod-calibration = <0x0f86 0x6844>;
-+			};
- 		};
- 
- 		nand: nand at 68000000 {
+It's something you can't account for when you initially define the
+binding, unless you describe all the registers, plus all their
+parameters and the way you interact with them, which isn't going to
+happen if you want to keep your sanity.
+
+And obviously, while maintaining the stability of the binding of those
+hundreds properties.
+
+Or, you can base all this on the compatible, and be done with it once
+and for all.
+
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/f376efb8/attachment.sig>
