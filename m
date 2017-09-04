@@ -1,70 +1,27 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 4 Sep 2017 09:21:06 +0100
-Subject: [PATCH] ARM: dma-mapping: Remove init_dma_coherent_pool_size()
-In-Reply-To: <1502700619-44809-3-git-send-email-vladimir.murzin@arm.com>
-References: <1502700619-44809-1-git-send-email-vladimir.murzin@arm.com>
- <1502700619-44809-3-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1e36540d-806b-b1c5-385b-10381da08897@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 4 Sep 2017 13:55:09 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: enable MTD_CMDLINE_PARTS
+In-Reply-To: <1504277599-12812-1-git-send-email-aford173@gmail.com>
+References: <1504277599-12812-1-git-send-email-aford173@gmail.com>
+Message-ID: <cb31f8be-c3d0-24f3-4eb3-a23d5cdbb0bb@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/17 09:50, Vladimir Murzin wrote:
-> There are no users of init_dma_coherent_pool_size() left due to
-> 387870f ("mm: dmapool: use provided gfp flags for all
-> dma_alloc_coherent() calls"), so remove it.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm/include/asm/dma-mapping.h |  7 -------
->  arch/arm/mm/dma-mapping.c          | 15 ---------------
->  2 files changed, 22 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 4e0285a..462803f 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -190,13 +190,6 @@ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
->  			unsigned long attrs);
->  
->  /*
-> - * This can be called during early boot to increase the size of the atomic
-> - * coherent DMA pool above the default value of 256KiB. It must be called
-> - * before postcore_initcall.
-> - */
-> -extern void __init init_dma_coherent_pool_size(unsigned long size);
-> -
-> -/*
->   * For SA-1111, IXP425, and ADI systems  the dma-mapping functions are "magic"
->   * and utilize bounce buffers as needed to work around limited DMA windows.
->   *
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 785606e..25a8bce 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -393,21 +393,6 @@ static int __init early_coherent_pool(char *p)
->  }
->  early_param("coherent_pool", early_coherent_pool);
->  
-> -void __init init_dma_coherent_pool_size(unsigned long size)
-> -{
-> -	/*
-> -	 * Catch any attempt to set the pool size too late.
-> -	 */
-> -	BUG_ON(atomic_pool);
-> -
-> -	/*
-> -	 * Set architecture specific coherent pool size only if
-> -	 * it has not been changed by kernel command line parameter.
-> -	 */
-> -	if (atomic_pool_size == DEFAULT_DMA_COHERENT_POOL_SIZE)
-> -		atomic_pool_size = size;
-> -}
-> -
->  /*
->   * Initialise the coherent pool for atomic allocations.
->   */
-> 
+On Friday 01 September 2017 08:23 PM, Adam Ford wrote:
+> There is some disagreement between the partition table map in Linux
+> for the DA850-EVM and the coresponding partition map in U-Boot.
 
-Ok for patch tracker?
+corresponding spelling fixed.
 
-Vladimir
+> To prevent breaking the Kernel, this patch enables MTD_CMDLINE_PARTS
+> which will allow the U-Boot to pass the partition map so future partitions
+> match without breaking backwards compatibility.
+> 
+> Signed-off-by: Adam Ford <aford173@gmail.com>
+
+And noted CONFIG_MMC_BLOCK_BOUNCE removal is because of savedefconfig sync.
+
+Applied for v4.15.
+
+Thanks,
+Sekhar
