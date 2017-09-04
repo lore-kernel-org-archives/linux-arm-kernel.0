@@ -1,71 +1,476 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 4 Sep 2017 15:52:36 +0200
-Subject: [PATCH v2 2/2] ARM: dts: sun8i: h3: Improved Wifi bindings on
- Bananapi M2 Plus
-In-Reply-To: <20170904080519.mec6ypjei7uvo5k7@flea>
-References: <1504283401-4263-1-git-send-email-embed3d@gmail.com>
- <1504283401-4263-3-git-send-email-embed3d@gmail.com>
- <20170904080519.mec6ypjei7uvo5k7@flea>
-Message-ID: <db2d8aed-b3da-7766-1fe5-6ef5d6c5578b@gmail.com>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Mon, 4 Sep 2017 17:24:05 +0300
+Subject: [PATCH v2 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20170831225400.19756-2-brendanhiggins@google.com>
+References: <20170831225400.19756-1-brendanhiggins@google.com>
+ <20170831225400.19756-2-brendanhiggins@google.com>
+Message-ID: <CAP6Zq1i98sUmJW8j2=5WRomBchmVSBmHEfb3Vn18-r-zPrZG=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime
+On 1 September 2017 at 01:53, Brendan Higgins <brendanhiggins@google.com> wrote:
+> Adds basic support for the Nuvoton NPCM750 BMC.
+>
+> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+> ---
+>  arch/arm/Kconfig             |   2 +
+>  arch/arm/Makefile            |   1 +
+>  arch/arm/mach-npcm/Kconfig   |  58 +++++++++++++++
+>  arch/arm/mach-npcm/Makefile  |   3 +
+>  arch/arm/mach-npcm/headsmp.S | 120 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-npcm/npcm7xx.c |  34 +++++++++
+>  arch/arm/mach-npcm/platsmp.c | 168 +++++++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 386 insertions(+)
+>  create mode 100644 arch/arm/mach-npcm/Kconfig
+>  create mode 100644 arch/arm/mach-npcm/Makefile
+>  create mode 100644 arch/arm/mach-npcm/headsmp.S
+>  create mode 100644 arch/arm/mach-npcm/npcm7xx.c
+>  create mode 100644 arch/arm/mach-npcm/platsmp.c
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 61a0cb15067e..05543f1cfbde 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -782,6 +782,8 @@ source "arch/arm/mach-netx/Kconfig"
+>
+>  source "arch/arm/mach-nomadik/Kconfig"
+>
+> +source "arch/arm/mach-npcm/Kconfig"
+> +
+>  source "arch/arm/mach-nspire/Kconfig"
+>
+>  source "arch/arm/plat-omap/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 47d3a1ab08d2..60ca50c7d762 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)             += mediatek
+>  machine-$(CONFIG_ARCH_MXS)             += mxs
+>  machine-$(CONFIG_ARCH_NETX)            += netx
+>  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
+> +machine-$(CONFIG_ARCH_NPCM)            += npcm
+>  machine-$(CONFIG_ARCH_NSPIRE)          += nspire
+>  machine-$(CONFIG_ARCH_OXNAS)           += oxnas
+>  machine-$(CONFIG_ARCH_OMAP1)           += omap1
+> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+> new file mode 100644
+> index 000000000000..a45670e516b4
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/Kconfig
+> @@ -0,0 +1,58 @@
+> +menuconfig ARCH_NPCM
+> +       bool "Nuvoton NPCM Architecture"
+> +       select ARCH_REQUIRE_GPIOLIB
+> +       select USE_OF
+> +       select PINCTRL
+> +       select PINCTRL_NPCM7XX
+> +
+> +if ARCH_NPCM
+> +
+> +comment "NPCMX50 CPU type"
+> +
+> +config CPU_NPCM750
+> +       depends on ARCH_NPCM && ARCH_MULTI_V7 && !CPU_V6 && !CPU_V6K
+> +       bool "Support for NPCM750 BMC CPU (Poleg)"
+> +       select CACHE_L2X0
+> +       select CPU_V7
+> +       select ARM_GIC
+> +       select ARM_ERRATA_754322
+> +       select ARM_ERRATA_764369
+> +       select USB_EHCI_ROOT_HUB_TT
+> +       select USB_ARCH_HAS_HCD
+> +       select USB_ARCH_HAS_EHCI
+> +       select USB_EHCI_HCD
+> +       select USB_ARCH_HAS_OHCI
+> +       select USB_OHCI_HCD
+> +       select USB
+> +       select FIQ
+> +       select CPU_USE_DOMAINS
+> +       select COMMON_CLK if OF
+> +       select NPCM750_TIMER
+> +       select MFD_SYSCON
+> +       help
+> +         Support for single core NPCM750 BMC CPU (Poleg).
+> +
+> +         Single core variant of the Nuvoton NPCM750 BMC based on the Cortex A9.
+> +
+> +config CPU_NPCM750_SMP
+> +       depends on CPU_NPCM750
+> +       bool "Support for NPCM750 BMC CPU SMP (Poleg)"
+> +       select HAVE_SMP
+> +       select HAVE_ARM_SCU
+> +       select ARM_ERRATA_794072
+> +       select PL310_ERRATA_588369
+> +       select PL310_ERRATA_727915
+> +       select ARM_ERRATA_720789
+> +       select DEBUG_SPINLOCK
+> +       select GENERIC_CLOCKEVENTS
+> +       select SMP
+> +       select HAVE_ARM_TWD if SMP
+> +       select HAVE_ARM_SCU if SMP
+> +       select CLKDEV_LOOKUP
+> +       select COMMON_CLK if OF
+> +       help
+> +         Support for dual core NPCM750 BMC CPU (Poleg).
+> +
+> +         Dual core variant of the Nuvoton NPCM750 BMC based on the Cortex A9.
+> +
+> +endif
+> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+> new file mode 100644
+> index 000000000000..634e7c4d6b98
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/Makefile
+> @@ -0,0 +1,3 @@
+> +obj-$(CONFIG_CPU_NPCM750_SMP)  += platsmp.o headsmp.o
+> +
+> +obj-$(CONFIG_CPU_NPCM750)      += npcm7xx.o
+> diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
+> new file mode 100644
+> index 000000000000..d22d2fc1a35c
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/headsmp.S
+> @@ -0,0 +1,120 @@
+> +/*
+> + * linux/arch/arm/mach-realview/headsmp.S
+> + *
+> + * Copyright (c) 2003 ARM Limited
+> + * Copyright 2017 Google, Inc.
+> + *  All Rights Reserved
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/init.h>
+> +
+> +.equ SVC_MODE, 0x13
+> +.equ I_BIT, 0x80
+> +.equ F_BIT, 0x40
+> +
+> +ENTRY(npcm7xx_wakeup_z1)
+> +       stmfd   sp!, {r0-r12, lr}
+> +       ldr     r0, =0x01
+> +       ldr     r1, =0x01
+> +       ldr     r2, =0x01
+> +
+> +       and     r3, r0, #0x0F /* Mask off unused bits of ID, and move to r3 */
+> +       and     r1, r1, #0x0F /* Mask off unused bits of target_filter */
+> +       and     r2, r2, #0x0F /* Mask off unused bits of filter_list */
+> +
+> +       orr     r3, r3, r1, LSL #16 /* Combine ID and target_filter */
+> +       orr     r3, r3, r2, LSL #24 /* and now the filter list */
+> +
+> +       /* Get the address of the GIC */
+> +       mrc     p15, 4, r0, c15, c0, 0 /* Read periph base address */
+> +       add     r0, r0, #0x1F00 /* Add offset of the sgi_trigger reg */
+> +
+> +       /* Write to the Software Generated Interrupt Register (ICDSGIR) */
+> +       str     r3, [r0]
+> +
+> +       ldmfd   sp!, {r0-r12, pc}
+> +ENDPROC(npcm7xx_wakeup_z1)
+> +
+> +ENTRY(v7_invalidate_l1_npcmX50)
+> +       mov     r0, #0
+> +       mcr     p15, 0, r0, c7, c5, 0 /* invalidate I cache */
+> +       mcr     p15, 2, r0, c0, c0, 0
+> +       mrc     p15, 1, r0, c0, c0, 0
+> +
+> +       ldr     r1, =0x7fff
+> +       and     r2, r1, r0, lsr #13
+> +
+> +       ldr     r1, =0x3ff
+> +
+> +       and     r3, r1, r0, lsr #3 /* NumWays - 1 */
+> +       add     r2, r2, #1         /* NumSets */
+> +
+> +       and     r0, r0, #0x7
+> +       add     r0, r0, #4 /* SetShift */
+> +
+> +       clz     r1, r3     /* WayShift */
+> +       add     r4, r3, #1 /* NumWays */
+> +1:     sub     r2, r2, #1 /* NumSets-- */
+> +       mov     r3, r4     /* Temp = NumWays */
+> +2:     subs    r3, r3, #1 /* Temp-- */
+> +       mov     r5, r3, lsl r1
+> +       mov     r6, r2, lsl r0
+> +       /* Reg = (Temp << WayShift) | (NumSets << SetShift) */
+> +       orr     r5, r5, r6
+> +       mcr     p15, 0, r5, c7, c6, 2
+> +       bgt     2b
+> +       cmp     r2, #0
+> +       bgt     1b
+> +       dsb
+> +       isb
+> +       mov     pc, lr
+> +ENDPROC(v7_invalidate_l1_npcmX50)
+> +
+> +/*
+> + * MSM specific entry point for secondary CPUs.  This provides
+> + * a "holding pen" into which all secondary cores are held until we're
+> + * ready for them to initialise.
+> + */
+> +ENTRY(npcm7xx_secondary_startup)
+> +       msr     CPSR_c, #(SVC_MODE)
+> +
+> +       bl      v7_invalidate_l1_npcmX50
+> +       /* disable vector table remapping */
+> +       mrc     p15, 0,r0, c1, c0, 0
+> +       and     r0, #0xffffdfff
+> +       mcr     p15, 0,r0, c1, c0, 0
+> +
+> +#ifdef CONFIG_CACHE_L2X0
+> +       /* Enable L1 & L2 prefetch + Zero line */
+> +       mrc     p15, 0, r0, c1, c0, 1
+> +       orr     r0, r0, #(7 << 1)
+> +       mcr     p15, 0, r0, c1, c0, 1
+> +#endif /* CONFIG_CACHE_L2X0 */
+> +
+> +       mrc     p15, 0, r0, c0, c0, 5
+> +       and     r0, r0, #15
+> +       adr     r4, 1f
+> +       ldmia   r4, {r5, r6}
+> +       sub     r4, r4, r5
+> +       add     r6, r6, r4
+> +       str r3,[r2]
+> +
+> +pen:   ldr     r7, [r6]
+> +       cmp     r7, r0
+> +       bne     pen
+> +
+> +       /*
+> +        * we've been released from the holding pen: secondary_stack
+> +        * should now contain the SVC stack for this core
+> +        */
+> +       b       secondary_startup
+> +ENDPROC(npcm7xx_secondary_startup)
+> +
+> +       .align
+> +1:     .long   .
+> +       .long   pen_release
+> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+> new file mode 100644
+> index 000000000000..106dc62dd62b
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/npcm7xx.c
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright (c) 2014 Nuvoton Technology corporation.
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation;version 2 of the License.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +#define NPCM7XX_AUX_VAL (L310_AUX_CTRL_INSTR_PREFETCH |                               \
+> +                        L310_AUX_CTRL_DATA_PREFETCH |                         \
+> +                        L310_AUX_CTRL_NS_LOCKDOWN |                           \
+> +                        L310_AUX_CTRL_CACHE_REPLACE_RR |                      \
+> +                        L2C_AUX_CTRL_SHARED_OVERRIDE |                        \
+> +                        L310_AUX_CTRL_FULL_LINE_ZERO)
+> +
+> +static const char *const npcm7xx_dt_match[] = {
+> +       "nuvoton,npcm750",
+> +       NULL
+> +};
+> +
+> +DT_MACHINE_START(NPCM7XX_DT, "NPCMX50 Chip family")
+> +       .atag_offset    = 0x100,
+> +       .dt_compat      = npcm7xx_dt_match,
+> +       .l2c_aux_val    = NPCM7XX_AUX_VAL,
+> +       .l2c_aux_mask   = ~NPCM7XX_AUX_VAL,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
+> new file mode 100644
+> index 000000000000..4b53adb467fc
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/platsmp.c
+> @@ -0,0 +1,168 @@
+> +/*
+> + * Copyright (C) 2002 ARM Ltd.
+> + * Copyright (C) 2008 STMicroelctronics.
+> + * Copyright (C) 2009 ST-Ericsson.
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This file is based on arm realview platform
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "PLATSMP: " fmt
+> +
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/smp.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/smp.h>
+> +#include <asm/smp_plat.h>
+> +#include <asm/smp_scu.h>
+> +
+> +#define NPCM7XX_SCRPAD_REG 0x13c
+> +
+> +static void __iomem *gcr_base;
+> +static void __iomem *scu_base;
+> +
+> +/* This is called from headsmp.S to wakeup the secondary core */
+> +extern void npcm7xx_secondary_startup(void);
+> +extern void npcm7xx_wakeup_z1(void);
+> +
+> +/*
+> + * Write pen_release in a way that is guaranteed to be visible to all
+> + * observers, irrespective of whether they're taking part in coherency
+> + * or not.  This is necessary for the hotplug code to work reliably.
+> + */
+> +static void npcm7xx_write_pen_release(int val)
+> +{
+> +       pen_release = val;
+> +       /* write to pen_release must be visible to all observers. */
+> +       smp_wmb();
+> +       __cpuc_flush_dcache_area((void *) &pen_release, sizeof(pen_release));
+> +       outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+> +}
+> +
+> +static DEFINE_SPINLOCK(boot_lock);
+> +
+> +static void npcm7xx_smp_secondary_init(unsigned int cpu)
+> +{
+> +       /*
+> +        * let the primary processor know we're out of the
+> +        * pen, then head off into the C entry point
+> +        */
+> +       npcm7xx_write_pen_release(-1);
+> +
+> +       /*
+> +        * Synchronise with the boot thread.
+> +        */
+> +       spin_lock(&boot_lock);
+> +       spin_unlock(&boot_lock);
+> +}
+> +
+> +static int npcm7xx_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> +       unsigned long timeout;
+> +
+> +       if (!gcr_base)
+> +               return -EIO;
+> +
+> +       /*
+> +        * set synchronisation state between this boot processor
+> +        * and the secondary one
+> +        */
+> +       spin_lock(&boot_lock);
+> +
+> +       /*
+> +        * The secondary processor is waiting to be released from
+> +        * the holding pen - release it, then wait for it to flag
+> +        * that it has been released by resetting pen_release.
+> +        */
+> +       npcm7xx_write_pen_release(cpu_logical_map(cpu));
+> +       iowrite32(virt_to_phys(npcm7xx_secondary_startup),
+> +                 gcr_base + NPCM7XX_SCRPAD_REG);
+> +       /* make npcm7xx_secondary_startup visible to all observers. */
+> +       smp_rmb();
+> +
+> +       arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+> +       timeout  = jiffies + (HZ * 1);
+> +       while (time_before(jiffies, timeout)) {
+> +               /* make sure we see any writes to pen_release. */
+> +               smp_rmb();
+> +               if (pen_release == -1)
+> +                       break;
+> +
+> +               udelay(10);
+> +       }
+> +
+> +       /*
+> +        * now the secondary core is starting up let it run its
+> +        * calibrations, then wait for it to finish
+> +        */
+> +       spin_unlock(&boot_lock);
+> +
+> +       return pen_release != -1 ? -EIO : 0;
+> +}
+> +
+> +
+> +static void __init npcm7xx_wakeup_secondary(void)
+> +{
+> +       /*
+> +        * write the address of secondary startup into the backup ram register
+> +        * at offset 0x1FF4, then write the magic number 0xA1FEED01 to the
+> +        * backup ram register at offset 0x1FF0, which is what boot rom code
+> +        * is waiting for. This would wake up the secondary core from WFE
+> +        */
+> +       iowrite32(virt_to_phys(npcm7xx_secondary_startup), gcr_base +
+> +                 NPCM7XX_SCRPAD_REG);
+> +       /* make sure npcm7xx_secondary_startup is seen by all observers. */
+> +       smp_wmb();
+> +       dsb_sev();
+> +
+> +       /* make sure write buffer is drained */
+> +       mb();
+> +}
+> +
+> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +       struct device_node *gcr_np, *scu_np;
+> +
+> +       gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
+> +       if (!gcr_np) {
+> +               pr_err("no gcr device node\n");
+> +               return;
+> +       }
+> +       gcr_base = of_iomap(gcr_np, 0);
+> +       if (!gcr_base) {
+> +               pr_err("could not iomap gcr at: 0x%llx\n", gcr_base);
+> +               return;
+> +       }
+> +
+> +       scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+> +       if (!scu_np) {
+> +               pr_err("no scu device node\n");
+> +               return;
+> +       }
+> +       scu_base = of_iomap(scu_np, 0);
+> +       if (!scu_base) {
+> +               pr_err("could not iomap gcr at: 0x%llx\n", scu_base);
+> +               return;
+> +       }
+> +
+> +       scu_enable(scu_base);
+> +       npcm7xx_wakeup_secondary();
+> +}
+> +
+> +static struct smp_operations npcm7xx_smp_ops __initdata = {
+> +       .smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
+> +       .smp_boot_secondary = npcm7xx_smp_boot_secondary,
+> +       .smp_secondary_init = npcm7xx_smp_secondary_init,
+> +};
+> +
+> +CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm7xx-smp", &npcm7xx_smp_ops);
+> --
+> 2.14.1.581.gf28d330327-goog
+>
 
-Am 04.09.2017 um 10:05 schrieb Maxime Ripard:
-> Hi Philipp,
-> 
-> On Fri, Sep 01, 2017 at 06:30:01PM +0200, Philipp Rossak wrote:
->> From: Philipp Rossak <embed3d@gmail.com>
->>
->> * vqmmc is in this case not needed
->> * no need for pincontrol nodes when the pin is set to a GPIO
->>
->> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> ---
->>   arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 7 -------
->>   1 file changed, 7 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
->> index d756ff8..f7e5d8a 100644
->> --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
->> +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
->> @@ -98,7 +98,6 @@
->>   	wifi_pwrseq: wifi_pwrseq {
->>   		compatible = "mmc-pwrseq-simple";
->>   		pinctrl-names = "default";
->> -		pinctrl-0 = <&wifi_en_bpi_m2p>;
->>   		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
->>   	};
->>   };
->> @@ -153,7 +152,6 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&mmc1_pins_a>;
->>   	vmmc-supply = <&reg_vcc3v3>;
->> -	vqmmc-supply = <&reg_vcc3v3>;
-> 
-> So we actually need this one.
-> 
->>   	mmc-pwrseq = <&wifi_pwrseq>;
->>   	bus-width = <4>;
->>   	non-removable;
->> @@ -200,11 +198,6 @@
->>   		pins = "PL3";
->>   		function = "gpio_in";
->>   	};
->> -
->> -	wifi_en_bpi_m2p: wifi_en_pin {
->> -		pins = "PL7";
->> -		function = "gpio_out";
->> -	};
-> 
-> And there's also other GPIO pins here, I'd prefer if you could tackle
-> them all at once.
-> 
-> Thanks!
-> Maxime
-> 
-Thanks for the feedback!
-I will fix that with a new single Patch in the next Days.
+Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+Tested-by: Tomer Maimon <tmaimon77@gmail.com>
 
-Philipp
+Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+Tested-by: Avi Fishman <avifishman70@gmail.com>
