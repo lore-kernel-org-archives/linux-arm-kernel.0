@@ -1,37 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Sep 2017 17:48:09 +0100
-Subject: Applied "regulator: pbias: Select voltage table based on
- max-voltage" to the regulator tree
-In-Reply-To: <f50319d6-9b18-0538-4eb1-6ff4226cac02@ti.com>
-References: <E1dnO3z-0000tI-7K@debutante>
- <64d9c623-456c-9142-9c5b-a94593628643@ti.com>
- <20170831135050.adiek6iqqzhndgci@sirena.org.uk>
- <CAPDyKFo=UdnVhFU7k+K1=N0e-1sniC+WZjZ4dZKSF8mXhM43Uw@mail.gmail.com>
- <20170901162322.xrjnim4khn3wfslj@sirena.org.uk>
- <f50319d6-9b18-0538-4eb1-6ff4226cac02@ti.com>
-Message-ID: <20170904164809.5coe6vhgyc7iwy6q@sirena.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Sep 2017 12:50:32 -0400 (EDT)
+Subject: [PATCH v2 11/29] ARM: head.S: use PC relative insn sequence to
+ calculate PHYS_OFFSET
+In-Reply-To: <20170903120757.14968-12-ard.biesheuvel@linaro.org>
+References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
+ <20170903120757.14968-12-ard.biesheuvel@linaro.org>
+Message-ID: <nycvar.YSQ.7.76.1709041248400.8603@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 11:16:54AM +0530, Kishon Vijay Abraham I wrote:
-> On Friday 01 September 2017 09:53 PM, Mark Brown wrote:
+On Sun, 3 Sep 2017, Ard Biesheuvel wrote:
 
-> > Hang on, how can this break anything?  If it breaks things shouldn't
-> > there be bugfixes for incorrect constraints somewhere?
+> Replace the open coded arithmetic with a simple adr_l/sub pair. This
+> ensures these quantities are invariant under runtime relocation.
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-> omap_hsmmc sets the pbias voltage to 3V. But here we program the volt table to
-> support either 1.8V or 3.3V (Initially the volt table was programmed to support
-> 3V because of a bug in TRM). So set_voltage of pbias voltage in omap_hsmmc will
-> fail.
+Of course there won't be anything to relocate in a XIP kernel. But 
+consistency is good and this looks nicer.
 
-Oh, that's appauling.  I guess this is some voltage that doesn't get
-presented to cards because otherwise I'm surprised nobody noticed.
-Anyway I've dropped the commit from my pull request for now, it'll not
-go for v4.14, but the pull request is still there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170904/c97db2b6/attachment.sig>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  arch/arm/kernel/head.S | 10 ++--------
+>  1 file changed, 2 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index f607e290ef4b..62c961849035 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -106,10 +106,8 @@ ENTRY(stext)
+>  #endif
+>  
+>  #ifndef CONFIG_XIP_KERNEL
+> -	adr	r3, 2f
+> -	ldmia	r3, {r4, r8}
+> -	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
+> -	add	r8, r8, r4			@ PHYS_OFFSET
+> +	adr_l	r8, _text			@ __pa(_text)
+> +	sub	r8, r8, #TEXT_OFFSET		@ PHYS_OFFSET
+>  #else
+>  	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
+>  #endif
+> @@ -161,10 +159,6 @@ ENTRY(stext)
+>  1:	b	__enable_mmu
+>  ENDPROC(stext)
+>  	.ltorg
+> -#ifndef CONFIG_XIP_KERNEL
+> -2:	.long	.
+> -	.long	PAGE_OFFSET
+> -#endif
+>  
+>  /*
+>   * Setup the initial page tables.  We only setup the barest
+> -- 
+> 2.11.0
+> 
+> 
