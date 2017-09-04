@@ -1,76 +1,68 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 04 Sep 2017 13:43:48 +0900
-Subject: [PATCH v3 2/2] arm64: dts: uniphier: add nodes of thermal monitor
- and thermal zone for LD20
-In-Reply-To: <CAK7LNAS38+GDnhC3Hgymt1gg6QCPG-q5SJo27Qsc3ErZv5RsnA@mail.gmail.com>
-References: <1499255595-31805-3-git-send-email-hayashi.kunihiko@socionext.com>
- <CAK7LNAS38+GDnhC3Hgymt1gg6QCPG-q5SJo27Qsc3ErZv5RsnA@mail.gmail.com>
-Message-ID: <20170904134347.9FF0.4A936039@socionext.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 4 Sep 2017 13:17:40 +0800
+Subject: [PATCH] binder: fix "cast to pointer from integer of different size"
+ warning
+Message-ID: <20170904051740.2636-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yamada-san,
+The binder driver now could cause warnings as below on 32bit platforms
+if ANDROID_BINDER_IPC_32BIT is unselected:
 
-On Thu, 10 Aug 2017 19:48:22 +0900 <yamada.masahiro@socionext.com> wrote:
+drivers/android/binder.c:1550:15: warning: cast to pointer from integer
+of different size [-Wint-to-pointer-cast]
 
-> Hi Hayashi-san,
-> 
-> 
-> 2017-07-05 20:53 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> > Add nodes of thermal monitor and thermal zone for UniPhier LD20 SoC.
-> > The thermal monitor is included in sysctrl.
-> >
-> > Furthermore, since the reference board doesn't have a calibrated value of
-> > thermal monitor, this patch gives the default value for LD20 reference
-> > board.
-> >
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > ---
-> >  .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts |  4 +++
-> >  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 40 ++++++++++++++++++++++
-> >  2 files changed, 44 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> > index 609162a..d7f6b39 100644
-> > --- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> > +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> > @@ -86,3 +86,7 @@
-> >  &i2c0 {
-> >         status = "okay";
-> >  };
-> > +
-> > +&pvtctl {
-> > +       socionext,tmod-calibration = <0x0f22 0x68ee>;
-> > +};
-> 
-> 
-> I think this calib value is shared among all boards
-> (ref and global).
-> 
-> 
-> Please move it to the SoC dtsi.
+This patch fix all of them.
 
-I see. I'll move it.
-
-> > +                       cooling-maps {
-> > +                               map0 {
-> > +                                       trip = <&cpu_alert>;
-> > +                                       cooling-device = <&cpu0 (-1) (-1)>;
-> > +                               };
-> > +                               map1 {
-> > +                                       trip = <&cpu_alert>;
-> > +                                       cooling-device = <&cpu2 (-1) (-1)>;
-> > +                               };
-> > +                       };
-> > +               };
-> > +       };
-> > +
-> 
-> After all, I decided to use dt-bindings headers.
-> Could you use THERMAL_NO_LIMIT for clarification?
-
-Okay, I'll replace '(-1)' to THERMAL_NO_LIMIT and add the '#include' directive.
-
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
-Best Regards,
-Kunihiko Hayashi
+ drivers/android/binder.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/android/binder.c b/drivers/android/binder.c
+index f7665c31feca..2812586bfae5 100644
+--- a/drivers/android/binder.c
++++ b/drivers/android/binder.c
+@@ -1547,7 +1547,8 @@ static void binder_transaction_buffer_release(struct binder_proc *proc,
+ 				       debug_id, (u64)fda->num_fds);
+ 				continue;
+ 			}
+-			fd_array = (u32 *)(parent_buffer + fda->parent_offset);
++			fd_array = (u32 *)(parent_buffer +
++					   (uintptr_t)fda->parent_offset);
+ 			for (fd_index = 0; fd_index < fda->num_fds; fd_index++)
+ 				task_close_fd(proc, fd_array[fd_index]);
+ 		} break;
+@@ -1751,7 +1752,7 @@ static int binder_translate_fd_array(struct binder_fd_array_object *fda,
+ 	 * back to the kernel address space to access it
+ 	 */
+ 	parent_buffer = parent->buffer - target_proc->user_buffer_offset;
+-	fd_array = (u32 *)(parent_buffer + fda->parent_offset);
++	fd_array = (u32 *)(parent_buffer + (uintptr_t)fda->parent_offset);
+ 	if (!IS_ALIGNED((unsigned long)fd_array, sizeof(u32))) {
+ 		binder_user_error("%d:%d parent offset not aligned correctly.\n",
+ 				  proc->pid, thread->pid);
+@@ -1786,7 +1787,7 @@ static int binder_fixup_parent(struct binder_transaction *t,
+ 			       binder_size_t last_fixup_min_off)
+ {
+ 	struct binder_buffer_object *parent;
+-	u8 *parent_buffer;
++	uintptr_t parent_buffer;
+ 	struct binder_buffer *b = t->buffer;
+ 	struct binder_proc *proc = thread->proc;
+ 	struct binder_proc *target_proc = t->to_proc;
+@@ -1817,9 +1818,9 @@ static int binder_fixup_parent(struct binder_transaction *t,
+ 				  proc->pid, thread->pid);
+ 		return -EINVAL;
+ 	}
+-	parent_buffer = (u8 *)(parent->buffer -
+-			       target_proc->user_buffer_offset);
+-	*(binder_uintptr_t *)(parent_buffer + bp->parent_offset) = bp->buffer;
++	parent_buffer = parent->buffer - target_proc->user_buffer_offset;
++	*(binder_uintptr_t *)(parent_buffer +
++			      (uintptr_t)bp->parent_offset) = bp->buffer;
+ 
+ 	return 0;
+ }
+-- 
+2.14.1
