@@ -1,52 +1,60 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue,  5 Sep 2017 11:43:02 +0300
-Subject: [PATCH v2 2/6] arm64: tegra: Add host1x on Tegra186
+Date: Tue,  5 Sep 2017 11:43:06 +0300
+Subject: [PATCH v2 6/6] drm/tegra: Add Tegra186 support for VIC
 In-Reply-To: <20170905084306.19318-1-mperttunen@nvidia.com>
 References: <20170905084306.19318-1-mperttunen@nvidia.com>
-Message-ID: <20170905084306.19318-3-mperttunen@nvidia.com>
+Message-ID: <20170905084306.19318-7-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the node for Host1x on the Tegra186, without any subdevices
-for now.
+Add Tegra186 support for VIC - no changes are required except for new
+firmware and compatibility string.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
-v2:
-- Changed address-cells and size-cells to 1 and fixed the ranges
-  property correspondingly.
+ drivers/gpu/drm/tegra/drm.c |  1 +
+ drivers/gpu/drm/tegra/vic.c | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index a964d246c0e9..b1a3e404c7be 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -355,6 +355,24 @@
- 		nvidia,bpmp = <&bpmp>;
- 	};
+diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
+index 3ba659a5940d..e3331a2bc082 100644
+--- a/drivers/gpu/drm/tegra/drm.c
++++ b/drivers/gpu/drm/tegra/drm.c
+@@ -1281,6 +1281,7 @@ static const struct of_device_id host1x_drm_subdevs[] = {
+ 	{ .compatible = "nvidia,tegra210-sor", },
+ 	{ .compatible = "nvidia,tegra210-sor1", },
+ 	{ .compatible = "nvidia,tegra210-vic", },
++	{ .compatible = "nvidia,tegra186-vic", },
+ 	{ /* sentinel */ }
+ };
  
-+	host1x at 13e00000 {
-+		compatible = "nvidia,tegra186-host1x", "simple-bus";
-+		reg = <0x0 0x13e00000 0x0 0x10000>,
-+		      <0x0 0x13e10000 0x0 0x10000>;
-+		reg-names = "hypervisor", "vm";
-+		interrupts = <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&bpmp TEGRA186_CLK_HOST1X>;
-+		clock-names = "host1x";
-+		resets = <&bpmp TEGRA186_RESET_HOST1X>;
-+		reset-names = "host1x";
+diff --git a/drivers/gpu/drm/tegra/vic.c b/drivers/gpu/drm/tegra/vic.c
+index 2448229fa653..6697a21a250d 100644
+--- a/drivers/gpu/drm/tegra/vic.c
++++ b/drivers/gpu/drm/tegra/vic.c
+@@ -270,9 +270,16 @@ static const struct vic_config vic_t210_config = {
+ 	.firmware = NVIDIA_TEGRA_210_VIC_FIRMWARE,
+ };
+ 
++#define NVIDIA_TEGRA_186_VIC_FIRMWARE "nvidia/tegra186/vic04_ucode.bin"
 +
-+		#address-cells = <1>;
-+		#size-cells = <1>;
++static const struct vic_config vic_t186_config = {
++	.firmware = NVIDIA_TEGRA_186_VIC_FIRMWARE,
++};
 +
-+		ranges = <0x15000000 0x0 0x15000000 0x01000000>;
-+	};
-+
- 	gpu at 17000000 {
- 		compatible = "nvidia,gp10b";
- 		reg = <0x0 0x17000000 0x0 0x1000000>,
+ static const struct of_device_id vic_match[] = {
+ 	{ .compatible = "nvidia,tegra124-vic", .data = &vic_t124_config },
+ 	{ .compatible = "nvidia,tegra210-vic", .data = &vic_t210_config },
++	{ .compatible = "nvidia,tegra186-vic", .data = &vic_t186_config },
+ 	{ },
+ };
+ 
+@@ -405,3 +412,6 @@ MODULE_FIRMWARE(NVIDIA_TEGRA_124_VIC_FIRMWARE);
+ #if IS_ENABLED(CONFIG_ARCH_TEGRA_210_SOC)
+ MODULE_FIRMWARE(NVIDIA_TEGRA_210_VIC_FIRMWARE);
+ #endif
++#if IS_ENABLED(CONFIG_ARCH_TEGRA_186_SOC)
++MODULE_FIRMWARE(NVIDIA_TEGRA_186_VIC_FIRMWARE);
++#endif
 -- 
 2.14.1
