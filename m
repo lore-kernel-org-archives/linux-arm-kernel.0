@@ -1,114 +1,87 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  5 Sep 2017 23:20:00 +0200
-Subject: [PATCH v2 2/2] ARM: owl: smp: Drop owl_secondary_boot()
-In-Reply-To: <20170905212000.7009-1-afaerber@suse.de>
-References: <20170905212000.7009-1-afaerber@suse.de>
-Message-ID: <20170905212000.7009-3-afaerber@suse.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Sep 2017 14:27:42 -0700
+Subject: [PATCH v2 00/29] implement KASLR for ARM
+In-Reply-To: <CAKv+Gu9c_j0qriRazSTmq8eD9icCu4Wuzw1z-LF7bubLVLQd7Q@mail.gmail.com>
+References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
+ <20170905164547.GA5024@atomide.com>
+ <CAKv+Gu_eT_eK9Tj4JvWSsK+iW9juGG6xYDO15umu6jBkoun8ew@mail.gmail.com>
+ <20170905193754.GD5024@atomide.com>
+ <CAKv+Gu9c_j0qriRazSTmq8eD9icCu4Wuzw1z-LF7bubLVLQd7Q@mail.gmail.com>
+Message-ID: <20170905212742.GG5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 simplified the S500 SMP
-code by removing a loop for pen_release in owl_secondary_boot().
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170905 12:43]:
+> Right. Well, I will try to reproduce with the BB white I have.
 
-Since then it is only calling owl_v7_invalidate_l1() before branching to
-secondary_startup().
+Yeah that should be reproducable, I got it to happen on BBB here
+after about 5 boots.
 
-The owl_v7_invalidate_l1() assembler function is superfluous, too.
-Therefore drop owl_secondary_boot() and use secondary_boot() directly.
+> Are you booting with an initrd?
 
-Fixes: 18cfd9429d8a ("ARM: owl: smp: Drop bogus holding pen")
-Cc: David Liu <liuwei@actions-semi.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v1 -> v2:
- * Rebased onto __pa_symbol()
- * Tweaked commit message
- 
- arch/arm/mach-actions/Makefile  |  4 +---
- arch/arm/mach-actions/headsmp.S | 52 -----------------------------------------
- arch/arm/mach-actions/platsmp.c |  2 +-
- 3 files changed, 2 insertions(+), 56 deletions(-)
- delete mode 100644 arch/arm/mach-actions/headsmp.S
+Not on this one, on beagleboard xm I do.
 
-diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
-index c0f116241da7..13831037d8cd 100644
---- a/arch/arm/mach-actions/Makefile
-+++ b/arch/arm/mach-actions/Makefile
-@@ -1,3 +1 @@
--obj-${CONFIG_SMP} += platsmp.o headsmp.o
--
--AFLAGS_headsmp.o := -Wa,-march=armv7-a
-+obj-${CONFIG_SMP} += platsmp.o
-diff --git a/arch/arm/mach-actions/headsmp.S b/arch/arm/mach-actions/headsmp.S
-deleted file mode 100644
-index 65f53bdb69e7..000000000000
---- a/arch/arm/mach-actions/headsmp.S
-+++ /dev/null
-@@ -1,52 +0,0 @@
--/*
-- * Copyright 2012 Actions Semi Inc.
-- * Author: Actions Semi, Inc.
-- *
-- * Copyright (c) 2017 Andreas F?rber
-- *
-- * This program is free software; you can redistribute  it and/or modify it
-- * under  the terms of  the GNU General  Public License as published by the
-- * Free Software Foundation;  either version 2 of the  License, or (at your
-- * option) any later version.
-- */
--
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--ENTRY(owl_v7_invalidate_l1)
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
--	mcr	p15, 2, r0, c0, c0, 0
--	mrc	p15, 1, r0, c0, c0, 0
--
--	ldr	r1, =0x7fff
--	and	r2, r1, r0, lsr #13
--
--	ldr	r1, =0x3ff
--
--	and	r3, r1, r0, lsr #3	@ NumWays - 1
--	add	r2, r2, #1		@ NumSets
--
--	and	r0, r0, #0x7
--	add	r0, r0, #4	@ SetShift
--
--	clz	r1, r3		@ WayShift
--	add	r4, r3, #1	@ NumWays
--1:	sub	r2, r2, #1	@ NumSets--
--	mov	r3, r4		@ Temp = NumWays
--2:	subs	r3, r3, #1	@ Temp--
--	mov	r5, r3, lsl r1
--	mov	r6, r2, lsl r0
--	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
--	mcr	p15, 0, r5, c7, c6, 2
--	bgt	2b
--	cmp	r2, #0
--	bgt	1b
--	dsb
--	isb
--	mov	pc, lr
--ENDPROC(owl_v7_invalidate_l1)
--
--ENTRY(owl_secondary_startup)
--	bl	owl_v7_invalidate_l1
--	b	secondary_startup
-diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
-index 7238926ab015..3efaa10efc43 100644
---- a/arch/arm/mach-actions/platsmp.c
-+++ b/arch/arm/mach-actions/platsmp.c
-@@ -71,7 +71,7 @@ static int s500_wakeup_secondary(unsigned int cpu)
- 	/* wait for CPUx to run to WFE instruction */
- 	udelay(200);
- 
--	writel(__pa_symbol(owl_secondary_startup),
-+	writel(__pa_symbol(secondary_startup),
- 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
- 	writel(OWL_CPUx_FLAG_BOOT,
- 	       timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
--- 
-2.13.5
+> >> > Then loading modules with CONFIG_RANDOMIZE_BASE=y seems to fail with:
+> >> >
+> >> > $ sudo modprobe rtc-twl
+> >> > rtc_twl: disagrees about version of symbol module_layout
+> >> > modprobe: ERROR: could not insert 'rtc_twl': Exec format error
+> >> >
+> >>
+> >> Is this with CONFIG_MODVERSIONS enabled?
+> >
+> > Yes, but disabling that did not seem to make any difference
+> > based on just one test.
+> >
+> 
+> Yeah, well, it appears I missed a couple of details :-)
+> 
+> This should fix the module loading issues:
+
+Yeah now modprobe works :) That's after manually applying
+it as the tabs got munched in your patch somewhere, see below.
+
+Regards,
+
+Tony
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1a0304dd388d..bbefd5f32ec2 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1830,6 +1830,8 @@ config RANDOMIZE_BASE
+>   depends on MMU && AUTO_ZRELADDR
+>   depends on !XIP_KERNEL && !ZBOOT_ROM
+>   select RELOCATABLE
+> + select ARM_MODULE_PLTS if MODULES
+> + select MODULE_REL_CRCS if MODVERSIONS
+>   help
+>    Randomizes the virtual and physical address at which the kernel
+>    image is loaded, as a security feature that deters exploit attempts
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index f13ae153fb24..b56fc4dd27b6 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
+>  #define R_ARM_NONE 0
+>  #define R_ARM_PC24 1
+>  #define R_ARM_ABS32 2
+> +#define R_ARM_REL32 3
+>  #define R_ARM_CALL 28
+>  #define R_ARM_JUMP24 29
+>  #define R_ARM_TARGET1 38
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 3ff571c2c71c..aa4d72837cd5 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -175,6 +175,10 @@
+>   *(u32 *)loc |= offset & 0x7fffffff;
+>   break;
+> 
+> + case R_ARM_REL32:
+> + *(u32 *)loc += sym->st_value - loc;
+> + break;
+> +
+>   case R_ARM_MOVW_ABS_NC:
+>   case R_ARM_MOVT_ABS:
+>   offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
