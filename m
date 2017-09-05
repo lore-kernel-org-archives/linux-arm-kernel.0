@@ -1,24 +1,19 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 05 Sep 2017 11:38:23 -0700
-Subject: [PATCH] arm64: Convert pr_warning to standard pr_warn
-In-Reply-To: <20170905091051.GA4401@leverpostej>
-References: <1504578518-77544-1-git-send-email-cj.chengjian@huawei.com>
- <20170905091051.GA4401@leverpostej>
-Message-ID: <1504636703.28899.9.camel@perches.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 5 Sep 2017 11:46:55 -0700
+Subject: [PATCH v2] clk: mb86s7x: Drop non-building driver
+In-Reply-To: <8601a2ec-33dc-0024-55ce-963f05faca75@suse.de>
+References: <20170824225237.21485-1-afaerber@suse.de>
+ <20170901203201.GB21656@codeaurora.org>
+ <8601a2ec-33dc-0024-55ce-963f05faca75@suse.de>
+Message-ID: <20170905184655.GK21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-09-05 at 10:10 +0100, Mark Rutland wrote:
-> On Tue, Sep 05, 2017 at 10:28:38AM +0800, chengjian c00427203 wrote:
-> > Convert pr_warning to standard pr_warn in arch/arm64/kernel/smp.c
-> > 
-> > Signed-off-by: Cheng Jian <cj.chengjian@huawei.com>
-> > ---
-> >  arch/arm64/kernel/smp.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> Is this a step towards removing pr_warning entirely?
-> 
-> If so, can you please fix up all occurences in arm64? i.e.
+On 09/04, Andreas F?rber wrote:
+> Thanks. Is this 4.14 or 4.15 material at this point? In particular I
 
-https://patchwork.kernel.org/patch/9578907/
+4.14 or whatever the next kernel version will be.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
