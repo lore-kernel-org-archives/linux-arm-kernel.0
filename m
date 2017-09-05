@@ -1,92 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Sep 2017 20:42:14 +0100
-Subject: [PATCH v2 00/29] implement KASLR for ARM
-In-Reply-To: <20170905193754.GD5024@atomide.com>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
- <20170905164547.GA5024@atomide.com>
- <CAKv+Gu_eT_eK9Tj4JvWSsK+iW9juGG6xYDO15umu6jBkoun8ew@mail.gmail.com>
- <20170905193754.GD5024@atomide.com>
-Message-ID: <CAKv+Gu9c_j0qriRazSTmq8eD9icCu4Wuzw1z-LF7bubLVLQd7Q@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 05 Sep 2017 12:43:18 -0700
+Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as
+ fallback
+In-Reply-To: <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
+References: <20170901094629.6566-1-linus.walleij@linaro.org>
+ <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
+Message-ID: <87h8whq6cp.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2017 at 20:37, Tony Lindgren <tony@atomide.com> wrote:
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170905 09:49]:
->> On 5 September 2017 at 17:45, Tony Lindgren <tony@atomide.com> wrote:
->> > I did see boot attempts fail with randomize enable where no output
->> > was produced. It seems this is happening for me maybe 1 out of 5 boots.
->> > Enabling DEBUG_LL did not show anything either.
->> >
->>
->> Yes. I am looking into a couple of kernelci boot reports that look
->> suspicious, but it is rather difficult to reproduce, for obvious
->> reasons :-)
->>
->> Which hardware are you testing this on?
+Daniel Vetter <daniel@ffwll.ch> writes:
+
+> On Fri, Sep 01, 2017 at 11:46:29AM +0200, Linus Walleij wrote:
+>> If we cannot find a panel, assume that the output from the
+>> PL111 is connected directly to a "dumb" VGA connector,
+>> so look up the connector from that bridge.
+>> 
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> This is how the new API is used in the PL111.
+>> ---
+>>  drivers/gpu/drm/pl111/Kconfig     | 1 +
+>>  drivers/gpu/drm/pl111/pl111_drv.c | 3 +++
+>>  2 files changed, 4 insertions(+)
+>> 
+>> diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
+>> index e5e2abd66491..82cb3e60ddc8 100644
+>> --- a/drivers/gpu/drm/pl111/Kconfig
+>> +++ b/drivers/gpu/drm/pl111/Kconfig
+>> @@ -8,6 +8,7 @@ config DRM_PL111
+>>  	select DRM_GEM_CMA_HELPER
+>>  	select DRM_BRIDGE
+>>  	select DRM_PANEL_BRIDGE
+>> +	select DRM_DUMB_VGA_DAC
+>>  	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
+>>  	help
+>>  	  Choose this option for DRM support for the PL111 CLCD controller.
+>> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+>> index f5bc6f160e60..6db423bbd84e 100644
+>> --- a/drivers/gpu/drm/pl111/pl111_drv.c
+>> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
+>> @@ -67,6 +67,7 @@
+>>  #include <drm/drm_of.h>
+>>  #include <drm/drm_bridge.h>
+>>  #include <drm/drm_panel.h>
+>> +#include <drm/dumb_vga_dac.h>
+>>  
+>>  #include "pl111_drm.h"
+>>  #include "pl111_versatile.h"
+>> @@ -128,6 +129,8 @@ static int pl111_modeset_init(struct drm_device *dev)
+>>  	if (panel) {
+>>  		priv->panel = panel;
+>>  		priv->connector = panel->connector;
+>> +	} else {
+>> +		priv->connector = drm_dumb_vga_get_connector(bridge);
 >
-> For testing on omap3, I'm mostly using logicpd torpedo devkit as
-> it works out of box with PM with mainline Linux and has NFSroot
-> usable too.
+> Why do you need to set this? The only code I could find tries to set
+> polarity values from bus_flags, and for VGA I'd assume you want to instead
+> key this off the mode?
 >
+> Wrt the more general problem: They way we solve this in the i915 atomic
+> framework is that the various ->fixup calls fill out relevant fields in
+> the drm_crtc_state. I guess we could add an ->atomic_check to bridges, add
+> a bus_flags to drm_crtc_state (or maybe just let everyone patch up
+> adjusted_mode->flags) instead?
 
-Right. Well, I will try to reproduce with the BB white I have.
-
-Are you booting with an initrd?
-
->> > Then loading modules with CONFIG_RANDOMIZE_BASE=y seems to fail with:
->> >
->> > $ sudo modprobe rtc-twl
->> > rtc_twl: disagrees about version of symbol module_layout
->> > modprobe: ERROR: could not insert 'rtc_twl': Exec format error
->> >
->>
->> Is this with CONFIG_MODVERSIONS enabled?
->
-> Yes, but disabling that did not seem to make any difference
-> based on just one test.
->
-
-Yeah, well, it appears I missed a couple of details :-)
-
-This should fix the module loading issues:
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1a0304dd388d..bbefd5f32ec2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1830,6 +1830,8 @@ config RANDOMIZE_BASE
-  depends on MMU && AUTO_ZRELADDR
-  depends on !XIP_KERNEL && !ZBOOT_ROM
-  select RELOCATABLE
-+ select ARM_MODULE_PLTS if MODULES
-+ select MODULE_REL_CRCS if MODVERSIONS
-  help
-   Randomizes the virtual and physical address at which the kernel
-   image is loaded, as a security feature that deters exploit attempts
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index f13ae153fb24..b56fc4dd27b6 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
- #define R_ARM_NONE 0
- #define R_ARM_PC24 1
- #define R_ARM_ABS32 2
-+#define R_ARM_REL32 3
- #define R_ARM_CALL 28
- #define R_ARM_JUMP24 29
- #define R_ARM_TARGET1 38
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 3ff571c2c71c..aa4d72837cd5 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -175,6 +175,10 @@
-  *(u32 *)loc |= offset & 0x7fffffff;
-  break;
-
-+ case R_ARM_REL32:
-+ *(u32 *)loc += sym->st_value - loc;
-+ break;
-+
-  case R_ARM_MOVW_ABS_NC:
-  case R_ARM_MOVT_ABS:
-  offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
+It seems to me like the bus_flags/format should be specific to each link
+in the display output chain, rather than global to it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170905/a7121552/attachment-0001.sig>
