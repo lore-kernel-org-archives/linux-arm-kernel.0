@@ -1,33 +1,31 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 5 Sep 2017 08:11:34 +0200
-Subject: [PATCH v2] clk: at91: utmi: set the mainck rate
-In-Reply-To: <cc938b2c-1cb7-f7ad-1336-dbb01b2aec9c@gmx.de>
-References: <20170904095226.29336-1-ludovic.desroches@microchip.com>
- <cc938b2c-1cb7-f7ad-1336-dbb01b2aec9c@gmx.de>
-Message-ID: <20170905061134.f6n6jtvz57ycqd2f@rfolt0960.corp.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 5 Sep 2017 08:41:26 +0200
+Subject: [linux-sunxi][PATCH v2] ARM: dts: sunxi: h3/h5 :Add DAI nodes
+In-Reply-To: <20170904174721.21985-1-codekipper@gmail.com>
+References: <20170904174721.21985-1-codekipper@gmail.com>
+Message-ID: <20170905064126.5tpu5s7kuywofgvg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 07:53:57PM +0200, Ingo van Lil wrote:
-> On 09/04/2017 11:52 AM, Ludovic Desroches wrote:
+On Mon, Sep 04, 2017 at 07:47:21PM +0200, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> > +	/* SFR node missing is not necessarily an issue. */
-> > +	regmap_sfr = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-> > +	if (IS_ERR(regmap_sfr))
-> > +		regmap_sfr = NULL;
+> Add the new DAI blocks to the device tree. I2S0 and I2S1 are for
+> connecting to an external codec.
 > 
-> What about SAMA5D3? That chip has an UTMICKTRIM register, too (SAMA5D4
-> doesn't, though).
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Oh Yes. I'll look for atmel,sama5d3-sfr too. Maybe there is a smarter
-solution but I don't have it in mind.
+Applied, thanks!
+Maxime
 
-> 
-> Otherwise the patch looks good and works fine on both my boards (SAMA5D2
-> 16MHz and SAMA5D3 12MHz).
-
-Thanks for testing.
-
-Regards
-
-Ludovic
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170905/3ef6f2e8/attachment-0001.sig>
