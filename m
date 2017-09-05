@@ -1,79 +1,38 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue,  5 Sep 2017 22:34:16 +0200
-Subject: [PATCH v2] ARM: dts: sun8i: h3: Fix Pincrtl bindings on Bananapi M2
- Plus
-Message-ID: <1504643656-4926-1-git-send-email-embed3d@gmail.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue,  5 Sep 2017 23:19:59 +0200
+Subject: [PATCH v2 1/2] ARM: owl: smp: Use __pa_symbol()
+In-Reply-To: <20170905212000.7009-1-afaerber@suse.de>
+References: <20170905212000.7009-1-afaerber@suse.de>
+Message-ID: <20170905212000.7009-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Rossak <embed3d@gmail.com>
+Replace an occurrence of virt_to_phys() with __pa_symbol() macro.
 
-There is no need for pincontrol nodes when the pin is set to a GPIO
+See 64fc2a947a9873700929ec0ef02b4654a04e0476 ("ARM: 8641/1: treewide:
+Replace uses of virt_to_phys with __pa_symbol").
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+Fixes: 172067e0bc87 ("ARM: owl: Implement CPU enable-method for S500")
+Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
-This is Patch is a new version of the following patch:
-https://patchwork.kernel.org/patch/9934835/
-
-
-changes since version 1:
-* vqmmc-supply was added again
-* The pincontrolers for the leds and gpio_keys were removed
-
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 20 --------------------
- 1 file changed, 20 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index d756ff8..cc20d67 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -64,7 +64,6 @@
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
--		pinctrl-0 = <&pwr_led_bpi_m2p>;
+ v1 -> v2: New
  
- 		pwr_led {
- 			label = "bananapi-m2-plus:red:pwr";
-@@ -76,7 +75,6 @@
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
--		pinctrl-0 = <&sw_r_bpi_m2p>;
+ arch/arm/mach-actions/platsmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
+index 12a9e331b432..7238926ab015 100644
+--- a/arch/arm/mach-actions/platsmp.c
++++ b/arch/arm/mach-actions/platsmp.c
+@@ -71,7 +71,7 @@ static int s500_wakeup_secondary(unsigned int cpu)
+ 	/* wait for CPUx to run to WFE instruction */
+ 	udelay(200);
  
- 		sw4 {
- 			label = "power";
-@@ -98,7 +96,6 @@
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		pinctrl-names = "default";
--		pinctrl-0 = <&wifi_en_bpi_m2p>;
- 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
- 	};
- };
-@@ -190,23 +187,6 @@
- 	status = "okay";
- };
- 
--&r_pio {
--	pwr_led_bpi_m2p: led_pins at 0 {
--		pins = "PL10";
--		function = "gpio_out";
--	};
--
--	sw_r_bpi_m2p: key_pins at 0 {
--		pins = "PL3";
--		function = "gpio_in";
--	};
--
--	wifi_en_bpi_m2p: wifi_en_pin {
--		pins = "PL7";
--		function = "gpio_out";
--	};
--};
--
- &reg_usb0_vbus {
- 	gpio = <&pio 3 11 GPIO_ACTIVE_HIGH>; /* PD11 */
- 	status = "okay";
+-	writel(virt_to_phys(owl_secondary_startup),
++	writel(__pa_symbol(owl_secondary_startup),
+ 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+ 	writel(OWL_CPUx_FLAG_BOOT,
+ 	       timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
 -- 
-2.7.4
+2.13.5
