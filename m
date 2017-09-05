@@ -1,37 +1,93 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue,  5 Sep 2017 11:43:04 +0300
-Subject: [PATCH v2 4/6] dt-bindings: host1x: Add Tegra186 information
-In-Reply-To: <20170905084306.19318-1-mperttunen@nvidia.com>
-References: <20170905084306.19318-1-mperttunen@nvidia.com>
-Message-ID: <20170905084306.19318-5-mperttunen@nvidia.com>
+Date: Tue,  5 Sep 2017 11:43:00 +0300
+Subject: [PATCH v2 0/6] Host1x and VIC support for Tegra186
+Message-ID: <20170905084306.19318-1-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Tegra186-specific hypervisor-related register range
-properties.
+Hi,
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
----
-v2:
-- Dropped incorrect note about cells properties.
+not many changes in v2:
 
- .../devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt       | 4 ++++
- 1 file changed, 4 insertions(+)
+Changed address-cells and size-cells for the Host1x device tree node
+to have value 1, since all subdevices fit in the lower 4G. Also dropped
+the incorrect change about this from the dt-bindings patch. Thanks to
+Rob for pointing this out.
 
-diff --git a/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt b/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
-index 74e1e8add5a1..844e0103fb0d 100644
---- a/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
-+++ b/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
-@@ -3,6 +3,10 @@ NVIDIA Tegra host1x
- Required properties:
- - compatible: "nvidia,tegra<chip>-host1x"
- - reg: Physical base address and length of the controller's registers.
-+  For pre-Tegra186, one entry describing the whole register area.
-+  For Tegra186, one entry for each entry in reg-names:
-+    "vm" - VM region assigned to Linux
-+    "hypervisor" - Hypervisor region (only if Linux acts as hypervisor)
- - interrupts: The interrupt outputs from the controller.
- - #address-cells: The number of cells used to represent physical base addresses
-   in the host1x address space. Should be 1.
+Mikko
+
+Notes for v1:
+
+Hi everyone,
+
+this series adds basic support for the Host1x channel engine and the
+VIC 2d compositor unit on Tegra186. The first three patches do the
+required device tree changes, the fourth patch updates the device tree
+binding documentation, and the two remaining patches add the actual
+implementation, almost all of which is in Host1x itself.
+
+The Tegra186 Host1x is a relatively large update over previous
+generations, which can be seen in the diffstat. The biggest change is
+that Host1x is now contains separate hypervisor and vm register
+apertures to support virtualization at the hardware level. This driver,
+however, currently assumes that this instance of Linux is the sole
+operating system having access to the hardware.
+
+This combined with increased numbers of supported channels and
+syncpoints have caused a number of register space changes that are
+responsible for most of the updated code.
+
+The series has been tested on the Jetson TX1 (T210) and TX2 (T186)
+using the host1x_test test suite available at
+
+http://github.com/cyndis/host1x_test
+
+The series itself is available at
+
+http://github.com/cyndis/linux, branch host1x-t186-1
+
+Cheers,
+Mikko
+
+Mikko Perttunen (6):
+  arm64: tegra: Add #power-domain-cells for BPMP
+  arm64: tegra: Add host1x on Tegra186
+  arm64: tegra: Add VIC on Tegra186
+  dt-bindings: host1x: Add Tegra186 information
+  gpu: host1x: Add Tegra186 support
+  drm/tegra: Add Tegra186 support for VIC
+
+ .../display/tegra/nvidia,tegra20-host1x.txt        |   4 +
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  31 ++++
+ drivers/gpu/drm/tegra/drm.c                        |   1 +
+ drivers/gpu/drm/tegra/vic.c                        |  10 ++
+ drivers/gpu/host1x/Makefile                        |   3 +-
+ drivers/gpu/host1x/dev.c                           |  60 ++++++-
+ drivers/gpu/host1x/dev.h                           |   4 +
+ drivers/gpu/host1x/hw/cdma_hw.c                    |  49 +++---
+ drivers/gpu/host1x/hw/debug_hw.c                   | 137 +---------------
+ drivers/gpu/host1x/hw/debug_hw_1x01.c              | 154 ++++++++++++++++++
+ drivers/gpu/host1x/hw/debug_hw_1x06.c              | 133 +++++++++++++++
+ drivers/gpu/host1x/hw/host1x01.c                   |   2 +
+ drivers/gpu/host1x/hw/host1x02.c                   |   2 +
+ drivers/gpu/host1x/hw/host1x04.c                   |   2 +
+ drivers/gpu/host1x/hw/host1x05.c                   |   2 +
+ drivers/gpu/host1x/hw/host1x06.c                   |  44 +++++
+ drivers/gpu/host1x/hw/host1x06.h                   |  26 +++
+ drivers/gpu/host1x/hw/host1x06_hardware.h          | 142 ++++++++++++++++
+ drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h     |  32 ++++
+ drivers/gpu/host1x/hw/hw_host1x06_uclass.h         | 181 +++++++++++++++++++++
+ drivers/gpu/host1x/hw/hw_host1x06_vm.h             |  47 ++++++
+ drivers/gpu/host1x/hw/intr_hw.c                    |  29 ++--
+ 22 files changed, 926 insertions(+), 169 deletions(-)
+ create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x01.c
+ create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x06.c
+ create mode 100644 drivers/gpu/host1x/hw/host1x06.c
+ create mode 100644 drivers/gpu/host1x/hw/host1x06.h
+ create mode 100644 drivers/gpu/host1x/hw/host1x06_hardware.h
+ create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h
+ create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_uclass.h
+ create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_vm.h
+
 -- 
 2.14.1
