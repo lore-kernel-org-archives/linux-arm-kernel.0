@@ -1,55 +1,66 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Tue, 5 Sep 2017 19:06:03 +0800
-Subject: [PATCH v2 0/3] arm64/ras: support sea error recovery
-Message-ID: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
+Date: Tue, 5 Sep 2017 19:06:05 +0800
+Subject: [PATCH v2 2/3] GHES: add a notify chain for process memory section
+In-Reply-To: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
+References: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1504609566-66318-3-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
-are consumed. In some cases, if the error address is in a clean page or a
-read-only page, there is a chance to recover. Such as error occurs in a
-instruction page, we can reread this page from disk instead of killing process.
+Add a notify chain for process memory section, with
+which other modules might do error recovery.
 
-Because memory_failure() may sleep, we can not call it directly in SEA exception
-context. So we saved faulting physical address associated with a process in the
-ghes handler and set __TIF_SEA_NOTIFY. When we return from SEA exception context
-and get into do_notify_resume() before the process running, we could check it
-and call memory_failure() to do recovery. It's safe, because we are in process
-context.
-
-In some platform, when SEA triggerred, physical address could be
-reported by memory section or by processor section, so we save 
-address at this two place.
-
-This patchset is only for internal review, and it's only compiled OK,
-not yet tested now.
-
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+Tested-by: Wang Xiongfeng <wangxiongfeng2@huawei.com>
 ---
-v2 - v1:
-  - wrap arm_proc_error_check and log_arm_hw_error in a single arm_process_error()
-  - fix sea_save_info return value issue
-  - fix link error if this CONFIG_ARM64_ERR_RECOV is not selected
-  - use a notify chain instead of call arch_apei_report_mem_error directly
+ drivers/acpi/apei/ghes.c | 10 ++++++++++
+ include/acpi/ghes.h      |  8 ++++++++
+ 2 files changed, 18 insertions(+)
 
-  https://lkml.org/lkml/2017/9/1/189
-
-Xie XiuQi (3):
-  arm64/ras: support sea error recovery
-  GHES: add a notify chain for process memory section
-  arm64/ras: save error address from memory section for recovery
-
- arch/arm64/Kconfig                   |  11 +++
- arch/arm64/include/asm/ras.h         |  36 ++++++++
- arch/arm64/include/asm/thread_info.h |   4 +-
- arch/arm64/kernel/Makefile           |   1 +
- arch/arm64/kernel/ras.c              | 174 +++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal.c           |   8 ++
- arch/arm64/mm/fault.c                |  27 ++++--
- drivers/acpi/apei/ghes.c             |  14 ++-
- include/acpi/ghes.h                  |   8 ++
- 9 files changed, 272 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm64/include/asm/ras.h
- create mode 100644 arch/arm64/kernel/ras.c
-
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 502335c..5b310b7 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -108,6 +108,9 @@ static inline bool is_hest_type_generic_v2(struct ghes *ghes)
+ static LIST_HEAD(ghes_hed);
+ static DEFINE_MUTEX(ghes_list_mutex);
+ 
++ATOMIC_NOTIFIER_HEAD(ghes_mem_err_chain);
++EXPORT_SYMBOL(ghes_mem_err_chain);
++
+ /*
+  * Because the memory area used to transfer hardware error information
+  * from BIOS to Linux can be determined only in NMI, IRQ or timer
+@@ -479,6 +482,13 @@ static void ghes_do_proc(struct ghes *ghes,
+ 
+ 		if (guid_equal(sec_type, &CPER_SEC_PLATFORM_MEM)) {
+ 			struct cper_sec_mem_err *mem_err = acpi_hest_get_payload(gdata);
++			struct ghes_mem_err mem;
++
++			mem.notify_type = ghes->generic->notify.type;
++			mem.severity = gdata->error_severity;
++			mem.mem_err = mem_err;
++
++			atomic_notifier_call_chain(&ghes_mem_err_chain, 0, &mem);
+ 
+ 			ghes_edac_report_mem_error(ghes, sev, mem_err);
+ 
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 9f26e01..e26b783 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -115,4 +115,12 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
+ 
+ int ghes_notify_sea(void);
+ 
++struct ghes_mem_err {
++	int notify_type;
++	int severity;
++	struct cper_sec_mem_err *mem_err;	
++};
++
++extern struct atomic_notifier_head ghes_mem_err_chain;
++
+ #endif /* GHES_H */
 -- 
 1.8.3.1
