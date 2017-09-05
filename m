@@ -1,169 +1,76 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 5 Sep 2017 12:07:59 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <20170904170928.GB20601@red-moon>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <47b8bf19-abad-3503-2e1c-b9d1304a157e@huawei.com>
- <20170904170928.GB20601@red-moon>
-Message-ID: <9a999fd4-3ade-f7a4-56d7-68ed731ff646@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 5 Sep 2017 13:09:17 +0200
+Subject: [PATCH v8] arm64: allwinner: h5: add NanoPi NEO Plus2 DT support
+In-Reply-To: <20170904143014.46904-1-antony@phenome.org>
+References: <20170824231716.2623-1-antony@phenome.org>
+ <20170904143014.46904-1-antony@phenome.org>
+Message-ID: <20170905110917.pjf22akyqiytx3iu@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> Hi Will, Lorenzo, Robin,
->>
->> I have created the patch to add DT support for this erratum.
->> However, currently I have only added support for pci-based devices.
->> I'm a bit stumped on how to add platform device support, or if we
->> should also add support at all. And I would rather ask before
->> sending the patches.
->>
->> The specific issue is that I know of no platform device with an ITS
->> msi-parent which we would want reserve, i.e. do not translate msi.
->> And, if there were, how to do it.
->>
->> The only platform devices I know off with msi ITS parents are SMMUv3
->> and mbigen. For mbigen, the msi are not translated. Actually, as I
->> see under IORT solution, for mbigen we don't reserve the hw msi
->> region as the SMMUv3 does not have an ID mapping. And we have no
->> equivalent ID mapping property for DT SMMUv3, so cannot create an
->> equivalent check.
->>
->> So here is how the DT iommu get reserved region function with only
->> pci device support looks:
->>
->> /**
->>  * of_iommu_its_get_resv_regions - Reserved region driver helper
->>  * @dev: Device from iommu_get_resv_regions()
->>  * @list: Reserved region list from iommu_get_resv_regions()
->>  *
->>  * Returns: Number of reserved regions on success(0 if no associated ITS),
->>  *          appropriate error value otherwise.
->>  */
->> int of_iommu_its_get_resv_regions(struct device *dev, struct
->> list_head *head)
->> {
->>     struct device_node *of_node = NULL;
->>     struct device *parent_dev;
->>     const __be32 *msi_map;
->>     int num_mappings, i, err, len, resv = 0;
->>
->>     /* walk up to find the parent with a msi-map property */
->>     for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
->>         if (!parent_dev->of_node)
->>             continue;
->>
->>         /*
->>          * Current logic to reserve ITS regions for only PCI root
->>          * complex.
->>          */
->>         msi_map = of_get_property(parent_dev->of_node, "msi-map", &len);
->>         if (msi_map) {
->>             of_node = parent_dev->of_node;
->>             break;
->>         }
->>     }
->>
->>     if (!of_node)
->>         return 0;
->>
->>     num_mappings = of_count_phandle_with_args(of_node, "msi-map",
->> NULL) / 4;
->>
->>     for (i = 0; i < num_mappings; i++) {
->>         int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
->>         struct iommu_resv_region *region;
->>         struct device_node *msi_node;
->>         struct resource resource;
->>         u32 phandle;
->>
->>         phandle = be32_to_cpup(msi_map + 1);
->>         msi_node = of_find_node_by_phandle(phandle);
->>         if (!msi_node)
->>             return -ENODEV;
->>
->>         /*
->>          * There may be different types of msi-controller, so check
->>          * for ITS.
->>          */
->>         if (!of_device_is_compatible(msi_node, "arm,gic-v3-its")) {
->>             of_node_put(msi_node);
->>             continue;
->>         }
->>
->>         err = of_address_to_resource(msi_node, 0, &resource);
->>
->>         of_node_put(msi_node);
->>         if (err)
->>             return err;
->>
->>         region = iommu_alloc_resv_region(resource.start, SZ_128K, prot,
->>                          IOMMU_RESV_MSI);
->>         if (region) {
->>             list_add_tail(&region->list, head);
->>             resv++;
->>         }
->>     }
->>
->>     return (resv == num_mappings) ? resv : -ENODEV;
->> }
->>
->> Any feedback is appreciated.
->
-> Hi John,
->
-> I appreciate it is not trivial to make the code generic, part of the
-> snippet above can be shared between ACPI/IORT and OF, the only sticking
-> point is probably the "compatible" string that has to be parameterized
-> since having this code in generic IOMMU layer is a bit horrible to
-> have it ITS specific (and it is a problem that was existing already
-> in the original patch with the hardcoded ITS node type or function
-> name).
+Hi Antony,
 
-Hi Lorenzo,
+Almost good, I'm sorry I missed a few things before.
 
-Agreed, checking the ITS compatible string in IOMMU code is not nice. 
-However the function is just trying to replicate our ACPI version, which 
-calls IORT code directly, and this is ITS specific. Anyway, we can make 
-it generic.
+On Mon, Sep 04, 2017 at 04:30:14PM +0200, Antony Antony wrote:
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	vqmmc-supply = <&reg_vcc3v3>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
 
->
-> To sum it up the hook:
->
-> - has to be called from SMMU driver in a firmware agnostic way
+Please add a new line here.
 
-ok
+> +	brcmf: wifi at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm";
 
-> - somehow it has to ascertain which interrupt controller "compatible"
->   (which in IORT is a node type) to match against so the hook has to
->   take an id of sorts
+This should be the actual compatible, not just the vendor.
 
-OK
+> +	};
+> +};
+> +
+> +&mmc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc2_8bit_pins>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	cap-mmc-hw-reset;
+> +	boot_device = <0>;
 
-I will mention 2 more points after discussion on OF solution with Shameer:
-- for platform device, we can add suppport by checking for the devices 
-msi-parent property
-- for both pci and platform device, we should check device rid for 
-msi-controller also, like IORT solution
+that property should still be removed.
 
-BTW, even though merge window is open, we would like to send some 
-solution to the lists this week, so any outstanding topics can 
-potentially be discussed at LPC next week. Let me know if you're unhappy 
-about this.
+> +&r_pio {
+> +	leds_r_npi: led_pins at 0 {
+> +		pins = "PL10";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	vdd_cpux_r_npi: regulator_pins at 0 {
+> +		allwinner,pins = "PL6";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
 
-All the best,
-John
+And these must be left out.
 
+Maxime
 
->
-> I need to go back and have a look at the original patch to see how
-> we can accommodate both OF/ACPI - certainly the region reservations
-> code can and should be shared.
->
-> Lorenzo
->
-> .
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170905/29fa07d0/attachment.sig>
