@@ -1,126 +1,75 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 5 Sep 2017 16:49:26 +0200
-Subject: [PATCH v2 5/6] KVM: arm/arm64: Rearrange kvm_vgic_[un]map_phys
- code in vgic.c
-In-Reply-To: <20170905140024.GP13572@cbox>
-References: <20170904102456.9025-1-cdall@linaro.org>
- <20170904102456.9025-6-cdall@linaro.org>
- <56431c9d-3f7e-f8b2-2d31-6baec4e294da@redhat.com>
- <20170905140024.GP13572@cbox>
-Message-ID: <2e5123d1-2440-45a1-651c-2813ffce42fd@redhat.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue,  5 Sep 2017 16:51:59 +0200
+Subject: [PULL 0/8] KVM/ARM Changes for v4.14
+Message-ID: <20170905145207.18447-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-On 05/09/2017 16:00, Christoffer Dall wrote:
-> On Tue, Sep 05, 2017 at 12:26:14PM +0200, Auger Eric wrote:
->> Hi Christoffer,
->> On 04/09/2017 12:24, Christoffer Dall wrote:
->>> The small indirection of a static function made the locking very obvious
->>> but becomes pretty ugly as we start passing function pointer around.
->>> Let's inline these two functions first to make the following patch more
->>> readable.
->>>
->>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
->>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  virt/kvm/arm/vgic/vgic.c | 38 +++++++++++++-------------------------
->>>  1 file changed, 13 insertions(+), 25 deletions(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->>> index 7aec730..b704ff5 100644
->>> --- a/virt/kvm/arm/vgic/vgic.c
->>> +++ b/virt/kvm/arm/vgic/vgic.c
->>> @@ -435,12 +435,17 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->>>  	return 0;
->>>  }
->>>  
->>> -/* @irq->irq_lock must be held */
->> I chose to hold the lock outside of kvm_vgic_map/unmap_irq because in
->> kvm_vgic_set_forwarding(see https://lkml.org/lkml/2017/6/15/278) I was
->> also testing hw and target_vcpu fields. As you pointed out maybe I am
->> not obliged to check them but that was the rationale.
->>
-> 
-> Ah ok, I see, you want to reuse this bit of code and the caller will
-> already be holding the spin-lock?
-> 
-> I can rework it then to pass the callback in kvm_vgic_map_irq.  Would
-> that fit better with your subsequent patches?
-Yes it would.
+Hi Paolo and Radim,
 
-Thanks
+Here are the changes for KVM/ARM for v4.14.
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
->>> -static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>> -			    unsigned int host_irq)
->>> +int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
->>> +			  u32 vintid)
->>>  {
->>> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
->>>  	struct irq_desc *desc;
->>>  	struct irq_data *data;
->>> +	int ret = 0;
->>> +
->>> +	BUG_ON(!irq);
->>> +
->>> +	spin_lock(&irq->irq_lock);
->>>  
->>>  	/*
->>>  	 * Find the physical IRQ number corresponding to @host_irq
->>> @@ -448,7 +453,8 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>>  	desc = irq_to_desc(host_irq);
->>>  	if (!desc) {
->>>  		kvm_err("%s: no interrupt descriptor\n", __func__);
->>> -		return -EINVAL;
->>> +		ret = -EINVAL;
->>> +		goto out;
->>>  	}
->>>  	data = irq_desc_get_irq_data(desc);
->>>  	while (data->parent_data)
->>> @@ -457,29 +463,10 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>>  	irq->hw = true;
->>>  	irq->host_irq = host_irq;
->>>  	irq->hwintid = data->hwirq;
->>> -	return 0;
->>> -}
->>> -
->>> -/* @irq->irq_lock must be held */
->>> -static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
->>> -{
->>> -	irq->hw = false;
->>> -	irq->hwintid = 0;
->>> -}
->>> -
->>> -int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
->>> -			  u32 vintid)
->>> -{
->>> -	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
->>> -	int ret;
->>>  
->>> -	BUG_ON(!irq);
->>> -
->>> -	spin_lock(&irq->irq_lock);
->>> -	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
->>> +out:
->>>  	spin_unlock(&irq->irq_lock);
->>>  	vgic_put_irq(vcpu->kvm, irq);
->>> -
->>>  	return ret;
->>>  }
->>>  
->>> @@ -494,7 +481,8 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
->>>  	BUG_ON(!irq);
->>>  
->>>  	spin_lock(&irq->irq_lock);
->>> -	kvm_vgic_unmap_irq(irq);
->>> +	irq->hw = false;
->>> +	irq->hwintid = 0;
->>>  	spin_unlock(&irq->irq_lock);
->>>  	vgic_put_irq(vcpu->kvm, irq);
->>>  
->>>
+The changes are mostly bug fixes which are cc'ed stable.
+
+We also have some minor cleanups and improvements, including added
+support for migrating the active priority of interrupts when running a
+GICv2 guest on a GICv3 host.
+
+Sorry about arriving with these rather late.
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.14
+
+for you to fetch changes up to f3470ce68ee2917ea17d27521b379af117b48c02:
+
+  KVM: arm/arm64: Support uaccess of GICC_APRn (2017-09-05 16:46:30 +0200)
+
+
+Thanks,
+-Christoffer
+
+Andrew Jones (1):
+  KVM: arm/arm64: PMU: Fix overflow interrupt injection
+
+Arvind Yadav (1):
+  KVM: arm/arm64: vgic: constify seq_operations and file_operations
+
+Christoffer Dall (2):
+  KVM: arm/arm64: Extract GICv3 max APRn index calculation
+  KVM: arm/arm64: Support uaccess of GICC_APRn
+
+James Morse (1):
+  KVM: arm/arm64: Fix guest external abort matching
+
+Marc Zyngier (1):
+  KVM: arm/arm64: vITS: Drop its_ite->lpi field
+
+Shanker Donthineni (1):
+  KVM: arm/arm64: Fix bug in advertising KVM_CAP_MSI_DEVID capability
+
+Suzuki K Poulose (1):
+  KVM: arm/arm64: Handle hva aging while destroying the vm
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  5 +++
+ arch/arm/include/asm/kvm_arm.h                 |  1 -
+ arch/arm/include/asm/kvm_emulate.h             | 24 ++++++++++---
+ arch/arm64/include/asm/kvm_emulate.h           | 24 ++++++++++---
+ arch/arm64/kvm/sys_regs.c                      |  2 +-
+ arch/arm64/kvm/vgic-sys-reg-v3.c               | 23 ++-----------
+ include/kvm/arm_pmu.h                          |  2 --
+ virt/kvm/arm/mmu.c                             | 44 ++++++++----------------
+ virt/kvm/arm/pmu.c                             | 43 ++++++++---------------
+ virt/kvm/arm/vgic/vgic-debug.c                 |  4 +--
+ virt/kvm/arm/vgic/vgic-init.c                  |  3 --
+ virt/kvm/arm/vgic/vgic-its.c                   | 11 +++---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c               | 47 +++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h                       | 16 +++++++++
+ 14 files changed, 146 insertions(+), 103 deletions(-)
+
+-- 
+2.9.0
