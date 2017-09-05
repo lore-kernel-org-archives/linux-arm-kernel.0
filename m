@@ -1,93 +1,31 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue,  5 Sep 2017 11:43:00 +0300
-Subject: [PATCH v2 0/6] Host1x and VIC support for Tegra186
-Message-ID: <20170905084306.19318-1-mperttunen@nvidia.com>
+Date: Tue,  5 Sep 2017 11:43:01 +0300
+Subject: [PATCH v2 1/6] arm64: tegra: Add #power-domain-cells for BPMP
+In-Reply-To: <20170905084306.19318-1-mperttunen@nvidia.com>
+References: <20170905084306.19318-1-mperttunen@nvidia.com>
+Message-ID: <20170905084306.19318-2-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add #power-domain-cells for the BPMP node on Tegra186 so that the power
+domain provider may be used.
 
-not many changes in v2:
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changed address-cells and size-cells for the Host1x device tree node
-to have value 1, since all subdevices fit in the lower 4G. Also dropped
-the incorrect change about this from the dt-bindings patch. Thanks to
-Rob for pointing this out.
-
-Mikko
-
-Notes for v1:
-
-Hi everyone,
-
-this series adds basic support for the Host1x channel engine and the
-VIC 2d compositor unit on Tegra186. The first three patches do the
-required device tree changes, the fourth patch updates the device tree
-binding documentation, and the two remaining patches add the actual
-implementation, almost all of which is in Host1x itself.
-
-The Tegra186 Host1x is a relatively large update over previous
-generations, which can be seen in the diffstat. The biggest change is
-that Host1x is now contains separate hypervisor and vm register
-apertures to support virtualization at the hardware level. This driver,
-however, currently assumes that this instance of Linux is the sole
-operating system having access to the hardware.
-
-This combined with increased numbers of supported channels and
-syncpoints have caused a number of register space changes that are
-responsible for most of the updated code.
-
-The series has been tested on the Jetson TX1 (T210) and TX2 (T186)
-using the host1x_test test suite available at
-
-http://github.com/cyndis/host1x_test
-
-The series itself is available at
-
-http://github.com/cyndis/linux, branch host1x-t186-1
-
-Cheers,
-Mikko
-
-Mikko Perttunen (6):
-  arm64: tegra: Add #power-domain-cells for BPMP
-  arm64: tegra: Add host1x on Tegra186
-  arm64: tegra: Add VIC on Tegra186
-  dt-bindings: host1x: Add Tegra186 information
-  gpu: host1x: Add Tegra186 support
-  drm/tegra: Add Tegra186 support for VIC
-
- .../display/tegra/nvidia,tegra20-host1x.txt        |   4 +
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  31 ++++
- drivers/gpu/drm/tegra/drm.c                        |   1 +
- drivers/gpu/drm/tegra/vic.c                        |  10 ++
- drivers/gpu/host1x/Makefile                        |   3 +-
- drivers/gpu/host1x/dev.c                           |  60 ++++++-
- drivers/gpu/host1x/dev.h                           |   4 +
- drivers/gpu/host1x/hw/cdma_hw.c                    |  49 +++---
- drivers/gpu/host1x/hw/debug_hw.c                   | 137 +---------------
- drivers/gpu/host1x/hw/debug_hw_1x01.c              | 154 ++++++++++++++++++
- drivers/gpu/host1x/hw/debug_hw_1x06.c              | 133 +++++++++++++++
- drivers/gpu/host1x/hw/host1x01.c                   |   2 +
- drivers/gpu/host1x/hw/host1x02.c                   |   2 +
- drivers/gpu/host1x/hw/host1x04.c                   |   2 +
- drivers/gpu/host1x/hw/host1x05.c                   |   2 +
- drivers/gpu/host1x/hw/host1x06.c                   |  44 +++++
- drivers/gpu/host1x/hw/host1x06.h                   |  26 +++
- drivers/gpu/host1x/hw/host1x06_hardware.h          | 142 ++++++++++++++++
- drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h     |  32 ++++
- drivers/gpu/host1x/hw/hw_host1x06_uclass.h         | 181 +++++++++++++++++++++
- drivers/gpu/host1x/hw/hw_host1x06_vm.h             |  47 ++++++
- drivers/gpu/host1x/hw/intr_hw.c                    |  29 ++--
- 22 files changed, 926 insertions(+), 169 deletions(-)
- create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x01.c
- create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x06.c
- create mode 100644 drivers/gpu/host1x/hw/host1x06.c
- create mode 100644 drivers/gpu/host1x/hw/host1x06.h
- create mode 100644 drivers/gpu/host1x/hw/host1x06_hardware.h
- create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h
- create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_uclass.h
- create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_vm.h
-
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+index 0b0552c9f7dd..a964d246c0e9 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+@@ -443,6 +443,7 @@
+ 		shmem = <&cpu_bpmp_tx &cpu_bpmp_rx>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
++		#power-domain-cells = <1>;
+ 
+ 		bpmp_i2c: i2c {
+ 			compatible = "nvidia,tegra186-bpmp-i2c";
 -- 
 2.14.1
