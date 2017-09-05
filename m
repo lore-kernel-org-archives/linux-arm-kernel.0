@@ -1,46 +1,62 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Sep 2017 08:42:58 -0500
-Subject: [PATCH 1/2] PCI: iproc: export iproc_pcie_shutdown symbol
-In-Reply-To: <20170905072004.3959082-1-arnd@arndb.de>
-References: <20170905072004.3959082-1-arnd@arndb.de>
-Message-ID: <20170905134258.GA14367@bhelgaas-glaptop.roam.corp.google.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 5 Sep 2017 14:45:01 +0100
+Subject: [PATCH v2 04/18] firmware: arm_scmi: add common infrastructure
+ and support for base protocol
+In-Reply-To: <9a6b0722-1299-fb0a-6c75-9aceb248659f@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-5-git-send-email-sudeep.holla@arm.com>
+ <9a6b0722-1299-fb0a-6c75-9aceb248659f@arm.com>
+Message-ID: <42d72579-07cd-798d-34e9-b9c584048b64@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 05, 2017 at 09:19:44AM +0200, Arnd Bergmann wrote:
-> The shutdown bugfix introduce a build regression for allmodconfig
-> kernels as the new function is not exported:
-> 
-> ERROR: "iproc_pcie_shutdown" [drivers/pci/host/pcie-iproc-platform.ko] undefined!
-> 
-> This adds the missing export.
-> 
-> Fixes: 2a9912565c05 ("PCI: iproc: Add 500ms delay during device shutdown")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Folded into the 2a9912565c05 commit, thanks!
 
-> ---
->  drivers/pci/host/pcie-iproc.c | 1 +
->  1 file changed, 1 insertion(+)
+On 05/09/17 14:39, Julien Thierry wrote:
+
+[...]
+
+>> diff --git a/drivers/firmware/arm_scmi/driver.c
+>> b/drivers/firmware/arm_scmi/driver.c
+>> index 139d6980f270..601d0d7210d9 100644
+>> --- a/drivers/firmware/arm_scmi/driver.c
+>> +++ b/drivers/firmware/arm_scmi/driver.c
+>> @@ -108,18 +108,22 @@ struct scmi_desc {
+>>    * @dev: Device pointer
+>>    * @desc: SoC description for this instance
+>>    * @handle: Instance of SCMI handle to send to clients
+>> + * @version: SCMI revision information containing protocol version,
+>> + *    implementation version and (sub-)vendor identification.
+>>    * @cl: Mailbox Client
+>>    * @tx_chan: Transmit mailbox channel
+>>    * @rx_chan: Receive mailbox channel
+>>    * @tx_payload: Transmit mailbox channel payload area
+>>    * @rx_payload: Receive mailbox channel payload area
+>>    * @minfo: Message info
+>> + * @protocols_imp: list of protocols implemented
+>>    * @node: list head
+>>    * @users: Number of users of this instance
+>>    */
+>>   struct scmi_info {
+>>       struct device *dev;
+>>       const struct scmi_desc *desc;
+>> +    struct scmi_revision_info version;
+>>       struct scmi_handle handle;
+>>       struct mbox_client cl;
+>>       struct mbox_chan *tx_chan;
+>> @@ -127,6 +131,7 @@ struct scmi_info {
+>>       void __iomem *tx_payload;
+>>       void __iomem *rx_payload;
+>>       struct scmi_xfers_info minfo;
+>> +    u8 *protocols_imp;
 > 
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index 8bd5e544b1c1..d7f4c29aed96 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -704,6 +704,7 @@ int iproc_pcie_shutdown(struct iproc_pcie *pcie)
->  
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(iproc_pcie_shutdown);
->  
->  static int iproc_pcie_check_link(struct iproc_pcie *pcie)
->  {
-> -- 
-> 2.9.0
+> Both the base protocol and driver part rely on this being of size
+> MAX_PROTOCOLS_IMP (if existing).
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Could this be a "u8 protocols_imp[MAX_PROTOCOLS_IMP]" instead? 
+
+Sounds better, will update accordingly.
+
+-- 
+Regards,
+Sudeep
