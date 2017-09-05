@@ -1,25 +1,33 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Tue, 5 Sep 2017 14:28:59 +0300
-Subject: [PATCH v2 0/6] Host1x and VIC support for Tegra186
-In-Reply-To: <20170905111031.u4damueklnuliqt4@phenom.ffwll.local>
-References: <20170905084306.19318-1-mperttunen@nvidia.com>
- <20170905111031.u4damueklnuliqt4@phenom.ffwll.local>
-Message-ID: <408624d4-9e69-661a-950f-b8d8386d6a27@kapsi.fi>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue,  5 Sep 2017 13:36:05 +0200
+Subject: [PATCH] clocksource: tcb_clksrc: Fix clock speed message
+Message-ID: <20170905113605.24191-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.09.2017 14:10, Daniel Vetter wrote:
->
-> Since this is new hw support, is there also open source userspace using
-> all this?
+The clock speed displayed at boot in an information message was 500 kHz
+too high compared to its real value. As the value is not used anywhere,
+there is no functional impact.
 
-The VIC HW in Tegra186 is backwards compatible with the one in Tegra210, 
-which has open userspace (https://github.com/cyndis/vaapi-tegra-driver), 
-so that userspace should remain compatible. The old firmware is not 
-compatible so we need a new compatibility string for that.
+Fix the rounding formula to display the correct value.
 
->
-> Thanks, Daniel
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ drivers/clocksource/tcb_clksrc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Mikko
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 59e8aee0ec16..8fb4bea14f16 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -383,7 +383,7 @@ static int __init tcb_clksrc_init(void)
+ 
+ 	printk(bootinfo, clksrc.name, CONFIG_ATMEL_TCB_CLKSRC_BLOCK,
+ 			divided_rate / 1000000,
+-			((divided_rate + 500000) % 1000000) / 1000);
++			((divided_rate % 1000000) + 500) / 1000);
+ 
+ 	if (tc->tcb_config && tc->tcb_config->counter_width == 32) {
+ 		/* use apropriate function to read 32 bit counter */
+-- 
+2.11.0
