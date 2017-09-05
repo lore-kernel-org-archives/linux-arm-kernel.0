@@ -1,31 +1,33 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 5 Sep 2017 11:41:47 +0530
-Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
-In-Reply-To: <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
-References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
- <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
-Message-ID: <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Tue, 5 Sep 2017 08:11:34 +0200
+Subject: [PATCH v2] clk: at91: utmi: set the mainck rate
+In-Reply-To: <cc938b2c-1cb7-f7ad-1336-dbb01b2aec9c@gmx.de>
+References: <20170904095226.29336-1-ludovic.desroches@microchip.com>
+ <cc938b2c-1cb7-f7ad-1336-dbb01b2aec9c@gmx.de>
+Message-ID: <20170905061134.f6n6jtvz57ycqd2f@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian,
-
-On Saturday 02 September 2017 07:46 AM, Florian Fainelli wrote:
+On Mon, Sep 04, 2017 at 07:53:57PM +0200, Ingo van Lil wrote:
+> On 09/04/2017 11:52 AM, Ludovic Desroches wrote:
 > 
+> > +	/* SFR node missing is not necessarily an issue. */
+> > +	regmap_sfr = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
+> > +	if (IS_ERR(regmap_sfr))
+> > +		regmap_sfr = NULL;
 > 
-> On 08/25/2017 10:51 AM, Al Cooper wrote:
->> Add a new USB Phy driver for Broadcom STB SoCs. This driver
->> supports Broadcom STB ARM SoCs. This driver in
->> combination with the Broadcom STB ohci, ehci and xhci
->> drivers will enable USB1.1, USB2.0 and USB3.0 support.
->> This Phy driver also supports the Broadcom BDC gadget
->> driver.
+> What about SAMA5D3? That chip has an UTMICKTRIM register, too (SAMA5D4
+> doesn't, though).
+
+Oh Yes. I'll look for atmel,sama5d3-sfr too. Maybe there is a smarter
+solution but I don't have it in mind.
+
 > 
-> Thanks Al! Kishon, feel free to merge everything through your tree there
-> should not be any conflicts with drivers/soc/bcm/brcmstb/common.c and
-> include/linux/soc/brcmstb/brcmstb.h.
+> Otherwise the patch looks good and works fine on both my boards (SAMA5D2
+> 16MHz and SAMA5D3 12MHz).
 
-I'll start merging once 4.14 -rc1 is tagged.
+Thanks for testing.
 
-Thanks
-Kishon
+Regards
+
+Ludovic
