@@ -1,45 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Sep 2017 13:32:44 -0700
-Subject: n900 in next-20170901
-In-Reply-To: <f62cd19e-c2e1-781e-eeb1-dce177200512@suse.cz>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <f62cd19e-c2e1-781e-eeb1-dce177200512@suse.cz>
-Message-ID: <20170905203240.GF5024@atomide.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Tue,  5 Sep 2017 22:34:16 +0200
+Subject: [PATCH v2] ARM: dts: sun8i: h3: Fix Pincrtl bindings on Bananapi M2
+ Plus
+Message-ID: <1504643656-4926-1-git-send-email-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vlastimil Babka <vbabka@suse.cz> [170905 13:29]:
-> On 09/05/2017 10:13 PM, Tony Lindgren wrote:
-> > * Pavel Machek <pavel@ucw.cz> [170903 13:38]:
-> >> Hi!
-> >>
-> >> It compiles ok, but it hangs on boot; black screen, so sometime before
-> >> display is initialized.
-> > 
-> > Thanks for reporting it. Based on git bisect, the regression causing
-> > commit is 9caf25f996e8 ("mm/cma: manage the memory of the CMA area
-> > by using the ZONE_MOVABLE"). With this path applied, booting hangs
-> > with an error in omap3_save_secure_ram_context() after a call to
-> > _omap_save_secure_sram() that calls the related assembly code
-> > save_secure_ram_context.
-> > 
-> > However, looks like there is also some other commit causing issue.
-> > 
-> > Just reverting 9caf25f996e8 on Linux next causes the oops below.
-> > 
-> > Anybody got ideas why this now happens?
-> 
-> I know that there are other two patches from the same series depending
-> on the one you reverted:
-> 
-> mm/cma: remove ALLOC_CMA
-> ARM: CMA: avoid double mapping to the CMA area if CONFIG_HIGHMEM = y
-> 
-> I'm guessing you need to revert all to have something consistent to test.
+From: Philipp Rossak <embed3d@gmail.com>
 
-Thanks, yes reverting all three in next makes things boot
-for me again.
+There is no need for pincontrol nodes when the pin is set to a GPIO
 
-Regards,
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+This is Patch is a new version of the following patch:
+https://patchwork.kernel.org/patch/9934835/
 
-Tony
+
+changes since version 1:
+* vqmmc-supply was added again
+* The pincontrolers for the leds and gpio_keys were removed
+
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 20 --------------------
+ 1 file changed, 20 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index d756ff8..cc20d67 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -64,7 +64,6 @@
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pwr_led_bpi_m2p>;
+ 
+ 		pwr_led {
+ 			label = "bananapi-m2-plus:red:pwr";
+@@ -76,7 +75,6 @@
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&sw_r_bpi_m2p>;
+ 
+ 		sw4 {
+ 			label = "power";
+@@ -98,7 +96,6 @@
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&wifi_en_bpi_m2p>;
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+ 	};
+ };
+@@ -190,23 +187,6 @@
+ 	status = "okay";
+ };
+ 
+-&r_pio {
+-	pwr_led_bpi_m2p: led_pins at 0 {
+-		pins = "PL10";
+-		function = "gpio_out";
+-	};
+-
+-	sw_r_bpi_m2p: key_pins at 0 {
+-		pins = "PL3";
+-		function = "gpio_in";
+-	};
+-
+-	wifi_en_bpi_m2p: wifi_en_pin {
+-		pins = "PL7";
+-		function = "gpio_out";
+-	};
+-};
+-
+ &reg_usb0_vbus {
+ 	gpio = <&pio 3 11 GPIO_ACTIVE_HIGH>; /* PD11 */
+ 	status = "okay";
+-- 
+2.7.4
