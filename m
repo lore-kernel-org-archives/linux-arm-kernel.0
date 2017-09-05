@@ -1,46 +1,65 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue, 5 Sep 2017 15:16:57 +0300
-Subject: [PATCH v7 00/19] simplify crypto wait for async op
-In-Reply-To: <CAFXBA=mqYxD3H_e38hEd2hVL4yvPXb_4DnfgGO5bf6YboTQVSg@mail.gmail.com>
-References: <1503584350-7831-1-git-send-email-gilad@benyossef.com>
- <CAFXBA=n6W_n1P=NKHEUAgpaDDrdmh4QwB4aYma9xyio7UFP3Vw@mail.gmail.com>
- <CAOtvUMcjtEMj4eoCG_Rpp-8CmJP+Yu0dPDN3PyOTWjHapf_y1g@mail.gmail.com>
- <CAFXBA=mqYxD3H_e38hEd2hVL4yvPXb_4DnfgGO5bf6YboTQVSg@mail.gmail.com>
-Message-ID: <CAOtvUMdrMEPjXqVk66EOM+2NYoU-Hze2+5Vx6HGuR4FDNxYzDQ@mail.gmail.com>
+From: m.purski@samsung.com (Maciej Purski)
+Date: Tue, 05 Sep 2017 14:23:02 +0200
+Subject: [PATCH] drm/exynos/hdmi: Fix unsafe list iteration
+References: <CGME20170905122309eucas1p15739d5191e6471e9bfc05aa32b334f2e@eucas1p1.samsung.com>
+Message-ID: <1504614182-1509-1-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 5, 2017 at 2:23 PM, Harsh Jain <harshjain.prof@gmail.com> wrote:
-> On Sun, Sep 3, 2017 at 11:47 AM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->> On Thu, Aug 31, 2017 at 3:31 PM, Harsh Jain <harshjain.prof@gmail.com> wrote:
->>> HI Gilad,
->>>
->>> I think we need an update in ESP also. Now EBUSY return means driver
->>> has accepted, Packet should not be dropped in
->>>
->>> esp_output_tail() function.
->>
->> Good catch. You are right and the same holds true for ah_output() in ah4.c.
->>
->> But I do wonder, the code there now treats -EBUSY as a special case
->> and returns NET_XMIT_DROP
->> but if an AEAD or AHASH transformation return some other error, like
->> -ENOMEM or -EINVAL shouldn't
->> we return NET_XMIT_DROP in that case too?
-> I think we should not,  XMIT_DROP implies drop current packet only,
-> later on when device is recovered from busy state, Upper layer
-> protocol(TCP) will re-transmit the packet. It helps in flow control.
->>
+Function hdmi_mode_fixup() used bare list_for_each entry, which was
+unsafe and caused memory corruption detected by kasan.
+It now uses drm_for_each_connector_iter macro, which is now recommended
+by the documentation and safe.
 
-I see. Makes sense.
+Signed-off-by: Maciej Purski <m.purski@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_hdmi.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-Thanks,
-Gilad
-
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 214fa5e..0109ff4 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -944,22 +944,27 @@ static bool hdmi_mode_fixup(struct drm_encoder *encoder,
+ 	struct drm_device *dev = encoder->dev;
+ 	struct drm_connector *connector;
+ 	struct drm_display_mode *m;
++	struct drm_connector_list_iter conn_iter;
+ 	int mode_ok;
+ 
+ 	drm_mode_set_crtcinfo(adjusted_mode, 0);
+ 
+-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
++	drm_connector_list_iter_begin(dev, &conn_iter);
++	drm_for_each_connector_iter(connector, &conn_iter) {
+ 		if (connector->encoder == encoder)
+ 			break;
+ 	}
++	if (connector)
++		drm_connector_get(connector);
++	drm_connector_list_iter_end(&conn_iter);
+ 
+-	if (connector->encoder != encoder)
++	if (!connector)
+ 		return true;
+ 
+ 	mode_ok = hdmi_mode_valid(connector, adjusted_mode);
+ 
+ 	if (mode_ok == MODE_OK)
+-		return true;
++		goto cleanup;
+ 
+ 	/*
+ 	 * Find the most suitable mode and copy it to adjusted_mode.
+@@ -979,6 +984,9 @@ static bool hdmi_mode_fixup(struct drm_encoder *encoder,
+ 		}
+ 	}
+ 
++cleanup:
++	drm_connector_put(connector);
++
+ 	return true;
+ }
+ 
 -- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+2.7.4
