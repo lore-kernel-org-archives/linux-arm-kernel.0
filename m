@@ -1,60 +1,55 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Tue, 5 Sep 2017 19:06:06 +0800
-Subject: [PATCH v2 3/3] arm64/ras: save error address from memory section for
- recovery
-In-Reply-To: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
-References: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1504609566-66318-4-git-send-email-xiexiuqi@huawei.com>
+Date: Tue, 5 Sep 2017 19:06:03 +0800
+Subject: [PATCH v2 0/3] arm64/ras: support sea error recovery
+Message-ID: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some platform, when SEA triggerred, physical address might be
-reported by memory section, so we save it for error recovery later.
+With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
+are consumed. In some cases, if the error address is in a clean page or a
+read-only page, there is a chance to recover. Such as error occurs in a
+instruction page, we can reread this page from disk instead of killing process.
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Tested-by: Wang Xiongfeng <wangxiongfeng2@huawei.com>
+Because memory_failure() may sleep, we can not call it directly in SEA exception
+context. So we saved faulting physical address associated with a process in the
+ghes handler and set __TIF_SEA_NOTIFY. When we return from SEA exception context
+and get into do_notify_resume() before the process running, we could check it
+and call memory_failure() to do recovery. It's safe, because we are in process
+context.
+
+In some platform, when SEA triggerred, physical address could be
+reported by memory section or by processor section, so we save 
+address at this two place.
+
+This patchset is only for internal review, and it's only compiled OK,
+not yet tested now.
+
 ---
- arch/arm64/kernel/ras.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+v2 - v1:
+  - wrap arm_proc_error_check and log_arm_hw_error in a single arm_process_error()
+  - fix sea_save_info return value issue
+  - fix link error if this CONFIG_ARM64_ERR_RECOV is not selected
+  - use a notify chain instead of call arch_apei_report_mem_error directly
 
-diff --git a/arch/arm64/kernel/ras.c b/arch/arm64/kernel/ras.c
-index 5710b2e..8a44c01 100644
---- a/arch/arm64/kernel/ras.c
-+++ b/arch/arm64/kernel/ras.c
-@@ -141,3 +141,34 @@ void arm_process_error(struct ghes *ghes, struct cper_sec_proc_arm *err)
- 		set_thread_flag(TIF_SEA_NOTIFY);
- }
- 
-+int ghes_mem_err_callback(struct notifier_block *nb, unsigned long val, void *data)
-+{
-+	bool info_saved = false;
-+	struct ghes_mem_err *ghes_mem = (struct ghes_mem_err *)data;
-+	struct cper_sec_mem_err *mem_err = ghes_mem->mem_err;
-+
-+	if ((ghes_mem->notify_type != ACPI_HEST_NOTIFY_SEA) ||
-+	    (ghes_mem->severity != CPER_SEV_RECOVERABLE))
-+		return 0;
-+
-+	if (mem_err->validation_bits & CPER_MEM_VALID_PA) {
-+		info_saved = sea_save_info(mem_err->physical_addr);
-+	}
-+
-+	if (info_saved)
-+		set_thread_flag(TIF_SEA_NOTIFY);
-+
-+	return 0;
-+}
-+
-+static struct notifier_block ghes_mem_err_nb = {
-+	.notifier_call	= ghes_mem_err_callback,
-+};
-+
-+static int arm64_err_recov_init(void)
-+{
-+	atomic_notifier_chain_register(&ghes_mem_err_chain, &ghes_mem_err_nb);
-+	return 0;
-+}
-+
-+late_initcall(arm64_err_recov_init);
+  https://lkml.org/lkml/2017/9/1/189
+
+Xie XiuQi (3):
+  arm64/ras: support sea error recovery
+  GHES: add a notify chain for process memory section
+  arm64/ras: save error address from memory section for recovery
+
+ arch/arm64/Kconfig                   |  11 +++
+ arch/arm64/include/asm/ras.h         |  36 ++++++++
+ arch/arm64/include/asm/thread_info.h |   4 +-
+ arch/arm64/kernel/Makefile           |   1 +
+ arch/arm64/kernel/ras.c              | 174 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal.c           |   8 ++
+ arch/arm64/mm/fault.c                |  27 ++++--
+ drivers/acpi/apei/ghes.c             |  14 ++-
+ include/acpi/ghes.h                  |   8 ++
+ 9 files changed, 272 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ras.h
+ create mode 100644 arch/arm64/kernel/ras.c
+
 -- 
 1.8.3.1
