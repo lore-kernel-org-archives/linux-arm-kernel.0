@@ -1,240 +1,563 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 5 Sep 2017 11:38:48 +0200
-Subject: [PATCH v2 3/6] KVM: arm/arm64: vgic: Support level-triggered
- mapped interrupts
-In-Reply-To: <20170904102456.9025-4-cdall@linaro.org>
-References: <20170904102456.9025-1-cdall@linaro.org>
- <20170904102456.9025-4-cdall@linaro.org>
-Message-ID: <5971dacd-ba04-1e68-f4c8-359500e79455@redhat.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 5 Sep 2017 11:03:08 +0100
+Subject: [PATCH v2 03/18] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <1501857104-11279-4-git-send-email-sudeep.holla@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <e05e75d4-e4ec-41b0-6983-63afeddd82f6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Sudeep,
 
-On 04/09/2017 12:24, Christoffer Dall wrote:
-> Level-triggered mapped IRQs are special because we only observe rising
-> edges as input to the VGIC, and we don't set the EOI flag and therefore
-> are not told when the level goes down, so that we can re-queue a new
-> interrupt when the level goes up.
+I am not sure what the patch does is correct when having a big endian 
+kernel dealing with scmi_shared_mem. Unless there is a reason not to 
+have SCMI with big endian kernel, please see remarks below.
+
+On 04/08/17 15:31, Sudeep Holla wrote:
+> The SCMI is intended to allow OSPM to manage various functions that are
+> provided by the hardware platform it is running on, including power and
+> performance functions. SCMI provides two levels of abstraction, protocols
+> and transports. Protocols define individual groups of system control and
+> management messages. A protocol specification describes the messages
+> that it supports. Transports describe the method by which protocol
+> messages are communicated between agents and the platform.
 > 
-> One way to solve this problem is to side-step the logic of the VGIC and
-> special case the validation in the injection path, but it has the
-> unfortunate drawback of having to peak into the physical GIC state
-> whenever we want to know if the interrupt is pending on the virtual
-> distributor.
+> This patch adds basic infrastructure to manage the message allocation,
+> initialisation, packing/unpacking and shared memory management.
 > 
-> Instead, we can maintain the current semantics of a level triggered
-> interrupt by sort of treating it as an edge-triggered interrupt,
-> following from the fact that we only observe an asserting edge.  This
-> requires us to be a bit careful when populating the LRs and when folding
-> the state back in though:
-> 
->  * We lower the line level when populating the LR, so that when
->    subsequently observing an asserting edge, the VGIC will do the right
->    thing.
-> 
->  * If the guest never acked the interrupt while running (for example if
->    it had masked interrupts at the CPU level while running), we have
->    to preserve the pending state of the LR and move it back to the
->    line_level field of the struct irq when folding LR state.
-> 
->    If the guest never acked the interrupt while running, but changed the
->    device state and lowered the line (again with interrupts masked) then
->    we need to observe this change in the line_level.
-> 
->    Both of the above situations are solved by sampling the physical line
->    and set the line level when folding the LR back.
-> 
->  * Finally, if the guest never acked the interrupt while running and
->    sampling the line reveals that the device state has changed and the
->    line has been lowered, we must clear the physical active state, since
->    we will otherwise never be told when the interrupt becomes asserted
->    again.
-> 
-> This has the added benefit of making the timer optimization patches
-> (https://lists.cs.columbia.edu/pipermail/kvmarm/2017-July/026343.html) a
-> bit simpler, because the timer code doesn't have to clear the active
-> state on the sync anymore.  It also potentially improves the performance
-> of the timer implementation because the GIC knows the state or the LR
-> and only needs to clear the
-> active state when the pending bit in the LR is still set, where the
-> timer has to always clear it when returning from running the guest with
-> an injected timer interrupt.
-> 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c | 29 +++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.c    | 23 +++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h    |  7 +++++++
->  4 files changed, 88 insertions(+)
+>   drivers/firmware/Kconfig           |  21 +
+>   drivers/firmware/Makefile          |   1 +
+>   drivers/firmware/arm_scmi/Makefile |   2 +
+>   drivers/firmware/arm_scmi/common.h |  74 ++++
+>   drivers/firmware/arm_scmi/driver.c | 774 +++++++++++++++++++++++++++++++++++++
+>   include/linux/scmi_protocol.h      |  48 +++
+>   6 files changed, 920 insertions(+)
+>   create mode 100644 drivers/firmware/arm_scmi/Makefile
+>   create mode 100644 drivers/firmware/arm_scmi/common.h
+>   create mode 100644 drivers/firmware/arm_scmi/driver.c
+>   create mode 100644 include/linux/scmi_protocol.h
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index e4187e5..618ed3f 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -104,6 +104,26 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->  				irq->pending_latch = false;
->  		}
->  
-> +		/*
-> +		 * Level-triggered mapped IRQs are special because we only
-> +		 * observe rising edges as input to the VGIC.
-> +		 *
-> +		 * If the guest never acked the interrupt we have to sample
-> +		 * the physical line and set the line level, because the
-> +		 * device state could have changed or we simply need to
-> +		 * process the still pending interrupt later.
-> +		 *
-> +		 * If this causes us to lower the level, we have to also clear
-> +		 * the physical active state, since we will otherwise never be
-> +		 * told when the interrupt becomes asserted again.
-> +		 */
-> +		if (vgic_irq_is_mapped_level(irq) && (val & GICH_LR_PENDING_BIT)) {
-> +			irq->line_level = vgic_get_phys_line_level(irq);
+> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+> index 6e4ed5a9c6fd..c3d1a12763ce 100644
+> --- a/drivers/firmware/Kconfig
+> +++ b/drivers/firmware/Kconfig
+> @@ -19,6 +19,27 @@ config ARM_PSCI_CHECKER
+>   	  on and off through hotplug, so for now torture tests and PSCI checker
+>   	  are mutually exclusive.
+>   
+> +config ARM_SCMI_PROTOCOL
+> +	tristate "ARM System Control and Management Interface (SCMI) Message Protocol"
+> +	depends on ARM || ARM64 || COMPILE_TEST
+> +	depends on MAILBOX
+> +	help
+> +	  ARM System Control and Management Interface (SCMI) protocol is a
+> +	  set of operating system-independent software interfaces that are
+> +	  used in system management. SCMI is extensible and currently provides
+> +	  interfaces for: Discovery and self-description of the interfaces
+> +	  it supports, Power domain management which is the ability to place
+> +	  a given device or domain into the various power-saving states that
+> +	  it supports, Performance management which is the ability to control
+> +	  the performance of a domain that is composed of compute engines
+> +	  such as application processors and other accelerators, Clock
+> +	  management which is the ability to set and inquire rates on platform
+> +	  managed clocks and Sensor management which is the ability to read
+> +	  sensor data, and be notified of sensor value.
 > +
-> +			if (!irq->line_level)
-> +				vgic_irq_set_phys_active(irq, false);
-I am still unclear wrt ISPENDR case. Assume the guest writes into the
-ISPENDR. So now we set the pending state on the phys distributor. The
-SPI is acked by the host. I understand it becomes active (ie. not
-pending and active). Then it gets injected into the guest and in the
-above fold code the LR state is observed GICH_LR_PENDING_BIT. We are
-going to read the physical pending state which is: not pending. So the
-line level is low, the latch_pending is not used in mapped case and is
-low. So to me the vIRQ is missed.
-
-What do I miss?
-
-Thanks
-
-Eric
-> +		}
+> +	  This protocol library provides interface for all the client drivers
+> +	  making use of the features offered by the SCMI.
 > +
->  		spin_unlock(&irq->irq_lock);
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
-> @@ -161,6 +181,15 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->  			val |= GICH_LR_EOI;
->  	}
->  
+>   config ARM_SCPI_PROTOCOL
+>   	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
+>   	depends on ARM || ARM64 || COMPILE_TEST
+> diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+> index a37f12e8d137..91d3ff62c653 100644
+> --- a/drivers/firmware/Makefile
+> +++ b/drivers/firmware/Makefile
+> @@ -23,6 +23,7 @@ obj-$(CONFIG_QCOM_SCM_32)	+= qcom_scm-32.o
+>   CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch armv7-a\n.arch_extension sec,-DREQUIRES_SEC=1) -march=armv7-a
+>   obj-$(CONFIG_TI_SCI_PROTOCOL)	+= ti_sci.o
+>   
+> +obj-$(CONFIG_ARM_SCMI_PROTOCOL)	+= arm_scmi/
+>   obj-y				+= broadcom/
+>   obj-y				+= meson/
+>   obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
+> diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
+> new file mode 100644
+> index 000000000000..58e94c95e523
+> --- /dev/null
+> +++ b/drivers/firmware/arm_scmi/Makefile
+> @@ -0,0 +1,2 @@
+> +obj-$(CONFIG_ARM_SCMI_PROTOCOL)	= arm_scmi.o
+> +arm_scmi-y = driver.o
+> diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
+> new file mode 100644
+> index 000000000000..a6829afc17e3
+> --- /dev/null
+> +++ b/drivers/firmware/arm_scmi/common.h
+> @@ -0,0 +1,74 @@
+> +/*
+> + * System Control and Management Interface (SCMI) Message Protocol
+> + * driver common header file containing some definitions, structures
+> + * and function prototypes used in all the different SCMI protocols.
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/completion.h>
+> +#include <linux/scmi_protocol.h>
+> +#include <linux/types.h>
+> +
+> +/**
+> + * struct scmi_msg_hdr - Message(Tx/Rx) header
+> + *
+> + * @id: The identifier of the command being sent
+> + * @protocol_id: The identifier of the protocol used to send @id command
+> + * @seq: The token to identify the message. when a message/command returns,
+> + *       the platform returns the whole message header unmodified including
+> + *	 the token.
+> + */
+> +struct scmi_msg_hdr {
+> +	u8 id;
+> +	u8 protocol_id;
+> +	u16 seq;
+> +	u32 status;
+> +	bool poll_completion;
+> +};
+> +
+> +/**
+> + * struct scmi_msg - Message(Tx/Rx) structure
+> + *
+> + * @buf: Buffer pointer
+> + * @len: Length of data in the Buffer
+> + */
+> +struct scmi_msg {
+> +	void *buf;
+> +	size_t len;
+> +};
+> +
+> +/**
+> + * struct scmi_xfer - Structure representing a message flow
+> + *
+> + * @hdr: Transmit message header
+> + * @tx: Transmit message
+> + * @rx: Receive message, the buffer should be pre-allocated to store
+> + *	message. If request-ACK protocol is used, we can reuse the same
+> + *	buffer for the rx path as we use for the tx path.
+> + * @done: completion event
+> + */
+> +
+> +struct scmi_xfer {
+> +	struct scmi_msg_hdr hdr;
+> +	struct scmi_msg tx;
+> +	struct scmi_msg rx;
+> +	struct completion done;
+> +};
+> +
+> +void scmi_one_xfer_put(const struct scmi_handle *h, struct scmi_xfer *xfer);
+> +int scmi_do_xfer(const struct scmi_handle *h, struct scmi_xfer *xfer);
+> +int scmi_one_xfer_init(const struct scmi_handle *h, u8 msg_id, u8 prot_id,
+> +		       size_t tx_size, size_t rx_size, struct scmi_xfer **p);
+> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+> new file mode 100644
+> index 000000000000..139d6980f270
+> --- /dev/null
+> +++ b/drivers/firmware/arm_scmi/driver.c
+> @@ -0,0 +1,774 @@
+> +/*
+> + * System Control and Management Interface (SCMI) Message Protocol driver
+> + *
+> + * SCMI Message Protocol is used between the System Control Processor(SCP)
+> + * and the Application Processors(AP). The Message Handling Unit(MHU)
+> + * provides a mechanism for inter-processor communication between SCP's
+> + * Cortex M3 and AP.
+> + *
+> + * SCP offers control and management of the core/cluster power states,
+> + * various power domain DVFS including the core/cluster, certain system
+> + * clocks configuration, thermal sensors and many others.
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/bitmap.h>
+> +#include <linux/export.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mailbox_client.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/semaphore.h>
+> +#include <linux/slab.h>
+> +
+> +#include "common.h"
+> +
+> +#define MSG_ID_SHIFT		0
+> +#define MSG_ID_MASK		0xff
+> +#define MSG_TYPE_SHIFT		8
+> +#define MSG_TYPE_MASK		0x3
+> +#define MSG_PROTOCOL_ID_SHIFT	10
+> +#define MSG_PROTOCOL_ID_MASK	0xff
+> +#define MSG_TOKEN_ID_SHIFT	18
+> +#define MSG_TOKEN_ID_MASK	0x3ff
+> +#define MSG_XTRACT_TOKEN(header)	\
+> +	(((header) >> MSG_TOKEN_ID_SHIFT) & MSG_TOKEN_ID_MASK)
+> +
+> +enum scmi_error_codes {
+> +	SCMI_SUCCESS = 0,	/* Success */
+> +	SCMI_ERR_SUPPORT = -1,	/* Not supported */
+> +	SCMI_ERR_PARAMS = -2,	/* Invalid Parameters */
+> +	SCMI_ERR_ACCESS = -3,	/* Invalid access/permission denied */
+> +	SCMI_ERR_ENTRY = -4,	/* Not found */
+> +	SCMI_ERR_RANGE = -5,	/* Value out of range */
+> +	SCMI_ERR_BUSY = -6,	/* Device busy */
+> +	SCMI_ERR_COMMS = -7,	/* Communication Error */
+> +	SCMI_ERR_GENERIC = -8,	/* Generic Error */
+> +	SCMI_ERR_HARDWARE = -9,	/* Hardware Error */
+> +	SCMI_ERR_PROTOCOL = -10,/* Protocol Error */
+> +	SCMI_ERR_MAX
+> +};
+> +
+> +/* List of all  SCMI devices active in system */
+> +static LIST_HEAD(scmi_list);
+> +/* Protection for the entire list */
+> +static DEFINE_MUTEX(scmi_list_mutex);
+> +
+> +/**
+> + * struct scmi_xfers_info - Structure to manage transfer information
+> + *
+> + * @sem_xfer_count: Counting Semaphore for managing max simultaneous
+> + *	Messages.
+> + * @xfer_block: Preallocated Message array
+> + * @xfer_alloc_table: Bitmap table for allocated messages.
+> + *	Index of this bitmap table is also used for message
+> + *	sequence identifier.
+> + * @xfer_lock: Protection for message allocation
+> + */
+> +struct scmi_xfers_info {
+> +	struct semaphore sem_xfer_count;
+> +	struct scmi_xfer *xfer_block;
+> +	unsigned long *xfer_alloc_table;
+> +	/* protect transfer allocation */
+> +	spinlock_t xfer_lock;
+> +};
+> +
+> +/**
+> + * struct scmi_desc - Description of SoC integration
+> + *
+> + * @max_rx_timeout_ms: Timeout for communication with SoC (in Milliseconds)
+> + * @max_msg: Maximum number of messages that can be pending
+> + *	simultaneously in the system
+> + * @max_msg_size: Maximum size of data per message that can be handled.
+> + */
+> +struct scmi_desc {
+> +	int max_rx_timeout_ms;
+> +	int max_msg;
+> +	int max_msg_size;
+> +};
+> +
+> +/**
+> + * struct scmi_info - Structure representing a  SCMI instance
+> + *
+> + * @dev: Device pointer
+> + * @desc: SoC description for this instance
+> + * @handle: Instance of SCMI handle to send to clients
+> + * @cl: Mailbox Client
+> + * @tx_chan: Transmit mailbox channel
+> + * @rx_chan: Receive mailbox channel
+> + * @tx_payload: Transmit mailbox channel payload area
+> + * @rx_payload: Receive mailbox channel payload area
+> + * @minfo: Message info
+> + * @node: list head
+> + * @users: Number of users of this instance
+> + */
+> +struct scmi_info {
+> +	struct device *dev;
+> +	const struct scmi_desc *desc;
+> +	struct scmi_handle handle;
+> +	struct mbox_client cl;
+> +	struct mbox_chan *tx_chan;
+> +	struct mbox_chan *rx_chan;
+> +	void __iomem *tx_payload;
+> +	void __iomem *rx_payload;
+> +	struct scmi_xfers_info minfo;
+> +	struct list_head node;
+> +	int users;
+> +};
+> +
+> +#define client_to_scmi_info(c)	container_of(c, struct scmi_info, cl)
+> +#define handle_to_scmi_info(h)	container_of(h, struct scmi_info, handle)
+> +
+> +/*
+> + * The SCP firmware providing SCM interface to OSPM and other agents must
+> + * execute only in little-endian mode as per SCMI specification, so any buffers
+> + * shared through SCMI should have their contents converted to little-endian
+> + */
+> +struct scmi_shared_mem {
+> +	__le32 reserved;
+> +	__le32 channel_status;
+> +#define SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR	BIT(1)
+> +#define SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE	BIT(0)
+> +	__le32 reserved1[2];
+> +	__le32 flags;
+> +#define SCMI_SHMEM_FLAG_INTR_ENABLED	BIT(0)
+> +	__le32 length;
+> +	__le32 msg_header;
+> +	u8 msg_payload[0];
+> +};
+> +
+> +static int scmi_linux_errmap[] = {
+> +	/* better than switch case as long as return value is continuous */
+> +	0,			/* SCMI_SUCCESS */
+> +	-EOPNOTSUPP,		/* SCMI_ERR_SUPPORT */
+> +	-EINVAL,		/* SCMI_ERR_PARAM */
+> +	-EACCES,		/* SCMI_ERR_ACCESS */
+> +	-ENOENT,		/* SCMI_ERR_ENTRY */
+> +	-ERANGE,		/* SCMI_ERR_RANGE */
+> +	-EBUSY,			/* SCMI_ERR_BUSY */
+> +	-ECOMM,			/* SCMI_ERR_COMMS */
+> +	-EIO,			/* SCMI_ERR_GENERIC */
+> +	-EREMOTEIO,		/* SCMI_ERR_HARDWARE */
+> +	-EPROTO,		/* SCMI_ERR_PROTOCOL */
+> +};
+> +
+> +static inline int scmi_to_linux_errno(int errno)
+> +{
+> +	if (errno < SCMI_SUCCESS && errno > SCMI_ERR_MAX)
+> +		return scmi_linux_errmap[-errno];
+> +	return -EIO;
+> +}
+> +
+> +/**
+> + * scmi_dump_header_dbg() - Helper to dump a message header.
+> + *
+> + * @dev: Device pointer corresponding to the SCMI entity
+> + * @hdr: pointer to header.
+> + */
+> +static inline void scmi_dump_header_dbg(struct device *dev,
+> +					struct scmi_msg_hdr *hdr)
+> +{
+> +	dev_dbg(dev, "Command ID: %x Sequence ID: %x Protocol: %x\n",
+> +		hdr->id, hdr->seq, hdr->protocol_id);
+> +}
+> +
+> +static void scmi_fetch_response(struct scmi_xfer *xfer,
+> +				struct scmi_shared_mem *mem)
+> +{
+> +	xfer->hdr.status = le32_to_cpu(*(__le32 *)mem->msg_payload);
+> +	/* Skip the length of header and statues in payload area i.e 8 bytes*/
+> +	xfer->rx.len = min_t(size_t, xfer->rx.len, mem->length - 8);
+> +
+> +	/* Take a copy to the rx buffer.. */
+> +	memcpy_fromio(xfer->rx.buf, mem->msg_payload + 4, xfer->rx.len);
+> +}
+> +
+> +/**
+> + * scmi_rx_callback() - mailbox client callback for receive messages
+> + *
+> + * @cl: client pointer
+> + * @m: mailbox message
+> + *
+> + * Processes one received message to appropriate transfer information and
+> + * signals completion of the transfer.
+> + *
+> + * NOTE: This function will be invoked in IRQ context, hence should be
+> + * as optimal as possible.
+> + */
+> +static void scmi_rx_callback(struct mbox_client *cl, void *m)
+> +{
+> +	u16 xfer_id;
+> +	struct scmi_xfer *xfer;
+> +	struct scmi_info *info = client_to_scmi_info(cl);
+> +	struct scmi_xfers_info *minfo = &info->minfo;
+> +	struct device *dev = info->dev;
+> +	struct scmi_shared_mem *mem = info->tx_payload;
+> +
+> +	xfer_id = MSG_XTRACT_TOKEN(mem->msg_header);
+> +
+
+Don't we need to convert msg_header to cpu endian?
+
 > +	/*
-> +	 * Level-triggered mapped IRQs are special because we only observe
-> +	 * rising edges as input to the VGIC.  We therefore lower the line
-> +	 * level here, so that we can take new virtual IRQs.  See
-> +	 * vgic_v2_fold_lr_state for more info.
+> +	 * Are we even expecting this?
 > +	 */
-> +	if (vgic_irq_is_mapped_level(irq) && (val & GICH_LR_PENDING_BIT))
-> +		irq->line_level = false;
+> +	if (!test_bit(xfer_id, minfo->xfer_alloc_table)) {
+> +		dev_err(dev, "message for %d is not expected!\n", xfer_id);
+> +		return;
+> +	}
 > +
->  	/* The GICv2 LR only holds five bits of priority. */
->  	val |= (irq->priority >> 3) << GICH_LR_PRIORITY_SHIFT;
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 96ea597..0f72bcb 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -94,6 +94,26 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
->  				irq->pending_latch = false;
->  		}
->  
-> +		/*
-> +		 * Level-triggered mapped IRQs are special because we only
-> +		 * observe rising edges as input to the VGIC.
-> +		 *
-> +		 * If the guest never acked the interrupt we have to sample
-> +		 * the physical line and set the line level, because the
-> +		 * device state could have changed or we simply need to
-> +		 * process the still pending interrupt later.
-> +		 *
-> +		 * If this causes us to lower the level, we have to also clear
-> +		 * the physical active state, since we will otherwise never be
-> +		 * told when the interrupt becomes asserted again.
-> +		 */
-> +		if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT)) {
-> +			irq->line_level = vgic_get_phys_line_level(irq);
+> +	xfer = &minfo->xfer_block[xfer_id];
 > +
-> +			if (!irq->line_level)
-> +				vgic_irq_set_phys_active(irq, false);
-> +		}
+> +	scmi_dump_header_dbg(dev, &xfer->hdr);
+> +	/* Is the message of valid length? */
+> +	if (xfer->rx.len > info->desc->max_msg_size) {
+> +		dev_err(dev, "unable to handle %zu xfer(max %d)\n",
+> +			xfer->rx.len, info->desc->max_msg_size);
+> +		return;
+> +	}
 > +
->  		spin_unlock(&irq->irq_lock);
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
-> @@ -144,6 +164,15 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->  	}
->  
->  	/*
-> +	 * Level-triggered mapped IRQs are special because we only observe
-> +	 * rising edges as input to the VGIC.  We therefore lower the line
-> +	 * level here, so that we can take new virtual IRQs.  See
-> +	 * vgic_v3_fold_lr_state for more info.
-> +	 */
-> +	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
-> +		irq->line_level = false;
+> +	scmi_fetch_response(xfer, mem);
+> +	complete(&xfer->done);
+> +}
+> +
+> +/**
+> + * pack_scmi_header() - packs and returns 32-bit header
+> + *
+> + * @hdr: pointer to header containing all the information on message id,
+> + *	protocol id and sequence id.
+> + */
+> +static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
+> +{
+> +	return ((hdr->id & MSG_ID_MASK) << MSG_ID_SHIFT) |
+> +	   ((hdr->seq & MSG_TOKEN_ID_MASK) << MSG_TOKEN_ID_SHIFT) |
+> +	   ((hdr->protocol_id & MSG_PROTOCOL_ID_MASK) << MSG_PROTOCOL_ID_SHIFT);
+> +}
+> +
+> +/**
+> + * scmi_tx_prepare() - mailbox client callback to prepare for the transfer
+> + *
+> + * @cl: client pointer
+> + * @m: mailbox message
+> + *
+> + * This function prepares the shared memory which contains the header and the
+> + * payload.
+> + */
+> +static void scmi_tx_prepare(struct mbox_client *cl, void *m)
+> +{
+> +	struct scmi_xfer *t = m;
+> +	struct scmi_info *info = client_to_scmi_info(cl);
+> +	struct scmi_shared_mem *mem = info->tx_payload;
+> +
+> +	mem->channel_status = 0x0; /* Mark channel busy + clear error */
+> +	mem->flags = t->hdr.poll_completion ? 0 : SCMI_SHMEM_FLAG_INTR_ENABLED;
+> +	mem->length = sizeof(mem->msg_header) + t->tx.len;
+> +	mem->msg_header = cpu_to_le32(pack_scmi_header(&t->hdr));
+> +	if (t->tx.buf)
+> +		memcpy_toio(mem->msg_payload, t->tx.buf, t->tx.len);
+> +}
+
+I thought every member of scmi_shared_mem should be in le, not just the 
+header.
+If that is the case, why do mem->length and mem->flags not get converted 
+to le?
+If it is not the case, should they be of type __le32?
+
+(same remark applies in scmi_fetch_response for mem->length)
+
+> +
+> +/**
+> + * scmi_one_xfer_get() - Allocate one message
+> + *
+> + * @handle: SCMI entity handle
+> + *
+> + * Helper function which is used by various command functions that are
+> + * exposed to clients of this driver for allocating a message traffic event.
+> + *
+> + * This function can sleep depending on pending requests already in the system
+> + * for the SCMI entity. Further, this also holds a spinlock to maintain
+> + * integrity of internal data structures.
+> + *
+> + * Return: 0 if all went fine, else corresponding error.
+> + */
+> +static struct scmi_xfer *scmi_one_xfer_get(const struct scmi_handle *handle)
+> +{
+> +	u16 xfer_id;
+> +	int ret, timeout;
+> +	struct scmi_xfer *xfer;
+> +	unsigned long flags, bit_pos;
+> +	struct scmi_info *info = handle_to_scmi_info(handle);
+> +	struct scmi_xfers_info *minfo = &info->minfo;
 > +
 > +	/*
->  	 * We currently only support Group1 interrupts, which is a
->  	 * known defect. This needs to be addressed at some point.
->  	 */
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 9d557efd..8072969 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -140,6 +140,29 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
->  	kfree(irq);
->  }
->  
-> +/* Get the input level of a mapped IRQ directly from the physical GIC */
-> +bool vgic_get_phys_line_level(struct vgic_irq *irq)
-> +{
-> +	bool line_level;
+> +	 * Ensure we have only controlled number of pending messages.
+> +	 * Ideally, we might just have to wait a single message, be
+> +	 * conservative and wait 5 times that..
+> +	 */
+> +	timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms) * 5;
+> +	ret = down_timeout(&minfo->sem_xfer_count, timeout);
+> +	if (ret < 0)
+> +		return ERR_PTR(ret);
 > +
-> +	BUG_ON(!irq->hw);
+> +	/* Keep the locked section as small as possible */
+> +	spin_lock_irqsave(&minfo->xfer_lock, flags);
+> +	bit_pos = find_first_zero_bit(minfo->xfer_alloc_table,
+> +				      info->desc->max_msg);
+> +	if (bit_pos == info->desc->max_msg) {
+> +		spin_unlock_irqrestore(&minfo->xfer_lock, flags);
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +	set_bit(bit_pos, minfo->xfer_alloc_table);
+> +	spin_unlock_irqrestore(&minfo->xfer_lock, flags);
 > +
-> +	WARN_ON(irq_get_irqchip_state(irq->host_irq,
-> +				      IRQCHIP_STATE_PENDING,
-> +				      &line_level));
-> +	return line_level;
+
+Is it needed to disable IRQs here? Since the callback called in IRQ 
+context only reads the xfer_alloc_table without modification nor taking 
+locks, can't we just do spin_lock/spin_unlock?
+
+> +	xfer_id = bit_pos;
+> +
+> +	xfer = &minfo->xfer_block[xfer_id];
+> +	xfer->hdr.seq = xfer_id;
+> +	reinit_completion(&xfer->done);
+> +
+> +	return xfer;
 > +}
 > +
-> +/* Set/Clear the physical active state */
-> +void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
+> +/**
+> + * scmi_one_xfer_put() - Release a message
+> + *
+> + * @minfo: transfer info pointer
+> + * @xfer: message that was reserved by scmi_one_xfer_get
+> + *
+> + * This holds a spinlock to maintain integrity of internal data structures.
+> + */
+> +void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 > +{
+> +	unsigned long flags;
+> +	struct scmi_info *info = handle_to_scmi_info(handle);
+> +	struct scmi_xfers_info *minfo = &info->minfo;
 > +
-> +	BUG_ON(!irq->hw);
-> +	WARN_ON(irq_set_irqchip_state(irq->host_irq,
-> +				      IRQCHIP_STATE_ACTIVE,
-> +				      active));
-> +}
+> +	/*
+> +	 * Keep the locked section as small as possible
+> +	 * NOTE: we might escape with smp_mb and no lock here..
+> +	 * but just be conservative and symmetric.
+> +	 */
+> +	spin_lock_irqsave(&minfo->xfer_lock, flags);
+> +	clear_bit(xfer->hdr.seq, minfo->xfer_alloc_table);
+> +	spin_unlock_irqrestore(&minfo->xfer_lock, flags);
 > +
->  /**
->   * kvm_vgic_target_oracle - compute the target vcpu for an irq
->   *
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index bba7fa2..7bdcda2 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -104,6 +104,11 @@ static inline bool irq_is_pending(struct vgic_irq *irq)
->  		return irq->pending_latch || irq->line_level;
->  }
->  
-> +static inline bool vgic_irq_is_mapped_level(struct vgic_irq *irq)
-> +{
-> +	return irq->config == VGIC_CONFIG_LEVEL && irq->hw;
-> +}
-> +
->  /*
->   * This struct provides an intermediate representation of the fields contained
->   * in the GICH_VMCR and ICH_VMCR registers, such that code exporting the GIC
-> @@ -140,6 +145,8 @@ vgic_get_mmio_region(struct kvm_vcpu *vcpu, struct vgic_io_device *iodev,
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
-> +bool vgic_get_phys_line_level(struct vgic_irq *irq);
-> +void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
->  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
->  void vgic_kick_vcpus(struct kvm *kvm);
->  
-> 
+
+Same question as before.
+
+Cheer,
+
+-- 
+Julien Thierry
