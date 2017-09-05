@@ -1,79 +1,89 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 5 Sep 2017 10:46:08 +0200
-Subject: [PATCH v3 0/5] arm64: Initial Realtek RTD1295 enablement
-In-Reply-To: <CAK8P3a2gBk_rbO7fgpqiTW7A5oxhAPbz6rOjH-kOnOntBjdHSw@mail.gmail.com>
-References: <20170514022429.11555-1-afaerber@suse.de>
- <068148b5-7add-96e5-dc6d-4597527a6c35@suse.de>
- <CAK8P3a2gBk_rbO7fgpqiTW7A5oxhAPbz6rOjH-kOnOntBjdHSw@mail.gmail.com>
-Message-ID: <95ea400d-4605-10f4-fa5f-f554b4705d58@suse.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 5 Sep 2017 14:22:55 +0530
+Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
+ sdhci-omap controller
+In-Reply-To: <20170829173913.GD6008@atomide.com>
+References: <20170821142132.GH6008@atomide.com>
+ <20170823054246.23927-1-kishon@ti.com>
+ <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
+ <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
+ <CAPDyKFqCZFM7UmHyQCm=DwwZXJvzUde3pW0HqARKrsgfgxSuaw@mail.gmail.com>
+ <0c7e0705-d9c2-4499-54ba-cbd84589dc01@ti.com>
+ <20170829115050.3axlr5uysmqlhvd2@earth> <20170829135822.GR6008@atomide.com>
+ <20170829170920.xpgk5ywlvfgrtbqi@rob-hp-laptop>
+ <20170829173913.GD6008@atomide.com>
+Message-ID: <06199a7e-456d-708d-6f2f-81f6bbfea2ba@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.09.2017 um 09:18 schrieb Arnd Bergmann:
-> On Tue, Sep 5, 2017 at 12:09 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> Am 14.05.2017 um 04:24 schrieb Andreas F?rber:
->>> This mini-series adds initial support for the Realtek RTD1295 SoC and
->>> the Zidoo X9S TV box.
+Hi,
+
+On Tuesday 29 August 2017 11:09 PM, Tony Lindgren wrote:
+> * Rob Herring <robh@kernel.org> [170829 10:09]:
+>> On Tue, Aug 29, 2017 at 06:58:23AM -0700, Tony Lindgren wrote:
+>>> * Sebastian Reichel <sebastian.reichel@collabora.co.uk> [170829 04:51]:
+>>>> I would expect the conversion to look like the one done for UART,
+>>>> see CONFIG_SERIAL_OMAP vs CONFIG_SERIAL_8250_OMAP. Both use the
+>>>> same compatible value and you can choose using kernel configuration.
 >>>
->>> v3 changes #address-cells, #size-cells and ranges.
->>>
->>> With these patches CPU0 can be booted with earlycon.
->>>
->>> PSCI doesn't work despite present in the vendor device tree; as enable-method
->>> it instead used a custom "rtk-spin-table" that I sadly have no source code of.
+>>> That does not work unfortunately :( We are now stuck in a situation
+>>> where two drivers are attempting to probe with the same compatible
+>>> and we can't enable 8250_OMAP because of the user space breakage
+>>> with the device names. And I'm actuallly thinking we should add a
+>>> new compatible for 8250-omap to be able to start enabling it one
+>>> board at a time.
 >>
->> Synology has now published source code for RTD1293/1296. This has
->> allowed me to narrow the RTD1295 CPU1..3 issue down to two changes in
->> arch/arm64/kernel/smp_spin_table.c:smp_spin_table_cpu_prepare():
->>
->> 1) writel_relaxed() instead of writeq_relaxed()
->> 2) ioremap() instead of ioremap_cache()
->>
->> Without those changes it hangs in earlycon after this line:
->> [    0.043674] Mountpoint-cache hash table entries: 4096 (order: 3,
->> 32768 bytes)
->>
->> The size difference sounds easy enough - we could introduce an optional
->> cpu-release-size property to handle this or derive a "spin-table-32bit"
->> enable-method to that effect.
->>
->> The second one appears to be caused by PROT_NORMAL vs.
->> PROT_DEVICE_nGnRE. Is there any simple check we could do on
->> cpu-release-addr to choose which MT to use?
->>
->> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit?id=113954c6463d1d80a206e91627ae49711f8b47cd
->>
->> Any other ideas?
+>> Is that the only problem? Presumably, the SD driver doesn't have a 
+>> userspace facing issue.
 > 
-> I think we had a similar problem before and concluded that something
-> requiring a write into an MMIO register is simply not a spin-table
-> implementation but something else.
+> No userspace issue with the sdhci-omap. But the sdhci-omap driver
+> still has the issue of trying enable it for everything at once and
+> expect everything to work. The sdhci-omap driver can already be
+> used for boards that don't need power management for example, but
+> will break things for devices running on batteries.
+> 
+>>> It's best to enable devices to use the new compatible as things are
+>>> tested rather than hope for some magic "flag day" flip that might
+>>> never happen. Having two days attempting to probe with the same
+>>> binding just won't work.
+>>
+>> Aren't you just picking whether the flag day is in DT or the kernel? I 
+>> guess you're assuming one kernel build and it would be switching all 
+>> boards at one. 
+> 
+> Right, this would be risky and would take unnecessarily long
+> to use the new driver on boards that can already use it. While
+> power management won't work yet, I'd expect the sdhci-omap be
+> faster on SoCs that can do ADMA.
+> 
+>>> So yeah, I agree with Kishon that we should stick with generic
+>>> and sdhci bindings. And then we can start already using it for
+>>> boards that can use it, then eventually when we're ready, start
+>>> parsing also the legacy bindings and maybe drop the old driver.
+>>
+>> I assume there are some other common properties you would switch to in 
+>> the transition?  You could make the legacy driver bail from probe based 
+>> on presence or absence of other properties. Or you could just blacklist 
+>> converted platforms in the legacy driver. The point is that the problems 
+>> are solvable in the kernel.
+> 
+> Yes this could be done too. But let's enable it on per-board
+> basis rather than attempt to flip it on at once.
+> 
+>> But if your really want a new compatible, I don't really care. It's 
+>> only one device.
+> 
+> Both a new compatible or a check for some resource work just fine
+> for me as long as the driver can be selected on per-board basis.
 
-Well, my understanding was that "something else" is not acceptable for
-arm64. And still being without ATF, U-Boot and OP-TEE sources I don't
-see how I could reimplement PSCI instead.
+New compatible sounds simpler to me since it allows to select a driver per-MMC
+instance. (SDIO support is not added/validated in sdhci-omap).
 
-> Is this simply using a copy of the spin-table code to trigger the actual
-> booting of the secondary CPU?
+To summarize, we'll create new compatible and new bindings for sdhci-omap and
+start enabling sdhci-omap on per-board basis. When all the TI platforms starts
+to use sdhci-omap, omap-hsmmc will be removed at which point support for old
+compatible and old dt bindings will be added to sdhci-omap.c. Does this sound
+reasonable?
 
-Yes. Realtek have duplicated and modified the file - I've instead tried
-to reuse the existing code with those minimal changes, for a chance to
-get this mainline with suitable conditions.
-
-The only other Realtek changes are additions for cpu_disable/cpu_die
-that I am ignoring for now. Happy that the cores are finally up!
-
-> Can you identify the MMIO address?
-
-The magic 32-bit register is 0x9801aa44, with RAM being 0..0x80000000.
-
-Thus I was hoping there might be some handy is_ram_addr(phys_addr) that
-we could use in generic code to choose the right ioremap function.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks
+Kishon
