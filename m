@@ -1,112 +1,68 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 5 Sep 2017 13:10:31 +0200
-Subject: [PATCH v2 0/6] Host1x and VIC support for Tegra186
-In-Reply-To: <20170905084306.19318-1-mperttunen@nvidia.com>
-References: <20170905084306.19318-1-mperttunen@nvidia.com>
-Message-ID: <20170905111031.u4damueklnuliqt4@phenom.ffwll.local>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Tue, 5 Sep 2017 14:21:08 +0300
+Subject: [PATCH] usb: host: xhci-plat: allow sysdev to inherit from ACPI
+In-Reply-To: <1504202057-23634-1-git-send-email-awallis@codeaurora.org>
+References: <1504202057-23634-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <59AE88A4.8070206@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 05, 2017 at 11:43:00AM +0300, Mikko Perttunen wrote:
-> Hi,
-> 
-> not many changes in v2:
-> 
-> Changed address-cells and size-cells for the Host1x device tree node
-> to have value 1, since all subdevices fit in the lower 4G. Also dropped
-> the incorrect change about this from the dt-bindings patch. Thanks to
-> Rob for pointing this out.
-> 
-> Mikko
-> 
-> Notes for v1:
-> 
-> Hi everyone,
-> 
-> this series adds basic support for the Host1x channel engine and the
-> VIC 2d compositor unit on Tegra186. The first three patches do the
-> required device tree changes, the fourth patch updates the device tree
-> binding documentation, and the two remaining patches add the actual
-> implementation, almost all of which is in Host1x itself.
-> 
-> The Tegra186 Host1x is a relatively large update over previous
-> generations, which can be seen in the diffstat. The biggest change is
-> that Host1x is now contains separate hypervisor and vm register
-> apertures to support virtualization at the hardware level. This driver,
-> however, currently assumes that this instance of Linux is the sole
-> operating system having access to the hardware.
-> 
-> This combined with increased numbers of supported channels and
-> syncpoints have caused a number of register space changes that are
-> responsible for most of the updated code.
-> 
-> The series has been tested on the Jetson TX1 (T210) and TX2 (T186)
-> using the host1x_test test suite available at
-> 
-> http://github.com/cyndis/host1x_test
-> 
-> The series itself is available at
-> 
-> http://github.com/cyndis/linux, branch host1x-t186-1
+On 31.08.2017 20:54, Adam Wallis wrote:
+> Currently, xhci_plat is not set up properly when the parent device is an
+> ACPI node. The conditions that xhci_plat_probe should satisfy are
+>
+> 1. xhci_plat comes from firmware
+> 2. xhci_plat is child of a device from firmware (dwc3-plat)
+> 3. xhci_plat is grandchild of a pci device (dwc3-pci)
+>
+> Case 2 is covered when the child is an OF node (by checking
+> sysdev->parent->of_node), however, an ACPI parent will return NULL in
+> the of_node check and will thus not result in sysdev being set to
+> sysdev->parent
+>
+> [   17.591549] xhci-hcd: probe of xhci-hcd.6.auto failed with error -5
+>
+> This change adds a check for ACPI to completely allow for condition 2.
+> This is done by first checking if the parent node is of type ACPI (e.g.,
+> dwc3-plat) and set sysdev to sysdev->parent if either of the two
+> following conditions are met:
+>
+> 1: If fwnode is empty (in the case that platform_device_add_properties
+> was not called on the allocated platform device)
+> 2: fwnode exists but is not of type ACPI (this would happen if
+> platform_device_add_properties was called on the allocated device.
+> Instead of type FWNODE_ACPI, you would end up with FWNODE_PDATA)
+>
+> Cc: stable at vger.kernel.org # 4.12.x
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
 
-Since this is new hw support, is there also open source userspace using
-all this?
+Thang Q. Nguyen  (in CC) proposed a patch for the same issue earlier,
 
-Thanks, Daniel
+I just replied to his patch with a new proposal (added you to CC)
 
-> 
-> Cheers,
-> Mikko
-> 
-> Mikko Perttunen (6):
->   arm64: tegra: Add #power-domain-cells for BPMP
->   arm64: tegra: Add host1x on Tegra186
->   arm64: tegra: Add VIC on Tegra186
->   dt-bindings: host1x: Add Tegra186 information
->   gpu: host1x: Add Tegra186 support
->   drm/tegra: Add Tegra186 support for VIC
-> 
->  .../display/tegra/nvidia,tegra20-host1x.txt        |   4 +
->  arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  31 ++++
->  drivers/gpu/drm/tegra/drm.c                        |   1 +
->  drivers/gpu/drm/tegra/vic.c                        |  10 ++
->  drivers/gpu/host1x/Makefile                        |   3 +-
->  drivers/gpu/host1x/dev.c                           |  60 ++++++-
->  drivers/gpu/host1x/dev.h                           |   4 +
->  drivers/gpu/host1x/hw/cdma_hw.c                    |  49 +++---
->  drivers/gpu/host1x/hw/debug_hw.c                   | 137 +---------------
->  drivers/gpu/host1x/hw/debug_hw_1x01.c              | 154 ++++++++++++++++++
->  drivers/gpu/host1x/hw/debug_hw_1x06.c              | 133 +++++++++++++++
->  drivers/gpu/host1x/hw/host1x01.c                   |   2 +
->  drivers/gpu/host1x/hw/host1x02.c                   |   2 +
->  drivers/gpu/host1x/hw/host1x04.c                   |   2 +
->  drivers/gpu/host1x/hw/host1x05.c                   |   2 +
->  drivers/gpu/host1x/hw/host1x06.c                   |  44 +++++
->  drivers/gpu/host1x/hw/host1x06.h                   |  26 +++
->  drivers/gpu/host1x/hw/host1x06_hardware.h          | 142 ++++++++++++++++
->  drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h     |  32 ++++
->  drivers/gpu/host1x/hw/hw_host1x06_uclass.h         | 181 +++++++++++++++++++++
->  drivers/gpu/host1x/hw/hw_host1x06_vm.h             |  47 ++++++
->  drivers/gpu/host1x/hw/intr_hw.c                    |  29 ++--
->  22 files changed, 926 insertions(+), 169 deletions(-)
->  create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x01.c
->  create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x06.c
->  create mode 100644 drivers/gpu/host1x/hw/host1x06.c
->  create mode 100644 drivers/gpu/host1x/hw/host1x06.h
->  create mode 100644 drivers/gpu/host1x/hw/host1x06_hardware.h
->  create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h
->  create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_uclass.h
->  create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_vm.h
-> 
-> -- 
-> 2.14.1
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Basically replace it all with:
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+-       sysdev = &pdev->dev;
+-       if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
+-               sysdev = sysdev->parent;
+-#ifdef CONFIG_PCI
+-       else if (sysdev->parent && sysdev->parent->parent &&
+-                sysdev->parent->parent->bus == &pci_bus_type)
+-               sysdev = sysdev->parent->parent;
+-#endif
++
++       for (sysdev = &pdev->dev; sysdev; sysdev = sysdev->parent) {
++               if (is_of_node(sysdev->fwnode) ||
++                   is_acpi_device_node(sysdev->fwnode))
++                       break;
++       #ifdef CONFIG_PCI
++               else if (sysdev->bus == &pci_bus_type)
++                       break;
++       #endif
++       }
++
++       if (!sysdev)
++               sysdev = &pdev->dev;
+
+-Mathias
