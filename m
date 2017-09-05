@@ -1,35 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Sep 2017 10:19:55 +0200
-Subject: [PATCH] drm: exynos: include linux/irq.h
-Message-ID: <20170905082022.1239056-1-arnd@arndb.de>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue,  5 Sep 2017 11:43:03 +0300
+Subject: [PATCH v2 3/6] arm64: tegra: Add VIC on Tegra186
+In-Reply-To: <20170905084306.19318-1-mperttunen@nvidia.com>
+References: <20170905084306.19318-1-mperttunen@nvidia.com>
+Message-ID: <20170905084306.19318-4-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I ran into a build error on x86:
+Add a node for the Video Image Compositor on the Tegra186.
 
-drivers/gpu/drm/exynos/exynos5433_drm_decon.c: In function 'decon_conf_irq':
-drivers/gpu/drm/exynos/exynos5433_drm_decon.c:706:2: error: implicit declaration of function 'irq_set_status_flags'; did you mean 'dquot_state_flag'? [-Werror=implicit-function-declaration]
-  irq_set_status_flags(irq, IRQ_NOAUTOEN);
-
-Adding the missing include fixes the error.
-
-Fixes: b37d53a0382c ("drm/exynos/decon5433: move TE handling to DECON")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- drivers/gpu/drm/exynos/exynos5433_drm_decon.c | 1 +
- 1 file changed, 1 insertion(+)
+v2:
+- Fixed reg property in accordance with changed parent cells.
 
-diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-index 730b8d9db187..6be5b53c3b27 100644
---- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-@@ -14,6 +14,7 @@
- #include <linux/clk.h>
- #include <linux/component.h>
- #include <linux/iopoll.h>
-+#include <linux/irq.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of_device.h>
- #include <linux/of_gpio.h>
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+index b1a3e404c7be..584bce64d41f 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+@@ -371,6 +371,18 @@
+ 		#size-cells = <1>;
+ 
+ 		ranges = <0x15000000 0x0 0x15000000 0x01000000>;
++
++		vic at 15340000 {
++			compatible = "nvidia,tegra186-vic";
++			reg = <0x15340000 0x40000>;
++			interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&bpmp TEGRA186_CLK_VIC>;
++			clock-names = "vic";
++			resets = <&bpmp TEGRA186_RESET_VIC>;
++			reset-names = "vic";
++
++			power-domains = <&bpmp TEGRA186_POWER_DOMAIN_VIC>;
++		};
+ 	};
+ 
+ 	gpu at 17000000 {
 -- 
-2.9.0
+2.14.1
