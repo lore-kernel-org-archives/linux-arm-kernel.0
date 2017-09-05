@@ -1,34 +1,18 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 5 Sep 2017 23:37:52 +0200
-Subject: [PATCH v4 18/28] ARM: dts: s500-guitar-bb-rev-b: Add fake uart3
- clock
-In-Reply-To: <20170606005426.26446-19-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-19-afaerber@suse.de>
-Message-ID: <5f7e0538-5cd5-6052-28bf-3cb9c07d7748@suse.de>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 05 Sep 2017 14:58:44 -0700 (PDT)
+Subject: [PATCH 0/3] drivers: net: xgene: Misc bug fixes
+In-Reply-To: <1504635392-19089-1-git-send-email-isubramanian@apm.com>
+References: <1504635392-19089-1-git-send-email-isubramanian@apm.com>
+Message-ID: <20170905.145844.649087066908439588.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> Add a fixed-clock for baudrate 115200.
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Tue,  5 Sep 2017 11:16:29 -0700
+
+> This patch set fixes bugs related to handling the case for ACPI for,
+> reading and programming tx/rx delay values.
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2 -> v3 -> v4: unchanged
->  
->  v2: new
->  
->  arch/arm/boot/dts/s500-guitar-bb-rev-b.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 
-Applied to v4.14/dt:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.14/dt
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Series applied, thank you.
