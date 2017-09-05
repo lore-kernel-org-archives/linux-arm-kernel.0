@@ -1,81 +1,196 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  5 Sep 2017 16:52:05 +0200
-Subject: [PULL 6/8] KVM: arm/arm64: vITS: Drop its_ite->lpi field
+Date: Tue,  5 Sep 2017 16:52:03 +0200
+Subject: [PULL 4/8] KVM: arm/arm64: Fix guest external abort matching
 In-Reply-To: <20170905145207.18447-1-cdall@linaro.org>
 References: <20170905145207.18447-1-cdall@linaro.org>
-Message-ID: <20170905145207.18447-7-cdall@linaro.org>
+Message-ID: <20170905145207.18447-5-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: James Morse <james.morse@arm.com>
 
-For unknown reasons, the its_ite data structure carries an "lpi" field
-which contains the intid of the LPI. This is an obvious duplication
-of the vgic_irq->intid field, so let's fix the only user and remove
-the now useless field.
+The ARM-ARM has two bits in the ESR/HSR relevant to external aborts.
+A range of {I,D}FSC values (of which bit 5 is always set) and bit 9 'EA'
+which provides:
+> an IMPLEMENTATION DEFINED classification of External Aborts.
 
+This bit is in addition to the {I,D}FSC range, and has an implementation
+defined meaning. KVM should always ignore this bit when handling external
+aborts from a guest.
+
+Remove the ESR_ELx_EA definition and rewrite its helper
+kvm_vcpu_dabt_isextabt() to check the {I,D}FSC range. This merges
+kvm_vcpu_dabt_isextabt() and the recently added is_abort_sea() helper.
+
+CC: Tyler Baicar <tbaicar@codeaurora.org>
+Reported-by: gengdongjiu <gengdj.1984@gmail.com>
+Signed-off-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_arm.h       |  1 -
+ arch/arm/include/asm/kvm_emulate.h   | 24 +++++++++++++++++-----
+ arch/arm64/include/asm/kvm_emulate.h | 24 +++++++++++++++++-----
+ virt/kvm/arm/mmu.c                   | 40 ++++++++++--------------------------
+ 4 files changed, 49 insertions(+), 40 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index aa6b68d..f51c1e1 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -144,7 +144,6 @@ struct its_ite {
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index ebf020b..c878145 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -227,7 +227,6 @@
  
- 	struct vgic_irq *irq;
- 	struct its_collection *collection;
--	u32 lpi;
- 	u32 event_id;
- };
+ #define HSR_DABT_S1PTW		(_AC(1, UL) << 7)
+ #define HSR_DABT_CM		(_AC(1, UL) << 8)
+-#define HSR_DABT_EA		(_AC(1, UL) << 9)
  
-@@ -813,7 +812,7 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- /* Must be called with its_lock mutex held */
- static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
- 					  struct its_collection *collection,
--					  u32 lpi_id, u32 event_id)
-+					  u32 event_id)
+ #define kvm_arm_exception_type	\
+ 	{0, "RESET" }, 		\
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 9a8a45a..98089ff 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -149,11 +149,6 @@ static inline int kvm_vcpu_dabt_get_rd(struct kvm_vcpu *vcpu)
+ 	return (kvm_vcpu_get_hsr(vcpu) & HSR_SRT_MASK) >> HSR_SRT_SHIFT;
+ }
+ 
+-static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
+-{
+-	return kvm_vcpu_get_hsr(vcpu) & HSR_DABT_EA;
+-}
+-
+ static inline bool kvm_vcpu_dabt_iss1tw(struct kvm_vcpu *vcpu)
  {
- 	struct its_ite *ite;
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_DABT_S1PTW;
+@@ -206,6 +201,25 @@ static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC_TYPE;
+ }
  
-@@ -823,7 +822,6 @@ static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
++static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
++{
++	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
++	case FSC_SEA:
++	case FSC_SEA_TTW0:
++	case FSC_SEA_TTW1:
++	case FSC_SEA_TTW2:
++	case FSC_SEA_TTW3:
++	case FSC_SECC:
++	case FSC_SECC_TTW0:
++	case FSC_SECC_TTW1:
++	case FSC_SECC_TTW2:
++	case FSC_SECC_TTW3:
++		return true;
++	default:
++		return false;
++	}
++}
++
+ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index fe39e68..e5df3fc 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -188,11 +188,6 @@ static inline int kvm_vcpu_dabt_get_rd(const struct kvm_vcpu *vcpu)
+ 	return (kvm_vcpu_get_hsr(vcpu) & ESR_ELx_SRT_MASK) >> ESR_ELx_SRT_SHIFT;
+ }
  
- 	ite->event_id	= event_id;
- 	ite->collection = collection;
--	ite->lpi = lpi_id;
+-static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+-{
+-	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_EA);
+-}
+-
+ static inline bool kvm_vcpu_dabt_iss1tw(const struct kvm_vcpu *vcpu)
+ {
+ 	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_S1PTW);
+@@ -240,6 +235,25 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_get_hsr(vcpu) & ESR_ELx_FSC_TYPE;
+ }
  
- 	list_add_tail(&ite->ite_list, &device->itt_head);
- 	return ite;
-@@ -873,7 +871,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
++static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
++{
++	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
++	case FSC_SEA:
++	case FSC_SEA_TTW0:
++	case FSC_SEA_TTW1:
++	case FSC_SEA_TTW2:
++	case FSC_SEA_TTW3:
++	case FSC_SECC:
++	case FSC_SECC_TTW0:
++	case FSC_SECC_TTW1:
++	case FSC_SECC_TTW2:
++	case FSC_SECC_TTW3:
++		return true;
++	default:
++		return false;
++	}
++}
++
+ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
+ {
+ 	u32 esr = kvm_vcpu_get_hsr(vcpu);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 2ea21da..b36945d 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1454,25 +1454,6 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 		kvm_set_pfn_accessed(pfn);
+ }
+ 
+-static bool is_abort_sea(unsigned long fault_status)
+-{
+-	switch (fault_status) {
+-	case FSC_SEA:
+-	case FSC_SEA_TTW0:
+-	case FSC_SEA_TTW1:
+-	case FSC_SEA_TTW2:
+-	case FSC_SEA_TTW3:
+-	case FSC_SECC:
+-	case FSC_SECC_TTW0:
+-	case FSC_SECC_TTW1:
+-	case FSC_SECC_TTW2:
+-	case FSC_SECC_TTW3:
+-		return true;
+-	default:
+-		return false;
+-	}
+-}
+-
+ /**
+  * kvm_handle_guest_abort - handles all 2nd stage aborts
+  * @vcpu:	the VCPU pointer
+@@ -1498,20 +1479,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+ 
+ 	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
++	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+ 
+-	/*
+-	 * The host kernel will handle the synchronous external abort. There
+-	 * is no need to pass the error into the guest.
+-	 */
+-	if (is_abort_sea(fault_status)) {
++	/* Synchronous External Abort? */
++	if (kvm_vcpu_dabt_isextabt(vcpu)) {
++		/*
++		 * For RAS the host kernel may handle this abort.
++		 * There is no need to pass the error into the guest.
++		 */
+ 		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
+ 			return 1;
+-	}
+ 
+-	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+-	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
+-		kvm_inject_vabt(vcpu);
+-		return 1;
++		if (unlikely(!is_iabt)) {
++			kvm_inject_vabt(vcpu);
++			return 1;
++		}
  	}
  
--	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
-+	ite = vgic_its_alloc_ite(device, collection, event_id);
- 	if (IS_ERR(ite)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
-@@ -1848,7 +1846,7 @@ static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
- 
- 	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
- 	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
--	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
-+	       ((u64)ite->irq->intid << KVM_ITS_ITE_PINTID_SHIFT) |
- 		ite->collection->collection_id;
- 	val = cpu_to_le64(val);
- 	return kvm_write_guest(kvm, gpa, &val, ite_esz);
-@@ -1895,7 +1893,7 @@ static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
- 	if (!collection)
- 		return -EINVAL;
- 
--	ite = vgic_its_alloc_ite(dev, collection, lpi_id, event_id);
-+	ite = vgic_its_alloc_ite(dev, collection, event_id);
- 	if (IS_ERR(ite))
- 		return PTR_ERR(ite);
- 
+ 	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
 -- 
 2.9.0
