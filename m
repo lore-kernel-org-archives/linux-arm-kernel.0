@@ -1,40 +1,52 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue,  5 Sep 2017 12:57:32 +0200
-Subject: [PATCH 0/7] ARM: dts: rockchip: add Utgard Mali nodes for some socs
-Message-ID: <20170905105739.8330-1-heiko@sntech.de>
+Date: Tue,  5 Sep 2017 12:57:35 +0200
+Subject: [PATCH 3/7] ARM: dts: rockchip: add rk3036 gpu node
+In-Reply-To: <20170905105739.8330-1-heiko@sntech.de>
+References: <20170905105739.8330-1-heiko@sntech.de>
+Message-ID: <20170905105739.8330-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a mali-supply similar to the Midgard binding, the
-compatibles for 3 Rockchip socs and the nodes for these.
+The rk3036 uses a Mali400 GPU with one pixel processor.
+This adds the core node for it, which can be enabled
+in board devicetrees.
 
-The rk3036 and rk3188 gpus were tested, on the boards that
-get their gpus enabled, using the current Lima resurrection
-project and were able to probe the gpus sucessfully.
+Rockchip Mali GPUs use only one clock line for both bus and core.
 
-The only special thing Rockchip Malis do, is that all MMUs have
-a shared interrupt and all PPs also have a shared interrupt, but
-that works out well with the current binding.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3036.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-
-Heiko Stuebner (7):
-  dt-bindings: gpu: mali-utgard: Add Rockchip Utgard Malis
-  dt-bindings: gpu: mali-utgard: add optional supply regulator
-  ARM: dts: rockchip: add rk3036 gpu node
-  ARM: dts: rockchip: enable the gpu on rk3036-kylin boards
-  ARM: dts: rockchip: add rk322x gpu node
-  ARM: dts: rockchip: add gpu nodes on rk3066/rk3188
-  ARM: dts: rockchip: enable gpu on rk3188-radxarock
-
- .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 10 +++++++++
- arch/arm/boot/dts/rk3036-kylin.dts                 |  5 +++++
- arch/arm/boot/dts/rk3036.dtsi                      | 19 +++++++++++++++++
- arch/arm/boot/dts/rk3066a.dtsi                     | 24 ++++++++++++++++++++++
- arch/arm/boot/dts/rk3188-radxarock.dts             |  4 ++++
- arch/arm/boot/dts/rk3188.dtsi                      | 24 ++++++++++++++++++++++
- arch/arm/boot/dts/rk322x.dtsi                      | 21 +++++++++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi                      | 11 ++++++++++
- 8 files changed, 118 insertions(+)
-
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index 4916c65e0ace..5b084c0143ce 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -152,6 +152,25 @@
+ 		};
+ 	};
+ 
++	gpu: gpu at 10090000 {
++		compatible = "rockchip,rk3036-mali", "arm,mali-400";
++		reg = <0x10090000 0x10000>;
++		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "gp",
++				  "gpmmu",
++				  "pp0",
++				  "pp0mmu";
++		assigned-clocks = <&cru SCLK_GPU>;
++		assigned-clock-rates = <100000000>;
++		clocks = <&cru SCLK_GPU>, <&cru SCLK_GPU>;
++		clock-names = "core", "bus";
++		resets = <&cru SRST_GPU>;
++		status = "disabled";
++	};
++
+ 	vop: vop at 10118000 {
+ 		compatible = "rockchip,rk3036-vop";
+ 		reg = <0x10118000 0x19c>;
 -- 
 2.14.1
