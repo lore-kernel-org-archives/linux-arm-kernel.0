@@ -1,50 +1,45 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  5 Sep 2017 16:52:02 +0200
-Subject: [PULL 3/8] KVM: arm/arm64: Handle hva aging while destroying the vm
+Date: Tue,  5 Sep 2017 16:52:04 +0200
+Subject: [PULL 5/8] KVM: arm/arm64: vgic: constify seq_operations and
+ file_operations
 In-Reply-To: <20170905145207.18447-1-cdall@linaro.org>
 References: <20170905145207.18447-1-cdall@linaro.org>
-Message-ID: <20170905145207.18447-4-cdall@linaro.org>
+Message-ID: <20170905145207.18447-6-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+From: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-The mmu_notifier_release() callback of KVM triggers cleaning up
-the stage2 page table on kvm-arm. However there could be other
-notifier callbacks in parallel with the mmu_notifier_release(),
-which could cause the call backs ending up in an empty stage2
-page table. Make sure we check it for all the notifier callbacks.
+vgic_debug_seq_ops and file_operations are not supposed to change
+at runtime and none of the structures is modified.
 
-Cc: stable at vger.kernel.org
-Fixes: commit 293f29363 ("kvm-arm: Unmap shadow pagetables properly")
-Reported-by: Alex Graf <agraf@suse.de>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/mmu.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ virt/kvm/arm/vgic/vgic-debug.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 0e1fc75..2ea21da 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1718,12 +1718,16 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *
- 
- int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
- {
-+	if (!kvm->arch.pgd)
-+		return 0;
- 	trace_kvm_age_hva(start, end);
- 	return handle_hva_to_gpa(kvm, start, end, kvm_age_hva_handler, NULL);
+diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+index 7072ab7..10b3817 100644
+--- a/virt/kvm/arm/vgic/vgic-debug.c
++++ b/virt/kvm/arm/vgic/vgic-debug.c
+@@ -234,7 +234,7 @@ static int vgic_debug_show(struct seq_file *s, void *v)
+ 	return 0;
  }
  
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
- {
-+	if (!kvm->arch.pgd)
-+		return 0;
- 	trace_kvm_test_age_hva(hva);
- 	return handle_hva_to_gpa(kvm, hva, hva, kvm_test_age_hva_handler, NULL);
- }
+-static struct seq_operations vgic_debug_seq_ops = {
++static const struct seq_operations vgic_debug_seq_ops = {
+ 	.start = vgic_debug_start,
+ 	.next  = vgic_debug_next,
+ 	.stop  = vgic_debug_stop,
+@@ -255,7 +255,7 @@ static int debug_open(struct inode *inode, struct file *file)
+ 	return ret;
+ };
+ 
+-static struct file_operations vgic_debug_fops = {
++static const struct file_operations vgic_debug_fops = {
+ 	.owner   = THIS_MODULE,
+ 	.open    = debug_open,
+ 	.read    = seq_read,
 -- 
 2.9.0
