@@ -1,65 +1,147 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Tue, 05 Sep 2017 14:23:02 +0200
-Subject: [PATCH] drm/exynos/hdmi: Fix unsafe list iteration
-References: <CGME20170905122309eucas1p15739d5191e6471e9bfc05aa32b334f2e@eucas1p1.samsung.com>
-Message-ID: <1504614182-1509-1-git-send-email-m.purski@samsung.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue,  5 Sep 2017 15:38:39 +0300
+Subject: [PATCH v8 00/20] simplify crypto wait for async op
+Message-ID: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function hdmi_mode_fixup() used bare list_for_each entry, which was
-unsafe and caused memory corruption detected by kasan.
-It now uses drm_for_each_connector_iter macro, which is now recommended
-by the documentation and safe.
+Many users of kernel async. crypto services have a pattern of
+starting an async. crypto op and than using a completion
+to wait for it to end.
 
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_hdmi.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+This patch set simplifies this common use case in two ways:
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 214fa5e..0109ff4 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -944,22 +944,27 @@ static bool hdmi_mode_fixup(struct drm_encoder *encoder,
- 	struct drm_device *dev = encoder->dev;
- 	struct drm_connector *connector;
- 	struct drm_display_mode *m;
-+	struct drm_connector_list_iter conn_iter;
- 	int mode_ok;
- 
- 	drm_mode_set_crtcinfo(adjusted_mode, 0);
- 
--	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-+	drm_connector_list_iter_begin(dev, &conn_iter);
-+	drm_for_each_connector_iter(connector, &conn_iter) {
- 		if (connector->encoder == encoder)
- 			break;
- 	}
-+	if (connector)
-+		drm_connector_get(connector);
-+	drm_connector_list_iter_end(&conn_iter);
- 
--	if (connector->encoder != encoder)
-+	if (!connector)
- 		return true;
- 
- 	mode_ok = hdmi_mode_valid(connector, adjusted_mode);
- 
- 	if (mode_ok == MODE_OK)
--		return true;
-+		goto cleanup;
- 
- 	/*
- 	 * Find the most suitable mode and copy it to adjusted_mode.
-@@ -979,6 +984,9 @@ static bool hdmi_mode_fixup(struct drm_encoder *encoder,
- 		}
- 	}
- 
-+cleanup:
-+	drm_connector_put(connector);
-+
- 	return true;
- }
- 
+First, by separating the return codes of the case where a
+request is queued to a backlog due to the provider being
+busy (-EBUSY) from the case the request has failed due
+to the provider being busy and backlogging is not enabled
+(-EAGAIN).
+
+Next, this change is than built on to create a generic API
+to wait for a async. crypto operation to complete.
+
+The end result is a smaller code base and an API that is
+easier to use and more difficult to get wrong.
+
+The patch set was boot tested on x86_64 and arm64 which
+at the very least tests the crypto users via testmgr and
+tcrypt but I do note that I do not have access to some
+of the HW whose drivers are modified nor do I claim I was
+able to test all of the corner cases.
+
+The patch set is based upon linux-next release tagged
+next-20170905.
+
+Changes from v7:
+- Turn -EBUSY to -EAGAIN also in crypto using net
+  code which I missed before, as has been pointed
+  out by Harsh Jain.
+
+Changes from v6:
+- Fix brown paper bag compile error on marvell/cesa
+  code.
+
+Changes from v5:
+- Remove redundant new line as spotted by Jonathan
+  Cameron.
+- Reworded dm-verity change commit message to better
+  clarify potential issue averted by change as
+  pointed out by Mikulas Patocka.
+
+Changes from v4:
+- Rebase on top of latest algif changes from Stephan
+  Mueller.
+- Fix typo in ccp patch title.
+
+Changes from v3:
+- Instead of changing the return code to indicate
+  backlog queueing, change the return code to indicate
+  transient busy state, as suggested by Herbert Xu.
+
+Changes from v2:
+- Patch title changed from "introduce crypto wait for
+  async op" to better reflect the current state.
+- Rebase on top of latest linux-next.
+- Add a new return code of -EIOCBQUEUED for backlog
+  queueing, as suggested by Herbert Xu.
+- Transform more users to the new API.
+- Update the drbg change to account for new init as
+  indicated by Stephan Muller.
+
+Changes from v1:
+- Address review comments from Eric Biggers.
+- Separated out bug fixes of existing code and rebase
+  on top of that patch set.
+- Rename 'ecr' to 'wait' in fscrypto code.
+- Split patch introducing the new API from the change
+  moving over the algif code which it originated from
+  to the new API.
+- Inline crypto_wait_req().
+- Some code indentation fixes.
+
+Gilad Ben-Yossef (20):
+  crypto: change transient busy return code to -EAGAIN
+  crypto: ccp: use -EAGAIN for transient busy indication
+  net: use -EAGAIN for transient busy indication
+  crypto: remove redundant backlog checks on EBUSY
+  crypto: marvell/cesa: remove redundant backlog checks on EBUSY
+  crypto: introduce crypto wait for async op
+  crypto: move algif to generic async completion
+  crypto: move pub key to generic async completion
+  crypto: move drbg to generic async completion
+  crypto: move gcm to generic async completion
+  crypto: move testmgr to generic async completion
+  fscrypt: move to generic async completion
+  dm: move dm-verity to generic async completion
+  cifs: move to generic async completion
+  ima: move to generic async completion
+  crypto: tcrypt: move to generic async completion
+  crypto: talitos: move to generic async completion
+  crypto: qce: move to generic async completion
+  crypto: mediatek: move to generic async completion
+  crypto: adapt api sample to use async. op wait
+
+ Documentation/crypto/api-samples.rst |  52 ++-------
+ crypto/af_alg.c                      |  27 -----
+ crypto/ahash.c                       |  12 +--
+ crypto/algapi.c                      |   6 +-
+ crypto/algif_aead.c                  |   8 +-
+ crypto/algif_hash.c                  |  50 +++++----
+ crypto/algif_skcipher.c              |   9 +-
+ crypto/api.c                         |  13 +++
+ crypto/asymmetric_keys/public_key.c  |  28 +----
+ crypto/cryptd.c                      |   4 +-
+ crypto/cts.c                         |   6 +-
+ crypto/drbg.c                        |  36 ++-----
+ crypto/gcm.c                         |  32 ++----
+ crypto/lrw.c                         |   8 +-
+ crypto/rsa-pkcs1pad.c                |  16 +--
+ crypto/tcrypt.c                      |  84 +++++----------
+ crypto/testmgr.c                     | 204 ++++++++++++-----------------------
+ crypto/xts.c                         |   8 +-
+ drivers/crypto/ccp/ccp-crypto-main.c |   8 +-
+ drivers/crypto/ccp/ccp-dev.c         |   7 +-
+ drivers/crypto/marvell/cesa.c        |   3 +-
+ drivers/crypto/marvell/cesa.h        |   2 +-
+ drivers/crypto/mediatek/mtk-aes.c    |  31 +-----
+ drivers/crypto/qce/sha.c             |  30 +-----
+ drivers/crypto/talitos.c             |  38 +------
+ drivers/md/dm-verity-target.c        |  81 ++++----------
+ drivers/md/dm-verity.h               |   5 -
+ fs/cifs/smb2ops.c                    |  30 +-----
+ fs/crypto/crypto.c                   |  28 +----
+ fs/crypto/fname.c                    |  36 ++-----
+ fs/crypto/fscrypt_private.h          |  10 --
+ fs/crypto/keyinfo.c                  |  21 +---
+ include/crypto/drbg.h                |   3 +-
+ include/crypto/if_alg.h              |  15 +--
+ include/linux/crypto.h               |  40 +++++++
+ net/ipv4/ah4.c                       |   2 +-
+ net/ipv4/esp4.c                      |   2 +-
+ net/ipv6/ah6.c                       |   2 +-
+ net/ipv6/esp6.c                      |   2 +-
+ security/integrity/ima/ima_crypto.c  |  56 +++-------
+ 40 files changed, 314 insertions(+), 741 deletions(-)
+
 -- 
-2.7.4
+2.1.4
