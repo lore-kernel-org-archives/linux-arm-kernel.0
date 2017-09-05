@@ -1,71 +1,46 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 5 Sep 2017 13:09:19 +0100
-Subject: Tegra baseline test results for v4.13
-Message-ID: <becc612c-b297-cf65-6b9a-0697db3d7bef@nvidia.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue, 5 Sep 2017 15:16:57 +0300
+Subject: [PATCH v7 00/19] simplify crypto wait for async op
+In-Reply-To: <CAFXBA=mqYxD3H_e38hEd2hVL4yvPXb_4DnfgGO5bf6YboTQVSg@mail.gmail.com>
+References: <1503584350-7831-1-git-send-email-gilad@benyossef.com>
+ <CAFXBA=n6W_n1P=NKHEUAgpaDDrdmh4QwB4aYma9xyio7UFP3Vw@mail.gmail.com>
+ <CAOtvUMcjtEMj4eoCG_Rpp-8CmJP+Yu0dPDN3PyOTWjHapf_y1g@mail.gmail.com>
+ <CAFXBA=mqYxD3H_e38hEd2hVL4yvPXb_4DnfgGO5bf6YboTQVSg@mail.gmail.com>
+Message-ID: <CAOtvUMdrMEPjXqVk66EOM+2NYoU-Hze2+5Vx6HGuR4FDNxYzDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.13.
-Logs and other details at:
+On Tue, Sep 5, 2017 at 2:23 PM, Harsh Jain <harshjain.prof@gmail.com> wrote:
+> On Sun, Sep 3, 2017 at 11:47 AM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+>> On Thu, Aug 31, 2017 at 3:31 PM, Harsh Jain <harshjain.prof@gmail.com> wrote:
+>>> HI Gilad,
+>>>
+>>> I think we need an update in ESP also. Now EBUSY return means driver
+>>> has accepted, Packet should not be dropped in
+>>>
+>>> esp_output_tail() function.
+>>
+>> Good catch. You are right and the same holds true for ah_output() in ah4.c.
+>>
+>> But I do wonder, the code there now treats -EBUSY as a special case
+>> and returns NET_XMIT_DROP
+>> but if an AEAD or AHASH transformation return some other error, like
+>> -ENOMEM or -EINVAL shouldn't
+>> we return NET_XMIT_DROP in that case too?
+> I think we should not,  XMIT_DROP implies drop current packet only,
+> later on when device is recovered from busy state, Upper layer
+> protocol(TCP) will re-transmit the packet. It helps in flow control.
+>>
 
-    https://nvtb.github.io//linux/test_v4.13/20170903140102/
+I see. Makes sense.
 
+Thanks,
+Gilad
 
-Test summary
-------------
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.13-rc7 (cc4a41fe5541a73019a864883297bd5043aa6d98)):
-   text     data      bss    total  kernel
-   -485     +476        0       -9  defconfig
-   +663        0        0     +663  multi_v7_defconfig
-   +899        0        0     +899  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.13-rc7 (cc4a41fe5541a73019a864883297bd5043aa6d98))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
