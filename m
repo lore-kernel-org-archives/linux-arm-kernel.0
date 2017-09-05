@@ -1,45 +1,31 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Tue, 05 Sep 2017 12:26:22 +0800
-Subject: [RESENT PATCH v7 3/7] arm64: dts: rockchip: Update rt5514 devices'
- compatible for Gru
-In-Reply-To: <3717071.LIWpZa6hqd@diego>
-References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
- <1649093.IvC24TsujL@diego> <59A6EF3C.5090308@rock-chips.com>
- <3717071.LIWpZa6hqd@diego>
-Message-ID: <59AE276E.6090100@rock-chips.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 5 Sep 2017 11:41:47 +0530
+Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
+In-Reply-To: <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+ <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
+Message-ID: <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Florian,
 
-On 09/05/2017 06:33 AM, Heiko St?bner wrote:
-> Am Donnerstag, 31. August 2017, 01:00:44 CEST schrieb jeffy:
->> On 08/30/2017 09:30 PM, Heiko St?bner wrote:
->>>>> -		compatible = "realtek,rt5514";
->>>>> +		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
->>>
->>> the rt5514-i2c and -spi compatibles should be documented in the
->>> binding-txt
->>> of the chip, but I haven't found any mention of this.
->>>
->>>
->>> Heiko
->>
->> these compatibles are only used for our snd driver to detect rt5514 i2c
->> driver and rt5514 spi driver, suggested by Matthias at
->> https://patchwork.kernel.org/patch/9904731/
->>
->> should i add it in the rockchip,rk3399-gru-sound.txt or rt5514 binding
->> document?
->
-> You're introducing new bindings for the codec, so they should of course
-> part of the rt5514 binding.
-ok, will do that.
-and it looks like there's no binding for rt5514-spi, will add it too :)
->
->
-> Heiko
->
->
->
->
+On Saturday 02 September 2017 07:46 AM, Florian Fainelli wrote:
+> 
+> 
+> On 08/25/2017 10:51 AM, Al Cooper wrote:
+>> Add a new USB Phy driver for Broadcom STB SoCs. This driver
+>> supports Broadcom STB ARM SoCs. This driver in
+>> combination with the Broadcom STB ohci, ehci and xhci
+>> drivers will enable USB1.1, USB2.0 and USB3.0 support.
+>> This Phy driver also supports the Broadcom BDC gadget
+>> driver.
+> 
+> Thanks Al! Kishon, feel free to merge everything through your tree there
+> should not be any conflicts with drivers/soc/bcm/brcmstb/common.c and
+> include/linux/soc/brcmstb/brcmstb.h.
+
+I'll start merging once 4.14 -rc1 is tagged.
+
+Thanks
+Kishon
