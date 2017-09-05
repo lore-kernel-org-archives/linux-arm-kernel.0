@@ -1,34 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Sep 2017 09:19:44 +0200
-Subject: [PATCH 1/2] PCI: iproc: export iproc_pcie_shutdown symbol
-Message-ID: <20170905072004.3959082-1-arnd@arndb.de>
+Date: Tue,  5 Sep 2017 09:19:45 +0200
+Subject: [PATCH 2/2] PCI: iproc: fix Stingray CRS defect handling
+In-Reply-To: <20170905072004.3959082-1-arnd@arndb.de>
+References: <20170905072004.3959082-1-arnd@arndb.de>
+Message-ID: <20170905072004.3959082-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The shutdown bugfix introduce a build regression for allmodconfig
-kernels as the new function is not exported:
+The condition that was used to detect the PCI_EXP_RTCAP
+flag access is wrong, as pointed out by gcc-8:
 
-ERROR: "iproc_pcie_shutdown" [drivers/pci/host/pcie-iproc-platform.ko] undefined!
+drivers/pci/host/pcie-iproc.c: In function 'iproc_pcie_config_read':
+drivers/pci/host/pcie-iproc.c:531:22: error: bitwise comparison always evaluates to false [-Werror=tautological-compare]
+   if ((where & ~0x3) == PCI_EXP_CAP + PCI_EXP_RTCAP)
 
-This adds the missing export.
+This adds the same bit mask to the other end as well, so the
+condition is evaluated correctly for any access.
 
-Fixes: 2a9912565c05 ("PCI: iproc: Add 500ms delay during device shutdown")
+Fixes: ac8d3e852f75 ("PCI: iproc: Work around Stingray CRS defects")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/pci/host/pcie-iproc.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pci/host/pcie-iproc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 8bd5e544b1c1..d7f4c29aed96 100644
+index d7f4c29aed96..f2df9c2266b9 100644
 --- a/drivers/pci/host/pcie-iproc.c
 +++ b/drivers/pci/host/pcie-iproc.c
-@@ -704,6 +704,7 @@ int iproc_pcie_shutdown(struct iproc_pcie *pcie)
+@@ -528,7 +528,7 @@ static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
+ 			return ret;
  
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(iproc_pcie_shutdown);
- 
- static int iproc_pcie_check_link(struct iproc_pcie *pcie)
- {
+ 		/* Don't advertise CRS SV support */
+-		if ((where & ~0x3) == PCI_EXP_CAP + PCI_EXP_RTCAP)
++		if ((where & ~0x3) == ((PCI_EXP_CAP + PCI_EXP_RTCAP) & ~0x03))
+ 			*val &= ~(PCI_EXP_RTCAP_CRSVIS << 16);
+ 		return PCIBIOS_SUCCESSFUL;
+ 	}
 -- 
 2.9.0
