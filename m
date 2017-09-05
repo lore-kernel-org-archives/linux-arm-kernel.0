@@ -1,44 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 5 Sep 2017 17:54:43 +0100
-Subject: [PATCH v2 05/18] firmware: arm_scmi: add initial support for
- performance protocol
-In-Reply-To: <534bae20-9f80-e79b-42a5-93d838732720@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-6-git-send-email-sudeep.holla@arm.com>
- <2690239b-27a7-dce3-88a6-d53808e8e93c@arm.com>
- <534bae20-9f80-e79b-42a5-93d838732720@arm.com>
-Message-ID: <b7303424-d63f-5ea7-866a-bda6d1f93ff2@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue,  5 Sep 2017 19:09:55 +0200
+Subject: [PATCH] ARM64: dts: meson-gxl-libretech-cc: enable saradc
+Message-ID: <20170905170955.13135-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Enable saradc and add the reference 1.8v regulator required.
+The libretech-cc has saradc channel 0 and 2 available on the 2 first
+pins of 2J3 header
 
-On 05/09/17 16:56, Julien Thierry wrote:
-> 
-> 
-> On 05/09/17 16:04, Julien Thierry wrote:
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-[...]
-
-
->>
->> This seems odd, shouldn't it be the following?
->> le64_to_cpu(attr->stats_addr_low | (__le64)attr->stats_addr_high << 32)
->>
-> 
-> After further reflexion, I think you are right. If I understood the
-> specification, the address seems to be split into upper and lower 32bits
-> and each one is stored as a uint32, which fits what you are doing to
-> obtain the address.
-> 
-> You can ignore my previous comment.
-> 
-
-Sorry I am checking this bit late, you have figured out yourself
-already. All the 64 bit values need to be dealt similarly as SCMI
-specification restricts so. It's basically done so as the firmware
-running is mostly 32-bit little endian system.
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index 69ca14ac10fa..71c3b3545bba 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -93,6 +93,13 @@
+ 			 <1800000 1>;
+ 	};
+ 
++	vddio_ao18: regulator-vddio_ao18 {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDIO_AO18";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
+ 	vddio_boot: regulator-vddio_boot {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VDDIO_BOOT";
+@@ -193,6 +200,11 @@
+ 			  "7J1 Header Pin15";
+ };
+ 
++&saradc {
++	status = "okay";
++	vref-supply = <&vddio_ao18>;
++};
++
+ /* SD card */
+ &sd_emmc_b {
+ 	status = "okay";
 -- 
-Regards,
-Sudeep
+2.9.5
