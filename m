@@ -1,62 +1,115 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 5 Sep 2017 14:45:01 +0100
-Subject: [PATCH v2 04/18] firmware: arm_scmi: add common infrastructure
- and support for base protocol
-In-Reply-To: <9a6b0722-1299-fb0a-6c75-9aceb248659f@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-5-git-send-email-sudeep.holla@arm.com>
- <9a6b0722-1299-fb0a-6c75-9aceb248659f@arm.com>
-Message-ID: <42d72579-07cd-798d-34e9-b9c584048b64@arm.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue,  5 Sep 2017 15:38:59 +0300
+Subject: [PATCH v8 20/20] crypto: adapt api sample to use async. op wait
+In-Reply-To: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
+References: <1504615144-29770-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1504615144-29770-21-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The code sample is waiting for an async. crypto op completion.
+Adapt sample to use the new generic infrastructure to do the same.
 
+This also fixes a possible data coruption bug created by the
+use of wait_for_completion_interruptible() without dealing
+correctly with an interrupt aborting the wait prior to the
+async op finishing.
 
-On 05/09/17 14:39, Julien Thierry wrote:
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ Documentation/crypto/api-samples.rst | 52 +++++++-----------------------------
+ 1 file changed, 10 insertions(+), 42 deletions(-)
 
-[...]
-
->> diff --git a/drivers/firmware/arm_scmi/driver.c
->> b/drivers/firmware/arm_scmi/driver.c
->> index 139d6980f270..601d0d7210d9 100644
->> --- a/drivers/firmware/arm_scmi/driver.c
->> +++ b/drivers/firmware/arm_scmi/driver.c
->> @@ -108,18 +108,22 @@ struct scmi_desc {
->>    * @dev: Device pointer
->>    * @desc: SoC description for this instance
->>    * @handle: Instance of SCMI handle to send to clients
->> + * @version: SCMI revision information containing protocol version,
->> + *    implementation version and (sub-)vendor identification.
->>    * @cl: Mailbox Client
->>    * @tx_chan: Transmit mailbox channel
->>    * @rx_chan: Receive mailbox channel
->>    * @tx_payload: Transmit mailbox channel payload area
->>    * @rx_payload: Receive mailbox channel payload area
->>    * @minfo: Message info
->> + * @protocols_imp: list of protocols implemented
->>    * @node: list head
->>    * @users: Number of users of this instance
->>    */
->>   struct scmi_info {
->>       struct device *dev;
->>       const struct scmi_desc *desc;
->> +    struct scmi_revision_info version;
->>       struct scmi_handle handle;
->>       struct mbox_client cl;
->>       struct mbox_chan *tx_chan;
->> @@ -127,6 +131,7 @@ struct scmi_info {
->>       void __iomem *tx_payload;
->>       void __iomem *rx_payload;
->>       struct scmi_xfers_info minfo;
->> +    u8 *protocols_imp;
-> 
-> Both the base protocol and driver part rely on this being of size
-> MAX_PROTOCOLS_IMP (if existing).
-> 
-> Could this be a "u8 protocols_imp[MAX_PROTOCOLS_IMP]" instead? 
-
-Sounds better, will update accordingly.
-
+diff --git a/Documentation/crypto/api-samples.rst b/Documentation/crypto/api-samples.rst
+index 2531948..006827e 100644
+--- a/Documentation/crypto/api-samples.rst
++++ b/Documentation/crypto/api-samples.rst
+@@ -7,59 +7,27 @@ Code Example For Symmetric Key Cipher Operation
+ ::
+ 
+ 
+-    struct tcrypt_result {
+-        struct completion completion;
+-        int err;
+-    };
+-
+     /* tie all data structures together */
+     struct skcipher_def {
+         struct scatterlist sg;
+         struct crypto_skcipher *tfm;
+         struct skcipher_request *req;
+-        struct tcrypt_result result;
++        struct crypto_wait wait;
+     };
+ 
+-    /* Callback function */
+-    static void test_skcipher_cb(struct crypto_async_request *req, int error)
+-    {
+-        struct tcrypt_result *result = req->data;
+-
+-        if (error == -EINPROGRESS)
+-            return;
+-        result->err = error;
+-        complete(&result->completion);
+-        pr_info("Encryption finished successfully\n");
+-    }
+-
+     /* Perform cipher operation */
+     static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
+                          int enc)
+     {
+-        int rc = 0;
++        int rc;
+ 
+         if (enc)
+-            rc = crypto_skcipher_encrypt(sk->req);
++            rc = crypto_wait_req(crypto_skcipher_encrypt(sk->req), &sk->wait);
+         else
+-            rc = crypto_skcipher_decrypt(sk->req);
+-
+-        switch (rc) {
+-        case 0:
+-            break;
+-        case -EINPROGRESS:
+-        case -EBUSY:
+-            rc = wait_for_completion_interruptible(
+-                &sk->result.completion);
+-            if (!rc && !sk->result.err) {
+-                reinit_completion(&sk->result.completion);
+-                break;
+-            }
+-        default:
+-            pr_info("skcipher encrypt returned with %d result %d\n",
+-                rc, sk->result.err);
+-            break;
+-        }
+-        init_completion(&sk->result.completion);
++            rc = crypto_wait_req(crypto_skcipher_decrypt(sk->req), &sk->wait);
++
++	if (rc)
++		pr_info("skcipher encrypt returned with result %d\n", rc);
+ 
+         return rc;
+     }
+@@ -89,8 +57,8 @@ Code Example For Symmetric Key Cipher Operation
+         }
+ 
+         skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-                          test_skcipher_cb,
+-                          &sk.result);
++                          crypto_req_done,
++                          &sk.wait);
+ 
+         /* AES 256 with random key */
+         get_random_bytes(&key, 32);
+@@ -122,7 +90,7 @@ Code Example For Symmetric Key Cipher Operation
+         /* We encrypt one block */
+         sg_init_one(&sk.sg, scratchpad, 16);
+         skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
+-        init_completion(&sk.result.completion);
++        crypto_init_wait(&sk.wait);
+ 
+         /* encrypt data */
+         ret = test_skcipher_encdec(&sk, 1);
 -- 
-Regards,
-Sudeep
+2.1.4
