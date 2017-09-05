@@ -1,81 +1,83 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  5 Sep 2017 17:41:04 +0200
-Subject: [PULL v2 3/5] KVM: arm/arm64: vITS: Drop its_ite->lpi field
+Date: Tue,  5 Sep 2017 17:41:05 +0200
+Subject: [PULL v2 4/5] KVM: arm/arm64: Extract GICv3 max APRn index calculation
 In-Reply-To: <20170905154106.2945-1-cdall@linaro.org>
 References: <20170905154106.2945-1-cdall@linaro.org>
-Message-ID: <20170905154106.2945-4-cdall@linaro.org>
+Message-ID: <20170905154106.2945-5-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+As we are about to access the APRs from the GICv2 uaccess interface,
+make this logic generally available.
 
-For unknown reasons, the its_ite data structure carries an "lpi" field
-which contains the intid of the LPI. This is an obvious duplication
-of the vgic_irq->intid field, so let's fix the only user and remove
-the now useless field.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ arch/arm64/kvm/vgic-sys-reg-v3.c | 23 +++--------------------
+ virt/kvm/arm/vgic/vgic.h         | 16 ++++++++++++++++
+ 2 files changed, 19 insertions(+), 20 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index aa6b68d..f51c1e1 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -144,7 +144,6 @@ struct its_ite {
- 
- 	struct vgic_irq *irq;
- 	struct its_collection *collection;
--	u32 lpi;
- 	u32 event_id;
- };
- 
-@@ -813,7 +812,7 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- /* Must be called with its_lock mutex held */
- static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
- 					  struct its_collection *collection,
--					  u32 lpi_id, u32 event_id)
-+					  u32 event_id)
+diff --git a/arch/arm64/kvm/vgic-sys-reg-v3.c b/arch/arm64/kvm/vgic-sys-reg-v3.c
+index 116786d..c77d508 100644
+--- a/arch/arm64/kvm/vgic-sys-reg-v3.c
++++ b/arch/arm64/kvm/vgic-sys-reg-v3.c
+@@ -208,29 +208,12 @@ static void vgic_v3_access_apr_reg(struct kvm_vcpu *vcpu,
+ static bool access_gic_aprn(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			    const struct sys_reg_desc *r, u8 apr)
  {
- 	struct its_ite *ite;
+-	struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
+ 	u8 idx = r->Op2 & 3;
  
-@@ -823,7 +822,6 @@ static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
+-	/*
+-	 * num_pri_bits are initialized with HW supported values.
+-	 * We can rely safely on num_pri_bits even if VM has not
+-	 * restored ICC_CTLR_EL1 before restoring APnR registers.
+-	 */
+-	switch (vgic_v3_cpu->num_pri_bits) {
+-	case 7:
+-		vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+-		break;
+-	case 6:
+-		if (idx > 1)
+-			goto err;
+-		vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+-		break;
+-	default:
+-		if (idx > 0)
+-			goto err;
+-		vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+-	}
++	if (idx > vgic_v3_max_apr_idx(vcpu))
++		goto err;
  
- 	ite->event_id	= event_id;
- 	ite->collection = collection;
--	ite->lpi = lpi_id;
++	vgic_v3_access_apr_reg(vcpu, p, apr, idx);
+ 	return true;
+ err:
+ 	if (!p->is_write)
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index bba7fa2..bf9ceab 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -220,4 +220,20 @@ int vgic_debug_destroy(struct kvm *kvm);
+ bool lock_all_vcpus(struct kvm *kvm);
+ void unlock_all_vcpus(struct kvm *kvm);
  
- 	list_add_tail(&ite->ite_list, &device->itt_head);
- 	return ite;
-@@ -873,7 +871,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
- 	}
- 
--	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
-+	ite = vgic_its_alloc_ite(device, collection, event_id);
- 	if (IS_ERR(ite)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
-@@ -1848,7 +1846,7 @@ static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
- 
- 	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
- 	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
--	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
-+	       ((u64)ite->irq->intid << KVM_ITS_ITE_PINTID_SHIFT) |
- 		ite->collection->collection_id;
- 	val = cpu_to_le64(val);
- 	return kvm_write_guest(kvm, gpa, &val, ite_esz);
-@@ -1895,7 +1893,7 @@ static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
- 	if (!collection)
- 		return -EINVAL;
- 
--	ite = vgic_its_alloc_ite(dev, collection, lpi_id, event_id);
-+	ite = vgic_its_alloc_ite(dev, collection, event_id);
- 	if (IS_ERR(ite))
- 		return PTR_ERR(ite);
- 
++static inline int vgic_v3_max_apr_idx(struct kvm_vcpu *vcpu)
++{
++	struct vgic_cpu *cpu_if = &vcpu->arch.vgic_cpu;
++
++	/*
++	 * num_pri_bits are initialized with HW supported values.
++	 * We can rely safely on num_pri_bits even if VM has not
++	 * restored ICC_CTLR_EL1 before restoring APnR registers.
++	 */
++	switch (cpu_if->num_pri_bits) {
++	case 7: return 3;
++	case 6: return 1;
++	default: return 0;
++	}
++}
++
+ #endif
 -- 
 2.9.0
