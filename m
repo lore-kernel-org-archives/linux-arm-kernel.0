@@ -1,41 +1,34 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 5 Sep 2017 14:27:05 +0530
-Subject: [PATCH 4/5] mmc: sdhci-omap: Add OMAP SDHCI driver
-In-Reply-To: <dfe1b4e2-bcb5-c969-efe6-7cddd0eb0bf9@intel.com>
-References: <20170821074132.4622-1-kishon@ti.com>
- <20170821074132.4622-5-kishon@ti.com>
- <4f0a7225-1843-b353-1a2a-9adcb49554d3@intel.com>
- <c7972f00-ef62-1736-822f-ebf6822b6d33@ti.com>
- <dfe1b4e2-bcb5-c969-efe6-7cddd0eb0bf9@intel.com>
-Message-ID: <3782edd2-af90-c6c9-1358-1721a1dae28f@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Sep 2017 11:03:04 +0200
+Subject: [PATCH] ASoC: improve RT5514 dependencies
+In-Reply-To: <20170801142117.oc3owynj74g5bmyi@sirena.org.uk>
+References: <20170731083217.4142512-1-arnd@arndb.de>
+ <s5hh8xt0xwy.wl-tiwai@suse.de>
+ <20170801142117.oc3owynj74g5bmyi@sirena.org.uk>
+Message-ID: <CAK8P3a1PgN=XmAuKrFGT50f4otXzRsPqjYM3bjjKU3DgY7wWLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 1, 2017 at 4:21 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Jul 31, 2017 at 11:15:57AM +0200, Takashi Iwai wrote:
+>
+>> IMO, flipping the dependency looks saner to me.  The SPI function call
+>> is a kind of add-on, after all.
+>
+> Yes, that's definitely the intention of the code.
 
-On Thursday 31 August 2017 06:32 PM, Adrian Hunter wrote:
-> On 30/08/17 16:53, Kishon Vijay Abraham I wrote:
->> On Monday 28 August 2017 02:36 PM, Adrian Hunter wrote:
->>> On 21/08/17 10:41, Kishon Vijay Abraham I wrote:
->>>> +
->>>> +static void sdhci_omap_set_clock(struct sdhci_host *host, unsigned int clock)
->>>> +{
->>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>>> +	struct sdhci_omap_host *omap_host = sdhci_pltfm_priv(pltfm_host);
->>>> +	unsigned long clkdiv;
->>>> +
->>>> +	if (!clock)
->>>> +		return;
->>>
->>> Are you sure you don't want to stop the clock.
->>
->> There is never a case where the MMC core sends a request to stop the clock.
->> Maybe this check is not required at all.
-> 
-> It does when voltage switching e.g. mmc_set_uhs_voltage(), but host drivers
-> should support the possibility anyway.
+I just ran into the same problem again on randconfig testing, after
+the bug had been
+gone before my vacation:
 
-Indeed! Will fix it and send a new revision once everyone agrees on the dt binding.
+    sound/soc/codecs/rt5514.o: In function `rt5514_dsp_voice_wake_up_put':
+    rt5514.c:(.text+0x2068): undefined reference to `rt5514_spi_burst_write'
+    rt5514.c:(.text+0x20c8): undefined reference to `rt5514_spi_burst_write'
 
-Thanks
-Kishon
+Is anyone looking into this? My original patch
+(https://patchwork.kernel.org/patch/9871255/) still fixes it but needs a
+minor change to apply now. When I last looked into changing
+the dependency in the code, I couldn't quite figure out how to
+do it there.
+
+         Arnd
