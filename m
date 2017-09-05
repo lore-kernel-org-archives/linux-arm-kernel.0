@@ -1,200 +1,72 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 5 Sep 2017 09:57:13 -0600
-Subject: [PATCH v6] vfio: platform: reset: Add Broadcom FlexRM reset module
-In-Reply-To: <CAALAos9a7qrHtYpcW0NRyo4uowet8nWLettSKa=+qyNSeVcqRQ@mail.gmail.com>
-References: <1503979486-5364-1-git-send-email-anup.patel@broadcom.com>
- <1503979486-5364-2-git-send-email-anup.patel@broadcom.com>
- <20170829140902.GK32175@char.us.oracle.com>
- <CAALAos9a7qrHtYpcW0NRyo4uowet8nWLettSKa=+qyNSeVcqRQ@mail.gmail.com>
-Message-ID: <20170905095713.0db61015@w520.home>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 5 Sep 2017 11:05:27 -0500
+Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <1504318583.15359.12.camel@mhfsdcap03>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+ <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
+ <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
+ <1504318583.15359.12.camel@mhfsdcap03>
+Message-ID: <CAL_JsqLe3o+iw0Wh=g5Ks93qM1BR1+S04Nv1R3FV17Z3dph1jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Sep 2017 15:20:11 +0530
-Anup Patel <anup.patel@broadcom.com> wrote:
+On Fri, Sep 1, 2017 at 9:16 PM, Chen Zhong <chen.zhong@mediatek.com> wrote:
+> On Thu, 2017-08-31 at 14:52 -0500, Rob Herring wrote:
+>> On Fri, Aug 25, 2017 at 02:32:30PM +0800, Chen Zhong wrote:
+>> > This patch adds the device tree binding documentation for the MediaTek
+>> > pmic keys found on PMIC MT6397/MT6323.
+>> >
+>> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+>> > ---
+>> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
+>> >  1 file changed, 38 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+>> > new file mode 100644
+>> > index 0000000..100ec44
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+>> > @@ -0,0 +1,38 @@
+>> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
+>> > +
+>> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
+>> > +and homekey. The key functions are defined as the subnode of the function
+>> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
+>> > +of Muti-Function Device (MFD)
+>> > +
+>> > +For MT6397/MT6323 MFD bindings see:
+>> > +Documentation/devicetree/bindings/mfd/mt6397.txt
+>> > +
+>> > +Required properties:
+>> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
+>> > +- linux,keycodes: Specifies the numeric keycode values to
+>> > +   be used for reporting keys presses. The array can
+>> > +   contain up to 2 entries.
+>> > +
+>> > +Optional Properties:
+>> > +- wakeup-source: each key can be used as a wakeup source.
+>>
+>> wakeup-source is defined as a boolean.
+>
+> Hi Rob,
+>
+> Could I modify it as this?
+>
+> mediatek,wakeup-keys = <1>, <0>;
+> wakeup-source;
 
-> Sorry for delayed response...
-> 
-> On Tue, Aug 29, 2017 at 7:39 PM, Konrad Rzeszutek Wilk
-> <konrad.wilk@oracle.com> wrote:
-> > On Tue, Aug 29, 2017 at 09:34:46AM +0530, Anup Patel wrote:  
-> >> This patch adds Broadcom FlexRM low-level reset for
-> >> VFIO platform.
-> >>  
-> >
-> > Is there an document that explains and /or details the various
-> > registers?  
-> 
-> Yes, there is a document but its not publicly accessible.
-> 
-> >> It will do the following:
-> >> 1. Disable/Deactivate each FlexRM ring
-> >> 2. Flush each FlexRM ring
-> >>
-> >> The cleanup sequence for FlexRM rings is adapted from
-> >> Broadcom FlexRM mailbox driver.
-> >>
-> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> >> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
-> >> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> >> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> >> ---
-> >>  drivers/vfio/platform/reset/Kconfig                |   9 ++
-> >>  drivers/vfio/platform/reset/Makefile               |   1 +
-> >>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 100 +++++++++++++++++++++
-> >>  3 files changed, 110 insertions(+)
-> >>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-> >>
-> >> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-> >> index 70cccc5..392e3c0 100644
-> >> --- a/drivers/vfio/platform/reset/Kconfig
-> >> +++ b/drivers/vfio/platform/reset/Kconfig
-> >> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
-> >>         Enables the VFIO platform driver to handle reset for AMD XGBE
-> >>
-> >>         If you don't know what to do here, say N.
-> >> +
-> >> +config VFIO_PLATFORM_BCMFLEXRM_RESET
-> >> +     tristate "VFIO support for Broadcom FlexRM reset"
-> >> +     depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
-> >> +     default ARCH_BCM_IPROC
-> >> +     help
-> >> +       Enables the VFIO platform driver to handle reset for Broadcom FlexRM
-> >> +
-> >> +       If you don't know what to do here, say N.
-> >> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-> >> index 93f4e23..8d9874b 100644
-> >> --- a/drivers/vfio/platform/reset/Makefile
-> >> +++ b/drivers/vfio/platform/reset/Makefile
-> >> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
-> >>
-> >>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
-> >>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
-> >> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
-> >> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-> >> new file mode 100644
-> >> index 0000000..966a813
-> >> --- /dev/null
-> >> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-> >> @@ -0,0 +1,100 @@
-> >> +/*
-> >> + * Copyright (C) 2017 Broadcom
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +
-> >> +/*
-> >> + * This driver provides reset support for Broadcom FlexRM ring manager
-> >> + * to VFIO platform.
-> >> + */
-> >> +
-> >> +#include <linux/delay.h>
-> >> +#include <linux/init.h>
-> >> +#include <linux/io.h>
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/module.h>
-> >> +
-> >> +#include "vfio_platform_private.h"
-> >> +
-> >> +/* FlexRM configuration */
-> >> +#define RING_REGS_SIZE                                       0x10000
-> >> +#define RING_VER_MAGIC                                       0x76303031
-> >> +
-> >> +/* Per-Ring register offsets */
-> >> +#define RING_VER                                     0x000
-> >> +#define RING_CONTROL                                 0x034
-> >> +#define RING_FLUSH_DONE                                      0x038
-> >> +
-> >> +/* Register RING_CONTROL fields */
-> >> +#define CONTROL_FLUSH_SHIFT                          5
-> >> +
-> >> +/* Register RING_FLUSH_DONE fields */
-> >> +#define FLUSH_DONE_MASK                                      0x1
-> >> +
-> >> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
-> >> +{
-> >> +     unsigned int timeout;
-> >> +
-> >> +     /* Disable/inactivate ring */
-> >> +     writel_relaxed(0x0, ring + RING_CONTROL);
-> >> +
-> >> +     /* Flush ring with timeout of 1s */
-> >> +     timeout = 1000;  
-> >
-> > Perhaps a #define for this value?  
-> 
-> This magic value 1000 makes it explicit that we try till 1 second
-> because inside the loop we have mdelay(1).
-> 
-> >  
-> >> +     writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
-> >> +     do {
-> >> +             if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
-> >> +                     break;
-> >> +             mdelay(1);
-> >> +     } while (--timeout);
-> >> +
-> >> +     if (!timeout) {
-> >> +             pr_warn("VFIO FlexRM shutdown timeout\n");
+What do the values and index signify? The power key is index 0 and the
+value 1 means enable wakeup? Or each value is the raw key (i.e.
+indexes in linux,keycode) that wakeup is enabled for?
 
-Since you're planning a new version anyway, perhaps we could also pass
-the device through and use a dev_warn here so we can associate this
-error to a specific device.  Perhaps even knowing which ring on the
-device encountered the timeout would be useful.  Thanks,
+I don't think this should be in DT really. It's really up to the user
+(i.e. userspace) to decide what keys cause wakeup (or maybe that's
+only suspend). If you default to the power key causes wakeup, do you
+really need to support different options?
 
-Alex
+If we do put this in DT, then it should be a common binding to specify
+keys that cause wake-up.
 
-> >> +             return -ETIMEDOUT;
-> >> +     }
-> >> +
-> >> +     return 0;
-> >> +}  
-> 
-> There is a correction in the sequence suggested by HW folks.
-> 
-> After above, we need to clear the FLUSH bit in RING_CONTROL
-> register and then wait for FLUSH_DONE bit to be cleared in
-> RING_FLUSH_DONE register.
-> 
-> This was missed out previously due to incomplete documentation.
-> 
-> >> +
-> >> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
-> >> +{
-> >> +     int rc = 0;
-> >> +     void __iomem *ring;
-> >> +     struct vfio_platform_region *reg = &vdev->regions[0];
-> >> +
-> >> +     /* Map FlexRM ring registers if not mapped */
-> >> +     if (!reg->ioaddr) {
-> >> +             reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
-> >> +             if (!reg->ioaddr)
-> >> +                     return -ENOMEM;
-> >> +     }
-> >> +
-> >> +     /* Discover and shutdown each FlexRM ring */
-> >> +     for (ring = reg->ioaddr;
-> >> +          ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
-> >> +             if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC) {
-> >> +                     rc = vfio_platform_bcmflexrm_shutdown(ring);
-> >> +                     if (rc)
-> >> +                             break;  
-> >
-> > You sure? Don't you want to continue trying to reset all of them and
-> > then return rc at the end?  
-> 
-> Yes, I think its better to reset all even if few fail. I will update this
-> accordingly.
-> 
-> Thanks,
-> Anup
+Rob
