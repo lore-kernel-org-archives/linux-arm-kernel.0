@@ -1,76 +1,118 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Tue,  5 Sep 2017 09:57:29 -0400
-Subject: [PATCH V2] usb: host: xhci-plat: allow sysdev to inherit from ACPI
-Message-ID: <1504619849-4567-1-git-send-email-awallis@codeaurora.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 5 Sep 2017 16:00:24 +0200
+Subject: [PATCH v2 5/6] KVM: arm/arm64: Rearrange kvm_vgic_[un]map_phys
+ code in vgic.c
+In-Reply-To: <56431c9d-3f7e-f8b2-2d31-6baec4e294da@redhat.com>
+References: <20170904102456.9025-1-cdall@linaro.org>
+ <20170904102456.9025-6-cdall@linaro.org>
+ <56431c9d-3f7e-f8b2-2d31-6baec4e294da@redhat.com>
+Message-ID: <20170905140024.GP13572@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, xhci_plat is not set up properly when the parent device is an
-ACPI node. The conditions that xhci_plat_probe should satisfy are
+On Tue, Sep 05, 2017 at 12:26:14PM +0200, Auger Eric wrote:
+> Hi Christoffer,
+> On 04/09/2017 12:24, Christoffer Dall wrote:
+> > The small indirection of a static function made the locking very obvious
+> > but becomes pretty ugly as we start passing function pointer around.
+> > Let's inline these two functions first to make the following patch more
+> > readable.
+> > 
+> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  virt/kvm/arm/vgic/vgic.c | 38 +++++++++++++-------------------------
+> >  1 file changed, 13 insertions(+), 25 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> > index 7aec730..b704ff5 100644
+> > --- a/virt/kvm/arm/vgic/vgic.c
+> > +++ b/virt/kvm/arm/vgic/vgic.c
+> > @@ -435,12 +435,17 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+> >  	return 0;
+> >  }
+> >  
+> > -/* @irq->irq_lock must be held */
+> I chose to hold the lock outside of kvm_vgic_map/unmap_irq because in
+> kvm_vgic_set_forwarding(see https://lkml.org/lkml/2017/6/15/278) I was
+> also testing hw and target_vcpu fields. As you pointed out maybe I am
+> not obliged to check them but that was the rationale.
+> 
 
-1. xhci_plat comes from firmware
-2. xhci_plat is child of a device from firmware (dwc3-plat)
-3. xhci_plat is grandchild of a pci device (dwc3-pci)
+Ah ok, I see, you want to reuse this bit of code and the caller will
+already be holding the spin-lock?
 
-Case 2 is covered when the child is an OF node (by checking
-sysdev->parent->of_node), however, an ACPI parent will return NULL in
-the of_node check and will thus not result in sysdev being set to
-sysdev->parent
+I can rework it then to pass the callback in kvm_vgic_map_irq.  Would
+that fit better with your subsequent patches?
 
-[   17.591549] xhci-hcd: probe of xhci-hcd.6.auto failed with error -5
+Thanks,
+-Christoffer
 
-This change adds a check for ACPI to completely allow for condition 2.
-This is done by first checking if the parent node is of type ACPI (e.g.,
-dwc3-plat) and set sysdev to sysdev->parent if either of the two
-following conditions are met:
-
-1: If fwnode is empty (in the case that platform_device_add_properties
-was not called on the allocated platform device)
-2: fwnode exists but is not of type ACPI (this would happen if
-platform_device_add_properties was called on the allocated device.
-Instead of type FWNODE_ACPI, you would end up with FWNODE_PDATA)
-
-Cc: stable at vger.kernel.org #4.12.x
-Cc: stable at vger.kernel.org #4.13.x
-
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
-Changes in v2: Incorporate the simplified fwnode check as suggested
-by Mathias
-
- drivers/usb/host/xhci-plat.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index c04144b..2087407 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -186,14 +186,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	 * 2. xhci_plat is child of a device from firmware (dwc3-plat)
- 	 * 3. xhci_plat is grandchild of a pci device (dwc3-pci)
- 	 */
--	sysdev = &pdev->dev;
--	if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
--		sysdev = sysdev->parent;
-+	for (sysdev = &pdev->dev; sysdev; sysdev = sysdev->parent) {
-+		if (is_of_node(sysdev->fwnode) ||
-+			is_acpi_device_node(sysdev->fwnode))
-+			break;
- #ifdef CONFIG_PCI
--	else if (sysdev->parent && sysdev->parent->parent &&
--		 sysdev->parent->parent->bus == &pci_bus_type)
--		sysdev = sysdev->parent->parent;
-+		else if (sysdev->bus == &pci_bus_type)
-+			break;
- #endif
-+	}
-+
-+	if (!sysdev)
-+		sysdev = &pdev->dev;
- 
- 	/* Try to set 64-bit DMA first */
- 	if (WARN_ON(!sysdev->dma_mask))
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> > -static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+> > -			    unsigned int host_irq)
+> > +int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+> > +			  u32 vintid)
+> >  {
+> > +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+> >  	struct irq_desc *desc;
+> >  	struct irq_data *data;
+> > +	int ret = 0;
+> > +
+> > +	BUG_ON(!irq);
+> > +
+> > +	spin_lock(&irq->irq_lock);
+> >  
+> >  	/*
+> >  	 * Find the physical IRQ number corresponding to @host_irq
+> > @@ -448,7 +453,8 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+> >  	desc = irq_to_desc(host_irq);
+> >  	if (!desc) {
+> >  		kvm_err("%s: no interrupt descriptor\n", __func__);
+> > -		return -EINVAL;
+> > +		ret = -EINVAL;
+> > +		goto out;
+> >  	}
+> >  	data = irq_desc_get_irq_data(desc);
+> >  	while (data->parent_data)
+> > @@ -457,29 +463,10 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+> >  	irq->hw = true;
+> >  	irq->host_irq = host_irq;
+> >  	irq->hwintid = data->hwirq;
+> > -	return 0;
+> > -}
+> > -
+> > -/* @irq->irq_lock must be held */
+> > -static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
+> > -{
+> > -	irq->hw = false;
+> > -	irq->hwintid = 0;
+> > -}
+> > -
+> > -int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+> > -			  u32 vintid)
+> > -{
+> > -	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+> > -	int ret;
+> >  
+> > -	BUG_ON(!irq);
+> > -
+> > -	spin_lock(&irq->irq_lock);
+> > -	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
+> > +out:
+> >  	spin_unlock(&irq->irq_lock);
+> >  	vgic_put_irq(vcpu->kvm, irq);
+> > -
+> >  	return ret;
+> >  }
+> >  
+> > @@ -494,7 +481,8 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+> >  	BUG_ON(!irq);
+> >  
+> >  	spin_lock(&irq->irq_lock);
+> > -	kvm_vgic_unmap_irq(irq);
+> > +	irq->hw = false;
+> > +	irq->hwintid = 0;
+> >  	spin_unlock(&irq->irq_lock);
+> >  	vgic_put_irq(vcpu->kvm, irq);
+> >  
+> > 
