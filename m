@@ -1,53 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Sep 2017 22:31:46 +0100
-Subject: [PATCH v2 00/29] implement KASLR for ARM
-In-Reply-To: <20170905212742.GG5024@atomide.com>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
- <20170905164547.GA5024@atomide.com>
- <CAKv+Gu_eT_eK9Tj4JvWSsK+iW9juGG6xYDO15umu6jBkoun8ew@mail.gmail.com>
- <20170905193754.GD5024@atomide.com>
- <CAKv+Gu9c_j0qriRazSTmq8eD9icCu4Wuzw1z-LF7bubLVLQd7Q@mail.gmail.com>
- <20170905212742.GG5024@atomide.com>
-Message-ID: <CAKv+Gu8uZH5PFVBwEGAK1hjGMTJD1a1KN0dVUjw=M3GPsps1FQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 5 Sep 2017 23:37:52 +0200
+Subject: [PATCH v4 18/28] ARM: dts: s500-guitar-bb-rev-b: Add fake uart3
+ clock
+In-Reply-To: <20170606005426.26446-19-afaerber@suse.de>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-19-afaerber@suse.de>
+Message-ID: <5f7e0538-5cd5-6052-28bf-3cb9c07d7748@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2017 at 22:27, Tony Lindgren <tony@atomide.com> wrote:
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170905 12:43]:
->> Right. Well, I will try to reproduce with the BB white I have.
->
-> Yeah that should be reproducable, I got it to happen on BBB here
-> after about 5 boots.
->
->> Are you booting with an initrd?
->
-> Not on this one, on beagleboard xm I do.
->
+Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
+> Add a fixed-clock for baudrate 115200.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v2 -> v3 -> v4: unchanged
+>  
+>  v2: new
+>  
+>  arch/arm/boot/dts/s500-guitar-bb-rev-b.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
 
-Interesting.
+Applied to v4.14/dt:
 
->> >> > Then loading modules with CONFIG_RANDOMIZE_BASE=y seems to fail with:
->> >> >
->> >> > $ sudo modprobe rtc-twl
->> >> > rtc_twl: disagrees about version of symbol module_layout
->> >> > modprobe: ERROR: could not insert 'rtc_twl': Exec format error
->> >> >
->> >>
->> >> Is this with CONFIG_MODVERSIONS enabled?
->> >
->> > Yes, but disabling that did not seem to make any difference
->> > based on just one test.
->> >
->>
->> Yeah, well, it appears I missed a couple of details :-)
->>
->> This should fix the module loading issues:
->
-> Yeah now modprobe works :) That's after manually applying
-> it as the tabs got munched in your patch somewhere, see below.
->
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.14/dt
 
-Yeah, Gmail tends to do that now and again. Apologies.
+Regards,
+Andreas
 
-Thanks for confirming that the module loading works for you, I will
-fold this into my v3.
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
