@@ -1,21 +1,182 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Sep 2017 08:50:58 +0200
-Subject: [PATCH v2 0/4] ARM: ep93xx: various updates
-In-Reply-To: <20170903174347.6148-1-f.fainelli@gmail.com>
-References: <20170903174347.6148-1-f.fainelli@gmail.com>
-Message-ID: <CACRpkdY5Qx_v8wMeY9jn4ZtfpqBDEzQBuNuvUuw8rEAFw_Fjzw@mail.gmail.com>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Tue, 5 Sep 2017 16:04:31 +0900
+Subject: [PATCH v1 1/3] dt-bindings: nvmem: add description for UniPhier
+ eFuse
+In-Reply-To: <CAK7LNASLh4vYqZhM9g2AL1uUtieviAmmWOp_Mzoj0zG=Ejz0cA@mail.gmail.com>
+References: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1504221620-358-2-git-send-email-hayashibara.keiji@socionext.com>
+ <CAK7LNASLh4vYqZhM9g2AL1uUtieviAmmWOp_Mzoj0zG=Ejz0cA@mail.gmail.com>
+Message-ID: <000001d32615$38e1b0c0$aaa51240$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 3, 2017 at 7:43 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+Hello Yamada-san,
 
-> This is a rebase of Hartley's original submission:
+Thank you for your comment.
 
-Hartley are you sending pull requests to ARM SoC for these
-changes?
+> From: Masahiro Yamada [mailto:yamada.masahiro at socionext.com]
+> Sent: Monday, September 4, 2017 9:56 PM
+> 
+> 2017-09-01 8:20 GMT+09:00 Keiji Hayashibara
+> <hayashibara.keiji@socionext.com>:
+> > Add uniphier-efuse dt-bindings documentation.
+> >
+> > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+> > ---
+> >  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 45
+> ++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+> > b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+> > new file mode 100644
+> > index 0000000..09024a2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+> > @@ -0,0 +1,45 @@
+> > += UniPhier eFuse device tree bindings =
+> > +
+> > +This UniPhier eFuse must be under soc-glue.
+> > +
+> > +Required properties:
+> > +- compatible: should be "socionext,uniphier-efuse"
+> > +- reg: should contain the register base and length
+> > +
+> > += Data cells =
+> > +Are child nodes of efuse, bindings of which as described in
+> > +bindings/nvmem/nvmem.txt
+> > +
+> > +Example:
+> > +
+> > +       soc-glue at 5f900000 {
+> > +               compatible = "socionext,uniphier-ld20-soc-glue-debug",
+> > +                            "simple-mfd";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <1>;
+> > +               ranges = <0x0 0x5f900000 0x2000>;
+> 
+> 
+> IMHO, I think an empty "ranges;" will clarify the code, but it is up to
+> your taste.
+> 
+> 
+> > +
+> > +               efuse {
+> > +                       compatible = "socionext,uniphier-efuse",
+> > +                                    "syscon";
+> 
+> 
+> You are adding a dedicated driver for "socionext,uniphier-efuse".
+> 
+> Then, "syscon" as well?
+> 
 
-Else I can stack them up in one of my trees and feed it to
-ARM SoC if you need help.
+Since I was using the syscon interface to implement the driver,
+I specified "syscon". It's interface is syscon_node_to_regmap().
 
-Yours,
-Linus Walleij
+I will rethink this in v2.
+
+> 
+> 
+> > +                       reg = <0x100 0xf00>;
+> 
+> 
+> Not so many efuse registers exist on the SoC.
+> 
+> reg = <0x100 0x200>; will be enough.
+> 
+> 
+> Or if you want to be strict to the hw spec, you can write as follows:
+> 
+>         soc-glue at 5f900000 {
+>                compatible = "socionext,uniphier-ld20-soc-glue-debug";
+>                             "simple-mfd";
+>                #address-cells = <1>;
+>                #size-cells = <1>;
+>                ranges = <0x0 0x5f900000 0x2000>;
+> 
+>                efuse at 100 {
+>                            compatible = "socionext,uniphier-efuse";
+>                            reg = <0x100 0x28>;
+>                };
+> 
+>                efuse at 200 {
+>                            compatible = "socionext,uniphier-efuse";
+>                            reg = <0x200 0x68>;
+>                };
+>        };
+> 
+> 
+> 
+> 
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <1>;
+> > +
+> > +                       /* Data cells */
+> > +                       usb_mon: usb_mon {
+> > +                               reg = <0x154 0xc>;
+> > +                       };
+> 
+> 
+> This <0x154 0xc> represents 0x5f900254 in CPU address view.
+> (0x5f900000 + 0x100 + 0x154)
+> 
+> So many ranges conversion, and how error-prone..
+> 
+
+Yes, indeed...
+I will modify as below.
+
+        soc-glue at 5f900000 {
+                compatible = "socionext,uniphier-ld20-soc-glue-debug",
+                             "simple-mfd";
+                #address-cells = <1>;
+                #size-cells = <1>;
+                ranges;
+
+                efuse at 5f900100 {
+                        compatible = "socionext,uniphier-efuse";
+                        reg = <0x5f900100 0x28>;
+                };
+
+                efuse at 5f900200 {
+                        compatible = "socionext,uniphier-efuse";
+                        reg = <0x5f900200 0x68>;
+                };
+        };
+
+
+> 
+> 
+> 
+> > +       };
+> > +
+> > += Data consumers =
+> > +Are device nodes which consume nvmem data cells.
+> > +
+> > +Example:
+> > +
+> > +       usb {
+> > +               ...
+> > +               nvmem-cells = <&usb_mon>;
+> > +               nvmem-cell-names = "usb_mon";
+> > +       }
+> > --
+> > 2.7.4
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree"
+> > in the body of a message to majordomo at vger.kernel.org More majordomo
+> > info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
+> --
+> Best Regards
+> Masahiro Yamada
+
+Best Regards,
+Keiji Hayashibara
