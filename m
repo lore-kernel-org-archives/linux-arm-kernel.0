@@ -1,235 +1,200 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 5 Sep 2017 16:56:51 +0100
-Subject: [PATCH v2 05/18] firmware: arm_scmi: add initial support for
- performance protocol
-In-Reply-To: <2690239b-27a7-dce3-88a6-d53808e8e93c@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-6-git-send-email-sudeep.holla@arm.com>
- <2690239b-27a7-dce3-88a6-d53808e8e93c@arm.com>
-Message-ID: <534bae20-9f80-e79b-42a5-93d838732720@arm.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 5 Sep 2017 09:57:13 -0600
+Subject: [PATCH v6] vfio: platform: reset: Add Broadcom FlexRM reset module
+In-Reply-To: <CAALAos9a7qrHtYpcW0NRyo4uowet8nWLettSKa=+qyNSeVcqRQ@mail.gmail.com>
+References: <1503979486-5364-1-git-send-email-anup.patel@broadcom.com>
+ <1503979486-5364-2-git-send-email-anup.patel@broadcom.com>
+ <20170829140902.GK32175@char.us.oracle.com>
+ <CAALAos9a7qrHtYpcW0NRyo4uowet8nWLettSKa=+qyNSeVcqRQ@mail.gmail.com>
+Message-ID: <20170905095713.0db61015@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 4 Sep 2017 15:20:11 +0530
+Anup Patel <anup.patel@broadcom.com> wrote:
 
-
-On 05/09/17 16:04, Julien Thierry wrote:
-> Hi Sudeep,
+> Sorry for delayed response...
 > 
-> On 04/08/17 15:31, Sudeep Holla wrote:
->> The performance protocol is intended for the performance management of
->> group(s) of device(s) that run in the same performance domain. It
->> includes even the CPUs. A performance domain is defined by a set of
->> devices that always have to run at the same performance level.
->> For example, a set of CPUs that share a voltage domain, and have a
->> common frequency control, is said to be in the same performance domain.
->>
->> The commands in this protocol provide functionality to describe the
->> protocol version, describe various attribute flags, set and get the
->> performance level of a domain. It also supports discovery of the list
->> of performance levels supported by a performance domain, and the
->> properties of each performance level.
->>
->> This patch adds basic support for the performance protocol.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   drivers/firmware/arm_scmi/Makefile |   2 +-
->>   drivers/firmware/arm_scmi/common.h |   1 +
->>   drivers/firmware/arm_scmi/perf.c   | 511 
->> +++++++++++++++++++++++++++++++++++++
->>   include/linux/scmi_protocol.h      |  31 +++
->>   4 files changed, 544 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/firmware/arm_scmi/perf.c
->>
->> diff --git a/drivers/firmware/arm_scmi/Makefile 
->> b/drivers/firmware/arm_scmi/Makefile
->> index 21d01d1d6b9c..159de726ee45 100644
->> --- a/drivers/firmware/arm_scmi/Makefile
->> +++ b/drivers/firmware/arm_scmi/Makefile
->> @@ -1,2 +1,2 @@
->>   obj-$(CONFIG_ARM_SCMI_PROTOCOL)    = arm_scmi.o
->> -arm_scmi-y = base.o driver.o
->> +arm_scmi-y = base.o driver.o perf.o
->> diff --git a/drivers/firmware/arm_scmi/common.h 
->> b/drivers/firmware/arm_scmi/common.h
->> index e3fe5d9acc82..7473dfcad4ee 100644
->> --- a/drivers/firmware/arm_scmi/common.h
->> +++ b/drivers/firmware/arm_scmi/common.h
->> @@ -30,6 +30,7 @@
->>   #define PROTOCOL_REV_MAJOR(x)    ((x) >> PROTOCOL_REV_MINOR_BITS)
->>   #define PROTOCOL_REV_MINOR(x)    ((x) & PROTOCOL_REV_MINOR_MASK)
->>   #define MAX_PROTOCOLS_IMP    16
->> +#define MAX_OPPS        16
->>   enum scmi_std_protocol {
->>       SCMI_PROTOCOL_BASE = 0x10,
->> diff --git a/drivers/firmware/arm_scmi/perf.c 
->> b/drivers/firmware/arm_scmi/perf.c
->> new file mode 100644
->> index 000000000000..13d84d829201
->> --- /dev/null
->> +++ b/drivers/firmware/arm_scmi/perf.c
->> @@ -0,0 +1,511 @@
->> +/*
->> + * System Control and Management Interface (SCMI) Performance Protocol
->> + *
->> + * Copyright (C) 2017 ARM Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or 
->> modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but 
->> WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public 
->> License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License 
->> along
->> + * with this program. If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pm_opp.h>
->> +#include <linux/sort.h>
->> +
->> +#include "common.h"
->> +
->> +enum scmi_performance_protocol_cmd {
->> +    PERF_DOMAIN_ATTRIBUTES = 0x3,
->> +    PERF_DESCRIBE_LEVELS = 0x4,
->> +    PERF_LIMITS_SET = 0x5,
->> +    PERF_LIMITS_GET = 0x6,
->> +    PERF_LEVEL_SET = 0x7,
->> +    PERF_LEVEL_GET = 0x8,
->> +    PERF_NOTIFY_LIMITS = 0x9,
->> +    PERF_NOTIFY_LEVEL = 0xa,
->> +};
->> +
->> +struct scmi_opp {
->> +    u32 perf;
->> +    u32 power;
->> +    u32 trans_latency_us;
->> +};
->> +
->> +struct scmi_msg_resp_perf_attributes {
->> +    __le16 num_domains;
->> +    __le16 flags;
->> +#define POWER_SCALE_IN_MILLIWATT(x)    ((x) & BIT(0))
->> +    __le32 stats_addr_low;
->> +    __le32 stats_addr_high;
->> +    __le32 stats_size;
->> +};
->> +
->> +struct scmi_msg_resp_perf_domain_attributes {
->> +    __le32 flags;
->> +#define SUPPORTS_SET_LIMITS(x)        ((x) & BIT(31))
->> +#define SUPPORTS_SET_PERF_LVL(x)    ((x) & BIT(30))
->> +#define SUPPORTS_PERF_LIMIT_NOTIFY(x)    ((x) & BIT(29))
->> +#define SUPPORTS_PERF_LEVEL_NOTIFY(x)    ((x) & BIT(28))
->> +    __le32 rate_limit_us;
->> +    __le32 sustained_freq_khz;
->> +    __le32 sustained_perf_level;
->> +        u8 name[SCMI_MAX_STR_SIZE];
->> +};
->> +
->> +struct scmi_msg_perf_describe_levels {
->> +    __le32 domain;
->> +    __le32 level_index;
->> +};
->> +
->> +struct scmi_perf_set_limits {
->> +    __le32 domain;
->> +    __le32 max_level;
->> +    __le32 min_level;
->> +};
->> +
->> +struct scmi_perf_get_limits {
->> +    __le32 max_level;
->> +    __le32 min_level;
->> +};
->> +
->> +struct scmi_perf_set_level {
->> +    __le32 domain;
->> +    __le32 level;
->> +};
->> +
->> +struct scmi_perf_notify_level_or_limits {
->> +    __le32 domain;
->> +    __le32 notify_enable;
->> +};
->> +
->> +struct scmi_msg_resp_perf_describe_levels {
->> +    __le16 num_returned;
->> +    __le16 num_remaining;
->> +    struct {
->> +        __le32 perf_val;
->> +        __le32 power;
->> +        __le16 transition_latency_us;
->> +        __le16 reserved;
->> +    } opp[0];
->> +};
->> +
->> +struct perf_dom_info {
->> +    bool set_limits;
->> +    bool set_perf;
->> +    bool perf_limit_notify;
->> +    bool perf_level_notify;
->> +    u32 opp_count;
->> +    u32 sustained_freq_khz;
->> +    u32 sustained_perf_level;
->> +    u32 mult_factor;
->> +    char name[SCMI_MAX_STR_SIZE];
->> +    struct scmi_opp opp[MAX_OPPS];
->> +};
->> +
->> +struct scmi_perf_info {
->> +    int num_domains;
->> +    bool power_scale_mw;
->> +    u64 stats_addr;
->> +    u32 stats_size;
->> +    struct perf_dom_info *dom_info;
->> +};
->> +
->> +static struct scmi_perf_info perf_info;
->> +
->> +static int scmi_perf_attributes_get(const struct scmi_handle *handle,
->> +                    struct scmi_perf_info *perf_info)
->> +{
->> +    int ret;
->> +    struct scmi_xfer *t;
->> +    struct scmi_msg_resp_perf_attributes *attr;
->> +
->> +    ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
->> +                 SCMI_PROTOCOL_PERF, 0, sizeof(*attr), &t);
->> +    if (ret)
->> +        return ret;
->> +
->> +    attr = t->rx.buf;
->> +
->> +    ret = scmi_do_xfer(handle, t);
->> +    if (!ret) {
->> +        u16 flags = le16_to_cpu(attr->flags);
->> +
->> +        perf_info->num_domains = le16_to_cpu(attr->num_domains);
->> +        perf_info->power_scale_mw = POWER_SCALE_IN_MILLIWATT(flags);
->> +        perf_info->stats_addr = le32_to_cpu(attr->stats_addr_low) |
->> +                (u64)le32_to_cpu(attr->stats_addr_high) << 32;
+> On Tue, Aug 29, 2017 at 7:39 PM, Konrad Rzeszutek Wilk
+> <konrad.wilk@oracle.com> wrote:
+> > On Tue, Aug 29, 2017 at 09:34:46AM +0530, Anup Patel wrote:  
+> >> This patch adds Broadcom FlexRM low-level reset for
+> >> VFIO platform.
+> >>  
+> >
+> > Is there an document that explains and /or details the various
+> > registers?  
 > 
-> This seems odd, shouldn't it be the following?
-> le64_to_cpu(attr->stats_addr_low | (__le64)attr->stats_addr_high << 32)
+> Yes, there is a document but its not publicly accessible.
 > 
+> >> It will do the following:
+> >> 1. Disable/Deactivate each FlexRM ring
+> >> 2. Flush each FlexRM ring
+> >>
+> >> The cleanup sequence for FlexRM rings is adapted from
+> >> Broadcom FlexRM mailbox driver.
+> >>
+> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> >> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+> >> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> >> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> >> ---
+> >>  drivers/vfio/platform/reset/Kconfig                |   9 ++
+> >>  drivers/vfio/platform/reset/Makefile               |   1 +
+> >>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 100 +++++++++++++++++++++
+> >>  3 files changed, 110 insertions(+)
+> >>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> >>
+> >> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+> >> index 70cccc5..392e3c0 100644
+> >> --- a/drivers/vfio/platform/reset/Kconfig
+> >> +++ b/drivers/vfio/platform/reset/Kconfig
+> >> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
+> >>         Enables the VFIO platform driver to handle reset for AMD XGBE
+> >>
+> >>         If you don't know what to do here, say N.
+> >> +
+> >> +config VFIO_PLATFORM_BCMFLEXRM_RESET
+> >> +     tristate "VFIO support for Broadcom FlexRM reset"
+> >> +     depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
+> >> +     default ARCH_BCM_IPROC
+> >> +     help
+> >> +       Enables the VFIO platform driver to handle reset for Broadcom FlexRM
+> >> +
+> >> +       If you don't know what to do here, say N.
+> >> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+> >> index 93f4e23..8d9874b 100644
+> >> --- a/drivers/vfio/platform/reset/Makefile
+> >> +++ b/drivers/vfio/platform/reset/Makefile
+> >> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
+> >>
+> >>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+> >>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+> >> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
+> >> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> >> new file mode 100644
+> >> index 0000000..966a813
+> >> --- /dev/null
+> >> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> >> @@ -0,0 +1,100 @@
+> >> +/*
+> >> + * Copyright (C) 2017 Broadcom
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + *
+> >> + * You should have received a copy of the GNU General Public License
+> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >> + */
+> >> +
+> >> +/*
+> >> + * This driver provides reset support for Broadcom FlexRM ring manager
+> >> + * to VFIO platform.
+> >> + */
+> >> +
+> >> +#include <linux/delay.h>
+> >> +#include <linux/init.h>
+> >> +#include <linux/io.h>
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/module.h>
+> >> +
+> >> +#include "vfio_platform_private.h"
+> >> +
+> >> +/* FlexRM configuration */
+> >> +#define RING_REGS_SIZE                                       0x10000
+> >> +#define RING_VER_MAGIC                                       0x76303031
+> >> +
+> >> +/* Per-Ring register offsets */
+> >> +#define RING_VER                                     0x000
+> >> +#define RING_CONTROL                                 0x034
+> >> +#define RING_FLUSH_DONE                                      0x038
+> >> +
+> >> +/* Register RING_CONTROL fields */
+> >> +#define CONTROL_FLUSH_SHIFT                          5
+> >> +
+> >> +/* Register RING_FLUSH_DONE fields */
+> >> +#define FLUSH_DONE_MASK                                      0x1
+> >> +
+> >> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
+> >> +{
+> >> +     unsigned int timeout;
+> >> +
+> >> +     /* Disable/inactivate ring */
+> >> +     writel_relaxed(0x0, ring + RING_CONTROL);
+> >> +
+> >> +     /* Flush ring with timeout of 1s */
+> >> +     timeout = 1000;  
+> >
+> > Perhaps a #define for this value?  
+> 
+> This magic value 1000 makes it explicit that we try till 1 second
+> because inside the loop we have mdelay(1).
+> 
+> >  
+> >> +     writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
+> >> +     do {
+> >> +             if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
+> >> +                     break;
+> >> +             mdelay(1);
+> >> +     } while (--timeout);
+> >> +
+> >> +     if (!timeout) {
+> >> +             pr_warn("VFIO FlexRM shutdown timeout\n");
 
-After further reflexion, I think you are right. If I understood the 
-specification, the address seems to be split into upper and lower 32bits 
-and each one is stored as a uint32, which fits what you are doing to 
-obtain the address.
+Since you're planning a new version anyway, perhaps we could also pass
+the device through and use a dev_warn here so we can associate this
+error to a specific device.  Perhaps even knowing which ring on the
+device encountered the timeout would be useful.  Thanks,
 
-You can ignore my previous comment.
+Alex
 
--- 
-Julien Thierry
+> >> +             return -ETIMEDOUT;
+> >> +     }
+> >> +
+> >> +     return 0;
+> >> +}  
+> 
+> There is a correction in the sequence suggested by HW folks.
+> 
+> After above, we need to clear the FLUSH bit in RING_CONTROL
+> register and then wait for FLUSH_DONE bit to be cleared in
+> RING_FLUSH_DONE register.
+> 
+> This was missed out previously due to incomplete documentation.
+> 
+> >> +
+> >> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
+> >> +{
+> >> +     int rc = 0;
+> >> +     void __iomem *ring;
+> >> +     struct vfio_platform_region *reg = &vdev->regions[0];
+> >> +
+> >> +     /* Map FlexRM ring registers if not mapped */
+> >> +     if (!reg->ioaddr) {
+> >> +             reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
+> >> +             if (!reg->ioaddr)
+> >> +                     return -ENOMEM;
+> >> +     }
+> >> +
+> >> +     /* Discover and shutdown each FlexRM ring */
+> >> +     for (ring = reg->ioaddr;
+> >> +          ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
+> >> +             if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC) {
+> >> +                     rc = vfio_platform_bcmflexrm_shutdown(ring);
+> >> +                     if (rc)
+> >> +                             break;  
+> >
+> > You sure? Don't you want to continue trying to reset all of them and
+> > then return rc at the end?  
+> 
+> Yes, I think its better to reset all even if few fail. I will update this
+> accordingly.
+> 
+> Thanks,
+> Anup
