@@ -1,76 +1,112 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Sep 2017 13:09:17 +0200
-Subject: [PATCH v8] arm64: allwinner: h5: add NanoPi NEO Plus2 DT support
-In-Reply-To: <20170904143014.46904-1-antony@phenome.org>
-References: <20170824231716.2623-1-antony@phenome.org>
- <20170904143014.46904-1-antony@phenome.org>
-Message-ID: <20170905110917.pjf22akyqiytx3iu@flea>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 5 Sep 2017 13:10:31 +0200
+Subject: [PATCH v2 0/6] Host1x and VIC support for Tegra186
+In-Reply-To: <20170905084306.19318-1-mperttunen@nvidia.com>
+References: <20170905084306.19318-1-mperttunen@nvidia.com>
+Message-ID: <20170905111031.u4damueklnuliqt4@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antony,
+On Tue, Sep 05, 2017 at 11:43:00AM +0300, Mikko Perttunen wrote:
+> Hi,
+> 
+> not many changes in v2:
+> 
+> Changed address-cells and size-cells for the Host1x device tree node
+> to have value 1, since all subdevices fit in the lower 4G. Also dropped
+> the incorrect change about this from the dt-bindings patch. Thanks to
+> Rob for pointing this out.
+> 
+> Mikko
+> 
+> Notes for v1:
+> 
+> Hi everyone,
+> 
+> this series adds basic support for the Host1x channel engine and the
+> VIC 2d compositor unit on Tegra186. The first three patches do the
+> required device tree changes, the fourth patch updates the device tree
+> binding documentation, and the two remaining patches add the actual
+> implementation, almost all of which is in Host1x itself.
+> 
+> The Tegra186 Host1x is a relatively large update over previous
+> generations, which can be seen in the diffstat. The biggest change is
+> that Host1x is now contains separate hypervisor and vm register
+> apertures to support virtualization at the hardware level. This driver,
+> however, currently assumes that this instance of Linux is the sole
+> operating system having access to the hardware.
+> 
+> This combined with increased numbers of supported channels and
+> syncpoints have caused a number of register space changes that are
+> responsible for most of the updated code.
+> 
+> The series has been tested on the Jetson TX1 (T210) and TX2 (T186)
+> using the host1x_test test suite available at
+> 
+> http://github.com/cyndis/host1x_test
+> 
+> The series itself is available at
+> 
+> http://github.com/cyndis/linux, branch host1x-t186-1
 
-Almost good, I'm sorry I missed a few things before.
+Since this is new hw support, is there also open source userspace using
+all this?
 
-On Mon, Sep 04, 2017 at 04:30:14PM +0200, Antony Antony wrote:
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins_a>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	vqmmc-supply = <&reg_vcc3v3>;
-> +	mmc-pwrseq = <&wifi_pwrseq>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
+Thanks, Daniel
 
-Please add a new line here.
-
-> +	brcmf: wifi at 1 {
-> +		reg = <1>;
-> +		compatible = "brcm";
-
-This should be the actual compatible, not just the vendor.
-
-> +	};
-> +};
-> +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_8bit_pins>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	cap-mmc-hw-reset;
-> +	boot_device = <0>;
-
-that property should still be removed.
-
-> +&r_pio {
-> +	leds_r_npi: led_pins at 0 {
-> +		pins = "PL10";
-> +		function = "gpio_out";
-> +	};
-> +
-> +	vdd_cpux_r_npi: regulator_pins at 0 {
-> +		allwinner,pins = "PL6";
-> +		allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +};
-
-And these must be left out.
-
-Maxime
+> 
+> Cheers,
+> Mikko
+> 
+> Mikko Perttunen (6):
+>   arm64: tegra: Add #power-domain-cells for BPMP
+>   arm64: tegra: Add host1x on Tegra186
+>   arm64: tegra: Add VIC on Tegra186
+>   dt-bindings: host1x: Add Tegra186 information
+>   gpu: host1x: Add Tegra186 support
+>   drm/tegra: Add Tegra186 support for VIC
+> 
+>  .../display/tegra/nvidia,tegra20-host1x.txt        |   4 +
+>  arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  31 ++++
+>  drivers/gpu/drm/tegra/drm.c                        |   1 +
+>  drivers/gpu/drm/tegra/vic.c                        |  10 ++
+>  drivers/gpu/host1x/Makefile                        |   3 +-
+>  drivers/gpu/host1x/dev.c                           |  60 ++++++-
+>  drivers/gpu/host1x/dev.h                           |   4 +
+>  drivers/gpu/host1x/hw/cdma_hw.c                    |  49 +++---
+>  drivers/gpu/host1x/hw/debug_hw.c                   | 137 +---------------
+>  drivers/gpu/host1x/hw/debug_hw_1x01.c              | 154 ++++++++++++++++++
+>  drivers/gpu/host1x/hw/debug_hw_1x06.c              | 133 +++++++++++++++
+>  drivers/gpu/host1x/hw/host1x01.c                   |   2 +
+>  drivers/gpu/host1x/hw/host1x02.c                   |   2 +
+>  drivers/gpu/host1x/hw/host1x04.c                   |   2 +
+>  drivers/gpu/host1x/hw/host1x05.c                   |   2 +
+>  drivers/gpu/host1x/hw/host1x06.c                   |  44 +++++
+>  drivers/gpu/host1x/hw/host1x06.h                   |  26 +++
+>  drivers/gpu/host1x/hw/host1x06_hardware.h          | 142 ++++++++++++++++
+>  drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h     |  32 ++++
+>  drivers/gpu/host1x/hw/hw_host1x06_uclass.h         | 181 +++++++++++++++++++++
+>  drivers/gpu/host1x/hw/hw_host1x06_vm.h             |  47 ++++++
+>  drivers/gpu/host1x/hw/intr_hw.c                    |  29 ++--
+>  22 files changed, 926 insertions(+), 169 deletions(-)
+>  create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x01.c
+>  create mode 100644 drivers/gpu/host1x/hw/debug_hw_1x06.c
+>  create mode 100644 drivers/gpu/host1x/hw/host1x06.c
+>  create mode 100644 drivers/gpu/host1x/hw/host1x06.h
+>  create mode 100644 drivers/gpu/host1x/hw/host1x06_hardware.h
+>  create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_hypervisor.h
+>  create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_uclass.h
+>  create mode 100644 drivers/gpu/host1x/hw/hw_host1x06_vm.h
+> 
+> -- 
+> 2.14.1
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170905/29fa07d0/attachment.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
