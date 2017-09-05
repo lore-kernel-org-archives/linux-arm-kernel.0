@@ -1,156 +1,50 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  5 Sep 2017 16:52:01 +0200
-Subject: [PULL 2/8] KVM: arm/arm64: PMU: Fix overflow interrupt injection
+Date: Tue,  5 Sep 2017 16:52:02 +0200
+Subject: [PULL 3/8] KVM: arm/arm64: Handle hva aging while destroying the vm
 In-Reply-To: <20170905145207.18447-1-cdall@linaro.org>
 References: <20170905145207.18447-1-cdall@linaro.org>
-Message-ID: <20170905145207.18447-3-cdall@linaro.org>
+Message-ID: <20170905145207.18447-4-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jones <drjones@redhat.com>
+From: Suzuki K Poulose <Suzuki.Poulose@arm.com>
 
-kvm_pmu_overflow_set() is called from perf's interrupt handler,
-making the call of kvm_vgic_inject_irq() from it introduced with
-"KVM: arm/arm64: PMU: remove request-less vcpu kick" a really bad
-idea, as it's quite easy to try and retake a lock that the
-interrupted context is already holding. The fix is to use a vcpu
-kick, leaving the interrupt injection to kvm_pmu_sync_hwstate(),
-like it was doing before the refactoring. We don't just revert,
-though, because before the kick was request-less, leaving the vcpu
-exposed to the request-less vcpu kick race, and also because the
-kick was used unnecessarily from register access handlers.
+The mmu_notifier_release() callback of KVM triggers cleaning up
+the stage2 page table on kvm-arm. However there could be other
+notifier callbacks in parallel with the mmu_notifier_release(),
+which could cause the call backs ending up in an empty stage2
+page table. Make sure we check it for all the notifier callbacks.
 
 Cc: stable at vger.kernel.org
+Fixes: commit 293f29363 ("kvm-arm: Unmap shadow pagetables properly")
+Reported-by: Alex Graf <agraf@suse.de>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c |  2 +-
- include/kvm/arm_pmu.h     |  2 --
- virt/kvm/arm/pmu.c        | 43 +++++++++++++++----------------------------
- 3 files changed, 16 insertions(+), 31 deletions(-)
+ virt/kvm/arm/mmu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 7786288..2e070d3 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -764,7 +764,7 @@ static bool access_pmovs(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	if (p->is_write) {
- 		if (r->CRm & 0x2)
- 			/* accessing PMOVSSET_EL0 */
--			kvm_pmu_overflow_set(vcpu, p->regval & mask);
-+			vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= (p->regval & mask);
- 		else
- 			/* accessing PMOVSCLR_EL0 */
- 			vcpu_sys_reg(vcpu, PMOVSSET_EL0) &= ~(p->regval & mask);
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index f6e0306..f87fe20 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -48,7 +48,6 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
- void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
--void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
- bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu);
-@@ -86,7 +85,6 @@ static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
--static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
- static inline bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index fc8a723..8a9c423 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -203,11 +203,15 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
- 	return reg;
- }
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 0e1fc75..2ea21da 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1718,12 +1718,16 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *
  
--static void kvm_pmu_check_overflow(struct kvm_vcpu *vcpu)
-+static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
+ int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
  {
- 	struct kvm_pmu *pmu = &vcpu->arch.pmu;
--	bool overflow = !!kvm_pmu_overflow_status(vcpu);
-+	bool overflow;
-+
-+	if (!kvm_arm_pmu_v3_ready(vcpu))
-+		return;
- 
-+	overflow = !!kvm_pmu_overflow_status(vcpu);
- 	if (pmu->irq_level == overflow)
- 		return;
- 
-@@ -215,33 +219,11 @@ static void kvm_pmu_check_overflow(struct kvm_vcpu *vcpu)
- 
- 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
- 		int ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
--					      pmu->irq_num, overflow,
--					      &vcpu->arch.pmu);
-+					      pmu->irq_num, overflow, pmu);
- 		WARN_ON(ret);
- 	}
++	if (!kvm->arch.pgd)
++		return 0;
+ 	trace_kvm_age_hva(start, end);
+ 	return handle_hva_to_gpa(kvm, start, end, kvm_age_hva_handler, NULL);
  }
  
--/**
-- * kvm_pmu_overflow_set - set PMU overflow interrupt
-- * @vcpu: The vcpu pointer
-- * @val: the value guest writes to PMOVSSET register
-- */
--void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
--{
--	if (val == 0)
--		return;
--
--	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
--	kvm_pmu_check_overflow(vcpu);
--}
--
--static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
--{
--	if (!kvm_arm_pmu_v3_ready(vcpu))
--		return;
--	kvm_pmu_check_overflow(vcpu);
--}
--
- bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
+ int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
  {
- 	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-@@ -303,7 +285,7 @@ static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
- }
- 
- /**
-- * When perf event overflows, call kvm_pmu_overflow_set to set overflow status.
-+ * When the perf event overflows, set the overflow status and inform the vcpu.
-  */
- static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
- 				  struct perf_sample_data *data,
-@@ -313,7 +295,12 @@ static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
- 	struct kvm_vcpu *vcpu = kvm_pmc_to_vcpu(pmc);
- 	int idx = pmc->idx;
- 
--	kvm_pmu_overflow_set(vcpu, BIT(idx));
-+	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= BIT(idx);
-+
-+	if (kvm_pmu_overflow_status(vcpu)) {
-+		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
-+		kvm_vcpu_kick(vcpu);
-+	}
- }
- 
- /**
-@@ -341,7 +328,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
- 			reg = lower_32_bits(reg);
- 			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) = reg;
- 			if (!reg)
--				kvm_pmu_overflow_set(vcpu, BIT(i));
-+				vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= BIT(i);
- 		}
- 	}
++	if (!kvm->arch.pgd)
++		return 0;
+ 	trace_kvm_test_age_hva(hva);
+ 	return handle_hva_to_gpa(kvm, hva, hva, kvm_test_age_hva_handler, NULL);
  }
 -- 
 2.9.0
