@@ -1,48 +1,96 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue,  5 Sep 2017 19:09:55 +0200
-Subject: [PATCH] ARM64: dts: meson-gxl-libretech-cc: enable saradc
-Message-ID: <20170905170955.13135-1-jbrunet@baylibre.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 5 Sep 2017 18:26:41 +0100
+Subject: [PATCH v11 4/6] target-arm: kvm64: detect guest RAS EXTENSION
+ feature
+In-Reply-To: <1503066227-18251-5-git-send-email-gengdongjiu@huawei.com>
+References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
+ <1503066227-18251-5-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <CAFEAcA9oecuzXXrdo3zZHxF3AgrDUh_NHxz-znto4GU+OoxVFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable saradc and add the reference 1.8v regulator required.
-The libretech-cc has saradc channel 0 and 2 available on the 2 first
-pins of 2J3 header
+On 18 August 2017 at 15:23, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+> check if kvm supports guest RAS EXTENSION. if so, set
+> corresponding feature bit for vcpu.
+>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+>  linux-headers/linux/kvm.h | 1 +
+>  target/arm/cpu.h          | 3 +++
+>  target/arm/kvm64.c        | 8 ++++++++
+>  3 files changed, 12 insertions(+)
+>
+> diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
+> index 7971a4f..2aa176e 100644
+> --- a/linux-headers/linux/kvm.h
+> +++ b/linux-headers/linux/kvm.h
+> @@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
+>  #define KVM_CAP_PPC_SMT_POSSIBLE 147
+>  #define KVM_CAP_HYPERV_SYNIC2 148
+>  #define KVM_CAP_HYPERV_VP_INDEX 149
+> +#define KVM_CAP_ARM_RAS_EXTENSION 150
+>
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Hi. Changes to linux-headers need to be done as a patch of their
+own created using scripts/update-linux-headers.sh run against a
+mainline kernel tree (and with a commit message that quotes the
+kernel commit hash used). This ensures that we have a consistent
+set of headers that don't diverge from the kernel copy.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-index 69ca14ac10fa..71c3b3545bba 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-@@ -93,6 +93,13 @@
- 			 <1800000 1>;
- 	};
- 
-+	vddio_ao18: regulator-vddio_ao18 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_AO18";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
- 	vddio_boot: regulator-vddio_boot {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VDDIO_BOOT";
-@@ -193,6 +200,11 @@
- 			  "7J1 Header Pin15";
- };
- 
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vddio_ao18>;
-+};
-+
- /* SD card */
- &sd_emmc_b {
- 	status = "okay";
--- 
-2.9.5
+> diff --git a/target/arm/cpu.h b/target/arm/cpu.h
+> index b39d64a..6b0961b 100644
+> --- a/target/arm/cpu.h
+> +++ b/target/arm/cpu.h
+> @@ -611,6 +611,8 @@ struct ARMCPU {
+>
+>      /* CPU has memory protection unit */
+>      bool has_mpu;
+> +    /* CPU has ras extension unit */
+> +    bool has_ras_extension;
+>      /* PMSAv7 MPU number of supported regions */
+>      uint32_t pmsav7_dregion;
+>
+> @@ -1229,6 +1231,7 @@ enum arm_features {
+>      ARM_FEATURE_THUMB_DSP, /* DSP insns supported in the Thumb encodings */
+>      ARM_FEATURE_PMU, /* has PMU support */
+>      ARM_FEATURE_VBAR, /* has cp15 VBAR */
+> +    ARM_FEATURE_RAS_EXTENSION, /*has RAS extension support */
+
+Missing space after '/*' ?
+
+>  };
+>
+>  static inline int arm_feature(CPUARMState *env, int feature)
+> diff --git a/target/arm/kvm64.c b/target/arm/kvm64.c
+> index a16abc8..0781367 100644
+> --- a/target/arm/kvm64.c
+> +++ b/target/arm/kvm64.c
+> @@ -518,6 +518,14 @@ int kvm_arch_init_vcpu(CPUState *cs)
+>          unset_feature(&env->features, ARM_FEATURE_PMU);
+>      }
+>
+> +    if (kvm_check_extension(cs->kvm_state, KVM_CAP_ARM_RAS_EXTENSION)) {
+> +        cpu->has_ras_extension = true;
+> +        set_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
+> +    } else {
+> +        cpu->has_ras_extension = false;
+> +        unset_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
+> +    }
+> +
+
+Shouldn't we need to also tell the kernel that we actually want
+it to expose RAS to the guest? Compare the PMU code in this
+function, where we set a kvm_init_features bit to do this.
+(This suggests that your ABI for the kernel part of this feature
+may not be correct?)
+
+You should also not be calling set_feature() here -- if the
+CPU features bit doesn't say "this CPU should have the RAS
+extensions" we shouldn't create a CPU with them. Instead
+you should set it in kvm_arm_get_host_cpu_features() (again,
+compare the PMU code).
+
+thanks
+-- PMM
