@@ -1,108 +1,55 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 6 Sep 2017 16:19:28 +0100
-Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-In-Reply-To: <etPan.59b00f79.2fe72a3.4a29@localhost>
-References: <0184EA26B2509940AA629AE1405DD7F2015EA4DE@DGGEMA503-MBX.china.huawei.com>
- <79163d5d-90cf-9a94-457e-80cfffc0415f@arm.com>
- <etPan.59b00f79.2fe72a3.4a29@localhost>
-Message-ID: <ee3bbb0d-0403-5719-bacf-93c4e654509d@arm.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Wed, 6 Sep 2017 09:04:03 -0700
+Subject: [PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and
+ kuser helpers (C sources)
+In-Reply-To: <20170816222723.118839-1-salyzyn@android.com>
+References: <20170816222723.118839-1-salyzyn@android.com>
+Message-ID: <898f1068-e99c-2f0e-8950-59dfd972bc89@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/17 16:08, gengdongjiu wrote:
-> It is similar with the PAN?when the guest traps to el2?it will reset the pstate.PAN <http://pstate.PAN> to 0, and continue run?In fact the host pstate.UAO <http://pstate.UAO> can be 1, but guest change it to 0 when trap to EL2?so after swich to host?need to check whether set pstate.UAO <http://pstate.UAO> again?
+Ping?
 
-What negative effect do you see with change UAO to 0 (i.e. do not override)?
-
-P. S.
-Please, avoid HTML and top posting
-
-Vladimir
-
-> *????*Vladimir Murzin
-> *????*???,marc.zyngier,christoffer.dall at linaro.org,pbonzini at redhat.com,rkrcmar at redhat.com,linux-arm-kernel at lists.infradead.org,kvmarm at lists.cs.columbia.edu,kvm at vger.kernel.org,linux-kernel,suzuki.poulose at arm.com,mark.rutland at arm.com,Catalin Marinas
-> *???*James Morse,???,???
-> *???*2017-09-06 22:41:09
-> *??:*Re: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-> 
-> On 06/09/17 15:10, gengdongjiu wrote:
->> Hi, Vladimir
->> 
->>>>> Do you see effect of "PAN is unexpectedly enabled"?
->>>> In fact I did not encounter this case, but I think it can exist.
->>>> I think if host OS dynamically disable PAN, it wants the host kernel access the user space address space not through copy_to/from_user
->>> API.
->>>> Now if it is unexpectedly enabled, when host kernel still accesses the user space address,  it will happen MMU fault exception.
->>>
->>> And this is expected! The only allowed channel for kernel <-> user is uaccess API.
->>>
->>> I guess that you have test (and that great!) which violates that rule (for testing purpose, why not?) and now you are trying to fit kernel into
->>> it...
->> 
->> 
->> If you think that makes sense for it, we do not consider the paste.PAN in the world-switch.
->> For the pstate.UAO issue, do you agree my fixing or you have other suggestion?  Also to other reviewer. Thanks.
-> 
-> It would help if you give precise description on "pstate.UAO issue".
-> 
-> Thanks
-> Vladimir
-> 
->> 
->> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
->> index 9341376..c3dd761 100644
->> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
->> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
->> @@ -21,6 +21,8 @@
->>  #include <asm/kvm_asm.h>
->>  #include <asm/kvm_hyp.h>
->> 
->> +#include <asm/exec.h>
->> 
->>  /* Yes, this does nothing, on purpose */
->>  static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
->> 
->> @@ -121,8 +123,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
->>         write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
->>  }
->> 
->> +static void __hyp_text __sysreg_restore_state_vhe(struct kvm_cpu_context *ctxt)
->> +{
->> +    uao_thread_switch(current);
->> +}
->> +
->>  static hyp_alternate_select(__sysreg_call_restore_host_state,
->> -                           __sysreg_restore_state, __sysreg_do_nothing,
->> +                           __sysreg_restore_state, __sysreg_restore_state_vhe,
->>                             ARM64_HAS_VIRT_HOST_EXTN);
->> 
->>  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
->> 
->> 
->>>
->>> Cheers
->>> Vladimir
->>>
->>>>
->>>>
->>>>>
->>>>> Cheers
->>>>> Vladimir
->>>>>
->>>>>>
->>>>>>>
->>>>>>> Cheers
->>>>>>> Vladimir
->>>>>>>
->>>>>>> .
->>>>>>>
->>>>>>
->>>>>>
->>>>>
->>>>>
->>>>> .
->>>>>
->>>>
->>>>
->> 
-> 
+On 08/16/2017 03:26 PM, Mark Salyzyn wrote:
+> From: Kevin Brodsky <kevin.brodsky@arm.com>
+>
+> AArch32 processes are currently installed a special [vectors] page that
+> contains the sigreturn trampolines and the kuser helpers, at the fixed
+> address mandated by the kuser helpers ABI.
+>
+> Having both functionalities in the same page has become problematic,
+> because:
+>
+> * It makes it impossible to disable the kuser helpers (the sigreturn
+>    trampolines cannot be removed), which is possible on arm.
+>
+> * A future 32-bit vDSO would provide the sigreturn trampolines itself,
+>    making those in [vectors] redundant.
+>
+> This patch addresses the problem by moving the sigreturn trampolines to
+> a separate [sigpage] page, mirroring [sigpage] on arm.
+>
+> Even though [vectors] has always been a misnomer on arm64/compat, as
+> there is no AArch32 vector there (and now only the kuser helpers),
+> its name has been left unchanged, for compatibility with arm (there
+> are reports of software relying on [vectors] being there as the last
+> mapping in /proc/maps).
+>
+> mm->context.vdso used to point to the [vectors] page, which is
+> unnecessary (as its address is fixed). It now points to the [sigpage]
+> page (whose address is randomized like a vDSO).
+>
+> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+>
+> v2:
+> - reduce churniness (and defer later to vDSO patches)
+> - vctors_page and compat_vdso_spec as array of 2
+> - free sigpage if vectors allocation failed
+> ---
+>   arch/arm64/include/asm/processor.h |  4 +-
+>   arch/arm64/include/asm/signal32.h  |  2 -
+>   arch/arm64/kernel/signal32.c       |  5 +--
+>   arch/arm64/kernel/vdso.c           | 82 ++++++++++++++++++++++++++------------
+>   4 files changed, 60 insertions(+), 33 deletions(-)
+. . .
