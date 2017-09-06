@@ -1,82 +1,85 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Wed,  6 Sep 2017 13:52:01 -0700
-Subject: [PATCH 3/3] phy: rockchip-typec: Do the calibration more correctly
-In-Reply-To: <20170906205201.16207-1-dianders@chromium.org>
-References: <20170906205201.16207-1-dianders@chromium.org>
-Message-ID: <20170906205201.16207-4-dianders@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Sep 2017 22:57:58 +0200
+Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues
+ in zImage with Linux 4.12, LZ4 and GCC5.3)
+In-Reply-To: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
+References: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
+Message-ID: <CAK8P3a3AQ43t2q1MVN9PoqQXZiuXQo1uDcGnRAPCiT66_oDyLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calculate the calibration code as per the docs.  The docs talk about
-reading and averaging the pullup and pulldown calibration codes.  They
-also talk about adding in some adjustment codes.  Let's do what the
-docs say.
+On Mon, Sep 4, 2017 at 6:19 PM, Romain Izard <romain.izard.pro@gmail.com> wrote:
+> 2017-07-24 13:07 GMT+02:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+>> On 24 July 2017 at 11:57, Romain Izard <romain.izard.pro@gmail.com> wrote:
+>>>
+>>> While upgrading the kernel from 4.9 to 4.12 for a custom board with a
+>>> Cortex-A5 based CPU, I have encountered a compilation issue that leads to
+>>> a data abort during the execution of the LZ4 decompression code in
+>>> zImage.
+>>>
+>>> [...]
+>>>
+>>> The compilation options are a little different between both cases:
+>>> The library is built with -O3, whereas the zImage decompressor is built
+>>> with -O2, -DDISABLE_BRANCH_PROFILING, -fpic, -mno-single-pic-base,
+>>> -fno-builtin. All other compilation options are shared in both cases.
+>>>
+>
+> This is a red herring: the critical option here is '-fno-builtin'. If it is
+> not set, the bug disappears. It also disappears if we replace it with
+> '-fno-builtin-putc'. But it only changes the optimizations applied by
+> the compiler itself, and cannot explain the issue.
+>
+> Before updating the LZ4 decompressor, the LZ4 header contained specific
+> code for handling alignment issues, which has been changed.
+>
+>>> For Linux 4.9, the LZ4 decompressor code is completely different, which
+>>> explains why the issue appeared when changing kernel versions.
+>>>
+>>
+>> I see some void* to u32* casts in the new code, which makes me think
+>> that it is perhaps not valid C, and has maybe not been tested on an
+>> architecture that has stricter alignment requirements than x86?
+>>
+>
+> I can reproduce it easily on v4.13 with GCC6.3:
+> - Configure with allnoconfig
+> - Enable CONFIG_MMU, CONFIG_KERNEL_LZ4
+> - Check the generated assembly for arch/arm/boot/compressed/decompress.o:
+> In the LZ4_decompress_fast function, the memory access after the third
+> branch uses ldm and stm. This is invalid, as the addresses can be unaligned.
+>
+> With this configuration, HAVE_EFFICIENT_UNALIGNED_ACCESS is set, but this is
+> wrong. On 32-bit ARM, the compiler is free to generate LDM or LDRD access
+> that will always fail on unaligned addresses. In this case, we have two
+> LDR/STR access to adjascent addresses that appear in inline code. The
+> get_unaligned functions in "include/linux/unaligned/access_ok.h" cast the
+> pointers directly as regular 32-bit access, and as those are by default
+> aligned, the compiler will optimise and combine the access.
+>
+> If we use the functions from "include/linux/unaligned/le_struct.h", the
+> get_unaligned() function correctly tells the compiler that the access is
+> special, and that it should not merge memory access. But we do not fall back
+> to byte-by-byte access, as the compiler itself knows how to use 32-bit
+> access when -funaligned-access is set (by default for ARMv7).
 
-In practice this doesn't seem to matter a whole lot.  On a device I
-tested the pullup and pulldown codes were nearly the same (0x23 and
-0x24) and the adjustment codes were 0.
+Right, I've come across this in the past as well.
 
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
+> The issue is probably hidden by the kernel fault handler in normal kernel
+> code, but for this case it does nothing as we are working in the boot
+> decompressor, that cannot use the fault handler. But it should have a
+> performance inpact.
+>
+> As a result, this means that HAVE_EFFICIENT_UNALIGNED_ACCESS should not
+> be set at least in the context of "include/asm-generic/unaligned.h". But
+> as this option is also used in other places, where it is not related to
+> the get_unaligned functions, it is not possible to remove it on ARM 32-bit
+> without further study.
 
- drivers/phy/rockchip/phy-rockchip-typec.c | 28 +++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
+This is a patch I prototyped in the past https://pastebin.com/apPTPXys
 
-diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-index b8696a7c45fb..e59983a82dcc 100644
---- a/drivers/phy/rockchip/phy-rockchip-typec.c
-+++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-@@ -194,6 +194,7 @@
- /* Use this for "n" in macros like "_MULT_XXX" to target the aux channel */
- #define AUX_CH_LANE			8
- 
-+
- #define TX_ANA_CTRL_REG_1		(0x5020 << 2)
- 
- #define TXDA_DP_AUX_EN			BIT(15)
-@@ -560,24 +561,33 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	u16 val;
- 	u16 tx_ana_ctrl_reg_1;
- 	u16 tx_ana_ctrl_reg_2;
--	s32 pu_calib_code;
--
--	/* disable txda_cal_latch_en for rewrite the calibration values */
--	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
--	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
--	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+	s32 pu_calib_code, pd_calib_code;
-+	s32 pu_adj, pd_adj;
-+	u16 calib;
- 
- 	/*
--	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[5:0] and
--	 * write it to TX_DIG_CTRL_REG_2[5:0].
-+	 * Calculate calibration code as per docs: use an average of the
-+	 * pull down and pull up.  Then add in adjustments.
- 	 */
- 	val = readl(tcphy->base + CMN_TXPUCAL_CTRL);
- 	pu_calib_code = CMN_CALIB_CODE_POS(val);
-+	val = readl(tcphy->base + CMN_TXPDCAL_CTRL);
-+	pd_calib_code = CMN_CALIB_CODE_POS(val);
-+	val = readl(tcphy->base + CMN_TXPU_ADJ_CTRL);
-+	pu_adj = CMN_CALIB_CODE(val);
-+	val = readl(tcphy->base + CMN_TXPD_ADJ_CTRL);
-+	pd_adj = CMN_CALIB_CODE(val);
-+	calib = (pu_calib_code + pd_calib_code) / 2 + pu_adj + pd_adj;
-+
-+	/* disable txda_cal_latch_en for rewrite the calibration values */
-+	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
- 
- 	/* write the calibration, then delay 10 ms as sample in docs */
- 	val = readl(tcphy->base + TX_DIG_CTRL_REG_2);
- 	val &= ~(TX_RESCAL_CODE_MASK << TX_RESCAL_CODE_OFFSET);
--	val |= pu_calib_code << TX_RESCAL_CODE_OFFSET;
-+	val |= calib << TX_RESCAL_CODE_OFFSET;
- 	writel(val, tcphy->base + TX_DIG_CTRL_REG_2);
- 	usleep_range(10000, 10050);
- 
--- 
-2.14.1.581.gf28d330327-goog
+I'm not entirely sure if this produces good object code with all compilers
+on all architectures, but it should solve the problem you observed and
+more.
+
+       Arnd
