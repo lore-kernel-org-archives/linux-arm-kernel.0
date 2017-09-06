@@ -1,85 +1,295 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Sep 2017 22:57:58 +0200
-Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues
- in zImage with Linux 4.12, LZ4 and GCC5.3)
-In-Reply-To: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
-References: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
-Message-ID: <CAK8P3a3AQ43t2q1MVN9PoqQXZiuXQo1uDcGnRAPCiT66_oDyLg@mail.gmail.com>
+From: avifishman70@gmail.com (Avi Fishman)
+Date: Thu, 7 Sep 2017 00:04:09 +0300
+Subject: [PATCH v4 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20170906080751.6773-2-brendanhiggins@google.com>
+References: <20170906080751.6773-1-brendanhiggins@google.com>
+ <20170906080751.6773-2-brendanhiggins@google.com>
+Message-ID: <CAKKbWA4OXL__VWzwRvN_wujDc70zWqmGPcu2_WRpvsSUYba1Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 4, 2017 at 6:19 PM, Romain Izard <romain.izard.pro@gmail.com> wrote:
-> 2017-07-24 13:07 GMT+02:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
->> On 24 July 2017 at 11:57, Romain Izard <romain.izard.pro@gmail.com> wrote:
->>>
->>> While upgrading the kernel from 4.9 to 4.12 for a custom board with a
->>> Cortex-A5 based CPU, I have encountered a compilation issue that leads to
->>> a data abort during the execution of the LZ4 decompression code in
->>> zImage.
->>>
->>> [...]
->>>
->>> The compilation options are a little different between both cases:
->>> The library is built with -O3, whereas the zImage decompressor is built
->>> with -O2, -DDISABLE_BRANCH_PROFILING, -fpic, -mno-single-pic-base,
->>> -fno-builtin. All other compilation options are shared in both cases.
->>>
->
-> This is a red herring: the critical option here is '-fno-builtin'. If it is
-> not set, the bug disappears. It also disappears if we replace it with
-> '-fno-builtin-putc'. But it only changes the optimizations applied by
-> the compiler itself, and cannot explain the issue.
->
-> Before updating the LZ4 decompressor, the LZ4 header contained specific
-> code for handling alignment issues, which has been changed.
->
->>> For Linux 4.9, the LZ4 decompressor code is completely different, which
->>> explains why the issue appeared when changing kernel versions.
->>>
->>
->> I see some void* to u32* casts in the new code, which makes me think
->> that it is perhaps not valid C, and has maybe not been tested on an
->> architecture that has stricter alignment requirements than x86?
->>
->
-> I can reproduce it easily on v4.13 with GCC6.3:
-> - Configure with allnoconfig
-> - Enable CONFIG_MMU, CONFIG_KERNEL_LZ4
-> - Check the generated assembly for arch/arm/boot/compressed/decompress.o:
-> In the LZ4_decompress_fast function, the memory access after the third
-> branch uses ldm and stm. This is invalid, as the addresses can be unaligned.
->
-> With this configuration, HAVE_EFFICIENT_UNALIGNED_ACCESS is set, but this is
-> wrong. On 32-bit ARM, the compiler is free to generate LDM or LDRD access
-> that will always fail on unaligned addresses. In this case, we have two
-> LDR/STR access to adjascent addresses that appear in inline code. The
-> get_unaligned functions in "include/linux/unaligned/access_ok.h" cast the
-> pointers directly as regular 32-bit access, and as those are by default
-> aligned, the compiler will optimise and combine the access.
->
-> If we use the functions from "include/linux/unaligned/le_struct.h", the
-> get_unaligned() function correctly tells the compiler that the access is
-> special, and that it should not merge memory access. But we do not fall back
-> to byte-by-byte access, as the compiler itself knows how to use 32-bit
-> access when -funaligned-access is set (by default for ARMv7).
+Sorry for sending again some mailing list rejected it due to HTML
+involved (althoug I tried Plain Text), Trying again.
 
-Right, I've come across this in the past as well.
-
-> The issue is probably hidden by the kernel fault handler in normal kernel
-> code, but for this case it does nothing as we are working in the boot
-> decompressor, that cannot use the fault handler. But it should have a
-> performance inpact.
+2017-09-06 11:07 GMT+03:00 Brendan Higgins <brendanhiggins@google.com>:
+> Adds basic support for the Nuvoton NPCM750 BMC.
 >
-> As a result, this means that HAVE_EFFICIENT_UNALIGNED_ACCESS should not
-> be set at least in the context of "include/asm-generic/unaligned.h". But
-> as this option is also used in other places, where it is not related to
-> the get_unaligned functions, it is not possible to remove it on ARM 32-bit
-> without further study.
+> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+> ---
+>  arch/arm/Kconfig             |  2 +
+>  arch/arm/Makefile            |  1 +
+>  arch/arm/mach-npcm/Kconfig   | 50 +++++++++++++++++++++++++
+>  arch/arm/mach-npcm/Makefile  |  3 ++
+>  arch/arm/mach-npcm/headsmp.S | 17 +++++++++
+>  arch/arm/mach-npcm/npcm7xx.c | 34 +++++++++++++++++
+>  arch/arm/mach-npcm/platsmp.c | 89 ++++++++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 196 insertions(+)
+>  create mode 100644 arch/arm/mach-npcm/Kconfig
+>  create mode 100644 arch/arm/mach-npcm/Makefile
+>  create mode 100644 arch/arm/mach-npcm/headsmp.S
+>  create mode 100644 arch/arm/mach-npcm/npcm7xx.c
+>  create mode 100644 arch/arm/mach-npcm/platsmp.c
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 61a0cb15067e..05543f1cfbde 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -782,6 +782,8 @@ source "arch/arm/mach-netx/Kconfig"
+>
+>  source "arch/arm/mach-nomadik/Kconfig"
+>
+> +source "arch/arm/mach-npcm/Kconfig"
+> +
+>  source "arch/arm/mach-nspire/Kconfig"
+>
+>  source "arch/arm/plat-omap/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 47d3a1ab08d2..60ca50c7d762 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)             += mediatek
+>  machine-$(CONFIG_ARCH_MXS)             += mxs
+>  machine-$(CONFIG_ARCH_NETX)            += netx
+>  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
+> +machine-$(CONFIG_ARCH_NPCM)            += npcm
+>  machine-$(CONFIG_ARCH_NSPIRE)          += nspire
+>  machine-$(CONFIG_ARCH_OXNAS)           += oxnas
+>  machine-$(CONFIG_ARCH_OMAP1)           += omap1
+> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+> new file mode 100644
+> index 000000000000..d47061855439
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/Kconfig
+> @@ -0,0 +1,50 @@
+> +menuconfig ARCH_NPCM
+> +       bool "Nuvoton NPCM Architecture"
+> +       select ARCH_REQUIRE_GPIOLIB
+> +       select USE_OF
+> +       select PINCTRL
+> +       select PINCTRL_NPCM7XX
+> +
+> +if ARCH_NPCM
+> +
+> +comment "NPCMX50 CPU type"
+> +
+> +config CPU_NPCM750
+> +       depends on ARCH_NPCM && ARCH_MULTI_V7
+> +       bool "Support for NPCM750 BMC CPU (Poleg)"
+> +       select CACHE_L2X0
+> +       select CPU_V7
+> +       select ARM_GIC
+> +       select HAVE_SMP
+> +       select SMP
+> +       select SMP_ON_UP
+> +       select HAVE_ARM_SCU
+> +       select HAVE_ARM_TWD if SMP
+> +       select ARM_ERRATA_458693
+> +       select ARM_ERRATA_720789
+> +       select ARM_ERRATA_742231
+> +       select ARM_ERRATA_754322
+> +       select ARM_ERRATA_764369
+> +       select ARM_ERRATA_794072
+> +       select PL310_ERRATA_588369
+> +       select PL310_ERRATA_727915
+> +       select USB_EHCI_ROOT_HUB_TT
+> +       select USB_ARCH_HAS_HCD
+> +       select USB_ARCH_HAS_EHCI
+> +       select USB_EHCI_HCD
+> +       select USB_ARCH_HAS_OHCI
+> +       select USB_OHCI_HCD
+> +       select USB
+> +       select FIQ
+> +       select CPU_USE_DOMAINS
+> +       select GENERIC_CLOCKEVENTS
+> +       select CLKDEV_LOOKUP
+> +       select COMMON_CLK if OF
+> +       select NPCM750_TIMER
+> +       select MFD_SYSCON
+> +       help
+> +         Support for NPCM750 BMC CPU (Poleg).
+> +
+> +         Nuvoton NPCM750 BMC based on the Cortex A9.
+> +
+> +endif
+> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+> new file mode 100644
+> index 000000000000..78416055b854
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/Makefile
+> @@ -0,0 +1,3 @@
+> +AFLAGS_headsmp.o               += -march=armv7-a
+> +
+> +obj-$(CONFIG_CPU_NPCM750)      += npcm7xx.o platsmp.o headsmp.o
+> diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
+> new file mode 100644
+> index 000000000000..9fccbbd49ed4
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/headsmp.S
+> @@ -0,0 +1,17 @@
+> +/*
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/init.h>
+> +#include <asm/assembler.h>
+> +
+> +ENTRY(npcm7xx_secondary_startup)
+> +       safe_svcmode_maskall r0
 
-This is a patch I prototyped in the past https://pastebin.com/apPTPXys
+I saw you  answered to Florian Fainelli that the BootRom is not
+starting the secondary CPU in SVC mode. Are you sure? In our
+engineering npcm7xx revision, Z1, the BootRom indeed started to run it
+in IRQ mode but we fixed it in the production version, A1, (quite long
+time ago), I hope you didn't get an EB with Z1 you can check that in
+BootBlock console print:
+> ADC CLK is set to 25000000
+>Last reset was CORST
+>vgaioen=1 and mux gspi.
+>A1 <<====== this is what you should see, if you see Z1 we need to replace your EB
 
-I'm not entirely sure if this produces good object code with all compilers
-on all architectures, but it should solve the problem you observed and
-more.
-
-       Arnd
+> +
+> +       b       secondary_startup
+> +ENDPROC(npcm7xx_secondary_startup)
+> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+> new file mode 100644
+> index 000000000000..132e9d587857
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/npcm7xx.c
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright (c) 2017 Nuvoton Technology corporation.
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +#define NPCM7XX_AUX_VAL (L310_AUX_CTRL_INSTR_PREFETCH |                               \
+> +                        L310_AUX_CTRL_DATA_PREFETCH |                         \
+> +                        L310_AUX_CTRL_NS_LOCKDOWN |                           \
+> +                        L310_AUX_CTRL_CACHE_REPLACE_RR |                      \
+> +                        L2C_AUX_CTRL_SHARED_OVERRIDE |                        \
+> +                        L310_AUX_CTRL_FULL_LINE_ZERO)
+> +
+> +static const char *const npcm7xx_dt_match[] = {
+> +       "nuvoton,npcm750",
+> +       NULL
+> +};
+> +
+> +DT_MACHINE_START(NPCM7XX_DT, "NPCMX50 Chip family")
+> +       .atag_offset    = 0x100,
+> +       .dt_compat      = npcm7xx_dt_match,
+> +       .l2c_aux_val    = NPCM7XX_AUX_VAL,
+> +       .l2c_aux_mask   = ~NPCM7XX_AUX_VAL,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
+> new file mode 100644
+> index 000000000000..144e3e7ec7e6
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/platsmp.c
+> @@ -0,0 +1,89 @@
+> +/*
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "PLATSMP: " fmt
+> +
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/smp.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/smp.h>
+> +#include <asm/smp_plat.h>
+> +#include <asm/smp_scu.h>
+> +
+> +#define NPCM7XX_SCRPAD_REG 0x13c
+> +
+> +extern void npcm7xx_secondary_startup(void);
+> +
+> +static int npcm7xx_smp_boot_secondary(unsigned int cpu,
+> +                                     struct task_struct *idle)
+> +{
+> +       struct device_node *gcr_np;
+> +       void __iomem *gcr_base;
+> +       int ret = 0;
+> +
+> +       gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
+> +       if (!gcr_np) {
+> +               pr_err("no gcr device node\n");
+> +               ret = -EFAULT;
+> +               goto out;
+> +       }
+> +       gcr_base = of_iomap(gcr_np, 0);
+> +       if (!gcr_base) {
+> +               pr_err("could not iomap gcr at: 0x%llx\n", gcr_base);
+> +               ret = -EFAULT;
+> +               goto out;
+> +       }
+> +
+> +       /* give boot ROM kernel start address. */
+> +       iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
+> +                 NPCM7XX_SCRPAD_REG);
+> +       /* make sure npcm7xx_secondary_startup is seen by all observers. */
+> +       smp_wmb();
+> +       dsb_sev();
+> +       /* make sure write buffer is drained */
+> +       mb();
+> +
+> +out:
+> +       iounmap(gcr_base);
+> +       return ret;
+> +}
+> +
+> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +       struct device_node *scu_np;
+> +       void __iomem *scu_base;
+> +
+> +       scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+> +       if (!scu_np) {
+> +               pr_err("no scu device node\n");
+> +               return;
+> +       }
+> +       scu_base = of_iomap(scu_np, 0);
+> +       if (!scu_base) {
+> +               pr_err("could not iomap scu at: 0x%llx\n", scu_base);
+> +               return;
+> +       }
+> +
+> +       scu_enable(scu_base);
+> +
+> +out:
+> +       iounmap(scu_base);
+> +}
+> +
+> +static struct smp_operations npcm7xx_smp_ops __initdata = {
+> +       .smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
+> +       .smp_boot_secondary = npcm7xx_smp_boot_secondary,
+> +};
+> +
+> +CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm7xx-smp", &npcm7xx_smp_ops);
+> --
+> 2.14.1.581.gf28d330327-goog
+>
