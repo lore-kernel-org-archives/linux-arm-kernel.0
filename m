@@ -1,91 +1,93 @@
-From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Wed, 6 Sep 2017 14:37:27 +0200
-Subject: [PATCH 4/8] tty/bcm63xx_uart: allow naming clock in device tree
-In-Reply-To: <20170906121715.GA27869@kroah.com>
-References: <20170802093429.12572-1-jonas.gorski@gmail.com>
- <20170802093429.12572-5-jonas.gorski@gmail.com>
- <CAOiHx=mC=GfX0VvuRWR-AmXYfVOEkuruwGHooS08WrL_z-60UA@mail.gmail.com>
- <20170906121715.GA27869@kroah.com>
-Message-ID: <CAOiHx==oPYiALNL-cHNWCH+YMFswJt4uz-ob++5z+hMauWuRqQ@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 6 Sep 2017 14:40:12 +0200
+Subject: [PATCH 1/4] arm: topology: remove cpu_efficiency
+In-Reply-To: <303d3f7b-5d64-e13a-c4f9-dd575958cafa@arm.com>
+References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
+ <20170830144120.9312-2-dietmar.eggemann@arm.com>
+ <CAKfTPtBXkAyAc1aqqqEn6Yt14_Y7LFp3oySY-=G3ZTuG-DR_nA@mail.gmail.com>
+ <303d3f7b-5d64-e13a-c4f9-dd575958cafa@arm.com>
+Message-ID: <CAKfTPtAvhujS1wpP1JE8OqCfsKXcrFxLQ0207WFg3ZhZjoHnBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2017 at 14:17, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Wed, Sep 06, 2017 at 01:01:32PM +0200, Jonas Gorski wrote:
->> Hi Greg,
->>
->> On 2 August 2017 at 11:34, Jonas Gorski <jonas.gorski@gmail.com> wrote:
->> > Codify using a named clock for the refclk of the uart. This makes it
->> > easier if we might need to add a gating clock (like present on the
->> > BCM6345).
->> >
->> > Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
->>
->> Could I please get a (N)Ack so Ralf can add this patch to his tree?
->>
->>
->> Regards
->> Jonas
->>
->>
->> > ---
->> >  Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt | 6 ++++++
->> >  drivers/tty/serial/bcm63xx_uart.c                              | 6 ++++--
->> >  2 files changed, 10 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
->> > index 5c52e5eef16d..8b2b0460259a 100644
->> > --- a/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
->> > +++ b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
->> > @@ -11,6 +11,11 @@ Required properties:
->> >  - clocks: Clock driving the hardware; used to figure out the baud rate
->> >    divisor.
->> >
->> > +
->> > +Optional properties:
->> > +
->> > +- clock-names: Should be "refclk".
->> > +
->> >  Example:
->> >
->> >         uart0: serial at 14e00520 {
->> > @@ -19,6 +24,7 @@ Example:
->> >                 interrupt-parent = <&periph_intc>;
->> >                 interrupts = <2>;
->> >                 clocks = <&periph_clk>;
->> > +               clock-names = "refclk";
->> >         };
->> >
->> >         clocks {
+On 6 September 2017 at 13:43, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> Hi Vincent,
 >
-> I don't ack devtree changes :)
+> On 04/09/17 08:49, Vincent Guittot wrote:
+>> Hi Dietmar,
+>>
+>> Removing cpu effificiency table looks good to me. Nevertheless, i have
+>> some comments below for this patch.
 >
->> > diff --git a/drivers/tty/serial/bcm63xx_uart.c b/drivers/tty/serial/bcm63xx_uart.c
->> > index a2b9376ec861..f227eff28d3a 100644
->> > --- a/drivers/tty/serial/bcm63xx_uart.c
->> > +++ b/drivers/tty/serial/bcm63xx_uart.c
->> > @@ -841,8 +841,10 @@ static int bcm_uart_probe(struct platform_device *pdev)
->> >         if (!res_irq)
->> >                 return -ENODEV;
->> >
->> > -       clk = pdev->dev.of_node ? of_clk_get(pdev->dev.of_node, 0) :
->> > -                                 clk_get(&pdev->dev, "refclk");
->> > +       clk = clk_get(&pdev->dev, "refclk");
->> > +       if (IS_ERR(clk) && pdev->dev.of_node)
->> > +               clk = of_clk_get(pdev->dev.of_node, 0);
->> > +
->> >         if (IS_ERR(clk))
->> >                 return -ENODEV;
->> >
+> Thanks for the review!
 >
-> This part is fine with me:
-
-That's all I wanted :)
+>> On 30 August 2017 at 16:41, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>>> Remove the 'cpu_efficiency/clock-frequency dt property' based solution
+>>> to set cpu capacity which was only working for Cortex-A15/A7 arm
+>>> big.LITTLE systems.
+>>>
+>>> I.e. the 'capacity-dmips-mhz' based solution is now the only one. It is
+>>> shared between arm and arm64 and works for every big.LITTLE system no
+>>> matter which core types it consists of.
+>>>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Vincent Guittot <vincent.guittot@linaro.org>
+>>> Cc: Juri Lelli <juri.lelli@arm.com>
+>>> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+>>> ---
+>>>  arch/arm/kernel/topology.c | 113 ++-------------------------------------------
+>>>  1 file changed, 3 insertions(+), 110 deletions(-)
 >
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> [...]
+>
+>>> @@ -115,73 +70,13 @@ static void __init parse_dt_topology(void)
+>>>                         of_node_put(cn);
+>>>                         continue;
+>>
+>> AFAICT, this continue is now useless as it was there to skipe the cpu
+>> table efficiency method
+>
+> You're right ... will remove it.
+>
+> [...]
+>
+>>> -       if (cap_from_dt)
+>>> -               topology_normalize_cpu_scale();
+>>
+>> Why have you moved the call to topology_normalize_cpu_scale() from
+>> parse_dt_topology() to update_cpu_capacity() ?
+>
+> Didn't move it ? It's still called from parse_dt_topology().
+>
+>> You should keep it in parse_dt_topology() as itis part of the dt
+>> parsing sequence
+>
+> Yes, this should be the case.
+>
+> [...]
+>
+>>> -/*
+>>> - * Look for a customed capacity of a CPU in the cpu_capacity table during the
+>>> - * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
+>>> - * function returns directly for SMP system.
+>>> - */
+>>> -static void update_cpu_capacity(unsigned int cpu)
+>>> -{
+>>> -       if (!cpu_capacity(cpu) || cap_from_dt)
+>>> -               return;
+>>> -
+>>> -       topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+>>> -
+>>> -       pr_info("CPU%u: update cpu_capacity %lu\n",
+>>> -               cpu, topology_get_cpu_scale(NULL, cpu));
+>>> +       topology_normalize_cpu_scale();
+>>>  }
+>>
+>> You can probably just removed update_cpu_capacity()
+>
+> I did remove update_cpu_capacity(). Maybe the patch layout is confusing?
 
-Thank you!
+yes you're right I have been confused by the layout
 
-
-Jonas
+>
+> [...]
