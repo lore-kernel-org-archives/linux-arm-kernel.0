@@ -1,42 +1,32 @@
-From: liubo95@huawei.com (Bob Liu)
-Date: Wed, 6 Sep 2017 08:51:05 +0800
-Subject: [RFC PATCH 4/6] iommu/arm-smmu-v3: Add SVM support for platform
- devices
-In-Reply-To: <039adc54-00f5-bf4e-e509-ffdc67baa15e@arm.com>
-References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
- <1504167642-14922-5-git-send-email-xieyisheng1@huawei.com>
- <039adc54-00f5-bf4e-e509-ffdc67baa15e@arm.com>
-Message-ID: <3f4e17fa-dcd0-5692-099a-73105e0e0095@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Sep 2017 17:55:55 -0700
+Subject: [GIT PULL 6/6 V2] Broadcom drivers changes for 4.14
+In-Reply-To: <20170825005632.29599-1-f.fainelli@gmail.com>
+References: <20170817183748.1450-1-f.fainelli@gmail.com>
+ <20170825005632.29599-1-f.fainelli@gmail.com>
+Message-ID: <CAOesGMi_ys8rYddFEEJfXAE7+iRfHbhe3LF5xnBUDi-UV+zGwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/9/5 20:53, Jean-Philippe Brucker wrote:
-> On 31/08/17 09:20, Yisheng Xie wrote:
->> From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
->>
->> Platform device can realise SVM function by using the stall mode. That
->> is to say, when device access a memory via iova which is not populated,
->> it will stalled and when SMMU try to translate this iova, it also will
->> stall and meanwhile send an event to CPU via MSI.
->>
->> After SMMU driver handle the event and populated the iova, it will send
->> a RESUME command to SMMU to exit the stall mode, therefore the platform
->> device can contiue access the memory.
->>
->> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> 
-> No. Please don't forge a signed-off-by under a commit message you wrote,
+Hi,
 
-Really sorry for that.
-We sent out the wrong version, I should take more careful review.
+On Thu, Aug 24, 2017 at 5:56 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>
+> are available in the git repository at:
+>
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/drivers
+>
+> for you to fetch changes up to ed70bd0aa574d4922382ead47cd370174e31cb0e:
+>
+>   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-08-24 17:49:43 -0700)
 
-Regards,
-Liubo
+Per discussion on IRC earlier today -- I had missed this updated pull
+request. Since it's been sitting in -next for a while through your
+tree, I've queued it up as next/late now and we'll try to get it
+merged later in the merge window.
 
-> it's rude. I didn't sign it, didn't consider it fit for mainline or even
-> as an RFC, and wanted to have another read before sending. My mistake,
-> I'll think twice before sharing prototypes in the future.
-> 
-> Thanks,
-> Jean
-> 
+
+-Olof
