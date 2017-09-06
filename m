@@ -1,63 +1,29 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 6 Sep 2017 12:47:21 +0100
-Subject: [PATCH 2/4] arm: dts: exynos: add exynos5420 cpu
- capacity-dmips-mhz information
-In-Reply-To: <20170903195614.iwe7v6g3xsg7p6nf@kozik-lap>
-References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
- <20170830144120.9312-3-dietmar.eggemann@arm.com>
- <20170830202650.mdlxy2c3uwuq5vde@kozik-lap>
- <94c1d6c6-655a-2a63-1f01-06ac45990388@arm.com>
- <20170903195614.iwe7v6g3xsg7p6nf@kozik-lap>
-Message-ID: <247b2b4a-c57a-eed9-c16f-fc7f1ef9f64f@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 6 Sep 2017 13:00:15 +0100
+Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
+In-Reply-To: <62860a85-c29c-87bb-24b7-c6e5ac6065f9@huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
+ <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
+ <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
+ <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
+ <62860a85-c29c-87bb-24b7-c6e5ac6065f9@huawei.com>
+Message-ID: <31b18967-c32a-1761-7e60-15c0de28203c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/17 20:56, Krzysztof Kozlowski wrote:
-> On Thu, Aug 31, 2017 at 11:36:07AM +0100, Dietmar Eggemann wrote:
->> On 30/08/17 21:26, Krzysztof Kozlowski wrote:
->>> On Wed, Aug 30, 2017 at 03:41:18PM +0100, Dietmar Eggemann wrote:
-
-[...]
-
->>>> The patch has been tested on Samsung Chromebook 2 13" (peach-pi, Exynos
->>>> 5800).
->>>>
->>>> $ cat /sys/devices/system/cpu/cpu*/cpu_capacity
->>>> 1024
->>>> 1024
->>>> 1024
->>>> 1024
->>>> 389
->>>> 389
->>>> 389
->>>> 389
->>>
->>> I am missing something... shouldn't this be 539? Or is it scaled with
->>> the clock-frequency (1 GHz) value?
->>
->> Yeah, the capacity-dmips-mhz dt value of 539 for the little cpus is
->> scaled by 1.3/1.8 (max cpu capacity/ system wide max cpu capacity):
->>
->> 539 * 1.3/1.8 = 389
->>
->> This max cpu capacity scaling is part of both solutions, the 'cpu
->> capacity-dmips-mhz' and the 'cpu_efficiency/clock-frequency dt property'
->> one.
->>
->> The (original*) cpu capacity on a heterogeneous platform expresses uArch
->> and max cpu frequency differences between the (logical) cpus of the
->> system.
->>
->> * not further reduced by rt and/or irq pressure.
->>
->> [...]
+On 06/09/17 11:35, gengdongjiu wrote:
+> Vladimir,
 > 
-> Thanks for explanation, looks fine for me. I'll take it after merge
-> window.
+> On 2017/9/6 17:41, Vladimir Murzin wrote:
+>> Can you please elaborate on cases where PAN is not enabled?
+> 
+> I mean the informal private usage, For example, he disabled the PAN dynamically to let kernel space to access the user space.
+> After he dynamic disabled the PAN, then switched to guest OS. after return to host. he found the PAN stage is modified.
+> Of cause this is not a formal usage, in our host kernel, it is always enabled, no dynamic change, but I means it may exist such cases.
+> 
+> 
 
-Nice, since the 'cpu capacity-dmips-mhz' is already supported for arm
-(and used by TC2 (vexpress-v2p-ca15_a7.dts)) this can be done
-independently of the actual removal of the
-'cpu_efficiency/clock-frequency dt property' solution in patch 1/4.
+So, in short, there is no real issue with PAN, right? What about UAO?
 
-[..]
+Cheers
+Vladimir
