@@ -1,385 +1,105 @@
 From: brendanhiggins@google.com (Brendan Higgins)
-Date: Tue,  5 Sep 2017 17:30:15 -0700
-Subject: [PATCH v3 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <20170906003016.2159-1-brendanhiggins@google.com>
-References: <20170906003016.2159-1-brendanhiggins@google.com>
-Message-ID: <20170906003016.2159-3-brendanhiggins@google.com>
+Date: Tue, 5 Sep 2017 17:42:46 -0700
+Subject: [PATCH v2 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <8fd55a57-946d-f53f-e10b-c73d1f70d1dc@gmail.com>
+References: <20170831225400.19756-1-brendanhiggins@google.com>
+ <20170831225400.19756-2-brendanhiggins@google.com>
+ <8fd55a57-946d-f53f-e10b-c73d1f70d1dc@gmail.com>
+Message-ID: <CAFd5g45W0jBFe-Uhjv07fxsaxtAbHmxkJU=RQu+qWT=Ohf8s+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM750 BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+With the exception of one comment, which I have responded to
+below, I have addressed your comments in my new version of
+this patch: https://patchwork.kernel.org/patch/9914153/
 
-Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-Tested-by: Tomer Maimon <tmaimon77@gmail.com>
-Tested-by: Avi Fishman <avifishman70@gmail.com>
----
- .../arm/cpu-enable-method/nuvoton,npcm7xx-smp      |  42 +++++
- .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  59 +++++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 177 +++++++++++++++++++++
- include/dt-bindings/clock/nuvoton,npcm7xx-clks.h   |  39 +++++
- 5 files changed, 323 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
- create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
- create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+On Mon, Sep 4, 2017 at 7:47 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+...
+>> +
+>> +ENTRY(v7_invalidate_l1_npcmX50)
+>> +     mov     r0, #0
+>> +     mcr     p15, 0, r0, c7, c5, 0 /* invalidate I cache */
+>> +     mcr     p15, 2, r0, c0, c0, 0
+>> +     mrc     p15, 1, r0, c0, c0, 0
+>> +
+>> +     ldr     r1, =0x7fff
+>> +     and     r2, r1, r0, lsr #13
+>> +
+>> +     ldr     r1, =0x3ff
+>> +
+>> +     and     r3, r1, r0, lsr #3 /* NumWays - 1 */
+>> +     add     r2, r2, #1         /* NumSets */
+>> +
+>> +     and     r0, r0, #0x7
+>> +     add     r0, r0, #4 /* SetShift */
+>> +
+>> +     clz     r1, r3     /* WayShift */
+>> +     add     r4, r3, #1 /* NumWays */
+>> +1:   sub     r2, r2, #1 /* NumSets-- */
+>> +     mov     r3, r4     /* Temp = NumWays */
+>> +2:   subs    r3, r3, #1 /* Temp-- */
+>> +     mov     r5, r3, lsl r1
+>> +     mov     r6, r2, lsl r0
+>> +     /* Reg = (Temp << WayShift) | (NumSets << SetShift) */
+>> +     orr     r5, r5, r6
+>> +     mcr     p15, 0, r5, c7, c6, 2
+>> +     bgt     2b
+>> +     cmp     r2, #0
+>> +     bgt     1b
+>> +     dsb
+>> +     isb
+>> +     mov     pc, lr
+>> +ENDPROC(v7_invalidate_l1_npcmX50)
+>
+> This looks a lot, if not nearly the same thing as v7_invalidate_l1 which
+> is already called by secondary_startup, can you see if you can re-use it
+> directly?
+>
+>> +
+>> +/*
+>> + * MSM specific entry point for secondary CPUs.  This provides
+>> + * a "holding pen" into which all secondary cores are held until we're
+>> + * ready for them to initialise.
+>> + */
+>
+> Assuming this was copied from a Qualcomm MSM routine, you may want to
+> fix the comment, typo on "initialis.
+>
+>> +ENTRY(npcm7xx_secondary_startup)
+>> +     msr     CPSR_c, #(SVC_MODE)
+>
+> Is there a BootROM or something that would not make the secondary cores
+> start in supervisor mode?
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
-new file mode 100644
-index 000000000000..e81f85b400cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
-@@ -0,0 +1,42 @@
-+=========================================================
-+Secondary CPU enable-method "nuvoton,npcm7xx-smp" binding
-+=========================================================
-+
-+To apply to all CPUs, a single "nuvoton,npcm7xx-smp" enable method should be
-+defined in the "cpus" node.
-+
-+Enable method name:	"nuvoton,npcm7xx-smp"
-+Compatible machines:	"nuvoton,npcm750"
-+Compatible CPUs:	"arm,cortex-a9"
-+Related properties:	(none)
-+
-+Note:
-+This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
-+"nuvoton,npcm750-gcr".
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm7xx-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-new file mode 100644
-index 000000000000..2d87d9ecea85
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-@@ -0,0 +1,6 @@
-+NPCM Platforms Device Tree Bindings
-+-----------------------------------
-+NPCM750 SoC
-+Required root node properties:
-+	- compatible = "nuvoton,npcm750";
-+
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..54df32cff21b
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,59 @@
-+/*
-+ * DTS file for all NPCM750 SoCs
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
-+
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+
-+	chosen {
-+		stdout-path = &serial3;
-+		bootargs = "earlyprintk=serial,serial3,115200";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	cpus {
-+		enable-method = "nuvoton,npcm7xx-smp";
-+	};
-+
-+	clk: clock-controller at f0801000 {
-+		status = "okay";
-+	};
-+
-+	apb {
-+		watchdog1: watchdog at f0009000 {
-+			status = "okay";
-+		};
-+
-+		serial0: serial0 at f0001000 {
-+			status = "okay";
-+		};
-+
-+		serial1: serial1 at f0002000 {
-+			status = "okay";
-+		};
-+
-+		serial2: serial2 at f0003000 {
-+			status = "okay";
-+		};
-+
-+		serial3: serial3 at f0004000 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..bca96b3ae9d3
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,177 @@
-+/*
-+ * DTSi file for the NPCM750 SoC
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	gcr: gcr at f0800000 {
-+		compatible = "nuvoton,npcm750-gcr", "syscon",
-+			"simple-mfd";
-+		reg = <0xf0800000 0x1000>;
-+	};
-+
-+	scu: scu at f03fe000 {
-+		compatible = "arm,cortex-a9-scu";
-+		reg = <0xf03fe000 0x1000>;
-+	};
-+
-+	l2: l2-cache at f03fc000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf03fc000 0x1000>;
-+		interrupts = <0 21 4>;
-+		cache-unified;
-+		cache-level = <2>;
-+		clocks = <&clk NPCM7XX_CLK_AXI>;
-+	};
-+
-+	gic: interrupt-controller at f03ff000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0xf03ff000 0x1000>,
-+		    <0xf03fe100 0x100>;
-+	};
-+
-+	clk: clock-controller at f0801000 {
-+		compatible = "nuvoton,npcm750-clk";
-+		#clock-cells = <1>;
-+		reg = <0xf0801000 0x1000>;
-+	};
-+
-+	/* external clock signal rg1refck, supplied by the phy */
-+	clk-rg1refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	/* external clock signal rg2refck, supplied by the phy */
-+	clk-rg2refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	clk-xin {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+	};
-+
-+	timer at f03fe600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xf03fe600 0x20>;
-+		interrupts = <1 13 0x304>;
-+		clocks = <&clk NPCM7XX_CLK_TIMER>;
-+	};
-+
-+	apb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		timer0: timer at f0000000 {
-+			compatible = "nuvoton,npcm750-timer";
-+			interrupts = <0 32 4>;
-+			reg = <0xf0000000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog0: watchdog at f0008000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 47 4>;
-+			reg = <0xf0008000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog1: watchdog at f0009000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 48 4>;
-+			reg = <0xf0009000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog2: watchdog at f000a000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 49 4>;
-+			reg = <0xf000a000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		serial0: serial0 at f0001000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0001000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 2 4>;
-+			status = "disabled";
-+		};
-+
-+		serial1: serial1 at f0002000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0002000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 3 4>;
-+			status = "disabled";
-+		};
-+
-+		serial2: serial2 at f0003000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0003000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 4 4>;
-+			status = "disabled";
-+		};
-+
-+		serial3: serial3 at f0004000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0004000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 5 4>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-new file mode 100644
-index 000000000000..c69d3bbf7e42
---- /dev/null
-+++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2016 Nuvoton Technologies,  tali.perry at nuvoton.com
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_NPCM7XX_H
-+#define _DT_BINDINGS_CLK_NPCM7XX_H
-+
-+#define NPCM7XX_CLK_PLL0	0
-+#define NPCM7XX_CLK_PLL1	1
-+#define NPCM7XX_CLK_PLL2	2
-+#define NPCM7XX_CLK_GFX		3
-+#define NPCM7XX_CLK_APB1	4
-+#define NPCM7XX_CLK_APB2	5
-+#define NPCM7XX_CLK_APB3	6
-+#define NPCM7XX_CLK_APB4	7
-+#define NPCM7XX_CLK_APB5	8
-+#define NPCM7XX_CLK_MC		9
-+#define NPCM7XX_CLK_CPU		10
-+#define NPCM7XX_CLK_SPI0	11
-+#define NPCM7XX_CLK_SPI3	12
-+#define NPCM7XX_CLK_SPIX	13
-+#define NPCM7XX_CLK_UART_CORE	14
-+#define NPCM7XX_CLK_TIMER	15
-+#define NPCM7XX_CLK_HOST_UART	16
-+#define NPCM7XX_CLK_MMC		17
-+#define NPCM7XX_CLK_SDHC	18
-+#define NPCM7XX_CLK_ADC		19
-+#define NPCM7XX_CLK_GFX_MEM	20
-+#define NPCM7XX_CLK_USB_BRIDGE	21
-+#define NPCM7XX_CLK_AXI		22
-+#define NPCM7XX_CLK_AHB		23
-+#define NPCM7XX_CLK_EMC		24
-+#define NPCM7XX_CLK_GMAC	25
-+
-+#endif
--- 
-2.14.1.581.gf28d330327-goog
+Unfortunately, yes; however, I was able to cut all of the other code out of
+npcm7xx_secondary_startup, so now it just puts the core in SVC mode and
+relies on secondary_startup to do all of the L1 cache invalidation.
+
+>
+>> +
+>> +     bl      v7_invalidate_l1_npcmX50
+>> +     /* disable vector table remapping */
+>> +     mrc     p15, 0,r0, c1, c0, 0
+>> +     and     r0, #0xffffdfff
+>> +     mcr     p15, 0,r0, c1, c0, 0
+>> +
+>> +#ifdef CONFIG_CACHE_L2X0
+>> +     /* Enable L1 & L2 prefetch + Zero line */
+>> +     mrc     p15, 0, r0, c1, c0, 1
+>> +     orr     r0, r0, #(7 << 1)
+>> +     mcr     p15, 0, r0, c1, c0, 1
+>> +#endif /* CONFIG_CACHE_L2X0 */
+>> +
+>> +     mrc     p15, 0, r0, c0, c0, 5
+>> +     and     r0, r0, #15
+>> +     adr     r4, 1f
+>> +     ldmia   r4, {r5, r6}
+>> +     sub     r4, r4, r5
+>> +     add     r6, r6, r4
+>> +     str r3,[r2]
+>> +
+>> +pen: ldr     r7, [r6]
+>> +     cmp     r7, r0
+>> +     bne     pen
+>> +
+...
