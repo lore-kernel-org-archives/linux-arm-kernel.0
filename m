@@ -1,45 +1,70 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 6 Sep 2017 14:24:57 -0700
-Subject: [PATCH 3/3] phy: rockchip-typec: Do the calibration more correctly
-In-Reply-To: <20170906205201.16207-4-dianders@chromium.org>
-References: <20170906205201.16207-1-dianders@chromium.org>
- <20170906205201.16207-4-dianders@chromium.org>
-Message-ID: <CAD=FV=WmW-=HhUznPHLvF=FqJSVk2-NLVYq-1WNJwgn4N3+psw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 06 Sep 2017 23:39:01 +0200
+Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path
+ for system sleep
+In-Reply-To: <CAPDyKFr0hV=m=TumYKLoYC57mTht9_185vR5ynP_3oi7rauRbg@mail.gmail.com>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+ <8456507.jc97SKmauk@aspire.rjw.lan>
+ <CAPDyKFr0hV=m=TumYKLoYC57mTht9_185vR5ynP_3oi7rauRbg@mail.gmail.com>
+Message-ID: <7722016.zqrrHyr8aS@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday, September 6, 2017 3:59:16 PM CEST Ulf Hansson wrote:
+> On 6 September 2017 at 12:46, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Wednesday, September 6, 2017 2:52:59 AM CEST Rafael J. Wysocki wrote:
+> >> On Monday, September 4, 2017 2:55:37 PM CEST Ulf Hansson wrote:
+> >> > [...]
+> >
+> > I guess I can wrap it up, because all of the points seem to have been stated
+> > and repeating them would not be useful.
+> >
+> > My summary of the discussion is as follows.
+> >
+> > It only is valid to use pm_runtime_force_suspend/resume() as *driver*
+> > callbacks for system suspend/resume if both the driver itself and all of
+> > the middle layers it has to work with carry out the same sequence of
+> > operations in order to suspend the device both in runtime PM and for
+> > system sleep (and analogously for resuming).  [The middle layers need
+> > to meet additional conditions, but that's less relevant.]
+> >
+> > Unfortunately, for the ACPI PM domain and the PCI bus type the situation is
+> > different, because they generally need to do different things to suspend
+> > devices for system sleep than they do for runtime PM (which mostly is
+> > related to the handling of ACPI-defined sleep states and device/system
+> > wakeup, but not limited to that).  This clearly means that drivers needing
+> > to work with the ACPI PM domain and PCI drivers cannot use
+> > pm_runtime_force_suspend/resume() as their PM callbacks for system
+> > suspend/resume (quite fundamentally).
+> >
+> > [Note that for i2c-designware-platdrv the situation is even more complicated,
+> > because on some platforms it has to work with the ACPI PM domain (or the
+> > ACPI LPSS driver), on some platforms its parent is a PCI device and on
+> > some other platforms there's none of them.]
+> 
+> That is also why it makes it really interesting. I am guessing we will
+> be seeing more of these cases sooner or later.
+> 
+> To make it even more complex, I can guess we can expect cases when
+> genpd is mixed with the ACPI PM domain.
+> 
+> >
+> > However, for drivers that need to work with the ACPI PM domain and
+> > PCI drivers the differences in the device handling between runtime PM and
+> > system suspend/resume are *very* often (even though not always) covered
+> > entirely by the middle layer code.  Then, the driver itself actually
+> > always carries out the same sequence of operations in order to suspend
+> > the device (or to resume it, analogously).  The driver then can re-use
+> > its runtime PM callbacks for system suspend/resume (but at the driver
+> > level only) and it would be good to make that easy (or easier) for these
+> > drivers somehow.
+> 
+> This is a very nice summary so far, thanks for putting it together.
 
-On Wed, Sep 6, 2017 at 1:52 PM, Douglas Anderson <dianders@chromium.org> wrote:
-> Calculate the calibration code as per the docs.  The docs talk about
-> reading and averaging the pullup and pulldown calibration codes.  They
-> also talk about adding in some adjustment codes.  Let's do what the
-> docs say.
->
-> In practice this doesn't seem to matter a whole lot.  On a device I
-> tested the pullup and pulldown codes were nearly the same (0x23 and
-> 0x24) and the adjustment codes were 0.
->
-> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
->
->  drivers/phy/rockchip/phy-rockchip-typec.c | 28 +++++++++++++++++++---------
->  1 file changed, 19 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-> index b8696a7c45fb..e59983a82dcc 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-> @@ -194,6 +194,7 @@
->  /* Use this for "n" in macros like "_MULT_XXX" to target the aux channel */
->  #define AUX_CH_LANE                    8
->
-> +
+No problem.
 
-Not sure how I missed that this was adding a blank line here.  :(  If
-there are no other issues I'm happy to re-post or happy if this blank
-line is removed when the patch is applied.  Please let me know which
-you'd prefer.
+I actually have an idea on how to move forward, but let me start a new thread
+for discussing that.
 
--Doug
+Thanks,
+Rafael
