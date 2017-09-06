@@ -1,82 +1,135 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  6 Sep 2017 14:26:08 +0200
-Subject: [PATCH v3 1/5] KVM: arm/arm64: Don't cache the timer IRQ level
+Date: Wed,  6 Sep 2017 14:26:11 +0200
+Subject: [PATCH v3 4/5] KVM: arm/arm64: Support VGIC dist pend/active changes
+ for mapped IRQs
 In-Reply-To: <20170906122612.18050-1-cdall@linaro.org>
 References: <20170906122612.18050-1-cdall@linaro.org>
-Message-ID: <20170906122612.18050-2-cdall@linaro.org>
+Message-ID: <20170906122612.18050-5-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer was modeled after a strict idea of modelling an interrupt line
-level in software, meaning that only transitions in the level needed to
-be reported to the VGIC.  This works well for the timer, because the
-arch timer code is in complete control of the device and can track the
-transitions of the line.
+For mapped IRQs (with the HW bit set in the LR) we have to follow some
+rules of the architecture.  One of these rules is that VM must not be
+allowed to deactivate a virtual interrupt with the HW bit set unless the
+physical interrupt is also active.
 
-However, as we are about to support using the HW bit in the VGIC not
-just for the timer, but also for VFIO which cannot track transitions of
-the interrupt line, we have to decide on an interface for level
-triggered mapped interrupts to the GIC, which both the timer and VFIO
-can use.
+This works fine when injecting mapped interrupts, because we leave it up
+to the injector to either set EOImode==1 or manually set the active
+state of the physical interrupt.
 
-VFIO only sees an asserting transition of the physical interrupt line,
-and tells the VGIC when that happens.  That means that part of the
-interrupt flow is offloaded to the hardware.
+However, the guest can set virtual interrupt to be pending or active by
+writing to the virtual distributor, which could lead to deactivating a
+virtual interrupt with the HW bit set without the physical interrupt
+being active.
 
-To use the same interface for VFIO devices and the timer, we therefore
-have to change the timer (we cannot change VFIO because it doesn't know
-the details of the device it is assigning to a VM).
+We could set the physical interrupt to active whenever we are about to
+enter the VM with a HW interrupt either pending or active, but that
+would be really slow, especially on GICv2.  So we take the long way
+around and do the hard work when needed, which is expected to be
+extremely rare.
 
-Luckily, changing the timer is simple, we just need to stop 'caching'
-the line level, but instead let the VGIC know the state of the timer on
-every entry to the guest, and the VGIC can ignore notifications using
-its validate mechanism.
+When the VM sets the pending state for a HW interrupt on the virtual
+distributor we set the active state on the physical distributor, because
+the virtual interrupt can become active and then the guest can
+deactivate it.
+
+When the VM clears the pending state we also clear it on the physical
+side, because the injector might otherwise raise the interrupt.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio.c | 33 +++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c      |  7 +++++++
+ virt/kvm/arm/vgic/vgic.h      |  1 +
+ 3 files changed, 41 insertions(+)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 8e89d63..2a5f877 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -219,9 +219,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 	int ret;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index c1e4bdd..00003ae 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -131,6 +131,9 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
  
- 	timer_ctx->active_cleared_last = false;
-+	if (timer_ctx->irq.level != new_level)
-+		trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-+					   new_level);
- 	timer_ctx->irq.level = new_level;
--	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
--				   timer_ctx->irq.level);
+ 		spin_lock(&irq->irq_lock);
++		if (irq->hw)
++			vgic_irq_set_phys_active(irq, true);
++
+ 		irq->pending_latch = true;
  
- 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
- 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-@@ -241,6 +242,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	bool level;
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq);
+@@ -149,6 +152,20 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
  
- 	/*
- 	 * If userspace modified the timer registers via SET_ONE_REG before
-@@ -251,11 +253,11 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	if (unlikely(!timer->enabled))
- 		return;
+ 		spin_lock(&irq->irq_lock);
++		/*
++		 * We don't want the guest to effectively mask the physical
++		 * interrupt by doing a write to SPENDR followed by a write to
++		 * CPENDR for HW interrupts, so we clear the active state on
++		 * the physical side here.  This may lead to taking an
++		 * additional interrupt on the host, but that should not be a
++		 * problem as the worst that can happen is an additional vgic
++		 * injection.  We also clear the pending state to maintain
++		 * proper semantics for edge HW interrupts.
++		 */
++		if (irq->hw) {
++			vgic_irq_set_phys_pending(irq, false);
++			vgic_irq_set_phys_active(irq, false);
++		}
  
--	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
--		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
-+	level = kvm_timer_should_fire(vtimer);
-+	kvm_timer_update_irq(vcpu, level, vtimer);
+ 		irq->pending_latch = false;
  
--	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
--		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-+	level = kvm_timer_should_fire(ptimer);
-+	kvm_timer_update_irq(vcpu, level, ptimer);
+@@ -214,6 +231,22 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
+ 
++	if (irq->hw) {
++		/*
++		 * We cannot support setting the physical active state for
++		 * private interrupts from another CPU than the one running
++		 * the VCPU which identifies which private interrupt it is
++		 * trying to modify.
++		 */
++		if (irq->intid < VGIC_NR_PRIVATE_IRQS &&
++		    irq->target_vcpu != requester_vcpu) {
++			spin_unlock(&irq->irq_lock);
++			return;
++		}
++
++		vgic_irq_set_phys_active(irq, new_active_state);
++	}
++
+ 	irq->active = new_active_state;
+ 	if (new_active_state)
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq);
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 8072969..7aec730 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -140,6 +140,13 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
+ 	kfree(irq);
  }
  
- /* Schedule the background timer for the emulated timer. */
++void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending)
++{
++	WARN_ON(irq_set_irqchip_state(irq->host_irq,
++				      IRQCHIP_STATE_PENDING,
++				      pending));
++}
++
+ /* Get the input level of a mapped IRQ directly from the physical GIC */
+ bool vgic_get_phys_line_level(struct vgic_irq *irq)
+ {
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 7bdcda2..498ee05 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -146,6 +146,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
+ bool vgic_get_phys_line_level(struct vgic_irq *irq);
++void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending);
+ void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
+ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+ void vgic_kick_vcpus(struct kvm *kvm);
 -- 
 2.9.0
