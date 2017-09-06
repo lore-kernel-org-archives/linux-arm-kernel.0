@@ -1,75 +1,187 @@
-From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Wed, 6 Sep 2017 13:01:32 +0200
-Subject: [PATCH 4/8] tty/bcm63xx_uart: allow naming clock in device tree
-In-Reply-To: <20170802093429.12572-5-jonas.gorski@gmail.com>
-References: <20170802093429.12572-1-jonas.gorski@gmail.com>
- <20170802093429.12572-5-jonas.gorski@gmail.com>
-Message-ID: <CAOiHx=mC=GfX0VvuRWR-AmXYfVOEkuruwGHooS08WrL_z-60UA@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 6 Sep 2017 13:09:32 +0200
+Subject: [PATCH v7] vfio: platform: reset: Add Broadcom FlexRM reset module
+In-Reply-To: <1504685798-27645-2-git-send-email-anup.patel@broadcom.com>
+References: <1504685798-27645-1-git-send-email-anup.patel@broadcom.com>
+ <1504685798-27645-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <140636c0-6d69-13fb-b17b-3c2a4bf3a1c7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Anup,
 
-On 2 August 2017 at 11:34, Jonas Gorski <jonas.gorski@gmail.com> wrote:
-> Codify using a named clock for the refclk of the uart. This makes it
-> easier if we might need to add a gating clock (like present on the
-> BCM6345).
->
-> Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
-
-Could I please get a (N)Ack so Ralf can add this patch to his tree?
-
-
-Regards
-Jonas
-
-
+On 06/09/2017 10:16, Anup Patel wrote:
+> This patch adds Broadcom FlexRM low-level reset for
+> VFIO platform.
+> 
+> It will do the following:
+> 1. Disable/Deactivate each FlexRM ring
+> 2. Flush each FlexRM ring
+> 
+> The cleanup sequence for FlexRM rings is adapted from
+> Broadcom FlexRM mailbox driver.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
 > ---
->  Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt | 6 ++++++
->  drivers/tty/serial/bcm63xx_uart.c                              | 6 ++++--
->  2 files changed, 10 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
-> index 5c52e5eef16d..8b2b0460259a 100644
-> --- a/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
-> @@ -11,6 +11,11 @@ Required properties:
->  - clocks: Clock driving the hardware; used to figure out the baud rate
->    divisor.
->
+>  drivers/vfio/platform/reset/Kconfig                |   9 ++
+>  drivers/vfio/platform/reset/Makefile               |   1 +
+>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 115 +++++++++++++++++++++
+>  3 files changed, 125 insertions(+)
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> 
+> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+> index 70cccc5..392e3c0 100644
+> --- a/drivers/vfio/platform/reset/Kconfig
+> +++ b/drivers/vfio/platform/reset/Kconfig
+> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
+>  	  Enables the VFIO platform driver to handle reset for AMD XGBE
+>  
+>  	  If you don't know what to do here, say N.
 > +
-> +Optional properties:
+> +config VFIO_PLATFORM_BCMFLEXRM_RESET
+> +	tristate "VFIO support for Broadcom FlexRM reset"
+> +	depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
+> +	default ARCH_BCM_IPROC
+> +	help
+> +	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
 > +
-> +- clock-names: Should be "refclk".
+> +	  If you don't know what to do here, say N.
+> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+> index 93f4e23..8d9874b 100644
+> --- a/drivers/vfio/platform/reset/Makefile
+> +++ b/drivers/vfio/platform/reset/Makefile
+> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
+>  
+>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
+> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> new file mode 100644
+> index 0000000..5f89066
+> --- /dev/null
+> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> @@ -0,0 +1,115 @@
+> +/*
+> + * Copyright (C) 2017 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
->  Example:
->
->         uart0: serial at 14e00520 {
-> @@ -19,6 +24,7 @@ Example:
->                 interrupt-parent = <&periph_intc>;
->                 interrupts = <2>;
->                 clocks = <&periph_clk>;
-> +               clock-names = "refclk";
->         };
->
->         clocks {
-> diff --git a/drivers/tty/serial/bcm63xx_uart.c b/drivers/tty/serial/bcm63xx_uart.c
-> index a2b9376ec861..f227eff28d3a 100644
-> --- a/drivers/tty/serial/bcm63xx_uart.c
-> +++ b/drivers/tty/serial/bcm63xx_uart.c
-> @@ -841,8 +841,10 @@ static int bcm_uart_probe(struct platform_device *pdev)
->         if (!res_irq)
->                 return -ENODEV;
->
-> -       clk = pdev->dev.of_node ? of_clk_get(pdev->dev.of_node, 0) :
-> -                                 clk_get(&pdev->dev, "refclk");
-> +       clk = clk_get(&pdev->dev, "refclk");
-> +       if (IS_ERR(clk) && pdev->dev.of_node)
-> +               clk = of_clk_get(pdev->dev.of_node, 0);
+> +/*
+> + * This driver provides reset support for Broadcom FlexRM ring manager
+> + * to VFIO platform.
+> + */
 > +
->         if (IS_ERR(clk))
->                 return -ENODEV;
->
-> --
-> 2.13.2
->
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "vfio_platform_private.h"
+> +
+> +/* FlexRM configuration */
+> +#define RING_REGS_SIZE					0x10000
+> +#define RING_VER_MAGIC					0x76303031
+> +
+> +/* Per-Ring register offsets */
+> +#define RING_VER					0x000
+> +#define RING_CONTROL					0x034
+> +#define RING_FLUSH_DONE					0x038
+> +
+> +/* Register RING_CONTROL fields */
+> +#define CONTROL_FLUSH_SHIFT				5
+> +
+> +/* Register RING_FLUSH_DONE fields */
+> +#define FLUSH_DONE_MASK					0x1
+> +
+> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
+> +{
+> +	unsigned int timeout;
+> +
+> +	/* Disable/inactivate ring */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +
+> +	/* Set ring flush state */
+> +	timeout = 1000; /* timeout of 1s */
+> +	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
+> +	do {
+> +		if (readl_relaxed(ring + RING_FLUSH_DONE) &
+> +		    FLUSH_DONE_MASK)
+> +			break;
+> +		mdelay(1);
+> +	} while (--timeout);
+> +	if (!timeout)
+> +		return -ETIMEDOUT;
+> +
+> +	/* Clear ring flush state */
+> +	timeout = 1000; /* timeout of 1s */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +	do {
+> +		if (!(readl_relaxed(ring + RING_FLUSH_DONE) &
+> +		      FLUSH_DONE_MASK))
+> +			break;
+> +		mdelay(1);
+> +	} while (--timeout);
+> +	if (!timeout)
+> +		return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
+> +
+> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
+> +{
+> +	void __iomem *ring;
+> +	int rc = 0, ret = 0, ring_num = 0;
+> +	struct vfio_platform_region *reg = &vdev->regions[0];
+> +
+> +	/* Map FlexRM ring registers if not mapped */
+> +	if (!reg->ioaddr) {
+> +		reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
+> +		if (!reg->ioaddr)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	/* Discover and shutdown each FlexRM ring */
+> +	for (ring = reg->ioaddr;
+> +	     ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
+> +		if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC) {
+> +			rc = vfio_platform_bcmflexrm_shutdown(ring);
+> +			if (rc) {
+> +				dev_warn(vdev->device,
+> +					 "FlexRM ring%d shutdown error %d\n",
+> +					 ring_num, rc);
+> +				ret = rc;
+miss |= ?
+
+Thanks
+
+Eric
+> +			}
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
+> +			  vfio_platform_bcmflexrm_reset);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
+> +MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
+> 
