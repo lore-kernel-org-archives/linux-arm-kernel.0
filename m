@@ -1,41 +1,81 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 6 Sep 2017 20:14:20 +0800
-Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-In-Reply-To: <31b18967-c32a-1761-7e60-15c0de28203c@arm.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
- <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
- <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
- <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
- <62860a85-c29c-87bb-24b7-c6e5ac6065f9@huawei.com>
- <31b18967-c32a-1761-7e60-15c0de28203c@arm.com>
-Message-ID: <57ba125f-9c3c-3504-35a6-9800a47450cf@huawei.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 6 Sep 2017 14:17:15 +0200
+Subject: [PATCH 4/8] tty/bcm63xx_uart: allow naming clock in device tree
+In-Reply-To: <CAOiHx=mC=GfX0VvuRWR-AmXYfVOEkuruwGHooS08WrL_z-60UA@mail.gmail.com>
+References: <20170802093429.12572-1-jonas.gorski@gmail.com>
+ <20170802093429.12572-5-jonas.gorski@gmail.com>
+ <CAOiHx=mC=GfX0VvuRWR-AmXYfVOEkuruwGHooS08WrL_z-60UA@mail.gmail.com>
+Message-ID: <20170906121715.GA27869@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/9/6 20:00, Vladimir Murzin wrote:
-> On 06/09/17 11:35, gengdongjiu wrote:
->> Vladimir,
->>
->> On 2017/9/6 17:41, Vladimir Murzin wrote:
->>> Can you please elaborate on cases where PAN is not enabled?
->>
->> I mean the informal private usage, For example, he disabled the PAN dynamically to let kernel space to access the user space.
->> After he dynamic disabled the PAN, then switched to guest OS. after return to host. he found the PAN stage is modified.
->> Of cause this is not a formal usage, in our host kernel, it is always enabled, no dynamic change, but I means it may exist such cases.
->>
->>
+On Wed, Sep 06, 2017 at 01:01:32PM +0200, Jonas Gorski wrote:
+> Hi Greg,
 > 
-> So, in short, there is no real issue with PAN, right? What about UAO?
-For the PAN, if host OS dynamically enable/disable PAN should have issue.
-Do you think that is not a issue as above description?
+> On 2 August 2017 at 11:34, Jonas Gorski <jonas.gorski@gmail.com> wrote:
+> > Codify using a named clock for the refclk of the uart. This makes it
+> > easier if we might need to add a gating clock (like present on the
+> > BCM6345).
+> >
+> > Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
+> 
+> Could I please get a (N)Ack so Ralf can add this patch to his tree?
+> 
+> 
+> Regards
+> Jonas
+> 
+> 
+> > ---
+> >  Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt | 6 ++++++
+> >  drivers/tty/serial/bcm63xx_uart.c                              | 6 ++++--
+> >  2 files changed, 10 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
+> > index 5c52e5eef16d..8b2b0460259a 100644
+> > --- a/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
+> > +++ b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
+> > @@ -11,6 +11,11 @@ Required properties:
+> >  - clocks: Clock driving the hardware; used to figure out the baud rate
+> >    divisor.
+> >
+> > +
+> > +Optional properties:
+> > +
+> > +- clock-names: Should be "refclk".
+> > +
+> >  Example:
+> >
+> >         uart0: serial at 14e00520 {
+> > @@ -19,6 +24,7 @@ Example:
+> >                 interrupt-parent = <&periph_intc>;
+> >                 interrupts = <2>;
+> >                 clocks = <&periph_clk>;
+> > +               clock-names = "refclk";
+> >         };
+> >
+> >         clocks {
 
-"host OS dynamically disable the PAN, but after go back from the guest OS, The PAN is unexpectedly enabled"
+I don't ack devtree changes :)
 
-> 
-> Cheers
-> Vladimir
-> 
-> .
-> 
+> > diff --git a/drivers/tty/serial/bcm63xx_uart.c b/drivers/tty/serial/bcm63xx_uart.c
+> > index a2b9376ec861..f227eff28d3a 100644
+> > --- a/drivers/tty/serial/bcm63xx_uart.c
+> > +++ b/drivers/tty/serial/bcm63xx_uart.c
+> > @@ -841,8 +841,10 @@ static int bcm_uart_probe(struct platform_device *pdev)
+> >         if (!res_irq)
+> >                 return -ENODEV;
+> >
+> > -       clk = pdev->dev.of_node ? of_clk_get(pdev->dev.of_node, 0) :
+> > -                                 clk_get(&pdev->dev, "refclk");
+> > +       clk = clk_get(&pdev->dev, "refclk");
+> > +       if (IS_ERR(clk) && pdev->dev.of_node)
+> > +               clk = of_clk_get(pdev->dev.of_node, 0);
+> > +
+> >         if (IS_ERR(clk))
+> >                 return -ENODEV;
+> >
+
+This part is fine with me:
+
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
