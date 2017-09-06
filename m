@@ -1,40 +1,70 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 6 Sep 2017 23:34:16 +0530
-Subject: [GIT PULL] Mailbox changes for v4.14
-Message-ID: <CABb+yY3YPPG2+h6ed=Sabqqgc45QXyxT=Y56-+HK6Khq+Lyw6g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 6 Sep 2017 19:04:57 +0100
+Subject: [PATCH v2 00/29] implement KASLR for ARM
+In-Reply-To: <20170906175308.GL5024@atomide.com>
+References: <CAKv+Gu9c_j0qriRazSTmq8eD9icCu4Wuzw1z-LF7bubLVLQd7Q@mail.gmail.com>
+ <20170905212742.GG5024@atomide.com>
+ <CAKv+Gu8uZH5PFVBwEGAK1hjGMTJD1a1KN0dVUjw=M3GPsps1FQ@mail.gmail.com>
+ <CAKv+Gu8qROYaQFSxChoz8cmS0S1wwqDmUvduXC_reQn1L7gFKg@mail.gmail.com>
+ <20170906162222.GI5024@atomide.com>
+ <CAKv+Gu__-WeHKDGwg4rNM9Dw8V471wNQX=J3mfz_AUKHVUza_g@mail.gmail.com>
+ <20170906163100.GJ5024@atomide.com>
+ <CAKv+Gu-HGM6T6cV25bo6_bBcZaV-x3qpc9XoYUA4AEx68Joz=A@mail.gmail.com>
+ <20170906171253.GK5024@atomide.com>
+ <CAKv+Gu8ngWMvkmNr77SzL8fEvSc5K-OntoZQ53vgWVLHhAajaw@mail.gmail.com>
+ <20170906175308.GL5024@atomide.com>
+Message-ID: <CAKv+Gu8qd8oz4wuEjAaR1E3ZUxt4Xr-j4NcLidRrNisVFefzCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 6 September 2017 at 18:53, Tony Lindgren <tony@atomide.com> wrote:
+> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 10:31]:
+>> On 6 September 2017 at 18:12, Tony Lindgren <tony@atomide.com> wrote:
+>> > Kernel image @ 0x81000000 [ 0x000000 - 0x426300 ]
+>> > ## Flattened Device Tree blob at 84000000
+>> >    Booting using the fdt blob at 0x84000000
+>> >    Loading Device Tree to 86feb000, end 86fff2d5 ... OK
+>> >
+>> > Starting kernel ...
+>> >
+>> > regions.image_size:00e00000
+>> > regions.pa_start:80000000
+>> > regions.pa_end:87200000
+>> > regions.zimage_start:81000000
+>> > regions.zimage_size:00437320
+>> > regions.dtb_start:86feb000
+>> > regions.dtb_size:00012000
+>> > regions.initrd_start:00000000
+>> > regions.initrd_size:00000000
+>> > num:00000028
+>> > num:00000025
+>> > *kaslr_offset:05e00000
+>> > Uncompressing Linux... done, booting the kernel.
+>> > Warning: Neither atags nor dtb found
+>>
+>> OK, so in this case, 80000000 + 00e00000 + 05e00000 == 86c00000, which
+>> is still below the DTB, but apparently, it has corrupted it anyway.
+>>
+>> I will try to figure out what's going on here.
+>
+> Do you need to have kaslr_offset beyond the uncompressed
+> kernel size maybe?
+>
 
-The following changes since commit 14ccee78fc82f5512908f4424f541549a5705b89:
+I think the problem is in the rounding of region.pa_start.
 
-  Linux 4.13-rc6 (2017-08-20 14:13:52 -0700)
+I have now changed this to
 
-are available in the git repository at:
+regions.image_size = image_base % SZ_128M + round_up(image_size, SZ_2M);
+regions.pa_start = round_down(image_base, SZ_128M);
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-tags/mailbox-v4.14
 
-for you to fetch changes up to 1da92afbbfcde9dcbbf85cc94ef506c986c7e4a1:
+>> Thanks again for taking the time,
+>
+> No problem, I'm happy to test these changes.
+>
 
-  mailbox: bcm-flexrm-mailbox: Use txdone_ack instead of txdone_poll
-(2017-08-31 08:39:04 +0530)
+I have updated my arm-kaslr-v3 with all the fixes from this discussion
+(and more)
 
-----------------------------------------------------------------
-Just behavorial changes to a controller driver:
-
-- Modified the Broadcom's Flexrm mailbox driver to
-  support debugfs and TX-Done mechanism by ACK.
-  Nothing for the core mailbox stack.
-
-----------------------------------------------------------------
-Anup Patel (5):
-      mailbox: bcm-flexrm-mailbox: Set IRQ affinity hint for FlexRM ring IRQs
-      mailbox: bcm-flexrm-mailbox: Add debugfs support
-      mailbox: bcm-flexrm-mailbox: Fix mask used in CMPL_START_ADDR_VALUE()
-      mailbox: bcm-flexrm-mailbox: Use bitmap instead of IDA
-      mailbox: bcm-flexrm-mailbox: Use txdone_ack instead of txdone_poll
-
- drivers/mailbox/bcm-flexrm-mailbox.c | 252 ++++++++++++++++++++++++-----------
- 1 file changed, 175 insertions(+), 77 deletions(-)
+Thanks,
