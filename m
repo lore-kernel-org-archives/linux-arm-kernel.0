@@ -1,15 +1,48 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 6 Sep 2017 10:41:58 +0100
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 6 Sep 2017 17:49:56 +0800
 Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
 In-Reply-To: <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
 References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
  <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
  <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
-Message-ID: <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
+Message-ID: <9396c8ff-98e3-af57-742a-bbe2ac54ad34@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/17 10:32, gengdongjiu wrote:
+For UAO, if not save/restore PSTATE.UAO, we can use below fixing.
+
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 9341376..c3dd761 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -21,6 +21,8 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
+
++#include <asm/exec.h>
++
+ /* Yes, this does nothing, on purpose */
+ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+
+@@ -121,8 +123,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
+ }
+
++static void __hyp_text __sysreg_restore_state_vhe(struct kvm_cpu_context *ctxt)
++{
++    uao_thread_switch(current);
++}
++
+ static hyp_alternate_select(__sysreg_call_restore_host_state,
+-			    __sysreg_restore_state, __sysreg_do_nothing,
++			    __sysreg_restore_state, __sysreg_restore_state_vhe,
+ 			    ARM64_HAS_VIRT_HOST_EXTN);
+
+ void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+
+
+
+On 2017/9/6 17:32, gengdongjiu wrote:
 > Hi Marc,
 > 
 > On 2017/9/6 16:17, Marc Zyngier wrote:
@@ -71,12 +104,6 @@ On 06/09/17 10:32, gengdongjiu wrote:
 > 
 > If not save/restore them, the KVM will set them according to the CPU capability. For example below fixing, it will check CPU capability, If CPU supports PAN,
 > the kvm will always enable the PAN for the host. But in fact, the host may be not enable the PAN.
-
-Can you please elaborate on cases where PAN is not enabled?
-
-Thanks
-Vladimir
-
 > Of course for the UAO, we can use the similar fixing if Marc or Christoffer is agreed. but seems not make sense.
 > 
 > commit cb96408da4e11698674abd04aeac941c1bed2038
@@ -122,5 +149,3 @@ Vladimir
 >>
 >> [1] https://www.spinics.net/lists/arm-kernel/msg599798.html
 >>
-> 
-> 
