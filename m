@@ -1,64 +1,55 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 6 Sep 2017 20:44:54 +0800
-Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-In-Reply-To: <b7d8388d-d9df-9cc4-3d07-82e7f807017a@arm.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
- <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
- <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
- <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
- <62860a85-c29c-87bb-24b7-c6e5ac6065f9@huawei.com>
- <31b18967-c32a-1761-7e60-15c0de28203c@arm.com>
- <57ba125f-9c3c-3504-35a6-9800a47450cf@huawei.com>
- <b7d8388d-d9df-9cc4-3d07-82e7f807017a@arm.com>
-Message-ID: <11e22405-1214-3dee-e2d2-f1e10340d0e4@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  6 Sep 2017 14:56:50 +0200
+Subject: [PATCH] iio: stm32: fix adc/trigger link error
+Message-ID: <20170906125722.2522781-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ADC driver can trigger on either the timer or the lptim
+trigger, but it only uses a Kconfig 'select' statement
+to ensure that the first of the two is present. When the lptim
+trigger is enabled as a loadable module, and the adc driver
+is built-in, we now get a link error:
 
+drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
+stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
 
-On 2017/9/6 20:30, Vladimir Murzin wrote:
-> On 06/09/17 13:14, gengdongjiu wrote:
->>
->>
->> On 2017/9/6 20:00, Vladimir Murzin wrote:
->>> On 06/09/17 11:35, gengdongjiu wrote:
->>>> Vladimir,
->>>>
->>>> On 2017/9/6 17:41, Vladimir Murzin wrote:
->>>>> Can you please elaborate on cases where PAN is not enabled?
->>>>
->>>> I mean the informal private usage, For example, he disabled the PAN dynamically to let kernel space to access the user space.
->>>> After he dynamic disabled the PAN, then switched to guest OS. after return to host. he found the PAN stage is modified.
->>>> Of cause this is not a formal usage, in our host kernel, it is always enabled, no dynamic change, but I means it may exist such cases.
->>>>
->>>>
->>>
->>> So, in short, there is no real issue with PAN, right? What about UAO?
->> For the PAN, if host OS dynamically enable/disable PAN should have issue.
->> Do you think that is not a issue as above description?
->>
->> "host OS dynamically disable the PAN, but after go back from the guest OS, The PAN is unexpectedly enabled"
-> 
-> Do you see effect of "PAN is unexpectedly enabled"?
-In fact I did not encounter this case, but I think it can exist.
-I think if host OS dynamically disable PAN, it wants the host kernel access the user space address space not through copy_to/from_user API.
-Now if it is unexpectedly enabled, when host kernel still accesses the user space address,  it will happen MMU fault exception.
+We could use a second 'select' statement and always have both
+trigger drivers enabled when the adc driver is, but it seems that
+the lptimer trigger was intentionally left optional, so it seems
+better to keep it that way.
 
+This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
+which avoids the link error, but instead leads to the lptimer trigger
+not being used in the broken configuration. I've added a runtime
+warning for this case to help users figure out what they did wrong
+if this should ever be done by accident.
 
-> 
-> Cheers
-> Vladimir
-> 
->>
->>>
->>> Cheers
->>> Vladimir
->>>
->>> .
->>>
->>
->>
-> 
-> 
-> .
-> 
+Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
+index 34d59bfdce2d..464458d20b16 100644
+--- a/include/linux/iio/timer/stm32-lptim-trigger.h
++++ b/include/linux/iio/timer/stm32-lptim-trigger.h
+@@ -16,11 +16,14 @@
+ #define LPTIM2_OUT	"lptim2_out"
+ #define LPTIM3_OUT	"lptim3_out"
+ 
+-#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
++#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+ bool is_stm32_lptim_trigger(struct iio_trigger *trig);
+ #else
+ static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
+ {
++#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
++	pr_warn_once("stm32 lptim_trigger not linked in\n");
++#endif
+ 	return false;
+ }
+ #endif
+-- 
+2.9.0
