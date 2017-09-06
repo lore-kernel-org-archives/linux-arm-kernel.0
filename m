@@ -1,78 +1,192 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 6 Sep 2017 14:00:28 +0100
-Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-In-Reply-To: <11e22405-1214-3dee-e2d2-f1e10340d0e4@huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
- <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
- <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
- <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
- <62860a85-c29c-87bb-24b7-c6e5ac6065f9@huawei.com>
- <31b18967-c32a-1761-7e60-15c0de28203c@arm.com>
- <57ba125f-9c3c-3504-35a6-9800a47450cf@huawei.com>
- <b7d8388d-d9df-9cc4-3d07-82e7f807017a@arm.com>
- <11e22405-1214-3dee-e2d2-f1e10340d0e4@huawei.com>
-Message-ID: <c334eba3-532e-e8af-7512-8ef4acf665b3@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 6 Sep 2017 14:31:18 +0100
+Subject: [PATCH v2 09/18] firmware: arm_scmi: probe and initialise all the
+ supported protocols
+In-Reply-To: <bc52d57a-156b-cef0-7560-63a9ed7e78b5@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
+ <bc52d57a-156b-cef0-7560-63a9ed7e78b5@arm.com>
+Message-ID: <7c82503d-229f-08e7-6605-18d778b6f525@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/17 13:44, gengdongjiu wrote:
-> 
-> 
-> On 2017/9/6 20:30, Vladimir Murzin wrote:
->> On 06/09/17 13:14, gengdongjiu wrote:
->>>
->>>
->>> On 2017/9/6 20:00, Vladimir Murzin wrote:
->>>> On 06/09/17 11:35, gengdongjiu wrote:
->>>>> Vladimir,
->>>>>
->>>>> On 2017/9/6 17:41, Vladimir Murzin wrote:
->>>>>> Can you please elaborate on cases where PAN is not enabled?
->>>>>
->>>>> I mean the informal private usage, For example, he disabled the PAN dynamically to let kernel space to access the user space.
->>>>> After he dynamic disabled the PAN, then switched to guest OS. after return to host. he found the PAN stage is modified.
->>>>> Of cause this is not a formal usage, in our host kernel, it is always enabled, no dynamic change, but I means it may exist such cases.
->>>>>
->>>>>
->>>>
->>>> So, in short, there is no real issue with PAN, right? What about UAO?
->>> For the PAN, if host OS dynamically enable/disable PAN should have issue.
->>> Do you think that is not a issue as above description?
->>>
->>> "host OS dynamically disable the PAN, but after go back from the guest OS, The PAN is unexpectedly enabled"
->>
->> Do you see effect of "PAN is unexpectedly enabled"?
-> In fact I did not encounter this case, but I think it can exist.
-> I think if host OS dynamically disable PAN, it wants the host kernel access the user space address space not through copy_to/from_user API.
-> Now if it is unexpectedly enabled, when host kernel still accesses the user space address,  it will happen MMU fault exception.
 
-And this is expected! The only allowed channel for kernel <-> user is uaccess
-API.
 
-I guess that you have test (and that great!) which violates that rule (for
-testing purpose, why not?) and now you are trying to fit kernel into it...
+On 06/09/17 10:41, Julien Thierry wrote:
+> 
+> 
+> On 04/08/17 15:31, Sudeep Holla wrote:
+>> Now that we have basic support for all the protocols in the
+>> specification, let's probe them individually and initialise them.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>   drivers/firmware/arm_scmi/common.h |  5 +++
+>>   drivers/firmware/arm_scmi/driver.c | 80
+>> +++++++++++++++++++++++++++++++++++++-
+>>   2 files changed, 84 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/firmware/arm_scmi/common.h
+>> b/drivers/firmware/arm_scmi/common.h
+>> index 7473dfcad4ee..d7c73a8d260b 100644
+>> --- a/drivers/firmware/arm_scmi/common.h
+>> +++ b/drivers/firmware/arm_scmi/common.h
+>> @@ -118,4 +118,9 @@ int scmi_version_get(const struct scmi_handle *h,
+>> u8 protocol, u32 *version);
+>>   void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
+>>                        u8 *prot_imp);
+>>   +typedef int (*scmi_init_fn_t)(struct scmi_handle *);
+>>   int scmi_base_protocol_init(struct scmi_handle *h);
+>> +int scmi_perf_protocol_init(struct scmi_handle *h);
+>> +int scmi_sensors_protocol_init(struct scmi_handle *h);
+>> +int scmi_power_protocol_init(struct scmi_handle *h);
+>> +int scmi_clock_protocol_init(struct scmi_handle *h);
+>> diff --git a/drivers/firmware/arm_scmi/driver.c
+>> b/drivers/firmware/arm_scmi/driver.c
+>> index 601d0d7210d9..6f31761043e2 100644
+>> --- a/drivers/firmware/arm_scmi/driver.c
+>> +++ b/drivers/firmware/arm_scmi/driver.c
+>> @@ -157,6 +157,12 @@ struct scmi_shared_mem {
+>>       u8 msg_payload[0];
+>>   };
+>>   +struct scmi_protocol_match {
+>> +    u8 protocol_id;
+>> +    scmi_init_fn_t fn;
+> 
+> Could we call this "init" or "prot_init"?
+> 
 
-Cheers
-Vladimir
+Done
 
+>> +    char name[32];
+>> +};
+>> +
+>>   static int scmi_linux_errmap[] = {
+>>       /* better than switch case as long as return value is continuous */
+>>       0,            /* SCMI_SUCCESS */
+>> @@ -687,6 +693,41 @@ static int scmi_xfer_info_init(struct scmi_info
+>> *sinfo)
+>>       return 0;
+>>   }
+>>   +static const struct scmi_protocol_match scmi_protocols[] = {
+>> +    {
+>> +        .protocol_id = SCMI_PROTOCOL_PERF,
+>> +        .fn = scmi_perf_protocol_init,
+>> +        .name = "scmi-cpufreq",
+>> +    }, {
+>> +        .protocol_id = SCMI_PROTOCOL_CLOCK,
+>> +        .fn = scmi_clock_protocol_init,
+>> +        .name = "scmi-clocks",
+>> +    }, {
+>> +        .protocol_id = SCMI_PROTOCOL_POWER,
+>> +        .fn = scmi_power_protocol_init,
+>> +        .name = "scmi-power-domain",
+>> +    }, {
+>> +        .protocol_id = SCMI_PROTOCOL_SENSOR,
+>> +        .fn = scmi_sensors_protocol_init,
+>> +        .name = "scmi-hwmon",
+>> +    },
+>> +    {}
+>> +};
+>> +
+>> +static const struct scmi_protocol_match *scmi_protocol_match_get(u8
+>> protocol_id)
+>> +{
+>> +    int i;
+>> +    const struct scmi_protocol_match *match = NULL, *loop =
+>> scmi_protocols;
+>> +
+>> +    for (i = 0; i < ARRAY_SIZE(scmi_protocols); i++, loop++)
+>> +        if (loop->protocol_id == protocol_id) {
+>> +            match = loop;
+>> +            break;
+>> +        }
+>> +
+>> +    return match;
+>> +}
+>> +
 > 
+> The "match" variable is not needed. We can just return "loop" in the if
+> branch and return NULL at the end of the function. Unless we are
+> following some coding standard that advises against that?
+>
+
+Agreed and fixed locally.
+
+>>   static int scmi_mailbox_check(struct device_node *np)
+>>   {
+>>       struct of_phandle_args arg;
+>> @@ -778,7 +819,7 @@ static int scmi_probe(struct platform_device *pdev)
+>>       const struct scmi_desc *desc;
+>>       struct scmi_info *info;
+>>       struct device *dev = &pdev->dev;
+>> -    struct device_node *np = dev->of_node;
+>> +    struct device_node *child, *np = dev->of_node;
+>>         /* Only mailbox method supported, check for the presence of
+>> one */
+>>       if (scmi_mailbox_check(np)) {
+>> @@ -817,6 +858,43 @@ static int scmi_probe(struct platform_device *pdev)
+>>           return ret;
+>>       }
+>>   +    for_each_available_child_of_node(np, child) {
+>> +        int init_ret;
+>> +        u32 prot_id;
+>> +        const struct scmi_protocol_match *match;
+>> +
+>> +        if (of_property_read_u32(child, "reg", &prot_id))
+>> +            continue;
+>> +
+>> +        prot_id &= MSG_PROTOCOL_ID_MASK;
+>> +
+>> +        if (!scmi_is_protocol_implemented(handle, prot_id)) {
+>> +            dev_err(dev, "SCMI protocol %d not implemented\n",
+>> +                prot_id);
+>> +            continue;
+>> +        }
+>> +
+>> +        match = scmi_protocol_match_get(prot_id);
+>> +        if (match) {
+>> +            struct platform_device *cdev;
+>> +
+>> +            cdev = of_platform_device_create(child, match->name,
+>> +                             dev);
+>> +            if (!cdev) {
+>> +                dev_err(dev, "failed to create %s device\n",
+>> +                    match->name);
+>> +                continue;
+>> +            }
+>> +
+>> +            init_ret = match->fn(handle);
+>> +            if (init_ret) {
+>> +                dev_err(dev, "SCMI protocol %d init error %d\n",
+>> +                    prot_id, init_ret);
+>> +                of_platform_device_destroy(&cdev->dev, NULL);
+>> +            }
+>> +        }
+>> +    }
+>> +
 > 
->>
->> Cheers
->> Vladimir
->>
->>>
->>>>
->>>> Cheers
->>>> Vladimir
->>>>
->>>> .
->>>>
->>>
->>>
->>
->>
->> .
->>
+> For the code in the "if (match)" branch, would it be better to have an
+> inline function "scmi_create_protocol_device" or something with a name
+> that fits?
 > 
+
+Done
+
+> Also I was wondering, what is the difference between the protocol being
+> implemented and finding the matching structure? Feels like there is a
+> bit of redundancy. If the protocol is implemented but doesn't have a
+> match structure does it just mean it doesn't need any specific
+> initialization?
 > 
+
+Yes, that's the idea. One reason to have both check is backward
+compatibility. Suppose new protocols are implemented in the f/w but DT
+doesn't have them or know how to use it or there are no users of that
+feature, then skip initializing it. Similarly if DT is updated but not
+the firmware.
+
+-- 
+Regards,
+Sudeep
