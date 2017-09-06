@@ -1,34 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Sep 2017 22:52:26 +0200
-Subject: [patch v7 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
- families JTAG master driver
-In-Reply-To: <1504281966-6199-3-git-send-email-oleksandrs@mellanox.com>
-References: <1504281966-6199-1-git-send-email-oleksandrs@mellanox.com>
- <1504281966-6199-3-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <CAK8P3a1Ym1UxbFyeUBrSBeHnoQh9NtBn5r6iVEjU_1ki_p3W5A@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed,  6 Sep 2017 13:51:58 -0700
+Subject: [PATCH 0/3] phy: rockchip-typec: Set "flip" at the right time;
+ some cleanups
+Message-ID: <20170906205201.16207-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 1, 2017 at 6:06 PM, Oleksandr Shamray
-<oleksandrs@mellanox.com> wrote:
-> Driver adds support of Aspeed 2500/2400 series SOC JTAG master controller.
->
-> Driver implements the following jtag ops:
-> - freq_get;
-> - freq_set;
-> - status_get;
-> - idle;
-> - xfer;
->
-> It has been tested on Mellanox system with BMC equipped with
-> Aspeed 2520 SoC for programming CPLD devices.
->
-> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+When connecting to certain DP monitors it was observed that only one
+of the two orientations of the type C to DP cable would work.
+Debugging showed that the problem was that we needed to set the type C
+"flip" state earlier.  Once we did this, problems went away.
 
-No further comments about this driver, if there is agreement about the subsystem
-in general, it looks good to go in.
+While trying to dig into this problem and some others, I found that
+the proper documentation for the Type C PHY was available to me.  This
+allowed me to cleanup the magic numbers in the funtion that I was
+touching and also fix a few minor issues that (luckily) haven't caused
+any problems yet.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de
+For this series I've added Chris Zhong's Reviewed-by tags since he
+gave a +1 to nearly identical patches on the Chrome OS gerrit and I
+didn't think he'd mind me carrying his tag.  If folks would rather I
+didn't do that, please yell.
 
-       Arnd
+
+Douglas Anderson (3):
+  phy: rockchip-typec: Set the AUX channel flip state earlier
+  phy: rockchip-typec: Avoid magic numbers + add delays in aux calib
+  phy: rockchip-typec: Do the calibration more correctly
+
+ drivers/phy/rockchip/phy-rockchip-typec.c | 247 ++++++++++++++++++++++++------
+ 1 file changed, 202 insertions(+), 45 deletions(-)
+
+-- 
+2.14.1.581.gf28d330327-goog
