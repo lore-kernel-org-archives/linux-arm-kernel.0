@@ -1,54 +1,59 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 06 Sep 2017 12:46:34 +0200
-Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path
- for system sleep
-In-Reply-To: <1883292.VFru06qUYG@aspire.rjw.lan>
-References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFpX3Owk4H=0SqgfspXZd9TmdL_ANOZftXRq6HPjrT2ctQ@mail.gmail.com>
- <1883292.VFru06qUYG@aspire.rjw.lan>
-Message-ID: <8456507.jc97SKmauk@aspire.rjw.lan>
+From: jonas.gorski@gmail.com (Jonas Gorski)
+Date: Wed, 6 Sep 2017 13:00:26 +0200
+Subject: [PATCH 6/8] bcm63xx_enet: just use "enet" as the clock name
+In-Reply-To: <20170802093429.12572-7-jonas.gorski@gmail.com>
+References: <20170802093429.12572-1-jonas.gorski@gmail.com>
+ <20170802093429.12572-7-jonas.gorski@gmail.com>
+Message-ID: <CAOiHx=nvzGybbsTy+y54TetDAQ5zZBLZ3pJh7EVAZM_VbzVS9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 6, 2017 2:52:59 AM CEST Rafael J. Wysocki wrote:
-> On Monday, September 4, 2017 2:55:37 PM CEST Ulf Hansson wrote:
-> > [...]
+Hi David,
 
-I guess I can wrap it up, because all of the points seem to have been stated
-and repeating them would not be useful.
+On 2 August 2017 at 11:34, Jonas Gorski <jonas.gorski@gmail.com> wrote:
+> Now that we have the individual clocks available as "enet" we
+> don't need to rely on the device id for them anymore.
+>
+> Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
 
-My summary of the discussion is as follows.
+Could I please get a (N)Ack so Ralf can add this patch to his tree?
 
-It only is valid to use pm_runtime_force_suspend/resume() as *driver*
-callbacks for system suspend/resume if both the driver itself and all of
-the middle layers it has to work with carry out the same sequence of
-operations in order to suspend the device both in runtime PM and for
-system sleep (and analogously for resuming).  [The middle layers need
-to meet additional conditions, but that's less relevant.]
 
-Unfortunately, for the ACPI PM domain and the PCI bus type the situation is
-different, because they generally need to do different things to suspend
-devices for system sleep than they do for runtime PM (which mostly is
-related to the handling of ACPI-defined sleep states and device/system
-wakeup, but not limited to that).  This clearly means that drivers needing
-to work with the ACPI PM domain and PCI drivers cannot use
-pm_runtime_force_suspend/resume() as their PM callbacks for system
-suspend/resume (quite fundamentally).
+Regards
+Jonas
 
-[Note that for i2c-designware-platdrv the situation is even more complicated,
-because on some platforms it has to work with the ACPI PM domain (or the
-ACPI LPSS driver), on some platforms its parent is a PCI device and on
-some other platforms there's none of them.]
-
-However, for drivers that need to work with the ACPI PM domain and
-PCI drivers the differences in the device handling between runtime PM and
-system suspend/resume are *very* often (even though not always) covered
-entirely by the middle layer code.  Then, the driver itself actually
-always carries out the same sequence of operations in order to suspend
-the device (or to resume it, analogously).  The driver then can re-use
-its runtime PM callbacks for system suspend/resume (but at the driver
-level only) and it would be good to make that easy (or easier) for these
-drivers somehow.
-
-Thanks,
-Rafael
+> ---
+>  drivers/net/ethernet/broadcom/bcm63xx_enet.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+> index 61a88b64bd39..d6844923a1c0 100644
+> --- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+> +++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+> @@ -1718,7 +1718,6 @@ static int bcm_enet_probe(struct platform_device *pdev)
+>         struct bcm63xx_enet_platform_data *pd;
+>         struct resource *res_mem, *res_irq, *res_irq_rx, *res_irq_tx;
+>         struct mii_bus *bus;
+> -       const char *clk_name;
+>         int i, ret;
+>
+>         /* stop if shared driver failed, assume driver->probe will be
+> @@ -1761,14 +1760,12 @@ static int bcm_enet_probe(struct platform_device *pdev)
+>         if (priv->mac_id == 0) {
+>                 priv->rx_chan = 0;
+>                 priv->tx_chan = 1;
+> -               clk_name = "enet0";
+>         } else {
+>                 priv->rx_chan = 2;
+>                 priv->tx_chan = 3;
+> -               clk_name = "enet1";
+>         }
+>
+> -       priv->mac_clk = clk_get(&pdev->dev, clk_name);
+> +       priv->mac_clk = clk_get(&pdev->dev, "enet");
+>         if (IS_ERR(priv->mac_clk)) {
+>                 ret = PTR_ERR(priv->mac_clk);
+>                 goto out;
+> --
+> 2.13.2
+>
