@@ -1,55 +1,65 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Wed, 6 Sep 2017 09:04:03 -0700
-Subject: [PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and
- kuser helpers (C sources)
-In-Reply-To: <20170816222723.118839-1-salyzyn@android.com>
-References: <20170816222723.118839-1-salyzyn@android.com>
-Message-ID: <898f1068-e99c-2f0e-8950-59dfd972bc89@android.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 6 Sep 2017 18:16:33 +0200
+Subject: [PATCH] iio: stm32: fix adc/trigger link error
+In-Reply-To: <20170906125722.2522781-1-arnd@arndb.de>
+References: <20170906125722.2522781-1-arnd@arndb.de>
+Message-ID: <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
+On 09/06/2017 02:56 PM, Arnd Bergmann wrote:
+> The ADC driver can trigger on either the timer or the lptim
+> trigger, but it only uses a Kconfig 'select' statement
+> to ensure that the first of the two is present. When the lptim
+> trigger is enabled as a loadable module, and the adc driver
+> is built-in, we now get a link error:
+> 
+> drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
+> stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
+> 
+> We could use a second 'select' statement and always have both
+> trigger drivers enabled when the adc driver is, but it seems that
+> the lptimer trigger was intentionally left optional, so it seems
+> better to keep it that way.
+Hi Arnd,
 
-On 08/16/2017 03:26 PM, Mark Salyzyn wrote:
-> From: Kevin Brodsky <kevin.brodsky@arm.com>
->
-> AArch32 processes are currently installed a special [vectors] page that
-> contains the sigreturn trampolines and the kuser helpers, at the fixed
-> address mandated by the kuser helpers ABI.
->
-> Having both functionalities in the same page has become problematic,
-> because:
->
-> * It makes it impossible to disable the kuser helpers (the sigreturn
->    trampolines cannot be removed), which is possible on arm.
->
-> * A future 32-bit vDSO would provide the sigreturn trampolines itself,
->    making those in [vectors] redundant.
->
-> This patch addresses the problem by moving the sigreturn trampolines to
-> a separate [sigpage] page, mirroring [sigpage] on arm.
->
-> Even though [vectors] has always been a misnomer on arm64/compat, as
-> there is no AArch32 vector there (and now only the kuser helpers),
-> its name has been left unchanged, for compatibility with arm (there
-> are reports of software relying on [vectors] being there as the last
-> mapping in /proc/maps).
->
-> mm->context.vdso used to point to the [vectors] page, which is
-> unnecessary (as its address is fixed). It now points to the [sigpage]
-> page (whose address is randomized like a vDSO).
->
-> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
->
-> v2:
-> - reduce churniness (and defer later to vDSO patches)
-> - vctors_page and compat_vdso_spec as array of 2
-> - free sigpage if vectors allocation failed
+This is correct, not all stm32 have this hardware.
+> 
+> This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
+> which avoids the link error, but instead leads to the lptimer trigger
+> not being used in the broken configuration. I've added a runtime
+> warning for this case to help users figure out what they did wrong
+> if this should ever be done by accident.
+> 
+> Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+
+Many thanks for the fix,
+Best Regards,
+Fabrice
 > ---
->   arch/arm64/include/asm/processor.h |  4 +-
->   arch/arm64/include/asm/signal32.h  |  2 -
->   arch/arm64/kernel/signal32.c       |  5 +--
->   arch/arm64/kernel/vdso.c           | 82 ++++++++++++++++++++++++++------------
->   4 files changed, 60 insertions(+), 33 deletions(-)
-. . .
+>  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
+> index 34d59bfdce2d..464458d20b16 100644
+> --- a/include/linux/iio/timer/stm32-lptim-trigger.h
+> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
+> @@ -16,11 +16,14 @@
+>  #define LPTIM2_OUT	"lptim2_out"
+>  #define LPTIM3_OUT	"lptim3_out"
+>  
+> -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+>  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
+>  #else
+>  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
+>  {
+> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> +	pr_warn_once("stm32 lptim_trigger not linked in\n");
+> +#endif
+>  	return false;
+>  }
+>  #endif
+> 
