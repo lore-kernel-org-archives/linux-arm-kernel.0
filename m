@@ -1,29 +1,30 @@
-From: inguin@gmx.de (Ingo van Lil)
-Date: Wed, 6 Sep 2017 12:25:01 +0200
-Subject: [PATCH v3] clk: at91: utmi: set the mainck rate
-In-Reply-To: <20170906095159.13295-1-ludovic.desroches@microchip.com>
-References: <20170906095159.13295-1-ludovic.desroches@microchip.com>
-Message-ID: <54f5a2d5-0dd3-e272-12e5-edc91fb2111e@gmx.de>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 6 Sep 2017 16:03:58 +0530
+Subject: [PATCH] arm: omap: dra7xx: Set OPT_CLKS_IN_RESET flag for gpio1
+Message-ID: <1504694038-32159-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2017 11:51 AM, Ludovic Desroches wrote:
+gpio1 soft reset fails in the kexec path as the optional clock
+is not enabled hence enable the HWMOD_CONTROL_OPT_CLKS_IN_RESET
+flag for gpio1 hwmod.
 
-> By default, it is assumed that the UTMI clock is generated from a 12 MHz
-> reference clock (MAINCK). If it's not the case, the FREQ field of the
-> SFR_UTMICKTRIM has to be updated to generate the UTMI clock in the
-> proper way.
-> 
-> The UTMI clock has a fixed rate of 480 MHz. In fact, there is no
-> multiplier we can configure. The multiplier is managed internally,
-> depending on the reference clock frequency, to achieve the target of
-> 480 MHz.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Works fine with all my boards. Thanks!
-
-Acked-by: Ingo van Lil <inguin@gmx.de>
-
-Regards,
-Ingo
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 7cc3247..6ae729a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1037,6 +1037,7 @@ struct omap_hwmod dra7xx_sha0_hwmod = {
+ 	.name		= "gpio1",
+ 	.class		= &dra7xx_gpio_hwmod_class,
+ 	.clkdm_name	= "wkupaon_clkdm",
++	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+ 	.main_clk	= "wkupaon_iclk_mux",
+ 	.prcm = {
+ 		.omap4 = {
+-- 
+1.9.1
