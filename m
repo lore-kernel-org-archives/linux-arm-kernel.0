@@ -1,146 +1,84 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  6 Sep 2017 14:26:12 +0200
-Subject: [PATCH v3 5/5] KVM: arm/arm64: Provide a vgic interrupt line level
- sample function
-In-Reply-To: <20170906122612.18050-1-cdall@linaro.org>
-References: <20170906122612.18050-1-cdall@linaro.org>
-Message-ID: <20170906122612.18050-6-cdall@linaro.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 6 Sep 2017 05:28:44 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170822152637.GA11320@linux.vnet.ibm.com>
+References: <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
+ <20170821111833.00006753@huawei.com>
+ <20170822001928.74f01322@roar.ozlabs.ibm.com>
+ <20170821.135504.1392954698746959868.davem@davemloft.net>
+ <20170822084911.00000c23@huawei.com>
+ <1503391892.3629.28.camel@abdul.in.ibm.com>
+ <20170822152637.GA11320@linux.vnet.ibm.com>
+Message-ID: <20170906122844.GA30180@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC sometimes need to sample the physical line of a mapped
-interrupt.  As we know this to be notoriously slow, provide a callback
-function for devices (such as the timer) which can do this much faster
-than talking to the distributor, for example by comparing a few
-in-memory values.  Fall back to the good old method of poking the
-physical GIC if no callback is provided.
+On Tue, Aug 22, 2017 at 08:26:37AM -0700, Paul E. McKenney wrote:
+> On Tue, Aug 22, 2017 at 02:21:32PM +0530, Abdul Haleem wrote:
+> > On Tue, 2017-08-22 at 08:49 +0100, Jonathan Cameron wrote:
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h    | 13 ++++++++++++-
- virt/kvm/arm/arch_timer.c | 16 +++++++++++++++-
- virt/kvm/arm/vgic/vgic.c  | 12 +++++++++---
- 3 files changed, 36 insertions(+), 5 deletions(-)
+[ . . . ]
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 53f631b..7f76c9e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -125,6 +125,17 @@ struct vgic_irq {
- 	u8 priority;
- 	enum vgic_irq_config config;	/* Level or edge */
- 
-+	/*
-+	 * Callback function pointer to in-kernel devices that can tell us the
-+	 * state of the input level of mapped level-triggered IRQ faster than
-+	 * peaking into the physical GIC.
-+	 *
-+	 * Always called in non-preemptible section and the functions can use
-+	 * kvm_arm_get_running_vcpu() to get the vcpu pointer for private
-+	 * IRQs.
-+	 */
-+	bool (*get_input_level)(int vintid);
-+
- 	void *owner;			/* Opaque pointer to reserve an interrupt
- 					   for in-kernel devices. */
- };
-@@ -309,7 +320,7 @@ void kvm_vgic_init_cpu_hardware(void);
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level, void *owner);
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid);
-+			  u32 vintid, bool (*get_input_level)(int vindid));
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index c4fa675..5cb96ca 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -645,6 +645,19 @@ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
-+static bool timer_get_input_level(int vintid)
-+{
-+	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-+	struct arch_timer_context *timer;
-+
-+	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
-+		timer = vcpu_vtimer(vcpu);
-+	else
-+		BUG(); /* We only map the vtimer so far */
-+
-+	return kvm_timer_should_fire(timer);
-+}
-+
- int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -666,7 +679,8 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	}
- 
--	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
-+	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
-+				    timer_get_input_level);
- 	if (ret)
- 		return ret;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 7aec730..0ca2b3d 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -154,6 +154,9 @@ bool vgic_get_phys_line_level(struct vgic_irq *irq)
- 
- 	BUG_ON(!irq->hw);
- 
-+	if (irq->get_input_level)
-+		return irq->get_input_level(irq->intid);
-+
- 	WARN_ON(irq_get_irqchip_state(irq->host_irq,
- 				      IRQCHIP_STATE_PENDING,
- 				      &line_level));
-@@ -437,7 +440,8 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 
- /* @irq->irq_lock must be held */
- static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
--			    unsigned int host_irq)
-+			    unsigned int host_irq,
-+			    bool (*get_input_level)(int vindid))
- {
- 	struct irq_desc *desc;
- 	struct irq_data *data;
-@@ -457,6 +461,7 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	irq->hw = true;
- 	irq->host_irq = host_irq;
- 	irq->hwintid = data->hwirq;
-+	irq->get_input_level = get_input_level;
- 	return 0;
- }
- 
-@@ -465,10 +470,11 @@ static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
- {
- 	irq->hw = false;
- 	irq->hwintid = 0;
-+	irq->get_input_level = NULL;
- }
- 
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid)
-+			  u32 vintid, bool (*get_input_level)(int vindid))
- {
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	int ret;
-@@ -476,7 +482,7 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
- 	BUG_ON(!irq);
- 
- 	spin_lock(&irq->irq_lock);
--	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
-+	ret = kvm_vgic_map_irq(vcpu, irq, host_irq, get_input_level);
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
--- 
-2.9.0
+> > No more RCU stalls on PowerPC, system is clean when idle or with some
+> > test runs.
+> > 
+> > Thank you all for your time and efforts in fixing this.
+> > 
+> > Reported-and-Tested-by: Abdul Haleem <abdhalee@linux.vnet.ibm.com>
+> 
+> I am still seeing failures, but then again I am running rcutorture with
+> lots of CPU hotplug activity.  So I am probably seeing some other bug,
+> though it still looks a lot like a lost timer.
+
+So one problem appears to be a timing-related deadlock between RCU and
+timers.  The way that this can happen is that the outgoing CPU goes
+offline (as in cpuhp_report_idle_dead() invoked from do_idle()) with
+one of RCU's grace-period kthread's timers queued.  Now, if someone
+waits for a grace period, either directly or indirectly, in a way that
+blocks the hotplug notifiers, execution will never reach timers_dead_cpu(),
+which means that the grace-period kthread will never wake, which will
+mean that the grace period will never complete.  Classic deadlock.
+
+I currently have an extremely ugly workaround for this deadlock, which
+is to periodically and (usually) redundantly wake up all the RCU
+grace-period kthreads from the scheduling-interrupt handler.  This is
+of course completely inappropriate for mainline, but it does reliably
+prevent the "kthread starved for %ld jiffies!" type of RCU CPU stall
+warning that I would otherwise see.
+
+To mainline this, one approach would be to make the timers switch to
+add_timer_on() to a surviving CPU once the offlining process starts.
+Alternatively, I suppose that RCU could do the redundant-wakeup kludge,
+but with checks to prevent it from happening unless (1) there is a CPU
+in the process of going offline (2) there is an RCU grace period in
+progress, and (3) the RCU grace period kthread has been blocked for
+(say) three times longer than it should have.
+
+Unfortunately, this is not sufficient to make rcutorture run reliably,
+though it does help, which is of course to say that it makes debugging
+slower.  ;-)
+
+What happens now is that random rcutorture kthreads will hang waiting for
+timeouts to complete.  This confused me for awhile because I expected
+that the timeouts would be delayed during offline processing, but that
+my crude deadlock-resolution approach would eventually get things going.
+My current suspicion is that the problem is due to a potential delay
+between the time an outgoing CPU hits cpuhp_report_idle_dead() and the
+timers get migrated from timers_dead_cpu().  This means that the CPU
+adopting the timers might be a few ticks ahead of where the outgoing CPU
+last processed timers.  My current guess is that any timers queued in
+intervening indexes are going to wait one good long time.  And I don't see
+any code in the timers_dead_cpu() that would account for this possibility,
+though I of course cannot claim to fully understand this code..
+
+Is this plausible, or am I confused?  (Either way, -something- besides
+just me is rather thoroughly confused!)
+
+If this is plausible, my guess is that timers_dead_cpu() needs to check
+for mismatched indexes (in timer->flags?) and force any intervening
+timers to expire if so.
+
+Thoughts?
+
+							Thanx, Paul
