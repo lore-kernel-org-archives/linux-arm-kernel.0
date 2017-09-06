@@ -1,84 +1,51 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 6 Sep 2017 05:28:44 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170822152637.GA11320@linux.vnet.ibm.com>
-References: <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
- <20170821111833.00006753@huawei.com>
- <20170822001928.74f01322@roar.ozlabs.ibm.com>
- <20170821.135504.1392954698746959868.davem@davemloft.net>
- <20170822084911.00000c23@huawei.com>
- <1503391892.3629.28.camel@abdul.in.ibm.com>
- <20170822152637.GA11320@linux.vnet.ibm.com>
-Message-ID: <20170906122844.GA30180@linux.vnet.ibm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 6 Sep 2017 13:30:43 +0100
+Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
+In-Reply-To: <57ba125f-9c3c-3504-35a6-9800a47450cf@huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
+ <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
+ <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
+ <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
+ <62860a85-c29c-87bb-24b7-c6e5ac6065f9@huawei.com>
+ <31b18967-c32a-1761-7e60-15c0de28203c@arm.com>
+ <57ba125f-9c3c-3504-35a6-9800a47450cf@huawei.com>
+Message-ID: <b7d8388d-d9df-9cc4-3d07-82e7f807017a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 08:26:37AM -0700, Paul E. McKenney wrote:
-> On Tue, Aug 22, 2017 at 02:21:32PM +0530, Abdul Haleem wrote:
-> > On Tue, 2017-08-22 at 08:49 +0100, Jonathan Cameron wrote:
-
-[ . . . ]
-
-> > No more RCU stalls on PowerPC, system is clean when idle or with some
-> > test runs.
-> > 
-> > Thank you all for your time and efforts in fixing this.
-> > 
-> > Reported-and-Tested-by: Abdul Haleem <abdhalee@linux.vnet.ibm.com>
+On 06/09/17 13:14, gengdongjiu wrote:
 > 
-> I am still seeing failures, but then again I am running rcutorture with
-> lots of CPU hotplug activity.  So I am probably seeing some other bug,
-> though it still looks a lot like a lost timer.
+> 
+> On 2017/9/6 20:00, Vladimir Murzin wrote:
+>> On 06/09/17 11:35, gengdongjiu wrote:
+>>> Vladimir,
+>>>
+>>> On 2017/9/6 17:41, Vladimir Murzin wrote:
+>>>> Can you please elaborate on cases where PAN is not enabled?
+>>>
+>>> I mean the informal private usage, For example, he disabled the PAN dynamically to let kernel space to access the user space.
+>>> After he dynamic disabled the PAN, then switched to guest OS. after return to host. he found the PAN stage is modified.
+>>> Of cause this is not a formal usage, in our host kernel, it is always enabled, no dynamic change, but I means it may exist such cases.
+>>>
+>>>
+>>
+>> So, in short, there is no real issue with PAN, right? What about UAO?
+> For the PAN, if host OS dynamically enable/disable PAN should have issue.
+> Do you think that is not a issue as above description?
+> 
+> "host OS dynamically disable the PAN, but after go back from the guest OS, The PAN is unexpectedly enabled"
 
-So one problem appears to be a timing-related deadlock between RCU and
-timers.  The way that this can happen is that the outgoing CPU goes
-offline (as in cpuhp_report_idle_dead() invoked from do_idle()) with
-one of RCU's grace-period kthread's timers queued.  Now, if someone
-waits for a grace period, either directly or indirectly, in a way that
-blocks the hotplug notifiers, execution will never reach timers_dead_cpu(),
-which means that the grace-period kthread will never wake, which will
-mean that the grace period will never complete.  Classic deadlock.
+Do you see effect of "PAN is unexpectedly enabled"?
 
-I currently have an extremely ugly workaround for this deadlock, which
-is to periodically and (usually) redundantly wake up all the RCU
-grace-period kthreads from the scheduling-interrupt handler.  This is
-of course completely inappropriate for mainline, but it does reliably
-prevent the "kthread starved for %ld jiffies!" type of RCU CPU stall
-warning that I would otherwise see.
+Cheers
+Vladimir
 
-To mainline this, one approach would be to make the timers switch to
-add_timer_on() to a surviving CPU once the offlining process starts.
-Alternatively, I suppose that RCU could do the redundant-wakeup kludge,
-but with checks to prevent it from happening unless (1) there is a CPU
-in the process of going offline (2) there is an RCU grace period in
-progress, and (3) the RCU grace period kthread has been blocked for
-(say) three times longer than it should have.
-
-Unfortunately, this is not sufficient to make rcutorture run reliably,
-though it does help, which is of course to say that it makes debugging
-slower.  ;-)
-
-What happens now is that random rcutorture kthreads will hang waiting for
-timeouts to complete.  This confused me for awhile because I expected
-that the timeouts would be delayed during offline processing, but that
-my crude deadlock-resolution approach would eventually get things going.
-My current suspicion is that the problem is due to a potential delay
-between the time an outgoing CPU hits cpuhp_report_idle_dead() and the
-timers get migrated from timers_dead_cpu().  This means that the CPU
-adopting the timers might be a few ticks ahead of where the outgoing CPU
-last processed timers.  My current guess is that any timers queued in
-intervening indexes are going to wait one good long time.  And I don't see
-any code in the timers_dead_cpu() that would account for this possibility,
-though I of course cannot claim to fully understand this code..
-
-Is this plausible, or am I confused?  (Either way, -something- besides
-just me is rather thoroughly confused!)
-
-If this is plausible, my guess is that timers_dead_cpu() needs to check
-for mismatched indexes (in timer->flags?) and force any intervening
-timers to expire if so.
-
-Thoughts?
-
-							Thanx, Paul
+> 
+>>
+>> Cheers
+>> Vladimir
+>>
+>> .
+>>
+> 
+> 
