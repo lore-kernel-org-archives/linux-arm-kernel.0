@@ -1,200 +1,104 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 6 Sep 2017 14:41:38 +0100
-Subject: [PATCH v2 09/18] firmware: arm_scmi: probe and initialise all the
- supported protocols
-In-Reply-To: <7c82503d-229f-08e7-6605-18d778b6f525@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
- <bc52d57a-156b-cef0-7560-63a9ed7e78b5@arm.com>
- <7c82503d-229f-08e7-6605-18d778b6f525@arm.com>
-Message-ID: <934ce254-15af-56a7-5d93-ade0aa1bf4fa@arm.com>
+From: chris.paterson2@renesas.com (Chris Paterson)
+Date: Wed,  6 Sep 2017 14:52:06 +0100
+Subject: [PATCH v3] ARM: dts: r8a7743: Add IIC cores to dtsi
+In-Reply-To: <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1504705926-31625-1-git-send-email-chris.paterson2@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Biju Das <biju.das@bp.renesas.com>
+
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+v2->v3
+- Renamed lables to use iic instead of i2c.
+
+v1->v2
+- Corrected the resets property for i2c6 device node.
+
+This patch is based on renesas-devel tag renesas-devel-20170905-v4.13.
+
+DT bindings has been accepted by Wolfram:
+https://patchwork.kernel.org/patch/9888119
 
 
-On 06/09/17 14:31, Sudeep Holla wrote:
-> 
-> 
-> On 06/09/17 10:41, Julien Thierry wrote:
->>
->>
->> On 04/08/17 15:31, Sudeep Holla wrote:
->>> Now that we have basic support for all the protocols in the
->>> specification, let's probe them individually and initialise them.
->>>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>    drivers/firmware/arm_scmi/common.h |  5 +++
->>>    drivers/firmware/arm_scmi/driver.c | 80
->>> +++++++++++++++++++++++++++++++++++++-
->>>    2 files changed, 84 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/firmware/arm_scmi/common.h
->>> b/drivers/firmware/arm_scmi/common.h
->>> index 7473dfcad4ee..d7c73a8d260b 100644
->>> --- a/drivers/firmware/arm_scmi/common.h
->>> +++ b/drivers/firmware/arm_scmi/common.h
->>> @@ -118,4 +118,9 @@ int scmi_version_get(const struct scmi_handle *h,
->>> u8 protocol, u32 *version);
->>>    void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
->>>                         u8 *prot_imp);
->>>    +typedef int (*scmi_init_fn_t)(struct scmi_handle *);
->>>    int scmi_base_protocol_init(struct scmi_handle *h);
->>> +int scmi_perf_protocol_init(struct scmi_handle *h);
->>> +int scmi_sensors_protocol_init(struct scmi_handle *h);
->>> +int scmi_power_protocol_init(struct scmi_handle *h);
->>> +int scmi_clock_protocol_init(struct scmi_handle *h);
->>> diff --git a/drivers/firmware/arm_scmi/driver.c
->>> b/drivers/firmware/arm_scmi/driver.c
->>> index 601d0d7210d9..6f31761043e2 100644
->>> --- a/drivers/firmware/arm_scmi/driver.c
->>> +++ b/drivers/firmware/arm_scmi/driver.c
->>> @@ -157,6 +157,12 @@ struct scmi_shared_mem {
->>>        u8 msg_payload[0];
->>>    };
->>>    +struct scmi_protocol_match {
->>> +    u8 protocol_id;
->>> +    scmi_init_fn_t fn;
->>
->> Could we call this "init" or "prot_init"?
->>
-> 
-> Done
-> 
->>> +    char name[32];
->>> +};
->>> +
->>>    static int scmi_linux_errmap[] = {
->>>        /* better than switch case as long as return value is continuous */
->>>        0,            /* SCMI_SUCCESS */
->>> @@ -687,6 +693,41 @@ static int scmi_xfer_info_init(struct scmi_info
->>> *sinfo)
->>>        return 0;
->>>    }
->>>    +static const struct scmi_protocol_match scmi_protocols[] = {
->>> +    {
->>> +        .protocol_id = SCMI_PROTOCOL_PERF,
->>> +        .fn = scmi_perf_protocol_init,
->>> +        .name = "scmi-cpufreq",
->>> +    }, {
->>> +        .protocol_id = SCMI_PROTOCOL_CLOCK,
->>> +        .fn = scmi_clock_protocol_init,
->>> +        .name = "scmi-clocks",
->>> +    }, {
->>> +        .protocol_id = SCMI_PROTOCOL_POWER,
->>> +        .fn = scmi_power_protocol_init,
->>> +        .name = "scmi-power-domain",
->>> +    }, {
->>> +        .protocol_id = SCMI_PROTOCOL_SENSOR,
->>> +        .fn = scmi_sensors_protocol_init,
->>> +        .name = "scmi-hwmon",
->>> +    },
->>> +    {}
->>> +};
->>> +
->>> +static const struct scmi_protocol_match *scmi_protocol_match_get(u8
->>> protocol_id)
->>> +{
->>> +    int i;
->>> +    const struct scmi_protocol_match *match = NULL, *loop =
->>> scmi_protocols;
->>> +
->>> +    for (i = 0; i < ARRAY_SIZE(scmi_protocols); i++, loop++)
->>> +        if (loop->protocol_id == protocol_id) {
->>> +            match = loop;
->>> +            break;
->>> +        }
->>> +
->>> +    return match;
->>> +}
->>> +
->>
->> The "match" variable is not needed. We can just return "loop" in the if
->> branch and return NULL at the end of the function. Unless we are
->> following some coding standard that advises against that?
->>
-> 
-> Agreed and fixed locally.
-> 
->>>    static int scmi_mailbox_check(struct device_node *np)
->>>    {
->>>        struct of_phandle_args arg;
->>> @@ -778,7 +819,7 @@ static int scmi_probe(struct platform_device *pdev)
->>>        const struct scmi_desc *desc;
->>>        struct scmi_info *info;
->>>        struct device *dev = &pdev->dev;
->>> -    struct device_node *np = dev->of_node;
->>> +    struct device_node *child, *np = dev->of_node;
->>>          /* Only mailbox method supported, check for the presence of
->>> one */
->>>        if (scmi_mailbox_check(np)) {
->>> @@ -817,6 +858,43 @@ static int scmi_probe(struct platform_device *pdev)
->>>            return ret;
->>>        }
->>>    +    for_each_available_child_of_node(np, child) {
->>> +        int init_ret;
->>> +        u32 prot_id;
->>> +        const struct scmi_protocol_match *match;
->>> +
->>> +        if (of_property_read_u32(child, "reg", &prot_id))
->>> +            continue;
->>> +
->>> +        prot_id &= MSG_PROTOCOL_ID_MASK;
->>> +
->>> +        if (!scmi_is_protocol_implemented(handle, prot_id)) {
->>> +            dev_err(dev, "SCMI protocol %d not implemented\n",
->>> +                prot_id);
->>> +            continue;
->>> +        }
->>> +
->>> +        match = scmi_protocol_match_get(prot_id);
->>> +        if (match) {
->>> +            struct platform_device *cdev;
->>> +
->>> +            cdev = of_platform_device_create(child, match->name,
->>> +                             dev);
->>> +            if (!cdev) {
->>> +                dev_err(dev, "failed to create %s device\n",
->>> +                    match->name);
->>> +                continue;
->>> +            }
->>> +
->>> +            init_ret = match->fn(handle);
->>> +            if (init_ret) {
->>> +                dev_err(dev, "SCMI protocol %d init error %d\n",
->>> +                    prot_id, init_ret);
->>> +                of_platform_device_destroy(&cdev->dev, NULL);
->>> +            }
->>> +        }
->>> +    }
->>> +
->>
->> For the code in the "if (match)" branch, would it be better to have an
->> inline function "scmi_create_protocol_device" or something with a name
->> that fits?
->>
-> 
-> Done
-> 
->> Also I was wondering, what is the difference between the protocol being
->> implemented and finding the matching structure? Feels like there is a
->> bit of redundancy. If the protocol is implemented but doesn't have a
->> match structure does it just mean it doesn't need any specific
->> initialization?
->>
-> 
-> Yes, that's the idea. One reason to have both check is backward
-> compatibility. Suppose new protocols are implemented in the f/w but DT
-> doesn't have them or know how to use it or there are no users of that
-> feature, then skip initializing it. Similarly if DT is updated but not
-> the firmware.
-> 
+ arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-Oh I see, makes sense. Thanks for explaining.
-
-Cheers,
-
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 665a515..266c5ec 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -25,6 +25,9 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &iic0;
++		i2c7 = &iic1;
++		i2c8 = &iic3;
+ 	};
+ 
+ 	cpus {
+@@ -436,6 +439,58 @@
+ 			status = "disabled";
+ 		};
+ 
++		iic0: i2c at e6500000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7743",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6500000 0 0x425>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>;
++			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
++			       <&dmac1 0x61>, <&dmac1 0x62>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
++		};
++
++		iic1: i2c at e6510000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7743",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6510000 0 0x425>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 323>;
++			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
++			       <&dmac1 0x65>, <&dmac1 0x66>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 323>;
++			status = "disabled";
++		};
++
++		iic3: i2c at e60b0000 {
++			/* doesn't need pinmux */
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7743",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe60b0000 0 0x425>;
++			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 926>;
++			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
++			       <&dmac1 0x77>, <&dmac1 0x78>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 926>;
++			status = "disabled";
++		};
++
+ 		scifa0: serial at e6c40000 {
+ 			compatible = "renesas,scifa-r8a7743",
+ 				     "renesas,rcar-gen2-scifa", "renesas,scifa";
 -- 
-Julien Thierry
+1.9.1
