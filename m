@@ -1,37 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Sep 2017 00:38:03 +0200
-Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues
- in zImage with Linux 4.12, LZ4 and GCC5.3)
-In-Reply-To: <CAKv+Gu_6kxidH-4YwuCorJx25WSZDsOdtbZ6MZCv+R4ufzUjrw@mail.gmail.com>
-References: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
- <CAK8P3a3AQ43t2q1MVN9PoqQXZiuXQo1uDcGnRAPCiT66_oDyLg@mail.gmail.com>
- <CAKv+Gu_6kxidH-4YwuCorJx25WSZDsOdtbZ6MZCv+R4ufzUjrw@mail.gmail.com>
-Message-ID: <CAK8P3a1xX5RfM1kao7WZBmS=0J=MgNZTH2_c-nSOY+GNmjNsUA@mail.gmail.com>
+Date: Thu, 7 Sep 2017 00:46:36 +0200
+Subject: [PATCH v3 1/5] scsi: ufs: add Hisilicon ufs driver code
+In-Reply-To: <20170829084116.106695-2-liwei213@huawei.com>
+References: <20170829084116.106695-1-liwei213@huawei.com>
+ <20170829084116.106695-2-liwei213@huawei.com>
+Message-ID: <CAK8P3a0vV94g=iNLfHXXgR-XFHaaK-mHoQQ45FDYG+FVQhix6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 7, 2017 at 12:23 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 6 September 2017 at 21:57, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Mon, Sep 4, 2017 at 6:19 PM, Romain Izard <romain.izard.pro@gmail.com> wrote:
->
-> HAVE_EFFICIENT_UNALIGNED_ACCESS only affects explicit unaligned
-> accesses, and selects between fixups in hardware or in software.
-> AFAICT the issue here is implicit unaligned accesses, where char
-> pointers are passed as u32 * arguments.
+On Tue, Aug 29, 2017 at 10:41 AM, Li Wei <liwei213@huawei.com> wrote:
+itel(host, UFS_ARESET, PERRSTDIS3_OFFSET);
+> +
+> +       /* disable lp_reset_n */
+> +       ufs_sys_ctrl_set_bits(host, BIT_SYSCTRL_LP_RESET_N, RESET_CTRL_EN);
+> +       mdelay(1);
+> +
+> +       if (gpio_is_valid(host->reset_gpio))
+> +               gpio_direction_output(host->reset_gpio, 1);
+> +
+> +       ufs_sys_ctrl_writel(host, MASK_UFS_DEVICE_RESET | BIT_UFS_DEVICE_RESET,
+> +               UFS_DEVICE_RESET_CTRL);
+> +
+> +       mdelay(20);
 
-The problem with include/linux/unaligned/access_ok.h is that it
-converts pointers
-that are known by the caller to be potentially unaligned and accesses them as if
-they were aligned. This means we require a software fixup through the
-trap handler
-on ARM in cases that the compiler already knows how to handle correctly when
-using linux/unaligned/le_struct.h. On ARMv7 this means it ends up using normal
-load/store instructures but not the ldm/stm or ldrd/stdr instructions
-that are not
-allowed on unaligned pointers.
+Could those mdelay() be turned into msleep() functions?
 
-Doing that solves the problem that Romain ran into and also makes other
-code much more efficient on ARMv7.
+> +static int ufs_hisi_get_resource(struct ufs_hisi_host *host)
+> +{
+> +       struct resource *mem_res;
+> +       struct device_node *np = NULL;
+> +       struct device *dev = host->hba->dev;
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +
+> +       /* get resource of ufs sys ctrl */
+> +       mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +       host->ufs_sys_ctrl = devm_ioremap_resource(dev, mem_res);
+> +       if (IS_ERR(host->ufs_sys_ctrl))
+> +               return PTR_ERR(host->ufs_sys_ctrl);
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "hisilicon,hi3660-crgctrl");
 
-       Arnd
+It's generally not a good idea to look up one device by its "compatible"
+string. What is the "crgctrl"? Does it have a proper DT binding?
+Maybe there should be a driver for it, or you could make it a "syscon"
+device and look it up by phandle instead.
+
+> diff --git a/drivers/scsi/ufs/ufs-hisi.h b/drivers/scsi/ufs/ufs-hisi.h
+> new file mode 100644
+> index 000000000000..52430a2aca90
+> --- /dev/null
+> +++ b/drivers/scsi/ufs/ufs-hisi.h
+
+
+If the header is only used in one file, you don't need it, just move
+the definitions
+into the other file.
+
+      Arnd
