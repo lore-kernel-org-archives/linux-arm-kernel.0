@@ -1,151 +1,227 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 6 Sep 2017 17:49:56 +0800
-Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-In-Reply-To: <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
- <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
- <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
-Message-ID: <9396c8ff-98e3-af57-742a-bbe2ac54ad34@huawei.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 6 Sep 2017 11:51:59 +0200
+Subject: [PATCH v3] clk: at91: utmi: set the mainck rate
+Message-ID: <20170906095159.13295-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For UAO, if not save/restore PSTATE.UAO, we can use below fixing.
+By default, it is assumed that the UTMI clock is generated from a 12 MHz
+reference clock (MAINCK). If it's not the case, the FREQ field of the
+SFR_UTMICKTRIM has to be updated to generate the UTMI clock in the
+proper way.
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 9341376..c3dd761 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -21,6 +21,8 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_hyp.h>
+The UTMI clock has a fixed rate of 480 MHz. In fact, there is no
+multiplier we can configure. The multiplier is managed internally,
+depending on the reference clock frequency, to achieve the target of
+480 MHz.
 
-+#include <asm/exec.h>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+
+Hi,
+
+As suggested by Ingo, I also look for atmel,sama5d3-sfr. I keep it simple by
+looking for atmel,sama5d3-sfr first, and if it fails  then atmel,sama5d2-sfr.
+
+If in the future, we would have to look for additional compatible strings,
+adding new compatible strings for the utmi-clk should be a better solution.
+
+Changes:
+- v3: look also for atmel,sama5d3-sfr
+- v2: move SFR configuration to prepare function
+
+ drivers/clk/at91/clk-utmi.c  | 95 +++++++++++++++++++++++++++++++++++++-------
+ include/soc/at91/atmel-sfr.h |  2 +
+ 2 files changed, 83 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
+index aadabd9d1e2b..cd8d689138ff 100644
+--- a/drivers/clk/at91/clk-utmi.c
++++ b/drivers/clk/at91/clk-utmi.c
+@@ -14,14 +14,20 @@
+ #include <linux/of.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
++#include <soc/at91/atmel-sfr.h>
+ 
+ #include "pmc.h"
+ 
+-#define UTMI_FIXED_MUL		40
++/*
++ * The purpose of this clock is to generate a 480 MHz signal. A different
++ * rate can't be configured.
++ */
++#define UTMI_RATE	480000000
+ 
+ struct clk_utmi {
+ 	struct clk_hw hw;
+-	struct regmap *regmap;
++	struct regmap *regmap_pmc;
++	struct regmap *regmap_sfr;
+ };
+ 
+ #define to_clk_utmi(hw) container_of(hw, struct clk_utmi, hw)
+@@ -37,13 +43,54 @@ static inline bool clk_utmi_ready(struct regmap *regmap)
+ 
+ static int clk_utmi_prepare(struct clk_hw *hw)
+ {
++	struct clk_hw *hw_parent;
+ 	struct clk_utmi *utmi = to_clk_utmi(hw);
+ 	unsigned int uckr = AT91_PMC_UPLLEN | AT91_PMC_UPLLCOUNT |
+ 			    AT91_PMC_BIASEN;
++	unsigned int utmi_ref_clk_freq;
++	unsigned long parent_rate;
 +
- /* Yes, this does nothing, on purpose */
- static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
-
-@@ -121,8 +123,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
++	/*
++	 * If mainck rate is different from 12 MHz, we have to configure the
++	 * FREQ field of the SFR_UTMICKTRIM register to generate properly
++	 * the utmi clock.
++	 */
++	hw_parent = clk_hw_get_parent(hw);
++	parent_rate = clk_hw_get_rate(hw_parent);
++
++	switch (parent_rate) {
++	case 12000000:
++		utmi_ref_clk_freq = 0;
++		break;
++	case 16000000:
++		utmi_ref_clk_freq = 1;
++		break;
++	case 24000000:
++		utmi_ref_clk_freq = 2;
++		break;
++	/*
++	 * Not supported on SAMA5D2 but it's not an issue since MAINCK
++	 * maximum value is 24 MHz.
++	 */
++	case 48000000:
++		utmi_ref_clk_freq = 3;
++		break;
++	default:
++		pr_err("UTMICK: unsupported mainck rate\n");
++		return -EINVAL;
++	}
+ 
+-	regmap_update_bits(utmi->regmap, AT91_CKGR_UCKR, uckr, uckr);
++	if (utmi->regmap_sfr) {
++		regmap_update_bits(utmi->regmap_sfr, AT91_SFR_UTMICKTRIM,
++				   AT91_UTMICKTRIM_FREQ, utmi_ref_clk_freq);
++	} else if (utmi_ref_clk_freq) {
++		pr_err("UTMICK: sfr node required\n");
++		return -EINVAL;
++	}
+ 
+-	while (!clk_utmi_ready(utmi->regmap))
++	regmap_update_bits(utmi->regmap_pmc, AT91_CKGR_UCKR, uckr, uckr);
++
++	while (!clk_utmi_ready(utmi->regmap_pmc))
+ 		cpu_relax();
+ 
+ 	return 0;
+@@ -53,21 +100,22 @@ static int clk_utmi_is_prepared(struct clk_hw *hw)
+ {
+ 	struct clk_utmi *utmi = to_clk_utmi(hw);
+ 
+-	return clk_utmi_ready(utmi->regmap);
++	return clk_utmi_ready(utmi->regmap_pmc);
  }
-
-+static void __hyp_text __sysreg_restore_state_vhe(struct kvm_cpu_context *ctxt)
-+{
-+    uao_thread_switch(current);
-+}
+ 
+ static void clk_utmi_unprepare(struct clk_hw *hw)
+ {
+ 	struct clk_utmi *utmi = to_clk_utmi(hw);
+ 
+-	regmap_update_bits(utmi->regmap, AT91_CKGR_UCKR, AT91_PMC_UPLLEN, 0);
++	regmap_update_bits(utmi->regmap_pmc, AT91_CKGR_UCKR,
++			   AT91_PMC_UPLLEN, 0);
+ }
+ 
+ static unsigned long clk_utmi_recalc_rate(struct clk_hw *hw,
+ 					  unsigned long parent_rate)
+ {
+-	/* UTMI clk is a fixed clk multiplier */
+-	return parent_rate * UTMI_FIXED_MUL;
++	/* UTMI clk rate is fixed. */
++	return UTMI_RATE;
+ }
+ 
+ static const struct clk_ops utmi_ops = {
+@@ -78,7 +126,7 @@ static const struct clk_ops utmi_ops = {
+ };
+ 
+ static struct clk_hw * __init
+-at91_clk_register_utmi(struct regmap *regmap,
++at91_clk_register_utmi(struct regmap *regmap_pmc, struct regmap *regmap_sfr,
+ 		       const char *name, const char *parent_name)
+ {
+ 	struct clk_utmi *utmi;
+@@ -97,7 +145,8 @@ at91_clk_register_utmi(struct regmap *regmap,
+ 	init.flags = CLK_SET_RATE_GATE;
+ 
+ 	utmi->hw.init = &init;
+-	utmi->regmap = regmap;
++	utmi->regmap_pmc = regmap_pmc;
++	utmi->regmap_sfr = regmap_sfr;
+ 
+ 	hw = &utmi->hw;
+ 	ret = clk_hw_register(NULL, &utmi->hw);
+@@ -114,17 +163,35 @@ static void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np)
+ 	struct clk_hw *hw;
+ 	const char *parent_name;
+ 	const char *name = np->name;
+-	struct regmap *regmap;
++	struct regmap *regmap_pmc, *regmap_sfr;
+ 
+ 	parent_name = of_clk_get_parent_name(np, 0);
+ 
+ 	of_property_read_string(np, "clock-output-names", &name);
+ 
+-	regmap = syscon_node_to_regmap(of_get_parent(np));
+-	if (IS_ERR(regmap))
++	regmap_pmc = syscon_node_to_regmap(of_get_parent(np));
++	if (IS_ERR(regmap_pmc))
+ 		return;
+ 
+-	hw = at91_clk_register_utmi(regmap, name, parent_name);
++	/*
++	 * If the device supports different mainck rates, this value has to be
++	 * set in the UTMI Clock Trimming register.
++	 * - 9x5: mainck supports several rates but it is indicated that a
++	 *   12 MHz is needed in case of USB.
++	 * - sama5d3 and sama5d2: mainck supports several rates. Configuring
++	 *   the FREQ field of the UTMI Clock Trimming register is mandatory.
++	 * - sama5d4: mainck is at 12 MHz.
++	 *
++	 * We only need to retrieve sama5d3 or sama5d2 sfr regmap.
++	 */
++	regmap_sfr = syscon_regmap_lookup_by_compatible("atmel,sama5d3-sfr");
++	if (IS_ERR(regmap_sfr)) {
++		regmap_sfr = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
++		if (IS_ERR(regmap_sfr))
++			regmap_sfr = NULL;
++	}
 +
- static hyp_alternate_select(__sysreg_call_restore_host_state,
--			    __sysreg_restore_state, __sysreg_do_nothing,
-+			    __sysreg_restore_state, __sysreg_restore_state_vhe,
- 			    ARM64_HAS_VIRT_HOST_EXTN);
-
- void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
-
-
-
-On 2017/9/6 17:32, gengdongjiu wrote:
-> Hi Marc,
-> 
-> On 2017/9/6 16:17, Marc Zyngier wrote:
->> On 05/09/17 19:58, gengdongjiu wrote:
->>> when exit from guest, some host PSTATE bits may be lost, such as
->>> PSTATE.PAN or PSTATE.UAO. It is because host and hypervisor all run
->>> in the EL2, host PSTATE value cannot be saved and restored via
->>> SPSR_EL2. So if guest has changed the PSTATE, host continues with
->>> a wrong value guest has set.
->>>
->>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->>> Signed-off-by: Haibin Zhang <zhanghaibin7@huawei.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_host.h |  8 +++++++
->>>  arch/arm64/include/asm/kvm_hyp.h  |  2 ++
->>>  arch/arm64/include/asm/sysreg.h   | 23 +++++++++++++++++++
->>>  arch/arm64/kvm/hyp/entry.S        |  2 --
->>>  arch/arm64/kvm/hyp/switch.c       | 24 ++++++++++++++++++--
->>>  arch/arm64/kvm/hyp/sysreg-sr.c    | 48 ++++++++++++++++++++++++++++++++++++---
->>>  6 files changed, 100 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>> index e923b58..cba7d3e 100644
->>> --- a/arch/arm64/include/asm/kvm_host.h
->>> +++ b/arch/arm64/include/asm/kvm_host.h
->>> @@ -193,6 +193,12 @@ struct kvm_cpu_context {
->>>  	};
->>>  };
->>>  
->>> +struct kvm_cpu_host_pstate {
->>> +	u64 daif;
->>> +	u64 uao;
->>> +	u64 pan;
->>> +};
->>
->> I love it. This is the most expensive way of saving/restoring a single
->> 32bit value.
->>
->> More seriously, please see the discussion between James and Christoffer
->> there[1]. I expect James to address the PAN/UAO states together with the
->> debug state in the next iteration of his patch.
-> 
-> I roughly see the discussion between James and Christoffer, Seems Christoffer does not suggest save and
-> restore it, and suggest to do below, and UAO/PAN may not use the same ways.
-> 
->       __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->       {
->           if (has_vhe())
->               asm("msr     daifset, #0xf");
-> 
->  	...
->          exit_code = __guest_enter(vcpu, host_ctxt);
->  	...
-> 
->  	if (has_vhe())
->               asm("msr     daifclr, #0xd");
->       }
-> 
-> 
-> If not save/restore them, the KVM will set them according to the CPU capability. For example below fixing, it will check CPU capability, If CPU supports PAN,
-> the kvm will always enable the PAN for the host. But in fact, the host may be not enable the PAN.
-> Of course for the UAO, we can use the similar fixing if Marc or Christoffer is agreed. but seems not make sense.
-> 
-> commit cb96408da4e11698674abd04aeac941c1bed2038
-> Author: Vladimir Murzin <vladimir.murzin@arm.com>
-> Date:   Thu Sep 1 15:29:03 2016 +0100
-> 
->     arm64: KVM: VHE: reset PSTATE.PAN on entry to EL2
-> 
->     SCTLR_EL2.SPAN bit controls what happens with the PSTATE.PAN bit on an
->     exception. However, this bit has no effect on the PSTATE.PAN when
->     HCR_EL2.E2H or HCR_EL2.TGE is unset. Thus when VHE is used and
->     exception taken from a guest PSTATE.PAN bit left unchanged and we
->     continue with a value guest has set.
-> 
->     To address that always reset PSTATE.PAN on entry from EL1.
-> 
->     Fixes: 1f364c8c48a0 ("arm64: VHE: Add support for running Linux in EL2 mode")
-> 
->     Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->     Reviewed-by: James Morse <james.morse@arm.com>
->     Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->     Cc: <stable@vger.kernel.org> # v4.6+
->     Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> index 3967c231..b5926ee 100644
-> --- a/arch/arm64/kvm/hyp/entry.S
-> +++ b/arch/arm64/kvm/hyp/entry.S
-> @@ -96,6 +96,8 @@ ENTRY(__guest_exit)
-> 
->         add     x1, x1, #VCPU_CONTEXT
-> 
-> +       ALTERNATIVE(nop, SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
-> +
->         // Store the guest regs x2 and x3
->         stp     x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
-> 
-> 
->>
->> Thanks,
->>
->> 	M.
->>
->> [1] https://www.spinics.net/lists/arm-kernel/msg599798.html
->>
++	hw = at91_clk_register_utmi(regmap_pmc, regmap_sfr, name, parent_name);
+ 	if (IS_ERR(hw))
+ 		return;
+ 
+diff --git a/include/soc/at91/atmel-sfr.h b/include/soc/at91/atmel-sfr.h
+index 506ea8ffda19..482337af06b8 100644
+--- a/include/soc/at91/atmel-sfr.h
++++ b/include/soc/at91/atmel-sfr.h
+@@ -17,6 +17,7 @@
+ /* 0x08 ~ 0x0c: Reserved */
+ #define AT91_SFR_OHCIICR	0x10	/* OHCI INT Configuration Register */
+ #define AT91_SFR_OHCIISR	0x14	/* OHCI INT Status Register */
++#define AT91_SFR_UTMICKTRIM	0x30	/* UTMI Clock Trimming Register */
+ #define AT91_SFR_I2SCLKSEL	0x90	/* I2SC Register */
+ 
+ /* Field definitions */
+@@ -28,5 +29,6 @@
+ 					 AT91_OHCIICR_SUSPEND_B | \
+ 					 AT91_OHCIICR_SUSPEND_C)
+ 
++#define AT91_UTMICKTRIM_FREQ	GENMASK(1, 0)
+ 
+ #endif /* _LINUX_MFD_SYSCON_ATMEL_SFR_H */
+-- 
+2.12.2
