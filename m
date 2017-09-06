@@ -1,58 +1,89 @@
-From: surenderp@techveda.org (surenderp at techveda.org)
-Date: Wed,  6 Sep 2017 10:38:27 +0530
-Subject: [PATCH v2] arm: dts: artpec6: Remove unnecessary interrupt-parent
- property from sub-nodes
-In-Reply-To: <5310134e-c371-d43f-175f-a3a9cdc5b657@axis.com>
-References: <5310134e-c371-d43f-175f-a3a9cdc5b657@axis.com>
-Message-ID: <1504674507-3364-1-git-send-email-surenderp@techveda.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 6 Sep 2017 14:53:26 +0930
+Subject: [PATCH v3 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <20170906003016.2159-3-brendanhiggins@google.com>
+References: <20170906003016.2159-1-brendanhiggins@google.com>
+ <20170906003016.2159-3-brendanhiggins@google.com>
+Message-ID: <CACPK8Xc0jrnx96=BoGMwQgoT2brgc0UTNU5HMHXDeFfeToVgxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Surender Polsani <surenderp@techveda.org>
+On Wed, Sep 6, 2017 at 10:00 AM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+> +++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
+> @@ -0,0 +1,6 @@
+> +NPCM Platforms Device Tree Bindings
+> +-----------------------------------
+> +NPCM750 SoC
+> +Required root node properties:
+> +       - compatible = "nuvoton,npcm750";
+> +
 
-"interrupt-parent" property is declared in root node, so it is global
-to all nodes. This property is re-declared in few sub-nodes. To avoid
-duplication this property is removed from following sub-nodes: pmu,
-amba at 0, amba at 0/ethernet.
+This is minimal. I assume there will be more content added as more
+support is added?
 
-Signed-off-by: Surender Polsani <surenderp@techveda.org>
-Acked-by: Niklas Cassel <niklas.cassel@axis.com>
----
-Changes for v2:
+Does it need it's own directory?
 
-- Done few changes as suggested by Niklas Cassel.
-- Patch is rebased and built(ARCH=arm) on latest next-20170905.
----
- arch/arm/boot/dts/artpec6.dtsi | 3 ---
- 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index 767cbe8..2ed1177 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -151,7 +151,6 @@
- 		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
- 			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-affinity = <&cpu0>, <&cpu1>;
--		interrupt-parent = <&intc>;
- 	};
- 
- 	pcie: pcie at f8050000 {
-@@ -185,7 +184,6 @@
- 		compatible = "simple-bus";
- 		#address-cells = <0x1>;
- 		#size-cells = <0x1>;
--		interrupt-parent = <&intc>;
- 		ranges;
- 		dma-ranges = <0x80000000 0x00000000 0x40000000>;
- 		dma-coherent;
-@@ -195,7 +193,6 @@
- 			clocks = <&eth_phy_ref_clk>,
- 				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
- 			compatible = "snps,dwc-qos-ethernet-4.10";
--			interrupt-parent = <&intc>;
- 			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xf8010000 0x4000>;
- 
--- 
-1.9.1
+> diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+> new file mode 100644
+> index 000000000000..54df32cff21b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+
+> +
+> +/dts-v1/;
+> +#include "nuvoton-npcm750.dtsi"
+> +
+> +/ {
+> +       model = "Nuvoton npcm750 Development Board (Device Tree)";
+> +       compatible = "nuvoton,npcm750";
+> +
+> +       chosen {
+> +               stdout-path = &serial3;
+> +               bootargs = "earlyprintk=serial,serial3,115200";
+> +       };
+> +
+> +       memory {
+> +               reg = <0 0x40000000>;
+> +       };
+> +
+> +       cpus {
+> +               enable-method = "nuvoton,npcm7xx-smp";
+> +       };
+> +
+> +       clk: clock-controller at f0801000 {
+> +               status = "okay";
+> +       };
+> +
+> +       apb {
+> +               watchdog1: watchdog at f0009000 {
+> +                       status = "okay";
+> +               };
+
+You've already got the label for the node, is there are reason you
+don't use a phandle to set the status?
+
+&watchdog1 {
+   status = "okay";
+};
+
+Same with the serial nodes below.
+
+> +
+> +               serial0: serial0 at f0001000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               serial1: serial1 at f0002000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               serial2: serial2 at f0003000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               serial3: serial3 at f0004000 {
+> +                       status = "okay";
+> +               };
+> +       };
