@@ -1,88 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Sep 2017 19:25:14 +0100
-Subject: [PATCH v2 00/29] implement KASLR for ARM
-In-Reply-To: <20170906182247.GM5024@atomide.com>
-References: <CAKv+Gu8uZH5PFVBwEGAK1hjGMTJD1a1KN0dVUjw=M3GPsps1FQ@mail.gmail.com>
- <CAKv+Gu8qROYaQFSxChoz8cmS0S1wwqDmUvduXC_reQn1L7gFKg@mail.gmail.com>
- <20170906162222.GI5024@atomide.com>
- <CAKv+Gu__-WeHKDGwg4rNM9Dw8V471wNQX=J3mfz_AUKHVUza_g@mail.gmail.com>
- <20170906163100.GJ5024@atomide.com>
- <CAKv+Gu-HGM6T6cV25bo6_bBcZaV-x3qpc9XoYUA4AEx68Joz=A@mail.gmail.com>
- <20170906171253.GK5024@atomide.com>
- <CAKv+Gu8ngWMvkmNr77SzL8fEvSc5K-OntoZQ53vgWVLHhAajaw@mail.gmail.com>
- <20170906175308.GL5024@atomide.com>
- <CAKv+Gu8qd8oz4wuEjAaR1E3ZUxt4Xr-j4NcLidRrNisVFefzCQ@mail.gmail.com>
- <20170906182247.GM5024@atomide.com>
-Message-ID: <CAKv+Gu8N_cjm_5aH=kWt6EKc6sGgQoWDVmdVAVw1Ru_xz1UWEw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 6 Sep 2017 11:40:46 -0700
+Subject: [PATCH][thermal-next] thermal: brcmstb: remove two redundant
+ integer range checks
+In-Reply-To: <20170903131619.6857-1-colin.king@canonical.com>
+References: <20170903131619.6857-1-colin.king@canonical.com>
+Message-ID: <20170906184046.GB35422@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2017 at 19:22, Tony Lindgren <tony@atomide.com> wrote:
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 11:05]:
->> On 6 September 2017 at 18:53, Tony Lindgren <tony@atomide.com> wrote:
->> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 10:31]:
->> >> On 6 September 2017 at 18:12, Tony Lindgren <tony@atomide.com> wrote:
->> >> > Kernel image @ 0x81000000 [ 0x000000 - 0x426300 ]
->> >> > ## Flattened Device Tree blob at 84000000
->> >> >    Booting using the fdt blob at 0x84000000
->> >> >    Loading Device Tree to 86feb000, end 86fff2d5 ... OK
->> >> >
->> >> > Starting kernel ...
->> >> >
->> >> > regions.image_size:00e00000
->> >> > regions.pa_start:80000000
->> >> > regions.pa_end:87200000
->> >> > regions.zimage_start:81000000
->> >> > regions.zimage_size:00437320
->> >> > regions.dtb_start:86feb000
->> >> > regions.dtb_size:00012000
->> >> > regions.initrd_start:00000000
->> >> > regions.initrd_size:00000000
->> >> > num:00000028
->> >> > num:00000025
->> >> > *kaslr_offset:05e00000
->> >> > Uncompressing Linux... done, booting the kernel.
->> >> > Warning: Neither atags nor dtb found
->> >>
->> >> OK, so in this case, 80000000 + 00e00000 + 05e00000 == 86c00000, which
->> >> is still below the DTB, but apparently, it has corrupted it anyway.
->> >>
->> >> I will try to figure out what's going on here.
->> >
->> > Do you need to have kaslr_offset beyond the uncompressed
->> > kernel size maybe?
->> >
->>
->> I think the problem is in the rounding of region.pa_start.
->>
->> I have now changed this to
->>
->> regions.image_size = image_base % SZ_128M + round_up(image_size, SZ_2M);
->> regions.pa_start = round_down(image_base, SZ_128M);
-> ...
->
->> I have updated my arm-kaslr-v3 with all the fixes from this discussion
->> (and more)
->
-> Looks like your branch at commit 5221c86ad2e7 still failed
-> after boot attempt #4, see below. Is that the right commit?
->
+Hi,
 
-It should be, yes.
+On Sun, Sep 03, 2017 at 02:16:19PM +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> The comparisons for integer low on low > INT_MAX and also
+> integer high > INT_MAX are never going to be true since an
+> int type cannot be greater than INT_MAX.  Remove these redundant
+> checks.
+> 
+> Detected by: CoverityScan CID#1455245, 1455248 ("Operands don't affect
+>   result (CONSTANT_EXPRESSION_RESULT)")
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/thermal/broadcom/brcmstb_thermal.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
+> index 87b8e7a86ee3..bcb3945feea6 100644
+> --- a/drivers/thermal/broadcom/brcmstb_thermal.c
+> +++ b/drivers/thermal/broadcom/brcmstb_thermal.c
+> @@ -278,8 +278,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
+>  	dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
+>  
+>  	if (low) {
+> -		if (low > INT_MAX)
+> -			low = INT_MAX;
+>  		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
+>  		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
+>  	} else {
+> @@ -287,8 +285,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
+>  	}
+>  
+>  	if (high < ULONG_MAX) {
 
-> 8< -----------------
-> regions.zimage_size:004379e8
-> regions.dtb_start:86feb000
-> regions.dtb_size:00012000
-> regions.initrd_start:00000000
-> regions.initrd_size:00000000
-> count:00000028
-> num:00000025
-> *kaslr_offset:05e00000
-> Uncompressing Linux... done, booting the kernel.
-> Warning: Neither atags nor dtb found
+Dan's robots noticed that the above condition is not useful either (on
+architectures where INT_MAX < ULONG_MAX -- i.e., all?), since 'high' is
+'int', not 'unsigned long'.
 
-Did you capture the image_size and pa_start/pa_end as well?
+Should probably fix that
 
-In any case, this is the exact same offset that failed before, so the
-rounding of pa_start wasn't the problem.
+s/ULONG_MAX/INT_MAX/
+
+?
+
+Brian
+
+> -		if (high > INT_MAX)
+> -			high = INT_MAX;
+>  		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
+>  		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
+>  	} else {
+> -- 
+> 2.14.1
+> 
