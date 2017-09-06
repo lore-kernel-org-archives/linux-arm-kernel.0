@@ -1,95 +1,82 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 6 Sep 2017 19:16:35 +0100
-Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
-In-Reply-To: <5FA513F682BE7F4EAAB8EE035D5B08E44109DFE8@G01JPEXMBKW02>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-20-git-send-email-Dave.Martin@arm.com>
- <5FA513F682BE7F4EAAB8EE035D5B08E44109DFE8@G01JPEXMBKW02>
-Message-ID: <20170906181634.GF6321@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Sep 2017 11:22:48 -0700
+Subject: [PATCH v2 00/29] implement KASLR for ARM
+In-Reply-To: <CAKv+Gu8qd8oz4wuEjAaR1E3ZUxt4Xr-j4NcLidRrNisVFefzCQ@mail.gmail.com>
+References: <CAKv+Gu8uZH5PFVBwEGAK1hjGMTJD1a1KN0dVUjw=M3GPsps1FQ@mail.gmail.com>
+ <CAKv+Gu8qROYaQFSxChoz8cmS0S1wwqDmUvduXC_reQn1L7gFKg@mail.gmail.com>
+ <20170906162222.GI5024@atomide.com>
+ <CAKv+Gu__-WeHKDGwg4rNM9Dw8V471wNQX=J3mfz_AUKHVUza_g@mail.gmail.com>
+ <20170906163100.GJ5024@atomide.com>
+ <CAKv+Gu-HGM6T6cV25bo6_bBcZaV-x3qpc9XoYUA4AEx68Joz=A@mail.gmail.com>
+ <20170906171253.GK5024@atomide.com>
+ <CAKv+Gu8ngWMvkmNr77SzL8fEvSc5K-OntoZQ53vgWVLHhAajaw@mail.gmail.com>
+ <20170906175308.GL5024@atomide.com>
+ <CAKv+Gu8qd8oz4wuEjAaR1E3ZUxt4Xr-j4NcLidRrNisVFefzCQ@mail.gmail.com>
+Message-ID: <20170906182247.GM5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 06, 2017 at 04:21:50PM +0000, Okamoto, Takayuki wrote:
-> Hi Dave,
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 11:05]:
+> On 6 September 2017 at 18:53, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 10:31]:
+> >> On 6 September 2017 at 18:12, Tony Lindgren <tony@atomide.com> wrote:
+> >> > Kernel image @ 0x81000000 [ 0x000000 - 0x426300 ]
+> >> > ## Flattened Device Tree blob at 84000000
+> >> >    Booting using the fdt blob at 0x84000000
+> >> >    Loading Device Tree to 86feb000, end 86fff2d5 ... OK
+> >> >
+> >> > Starting kernel ...
+> >> >
+> >> > regions.image_size:00e00000
+> >> > regions.pa_start:80000000
+> >> > regions.pa_end:87200000
+> >> > regions.zimage_start:81000000
+> >> > regions.zimage_size:00437320
+> >> > regions.dtb_start:86feb000
+> >> > regions.dtb_size:00012000
+> >> > regions.initrd_start:00000000
+> >> > regions.initrd_size:00000000
+> >> > num:00000028
+> >> > num:00000025
+> >> > *kaslr_offset:05e00000
+> >> > Uncompressing Linux... done, booting the kernel.
+> >> > Warning: Neither atags nor dtb found
+> >>
+> >> OK, so in this case, 80000000 + 00e00000 + 05e00000 == 86c00000, which
+> >> is still below the DTB, but apparently, it has corrupted it anyway.
+> >>
+> >> I will try to figure out what's going on here.
+> >
+> > Do you need to have kaslr_offset beyond the uncompressed
+> > kernel size maybe?
+> >
 > 
-> I am an engineer of the postK computer from Fujitsu.
+> I think the problem is in the rounding of region.pa_start.
 > 
-> When I tried to read "max_vl" by ptrace with this patch on our local SVE 
-> simulator, it was read as zero.
-> I think the cause of this incident is that "max_vl" is set as "header->vl" 
-> only on warning case in sve_init_header_from_task().
-> "max_vl" should be set up also on normal case, like the following patch.
+> I have now changed this to
 > 
-> 
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -755,6 +755,8 @@ static void sve_init_header_from_task(struct user_sve_header *header,
-> 
->         if (WARN_ON(!sve_vl_valid(sve_max_vl)))
->                 header->max_vl = header->vl;
-> +       else
-> +               header->max_vl = sve_max_vl;
-> 
->         header->size = SVE_PT_SIZE(vq, header->flags);
->         header->max_size = SVE_PT_SIZE(sve_vq_from_vl(header->max_vl),
+> regions.image_size = image_base % SZ_128M + round_up(image_size, SZ_2M);
+> regions.pa_start = round_down(image_base, SZ_128M);
+...
 
-Hi, thanks for reporting this.
+> I have updated my arm-kaslr-v3 with all the fixes from this discussion
+> (and more)
 
-It looks like a refactoring mistake I made while removing BUG_ON()s,
-which I missed in my testing.
+Looks like your branch at commit 5221c86ad2e7 still failed
+after boot attempt #4, see below. Is that the right commit?
 
-Your fix looks correct and seems to work.  For stylistic reasons, I may
-write it like this instead, but the effect should be the same:
+Regards,
 
-	header->max_vl = sve_max_vl;
-	if (WARN_ON(!sve_vl_valid(sve_max_vl))
-		header->max_vl = header->vl;
+Tony
 
-Cheers
----Dave
-
-> 
-> 
-> Best regards,
-> Takayuki Okamoto
-> 
-> -----Original Message-----
-> From: gdb-owner at sourceware.org [mailto:gdb-owner at sourceware.org] On Behalf Of Dave Martin
-> Sent: Friday, September 1, 2017 2:01 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Catalin Marinas <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>; Ard Biesheuvel <ard.biesheuvel@linaro.org>; Alex Benn?e <alex.bennee@linaro.org>; Szabolcs Nagy <szabolcs.nagy@arm.com>; Richard Sandiford <richard.sandiford@arm.com>; kvmarm at lists.cs.columbia.edu; libc-alpha at sourceware.org; linux-arch at vger.kernel.org; gdb at sourceware.org; Alan Hayward <alan.hayward@arm.com>; Yao Qi <Yao.Qi@arm.com>; Oleg Nesterov <oleg@redhat.com>; Alexander Viro <viro@zeniv.linux.org.uk>
-> Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
-> 
-
-[...]
-
-> @@ -702,6 +737,210 @@ static int system_call_set(struct task_struct *target,
->  	return ret;
->  }
->  
-> +#ifdef CONFIG_ARM64_SVE
-> +
-> +static void sve_init_header_from_task(struct user_sve_header *header,
-> +				      struct task_struct *target)
-> +{
-> +	unsigned int vq;
-> +
-> +	memset(header, 0, sizeof(*header));
-> +
-> +	header->flags = test_tsk_thread_flag(target, TIF_SVE) ?
-> +		SVE_PT_REGS_SVE : SVE_PT_REGS_FPSIMD;
-> +	if (test_tsk_thread_flag(target, TIF_SVE_VL_INHERIT))
-> +		header->flags |= SVE_PT_VL_INHERIT;
-> +
-> +	header->vl = target->thread.sve_vl;
-> +	vq = sve_vq_from_vl(header->vl);
-> +
-> +	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
-> +		header->max_vl = header->vl;
-> +
-> +	header->size = SVE_PT_SIZE(vq, header->flags);
-> +	header->max_size = SVE_PT_SIZE(sve_vq_from_vl(header->max_vl),
-> +				      SVE_PT_REGS_SVE);
-> +}
-
-[...]
+8< -----------------
+regions.zimage_size:004379e8
+regions.dtb_start:86feb000
+regions.dtb_size:00012000
+regions.initrd_start:00000000
+regions.initrd_size:00000000
+count:00000028
+num:00000025
+*kaslr_offset:05e00000
+Uncompressing Linux... done, booting the kernel.
+Warning: Neither atags nor dtb found
