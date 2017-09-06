@@ -1,60 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Sep 2017 11:40:52 +0100
-Subject: [PATCH v2 00/29] implement KASLR for ARM
-In-Reply-To: <CAKv+Gu8uZH5PFVBwEGAK1hjGMTJD1a1KN0dVUjw=M3GPsps1FQ@mail.gmail.com>
-References: <20170903120757.14968-1-ard.biesheuvel@linaro.org>
- <20170905164547.GA5024@atomide.com>
- <CAKv+Gu_eT_eK9Tj4JvWSsK+iW9juGG6xYDO15umu6jBkoun8ew@mail.gmail.com>
- <20170905193754.GD5024@atomide.com>
- <CAKv+Gu9c_j0qriRazSTmq8eD9icCu4Wuzw1z-LF7bubLVLQd7Q@mail.gmail.com>
- <20170905212742.GG5024@atomide.com>
- <CAKv+Gu8uZH5PFVBwEGAK1hjGMTJD1a1KN0dVUjw=M3GPsps1FQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8qROYaQFSxChoz8cmS0S1wwqDmUvduXC_reQn1L7gFKg@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 06 Sep 2017 12:46:34 +0200
+Subject: [PATCH v3 0/8] PM / ACPI / i2c: Deploy runtime PM centric path
+ for system sleep
+In-Reply-To: <1883292.VFru06qUYG@aspire.rjw.lan>
+References: <1504018610-10822-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFpX3Owk4H=0SqgfspXZd9TmdL_ANOZftXRq6HPjrT2ctQ@mail.gmail.com>
+ <1883292.VFru06qUYG@aspire.rjw.lan>
+Message-ID: <8456507.jc97SKmauk@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2017 at 22:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 5 September 2017 at 22:27, Tony Lindgren <tony@atomide.com> wrote:
->> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170905 12:43]:
->>> Right. Well, I will try to reproduce with the BB white I have.
->>
->> Yeah that should be reproducable, I got it to happen on BBB here
->> after about 5 boots.
->>
+On Wednesday, September 6, 2017 2:52:59 AM CEST Rafael J. Wysocki wrote:
+> On Monday, September 4, 2017 2:55:37 PM CEST Ulf Hansson wrote:
+> > [...]
 
-Unfortunately, my BB white boots happily every time.
+I guess I can wrap it up, because all of the points seem to have been stated
+and repeating them would not be useful.
 
-I have added DEBUG_UNCOMPRESS support to mach-omap2, and added some
-debug output to the kaslr init routine
+My summary of the discussion is as follows.
 
-For example,
+It only is valid to use pm_runtime_force_suspend/resume() as *driver*
+callbacks for system suspend/resume if both the driver itself and all of
+the middle layers it has to work with carry out the same sequence of
+operations in order to suspend the device both in runtime PM and for
+system sleep (and analogously for resuming).  [The middle layers need
+to meet additional conditions, but that's less relevant.]
 
-Starting kernel ...
+Unfortunately, for the ACPI PM domain and the PCI bus type the situation is
+different, because they generally need to do different things to suspend
+devices for system sleep than they do for runtime PM (which mostly is
+related to the handling of ACPI-defined sleep states and device/system
+wakeup, but not limited to that).  This clearly means that drivers needing
+to work with the ACPI PM domain and PCI drivers cannot use
+pm_runtime_force_suspend/resume() as their PM callbacks for system
+suspend/resume (quite fundamentally).
 
-regions.image_size:00e00000
-regions.pa_start:80000000
-regions.pa_end:90000000
-regions.zimage_start:80200000
-regions.zimage_size:00430228
-regions.dtb_start:82000000
-regions.dtb_size:00009000
-num:00000016
-*kaslr_offset:04400000
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
- ....
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xd0000000 - 0xff800000   ( 760 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xcfe00000   ( 254 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc4408000 - 0xc4d00000   (9184 kB)
-[    0.000000]       .init : 0xc5000000 - 0xc5100000   (1024 kB)
-[    0.000000]       .data : 0xc5100000 - 0xc5149df0   ( 296 kB)
-[    0.000000]        .bss : 0xc51cb000 - 0xc59a9a8c   (8059 kB)
+[Note that for i2c-designware-platdrv the situation is even more complicated,
+because on some platforms it has to work with the ACPI PM domain (or the
+ACPI LPSS driver), on some platforms its parent is a PCI device and on
+some other platforms there's none of them.]
 
-I have pushed the changes to my arm-kaslr-v3 branch. If you are
-willing to spend more cycles on this, could you please run it with
-DEBUG_LL enabled, and capture the output of the failed boots?
+However, for drivers that need to work with the ACPI PM domain and
+PCI drivers the differences in the device handling between runtime PM and
+system suspend/resume are *very* often (even though not always) covered
+entirely by the middle layer code.  Then, the driver itself actually
+always carries out the same sequence of operations in order to suspend
+the device (or to resume it, analogously).  The driver then can re-use
+its runtime PM callbacks for system suspend/resume (but at the driver
+level only) and it would be good to make that easy (or easier) for these
+drivers somehow.
+
+Thanks,
+Rafael
