@@ -1,170 +1,126 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 6 Sep 2017 10:41:35 +0100
-Subject: [PATCH v2 09/18] firmware: arm_scmi: probe and initialise all the
- supported protocols
-In-Reply-To: <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
-Message-ID: <bc52d57a-156b-cef0-7560-63a9ed7e78b5@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 6 Sep 2017 10:41:58 +0100
+Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
+In-Reply-To: <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
+ <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
+ <e47a9304-b429-b2bd-f151-d65f1c32044c@huawei.com>
+Message-ID: <981d7334-8841-d3e3-0833-1aa061bf97a2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/08/17 15:31, Sudeep Holla wrote:
-> Now that we have basic support for all the protocols in the
-> specification, let's probe them individually and initialise them.
+On 06/09/17 10:32, gengdongjiu wrote:
+> Hi Marc,
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->   drivers/firmware/arm_scmi/common.h |  5 +++
->   drivers/firmware/arm_scmi/driver.c | 80 +++++++++++++++++++++++++++++++++++++-
->   2 files changed, 84 insertions(+), 1 deletion(-)
+> On 2017/9/6 16:17, Marc Zyngier wrote:
+>> On 05/09/17 19:58, gengdongjiu wrote:
+>>> when exit from guest, some host PSTATE bits may be lost, such as
+>>> PSTATE.PAN or PSTATE.UAO. It is because host and hypervisor all run
+>>> in the EL2, host PSTATE value cannot be saved and restored via
+>>> SPSR_EL2. So if guest has changed the PSTATE, host continues with
+>>> a wrong value guest has set.
+>>>
+>>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>>> Signed-off-by: Haibin Zhang <zhanghaibin7@huawei.com>
+>>> ---
+>>>  arch/arm64/include/asm/kvm_host.h |  8 +++++++
+>>>  arch/arm64/include/asm/kvm_hyp.h  |  2 ++
+>>>  arch/arm64/include/asm/sysreg.h   | 23 +++++++++++++++++++
+>>>  arch/arm64/kvm/hyp/entry.S        |  2 --
+>>>  arch/arm64/kvm/hyp/switch.c       | 24 ++++++++++++++++++--
+>>>  arch/arm64/kvm/hyp/sysreg-sr.c    | 48 ++++++++++++++++++++++++++++++++++++---
+>>>  6 files changed, 100 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index e923b58..cba7d3e 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -193,6 +193,12 @@ struct kvm_cpu_context {
+>>>  	};
+>>>  };
+>>>  
+>>> +struct kvm_cpu_host_pstate {
+>>> +	u64 daif;
+>>> +	u64 uao;
+>>> +	u64 pan;
+>>> +};
+>>
+>> I love it. This is the most expensive way of saving/restoring a single
+>> 32bit value.
+>>
+>> More seriously, please see the discussion between James and Christoffer
+>> there[1]. I expect James to address the PAN/UAO states together with the
+>> debug state in the next iteration of his patch.
 > 
-> diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-> index 7473dfcad4ee..d7c73a8d260b 100644
-> --- a/drivers/firmware/arm_scmi/common.h
-> +++ b/drivers/firmware/arm_scmi/common.h
-> @@ -118,4 +118,9 @@ int scmi_version_get(const struct scmi_handle *h, u8 protocol, u32 *version);
->   void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
->   				     u8 *prot_imp);
->   
-> +typedef int (*scmi_init_fn_t)(struct scmi_handle *);
->   int scmi_base_protocol_init(struct scmi_handle *h);
-> +int scmi_perf_protocol_init(struct scmi_handle *h);
-> +int scmi_sensors_protocol_init(struct scmi_handle *h);
-> +int scmi_power_protocol_init(struct scmi_handle *h);
-> +int scmi_clock_protocol_init(struct scmi_handle *h);
-> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-> index 601d0d7210d9..6f31761043e2 100644
-> --- a/drivers/firmware/arm_scmi/driver.c
-> +++ b/drivers/firmware/arm_scmi/driver.c
-> @@ -157,6 +157,12 @@ struct scmi_shared_mem {
->   	u8 msg_payload[0];
->   };
->   
-> +struct scmi_protocol_match {
-> +	u8 protocol_id;
-> +	scmi_init_fn_t fn;
+> I roughly see the discussion between James and Christoffer, Seems Christoffer does not suggest save and
+> restore it, and suggest to do below, and UAO/PAN may not use the same ways.
+> 
+>       __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>       {
+>           if (has_vhe())
+>               asm("msr     daifset, #0xf");
+> 
+>  	...
+>          exit_code = __guest_enter(vcpu, host_ctxt);
+>  	...
+> 
+>  	if (has_vhe())
+>               asm("msr     daifclr, #0xd");
+>       }
+> 
+> 
+> If not save/restore them, the KVM will set them according to the CPU capability. For example below fixing, it will check CPU capability, If CPU supports PAN,
+> the kvm will always enable the PAN for the host. But in fact, the host may be not enable the PAN.
 
-Could we call this "init" or "prot_init"?
+Can you please elaborate on cases where PAN is not enabled?
 
-> +	char name[32];
-> +};
-> +
->   static int scmi_linux_errmap[] = {
->   	/* better than switch case as long as return value is continuous */
->   	0,			/* SCMI_SUCCESS */
-> @@ -687,6 +693,41 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
->   	return 0;
->   }
->   
-> +static const struct scmi_protocol_match scmi_protocols[] = {
-> +	{
-> +		.protocol_id = SCMI_PROTOCOL_PERF,
-> +		.fn = scmi_perf_protocol_init,
-> +		.name = "scmi-cpufreq",
-> +	}, {
-> +		.protocol_id = SCMI_PROTOCOL_CLOCK,
-> +		.fn = scmi_clock_protocol_init,
-> +		.name = "scmi-clocks",
-> +	}, {
-> +		.protocol_id = SCMI_PROTOCOL_POWER,
-> +		.fn = scmi_power_protocol_init,
-> +		.name = "scmi-power-domain",
-> +	}, {
-> +		.protocol_id = SCMI_PROTOCOL_SENSOR,
-> +		.fn = scmi_sensors_protocol_init,
-> +		.name = "scmi-hwmon",
-> +	},
-> +	{}
-> +};
-> +
-> +static const struct scmi_protocol_match *scmi_protocol_match_get(u8 protocol_id)
-> +{
-> +	int i;
-> +	const struct scmi_protocol_match *match = NULL, *loop = scmi_protocols;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(scmi_protocols); i++, loop++)
-> +		if (loop->protocol_id == protocol_id) {
-> +			match = loop;
-> +			break;
-> +		}
-> +
-> +	return match;
-> +}
-> +
+Thanks
+Vladimir
 
-The "match" variable is not needed. We can just return "loop" in the if 
-branch and return NULL at the end of the function. Unless we are 
-following some coding standard that advises against that?
-
->   static int scmi_mailbox_check(struct device_node *np)
->   {
->   	struct of_phandle_args arg;
-> @@ -778,7 +819,7 @@ static int scmi_probe(struct platform_device *pdev)
->   	const struct scmi_desc *desc;
->   	struct scmi_info *info;
->   	struct device *dev = &pdev->dev;
-> -	struct device_node *np = dev->of_node;
-> +	struct device_node *child, *np = dev->of_node;
->   
->   	/* Only mailbox method supported, check for the presence of one */
->   	if (scmi_mailbox_check(np)) {
-> @@ -817,6 +858,43 @@ static int scmi_probe(struct platform_device *pdev)
->   		return ret;
->   	}
->   
-> +	for_each_available_child_of_node(np, child) {
-> +		int init_ret;
-> +		u32 prot_id;
-> +		const struct scmi_protocol_match *match;
+> Of course for the UAO, we can use the similar fixing if Marc or Christoffer is agreed. but seems not make sense.
+> 
+> commit cb96408da4e11698674abd04aeac941c1bed2038
+> Author: Vladimir Murzin <vladimir.murzin@arm.com>
+> Date:   Thu Sep 1 15:29:03 2016 +0100
+> 
+>     arm64: KVM: VHE: reset PSTATE.PAN on entry to EL2
+> 
+>     SCTLR_EL2.SPAN bit controls what happens with the PSTATE.PAN bit on an
+>     exception. However, this bit has no effect on the PSTATE.PAN when
+>     HCR_EL2.E2H or HCR_EL2.TGE is unset. Thus when VHE is used and
+>     exception taken from a guest PSTATE.PAN bit left unchanged and we
+>     continue with a value guest has set.
+> 
+>     To address that always reset PSTATE.PAN on entry from EL1.
+> 
+>     Fixes: 1f364c8c48a0 ("arm64: VHE: Add support for running Linux in EL2 mode")
+> 
+>     Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>     Reviewed-by: James Morse <james.morse@arm.com>
+>     Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>     Cc: <stable@vger.kernel.org> # v4.6+
+>     Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 3967c231..b5926ee 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -96,6 +96,8 @@ ENTRY(__guest_exit)
+> 
+>         add     x1, x1, #VCPU_CONTEXT
+> 
+> +       ALTERNATIVE(nop, SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
 > +
-> +		if (of_property_read_u32(child, "reg", &prot_id))
-> +			continue;
-> +
-> +		prot_id &= MSG_PROTOCOL_ID_MASK;
-> +
-> +		if (!scmi_is_protocol_implemented(handle, prot_id)) {
-> +			dev_err(dev, "SCMI protocol %d not implemented\n",
-> +				prot_id);
-> +			continue;
-> +		}
-> +
-> +		match = scmi_protocol_match_get(prot_id);
-> +		if (match) {
-> +			struct platform_device *cdev;
-> +
-> +			cdev = of_platform_device_create(child, match->name,
-> +							 dev);
-> +			if (!cdev) {
-> +				dev_err(dev, "failed to create %s device\n",
-> +					match->name);
-> +				continue;
-> +			}
-> +
-> +			init_ret = match->fn(handle);
-> +			if (init_ret) {
-> +				dev_err(dev, "SCMI protocol %d init error %d\n",
-> +					prot_id, init_ret);
-> +				of_platform_device_destroy(&cdev->dev, NULL);
-> +			}
-> +		}
-> +	}
-> +
-
-For the code in the "if (match)" branch, would it be better to have an 
-inline function "scmi_create_protocol_device" or something with a name 
-that fits?
-
-Also I was wondering, what is the difference between the protocol being 
-implemented and finding the matching structure? Feels like there is a 
-bit of redundancy. If the protocol is implemented but doesn't have a 
-match structure does it just mean it doesn't need any specific 
-initialization?
-
-Thanks,
-
--- 
-Julien Thierry
+>         // Store the guest regs x2 and x3
+>         stp     x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+> 
+> 
+>>
+>> Thanks,
+>>
+>> 	M.
+>>
+>> [1] https://www.spinics.net/lists/arm-kernel/msg599798.html
+>>
+> 
+> 
