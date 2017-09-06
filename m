@@ -1,64 +1,47 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Wed, 6 Sep 2017 10:23:00 +0800
-Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
- STE.S1STALLD and CD.S
-In-Reply-To: <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
-References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
- <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
- <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
-Message-ID: <de4599d6-277f-00d6-40e7-7ca43a2bf2b8@huawei.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed,  6 Sep 2017 10:50:10 +0800
+Subject: [RESENT PATCH v9 2/2] arm64: dts: rockchip: Update rt5514 devices'
+ compatible for Gru
+In-Reply-To: <20170906025010.10750-1-jeffy.chen@rock-chips.com>
+References: <20170906025010.10750-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170906025010.10750-2-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
+Currently the rt5514 i2c driver and rt5514 spi driver are using the same
+compatible string.
 
-On 2017/9/5 20:54, Jean-Philippe Brucker wrote:
-> On 31/08/17 09:20, Yisheng Xie wrote:
->> It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
->> means we should not disable stall mode if stall/terminate mode is not
->> configuable.
->>
->> Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
->> means if stall mode is force we should always set CD.S.
->>
->> This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
->> TERMINATE feature checking to ensue above ILLEGAL cases from happening.
->>
->> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
->>  1 file changed, 16 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index dbda2eb..0745522 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -55,6 +55,7 @@
->>  #define IDR0_STALL_MODEL_SHIFT		24
->>  #define IDR0_STALL_MODEL_MASK		0x3
->>  #define IDR0_STALL_MODEL_STALL		(0 << IDR0_STALL_MODEL_SHIFT)
->> +#define IDR0_STALL_MODEL_NS		(1 << IDR0_STALL_MODEL_SHIFT)
->>  #define IDR0_STALL_MODEL_FORCE		(2 << IDR0_STALL_MODEL_SHIFT)
->>  #define IDR0_TTENDIAN_SHIFT		21
->>  #define IDR0_TTENDIAN_MASK		0x3
->> @@ -766,6 +767,7 @@ struct arm_smmu_device {
->>  #define ARM_SMMU_FEAT_SVM		(1 << 15)
->>  #define ARM_SMMU_FEAT_HA		(1 << 16)
->>  #define ARM_SMMU_FEAT_HD		(1 << 17)
->> +#define ARM_SMMU_FEAT_TERMINATE		(1 << 18)
-> 
-> I'd rather introduce something like "ARM_SMMU_FEAT_STALL_FORCE" instead.
-> Terminate model has another meaning, and is defined by a different bit in
-> IDR0.
+Add additional compatible strings to identify them for Gru boards.
 
-Ok, sound more reasonable.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Thanks
-Yisheng Xie
+Changes in v9: None
 
-> 
-> Thanks,
-> Jean
-> 
-> .
-> 
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 199a5118b20d..a86afbf09333 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -610,7 +610,7 @@ ap_i2c_mic: &i2c1 {
+ 	i2c-scl-rising-time-ns = <300>;
+ 
+ 	headsetcodec: rt5514 at 57 {
+-		compatible = "realtek,rt5514";
++		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
+ 		reg = <0x57>;
+ 		realtek,dmic-init-delay-ms = <20>;
+ 	};
+@@ -819,7 +819,7 @@ ap_i2c_audio: &i2c8 {
+ 	status = "okay";
+ 
+ 	wacky_spi_audio: spi2 at 0 {
+-		compatible = "realtek,rt5514";
++		compatible = "realtek,rt5514", "realtek,rt5514-spi";
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.11.0
