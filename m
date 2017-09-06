@@ -1,105 +1,170 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 6 Sep 2017 17:35:33 +0800
-Subject: [PATCH v11 4/6] target-arm: kvm64: detect guest RAS EXTENSION
- feature
-In-Reply-To: <CAFEAcA9oecuzXXrdo3zZHxF3AgrDUh_NHxz-znto4GU+OoxVFw@mail.gmail.com>
-References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
- <1503066227-18251-5-git-send-email-gengdongjiu@huawei.com>
- <CAFEAcA9oecuzXXrdo3zZHxF3AgrDUh_NHxz-znto4GU+OoxVFw@mail.gmail.com>
-Message-ID: <5e3c8d25-6260-d00e-dda3-d160a9973701@huawei.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 6 Sep 2017 10:41:35 +0100
+Subject: [PATCH v2 09/18] firmware: arm_scmi: probe and initialise all the
+ supported protocols
+In-Reply-To: <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
+Message-ID: <bc52d57a-156b-cef0-7560-63a9ed7e78b5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-  Thanks very much for your review, I will check your comments in detail and reply.
 
 
-On 2017/9/6 1:26, Peter Maydell wrote:
-> On 18 August 2017 at 15:23, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
->> check if kvm supports guest RAS EXTENSION. if so, set
->> corresponding feature bit for vcpu.
->>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
->>  linux-headers/linux/kvm.h | 1 +
->>  target/arm/cpu.h          | 3 +++
->>  target/arm/kvm64.c        | 8 ++++++++
->>  3 files changed, 12 insertions(+)
->>
->> diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
->> index 7971a4f..2aa176e 100644
->> --- a/linux-headers/linux/kvm.h
->> +++ b/linux-headers/linux/kvm.h
->> @@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
->>  #define KVM_CAP_PPC_SMT_POSSIBLE 147
->>  #define KVM_CAP_HYPERV_SYNIC2 148
->>  #define KVM_CAP_HYPERV_VP_INDEX 149
->> +#define KVM_CAP_ARM_RAS_EXTENSION 150
->>
->>  #ifdef KVM_CAP_IRQ_ROUTING
->>
+On 04/08/17 15:31, Sudeep Holla wrote:
+> Now that we have basic support for all the protocols in the
+> specification, let's probe them individually and initialise them.
 > 
-> Hi. Changes to linux-headers need to be done as a patch of their
-> own created using scripts/update-linux-headers.sh run against a
-> mainline kernel tree (and with a commit message that quotes the
-> kernel commit hash used). This ensures that we have a consistent
-> set of headers that don't diverge from the kernel copy.
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>   drivers/firmware/arm_scmi/common.h |  5 +++
+>   drivers/firmware/arm_scmi/driver.c | 80 +++++++++++++++++++++++++++++++++++++-
+>   2 files changed, 84 insertions(+), 1 deletion(-)
 > 
->> diff --git a/target/arm/cpu.h b/target/arm/cpu.h
->> index b39d64a..6b0961b 100644
->> --- a/target/arm/cpu.h
->> +++ b/target/arm/cpu.h
->> @@ -611,6 +611,8 @@ struct ARMCPU {
->>
->>      /* CPU has memory protection unit */
->>      bool has_mpu;
->> +    /* CPU has ras extension unit */
->> +    bool has_ras_extension;
->>      /* PMSAv7 MPU number of supported regions */
->>      uint32_t pmsav7_dregion;
->>
->> @@ -1229,6 +1231,7 @@ enum arm_features {
->>      ARM_FEATURE_THUMB_DSP, /* DSP insns supported in the Thumb encodings */
->>      ARM_FEATURE_PMU, /* has PMU support */
->>      ARM_FEATURE_VBAR, /* has cp15 VBAR */
->> +    ARM_FEATURE_RAS_EXTENSION, /*has RAS extension support */
-> 
-> Missing space after '/*' ?
-> 
->>  };
->>
->>  static inline int arm_feature(CPUARMState *env, int feature)
->> diff --git a/target/arm/kvm64.c b/target/arm/kvm64.c
->> index a16abc8..0781367 100644
->> --- a/target/arm/kvm64.c
->> +++ b/target/arm/kvm64.c
->> @@ -518,6 +518,14 @@ int kvm_arch_init_vcpu(CPUState *cs)
->>          unset_feature(&env->features, ARM_FEATURE_PMU);
->>      }
->>
->> +    if (kvm_check_extension(cs->kvm_state, KVM_CAP_ARM_RAS_EXTENSION)) {
->> +        cpu->has_ras_extension = true;
->> +        set_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
->> +    } else {
->> +        cpu->has_ras_extension = false;
->> +        unset_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
->> +    }
->> +
-> 
-> Shouldn't we need to also tell the kernel that we actually want
-> it to expose RAS to the guest? Compare the PMU code in this
-> function, where we set a kvm_init_features bit to do this.
-> (This suggests that your ABI for the kernel part of this feature
-> may not be correct?)
-> 
-> You should also not be calling set_feature() here -- if the
-> CPU features bit doesn't say "this CPU should have the RAS
-> extensions" we shouldn't create a CPU with them. Instead
-> you should set it in kvm_arm_get_host_cpu_features() (again,
-> compare the PMU code).
-> 
-> thanks
-> -- PMM
-> 
-> .
-> 
+> diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
+> index 7473dfcad4ee..d7c73a8d260b 100644
+> --- a/drivers/firmware/arm_scmi/common.h
+> +++ b/drivers/firmware/arm_scmi/common.h
+> @@ -118,4 +118,9 @@ int scmi_version_get(const struct scmi_handle *h, u8 protocol, u32 *version);
+>   void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
+>   				     u8 *prot_imp);
+>   
+> +typedef int (*scmi_init_fn_t)(struct scmi_handle *);
+>   int scmi_base_protocol_init(struct scmi_handle *h);
+> +int scmi_perf_protocol_init(struct scmi_handle *h);
+> +int scmi_sensors_protocol_init(struct scmi_handle *h);
+> +int scmi_power_protocol_init(struct scmi_handle *h);
+> +int scmi_clock_protocol_init(struct scmi_handle *h);
+> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+> index 601d0d7210d9..6f31761043e2 100644
+> --- a/drivers/firmware/arm_scmi/driver.c
+> +++ b/drivers/firmware/arm_scmi/driver.c
+> @@ -157,6 +157,12 @@ struct scmi_shared_mem {
+>   	u8 msg_payload[0];
+>   };
+>   
+> +struct scmi_protocol_match {
+> +	u8 protocol_id;
+> +	scmi_init_fn_t fn;
+
+Could we call this "init" or "prot_init"?
+
+> +	char name[32];
+> +};
+> +
+>   static int scmi_linux_errmap[] = {
+>   	/* better than switch case as long as return value is continuous */
+>   	0,			/* SCMI_SUCCESS */
+> @@ -687,6 +693,41 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
+>   	return 0;
+>   }
+>   
+> +static const struct scmi_protocol_match scmi_protocols[] = {
+> +	{
+> +		.protocol_id = SCMI_PROTOCOL_PERF,
+> +		.fn = scmi_perf_protocol_init,
+> +		.name = "scmi-cpufreq",
+> +	}, {
+> +		.protocol_id = SCMI_PROTOCOL_CLOCK,
+> +		.fn = scmi_clock_protocol_init,
+> +		.name = "scmi-clocks",
+> +	}, {
+> +		.protocol_id = SCMI_PROTOCOL_POWER,
+> +		.fn = scmi_power_protocol_init,
+> +		.name = "scmi-power-domain",
+> +	}, {
+> +		.protocol_id = SCMI_PROTOCOL_SENSOR,
+> +		.fn = scmi_sensors_protocol_init,
+> +		.name = "scmi-hwmon",
+> +	},
+> +	{}
+> +};
+> +
+> +static const struct scmi_protocol_match *scmi_protocol_match_get(u8 protocol_id)
+> +{
+> +	int i;
+> +	const struct scmi_protocol_match *match = NULL, *loop = scmi_protocols;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(scmi_protocols); i++, loop++)
+> +		if (loop->protocol_id == protocol_id) {
+> +			match = loop;
+> +			break;
+> +		}
+> +
+> +	return match;
+> +}
+> +
+
+The "match" variable is not needed. We can just return "loop" in the if 
+branch and return NULL at the end of the function. Unless we are 
+following some coding standard that advises against that?
+
+>   static int scmi_mailbox_check(struct device_node *np)
+>   {
+>   	struct of_phandle_args arg;
+> @@ -778,7 +819,7 @@ static int scmi_probe(struct platform_device *pdev)
+>   	const struct scmi_desc *desc;
+>   	struct scmi_info *info;
+>   	struct device *dev = &pdev->dev;
+> -	struct device_node *np = dev->of_node;
+> +	struct device_node *child, *np = dev->of_node;
+>   
+>   	/* Only mailbox method supported, check for the presence of one */
+>   	if (scmi_mailbox_check(np)) {
+> @@ -817,6 +858,43 @@ static int scmi_probe(struct platform_device *pdev)
+>   		return ret;
+>   	}
+>   
+> +	for_each_available_child_of_node(np, child) {
+> +		int init_ret;
+> +		u32 prot_id;
+> +		const struct scmi_protocol_match *match;
+> +
+> +		if (of_property_read_u32(child, "reg", &prot_id))
+> +			continue;
+> +
+> +		prot_id &= MSG_PROTOCOL_ID_MASK;
+> +
+> +		if (!scmi_is_protocol_implemented(handle, prot_id)) {
+> +			dev_err(dev, "SCMI protocol %d not implemented\n",
+> +				prot_id);
+> +			continue;
+> +		}
+> +
+> +		match = scmi_protocol_match_get(prot_id);
+> +		if (match) {
+> +			struct platform_device *cdev;
+> +
+> +			cdev = of_platform_device_create(child, match->name,
+> +							 dev);
+> +			if (!cdev) {
+> +				dev_err(dev, "failed to create %s device\n",
+> +					match->name);
+> +				continue;
+> +			}
+> +
+> +			init_ret = match->fn(handle);
+> +			if (init_ret) {
+> +				dev_err(dev, "SCMI protocol %d init error %d\n",
+> +					prot_id, init_ret);
+> +				of_platform_device_destroy(&cdev->dev, NULL);
+> +			}
+> +		}
+> +	}
+> +
+
+For the code in the "if (match)" branch, would it be better to have an 
+inline function "scmi_create_protocol_device" or something with a name 
+that fits?
+
+Also I was wondering, what is the difference between the protocol being 
+implemented and finding the matching structure? Feels like there is a 
+bit of redundancy. If the protocol is implemented but doesn't have a 
+match structure does it just mean it doesn't need any specific 
+initialization?
+
+Thanks,
+
+-- 
+Julien Thierry
