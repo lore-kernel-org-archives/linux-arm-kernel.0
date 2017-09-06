@@ -1,172 +1,378 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Wed,  6 Sep 2017 13:51:59 -0700
-Subject: [PATCH 1/3] phy: rockchip-typec: Set the AUX channel flip state
- earlier
+Date: Wed,  6 Sep 2017 13:52:00 -0700
+Subject: [PATCH 2/3] phy: rockchip-typec: Avoid magic numbers + add delays in
+ aux calib
 In-Reply-To: <20170906205201.16207-1-dianders@chromium.org>
 References: <20170906205201.16207-1-dianders@chromium.org>
-Message-ID: <20170906205201.16207-2-dianders@chromium.org>
+Message-ID: <20170906205201.16207-3-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some DP monitors we found that setting the wrong flip state on the
-AUX channel could cause the monitor to stop asserting HotPlug Detect
-(HPD).  Setting the right flip state caused these monitors to start
-asserting HotPlug Detect again.
+NOTE: nothing is known to be fixed by this change, but it does enforce
+some delays that are documented to be necessary.  Possibly this could
+fix some corner cases.
 
-Here's what we believe was happening:
-* We'd plug in the monitor and we'd see HPD assert
-* We'd quickly see HPD deassert
-* The kernel would try to init the type C PHY but would init it in USB
-  mode (because there was a peripheral there but no HPD)
-* Because the kernel never set the flip mode properly we'd never see
-  the HPD come back.
+The function tcphy_dp_aux_calibration(), like most of the functions in
+the type C PHY, is mostly undocumented and filled with mysterious,
+hardcoded numbers.
 
-With this change, we'll still see HPD disappear (we don't think
-there's anything we can do about that), but then it will come back.
+Let's attempt to try to document some of these numbers and clean the
+function up a little bit.  Here's the actual cleanup that happened
+here:
 
-Overall we can say that it's sane to set the AUX channel flip state
-even when HPD is not asserted.
+1. All magic numbers were replaced with bit definitions.
 
-NOTE: to make this change possible, I needed to do a bit of cleanup to
-the tcphy_dp_aux_calibration() function so that it doesn't ever
-clobber the FLIP state.  This made it very obvious that a line of code
-documented as "setting bit 12" also did a bunch of other magic,
-undocumented stuff.  For now I'll just break out the bits and add a
-comment that this is black magic and we'll try to document
-tcphy_dp_aux_calibration() better in a future CL.
+2. For registers that we modify multiple times I now keep track of the
+   value of the register rather than randomly doing a
+   read/modify/write or just hardcoding a new number based on knowing
+   what the old number was.
 
-ALSO NOTE: the old function used to write a bunch of hardcoded
-values in _some_ cases instead of doing a read-modify-write.  One
-could possibly assert that these could have had (beneficial) side
-effects and thus with this new code (which always does
-read-modify-write) we could have a bug.  We shouldn't need to worry,
-though, since in the old code tcphy_dp_aux_calibration() was always
-called following the de-assertion of "reset" the the type C PHY.
-...so the type C PHY was always in default state.  TX_ANA_CTRL_REG_1
-is documented to be 0x0 after reset.  This was also confirmed by
-printk.
+3. Delay 10 ms (vs 1 ms) after writing the calibration code.  No idea
+   if this is important but it matches the example in the docs.
 
-Suggested-by: Shawn Nematbakhsh <shawnn@chromium.org>
+4. Whenever setting a "delayed" version of a signal always put an
+   explicit delay in the code.  No known problems were seen without
+   this delay but it seems wise to have it.  Whenever a delay of "at
+   least 100 ns" was specified I used a delay of 1 us.
+
+5. Added comments to some of the bits of code.
+
+6. Removed duplicate setting of TX_ANA_CTRL_REG_5 (to 0)
+
+7. Moved setting of TX_ANA_CTRL_REG_3 to the same place it was in the
+   sample code.  Note that TX_ANA_CTRL_REG_3 ought to be initted to 0
+   (and elsewhere we assume that we just got a reset), but it seems
+   fine to be explicit.
+
+8. Treats the calibration code as a 7-bit two's complement number.
+   This isn't strictly required, but seems slightly cleaner.  The docs
+   say "treat this as a two's complement number, but it should never
+   be negative".  If we ever read the "adjustment" codes as documented
+   then perhaps the two's complement bit will matter more.
+
+There are still a few weird / mysterious things around aux init and
+this doesn't attempt to fix all of them.  Mostly it's aimed at doing
+changes that should be _very_ safe and add a lot of clarity.  Things
+specifically not done:
+
+A) Resolve the fact that some registers are read/modify/write and
+   others are explicitly initted to a value.  We always call
+   tcphy_dp_aux_calibration() right after resetting the PHY so it's
+   probably not critical, but it's a little weird that the code is
+   inconsistent.
+
+B) Fully resolve the documented init sequence with the current one.
+   We still have a few mystery steps and we also leave out turning on
+   TXDA_DRV_LDO_BG_FB_EN and TXDA_DRV_LDO_BG_REF_EN, which is in the
+   sample code.
+
+C) Clean things up to read all the bits of the calibration code.  This
+   will hopefully come in a followup change.
+
+This also doesn't attempt to document any of the other parts of the
+PHY--just the aux init which is all I got docs for.
+
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
 
- drivers/phy/rockchip/phy-rockchip-typec.c | 62 +++++++++++++++++++++----------
- 1 file changed, 42 insertions(+), 20 deletions(-)
+ drivers/phy/rockchip/phy-rockchip-typec.c | 203 ++++++++++++++++++++++++------
+ 1 file changed, 164 insertions(+), 39 deletions(-)
 
 diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-index 4d2c57f21d76..342a77733207 100644
+index 342a77733207..b8696a7c45fb 100644
 --- a/drivers/phy/rockchip/phy-rockchip-typec.c
 +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-@@ -443,14 +443,34 @@ static inline int property_enable(struct rockchip_typec_phy *tcphy,
- 	return regmap_write(tcphy->grf_regs, reg->offset, val | mask);
+@@ -102,9 +102,40 @@
+ #define CMN_PLL1_SS_CTRL1		(0xb8 << 2)
+ #define CMN_PLL1_SS_CTRL2		(0xb9 << 2)
+ #define CMN_RXCAL_OVRD			(0xd1 << 2)
++
+ #define CMN_TXPUCAL_CTRL		(0xe0 << 2)
+ #define CMN_TXPUCAL_OVRD		(0xe1 << 2)
++#define CMN_TXPDCAL_CTRL		(0xf0 << 2)
+ #define CMN_TXPDCAL_OVRD		(0xf1 << 2)
++
++/* For CMN_TXPUCAL_CTRL, CMN_TXPDCAL_CTRL */
++#define CMN_TXPXCAL_START		BIT(15)
++#define CMN_TXPXCAL_DONE		BIT(14)
++#define CMN_TXPXCAL_NO_RESPONSE		BIT(13)
++#define CMN_TXPXCAL_CURRENT_RESPONSE	BIT(12)
++
++#define CMN_TXPU_ADJ_CTRL		(0x108 << 2)
++#define CMN_TXPD_ADJ_CTRL		(0x10c << 2)
++
++/*
++ * For CMN_TXPUCAL_CTRL, CMN_TXPDCAL_CTRL,
++ *     CMN_TXPU_ADJ_CTRL, CMN_TXPDCAL_CTRL
++ *
++ * NOTE: some of these registers are documented to be 2's complement
++ * signed numbers, but then documented to be always positive.  Weird.
++ * In such a case, using CMN_CALIB_CODE_POS() avoids the unnecessary
++ * sign extension.
++ */
++#define CMN_CALIB_CODE_WIDTH	7
++#define CMN_CALIB_CODE_OFFSET	0
++#define CMN_CALIB_CODE_MASK	GENMASK(CMN_CALIB_CODE_WIDTH, 0)
++#define CMN_CALIB_CODE(x)	\
++	sign_extend32((x) >> CMN_CALIB_CODE_OFFSET, CMN_CALIB_CODE_WIDTH)
++
++#define CMN_CALIB_CODE_POS_MASK	GENMASK(CMN_CALIB_CODE_WIDTH - 1, 0)
++#define CMN_CALIB_CODE_POS(x)	\
++	(((x) >> CMN_CALIB_CODE_OFFSET) & CMN_CALIB_CODE_POS_MASK)
++
+ #define CMN_DIAG_PLL0_FBH_OVRD		(0x1c0 << 2)
+ #define CMN_DIAG_PLL0_FBL_OVRD		(0x1c1 << 2)
+ #define CMN_DIAG_PLL0_OVRD		(0x1c2 << 2)
+@@ -138,6 +169,15 @@
+ #define TX_TXCC_MGNFS_MULT_101(n)	((0x4055 | ((n) << 9)) << 2)
+ #define TX_TXCC_MGNFS_MULT_110(n)	((0x4056 | ((n) << 9)) << 2)
+ #define TX_TXCC_MGNFS_MULT_111(n)	((0x4057 | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_000(n)	((0x4058 | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_001(n)	((0x4059 | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_010(n)	((0x405a | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_011(n)	((0x405b | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_100(n)	((0x405c | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_101(n)	((0x405d | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_110(n)	((0x405e | ((n) << 9)) << 2)
++#define TX_TXCC_MGNLS_MULT_111(n)	((0x405f | ((n) << 9)) << 2)
++
+ #define XCVR_DIAG_PLLDRC_CTRL(n)	((0x40e0 | ((n) << 9)) << 2)
+ #define XCVR_DIAG_BIDI_CTRL(n)		((0x40e8 | ((n) << 9)) << 2)
+ #define XCVR_DIAG_LANE_FCM_EN_MGN(n)	((0x40f2 | ((n) << 9)) << 2)
+@@ -150,10 +190,63 @@
+ #define TX_RCVDET_ST_TMR(n)		((0x4123 | ((n) << 9)) << 2)
+ #define TX_DIAG_TX_DRV(n)		((0x41e1 | ((n) << 9)) << 2)
+ #define TX_DIAG_BGREF_PREDRV_DELAY	(0x41e7 << 2)
++
++/* Use this for "n" in macros like "_MULT_XXX" to target the aux channel */
++#define AUX_CH_LANE			8
++
+ #define TX_ANA_CTRL_REG_1		(0x5020 << 2)
++
++#define TXDA_DP_AUX_EN			BIT(15)
++#define AUXDA_SE_EN			BIT(14)
++#define TXDA_CAL_LATCH_EN		BIT(13)
++#define AUXDA_POLARITY			BIT(12)
++#define TXDA_DRV_POWER_ISOLATION_EN	BIT(11)
++#define TXDA_DRV_POWER_EN_PH_2_N	BIT(10)
++#define TXDA_DRV_POWER_EN_PH_1_N	BIT(9)
++#define TXDA_BGREF_EN			BIT(8)
++#define TXDA_DRV_LDO_EN			BIT(7)
++#define TXDA_DECAP_EN_DEL		BIT(6)
++#define TXDA_DECAP_EN			BIT(5)
++#define TXDA_UPHY_SUPPLY_EN_DEL		BIT(4)
++#define TXDA_UPHY_SUPPLY_EN		BIT(3)
++#define TXDA_LOW_LEAKAGE_EN		BIT(2)
++#define TXDA_DRV_IDLE_LOWI_EN		BIT(1)
++#define TXDA_DRV_CMN_MODE_EN		BIT(0)
++
+ #define TX_ANA_CTRL_REG_2		(0x5021 << 2)
++
++#define AUXDA_DEBOUNCING_CLK		BIT(15)
++#define TXDA_LPBK_RECOVERED_CLK_EN	BIT(14)
++#define TXDA_LPBK_ISI_GEN_EN		BIT(13)
++#define TXDA_LPBK_SERIAL_EN		BIT(12)
++#define TXDA_LPBK_LINE_EN		BIT(11)
++#define TXDA_DRV_LDO_REDC_SINKIQ	BIT(10)
++#define XCVR_DECAP_EN_DEL		BIT(9)
++#define XCVR_DECAP_EN			BIT(8)
++#define TXDA_MPHY_ENABLE_HS_NT		BIT(7)
++#define TXDA_MPHY_SA_MODE		BIT(6)
++#define TXDA_DRV_LDO_RBYR_FB_EN		BIT(5)
++#define TXDA_DRV_RST_PULL_DOWN		BIT(4)
++#define TXDA_DRV_LDO_BG_FB_EN		BIT(3)
++#define TXDA_DRV_LDO_BG_REF_EN		BIT(2)
++#define TXDA_DRV_PREDRV_EN_DEL		BIT(1)
++#define TXDA_DRV_PREDRV_EN		BIT(0)
++
+ #define TXDA_COEFF_CALC_CTRL		(0x5022 << 2)
++
++#define TX_HIGH_Z			BIT(6)
++#define TX_VMARGIN_OFFSET		3
++#define TX_VMARGIN_MASK			0x7
++#define LOW_POWER_SWING_EN		BIT(2)
++#define TX_FCM_DRV_MAIN_EN		BIT(1)
++#define TX_FCM_FULL_MARGIN		BIT(0)
++
+ #define TX_DIG_CTRL_REG_2		(0x5024 << 2)
++
++#define TX_HIGH_Z_TM_EN			BIT(15)
++#define TX_RESCAL_CODE_OFFSET		0
++#define TX_RESCAL_CODE_MASK		0x3f
++
+ #define TXDA_CYA_AUXDA_CYA		(0x5025 << 2)
+ #define TX_ANA_CTRL_REG_3		(0x5026 << 2)
+ #define TX_ANA_CTRL_REG_4		(0x5027 << 2)
+@@ -456,54 +549,63 @@ static void tcphy_dp_aux_set_flip(struct rockchip_typec_phy *tcphy)
+ 	 */
+ 	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
+ 	if (!tcphy->flip)
+-		tx_ana_ctrl_reg_1 |= BIT(12);
++		tx_ana_ctrl_reg_1 |= AUXDA_POLARITY;
+ 	else
+-		tx_ana_ctrl_reg_1 &= ~BIT(12);
++		tx_ana_ctrl_reg_1 &= ~AUXDA_POLARITY;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
  }
  
-+static void tcphy_dp_aux_set_flip(struct rockchip_typec_phy *tcphy)
-+{
-+	u16 tx_ana_ctrl_reg_1;
-+
-+	/*
-+	 * Select the polarity of the xcvr:
-+	 * 1, Reverses the polarity (If TYPEC, Pulls ups aux_p and pull
-+	 * down aux_m)
-+	 * 0, Normal polarity (if TYPEC, pulls up aux_m and pulls down
-+	 * aux_p)
-+	 */
-+	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
-+	if (!tcphy->flip)
-+		tx_ana_ctrl_reg_1 |= BIT(12);
-+	else
-+		tx_ana_ctrl_reg_1 &= ~BIT(12);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+}
-+
  static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
  {
-+	u16 tx_ana_ctrl_reg_1;
- 	u16 rdata, rdata2, val;
++	u16 val;
+ 	u16 tx_ana_ctrl_reg_1;
+-	u16 rdata, rdata2, val;
++	u16 tx_ana_ctrl_reg_2;
++	s32 pu_calib_code;
  
  	/* disable txda_cal_latch_en for rewrite the calibration values */
--	rdata = readl(tcphy->base + TX_ANA_CTRL_REG_1);
--	val = rdata & 0xdfff;
--	writel(val, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 &= ~BIT(13);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+ 	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
+-	tx_ana_ctrl_reg_1 &= ~BIT(13);
++	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
  
  	/*
- 	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[6:0] and
-@@ -472,9 +492,8 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
+-	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[6:0] and
+-	 * write it to TX_DIG_CTRL_REG_2[6:0], and delay 1ms to make sure it
+-	 * works.
++	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[5:0] and
++	 * write it to TX_DIG_CTRL_REG_2[5:0].
+ 	 */
+-	rdata = readl(tcphy->base + TX_DIG_CTRL_REG_2);
+-	rdata = rdata & 0xffc0;
+-
+-	rdata2 = readl(tcphy->base + CMN_TXPUCAL_CTRL);
+-	rdata2 = rdata2 & 0x3f;
++	val = readl(tcphy->base + CMN_TXPUCAL_CTRL);
++	pu_calib_code = CMN_CALIB_CODE_POS(val);
+ 
+-	val = rdata | rdata2;
++	/* write the calibration, then delay 10 ms as sample in docs */
++	val = readl(tcphy->base + TX_DIG_CTRL_REG_2);
++	val &= ~(TX_RESCAL_CODE_MASK << TX_RESCAL_CODE_OFFSET);
++	val |= pu_calib_code << TX_RESCAL_CODE_OFFSET;
+ 	writel(val, tcphy->base + TX_DIG_CTRL_REG_2);
+-	usleep_range(1000, 1050);
++	usleep_range(10000, 10050);
+ 
+ 	/*
+ 	 * Enable signal for latch that sample and holds calibration values.
  	 * Activate this signal for 1 clock cycle to sample new calibration
  	 * values.
  	 */
--	rdata = readl(tcphy->base + TX_ANA_CTRL_REG_1);
--	val = rdata | 0x2000;
--	writel(val, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(13);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+-	tx_ana_ctrl_reg_1 |= BIT(13);
++	tx_ana_ctrl_reg_1 |= TXDA_CAL_LATCH_EN;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
  	usleep_range(150, 200);
  
  	/* set TX Voltage Level and TX Deemphasis to 0 */
-@@ -482,8 +501,10 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
+ 	writel(0, tcphy->base + PHY_DP_TX_CTL);
++
  	/* re-enable decap */
- 	writel(0x100, tcphy->base + TX_ANA_CTRL_REG_2);
- 	writel(0x300, tcphy->base + TX_ANA_CTRL_REG_2);
--	writel(0x2008, tcphy->base + TX_ANA_CTRL_REG_1);
--	writel(0x2018, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(3);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(4);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+-	writel(0x100, tcphy->base + TX_ANA_CTRL_REG_2);
+-	writel(0x300, tcphy->base + TX_ANA_CTRL_REG_2);
+-	tx_ana_ctrl_reg_1 |= BIT(3);
++	tx_ana_ctrl_reg_2 = XCVR_DECAP_EN;
++	writel(tx_ana_ctrl_reg_2, tcphy->base + TX_ANA_CTRL_REG_2);
++	udelay(1);
++	tx_ana_ctrl_reg_2 |= XCVR_DECAP_EN_DEL;
++	writel(tx_ana_ctrl_reg_2, tcphy->base + TX_ANA_CTRL_REG_2);
++
++	writel(0, tcphy->base + TX_ANA_CTRL_REG_3);
++
++	tx_ana_ctrl_reg_1 |= TXDA_UPHY_SUPPLY_EN;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+-	tx_ana_ctrl_reg_1 |= BIT(4);
++	udelay(1);
++	tx_ana_ctrl_reg_1 |= TXDA_UPHY_SUPPLY_EN_DEL;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
  
  	writel(0, tcphy->base + TX_ANA_CTRL_REG_5);
- 
-@@ -494,8 +515,10 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
+@@ -515,43 +617,66 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
  	writel(0x1001, tcphy->base + TX_ANA_CTRL_REG_4);
  
  	/* re-enables Bandgap reference for LDO */
--	writel(0x2098, tcphy->base + TX_ANA_CTRL_REG_1);
--	writel(0x2198, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(7);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(8);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+-	tx_ana_ctrl_reg_1 |= BIT(7);
++	tx_ana_ctrl_reg_1 |= TXDA_DRV_LDO_EN;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+-	tx_ana_ctrl_reg_1 |= BIT(8);
++	udelay(5);
++	tx_ana_ctrl_reg_1 |= TXDA_BGREF_EN;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
  
  	/*
  	 * re-enables the transmitter pre-driver, driver data selection MUX,
-@@ -505,17 +528,15 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	writel(0x303, tcphy->base + TX_ANA_CTRL_REG_2);
+ 	 * and receiver detect circuits.
+ 	 */
+-	writel(0x301, tcphy->base + TX_ANA_CTRL_REG_2);
+-	writel(0x303, tcphy->base + TX_ANA_CTRL_REG_2);
++	tx_ana_ctrl_reg_2 |= TXDA_DRV_PREDRV_EN;
++	writel(tx_ana_ctrl_reg_2, tcphy->base + TX_ANA_CTRL_REG_2);
++	udelay(1);
++	tx_ana_ctrl_reg_2 |= TXDA_DRV_PREDRV_EN_DEL;
++	writel(tx_ana_ctrl_reg_2, tcphy->base + TX_ANA_CTRL_REG_2);
  
  	/*
--	 * BIT 12: Controls auxda_polarity, which selects the polarity of the
--	 * xcvr:
--	 * 1, Reverses the polarity (If TYPEC, Pulls ups aux_p and pull
--	 * down aux_m)
--	 * 0, Normal polarity (if TYPE_C, pulls up aux_m and pulls down
--	 * aux_p)
-+	 * Do some magic undocumented stuff, some of which appears to
-+	 * undo the "re-enables Bandgap reference for LDO" above.
+-	 * Do some magic undocumented stuff, some of which appears to
+-	 * undo the "re-enables Bandgap reference for LDO" above.
++	 * Do all the undocumented magic:
++	 * - Turn on TXDA_DP_AUX_EN, whatever that is, even though sample
++	 *   never shows this going on.
++	 * - Turn on TXDA_DECAP_EN (and TXDA_DECAP_EN_DEL) even though
++	 *   docs say for aux it's always 0.
++	 * - Turn off the LDO and BGREF, which we just spent time turning
++	 *   on above (???).
++	 *
++	 * Without this magic, things seem worse.
  	 */
--	val = 0xa078;
--	if (!tcphy->flip)
--		val |= BIT(12);
--	writel(val, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |=  BIT(15);
-+	tx_ana_ctrl_reg_1 &= ~BIT(8);
-+	tx_ana_ctrl_reg_1 &= ~BIT(7);
-+	tx_ana_ctrl_reg_1 |=  BIT(6);
-+	tx_ana_ctrl_reg_1 |=  BIT(5);
+-	tx_ana_ctrl_reg_1 |=  BIT(15);
+-	tx_ana_ctrl_reg_1 &= ~BIT(8);
+-	tx_ana_ctrl_reg_1 &= ~BIT(7);
+-	tx_ana_ctrl_reg_1 |=  BIT(6);
+-	tx_ana_ctrl_reg_1 |=  BIT(5);
++	tx_ana_ctrl_reg_1 |= TXDA_DP_AUX_EN;
++	tx_ana_ctrl_reg_1 |= TXDA_DECAP_EN;
++	tx_ana_ctrl_reg_1 &= ~TXDA_DRV_LDO_EN;
++	tx_ana_ctrl_reg_1 &= ~TXDA_BGREF_EN;
 +	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
++	udelay(1);
++	tx_ana_ctrl_reg_1 |= TXDA_DECAP_EN_DEL;
+ 	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+-
+-	writel(0, tcphy->base + TX_ANA_CTRL_REG_3);
+-	writel(0, tcphy->base + TX_ANA_CTRL_REG_4);
+-	writel(0, tcphy->base + TX_ANA_CTRL_REG_5);
  
- 	writel(0, tcphy->base + TX_ANA_CTRL_REG_3);
- 	writel(0, tcphy->base + TX_ANA_CTRL_REG_4);
-@@ -555,6 +576,7 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
- 	reset_control_deassert(tcphy->tcphy_rst);
+ 	/*
+-	 * Controls low_power_swing_en, set the voltage swing of the driver
+-	 * to 400mv. The values	below are peak to peak (differential) values.
++	 * Undo the work we did to set the LDO voltage.
++	 * This doesn't seem to help nor hurt, but it kinda goes with the
++	 * undocumented magic above.
+ 	 */
+-	writel(4, tcphy->base + TXDA_COEFF_CALC_CTRL);
++	writel(0, tcphy->base + TX_ANA_CTRL_REG_4);
++
++	/* Set voltage swing to 400 mV peak to peak (differential) */
++	writel(LOW_POWER_SWING_EN, tcphy->base + TXDA_COEFF_CALC_CTRL);
++
++	/* Init TXDA_CYA_AUXDA_CYA for unknown magic reasons */
+ 	writel(0, tcphy->base + TXDA_CYA_AUXDA_CYA);
  
- 	property_enable(tcphy, &cfg->typec_conn_dir, tcphy->flip);
-+	tcphy_dp_aux_set_flip(tcphy);
- 
- 	tcphy_cfg_24m(tcphy);
+-	/* Controls tx_high_z_tm_en */
++	/*
++	 * More undocumented magic, presumably the goal of which is to
++	 * make the "auxda_source_aux_oen" be ignored and instead to decide
++	 * about "high impedance state" based on what software puts in the
++	 * register TXDA_COEFF_CALC_CTRL (see TX_HIGH_Z).  Since we only
++	 * program that register once and we don't set the bit TX_HIGH_Z,
++	 * presumably the goal here is that we should never put the analog
++	 * driver in high impedance state.
++	 */
+ 	val = readl(tcphy->base + TX_DIG_CTRL_REG_2);
+-	val |= BIT(15);
++	val |= TX_HIGH_Z_TM_EN;
+ 	writel(val, tcphy->base + TX_DIG_CTRL_REG_2);
+ }
  
 -- 
 2.14.1.581.gf28d330327-goog
