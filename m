@@ -1,55 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 6 Sep 2017 09:17:41 +0100
-Subject: [PATCH] arm64: KVM: VHE: save and restore some PSTATE bits
-In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015DF717@DGGEMA503-MBX.china.huawei.com>
-Message-ID: <2a5d4299-2523-aef5-7db1-f351ca66b562@arm.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Wed, 6 Sep 2017 01:19:11 -0700
+Subject: [PATCH v3 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <CACPK8Xc0jrnx96=BoGMwQgoT2brgc0UTNU5HMHXDeFfeToVgxA@mail.gmail.com>
+References: <20170906003016.2159-1-brendanhiggins@google.com>
+ <20170906003016.2159-3-brendanhiggins@google.com>
+ <CACPK8Xc0jrnx96=BoGMwQgoT2brgc0UTNU5HMHXDeFfeToVgxA@mail.gmail.com>
+Message-ID: <CAFd5g45s6yo=HSut76YknOkUeKbV8yOXWbivc=EyM2s7R8DOrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/17 19:58, gengdongjiu wrote:
-> when exit from guest, some host PSTATE bits may be lost, such as
-> PSTATE.PAN or PSTATE.UAO. It is because host and hypervisor all run
-> in the EL2, host PSTATE value cannot be saved and restored via
-> SPSR_EL2. So if guest has changed the PSTATE, host continues with
-> a wrong value guest has set.
-> 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> Signed-off-by: Haibin Zhang <zhanghaibin7@huawei.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  8 +++++++
->  arch/arm64/include/asm/kvm_hyp.h  |  2 ++
->  arch/arm64/include/asm/sysreg.h   | 23 +++++++++++++++++++
->  arch/arm64/kvm/hyp/entry.S        |  2 --
->  arch/arm64/kvm/hyp/switch.c       | 24 ++++++++++++++++++--
->  arch/arm64/kvm/hyp/sysreg-sr.c    | 48 ++++++++++++++++++++++++++++++++++++---
->  6 files changed, 100 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e923b58..cba7d3e 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -193,6 +193,12 @@ struct kvm_cpu_context {
->  	};
->  };
->  
-> +struct kvm_cpu_host_pstate {
-> +	u64 daif;
-> +	u64 uao;
-> +	u64 pan;
-> +};
+On Tue, Sep 5, 2017 at 10:23 PM, Joel Stanley <joel@jms.id.au> wrote:
+> On Wed, Sep 6, 2017 at 10:00 AM, Brendan Higgins
+> <brendanhiggins@google.com> wrote:
+>> +++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
+>> @@ -0,0 +1,6 @@
+>> +NPCM Platforms Device Tree Bindings
+>> +-----------------------------------
+>> +NPCM750 SoC
+>> +Required root node properties:
+>> +       - compatible = "nuvoton,npcm750";
+>> +
+>
+> This is minimal. I assume there will be more content added as more
+> support is added?
 
-I love it. This is the most expensive way of saving/restoring a single
-32bit value.
+Yep, that's the plan. They have a number of similar BMCs, both those
+based on different ARM cores and some with different peripheral sets,
+so we will probably want to have different compat strings for those.
 
-More seriously, please see the discussion between James and Christoffer
-there[1]. I expect James to address the PAN/UAO states together with the
-debug state in the next iteration of his patch.
+>
+> Does it need it's own directory?
 
-Thanks,
+Not sure, I saw that some of the other architectures did it, some did
+not. I don't feel strongly about it.
 
-	M.
+>
+>
+>> diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+>> new file mode 100644
+>> index 000000000000..54df32cff21b
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+>
+>> +
+>> +/dts-v1/;
+>> +#include "nuvoton-npcm750.dtsi"
+>> +
+>> +/ {
+>> +       model = "Nuvoton npcm750 Development Board (Device Tree)";
+>> +       compatible = "nuvoton,npcm750";
+>> +
+>> +       chosen {
+>> +               stdout-path = &serial3;
+>> +               bootargs = "earlyprintk=serial,serial3,115200";
+>> +       };
+>> +
+>> +       memory {
+>> +               reg = <0 0x40000000>;
+>> +       };
+>> +
+>> +       cpus {
+>> +               enable-method = "nuvoton,npcm7xx-smp";
+>> +       };
+>> +
+>> +       clk: clock-controller at f0801000 {
+>> +               status = "okay";
+>> +       };
+>> +
+>> +       apb {
+>> +               watchdog1: watchdog at f0009000 {
+>> +                       status = "okay";
+>> +               };
+>
+> You've already got the label for the node, is there are reason you
+> don't use a phandle to set the status?
 
-[1] https://www.spinics.net/lists/arm-kernel/msg599798.html
--- 
-Jazz is not dead. It just smells funny...
+Addressed in v4.
+
+>
+> &watchdog1 {
+>    status = "okay";
+> };
+>
+> Same with the serial nodes below.
+>
+>> +
+>> +               serial0: serial0 at f0001000 {
+>> +                       status = "okay";
+>> +               };
+>> +
+>> +               serial1: serial1 at f0002000 {
+>> +                       status = "okay";
+>> +               };
+>> +
+>> +               serial2: serial2 at f0003000 {
+>> +                       status = "okay";
+>> +               };
+>> +
+>> +               serial3: serial3 at f0004000 {
+>> +                       status = "okay";
+>> +               };
+>> +       };
