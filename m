@@ -1,166 +1,138 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 7 Sep 2017 10:54:11 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <9a999fd4-3ade-f7a4-56d7-68ed731ff646@huawei.com>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <47b8bf19-abad-3503-2e1c-b9d1304a157e@huawei.com>
- <20170904170928.GB20601@red-moon>
- <9a999fd4-3ade-f7a4-56d7-68ed731ff646@huawei.com>
-Message-ID: <20170907095411.GA5057@red-moon>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Thu, 7 Sep 2017 18:05:11 +0800
+Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
+In-Reply-To: <59B10F52.9010400@arm.com>
+References: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
+ <59B10F52.9010400@arm.com>
+Message-ID: <f710f68a-1e89-85a6-41a6-afc7588114db@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 05, 2017 at 12:07:59PM +0100, John Garry wrote:
-> >>
-> >>Hi Will, Lorenzo, Robin,
-> >>
-> >>I have created the patch to add DT support for this erratum.
-> >>However, currently I have only added support for pci-based devices.
-> >>I'm a bit stumped on how to add platform device support, or if we
-> >>should also add support at all. And I would rather ask before
-> >>sending the patches.
-> >>
-> >>The specific issue is that I know of no platform device with an ITS
-> >>msi-parent which we would want reserve, i.e. do not translate msi.
-> >>And, if there were, how to do it.
-> >>
-> >>The only platform devices I know off with msi ITS parents are SMMUv3
-> >>and mbigen. For mbigen, the msi are not translated. Actually, as I
-> >>see under IORT solution, for mbigen we don't reserve the hw msi
-> >>region as the SMMUv3 does not have an ID mapping. And we have no
-> >>equivalent ID mapping property for DT SMMUv3, so cannot create an
-> >>equivalent check.
-> >>
-> >>So here is how the DT iommu get reserved region function with only
-> >>pci device support looks:
-> >>
-> >>/**
-> >> * of_iommu_its_get_resv_regions - Reserved region driver helper
-> >> * @dev: Device from iommu_get_resv_regions()
-> >> * @list: Reserved region list from iommu_get_resv_regions()
-> >> *
-> >> * Returns: Number of reserved regions on success(0 if no associated ITS),
-> >> *          appropriate error value otherwise.
-> >> */
-> >>int of_iommu_its_get_resv_regions(struct device *dev, struct
-> >>list_head *head)
-> >>{
-> >>    struct device_node *of_node = NULL;
-> >>    struct device *parent_dev;
-> >>    const __be32 *msi_map;
-> >>    int num_mappings, i, err, len, resv = 0;
-> >>
-> >>    /* walk up to find the parent with a msi-map property */
-> >>    for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
-> >>        if (!parent_dev->of_node)
-> >>            continue;
-> >>
-> >>        /*
-> >>         * Current logic to reserve ITS regions for only PCI root
-> >>         * complex.
-> >>         */
-> >>        msi_map = of_get_property(parent_dev->of_node, "msi-map", &len);
-> >>        if (msi_map) {
-> >>            of_node = parent_dev->of_node;
-> >>            break;
-> >>        }
-> >>    }
-> >>
-> >>    if (!of_node)
-> >>        return 0;
-> >>
-> >>    num_mappings = of_count_phandle_with_args(of_node, "msi-map",
-> >>NULL) / 4;
-> >>
-> >>    for (i = 0; i < num_mappings; i++) {
-> >>        int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> >>        struct iommu_resv_region *region;
-> >>        struct device_node *msi_node;
-> >>        struct resource resource;
-> >>        u32 phandle;
-> >>
-> >>        phandle = be32_to_cpup(msi_map + 1);
-> >>        msi_node = of_find_node_by_phandle(phandle);
-> >>        if (!msi_node)
-> >>            return -ENODEV;
-> >>
-> >>        /*
-> >>         * There may be different types of msi-controller, so check
-> >>         * for ITS.
-> >>         */
-> >>        if (!of_device_is_compatible(msi_node, "arm,gic-v3-its")) {
-> >>            of_node_put(msi_node);
-> >>            continue;
-> >>        }
-> >>
-> >>        err = of_address_to_resource(msi_node, 0, &resource);
-> >>
-> >>        of_node_put(msi_node);
-> >>        if (err)
-> >>            return err;
-> >>
-> >>        region = iommu_alloc_resv_region(resource.start, SZ_128K, prot,
-> >>                         IOMMU_RESV_MSI);
-> >>        if (region) {
-> >>            list_add_tail(&region->list, head);
-> >>            resv++;
-> >>        }
-> >>    }
-> >>
-> >>    return (resv == num_mappings) ? resv : -ENODEV;
-> >>}
-> >>
-> >>Any feedback is appreciated.
-> >
-> >Hi John,
-> >
-> >I appreciate it is not trivial to make the code generic, part of the
-> >snippet above can be shared between ACPI/IORT and OF, the only sticking
-> >point is probably the "compatible" string that has to be parameterized
-> >since having this code in generic IOMMU layer is a bit horrible to
-> >have it ITS specific (and it is a problem that was existing already
-> >in the original patch with the hardcoded ITS node type or function
-> >name).
-> 
-> Hi Lorenzo,
-> 
-> Agreed, checking the ITS compatible string in IOMMU code is not
-> nice. However the function is just trying to replicate our ACPI
-> version, which calls IORT code directly, and this is ITS specific.
-> Anyway, we can make it generic.
-> 
-> >
-> >To sum it up the hook:
-> >
-> >- has to be called from SMMU driver in a firmware agnostic way
-> 
-> ok
-> 
-> >- somehow it has to ascertain which interrupt controller "compatible"
-> >  (which in IORT is a node type) to match against so the hook has to
-> >  take an id of sorts
-> 
-> OK
-> 
-> I will mention 2 more points after discussion on OF solution with Shameer:
-> - for platform device, we can add suppport by checking for the
-> devices msi-parent property
-> - for both pci and platform device, we should check device rid for
-> msi-controller also, like IORT solution
-> 
-> BTW, even though merge window is open, we would like to send some
-> solution to the lists this week, so any outstanding topics can
-> potentially be discussed at LPC next week. Let me know if you're
-> unhappy about this.
+Hi James,
 
-I am happy to find a way forward for this next week, posting patches
-this week would not help much with the merge window ongoing, I think
-it is better to try to find a way forward and post the resulting code
-after reaching an agreement, at -rc1 (or right after the IOMMU PR is
-merged).
+On 2017/9/7 17:20, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 07/09/17 06:54, Dongjiu Geng wrote:
+>> In VHE mode, host kernel runs in the EL2 and can enable
+>> 'User Access Override' when fs==KERNEL_DS so that it can
+>> access kernel memory. However, PSTATE.UAO is set to 0 on
+>> an exception taken from EL1 to EL2. Thus when VHE is used
+>> and exception taken from a guest UAO will be disabled and
+>> host will use the incorrect PSTATE.UAO. So check and reset
+>> the PSTATE.UAO when switching to host.
+> 
+> This would only be a problem if KVM were calling into world-switch with
+> fs==KERNEL_DS. I can't see where this happens.
+ Not only KVM, may also kernel sets the fs == KERNEL_DS before calling into world-switch
 
-Thanks,
-Lorenzo
+> 
+> kvm_arch_vcpu_ioctl_run() is the only place KVM calls world-switch, there are no
+> set_fs() calls in it, or on the path to it. The addr_limit should be USER_DS,
+> PSTATE.UAO will be clear, as it is when we come back from a guest.
+how about if kernel set the KERNEL_DS? but not the kvm_arch_vcpu_ioctl_run().
+
+> 
+> This isn't broken today. I agree it will break if KVM decides to
+> set_fs(KERNEL_DS) around world switch, but until then we don't need this patch.
+KVM and host kernel set_fs(KERNEL_DS) all can break this.
+In the normal way, after world-switch, I think it should check whether it needs to restore to its previous state.
+we should not always consider the set_fs(KERNEL_DS) is disabled for the host.
+
+> 
+> 
+>> Move the reset PSTATE.PAN on entry to EL2 together with
+>> PSTATE.UAO reset.
+> 
+> Moving this breaks PAN-at-HYP for systems with PAN but without VHE.
+No, without VHE, the host kernel is running in the EL1.
+Before host kernel enter guest, host OS will call 'HVC' instruction to do the world-switch, and the pstate.PAN will be saved into the SPSR_EL2.
+When world-switch back to host kernel from EL2, it will call 'eret' instruction to EL1 host, this 'eret' instruction will restore the SPSR_EL2 to the PSTATE.
+so the PSTATE.PAN will be restored.
+So without VHE, we should not reset the PAN. I paste the spec statement
+
+------------------------------
+PSTATE.PAN is copied to SPSR_ELx.PAN on an exception taken from AArch64 to AArch64
+SPSR_ELx.PAN is copied to PSTATE.PAN on an exception return to AArch64 from AArch64
+
+
+> 
+> 
+>> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+>> index 12ee62d..7662ef5 100644
+>> --- a/arch/arm64/kvm/hyp/entry.S
+>> +++ b/arch/arm64/kvm/hyp/entry.S
+>> @@ -96,8 +96,6 @@ ENTRY(__guest_exit)
+>>  
+>>  	add	x1, x1, #VCPU_CONTEXT
+>>  
+>> -	ALTERNATIVE(nop, SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+>> -
+>>  	// Store the guest regs x2 and x3
+>>  	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+>>  
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index a733461..715b3941 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -22,6 +22,7 @@
+>>  #include <asm/kvm_emulate.h>
+>>  #include <asm/kvm_hyp.h>
+>>  #include <asm/fpsimd.h>
+>> +#include <asm/exec.h>
+>>  
+>>  static bool __hyp_text __fpsimd_enabled_nvhe(void)
+>>  {
+>> @@ -399,6 +400,17 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>>  
+>>  	__sysreg_restore_host_state(host_ctxt);
+>>  
+>> +	if (has_vhe()) {
+>> +		/*
+>> +		 * PSTATE was not saved over guest enter/exit, re-enable
+>> +		 * any detecte features that might not have been set
+>> +		 * correctly.
+>> +		 */
+>> +		uao_thread_switch(current);
+> 
+> I don't see how addr_limit will ever be KERNEL_DS, so this is always clearing
+> PSTATE.UAO, which was already clear from the guest-exit exception.
+I think we should not always consider the host kernel does not set the KERNEL_DS before entering guest.
+
+> 
+> (Also, the uao_thread_switch() code isn't accessible from EL2, neither is current)
+No,
+for the VHE, both the uao_thread_switch() and current can be accessible from the EL2.
+all the host kernel runs in the EL2.
+The API can be accessible from EL2 to the VHE.
+The current is Qemu or other kvm tools
+I have tested this patch, it is workable.
+
+> 
+> 
+>> +		asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1),
+>> +			ARM64_HAS_PAN, CONFIG_ARM64_PAN));
+> 
+> ... and this is setting PSTATE.PAN on VHE, which was already set, and breaking
+> PAN-at-HYP on non-VHE systems.
+> 
+> Vladimir's commit message for that patch that added this enabling explained it
+> is needed for !VHE as SCTLR_EL2 when HCR_EL2.E2H is clear doesn't have a SPAN bit.
+> 
+> When we have VHE clearing SCTLR_EL2.SPAN (clearing because it was RES1 on v8.0)
+> will cause the CPU to set PSTATE.PAN when we take an exception.
+> 
+> 
+>> +	}
+>> +
+>>  	if (fp_enabled) {
+>>  		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+>>
+> 
+> 
+> James
+> 
+> 
+> .
+> 
