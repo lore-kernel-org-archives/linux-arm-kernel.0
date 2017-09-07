@@ -1,56 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Sep 2017 09:16:51 -0700
-Subject: n900 in next-20170901
-In-Reply-To: <20170907073038.GA2111@js1304-P5Q-DELUXE>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <20170905233241.GA19231@js1304-P5Q-DELUXE>
- <20170906133057.GH5024@atomide.com>
- <20170907073038.GA2111@js1304-P5Q-DELUXE>
-Message-ID: <20170907161650.GP5024@atomide.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 7 Sep 2017 17:30:37 +0100
+Subject: [RFC PATCH 0/6] Add platform device SVM support for ARM SMMUv3
+In-Reply-To: <8e4764f5-0e5d-7fd6-529b-35914e1e3668@huawei.com>
+References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
+ <95d1a9e2-1816-ff7d-9a8d-98406a6c2c22@arm.com>
+ <de1a6b52-5e4f-1c0a-af3d-f6adb4b01daf@huawei.com>
+ <fd4200c1-3c89-23f1-a2b1-6457ef8475c1@arm.com>
+ <8e4764f5-0e5d-7fd6-529b-35914e1e3668@huawei.com>
+Message-ID: <24e7e405-ad4a-4847-6177-987966182cbd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joonsoo Kim <iamjoonsoo.kim@lge.com> [170907 00:30]:
-> On Wed, Sep 06, 2017 at 06:30:57AM -0700, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170905 16:32]:
-> > > I think that I made a mistake for configuration CONFIG_HIGHMEM=y and
-> > > CONFIG_HAVE_MEMBLOCK_NODE_MAP=y. In this case, the MOVABLE_ZONE can
-> > > be *!highmem*. Could you check that your configuration have above
-> > > options?
-> > 
-> > CONFIG_HIGHMEM is set yeah.
-> > 
-> > > And, could you check that following patch works for you?
-> > 
-> > Does not seem to help, tried against next with just 9caf25f996e8
-> > revert and also with 9caf25f996e8.
+On 07/09/17 02:55, Bob Liu wrote:
+> Speak to the invalidation, I have one more question.
 > 
-> Oops. I misunderstood your problem. Could you test with
-> CONFIG_DEBUG_VIRTUAL?
+> There is a time window between 1) modify page table;  2) tlb invalidate;
+> 
+> ARM-CPU                           Device
+> 
+> 1. modify page table
+> 
+>                              ^^^^^
+>                               Can still write data through smmu tlb even page table was already modified.
+>                               (At this point, the same virtual addr may not point to the same thing for CPU and device!!!
+>                                I'm afraid there may be some data-loss or other potential problems if this situation happens.)
+> 
+> 2. tlb invalidate range
 
-Sure.
+The mm code serializes map/unmap operations with mm->mmap_sem, and at a
+lower level I think the pte lock is used to prevent more subtle races.
+Don't take my word for it though, mm/ is still very obscure to me. So the
+kernel shouldn't be able to reuse the VA for something else before the tlb
+invalidation completes. Even if you're using the CMDQ to invalidate
+instead of TLBI instructions, you're still called by a notifier from the
+mm code so there is no problem.
 
-> After commit 9caf25f996e8, user for CMA memory should use to check
-> PageHighmem in order to get proper virtual address of the page. If
-> someone doesn't use it, it is possible to use wrong virtual address
-> and it then causes the use of wrong physical address.
-> CONFIG_DEBUG_VIRTUAL would catch this case.
-
-OK, no extra output of current next with CONFIG_DEBUG_VIRTUAL=y.
-Booting of n900 hangs with just the same error:
-
-save_secure_sram() returns 0000ff02
-
-> If it doesn't help, is there a way to test n900 configuration in QEMU?
-
-I doubt that QEMU n900 boots in secure mode but instead shows
-the SoC as general purpose SoC. If so, you'd have to patch the
-omap3_save_secure_ram_context() to attempt to save secure RAM
-context in all cases. If that works then debugging with any
-omap3 board like beagleboard in QEMU should work.
-
-Regards,
-
-Tony
+Thanks,
+Jean
