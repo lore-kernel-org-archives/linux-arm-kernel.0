@@ -1,221 +1,71 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Thu, 07 Sep 2017 14:16:13 +0900
-Subject: [PATCH 3/3] drm/exynos/gsc: Add rotation hardware limits of
- gscaler
-In-Reply-To: <7e628ff8-82be-a295-90fa-8f547a541cb3@samsung.com>
-References: <1504230476-1878-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170901014758epcas2p13ae73e7dcac72a1a28c9324164efbd6d@epcas2p1.samsung.com>
- <1504230476-1878-4-git-send-email-hoegeun.kwon@samsung.com>
- <10747c31-55fc-6464-eb00-99da6d66fca6@samsung.com>
- <7e628ff8-82be-a295-90fa-8f547a541cb3@samsung.com>
-Message-ID: <1e8a7563-046b-82b1-6da9-2e883426edf7@samsung.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Thu, 7 Sep 2017 13:54:44 +0800
+Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
+Message-ID: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2017 03:19 PM, Hoegeun Kwon wrote:
-> On 09/01/2017 04:31 PM, Marek Szyprowski wrote:
->> Hi Hoegeun,
->>
->> On 2017-09-01 03:47, Hoegeun Kwon wrote:
->>> The gscaler has hardware rotation limits that need to be imported from
->>> dts. Parse them and add them to the property list.
->>>
->>> The rotation hardware limits are related to the cropped source size.
->>> When swap occurs, use rot_max size instead of crop_max size.
->>>
->>> Also the scaling limits are related to post size, use pos size to
->>> check the limits.
->>>
->>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
->>> ---
->>>   drivers/gpu/drm/exynos/exynos_drm_gsc.c | 63 
->>> +++++++++++++++++++++------------
->>>   include/uapi/drm/exynos_drm.h           |  2 ++
->>>   2 files changed, 42 insertions(+), 23 deletions(-)
->>>
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c 
->>> b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
->>> index 0506b2b..dd9b057 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
->>> @@ -1401,6 +1401,23 @@ static int gsc_ippdrv_check_property(struct 
->>> device *dev,
->>>       bool swap;
->>>       int i;
->>>   +    config = &property->config[EXYNOS_DRM_OPS_DST];
->>> +
->>> +    /* check for degree */
->>> +    switch (config->degree) {
->>> +    case EXYNOS_DRM_DEGREE_90:
->>> +    case EXYNOS_DRM_DEGREE_270:
->>> +        swap = true;
->>> +        break;
->>> +    case EXYNOS_DRM_DEGREE_0:
->>> +    case EXYNOS_DRM_DEGREE_180:
->>> +        swap = false;
->>> +        break;
->>> +    default:
->>> +        DRM_ERROR("invalid degree.\n");
->>> +        goto err_property;
->>> +    }
->>> +
->>>       for_each_ipp_ops(i) {
->>>           if ((i == EXYNOS_DRM_OPS_SRC) &&
->>>               (property->cmd == IPP_CMD_WB))
->>> @@ -1416,21 +1433,6 @@ static int gsc_ippdrv_check_property(struct 
->>> device *dev,
->>>               goto err_property;
->>>           }
->>>   -        /* check for degree */
->>> -        switch (config->degree) {
->>> -        case EXYNOS_DRM_DEGREE_90:
->>> -        case EXYNOS_DRM_DEGREE_270:
->>> -            swap = true;
->>> -            break;
->>> -        case EXYNOS_DRM_DEGREE_0:
->>> -        case EXYNOS_DRM_DEGREE_180:
->>> -            swap = false;
->>> -            break;
->>> -        default:
->>> -            DRM_ERROR("invalid degree.\n");
->>> -            goto err_property;
->>> -        }
->>> -
->>>           /* check for buffer bound */
->>>           if ((pos->x + pos->w > sz->hsize) ||
->>>               (pos->y + pos->h > sz->vsize)) {
->>> @@ -1438,21 +1440,27 @@ static int gsc_ippdrv_check_property(struct 
->>> device *dev,
->>>               goto err_property;
->>>           }
->>>   +        /*
->>> +         * The rotation hardware limits are related to the cropped
->>> +         * source size. So use rot_max size to check the limits when
->>> +         * swap happens. And also the scaling limits are related to 
->>> pos
->>> +         * size, use pos size to check the limits.
->>> +         */
->>>           /* check for crop */
->>>           if ((i == EXYNOS_DRM_OPS_SRC) && (pp->crop)) {
->>>               if (swap) {
->>>                   if ((pos->h < pp->crop_min.hsize) ||
->>> -                    (sz->vsize > pp->crop_max.hsize) ||
->>> +                    (pos->h > pp->rot_max.hsize) ||
->>>                       (pos->w < pp->crop_min.vsize) ||
->>> -                    (sz->hsize > pp->crop_max.vsize)) {
->>> +                    (pos->w > pp->rot_max.vsize)) {
->>>                       DRM_ERROR("out of crop size.\n");
->>>                       goto err_property;
->>>                   }
->>>               } else {
->>>                   if ((pos->w < pp->crop_min.hsize) ||
->>> -                    (sz->hsize > pp->crop_max.hsize) ||
->>> +                    (pos->w > pp->crop_max.hsize) ||
->>>                       (pos->h < pp->crop_min.vsize) ||
->>> -                    (sz->vsize > pp->crop_max.vsize)) {
->>> +                    (pos->h > pp->crop_max.vsize)) {
->>>                       DRM_ERROR("out of crop size.\n");
->>>                       goto err_property;
->>>                   }
->>> @@ -1463,17 +1471,17 @@ static int gsc_ippdrv_check_property(struct 
->>> device *dev,
->>>           if ((i == EXYNOS_DRM_OPS_DST) && (pp->scale)) {
->>>               if (swap) {
->>>                   if ((pos->h < pp->scale_min.hsize) ||
->>> -                    (sz->vsize > pp->scale_max.hsize) ||
->>> +                    (pos->h > pp->scale_max.hsize) ||
->>>                       (pos->w < pp->scale_min.vsize) ||
->>> -                    (sz->hsize > pp->scale_max.vsize)) {
->>> +                    (pos->w > pp->scale_max.vsize)) {
->>>                       DRM_ERROR("out of scale size.\n");
->>>                       goto err_property;
->>>                   }
->>>               } else {
->>>                   if ((pos->w < pp->scale_min.hsize) ||
->>> -                    (sz->hsize > pp->scale_max.hsize) ||
->>> +                    (pos->w > pp->scale_max.hsize) ||
->>>                       (pos->h < pp->scale_min.vsize) ||
->>> -                    (sz->vsize > pp->scale_max.vsize)) {
->>> +                    (pos->h > pp->scale_max.vsize)) {
->>>                       DRM_ERROR("out of scale size.\n");
->>>                       goto err_property;
->>>                   }
->>> @@ -1676,6 +1684,15 @@ static int gsc_probe(struct platform_device 
->>> *pdev)
->>>               dev_warn(dev, "failed to get system register.\n");
->>>               ctx->sysreg = NULL;
->>>           }
->>> +
->>> +        ret = of_property_read_u32(dev->of_node, "rot-max-hsize",
->>> +                &ctx->ippdrv.prop_list.rot_max.hsize);
->>> +        ret |= of_property_read_u32(dev->of_node, "rot-max-vsize",
->>> +                &ctx->ippdrv.prop_list.rot_max.vsize);
->>> +        if (ret) {
->>> +            dev_err(dev, "rot-max property should be provided by 
->>> device tree.\n");
->>> +            return -EINVAL;
->>> +        }
->>>       }
->>>         /* clock control */
->>> diff --git a/include/uapi/drm/exynos_drm.h 
->>> b/include/uapi/drm/exynos_drm.h
->>> index cb3e9f9..d5d5518 100644
->>> --- a/include/uapi/drm/exynos_drm.h
->>> +++ b/include/uapi/drm/exynos_drm.h
->>> @@ -192,6 +192,7 @@ enum drm_exynos_planer {
->>>    * @crop_max: crop max resolution.
->>>    * @scale_min: scale min resolution.
->>>    * @scale_max: scale max resolution.
->>> + * @rot_max: rotation max resolution.
->>>    */
->>>   struct drm_exynos_ipp_prop_list {
->>>       __u32    version;
->>> @@ -210,6 +211,7 @@ struct drm_exynos_ipp_prop_list {
->>>       struct drm_exynos_sz    crop_max;
->>>       struct drm_exynos_sz    scale_min;
->>>       struct drm_exynos_sz    scale_max;
->>> +    struct drm_exynos_sz    rot_max;
->>>   };
->>>     /**
->>
->> IMO maximum supported picture size should be hardcoded into driver, 
->> there
->> is no need to add device tree properties for that. Please also check 
->> v4l2
->> driver for Exynos GSC.
->>
->> Currently it uses only one compatible - "exynos5-gsc", but imho You 
->> should
->> simply replace it with "exynos5250-gsc" and "exynos5420-gsc", and add 
->> those
->> variants with proper maximum supported size (2047 and 2016 
->> respectively).
->>
->> Best regards
->
-> Hi Krzysztof and Marek,
->
-> Thanks Krzysztof and Marek reviews.
->
-> As Marek says, rot_max size will be hardcoded into driver,
-> then it will not break the ABI. And also,
-> I will check the v4l2 driver for Exynos GSC.
->
-> Best regards,
-> Hoegeun
->
+In VHE mode, host kernel runs in the EL2 and can enable
+'User Access Override' when fs==KERNEL_DS so that it can
+access kernel memory. However, PSTATE.UAO is set to 0 on
+an exception taken from EL1 to EL2. Thus when VHE is used
+and exception taken from a guest UAO will be disabled and
+host will use the incorrect PSTATE.UAO. So check and reset
+the PSTATE.UAO when switching to host.
 
-Hi Marek,
+Move the reset PSTATE.PAN on entry to EL2 together with
+PSTATE.UAO reset.
 
-I have checked v4l2 driver for Exynos GSC. The v4l2 driver supports
-Exynos 5250 and 5433 GSC. Currently, the hardware limits rotation is
-set to 2047 in the v4l2 driver.
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Signed-off-by: Haibin Zhang <zhanghaibin7@huawei.com>
+Tested-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+ arch/arm64/kvm/hyp/entry.S  |  2 --
+ arch/arm64/kvm/hyp/switch.c | 12 ++++++++++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-In my opinion don't need to fix it, because the Exynos 5250 has a
-hardware rotation limits of 2048 and the Exynos 5250 has a hardware
-rotation limits of 2047.
-
-Please tell me if you have any other opinion.
-
-Best regards,
-Hoegeun
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index 12ee62d..7662ef5 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -96,8 +96,6 @@ ENTRY(__guest_exit)
+ 
+ 	add	x1, x1, #VCPU_CONTEXT
+ 
+-	ALTERNATIVE(nop, SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+-
+ 	// Store the guest regs x2 and x3
+ 	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index a733461..715b3941 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -22,6 +22,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ #include <asm/fpsimd.h>
++#include <asm/exec.h>
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+ {
+@@ -399,6 +400,17 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 
+ 	__sysreg_restore_host_state(host_ctxt);
+ 
++	if (has_vhe()) {
++		/*
++		 * PSTATE was not saved over guest enter/exit, re-enable
++		 * any detecte features that might not have been set
++		 * correctly.
++		 */
++		uao_thread_switch(current);
++		asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1),
++			ARM64_HAS_PAN, CONFIG_ARM64_PAN));
++	}
++
+ 	if (fp_enabled) {
+ 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+ 		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+-- 
+1.8.3.1
