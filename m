@@ -1,354 +1,72 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 07 Sep 2017 18:10 +0200
-Subject: [PATCH v2] ARM: dts: exynos: fix incomplete Odroid-XU3/4
- thermal-zones definition
-References: <CGME20170907161007epcas1p316fba6e329eaabedde8a98628ebb9751@epcas1p3.samsung.com>
-Message-ID: <1848394.K3C0KxojUN@amdc3058>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Thu, 7 Sep 2017 18:12:32 +0200
+Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as
+ fallback
+In-Reply-To: <CACRpkdZrwZ980YhKGQSpLxoYaFtHvQBUPTXzXqLCbn+4+zvs9g@mail.gmail.com>
+References: <20170901094629.6566-1-linus.walleij@linaro.org>
+ <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
+ <CACRpkdZrwZ980YhKGQSpLxoYaFtHvQBUPTXzXqLCbn+4+zvs9g@mail.gmail.com>
+Message-ID: <d9adcbb3-782b-3ae8-746a-ffb3b1b031af@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Willy Wolff <willy.mh.wolff@gmail.com>
 
-Odroid XU3/4 boards have thermal sensors per 4 pairs of A7+A15
-cores but currently there is only one thermal-zone (including
-cooling maps) defined (for the first pair of cores - the first
-core of the A7 cluster and the first core of A15 cluster) so
-i.e. if the task is running on any of A15 cores but the first
-one, such core can reach high temperature without any proper
-cooling action.
+Den 07.09.2017 14.59, skrev Linus Walleij:
+> On Mon, Sep 4, 2017 at 9:43 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+>> On Fri, Sep 01, 2017 at 11:46:29AM +0200, Linus Walleij wrote:
+>>> If we cannot find a panel, assume that the output from the
+>>> PL111 is connected directly to a "dumb" VGA connector,
+>>> so look up the connector from that bridge.
+>>>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>>        if (panel) {
+>>>                priv->panel = panel;
+>>>                priv->connector = panel->connector;
+>>> +     } else {
+>>> +             priv->connector = drm_dumb_vga_get_connector(bridge);
+>> Why do you need to set this?
+> Essentially because drm_simple_display_pipe_init() require that you
+> specify a connector in the last argument, so I have to get it from
+> somewhere.
 
-Fix it by adding missing thermal-zones definitions.
+It's optional particularly for the bridge case. From docs:
 
-Also while at it fix the number of steps in cpufreq cooling for
-cpu4 (11 steps for A15 corresponds to 700MHz, for 600MHz 12 steps
-should be used).
+ ?* If a connector is supplied, the pipe will be coupled with the provided
+ ?* connector. You may supply a NULL connector when using drm bridges, that
+ ?* handle connectors themselves (see 
+drm_simple_display_pipe_attach_bridge()).
 
-Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Kukjin Kim <kgene@kernel.org>
-[b.zolnierkie: rewrote patch subject & description + minor fixups]
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-v2:
+Noralf.
 
-Newlines removed (1 original + 3 new ones), sorry for not catching it
-earlier in v1.
-
-v1:
-
-I updated the patch to address Krzysztof's review comments,
-the original version from June can be found here:
-
-	https://patchwork.kernel.org/patch/9807333/
-
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  239 +++++++++++++++++++--
- 1 file changed, 219 insertions(+), 20 deletions(-)
-
-Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-===================================================================
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 17:56:29.256414483 +0200
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 18:04:40.596426857 +0200
-@@ -63,22 +63,22 @@
- 			polling-delay-passive = <250>;
- 			polling-delay = <0>;
- 			trips {
--				cpu_alert0: cpu-alert-0 {
-+				cpu0_alert0: cpu-alert-0 {
- 					temperature = <50000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
--				cpu_alert1: cpu-alert-1 {
-+				cpu0_alert1: cpu-alert-1 {
- 					temperature = <60000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
--				cpu_alert2: cpu-alert-2 {
-+				cpu0_alert2: cpu-alert-2 {
- 					temperature = <70000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
--				cpu_crit0: cpu-crit-0 {
-+				cpu0_crit0: cpu-crit-0 {
- 					temperature = <120000>; /* millicelsius */
- 					hysteresis = <0>; /* millicelsius */
- 					type = "critical";
-@@ -87,59 +87,258 @@
- 				 * Exynos542x supports only 4 trip-points
- 				 * so for these polling mode is required.
- 				 * Start polling at temperature level of last
--				 * interrupt-driven trip: cpu_alert2
-+				 * interrupt-driven trip: cpu0_alert2
- 				 */
--				cpu_alert3: cpu-alert-3 {
-+				cpu0_alert3: cpu-alert-3 {
- 					temperature = <70000>; /* millicelsius */
- 					hysteresis = <10000>; /* millicelsius */
- 					type = "passive";
- 				};
--				cpu_alert4: cpu-alert-4 {
-+				cpu0_alert4: cpu-alert-4 {
- 					temperature = <85000>; /* millicelsius */
- 					hysteresis = <10000>; /* millicelsius */
- 					type = "passive";
- 				};
--
- 			};
- 			cooling-maps {
- 				map0 {
--					trip = <&cpu_alert0>;
-+					trip = <&cpu0_alert0>;
- 					cooling-device = <&fan0 0 1>;
- 				};
- 				map1 {
--					trip = <&cpu_alert1>;
-+					trip = <&cpu0_alert1>;
- 					cooling-device = <&fan0 1 2>;
- 				};
- 				map2 {
--					trip = <&cpu_alert2>;
-+					trip = <&cpu0_alert2>;
- 					cooling-device = <&fan0 2 3>;
- 				};
- 				/*
--				 * When reaching cpu_alert3, reduce CPU
-+				 * When reaching cpu0_alert3, reduce CPU
- 				 * by 2 steps. On Exynos5422/5800 that would
- 				 * be: 1600 MHz and 1100 MHz.
- 				 */
- 				map3 {
--					trip = <&cpu_alert3>;
-+					trip = <&cpu0_alert3>;
- 					cooling-device = <&cpu0 0 2>;
- 				};
- 				map4 {
--					trip = <&cpu_alert3>;
-+					trip = <&cpu0_alert3>;
- 					cooling-device = <&cpu4 0 2>;
- 				};
--
- 				/*
--				 * When reaching cpu_alert4, reduce CPU
--				 * further, down to 600 MHz (11 steps for big,
-+				 * When reaching cpu0_alert4, reduce CPU
-+				 * further, down to 600 MHz (12 steps for big,
- 				 * 7 steps for LITTLE).
- 				 */
- 				map5 {
--					trip = <&cpu_alert4>;
-+					trip = <&cpu0_alert4>;
- 					cooling-device = <&cpu0 3 7>;
- 				};
- 				map6 {
--					trip = <&cpu_alert4>;
--					cooling-device = <&cpu4 3 11>;
-+					trip = <&cpu0_alert4>;
-+					cooling-device = <&cpu4 3 12>;
-+				};
-+			};
-+		};
-+		cpu1_thermal: cpu1-thermal {
-+			thermal-sensors = <&tmu_cpu1 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu1_alert0: cpu-alert-0 {
-+					temperature = <50000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu1_alert1: cpu-alert-1 {
-+					temperature = <60000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu1_alert2: cpu-alert-2 {
-+					temperature = <70000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu1_crit0: cpu-crit-0 {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+				cpu1_alert3: cpu-alert-3 {
-+					temperature = <70000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+				cpu1_alert4: cpu-alert-4 {
-+					temperature = <85000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu1_alert0>;
-+					cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+					trip = <&cpu1_alert1>;
-+					cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+					trip = <&cpu1_alert2>;
-+					cooling-device = <&fan0 2 3>;
-+				};
-+				map3 {
-+					trip = <&cpu1_alert3>;
-+					cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+					trip = <&cpu1_alert3>;
-+					cooling-device = <&cpu4 0 2>;
-+				};
-+				map5 {
-+					trip = <&cpu1_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+					trip = <&cpu1_alert4>;
-+					cooling-device = <&cpu4 3 12>;
-+				};
-+			};
-+		};
-+		cpu2_thermal: cpu2-thermal {
-+			thermal-sensors = <&tmu_cpu2 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu2_alert0: cpu-alert-0 {
-+					temperature = <50000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu2_alert1: cpu-alert-1 {
-+					temperature = <60000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu2_alert2: cpu-alert-2 {
-+					temperature = <70000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu2_crit0: cpu-crit-0 {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+				cpu2_alert3: cpu-alert-3 {
-+					temperature = <70000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+				cpu2_alert4: cpu-alert-4 {
-+					temperature = <85000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu2_alert0>;
-+					cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+					trip = <&cpu2_alert1>;
-+					cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+					trip = <&cpu2_alert2>;
-+					cooling-device = <&fan0 2 3>;
-+				};
-+				map3 {
-+					trip = <&cpu2_alert3>;
-+					cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+					trip = <&cpu2_alert3>;
-+					cooling-device = <&cpu4 0 2>;
-+				};
-+				map5 {
-+					trip = <&cpu2_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+					trip = <&cpu2_alert4>;
-+					cooling-device = <&cpu4 3 12>;
-+				};
-+			};
-+		};
-+		cpu3_thermal: cpu3-thermal {
-+			thermal-sensors = <&tmu_cpu3 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu3_alert0: cpu-alert-0 {
-+					temperature = <50000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu3_alert1: cpu-alert-1 {
-+					temperature = <60000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu3_alert2: cpu-alert-2 {
-+					temperature = <70000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu3_crit0: cpu-crit-0 {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+				cpu3_alert3: cpu-alert-3 {
-+					temperature = <70000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+				cpu3_alert4: cpu-alert-4 {
-+					temperature = <85000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu3_alert0>;
-+					cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+					trip = <&cpu3_alert1>;
-+					cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+					trip = <&cpu3_alert2>;
-+					cooling-device = <&fan0 2 3>;
-+				};
-+				map3 {
-+					trip = <&cpu3_alert3>;
-+					cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+					trip = <&cpu3_alert3>;
-+					cooling-device = <&cpu4 0 2>;
-+				};
-+				map5 {
-+					trip = <&cpu3_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+					trip = <&cpu3_alert4>;
-+					cooling-device = <&cpu4 3 12>;
- 				};
- 			};
- 		};
+>> The only code I could find tries to set
+>> polarity values from bus_flags, and for VGA I'd assume you want to instead
+>> key this off the mode?
+> The usecase is that either a panel or a dumb VGA bridge is used
+> (not both, luckily).
+>
+> On *some* dumb VGA bridges, the polarity of the clock signal is
+> inverted, i.e. it expects data to be clocked out on the negative
+> edge rather than the positive edge. See:
+> https://lists.freedesktop.org/archives/dri-devel/2017-September/151603.html
+>
+> And the PL111 can control this in software, that is why it is inspecting
+> the flags on the connector to figure out when to clock things out.
+>
+> It seems logical to check the connector to figure out what clock edge
+> it wants?
+>
+>> Wrt the more general problem: They way we solve this in the i915 atomic
+>> framework is that the various ->fixup calls fill out relevant fields in
+>> the drm_crtc_state. I guess we could add an ->atomic_check to bridges, add
+>> a bus_flags to drm_crtc_state (or maybe just let everyone patch up
+>> adjusted_mode->flags) instead?
+> Not quite following... I do need fixups to mask some modes off the
+> PL111 but that would be on the driver side.
+>
+> Yours,
+> Linus Walleij
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
