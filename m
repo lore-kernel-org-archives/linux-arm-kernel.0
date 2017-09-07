@@ -1,285 +1,102 @@
-From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Thu, 7 Sep 2017 12:18:47 +0300
-Subject: [PATCH v4 1/3] arm: npcm: add basic support for Nuvoton BMCs
-In-Reply-To: <20170906080751.6773-2-brendanhiggins@google.com>
-References: <20170906080751.6773-1-brendanhiggins@google.com>
- <20170906080751.6773-2-brendanhiggins@google.com>
-Message-ID: <CAP6Zq1jf81tvG_F1aDN+1QdWg=c2v2spkb9gi-Z8-e5=9pMd0g@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 07 Sep 2017 10:20:18 +0100
+Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
+In-Reply-To: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
+References: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <59B10F52.9010400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2017 at 11:07, Brendan Higgins <brendanhiggins@google.com> wrote:
-> Adds basic support for the Nuvoton NPCM750 BMC.
->
-> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-> ---
->  arch/arm/Kconfig             |  2 +
->  arch/arm/Makefile            |  1 +
->  arch/arm/mach-npcm/Kconfig   | 50 +++++++++++++++++++++++++
->  arch/arm/mach-npcm/Makefile  |  3 ++
->  arch/arm/mach-npcm/headsmp.S | 17 +++++++++
->  arch/arm/mach-npcm/npcm7xx.c | 34 +++++++++++++++++
->  arch/arm/mach-npcm/platsmp.c | 89 ++++++++++++++++++++++++++++++++++++++++++++
->  7 files changed, 196 insertions(+)
->  create mode 100644 arch/arm/mach-npcm/Kconfig
->  create mode 100644 arch/arm/mach-npcm/Makefile
->  create mode 100644 arch/arm/mach-npcm/headsmp.S
->  create mode 100644 arch/arm/mach-npcm/npcm7xx.c
->  create mode 100644 arch/arm/mach-npcm/platsmp.c
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 61a0cb15067e..05543f1cfbde 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -782,6 +782,8 @@ source "arch/arm/mach-netx/Kconfig"
->
->  source "arch/arm/mach-nomadik/Kconfig"
->
-> +source "arch/arm/mach-npcm/Kconfig"
-> +
->  source "arch/arm/mach-nspire/Kconfig"
->
->  source "arch/arm/plat-omap/Kconfig"
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 47d3a1ab08d2..60ca50c7d762 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)             += mediatek
->  machine-$(CONFIG_ARCH_MXS)             += mxs
->  machine-$(CONFIG_ARCH_NETX)            += netx
->  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
-> +machine-$(CONFIG_ARCH_NPCM)            += npcm
->  machine-$(CONFIG_ARCH_NSPIRE)          += nspire
->  machine-$(CONFIG_ARCH_OXNAS)           += oxnas
->  machine-$(CONFIG_ARCH_OMAP1)           += omap1
-> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
-> new file mode 100644
-> index 000000000000..d47061855439
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/Kconfig
-> @@ -0,0 +1,50 @@
-> +menuconfig ARCH_NPCM
-> +       bool "Nuvoton NPCM Architecture"
-> +       select ARCH_REQUIRE_GPIOLIB
-> +       select USE_OF
-> +       select PINCTRL
-> +       select PINCTRL_NPCM7XX
-> +
-> +if ARCH_NPCM
-> +
-> +comment "NPCMX50 CPU type"
-> +
-> +config CPU_NPCM750
-> +       depends on ARCH_NPCM && ARCH_MULTI_V7
-> +       bool "Support for NPCM750 BMC CPU (Poleg)"
-> +       select CACHE_L2X0
-> +       select CPU_V7
-> +       select ARM_GIC
-> +       select HAVE_SMP
-> +       select SMP
-> +       select SMP_ON_UP
-> +       select HAVE_ARM_SCU
-> +       select HAVE_ARM_TWD if SMP
-> +       select ARM_ERRATA_458693
-> +       select ARM_ERRATA_720789
-> +       select ARM_ERRATA_742231
-> +       select ARM_ERRATA_754322
-> +       select ARM_ERRATA_764369
-> +       select ARM_ERRATA_794072
-> +       select PL310_ERRATA_588369
-> +       select PL310_ERRATA_727915
-> +       select USB_EHCI_ROOT_HUB_TT
-> +       select USB_ARCH_HAS_HCD
-> +       select USB_ARCH_HAS_EHCI
-> +       select USB_EHCI_HCD
-> +       select USB_ARCH_HAS_OHCI
-> +       select USB_OHCI_HCD
-> +       select USB
-> +       select FIQ
-> +       select CPU_USE_DOMAINS
-> +       select GENERIC_CLOCKEVENTS
-> +       select CLKDEV_LOOKUP
-> +       select COMMON_CLK if OF
-> +       select NPCM750_TIMER
-> +       select MFD_SYSCON
-> +       help
-> +         Support for NPCM750 BMC CPU (Poleg).
-> +
-> +         Nuvoton NPCM750 BMC based on the Cortex A9.
-> +
-> +endif
-> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
-> new file mode 100644
-> index 000000000000..78416055b854
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/Makefile
-> @@ -0,0 +1,3 @@
-> +AFLAGS_headsmp.o               += -march=armv7-a
-> +
-> +obj-$(CONFIG_CPU_NPCM750)      += npcm7xx.o platsmp.o headsmp.o
-> diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
-> new file mode 100644
-> index 000000000000..9fccbbd49ed4
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/headsmp.S
-> @@ -0,0 +1,17 @@
-> +/*
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +#include <asm/assembler.h>
-> +
-> +ENTRY(npcm7xx_secondary_startup)
-> +       safe_svcmode_maskall r0
-> +
-> +       b       secondary_startup
-> +ENDPROC(npcm7xx_secondary_startup)
-> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
-> new file mode 100644
-> index 000000000000..132e9d587857
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/npcm7xx.c
-> @@ -0,0 +1,34 @@
-> +/*
-> + * Copyright (c) 2017 Nuvoton Technology corporation.
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/hardware/cache-l2x0.h>
-> +
-> +#define NPCM7XX_AUX_VAL (L310_AUX_CTRL_INSTR_PREFETCH |                               \
-> +                        L310_AUX_CTRL_DATA_PREFETCH |                         \
-> +                        L310_AUX_CTRL_NS_LOCKDOWN |                           \
-> +                        L310_AUX_CTRL_CACHE_REPLACE_RR |                      \
-> +                        L2C_AUX_CTRL_SHARED_OVERRIDE |                        \
-> +                        L310_AUX_CTRL_FULL_LINE_ZERO)
-> +
-> +static const char *const npcm7xx_dt_match[] = {
-> +       "nuvoton,npcm750",
-> +       NULL
-> +};
-> +
-> +DT_MACHINE_START(NPCM7XX_DT, "NPCMX50 Chip family")
-> +       .atag_offset    = 0x100,
-> +       .dt_compat      = npcm7xx_dt_match,
-> +       .l2c_aux_val    = NPCM7XX_AUX_VAL,
-> +       .l2c_aux_mask   = ~NPCM7XX_AUX_VAL,
-> +MACHINE_END
-> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
-> new file mode 100644
-> index 000000000000..144e3e7ec7e6
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/platsmp.c
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt) "PLATSMP: " fmt
-> +
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/smp_scu.h>
-> +
-> +#define NPCM7XX_SCRPAD_REG 0x13c
-> +
-> +extern void npcm7xx_secondary_startup(void);
-> +
-> +static int npcm7xx_smp_boot_secondary(unsigned int cpu,
-> +                                     struct task_struct *idle)
-> +{
-> +       struct device_node *gcr_np;
-> +       void __iomem *gcr_base;
-> +       int ret = 0;
-> +
-> +       gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
-> +       if (!gcr_np) {
-> +               pr_err("no gcr device node\n");
-> +               ret = -EFAULT;
-> +               goto out;
-> +       }
-> +       gcr_base = of_iomap(gcr_np, 0);
-> +       if (!gcr_base) {
-> +               pr_err("could not iomap gcr at: 0x%llx\n", gcr_base);
-> +               ret = -EFAULT;
-> +               goto out;
-> +       }
-> +
-> +       /* give boot ROM kernel start address. */
-> +       iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
-> +                 NPCM7XX_SCRPAD_REG);
-> +       /* make sure npcm7xx_secondary_startup is seen by all observers. */
-> +       smp_wmb();
-> +       dsb_sev();
-> +       /* make sure write buffer is drained */
-> +       mb();
-> +
-> +out:
-> +       iounmap(gcr_base);
-> +       return ret;
-> +}
-> +
-> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +       struct device_node *scu_np;
-> +       void __iomem *scu_base;
-> +
-> +       scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-> +       if (!scu_np) {
-> +               pr_err("no scu device node\n");
-> +               return;
-> +       }
-> +       scu_base = of_iomap(scu_np, 0);
-> +       if (!scu_base) {
-> +               pr_err("could not iomap scu at: 0x%llx\n", scu_base);
-> +               return;
-> +       }
-> +
-> +       scu_enable(scu_base);
-> +
-> +out:
-> +       iounmap(scu_base);
-> +}
-> +
-> +static struct smp_operations npcm7xx_smp_ops __initdata = {
-> +       .smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
-> +       .smp_boot_secondary = npcm7xx_smp_boot_secondary,
-> +};
-> +
-> +CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm7xx-smp", &npcm7xx_smp_ops);
-> --
-> 2.14.1.581.gf28d330327-goog
->
+Hi Dongjiu Geng,
 
-Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-Tested-by: Tomer Maimon <tmaimon77@gmail.com>
-Tested-by: Avi Fishman <avifishman70@gmail.com>
+On 07/09/17 06:54, Dongjiu Geng wrote:
+> In VHE mode, host kernel runs in the EL2 and can enable
+> 'User Access Override' when fs==KERNEL_DS so that it can
+> access kernel memory. However, PSTATE.UAO is set to 0 on
+> an exception taken from EL1 to EL2. Thus when VHE is used
+> and exception taken from a guest UAO will be disabled and
+> host will use the incorrect PSTATE.UAO. So check and reset
+> the PSTATE.UAO when switching to host.
+
+This would only be a problem if KVM were calling into world-switch with
+fs==KERNEL_DS. I can't see where this happens.
+
+kvm_arch_vcpu_ioctl_run() is the only place KVM calls world-switch, there are no
+set_fs() calls in it, or on the path to it. The addr_limit should be USER_DS,
+PSTATE.UAO will be clear, as it is when we come back from a guest.
+
+This isn't broken today. I agree it will break if KVM decides to
+set_fs(KERNEL_DS) around world switch, but until then we don't need this patch.
+
+
+> Move the reset PSTATE.PAN on entry to EL2 together with
+> PSTATE.UAO reset.
+
+Moving this breaks PAN-at-HYP for systems with PAN but without VHE.
+
+
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 12ee62d..7662ef5 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -96,8 +96,6 @@ ENTRY(__guest_exit)
+>  
+>  	add	x1, x1, #VCPU_CONTEXT
+>  
+> -	ALTERNATIVE(nop, SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+> -
+>  	// Store the guest regs x2 and x3
+>  	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index a733461..715b3941 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -22,6 +22,7 @@
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_hyp.h>
+>  #include <asm/fpsimd.h>
+> +#include <asm/exec.h>
+>  
+>  static bool __hyp_text __fpsimd_enabled_nvhe(void)
+>  {
+> @@ -399,6 +400,17 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_restore_host_state(host_ctxt);
+>  
+> +	if (has_vhe()) {
+> +		/*
+> +		 * PSTATE was not saved over guest enter/exit, re-enable
+> +		 * any detecte features that might not have been set
+> +		 * correctly.
+> +		 */
+> +		uao_thread_switch(current);
+
+I don't see how addr_limit will ever be KERNEL_DS, so this is always clearing
+PSTATE.UAO, which was already clear from the guest-exit exception.
+
+(Also, the uao_thread_switch() code isn't accessible from EL2, neither is current)
+
+
+> +		asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1),
+> +			ARM64_HAS_PAN, CONFIG_ARM64_PAN));
+
+... and this is setting PSTATE.PAN on VHE, which was already set, and breaking
+PAN-at-HYP on non-VHE systems.
+
+Vladimir's commit message for that patch that added this enabling explained it
+is needed for !VHE as SCTLR_EL2 when HCR_EL2.E2H is clear doesn't have a SPAN bit.
+
+When we have VHE clearing SCTLR_EL2.SPAN (clearing because it was RES1 on v8.0)
+will cause the CPU to set PSTATE.PAN when we take an exception.
+
+
+> +	}
+> +
+>  	if (fp_enabled) {
+>  		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> 
+
+
+James
