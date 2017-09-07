@@ -1,124 +1,39 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 7 Sep 2017 13:52:45 +0200
-Subject: [PATCH v4 1/4] dt-bindings: Document the STM32 DMAMUX bindings
+Date: Thu, 7 Sep 2017 13:52:48 +0200
+Subject: [PATCH v4 4/4] ARM: configs: stm32: Add MDMA support in STM32
+ defconfig
 In-Reply-To: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1504785168-26572-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1504785168-26572-5-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation of device tree bindings for the STM32
-DMAMUX.
+This patch adds MDMA support in STM32 defconfig file
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
  Version history:
     v4:
-        * Add multi-master ability for STM32 DMAMUX
-        * Get rid of st,dmamux properties
     v3:
-        * Change compatible to st,stm32h7-dmamux to be mode Soc specific
-        * Add verbosity in dma-cells
+        * None
     v2:
-        * Move clock bindings from optional to mandatory one
-        * Drop channelID bindings as managed dynamically from now on by
-          DMAMUX driver.
+        * Add MDMA support in STM32 defconfig
 ---
 ---
- .../devicetree/bindings/dma/stm32-dmamux.txt       | 84 ++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-new file mode 100644
-index 0000000..1b893b2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-@@ -0,0 +1,84 @@
-+STM32 DMA MUX (DMA request router)
-+
-+Required properties:
-+- compatible:	"st,stm32h7-dmamux"
-+- reg:		Memory map for accessing module
-+- #dma-cells:	Should be set to <3>.
-+		First parameter is request line number.
-+		Second is DMA channel configuration
-+		Third is Fifo threshold
-+		For more details about the three cells, please see
-+		stm32-dma.txt documentation binding file
-+- dma-masters:	Phandle pointing to the DMA controllers.
-+		Several controllers are allowed. Only "st,stm32-dma" DMA
-+		compatible are supported.
-+
-+Optional properties:
-+- dma-channels : Number of DMA requests supported.
-+- dma-requests : Number of DMAMUX requests supported.
-+- resets: Reference to a reset controller asserting the DMA controller
-+- clocks: Input clock of the DMAMUX instance.
-+
-+Example:
-+
-+/* DMA controller 1 */
-+dma1: dma-controller at 40020000 {
-+	compatible = "st,stm32-dma";
-+	reg = <0x40020000 0x400>;
-+	interrupts = <11>,
-+		     <12>,
-+		     <13>,
-+		     <14>,
-+		     <15>,
-+		     <16>,
-+		     <17>,
-+		     <47>;
-+	clocks = <&timer_clk>;
-+	#dma-cells = <4>;
-+	st,mem2mem;
-+	resets = <&rcc 150>;
-+	dma-channels = <8>;
-+	dma-requests = <8>;
-+};
-+
-+/* DMA controller 1 */
-+dma2: dma at 40020400 {
-+	compatible = "st,stm32-dma";
-+	reg = <0x40020400 0x400>;
-+	interrupts = <56>,
-+		     <57>,
-+		     <58>,
-+		     <59>,
-+		     <60>,
-+		     <68>,
-+		     <69>,
-+		     <70>;
-+	clocks = <&timer_clk>;
-+	#dma-cells = <4>;
-+	st,mem2mem;
-+	resets = <&rcc 150>;
-+	dma-channels = <8>;
-+	dma-requests = <8>;
-+};
-+
-+/* DMA mux */
-+dmamux1: dma-router at 40020800 {
-+	compatible = "st,stm32h7-dmamux";
-+	reg = <0x40020800 0x3c>;
-+	#dma-cells = <3>;
-+	dma-requests = <128>;
-+	dma-channels = <16>;
-+	dma-masters = <&dma1 &dma2>;
-+	clocks = <&timer_clk>;
-+};
-+
-+/* DMA client */
-+usart1: serial at 40011000 {
-+	compatible = "st,stm32-usart", "st,stm32-uart";
-+	reg = <0x40011000 0x400>;
-+	interrupts = <37>;
-+	clocks = <&timer_clk>;
-+	dmas = <&dmamux1 41 0x414 0>,
-+	       <&dmamux1 42 0x414 0>;
-+	dma-names = "rx", "tx";
-+};
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 90e5c46..988f395 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_STM32=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
++CONFIG_STM32_DMAMUX=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
 -- 
 2.7.4
