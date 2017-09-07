@@ -1,60 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Sep 2017 14:59:08 +0200
-Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as
- fallback
-In-Reply-To: <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
-References: <20170901094629.6566-1-linus.walleij@linaro.org>
- <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
-Message-ID: <CACRpkdZrwZ980YhKGQSpLxoYaFtHvQBUPTXzXqLCbn+4+zvs9g@mail.gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Thu,  7 Sep 2017 15:04:53 +0200
+Subject: [PATCH v2] arm64: dts: marvell: Fix A37xx UART0 register size
+Message-ID: <20170907130453.25497-1-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 4, 2017 at 9:43 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Fri, Sep 01, 2017 at 11:46:29AM +0200, Linus Walleij wrote:
->> If we cannot find a panel, assume that the output from the
->> PL111 is connected directly to a "dumb" VGA connector,
->> so look up the connector from that bridge.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+From: allen yan <yanwei@marvell.com>
 
->>       if (panel) {
->>               priv->panel = panel;
->>               priv->connector = panel->connector;
->> +     } else {
->> +             priv->connector = drm_dumb_vga_get_connector(bridge);
->
-> Why do you need to set this?
+Armada-37xx UART0 registers are 0x200 bytes wide. Right next to them are
+the UART1 registers that should not be declared in this node.
 
-Essentially because drm_simple_display_pipe_init() require that you
-specify a connector in the last argument, so I have to get it from
-somewhere.
+Update the example in DT bindings document accordingly.
 
-> The only code I could find tries to set
-> polarity values from bus_flags, and for VGA I'd assume you want to instead
-> key this off the mode?
+Signed-off-by: allen yan <yanwei@marvell.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+---
 
-The usecase is that either a panel or a dumb VGA bridge is used
-(not both, luckily).
+Change since first version: re-added original author 'Signed-off-by'.
 
-On *some* dumb VGA bridges, the polarity of the clock signal is
-inverted, i.e. it expects data to be clocked out on the negative
-edge rather than the positive edge. See:
-https://lists.freedesktop.org/archives/dri-devel/2017-September/151603.html
+ Documentation/devicetree/bindings/serial/mvebu-uart.txt | 2 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-And the PL111 can control this in software, that is why it is inspecting
-the flags on the connector to figure out when to clock things out.
-
-It seems logical to check the connector to figure out what clock edge
-it wants?
-
-> Wrt the more general problem: They way we solve this in the i915 atomic
-> framework is that the various ->fixup calls fill out relevant fields in
-> the drm_crtc_state. I guess we could add an ->atomic_check to bridges, add
-> a bus_flags to drm_crtc_state (or maybe just let everyone patch up
-> adjusted_mode->flags) instead?
-
-Not quite following... I do need fixups to mask some modes off the
-PL111 but that would be on the driver side.
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+index 6087defd9f93..d37fabe17bd1 100644
+--- a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
++++ b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+@@ -8,6 +8,6 @@ Required properties:
+ Example:
+ 	serial at 12000 {
+ 		compatible = "marvell,armada-3700-uart";
+-		reg = <0x12000 0x400>;
++		reg = <0x12000 0x200>;
+ 		interrupts = <43>;
+ 	};
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 51763d674050..9e558801266a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -129,7 +129,7 @@
+ 
+ 			uart0: serial at 12000 {
+ 				compatible = "marvell,armada-3700-uart";
+-				reg = <0x12000 0x400>;
++				reg = <0x12000 0x200>;
+ 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 				status = "disabled";
+ 			};
+-- 
+2.11.0
