@@ -1,213 +1,318 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 7 Sep 2017 12:22:15 +0800
-Subject: [PATCH v2 1/3] arm64/ras: support sea error recovery
-In-Reply-To: <20170906101251.5gy53sbbkikpfg3y@pd.tnic>
-References: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
- <1504609566-66318-2-git-send-email-xiexiuqi@huawei.com>
- <20170906101251.5gy53sbbkikpfg3y@pd.tnic>
-Message-ID: <281c6244-2203-e06c-1850-f07c6fba4954@huawei.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Wed, 6 Sep 2017 22:09:05 -0700
+Subject: [PATCH v4 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <CAKKbWA4OXL__VWzwRvN_wujDc70zWqmGPcu2_WRpvsSUYba1Qg@mail.gmail.com>
+References: <20170906080751.6773-1-brendanhiggins@google.com>
+ <20170906080751.6773-2-brendanhiggins@google.com>
+ <CAKKbWA4OXL__VWzwRvN_wujDc70zWqmGPcu2_WRpvsSUYba1Qg@mail.gmail.com>
+Message-ID: <CAFd5g46fh3unYC8J3CyUg25=3XAbz+U-XC6ON7V9p5Nt0mLKgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
-
-On 2017/9/6 18:12, Borislav Petkov wrote:
-> On Tue, Sep 05, 2017 at 07:06:04PM +0800, Xie XiuQi wrote:
->> With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
->> are consumed. In some cases, if the error address is in a clean page or a
->> read-only page, there is a chance to recover. Such as error occurs in a
->> instruction page, we can reread this page from disk instead of killing process.
+On Wed, Sep 6, 2017 at 2:04 PM, Avi Fishman <avifishman70@gmail.com> wrote:
+> Sorry for sending again some mailing list rejected it due to HTML
+> involved (althoug I tried Plain Text), Trying again.
+>
+> 2017-09-06 11:07 GMT+03:00 Brendan Higgins <brendanhiggins@google.com>:
+>> Adds basic support for the Nuvoton NPCM750 BMC.
 >>
->> Because memory_failure() may sleep, we can not call it directly in SEA exception
->> context. So we saved faulting physical address associated with a process in the
->> ghes handler and set __TIF_SEA_NOTIFY. When we return from SEA exception context
->> and get into do_notify_resume() before the process running, we could check it
->> and call memory_failure() to do recovery. It's safe, because we are in process
->> context.
->>
->> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
->> Signed-off-by: Wang Xiongfeng <wangxiongfeng2@huawei.com>
+>> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
 >> ---
->>  arch/arm64/Kconfig                   |  11 +++
->>  arch/arm64/include/asm/ras.h         |  36 +++++++++
->>  arch/arm64/include/asm/thread_info.h |   4 +-
->>  arch/arm64/kernel/Makefile           |   1 +
->>  arch/arm64/kernel/ras.c              | 143 +++++++++++++++++++++++++++++++++++
->>  arch/arm64/kernel/signal.c           |   8 ++
->>  arch/arm64/mm/fault.c                |  27 +++++--
->>  drivers/acpi/apei/ghes.c             |   4 +-
->>  8 files changed, 223 insertions(+), 11 deletions(-)
->>  create mode 100644 arch/arm64/include/asm/ras.h
->>  create mode 100644 arch/arm64/kernel/ras.c
-> 
-> Please integrate scripts/checkpatch.pl into your patch creation workflow
-> and run all patches through it before submitting:
+>>  arch/arm/Kconfig             |  2 +
+>>  arch/arm/Makefile            |  1 +
+>>  arch/arm/mach-npcm/Kconfig   | 50 +++++++++++++++++++++++++
+>>  arch/arm/mach-npcm/Makefile  |  3 ++
+>>  arch/arm/mach-npcm/headsmp.S | 17 +++++++++
+>>  arch/arm/mach-npcm/npcm7xx.c | 34 +++++++++++++++++
+>>  arch/arm/mach-npcm/platsmp.c | 89 ++++++++++++++++++++++++++++++++++++++++++++
+>>  7 files changed, 196 insertions(+)
+>>  create mode 100644 arch/arm/mach-npcm/Kconfig
+>>  create mode 100644 arch/arm/mach-npcm/Makefile
+>>  create mode 100644 arch/arm/mach-npcm/headsmp.S
+>>  create mode 100644 arch/arm/mach-npcm/npcm7xx.c
+>>  create mode 100644 arch/arm/mach-npcm/platsmp.c
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 61a0cb15067e..05543f1cfbde 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -782,6 +782,8 @@ source "arch/arm/mach-netx/Kconfig"
+>>
+>>  source "arch/arm/mach-nomadik/Kconfig"
+>>
+>> +source "arch/arm/mach-npcm/Kconfig"
+>> +
+>>  source "arch/arm/mach-nspire/Kconfig"
+>>
+>>  source "arch/arm/plat-omap/Kconfig"
+>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>> index 47d3a1ab08d2..60ca50c7d762 100644
+>> --- a/arch/arm/Makefile
+>> +++ b/arch/arm/Makefile
+>> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)             += mediatek
+>>  machine-$(CONFIG_ARCH_MXS)             += mxs
+>>  machine-$(CONFIG_ARCH_NETX)            += netx
+>>  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
+>> +machine-$(CONFIG_ARCH_NPCM)            += npcm
+>>  machine-$(CONFIG_ARCH_NSPIRE)          += nspire
+>>  machine-$(CONFIG_ARCH_OXNAS)           += oxnas
+>>  machine-$(CONFIG_ARCH_OMAP1)           += omap1
+>> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+>> new file mode 100644
+>> index 000000000000..d47061855439
+>> --- /dev/null
+>> +++ b/arch/arm/mach-npcm/Kconfig
+>> @@ -0,0 +1,50 @@
+>> +menuconfig ARCH_NPCM
+>> +       bool "Nuvoton NPCM Architecture"
+>> +       select ARCH_REQUIRE_GPIOLIB
+>> +       select USE_OF
+>> +       select PINCTRL
+>> +       select PINCTRL_NPCM7XX
+>> +
+>> +if ARCH_NPCM
+>> +
+>> +comment "NPCMX50 CPU type"
+>> +
+>> +config CPU_NPCM750
+>> +       depends on ARCH_NPCM && ARCH_MULTI_V7
+>> +       bool "Support for NPCM750 BMC CPU (Poleg)"
+>> +       select CACHE_L2X0
+>> +       select CPU_V7
+>> +       select ARM_GIC
+>> +       select HAVE_SMP
+>> +       select SMP
+>> +       select SMP_ON_UP
+>> +       select HAVE_ARM_SCU
+>> +       select HAVE_ARM_TWD if SMP
+>> +       select ARM_ERRATA_458693
+>> +       select ARM_ERRATA_720789
+>> +       select ARM_ERRATA_742231
+>> +       select ARM_ERRATA_754322
+>> +       select ARM_ERRATA_764369
+>> +       select ARM_ERRATA_794072
+>> +       select PL310_ERRATA_588369
+>> +       select PL310_ERRATA_727915
+>> +       select USB_EHCI_ROOT_HUB_TT
+>> +       select USB_ARCH_HAS_HCD
+>> +       select USB_ARCH_HAS_EHCI
+>> +       select USB_EHCI_HCD
+>> +       select USB_ARCH_HAS_OHCI
+>> +       select USB_OHCI_HCD
+>> +       select USB
+>> +       select FIQ
+>> +       select CPU_USE_DOMAINS
+>> +       select GENERIC_CLOCKEVENTS
+>> +       select CLKDEV_LOOKUP
+>> +       select COMMON_CLK if OF
+>> +       select NPCM750_TIMER
+>> +       select MFD_SYSCON
+>> +       help
+>> +         Support for NPCM750 BMC CPU (Poleg).
+>> +
+>> +         Nuvoton NPCM750 BMC based on the Cortex A9.
+>> +
+>> +endif
+>> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+>> new file mode 100644
+>> index 000000000000..78416055b854
+>> --- /dev/null
+>> +++ b/arch/arm/mach-npcm/Makefile
+>> @@ -0,0 +1,3 @@
+>> +AFLAGS_headsmp.o               += -march=armv7-a
+>> +
+>> +obj-$(CONFIG_CPU_NPCM750)      += npcm7xx.o platsmp.o headsmp.o
+>> diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
+>> new file mode 100644
+>> index 000000000000..9fccbbd49ed4
+>> --- /dev/null
+>> +++ b/arch/arm/mach-npcm/headsmp.S
+>> @@ -0,0 +1,17 @@
+>> +/*
+>> + * Copyright 2017 Google, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +#include <linux/init.h>
+>> +#include <asm/assembler.h>
+>> +
+>> +ENTRY(npcm7xx_secondary_startup)
+>> +       safe_svcmode_maskall r0
+>
+> I saw you  answered to Florian Fainelli that the BootRom is not
+> starting the secondary CPU in SVC mode. Are you sure? In our
+> engineering npcm7xx revision, Z1, the BootRom indeed started to run it
+> in IRQ mode but we fixed it in the production version, A1, (quite long
+> time ago), I hope you didn't get an EB with Z1 you can check that in
+> BootBlock console print:
+>> ADC CLK is set to 25000000
+>>Last reset was CORST
+>>vgaioen=1 and mux gspi.
+>>A1 <<====== this is what you should see, if you see Z1 we need to replace your EB
+>
 
-Sorry for my mistake. I'll fix it, thanks.
+Nope, on boot it prints:
 
-> 
-> ERROR: code indent should use tabs where possible
-> #200: FILE: arch/arm64/kernel/ras.c:42:
-> +        atomic_t                inuse;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #200: FILE: arch/arm64/kernel/ras.c:42:
-> +        atomic_t                inuse;$
-> 
-> ERROR: code indent should use tabs where possible
-> #201: FILE: arch/arm64/kernel/ras.c:43:
-> +        struct task_struct      *t;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #201: FILE: arch/arm64/kernel/ras.c:43:
-> +        struct task_struct      *t;$
-> 
-> ERROR: code indent should use tabs where possible
-> #202: FILE: arch/arm64/kernel/ras.c:44:
-> +        __u64                   paddr;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #202: FILE: arch/arm64/kernel/ras.c:44:
-> +        __u64                   paddr;$
-> 
-> ERROR: code indent should use tabs where possible
-> #207: FILE: arch/arm64/kernel/ras.c:49:
-> +        struct sea_info *si;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #207: FILE: arch/arm64/kernel/ras.c:49:
-> +        struct sea_info *si;$
-> 
-> ERROR: code indent should use tabs where possible
-> #209: FILE: arch/arm64/kernel/ras.c:51:
-> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++) {$
-> 
-> WARNING: please, no spaces at the start of a line
-> #209: FILE: arch/arm64/kernel/ras.c:51:
-> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++) {$
-> 
-> ERROR: code indent should use tabs where possible
-> #210: FILE: arch/arm64/kernel/ras.c:52:
-> +                if (atomic_cmpxchg(&si->inuse, 0, 1) == 0) {$
-> 
-> WARNING: please, no spaces at the start of a line
-> #210: FILE: arch/arm64/kernel/ras.c:52:
-> +                if (atomic_cmpxchg(&si->inuse, 0, 1) == 0) {$
-> 
-> ERROR: code indent should use tabs where possible
-> #211: FILE: arch/arm64/kernel/ras.c:53:
-> +                        si->t = current;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #211: FILE: arch/arm64/kernel/ras.c:53:
-> +                        si->t = current;$
-> 
-> ERROR: code indent should use tabs where possible
-> #212: FILE: arch/arm64/kernel/ras.c:54:
-> +                        si->paddr = addr;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #212: FILE: arch/arm64/kernel/ras.c:54:
-> +                        si->paddr = addr;$
-> 
-> ERROR: code indent should use tabs where possible
-> #213: FILE: arch/arm64/kernel/ras.c:55:
-> +                        return true;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #213: FILE: arch/arm64/kernel/ras.c:55:
-> +                        return true;$
-> 
-> ERROR: code indent should use tabs where possible
-> #214: FILE: arch/arm64/kernel/ras.c:56:
-> +                }$
-> 
-> WARNING: please, no spaces at the start of a line
-> #214: FILE: arch/arm64/kernel/ras.c:56:
-> +                }$
-> 
-> ERROR: code indent should use tabs where possible
-> #215: FILE: arch/arm64/kernel/ras.c:57:
-> +        }$
-> 
-> WARNING: please, no spaces at the start of a line
-> #215: FILE: arch/arm64/kernel/ras.c:57:
-> +        }$
-> 
-> ERROR: code indent should use tabs where possible
-> #223: FILE: arch/arm64/kernel/ras.c:65:
-> +        struct sea_info *si;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #223: FILE: arch/arm64/kernel/ras.c:65:
-> +        struct sea_info *si;$
-> 
-> ERROR: code indent should use tabs where possible
-> #225: FILE: arch/arm64/kernel/ras.c:67:
-> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++)$
-> 
-> WARNING: please, no spaces at the start of a line
-> #225: FILE: arch/arm64/kernel/ras.c:67:
-> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++)$
-> 
-> ERROR: code indent should use tabs where possible
-> #226: FILE: arch/arm64/kernel/ras.c:68:
-> +                if (atomic_read(&si->inuse) && si->t == current)$
-> 
-> WARNING: please, no spaces at the start of a line
-> #226: FILE: arch/arm64/kernel/ras.c:68:
-> +                if (atomic_read(&si->inuse) && si->t == current)$
-> 
-> ERROR: code indent should use tabs where possible
-> #227: FILE: arch/arm64/kernel/ras.c:69:
-> +                        return si;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #227: FILE: arch/arm64/kernel/ras.c:69:
-> +                        return si;$
-> 
-> ERROR: code indent should use tabs where possible
-> #228: FILE: arch/arm64/kernel/ras.c:70:
-> +        return NULL;$
-> 
-> WARNING: please, no spaces at the start of a line
-> #228: FILE: arch/arm64/kernel/ras.c:70:
-> +        return NULL;$
-> 
-> ERROR: code indent should use tabs where possible
-> #233: FILE: arch/arm64/kernel/ras.c:75:
-> +        atomic_set(&si->inuse, 0);$
-> 
-> WARNING: please, no spaces at the start of a line
-> #233: FILE: arch/arm64/kernel/ras.c:75:
-> +        atomic_set(&si->inuse, 0);$
-> 
-> WARNING: braces {} are not necessary for single statement blocks
-> #265: FILE: arch/arm64/kernel/ras.c:107:
-> +		if (memory_failure(pfn, 0, flags) < 0) {
-> +			fail++;
-> +		}
-> 
-> WARNING: braces {} are not necessary for single statement blocks
-> #293: FILE: arch/arm64/kernel/ras.c:135:
-> +		if (err_info->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR) {
-> +			info_saved |= sea_save_info(err_info->physical_fault_addr);
-> +		}
-> 
-> total: 17 errors, 21 warnings, 299 lines checked
-> 
-> NOTE: For some of the reported defects, checkpatch may be able to
->       mechanically convert to the typical style using --fix or --fix-inplace.
-> 
-> NOTE: Whitespace errors detected.
->       You may wish to use scripts/cleanpatch or scripts/cleanfile
-> 
-> Your patch has style problems, please review.
-> 
-> NOTE: If any of the errors are false positives, please report
->       them to the maintainer, see CHECKPATCH in MAINTAINERS.
-> 
+>EB
+>Board manufacturer: Nuvoton
 
--- 
-Thanks,
-Xie XiuQi
+> CPU CLK is 800000000
+> MC  CLK is 800000000
+
+> ADC CLK is set to 25000000
+>Last reset was PORST
+>vgaioen=1 and mux gspi.
+>A1
+>Skip PCI config.
+
+To reproduce, all you have to do is delete
+
+>> +       safe_svcmode_maskall r0
+
+and the kernel will warn that the core is not starting in SVC mode
+
+>> +
+>> +       b       secondary_startup
+>> +ENDPROC(npcm7xx_secondary_startup)
+>> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+>> new file mode 100644
+>> index 000000000000..132e9d587857
+>> --- /dev/null
+>> +++ b/arch/arm/mach-npcm/npcm7xx.c
+>> @@ -0,0 +1,34 @@
+>> +/*
+>> + * Copyright (c) 2017 Nuvoton Technology corporation.
+>> + * Copyright 2017 Google, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/types.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/map.h>
+>> +#include <asm/hardware/cache-l2x0.h>
+>> +
+>> +#define NPCM7XX_AUX_VAL (L310_AUX_CTRL_INSTR_PREFETCH |                               \
+>> +                        L310_AUX_CTRL_DATA_PREFETCH |                         \
+>> +                        L310_AUX_CTRL_NS_LOCKDOWN |                           \
+>> +                        L310_AUX_CTRL_CACHE_REPLACE_RR |                      \
+>> +                        L2C_AUX_CTRL_SHARED_OVERRIDE |                        \
+>> +                        L310_AUX_CTRL_FULL_LINE_ZERO)
+>> +
+>> +static const char *const npcm7xx_dt_match[] = {
+>> +       "nuvoton,npcm750",
+>> +       NULL
+>> +};
+>> +
+>> +DT_MACHINE_START(NPCM7XX_DT, "NPCMX50 Chip family")
+>> +       .atag_offset    = 0x100,
+>> +       .dt_compat      = npcm7xx_dt_match,
+>> +       .l2c_aux_val    = NPCM7XX_AUX_VAL,
+>> +       .l2c_aux_mask   = ~NPCM7XX_AUX_VAL,
+>> +MACHINE_END
+>> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
+>> new file mode 100644
+>> index 000000000000..144e3e7ec7e6
+>> --- /dev/null
+>> +++ b/arch/arm/mach-npcm/platsmp.c
+>> @@ -0,0 +1,89 @@
+>> +/*
+>> + * Copyright 2017 Google, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#define pr_fmt(fmt) "PLATSMP: " fmt
+>> +
+>> +#include <linux/delay.h>
+>> +#include <linux/device.h>
+>> +#include <linux/smp.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/of_address.h>
+>> +#include <asm/cacheflush.h>
+>> +#include <asm/smp.h>
+>> +#include <asm/smp_plat.h>
+>> +#include <asm/smp_scu.h>
+>> +
+>> +#define NPCM7XX_SCRPAD_REG 0x13c
+>> +
+>> +extern void npcm7xx_secondary_startup(void);
+>> +
+>> +static int npcm7xx_smp_boot_secondary(unsigned int cpu,
+>> +                                     struct task_struct *idle)
+>> +{
+>> +       struct device_node *gcr_np;
+>> +       void __iomem *gcr_base;
+>> +       int ret = 0;
+>> +
+>> +       gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
+>> +       if (!gcr_np) {
+>> +               pr_err("no gcr device node\n");
+>> +               ret = -EFAULT;
+>> +               goto out;
+>> +       }
+>> +       gcr_base = of_iomap(gcr_np, 0);
+>> +       if (!gcr_base) {
+>> +               pr_err("could not iomap gcr at: 0x%llx\n", gcr_base);
+>> +               ret = -EFAULT;
+>> +               goto out;
+>> +       }
+>> +
+>> +       /* give boot ROM kernel start address. */
+>> +       iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
+>> +                 NPCM7XX_SCRPAD_REG);
+>> +       /* make sure npcm7xx_secondary_startup is seen by all observers. */
+>> +       smp_wmb();
+>> +       dsb_sev();
+>> +       /* make sure write buffer is drained */
+>> +       mb();
+>> +
+>> +out:
+>> +       iounmap(gcr_base);
+>> +       return ret;
+>> +}
+>> +
+>> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
+>> +{
+>> +       struct device_node *scu_np;
+>> +       void __iomem *scu_base;
+>> +
+>> +       scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+>> +       if (!scu_np) {
+>> +               pr_err("no scu device node\n");
+>> +               return;
+>> +       }
+>> +       scu_base = of_iomap(scu_np, 0);
+>> +       if (!scu_base) {
+>> +               pr_err("could not iomap scu at: 0x%llx\n", scu_base);
+>> +               return;
+>> +       }
+>> +
+>> +       scu_enable(scu_base);
+>> +
+>> +out:
+>> +       iounmap(scu_base);
+>> +}
+>> +
+>> +static struct smp_operations npcm7xx_smp_ops __initdata = {
+>> +       .smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
+>> +       .smp_boot_secondary = npcm7xx_smp_boot_secondary,
+>> +};
+>> +
+>> +CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm7xx-smp", &npcm7xx_smp_ops);
+>> --
+>> 2.14.1.581.gf28d330327-goog
+>>
