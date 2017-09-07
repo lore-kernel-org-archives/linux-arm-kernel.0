@@ -1,51 +1,57 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu,  7 Sep 2017 15:04:53 +0200
-Subject: [PATCH v2] arm64: dts: marvell: Fix A37xx UART0 register size
-Message-ID: <20170907130453.25497-1-miquel.raynal@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Sep 2017 15:26:40 +0200
+Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as
+ fallback
+In-Reply-To: <4828013.uWK28amVrN@avalon>
+References: <20170901094629.6566-1-linus.walleij@linaro.org>
+ <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
+ <4828013.uWK28amVrN@avalon>
+Message-ID: <CACRpkdYNmku09W3wSFEpX7j8M_8d3w1RPoNhxm7hBDYqAuuBvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: allen yan <yanwei@marvell.com>
+On Mon, Sep 4, 2017 at 11:51 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Monday, 4 September 2017 10:43:55 EEST Daniel Vetter wrote:
+>> On Fri, Sep 01, 2017 at 11:46:29AM +0200, Linus Walleij wrote:
 
-Armada-37xx UART0 registers are 0x200 bytes wide. Right next to them are
-the UART1 registers that should not be declared in this node.
+>> Wrt the more general problem: They way we solve this in the i915 atomic
+>> framework is that the various ->fixup calls fill out relevant fields in
+>> the drm_crtc_state. I guess we could add an ->atomic_check to bridges, add
+>> a bus_flags to drm_crtc_state (or maybe just let everyone patch up
+>> adjusted_mode->flags) instead?
+>
+> Furthermore, if we needed to have access to the connector in the display
+> controller driver, this would call for creating the connector there, not in
+> the bridge driver. I've advocated this for a long time, and still haven't
+> given up all hopes of fixing it.
 
-Update the example in DT bindings document accordingly.
+Hm as it is I am trying to adopt to circumstances, so I was just asked
+to replace the custom connector with the generic panel bridge.
+(bridge/panel.c)
 
-Signed-off-by: allen yan <yanwei@marvell.com>
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
+Then we get the connector out of the generic panel bridge by just
+dereferencing panel->connector, this is what the PL111 driver
+is already doing for panels since its inception.
 
-Change since first version: re-added original author 'Signed-off-by'.
+Maybe that is wrong, I don't know :/
 
- Documentation/devicetree/bindings/serial/mvebu-uart.txt | 2 +-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+But like Eric says, the core problem is that the display driver
+say enable function needs to know the flags of what it should
+output. This driver looks at
 
-diff --git a/Documentation/devicetree/bindings/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-index 6087defd9f93..d37fabe17bd1 100644
---- a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-@@ -8,6 +8,6 @@ Required properties:
- Example:
- 	serial at 12000 {
- 		compatible = "marvell,armada-3700-uart";
--		reg = <0x12000 0x400>;
-+		reg = <0x12000 0x200>;
- 		interrupts = <43>;
- 	};
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 51763d674050..9e558801266a 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -129,7 +129,7 @@
- 
- 			uart0: serial at 12000 {
- 				compatible = "marvell,armada-3700-uart";
--				reg = <0x12000 0x400>;
-+				reg = <0x12000 0x200>;
- 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 				status = "disabled";
- 			};
--- 
-2.11.0
+connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW
+connector->display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE
+
+So the bus flags really need to be available somehow.
+I am doing it by keeping a local reference to the connector
+in the driver state container.
+
+I tried to dereference the connector from from the pipe at one
+point, passing NULL to  but it didn't work out, it seems like
+struct drm_simple_display_pipe_funcs
+.enable() is called before attaching the connector or something
+but I guess I should look closer.
+
+Yours,
+Linus Walleij
