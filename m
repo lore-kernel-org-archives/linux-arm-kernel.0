@@ -1,234 +1,349 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu,  7 Sep 2017 10:33:28 -0500
-Subject: [PATCH 1/2] [v5] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1504798409-32041-2-git-send-email-timur@codeaurora.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 07 Sep 2017 17:58:54 +0200
+Subject: [PATCH] ARM: dts: exynos: fix incomplete Odroid-XU3/4 thermal-zones
+ definition
+References: <CGME20170907155857epcas2p1819af1f0290828b48aaf953a05aa32b0@epcas2p1.samsung.com>
+Message-ID: <12756817.Sq0VSgt4c1@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pinctrl-msm only accepts an array of GPIOs from 0 to n-1, and it expects
-each group to support have only one pin (npins == 1).
+From: Willy Wolff <willy.mh.wolff@gmail.com>
 
-We can support "sparse" GPIO maps if we allow for some groups to have zero
-pins (npins == 0).  These pins are "hidden" from the rest of the driver
-and gpiolib.
+Odroid XU3/4 boards have thermal sensors per 4 pairs of A7+A15
+cores but currently there is only one thermal-zone (including
+cooling maps) defined (for the first pair of cores - the first
+core of the A7 cluster and the first core of A15 cluster) so
+i.e. if the task is running on any of A15 cores but the first
+one, such core can reach high temperature without any proper
+cooling action.
 
-A new boolean 'sparse' indicates whether the GPIO map is sparse.  If any
-GPIO has an 'npins' value of 0, then 'sparse' must be set to True.
+Fix it by adding missing thermal-zones definitions.
 
-Most access to unavailable GPIOs can be blocked via the gpio_chip.request
-function.  The one exception is when gpiochip_add_data() scans all of
-the GPIOs without "requesting" them.  To cover this case,
-msm_gpio_get_direction() separately checks if the GPIO is available.
+Also while at it fix the number of steps in cpufreq cooling for
+cpu4 (11 steps for A15 corresponds to 700MHz, for 600MHz 12 steps
+should be used).
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
+Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Kukjin Kim <kgene@kernel.org>
+[b.zolnierkie: rewrote patch subject & description + minor fixups]
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/pinctrl/qcom/pinctrl-msm.c | 110 +++++++++++++++++++++++++++++++++++--
- drivers/pinctrl/qcom/pinctrl-msm.h |   2 +
- 2 files changed, 106 insertions(+), 6 deletions(-)
+I updated the patch to address Krzysztof's review comments,
+the original version from June can be found here:
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index ff491da64dab..ca4ae3d76eb4 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -443,6 +443,14 @@ static int msm_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
- 
- 	g = &pctrl->soc->groups[offset];
- 
-+	/*
-+	 * During initialization, gpiolib may query all GPIOs for their
-+	 * initial direction, regardless if they exist, so block access
-+	 * to those that are unavailable.
-+	 */
-+	if (!g->npins)
-+		return -ENODEV;
+	https://patchwork.kernel.org/patch/9807333/
+
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  241 +++++++++++++++++++--
+ 1 file changed, 222 insertions(+), 19 deletions(-)
+
+Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 17:41:18.264391541 +0200
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 17:47:07.788400343 +0200
+@@ -63,22 +63,22 @@
+ 			polling-delay-passive = <250>;
+ 			polling-delay = <0>;
+ 			trips {
+-				cpu_alert0: cpu-alert-0 {
++				cpu0_alert0: cpu-alert-0 {
+ 					temperature = <50000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+ 					type = "active";
+ 				};
+-				cpu_alert1: cpu-alert-1 {
++				cpu0_alert1: cpu-alert-1 {
+ 					temperature = <60000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+ 					type = "active";
+ 				};
+-				cpu_alert2: cpu-alert-2 {
++				cpu0_alert2: cpu-alert-2 {
+ 					temperature = <70000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+ 					type = "active";
+ 				};
+-				cpu_crit0: cpu-crit-0 {
++				cpu0_crit0: cpu-crit-0 {
+ 					temperature = <120000>; /* millicelsius */
+ 					hysteresis = <0>; /* millicelsius */
+ 					type = "critical";
+@@ -87,14 +87,14 @@
+ 				 * Exynos542x supports only 4 trip-points
+ 				 * so for these polling mode is required.
+ 				 * Start polling at temperature level of last
+-				 * interrupt-driven trip: cpu_alert2
++				 * interrupt-driven trip: cpu0_alert2
+ 				 */
+-				cpu_alert3: cpu-alert-3 {
++				cpu0_alert3: cpu-alert-3 {
+ 					temperature = <70000>; /* millicelsius */
+ 					hysteresis = <10000>; /* millicelsius */
+ 					type = "passive";
+ 				};
+-				cpu_alert4: cpu-alert-4 {
++				cpu0_alert4: cpu-alert-4 {
+ 					temperature = <85000>; /* millicelsius */
+ 					hysteresis = <10000>; /* millicelsius */
+ 					type = "passive";
+@@ -103,43 +103,246 @@
+ 			};
+ 			cooling-maps {
+ 				map0 {
+-					trip = <&cpu_alert0>;
++					trip = <&cpu0_alert0>;
+ 					cooling-device = <&fan0 0 1>;
+ 				};
+ 				map1 {
+-					trip = <&cpu_alert1>;
++					trip = <&cpu0_alert1>;
+ 					cooling-device = <&fan0 1 2>;
+ 				};
+ 				map2 {
+-					trip = <&cpu_alert2>;
++					trip = <&cpu0_alert2>;
+ 					cooling-device = <&fan0 2 3>;
+ 				};
+ 				/*
+-				 * When reaching cpu_alert3, reduce CPU
++				 * When reaching cpu0_alert3, reduce CPU
+ 				 * by 2 steps. On Exynos5422/5800 that would
+ 				 * be: 1600 MHz and 1100 MHz.
+ 				 */
+ 				map3 {
+-					trip = <&cpu_alert3>;
++					trip = <&cpu0_alert3>;
+ 					cooling-device = <&cpu0 0 2>;
+ 				};
+ 				map4 {
+-					trip = <&cpu_alert3>;
++					trip = <&cpu0_alert3>;
+ 					cooling-device = <&cpu4 0 2>;
+ 				};
+-
+ 				/*
+-				 * When reaching cpu_alert4, reduce CPU
+-				 * further, down to 600 MHz (11 steps for big,
++				 * When reaching cpu0_alert4, reduce CPU
++				 * further, down to 600 MHz (12 steps for big,
+ 				 * 7 steps for LITTLE).
+ 				 */
+ 				map5 {
+-					trip = <&cpu_alert4>;
++					trip = <&cpu0_alert4>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
++					trip = <&cpu0_alert4>;
++					cooling-device = <&cpu4 3 12>;
++				};
++			};
++		};
++		cpu1_thermal: cpu1-thermal {
++			thermal-sensors = <&tmu_cpu1 0>;
++			polling-delay-passive = <250>;
++			polling-delay = <0>;
++			trips {
++				cpu1_alert0: cpu-alert-0 {
++					temperature = <50000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu1_alert1: cpu-alert-1 {
++					temperature = <60000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu1_alert2: cpu-alert-2 {
++					temperature = <70000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu1_crit0: cpu-crit-0 {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++				cpu1_alert3: cpu-alert-3 {
++					temperature = <70000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++				cpu1_alert4: cpu-alert-4 {
++					temperature = <85000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
 +
- 	val = readl(pctrl->regs + g->ctl_reg);
- 
- 	/* 0 = output, 1 = input */
-@@ -507,6 +515,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
- 	};
- 
- 	g = &pctrl->soc->groups[offset];
++			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu1_alert0>;
++					cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++					trip = <&cpu1_alert1>;
++					cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++					trip = <&cpu1_alert2>;
++					cooling-device = <&fan0 2 3>;
++				};
++				map3 {
++					trip = <&cpu1_alert3>;
++					cooling-device = <&cpu0 0 2>;
++				};
++				map4 {
++					trip = <&cpu1_alert3>;
++					cooling-device = <&cpu4 0 2>;
++				};
++				map5 {
++					trip = <&cpu1_alert4>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
++					trip = <&cpu1_alert4>;
++					cooling-device = <&cpu4 3 12>;
++				};
++			};
++		};
++		cpu2_thermal: cpu2-thermal {
++			thermal-sensors = <&tmu_cpu2 0>;
++			polling-delay-passive = <250>;
++			polling-delay = <0>;
++			trips {
++				cpu2_alert0: cpu-alert-0 {
++					temperature = <50000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu2_alert1: cpu-alert-1 {
++					temperature = <60000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu2_alert2: cpu-alert-2 {
++					temperature = <70000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu2_crit0: cpu-crit-0 {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++				cpu2_alert3: cpu-alert-3 {
++					temperature = <70000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++				cpu2_alert4: cpu-alert-4 {
++					temperature = <85000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
 +
-+	/* If the GPIO group has no pins, then don't show it. */
-+	if (!g->npins)
-+		return;
++			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu2_alert0>;
++					cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++					trip = <&cpu2_alert1>;
++					cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++					trip = <&cpu2_alert2>;
++					cooling-device = <&fan0 2 3>;
++				};
++				map3 {
++					trip = <&cpu2_alert3>;
++					cooling-device = <&cpu0 0 2>;
++				};
++				map4 {
++					trip = <&cpu2_alert3>;
++					cooling-device = <&cpu4 0 2>;
++				};
++				map5 {
++					trip = <&cpu2_alert4>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
++					trip = <&cpu2_alert4>;
++					cooling-device = <&cpu4 3 12>;
++				};
++			};
++		};
++		cpu3_thermal: cpu3-thermal {
++			thermal-sensors = <&tmu_cpu3 0>;
++			polling-delay-passive = <250>;
++			polling-delay = <0>;
++			trips {
++				cpu3_alert0: cpu-alert-0 {
++					temperature = <50000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu3_alert1: cpu-alert-1 {
++					temperature = <60000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu3_alert2: cpu-alert-2 {
++					temperature = <70000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu3_crit0: cpu-crit-0 {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++				cpu3_alert3: cpu-alert-3 {
++					temperature = <70000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++				cpu3_alert4: cpu-alert-4 {
++					temperature = <85000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
 +
- 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
- 
- 	is_out = !!(ctl_reg & BIT(g->oe_bit));
-@@ -516,7 +529,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
- 
- 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
- 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
--	seq_printf(s, " %s", pulls[pull]);
-+	seq_printf(s, " %s\n", pulls[pull]);
- }
- 
- static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-@@ -524,23 +537,36 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 	unsigned gpio = chip->base;
- 	unsigned i;
- 
--	for (i = 0; i < chip->ngpio; i++, gpio++) {
-+	for (i = 0; i < chip->ngpio; i++, gpio++)
- 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
--		seq_puts(s, "\n");
--	}
- }
- 
- #else
- #define msm_gpio_dbg_show NULL
- #endif
- 
-+/*
-+ * If the requested GPIO has no pins, then treat it as unavailable.
-+ * Otherwise, call the standard request function.
-+ */
-+static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
-+	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
-+
-+	if (!g->npins)
-+		return -ENODEV;
-+
-+	return gpiochip_generic_request(chip, offset);
-+}
-+
- static const struct gpio_chip msm_gpio_template = {
- 	.direction_input  = msm_gpio_direction_input,
- 	.direction_output = msm_gpio_direction_output,
- 	.get_direction    = msm_gpio_get_direction,
- 	.get              = msm_gpio_get,
- 	.set              = msm_gpio_set,
--	.request          = gpiochip_generic_request,
-+	.request          = msm_gpio_request,
- 	.free             = gpiochip_generic_free,
- 	.dbg_show         = msm_gpio_dbg_show,
- };
-@@ -808,11 +834,57 @@ static void msm_gpio_irq_handler(struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
-+/**
-+ * msm_gpio_get_next_range() - find next range of consecutive gpios
-+ * @pctrl: msm_pinctrl object
-+ * @pstart: pointer to index of next starting position
-+ *
-+ * In a sparse GPIO map, available GPIOs are typically collected into blocks.
-+ * Given a starting index into the groups[] array, this function will scan all
-+ * the gpios until it finds the next block of available GPIOs.
-+ *
-+ * If groups[*pstart] already points to an available GPIO, then assume that
-+ * it is the start of a block.
-+ *
-+ * The caller is responsible for moving *pstart to after the end of the
-+ * previous block so that it this function can find the next block.
-+ *
-+ * Return: The count of the block starting at @pstart, or 0 if there are no
-+ *         more blocks.
-+ */
-+static unsigned int msm_gpio_get_next_range(struct msm_pinctrl *pctrl,
-+					    unsigned int *pstart)
-+{
-+	const struct msm_pingroup *groups = pctrl->soc->groups;
-+	unsigned int ngpio = pctrl->soc->ngpios;
-+	unsigned int count = 0;
-+	unsigned int start = *pstart;
-+
-+	/* Find the first available GPIO */
-+	while (!groups[start].npins)
-+		if (++start == ngpio)
-+			/* None found, so just exit */
-+			return 0;
-+
-+	*pstart = start;
-+
-+	/* Count the number of those GPIOs in a row */
-+	while (groups[start].npins) {
-+		count++;
-+		if (++start == ngpio)
-+			break;
-+	}
-+
-+	return count;
-+}
-+
- static int msm_gpio_init(struct msm_pinctrl *pctrl)
- {
- 	struct gpio_chip *chip;
- 	int ret;
- 	unsigned ngpio = pctrl->soc->ngpios;
-+	const struct msm_pingroup *groups = pctrl->soc->groups;
-+	unsigned int i, start = 0, count;
- 
- 	if (WARN_ON(ngpio > MAX_NR_GPIO))
- 		return -EINVAL;
-@@ -825,13 +897,39 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
- 	chip->owner = THIS_MODULE;
- 	chip->of_node = pctrl->dev->of_node;
- 
-+	/* If the GPIO map is sparse, then we need to disable specific IRQs */
-+	chip->irq_need_valid_mask = pctrl->soc->sparse;
-+
- 	ret = gpiochip_add_data(&pctrl->chip, pctrl);
- 	if (ret) {
- 		dev_err(pctrl->dev, "Failed register gpiochip\n");
- 		return ret;
- 	}
- 
--	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
-+	/*
-+	 * If irq_need_valid_mask is true, then gpiochip_add_data() will
-+	 * initialize irq_valid_mask to all 1s.  We need to clear all the
-+	 * GPIOs that are unavailable, and we need to find each block
-+	 * of consecutive available GPIOs are add them as pin ranges.
-+	 */
-+	if (chip->irq_need_valid_mask) {
-+		for (i = 0; i < ngpio; i++)
-+			if (!groups[i].npins)
-+				clear_bit(i, pctrl->chip.irq_valid_mask);
-+
-+		while ((count = msm_gpio_get_next_range(pctrl, &start))) {
-+			ret = gpiochip_add_pin_range(&pctrl->chip,
-+						     dev_name(pctrl->dev),
-+						     start, start, count);
-+			if (ret)
-+				break;
-+			start += count;
-+		}
-+	} else {
-+		ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
-+					     0, 0, ngpio);
-+	}
-+
- 	if (ret) {
- 		dev_err(pctrl->dev, "Failed to add pin range\n");
- 		gpiochip_remove(&pctrl->chip);
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.h b/drivers/pinctrl/qcom/pinctrl-msm.h
-index 9b9feea540ff..70762bcb84cb 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.h
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.h
-@@ -107,6 +107,7 @@ struct msm_pingroup {
-  * @ngroups:	    The numbmer of entries in @groups.
-  * @ngpio:	    The number of pingroups the driver should expose as GPIOs.
-  * @pull_no_keeper: The SoC does not support keeper bias.
-+ * @sparse:         The GPIO map is sparse (some GPIOs have npins == 0)
-  */
- struct msm_pinctrl_soc_data {
- 	const struct pinctrl_pin_desc *pins;
-@@ -117,6 +118,7 @@ struct msm_pinctrl_soc_data {
- 	unsigned ngroups;
- 	unsigned ngpios;
- 	bool pull_no_keeper;
-+	bool sparse;
- };
- 
- int msm_pinctrl_probe(struct platform_device *pdev,
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
++			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu3_alert0>;
++					cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++					trip = <&cpu3_alert1>;
++					cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++					trip = <&cpu3_alert2>;
++					cooling-device = <&fan0 2 3>;
++				};
++				map3 {
++					trip = <&cpu3_alert3>;
++					cooling-device = <&cpu0 0 2>;
++				};
++				map4 {
++					trip = <&cpu3_alert3>;
++					cooling-device = <&cpu4 0 2>;
++				};
++				map5 {
++					trip = <&cpu3_alert4>;
+ 					cooling-device = <&cpu0 3 7>;
+ 				};
+ 				map6 {
+-					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu4 3 11>;
++					trip = <&cpu3_alert4>;
++					cooling-device = <&cpu4 3 12>;
+ 				};
+ 			};
+ 		};
