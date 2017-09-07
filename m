@@ -1,40 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Sep 2017 17:46:51 +0100
-Subject: [PATCH] arm64: relax assembly code alignment from 16 byte to 4
- byte
-In-Reply-To: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170907164651.3bmhdkbnxvj3pz7g@armageddon.cambridge.arm.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 7 Sep 2017 10:52:37 -0600
+Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
+In-Reply-To: <20170907074904.GB13490@hc>
+References: <20170830142454.10971-1-jglauber@cavium.com>
+ <20170830142454.10971-4-jglauber@cavium.com>
+ <20170830084012.19d91759@w520.home> <20170831094052.GA15906@hc>
+ <20170831100130.5c8a922e@w520.home> <20170907074011.GA13490@hc>
+ <20170907074904.GB13490@hc>
+Message-ID: <20170907105237.3f025280@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 06:56:23PM +0900, Masahiro Yamada wrote:
-> Aarch64 instructions must be word aligned.  The current 16 byte
-> alignment is more than enough.  Relax it into 4 byte alignment.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> I do not know why arm64 Linux requires 16 byte alignment.
-> 
-> I dug git-history of arch/arm64/include/asm/linkage.h
-> and the only commit I see is:
-> 
->   commit aeed41a9371ee02257b608eb06a9058507a7d0f4
->   Author: Marc Zyngier <Marc.Zyngier@arm.com>
->   Date:   Fri Oct 19 17:33:27 2012 +0100
-> 
->       arm64: fix alignment padding in assembly code
-> 
-> It just opt out of the asm-generic variant to remove 0x90.
-> So, the amount of alignment might not be not optimized yet.
-> 
-> Please correct me if I am missing something.
+On Thu, 7 Sep 2017 09:49:04 +0200
+Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
 
-Not sure why we ended up with 4. Possibly because we forgot the power of
-2 difference for arm/arm64.
+> On Thu, Sep 07, 2017 at 09:40:11AM +0200, Jan Glauber wrote:
+> > So what if we add an additional check like:
+> > 
+> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > index fdf65a6..389db4b 100644
+> > --- a/drivers/pci/pci.c
+> > +++ b/drivers/pci/pci.c
+> > @@ -4389,6 +4389,9 @@ static bool pci_slot_resetable(struct pci_slot *slot)
+> >  {
+> >         struct pci_dev *dev;
+> >  
+> > +       if (slot->bus->self & PCI_DEV_FLAGS_NO_BUS_RESET)
+> > +               return false;
+> > +
+> >         list_for_each_entry(dev, &slot->bus->devices, bus_list) {
+> >                 if (!dev->slot || dev->slot != slot)
+> >                         continue;  
+> 
+> Obviously I meant:
+> if (slot->bus->self->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET)
 
-Queued for 4.14. Thanks.
+Much better, perhaps even incorporate the bus->self check for good
+measure... is it possible to have a slot on a root bus?  Taking
+different approaches for bus vs slot reset should have been a giant red
+flag that something is wrong.  Thanks,
 
--- 
-Catalin
+Alex
