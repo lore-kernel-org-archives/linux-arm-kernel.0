@@ -1,60 +1,12 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu,  7 Sep 2017 08:30:44 -0700
-Subject: [PATCH 1/4] syscalls: Use CHECK_DATA_CORRUPTION for
- addr_limit_user_check
-In-Reply-To: <1504798247-48833-1-git-send-email-keescook@chromium.org>
-References: <1504798247-48833-1-git-send-email-keescook@chromium.org>
-Message-ID: <1504798247-48833-2-git-send-email-keescook@chromium.org>
+Date: Thu,  7 Sep 2017 08:30:43 -0700
+Subject: [PATCH 0/4] Fix check address limit on user-mode
+Message-ID: <1504798247-48833-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Garnier <thgarnie@google.com>
+Fixes from Thomas Garnier: the new address limit check was causing
+hangs on ARM. This solves the problem and takes proactive steps on
+ARM64. Additionally removes the unconditional BUG_ON() on check failures.
 
-Use CHECK_DATA_CORRUPTION instead of BUG_ON to provide more flexibility
-on address limit failures. By default, send a SIGKILL signal to kill the
-current process preventing exploitation of a bad address limit.
-
-Make the TIF_FSCHECK flag optional so ARM can use this function.
-
-Signed-off-by: Thomas Garnier <thgarnie@google.com>
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- include/linux/syscalls.h | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index 88951b795ee3..65e273aadada 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -219,21 +219,25 @@ static inline int is_syscall_trace_event(struct trace_event_call *tp_event)
- 	}								\
- 	static inline long SYSC##name(__MAP(x,__SC_DECL,__VA_ARGS__))
- 
--#ifdef TIF_FSCHECK
- /*
-  * Called before coming back to user-mode. Returning to user-mode with an
-  * address limit different than USER_DS can allow to overwrite kernel memory.
-  */
- static inline void addr_limit_user_check(void)
- {
--
-+#ifdef TIF_FSCHECK
- 	if (!test_thread_flag(TIF_FSCHECK))
- 		return;
-+#endif
- 
--	BUG_ON(!segment_eq(get_fs(), USER_DS));
-+	if (CHECK_DATA_CORRUPTION(!segment_eq(get_fs(), USER_DS),
-+				  "Invalid address limit on user-mode return"))
-+		force_sig(SIGKILL, current);
-+
-+#ifdef TIF_FSCHECK
- 	clear_thread_flag(TIF_FSCHECK);
--}
- #endif
-+}
- 
- asmlinkage long sys32_quotactl(unsigned int cmd, const char __user *special,
- 			       qid_t id, void __user *addr);
--- 
-2.7.4
+-Kees
