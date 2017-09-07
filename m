@@ -1,114 +1,78 @@
 From: tycho@docker.com (Tycho Andersen)
-Date: Thu,  7 Sep 2017 11:36:03 -0600
-Subject: [PATCH v6 05/11] arm64/mm: Add support for XPFO
+Date: Thu,  7 Sep 2017 11:36:07 -0600
+Subject: [PATCH v6 09/11] arm64/mm: disable section/contiguous mappings if
+ XPFO is enabled
 In-Reply-To: <20170907173609.22696-1-tycho@docker.com>
 References: <20170907173609.22696-1-tycho@docker.com>
-Message-ID: <20170907173609.22696-6-tycho@docker.com>
+Message-ID: <20170907173609.22696-10-tycho@docker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Juerg Haefliger <juerg.haefliger@canonical.com>
+XPFO doesn't support section/contiguous mappings yet, so let's disable it
+if XPFO is turned on.
 
-Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 and
-provide a hook for updating a single kernel page table entry (which is
-required by the generic XPFO code).
-
-v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+Thanks to Laura Abbot for the simplification from v5, and Mark Rutland for
+pointing out we need NO_CONT_MAPPINGS too.
 
 CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
 Signed-off-by: Tycho Andersen <tycho@docker.com>
 ---
- arch/arm64/Kconfig     |  1 +
- arch/arm64/mm/Makefile |  2 ++
- arch/arm64/mm/xpfo.c   | 58 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 61 insertions(+)
+ arch/arm64/mm/mmu.c  | 2 +-
+ include/linux/xpfo.h | 4 ++++
+ mm/xpfo.c            | 6 ++++++
+ 3 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd908630631..44fa44ef02ec 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -121,6 +121,7 @@ config ARM64
- 	select SPARSE_IRQ
- 	select SYSCTL_EXCEPTION_TRACE
- 	select THREAD_INFO_IN_TASK
-+	select ARCH_SUPPORTS_XPFO
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f1eb15e0e864..34bb95303cce 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -420,7 +420,7 @@ static void __init map_mem(pgd_t *pgd)
+ 	struct memblock_region *reg;
+ 	int flags = 0;
  
-diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-index 9b0ba191e48e..22e5cab543d8 100644
---- a/arch/arm64/mm/Makefile
-+++ b/arch/arm64/mm/Makefile
-@@ -11,3 +11,5 @@ KASAN_SANITIZE_physaddr.o	+= n
+-	if (debug_pagealloc_enabled())
++	if (debug_pagealloc_enabled() || xpfo_enabled())
+ 		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
  
- obj-$(CONFIG_KASAN)		+= kasan_init.o
- KASAN_SANITIZE_kasan_init.o	:= n
+ 	/*
+diff --git a/include/linux/xpfo.h b/include/linux/xpfo.h
+index d37a06c9d62c..1693af1a0293 100644
+--- a/include/linux/xpfo.h
++++ b/include/linux/xpfo.h
+@@ -43,6 +43,8 @@ void xpfo_temp_map(const void *addr, size_t size, void **mapping,
+ void xpfo_temp_unmap(const void *addr, size_t size, void **mapping,
+ 		     size_t mapping_len);
+ 
++bool xpfo_enabled(void);
 +
-+obj-$(CONFIG_XPFO)		+= xpfo.o
-diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
-new file mode 100644
-index 000000000000..678e2be848eb
---- /dev/null
-+++ b/arch/arm64/mm/xpfo.c
-@@ -0,0 +1,58 @@
-+/*
-+ * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
-+ * Copyright (C) 2016 Brown University. All rights reserved.
-+ *
-+ * Authors:
-+ *   Juerg Haefliger <juerg.haefliger@hpe.com>
-+ *   Vasileios P. Kemerlis <vpk@cs.brown.edu>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ */
+ #else /* !CONFIG_XPFO */
+ 
+ static inline void xpfo_kmap(void *kaddr, struct page *page) { }
+@@ -65,6 +67,8 @@ static inline void xpfo_temp_unmap(const void *addr, size_t size,
+ }
+ 
+ 
++static inline bool xpfo_enabled(void) { return false; }
 +
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+
-+#include <asm/tlbflush.h>
-+
-+/*
-+ * Lookup the page table entry for a virtual address and return a pointer to
-+ * the entry. Based on x86 tree.
-+ */
-+static pte_t *lookup_address(unsigned long addr)
+ #endif /* CONFIG_XPFO */
+ 
+ #endif /* _LINUX_XPFO_H */
+diff --git a/mm/xpfo.c b/mm/xpfo.c
+index f79075bf7d65..25fba05d01bd 100644
+--- a/mm/xpfo.c
++++ b/mm/xpfo.c
+@@ -70,6 +70,12 @@ struct page_ext_operations page_xpfo_ops = {
+ 	.init = init_xpfo,
+ };
+ 
++bool __init xpfo_enabled(void)
 +{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+
-+	pgd = pgd_offset_k(addr);
-+	if (pgd_none(*pgd))
-+		return NULL;
-+
-+	pud = pud_offset(pgd, addr);
-+	if (pud_none(*pud))
-+		return NULL;
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return NULL;
-+
-+	return pte_offset_kernel(pmd, addr);
++	return !xpfo_disabled;
 +}
++EXPORT_SYMBOL(xpfo_enabled);
 +
-+/* Update a single kernel page table entry */
-+inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)
-+{
-+	pte_t *pte = lookup_address((unsigned long)kaddr);
-+
-+	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
-+}
-+
-+inline void xpfo_flush_kernel_tlb(struct page *page, int order)
-+{
-+	unsigned long kaddr = (unsigned long)page_address(page);
-+	unsigned long size = PAGE_SIZE;
-+
-+	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
-+}
+ static inline struct xpfo *lookup_xpfo(struct page *page)
+ {
+ 	struct page_ext *page_ext = lookup_page_ext(page);
 -- 
 2.11.0
