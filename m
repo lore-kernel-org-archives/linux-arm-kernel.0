@@ -1,99 +1,87 @@
-From: liubo95@huawei.com (Bob Liu)
-Date: Thu, 7 Sep 2017 09:55:49 +0800
-Subject: [RFC PATCH 0/6] Add platform device SVM support for ARM SMMUv3
-In-Reply-To: <fd4200c1-3c89-23f1-a2b1-6457ef8475c1@arm.com>
-References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
- <95d1a9e2-1816-ff7d-9a8d-98406a6c2c22@arm.com>
- <de1a6b52-5e4f-1c0a-af3d-f6adb4b01daf@huawei.com>
- <fd4200c1-3c89-23f1-a2b1-6457ef8475c1@arm.com>
-Message-ID: <8e4764f5-0e5d-7fd6-529b-35914e1e3668@huawei.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Thu, 7 Sep 2017 11:05:40 +0800
+Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <CAL_JsqLe3o+iw0Wh=g5Ks93qM1BR1+S04Nv1R3FV17Z3dph1jg@mail.gmail.com>
+References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
+ <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
+ <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
+ <1504318583.15359.12.camel@mhfsdcap03>
+ <CAL_JsqLe3o+iw0Wh=g5Ks93qM1BR1+S04Nv1R3FV17Z3dph1jg@mail.gmail.com>
+Message-ID: <1504753540.9882.15.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/9/6 17:59, Jean-Philippe Brucker wrote:
-> On 06/09/17 02:16, Yisheng Xie wrote:
->> Hi Jean-Philippe,
->>
->> On 2017/9/5 20:56, Jean-Philippe Brucker wrote:
->>> On 31/08/17 09:20, Yisheng Xie wrote:
->>>> Jean-Philippe has post a patchset for Adding PCIe SVM support to ARM SMMUv3:
->>>> https://www.spinics.net/lists/arm-kernel/msg565155.html
->>>>
->>>> But for some platform devices(aka on-chip integrated devices), there is also
->>>> SVM requirement, which works based on the SMMU stall mode.
->>>> Jean-Philippe has prepared a prototype patchset to support it:
->>>> git://linux-arm.org/linux-jpb.git svm/stall
->>>
->>> Only meant for testing at that point, and unfit even for an RFC.
->>
->> Sorry about that, I should ask you before send it out. It's my mistake. For I also
->> have some question about this patchset.
->>
->> We have related device, and would like to do some help about it. Do you have
->> any plan about upstream ?
->>
->>>
->>>> We tested this patchset with some fixes on a on-chip integrated device. The
->>>> basic function is ok, so I just send them out for review, although this
->>>> patchset heavily depends on the former patchset (PCIe SVM support for ARM
->>>> SMMUv3), which is still under discussion.
->>>>
->>>> Patch Overview:
->>>> *1 to 3 prepare for device tree or acpi get the device stall ability and pasid bits
->>>> *4 is to realise the SVM function for platform device
->>>> *5 is fix a bug when test SVM function while SMMU donnot support this feature
->>>> *6 avoid ILLEGAL setting of STE and CD entry about stall
->>>>
->>>> Acctually here, I also have some questions about SVM on SMMUv3:
->>>>
->>>> 1. Why the SVM feature on SMMUv3 depends on BTM feature? when bind a task to device,
->>>>    it will register a mmu_notify. Therefore, when a page range is invalid, we can
->>>>    send TLBI or ATC invalid without BTM?
->>>
->>> We could, but the end goal for SVM is to perfectly mirror the CPU page
->>> tables. So for platform SVM we would like to get rid of MMU notifiers
->>> entirely.
->>
->> I see, but for some SMMU which do not support BTM, it cannot benefit from SVM.
->>
->> Meanwhile, do you mean even with BTM feature, the PCI-e device also need to send a
->> ATC invalid by MMU notify? It seems not fair, why not hardware do the entirely work
->> in this case? It may costly for send ATC invalid and sync.
+On Tue, 2017-09-05 at 11:05 -0500, Rob Herring wrote:
+> On Fri, Sep 1, 2017 at 9:16 PM, Chen Zhong <chen.zhong@mediatek.com> wrote:
+> > On Thu, 2017-08-31 at 14:52 -0500, Rob Herring wrote:
+> >> On Fri, Aug 25, 2017 at 02:32:30PM +0800, Chen Zhong wrote:
+> >> > This patch adds the device tree binding documentation for the MediaTek
+> >> > pmic keys found on PMIC MT6397/MT6323.
+> >> >
+> >> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> >> > ---
+> >> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
+> >> >  1 file changed, 38 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> >> > new file mode 100644
+> >> > index 0000000..100ec44
+> >> > --- /dev/null
+> >> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> >> > @@ -0,0 +1,38 @@
+> >> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
+> >> > +
+> >> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
+> >> > +and homekey. The key functions are defined as the subnode of the function
+> >> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
+> >> > +of Muti-Function Device (MFD)
+> >> > +
+> >> > +For MT6397/MT6323 MFD bindings see:
+> >> > +Documentation/devicetree/bindings/mfd/mt6397.txt
+> >> > +
+> >> > +Required properties:
+> >> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
+> >> > +- linux,keycodes: Specifies the numeric keycode values to
+> >> > +   be used for reporting keys presses. The array can
+> >> > +   contain up to 2 entries.
+> >> > +
+> >> > +Optional Properties:
+> >> > +- wakeup-source: each key can be used as a wakeup source.
+> >>
+> >> wakeup-source is defined as a boolean.
+> >
+> > Hi Rob,
+> >
+> > Could I modify it as this?
+> >
+> > mediatek,wakeup-keys = <1>, <0>;
+> > wakeup-source;
 > 
-> It will certainly be costly. But there are major problems with
-> transforming broadcast TLB maintenance into ATC invalidations in HW:
+> What do the values and index signify? The power key is index 0 and the
+> value 1 means enable wakeup? Or each value is the raw key (i.e.
+> indexes in linux,keycode) that wakeup is enabled for?
 > 
-> * VMID:ASID to SID:SSID conversion. TLBIs use VMID:ASID, while ATCIs use
-> SID:SSID.
+> I don't think this should be in DT really. It's really up to the user
+> (i.e. userspace) to decide what keys cause wakeup (or maybe that's
+> only suspend). If you default to the power key causes wakeup, do you
+> really need to support different options?
 > 
-> * Most importantly, ATC invalidations accounting. Each endpoint has a
-> limited number of in-flight ATC invalidate requests. The conversion module
-> would have to buffer incoming invalidations and wait for in-flight ATC
-> invalidation to complete before sending the next ones. In case of
-> overflow, either we lose invalidation (which opens security holes) or we
-> somehow put back-pressure on the interconnect (no idea how feasible this
-> is, I suspect really hard).
+> If we do put this in DT, then it should be a common binding to specify
+> keys that cause wake-up.
 > 
-> Solving the last one is also quite difficult in software, but at least we
-> can still invalidate a range. In hardware we would invalidate the ATC
-> page-by-page and quickly jam the bus.
-> 
+> Rob
 
-Speak to the invalidation, I have one more question.
+Hi Rob,
 
-There is a time window between 1) modify page table;  2) tlb invalidate;
+Yes, we want to describe that power key is index 0 and is a wakeup
+source, homekey is index 1 and not a wakeup source.
 
-ARM-CPU                           Device
+Since power key and homekey are two real HW keys, customer can decide
+which key to be the wakeup source or both due to their hw design, so we
+put this in DT and can be different for different boards.
 
-1. modify page table
+Thank you.
 
-                             ^^^^^
-                              Can still write data through smmu tlb even page table was already modified.
-                              (At this point, the same virtual addr may not point to the same thing for CPU and device!!!
-                               I'm afraid there may be some data-loss or other potential problems if this situation happens.)
-
-2. tlb invalidate range
-
---
-Thanks,
-Bob
+Chen
