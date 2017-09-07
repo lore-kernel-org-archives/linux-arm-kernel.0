@@ -1,72 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 7 Sep 2017 16:23:30 +0100
-Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
-In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2015EF473@DGGEMA503-MBX.china.huawei.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015EF473@DGGEMA503-MBX.china.huawei.com>
-Message-ID: <d01b49a2-e204-73af-23e3-5fd7f7202859@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 7 Sep 2017 23:24:56 +0800
+Subject: [PATCH v3 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20170906003016.2159-2-brendanhiggins@google.com>
+Message-ID: <201709072303.wpwEY62K%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/17 16:03, gengdongjiu wrote:
->> On 07/09/17 12:49, gengdongjiu wrote:
->>>
->>>
->>> On 2017/9/7 18:13, Marc Zyngier wrote:
->>>> On 07/09/17 11:05, gengdongjiu wrote:
->>>>> Hi James,
->>>>>
->>>>> On 2017/9/7 17:20, James Morse wrote:
->>>>>> Hi Dongjiu Geng,
->>>>>>
->>>>>> On 07/09/17 06:54, Dongjiu Geng wrote:
->>>>>>> In VHE mode, host kernel runs in the EL2 and can enable 'User
->>>>>>> Access Override' when fs==KERNEL_DS so that it can access kernel
->>>>>>> memory. However, PSTATE.UAO is set to 0 on an exception taken from
->>>>>>> EL1 to EL2. Thus when VHE is used and exception taken from a guest
->>>>>>> UAO will be disabled and host will use the incorrect PSTATE.UAO.
->>>>>>> So check and reset the PSTATE.UAO when switching to host.
->>>>>>
->>>>>> This would only be a problem if KVM were calling into world-switch
->>>>>> with fs==KERNEL_DS. I can't see where this happens.
->>>>>  Not only KVM, may also kernel sets the fs == KERNEL_DS before
->>>>> calling into world-switch
->>>>
->>>> How? Please describe the exact sequence of event that lead to this
->>>> situation with the current code base.
->>>
->>> Hi Marc,
->>>
->>>    Different tasks have different fs, such as USER_DS or KERNEL_DS. In
->>> the context switch, it will restore the task's fs. Thus, that depends
->>> on task itself, as shown below code. UAO is different with PAN, PAN will be always enabled if hardware CPU supports PAN feature, but
->> UAO is dynamical change.
->>
->> You haven't answered my question: There is exactly one point where we enter the world-switch. Show me that, at this point, PSTATE.UAO
->> *before* the call is different from PSTATE.UAO after the call. Give me the exact sequence of event that leads to this situation. Show me a
->> stack trace.
-> 
-> Hi Marc,
-> 
-> If using current mainline KVM code + Qemu and modify nothing, may not
-> exist broken issue,  because the Qemu progress FS should be USER_DS.
+Hi Brendan,
 
-Thanks. You've just been wasting everybody's time for two days. In case
-you haven't noticed, mainline KVM code is the *ONLY* thing we care about.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.13 next-20170907]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> But if I make a modification for user space( Qemu or KVM tools) to
-> change its FS property to KERNEL_DS or use third party application
-> with KERNEL_DS FS to run the guest, it will have problem(the
-> KERNEL_DS is cleared). If you think my case is reasonable and should
-> support, I can show you the calling stack trace. If you think, my
-> case is not reasonable and KVM should not support the application
-> with KERNEL_DS fs to run guest. You can ignore this patch, thanks.
+url:    https://github.com/0day-ci/linux/commits/Brendan-Higgins/arm-npcm-add-basic-support-for-Nuvoton-BMCs/20170907-214055
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-I really cannot think of a good reason why we'd want to do that. Playing
-with set_fs() is almost universally wrong, and I'm certainly going to
-oppose to any change in that area unless the code that calls set_fs()
-has been made public and properly reviewed. Until then, UAO/PAN will
-stay as they are unless you prove that our current code is wrong.
+All warnings (new ones prefixed by >>):
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+warning: (CPU_NPCM750) selects ARM_ERRATA_458693 which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+warning: (CPU_NPCM750) selects ARM_ERRATA_742231 which has unmet direct dependencies (CPU_V7 && SMP && !ARCH_MULTIPLATFORM)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63097 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170907/e26a8a1f/attachment-0001.gz>
