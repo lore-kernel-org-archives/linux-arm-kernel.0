@@ -1,87 +1,213 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Thu, 7 Sep 2017 11:05:40 +0800
-Subject: [PATCH v3 2/5] dt-bindings: input: Add document bindings for
- mtk-pmic-keys
-In-Reply-To: <CAL_JsqLe3o+iw0Wh=g5Ks93qM1BR1+S04Nv1R3FV17Z3dph1jg@mail.gmail.com>
-References: <1503642753-12385-1-git-send-email-chen.zhong@mediatek.com>
- <1503642753-12385-3-git-send-email-chen.zhong@mediatek.com>
- <20170831195239.b2litxbu7smhkkjl@rob-hp-laptop>
- <1504318583.15359.12.camel@mhfsdcap03>
- <CAL_JsqLe3o+iw0Wh=g5Ks93qM1BR1+S04Nv1R3FV17Z3dph1jg@mail.gmail.com>
-Message-ID: <1504753540.9882.15.camel@mhfsdcap03>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Thu, 7 Sep 2017 12:22:15 +0800
+Subject: [PATCH v2 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <20170906101251.5gy53sbbkikpfg3y@pd.tnic>
+References: <1504609566-66318-1-git-send-email-xiexiuqi@huawei.com>
+ <1504609566-66318-2-git-send-email-xiexiuqi@huawei.com>
+ <20170906101251.5gy53sbbkikpfg3y@pd.tnic>
+Message-ID: <281c6244-2203-e06c-1850-f07c6fba4954@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-09-05 at 11:05 -0500, Rob Herring wrote:
-> On Fri, Sep 1, 2017 at 9:16 PM, Chen Zhong <chen.zhong@mediatek.com> wrote:
-> > On Thu, 2017-08-31 at 14:52 -0500, Rob Herring wrote:
-> >> On Fri, Aug 25, 2017 at 02:32:30PM +0800, Chen Zhong wrote:
-> >> > This patch adds the device tree binding documentation for the MediaTek
-> >> > pmic keys found on PMIC MT6397/MT6323.
-> >> >
-> >> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> >> > ---
-> >> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   38 ++++++++++++++++++++
-> >> >  1 file changed, 38 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> >> > new file mode 100644
-> >> > index 0000000..100ec44
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> >> > @@ -0,0 +1,38 @@
-> >> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
-> >> > +
-> >> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
-> >> > +and homekey. The key functions are defined as the subnode of the function
-> >> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
-> >> > +of Muti-Function Device (MFD)
-> >> > +
-> >> > +For MT6397/MT6323 MFD bindings see:
-> >> > +Documentation/devicetree/bindings/mfd/mt6397.txt
-> >> > +
-> >> > +Required properties:
-> >> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-> >> > +- linux,keycodes: Specifies the numeric keycode values to
-> >> > +   be used for reporting keys presses. The array can
-> >> > +   contain up to 2 entries.
-> >> > +
-> >> > +Optional Properties:
-> >> > +- wakeup-source: each key can be used as a wakeup source.
-> >>
-> >> wakeup-source is defined as a boolean.
-> >
-> > Hi Rob,
-> >
-> > Could I modify it as this?
-> >
-> > mediatek,wakeup-keys = <1>, <0>;
-> > wakeup-source;
+Hi Borislav,
+
+On 2017/9/6 18:12, Borislav Petkov wrote:
+> On Tue, Sep 05, 2017 at 07:06:04PM +0800, Xie XiuQi wrote:
+>> With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
+>> are consumed. In some cases, if the error address is in a clean page or a
+>> read-only page, there is a chance to recover. Such as error occurs in a
+>> instruction page, we can reread this page from disk instead of killing process.
+>>
+>> Because memory_failure() may sleep, we can not call it directly in SEA exception
+>> context. So we saved faulting physical address associated with a process in the
+>> ghes handler and set __TIF_SEA_NOTIFY. When we return from SEA exception context
+>> and get into do_notify_resume() before the process running, we could check it
+>> and call memory_failure() to do recovery. It's safe, because we are in process
+>> context.
+>>
+>> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+>> Signed-off-by: Wang Xiongfeng <wangxiongfeng2@huawei.com>
+>> ---
+>>  arch/arm64/Kconfig                   |  11 +++
+>>  arch/arm64/include/asm/ras.h         |  36 +++++++++
+>>  arch/arm64/include/asm/thread_info.h |   4 +-
+>>  arch/arm64/kernel/Makefile           |   1 +
+>>  arch/arm64/kernel/ras.c              | 143 +++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/signal.c           |   8 ++
+>>  arch/arm64/mm/fault.c                |  27 +++++--
+>>  drivers/acpi/apei/ghes.c             |   4 +-
+>>  8 files changed, 223 insertions(+), 11 deletions(-)
+>>  create mode 100644 arch/arm64/include/asm/ras.h
+>>  create mode 100644 arch/arm64/kernel/ras.c
 > 
-> What do the values and index signify? The power key is index 0 and the
-> value 1 means enable wakeup? Or each value is the raw key (i.e.
-> indexes in linux,keycode) that wakeup is enabled for?
+> Please integrate scripts/checkpatch.pl into your patch creation workflow
+> and run all patches through it before submitting:
+
+Sorry for my mistake. I'll fix it, thanks.
+
 > 
-> I don't think this should be in DT really. It's really up to the user
-> (i.e. userspace) to decide what keys cause wakeup (or maybe that's
-> only suspend). If you default to the power key causes wakeup, do you
-> really need to support different options?
+> ERROR: code indent should use tabs where possible
+> #200: FILE: arch/arm64/kernel/ras.c:42:
+> +        atomic_t                inuse;$
 > 
-> If we do put this in DT, then it should be a common binding to specify
-> keys that cause wake-up.
+> WARNING: please, no spaces at the start of a line
+> #200: FILE: arch/arm64/kernel/ras.c:42:
+> +        atomic_t                inuse;$
 > 
-> Rob
+> ERROR: code indent should use tabs where possible
+> #201: FILE: arch/arm64/kernel/ras.c:43:
+> +        struct task_struct      *t;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #201: FILE: arch/arm64/kernel/ras.c:43:
+> +        struct task_struct      *t;$
+> 
+> ERROR: code indent should use tabs where possible
+> #202: FILE: arch/arm64/kernel/ras.c:44:
+> +        __u64                   paddr;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #202: FILE: arch/arm64/kernel/ras.c:44:
+> +        __u64                   paddr;$
+> 
+> ERROR: code indent should use tabs where possible
+> #207: FILE: arch/arm64/kernel/ras.c:49:
+> +        struct sea_info *si;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #207: FILE: arch/arm64/kernel/ras.c:49:
+> +        struct sea_info *si;$
+> 
+> ERROR: code indent should use tabs where possible
+> #209: FILE: arch/arm64/kernel/ras.c:51:
+> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++) {$
+> 
+> WARNING: please, no spaces at the start of a line
+> #209: FILE: arch/arm64/kernel/ras.c:51:
+> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++) {$
+> 
+> ERROR: code indent should use tabs where possible
+> #210: FILE: arch/arm64/kernel/ras.c:52:
+> +                if (atomic_cmpxchg(&si->inuse, 0, 1) == 0) {$
+> 
+> WARNING: please, no spaces at the start of a line
+> #210: FILE: arch/arm64/kernel/ras.c:52:
+> +                if (atomic_cmpxchg(&si->inuse, 0, 1) == 0) {$
+> 
+> ERROR: code indent should use tabs where possible
+> #211: FILE: arch/arm64/kernel/ras.c:53:
+> +                        si->t = current;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #211: FILE: arch/arm64/kernel/ras.c:53:
+> +                        si->t = current;$
+> 
+> ERROR: code indent should use tabs where possible
+> #212: FILE: arch/arm64/kernel/ras.c:54:
+> +                        si->paddr = addr;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #212: FILE: arch/arm64/kernel/ras.c:54:
+> +                        si->paddr = addr;$
+> 
+> ERROR: code indent should use tabs where possible
+> #213: FILE: arch/arm64/kernel/ras.c:55:
+> +                        return true;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #213: FILE: arch/arm64/kernel/ras.c:55:
+> +                        return true;$
+> 
+> ERROR: code indent should use tabs where possible
+> #214: FILE: arch/arm64/kernel/ras.c:56:
+> +                }$
+> 
+> WARNING: please, no spaces at the start of a line
+> #214: FILE: arch/arm64/kernel/ras.c:56:
+> +                }$
+> 
+> ERROR: code indent should use tabs where possible
+> #215: FILE: arch/arm64/kernel/ras.c:57:
+> +        }$
+> 
+> WARNING: please, no spaces at the start of a line
+> #215: FILE: arch/arm64/kernel/ras.c:57:
+> +        }$
+> 
+> ERROR: code indent should use tabs where possible
+> #223: FILE: arch/arm64/kernel/ras.c:65:
+> +        struct sea_info *si;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #223: FILE: arch/arm64/kernel/ras.c:65:
+> +        struct sea_info *si;$
+> 
+> ERROR: code indent should use tabs where possible
+> #225: FILE: arch/arm64/kernel/ras.c:67:
+> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++)$
+> 
+> WARNING: please, no spaces at the start of a line
+> #225: FILE: arch/arm64/kernel/ras.c:67:
+> +        for (si = sea_info; si < &sea_info[SEA_INFO_MAX]; si++)$
+> 
+> ERROR: code indent should use tabs where possible
+> #226: FILE: arch/arm64/kernel/ras.c:68:
+> +                if (atomic_read(&si->inuse) && si->t == current)$
+> 
+> WARNING: please, no spaces at the start of a line
+> #226: FILE: arch/arm64/kernel/ras.c:68:
+> +                if (atomic_read(&si->inuse) && si->t == current)$
+> 
+> ERROR: code indent should use tabs where possible
+> #227: FILE: arch/arm64/kernel/ras.c:69:
+> +                        return si;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #227: FILE: arch/arm64/kernel/ras.c:69:
+> +                        return si;$
+> 
+> ERROR: code indent should use tabs where possible
+> #228: FILE: arch/arm64/kernel/ras.c:70:
+> +        return NULL;$
+> 
+> WARNING: please, no spaces at the start of a line
+> #228: FILE: arch/arm64/kernel/ras.c:70:
+> +        return NULL;$
+> 
+> ERROR: code indent should use tabs where possible
+> #233: FILE: arch/arm64/kernel/ras.c:75:
+> +        atomic_set(&si->inuse, 0);$
+> 
+> WARNING: please, no spaces at the start of a line
+> #233: FILE: arch/arm64/kernel/ras.c:75:
+> +        atomic_set(&si->inuse, 0);$
+> 
+> WARNING: braces {} are not necessary for single statement blocks
+> #265: FILE: arch/arm64/kernel/ras.c:107:
+> +		if (memory_failure(pfn, 0, flags) < 0) {
+> +			fail++;
+> +		}
+> 
+> WARNING: braces {} are not necessary for single statement blocks
+> #293: FILE: arch/arm64/kernel/ras.c:135:
+> +		if (err_info->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR) {
+> +			info_saved |= sea_save_info(err_info->physical_fault_addr);
+> +		}
+> 
+> total: 17 errors, 21 warnings, 299 lines checked
+> 
+> NOTE: For some of the reported defects, checkpatch may be able to
+>       mechanically convert to the typical style using --fix or --fix-inplace.
+> 
+> NOTE: Whitespace errors detected.
+>       You may wish to use scripts/cleanpatch or scripts/cleanfile
+> 
+> Your patch has style problems, please review.
+> 
+> NOTE: If any of the errors are false positives, please report
+>       them to the maintainer, see CHECKPATCH in MAINTAINERS.
+> 
 
-Hi Rob,
-
-Yes, we want to describe that power key is index 0 and is a wakeup
-source, homekey is index 1 and not a wakeup source.
-
-Since power key and homekey are two real HW keys, customer can decide
-which key to be the wakeup source or both due to their hw design, so we
-put this in DT and can be different for different boards.
-
-Thank you.
-
-Chen
+-- 
+Thanks,
+Xie XiuQi
