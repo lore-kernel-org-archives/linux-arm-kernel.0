@@ -1,47 +1,38 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu,  7 Sep 2017 14:44:05 +0200
-Subject: [PATCH] arm64: dts: marvell: Fix A37xx UART0 register size
-Message-ID: <20170907124405.23719-1-miquel.raynal@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  7 Sep 2017 14:49:19 +0200
+Subject: [PATCH 1/7 v3] drm/pl111: Cleanup local header file
+Message-ID: <20170907124925.13805-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: allen yan <yanwei@marvell.com>
+The header file contains prototypes for two nonexisting
+functions. Get rid of them.
 
-Armada-37xx UART0 registers are 0x200 bytes wide. Right next to them are
-the UART1 registers that should not be declared in this node.
-
-Update the example in DT bindings document accordingly.
-
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/serial/mvebu-uart.txt | 2 +-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ChangeLog v2->v3:
+- Rebase on DRM-TIP
+ChangeLog v1->v2:
+- Collect Eric's ACK.
+---
+ drivers/gpu/drm/pl111/pl111_drm.h | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-index 6087defd9f93..d37fabe17bd1 100644
---- a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-@@ -8,6 +8,6 @@ Required properties:
- Example:
- 	serial at 12000 {
- 		compatible = "marvell,armada-3700-uart";
--		reg = <0x12000 0x400>;
-+		reg = <0x12000 0x200>;
- 		interrupts = <43>;
- 	};
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 51763d674050..9e558801266a 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -129,7 +129,7 @@
+diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+index 5c685bfc8fdc..a97f303f6833 100644
+--- a/drivers/gpu/drm/pl111/pl111_drm.h
++++ b/drivers/gpu/drm/pl111/pl111_drm.h
+@@ -58,10 +58,6 @@ int pl111_enable_vblank(struct drm_device *drm, unsigned int crtc);
+ void pl111_disable_vblank(struct drm_device *drm, unsigned int crtc);
+ irqreturn_t pl111_irq(int irq, void *data);
+ int pl111_connector_init(struct drm_device *dev);
+-int pl111_encoder_init(struct drm_device *dev);
+-int pl111_dumb_create(struct drm_file *file_priv,
+-		      struct drm_device *dev,
+-		      struct drm_mode_create_dumb *args);
+ int pl111_debugfs_init(struct drm_minor *minor);
  
- 			uart0: serial at 12000 {
- 				compatible = "marvell,armada-3700-uart";
--				reg = <0x12000 0x400>;
-+				reg = <0x12000 0x200>;
- 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 				status = "disabled";
- 			};
+ #endif /* _PL111_DRM_H_ */
 -- 
-2.11.0
+2.13.5
