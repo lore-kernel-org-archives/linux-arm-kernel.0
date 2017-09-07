@@ -1,57 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Sep 2017 15:26:40 +0200
-Subject: [PATCH 2/2] RFC: drm/pl111: Support using the VGA bridge as
- fallback
-In-Reply-To: <4828013.uWK28amVrN@avalon>
-References: <20170901094629.6566-1-linus.walleij@linaro.org>
- <20170904074355.gjbf7he2dt5kszfg@phenom.ffwll.local>
- <4828013.uWK28amVrN@avalon>
-Message-ID: <CACRpkdYNmku09W3wSFEpX7j8M_8d3w1RPoNhxm7hBDYqAuuBvQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  7 Sep 2017 15:50:58 +0200
+Subject: [PATCH] soc: bcm: brcmstb: fix ARM build errors
+Message-ID: <20170907135136.2923775-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 4, 2017 at 11:51 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday, 4 September 2017 10:43:55 EEST Daniel Vetter wrote:
->> On Fri, Sep 01, 2017 at 11:46:29AM +0200, Linus Walleij wrote:
+When building the new PM driver on older ARM architectures, we can
+run into one of two build errors:
 
->> Wrt the more general problem: They way we solve this in the i915 atomic
->> framework is that the various ->fixup calls fill out relevant fields in
->> the drm_crtc_state. I guess we could add an ->atomic_check to bridges, add
->> a bus_flags to drm_crtc_state (or maybe just let everyone patch up
->> adjusted_mode->flags) instead?
->
-> Furthermore, if we needed to have access to the connector in the display
-> controller driver, this would call for creating the connector there, not in
-> the bridge driver. I've advocated this for a long time, and still haven't
-> given up all hopes of fixing it.
+drivers/soc/bcm/brcmstb/pm/pm-arm.c: In function 'brcmstb_do_pmsm_power_down':
+drivers/soc/bcm/brcmstb/pm/pm-arm.c:334:2: error: implicit declaration of function 'wfi' [-Werror=implicit-function-declaration]
 
-Hm as it is I am trying to adopt to circumstances, so I was just asked
-to replace the custom connector with the generic panel bridge.
-(bridge/panel.c)
+drivers/soc/bcm/brcmstb/pm/pm-arm.o: In function `brcmstb_pm_s3_finish':
+pm-arm.c:(.text+0x860): undefined reference to `cpu_resume'
 
-Then we get the connector out of the generic panel bridge by just
-dereferencing panel->connector, this is what the PL111 driver
-is already doing for panels since its inception.
+The first one requires at least ARMv6K, the second one requires the CPU
+suspend/resume logic which is not available on some of the older CPUs,
+and needs to be selected explicitly.
 
-Maybe that is wrong, I don't know :/
+This adds the extra Kconfig statements to enforce this, limiting
+compilation on ARM to the STB platform that is guaranteed to be
+ARMv7. We could enable compile-testing for other ARMv7 platforms,
+but there seems to be little value as an allmodconfig kernel
+already includes it.
 
-But like Eric says, the core problem is that the display driver
-say enable function needs to know the flags of what it should
-output. This driver looks at
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/soc/bcm/brcmstb/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW
-connector->display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE
-
-So the bus flags really need to be available somehow.
-I am doing it by keeping a local reference to the connector
-in the driver state container.
-
-I tried to dereference the connector from from the pipe at one
-point, passing NULL to  but it didn't work out, it seems like
-struct drm_simple_display_pipe_funcs
-.enable() is called before attaching the connector or something
-but I guess I should look closer.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/soc/bcm/brcmstb/Kconfig b/drivers/soc/bcm/brcmstb/Kconfig
+index d05bfce82e71..d36f6e03c1a6 100644
+--- a/drivers/soc/bcm/brcmstb/Kconfig
++++ b/drivers/soc/bcm/brcmstb/Kconfig
+@@ -4,6 +4,7 @@ config BRCMSTB_PM
+ 	bool "Support suspend/resume for STB platforms"
+ 	default y
+ 	depends on PM
+-	depends on ARM || BMIPS_GENERIC
++	depends on ARCH_BRCMSTB || BMIPS_GENERIC
++	select ARM_CPU_SUSPEND if ARM
+ 
+ endif # SOC_BRCMSTB
+-- 
+2.9.0
