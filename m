@@ -1,414 +1,92 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  7 Sep 2017 14:49:21 +0200
-Subject: [PATCH 3/7 v3] drm/pl111: Replace custom connector with panel bridge
+Date: Thu,  7 Sep 2017 14:49:23 +0200
+Subject: [PATCH 5/7 v3] drm/pl111: Insert delay before powering up PL11x
 In-Reply-To: <20170907124925.13805-1-linus.walleij@linaro.org>
 References: <20170907124925.13805-1-linus.walleij@linaro.org>
-Message-ID: <20170907124925.13805-3-linus.walleij@linaro.org>
+Message-ID: <20170907124925.13805-5-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces the custom connector in the PL111 with the
-panel bridge helper.
+The old codebase has a delay between enabling and powering up the
+PL11x.
 
-This works nicely for all standard panels, but since there
-are several PL11x-based systems that will need to use the dumb
-VGA connector bridge we use drm_of_find_panel_or_bridge()
-and make some headroom for dealing with bridges that are
-not panels as well, and drop a TODO in the code.
+According to the manual for PL110, ARM DDI 0161E page 1-5 and
+the PL111 manual ARM DDI 0293C page 1-6, the power sequence should
+be such that once Vdd is stable (which we assume it is at boot)
+LCDEN is enabled first and then CLPOWER should be enabled
+"after the signals have stabilized" and this is said to
+be display-dependent. The old codebase uses 20ms.
 
+Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v2->v3:
 - Rebase on DRM-TIP
-- Use drm_simple_display_pipe_attach_bridge() as suggested
-  by Daniel Vetter.
 ChangeLog v1->v2:
-- Remove the panel [un]prepare() and [en|dis]able() calls
-  from the display driver, since this is now handled
-  by the bridge.
+- Fall back to the delay of 20 ms from the old framebuffer
+  driver to stabilize Vee in shortage of other alternatives.
 ---
- drivers/gpu/drm/pl111/Kconfig           |   3 +-
- drivers/gpu/drm/pl111/Makefile          |   3 +-
- drivers/gpu/drm/pl111/pl111_connector.c | 126 --------------------------------
- drivers/gpu/drm/pl111/pl111_display.c   |  18 ++---
- drivers/gpu/drm/pl111/pl111_drm.h       |  17 ++---
- drivers/gpu/drm/pl111/pl111_drv.c       |  52 ++++++++-----
- 6 files changed, 52 insertions(+), 167 deletions(-)
- delete mode 100644 drivers/gpu/drm/pl111/pl111_connector.c
+ drivers/gpu/drm/pl111/pl111_display.c | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
-index bbfba87cd1a8..e5e2abd66491 100644
---- a/drivers/gpu/drm/pl111/Kconfig
-+++ b/drivers/gpu/drm/pl111/Kconfig
-@@ -6,7 +6,8 @@ config DRM_PL111
- 	select DRM_KMS_HELPER
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_GEM_CMA_HELPER
--	select DRM_PANEL
-+	select DRM_BRIDGE
-+	select DRM_PANEL_BRIDGE
- 	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
- 	help
- 	  Choose this option for DRM support for the PL111 CLCD controller.
-diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
-index 59483d610ef5..c5f8f9684848 100644
---- a/drivers/gpu/drm/pl111/Makefile
-+++ b/drivers/gpu/drm/pl111/Makefile
-@@ -1,5 +1,4 @@
--pl111_drm-y +=	pl111_connector.o \
--		pl111_display.o \
-+pl111_drm-y +=	pl111_display.o \
- 		pl111_drv.o
- 
- pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
-diff --git a/drivers/gpu/drm/pl111/pl111_connector.c b/drivers/gpu/drm/pl111/pl111_connector.c
-deleted file mode 100644
-index d335f9a29ce4..000000000000
---- a/drivers/gpu/drm/pl111/pl111_connector.c
-+++ /dev/null
-@@ -1,126 +0,0 @@
--/*
-- * (C) COPYRIGHT 2012-2013 ARM Limited. All rights reserved.
-- *
-- * Parts of this file were based on sources as follows:
-- *
-- * Copyright (c) 2006-2008 Intel Corporation
-- * Copyright (c) 2007 Dave Airlie <airlied@linux.ie>
-- * Copyright (C) 2011 Texas Instruments
-- *
-- * This program is free software and is provided to you under the terms of the
-- * GNU General Public License version 2 as published by the Free Software
-- * Foundation, and any use by you of this program is subject to the terms of
-- * such GNU licence.
-- *
-- */
--
--/**
-- * pl111_drm_connector.c
-- * Implementation of the connector functions for PL111 DRM
-- */
--#include <linux/amba/clcd-regs.h>
--#include <linux/version.h>
--#include <linux/shmem_fs.h>
--#include <linux/dma-buf.h>
--
--#include <drm/drmP.h>
--#include <drm/drm_atomic_helper.h>
--#include <drm/drm_crtc_helper.h>
--#include <drm/drm_of.h>
--#include <drm/drm_panel.h>
--
--#include "pl111_drm.h"
--
--static void pl111_connector_destroy(struct drm_connector *connector)
--{
--	struct pl111_drm_connector *pl111_connector =
--		to_pl111_connector(connector);
--
--	if (pl111_connector->panel)
--		drm_panel_detach(pl111_connector->panel);
--
--	drm_connector_unregister(connector);
--	drm_connector_cleanup(connector);
--}
--
--static enum drm_connector_status pl111_connector_detect(struct drm_connector
--							*connector, bool force)
--{
--	struct pl111_drm_connector *pl111_connector =
--		to_pl111_connector(connector);
--
--	return (pl111_connector->panel ?
--		connector_status_connected :
--		connector_status_disconnected);
--}
--
--static int pl111_connector_helper_get_modes(struct drm_connector *connector)
--{
--	struct pl111_drm_connector *pl111_connector =
--		to_pl111_connector(connector);
--
--	if (!pl111_connector->panel)
--		return 0;
--
--	return drm_panel_get_modes(pl111_connector->panel);
--}
--
--const struct drm_connector_funcs connector_funcs = {
--	.fill_modes = drm_helper_probe_single_connector_modes,
--	.destroy = pl111_connector_destroy,
--	.detect = pl111_connector_detect,
--	.reset = drm_atomic_helper_connector_reset,
--	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
--	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
--};
--
--const struct drm_connector_helper_funcs connector_helper_funcs = {
--	.get_modes = pl111_connector_helper_get_modes,
--};
--
--/* Walks the OF graph to find the panel node and then asks DRM to look
-- * up the panel.
-- */
--static struct drm_panel *pl111_get_panel(struct device *dev)
--{
--	struct device_node *endpoint, *panel_node;
--	struct device_node *np = dev->of_node;
--	struct drm_panel *panel;
--
--	endpoint = of_graph_get_next_endpoint(np, NULL);
--	if (!endpoint) {
--		dev_err(dev, "no endpoint to fetch panel\n");
--		return NULL;
--	}
--
--	/* don't proceed if we have an endpoint but no panel_node tied to it */
--	panel_node = of_graph_get_remote_port_parent(endpoint);
--	of_node_put(endpoint);
--	if (!panel_node) {
--		dev_err(dev, "no valid panel node\n");
--		return NULL;
--	}
--
--	panel = of_drm_find_panel(panel_node);
--	of_node_put(panel_node);
--
--	return panel;
--}
--
--int pl111_connector_init(struct drm_device *dev)
--{
--	struct pl111_drm_dev_private *priv = dev->dev_private;
--	struct pl111_drm_connector *pl111_connector = &priv->connector;
--	struct drm_connector *connector = &pl111_connector->connector;
--
--	drm_connector_init(dev, connector, &connector_funcs,
--			   DRM_MODE_CONNECTOR_DPI);
--	drm_connector_helper_add(connector, &connector_helper_funcs);
--
--	pl111_connector->panel = pl111_get_panel(dev->dev);
--	if (pl111_connector->panel)
--		drm_panel_attach(pl111_connector->panel, connector);
--
--	return 0;
--}
--
 diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index b58c988d9da0..e4c692230548 100644
+index b104011cea55..b7df9f5df881 100644
 --- a/drivers/gpu/drm/pl111/pl111_display.c
 +++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -21,7 +21,6 @@
- #include <linux/of_graph.h>
- 
- #include <drm/drmP.h>
--#include <drm/drm_panel.h>
- #include <drm/drm_gem_cma_helper.h>
- #include <drm/drm_gem_framebuffer_helper.h>
- #include <drm/drm_fb_cma_helper.h>
-@@ -94,7 +93,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 	const struct drm_display_mode *mode = &cstate->mode;
- 	struct drm_framebuffer *fb = plane->state->fb;
--	struct drm_connector *connector = &priv->connector.connector;
-+	struct drm_connector *connector = priv->connector;
- 	u32 cntl;
- 	u32 ppl, hsw, hfp, hbp;
- 	u32 lpp, vsw, vfp, vbp;
-@@ -156,8 +155,6 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+@@ -155,8 +155,8 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
  
  	writel(0, priv->regs + CLCD_TIM3);
  
--	drm_panel_prepare(priv->connector.panel);
--
- 	/* Enable and Power Up */
- 	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDPWR | CNTL_LCDVCOMP(1);
+-	/* Enable and Power Up */
+-	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDPWR | CNTL_LCDVCOMP(1);
++	/* Hard-code TFT panel */
++	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDVCOMP(1);
  
-@@ -204,8 +201,6 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 	/* Note that the the hardware's format reader takes 'r' from
+ 	 * the low bit, while DRM formats list channels from high bit
+@@ -199,6 +199,17 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 		break;
+ 	}
  
- 	writel(cntl, priv->regs + CLCD_PL111_CNTL);
++	/* Power sequence: first enable and chill */
++	writel(cntl, priv->regs + priv->ctrl);
++
++	/*
++	 * We expect this delay to stabilize the contrast
++	 * voltage Vee as stipulated by the manual
++	 */
++	msleep(20);
++
++	/* Power Up */
++	cntl |= CNTL_LCDPWR;
+ 	writel(cntl, priv->regs + priv->ctrl);
  
--	drm_panel_enable(priv->connector.panel);
--
  	drm_crtc_vblank_on(crtc);
- }
- 
-@@ -217,13 +212,9 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
+@@ -209,10 +220,24 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
+ 	struct drm_crtc *crtc = &pipe->crtc;
+ 	struct drm_device *drm = crtc->dev;
+ 	struct pl111_drm_dev_private *priv = drm->dev_private;
++	u32 cntl;
  
  	drm_crtc_vblank_off(crtc);
  
--	drm_panel_disable(priv->connector.panel);
--
- 	/* Disable and Power Down */
- 	writel(0, priv->regs + CLCD_PL111_CNTL);
- 
--	drm_panel_unprepare(priv->connector.panel);
--
- 	clk_disable_unprepare(priv->clk);
- }
- 
-@@ -458,7 +449,12 @@ int pl111_display_init(struct drm_device *drm)
- 	ret = drm_simple_display_pipe_init(drm, &priv->pipe,
- 					   &pl111_display_funcs,
- 					   formats, ARRAY_SIZE(formats),
--					   NULL, &priv->connector.connector);
-+					   NULL, priv->connector);
-+	if (ret)
-+		return ret;
+-	/* Disable and Power Down */
++	/* Power Down */
++	cntl = readl(priv->regs + priv->ctrl);
++	if (cntl & CNTL_LCDPWR) {
++		cntl &= ~CNTL_LCDPWR;
++		writel(cntl, priv->regs + priv->ctrl);
++	}
 +
-+	ret = drm_simple_display_pipe_attach_bridge(&priv->pipe,
-+						    priv->bridge);
- 	if (ret)
- 		return ret;
++	/*
++	 * We expect this delay to stabilize the contrast voltage Vee as
++	 * stipulated by the manual
++	 */
++	msleep(20);
++
++	/* Disable */
+ 	writel(0, priv->regs + priv->ctrl);
  
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index a97f303f6833..000534d85b43 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -21,21 +21,22 @@
- 
- #include <drm/drm_gem.h>
- #include <drm/drm_simple_kms_helper.h>
-+#include <drm/drm_connector.h>
-+#include <drm/drm_encoder.h>
-+#include <drm/drm_panel.h>
-+#include <drm/drm_bridge.h>
- #include <linux/clk-provider.h>
- 
- #define CLCD_IRQ_NEXTBASE_UPDATE BIT(2)
- 
- struct drm_minor;
- 
--struct pl111_drm_connector {
--	struct drm_connector connector;
--	struct drm_panel *panel;
--};
--
- struct pl111_drm_dev_private {
- 	struct drm_device *drm;
- 
--	struct pl111_drm_connector connector;
-+	struct drm_connector *connector;
-+	struct drm_panel *panel;
-+	struct drm_bridge *bridge;
- 	struct drm_simple_display_pipe pipe;
- 	struct drm_fbdev_cma *fbdev;
- 
-@@ -50,14 +51,10 @@ struct pl111_drm_dev_private {
- 	spinlock_t tim2_lock;
- };
- 
--#define to_pl111_connector(x) \
--	container_of(x, struct pl111_drm_connector, connector)
--
- int pl111_display_init(struct drm_device *dev);
- int pl111_enable_vblank(struct drm_device *drm, unsigned int crtc);
- void pl111_disable_vblank(struct drm_device *drm, unsigned int crtc);
- irqreturn_t pl111_irq(int irq, void *data);
--int pl111_connector_init(struct drm_device *dev);
- int pl111_debugfs_init(struct drm_minor *minor);
- 
- #endif /* _PL111_DRM_H_ */
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 581c452cede1..bddf24327910 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -68,6 +68,9 @@
- #include <drm/drm_gem_cma_helper.h>
- #include <drm/drm_gem_framebuffer_helper.h>
- #include <drm/drm_fb_cma_helper.h>
-+#include <drm/drm_of.h>
-+#include <drm/drm_bridge.h>
-+#include <drm/drm_panel.h>
- 
- #include "pl111_drm.h"
- 
-@@ -83,6 +86,8 @@ static int pl111_modeset_init(struct drm_device *dev)
- {
- 	struct drm_mode_config *mode_config;
- 	struct pl111_drm_dev_private *priv = dev->dev_private;
-+	struct drm_panel *panel;
-+	struct drm_bridge *bridge;
- 	int ret = 0;
- 
- 	drm_mode_config_init(dev);
-@@ -93,34 +98,38 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	mode_config->min_height = 1;
- 	mode_config->max_height = 768;
- 
--	ret = pl111_connector_init(dev);
--	if (ret) {
--		dev_err(dev->dev, "Failed to create pl111_drm_connector\n");
--		goto out_config;
-+	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
-+					  0, 0, &panel, &bridge);
-+	if (ret && ret != -ENODEV)
-+		return ret;
-+	if (panel) {
-+		bridge = drm_panel_bridge_add(panel,
-+					      DRM_MODE_CONNECTOR_Unknown);
-+		if (IS_ERR(bridge)) {
-+			ret = PTR_ERR(bridge);
-+			goto out_config;
-+		}
-+		/*
-+		 * TODO: when we are using a different bridge than a panel
-+		 * (such as a dumb VGA connector) we need to devise a different
-+		 * method to get the connector out of the bridge.
-+		 */
-+		priv->panel = panel;
-+		priv->connector = panel->connector;
- 	}
- 
--	/* Don't actually attach if we didn't find a drm_panel
--	 * attached to us.  This will allow a kernel to include both
--	 * the fbdev pl111 driver and this one, and choose between
--	 * them based on which subsystem has support for the panel.
--	 */
--	if (!priv->connector.panel) {
--		dev_info(dev->dev,
--			 "Disabling due to lack of DRM panel device.\n");
--		ret = -ENODEV;
--		goto out_config;
--	}
-+	priv->bridge = bridge;
- 
- 	ret = pl111_display_init(dev);
- 	if (ret != 0) {
- 		dev_err(dev->dev, "Failed to init display\n");
--		goto out_config;
-+		goto out_bridge;
- 	}
- 
- 	ret = drm_vblank_init(dev, 1);
- 	if (ret != 0) {
- 		dev_err(dev->dev, "Failed to init vblank\n");
--		goto out_config;
-+		goto out_bridge;
- 	}
- 
- 	drm_mode_config_reset(dev);
-@@ -132,6 +141,11 @@ static int pl111_modeset_init(struct drm_device *dev)
- 
- 	goto finish;
- 
-+out_bridge:
-+	if (panel)
-+		drm_panel_bridge_remove(bridge);
-+	else
-+		drm_bridge_remove(bridge);
- out_config:
- 	drm_mode_config_cleanup(dev);
- finish:
-@@ -236,6 +250,10 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
- 	drm_dev_unregister(drm);
- 	if (priv->fbdev)
- 		drm_fbdev_cma_fini(priv->fbdev);
-+	if (priv->panel)
-+		drm_panel_bridge_remove(priv->bridge);
-+	else
-+		drm_bridge_remove(priv->bridge);
- 	drm_mode_config_cleanup(drm);
- 	drm_dev_unref(drm);
- 
+ 	clk_disable_unprepare(priv->clk);
 -- 
 2.13.5
