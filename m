@@ -1,16 +1,34 @@
-From: jason@tensyr.com (Jason Teplitz)
-Date: Thu, 7 Sep 2017 12:36:48 -0700
-Subject: Conflict when accessing PMU counters from userspace
-Message-ID: <CALk3wS0P-R9=HU1wYCWWYZ2w=7RjFoD4M=Vwzg-1ALRuRNMHUA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 7 Sep 2017 21:37:32 +0200
+Subject: [PATCH v2 15/16] dmaengine: bcm-sba-raid: Add debugfs support
+In-Reply-To: <20170818052613.GE3053@localhost>
+References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
+ <1501583880-32072-16-git-send-email-anup.patel@broadcom.com>
+ <20170817080142.GC3053@localhost>
+ <CAALAos_SXTMms8XmhEC28gxx4qvvr0z3wqQ=o_-BohMpcXwQTw@mail.gmail.com>
+ <20170818052613.GE3053@localhost>
+Message-ID: <20170907193732.GB11006@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Aug 18, 2017 at 10:56:13AM +0530, Vinod Koul wrote:
+> On Fri, Aug 18, 2017 at 10:33:54AM +0530, Anup Patel wrote:
+> > On Thu, Aug 17, 2017 at 1:31 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > > On Tue, Aug 01, 2017 at 04:07:59PM +0530, Anup Patel wrote:
+> > > why fail, debugfs should be an optional thingy, why would you want to fail here?
+> > 
+> > Yes, we are handling the case when debugfs is not available
+> > and skipping debugfs gracefully.
+> > 
+> > If debugfs is available then failure of debugfs_create_dir()
+> > should be reported.
+> 
+> reported yes, bailing out on that err no..
 
-I'm reading the PMU counters from a userspace process, but the cycle
-counter keeps getting reset. I don't believe any other running
-processes are doing this. Is there something in the kernel that resets
-the cycle counter periodically and if so is there an easy way to
-disable it?
+Reported, no.  You should _never_ care about the return value of a
+debugfs call.  Never check it, just move on ad keep on going.  It
+doesn't matter.
 
--Jason
+thanks,
+
+greg k-h
