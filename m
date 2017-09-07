@@ -1,104 +1,59 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Thu, 7 Sep 2017 09:40:11 +0200
-Subject: [PATCH v3 3/3] PCI: Avoid slot reset for Cavium cn8xxx root ports
-In-Reply-To: <20170831100130.5c8a922e@w520.home>
-References: <20170830142454.10971-1-jglauber@cavium.com>
- <20170830142454.10971-4-jglauber@cavium.com>
- <20170830084012.19d91759@w520.home> <20170831094052.GA15906@hc>
- <20170831100130.5c8a922e@w520.home>
-Message-ID: <20170907074011.GA13490@hc>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Thu, 7 Sep 2017 15:45:16 +0800
+Subject: [PATCH v3 3/3] arm64/ras: save error address from memory section for
+ recovery
+In-Reply-To: <1504770316-4327-1-git-send-email-xiexiuqi@huawei.com>
+References: <1504770316-4327-1-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1504770316-4327-4-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 10:01:30AM -0600, Alex Williamson wrote:
-> On Thu, 31 Aug 2017 11:40:52 +0200
-> Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
-> 
-> > On Wed, Aug 30, 2017 at 08:40:12AM -0600, Alex Williamson wrote:
-> > > On Wed, 30 Aug 2017 16:24:54 +0200
-> > > Jan Glauber <jglauber@cavium.com> wrote:
-> > >   
-> > > > Root ports of cn8xxx do not function after a slot reset when used with
-> > > > some e1000e and LSI HBA devices. Add a quirk to prevent slot reset on
-> > > > these root ports.
-> > > > 
-> > > > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > > > ---
-> > > >  drivers/pci/quirks.c | 16 ++++++++++++++++
-> > > >  1 file changed, 16 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> > > > index 85191b8..6679971 100644
-> > > > --- a/drivers/pci/quirks.c
-> > > > +++ b/drivers/pci/quirks.c
-> > > > @@ -845,6 +845,22 @@ static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
-> > > >  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
-> > > >  #endif
-> > > >  
-> > > > +/*
-> > > > + * Root port on some Cavium CN8xxx chips do not successfully complete
-> > > > + * a bus reset when used with certain types of child devices. Config
-> > > > + * space access to the child may quit responding. Flag all devices under
-> > > > + * the secondary bus as non-resettable.
-> > > > + */
-> > > > +static void quirk_CN8xxx_secondary_bus(struct pci_dev *dev)
-> > > > +{
-> > > > +	struct pci_dev *pdev;
-> > > > +
-> > > > +	dev_warn(&dev->dev, "Cavium CN8xxx quirk detected; reset for devices on secondary bus disabled\n");
-> > > > +	list_for_each_entry(pdev, &dev->subordinate->devices, bus_list)
-> > > > +		pdev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
-> > > > +}
-> > > > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_CN8xxx_secondary_bus);
-> > > > +
-> > > >  /*
-> > > >   * Some settings of MMRBC can lead to data corruption so block changes.
-> > > >   * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide  
-> > > 
-> > > 
-> > > This doesn't seem reliable, doesn't the user just need to remove and
-> > > reprobe the slot and the device would re-appear without this flag set?  
-> > 
-> > No, I tried before to disable the slot with "echo 0 > /sys/bus/pci/slots/3/power"
-> > but that does not work as it is not supported.
-> > 
-> > I'm not familiar with the quirk types, would another one be better
-> > suited here (even if we don't have the problem you descibed)?
-> 
-> The scenario I'm mentioning is to "echo 1 > /sys/bus/pci/devices/<some
-> device under the slot>/remove", then "echo <that device address> >
-> /sys/bus/pci/rescan".  This would break the ordering implicit in using
-> a fixup defined for the root port.  It seems like it'd make a lot more
-> sense to add a test on the parent bridge more similar to how the bus
-> reset works.  It's not the subordinate devices imposing the
-> no-bus-reset flag, it's the bridge device and the objects and code
-> should support and reflect that.  Thanks,
+In some platform, when SEA triggerred, physical address might be
+reported by memory section, so we save it for error recovery later.
 
-Doing "echo <that device address> > /sys/bus/pci/rescan" after the
-remove did not work for me, but maybe the format of the device address
-needs to be different. Anyway, the sequence
-  echo 1 > /sys/bus/pci/devices/<some device under the slot>/remove
-  echo 1 > /sys/bus/pci/rescan
-still triggers the panic as you mentioned above.
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+---
+ arch/arm64/kernel/ras.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-I agree that the subordinate devices are not causing the issue, still
-I need to make pci_slot_resetable() return false in our case.
-
-So what if we add an additional check like:
-
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index fdf65a6..389db4b 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4389,6 +4389,9 @@ static bool pci_slot_resetable(struct pci_slot *slot)
- {
-        struct pci_dev *dev;
- 
-+       if (slot->bus->self & PCI_DEV_FLAGS_NO_BUS_RESET)
-+               return false;
+diff --git a/arch/arm64/kernel/ras.c b/arch/arm64/kernel/ras.c
+index 797722d..b24b449 100644
+--- a/arch/arm64/kernel/ras.c
++++ b/arch/arm64/kernel/ras.c
+@@ -139,3 +139,34 @@ void arm_process_error(struct ghes *ghes, struct cper_sec_proc_arm *err)
+ 	if (info_saved)
+ 		set_thread_flag(TIF_SEA_NOTIFY);
+ }
 +
-        list_for_each_entry(dev, &slot->bus->devices, bus_list) {
-                if (!dev->slot || dev->slot != slot)
-                        continue;
-
---Jan
++int ghes_mem_err_callback(struct notifier_block *nb, unsigned long val, void *data)
++{
++	bool info_saved = false;
++	struct ghes_mem_err *ghes_mem = (struct ghes_mem_err *)data;
++	struct cper_sec_mem_err *mem_err = ghes_mem->mem_err;
++
++	if ((ghes_mem->notify_type != ACPI_HEST_NOTIFY_SEA) ||
++	    (ghes_mem->severity != CPER_SEV_RECOVERABLE))
++		return 0;
++
++	if (mem_err->validation_bits & CPER_MEM_VALID_PA)
++		info_saved = sea_save_info(mem_err->physical_addr);
++
++	if (info_saved)
++		set_thread_flag(TIF_SEA_NOTIFY);
++
++	return 0;
++}
++
++static struct notifier_block ghes_mem_err_nb = {
++	.notifier_call	= ghes_mem_err_callback,
++};
++
++static int arm64_err_recov_init(void)
++{
++	atomic_notifier_chain_register(&ghes_mem_err_chain, &ghes_mem_err_nb);
++	return 0;
++}
++
++late_initcall(arm64_err_recov_init);
+-- 
+1.8.3.1
