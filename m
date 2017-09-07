@@ -1,9 +1,9 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 07 Sep 2017 17:58:54 +0200
-Subject: [PATCH] ARM: dts: exynos: fix incomplete Odroid-XU3/4 thermal-zones
- definition
-References: <CGME20170907155857epcas2p1819af1f0290828b48aaf953a05aa32b0@epcas2p1.samsung.com>
-Message-ID: <12756817.Sq0VSgt4c1@amdc3058>
+Date: Thu, 07 Sep 2017 18:10 +0200
+Subject: [PATCH v2] ARM: dts: exynos: fix incomplete Odroid-XU3/4
+ thermal-zones definition
+References: <CGME20170907161007epcas1p316fba6e329eaabedde8a98628ebb9751@epcas1p3.samsung.com>
+Message-ID: <1848394.K3C0KxojUN@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,18 +31,25 @@ Cc: Kukjin Kim <kgene@kernel.org>
 [b.zolnierkie: rewrote patch subject & description + minor fixups]
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
+v2:
+
+Newlines removed (1 original + 3 new ones), sorry for not catching it
+earlier in v1.
+
+v1:
+
 I updated the patch to address Krzysztof's review comments,
 the original version from June can be found here:
 
 	https://patchwork.kernel.org/patch/9807333/
 
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  241 +++++++++++++++++++--
- 1 file changed, 222 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  239 +++++++++++++++++++--
+ 1 file changed, 219 insertions(+), 20 deletions(-)
 
 Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
 ===================================================================
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 17:41:18.264391541 +0200
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 17:47:07.788400343 +0200
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 17:56:29.256414483 +0200
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi	2017-09-07 18:04:40.596426857 +0200
 @@ -63,22 +63,22 @@
  			polling-delay-passive = <250>;
  			polling-delay = <0>;
@@ -70,7 +77,7 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
  					temperature = <120000>; /* millicelsius */
  					hysteresis = <0>; /* millicelsius */
  					type = "critical";
-@@ -87,14 +87,14 @@
+@@ -87,59 +87,258 @@
  				 * Exynos542x supports only 4 trip-points
  				 * so for these polling mode is required.
  				 * Start polling at temperature level of last
@@ -88,7 +95,8 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
  					temperature = <85000>; /* millicelsius */
  					hysteresis = <10000>; /* millicelsius */
  					type = "passive";
-@@ -103,43 +103,246 @@
+ 				};
+-
  			};
  			cooling-maps {
  				map0 {
@@ -133,9 +141,11 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
  				map5 {
 -					trip = <&cpu_alert4>;
 +					trip = <&cpu0_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
+ 					cooling-device = <&cpu0 3 7>;
+ 				};
+ 				map6 {
+-					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu4 3 11>;
 +					trip = <&cpu0_alert4>;
 +					cooling-device = <&cpu4 3 12>;
 +				};
@@ -176,7 +186,6 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
 +					hysteresis = <10000>;
 +					type = "passive";
 +				};
-+
 +			};
 +			cooling-maps {
 +				map0 {
@@ -244,7 +253,6 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
 +					hysteresis = <10000>;
 +					type = "passive";
 +				};
-+
 +			};
 +			cooling-maps {
 +				map0 {
@@ -312,7 +320,6 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
 +					hysteresis = <10000>;
 +					type = "passive";
 +				};
-+
 +			};
 +			cooling-maps {
 +				map0 {
@@ -337,11 +344,9 @@ Index: b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
 +				};
 +				map5 {
 +					trip = <&cpu3_alert4>;
- 					cooling-device = <&cpu0 3 7>;
- 				};
- 				map6 {
--					trip = <&cpu_alert4>;
--					cooling-device = <&cpu4 3 11>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
 +					trip = <&cpu3_alert4>;
 +					cooling-device = <&cpu4 3 12>;
  				};
