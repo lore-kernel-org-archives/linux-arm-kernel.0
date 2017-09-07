@@ -1,57 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 7 Sep 2017 13:00:50 +0100
-Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
-In-Reply-To: <eebc5831-79ff-c79c-34ff-37c852885bbe@huawei.com>
-References: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
- <59B10F52.9010400@arm.com> <f710f68a-1e89-85a6-41a6-afc7588114db@huawei.com>
- <ec27c833-c9f7-d144-3c6f-a87a3bf3d97f@arm.com>
- <eebc5831-79ff-c79c-34ff-37c852885bbe@huawei.com>
-Message-ID: <a2f82bb5-e61c-9c80-51c9-738fbcdd127e@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 07 Sep 2017 14:09:26 +0200
+Subject: [PATCH v8 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
+In-Reply-To: <8d36106e-ad19-8b4b-6b90-943cc6ff65aa@rock-chips.com>
+References: <1504351723-135876-1-git-send-email-hjc@rock-chips.com>
+ <1504351737-136042-1-git-send-email-hjc@rock-chips.com>
+ <8d36106e-ad19-8b4b-6b90-943cc6ff65aa@rock-chips.com>
+Message-ID: <2057816.0G3n1KPuPZ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/17 12:49, gengdongjiu wrote:
-> 
-> 
-> On 2017/9/7 18:13, Marc Zyngier wrote:
->> On 07/09/17 11:05, gengdongjiu wrote:
->>> Hi James,
->>>
->>> On 2017/9/7 17:20, James Morse wrote:
->>>> Hi Dongjiu Geng,
->>>>
->>>> On 07/09/17 06:54, Dongjiu Geng wrote:
->>>>> In VHE mode, host kernel runs in the EL2 and can enable
->>>>> 'User Access Override' when fs==KERNEL_DS so that it can
->>>>> access kernel memory. However, PSTATE.UAO is set to 0 on
->>>>> an exception taken from EL1 to EL2. Thus when VHE is used
->>>>> and exception taken from a guest UAO will be disabled and
->>>>> host will use the incorrect PSTATE.UAO. So check and reset
->>>>> the PSTATE.UAO when switching to host.
->>>>
->>>> This would only be a problem if KVM were calling into world-switch with
->>>> fs==KERNEL_DS. I can't see where this happens.
->>>  Not only KVM, may also kernel sets the fs == KERNEL_DS before calling into world-switch
->>
->> How? Please describe the exact sequence of event that lead to this
->> situation with the current code base.
-> 
-> Hi Marc,
-> 
->    Different tasks have different fs, such as USER_DS or KERNEL_DS. In the context switch, it will restore the
-> task's fs. Thus, that depends on task itself, as shown below code. UAO is different with PAN, PAN will be always enabled if
-> hardware CPU supports PAN feature, but UAO is dynamical change.
+Hi Mark,
 
-You haven't answered my question: There is exactly one point where we
-enter the world-switch. Show me that, at this point, PSTATE.UAO *before*
-the call is different from PSTATE.UAO after the call. Give me the exact
-sequence of event that leads to this situation. Show me a stack trace.
+Am Donnerstag, 7. September 2017, 18:16:29 CEST schrieb Mark yao:
+> Looks good for me, so:
+> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
+> 
+> I'd like to apply these lvds patches tomorrow if there is no more doubts.
 
-Until you do this, I will ignore any further comment coming from you on
-this subject.
+Rob had some minor comments on v7 of the dt-binding, so you may want
+to give him a bit more time to Ack the hopefully updated binding.
 
-Thanks,
+Otherwise no doubts from me, just a reminder that you should take
+patches 1+3 and I'll pick patch 2 with the dts changes after that.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+Thanks
+Heiko
