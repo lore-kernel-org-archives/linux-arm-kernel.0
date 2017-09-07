@@ -1,51 +1,57 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 7 Sep 2017 13:52:44 +0200
-Subject: [PATCH v4 0/4] Add STM32 DMAMUX support
-Message-ID: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 7 Sep 2017 13:00:50 +0100
+Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
+In-Reply-To: <eebc5831-79ff-c79c-34ff-37c852885bbe@huawei.com>
+References: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
+ <59B10F52.9010400@arm.com> <f710f68a-1e89-85a6-41a6-afc7588114db@huawei.com>
+ <ec27c833-c9f7-d144-3c6f-a87a3bf3d97f@arm.com>
+ <eebc5831-79ff-c79c-34ff-37c852885bbe@huawei.com>
+Message-ID: <a2f82bb5-e61c-9c80-51c9-738fbcdd127e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the STM32 DMA multiplexer.
-It allows to map any peripheral DMA request to any channel of the product
-DMAs.
-This IP has been introduced with STM32H7 SoC.
+On 07/09/17 12:49, gengdongjiu wrote:
+> 
+> 
+> On 2017/9/7 18:13, Marc Zyngier wrote:
+>> On 07/09/17 11:05, gengdongjiu wrote:
+>>> Hi James,
+>>>
+>>> On 2017/9/7 17:20, James Morse wrote:
+>>>> Hi Dongjiu Geng,
+>>>>
+>>>> On 07/09/17 06:54, Dongjiu Geng wrote:
+>>>>> In VHE mode, host kernel runs in the EL2 and can enable
+>>>>> 'User Access Override' when fs==KERNEL_DS so that it can
+>>>>> access kernel memory. However, PSTATE.UAO is set to 0 on
+>>>>> an exception taken from EL1 to EL2. Thus when VHE is used
+>>>>> and exception taken from a guest UAO will be disabled and
+>>>>> host will use the incorrect PSTATE.UAO. So check and reset
+>>>>> the PSTATE.UAO when switching to host.
+>>>>
+>>>> This would only be a problem if KVM were calling into world-switch with
+>>>> fs==KERNEL_DS. I can't see where this happens.
+>>>  Not only KVM, may also kernel sets the fs == KERNEL_DS before calling into world-switch
+>>
+>> How? Please describe the exact sequence of event that lead to this
+>> situation with the current code base.
+> 
+> Hi Marc,
+> 
+>    Different tasks have different fs, such as USER_DS or KERNEL_DS. In the context switch, it will restore the
+> task's fs. Thus, that depends on task itself, as shown below code. UAO is different with PAN, PAN will be always enabled if
+> hardware CPU supports PAN feature, but UAO is dynamical change.
 
----
- Version history:
-    v4:
-        * Add multi-master ability for STM32 DMAMUX
-        * Get rid of st,dmamux property and custom API between STM32
-          DMAMUX and DMA. Bindings has changed.
-          DMAMUX will read DMA masters from Device Tree from now on.
-          Merely one DMAMUX node is needed now.
-        * Only STM32 DMA are allowed to be connected onto DMAMUX
-        * channelID is computed locally within the driver and crafted in
-          dma_psec to be passed toward DMA master.
-          DMAMUX router sorts out which DMA master will serve the
-          request automatically.
-        * This version forbids the use of DMA in standalone and DMAMUX at
-          the same time : all clients need to be connected either on DMA
-          or DMAMUX ; no mix up
-    v3:
-        * change compatible to st,stm32h7-dmamux to be mode Soc specific
-        * add verbosity in dma-cells
----
+You haven't answered my question: There is exactly one point where we
+enter the world-switch. Show me that, at this point, PSTATE.UAO *before*
+the call is different from PSTATE.UAO after the call. Give me the exact
+sequence of event that leads to this situation. Show me a stack trace.
 
-Pierre-Yves MORDRET (4):
-  dt-bindings: Document the STM32 DMAMUX bindings
-  dmaengine: Add STM32 DMAMUX driver
-  dt-bindings: stm32-dma: add a property to handle STM32 DMAMUX
-  ARM: configs: stm32: Add MDMA support in STM32 defconfig
+Until you do this, I will ignore any further comment coming from you on
+this subject.
 
- .../devicetree/bindings/dma/stm32-dma.txt          |   4 +-
- .../devicetree/bindings/dma/stm32-dmamux.txt       |  84 ++++++
- arch/arm/configs/stm32_defconfig                   |   1 +
- drivers/dma/Kconfig                                |   9 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/stm32-dmamux.c                         | 321 +++++++++++++++++++++
- 6 files changed, 419 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
- create mode 100644 drivers/dma/stm32-dmamux.c
+Thanks,
 
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
