@@ -1,168 +1,264 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 07 Sep 2017 17:32:53 +0100
-Subject: [PATCH v6 0/7] Add RAS virtualization support for SEA/SEI
- notification type in KVM
-In-Reply-To: <61d15c7d-803b-15b2-78e1-637fdb9396d6@huawei.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <59A84ACB.7030808@arm.com> <61d15c7d-803b-15b2-78e1-637fdb9396d6@huawei.com>
-Message-ID: <59B174B5.20807@arm.com>
+From: antony@phenome.org (Antony Antony)
+Date: Thu,  7 Sep 2017 18:42:22 +0200
+Subject: [PATCH v9] arm64: allwinner: h5: add NanoPi NEO Plus2 DT support
+In-Reply-To: <20170824231716.2623-1-antony@phenome.org>
+References: <20170824231716.2623-1-antony@phenome.org>
+Message-ID: <20170907164222.66759-1-antony@phenome.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+Add initial DT for NanoPi NEO Plus2 by FriendlyARM
+- Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
+- 1 GB DDR3 RAM
+- 8GB eMMC flash (Samsung KLM8G1WEPD-B031)
+- micro SD card slot
+- Gigabit Ethernet (external RTL8211E-VB-CG chip)
+- 802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
+- 2x USB 2.0 host ports & 2x USB via headers
 
-(I've re-ordered some of the hunks here:)
+Signed-off-by: Antony Antony <antony@phenome.org>
+---
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 193 +++++++++++++++++++++
+ 2 files changed, 194 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
 
-On 04/09/17 12:10, gengdongjiu wrote:
-> On 2017/9/1 1:43, James Morse wrote:
->> On 28/08/17 11:38, Dongjiu Geng wrote:
->>> Not call memory_failure() to handle it. Because the error address recorded
->>> by APEI is not accurated, so can not identify the address to hwpoison
->>> memory.
->>
->> This looks like a firmware bug, what address do you get in your CPER
->> records? It should be a physical address.
+---
+Changes
+v1 -> v2
+ add wifi power controller,  mmc1, mmc2
+ remove reg_usb0_vbus
+v2 -> v3
+fix typo s/orangepi/nanopi/, s/pus/plus/
+ usb_otg set to host mode
+ wifi fix, based on commit 442e1f7e brcm,bcm43xx-fmac.txt
+ remove functions on header pins: spi, ir, ehci 1&2, ohci 1&2, uart 1&2
+ remove hdmi, de2, r-gpio-keys, mixer - not supported the board
+v3->v4 update WiFi chip compatible to bcm43430-fmac
+v4->v5 back to bcm4329-fmac bcm43430-fmac is the wrong way.
+v5-->v6
+  sorted nodes
+  removed usb0_id_det-gpios,boot_device, drive-strength = <40>; boot_device
+  delete nodes which are same as the defaults.
+v6->v7
+  s/brcm,bcm4329-fmac/brcm/
+v7->v8
+  remove emac(stmmac: sun8i is reverted in upstream) & related node
+  remove AP6212A comment
+v8->v9
+  remove r_pio, boot_device(missed in v6)
+  s/brcm/brcm,bcm4329-fmac/
 
-> No, not firmware bug. At least in the armv8.0 CPU and huawei's armv8.2 CPU,
-> the architecture decided it is not accurate, this abort is asynchronous not
-> synchronous.
-
-This is going to be a problem. (I'm chasing Achin to find out when this is
-allowed to happen and what we're expected to do about it!)
-
-I hope this isn't the default behaviour, but only happens in exceptionally rare
-circumstances.
-
-
->> To report a memory-error you must have an address.
-> maybe we can not get the accurate error address, can you get it in your armv8
-> platform?
-
-I only have software-models, they only generate the errors you tell them to.
-
-
-I think I see why you're taking this approach with the series, the scenario is:
-1. Firmware takes an SError due to a bad memory location from guest EL0.
-2. The CPU doesn't provide the address of the memory location.
-
-You want to confine this error as much as possible, in particular to the context
-it came from (e.g. guest EL0). CPU context isn't something the CPER records can
-describe (they describe failures in system components), hence your hybrid
-{kernel,firmware}-first code.
-
-I don't think its safe to kill guest-EL0 and hope this confined the error.
-
-If the affected page of guest memory has never been written to by the guest, the
-host will map in the global zero-page, (made read-only at stage2). If the
-corruption is in this page it affects the host kernel, guests and user-space
-processes. Just because the error came from guest-EL0 doesn't mean
-kernel/hypervisor memory isn't affected.
-
-This doesn't just affect that one page: KSM may have merged every copy of every
-guest user-space's libc, which has subsequently become corrupt. The first
-guest-EL0 to step in this triggers the fault, but it affects all the guests.
-With the address all the guests can fix this error, and KSM will re-merge the
-pages. Without the address every user-space process in every guest will
-eventually be killed.
-
-We aren't even guaranteed that the access that caused the fault came from your
-guest EL0. The fault may be in the page tables belonging to the guest kernel,
-even worse they may belong to they hypervisor's stage2 page tables.
-
-(Thanks to Mark and Robin for these examples)
-
-
-I think in this scenario your firmware should describe a memory-error with an
-unknown address. (i.e. don't set the 'physical address valid' bit in CPER's
-'Table 275 Memory Error Record'). When Linux gets one of these, it should
-panic(): We know some memory is corrupt, we don't know where it is.
-
-
->> User-space may be signalled by the memory_failure() helper, and user-space >>
-may choose to notify the guest about the memory-failure, but this would be a
->> new error.
-
-> For the SError, it is asynchronous abort. so it is not better to call
-> memory_failure() helper, because the error address is not accurate.
-> memory_failure() will offline or poison the address, but the address is not
-> accurate. so it is dangerous
-
-By 'not accurate' do you mean the CPU provides an address, and its wrong.
-(surely this is a CPU bug), or just no address is provided. (i.e. the
-ERR<n>ADDR.AI 'address incorrect' bit is set).
-
-
->>> Because the error was taken from a lower Exception level, if the
->>> exception is SEA/SEI and HCR_EL2.TEA/HCR_EL2.AMO is 1, firmware
->>> sets ESR_EL2/FAR_EL2 to fake a exception trap to EL2, then
->>> transfers to hypervisor.
->>
->> What happens if you took an SError from EL2 and EL2 has PSTATE.A set masking
->> SError? (this is very common today: all kernel code runs like this).
-
-> Firstly, the guest OS usually runs in the El1 or El0, not El2.
-> if El2 happens an SError, it will trap to EL3 firmware even though the PSTATE.A is set.
-> Because the PSTATE.A can not mask it if the SError is trapped to EL3.
-
-Sure, we agree that from the CPU's view when SCR_EL3.EA is set physical-SError
-can't be masked when executing any EL below EL3.
-
-My question was about the 'firmware sets ESR_EL2/FAR_EL2 to fake an exception
-trap to EL2' step. While EL3 can take the physical-SError at any time the
-normal-world is running, it can't always deliver a fake-SError to EL2, because
-EL2 believes it has masked physical-SError.
-
-With the SError rework this should only be masked while we are in entry.S
-preparing to handle an exception, receiving an unexpected asynchronous exception
-at this point would overwrite ELR/ESR, meaning we could never handle the
-original exception.
-
-
->> What happens if the hypervisor then executes an ESB with PSTATE.A set? It
->> expects to see any pending SError deferred and its syndrome written to DISR_EL1,
->> but this register is RAZ/WI when you set SCR_EL3.EA. '4.4.2' of [0]
-
-> From my understand, if the SCR_EL3.EA is set, the Abort can not mask, it always happen and
-> take to EL3, DISR_El1 can not record the syndrome. DISR_El1 is only recorded when
-> the External Abort is masked, but when SCR_EL3.EA is set, the pstate.A can not mask the Error.
-
-But once EL3 wants to notify EL2, and EL2 believes it has SError masked, (even
-if the CPU knows its going route physical-SError to EL3) what do you do?
-
-(The best I can think of is that if firmware has to deliver a RAS Error as a
-fake-SError, and the target exception-level has SError masked, then firmware
-should reboot normal-world and deliver the error via the BERT. To support
-NOTIFY_SEI the OS should aim to mask SError as little as possible.)
-
-
->>> For the synchronous external abort(SEA), Hypervisor calls the
->>> ghes_handle_memory_failure() to deal with this error,
->>> ghes_handle_memory_failure() function reads the APEI table and 
->>> callls memory_failure() to decide whether it needs to deliver
->>> SIGBUS signal to user space, the advantage of using SIGBUS signal
->>> to notify user space is that it can be compatible with Non-Kvm users.
->>>
->>> For the SError Interrupt(SEI),KVM firstly classified the error.
->>
->> KVM can't parse the CPER records, nor does it know where to look to find them.
->> KVM should call out to the APEI code so the host kernel can handle the error.
-
-> KVM does not parse the CPER records, I mean KVM classified the error according to the esr_el2.AET.
-
-Decoding the AET bits in KVM is stub code for systems without firmware-first.
-This will eventually be a call-out to some arm64 arch code to decode the RAS ERR
-records and do kernel-first handling.
-
-All the GHES notification methods mean 'go read the CPER records'. The CPER
-records then contain all the information, including severities. The SError ESR
-value should be irrelevant if the host supports firmware-first.
-
-Without firmware-first or kernel-first we decode the SError ESR to know whether
-or not to panic(). This is the minimum-work to avoid data corruption while Linux
-only supports firmware-first and the platform expects kernel-first.
-
-
-
-Thanks,
-
-James
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 108f12c..e6810c8 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -6,6 +6,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+new file mode 100644
+index 0000000..7c028af
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+@@ -0,0 +1,193 @@
++/*
++ * Copyright (C) 2017 Antony Antony <antony@phenome.org>
++ * Copyright (C) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun50i-h5.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "FriendlyARM NanoPi NEO Plus2";
++	compatible = "friendlyarm,nanopi-neo-plus2", "allwinner,sun50i-h5";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr {
++			label = "nanopi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		status {
++			label = "nanopi:red:status";
++			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	vdd_cpux: gpio-regulator {
++		compatible = "regulator-gpio";
++		pinctrl-names = "default";
++		regulator-name = "vdd-cpux";
++		regulator-type = "voltage";
++		regulator-boot-on;
++		regulator-always-on;
++		regulator-min-microvolt = <1100000>;
++		regulator-max-microvolt = <1300000>;
++		regulator-ramp-delay = <50>; /* 4ms */
++		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>;
++		gpios-states = <0x1>;
++		states = <1100000 0x0
++			  1300000 0x1>;
++	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
++		post-power-on-delay-ms = <200>;
++	};
++};
++
++&codec {
++	allwinner,audio-routing =
++		"Line Out", "LINEOUT",
++		"MIC1", "Mic",
++		"Mic",  "MBIAS";
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++	};
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_8bit_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbphy {
++	/* USB Type-A ports' VBUS is always on */
++	status = "okay";
++};
+-- 
+2.9.3
