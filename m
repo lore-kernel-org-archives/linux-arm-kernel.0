@@ -1,22 +1,17 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Sep 2017 17:29:18 +0100
-Subject: [PATCH] arm64: efi: Don't include EFI fpsimd save/restore code
- in non-EFI kernels
-In-Reply-To: <1504193606-14461-1-git-send-email-Dave.Martin@arm.com>
-References: <1504193606-14461-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170907162917.t6azerdbcc2e3syn@armageddon.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Sep 2017 09:30:13 -0700
+Subject: [PATCH v3 0/3] mmc: Add OMAP SDHCI driver
+In-Reply-To: <20170906114556.32532-1-kishon@ti.com>
+References: <20170906114556.32532-1-kishon@ti.com>
+Message-ID: <20170907163009.GQ5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 04:33:26PM +0100, Dave P Martin wrote:
-> __efi_fpsimd_begin()/__efi_fpsimd_end() are for use when making EFI
-> calls only, so using them in non-EFI kernels is not allowed.
-> 
-> This patch compiles them out if CONFIG_EFI is not set.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+* Kishon Vijay Abraham I <kishon@ti.com> [170906 04:47]:
+> This is the first step in deprecating omap_hsmmc driver completely
+> and moving to sdhci-omap driver which uses the sdhci library.
 
-Queued for 4.14. Thanks.
+Looks good to me. A beverage coming your way at some conf
+on me for sure for dealing with this :)
 
--- 
-Catalin
+Acked-by: Tony Lindgren <tony@atomide.com>
