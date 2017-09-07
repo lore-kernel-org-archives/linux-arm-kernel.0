@@ -1,98 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  7 Sep 2017 23:19:33 +0200
-Subject: [PATCH] drm/tve200: Clean up panel bridging
-Message-ID: <20170907211933.8308-1-linus.walleij@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 8 Sep 2017 07:25:42 +0800
+Subject: [PATCH v2 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <1504609566-66318-2-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <201709080708.qJGN76YL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes use of the drm_simple_display_pipe_attach_bridge()
-call and removes the two calls removing the bridge, which were
-erroneous: they unregister the bridge which is not what
-we want, we just want to unreference it and that is already
-handled by the core.
+Hi Xie,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.13]
+[cannot apply to arm64/for-next/core next-20170907]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Xie-XiuQi/arm64-ras-support-sea-error-recovery/20170908-062353
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: x86_64-allyesdebian (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/acpi/apei/ghes.c:54:21: fatal error: asm/ras.h: No such file or directory
+    #include <asm/ras.h>
+                        ^
+   compilation terminated.
+
+vim +54 drivers/acpi/apei/ghes.c
+
+    49	
+    50	#include <acpi/actbl1.h>
+    51	#include <acpi/ghes.h>
+    52	#include <acpi/apei.h>
+    53	#include <asm/tlbflush.h>
+  > 54	#include <asm/ras.h>
+    55	#include <ras/ras_event.h>
+    56	
+
 ---
- drivers/gpu/drm/tve200/tve200_display.c |  3 ---
- drivers/gpu/drm/tve200/tve200_drv.c     | 30 +++++++++++++-----------------
- 2 files changed, 13 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/gpu/drm/tve200/tve200_display.c b/drivers/gpu/drm/tve200/tve200_display.c
-index cfdffc15a2ce..fd193377c3c0 100644
---- a/drivers/gpu/drm/tve200/tve200_display.c
-+++ b/drivers/gpu/drm/tve200/tve200_display.c
-@@ -332,8 +332,5 @@ int tve200_display_init(struct drm_device *drm)
- 	if (ret)
- 		return ret;
- 
--	/* We need the encoder to attach the bridge */
--	priv->encoder = &priv->pipe.encoder;
--
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/tve200/tve200_drv.c b/drivers/gpu/drm/tve200/tve200_drv.c
-index c22644692a88..eae38b669f0a 100644
---- a/drivers/gpu/drm/tve200/tve200_drv.c
-+++ b/drivers/gpu/drm/tve200/tve200_drv.c
-@@ -87,6 +87,14 @@ static int tve200_modeset_init(struct drm_device *dev)
- 			ret = PTR_ERR(bridge);
- 			goto out_bridge;
- 		}
-+	} else {
-+		/*
-+		 * TODO: when we are using a different bridge than a panel
-+		 * (such as a dumb VGA connector) we need to devise a different
-+		 * method to get the connector out of the bridge.
-+		 */
-+		dev_err(dev->dev, "the bridge is not a panel\n");
-+		goto out_bridge;
- 	}
- 
- 	ret = tve200_display_init(dev);
-@@ -95,21 +103,13 @@ static int tve200_modeset_init(struct drm_device *dev)
- 		goto out_bridge;
- 	}
- 
--	if (bridge) {
--		ret = drm_bridge_attach(priv->encoder, bridge, NULL);
--		if (ret)
--			goto out_bridge;
--	}
--
--	/*
--	 * TODO: when we are using a different bridge than a panel
--	 * (such as a dumb VGA connector) we need to devise a different
--	 * method to get the connector out of the bridge.
--	 */
--	if (!panel) {
--		dev_err(dev->dev, "the bridge is not a panel\n");
-+	ret = drm_simple_display_pipe_attach_bridge(&priv->pipe,
-+						    bridge);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to attach bridge\n");
- 		goto out_bridge;
- 	}
-+
- 	priv->panel = panel;
- 	priv->connector = panel->connector;
- 	priv->bridge = bridge;
-@@ -138,8 +138,6 @@ static int tve200_modeset_init(struct drm_device *dev)
- out_bridge:
- 	if (panel)
- 		drm_panel_bridge_remove(bridge);
--	else
--		drm_bridge_remove(bridge);
- 	drm_mode_config_cleanup(dev);
- finish:
- 	return ret;
-@@ -275,8 +273,6 @@ static int tve200_remove(struct platform_device *pdev)
- 		drm_fbdev_cma_fini(priv->fbdev);
- 	if (priv->panel)
- 		drm_panel_bridge_remove(priv->bridge);
--	else
--		drm_bridge_remove(priv->bridge);
- 	drm_mode_config_cleanup(drm);
- 	clk_disable_unprepare(priv->pclk);
- 	drm_dev_unref(drm);
--- 
-2.13.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 39282 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/e6026ec8/attachment-0001.gz>
