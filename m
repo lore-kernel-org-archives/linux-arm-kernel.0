@@ -1,181 +1,116 @@
-From: tycho@docker.com (Tycho Andersen)
-Date: Thu,  7 Sep 2017 11:36:08 -0600
-Subject: [PATCH v6 10/11] mm: add a user_virt_to_phys symbol
-In-Reply-To: <20170907173609.22696-1-tycho@docker.com>
-References: <20170907173609.22696-1-tycho@docker.com>
-Message-ID: <20170907173609.22696-11-tycho@docker.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 8 Sep 2017 02:01:08 +0800
+Subject: [PATCH v3 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20170906003016.2159-2-brendanhiggins@google.com>
+Message-ID: <201709080102.sovqCRiS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need someting like this for testing XPFO. Since it's architecture
-specific, putting it in the test code is slightly awkward, so let's make it
-an arch-specific symbol and export it for use in LKDTM.
+Hi Brendan,
 
-v6: * add a definition of user_virt_to_phys in the !CONFIG_XPFO case
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.13 next-20170907]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-CC: linux-arm-kernel at lists.infradead.org
-CC: x86 at kernel.org
-Signed-off-by: Tycho Andersen <tycho@docker.com>
-Tested-by: Marco Benatto <marco.antonio.780@gmail.com>
+url:    https://github.com/0day-ci/linux/commits/Brendan-Higgins/arm-npcm-add-basic-support-for-Nuvoton-BMCs/20170907-214055
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All warnings (new ones prefixed by >>):
+
+   In file included from include/linux/printk.h:6:0,
+                    from include/linux/kernel.h:13,
+                    from include/linux/delay.h:21,
+                    from arch/arm/mach-npcm/platsmp.c:11:
+   arch/arm/mach-npcm/platsmp.c: In function 'npcm7xx_smp_boot_secondary':
+>> include/linux/kern_levels.h:4:18: warning: format '%llx' expects argument of type 'long long unsigned int', but argument 2 has type 'void *' [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:10:18: note: in expansion of macro 'KERN_SOH'
+    #define KERN_ERR KERN_SOH "3" /* error conditions */
+                     ^~~~~~~~
+   include/linux/printk.h:301:9: note: in expansion of macro 'KERN_ERR'
+     printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+            ^~~~~~~~
+>> arch/arm/mach-npcm/platsmp.c:43:3: note: in expansion of macro 'pr_err'
+      pr_err("could not iomap gcr at: 0x%llx\n", gcr_base);
+      ^~~~~~
+   arch/arm/mach-npcm/platsmp.c: In function 'npcm7xx_smp_prepare_cpus':
+>> include/linux/kern_levels.h:4:18: warning: format '%llx' expects argument of type 'long long unsigned int', but argument 2 has type 'void *' [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:10:18: note: in expansion of macro 'KERN_SOH'
+    #define KERN_ERR KERN_SOH "3" /* error conditions */
+                     ^~~~~~~~
+   include/linux/printk.h:301:9: note: in expansion of macro 'KERN_ERR'
+     printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+            ^~~~~~~~
+   arch/arm/mach-npcm/platsmp.c:74:3: note: in expansion of macro 'pr_err'
+      pr_err("could not iomap scu at: 0x%llx\n", scu_base);
+      ^~~~~~
+   arch/arm/mach-npcm/platsmp.c:80:1: warning: label 'out' defined but not used [-Wunused-label]
+    out:
+    ^~~
+   In file included from include/linux/io.h:25:0,
+                    from arch/arm/mach-npcm/platsmp.c:14:
+   arch/arm/mach-npcm/platsmp.c: In function 'npcm7xx_smp_boot_secondary':
+>> arch/arm/include/asm/io.h:421:17: warning: 'gcr_base' may be used uninitialized in this function [-Wmaybe-uninitialized]
+    #define iounmap iounmap
+                    ^~~~~~~
+   arch/arm/mach-npcm/platsmp.c:32:16: note: 'gcr_base' was declared here
+     void __iomem *gcr_base;
+                   ^~~~~~~~
+
+vim +/pr_err +43 arch/arm/mach-npcm/platsmp.c
+
+    27	
+    28	static int npcm7xx_smp_boot_secondary(unsigned int cpu,
+    29					      struct task_struct *idle)
+    30	{
+    31		struct device_node *gcr_np;
+    32		void __iomem *gcr_base;
+    33		int ret = 0;
+    34	
+    35		gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
+    36		if (!gcr_np) {
+    37			pr_err("no gcr device node\n");
+    38			ret = -EFAULT;
+    39			goto out;
+    40		}
+    41		gcr_base = of_iomap(gcr_np, 0);
+    42		if (!gcr_base) {
+  > 43			pr_err("could not iomap gcr at: 0x%llx\n", gcr_base);
+    44			ret = -EFAULT;
+    45			goto out;
+    46		}
+    47	
+    48		/* give boot ROM kernel start address. */
+    49		iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
+    50			  NPCM7XX_SCRPAD_REG);
+    51		/* make sure npcm7xx_secondary_startup is seen by all observers. */
+    52		smp_wmb();
+    53		dsb_sev();
+    54		/* make sure write buffer is drained */
+    55		mb();
+    56	
+    57	out:
+    58		iounmap(gcr_base);
+    59		return ret;
+    60	}
+    61	
+
 ---
- arch/arm64/mm/xpfo.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++
- arch/x86/mm/xpfo.c   | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/xpfo.h |  5 +++++
- 3 files changed, 113 insertions(+)
-
-diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
-index 342a9ccb93c1..94a667d94e15 100644
---- a/arch/arm64/mm/xpfo.c
-+++ b/arch/arm64/mm/xpfo.c
-@@ -74,3 +74,54 @@ void xpfo_dma_map_unmap_area(bool map, const void *addr, size_t size,
- 
- 	xpfo_temp_unmap(addr, size, mapping, sizeof(mapping[0]) * num_pages);
- }
-+
-+/* Convert a user space virtual address to a physical address.
-+ * Shamelessly copied from slow_virt_to_phys() and lookup_address() in
-+ * arch/x86/mm/pageattr.c
-+ */
-+phys_addr_t user_virt_to_phys(unsigned long addr)
-+{
-+	phys_addr_t phys_addr;
-+	unsigned long offset;
-+	pgd_t *pgd;
-+	p4d_t *p4d;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	pte_t *pte;
-+
-+	pgd = pgd_offset(current->mm, addr);
-+	if (pgd_none(*pgd))
-+		return 0;
-+
-+	p4d = p4d_offset(pgd, addr);
-+	if (p4d_none(*p4d))
-+		return 0;
-+
-+	pud = pud_offset(p4d, addr);
-+	if (pud_none(*pud))
-+		return 0;
-+
-+	if (pud_sect(*pud) || !pud_present(*pud)) {
-+		phys_addr = (unsigned long)pud_pfn(*pud) << PAGE_SHIFT;
-+		offset = addr & ~PUD_MASK;
-+		goto out;
-+	}
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return 0;
-+
-+	if (pmd_sect(*pmd) || !pmd_present(*pmd)) {
-+		phys_addr = (unsigned long)pmd_pfn(*pmd) << PAGE_SHIFT;
-+		offset = addr & ~PMD_MASK;
-+		goto out;
-+	}
-+
-+	pte =  pte_offset_kernel(pmd, addr);
-+	phys_addr = (phys_addr_t)pte_pfn(*pte) << PAGE_SHIFT;
-+	offset = addr & ~PAGE_MASK;
-+
-+out:
-+	return (phys_addr_t)(phys_addr | offset);
-+}
-+EXPORT_SYMBOL(user_virt_to_phys);
-diff --git a/arch/x86/mm/xpfo.c b/arch/x86/mm/xpfo.c
-index 6794d6724ab5..d24cf2c600e8 100644
---- a/arch/x86/mm/xpfo.c
-+++ b/arch/x86/mm/xpfo.c
-@@ -112,3 +112,60 @@ inline void xpfo_flush_kernel_tlb(struct page *page, int order)
- 
- 	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
- }
-+
-+/* Convert a user space virtual address to a physical address.
-+ * Shamelessly copied from slow_virt_to_phys() and lookup_address() in
-+ * arch/x86/mm/pageattr.c
-+ */
-+phys_addr_t user_virt_to_phys(unsigned long addr)
-+{
-+	phys_addr_t phys_addr;
-+	unsigned long offset;
-+	pgd_t *pgd;
-+	p4d_t *p4d;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	pte_t *pte;
-+
-+	pgd = pgd_offset(current->mm, addr);
-+	if (pgd_none(*pgd))
-+		return 0;
-+
-+	p4d = p4d_offset(pgd, addr);
-+	if (p4d_none(*p4d))
-+		return 0;
-+
-+	if (p4d_large(*p4d) || !p4d_present(*p4d)) {
-+		phys_addr = (unsigned long)p4d_pfn(*p4d) << PAGE_SHIFT;
-+		offset = addr & ~P4D_MASK;
-+		goto out;
-+	}
-+
-+	pud = pud_offset(p4d, addr);
-+	if (pud_none(*pud))
-+		return 0;
-+
-+	if (pud_large(*pud) || !pud_present(*pud)) {
-+		phys_addr = (unsigned long)pud_pfn(*pud) << PAGE_SHIFT;
-+		offset = addr & ~PUD_MASK;
-+		goto out;
-+	}
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return 0;
-+
-+	if (pmd_large(*pmd) || !pmd_present(*pmd)) {
-+		phys_addr = (unsigned long)pmd_pfn(*pmd) << PAGE_SHIFT;
-+		offset = addr & ~PMD_MASK;
-+		goto out;
-+	}
-+
-+	pte =  pte_offset_kernel(pmd, addr);
-+	phys_addr = (phys_addr_t)pte_pfn(*pte) << PAGE_SHIFT;
-+	offset = addr & ~PAGE_MASK;
-+
-+out:
-+	return (phys_addr_t)(phys_addr | offset);
-+}
-+EXPORT_SYMBOL(user_virt_to_phys);
-diff --git a/include/linux/xpfo.h b/include/linux/xpfo.h
-index 1693af1a0293..be72da5fba26 100644
---- a/include/linux/xpfo.h
-+++ b/include/linux/xpfo.h
-@@ -19,6 +19,7 @@
- #ifdef CONFIG_XPFO
- 
- #include <linux/dma-mapping.h>
-+#include <linux/types.h>
- 
- extern struct page_ext_operations page_xpfo_ops;
- 
-@@ -45,6 +46,8 @@ void xpfo_temp_unmap(const void *addr, size_t size, void **mapping,
- 
- bool xpfo_enabled(void);
- 
-+phys_addr_t user_virt_to_phys(unsigned long addr);
-+
- #else /* !CONFIG_XPFO */
- 
- static inline void xpfo_kmap(void *kaddr, struct page *page) { }
-@@ -69,6 +72,8 @@ static inline void xpfo_temp_unmap(const void *addr, size_t size,
- 
- static inline bool xpfo_enabled(void) { return false; }
- 
-+static inline phys_addr_t user_virt_to_phys(unsigned long addr) { return 0; }
-+
- #endif /* CONFIG_XPFO */
- 
- #endif /* _LINUX_XPFO_H */
--- 
-2.11.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63097 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/5e718398/attachment-0001.gz>
