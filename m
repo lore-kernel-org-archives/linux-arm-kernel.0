@@ -1,18 +1,16 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  7 Sep 2017 14:49:22 +0200
-Subject: [PATCH 4/7 v3] drm/pl111: Enable PL110 variant
+Date: Thu,  7 Sep 2017 14:49:24 +0200
+Subject: [PATCH 6/7 v3] drm/pl111: Add optional variant display en/disable
+ callbacks
 In-Reply-To: <20170907124925.13805-1-linus.walleij@linaro.org>
 References: <20170907124925.13805-1-linus.walleij@linaro.org>
-Message-ID: <20170907124925.13805-4-linus.walleij@linaro.org>
+Message-ID: <20170907124925.13805-6-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We detect and enable the use of the PL110 variant, an earlier
-incarnation of PL111. The only real difference is that the
-control and interrupt enable registers have swapped place.
-The Versatile AB and Versatile PB have a variant inbetween
-PL110 and PL111, it is PL110 but they have already swapped the
-two registers so those two need a bit of special handling.
+The silcon and components around the PL111 may require some
+variants to perform special set-up of the display. Add two
+callbacks to manage this.
 
 Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
@@ -20,256 +18,56 @@ Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ChangeLog v2->v3:
 - Rebase on DRM-TIP
 ChangeLog v1->v2:
-- Fix static const on the variant struct holders. (Had to
-  insert a (void*) cast for this because amba_id is not
-  consting this field)
-- Collect Eric A's Reviewed-by
+- Rebase on other display driver changes.
 ---
- drivers/gpu/drm/pl111/pl111_display.c | 30 ++++--------
- drivers/gpu/drm/pl111/pl111_drm.h     | 17 +++++++
- drivers/gpu/drm/pl111/pl111_drv.c     | 86 +++++++++++++++++++++++++++++++++--
- 3 files changed, 108 insertions(+), 25 deletions(-)
+ drivers/gpu/drm/pl111/pl111_display.c | 6 ++++++
+ drivers/gpu/drm/pl111/pl111_drm.h     | 3 +++
+ 2 files changed, 9 insertions(+)
 
 diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index e4c692230548..b104011cea55 100644
+index b7df9f5df881..68847a074331 100644
 --- a/drivers/gpu/drm/pl111/pl111_display.c
 +++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -199,7 +199,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 		break;
- 	}
+@@ -208,6 +208,9 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 	 */
+ 	msleep(20);
  
--	writel(cntl, priv->regs + CLCD_PL111_CNTL);
-+	writel(cntl, priv->regs + priv->ctrl);
++	if (priv->variant_display_enable)
++		priv->variant_display_enable(drm, fb->format->format);
++
+ 	/* Power Up */
+ 	cntl |= CNTL_LCDPWR;
+ 	writel(cntl, priv->regs + priv->ctrl);
+@@ -237,6 +240,9 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
+ 	 */
+ 	msleep(20);
  
- 	drm_crtc_vblank_on(crtc);
- }
-@@ -213,7 +213,7 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
- 	drm_crtc_vblank_off(crtc);
- 
- 	/* Disable and Power Down */
--	writel(0, priv->regs + CLCD_PL111_CNTL);
-+	writel(0, priv->regs + priv->ctrl);
- 
- 	clk_disable_unprepare(priv->clk);
- }
-@@ -251,7 +251,7 @@ int pl111_enable_vblank(struct drm_device *drm, unsigned int crtc)
- {
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 
--	writel(CLCD_IRQ_NEXTBASE_UPDATE, priv->regs + CLCD_PL111_IENB);
-+	writel(CLCD_IRQ_NEXTBASE_UPDATE, priv->regs + priv->ienb);
- 
- 	return 0;
- }
-@@ -260,7 +260,7 @@ void pl111_disable_vblank(struct drm_device *drm, unsigned int crtc)
- {
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 
--	writel(0, priv->regs + CLCD_PL111_IENB);
-+	writel(0, priv->regs + priv->ienb);
- }
- 
- static int pl111_display_prepare_fb(struct drm_simple_display_pipe *pipe,
-@@ -404,22 +404,6 @@ int pl111_display_init(struct drm_device *drm)
- 	struct device_node *endpoint;
- 	u32 tft_r0b0g0[3];
- 	int ret;
--	static const u32 formats[] = {
--		DRM_FORMAT_ABGR8888,
--		DRM_FORMAT_XBGR8888,
--		DRM_FORMAT_ARGB8888,
--		DRM_FORMAT_XRGB8888,
--		DRM_FORMAT_BGR565,
--		DRM_FORMAT_RGB565,
--		DRM_FORMAT_ABGR1555,
--		DRM_FORMAT_XBGR1555,
--		DRM_FORMAT_ARGB1555,
--		DRM_FORMAT_XRGB1555,
--		DRM_FORMAT_ABGR4444,
--		DRM_FORMAT_XBGR4444,
--		DRM_FORMAT_ARGB4444,
--		DRM_FORMAT_XRGB4444,
--	};
- 
- 	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
- 	if (!endpoint)
-@@ -448,8 +432,10 @@ int pl111_display_init(struct drm_device *drm)
- 
- 	ret = drm_simple_display_pipe_init(drm, &priv->pipe,
- 					   &pl111_display_funcs,
--					   formats, ARRAY_SIZE(formats),
--					   NULL, priv->connector);
-+					   priv->variant->formats,
-+					   priv->variant->nformats,
-+					   NULL,
-+					   priv->connector);
- 	if (ret)
- 		return ret;
++	if (priv->variant_display_disable)
++		priv->variant_display_disable(drm);
++
+ 	/* Disable */
+ 	writel(0, priv->regs + priv->ctrl);
  
 diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index 000534d85b43..b380a7b4fb58 100644
+index b380a7b4fb58..440f53ebee8c 100644
 --- a/drivers/gpu/drm/pl111/pl111_drm.h
 +++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -31,6 +31,20 @@
+@@ -26,6 +26,7 @@
+ #include <drm/drm_panel.h>
+ #include <drm/drm_bridge.h>
+ #include <linux/clk-provider.h>
++#include <linux/interrupt.h>
  
- struct drm_minor;
+ #define CLCD_IRQ_NEXTBASE_UPDATE BIT(2)
  
-+/**
-+ * struct pl111_variant_data - encodes IP differences
-+ * @name: the name of this variant
-+ * @is_pl110: this is the early PL110 variant
-+ * @formats: array of supported pixel formats on this variant
-+ * @nformats: the length of the array of supported pixel formats
-+ */
-+struct pl111_variant_data {
-+	const char *name;
-+	bool is_pl110;
-+	const u32 *formats;
-+	unsigned int nformats;
-+};
-+
- struct pl111_drm_dev_private {
- 	struct drm_device *drm;
- 
-@@ -41,6 +55,8 @@ struct pl111_drm_dev_private {
- 	struct drm_fbdev_cma *fbdev;
- 
- 	void *regs;
-+	u32 ienb;
-+	u32 ctrl;
- 	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
- 	struct clk *clk;
- 	/* pl111's internal clock divider. */
-@@ -49,6 +65,7 @@ struct pl111_drm_dev_private {
- 	 * subsystem and pl111_display_enable().
+@@ -66,6 +67,8 @@ struct pl111_drm_dev_private {
  	 */
  	spinlock_t tim2_lock;
-+	const struct pl111_variant_data *variant;
+ 	const struct pl111_variant_data *variant;
++	void (*variant_display_enable) (struct drm_device *drm, u32 format);
++	void (*variant_display_disable) (struct drm_device *drm);
  };
  
  int pl111_display_init(struct drm_device *dev);
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index bddf24327910..903e948afea1 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -197,6 +197,7 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- {
- 	struct device *dev = &amba_dev->dev;
- 	struct pl111_drm_dev_private *priv;
-+	struct pl111_variant_data *variant = id->data;
- 	struct drm_device *drm;
- 	int ret;
- 
-@@ -210,6 +211,33 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	amba_set_drvdata(amba_dev, drm);
- 	priv->drm = drm;
- 	drm->dev_private = priv;
-+	priv->variant = variant;
-+
-+	/*
-+	 * The PL110 and PL111 variants have two registers
-+	 * swapped: interrupt enable and control. For this reason
-+	 * we use offsets that we can change per variant.
-+	 */
-+	if (variant->is_pl110) {
-+		/*
-+		 * The ARM Versatile boards are even more special:
-+		 * their PrimeCell ID say they are PL110 but the
-+		 * control and interrupt enable registers are anyway
-+		 * swapped to the PL111 order so they are not following
-+		 * the PL110 datasheet.
-+		 */
-+		if (of_machine_is_compatible("arm,versatile-ab") ||
-+		    of_machine_is_compatible("arm,versatile-pb")) {
-+			priv->ienb = CLCD_PL111_IENB;
-+			priv->ctrl = CLCD_PL111_CNTL;
-+		} else {
-+			priv->ienb = CLCD_PL110_IENB;
-+			priv->ctrl = CLCD_PL110_CNTL;
-+		}
-+	} else {
-+		priv->ienb = CLCD_PL111_IENB;
-+		priv->ctrl = CLCD_PL111_CNTL;
-+	}
- 
- 	priv->regs = devm_ioremap_resource(dev, &amba_dev->res);
- 	if (IS_ERR(priv->regs)) {
-@@ -218,10 +246,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	}
- 
- 	/* turn off interrupts before requesting the irq */
--	writel(0, priv->regs + CLCD_PL111_IENB);
-+	writel(0, priv->regs + priv->ienb);
- 
- 	ret = devm_request_irq(dev, amba_dev->irq[0], pl111_irq, 0,
--			       "pl111", priv);
-+			       variant->name, priv);
- 	if (ret != 0) {
- 		dev_err(dev, "%s failed irq %d\n", __func__, ret);
- 		return ret;
-@@ -260,10 +288,62 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
- 	return 0;
- }
- 
--static struct amba_id pl111_id_table[] = {
-+/*
-+ * This variant exist in early versions like the ARM Integrator
-+ * and this version lacks the 565 and 444 pixel formats.
-+ */
-+static const u32 pl110_pixel_formats[] = {
-+	DRM_FORMAT_ABGR8888,
-+	DRM_FORMAT_XBGR8888,
-+	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_ABGR1555,
-+	DRM_FORMAT_XBGR1555,
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_XRGB1555,
-+};
-+
-+static const struct pl111_variant_data pl110_variant = {
-+	.name = "PL110",
-+	.is_pl110 = true,
-+	.formats = pl110_pixel_formats,
-+	.nformats = ARRAY_SIZE(pl110_pixel_formats),
-+};
-+
-+/* RealView, Versatile Express etc use this modern variant */
-+static const u32 pl111_pixel_formats[] = {
-+	DRM_FORMAT_ABGR8888,
-+	DRM_FORMAT_XBGR8888,
-+	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_BGR565,
-+	DRM_FORMAT_RGB565,
-+	DRM_FORMAT_ABGR1555,
-+	DRM_FORMAT_XBGR1555,
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_XRGB1555,
-+	DRM_FORMAT_ABGR4444,
-+	DRM_FORMAT_XBGR4444,
-+	DRM_FORMAT_ARGB4444,
-+	DRM_FORMAT_XRGB4444,
-+};
-+
-+static const struct pl111_variant_data pl111_variant = {
-+	.name = "PL111",
-+	.formats = pl111_pixel_formats,
-+	.nformats = ARRAY_SIZE(pl111_pixel_formats),
-+};
-+
-+static const struct amba_id pl111_id_table[] = {
-+	{
-+		.id = 0x00041110,
-+		.mask = 0x000fffff,
-+		.data = (void*)&pl110_variant,
-+	},
- 	{
- 		.id = 0x00041111,
- 		.mask = 0x000fffff,
-+		.data = (void*)&pl111_variant,
- 	},
- 	{0, 0},
- };
 -- 
 2.13.5
