@@ -1,76 +1,57 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 7 Sep 2017 19:59:36 -0700
-Subject: [PATCH][thermal-next] thermal: brcmstb: remove two redundant
- integer range checks
-In-Reply-To: <20170906184046.GB35422@google.com>
-References: <20170903131619.6857-1-colin.king@canonical.com>
- <20170906184046.GB35422@google.com>
-Message-ID: <20170908025935.GB2755@localhost.localdomain>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 8 Sep 2017 12:07:51 +0900
+Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
+In-Reply-To: <20170829100112.GC2901@leverpostej>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-15-takahiro.akashi@linaro.org>
+ <20170824173049.GG29665@leverpostej>
+ <20170829100112.GC2901@leverpostej>
+Message-ID: <20170908030750.GF17186@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Aug 29, 2017 at 11:01:12AM +0100, Mark Rutland wrote:
+> On Thu, Aug 24, 2017 at 06:30:50PM +0100, Mark Rutland wrote:
+> > On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
+> > > The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
+> > > will be loaded at the offset of TEXT_OFFSET from the begining of system
+> > > memory. The other PT_LOAD segments are placed relative to the first one.
+> > 
+> > I really don't like assuming things about the vmlinux ELF file.
+> > 
+> > > Regarding kernel verification, since there is no standard way to contain
+> > > a signature within elf binary, we follow PowerPC's (not yet upstreamed)
+> > > approach, that is, appending a signature right after the kernel binary
+> > > itself like module signing.
+> > 
+> > I also *really* don't like this. It's a bizarre in-band mechanism,
+> > without explcit information. It's not a nice ABI.
+> > 
+> > If we can load an Image, why do we need to be able to load a vmlinux?
+> 
+> So IIUC, the whole point of this is to be able to kexec_file_load() a
+> vmlinux + signature bundle, for !CONFIG_EFI kernels.
+> 
+> For that, I think that we actually need a new kexec_file_load${N}
+> syscall, where we can pass the signature for the kernel as a separate
+> file. Ideally also with a flags argument and perhaps the ability to sign
+> the initrd too.
 
-On Wed, Sep 06, 2017 at 11:40:46AM -0700, Brian Norris wrote:
-> Hi,
-> 
-> On Sun, Sep 03, 2017 at 02:16:19PM +0100, Colin King wrote:
-> > From: Colin Ian King <colin.king@canonical.com>
-> > 
-> > The comparisons for integer low on low > INT_MAX and also
-> > integer high > INT_MAX are never going to be true since an
-> > int type cannot be greater than INT_MAX.  Remove these redundant
-> > checks.
-> > 
-> > Detected by: CoverityScan CID#1455245, 1455248 ("Operands don't affect
-> >   result (CONSTANT_EXPRESSION_RESULT)")
-> > 
-> > Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> > ---
-> >  drivers/thermal/broadcom/brcmstb_thermal.c | 4 ----
-> >  1 file changed, 4 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
-> > index 87b8e7a86ee3..bcb3945feea6 100644
-> > --- a/drivers/thermal/broadcom/brcmstb_thermal.c
-> > +++ b/drivers/thermal/broadcom/brcmstb_thermal.c
-> > @@ -278,8 +278,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
-> >  	dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
-> >  
-> >  	if (low) {
-> > -		if (low > INT_MAX)
-> > -			low = INT_MAX;
-> >  		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
-> >  		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
-> >  	} else {
-> > @@ -287,8 +285,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
-> >  	}
-> >  
-> >  	if (high < ULONG_MAX) {
-> 
-> Dan's robots noticed that the above condition is not useful either (on
-> architectures where INT_MAX < ULONG_MAX -- i.e., all?), since 'high' is
-> 'int', not 'unsigned long'.
-> 
-> Should probably fix that
-> 
-> s/ULONG_MAX/INT_MAX/
+Verifying root file system would be another topic in general.
 
-Yeah, that would probably make sense. I might be also the case that the
-driver was considering long because that was the type used to represent
-temperature some time back in the thermal subsystem. So, the limits on
-the driver may be outdated.
+> That way we don't ahve to come up with a magic vmlinux+signature format,
+> as we can just pass a regular image and a signature for that image
+> separately. That should work for PPC and others, too.
 
-> 
-> ?
-> 
-> Brian
-> 
-> > -		if (high > INT_MAX)
-> > -			high = INT_MAX;
-> >  		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
-> >  		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
-> >  	} else {
-> > -- 
-> > 2.14.1
-> > 
+Since some discussions are to be expected around vmlinux signing,
+I will drop vmlinux support in v2.
+
+(This means, as you mentioned, that we have no way to sign
+a !CONFIG_EFI kernel for now. The possible solution in future would
+be to utilize file extended attributes as proposed by powerpc guys?)
+
+Thanks,
+-Takahiro AKASHI
+
+> Thanks,
+> Mark.
