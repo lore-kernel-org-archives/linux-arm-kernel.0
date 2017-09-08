@@ -1,53 +1,110 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 8 Sep 2017 15:05:48 +0800
-Subject: [PATCH v8 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
-In-Reply-To: <72a0da24-e61f-25a1-4971-b768dc119b4f@rock-chips.com>
-References: <1504351723-135876-1-git-send-email-hjc@rock-chips.com>
- <2057816.0G3n1KPuPZ@diego>
- <06e92b85-45f3-b23d-b149-e130c863214b@rock-chips.com>
- <4080498.FZDnVPY7UJ@phil>
- <72a0da24-e61f-25a1-4971-b768dc119b4f@rock-chips.com>
-Message-ID: <29751b4e-a13a-e1e9-ffdf-c695fe162794@rock-chips.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri,  8 Sep 2017 09:11:48 +0200
+Subject: [PATCH v5 02/10] dt-bindings: net: Restore sun8i dwmac binding
+In-Reply-To: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170908071156.5115-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?09?08? 14:12, Mark yao wrote:
-> On 2017?09?08? 13:04, Heiko Stuebner wrote:
->> Am Freitag, 8. September 2017, 09:23:09 CEST schrieb Mark yao:
->>> On 2017?09?07? 20:09, Heiko St?bner wrote:
->>>> Hi Mark,
->>>>
->>>> Am Donnerstag, 7. September 2017, 18:16:29 CEST schrieb Mark yao:
->>>>> Looks good for me, so:
->>>>> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
->>>>>
->>>>> I'd like to apply these lvds patches tomorrow if there is no more doubts.
->>>> Rob had some minor comments on v7 of the dt-binding, so you may want
->>>> to give him a bit more time to Ack the hopefully updated binding.
->>> Rob already gave a Reviewed-by on v7 dt-binding, but maybe it has some doubts for his Ack.
->>>
->>> Ok, let's wait some more time.
->> ah, I looked at v6 and found the comments, not v7 and v7 is not in my
->> archive because I likely accidentially deleted it.
->> So Sandy just forgot to carry over the Ack/Review tag. So I guess there is
->> no need to wait anymore and you just need to pick up Rob's tag from v7 then.
->
-> Right, Sandy forgot to carry those tag on new patchset, I will carry those tag:
->     Tested-by on v5, Reviewed-by on v6 and v7
->
-> Thanks.
->
+This patch restore dt-bindings documentation about dwmac-sun8i
+This reverts commit 8aa33ec2f481 ("dt-bindings: net: Revert sun8i dwmac binding")
 
-Pushed patches 1+3 to drm-misc-next.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
 
-Best Regards
-Mark
->>
->> Heiko
->>
->> _______________________________________________
->> Linux-rockchip mailing list
->> Linux-rockchip at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
->
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+new file mode 100644
+index 000000000000..725f3b187886
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -0,0 +1,84 @@
++* Allwinner sun8i GMAC ethernet controller
++
++This device is a platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++Required properties:
++- compatible: should be one of the following string:
++		"allwinner,sun8i-a83t-emac"
++		"allwinner,sun8i-h3-emac"
++		"allwinner,sun8i-v3s-emac"
++		"allwinner,sun50i-a64-emac"
++- reg: address and length of the register for the device.
++- interrupts: interrupt for the device
++- interrupt-names: should be "macirq"
++- clocks: A phandle to the reference clock for this device
++- clock-names: should be "stmmaceth"
++- resets: A phandle to the reset control for this device
++- reset-names: should be "stmmaceth"
++- phy-mode: See ethernet.txt
++- phy-handle: See ethernet.txt
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++- syscon: A phandle to the syscon of the SoC with one of the following
++ compatible string:
++  - allwinner,sun8i-h3-system-controller
++  - allwinner,sun8i-v3s-system-controller
++  - allwinner,sun50i-a64-system-controller
++  - allwinner,sun8i-a83t-system-controller
++
++Optional properties:
++- allwinner,tx-delay-ps: TX clock delay chain value in ps. Range value is 0-700. Default is 0)
++- allwinner,rx-delay-ps: RX clock delay chain value in ps. Range value is 0-3100. Default is 0)
++Both delay properties need to be a multiple of 100. They control the delay for
++external PHY.
++
++Optional properties for the following compatibles:
++  - "allwinner,sun8i-h3-emac",
++  - "allwinner,sun8i-v3s-emac":
++- allwinner,leds-active-low: EPHY LEDs are active low
++
++Required child node of emac:
++- mdio bus node: should be named mdio
++
++Required properties of the mdio node:
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++
++The device node referenced by "phy" or "phy-handle" should be a child node
++of the mdio node. See phy.txt for the generic PHY bindings.
++
++Required properties of the phy node with the following compatibles:
++  - "allwinner,sun8i-h3-emac",
++  - "allwinner,sun8i-v3s-emac":
++- clocks: a phandle to the reference clock for the EPHY
++- resets: a phandle to the reset control for the EPHY
++
++Example:
++
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-h3-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	mdio: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		int_mii_phy: ethernet-phy at 1 {
++			reg = <1>;
++			clocks = <&ccu CLK_BUS_EPHY>;
++			resets = <&ccu RST_BUS_EPHY>;
++		};
++	};
++};
+-- 
+2.13.5
