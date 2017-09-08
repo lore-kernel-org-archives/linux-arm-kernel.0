@@ -1,66 +1,176 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  8 Sep 2017 15:50:08 +0800
-Subject: [PATCH 0/8] drm/sun4i: Make both display pipeline work together
-Message-ID: <20170908075016.18657-1-wens@csie.org>
+Date: Fri,  8 Sep 2017 15:50:10 +0800
+Subject: [PATCH 2/8] drm/sun4i: add components in breadth first traversal order
+In-Reply-To: <20170908075016.18657-1-wens@csie.org>
+References: <20170908075016.18657-1-wens@csie.org>
+Message-ID: <20170908075016.18657-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The encoder drivers use drm_of_find_possible_crtcs to get upstream
+crtcs from the device tree using of_graph. For the results to be
+correct, encoders must be probed/bound after _all_ crtcs have been
+created. The existing code uses a depth first recursive traversal
+of the of_graph, which means the encoders downstream of the TCON
+get add right after the first TCON. The second TCON or CRTC will
+never be properly associated with encoders connected to it.
 
-Previously I added support for two display pipelines for the sun4i-drm
-driver. At the time we did not have support for downstream encoders to
-actually test the second pipeline, nor having both pipelines active at
-the same time.
+Other platforms, such as Rockchip, deal with this by probing all
+CRTCs first, then all subsequent components. This is easy to do
+since the CRTCs correspond to just one device node, and are the
+first nodes in the pipeline.
 
-With HDMI encoder support now merged and support for it on sun6i in
-progress, we are now able to test both pipelines being active at the
-same time, with LCD output from one and HDMI from the other. Testing
-has revealed some more issues, such as component probing order. Also,
-we found out that muxing between the display backend and TCON was
-possible, and required for the second pipeline to work as intended.
-Last, the number of CRTCs provided to drm_vblank_init needs to be
-increased for vblanks to work properly.
+However with Allwinner SoCs, the function of the CRTC is split
+between the display backend (DE 1.0) or mixer (DE 2.0), which does
+scan-out and compositing, and the TCON, which generates the display
+timing signals. Further complicating the process, there may be a
+Dynamic Range Controller between the backend and the TCON. Also, the
+backend is preceded by the frontend, with a Display Enhancement Unit
+possibly in between.
 
-This patch series does a few things:
+In a dual display pipeline setup, both frontends can feed either
+backend, and both backends can feed either TCON. We want all
+components of the same type to be added before the next type in the
+pipeline. Fortunately, the pipelines are perfectly symmetric, i.e.
+components of the same type are at the same depth when counted from
+the frontend. The only exception is the third pipeline in the A80
+SoC, which we do not support anyway.
 
-  - Fix endpoint IDs so they conform to what the DT binding stipulates.
+Hence we can use a breadth first search traversal order to add
+components. We do not need to check for duplicates. The component
+matching system handles this for us.
 
-  - Change the order the individual components are queued up.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 81 ++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 72 insertions(+), 9 deletions(-)
 
-  - Fix how the TCON gets its ID when the backend-TCON mux is present.
-
-  - Support the input mux in the TCON (which selects which backend to
-    use on the A31/A31s).
-
-  - Fix the drm_vblank_init call and pass the correct number of crtcs.
-
-  - Add the cross pipeline connections between the DRCs and TCONs on
-    the A31, conforming to the DT binding and what the hardware is
-    capable of.
-
-More details are available in each individual commit. Please have a look.
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (8):
-  ARM: dts: sun6i: Fix endpoint IDs in second display pipeline
-  drm/sun4i: add components in breadth first traversal order
-  drm/sun4i: tcon: Check for multiple paths between TCONs and backends
-  drm/sun4i: tcon: get TCON ID and matching engine with remote endpoint
-    ID
-  drm/sun4i: tcon: Simplify sun4i_tcon_find_engine_traverse for one
-    input
-  drm/sun4i: tcon: Support backend input mux
-  drm/sun4i: call drm_vblank_init with correct number of crtcs
-  ARM: dts: sun6i: Add cross pipeline connections between DRCs and TCONs
-
- arch/arm/boot/dts/sun6i-a31.dtsi   |  32 +++++--
- drivers/gpu/drm/sun4i/sun4i_drv.c  |  91 +++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 191 +++++++++++++++++++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_tcon.h |   3 +
- 4 files changed, 276 insertions(+), 41 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index ace59651892f..2ff4233fe2da 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -200,11 +200,39 @@ static int compare_of(struct device *dev, void *data)
+ 	return dev->of_node == data;
+ }
+ 
++/*
++ * The encoder drivers use drm_of_find_possible_crtcs to get upstream
++ * crtcs from the device tree using of_graph. For the results to be
++ * correct, encoders must be probed/bound after _all_ crtcs have been
++ * created. The existing code uses a depth first recursive traversal
++ * of the of_graph, which means the encoders downstream of the TCON
++ * get add right after the first TCON. The second TCON or CRTC will
++ * never be properly associated with encoders connected to it.
++ *
++ * Also, in a dual display pipeline setup, both frontends can feed
++ * either backend, and both backends can feed either TCON, we want
++ * all components of the same type to be added before the next type
++ * in the pipeline. Fortunately, the pipelines are perfectly symmetric,
++ * i.e. components of the same type are at the same depth when counted
++ * from the frontend. The only exception is the third pipeline in
++ * the A80 SoC, which we do not support anyway.
++ *
++ * Hence we can use a breadth first search traversal order to add
++ * components. We do not need to check for duplicates. The component
++ * matching system handles this for us.
++ */
++struct endpoint_list {
++	struct device_node *node;
++	struct list_head list;
++};
++
+ static int sun4i_drv_add_endpoints(struct device *dev,
++				   struct list_head *endpoints,
+ 				   struct component_match **match,
+ 				   struct device_node *node)
+ {
+ 	struct device_node *port, *ep, *remote;
++	struct endpoint_list *endpoint;
+ 	int count = 0;
+ 
+ 	/*
+@@ -264,10 +292,15 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 			}
+ 		}
+ 
+-		/* Walk down our tree */
+-		count += sun4i_drv_add_endpoints(dev, match, remote);
++		/* Add downstream nodes to the queue */
++		endpoint = kzalloc(sizeof(*endpoint), GFP_KERNEL);
++		if (!endpoint) {
++			of_node_put(remote);
++			return -ENOMEM;
++		}
+ 
+-		of_node_put(remote);
++		endpoint->node = remote;
++		list_add_tail(&endpoint->list, endpoints);
+ 	}
+ 
+ 	return count;
+@@ -277,7 +310,9 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+ {
+ 	struct component_match *match = NULL;
+ 	struct device_node *np = pdev->dev.of_node;
+-	int i, count = 0;
++	struct endpoint_list *endpoint, *endpoint_temp;
++	int i, ret, count = 0;
++	LIST_HEAD(endpoints);
+ 
+ 	for (i = 0;; i++) {
+ 		struct device_node *pipeline = of_parse_phandle(np,
+@@ -286,12 +321,31 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+ 		if (!pipeline)
+ 			break;
+ 
+-		count += sun4i_drv_add_endpoints(&pdev->dev, &match,
+-						pipeline);
+-		of_node_put(pipeline);
++		endpoint = kzalloc(sizeof(*endpoint), GFP_KERNEL);
++		if (!endpoint) {
++			ret = -ENOMEM;
++			goto err_free_endpoints;
++		}
++
++		endpoint->node = pipeline;
++		list_add_tail(&endpoint->list, &endpoints);
++	}
++
++	list_for_each_entry_safe(endpoint, endpoint_temp, &endpoints, list) {
++		/* process this endpoint */
++		ret = sun4i_drv_add_endpoints(&pdev->dev, &endpoints, &match,
++					      endpoint->node);
++
++		/* sun4i_drv_add_endpoints can fail to allocate memory */
++		if (ret < 0)
++			goto err_free_endpoints;
++
++		count += ret;
+ 
+-		DRM_DEBUG_DRIVER("Queued %d outputs on pipeline %d\n",
+-				 count, i);
++		/* delete and cleanup the current entry */
++		list_del(&endpoint->list);
++		of_node_put(endpoint->node);
++		kfree(endpoint);
+ 	}
+ 
+ 	if (count)
+@@ -300,6 +354,15 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+ 						       match);
+ 	else
+ 		return 0;
++
++err_free_endpoints:
++	list_for_each_entry_safe(endpoint, endpoint_temp, &endpoints, list) {
++		list_del(&endpoint->list);
++		of_node_put(endpoint->node);
++		kfree(endpoint);
++	}
++
++	return ret;
+ }
+ 
+ static int sun4i_drv_remove(struct platform_device *pdev)
 -- 
 2.14.1
