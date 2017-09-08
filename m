@@ -1,52 +1,41 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:35:57 +0200
-Subject: [PATCH v1 03/10] clk: at91: pmc: Support backup for programmable
- clocks
+Date: Fri,  8 Sep 2017 17:35:59 +0200
+Subject: [PATCH v1 05/10] mtd: nand: atmel: Report PMECC failures as errors
 In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-4-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-6-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Romain Izard <romain.izard@mobile-devices.fr>
-
-Save and restore the System Clock and Programmable Clock register for
-the backup use case.
+It is not normal for the PMECC to fail when trying to fix ECC errors.
+Report these cases as errors.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/clk/at91/pmc.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mtd/nand/atmel/pmecc.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 07dc2861ad3f..5421b03553ec 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -66,6 +66,7 @@ static struct
- 	u32 pcr[PMC_MAX_IDS];
- 	u32 audio_pll0;
- 	u32 audio_pll1;
-+	u32 pckr[3];
- } pmc_cache;
- 
- void pmc_register_id(u8 id)
-@@ -103,6 +104,8 @@ static int pmc_suspend(void)
- 		regmap_read(pmcreg, AT91_PMC_PCR,
- 			    &pmc_cache.pcr[registered_ids[i]]);
- 	}
-+	for (i = 0; i < 3; i++)
-+		regmap_read(pmcreg, AT91_PMC_PCKR(i), &pmc_cache.pckr[i]);
- 
- 	return 0;
+diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
+index 8d1208f38025..2a23f1ff945f 100644
+--- a/drivers/mtd/nand/atmel/pmecc.c
++++ b/drivers/mtd/nand/atmel/pmecc.c
+@@ -687,6 +687,8 @@ static int atmel_pmecc_err_location(struct atmel_pmecc_user *user)
+ 	 * Number of roots does not match the degree of smu
+ 	 * unable to correct error.
+ 	 */
++	dev_err(pmecc->dev,
++		"PMECC: Impossible to calculate error location.\n");
+ 	return -EBADMSG;
  }
-@@ -143,6 +146,8 @@ static void pmc_resume(void)
- 			     pmc_cache.pcr[registered_ids[i]] |
- 			     AT91_PMC_PCR_CMD);
- 	}
-+	for (i = 0; i < 3; i++)
-+		regmap_write(pmcreg, AT91_PMC_PCKR(i), pmc_cache.pckr[i]);
  
- 	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
- 		mask |= AT91_PMC_LOCKU;
+@@ -729,7 +731,7 @@ int atmel_pmecc_correct_sector(struct atmel_pmecc_user *user, int sector,
+ 			ptr = ecc + byte - sectorsize;
+ 			area = "ECC";
+ 		} else {
+-			dev_dbg(pmecc->dev,
++			dev_err(pmecc->dev,
+ 				"Invalid errpos value (%d, max is %d)\n",
+ 				errpos, (sectorsize + eccbytes) * 8);
+ 			return -EINVAL;
 -- 
 2.11.0
