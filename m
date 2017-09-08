@@ -1,25 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Sep 2017 14:50:04 +0200
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkdb563nCp9iptfzZOUPX6B0-qU+iWzurn-JL4PQCPHqStw@mail.gmail.com>
+Date: Fri, 8 Sep 2017 14:54:20 +0200
+Subject: [PATCH] gpio: xgene-sb: Tidy up fwnode usage
+In-Reply-To: <2ccfa46003fb5cf5970dc5cd8771953d375fed77.1503594687.git.robin.murphy@arm.com>
+References: <2ccfa46003fb5cf5970dc5cd8771953d375fed77.1503594687.git.robin.murphy@arm.com>
+Message-ID: <CACRpkdbdL5OrfWAJyrC_BCmfTWJC=r4oGzzssmCPt96b_Q=Agg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 7, 2017 at 5:33 PM, Timur Tabi <timur@codeaurora.org> wrote:
+On Thu, Aug 24, 2017 at 7:24 PM, Robin Murphy <robin.murphy@arm.com> wrote:
 
-> First patch allows for for pinctrl-msm to understand GPIO groups with
-> no pins.  Such pins are "hidden" and can't be exported or accessed.
+> Since f94277af03ea ("of/platform: Initialise dev->fwnode appropriately"),
+> of_platform_device_create() already initialises dev->fwnode to that of
+> the appropriate device_node, so within the driver we shouldn't need to
+> care whether we probed via DT or ACPI.
 >
-> Second patch updates the QDF2xxx driver to take advantage of all that.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 >
-> v5:
->  Since gpiochip_add_data no longer requests GPIOs before scanning for
->  the direction (that patch was reverted), pinctrl-msm.c now specifically
->  checks for special case.
+> Not tested, just an opportunity I happened to spot whilst looking
+> at something else.
 
-Waiting for Bjorn's review on these.
+No replies so applied for v4.15 (next merge window).
 
 Yours,
 Linus Walleij
