@@ -1,176 +1,85 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  8 Sep 2017 15:50:10 +0800
-Subject: [PATCH 2/8] drm/sun4i: add components in breadth first traversal order
+Date: Fri,  8 Sep 2017 15:50:16 +0800
+Subject: [PATCH 8/8] ARM: dts: sun6i: Add cross pipeline connections between
+ DRCs and TCONs
 In-Reply-To: <20170908075016.18657-1-wens@csie.org>
 References: <20170908075016.18657-1-wens@csie.org>
-Message-ID: <20170908075016.18657-3-wens@csie.org>
+Message-ID: <20170908075016.18657-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder drivers use drm_of_find_possible_crtcs to get upstream
-crtcs from the device tree using of_graph. For the results to be
-correct, encoders must be probed/bound after _all_ crtcs have been
-created. The existing code uses a depth first recursive traversal
-of the of_graph, which means the encoders downstream of the TCON
-get add right after the first TCON. The second TCON or CRTC will
-never be properly associated with encoders connected to it.
+The TCONs on A31/A31s can select either backend as its input. As there
+is no configurable mux in the backend or DRC to redirect their output,
+or for the DRC to select an input, the connections are presumably from
+the each DRC to each TCON, with the TCON having two input ports, like
+the following diagram:
 
-Other platforms, such as Rockchip, deal with this by probing all
-CRTCs first, then all subsequent components. This is easy to do
-since the CRTCs correspond to just one device node, and are the
-first nodes in the pipeline.
+	Backend 0  -------  DRC 0  ------- [0]  TCON 0
+				   --   -- [1]
+                                     \ /
+				      X
+				     / \
+				   --   -- [0]
+	Backend 1  -------  DRC 1  ------- [1]  TCON 1
 
-However with Allwinner SoCs, the function of the CRTC is split
-between the display backend (DE 1.0) or mixer (DE 2.0), which does
-scan-out and compositing, and the TCON, which generates the display
-timing signals. Further complicating the process, there may be a
-Dynamic Range Controller between the backend and the TCON. Also, the
-backend is preceded by the frontend, with a Display Enhancement Unit
-possibly in between.
-
-In a dual display pipeline setup, both frontends can feed either
-backend, and both backends can feed either TCON. We want all
-components of the same type to be added before the next type in the
-pipeline. Fortunately, the pipelines are perfectly symmetric, i.e.
-components of the same type are at the same depth when counted from
-the frontend. The only exception is the third pipeline in the A80
-SoC, which we do not support anyway.
-
-Hence we can use a breadth first search traversal order to add
-components. We do not need to check for duplicates. The component
-matching system handles this for us.
+Add these connection endpoints to the device tree.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 81 ++++++++++++++++++++++++++++++++++-----
- 1 file changed, 72 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index ace59651892f..2ff4233fe2da 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -200,11 +200,39 @@ static int compare_of(struct device *dev, void *data)
- 	return dev->of_node == data;
- }
- 
-+/*
-+ * The encoder drivers use drm_of_find_possible_crtcs to get upstream
-+ * crtcs from the device tree using of_graph. For the results to be
-+ * correct, encoders must be probed/bound after _all_ crtcs have been
-+ * created. The existing code uses a depth first recursive traversal
-+ * of the of_graph, which means the encoders downstream of the TCON
-+ * get add right after the first TCON. The second TCON or CRTC will
-+ * never be properly associated with encoders connected to it.
-+ *
-+ * Also, in a dual display pipeline setup, both frontends can feed
-+ * either backend, and both backends can feed either TCON, we want
-+ * all components of the same type to be added before the next type
-+ * in the pipeline. Fortunately, the pipelines are perfectly symmetric,
-+ * i.e. components of the same type are at the same depth when counted
-+ * from the frontend. The only exception is the third pipeline in
-+ * the A80 SoC, which we do not support anyway.
-+ *
-+ * Hence we can use a breadth first search traversal order to add
-+ * components. We do not need to check for duplicates. The component
-+ * matching system handles this for us.
-+ */
-+struct endpoint_list {
-+	struct device_node *node;
-+	struct list_head list;
-+};
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 00a4c7614e0a..93209cda28db 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -278,6 +278,11 @@
+ 						reg = <0>;
+ 						remote-endpoint = <&drc0_out_tcon0>;
+ 					};
 +
- static int sun4i_drv_add_endpoints(struct device *dev,
-+				   struct list_head *endpoints,
- 				   struct component_match **match,
- 				   struct device_node *node)
- {
- 	struct device_node *port, *ep, *remote;
-+	struct endpoint_list *endpoint;
- 	int count = 0;
++					tcon0_in_drc1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&drc1_out_tcon0>;
++					};
+ 				};
  
- 	/*
-@@ -264,10 +292,15 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 			}
- 		}
+ 				tcon0_out: port at 1 {
+@@ -311,6 +316,11 @@
+ 					#size-cells = <0>;
+ 					reg = <0>;
  
--		/* Walk down our tree */
--		count += sun4i_drv_add_endpoints(dev, match, remote);
-+		/* Add downstream nodes to the queue */
-+		endpoint = kzalloc(sizeof(*endpoint), GFP_KERNEL);
-+		if (!endpoint) {
-+			of_node_put(remote);
-+			return -ENOMEM;
-+		}
- 
--		of_node_put(remote);
-+		endpoint->node = remote;
-+		list_add_tail(&endpoint->list, endpoints);
- 	}
- 
- 	return count;
-@@ -277,7 +310,9 @@ static int sun4i_drv_probe(struct platform_device *pdev)
- {
- 	struct component_match *match = NULL;
- 	struct device_node *np = pdev->dev.of_node;
--	int i, count = 0;
-+	struct endpoint_list *endpoint, *endpoint_temp;
-+	int i, ret, count = 0;
-+	LIST_HEAD(endpoints);
- 
- 	for (i = 0;; i++) {
- 		struct device_node *pipeline = of_parse_phandle(np,
-@@ -286,12 +321,31 @@ static int sun4i_drv_probe(struct platform_device *pdev)
- 		if (!pipeline)
- 			break;
- 
--		count += sun4i_drv_add_endpoints(&pdev->dev, &match,
--						pipeline);
--		of_node_put(pipeline);
-+		endpoint = kzalloc(sizeof(*endpoint), GFP_KERNEL);
-+		if (!endpoint) {
-+			ret = -ENOMEM;
-+			goto err_free_endpoints;
-+		}
++					tcon1_in_drc0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc0_out_tcon1>;
++					};
 +
-+		endpoint->node = pipeline;
-+		list_add_tail(&endpoint->list, &endpoints);
-+	}
-+
-+	list_for_each_entry_safe(endpoint, endpoint_temp, &endpoints, list) {
-+		/* process this endpoint */
-+		ret = sun4i_drv_add_endpoints(&pdev->dev, &endpoints, &match,
-+					      endpoint->node);
-+
-+		/* sun4i_drv_add_endpoints can fail to allocate memory */
-+		if (ret < 0)
-+			goto err_free_endpoints;
-+
-+		count += ret;
+ 					tcon1_in_drc1: endpoint at 1 {
+ 						reg = <1>;
+ 						remote-endpoint = <&drc1_out_tcon1>;
+@@ -1079,6 +1089,11 @@
+ 					#size-cells = <0>;
+ 					reg = <1>;
  
--		DRM_DEBUG_DRIVER("Queued %d outputs on pipeline %d\n",
--				 count, i);
-+		/* delete and cleanup the current entry */
-+		list_del(&endpoint->list);
-+		of_node_put(endpoint->node);
-+		kfree(endpoint);
- 	}
- 
- 	if (count)
-@@ -300,6 +354,15 @@ static int sun4i_drv_probe(struct platform_device *pdev)
- 						       match);
- 	else
- 		return 0;
++					drc1_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_drc1>;
++					};
 +
-+err_free_endpoints:
-+	list_for_each_entry_safe(endpoint, endpoint_temp, &endpoints, list) {
-+		list_del(&endpoint->list);
-+		of_node_put(endpoint->node);
-+		kfree(endpoint);
-+	}
+ 					drc1_out_tcon1: endpoint at 1 {
+ 						reg = <1>;
+ 						remote-endpoint = <&tcon1_in_drc1>;
+@@ -1170,6 +1185,11 @@
+ 						reg = <0>;
+ 						remote-endpoint = <&tcon0_in_drc0>;
+ 					};
 +
-+	return ret;
- }
- 
- static int sun4i_drv_remove(struct platform_device *pdev)
++					drc0_out_tcon1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_in_drc0>;
++					};
+ 				};
+ 			};
+ 		};
 -- 
 2.14.1
