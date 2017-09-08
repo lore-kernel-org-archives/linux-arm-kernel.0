@@ -1,40 +1,27 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 8 Sep 2017 18:40:15 +0200
-Subject: [PATCH v2] ARM: dts: exynos: fix incomplete Odroid-XU3/4
- thermal-zones definition
-In-Reply-To: <1848394.K3C0KxojUN@amdc3058>
-References: <CGME20170907161007epcas1p316fba6e329eaabedde8a98628ebb9751@epcas1p3.samsung.com>
- <1848394.K3C0KxojUN@amdc3058>
-Message-ID: <20170908164015.rayfh2kluy45ktfi@kozik-lap>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 8 Sep 2017 16:40:51 +0000
+Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjExIDUvNl0gdGFyZ2V0LWFybToga3ZtNjQ6IGhh?=
+ =?utf-8?B?bmRsZSBTSUdCVVMgc2lnbmFsIGZvciBzeW5jaHJvbm91cyBFeHRlcm5hbCBB?=
+ =?utf-8?Q?bort?=
+In-Reply-To: <CAFEAcA8HPhHeeXEDtxnewJ7mAJ-gYzR96pC06qA+Xx95LHu2DA@mail.gmail.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015F5F11@DGGEMA503-MBX.china.huawei.com>
+ <CAFEAcA8HPhHeeXEDtxnewJ7mAJ-gYzR96pC06qA+Xx95LHu2DA@mail.gmail.com>
+Message-ID: <0184EA26B2509940AA629AE1405DD7F2015F5FE7@DGGEMA503-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 06:10:00PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> From: Willy Wolff <willy.mh.wolff@gmail.com>
+[...]
+> >
+> > /*
+> >  * xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+> >  */
+> > void kvm_hwpoison_page_add(ram_addr_t ram_addr);
 > 
-> Odroid XU3/4 boards have thermal sensors per 4 pairs of A7+A15
-> cores but currently there is only one thermal-zone (including
-> cooling maps) defined (for the first pair of cores - the first
-> core of the A7 cluster and the first core of A15 cluster) so
-> i.e. if the task is running on any of A15 cores but the first
-> one, such core can reach high temperature without any proper
-> cooling action.
-> 
-> Fix it by adding missing thermal-zones definitions.
-> 
-> Also while at it fix the number of steps in cpufreq cooling for
-> cpu4 (11 steps for A15 corresponds to 700MHz, for 600MHz 12 steps
-> should be used).
-> 
-> Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> [b.zolnierkie: rewrote patch subject & description + minor fixups]
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> It should be in the doc-comment format, which begins "/**" and has some stylization of how you list parameters and so on. Lots of
+> examples in the existing headers.
 
-Thanks for taking care of this. I'll take it after merge window.
+understand, thanks for the explanation.
 
-Best regards,
-Krzysztof
+> 
+> thanks
+> -- PMM
