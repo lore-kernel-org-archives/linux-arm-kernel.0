@@ -1,120 +1,89 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 8 Sep 2017 11:33:47 +0900
-Subject: [PATCH 03/14] resource: add walk_system_ram_res_rev()
-In-Reply-To: <5b6a0f9a-839a-ed57-e78e-88dbc9a7361c@redhat.com>
+Date: Fri, 8 Sep 2017 11:46:53 +0900
+Subject: [PATCH 08/14] arm64: kexec_file: create purgatory
+In-Reply-To: <878ti7fws9.fsf@linux.vnet.ibm.com>
 References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-4-takahiro.akashi@linaro.org>
- <5b6a0f9a-839a-ed57-e78e-88dbc9a7361c@redhat.com>
-Message-ID: <20170908023347.GB17186@linaro.org>
+ <20170824081811.19299-9-takahiro.akashi@linaro.org>
+ <20170824165617.GC29665@leverpostej>
+ <20170825010054.GC6434@akashi-kouhiroshi-no-MacBook-Air.local>
+ <20170825102250.GA3127@leverpostej>
+ <878ti7fws9.fsf@linux.vnet.ibm.com>
+Message-ID: <20170908024653.GC17186@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 08:04:51AM +0530, Pratyush Anand wrote:
+On Fri, Aug 25, 2017 at 01:16:06PM -0300, Thiago Jung Bauermann wrote:
 > 
+> Mark Rutland <mark.rutland@arm.com> writes:
 > 
-> On Thursday 24 August 2017 01:48 PM, AKASHI Takahiro wrote:
-> >This function, being a variant of walk_system_ram_res() introduced in
-> >commit 8c86e70acead ("resource: provide new functions to walk through
-> >resources"), walks through a list of all the resources of System RAM
-> >in reversed order, i.e., from higher to lower.
+> > On Fri, Aug 25, 2017 at 10:00:59AM +0900, AKASHI Takahiro wrote:
+> >> On Thu, Aug 24, 2017 at 05:56:17PM +0100, Mark Rutland wrote:
+> >> > On Thu, Aug 24, 2017 at 05:18:05PM +0900, AKASHI Takahiro wrote:
+> >> > > This is a basic purgtory, or a kind of glue code between the two kernel,
+> >> > > for arm64. We will later add a feature of verifying a digest check against
+> >> > > loaded memory segments.
+> >> > > 
+> >> > > arch_kexec_apply_relocations_add() is responsible for re-linking any
+> >> > > relative symbols in purgatory. Please note that the purgatory is not
+> >> > > an executable, but a non-linked archive of binaries so relative symbols
+> >> > > contained here must be resolved at kexec load time.
+> >> > > Despite that arm64_kernel_start and arm64_dtb_addr are only such global
+> >> > > variables now, arch_kexec_apply_relocations_add() can manage more various
+> >> > > types of relocations.
+> >> > 
+> >> > Why does the purgatory code need to be so complex?
+> >> > 
+> >> > Why is it not possible to write this as position-independent asm?
+> >> 
+> >> I don't get your point, but please note that these values are also
+> >> re-written by the 1st kernel when it loads the 2nd kernel and so
+> >> they must appear as globals.
 > >
-> >It will be used in kexec_file implementation on arm64.
+> > My fear about complexity is that we must "re-link" the purgatory.
 > >
-> >Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >Cc: Vivek Goyal <vgoyal@redhat.com>
-> >Cc: Andrew Morton <akpm@linux-foundation.org>
-> >Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> >---
-> >  include/linux/ioport.h |  3 +++
-> >  kernel/resource.c      | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 51 insertions(+)
+> > I don't understand why that has to be necessary. Surely we can have the
+> > purgatory code be position independent, and store those globals in a
+> > single struct purgatory_info that we can fill in from the host?
 > >
-> >diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> >index 6230064d7f95..9a212266299f 100644
-> >--- a/include/linux/ioport.h
-> >+++ b/include/linux/ioport.h
-> >@@ -271,6 +271,9 @@ extern int
-> >  walk_system_ram_res(u64 start, u64 end, void *arg,
-> >  		    int (*func)(u64, u64, void *));
-> >  extern int
-> >+walk_system_ram_res_rev(u64 start, u64 end, void *arg,
-> >+			int (*func)(u64, u64, void *));
-> >+extern int
-> >  walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start, u64 end,
-> >  		    void *arg, int (*func)(u64, u64, void *));
-> >diff --git a/kernel/resource.c b/kernel/resource.c
-> >index 9b5f04404152..1d6d734c75ac 100644
-> >--- a/kernel/resource.c
-> >+++ b/kernel/resource.c
-> >@@ -23,6 +23,7 @@
-> >  #include <linux/pfn.h>
-> >  #include <linux/mm.h>
-> >  #include <linux/resource_ext.h>
-> >+#include <linux/vmalloc.h>
-> >  #include <asm/io.h>
-> >@@ -469,6 +470,53 @@ int walk_system_ram_res(u64 start, u64 end, void *arg,
-> >  	return ret;
-> >  }
-> >+int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
-> >+				int (*func)(u64, u64, void *))
-> >+{
-> >+	struct resource res, *rams;
-> >+	u64 orig_end;
-> >+	int count, i;
-> >+	int ret = -1;
-> >+
-> >+	count = 16; /* initial */
-> >+again:
-> >+	/* create a list */
-> >+	rams = vmalloc(sizeof(struct resource) * count);
-> >+	if (!rams)
-> >+		return ret;
-> >+
-> >+	res.start = start;
-> >+	res.end = end;
-> >+	res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-> >+	orig_end = res.end;
-> >+	i = 0;
-> >+	while ((res.start < res.end) &&
-> >+		(!find_next_iomem_res(&res, IORES_DESC_NONE, true))) {
-> >+		if (i >= count) {
-> >+			/* unlikely but */
-> >+			vfree(rams);
-> >+			count += 16;
-> >+			goto again;
+> > i.e. similar to what we do for values shared with the VDSO, where we
+> > just poke vdso_data->field, no re-linking required.
 > 
-> Wounld't it be better to re-alloc a bigger space,copy previous values and
-> free the previous pointer, instead of going *again*.
+> Right. I'm not sure why it is a partially linked object. I believe that
+> the purgatory could be linked at build time into a PIE executable with
+> exported symbols for the variables that need to be filled in from the
+> host.
 
-Okey, I will do that.
+For clarification, generic kexec code expects that the purgatory is
+*relocatable* (not executable in ELF terms) as compiled with -r gcc option.
+On arm64, in this case, all the *global* symbols remain to be un-resolved
+even if the references are local within a single section (in a file).
+This would require re-linking at purgatory load time.
+
+I'm going to resolve this issue by adding extra *local labels*.
+(See my v2.)
+
+> On some architectures (e.g., powerpc), this would greatly reduce the
+> number of relocation types that the kernel needs to know how to process.
+> On x86 it make less of a difference because the partially linked object
+> already has just a handful of relocation types.
+> 
+> > Otherwise, why can't the purgatory code be written in assembly? AFAICT,
+> > the only complex part is the hashing code, which I don't beleive is
+> > strictly necessary.
+> 
+> When I posted a similar series for powerpc with similar changes to
+> handle a partially linked purgatory in the kernel, Michael Ellerman
+> preferred to go for a purgatory written in assembly, partially based on
+> the one from kexec-lite. That purgatory doesn't do the checksum
+> verification of the segments.
+
+Anyhow, I will drop hash-check code from the purgatory in v2 so that
+it will now be quite a simple asm.
 
 Thanks,
 -Takahiro AKASHI
 
-> >+		}
-> >+
-> >+		rams[i].start = res.start;
-> >+		rams[i++].end = res.end;
-> >+
-> >+		res.start = res.end + 1;
-> >+		res.end = orig_end;
-> >+	}
-> >+
-> >+	/* go reverse */
-> >+	for (i--; i >= 0; i--) {
-> >+		ret = (*func)(rams[i].start, rams[i].end, arg);
-> >+		if (ret)
-> >+			break;
-> >+	}
-> >+
-> >+	vfree(rams);
-> >+	return ret;
-> >+}
-> >+
-> >  #if !defined(CONFIG_ARCH_HAS_WALK_MEMORY)
-> >  /*
-> >
-> 
 > -- 
-> Regards
-> Pratyush
+> Thiago Jung Bauermann
+> IBM Linux Technology Center
+> 
