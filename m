@@ -1,41 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  8 Sep 2017 11:53:41 +0200
-Subject: [PATCH 0/7] PCI: aardvark: improve compatibility with PCI devices
-Message-ID: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+Date: Fri,  8 Sep 2017 11:53:42 +0200
+Subject: [PATCH 1/7] PCI: aardvark: fix logic in PCI configuration read/write
+ functions
+In-Reply-To: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+References: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170908095348.16578-2-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Victor Gu <xigu@marvell.com>
 
-This patch series brings a number of fixes to the pci-aardvark driver
-that allows a much larger number of PCIe devices to be used.
+The PCI configuration space read/write functions were special casing
+the situation where PCI_SLOT(devfn) != 0, and returned
+PCIBIOS_DEVICE_NOT_FOUND in this case.
 
-It fixes kernel bug
-https://bugzilla.kernel.org/show_bug.cgi?id=196339, and has been
-tested with an IGB NIC and a Marvell SATA PCIe card, which were not
-working previously.
+However, will this is what is intended for the root bus, it is not
+intended for the child busses, as it prevents discovering devices with
+PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
+if we're on the root bus.
 
-They should be taken for the 4.14 cycle, as they are all bug fixes.
+Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+[Thomas: tweak commit log.]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-aardvark.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks a lot!
-
-Thomas
-
-Evan Wang (1):
-  PCI: aardvark: fix PCIe max read request size setting
-
-Thomas Petazzoni (1):
-  PCI: aardvark: define IRQ related hooks in pci_host_bridge
-
-Victor Gu (5):
-  PCI: aardvark: fix logic in PCI configuration read/write functions
-  PCI: aardvark: set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
-  PCI: aardvark: set host and device to the same MAX payload size
-  PCI: aardvark: use isr1 instead of isr0 interrupt in legacy irq mode
-  PCI: aardvark: disable LOS state by default
-
- drivers/pci/host/pci-aardvark.c | 116 +++++++++++++++++++++++++++++++---------
- 1 file changed, 92 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index 5fb9b620ac78..582d75f864e3 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -441,7 +441,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	u32 reg;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0) {
++	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
+@@ -495,7 +495,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	int offset;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0)
++	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0))
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	if (where % size)
 -- 
 2.13.5
