@@ -1,47 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 8 Sep 2017 11:31:00 +0200
-Subject: n900 in next-20170901
-In-Reply-To: <20170905201314.GE5024@atomide.com>
-References: <20170903203737.GA12475@amd>
- <20170905201314.GE5024@atomide.com>
-Message-ID: <20170908093100.GE18365@amd>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  8 Sep 2017 11:53:43 +0200
+Subject: [PATCH 2/7] PCI: aardvark: set PIO_ADDR_LS correctly in
+ advk_pcie_rd_conf()
+In-Reply-To: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+References: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170908095348.16578-3-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Victor Gu <xigu@marvell.com>
 
-> > It compiles ok, but it hangs on boot; black screen, so sometime before
-> > display is initialized.
-> 
-> Thanks for reporting it. Based on git bisect, the regression causing
-> commit is 9caf25f996e8 ("mm/cma: manage the memory of the CMA area
-> by using the ZONE_MOVABLE"). With this path applied, booting hangs
-> with an error in omap3_save_secure_ram_context() after a call to
-> _omap_save_secure_sram() that calls the related assembly code
-> save_secure_ram_context.
-> 
-> However, looks like there is also some other commit causing issue.
-> 
-> Just reverting 9caf25f996e8 on Linux next causes the oops below.
-> 
-> Anybody got ideas why this now happens?
+When setting the PIO_ADDR_LS register during a configuration read, we
+were properly passing the device number, function number and register
+number, but not the bus number, causing issues when reading the
+configuration of PCIe devices.
 
-Thanks for quick bisect.
+Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+[Thomas: tweak commit log.]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-aardvark.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I take it 9caf25f996e8 is not going to be merged anywhere until this
-is fixed...?
-
-Best regards,
-								Pavel
-								
-
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index 582d75f864e3..68ff10e17c74 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -460,7 +460,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	advk_writel(pcie, reg, PIO_CTRL);
+ 
+ 	/* Program the address registers */
+-	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
++	reg = PCIE_CONF_ADDR(bus->number, devfn, where);
+ 	advk_writel(pcie, reg, PIO_ADDR_LS);
+ 	advk_writel(pcie, 0, PIO_ADDR_MS);
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/b6c71cac/attachment-0001.sig>
+2.13.5
