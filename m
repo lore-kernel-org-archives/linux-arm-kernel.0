@@ -1,9 +1,8 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 08 Sep 2017 17:17:03 +0200
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Sep 2017 16:18:06 +0100
 Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
  PE/COFF sections
-In-Reply-To: <CAKv+Gu8hcT=_1iF4gaS==uGQWAb9-i0Y=XJ-MqgfQQyn1RmGtQ@mail.gmail.com>
- (Ard Biesheuvel's message of "Fri, 8 Sep 2017 16:11:53 +0100")
+In-Reply-To: <87a825rzio.fsf@free-electrons.com>
 References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
  <20170629081849.15081-6-ard.biesheuvel@linaro.org>
  <87r2vhs3il.fsf@free-electrons.com>
@@ -14,132 +13,129 @@ References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
  <87efrhs0gj.fsf@free-electrons.com>
  <CAKv+Gu8Aa7Y8SK2nJM2DXZzHbzZT6aq2Rt1wsgaLwz7_C3otJA@mail.gmail.com>
  <CAKv+Gu8hcT=_1iF4gaS==uGQWAb9-i0Y=XJ-MqgfQQyn1RmGtQ@mail.gmail.com>
-Message-ID: <87a825rzio.fsf@free-electrons.com>
+ <87a825rzio.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu8+piFk6k8pL35i9GzNaFVKRxHztCipnB0XhXwytd3bvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
- 
- On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-
-> On 8 September 2017 at 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 8 September 2017 at 15:56, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>> Hi Ard,
->>>
->>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>
->>>> On 8 September 2017 at 15:33, Gregory CLEMENT
->>>> <gregory.clement@free-electrons.com> wrote:
->>>>> Hi Ard,
->>>>>
->>>>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>
->>>>>> On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>> On 8 September 2017 at 14:50, Gregory CLEMENT
->>>>>>> <gregory.clement@free-electrons.com> wrote:
->>>>>>>> Hi Ard,
->>>>>>>>
->>>>>>>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>>>
->>>>>>>>> To prevent unintended modifications to the kernel text (malicious or
->>>>>>>>> otherwise) while running the EFI stub, describe the kernel image as
->>>>>>>>> two separate sections: a .text section with read-execute permissions,
->>>>>>>>> covering .text, .rodata, .piggytext and the GOT sections (which the
->>>>>>>>> stub does not care about anyway), and a .data section with read-write
->>>>>>>>> permissions, covering .data and .bss.
+On 8 September 2017 at 16:17, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ard,
+>
+>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 8 September 2017 at 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> On 8 September 2017 at 15:56, Gregory CLEMENT
+>>> <gregory.clement@free-electrons.com> wrote:
+>>>> Hi Ard,
+>>>>
+>>>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>
+>>>>> On 8 September 2017 at 15:33, Gregory CLEMENT
+>>>>> <gregory.clement@free-electrons.com> wrote:
+>>>>>> Hi Ard,
+>>>>>>
+>>>>>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>>>
+>>>>>>> On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>>>>> On 8 September 2017 at 14:50, Gregory CLEMENT
+>>>>>>>> <gregory.clement@free-electrons.com> wrote:
+>>>>>>>>> Hi Ard,
 >>>>>>>>>
->>>>>>>>> This relies on the firmware to actually take the section permission
->>>>>>>>> flags into account, but this is something that is currently being
->>>>>>>>> implemented in EDK2, which means we will likely start seeing it in
->>>>>>>>> the wild between one and two years from now.
+>>>>>>>>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>>>>>>
+>>>>>>>>>> To prevent unintended modifications to the kernel text (malicious or
+>>>>>>>>>> otherwise) while running the EFI stub, describe the kernel image as
+>>>>>>>>>> two separate sections: a .text section with read-execute permissions,
+>>>>>>>>>> covering .text, .rodata, .piggytext and the GOT sections (which the
+>>>>>>>>>> stub does not care about anyway), and a .data section with read-write
+>>>>>>>>>> permissions, covering .data and .bss.
+>>>>>>>>>>
+>>>>>>>>>> This relies on the firmware to actually take the section permission
+>>>>>>>>>> flags into account, but this is something that is currently being
+>>>>>>>>>> implemented in EDK2, which means we will likely start seeing it in
+>>>>>>>>>> the wild between one and two years from now.
+>>>>>>>>>
+>>>>>>>>> This patch had been merged in mainline yesterday and now prevent the
+>>>>>>>>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
+>>>>>>>>> that more Socs are impacted because the number of boot fail exploded
+>>>>>>>>> according to kci:
+>>>>>>>>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
+>>>>>>>>>
 >>>>>>>>
->>>>>>>> This patch had been merged in mainline yesterday and now prevent the
->>>>>>>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
->>>>>>>> that more Socs are impacted because the number of boot fail exploded
->>>>>>>> according to kci:
->>>>>>>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
+>>>>>>>> Ouch.
 >>>>>>>>
+>>>>>>>>> I found this patch after bisecting (I can provide the bisect log if
+>>>>>>>>> needed).
+>>>>>>>>>
+>>>>>>>>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
+>>>>>>>>> multi_v7_defconfig but not with mvebu_v7_defconfig.
+>>>>>>>>>
+>>>>>>>>> Currently the solution is to revert this patch.
+>>>>>>>>>
+>>>>>>>>> Have you a better option?
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> I will investigate.
 >>>>>>>
->>>>>>> Ouch.
+>>>>>>> I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
+>>>>>>> locally built zImage as well as the one built by kernelci.
 >>>>>>>
->>>>>>>> I found this patch after bisecting (I can provide the bisect log if
->>>>>>>> needed).
->>>>>>>>
->>>>>>>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
->>>>>>>> multi_v7_defconfig but not with mvebu_v7_defconfig.
->>>>>>>>
->>>>>>>> Currently the solution is to revert this patch.
->>>>>>>>
->>>>>>>> Have you a better option?
->>>>>>>>
+>>>>>>> Could you please try whether this fixes things? It does not explain
+>>>>>>> anything but it will help me figure out what is going on (hopefully)
+>>>>>>
+>>>>>> I've just tested this change and it didn't fix anything.
+>>>>>>
+>>>>>> Gregory
+>>>>>>
 >>>>>>>
->>>>>>> I will investigate.
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/compressed/efi-header.S
+>>>>>>> b/arch/arm/boot/compressed/efi-header.S
+>>>>>>> index c94a88ae834d..671a6e5b7b99 100644
+>>>>>>> --- a/arch/arm/boot/compressed/efi-header.S
+>>>>>>> +++ b/arch/arm/boot/compressed/efi-header.S
+>>>>>>> @@ -127,7 +127,7 @@ section_table:
+>>>>>>>
+>>>>>>>                 .set    section_count, (. - section_table) / 40
+>>>>>>>
+>>>>>>> -               .align  12
+>>>>>>> +               .align  9
+>>>>>>>  __efi_start:
+>>>>>>>  #endif
+>>>>>>>                 .endm
 >>>>>>
->>>>>> I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
->>>>>> locally built zImage as well as the one built by kernelci.
->>>>>>
->>>>>> Could you please try whether this fixes things? It does not explain
->>>>>> anything but it will help me figure out what is going on (hopefully)
 >>>>>
->>>>> I've just tested this change and it didn't fix anything.
 >>>>>
->>>>> Gregory
->>>>>
->>>>>>
->>>>>>
->>>>>> diff --git a/arch/arm/boot/compressed/efi-header.S
->>>>>> b/arch/arm/boot/compressed/efi-header.S
->>>>>> index c94a88ae834d..671a6e5b7b99 100644
->>>>>> --- a/arch/arm/boot/compressed/efi-header.S
->>>>>> +++ b/arch/arm/boot/compressed/efi-header.S
->>>>>> @@ -127,7 +127,7 @@ section_table:
->>>>>>
->>>>>>                 .set    section_count, (. - section_table) / 40
->>>>>>
->>>>>> -               .align  12
->>>>>> +               .align  9
->>>>>>  __efi_start:
->>>>>>  #endif
->>>>>>                 .endm
->>>>>
+>>>>> How about this?
 >>>>
+>>>> It fixed the bug! (I tested with and without your previous patch and it
+>>>> worked in both case)
 >>>>
->>>> How about this?
->>>
->>> It fixed the bug! (I tested with and without your previous patch and it
->>> worked in both case)
->>>
->>> When you will send your patch, you can add my:
->>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>
+>>>> When you will send your patch, you can add my:
+>>>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>>
+>>
+>> Would you mind checking whether this fixes the issue as well?
+>>
+>> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
+>> index f72088495f43..5d52c556dd32 100644
+>> --- a/arch/arm/boot/compressed/piggy.S
+>> +++ b/arch/arm/boot/compressed/piggy.S
+>> @@ -1,5 +1,6 @@
+>>         .section .piggydata,#alloc
+>>         .globl  input_data
+>> +       .align  2
+>>  input_data:
+>>         .incbin "arch/arm/boot/compressed/piggy_data"
+>>         .globl  input_data_end
+>>
+>> There may be other reasons than ksymtab entries that could result in
+>> piggydata ending up unaligned in the decompressor (which is what
+>> caused the issue before)
+>> This is a better fix, because it addresses the root cause.
 >
-> Would you mind checking whether this fixes the issue as well?
+> I've tested this single patch and it does not fix the boot issue :(
 >
-> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
-> index f72088495f43..5d52c556dd32 100644
-> --- a/arch/arm/boot/compressed/piggy.S
-> +++ b/arch/arm/boot/compressed/piggy.S
-> @@ -1,5 +1,6 @@
->         .section .piggydata,#alloc
->         .globl  input_data
-> +       .align  2
->  input_data:
->         .incbin "arch/arm/boot/compressed/piggy_data"
->         .globl  input_data_end
->
-> There may be other reasons than ksymtab entries that could result in
-> piggydata ending up unaligned in the decompressor (which is what
-> caused the issue before)
-> This is a better fix, because it addresses the root cause.
 
-I've tested this single patch and it does not fix the boot issue :(
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+OK, strange. Anyway, thanks for testing. I will post the original fix then.
