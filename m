@@ -1,36 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 8 Sep 2017 16:49:06 +0200
-Subject: [PATCH v9] arm64: allwinner: h5: add NanoPi NEO Plus2 DT support
-In-Reply-To: <20170907164222.66759-1-antony@phenome.org>
-References: <20170824231716.2623-1-antony@phenome.org>
- <20170907164222.66759-1-antony@phenome.org>
-Message-ID: <20170908144906.zs7vutgsqbuvvodt@flea.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri,  8 Sep 2017 07:52:17 -0700
+Subject: [PATCH 0/2] Fix preemption issues with kvm_arm_get_running_vcpu
+Message-ID: <1504882339-42520-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 06:42:22PM +0200, Antony Antony wrote:
-> Add initial DT for NanoPi NEO Plus2 by FriendlyARM
-> - Allwinner quad core H5 Cortex A53 with an ARM Mali-450MP GPU
-> - 1 GB DDR3 RAM
-> - 8GB eMMC flash (Samsung KLM8G1WEPD-B031)
-> - micro SD card slot
-> - Gigabit Ethernet (external RTL8211E-VB-CG chip)
-> - 802.11 b/g/n WiFi, Bluetooth 4.0 (Ampak AP6212A module)
-> - 2x USB 2.0 host ports & 2x USB via headers
-> 
-> Signed-off-by: Antony Antony <antony@phenome.org>
+From: Christoffer Dall <cdall@linaro.org>
 
-Queued for 4.15, thanks!
-Maxime
+These two patches slightly improves our preemption configuration when
+accessing the per-CPU variables holding the currently running VCPU by
+removing a redundant check and rearranging calling code from
+non-preemptible context on RT systems.
+
+I'm not entirely sure if we fix issues only affecting PREEMPT_RT in mainline
+and also cc these to stable.  Looking at the git log there seems to be some
+precedence for this.  If not, I'm happy to remove the cc tag and/or drop the
+second patch.
+
+Thanks,
+-Christoffer
+
+Christoffer Dall (2):
+  KVM: arm/arm64: Remove redundant preemptible checks
+  KVM: arm/arm64: Fix vgic_mmio_change_active with PREEMPT_RT
+
+ virt/kvm/arm/arm.c            |  2 --
+ virt/kvm/arm/vgic/vgic-mmio.c | 12 +++++++++++-
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/651ab2a2/attachment.sig>
+2.7.4
