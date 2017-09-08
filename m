@@ -1,93 +1,67 @@
-From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
-Date: Fri, 8 Sep 2017 11:23:28 +0800
-Subject: [1/9] i2c: designware: Fix system suspend
-In-Reply-To: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
-References: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <5597d9a7-8b1a-d45d-e8d5-d1c0b46ddb7a@hisilicon.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  8 Sep 2017 12:16:15 +0900
+Subject: [PATCH 8/9] arm64: enable KEXEC_FILE config
+In-Reply-To: <20170908031616.17916-1-takahiro.akashi@linaro.org>
+References: <20170908031616.17916-1-takahiro.akashi@linaro.org>
+Message-ID: <20170908031616.17916-9-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Modify arm64/Kconfig and Makefile to enable kexec_file_load support.
 
-This patch can fix the issue we found on hikey960 that i2c doesn't skip system suspend when it is runtime suspended.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig         | 22 ++++++++++++++++++++++
+ arch/arm64/kernel/Makefile |  2 +-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-? 2017/6/22 3:21, Ulf Hansson ??:
-> The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
-> during system suspend"), may suggest to the PM core to try out the so
-> called direct_complete path for system sleep. In this path, the PM core
-> treats a runtime suspended device as it's already in a proper low power
-> state for system sleep, which makes it skip calling the system sleep
-> callbacks for the device, except for the ->prepare() and the ->complete()
-> callback.
-> 
-> Moreover, under certain circumstances the PM core may unset the
-> direct_complete flag for a parent device, in case its child device are
-> being system suspended before. In other words, the PM core doesn't skip
-> calling the system sleep callbacks, no matter if the device is runtime
-> suspended or not.
-> 
-> In cases of an i2c slave device, the above situation is triggered.
-> Unfortunate, this also breaks the assumption that the i2c device is always
-> runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
-> invoked, which then leads to a regression.
-> 
-> More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
-> clk_core_unprepare(), for an already disabled/unprepared clock, leading to
-> complaints about clocks calls being wrongly balanced.
-> 
-> In cases when the i2c device is attached to the ACPI PM domain, the problem
-> doesn't occur. That's because ACPI's ->suspend() callback, assigned to
-> acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
-> 
-> To make a simple fix for this regression, let's runtime resume the i2c
-> device in the ->prepare() callback, assigned to dw_i2c_plat_prepare(). This
-> prevents the direct_complete path from being executed by the PM core and
-> guarantees the dw_i2c_plat_suspend() is called with the i2c device always
-> being runtime resumed.
-> 
-> Of course this change is suboptimal, because to always force a runtime
-> resume of the i2c device in ->prepare() is a waste, especially in those
-> cases when it could have remained runtime suspended during the entire
-> system sleep sequence. However, to accomplish that behaviour a bigger
-> change is needed, so defer that to future changes not applicable as fixes
-> or for stable.
-> 
-> Fixes: 8503ff166504 ("i2c: designware: Avoid unnecessary resuming...")
-> Cc: stable at vger.linux.org
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->   drivers/i2c/busses/i2c-designware-platdrv.c | 11 ++---------
->   1 file changed, 2 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index d1263b8..2b7fa75 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -375,17 +375,11 @@ MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
->   #ifdef CONFIG_PM_SLEEP
->   static int dw_i2c_plat_prepare(struct device *dev)
->   {
-> -	return pm_runtime_suspended(dev);
-> -}
-> -
-> -static void dw_i2c_plat_complete(struct device *dev)
-> -{
-> -	if (dev->power.direct_complete)
-> -		pm_request_resume(dev);
-> +	pm_runtime_resume(dev);
-> +	return 0;
->   }
->   #else
->   #define dw_i2c_plat_prepare	NULL
-> -#define dw_i2c_plat_complete	NULL
->   #endif
->   
->   #ifdef CONFIG_PM
-> @@ -413,7 +407,6 @@ static int dw_i2c_plat_resume(struct device *dev)
->   
->   static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
->   	.prepare = dw_i2c_plat_prepare,
-> -	.complete = dw_i2c_plat_complete,
->   	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
->   	SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
->   };
-> 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index dfd908630631..fa7299f08cc6 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -756,6 +756,28 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
+ 
++config KEXEC_FILE
++	bool "kexec file based system call"
++	select KEXEC_CORE
++	select BUILD_BIN2C
++	---help---
++	  This is new version of kexec system call. This system call is
++	  file based and takes file descriptors as system call argument
++	  for kernel and initramfs as opposed to list of segments as
++	  accepted by previous system call.
++
++	  In addition to this option, you need to enable a specific type
++	  of image support.
++
++config KEXEC_VERIFY_SIG
++	bool "Verify kernel signature during kexec_file_load() syscall"
++	depends on KEXEC_FILE
++	select SYSTEM_DATA_VERIFICATION
++	---help---
++	  Select this option to verify a signature with loaded kernel
++	  image. If configured, any attempt of loading a image without
++	  valid signature will fail.
++
+ config CRASH_DUMP
+ 	bool "Build kdump crash kernel"
+ 	help
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 16e9f56b536a..5df003d6157c 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -48,7 +48,7 @@ arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+-arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
++arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
+ arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+-- 
+2.14.1
