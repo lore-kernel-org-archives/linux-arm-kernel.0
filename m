@@ -1,167 +1,64 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 8 Sep 2017 18:21:33 +0200
-Subject: [PATCH v1 07/10] iio:adc:at91-sama5d2: Support backup mode
-In-Reply-To: <760d7c25-afa4-2242-a278-e0989bca5478@microchip.com>
-References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
- <20170908153604.28383-8-romain.izard.pro@gmail.com>
- <760d7c25-afa4-2242-a278-e0989bca5478@microchip.com>
-Message-ID: <CAGkQfmNgo9kp90eOrrez70f2-kMSD5EzxRjxWi=THBCE9EL4YA@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 8 Sep 2017 17:21:52 +0100
+Subject: [PATCH v11 5/6] target-arm: kvm64: handle SIGBUS signal for
+ synchronous External Abort
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2015F5F11@DGGEMA503-MBX.china.huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015F5F11@DGGEMA503-MBX.china.huawei.com>
+Message-ID: <CAFEAcA8HPhHeeXEDtxnewJ7mAJ-gYzR96pC06qA+Xx95LHu2DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-09-08 18:03 GMT+02:00 Nicolas Ferre <nicolas.ferre@microchip.com>:
-> On 08/09/2017 at 17:36, Romain Izard wrote:
->> Support the backup mode for platform suspend, by restoring the hardware
->> registers on resume.
+On 8 September 2017 at 17:17, gengdongjiu <gengdongjiu@huawei.com> wrote:
 >>
->> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+>> This code has all just been copied-and-pasted from target/i386/kvm.c.
+>> Please instead abstract it out properly into a cpu-independent source file.
 >
-> Romain,
 >
-> Thanks for your series: definitively some of your patches need to be
-> integrated (I've merged some of them in our current linux-4.9-at91 branch.
-> However, It seems that some of your additions have already been
-> submitted and/or accepted by maintainers.
-> For instance an equivalent of this one seems already in Linus' tree:
-> 500a2eefd6b16ba141a8fb777ea6962d2eb65e3b ("iio: adc: at91-sama5d2_adc:
-> add support for suspend/resume functionality").
->
-> Please tell us if it fits what your observed on this driver (or others).
->
-> Regards,
->
->> ---
->>  drivers/iio/adc/at91-sama5d2_adc.c | 71 ++++++++++++++++++++++++++++++++------
->>  1 file changed, 61 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
->> index e10dca3ed74b..f9718c863363 100644
->> --- a/drivers/iio/adc/at91-sama5d2_adc.c
->> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
->> @@ -200,6 +200,7 @@ struct at91_adc_state {
->>       u32                             conversion_value;
->>       struct at91_adc_soc_info        soc_info;
->>       wait_queue_head_t               wq_data_available;
->> +     unsigned int                    current_rate;
->>       /*
->>        * lock to prevent concurrent 'single conversion' requests through
->>        * sysfs.
->> @@ -269,6 +270,8 @@ static void at91_adc_setup_samp_freq(struct at91_adc_state *st, unsigned freq)
->>       mr |= AT91_SAMA5D2_MR_PRESCAL(prescal);
->>       at91_adc_writel(st, AT91_SAMA5D2_MR, mr);
->>
->> +     st->current_rate = freq;
->> +
->>       dev_dbg(&indio_dev->dev, "freq: %u, startup: %u, prescal: %u\n",
->>               freq, startup, prescal);
->>  }
->> @@ -375,7 +378,9 @@ static int at91_adc_write_raw(struct iio_dev *indio_dev,
->>           val > st->soc_info.max_sample_rate)
->>               return -EINVAL;
->>
->> +     mutex_lock(&st->lock);
->>       at91_adc_setup_samp_freq(st, val);
->> +     mutex_unlock(&st->lock);
->>
->>       return 0;
->>  }
->> @@ -386,6 +391,21 @@ static const struct iio_info at91_adc_info = {
->>       .driver_module = THIS_MODULE,
->>  };
->>
->> +static void at91_adc_init_hw(struct at91_adc_state *st, unsigned int freq)
->> +{
->> +     at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
->> +     at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
->> +     /*
->> +      * Transfer field must be set to 2 according to the datasheet and
->> +      * allows different analog settings for each channel.
->> +      */
->> +     at91_adc_writel(st, AT91_SAMA5D2_MR,
->> +                     AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
->> +
->> +     at91_adc_setup_samp_freq(st, freq);
->> +
->> +}
->> +
->>  static int at91_adc_probe(struct platform_device *pdev)
->>  {
->>       struct iio_dev *indio_dev;
->> @@ -482,16 +502,7 @@ static int at91_adc_probe(struct platform_device *pdev)
->>               goto vref_disable;
->>       }
->>
->> -     at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
->> -     at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
->> -     /*
->> -      * Transfer field must be set to 2 according to the datasheet and
->> -      * allows different analog settings for each channel.
->> -      */
->> -     at91_adc_writel(st, AT91_SAMA5D2_MR,
->> -                     AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
->> -
->> -     at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
->> +     at91_adc_init_hw(st, st->soc_info.min_sample_rate);
->>
->>       ret = clk_prepare_enable(st->per_clk);
->>       if (ret)
->> @@ -541,12 +552,52 @@ static const struct of_device_id at91_adc_dt_match[] = {
->>  };
->>  MODULE_DEVICE_TABLE(of, at91_adc_dt_match);
->>
->> +#ifdef CONFIG_PM_SLEEP
->> +static int at91_adc_suspend(struct device *dev)
->> +{
->> +     struct platform_device *pdev = to_platform_device(dev);
->> +     struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->> +     struct at91_adc_state *st = iio_priv(indio_dev);
->> +
->> +     clk_disable_unprepare(st->per_clk);
->> +
->> +     regulator_disable(st->vref);
->> +     regulator_disable(st->reg);
->> +
->> +     return 0;
->> +}
->> +
->> +static int at91_adc_resume(struct device *dev)
->> +{
->> +     struct platform_device *pdev = to_platform_device(dev);
->> +     struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->> +     struct at91_adc_state *st = iio_priv(indio_dev);
->> +     int err;
->> +
->> +     err = regulator_enable(st->reg);
->> +     if (err)
->> +             return err;
->> +
->> +     err = regulator_enable(st->vref);
->> +     if (err)
->> +             return err;
->> +
->> +     at91_adc_init_hw(st, st->current_rate);
->> +
->> +     err = clk_prepare_enable(st->per_clk);
->> +     return err;
->> +}
->> +#endif
->> +
->> +static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
->> +
->>  static struct platform_driver at91_adc_driver = {
->>       .probe = at91_adc_probe,
->>       .remove = at91_adc_remove,
->>       .driver = {
->>               .name = "at91-sama5d2_adc",
->>               .of_match_table = at91_adc_dt_match,
->> +             .pm = &at91_adc_pm_ops,
->>       },
->>  };
->>  module_platform_driver(at91_adc_driver)
->>
+> Yes, it copied from x86.
+> Do you mean abstracting this code to a common folder so that i386 and arm platform share it?
 
-Please ignore this patch. The existing merged patch is better.
+I mean it should go into a common source file (perhaps
+accel/kvm/kvm-all.c).
 
-Best regards,
--- 
-Romain Izard
+
+>> What is this ??? You should never need to look up things in the cpreg arrays by fieldoffset.
+>
+>
+> I used it to set the esr_el1's and far_el1's value, for example:
+>
+>   /* set ESR_EL1 */
+>   ret = kvm_arm_cpreg_value(cpu, offsetof(CPUARMState, cp15.esr_el[1]));
+>
+>   /* set FAR_EL1 */
+>   ret = kvm_arm_cpreg_value(cpu, offsetof(CPUARMState, cp15.far_el[1]));
+
+Yes, I saw that, but I have no idea why you think that's
+the right way to set register values. No other code in
+QEMU does this.
+
+> So use the added API kvm_arm_cpreg_value() to set their value.
+> If not used it, do you better method to set their value?
+
+I suggest:
+
+>> The code for handling debug exits (software step, watchpoint,
+>> etc) is probably a good place to look for how to deal with register state.
+
+>> Any new globally-visible function prototype in a header should
+>> have a doc-comment formatted documentation comment, please.
+>
+>
+> Ok, thanks for this reminder. Do you mean I need to add comments
+> for this globally-visible function, such as below:
+>
+> /*
+>  * xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+>  */
+> void kvm_hwpoison_page_add(ram_addr_t ram_addr);
+
+It should be in the doc-comment format, which begins
+"/**" and has some stylization of how you list parameters
+and so on. Lots of examples in the existing headers.
+
+thanks
+-- PMM
