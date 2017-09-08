@@ -1,139 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 8 Sep 2017 21:51:43 +0200
-Subject: [patch v8 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1504887229-2748-2-git-send-email-oleksandrs@mellanox.com>
-References: <1504887229-2748-1-git-send-email-oleksandrs@mellanox.com>
- <1504887229-2748-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <CAK8P3a2zkA5Tp4En+=zLBes4YRedHcn9xf1DhBsRufqPWrzvVQ@mail.gmail.com>
+Date: Fri, 8 Sep 2017 22:06:28 +0200
+Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues
+ in zImage with Linux 4.12, LZ4 and GCC5.3)
+In-Reply-To: <CAKv+Gu8by5B52L=xD5to2dP1hzVkc9e5p+SwWU5mumdf3VkZnQ@mail.gmail.com>
+References: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
+ <CAK8P3a3AQ43t2q1MVN9PoqQXZiuXQo1uDcGnRAPCiT66_oDyLg@mail.gmail.com>
+ <CAKv+Gu_6kxidH-4YwuCorJx25WSZDsOdtbZ6MZCv+R4ufzUjrw@mail.gmail.com>
+ <CAK8P3a1xX5RfM1kao7WZBmS=0J=MgNZTH2_c-nSOY+GNmjNsUA@mail.gmail.com>
+ <CAKv+Gu_UO_Td2kkN-2k1LzTWJGXO8vZaZdQkN-xnqsK=K5T20g@mail.gmail.com>
+ <CAK8P3a0ECzB5ahbdmgM7=1NGkOaEc+wzr_EHbuQJij0+nygbLQ@mail.gmail.com>
+ <CAKv+Gu8by5B52L=xD5to2dP1hzVkc9e5p+SwWU5mumdf3VkZnQ@mail.gmail.com>
+Message-ID: <CAK8P3a2XjZ6ZfHVu8gbAQ2ncj+GTR30Zj6oKUG8CTH4iswOnTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 8, 2017 at 6:13 PM, Oleksandr Shamray
-<oleksandrs@mellanox.com> wrote:
-> Initial patch for JTAG driver
-> JTAG class driver provide infrastructure to support hardware/software
-> JTAG platform drivers. It provide user layer API interface for flashing
-> and debugging external devices which equipped with JTAG interface
-> using standard transactions.
+On Thu, Sep 7, 2017 at 1:31 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 7 September 2017 at 00:18, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thu, Sep 7, 2017 at 12:48 AM, Ard Biesheuvel
+
+>> I see lots of unaligned helpers in the lz4 code, is this not what
+>> we hit?
+>>
+>> $ git grep unaligned lib/
+>> lib/lz4/lz4_compress.c:#include <asm/unaligned.h>
+>> lib/lz4/lz4_decompress.c:#include <asm/unaligned.h>
+>> lib/lz4/lz4defs.h:#include <asm/unaligned.h>
+>> lib/lz4/lz4defs.h:      return get_unaligned((const U16 *)ptr);
+>> lib/lz4/lz4defs.h:      return get_unaligned((const U32 *)ptr);
+>> lib/lz4/lz4defs.h:      return get_unaligned((const size_t *)ptr);
+>> lib/lz4/lz4defs.h:      put_unaligned(value, (U16 *)memPtr);
+>>
 >
-> Driver exposes set of IOCTL to user space for:
-> - XFER:
-> - SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-> - SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-> - RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
->   number of clocks).
-> - SIOCFREQ/GIOCFREQ for setting and reading JTAG frequency.
+> Yes, you are right. The code I looked at before does cast a char* to a
+> U32*, but it is in the compression path, so it has nothing to do with
+> this issue.
 >
-> Driver core provides set of internal APIs for allocation and
-> registration:
-> - jtag_register;
-> - jtag_unregister;
-> - jtag_alloc;
-> - jtag_free;
->
-> Platform driver on registration with jtag-core creates the next
-> entry in dev folder:
-> /dev/jtagX
->
-> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Signed-off-by: Jiri Pirko <jiri@mellanox.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> So I agree that access_ok.h is unsuitable for any 32-bit ARM core, and
+> we should be using the struct version instead. My only remaining
+> question is why we need access_ok.h in the first place: it is worth a
+> try to check whether both produce the same code on AArch64.
 
-My Ack was actually just for the device driver part, I had not
-looked at the core again, sorry for not being clearer here.
+It's been a while since I looked into this problem, but from my memory,
+it turned out rather hard to analyze single files after the change, as
+gcc inlining decisions and register allocation tend to be non-deterministic.
+However, my conclusion then was that those changes are rather random,
+usually no effect, sometimes better and sometimes worse by chance,
+with the only real differences being the few cases we avoid the ldrd/ldm/...
+instructions.
 
-The other two patches are fine, but looking at this one again,
-I find a couple of things to improve:
+I have no idea which compiler version I tried back then, so it's very
+possible that some older compilers actually do produce slightly worse
+code with the struct version, the question is what the oldest compiler
+is that we care about enough to investigate. Maybe gcc-4.8?
 
-> +
-> +static __u64 jtag_copy_from_user(__u64 udata, unsigned long bit_size)
-> +{
-> +       unsigned long size;
-> +       void *kdata;
-> +
-> +       size = DIV_ROUND_UP(bit_size, BITS_PER_BYTE);
-> +       kdata = memdup_user(u64_to_user_ptr(udata), size);
-> +
-> +       return (__u64)(uintptr_t)kdata;
-> +}
-> +
-> +static unsigned long jtag_copy_to_user(__u64 udata, __u64 kdata,
-> +                                      unsigned long bit_size)
-> +{
-> +       unsigned long size;
-> +
-> +       size = DIV_ROUND_UP(bit_size, BITS_PER_BYTE);
-> +
-> +       return copy_to_user(u64_to_user_ptr(udata), jtag_u64_to_ptr(kdata),
-> +                           size);
-> +}
-
-Only a style comment, but the casting to and from u64 multiple
-times here seems overly complicated. Why not use a regular kernel
-pointer here, and then pass that as a third argument to
-ag->ops->xfer() ?
-
-> +
-> +       case JTAG_SIOCFREQ:
-> +               err = __get_user(value, uarg);
-
-This needs to use get_user(), not __get_user(). I think you changed
-all the other instances after an earlier comment, but missed this one.
-
-> +static int jtag_open(struct inode *inode, struct file *file)
-> +{
-> +       struct jtag *jtag = container_of(inode->i_cdev, struct jtag, cdev);
-> +
-> +       spin_lock(&jtag->lock);
-> +
-> +       if (jtag->open) {
-> +               dev_info(NULL, "jtag already opened\n");
-> +               spin_unlock(&jtag->lock);
-> +               return -EBUSY;
-> +       }
-> +
-> +       jtag->open++;
-> +       file->private_data = jtag;
-> +       spin_unlock(&jtag->lock);
-> +       return 0;
-> +}
-
-The spinlock seems to not protect anything but the use count,
-so this could be an atomic_t.
-
-
-> +       mutex_lock(&jtag_mutex);
-> +       list_add_tail(&jtag->list, &jtag_list);
-> +       mutex_unlock(&jtag_mutex);
-
-Similarly, you only use the mutex to protect the list_add/list_del,
-but nothing ever walks the list, so I think you can simply remove
-both the list and the mutex.
-
-> +static int __init jtag_init(void)
-> +{
-> +       int err;
-> +
-> +       err = alloc_chrdev_region(&jtag_devt, 0, 1, "jtag");
-> +       if (err)
-> +               return err;
-> +       return class_register(&jtag_class);
-> +}
-> +
-> +static void __exit jtag_exit(void)
-> +{
-> +       class_unregister(&jtag_class);
-> +}
-
-This looks a bit asymmetric:
-
-- you allocate a chardev region but don't destroy it in jtag_exit,
-  so presumably this leaks a major number allocation each
-  time you load/unload the module
-
-- you allocate a single minor number at module load time,
-  but the individual devices each get another number, and
-  the original one does not appear to be used, unless I
-  misunderstand the API here.
-
-     Arnd
+       Arnd
