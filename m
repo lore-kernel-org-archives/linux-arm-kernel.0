@@ -1,46 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  8 Sep 2017 11:53:46 +0200
-Subject: [PATCH 5/7] PCI: aardvark: disable LOS state by default
-In-Reply-To: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
-References: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170908095348.16578-6-thomas.petazzoni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Sep 2017 11:28:06 +0100
+Subject: Conflict when accessing PMU counters from userspace
+In-Reply-To: <CALk3wS0P-R9=HU1wYCWWYZ2w=7RjFoD4M=Vwzg-1ALRuRNMHUA@mail.gmail.com>
+References: <CALk3wS0P-R9=HU1wYCWWYZ2w=7RjFoD4M=Vwzg-1ALRuRNMHUA@mail.gmail.com>
+Message-ID: <20170908102806.GD13657@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+On Thu, Sep 07, 2017 at 12:36:48PM -0700, Jason Teplitz wrote:
+> Hello,
 
-Some PCIe devices do not support LOS, and will cause timeouts if the
-root complex forces the LOS state. This patch disables the LOS state
-by default.
+Hi,
 
-This is part of fixing bug
-https://bugzilla.kernel.org/show_bug.cgi?id=196339, this commit was
-reported as the user to be important to get a Intel 7260 mini-PCIe
-WiFi card working.
+> I'm reading the PMU counters from a userspace process, but the cycle
+> counter keeps getting reset. I don't believe any other running
+> processes are doing this. Is there something in the kernel that resets
+> the cycle counter periodically and if so is there an easy way to
+> disable it?
 
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Evan Wang <xswang@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-[Thomas: tweak commit log.]
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-aardvark.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Reading the PMU counters directly from userspace is not supported, and
+we configure the CPU to trap such accesses.
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 4a563d8526ae..461517a87eca 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -369,8 +369,7 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
- 
- 	advk_pcie_wait_for_link(pcie);
- 
--	reg = PCIE_CORE_LINK_L0S_ENTRY |
--		(1 << PCIE_CORE_LINK_WIDTH_SHIFT);
-+	reg = (1 << PCIE_CORE_LINK_WIDTH_SHIFT);
- 	advk_writel(pcie, reg, PCIE_CORE_LINK_CTRL_STAT_REG);
- 
- 	reg = advk_readl(pcie, PCIE_CORE_CMD_STATUS_REG);
--- 
-2.13.5
+Ignoring explicit reset of the counters, there are a number of reasons
+why you will not see consistent values from userspace.
+
+Which kernel are you using (e.g. version? arm/arm64?), and how have you
+enabled userspace access?
+
+Thanks,
+Mark.
