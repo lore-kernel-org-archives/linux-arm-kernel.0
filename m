@@ -1,28 +1,40 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 8 Sep 2017 11:35:28 -0500
-Subject: [PATCH] arm64: spinlocks: Fix write starvation with rwlock
-In-Reply-To: <20170908162214.63cf3wp27rhcrw6h@hirez.programming.kicks-ass.net>
-References: <20170908155959.6940-1-jeremy.linton@arm.com>
- <20170908162214.63cf3wp27rhcrw6h@hirez.programming.kicks-ass.net>
-Message-ID: <b2146b00-7922-136b-0596-79fdab7e324e@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 8 Sep 2017 18:40:15 +0200
+Subject: [PATCH v2] ARM: dts: exynos: fix incomplete Odroid-XU3/4
+ thermal-zones definition
+In-Reply-To: <1848394.K3C0KxojUN@amdc3058>
+References: <CGME20170907161007epcas1p316fba6e329eaabedde8a98628ebb9751@epcas1p3.samsung.com>
+ <1848394.K3C0KxojUN@amdc3058>
+Message-ID: <20170908164015.rayfh2kluy45ktfi@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/08/2017 11:22 AM, Peter Zijlstra wrote:
-> On Fri, Sep 08, 2017 at 10:59:59AM -0500, Jeremy Linton wrote:
->>
->> This patch changes the rwlock behavior so that the writer
->> unconditionally flags the lock structure (given that its
->> not already flagged by another writer). This blocks further
->> readers from acquiring the lock. Once all the readers have
->> drained, the writer that successfully flagged the lock can
->> progress.
+On Thu, Sep 07, 2017 at 06:10:00PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> From: Willy Wolff <willy.mh.wolff@gmail.com>
 > 
-> Recursive readers from IRQ context _should_ be allowed through,
-> otherwise you'll have deadlocks on tasklist_lock.
+> Odroid XU3/4 boards have thermal sensors per 4 pairs of A7+A15
+> cores but currently there is only one thermal-zone (including
+> cooling maps) defined (for the first pair of cores - the first
+> core of the A7 cluster and the first core of A15 cluster) so
+> i.e. if the task is running on any of A15 cores but the first
+> one, such core can reach high temperature without any proper
+> cooling action.
+> 
+> Fix it by adding missing thermal-zones definitions.
+> 
+> Also while at it fix the number of steps in cpufreq cooling for
+> cpu4 (11 steps for A15 corresponds to 700MHz, for 600MHz 12 steps
+> should be used).
+> 
+> Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> [b.zolnierkie: rewrote patch subject & description + minor fixups]
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Oh fun! Do you have a test case that triggers this?
+Thanks for taking care of this. I'll take it after merge window.
 
-Thanks,
+Best regards,
+Krzysztof
