@@ -1,66 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  8 Sep 2017 07:52:19 -0700
-Subject: [PATCH 2/2] KVM: arm/arm64: Fix vgic_mmio_change_active with
- PREEMPT_RT
-In-Reply-To: <1504882339-42520-1-git-send-email-christoffer.dall@linaro.org>
-References: <1504882339-42520-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1504882339-42520-3-git-send-email-christoffer.dall@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 8 Sep 2017 15:55:53 +0100
+Subject: [PATCH v11 4/6] target-arm: kvm64: detect guest RAS EXTENSION
+ feature
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2015F5973@DGGEMA503-MBX.china.huawei.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015F5973@DGGEMA503-MBX.china.huawei.com>
+Message-ID: <CAFEAcA-tCv9HAG4JzgHbW9VC77tYYFD=rp=b1BoKN7UayWc0yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@linaro.org>
+On 8 September 2017 at 15:26, gengdongjiu <gengdongjiu@huawei.com> wrote:
 
-Getting a per-CPU variable requires a non-preemptible context and we
-were relying on a normal spinlock to disable preemption as well.  This
-asusmption breaks with PREEMPT_RT and was observed on v4.9 using
-PREEMPT_RT.
 
-This change moves the spinlock tighter around the critical section
-accessing the IRQ structure protected by the lock and uses a separate
-preemption disabled section for determining the requesting VCPU.  There
-should be no change in functionality of performance degradation on
-non-RT.
+>> Shouldn't we need to also tell the kernel that we actually want
+>> it to expose RAS to the guest? Compare the PMU code in this function,
+>> where we set a kvm_init_features bit to do this.
 
-Fixes: 370a0ec18199 ("KVM: arm/arm64: Let vcpu thread modify its own active state")
-Cc: stable at vger.kernel.org
-Cc: Jintack Lim <jintack@cs.columbia.edu>
-Reported-by: Hemanth Kumar <hemk976@gmail.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-mmio.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+> In the PMU code, it indeed sets a kvm_init_features bit. Here ARM
+> James has a concern that we are depend on the host CPU RAS extension,
+> He means that if userspace receives the SIGBUS delivered by host
+> memory_failure(), user space should record the CPER for guest
+> and handling the error regardless whether host CPU supports RAS
+> extension. But I think if user space receives the SIGBUS signal,
+> that means
+> host CPU RAS module detects the error or CPU consumes the poison
+> data, thus we should check whether physical CPU support RAS extension.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index c1e4bdd..7377f97 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -181,7 +181,6 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 				    bool new_active_state)
- {
- 	struct kvm_vcpu *requester_vcpu;
--	spin_lock(&irq->irq_lock);
- 
- 	/*
- 	 * The vcpu parameter here can mean multiple things depending on how
-@@ -195,8 +194,19 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * NULL, which is fine, because we guarantee that no VCPUs are running
- 	 * when accessing VGIC state from user space so irq->vcpu->cpu is
- 	 * always -1.
-+	 *
-+	 * We have to temporarily disable preemption to read the per-CPU
-+	 * variable.  It doesn't matter if we actually get preempted
-+	 * after enabling preemption because we only need to figure out if
-+	 * this thread is a running VCPU thread, and in that case for which
-+	 * VCPU.  If we're migrated the preempt notifiers will migrate the
-+	 * running VCPU pointer with us.
- 	 */
-+	preempt_disable();
- 	requester_vcpu = kvm_arm_get_running_vcpu();
-+	preempt_enable();
-+
-+	spin_lock(&irq->irq_lock);
- 
- 	/*
- 	 * If this virtual IRQ was written into a list register, we
--- 
-2.7.4
+I don't understand what you have in mind here. If the host does
+not support the CPU RAS extension then we should never get a
+SIGBUS in the first place.
+
+In any case this doesn't seem relevant to the question of whether it
+should be optional to expose the RAS extension to the *guest*.
+Even if the host does support RAS, you should be able to run a
+VM that knows nothing about RAS.
+
+thanks
+-- PMM
