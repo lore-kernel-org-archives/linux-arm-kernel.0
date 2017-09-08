@@ -1,45 +1,71 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Fri, 8 Sep 2017 12:54:48 -0500
-Subject: [PATCH v3 2/2] dt-bindings: i2c: i2c-davinci: Update binding for
- 66AK2Gx pwr dm property
-In-Reply-To: <20170908175448.3367-1-fcooper@ti.com>
-References: <20170908175448.3367-1-fcooper@ti.com>
-Message-ID: <20170908175448.3367-3-fcooper@ti.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 8 Sep 2017 14:13:21 -0400
+Subject: [RFC v3 2/3] interconnect: Add basic event tracing
+In-Reply-To: <20170908171830.13813-3-georgi.djakov@linaro.org>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-3-georgi.djakov@linaro.org>
+Message-ID: <20170908141321.02f51e92@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm-domains property which is required for 66AK2Gx. Also document 66AK2G
-unique clocks property usage.
+On Fri,  8 Sep 2017 20:18:29 +0300
+Georgi Djakov <georgi.djakov@linaro.org> wrote:
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Sekhar Nori <nsekhar@ti.com>
----
- Documentation/devicetree/bindings/i2c/i2c-davinci.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> diff --git a/include/trace/events/interconnect.h b/include/trace/events/interconnect.h
+> new file mode 100644
+> index 000000000000..c4a72163873c
+> --- /dev/null
+> +++ b/include/trace/events/interconnect.h
+> @@ -0,0 +1,45 @@
+> +#undef TRACE_SYSTEM
+> +#define TRACE_SYSTEM interconnect
+> +
+> +#if !defined(_TRACE_INTERCONNECT_H) || defined(TRACE_HEADER_MULTI_READ)
+> +#define _TRACE_INTERCONNECT_H
+> +
+> +#include <linux/tracepoint.h>
+> +
+> +struct interconnect_path;
+> +
+> +DECLARE_EVENT_CLASS(interconnect_path,
+> +
+> +	TP_PROTO(struct interconnect_path *path),
+> +
+> +	TP_ARGS(path),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(struct interconnect_path *, path)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->path = path;
+> +	),
+> +
+> +	TP_printk("INTERCONNECT: %p", __entry->path)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-davinci.txt b/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-index 5b123e0..64e6e65 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-@@ -6,6 +6,18 @@ davinci/keystone i2c interface contains.
- Required properties:
- - compatible: "ti,davinci-i2c" or "ti,keystone-i2c";
- - reg : Offset and length of the register set for the device
-+- clocks: I2C functional clock phandle.
-+	  For 66AK2G this property should be set per binding,
-+	  Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-+
-+SoC-specific Required Properties:
-+
-+The following are mandatory properties for Keystone 2 66AK2G SoCs only:
-+
-+- power-domains:	Should contain a phandle to a PM domain provider node
-+			and an args specifier containing the I2C device id
-+			value. This property is as per the binding,
-+			Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
- 
- Recommended properties :
- - interrupts : standard interrupt property.
--- 
-2.9.4.dirty
+You're passing in an interconnect_path and only recording the pointer
+to it? Wouldn't it be useful to record other aspects? Like the number
+of nodes, the avg and peak bw of each node?
+
+-- Steve
+
+> +);
+> +
+> +DEFINE_EVENT(interconnect_path, interconnect_set,
+> +
+> +	TP_PROTO(struct interconnect_path *path),
+> +
+> +	TP_ARGS(path)
+> +);
+> +
+> +DEFINE_EVENT(interconnect_path, interconnect_set_complete,
+> +
+> +	TP_PROTO(struct interconnect_path *path),
+> +
+> +	TP_ARGS(path)
+> +);
+> +
+> +#endif /* _TRACE_INTERCONNECT_H */
+> +
+> +/* This part must be outside protection */
+> +#include <trace/define_trace.h>
