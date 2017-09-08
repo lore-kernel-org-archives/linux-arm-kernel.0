@@ -1,56 +1,47 @@
 From: venkata.ravi.jonnalagadda@xilinx.com (Ravi Shankar Jonnalagadda)
-Date: Fri, 8 Sep 2017 17:53:04 +0530
-Subject: [PATCH v2 2/5] PCI:xilinx-nwl: Correcting Styling checks
-In-Reply-To: <1504873388-29195-1-git-send-email-vjonnal@xilinx.com>
-References: <1504873388-29195-1-git-send-email-vjonnal@xilinx.com>
-Message-ID: <1504873388-29195-3-git-send-email-vjonnal@xilinx.com>
+Date: Fri, 8 Sep 2017 17:53:02 +0530
+Subject: [PATCH v2 0/5] dmaengine: ZynqMP PS PCIe DMA driver
+Message-ID: <1504873388-29195-1-git-send-email-vjonnal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correcting Style checks thrown by checkpatch scripts
+ZynqMP devices have PCIe Bridge along with DMA in PS.
+These devices can be configured as either PCIe Endpoints
+or as PCIe Root Complex.
+This patch series shall provide a driver to initiate
+transactions using this DMA.
+Single platform driver shall handle both EndPoint and
+Root DMA transfers.
+Patch 1 enables Root DMA register translation and
+	interrupts
+Patch 2 corrects styling errors seen with checkpatch
+Patch 3 adds PCIe driver for end points
+Patch 4 adds Platform driver which handles DMA transactions
+	for both PCI end points and Root DMA
+Patch 5 describes device tree bindings for Root DMA
 
-Signed-off-by: Ravi Shankar Jonnalagadda <vjonnal@xilinx.com>
-Signed-off-by: RaviKiran Gummaluri <rgummal@xilinx.com>
----
- drivers/pci/host/pcie-xilinx-nwl.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 5766582..3c62e3d 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -506,15 +506,15 @@ static int nwl_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 
- 	for (i = 0; i < nr_irqs; i++) {
- 		irq_domain_set_info(domain, virq + i, bit + i, &nwl_irq_chip,
--				domain->host_data, handle_simple_irq,
--				NULL, NULL);
-+				    domain->host_data, handle_simple_irq,
-+				    NULL, NULL);
- 	}
- 	mutex_unlock(&msi->lock);
- 	return 0;
- }
- 
- static void nwl_irq_domain_free(struct irq_domain *domain, unsigned int virq,
--					unsigned int nr_irqs)
-+				unsigned int nr_irqs)
- {
- 	struct irq_data *data = irq_domain_get_irq_data(domain, virq);
- 	struct nwl_pcie *pcie = irq_data_get_irq_chip_data(data);
-@@ -767,7 +767,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
- 	/* Enable all misc interrupts */
- 	nwl_bridge_writel(pcie, MSGF_MISC_SR_MASKALL, MSGF_MISC_MASK);
- 
--
- 	/* Disable all legacy interrupts */
- 	nwl_bridge_writel(pcie, (u32)~MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
- 
-@@ -932,4 +931,5 @@ static struct platform_driver nwl_pcie_driver = {
- 	},
- 	.probe = nwl_pcie_probe,
- };
-+
- builtin_platform_driver(nwl_pcie_driver);
+Ravi Shankar Jonnalagadda (5):
+  PCI:xilinx-nwl: Enable Root DMA
+  PCI:xilinx-nwl: Correcting Styling checks
+  dmaengine: zynqmp_ps_pcie: Adding PS PCIe DMA driver
+  dmaengine: zynqmp_ps_pcie: Adding PS PCIe platform DMA driver
+  devicetree: zynqmp_ps_pcie: Devicetree binding for Root DMA
+
+ .../devicetree/bindings/dma/xilinx/ps-pcie-dma.txt |   67 +
+ drivers/dma/Kconfig                                |   12 +
+ drivers/dma/xilinx/Makefile                        |    2 +
+ drivers/dma/xilinx/ps_pcie.h                       |   44 +
+ drivers/dma/xilinx/ps_pcie_main.c                  |  200 ++
+ drivers/dma/xilinx/ps_pcie_platform.c              | 3055 ++++++++++++++++++++
+ drivers/pci/host/pcie-xilinx-nwl.c                 |   23 +-
+ include/linux/dma/ps_pcie_dma.h                    |   69 +
+ 8 files changed, 3468 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/ps-pcie-dma.txt
+ create mode 100644 drivers/dma/xilinx/ps_pcie.h
+ create mode 100644 drivers/dma/xilinx/ps_pcie_main.c
+ create mode 100644 drivers/dma/xilinx/ps_pcie_platform.c
+ create mode 100644 include/linux/dma/ps_pcie_dma.h
+
 -- 
 2.7.4
