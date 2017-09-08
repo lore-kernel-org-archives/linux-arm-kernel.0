@@ -1,234 +1,204 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 8 Sep 2017 15:50:30 +0200
-Subject: [PATCH net-next 2/3] net: ethernet: socionext: add AVE ethernet
- driver
-In-Reply-To: <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1504875731-3680-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20170908135030.GA25219@lunn.ch>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 08 Sep 2017 15:50:42 +0200
+Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
+ PE/COFF sections
+In-Reply-To: <20170629081849.15081-6-ard.biesheuvel@linaro.org> (Ard
+ Biesheuvel's message of "Thu, 29 Jun 2017 08:18:47 +0000")
+References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
+ <20170629081849.15081-6-ard.biesheuvel@linaro.org>
+Message-ID: <87r2vhs3il.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static int ave_mdio_busywait(struct net_device *ndev)
-> +{
-> +	int ret = 1, loop = 100;
-> +	u32 mdiosr;
+Hi Ard,
+ 
+ On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+
+> To prevent unintended modifications to the kernel text (malicious or
+> otherwise) while running the EFI stub, describe the kernel image as
+> two separate sections: a .text section with read-execute permissions,
+> covering .text, .rodata, .piggytext and the GOT sections (which the
+> stub does not care about anyway), and a .data section with read-write
+> permissions, covering .data and .bss.
+>
+> This relies on the firmware to actually take the section permission
+> flags into account, but this is something that is currently being
+> implemented in EDK2, which means we will likely start seeing it in
+> the wild between one and two years from now.
+
+This patch had been merged in mainline yesterday and now prevent the
+Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
+that more Socs are impacted because the number of boot fail exploded
+according to kci:
+https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
+
+I found this patch after bisecting (I can provide the bisect log if
+needed).
+
+The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
+multi_v7_defconfig but not with mvebu_v7_defconfig.
+
+Currently the solution is to revert this patch.
+
+Have you a better option?
+
+Thanks,
+
+Gregory
+
+>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/boot/compressed/efi-header.S  | 32 ++++++++++++++------
+>  arch/arm/boot/compressed/vmlinux.lds.S | 30 +++++++++++++-----
+>  2 files changed, 46 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> index 542e1ad432ae..c94a88ae834d 100644
+> --- a/arch/arm/boot/compressed/efi-header.S
+> +++ b/arch/arm/boot/compressed/efi-header.S
+> @@ -54,20 +54,22 @@ coff_header:
+>  			IMAGE_FILE_EXECUTABLE_IMAGE | \
+>  			IMAGE_FILE_LINE_NUMS_STRIPPED	@ Characteristics
+>  
+> +#define __pecoff_code_size (__pecoff_data_start - __efi_start)
 > +
-> +	/* wait until completion */
-> +	while (1) {
-> +		mdiosr = ave_r32(ndev, AVE_MDIOSR);
-> +		if (!(mdiosr & AVE_MDIOSR_STS))
-> +			break;
+>  optional_header:
+>  		.short	PE_OPT_MAGIC_PE32		@ PE32 format
+>  		.byte	0x02				@ MajorLinkerVersion
+>  		.byte	0x14				@ MinorLinkerVersion
+> -		.long	_end - __efi_start		@ SizeOfCode
+> -		.long	0				@ SizeOfInitializedData
+> +		.long	__pecoff_code_size		@ SizeOfCode
+> +		.long	__pecoff_data_size		@ SizeOfInitializedData
+>  		.long	0				@ SizeOfUninitializedData
+>  		.long	efi_stub_entry - start		@ AddressOfEntryPoint
+>  		.long	start_offset			@ BaseOfCode
+> -		.long	0				@ BaseOfData
+> +		.long	__pecoff_data_start - start	@ BaseOfData
+>  
+>  extra_header_fields:
+>  		.long	0				@ ImageBase
+> -		.long	SZ_512				@ SectionAlignment
+> +		.long	SZ_4K				@ SectionAlignment
+>  		.long	SZ_512				@ FileAlignment
+>  		.short	0				@ MajorOsVersion
+>  		.short	0				@ MinorOsVersion
+> @@ -77,7 +79,7 @@ extra_header_fields:
+>  		.short	0				@ MinorSubsystemVersion
+>  		.long	0				@ Win32VersionValue
+>  
+> -		.long	_end - start			@ SizeOfImage
+> +		.long	__pecoff_end - start		@ SizeOfImage
+>  		.long	start_offset			@ SizeOfHeaders
+>  		.long	0				@ CheckSum
+>  		.short	IMAGE_SUBSYSTEM_EFI_APPLICATION	@ Subsystem
+> @@ -98,9 +100,9 @@ extra_header_fields:
+>  
+>  section_table:
+>  		.ascii	".text\0\0\0"
+> -		.long	_end - __efi_start		@ VirtualSize
+> +		.long	__pecoff_code_size		@ VirtualSize
+>  		.long	__efi_start			@ VirtualAddress
+> -		.long	_edata - __efi_start		@ SizeOfRawData
+> +		.long	__pecoff_code_size		@ SizeOfRawData
+>  		.long	__efi_start			@ PointerToRawData
+>  		.long	0				@ PointerToRelocations
+>  		.long	0				@ PointerToLineNumbers
+> @@ -108,12 +110,24 @@ section_table:
+>  		.short	0				@ NumberOfLineNumbers
+>  		.long	IMAGE_SCN_CNT_CODE | \
+>  			IMAGE_SCN_MEM_READ | \
+> -			IMAGE_SCN_MEM_WRITE | \
+>  			IMAGE_SCN_MEM_EXECUTE		@ Characteristics
+>  
+> +		.ascii	".data\0\0\0"
+> +		.long	__pecoff_data_size		@ VirtualSize
+> +		.long	__pecoff_data_start - start	@ VirtualAddress
+> +		.long	__pecoff_data_rawsize		@ SizeOfRawData
+> +		.long	__pecoff_data_start - start	@ PointerToRawData
+> +		.long	0				@ PointerToRelocations
+> +		.long	0				@ PointerToLineNumbers
+> +		.short	0				@ NumberOfRelocations
+> +		.short	0				@ NumberOfLineNumbers
+> +		.long	IMAGE_SCN_CNT_INITIALIZED_DATA | \
+> +			IMAGE_SCN_MEM_READ | \
+> +			IMAGE_SCN_MEM_WRITE		@ Characteristics
 > +
-> +		usleep_range(10, 20);
-> +		if (!loop--) {
-> +			netdev_err(ndev,
-> +				   "failed to read from MDIO (status:0x%08x)\n",
-> +				   mdiosr);
-> +			ret = 0;
-
-ETIMEDOUT would be better.
-
-> +			break;
-> +		}
-> +	}
+>  		.set	section_count, (. - section_table) / 40
+>  
+> -		.align	9
+> +		.align	12
+>  __efi_start:
+>  #endif
+>  		.endm
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index 1fa62432e283..dfcc2baa0077 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -53,13 +53,6 @@ SECTIONS
+>      *(.rodata)
+>      *(.rodata.*)
+>    }
+> -  .data : {
+> -    /*
+> -     * The EFI stub always executes from RAM, and runs strictly before the
+> -     * decompressor, so we can make an exception for its r/w data, and keep it
+> -     */
+> -    *(.data.efistub)
+> -  }
+>    .piggydata : {
+>      *(.piggydata)
+>    }
+> @@ -75,6 +68,26 @@ SECTIONS
+>    /* ensure the zImage file size is always a multiple of 64 bits */
+>    /* (without a dummy byte, ld just ignores the empty section) */
+>    .pad			: { BYTE(0); . = ALIGN(8); }
 > +
-> +	return ret;
-
-and then return 0 on success. That is the normal convention for return
-values. An error code, and 0.
-
-> +static int ave_mdiobus_write(struct mii_bus *bus,
-> +			     int phyid, int regnum, u16 val)
-> +{
-> +	struct net_device *ndev = bus->priv;
-> +	u32 mdioctl;
+> +#ifdef CONFIG_EFI_STUB
+> +  .data : ALIGN(4096) {
+> +    __pecoff_data_start = .;
+> +    /*
+> +     * The EFI stub always executes from RAM, and runs strictly before the
+> +     * decompressor, so we can make an exception for its r/w data, and keep it
+> +     */
+> +    *(.data.efistub)
+> +    __pecoff_data_end = .;
 > +
-> +	/* write address */
-> +	ave_w32(ndev, AVE_MDIOAR, (phyid << 8) | regnum);
+> +    /*
+> +     * PE/COFF mandates a file size which is a multiple of 512 bytes if the
+> +     * section size equals or exceeds 4 KB
+> +     */
+> +    . = ALIGN(512);
+> +  }
+> +  __pecoff_data_rawsize = . - ADDR(.data);
+> +#endif
 > +
-> +	/* write data */
-> +	ave_w32(ndev, AVE_MDIOWDR, val);
+>    _edata = .;
+>  
+>    _magic_sig = ZIMAGE_MAGIC(0x016f2818);
+> @@ -89,6 +102,9 @@ SECTIONS
+>    . = ALIGN(8);		/* the stack must be 64-bit aligned */
+>    .stack		: { *(.stack) }
+>  
+> +  PROVIDE(__pecoff_data_size = ALIGN(512) - ADDR(.data));
+> +  PROVIDE(__pecoff_end = ALIGN(512));
 > +
-> +	/* write request */
-> +	mdioctl = ave_r32(ndev, AVE_MDIOCTR);
-> +	ave_w32(ndev, AVE_MDIOCTR, mdioctl | AVE_MDIOCTR_WREQ);
-> +
-> +	if (!ave_mdio_busywait(ndev)) {
-> +		netdev_err(ndev, "phy-%d reg-%x write failed\n",
-> +			   phyid, regnum);
-> +		return -1;
+>    .stab 0		: { *(.stab) }
+>    .stabstr 0		: { *(.stabstr) }
+>    .stab.excl 0		: { *(.stab.excl) }
+> -- 
+> 2.9.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-If ave_mdio_busywait() returns ETIMEDOUT, you can just return
-it. Returning -1 is not good.
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static irqreturn_t ave_interrupt(int irq, void *netdev)
-> +{
-> +	struct net_device *ndev = (struct net_device *)netdev;
-> +	struct ave_private *priv = netdev_priv(ndev);
-> +	u32 gimr_val, gisr_val;
-> +
-> +	gimr_val = ave_irq_disable_all(ndev);
-> +
-> +	/* get interrupt status */
-> +	gisr_val = ave_r32(ndev, AVE_GISR);
-> +
-> +	/* PHY */
-> +	if (gisr_val & AVE_GI_PHY) {
-> +		ave_w32(ndev, AVE_GISR, AVE_GI_PHY);
-> +		if (priv->internal_phy_interrupt)
-> +			phy_mac_interrupt(ndev->phydev, ndev->phydev->link);
-
-Humm. I don't think this is correct. You are supposed to give it the
-new link state, not the old.
-
-What does a PHY interrupt mean here? 
-
-> +static void ave_adjust_link(struct net_device *ndev)
-> +{
-> +	struct ave_private *priv = netdev_priv(ndev);
-> +	struct phy_device *phydev = ndev->phydev;
-> +	u32 val, txcr, rxcr, rxcr_org;
-> +
-> +	/* set RGMII speed */
-> +	val = ave_r32(ndev, AVE_TXCR);
-> +	val &= ~(AVE_TXCR_TXSPD_100 | AVE_TXCR_TXSPD_1G);
-> +
-> +	if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII &&
-> +	    phydev->speed == SPEED_1000)
-
-phy_interface_mode_is_rgmii(), so that you handle all the RGMII modes.
-
-> +		val |= AVE_TXCR_TXSPD_1G;
-> +	else if (phydev->speed == SPEED_100)
-> +		val |= AVE_TXCR_TXSPD_100;
-> +
-> +	ave_w32(ndev, AVE_TXCR, val);
-> +
-> +	/* set RMII speed (100M/10M only) */
-> +	if (priv->phy_mode != PHY_INTERFACE_MODE_RGMII) {
-
-Not so safe. It would be better to check for the modes you actually
-support.
-
-> +	if (phydev->link)
-> +		netif_carrier_on(ndev);
-> +	else
-> +		netif_carrier_off(ndev);
-
-I don't think you need this. The phylib should do it for you.
-
-> +
-> +	phy_print_status(phydev);
-> +}
-> +
-> +static int ave_init(struct net_device *ndev)
-> +{
-> +	struct ave_private *priv = netdev_priv(ndev);
-> +	struct device *dev = ndev->dev.parent;
-> +	struct device_node *phy_node, *np = dev->of_node;
-> +	struct phy_device *phydev;
-> +	const void *mac_addr;
-> +	u32 supported;
-> +
-> +	/* get mac address */
-> +	mac_addr = of_get_mac_address(np);
-> +	if (mac_addr)
-> +		ether_addr_copy(ndev->dev_addr, mac_addr);
-> +
-> +	/* if the mac address is invalid, use random mac address */
-> +	if (!is_valid_ether_addr(ndev->dev_addr)) {
-> +		eth_hw_addr_random(ndev);
-> +		dev_warn(dev, "Using random MAC address: %pM\n",
-> +			 ndev->dev_addr);
-> +	}
-> +
-> +	/* attach PHY with MAC */
-> +	phy_node =  of_get_next_available_child(np, NULL);
-
-???
-
-Should this not be looking for a phy-handle property?
-Documentation/devicetree/binds/net/ethernet.txt:
-
-- phy-handle: phandle, specifies a reference to a node representing a PHY
-  device; this property is described in the Devicetree Specification and so
-  preferred;
-
-
-> +	phydev = of_phy_connect(ndev, phy_node,
-> +				ave_adjust_link, 0, priv->phy_mode);
-> +	if (!phydev) {
-> +		dev_err(dev, "could not attach to PHY\n");
-> +		return -ENODEV;
-> +	}
-> +	of_node_put(phy_node);
-> +
-> +	priv->phydev = phydev;
-> +	phydev->autoneg = AUTONEG_ENABLE;
-> +	phydev->speed = 0;
-> +	phydev->duplex = 0;
-
-And this should not be needed.
-
-> +
-> +	dev_info(dev, "connected to %s phy with id 0x%x\n",
-> +		 phydev->drv->name, phydev->phy_id);
-
-phy_attached_info()
-
-> +
-> +	if (priv->phy_mode != PHY_INTERFACE_MODE_RGMII) {
-
-Same comment as above.
-
-> +		supported = phydev->supported;
-> +		phydev->supported &= ~PHY_GBIT_FEATURES;
-> +		phydev->supported |= supported & PHY_BASIC_FEATURES;
-> +	}
-> +
-> +	/* PHY interrupt stop instruction is needed because the interrupt
-> +	 * continues to assert.
-> +	 */
-> +	phy_stop_interrupts(phydev);
-
-Could you explain this some more? It sounds like your interrupt
-controller is broken.
-
-> +
-> +	/* When PHY driver can't handle its interrupt directly,
-> +	 * interrupt request always fails and polling method is used
-> +	 * alternatively. In this case, the libphy says
-> +	 * "libphy: uniphier-mdio: Can't get IRQ -1 (PHY)".
-> +	 */
-> +	phy_start_interrupts(phydev);
-
--1 is PHY_POLL. So calling phy_start_interrupts() is wrong. In fact,
-you should not be calling phy_start_interrupts() at all. No other
-Ethernet driver does.
-
-> +
-> +	phy_start_aneg(phydev);
-> +
-> +	return 0;
-> +}
-> +
-> +static void ave_uninit(struct net_device *ndev)
-> +{
-> +	struct ave_private *priv = netdev_priv(ndev);
-> +
-> +	phy_stop_interrupts(priv->phydev);
-
-And no other Ethernet driver calls phy_stop_interrupts either.
-Please take a look at this.
-
-> +	phy_disconnect(priv->phydev);
-> +}
-> +
-
-  Andrew
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
