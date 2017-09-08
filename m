@@ -1,54 +1,36 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 8 Sep 2017 23:16:44 +0300
-Subject: [RFC v3 2/3] interconnect: Add basic event tracing
-In-Reply-To: <20170908141321.02f51e92@gandalf.local.home>
-References: <20170908171830.13813-1-georgi.djakov@linaro.org>
- <20170908171830.13813-3-georgi.djakov@linaro.org>
- <20170908141321.02f51e92@gandalf.local.home>
-Message-ID: <e45d096f-1e7a-89cd-f334-266d4b3466bc@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Sep 2017 22:34:44 +0200
+Subject: [GIT PULL] ARM: config: aspeed: Changes for 4.14
+In-Reply-To: <CACPK8Xe0C=A9_+5EHwhTMPTxd8mV5n52rC+XHLLvdSn+Lasq5A@mail.gmail.com>
+References: <CACPK8XehxPjTuAq70ofmom9_DJ7LBR2C0ehO+2jGJUANTXod+A@mail.gmail.com>
+ <CAK8P3a2WqMuqgOrg6JJpLJagVgWRKUgw=muC_ivzz2RguAMPjQ@mail.gmail.com>
+ <CACPK8Xe0C=A9_+5EHwhTMPTxd8mV5n52rC+XHLLvdSn+Lasq5A@mail.gmail.com>
+Message-ID: <CAK8P3a2j9HKQLVAaypr+L5aVvxOLR6PHQnnbJR4BF69ti09vBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8.09.17 ?. 21:13, Steven Rostedt wrote:
-> On Fri,  8 Sep 2017 20:18:29 +0300
-> Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> 
->> diff --git a/include/trace/events/interconnect.h b/include/trace/events/interconnect.h
->> new file mode 100644
->> index 000000000000..c4a72163873c
->> --- /dev/null
->> +++ b/include/trace/events/interconnect.h
->> @@ -0,0 +1,45 @@
->> +#undef TRACE_SYSTEM
->> +#define TRACE_SYSTEM interconnect
->> +
->> +#if !defined(_TRACE_INTERCONNECT_H) || defined(TRACE_HEADER_MULTI_READ)
->> +#define _TRACE_INTERCONNECT_H
->> +
->> +#include <linux/tracepoint.h>
->> +
->> +struct interconnect_path;
->> +
->> +DECLARE_EVENT_CLASS(interconnect_path,
->> +
->> +	TP_PROTO(struct interconnect_path *path),
->> +
->> +	TP_ARGS(path),
->> +
->> +	TP_STRUCT__entry(
->> +		__field(struct interconnect_path *, path)
->> +	),
->> +
->> +	TP_fast_assign(
->> +		__entry->path = path;
->> +	),
->> +
->> +	TP_printk("INTERCONNECT: %p", __entry->path)
-> 
-> You're passing in an interconnect_path and only recording the pointer
-> to it? Wouldn't it be useful to record other aspects? Like the number
-> of nodes, the avg and peak bw of each node?
-> 
+On Fri, Sep 8, 2017 at 5:10 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Thu, Aug 24, 2017 at 8:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thu, Aug 24, 2017 at 6:14 AM, Joel Stanley <joel@jms.id.au> wrote:
+>> For some reason, we never added a multi_v6_defconfig, but we could do that now,
+>> and add the other common v6 platforms as well: bcm2835, oxnas, omap2, imx3,
+>> s3c64xx and realview. (cns3xxxx, picoxcell and vt8500 are pretty much dead
+>> as far as I can tell)
+>
+> I assumed this was because the V7 and V6 platforms can be built into
+> the same kernel.
+>
+> We could get the same coverage by making sure all of our V6 platforms
+> are enabled in multi_v7_defconfig.
 
-My goal was to get just the path with some timestamps, but your suggestion
-sounds good. Will do it. Thanks!
+Enabling CONFIG_CPU_V6 there may have noticeable overhead on v7
+platforms, and it would be a bit confusing, so I'm not sure about doing
+that by itself.
+
+However, a related question would be whether we want to add options
+for ARMv7VE (adding IDIV and LPAE) and ARMv8 and then using
+config fragments to specialize what is currently the multi_v7_defconfig
+to give us four separate configurations (v6/v7/v7ve/v8.0) with an
+increasing feature set but decreasing platform support.
+
+     Arnd
