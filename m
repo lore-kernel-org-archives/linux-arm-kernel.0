@@ -1,43 +1,28 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Fri,  8 Sep 2017 10:10:32 +0200
-Subject: [PATCH v4 2/3] PCI: Avoid bus reset for Cavium cn8xxx root ports
-In-Reply-To: <20170908081033.3025-1-jglauber@cavium.com>
-References: <20170908081033.3025-1-jglauber@cavium.com>
-Message-ID: <20170908081033.3025-3-jglauber@cavium.com>
+Date: Fri,  8 Sep 2017 10:10:30 +0200
+Subject: [PATCH v4 0/3] Workaround for bus/slot reset on Cavium cn8xxx root
+ ports
+Message-ID: <20170908081033.3025-1-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Using vfio-pci on a combination of cn8xxx and some PCI devices results in
+a kernel panic. This is triggered by issuing a bus or a slot reset
+on the PCI device.
 
-Root ports of cn8xxx do not function after bus reset when used with
-some e1000e and LSI HBA devices. Add a quirk to prevent bus reset on
-these root ports.
+With this series both checks indicate that the reset is not possible
+preventing the kernel panic.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
-[jglauber at cavium.com: fixed typo and whitespaces]
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
+David Daney (2):
+  PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
+  PCI: Avoid bus reset for Cavium cn8xxx root ports
+
+Jan Glauber (1):
+  PCI: Avoid slot reset if bus reset is not possible
+
+ drivers/pci/pci.c    | 8 ++++++++
  drivers/pci/quirks.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 140760403f36..2e4e7b6d1a79 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -3364,6 +3364,14 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0032, quirk_no_bus_reset);
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x003c, quirk_no_bus_reset);
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0033, quirk_no_bus_reset);
- 
-+/*
-+ * Root port on some Cavium CN8xxx chips do not successfully complete
-+ * a bus reset when used with certain types of child devices. Config
-+ * space access to the child may quit responding. Flag the root port
-+ * as not supporting bus reset.
-+ */
-+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_no_bus_reset);
-+
- static void quirk_no_pm_reset(struct pci_dev *dev)
- {
- 	/*
 -- 
 2.9.0.rc0.21.g7777322
