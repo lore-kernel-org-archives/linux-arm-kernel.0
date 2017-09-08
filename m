@@ -1,103 +1,181 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri,  8 Sep 2017 09:11:54 +0200
-Subject: [PATCH v5 08/10] net: stmmac: dwmac-sun8i: choose internal PHY via
- phy-is-integrated
+Date: Fri,  8 Sep 2017 09:11:51 +0200
+Subject: [PATCH v5 05/10] dt-bindings: net: dwmac-sun8i: update documentation
+ about integrated PHY
 In-Reply-To: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
 References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170908071156.5115-9-clabbe.montjoie@gmail.com>
+Message-ID: <20170908071156.5115-6-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current way to find if the phy is internal is to compare DT phy-mode
-and emac_variant/internal_phy.
-But it will negate a possible future SoC where an external PHY use the
-same phy mode than the internal one.
-
-This patch adds a new way to find if the PHY is internal, via
-the phy-is-integrated property.
-
-Since the internal_phy variable does not need anymore to contain the xMII mode
-used by the internal PHY, it is still used for knowing the presence of an
-internal PHY, so it is modified to a boolean soc_has_internal_phy.
+This patch add documentation about the MDIO switch used on sun8i-h3-emac
+for integrated PHY.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 127 +++++++++++++++++++--
+ 1 file changed, 120 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index fffd6d5fc907..672553b652bd 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -41,14 +41,14 @@
-  *				This value is used for disabling properly EMAC
-  *				and used as a good starting value in case of the
-  *				boot process(uboot) leave some stuff.
-- * @internal_phy:		Does the MAC embed an internal PHY
-+ * @soc_has_internal_phy:	Does the MAC embed an internal PHY
-  * @support_mii:		Does the MAC handle MII
-  * @support_rmii:		Does the MAC handle RMII
-  * @support_rgmii:		Does the MAC handle RGMII
-  */
- struct emac_variant {
- 	u32 default_syscon_value;
--	int internal_phy;
-+	bool soc_has_internal_phy;
- 	bool support_mii;
- 	bool support_rmii;
- 	bool support_rgmii;
-@@ -75,7 +75,7 @@ struct sunxi_priv_data {
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+index 725f3b187886..3fa0e54825ea 100644
+--- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -39,7 +39,7 @@ Optional properties for the following compatibles:
+ - allwinner,leds-active-low: EPHY LEDs are active low
  
- static const struct emac_variant emac_variant_h3 = {
- 	.default_syscon_value = 0x58000,
--	.internal_phy = PHY_INTERFACE_MODE_MII,
-+	.soc_has_internal_phy = true,
- 	.support_mii = true,
- 	.support_rmii = true,
- 	.support_rgmii = true
-@@ -83,20 +83,20 @@ static const struct emac_variant emac_variant_h3 = {
+ Required child node of emac:
+-- mdio bus node: should be named mdio
++- mdio bus node: should be labelled mdio
  
- static const struct emac_variant emac_variant_v3s = {
- 	.default_syscon_value = 0x38000,
--	.internal_phy = PHY_INTERFACE_MODE_MII,
-+	.soc_has_internal_phy = true,
- 	.support_mii = true
+ Required properties of the mdio node:
+ - #address-cells: shall be 1
+@@ -48,14 +48,28 @@ Required properties of the mdio node:
+ The device node referenced by "phy" or "phy-handle" should be a child node
+ of the mdio node. See phy.txt for the generic PHY bindings.
+ 
+-Required properties of the phy node with the following compatibles:
++The following compatibles require an mdio-mux node called "mdio-mux":
++  - "allwinner,sun8i-h3-emac"
++  - "allwinner,sun8i-v3s-emac":
++Required properties for the mdio-mux node:
++  - compatible = "mdio-mux"
++  - one child mdio for the integrated mdio
++  - one child mdio for the external mdio if present (V3s have none)
++Required properties for the mdio-mux children node:
++  - reg: 0 for internal MDIO bus, 1 for external MDIO bus
++
++The following compatibles require a PHY node representing the integrated
++PHY, under the integrated MDIO bus node if an mdio-mux node is used:
+   - "allwinner,sun8i-h3-emac",
+   - "allwinner,sun8i-v3s-emac":
++
++Required properties of the integrated phy node:
+ - clocks: a phandle to the reference clock for the EPHY
+ - resets: a phandle to the reset control for the EPHY
++- phy-is-integrated
++- Should be a child of the integrated mdio
+ 
+-Example:
+-
++Example with integrated PHY:
+ emac: ethernet at 1c0b000 {
+ 	compatible = "allwinner,sun8i-h3-emac";
+ 	syscon = <&syscon>;
+@@ -72,13 +86,112 @@ emac: ethernet at 1c0b000 {
+ 	phy-handle = <&int_mii_phy>;
+ 	phy-mode = "mii";
+ 	allwinner,leds-active-low;
++
++	mdio0: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++	};
++
++	mdio-mux {
++		compatible = "mdio-mux";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		int_mdio: mdio at 1 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			int_mii_phy: ethernet-phy at 1 {
++				reg = <1>;
++				clocks = <&ccu CLK_BUS_EPHY>;
++				resets = <&ccu RST_BUS_EPHY>;
++				phy-is-integrated
++			};
++		};
++		ext_mdio: mdio at 0 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++};
++
++Example with external PHY:
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-h3-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	allwinner,leds-active-low;
++
++	mdio0: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++	};
++
++	mdio-mux {
++		compatible = "mdio-mux";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		int_mdio: mdio at 1 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			int_mii_phy: ethernet-phy at 1 {
++				reg = <1>;
++				clocks = <&ccu CLK_BUS_EPHY>;
++				resets = <&ccu RST_BUS_EPHY>;
++				phy-is-integrated
++			};
++		};
++		ext_mdio: mdio at 0 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ext_rgmii_phy: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++	};
++};
++
++Example with SoC without integrated PHY
++
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-a83t-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++
+ 	mdio: mdio {
++		compatible = "snps,dwmac-mdio";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		int_mii_phy: ethernet-phy at 1 {
++		ext_rgmii_phy: ethernet-phy at 1 {
+ 			reg = <1>;
+-			clocks = <&ccu CLK_BUS_EPHY>;
+-			resets = <&ccu RST_BUS_EPHY>;
+ 		};
+ 	};
  };
- 
- static const struct emac_variant emac_variant_a83t = {
- 	.default_syscon_value = 0,
--	.internal_phy = 0,
-+	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rgmii = true
- };
- 
- static const struct emac_variant emac_variant_a64 = {
- 	.default_syscon_value = 0,
--	.internal_phy = 0,
-+	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rmii = true,
- 	.support_rgmii = true
-@@ -648,7 +648,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 			 "Current syscon value is not the default %x (expect %x)\n",
- 			 val, reg);
- 
--	if (gmac->variant->internal_phy) {
-+	if (gmac->variant->soc_has_internal_phy) {
- 		if (!gmac->use_internal_phy) {
- 			/* switch to external PHY interface */
- 			reg &= ~H3_EPHY_SELECT;
-@@ -932,7 +932,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 	}
- 
- 	plat_dat->interface = of_get_phy_mode(dev->of_node);
--	if (plat_dat->interface == gmac->variant->internal_phy) {
-+	if (of_property_read_bool(plat_dat->phy_node, "phy-is-integrated")) {
- 		dev_info(&pdev->dev, "Will use internal PHY\n");
- 		gmac->use_internal_phy = true;
- 		gmac->ephy_clk = of_clk_get(plat_dat->phy_node, 0);
 -- 
 2.13.5
