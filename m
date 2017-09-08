@@ -1,42 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 8 Sep 2017 16:39:13 +0200
-Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
-In-Reply-To: <d3d32839-12a8-71fa-cfec-03055d64388d@arm.com>
-References: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
- <20170901003135.10058-1-andre.przywara@arm.com>
- <20170901060445.vboici7qxfkztp3s@flea>
- <743ae23a-372a-762b-c345-b914f09fd718@arm.com>
- <20170904070415.e6nclz5n23bo7f4v@flea>
- <d3d32839-12a8-71fa-cfec-03055d64388d@arm.com>
-Message-ID: <20170908143913.6ga64ssakvk2mjis@flea.lan>
+Date: Fri, 8 Sep 2017 16:37:10 +0200
+Subject: [PATCH 05/10] dmaengine: sun6i: Move number of
+ pchans/vchans/request to device struct
+In-Reply-To: <3533197.81BdoSVRz8@sbruens-linux>
+References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
+ <20170903224100.17893-6-stefan.bruens@rwth-aachen.de>
+ <20170904074355.niloziky42aki7bg@flea>
+ <3533197.81BdoSVRz8@sbruens-linux>
+Message-ID: <20170908143710.rhz6x3i776zrhbzo@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Sep 04, 2017 at 09:14:52AM +0100, Andr? Przywara wrote:
-> > And obviously, while maintaining the stability of the binding of those
-> > hundreds properties.
+On Mon, Sep 04, 2017 at 02:30:59PM +0000, Br?ns, Stefan wrote:
+> On Montag, 4. September 2017 09:43:55 CEST Maxime Ripard wrote:
+> > On Mon, Sep 04, 2017 at 12:40:56AM +0200, Stefan Br?ns wrote:
+> > > Preparatory patch: If the same compatible is used for different SoCs which
+> > > have a common register layout, but different number of channels, the
+> > > channel count can no longer be stored in the config. Store it in the
+> > > device structure instead.
+> > > 
+> > > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 > > 
-> > Or, you can base all this on the compatible, and be done with it once
-> > and for all.
+> > As stated already, we already are going to have a different
+> > compatible, and this is not something that will change from one
+> > instance to the other. Having code is therefore:
+> >   A) Making the code more complex
+> >   B) For no particular reason.
 > 
-> What I am after is to cover SoCs which *don't* have differences in their
-> register layout, for instance A83T, H3, A64, R40.
-> In an ideal world we could have reused the H3 compatible string,
-> adjusting the number of channels for each SoC in the DT.
+> If the dma channel count (which is a standard dma binding, likely for a 
+> reason) goes into the devicetree, it has to be moved out of the config.
+>
+> The R40 (which has register manuals available) has the same register layout as 
+> the A64, but *does* have a different channel count. So you think it is a good 
+> idea to introduce a new compatible again?
 > 
-> So I see that having a generic compatible name will not fly, as we now
-> have differences which should not be modelled by DT properties.
-> But I still think we should try to cover those non-register differences
-> (number of channels) with a DT property, to allow reusing the existing
-> driver code whenever possible. As is stands with this series, the R40
-> support should just be a matter of:
-> 	compatible = "allwinner,sun8i-r40-dma",
-> 		     "allwinner,sun50i-a64-dma";
+> If you had been half as picky when merging the H3 and A83T support, we would 
+> not have this mess now.
+> 
+> There is also the H6, where there is no register manual available yet, but I  
+> bet it has the H3 (and A64, H5, R40) register layout, but unlikely the same 
+> number of DMA channels *and* the same number of ports.
 
-I just suggested the exact same thing, and then saw your mail, so I
-guess we have an agreement :)
+The thing is that this kind of things usually grow organically until
+you can't just add a simple if case any more.
+
+I'm sorry you were at the tipping point, but I'm sure you also
+understand that adding more to the mess until the next one shows up
+isn't viable either.
+
+That being said, thinking a bit more on that one, if you add to the
+binding that we need to have both the current SoC compatible (to
+workaround any variation / bugs we might encounter in the future) and
+the "generation" one (to avoid adding one for each new IP), plus the
+mandatory dma-channels / dma-requests properties, that would work for
+me.
 
 Maxime
 
@@ -50,4 +67,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/01b3c576/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/67b516d8/attachment.sig>
