@@ -1,87 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  8 Sep 2017 16:31:43 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-Message-ID: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri,  8 Sep 2017 17:35:56 +0200
+Subject: [PATCH v1 02/10] clk: at91: pmc: Save SCSR during suspend
+In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-3-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it turns out, building the ARM kernel with EFI support pulls in
-a couple of sections that we don't really need in the decompressor.
-This is due to the fact the the UEFI stub uses sort() to sort the UEFI
-memory map, which is an exported symbol pulled in from lib/sort.c.
+The contents of the System Clock Status Register (SCSR) needs to be
+restored into the System Clock Enable Register (SCER).
 
-Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
-separate PE/COFF sections"), this resulted in the following layout
-for the decompressor ELF binary.
+As the bootloader will restore some clocks by itself, the issue can be
+missed as only the USB controller, the LCD controller, the Image Sensor
+controller and the programmable clocks will be impacted.
 
-  [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
-  [ 0]                   NULL     00000000 000000 000000 00      0   0  0
-  [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
-  [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
-  [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
-  [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
-  [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
-  [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
-  [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
-  [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
-  [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
-  [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
-  [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
+Fix the obvious typo in the suspend/resume code, as the IMR register
+does not need to be saved twice.
 
-Commit e4bae4d0b5f3 made some changes to the linker script to allow the
-UEFI firmware to map the decompressor with strict R-X/RW- permissions
-before invoking it. Unfortunately, this turns out to break the boot on
-some systems, because the linker now also moves the ksymtab/kcrctab
-sections around, resulting in .piggydata to appear misaligned.
-
-  [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
-  [ 0]                   NULL     00000000 000000 000000 00      0   0  0
-  [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
-  [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
-  [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
-  [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
-  [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
-  [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
-  [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
-  [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
-  [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
-  [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
-  [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
-
-So let's align piggydata explicitly, and discard these sections from the
-binary.
-
-Cc: Russell King <linux@armlinux.org.uk>
-Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- arch/arm/boot/compressed/piggy.S       | 1 +
- arch/arm/boot/compressed/vmlinux.lds.S | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/clk/at91/pmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
-index f72088495f43..5d52c556dd32 100644
---- a/arch/arm/boot/compressed/piggy.S
-+++ b/arch/arm/boot/compressed/piggy.S
-@@ -1,5 +1,6 @@
- 	.section .piggydata,#alloc
- 	.globl	input_data
-+	.align	2
- input_data:
- 	.incbin	"arch/arm/boot/compressed/piggy_data"
- 	.globl	input_data_end
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-index 7a4c59154361..5c5265be4605 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.S
-+++ b/arch/arm/boot/compressed/vmlinux.lds.S
-@@ -29,6 +29,7 @@ SECTIONS
-      * of the text/got segments.
-      */
-     *(.data)
-+    *(*ksymtab* *kcrctab*)
-   }
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 5c2b26de303e..07dc2861ad3f 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -86,7 +86,7 @@ static int pmc_suspend(void)
+ {
+ 	int i;
  
-   . = TEXT_START;
+-	regmap_read(pmcreg, AT91_PMC_IMR, &pmc_cache.scsr);
++	regmap_read(pmcreg, AT91_PMC_SCSR, &pmc_cache.scsr);
+ 	regmap_read(pmcreg, AT91_PMC_PCSR, &pmc_cache.pcsr0);
+ 	regmap_read(pmcreg, AT91_CKGR_UCKR, &pmc_cache.uckr);
+ 	regmap_read(pmcreg, AT91_CKGR_MOR, &pmc_cache.mor);
+@@ -129,7 +129,7 @@ static void pmc_resume(void)
+ 	if (pmc_cache.pllar != tmp)
+ 		pr_warn("PLLAR was not configured properly by the firmware\n");
+ 
+-	regmap_write(pmcreg, AT91_PMC_IMR, pmc_cache.scsr);
++	regmap_write(pmcreg, AT91_PMC_SCER, pmc_cache.scsr);
+ 	regmap_write(pmcreg, AT91_PMC_PCER, pmc_cache.pcsr0);
+ 	regmap_write(pmcreg, AT91_CKGR_UCKR, pmc_cache.uckr);
+ 	regmap_write(pmcreg, AT91_CKGR_MOR, pmc_cache.mor);
 -- 
 2.11.0
