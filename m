@@ -1,16 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  8 Sep 2017 14:47:08 +0200
-Subject: [PATCH 6/7 v4] drm/pl111: Add optional variant display en/disable
- callbacks
+Date: Fri,  8 Sep 2017 14:47:07 +0200
+Subject: [PATCH 5/7 v4] drm/pl111: Insert delay before powering up PL11x
 In-Reply-To: <20170908124709.4758-1-linus.walleij@linaro.org>
 References: <20170908124709.4758-1-linus.walleij@linaro.org>
-Message-ID: <20170908124709.4758-6-linus.walleij@linaro.org>
+Message-ID: <20170908124709.4758-5-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The silcon and components around the PL111 may require some
-variants to perform special set-up of the display. Add two
-callbacks to manage this.
+The old codebase has a delay between enabling and powering up the
+PL11x.
+
+According to the manual for PL110, ARM DDI 0161E page 1-5 and
+the PL111 manual ARM DDI 0293C page 1-6, the power sequence should
+be such that once Vdd is stable (which we assume it is at boot)
+LCDEN is enabled first and then CLPOWER should be enabled
+"after the signals have stabilized" and this is said to
+be display-dependent. The old codebase uses 20ms.
 
 Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
@@ -20,56 +25,70 @@ ChangeLog v3->v4:
 ChangeLog v2->v3:
 - Rebase on DRM-TIP
 ChangeLog v1->v2:
-- Rebase on other display driver changes.
+- Fall back to the delay of 20 ms from the old framebuffer
+  driver to stabilize Vee in shortage of other alternatives.
 ---
- drivers/gpu/drm/pl111/pl111_display.c | 6 ++++++
- drivers/gpu/drm/pl111/pl111_drm.h     | 3 +++
- 2 files changed, 9 insertions(+)
+ drivers/gpu/drm/pl111/pl111_display.c | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 3091fb4559cf..29148ff380d8 100644
+index c08706be4b7e..3091fb4559cf 100644
 --- a/drivers/gpu/drm/pl111/pl111_display.c
 +++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -208,6 +208,9 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	 */
- 	msleep(20);
+@@ -155,8 +155,8 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
  
-+	if (priv->variant_display_enable)
-+		priv->variant_display_enable(drm, fb->format->format);
+ 	writel(0, priv->regs + CLCD_TIM3);
+ 
+-	/* Enable and Power Up */
+-	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDPWR | CNTL_LCDVCOMP(1);
++	/* Hard-code TFT panel */
++	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDVCOMP(1);
+ 
+ 	/* Note that the the hardware's format reader takes 'r' from
+ 	 * the low bit, while DRM formats list channels from high bit
+@@ -199,6 +199,17 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 		break;
+ 	}
+ 
++	/* Power sequence: first enable and chill */
++	writel(cntl, priv->regs + priv->ctrl);
 +
- 	/* Power Up */
- 	cntl |= CNTL_LCDPWR;
++	/*
++	 * We expect this delay to stabilize the contrast
++	 * voltage Vee as stipulated by the manual
++	 */
++	msleep(20);
++
++	/* Power Up */
++	cntl |= CNTL_LCDPWR;
  	writel(cntl, priv->regs + priv->ctrl);
-@@ -237,6 +240,9 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
- 	 */
- 	msleep(20);
  
-+	if (priv->variant_display_disable)
-+		priv->variant_display_disable(drm);
+ 	drm_crtc_vblank_on(crtc);
+@@ -209,10 +220,24 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
+ 	struct drm_crtc *crtc = &pipe->crtc;
+ 	struct drm_device *drm = crtc->dev;
+ 	struct pl111_drm_dev_private *priv = drm->dev_private;
++	u32 cntl;
+ 
+ 	drm_crtc_vblank_off(crtc);
+ 
+-	/* Disable and Power Down */
++	/* Power Down */
++	cntl = readl(priv->regs + priv->ctrl);
++	if (cntl & CNTL_LCDPWR) {
++		cntl &= ~CNTL_LCDPWR;
++		writel(cntl, priv->regs + priv->ctrl);
++	}
 +
- 	/* Disable */
++	/*
++	 * We expect this delay to stabilize the contrast voltage Vee as
++	 * stipulated by the manual
++	 */
++	msleep(20);
++
++	/* Disable */
  	writel(0, priv->regs + priv->ctrl);
  
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index b380a7b4fb58..440f53ebee8c 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -26,6 +26,7 @@
- #include <drm/drm_panel.h>
- #include <drm/drm_bridge.h>
- #include <linux/clk-provider.h>
-+#include <linux/interrupt.h>
- 
- #define CLCD_IRQ_NEXTBASE_UPDATE BIT(2)
- 
-@@ -66,6 +67,8 @@ struct pl111_drm_dev_private {
- 	 */
- 	spinlock_t tim2_lock;
- 	const struct pl111_variant_data *variant;
-+	void (*variant_display_enable) (struct drm_device *drm, u32 format);
-+	void (*variant_display_disable) (struct drm_device *drm);
- };
- 
- int pl111_display_init(struct drm_device *dev);
+ 	clk_disable_unprepare(priv->clk);
 -- 
 2.13.5
