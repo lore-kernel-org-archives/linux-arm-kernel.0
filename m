@@ -1,59 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 8 Sep 2017 09:19:54 +0200
-Subject: [PATCH v5 01/10] arm64: dts: allwinner: Restore EMAC changes
-In-Reply-To: <20170908071156.5115-2-clabbe.montjoie@gmail.com>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-2-clabbe.montjoie@gmail.com>
-Message-ID: <20170908071954.j2bhtw4wqa27fald@flea.lan>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 8 Sep 2017 15:19:21 +0800
+Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
+In-Reply-To: <d01b49a2-e204-73af-23e3-5fd7f7202859@arm.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015EF473@DGGEMA503-MBX.china.huawei.com>
+ <d01b49a2-e204-73af-23e3-5fd7f7202859@arm.com>
+Message-ID: <1bcd0c1e-c3b5-aac4-bb4f-83ee14b1d1ab@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 08, 2017 at 09:11:47AM +0200, Corentin Labbe wrote:
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-> index 1c2387bd5df6..968908761194 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-> @@ -50,6 +50,7 @@
->  	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
->  
->  	aliases {
-> +		ethernet0 = &emac;
->  		serial0 = &uart0;
->  	};
->  
-> @@ -108,6 +109,22 @@
->  	status = "okay";
->  };
->  
-> +&emac {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emac_rgmii_pins>;
-> +	phy-supply = <&reg_gmac_3v3>;
-> +	phy-handle = <&ext_rgmii_phy>;
-> +	phy-mode = "rgmii";
-> +	status = "okay";
-> +};
-> +
-> +&mdio {
-> +	ext_rgmii_phy: ethernet-phy at 7 {
-> +		compatible = "ethernet-phy-ieee802.3-c22";
-> +		reg = <7>;
-> +	};
-> +};
-> +
 
-This won't compile, you don't have that node in the H5 DTSI.
 
-Maxime
+On 2017/9/7 23:23, Marc Zyngier wrote:
+> On 07/09/17 16:03, gengdongjiu wrote:
+>>> On 07/09/17 12:49, gengdongjiu wrote:
+>>>>
+[...]
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/d7832ef0/attachment.sig>
+> 
+> I really cannot think of a good reason why we'd want to do that. Playing
+> with set_fs() is almost universally wrong, and I'm certainly going to
+> oppose to any change in that area unless the code that calls set_fs()
+> has been made public and properly reviewed. Until then, UAO/PAN will
+> stay as they are unless you prove that our current code is wrong.
+
+Marc,
+
+sorry I have another question for the PAN.
+
+In the non-VHE mode, The host kernel is running in the EL1. Before host kernel enter guest, host OS will call 'HVC' instruction to do the world-switch,
+and the pstate.PAN will be saved into the SPSR_EL2. When world-switch back to host kernel from EL2, it will call 'eret' instruction to EL1 host,
+this 'eret' instruction will restore the SPSR_EL2 to the PSTATE. so the PSTATE.PAN will be restored.
+
+For the Non-VHE mode, in the EL2 where mainly have word-switch code, do you think it needs to reset the PSTATE.PAN? From the spec, it does not provide SCTLR_EL2.SPAN bit for non-VHE mode,
+so reset the PSTATE.PAN does not sure whether it is needed or whether affects the performance. If you think it is needed for El2 in Non-VHE mode, moving the reset PSTATE.PAN to
+the exception entry to EL2 may be better, such as "el1_sync", because host can also call 'hvc' instruction without guest running.
+
+> 
+> 	M.
+> 
