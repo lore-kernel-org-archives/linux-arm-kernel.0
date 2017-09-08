@@ -1,127 +1,143 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:36:02 +0200
-Subject: [PATCH v1 08/10] pwm: atmel-tcb: Support backup mode
+Date: Fri,  8 Sep 2017 17:36:01 +0200
+Subject: [PATCH v1 07/10] iio:adc:at91-sama5d2: Support backup mode
 In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-9-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-8-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore registers for the PWM on suspend and resume, which
-makes hibernation and backup modes possible.
+Support the backup mode for platform suspend, by restoring the hardware
+registers on resume.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/pwm/pwm-atmel-tcb.c | 63 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 61 insertions(+), 2 deletions(-)
+ drivers/iio/adc/at91-sama5d2_adc.c | 71 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 61 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-index 75db585a2a94..acd3ce8ecf3f 100644
---- a/drivers/pwm/pwm-atmel-tcb.c
-+++ b/drivers/pwm/pwm-atmel-tcb.c
-@@ -37,11 +37,20 @@ struct atmel_tcb_pwm_device {
- 	unsigned period;		/* PWM period expressed in clk cycles */
- };
+diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+index e10dca3ed74b..f9718c863363 100644
+--- a/drivers/iio/adc/at91-sama5d2_adc.c
++++ b/drivers/iio/adc/at91-sama5d2_adc.c
+@@ -200,6 +200,7 @@ struct at91_adc_state {
+ 	u32				conversion_value;
+ 	struct at91_adc_soc_info	soc_info;
+ 	wait_queue_head_t		wq_data_available;
++	unsigned int			current_rate;
+ 	/*
+ 	 * lock to prevent concurrent 'single conversion' requests through
+ 	 * sysfs.
+@@ -269,6 +270,8 @@ static void at91_adc_setup_samp_freq(struct at91_adc_state *st, unsigned freq)
+ 	mr |= AT91_SAMA5D2_MR_PRESCAL(prescal);
+ 	at91_adc_writel(st, AT91_SAMA5D2_MR, mr);
  
-+struct atmel_tcb_channel {
-+	u32 enabled;
-+	u32 cmr;
-+	u32 ra;
-+	u32 rb;
-+	u32 rc;
-+};
++	st->current_rate = freq;
 +
- struct atmel_tcb_pwm_chip {
- 	struct pwm_chip chip;
- 	spinlock_t lock;
- 	struct atmel_tc *tc;
- 	struct atmel_tcb_pwm_device *pwms[NPWM];
-+	struct atmel_tcb_channel bkup[NPWM / 2];
- };
- 
- static inline struct atmel_tcb_pwm_chip *to_tcb_chip(struct pwm_chip *chip)
-@@ -175,12 +184,15 @@ static void atmel_tcb_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	 * Use software trigger to apply the new setting.
- 	 * If both PWM devices in this group are disabled we stop the clock.
- 	 */
--	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC)))
-+	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC))) {
- 		__raw_writel(ATMEL_TC_SWTRG | ATMEL_TC_CLKDIS,
- 			     regs + ATMEL_TC_REG(group, CCR));
--	else
-+		tcbpwmc->bkup[group].enabled = 1;
-+	} else {
- 		__raw_writel(ATMEL_TC_SWTRG, regs +
- 			     ATMEL_TC_REG(group, CCR));
-+		tcbpwmc->bkup[group].enabled = 0;
-+	}
- 
- 	spin_unlock(&tcbpwmc->lock);
+ 	dev_dbg(&indio_dev->dev, "freq: %u, startup: %u, prescal: %u\n",
+ 		freq, startup, prescal);
  }
-@@ -263,6 +275,7 @@ static int atmel_tcb_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	/* Use software trigger to apply the new setting */
- 	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
- 		     regs + ATMEL_TC_REG(group, CCR));
-+	tcbpwmc->bkup[group].enabled = 1;
- 	spin_unlock(&tcbpwmc->lock);
+@@ -375,7 +378,9 @@ static int at91_adc_write_raw(struct iio_dev *indio_dev,
+ 	    val > st->soc_info.max_sample_rate)
+ 		return -EINVAL;
+ 
++	mutex_lock(&st->lock);
+ 	at91_adc_setup_samp_freq(st, val);
++	mutex_unlock(&st->lock);
+ 
  	return 0;
  }
-@@ -445,10 +458,56 @@ static const struct of_device_id atmel_tcb_pwm_dt_ids[] = {
+@@ -386,6 +391,21 @@ static const struct iio_info at91_adc_info = {
+ 	.driver_module = THIS_MODULE,
  };
- MODULE_DEVICE_TABLE(of, atmel_tcb_pwm_dt_ids);
+ 
++static void at91_adc_init_hw(struct at91_adc_state *st, unsigned int freq)
++{
++	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
++	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
++	/*
++	 * Transfer field must be set to 2 according to the datasheet and
++	 * allows different analog settings for each channel.
++	 */
++	at91_adc_writel(st, AT91_SAMA5D2_MR,
++			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
++
++	at91_adc_setup_samp_freq(st, freq);
++
++}
++
+ static int at91_adc_probe(struct platform_device *pdev)
+ {
+ 	struct iio_dev *indio_dev;
+@@ -482,16 +502,7 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 		goto vref_disable;
+ 	}
+ 
+-	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
+-	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
+-	/*
+-	 * Transfer field must be set to 2 according to the datasheet and
+-	 * allows different analog settings for each channel.
+-	 */
+-	at91_adc_writel(st, AT91_SAMA5D2_MR,
+-			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
+-
+-	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
++	at91_adc_init_hw(st, st->soc_info.min_sample_rate);
+ 
+ 	ret = clk_prepare_enable(st->per_clk);
+ 	if (ret)
+@@ -541,12 +552,52 @@ static const struct of_device_id at91_adc_dt_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, at91_adc_dt_match);
  
 +#ifdef CONFIG_PM_SLEEP
-+static int atmel_tcb_pwm_suspend(struct device *dev)
++static int at91_adc_suspend(struct device *dev)
 +{
 +	struct platform_device *pdev = to_platform_device(dev);
-+	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-+	void __iomem *base = tcbpwm->tc->regs;
-+	int i;
++	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
++	struct at91_adc_state *st = iio_priv(indio_dev);
 +
-+	for (i = 0; i < (NPWM / 2); i++) {
-+		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
++	clk_disable_unprepare(st->per_clk);
 +
-+		chan->cmr = readl(base + ATMEL_TC_REG(i, CMR));
-+		chan->ra = readl(base + ATMEL_TC_REG(i, RA));
-+		chan->rb = readl(base + ATMEL_TC_REG(i, RB));
-+		chan->rc = readl(base + ATMEL_TC_REG(i, RC));
-+	}
++	regulator_disable(st->vref);
++	regulator_disable(st->reg);
++
 +	return 0;
 +}
 +
-+static int atmel_tcb_pwm_resume(struct device *dev)
++static int at91_adc_resume(struct device *dev)
 +{
 +	struct platform_device *pdev = to_platform_device(dev);
-+	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-+	void __iomem *base = tcbpwm->tc->regs;
-+	int i;
++	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
++	struct at91_adc_state *st = iio_priv(indio_dev);
++	int err;
 +
-+	for (i = 0; i < (NPWM / 2); i++) {
-+		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
++	err = regulator_enable(st->reg);
++	if (err)
++		return err;
 +
-+		writel(chan->cmr, base + ATMEL_TC_REG(i, CMR));
-+		writel(chan->ra, base + ATMEL_TC_REG(i, RA));
-+		writel(chan->rb, base + ATMEL_TC_REG(i, RB));
-+		writel(chan->rc, base + ATMEL_TC_REG(i, RC));
-+		if (chan->enabled) {
-+			writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
-+				base + ATMEL_TC_REG(i, CCR));
-+		}
-+	}
-+	return 0;
++	err = regulator_enable(st->vref);
++	if (err)
++		return err;
++
++	at91_adc_init_hw(st, st->current_rate);
++
++	err = clk_prepare_enable(st->per_clk);
++	return err;
 +}
 +#endif
 +
-+static SIMPLE_DEV_PM_OPS(atmel_tcb_pwm_pm_ops, atmel_tcb_pwm_suspend,
-+			 atmel_tcb_pwm_resume);
++static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
 +
- static struct platform_driver atmel_tcb_pwm_driver = {
+ static struct platform_driver at91_adc_driver = {
+ 	.probe = at91_adc_probe,
+ 	.remove = at91_adc_remove,
  	.driver = {
- 		.name = "atmel-tcb-pwm",
- 		.of_match_table = atmel_tcb_pwm_dt_ids,
-+		.pm = &atmel_tcb_pwm_pm_ops,
+ 		.name = "at91-sama5d2_adc",
+ 		.of_match_table = at91_adc_dt_match,
++		.pm = &at91_adc_pm_ops,
  	},
- 	.probe = atmel_tcb_pwm_probe,
- 	.remove = atmel_tcb_pwm_remove,
+ };
+ module_platform_driver(at91_adc_driver)
 -- 
 2.11.0
