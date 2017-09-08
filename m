@@ -1,69 +1,64 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 8 Sep 2017 22:53:34 +0200
-Subject: [PATCH 3/3] [media] s5p-mfc: Adjust a null pointer check in four
- functions
-In-Reply-To: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
-References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
-Message-ID: <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Sat,  9 Sep 2017 01:00:38 +0300
+Subject: [PATCH] mtd: oxnas_nand: Fix error handling in oxnas_nand_probe()
+Message-ID: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 8 Sep 2017 22:37:00 +0200
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+oxnas_nand_probe() does not disable clock on error paths.
+The patch adds disabling using devm interface.
 
-The script ?checkpatch.pl? pointed information out like the following.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-Comparison to NULL could be written ?
-
-Thus fix the affected source code places.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mtd/nand/oxnas_nand.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index abfb70b07032..cf68aed59e0d 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -470,7 +470,7 @@ static void s5p_mfc_handle_error(struct s5p_mfc_dev *dev,
- {
- 	mfc_err("Interrupt Error: %08x\n", err);
+diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+index 1b207aac840c..8abc69a285dd 100644
+--- a/drivers/mtd/nand/oxnas_nand.c
++++ b/drivers/mtd/nand/oxnas_nand.c
+@@ -103,16 +103,26 @@ static int oxnas_nand_probe(struct platform_device *pdev)
+ 	if (IS_ERR(oxnas->io_base))
+ 		return PTR_ERR(oxnas->io_base);
  
--	if (ctx != NULL) {
-+	if (ctx) {
- 		/* Error recovery is dependent on the state of context */
- 		switch (ctx->state) {
- 		case MFCINST_RES_CHANGE_INIT:
-@@ -508,7 +508,7 @@ static void s5p_mfc_handle_seq_done(struct s5p_mfc_ctx *ctx,
- {
- 	struct s5p_mfc_dev *dev;
+-	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(oxnas->clk))
+-		oxnas->clk = NULL;
+-
+ 	/* Only a single chip node is supported */
+ 	count = of_get_child_count(np);
+ 	if (count > 1)
+ 		return -EINVAL;
  
--	if (ctx == NULL)
-+	if (!ctx)
- 		return;
- 	dev = ctx->dev;
- 	if (ctx->c_ops->post_seq_start) {
-@@ -562,7 +562,7 @@ static void s5p_mfc_handle_init_buffers(struct s5p_mfc_ctx *ctx,
- 	struct s5p_mfc_buf *src_buf;
- 	struct s5p_mfc_dev *dev;
+-	clk_prepare_enable(oxnas->clk);
++	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(oxnas->clk)) {
++		oxnas->clk = NULL;
++	} else {
++		err = clk_prepare_enable(oxnas->clk);
++		if (err)
++			return err;
++
++		err = devm_add_action_or_reset(&pdev->dev,
++				(void(*)(void *))clk_disable_unprepare,
++				oxnas->clk);
++		if (err)
++			return err;
++	}
++
+ 	device_reset_optional(&pdev->dev);
  
--	if (ctx == NULL)
-+	if (!ctx)
- 		return;
- 	dev = ctx->dev;
- 	s5p_mfc_hw_call(dev->mfc_ops, clear_int_flags, dev);
-@@ -1289,7 +1289,7 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 		return PTR_ERR(dev->regs_base);
+ 	for_each_child_of_node(np, nand_np) {
+@@ -167,8 +177,6 @@ static int oxnas_nand_remove(struct platform_device *pdev)
+ 	if (oxnas->chips[0])
+ 		nand_release(nand_to_mtd(oxnas->chips[0]));
  
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	if (res == NULL) {
-+	if (!res) {
- 		dev_err(&pdev->dev, "failed to get irq resource\n");
- 		return -ENOENT;
- 	}
+-	clk_disable_unprepare(oxnas->clk);
+-
+ 	return 0;
+ }
+ 
 -- 
-2.14.1
+2.7.4
