@@ -1,23 +1,40 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 8 Sep 2017 22:50:13 +0200
-Subject: [PATCH 0/3] S5P MFC: Adjustments for five function implementations
-Message-ID: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
+Date: Fri, 8 Sep 2017 22:51:35 +0200
+Subject: [PATCH 1/3] [media] s5p-mfc: Delete an error message for a failed
+ memory allocation in s5p_mfc_probe()
+In-Reply-To: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
+References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
+Message-ID: <ff8f7dcd-c3e8-2a12-c0db-997b514f5d94@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 8 Sep 2017 22:44:55 +0200
+Date: Fri, 8 Sep 2017 22:25:17 +0200
 
-Three update suggestions were taken into account
-from static source code analysis.
+Omit an extra message for a memory allocation failure in this function.
 
-Markus Elfring (3):
-  Delete an error message for a failed memory allocation in s5p_mfc_probe()
-  Improve a size determination ins5p_mfc_alloc_memdev()
-  Adjust a null pointer check in four functions
+This issue was detected by using the Coccinelle software.
 
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 1afde5021ca6..8af45d53846f 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1270,10 +1270,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 
+ 	pr_debug("%s++\n", __func__);
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+-	if (!dev) {
+-		dev_err(&pdev->dev, "Not enough memory for MFC device\n");
++	if (!dev)
+ 		return -ENOMEM;
+-	}
+ 
+ 	spin_lock_init(&dev->irqlock);
+ 	spin_lock_init(&dev->condlock);
 -- 
 2.14.1
