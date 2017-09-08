@@ -1,134 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 8 Sep 2017 17:30:54 +0100
-Subject: [PATCH v3 4/5] KVM: arm/arm64: Support VGIC dist pend/active
- changes for mapped IRQs
-In-Reply-To: <CAMJs5B89AsrDMhuNjC7La2ZP+ndiAWhY=7nqTbq1v6mp7=BDqA@mail.gmail.com>
-References: <20170906122612.18050-1-cdall@linaro.org>
- <20170906122612.18050-5-cdall@linaro.org>
- <d51a40df-92f9-eeff-0d16-ea12fd451dea@redhat.com>
- <2e1352d7-fb64-907d-7726-4d53d7af5768@arm.com>
- <5579210b-9b62-b33d-ac36-df3cb835c1e7@redhat.com>
- <CAMJs5B89AsrDMhuNjC7La2ZP+ndiAWhY=7nqTbq1v6mp7=BDqA@mail.gmail.com>
-Message-ID: <b8a20b6a-3fb7-5e36-cfc8-5a90383e2e99@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 8 Sep 2017 11:35:28 -0500
+Subject: [PATCH] arm64: spinlocks: Fix write starvation with rwlock
+In-Reply-To: <20170908162214.63cf3wp27rhcrw6h@hirez.programming.kicks-ass.net>
+References: <20170908155959.6940-1-jeremy.linton@arm.com>
+ <20170908162214.63cf3wp27rhcrw6h@hirez.programming.kicks-ass.net>
+Message-ID: <b2146b00-7922-136b-0596-79fdab7e324e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/17 17:05, Christoffer Dall wrote:
-> On Fri, Sep 8, 2017 at 4:27 PM, Auger Eric <eric.auger@redhat.com> wrote:
->> Hi Marc,
+Hi,
+
+On 09/08/2017 11:22 AM, Peter Zijlstra wrote:
+> On Fri, Sep 08, 2017 at 10:59:59AM -0500, Jeremy Linton wrote:
 >>
->> On 08/09/2017 15:32, Marc Zyngier wrote:
->>> On 08/09/17 14:04, Auger Eric wrote:
->>>> Hi Christoffer,
->>>>
->>>> On 06/09/2017 14:26, Christoffer Dall wrote:
->>>>> For mapped IRQs (with the HW bit set in the LR) we have to follow some
->>>>> rules of the architecture.  One of these rules is that VM must not be
->>>>> allowed to deactivate a virtual interrupt with the HW bit set unless the
->>>>> physical interrupt is also active.
->>>>>
->>>>> This works fine when injecting mapped interrupts, because we leave it up
->>>>> to the injector to either set EOImode==1 or manually set the active
->>>>> state of the physical interrupt.
->>>>>
->>>>> However, the guest can set virtual interrupt to be pending or active by
->>>>> writing to the virtual distributor, which could lead to deactivating a
->>>>> virtual interrupt with the HW bit set without the physical interrupt
->>>>> being active.
->>>>>
->>>>> We could set the physical interrupt to active whenever we are about to
->>>>> enter the VM with a HW interrupt either pending or active, but that
->>>>> would be really slow, especially on GICv2.  So we take the long way
->>>>> around and do the hard work when needed, which is expected to be
->>>>> extremely rare.
->>>>>
->>>>> When the VM sets the pending state for a HW interrupt on the virtual
->>>>> distributor we set the active state on the physical distributor, because
->>>>> the virtual interrupt can become active and then the guest can
->>>>> deactivate it.
->>>>>
->>>>> When the VM clears the pending state we also clear it on the physical
->>>>> side, because the injector might otherwise raise the interrupt.
->>>>>
->>>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
->>>>> ---
->>>>>  virt/kvm/arm/vgic/vgic-mmio.c | 33 +++++++++++++++++++++++++++++++++
->>>>>  virt/kvm/arm/vgic/vgic.c      |  7 +++++++
->>>>>  virt/kvm/arm/vgic/vgic.h      |  1 +
->>>>>  3 files changed, 41 insertions(+)
->>>>>
->>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->>>>> index c1e4bdd..00003ae 100644
->>>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->>>>> @@ -131,6 +131,9 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->>>>>             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>>>>
->>>>>             spin_lock(&irq->irq_lock);
->>>>> +           if (irq->hw)
->>>>> +                   vgic_irq_set_phys_active(irq, true);
->>>>> +
->>>>>             irq->pending_latch = true;
->>>>>
->>>>>             vgic_queue_irq_unlock(vcpu->kvm, irq);
->>>>> @@ -149,6 +152,20 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->>>>>             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>>>>
->>>>>             spin_lock(&irq->irq_lock);
->>>>> +           /*
->>>>> +            * We don't want the guest to effectively mask the physical
->>>>> +            * interrupt by doing a write to SPENDR followed by a write to
->>>>> +            * CPENDR for HW interrupts, so we clear the active state on
->>>>> +            * the physical side here.  This may lead to taking an
->>>>> +            * additional interrupt on the host, but that should not be a
->>>>> +            * problem as the worst that can happen is an additional vgic
->>>>> +            * injection.  We also clear the pending state to maintain
->>>>> +            * proper semantics for edge HW interrupts.
->>>>> +            */
->>>>> +           if (irq->hw) {
->>>>> +                   vgic_irq_set_phys_pending(irq, false);
->>>>> +                   vgic_irq_set_phys_active(irq, false);
->>>> I fail in understanding why the active state is reset here. Can you
->>>> provide an example?
->>>
->>>
->>> If we're clearing the pending state on the virtual side, we need to be
->>> able to let an incoming physical interrupt fire so that it can be made
->>> pending again. We may have to check that the virtual active state is
->>> clear though.
->>>
->>>> If the physical dist has an active state can't the virtual IRQ be in
->>>> active state, in which case you may later on deactivate a phys IRQ which
->>>> is not active?
->>>
->>>
->>> Well, I think we must be able to handle both cases:
->>>
->>> - CPENDR write:
->>>       clear physical pending
->>>       if (virtual active clear)
->>>               clear physical active
->>>
->>> - CACTIVER write:
->>>       clear physical active
->>>
->>> Does this work for you?
->>
->> yes it does with that change!
->>
-> I agree, I should fix that.
+>> This patch changes the rwlock behavior so that the writer
+>> unconditionally flags the lock structure (given that its
+>> not already flagged by another writer). This blocks further
+>> readers from acquiring the lock. Once all the readers have
+>> drained, the writer that successfully flagged the lock can
+>> progress.
 > 
-> But then I wondered, are we properly handling PPIs for
-> setting/clearing the pending state?  Don't we actually need to do
-> something similar like the active cpu where we check the requester CPU
-> and make sure we're not fiddling with some random hardware state when
-> accessed by userspace?
-Hmmm. Yeah, that's another can of worm. We should certainly make sure
-that whatever userspace does is not directly impacting the HW state (and
-only the guest does).
+> Recursive readers from IRQ context _should_ be allowed through,
+> otherwise you'll have deadlocks on tasklist_lock.
 
-I think. I'm not quite sure...
+Oh fun! Do you have a test case that triggers this?
 
-	M. (GIC-ed, again).
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
