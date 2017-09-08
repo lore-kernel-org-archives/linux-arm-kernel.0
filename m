@@ -1,39 +1,193 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Fri, 8 Sep 2017 12:54:46 -0500
-Subject: [PATCH v3 0/2] ARM: dts: keystone-k2g: Add I2C support for 66AK2G
-Message-ID: <20170908175448.3367-1-fcooper@ti.com>
+Date: Fri, 8 Sep 2017 12:54:47 -0500
+Subject: [PATCH v3 1/2] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <20170908175448.3367-1-fcooper@ti.com>
+References: <20170908175448.3367-1-fcooper@ti.com>
+Message-ID: <20170908175448.3367-2-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C support to 66AK2G. Primary requirement is to add PM
-Runtime support to the driver.
+66AK2G has I2C instances that are not apart of the ALWAYS_ON power domain
+like other Keystone 2 SoCs and OMAPL138. Therefore, pm_runtime
+is required to insure the power domain used by the specific I2C instance is
+properly turned on along with its functional clock.
 
-This has been tested on following platforms by performing simple i2c test
-such as i2c detect and reading on board i2c devices:
-K2G GP evm
-OMAPL138
-K2L GP EVM
-
-and boot tested on:
-K2E GP EVM
-K2HK GP EVM
-
-Version 2 changes:
-Moved ordering of pm runtime calls
-
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
 Version 3 changes:
-Dropped first patch since it was pulled in.
-Remove clk = NULL statements
+Remove several statements that set clk to NULL
 Fix error path
 
-Franklin S Cooper Jr (2):
-  i2c: davinci: Add PM Runtime Support
-  dt-bindings: i2c: i2c-davinci: Update binding for 66AK2Gx pwr dm
-    property
+ drivers/i2c/busses/i2c-davinci.c | 64 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 53 insertions(+), 11 deletions(-)
 
- .../devicetree/bindings/i2c/i2c-davinci.txt        | 12 ++++
- drivers/i2c/busses/i2c-davinci.c                   | 64 ++++++++++++++++++----
- 2 files changed, 65 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index b8c4353..57612cb 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -36,6 +36,7 @@
+ #include <linux/gpio.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_data/i2c-davinci.h>
++#include <linux/pm_runtime.h>
+ 
+ /* ----- global defines ----------------------------------------------- */
+ 
+@@ -122,6 +123,9 @@
+ /* set the SDA GPIO low */
+ #define DAVINCI_I2C_DCLR_PDCLR1	BIT(1)
+ 
++/* timeout for pm runtime autosuspend */
++#define DAVINCI_I2C_PM_TIMEOUT	1000	/* ms */
++
+ struct davinci_i2c_dev {
+ 	struct device           *dev;
+ 	void __iomem		*base;
+@@ -541,10 +545,17 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	dev_dbg(dev->dev, "%s: msgs: %d\n", __func__, num);
+ 
++	ret = pm_runtime_get_sync(dev->dev);
++	if (ret < 0) {
++		dev_err(dev->dev, "Failed to runtime_get device: %d\n", ret);
++		pm_runtime_put_noidle(dev->dev);
++		return ret;
++	}
++
+ 	ret = i2c_davinci_wait_bus_not_busy(dev);
+ 	if (ret < 0) {
+ 		dev_warn(dev->dev, "timeout waiting for bus ready\n");
+-		return ret;
++		goto out;
+ 	}
+ 
+ 	for (i = 0; i < num; i++) {
+@@ -552,14 +563,19 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 		dev_dbg(dev->dev, "%s [%d/%d] ret: %d\n", __func__, i + 1, num,
+ 			ret);
+ 		if (ret < 0)
+-			return ret;
++			goto out;
+ 	}
+ 
++	ret = num;
+ #ifdef CONFIG_CPU_FREQ
+ 	complete(&dev->xfr_complete);
+ #endif
+ 
+-	return num;
++out:
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
++
++	return ret;
+ }
+ 
+ static u32 i2c_davinci_func(struct i2c_adapter *adap)
+@@ -599,6 +615,9 @@ static irqreturn_t i2c_davinci_isr(int this_irq, void *dev_id)
+ 	int count = 0;
+ 	u16 w;
+ 
++	if (pm_runtime_suspended(dev->dev))
++		return IRQ_NONE;
++
+ 	while ((stat = davinci_i2c_read_reg(dev, DAVINCI_I2C_IVR_REG))) {
+ 		dev_dbg(dev->dev, "%s: stat=0x%x\n", __func__, stat);
+ 		if (count++ == 100) {
+@@ -802,12 +821,22 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	dev->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(dev->clk))
+ 		return PTR_ERR(dev->clk);
+-	clk_prepare_enable(dev->clk);
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+ 	if (IS_ERR(dev->base)) {
+-		r = PTR_ERR(dev->base);
++		return PTR_ERR(dev->base);
++	}
++
++	pm_runtime_set_autosuspend_delay(dev->dev,
++					 DAVINCI_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
++	pm_runtime_enable(dev->dev);
++
++	r = pm_runtime_get_sync(dev->dev);
++	if (r < 0) {
++		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+ 		goto err_unuse_clocks;
+ 	}
+ 
+@@ -849,27 +878,40 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	if (r)
+ 		goto err_unuse_clocks;
+ 
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
++
+ 	return 0;
+ 
+ err_unuse_clocks:
+-	clk_disable_unprepare(dev->clk);
+-	dev->clk = NULL;
++	pm_runtime_dont_use_autosuspend(dev->dev);
++	pm_runtime_put_sync(dev->dev);
++	pm_runtime_disable(dev->dev);
++
+ 	return r;
+ }
+ 
+ static int davinci_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct davinci_i2c_dev *dev = platform_get_drvdata(pdev);
++	int ret;
+ 
+ 	i2c_davinci_cpufreq_deregister(dev);
+ 
+ 	i2c_del_adapter(&dev->adapter);
+ 
+-	clk_disable_unprepare(dev->clk);
+-	dev->clk = NULL;
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(&pdev->dev);
++		return ret;
++	}
+ 
+ 	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, 0);
+ 
++	pm_runtime_dont_use_autosuspend(dev->dev);
++	pm_runtime_put_sync(dev->dev);
++	pm_runtime_disable(dev->dev);
++
+ 	return 0;
+ }
+ 
+@@ -880,7 +922,6 @@ static int davinci_i2c_suspend(struct device *dev)
+ 
+ 	/* put I2C into reset */
+ 	davinci_i2c_reset_ctrl(i2c_dev, 0);
+-	clk_disable_unprepare(i2c_dev->clk);
+ 
+ 	return 0;
+ }
+@@ -889,7 +930,6 @@ static int davinci_i2c_resume(struct device *dev)
+ {
+ 	struct davinci_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+ 
+-	clk_prepare_enable(i2c_dev->clk);
+ 	/* take I2C out of reset */
+ 	davinci_i2c_reset_ctrl(i2c_dev, 1);
+ 
+@@ -899,6 +939,8 @@ static int davinci_i2c_resume(struct device *dev)
+ static const struct dev_pm_ops davinci_i2c_pm = {
+ 	.suspend        = davinci_i2c_suspend,
+ 	.resume         = davinci_i2c_resume,
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				      pm_runtime_force_resume)
+ };
+ 
+ #define davinci_i2c_pm_ops (&davinci_i2c_pm)
 -- 
 2.9.4.dirty
