@@ -1,148 +1,66 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 8 Sep 2017 15:04:33 +0200
-Subject: [PATCH v3 4/5] KVM: arm/arm64: Support VGIC dist pend/active
- changes for mapped IRQs
-In-Reply-To: <20170906122612.18050-5-cdall@linaro.org>
-References: <20170906122612.18050-1-cdall@linaro.org>
- <20170906122612.18050-5-cdall@linaro.org>
-Message-ID: <d51a40df-92f9-eeff-0d16-ea12fd451dea@redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 8 Sep 2017 15:05:20 +0200
+Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
+ integrated/external MDIOs
+In-Reply-To: <20170908071156.5115-11-clabbe.montjoie@gmail.com>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-11-clabbe.montjoie@gmail.com>
+Message-ID: <20170908130520.GA11248@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 06/09/2017 14:26, Christoffer Dall wrote:
-> For mapped IRQs (with the HW bit set in the LR) we have to follow some
-> rules of the architecture.  One of these rules is that VM must not be
-> allowed to deactivate a virtual interrupt with the HW bit set unless the
-> physical interrupt is also active.
-> 
-> This works fine when injecting mapped interrupts, because we leave it up
-> to the injector to either set EOImode==1 or manually set the active
-> state of the physical interrupt.
-> 
-> However, the guest can set virtual interrupt to be pending or active by
-> writing to the virtual distributor, which could lead to deactivating a
-> virtual interrupt with the HW bit set without the physical interrupt
-> being active.
-> 
-> We could set the physical interrupt to active whenever we are about to
-> enter the VM with a HW interrupt either pending or active, but that
-> would be really slow, especially on GICv2.  So we take the long way
-> around and do the hard work when needed, which is expected to be
-> extremely rare.
-> 
-> When the VM sets the pending state for a HW interrupt on the virtual
-> distributor we set the active state on the physical distributor, because
-> the virtual interrupt can become active and then the guest can
-> deactivate it.
-> 
-> When the VM clears the pending state we also clear it on the physical
-> side, because the injector might otherwise raise the interrupt.
-> 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  virt/kvm/arm/vgic/vgic-mmio.c | 33 +++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.c      |  7 +++++++
->  virt/kvm/arm/vgic/vgic.h      |  1 +
->  3 files changed, 41 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index c1e4bdd..00003ae 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -131,6 +131,9 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +#define DWMAC_sUN8I_MDIO_MUX_INTERNAL_ID	0
+> +#define DWMAC_sUN8I_MDIO_MUX_EXTERNAL_ID	1
 >  
->  		spin_lock(&irq->irq_lock);
-> +		if (irq->hw)
-> +			vgic_irq_set_phys_active(irq, true);
-> +
->  		irq->pending_latch = true;
->  
->  		vgic_queue_irq_unlock(vcpu->kvm, irq);
-> @@ -149,6 +152,20 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->  
->  		spin_lock(&irq->irq_lock);
-> +		/*
-> +		 * We don't want the guest to effectively mask the physical
-> +		 * interrupt by doing a write to SPENDR followed by a write to
-> +		 * CPENDR for HW interrupts, so we clear the active state on
-> +		 * the physical side here.  This may lead to taking an
-> +		 * additional interrupt on the host, but that should not be a
-> +		 * problem as the worst that can happen is an additional vgic
-> +		 * injection.  We also clear the pending state to maintain
-> +		 * proper semantics for edge HW interrupts.
-> +		 */
-> +		if (irq->hw) {
-> +			vgic_irq_set_phys_pending(irq, false);
-> +			vgic_irq_set_phys_active(irq, false);
-I fail in understanding why the active state is reset here. Can you
-provide an example?
-
-If the physical dist has an active state can't the virtual IRQ be in
-active state, in which case you may later on deactivate a phys IRQ which
-is not active?
-
-Thanks
-
-Eric
-> +		}
->  
->  		irq->pending_latch = false;
->  
-> @@ -214,6 +231,22 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->  	       irq->vcpu->cpu != -1) /* VCPU thread is running */
->  		cond_resched_lock(&irq->irq_lock);
->  
-> +	if (irq->hw) {
-> +		/*
-> +		 * We cannot support setting the physical active state for
-> +		 * private interrupts from another CPU than the one running
-> +		 * the VCPU which identifies which private interrupt it is
-> +		 * trying to modify.
-> +		 */
-> +		if (irq->intid < VGIC_NR_PRIVATE_IRQS &&
-> +		    irq->target_vcpu != requester_vcpu) {
-> +			spin_unlock(&irq->irq_lock);
-> +			return;
-> +		}
-> +
-> +		vgic_irq_set_phys_active(irq, new_active_state);
-> +	}
-> +
->  	irq->active = new_active_state;
->  	if (new_active_state)
->  		vgic_queue_irq_unlock(vcpu->kvm, irq);
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 8072969..7aec730 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -140,6 +140,13 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
->  	kfree(irq);
+>  /* H3/A64 specific bits */
+>  #define SYSCON_RMII_EN		BIT(13) /* 1: enable RMII (overrides EPIT) */
+> @@ -634,6 +639,76 @@ static int sun8i_dwmac_reset(struct stmmac_priv *priv)
+>  	return 0;
 >  }
 >  
-> +void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending)
+> +/* MDIO multiplexing switch function
+> + * This function is called by the mdio-mux layer when it thinks the mdio bus
+> + * multiplexer needs to switch.
+> + * 'current_child' is the current value of the mux register
+> + * 'desired_child' is the value of the 'reg' property of the target child MDIO
+> + * node.
+> + * The first time this function is called, current_child == -1.
+> + * If current_child == desired_child, then the mux is already set to the
+> + * correct bus.
+> + *
+> + * Note that we do not use reg/mask like mdio-mux-mmioreg because we need to
+> + * know easily which bus is used (reset must be done only for desired bus).
+> + */
+> +static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
+> +				     void *data)
 > +{
-> +	WARN_ON(irq_set_irqchip_state(irq->host_irq,
-> +				      IRQCHIP_STATE_PENDING,
-> +				      pending));
-> +}
+> +	struct stmmac_priv *priv = data;
+> +	struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
+> +	u32 reg, val;
+> +	int ret = 0;
+> +	bool need_reset = false;
 > +
->  /* Get the input level of a mapped IRQ directly from the physical GIC */
->  bool vgic_get_phys_line_level(struct vgic_irq *irq)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 7bdcda2..498ee05 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -146,6 +146,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
->  bool vgic_get_phys_line_level(struct vgic_irq *irq);
-> +void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending);
->  void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
->  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
->  void vgic_kick_vcpus(struct kvm *kvm);
-> 
+> +	if (current_child ^ desired_child) {
+> +		regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
+> +		switch (desired_child) {
+> +		case DWMAC_sUN8I_MDIO_MUX_INTERNAL_ID:
+> +			dev_info(priv->device, "Switch mux to internal PHY");
+> +			val = (reg & ~H3_EPHY_MUX_MASK) | H3_EPHY_SELECT;
+> +			if (gmac->use_internal_phy)
+> +				need_reset = true;
+> +			break;
+
+This i don't get. Why do you need use_internal_phy? Isn't that
+implicit from DWMAC_sUN8I_MDIO_MUX_INTERNAL_ID? Is it even possible to
+use an external PHY on the internal MDIO bus?
+
+> +		case DWMAC_sUN8I_MDIO_MUX_EXTERNAL_ID:
+> +			dev_info(priv->device, "Switch mux to external PHY");
+> +			val = (reg & ~H3_EPHY_MUX_MASK) | H3_EPHY_SHUTDOWN;
+> +			if (!gmac->use_internal_phy)
+> +				need_reset = true;
+> +			break;
+
+And is it possible to use the internal PHY on the external bus?
+
+    Andrew
