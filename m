@@ -1,126 +1,72 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 8 Sep 2017 18:05:58 +0200
-Subject: [PATCH v3 4/5] KVM: arm/arm64: Support VGIC dist pend/active
- changes for mapped IRQs
-In-Reply-To: <5579210b-9b62-b33d-ac36-df3cb835c1e7@redhat.com>
-References: <20170906122612.18050-1-cdall@linaro.org>
- <20170906122612.18050-5-cdall@linaro.org>
- <d51a40df-92f9-eeff-0d16-ea12fd451dea@redhat.com>
- <2e1352d7-fb64-907d-7726-4d53d7af5768@arm.com>
- <5579210b-9b62-b33d-ac36-df3cb835c1e7@redhat.com>
-Message-ID: <CAMJs5B89AsrDMhuNjC7La2ZP+ndiAWhY=7nqTbq1v6mp7=BDqA@mail.gmail.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Fri,  8 Sep 2017 19:13:49 +0300
+Subject: [patch v8 4/4] Documentation: jtag: Add ABI documentation
+In-Reply-To: <1504887229-2748-1-git-send-email-oleksandrs@mellanox.com>
+References: <1504887229-2748-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1504887229-2748-5-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 8, 2017 at 4:27 PM, Auger Eric <eric.auger@redhat.com> wrote:
-> Hi Marc,
->
-> On 08/09/2017 15:32, Marc Zyngier wrote:
->> On 08/09/17 14:04, Auger Eric wrote:
->>> Hi Christoffer,
->>>
->>> On 06/09/2017 14:26, Christoffer Dall wrote:
->>>> For mapped IRQs (with the HW bit set in the LR) we have to follow some
->>>> rules of the architecture.  One of these rules is that VM must not be
->>>> allowed to deactivate a virtual interrupt with the HW bit set unless the
->>>> physical interrupt is also active.
->>>>
->>>> This works fine when injecting mapped interrupts, because we leave it up
->>>> to the injector to either set EOImode==1 or manually set the active
->>>> state of the physical interrupt.
->>>>
->>>> However, the guest can set virtual interrupt to be pending or active by
->>>> writing to the virtual distributor, which could lead to deactivating a
->>>> virtual interrupt with the HW bit set without the physical interrupt
->>>> being active.
->>>>
->>>> We could set the physical interrupt to active whenever we are about to
->>>> enter the VM with a HW interrupt either pending or active, but that
->>>> would be really slow, especially on GICv2.  So we take the long way
->>>> around and do the hard work when needed, which is expected to be
->>>> extremely rare.
->>>>
->>>> When the VM sets the pending state for a HW interrupt on the virtual
->>>> distributor we set the active state on the physical distributor, because
->>>> the virtual interrupt can become active and then the guest can
->>>> deactivate it.
->>>>
->>>> When the VM clears the pending state we also clear it on the physical
->>>> side, because the injector might otherwise raise the interrupt.
->>>>
->>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
->>>> ---
->>>>  virt/kvm/arm/vgic/vgic-mmio.c | 33 +++++++++++++++++++++++++++++++++
->>>>  virt/kvm/arm/vgic/vgic.c      |  7 +++++++
->>>>  virt/kvm/arm/vgic/vgic.h      |  1 +
->>>>  3 files changed, 41 insertions(+)
->>>>
->>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->>>> index c1e4bdd..00003ae 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->>>> @@ -131,6 +131,9 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->>>>             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>>>
->>>>             spin_lock(&irq->irq_lock);
->>>> +           if (irq->hw)
->>>> +                   vgic_irq_set_phys_active(irq, true);
->>>> +
->>>>             irq->pending_latch = true;
->>>>
->>>>             vgic_queue_irq_unlock(vcpu->kvm, irq);
->>>> @@ -149,6 +152,20 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->>>>             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>>>
->>>>             spin_lock(&irq->irq_lock);
->>>> +           /*
->>>> +            * We don't want the guest to effectively mask the physical
->>>> +            * interrupt by doing a write to SPENDR followed by a write to
->>>> +            * CPENDR for HW interrupts, so we clear the active state on
->>>> +            * the physical side here.  This may lead to taking an
->>>> +            * additional interrupt on the host, but that should not be a
->>>> +            * problem as the worst that can happen is an additional vgic
->>>> +            * injection.  We also clear the pending state to maintain
->>>> +            * proper semantics for edge HW interrupts.
->>>> +            */
->>>> +           if (irq->hw) {
->>>> +                   vgic_irq_set_phys_pending(irq, false);
->>>> +                   vgic_irq_set_phys_active(irq, false);
->>> I fail in understanding why the active state is reset here. Can you
->>> provide an example?
->>
->>
->> If we're clearing the pending state on the virtual side, we need to be
->> able to let an incoming physical interrupt fire so that it can be made
->> pending again. We may have to check that the virtual active state is
->> clear though.
->>
->>> If the physical dist has an active state can't the virtual IRQ be in
->>> active state, in which case you may later on deactivate a phys IRQ which
->>> is not active?
->>
->>
->> Well, I think we must be able to handle both cases:
->>
->> - CPENDR write:
->>       clear physical pending
->>       if (virtual active clear)
->>               clear physical active
->>
->> - CACTIVER write:
->>       clear physical active
->>
->> Does this work for you?
->
-> yes it does with that change!
->
-I agree, I should fix that.
+Added document that describe the ABI for JTAG class drivrer
 
-But then I wondered, are we properly handling PPIs for
-setting/clearing the pending state?  Don't we actually need to do
-something similar like the active cpu where we check the requester CPU
-and make sure we're not fiddling with some random hardware state when
-accessed by userspace?
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+v7->v8
+v6->v7
+Comments pointed by Pavel Machek <pavel@ucw.cz>
+- Added jtag-cdev documentation to Documentation/ABI/testing folder
+---
+ Documentation/ABI/testing/jatg-cdev |   27 +++++++++++++++++++++++++++
+ MAINTAINERS                         |    1 +
+ 2 files changed, 28 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/ABI/testing/jatg-cdev
 
-Thanks,
--Christoffer
+diff --git a/Documentation/ABI/testing/jatg-cdev b/Documentation/ABI/testing/jatg-cdev
+new file mode 100644
+index 0000000..14a3610
+--- /dev/null
++++ b/Documentation/ABI/testing/jatg-cdev
+@@ -0,0 +1,27 @@
++What:		/dev/jtag[0-9]+
++Date:		September 2017
++KernelVersion:	4.14
++Contact:	oleksandrs at mellanox.com
++Description:
++		The character device files /dev/jtag* are the interface
++		between JTAG master interfase and userspace.
++
++		The ioctl(2)-based ABI is defined and documented in
++		[include/uapi]<linux/jtag.h>.
++
++		The following file operations are supported:
++
++		open(2)
++		The argument flag currently support only one access
++		mode O_RDWR.
++
++		ioctl(2)
++		Initiate various actions.
++		See the inline documentation in [include/uapi]<linux/jtag.h>
++		for descriptions of all ioctls.
++
++		close(2)
++		Stops and free up the I/O contexts that was associated
++		with the file descriptor.
++
++Users:		TBD
+\ No newline at end of file
+diff --git a/MAINTAINERS b/MAINTAINERS
+index bfdfa94..dfcf49c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7300,6 +7300,7 @@ F:	include/linux/jtag.h
+ F:	include/uapi/linux/jtag.h
+ F:	drivers/jtag/
+ F:	Documentation/devicetree/bindings/jtag/
++F:	Documentation/ABI/testing/jtag-cdev
+ 
+ K10TEMP HARDWARE MONITORING DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
+-- 
+1.7.1
