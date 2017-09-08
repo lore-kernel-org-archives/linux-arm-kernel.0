@@ -1,113 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 Sep 2017 15:57:54 +0100
-Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
- PE/COFF sections
-In-Reply-To: <87efrhs0gj.fsf@free-electrons.com>
-References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
- <20170629081849.15081-6-ard.biesheuvel@linaro.org>
- <87r2vhs3il.fsf@free-electrons.com>
- <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
- <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
- <87mv65s1iu.fsf@free-electrons.com>
- <CAKv+Gu8e49ZmB6X=H2vE_dw1HA3CyOq0GN7cZOYJ+JpkTftGWA@mail.gmail.com>
- <87efrhs0gj.fsf@free-electrons.com>
-Message-ID: <CAKv+Gu8Aa7Y8SK2nJM2DXZzHbzZT6aq2Rt1wsgaLwz7_C3otJA@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 8 Sep 2017 16:03:21 +0100
+Subject: =?UTF-8?Q?Re=3A_=E7=AD=94=E5=A4=8D=3A_=5BPATCH_v6_4=2F7=5D_arm64=3A_kvm=3A_support_user_?=
+ =?UTF-8?Q?space_to_query_RAS_extension_feature?=
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2015F5A1C@DGGEMA503-MBX.china.huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
+ <59A84F9D.8030309@arm.com> <29951852-8d91-7c33-c68b-ad8b4bbdea54@huawei.com>
+ <59B1747A.5030909@arm.com>
+ <0184EA26B2509940AA629AE1405DD7F2015F5A1C@DGGEMA503-MBX.china.huawei.com>
+Message-ID: <CAFEAcA8tXV31RTa+RCkkNFyR2t1dTwR5kYXUmBXMj9wkeLWCpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2017 at 15:56, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ard,
->
->  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> On 8 September 2017 at 15:33, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>> Hi Ard,
->>>
->>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>
->>>> On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>> On 8 September 2017 at 14:50, Gregory CLEMENT
->>>>> <gregory.clement@free-electrons.com> wrote:
->>>>>> Hi Ard,
->>>>>>
->>>>>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>
->>>>>>> To prevent unintended modifications to the kernel text (malicious or
->>>>>>> otherwise) while running the EFI stub, describe the kernel image as
->>>>>>> two separate sections: a .text section with read-execute permissions,
->>>>>>> covering .text, .rodata, .piggytext and the GOT sections (which the
->>>>>>> stub does not care about anyway), and a .data section with read-write
->>>>>>> permissions, covering .data and .bss.
->>>>>>>
->>>>>>> This relies on the firmware to actually take the section permission
->>>>>>> flags into account, but this is something that is currently being
->>>>>>> implemented in EDK2, which means we will likely start seeing it in
->>>>>>> the wild between one and two years from now.
->>>>>>
->>>>>> This patch had been merged in mainline yesterday and now prevent the
->>>>>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
->>>>>> that more Socs are impacted because the number of boot fail exploded
->>>>>> according to kci:
->>>>>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
->>>>>>
->>>>>
->>>>> Ouch.
->>>>>
->>>>>> I found this patch after bisecting (I can provide the bisect log if
->>>>>> needed).
->>>>>>
->>>>>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
->>>>>> multi_v7_defconfig but not with mvebu_v7_defconfig.
->>>>>>
->>>>>> Currently the solution is to revert this patch.
->>>>>>
->>>>>> Have you a better option?
->>>>>>
->>>>>
->>>>> I will investigate.
->>>>
->>>> I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
->>>> locally built zImage as well as the one built by kernelci.
->>>>
->>>> Could you please try whether this fixes things? It does not explain
->>>> anything but it will help me figure out what is going on (hopefully)
->>>
->>> I've just tested this change and it didn't fix anything.
->>>
->>> Gregory
->>>
->>>>
->>>>
->>>> diff --git a/arch/arm/boot/compressed/efi-header.S
->>>> b/arch/arm/boot/compressed/efi-header.S
->>>> index c94a88ae834d..671a6e5b7b99 100644
->>>> --- a/arch/arm/boot/compressed/efi-header.S
->>>> +++ b/arch/arm/boot/compressed/efi-header.S
->>>> @@ -127,7 +127,7 @@ section_table:
->>>>
->>>>                 .set    section_count, (. - section_table) / 40
->>>>
->>>> -               .align  12
->>>> +               .align  9
->>>>  __efi_start:
->>>>  #endif
->>>>                 .endm
->>>
->>
->>
->> How about this?
->
-> It fixed the bug! (I tested with and without your previous patch and it
-> worked in both case)
->
-> When you will send your patch, you can add my:
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Thanks,
->
-> Gregory
->
+On 8 September 2017 at 15:34, gengdongjiu <gengdongjiu@huawei.com> wrote:
+> Hi Peter/ shenglong,
+>    What is your idea about it? We may need to consult with you about it.
 
-Thanks a lot. I will send it out today.
+I agree with what I take to be James' general point that we
+should be careful to distinguish "KVM supports API A to
+do a particular operation on the guest" and "KVM supports API
+B to tell QEMU about certain events" and so on, and not just
+lump these all together under "host CPU supports RAS and
+so we turn all these on together and expose RAS to the guest
+regardless". I don't know enough about the details of RAS
+to be more specific than that general point of view.
+
+PS: your mail client doesn't seem to be doing the right
+thing with wrapping long lines :-(
+
+thanks
+-- PMM
