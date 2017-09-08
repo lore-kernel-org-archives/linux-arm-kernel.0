@@ -1,66 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 8 Sep 2017 15:05:20 +0200
-Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
- integrated/external MDIOs
-In-Reply-To: <20170908071156.5115-11-clabbe.montjoie@gmail.com>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-11-clabbe.montjoie@gmail.com>
-Message-ID: <20170908130520.GA11248@lunn.ch>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 8 Sep 2017 14:11:40 +0100
+Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
+In-Reply-To: <5FA513F682BE7F4EAAB8EE035D5B08E44109EBDF@G01JPEXMBKW02>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-20-git-send-email-Dave.Martin@arm.com>
+ <5FA513F682BE7F4EAAB8EE035D5B08E44109DFE8@G01JPEXMBKW02>
+ <20170906181634.GF6321@e103592.cambridge.arm.com>
+ <5FA513F682BE7F4EAAB8EE035D5B08E44109EBDF@G01JPEXMBKW02>
+Message-ID: <20170908131136.GG6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +#define DWMAC_sUN8I_MDIO_MUX_INTERNAL_ID	0
-> +#define DWMAC_sUN8I_MDIO_MUX_EXTERNAL_ID	1
->  
->  /* H3/A64 specific bits */
->  #define SYSCON_RMII_EN		BIT(13) /* 1: enable RMII (overrides EPIT) */
-> @@ -634,6 +639,76 @@ static int sun8i_dwmac_reset(struct stmmac_priv *priv)
->  	return 0;
->  }
->  
-> +/* MDIO multiplexing switch function
-> + * This function is called by the mdio-mux layer when it thinks the mdio bus
-> + * multiplexer needs to switch.
-> + * 'current_child' is the current value of the mux register
-> + * 'desired_child' is the value of the 'reg' property of the target child MDIO
-> + * node.
-> + * The first time this function is called, current_child == -1.
-> + * If current_child == desired_child, then the mux is already set to the
-> + * correct bus.
-> + *
-> + * Note that we do not use reg/mask like mdio-mux-mmioreg because we need to
-> + * know easily which bus is used (reset must be done only for desired bus).
-> + */
-> +static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
-> +				     void *data)
-> +{
-> +	struct stmmac_priv *priv = data;
-> +	struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
-> +	u32 reg, val;
-> +	int ret = 0;
-> +	bool need_reset = false;
-> +
-> +	if (current_child ^ desired_child) {
-> +		regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
-> +		switch (desired_child) {
-> +		case DWMAC_sUN8I_MDIO_MUX_INTERNAL_ID:
-> +			dev_info(priv->device, "Switch mux to internal PHY");
-> +			val = (reg & ~H3_EPHY_MUX_MASK) | H3_EPHY_SELECT;
-> +			if (gmac->use_internal_phy)
-> +				need_reset = true;
-> +			break;
+On Thu, Sep 07, 2017 at 05:11:45AM +0000, Okamoto, Takayuki wrote:
+> Hi Dave,
+> 
+> Thank you for your reply.
+> 
+> > Your fix looks correct and seems to work.  For stylistic reasons, I may
+> > write it like this instead, but the effect should be the same:
+> > 
+> > 	header->max_vl = sve_max_vl;
+> > 	if (WARN_ON(!sve_vl_valid(sve_max_vl))
+> > 		header->max_vl = header->vl;
+> 
+> It is better than my fix.
+> Please, apply it at next version.
 
-This i don't get. Why do you need use_internal_phy? Isn't that
-implicit from DWMAC_sUN8I_MDIO_MUX_INTERNAL_ID? Is it even possible to
-use an external PHY on the internal MDIO bus?
+I've rebased to v4.13 and pushed a branch to track fixes against v2,
+here:
 
-> +		case DWMAC_sUN8I_MDIO_MUX_EXTERNAL_ID:
-> +			dev_info(priv->device, "Switch mux to external PHY");
-> +			val = (reg & ~H3_EPHY_MUX_MASK) | H3_EPHY_SHUTDOWN;
-> +			if (!gmac->use_internal_phy)
-> +				need_reset = true;
-> +			break;
+ * http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v2%2Bfixes
 
-And is it possible to use the internal PHY on the external bus?
+ * git://linux-arm.org/linux-dm.git sve/v2+fixes
 
-    Andrew
+Cheers
+---Dave
