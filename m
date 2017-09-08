@@ -1,38 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 8 Sep 2017 09:39:54 +0530
-Subject: [PATCH v2 15/16] dmaengine: bcm-sba-raid: Add debugfs support
-In-Reply-To: <20170907193732.GB11006@kroah.com>
-References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
- <1501583880-32072-16-git-send-email-anup.patel@broadcom.com>
- <20170817080142.GC3053@localhost>
- <CAALAos_SXTMms8XmhEC28gxx4qvvr0z3wqQ=o_-BohMpcXwQTw@mail.gmail.com>
- <20170818052613.GE3053@localhost>
- <20170907193732.GB11006@kroah.com>
-Message-ID: <20170908040954.GB3053@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 08 Sep 2017 07:04:05 +0200
+Subject: [PATCH v8 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
+In-Reply-To: <06e92b85-45f3-b23d-b149-e130c863214b@rock-chips.com>
+References: <1504351723-135876-1-git-send-email-hjc@rock-chips.com>
+ <2057816.0G3n1KPuPZ@diego>
+ <06e92b85-45f3-b23d-b149-e130c863214b@rock-chips.com>
+Message-ID: <4080498.FZDnVPY7UJ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 09:37:32PM +0200, Greg KH wrote:
-> On Fri, Aug 18, 2017 at 10:56:13AM +0530, Vinod Koul wrote:
-> > On Fri, Aug 18, 2017 at 10:33:54AM +0530, Anup Patel wrote:
-> > > On Thu, Aug 17, 2017 at 1:31 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > > > On Tue, Aug 01, 2017 at 04:07:59PM +0530, Anup Patel wrote:
-> > > > why fail, debugfs should be an optional thingy, why would you want to fail here?
-> > > 
-> > > Yes, we are handling the case when debugfs is not available
-> > > and skipping debugfs gracefully.
-> > > 
-> > > If debugfs is available then failure of debugfs_create_dir()
-> > > should be reported.
-> > 
-> > reported yes, bailing out on that err no..
+Am Freitag, 8. September 2017, 09:23:09 CEST schrieb Mark yao:
+> On 2017?09?07? 20:09, Heiko St?bner wrote:
+> > Hi Mark,
+> >
+> > Am Donnerstag, 7. September 2017, 18:16:29 CEST schrieb Mark yao:
+> >> Looks good for me, so:
+> >> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
+> >>
+> >> I'd like to apply these lvds patches tomorrow if there is no more doubts.
+> > Rob had some minor comments on v7 of the dt-binding, so you may want
+> > to give him a bit more time to Ack the hopefully updated binding.
 > 
-> Reported, no.  You should _never_ care about the return value of a
-> debugfs call.  Never check it, just move on ad keep on going.  It
-> doesn't matter.
+> Rob already gave a Reviewed-by on v7 dt-binding, but maybe it has some doubts for his Ack.
+> 
+> Ok, let's wait some more time.
 
-Agreed that makes more sense. The driver was checking and bailing out, I
-advised against that :)
+ah, I looked at v6 and found the comments, not v7 and v7 is not in my
+archive because I likely accidentially deleted it.
+So Sandy just forgot to carry over the Ack/Review tag. So I guess there is
+no need to wait anymore and you just need to pick up Rob's tag from v7 then.
 
--- 
-~Vinod
+
+Heiko
