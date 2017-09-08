@@ -1,92 +1,79 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 08 Sep 2017 16:33:45 +0200
-Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
- PE/COFF sections
-In-Reply-To: <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
- (Ard Biesheuvel's message of "Fri, 8 Sep 2017 15:28:44 +0100")
-References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
- <20170629081849.15081-6-ard.biesheuvel@linaro.org>
- <87r2vhs3il.fsf@free-electrons.com>
- <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
- <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
-Message-ID: <87mv65s1iu.fsf@free-electrons.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 8 Sep 2017 14:34:27 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHY2IDQvN10gYXJtNjQ6IGt2bTogc3VwcG9ydCB1c2Vy?=
+ =?gb2312?Q?_space_to_query_RAS_extension_feature?=
+In-Reply-To: <59B1747A.5030909@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
+ <59A84F9D.8030309@arm.com> <29951852-8d91-7c33-c68b-ad8b4bbdea54@huawei.com>
+ <59B1747A.5030909@arm.com>
+Message-ID: <0184EA26B2509940AA629AE1405DD7F2015F5A1C@DGGEMA503-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
- 
- On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Hi James,
+  Thanks a lot for your detailed comments.
 
-> On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 8 September 2017 at 14:50, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>> Hi Ard,
->>>
->>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>
->>>> To prevent unintended modifications to the kernel text (malicious or
->>>> otherwise) while running the EFI stub, describe the kernel image as
->>>> two separate sections: a .text section with read-execute permissions,
->>>> covering .text, .rodata, .piggytext and the GOT sections (which the
->>>> stub does not care about anyway), and a .data section with read-write
->>>> permissions, covering .data and .bss.
->>>>
->>>> This relies on the firmware to actually take the section permission
->>>> flags into account, but this is something that is currently being
->>>> implemented in EDK2, which means we will likely start seeing it in
->>>> the wild between one and two years from now.
->>>
->>> This patch had been merged in mainline yesterday and now prevent the
->>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
->>> that more Socs are impacted because the number of boot fail exploded
->>> according to kci:
->>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
->>>
->>
->> Ouch.
->>
->>> I found this patch after bisecting (I can provide the bisect log if
->>> needed).
->>>
->>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
->>> multi_v7_defconfig but not with mvebu_v7_defconfig.
->>>
->>> Currently the solution is to revert this patch.
->>>
->>> Have you a better option?
->>>
->>
->> I will investigate.
->
-> I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
-> locally built zImage as well as the one built by kernelci.
->
-> Could you please try whether this fixes things? It does not explain
-> anything but it will help me figure out what is going on (hopefully)
+CC Peter.
 
-I've just tested this change and it didn't fix anything.
+Peter is Qemu expert. Let us see his suggestion.
 
-Gregory
+> 
+> Hi gengdongjiu,
+> 
+> On 05/09/17 08:18, gengdongjiu wrote:
+> > On 2017/9/1 2:04, James Morse wrote:
+> >> On 28/08/17 11:38, Dongjiu Geng wrote:
+> >>> Userspace will want to check if the CPU has the RAS extension.
+> >>
+> >> ... but user-space wants to know if it can inject SErrors with a specified ESR.
+> >>
+> >> What if we gain another way of doing this that isn't via the
+> >> RAS-extensions, now user-space has to check for two capabilities.
+> >>
+> >>
+> >>> If it has, it wil specify the virtual SError syndrome value,
+> >>> otherwise it will not be set. This patch adds support for querying
+> >>> the availability of this extension.
+> >>
+> >> I'm against telling user-space what features the CPU has unless it
+> >> can use them directly. In this case we are talking about a KVM API,
+> >> so we should describe the API not the CPU.
+> >
+> > shenglong (zhaoshenglong at huawei.com) who is Qemu maintainer suggested
+> > checking the CPU RAS-extensions to decide whether generate the APEI table and record CPER for the guest OS in the user space.
+> > he means if the host does not support RAS, user space may also not support RAS.
+> 
+> The code to signal memory-failure to user-space doesn't depend on the CPU's RAS-extensions.
+> 
+> If Qemu supports notifying the guest about RAS errors using CPER records, it should generate a HEST describing firmware first. It can then
+> choose the notification methods, some of which may require optional KVM APIs to support.
+> 
+> Seattle has a HEST, it doesn't support the CPU RAS-extensions. The kernel can notify user-space about memory_failure() on this machine. I
+> would expect Qemu to be able to receive signals and describe memory errors to a guest (1).
+> 
+> The question should be: 'How can Qemu know it can use SEI as a firmware-first notification?' It needs a KVM API to trigger an SError in the
+> guest with a specified ESR. The name of the KVM CAP needs to reflect the API (2).
+> 
+> Just because this is the first KVM API that needs the CPU to have the RAS extensions doesn't mean we should call it 'has RAS' and be done
+> with it.
+> 
+> We will eventually need another KVM API to configure trapping and emulating values in the RAS ERR registers so that Qemu can emulate a
+> machine without firmware-first. (This is likely to be a page of memory that backs the registers, there will need to be another KVM CAP to
+> describe this support (3)).
+> 
+> 
+> Exposing the CPUs support for RAS-extensions to support (2) means having per-platform support for (1). This is either creating extra work,
+> or not supporting as many platforms as we could. Both are bad.
+> Once we have (3) as well, any developer needs to know that 'has RAS' just meant the first API KVM implemented using RAS, and doesn't
+> mean later APIs also using RAS are supported by the kernel.
 
->
->
-> diff --git a/arch/arm/boot/compressed/efi-header.S
-> b/arch/arm/boot/compressed/efi-header.S
-> index c94a88ae834d..671a6e5b7b99 100644
-> --- a/arch/arm/boot/compressed/efi-header.S
-> +++ b/arch/arm/boot/compressed/efi-header.S
-> @@ -127,7 +127,7 @@ section_table:
->
->                 .set    section_count, (. - section_table) / 40
->
-> -               .align  12
-> +               .align  9
->  __efi_start:
->  #endif
->                 .endm
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Hi Peter/ shenglong,
+   What is your idea about it? We may need to consult with you about it.
+
+> 
+> 
+> Thanks,
+> 
+> James
