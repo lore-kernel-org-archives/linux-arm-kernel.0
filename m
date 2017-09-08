@@ -1,117 +1,79 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:36:04 +0200
-Subject: [PATCH v1 10/10] tty/serial: atmel: Prevent a warning on suspend
-In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-11-romain.izard.pro@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Sep 2017 16:41:08 +0100
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <8760ctryhm.fsf@free-electrons.com>
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+ <8760ctryhm.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu9D8mHEv-bRXrTJeRAAqinRxqZd97FaRgExKq6Hxt59XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel serial port driver reported the following warning on suspend:
-atmel_usart f8020000.serial: ttyS1: Unable to drain transmitter
+On 8 September 2017 at 16:39, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ard,
+>
+>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> As it turns out, building the ARM kernel with EFI support pulls in
+>> a couple of sections that we don't really need in the decompressor.
+>> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
+>> memory map, which is an exported symbol pulled in from lib/sort.c.
+>>
+>> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
+>> separate PE/COFF sections"), this resulted in the following layout
+>> for the decompressor ELF binary.
+>>
+>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
+>>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
+>>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
+>>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
+>>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
+>>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
+>>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
+>>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
+>>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
+>>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
+>>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
+>>
+>> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
+>> UEFI firmware to map the decompressor with strict R-X/RW- permissions
+>> before invoking it. Unfortunately, this turns out to break the boot on
+>> some systems, because the linker now also moves the ksymtab/kcrctab
+>> sections around, resulting in .piggydata to appear misaligned.
+>>
+>>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
+>>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
+>>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
+>>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
+>>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
+>>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
+>>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
+>>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
+>>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
+>>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
+>>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
+>>
+>> So let's align piggydata explicitly, and discard these sections from the
+>> binary.
+>>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
+>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Actually I had not tested a kernel with these two changes in the same
+> time. But now I've just done it, and it still works, so the patch and my
+> tested-by remain valid.
+>
+> Thanks!
+>
 
-As the ATMEL_US_TXEMPTY status bit in ATMEL_US_CSR is always cleared
-when the transmitter is disabled, we need to know the transmitter's
-state to return the real fifo state. And as ATMEL_US_CR is write-only,
-it is necessary to save the state of the transmitter in a local
-variable, and update the variable when TXEN and TXDIS is written in
-ATMEL_US_CR.
+Thanks for confirming. I was a bit sneaky, but the added .align can
+never make a difference when the section is already aligned. I don't
+understand why just the .align is not sufficient, but the patch is
+simple enough so I think I am not going to investigate any further.
 
-After those changes, atmel_tx_empty can return "empty" on suspend, the
-warning in uart_suspend_port disappears, and suspending is 20ms shorter
-for each enabled Atmel serial port.
-
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/tty/serial/atmel_serial.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 7551cab438ff..195c0d1b594e 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -171,6 +171,7 @@ struct atmel_uart_port {
- 	bool			has_hw_timer;
- 	struct timer_list	uart_timer;
- 
-+	bool			tx_stopped;
- 	bool			suspended;
- 	unsigned int		pending;
- 	unsigned int		pending_status;
-@@ -380,6 +381,10 @@ static int atmel_config_rs485(struct uart_port *port,
-  */
- static u_int atmel_tx_empty(struct uart_port *port)
- {
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+
-+	if (atmel_port->tx_stopped)
-+		return TIOCSER_TEMT;
- 	return (atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXEMPTY) ?
- 		TIOCSER_TEMT :
- 		0;
-@@ -485,6 +490,7 @@ static void atmel_stop_tx(struct uart_port *port)
- 	 * is fully transmitted.
- 	 */
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
-+	atmel_port->tx_stopped = true;
- 
- 	/* Disable interrupts */
- 	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
-@@ -492,6 +498,7 @@ static void atmel_stop_tx(struct uart_port *port)
- 	if ((port->rs485.flags & SER_RS485_ENABLED) &&
- 	    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
- 		atmel_start_rx(port);
-+
- }
- 
- /*
-@@ -521,6 +528,7 @@ static void atmel_start_tx(struct uart_port *port)
- 
- 	/* re-enable the transmitter */
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-+	atmel_port->tx_stopped = false;
- }
- 
- /*
-@@ -1866,6 +1874,7 @@ static int atmel_startup(struct uart_port *port)
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
- 	/* enable xmit & rcvr */
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-+	atmel_port->tx_stopped = false;
- 
- 	setup_timer(&atmel_port->uart_timer,
- 			atmel_uart_timer_callback,
-@@ -2122,6 +2131,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	/* disable receiver and transmitter */
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS | ATMEL_US_RXDIS);
-+	atmel_port->tx_stopped = true;
- 
- 	/* mode */
- 	if (port->rs485.flags & SER_RS485_ENABLED) {
-@@ -2207,6 +2217,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-+	atmel_port->tx_stopped = false;
- 
- 	/* restore interrupts */
- 	atmel_uart_writel(port, ATMEL_US_IER, imr);
-@@ -2450,6 +2461,7 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
- 
- 	/* Make sure that tx path is actually able to send characters */
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-+	atmel_port->tx_stopped = false;
- 
- 	uart_console_write(port, s, count, atmel_console_putchar);
- 
-@@ -2528,6 +2540,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
- 	atmel_uart_writel(port, ATMEL_US_IDR, -1);
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-+	atmel_port->tx_stopped = false;
- 
- 	if (options)
- 		uart_parse_options(options, &baud, &parity, &bits, &flow);
--- 
-2.11.0
+Thanks
