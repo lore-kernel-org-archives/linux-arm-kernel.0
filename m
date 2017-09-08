@@ -1,37 +1,31 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 8 Sep 2017 14:11:40 +0100
-Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
-In-Reply-To: <5FA513F682BE7F4EAAB8EE035D5B08E44109EBDF@G01JPEXMBKW02>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-20-git-send-email-Dave.Martin@arm.com>
- <5FA513F682BE7F4EAAB8EE035D5B08E44109DFE8@G01JPEXMBKW02>
- <20170906181634.GF6321@e103592.cambridge.arm.com>
- <5FA513F682BE7F4EAAB8EE035D5B08E44109EBDF@G01JPEXMBKW02>
-Message-ID: <20170908131136.GG6321@e103592.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 8 Sep 2017 15:26:07 +0200
+Subject: [PATCH v2] ARM: dts: sun8i: h3: Fix Pincrtl bindings on Bananapi
+ M2 Plus
+In-Reply-To: <1504643656-4926-1-git-send-email-embed3d@gmail.com>
+References: <1504643656-4926-1-git-send-email-embed3d@gmail.com>
+Message-ID: <20170908132607.rr3r7se23ixg7wqn@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 05:11:45AM +0000, Okamoto, Takayuki wrote:
-> Hi Dave,
+On Tue, Sep 05, 2017 at 10:34:16PM +0200, Philipp Rossak wrote:
+> From: Philipp Rossak <embed3d@gmail.com>
 > 
-> Thank you for your reply.
+> There is no need for pincontrol nodes when the pin is set to a GPIO
 > 
-> > Your fix looks correct and seems to work.  For stylistic reasons, I may
-> > write it like this instead, but the effect should be the same:
-> > 
-> > 	header->max_vl = sve_max_vl;
-> > 	if (WARN_ON(!sve_vl_valid(sve_max_vl))
-> > 		header->max_vl = header->vl;
-> 
-> It is better than my fix.
-> Please, apply it at next version.
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 
-I've rebased to v4.13 and pushed a branch to track fixes against v2,
-here:
+Applied, thanks!
+Maxime
 
- * http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v2%2Bfixes
-
- * git://linux-arm.org/linux-dm.git sve/v2+fixes
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/e25e9406/attachment.sig>
