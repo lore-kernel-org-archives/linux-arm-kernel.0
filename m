@@ -1,109 +1,191 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 08 Sep 2017 17:39:17 +0200
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <20170908153143.27279-1-ard.biesheuvel@linaro.org> (Ard
- Biesheuvel's message of "Fri, 8 Sep 2017 16:31:43 +0100")
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
-Message-ID: <8760ctryhm.fsf@free-electrons.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 8 Sep 2017 17:58:23 +0200
+Subject: [PATCH v8] vfio: platform: reset: Add Broadcom FlexRM reset module
+In-Reply-To: <1504696697-2733-2-git-send-email-anup.patel@broadcom.com>
+References: <1504696697-2733-1-git-send-email-anup.patel@broadcom.com>
+ <1504696697-2733-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <9ca6fe31-fdc4-71f4-4169-ddf9f515cfdf@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
- 
- On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Hi Anup,
 
-> As it turns out, building the ARM kernel with EFI support pulls in
-> a couple of sections that we don't really need in the decompressor.
-> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
-> memory map, which is an exported symbol pulled in from lib/sort.c.
->
-> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
-> separate PE/COFF sections"), this resulted in the following layout
-> for the decompressor ELF binary.
->
->   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
->   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
->   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
->   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
->   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
->   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
->   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
->   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
->   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
->   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
->   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
->
-> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
-> UEFI firmware to map the decompressor with strict R-X/RW- permissions
-> before invoking it. Unfortunately, this turns out to break the boot on
-> some systems, because the linker now also moves the ksymtab/kcrctab
-> sections around, resulting in .piggydata to appear misaligned.
->
->   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
->   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
->   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
->   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
->   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
->   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
->   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
->   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
->   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
->   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
->   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
->
-> So let's align piggydata explicitly, and discard these sections from the
-> binary.
->
-> Cc: Russell King <linux@armlinux.org.uk>
-> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Actually I had not tested a kernel with these two changes in the same
-time. But now I've just done it, and it still works, so the patch and my
-tested-by remain valid.
-
-Thanks!
-
-
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 06/09/2017 13:18, Anup Patel wrote:
+> This patch adds Broadcom FlexRM low-level reset for
+> VFIO platform.
+> 
+> It will do the following:
+> 1. Disable/Deactivate each FlexRM ring
+> 2. Flush each FlexRM ring
+> 
+> The cleanup sequence for FlexRM rings is adapted from
+> Broadcom FlexRM mailbox driver.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
 > ---
->  arch/arm/boot/compressed/piggy.S       | 1 +
->  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
-> index f72088495f43..5d52c556dd32 100644
-> --- a/arch/arm/boot/compressed/piggy.S
-> +++ b/arch/arm/boot/compressed/piggy.S
-> @@ -1,5 +1,6 @@
->  	.section .piggydata,#alloc
->  	.globl	input_data
-> +	.align	2
->  input_data:
->  	.incbin	"arch/arm/boot/compressed/piggy_data"
->  	.globl	input_data_end
-> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-> index 7a4c59154361..5c5265be4605 100644
-> --- a/arch/arm/boot/compressed/vmlinux.lds.S
-> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
-> @@ -29,6 +29,7 @@ SECTIONS
->       * of the text/got segments.
->       */
->      *(.data)
-> +    *(*ksymtab* *kcrctab*)
->    }
+>  drivers/vfio/platform/reset/Kconfig                |   9 ++
+>  drivers/vfio/platform/reset/Makefile               |   1 +
+>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 115 +++++++++++++++++++++
+>  3 files changed, 125 insertions(+)
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> 
+> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+> index 70cccc5..392e3c0 100644
+> --- a/drivers/vfio/platform/reset/Kconfig
+> +++ b/drivers/vfio/platform/reset/Kconfig
+> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
+>  	  Enables the VFIO platform driver to handle reset for AMD XGBE
 >  
->    . = TEXT_START;
-> -- 
-> 2.11.0
->
+>  	  If you don't know what to do here, say N.
+> +
+> +config VFIO_PLATFORM_BCMFLEXRM_RESET
+> +	tristate "VFIO support for Broadcom FlexRM reset"
+> +	depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
+> +	default ARCH_BCM_IPROC
+> +	help
+> +	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
+> +
+> +	  If you don't know what to do here, say N.
+> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+> index 93f4e23..8d9874b 100644
+> --- a/drivers/vfio/platform/reset/Makefile
+> +++ b/drivers/vfio/platform/reset/Makefile
+> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
+>  
+>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
+> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> new file mode 100644
+> index 0000000..5a17d50
+> --- /dev/null
+> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> @@ -0,0 +1,115 @@
+> +/*
+> + * Copyright (C) 2017 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +/*
+> + * This driver provides reset support for Broadcom FlexRM ring manager
+> + * to VFIO platform.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "vfio_platform_private.h"
+> +
+> +/* FlexRM configuration */
+> +#define RING_REGS_SIZE					0x10000
+> +#define RING_VER_MAGIC					0x76303031
+> +
+> +/* Per-Ring register offsets */
+> +#define RING_VER					0x000
+> +#define RING_CONTROL					0x034
+> +#define RING_FLUSH_DONE					0x038
+> +
+> +/* Register RING_CONTROL fields */
+> +#define CONTROL_FLUSH_SHIFT				5
+> +
+> +/* Register RING_FLUSH_DONE fields */
+> +#define FLUSH_DONE_MASK					0x1
+> +
+> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
+> +{
+> +	unsigned int timeout;
+> +
+> +	/* Disable/inactivate ring */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +
+> +	/* Set ring flush state */
+> +	timeout = 1000; /* timeout of 1s */
+> +	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
+> +	do {
+> +		if (readl_relaxed(ring + RING_FLUSH_DONE) &
+> +		    FLUSH_DONE_MASK)
+> +			break;
+> +		mdelay(1);
+> +	} while (--timeout);
+> +	if (!timeout)
+> +		return -ETIMEDOUT;
+> +
+> +	/* Clear ring flush state */
+> +	timeout = 1000; /* timeout of 1s */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +	do {
+> +		if (!(readl_relaxed(ring + RING_FLUSH_DONE) &
+> +		      FLUSH_DONE_MASK))
+> +			break;
+> +		mdelay(1);
+> +	} while (--timeout);
+> +	if (!timeout)
+> +		return -ETIMEDOUT;
+As this sequence is not part of flexrm_shutdown() in
+drivers/mailbox/bcm-flexrm-mailbox.c, do you plan to update the native
+driver with that addition?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> +
+> +	return 0;
+> +}
+> +
+> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
+> +{
+> +	void __iomem *ring;
+> +	int rc = 0, ret = 0, ring_num = 0;
+> +	struct vfio_platform_region *reg = &vdev->regions[0];
+> +
+> +	/* Map FlexRM ring registers if not mapped */
+> +	if (!reg->ioaddr) {
+> +		reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
+> +		if (!reg->ioaddr)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	/* Discover and shutdown each FlexRM ring */
+> +	for (ring = reg->ioaddr;
+> +	     ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
+> +		if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC) {
+> +			rc = vfio_platform_bcmflexrm_shutdown(ring);
+> +			if (rc) {
+> +				dev_warn(vdev->device,
+> +					 "FlexRM ring%d shutdown error %d\n",
+> +					 ring_num, rc);
+sorry but ring_num sticks to 0.
+
+Thanks
+
+Eric
+> +				ret |= rc;
+> +			}
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
+> +			  vfio_platform_bcmflexrm_reset);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
+> +MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
+> 
