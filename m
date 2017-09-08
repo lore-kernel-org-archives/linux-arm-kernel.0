@@ -1,34 +1,49 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri,  8 Sep 2017 09:07:15 +0100
-Subject: [PATCH] dt-bindings: qspi: Add r8a7743/5 to the compatible list
-Message-ID: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Fri,  8 Sep 2017 10:10:31 +0200
+Subject: [PATCH v4 1/3] PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on
+ bus device
+In-Reply-To: <20170908081033.3025-1-jglauber@cavium.com>
+References: <20170908081033.3025-1-jglauber@cavium.com>
+Message-ID: <20170908081033.3025-2-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
- Documentation/devicetree/bindings/spi/spi-rspi.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+From: David Daney <david.daney@cavium.com>
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rspi.txt b/Documentation/devicetree/bindings/spi/spi-rspi.txt
-index 8f4169f..3b02b3a 100644
---- a/Documentation/devicetree/bindings/spi/spi-rspi.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rspi.txt
-@@ -5,11 +5,14 @@ Required properties:
- 		     "renesas,rspi-<soctype>", "renesas,rspi" as fallback.
- 		     For Renesas Serial Peripheral Interface on RZ/A1H:
- 		     "renesas,rspi-<soctype>", "renesas,rspi-rz" as fallback.
--		     For Quad Serial Peripheral Interface on R-Car Gen2:
-+		     For Quad Serial Peripheral Interface on R-Car Gen2 and
-+		     RZ/G1 devices:
- 		     "renesas,qspi-<soctype>", "renesas,qspi" as fallback.
- 		     Examples with soctypes are:
- 		        - "renesas,rspi-sh7757" (SH)
- 			- "renesas,rspi-r7s72100" (RZ/A1H)
-+			- "renesas,qspi-r8a7743" (RZ/G1M)
-+			- "renesas,qspi-r8a7745" (RZ/G1E)
- 			- "renesas,qspi-r8a7790" (R-Car H2)
- 			- "renesas,qspi-r8a7791" (R-Car M2-W)
- 			- "renesas,qspi-r8a7792" (R-Car V2H)
+When checking to see if a PCI bus can safely be reset, we check to see
+if any of the children have their PCI_DEV_FLAGS_NO_BUS_RESET flag set.
+As these devices are known not to behave well after a bus reset.
+
+Some PCIe root port bridges also do not behave well after a bus reset,
+sometimes causing the devices behind the bridge to become unusable.
+
+Add a check for the PCI_DEV_FLAGS_NO_BUS_RESET flag being set in the
+bridge device to allow these bridges to be flagged, and prevent their
+buses from being reset.
+
+A follow on patch will add a quirk for this type of bridge.
+
+Signed-off-by: David Daney <david.daney@cavium.com>
+[jglauber at cavium.com: fixed typo]
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ drivers/pci/pci.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index fdf65a6c13f6..b2a46ca7f133 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4325,6 +4325,10 @@ static bool pci_bus_resetable(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 
++
++	if (bus->self && (bus->self->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET))
++		return false;
++
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		if (dev->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET ||
+ 		    (dev->subordinate && !pci_bus_resetable(dev->subordinate)))
 -- 
-2.7.4
+2.9.0.rc0.21.g7777322
