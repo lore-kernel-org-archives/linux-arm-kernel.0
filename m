@@ -1,72 +1,127 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:35:58 +0200
-Subject: [PATCH v1 04/10] mtd: nand: atmel: Avoid ECC errors when leaving
- backup mode
+Date: Fri,  8 Sep 2017 17:36:02 +0200
+Subject: [PATCH v1 08/10] pwm: atmel-tcb: Support backup mode
 In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-5-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-9-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During backup mode, the contents of all registers will be cleared as the
-SoC will be completely powered down. For a product that boots on NAND
-Flash memory, the bootloader will obviously use the related controller
-to read the Flash and correct any detected error in the memory, before
-handling back control to the kernel's resuming entry point.
-
-In normal devices, it is up to the driver's suspend/resume code to
-restore the registers in a valid state. But the PMECC is not a regular
-device in the driver model when used with the legacy device tree binding
-for the Atmel NAND controller, and suspend/resume code is not called.
-
-As in my case the bootloader leaves the PMECC controller in a programmed
-state, and the controller is only reset at boot or after a NAND access,
-the first NAND Flash access with the Atmel controller will report
-uncorrectable ECC errors.
-
-To avoid this, systematically reset the PMECC controller before using
-it.
+Save and restore registers for the PWM on suspend and resume, which
+makes hibernation and backup modes possible.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/mtd/nand/atmel/pmecc.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ drivers/pwm/pwm-atmel-tcb.c | 63 +++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 61 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
-index 8c210a5776bc..8d1208f38025 100644
---- a/drivers/mtd/nand/atmel/pmecc.c
-+++ b/drivers/mtd/nand/atmel/pmecc.c
-@@ -777,6 +777,9 @@ int atmel_pmecc_enable(struct atmel_pmecc_user *user, int op)
+diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
+index 75db585a2a94..acd3ce8ecf3f 100644
+--- a/drivers/pwm/pwm-atmel-tcb.c
++++ b/drivers/pwm/pwm-atmel-tcb.c
+@@ -37,11 +37,20 @@ struct atmel_tcb_pwm_device {
+ 	unsigned period;		/* PWM period expressed in clk cycles */
+ };
  
- 	mutex_lock(&user->pmecc->lock);
- 
-+	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
-+	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
++struct atmel_tcb_channel {
++	u32 enabled;
++	u32 cmr;
++	u32 ra;
++	u32 rb;
++	u32 rc;
++};
 +
- 	cfg = user->cache.cfg;
- 	if (op == NAND_ECC_WRITE)
- 		cfg |= PMECC_CFG_WRITE_OP;
-@@ -797,10 +800,6 @@ EXPORT_SYMBOL_GPL(atmel_pmecc_enable);
+ struct atmel_tcb_pwm_chip {
+ 	struct pwm_chip chip;
+ 	spinlock_t lock;
+ 	struct atmel_tc *tc;
+ 	struct atmel_tcb_pwm_device *pwms[NPWM];
++	struct atmel_tcb_channel bkup[NPWM / 2];
+ };
  
- void atmel_pmecc_disable(struct atmel_pmecc_user *user)
- {
--	struct atmel_pmecc *pmecc = user->pmecc;
--
--	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
--	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
- 	mutex_unlock(&user->pmecc->lock);
+ static inline struct atmel_tcb_pwm_chip *to_tcb_chip(struct pwm_chip *chip)
+@@ -175,12 +184,15 @@ static void atmel_tcb_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	 * Use software trigger to apply the new setting.
+ 	 * If both PWM devices in this group are disabled we stop the clock.
+ 	 */
+-	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC)))
++	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC))) {
+ 		__raw_writel(ATMEL_TC_SWTRG | ATMEL_TC_CLKDIS,
+ 			     regs + ATMEL_TC_REG(group, CCR));
+-	else
++		tcbpwmc->bkup[group].enabled = 1;
++	} else {
+ 		__raw_writel(ATMEL_TC_SWTRG, regs +
+ 			     ATMEL_TC_REG(group, CCR));
++		tcbpwmc->bkup[group].enabled = 0;
++	}
+ 
+ 	spin_unlock(&tcbpwmc->lock);
  }
- EXPORT_SYMBOL_GPL(atmel_pmecc_disable);
-@@ -856,10 +855,6 @@ static struct atmel_pmecc *atmel_pmecc_create(struct platform_device *pdev,
- 	/* Disable all interrupts before registering the PMECC handler. */
- 	writel(0xffffffff, pmecc->regs.base + ATMEL_PMECC_IDR);
- 
--	/* Reset the ECC engine */
--	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
--	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
--
- 	return pmecc;
+@@ -263,6 +275,7 @@ static int atmel_tcb_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	/* Use software trigger to apply the new setting */
+ 	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+ 		     regs + ATMEL_TC_REG(group, CCR));
++	tcbpwmc->bkup[group].enabled = 1;
+ 	spin_unlock(&tcbpwmc->lock);
+ 	return 0;
  }
+@@ -445,10 +458,56 @@ static const struct of_device_id atmel_tcb_pwm_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, atmel_tcb_pwm_dt_ids);
  
++#ifdef CONFIG_PM_SLEEP
++static int atmel_tcb_pwm_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
++	void __iomem *base = tcbpwm->tc->regs;
++	int i;
++
++	for (i = 0; i < (NPWM / 2); i++) {
++		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
++
++		chan->cmr = readl(base + ATMEL_TC_REG(i, CMR));
++		chan->ra = readl(base + ATMEL_TC_REG(i, RA));
++		chan->rb = readl(base + ATMEL_TC_REG(i, RB));
++		chan->rc = readl(base + ATMEL_TC_REG(i, RC));
++	}
++	return 0;
++}
++
++static int atmel_tcb_pwm_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
++	void __iomem *base = tcbpwm->tc->regs;
++	int i;
++
++	for (i = 0; i < (NPWM / 2); i++) {
++		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
++
++		writel(chan->cmr, base + ATMEL_TC_REG(i, CMR));
++		writel(chan->ra, base + ATMEL_TC_REG(i, RA));
++		writel(chan->rb, base + ATMEL_TC_REG(i, RB));
++		writel(chan->rc, base + ATMEL_TC_REG(i, RC));
++		if (chan->enabled) {
++			writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
++				base + ATMEL_TC_REG(i, CCR));
++		}
++	}
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(atmel_tcb_pwm_pm_ops, atmel_tcb_pwm_suspend,
++			 atmel_tcb_pwm_resume);
++
+ static struct platform_driver atmel_tcb_pwm_driver = {
+ 	.driver = {
+ 		.name = "atmel-tcb-pwm",
+ 		.of_match_table = atmel_tcb_pwm_dt_ids,
++		.pm = &atmel_tcb_pwm_pm_ops,
+ 	},
+ 	.probe = atmel_tcb_pwm_probe,
+ 	.remove = atmel_tcb_pwm_remove,
 -- 
 2.11.0
