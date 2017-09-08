@@ -1,79 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 Sep 2017 16:41:08 +0100
-Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
-In-Reply-To: <8760ctryhm.fsf@free-electrons.com>
-References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
- <8760ctryhm.fsf@free-electrons.com>
-Message-ID: <CAKv+Gu9D8mHEv-bRXrTJeRAAqinRxqZd97FaRgExKq6Hxt59XQ@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri,  8 Sep 2017 10:48:54 -0500
+Subject: [PATCH 2/2] arm64: dts: stratix10: add ethernet/sdmmc support to the
+ S10 devkit
+In-Reply-To: <1504885734-9618-1-git-send-email-dinguyen@kernel.org>
+References: <1504885734-9618-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <1504885734-9618-2-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2017 at 16:39, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ard,
->
->  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> As it turns out, building the ARM kernel with EFI support pulls in
->> a couple of sections that we don't really need in the decompressor.
->> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
->> memory map, which is an exported symbol pulled in from lib/sort.c.
->>
->> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
->> separate PE/COFF sections"), this resulted in the following layout
->> for the decompressor ELF binary.
->>
->>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
->>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
->>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
->>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
->>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
->>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
->>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
->>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
->>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
->>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
->>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
->>
->> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
->> UEFI firmware to map the decompressor with strict R-X/RW- permissions
->> before invoking it. Unfortunately, this turns out to break the boot on
->> some systems, because the linker now also moves the ksymtab/kcrctab
->> sections around, resulting in .piggydata to appear misaligned.
->>
->>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
->>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
->>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
->>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
->>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
->>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
->>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
->>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
->>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
->>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
->>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
->>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
->>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
->>
->> So let's align piggydata explicitly, and discard these sections from the
->> binary.
->>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
->> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Actually I had not tested a kernel with these two changes in the same
-> time. But now I've just done it, and it still works, so the patch and my
-> tested-by remain valid.
->
-> Thanks!
->
+Enable ethernet and sdmmc support on the Stratix10 devkit.
 
-Thanks for confirming. I was a bit sneaky, but the added .align can
-never make a difference when the section is already aligned. I don't
-understand why just the .align is not sufficient, but the patch is
-simple enough so I think I am not going to investigate any further.
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-Thanks
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+index 41ea2db..ae0e8f3 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+@@ -34,6 +34,42 @@
+ 	};
+ };
+ 
++&gmac0 {
++	phy-mode = "rgmii";
++	phy-addr = <0xffffffff>; /* probe for phy addr */
++
++	/*
++	 * These skews assume the user's FPGA design is adding 600ps of delay
++	 * for TX_CLK on Arria 10.
++	 *
++	 * All skews are offset since hardware skew values for the ksz9031
++	 * range from a negative skew to a positive skew.
++	 * See the micrel-ksz90x1.txt Documentation file for details.
++	*/
++	txd0-skew-ps = <0>; /* -420ps */
++	txd1-skew-ps = <0>; /* -420ps */
++	txd2-skew-ps = <0>; /* -420ps */
++	txd3-skew-ps = <0>; /* -420ps */
++	rxd0-skew-ps = <420>; /* 0ps */
++	rxd1-skew-ps = <420>; /* 0ps */
++	rxd2-skew-ps = <420>; /* 0ps */
++	rxd3-skew-ps = <420>; /* 0ps */
++	txen-skew-ps = <0>; /* -420ps */
++	txc-skew-ps = <1860>; /* 960ps */
++	rxdv-skew-ps = <420>; /* 0ps */
++	rxc-skew-ps = <1680>; /* 780ps */
++	max-frame-size = <3800>;
++	status = "okay";
++};
++
++&mmc {
++	status = "okay";
++	num-slots = <1>;
++	cap-sd-highspeed;
++	broken-cd;
++	bus-width = <4>;
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+-- 
+2.7.4
