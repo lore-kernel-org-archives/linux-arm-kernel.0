@@ -1,82 +1,47 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 8 Sep 2017 17:05:12 +0800
-Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.UAO when switch to host
-In-Reply-To: <20170908092155.4d90862b@why.wild-wind.fr.eu.org>
-References: <1504763684-30128-1-git-send-email-gengdongjiu@huawei.com>
- <1bcd0c1e-c3b5-aac4-bb4f-83ee14b1d1ab@huawei.com>
- <20170908092155.4d90862b@why.wild-wind.fr.eu.org>
-Message-ID: <8331df16-869c-9599-f559-fd284e571d9d@huawei.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 8 Sep 2017 11:31:00 +0200
+Subject: n900 in next-20170901
+In-Reply-To: <20170905201314.GE5024@atomide.com>
+References: <20170903203737.GA12475@amd>
+ <20170905201314.GE5024@atomide.com>
+Message-ID: <20170908093100.GE18365@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-   Thanks for reply.
+Hi!
 
-On 2017/9/8 16:21, Marc Zyngier wrote:
->> Marc,
->>
->> sorry I have another question for the PAN.
->>
->> In the non-VHE mode, The host kernel is running in the EL1. Before
->> host kernel enter guest, host OS will call 'HVC' instruction to do
->> the world-switch, and the pstate.PAN will be saved into the SPSR_EL2.
->> When world-switch back to host kernel from EL2, it will call 'eret'
->> instruction to EL1 host, this 'eret' instruction will restore the
->> SPSR_EL2 to the PSTATE. so the PSTATE.PAN will be restored.
->>
->> For the Non-VHE mode, in the EL2 where mainly have word-switch code,
->> do you think it needs to reset the PSTATE.PAN? From the spec, it does
->> not provide SCTLR_EL2.SPAN bit for non-VHE mode, so reset the
->> PSTATE.PAN does not sure whether it is needed or whether affects the
->> performance. If you think it is needed for El2 in Non-VHE mode,
->> moving the reset PSTATE.PAN to the exception entry to EL2 may be
->> better, such as "el1_sync", because host can also call 'hvc'
->> instruction without guest running.
-> So let's see if I correctly understand your question:
+> > It compiles ok, but it hangs on boot; black screen, so sometime before
+> > display is initialized.
 > 
-> You're worried that we don't set/reset PSTATE.PAN at EL2 in non-VHE?
-> In non-VHE, there is no user-space mapping that is present at the
-> same time as the hypervisor mappings. Actually, we hardly have any
-> mapping other than the HYP text/data and the vcpu/vm structures.
-
-Not that meaning.
-there are two meanings:
-
-In short, we should not set PAN for El2 in non-VHE; If you think we should, current code does not cover all scenarios.
-
-
-1. In the current mainline code it sets the PSTATE.PAN at EL2 in non-VHE. As you said,
-in non-VHE, there is no user-space mapping that is present at the same time as the
-hypervisor mappings, so I think it may not need to set both for EL1 and El2 in non-VHE,
-but current code sets it. As you see[1], the code does not check VHE.
-
-2. Conversely, in non-VHE, if you think we should set PAN in the EL2,
-current code only sets it in the guest_exit path, do not cover all scenarios.
-For example, when there is no guest, only have host, host calling 'HVC' instruction enter to El2 to do somethings,
-then it will not call the guest_exit, so the PAN will not be set.
-In order to handle this case, we should move it to the 'el1_sync'
-
-
-ENTRY(__guest_exit)
-        // x0: return code
-        // x1: vcpu
-        // x2-x29,lr: vcpu regs
-        // vcpu x0-x1 on the stack
-
-        add     x1, x1, #VCPU_CONTEXT
-
-        ALTERNATIVE(nop, SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)  	[1]
-
-        // Store the guest regs x2 and x3
-        stp     x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
-
-        // Retrieve the guest regs x0-x1 from the stack
-        ldp     x2, x3, [sp], #16       // x0, x1
-
-
+> Thanks for reporting it. Based on git bisect, the regression causing
+> commit is 9caf25f996e8 ("mm/cma: manage the memory of the CMA area
+> by using the ZONE_MOVABLE"). With this path applied, booting hangs
+> with an error in omap3_save_secure_ram_context() after a call to
+> _omap_save_secure_sram() that calls the related assembly code
+> save_secure_ram_context.
 > 
-> So how is PAN relevant in this context? What does it even mean?
-> If you have a ARMv8.0 behaviour, PAN doesn't even seem to *exist* at
-> EL2.
+> However, looks like there is also some other commit causing issue.
 > 
-> Or am I completely missing the point here?
+> Just reverting 9caf25f996e8 on Linux next causes the oops below.
+> 
+> Anybody got ideas why this now happens?
+
+Thanks for quick bisect.
+
+I take it 9caf25f996e8 is not going to be merged anywhere until this
+is fixed...?
+
+Best regards,
+								Pavel
+								
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/b6c71cac/attachment-0001.sig>
