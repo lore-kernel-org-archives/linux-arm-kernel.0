@@ -1,32 +1,44 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  8 Sep 2017 07:52:17 -0700
-Subject: [PATCH 0/2] Fix preemption issues with kvm_arm_get_running_vcpu
-Message-ID: <1504882339-42520-1-git-send-email-christoffer.dall@linaro.org>
+Date: Fri,  8 Sep 2017 07:52:18 -0700
+Subject: [PATCH 1/2] KVM: arm/arm64: Remove redundant preemptible checks
+In-Reply-To: <1504882339-42520-1-git-send-email-christoffer.dall@linaro.org>
+References: <1504882339-42520-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1504882339-42520-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-These two patches slightly improves our preemption configuration when
-accessing the per-CPU variables holding the currently running VCPU by
-removing a redundant check and rearranging calling code from
-non-preemptible context on RT systems.
+The __this_cpu_read() and __this_cpu_write() functions already implement
+checks for the required preemption levels when using
+CONFIG_DEBUG_PREEMPT which gives you nice error messages and such.
+Therefore there is no need to explicitly check this using a BUG_ON() in
+the code (which we don't do for other uses of per cpu variables either).
 
-I'm not entirely sure if we fix issues only affecting PREEMPT_RT in mainline
-and also cc these to stable.  Looking at the git log there seems to be some
-precedence for this.  If not, I'm happy to remove the cc tag and/or drop the
-second patch.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/arm.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Thanks,
--Christoffer
-
-Christoffer Dall (2):
-  KVM: arm/arm64: Remove redundant preemptible checks
-  KVM: arm/arm64: Fix vgic_mmio_change_active with PREEMPT_RT
-
- virt/kvm/arm/arm.c            |  2 --
- virt/kvm/arm/vgic/vgic-mmio.c | 12 +++++++++++-
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index a39a1e1..04313a2 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -69,7 +69,6 @@ static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
+ 
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+-	BUG_ON(preemptible());
+ 	__this_cpu_write(kvm_arm_running_vcpu, vcpu);
+ }
+ 
+@@ -79,7 +78,6 @@ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+  */
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
+ {
+-	BUG_ON(preemptible());
+ 	return __this_cpu_read(kvm_arm_running_vcpu);
+ }
+ 
 -- 
 2.7.4
