@@ -1,57 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 8 Sep 2017 22:06:28 +0200
-Subject: HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32 (was: Alignment issues
- in zImage with Linux 4.12, LZ4 and GCC5.3)
-In-Reply-To: <CAKv+Gu8by5B52L=xD5to2dP1hzVkc9e5p+SwWU5mumdf3VkZnQ@mail.gmail.com>
-References: <CAGkQfmOKqFWisiRjkCHBHDwgY5A0HA_+hcLYSeDYaoGQ6CVu6Q@mail.gmail.com>
- <CAK8P3a3AQ43t2q1MVN9PoqQXZiuXQo1uDcGnRAPCiT66_oDyLg@mail.gmail.com>
- <CAKv+Gu_6kxidH-4YwuCorJx25WSZDsOdtbZ6MZCv+R4ufzUjrw@mail.gmail.com>
- <CAK8P3a1xX5RfM1kao7WZBmS=0J=MgNZTH2_c-nSOY+GNmjNsUA@mail.gmail.com>
- <CAKv+Gu_UO_Td2kkN-2k1LzTWJGXO8vZaZdQkN-xnqsK=K5T20g@mail.gmail.com>
- <CAK8P3a0ECzB5ahbdmgM7=1NGkOaEc+wzr_EHbuQJij0+nygbLQ@mail.gmail.com>
- <CAKv+Gu8by5B52L=xD5to2dP1hzVkc9e5p+SwWU5mumdf3VkZnQ@mail.gmail.com>
-Message-ID: <CAK8P3a2XjZ6ZfHVu8gbAQ2ncj+GTR30Zj6oKUG8CTH4iswOnTw@mail.gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Fri, 8 Sep 2017 23:16:44 +0300
+Subject: [RFC v3 2/3] interconnect: Add basic event tracing
+In-Reply-To: <20170908141321.02f51e92@gandalf.local.home>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-3-georgi.djakov@linaro.org>
+ <20170908141321.02f51e92@gandalf.local.home>
+Message-ID: <e45d096f-1e7a-89cd-f334-266d4b3466bc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 7, 2017 at 1:31 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 7 September 2017 at 00:18, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Thu, Sep 7, 2017 at 12:48 AM, Ard Biesheuvel
+On 8.09.17 ?. 21:13, Steven Rostedt wrote:
+> On Fri,  8 Sep 2017 20:18:29 +0300
+> Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> 
+>> diff --git a/include/trace/events/interconnect.h b/include/trace/events/interconnect.h
+>> new file mode 100644
+>> index 000000000000..c4a72163873c
+>> --- /dev/null
+>> +++ b/include/trace/events/interconnect.h
+>> @@ -0,0 +1,45 @@
+>> +#undef TRACE_SYSTEM
+>> +#define TRACE_SYSTEM interconnect
+>> +
+>> +#if !defined(_TRACE_INTERCONNECT_H) || defined(TRACE_HEADER_MULTI_READ)
+>> +#define _TRACE_INTERCONNECT_H
+>> +
+>> +#include <linux/tracepoint.h>
+>> +
+>> +struct interconnect_path;
+>> +
+>> +DECLARE_EVENT_CLASS(interconnect_path,
+>> +
+>> +	TP_PROTO(struct interconnect_path *path),
+>> +
+>> +	TP_ARGS(path),
+>> +
+>> +	TP_STRUCT__entry(
+>> +		__field(struct interconnect_path *, path)
+>> +	),
+>> +
+>> +	TP_fast_assign(
+>> +		__entry->path = path;
+>> +	),
+>> +
+>> +	TP_printk("INTERCONNECT: %p", __entry->path)
+> 
+> You're passing in an interconnect_path and only recording the pointer
+> to it? Wouldn't it be useful to record other aspects? Like the number
+> of nodes, the avg and peak bw of each node?
+> 
 
->> I see lots of unaligned helpers in the lz4 code, is this not what
->> we hit?
->>
->> $ git grep unaligned lib/
->> lib/lz4/lz4_compress.c:#include <asm/unaligned.h>
->> lib/lz4/lz4_decompress.c:#include <asm/unaligned.h>
->> lib/lz4/lz4defs.h:#include <asm/unaligned.h>
->> lib/lz4/lz4defs.h:      return get_unaligned((const U16 *)ptr);
->> lib/lz4/lz4defs.h:      return get_unaligned((const U32 *)ptr);
->> lib/lz4/lz4defs.h:      return get_unaligned((const size_t *)ptr);
->> lib/lz4/lz4defs.h:      put_unaligned(value, (U16 *)memPtr);
->>
->
-> Yes, you are right. The code I looked at before does cast a char* to a
-> U32*, but it is in the compression path, so it has nothing to do with
-> this issue.
->
-> So I agree that access_ok.h is unsuitable for any 32-bit ARM core, and
-> we should be using the struct version instead. My only remaining
-> question is why we need access_ok.h in the first place: it is worth a
-> try to check whether both produce the same code on AArch64.
-
-It's been a while since I looked into this problem, but from my memory,
-it turned out rather hard to analyze single files after the change, as
-gcc inlining decisions and register allocation tend to be non-deterministic.
-However, my conclusion then was that those changes are rather random,
-usually no effect, sometimes better and sometimes worse by chance,
-with the only real differences being the few cases we avoid the ldrd/ldm/...
-instructions.
-
-I have no idea which compiler version I tried back then, so it's very
-possible that some older compilers actually do produce slightly worse
-code with the struct version, the question is what the oldest compiler
-is that we care about enough to investigate. Maybe gcc-4.8?
-
-       Arnd
+My goal was to get just the path with some timestamps, but your suggestion
+sounds good. Will do it. Thanks!
