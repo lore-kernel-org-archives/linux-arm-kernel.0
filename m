@@ -1,31 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 8 Sep 2017 11:28:06 +0100
-Subject: Conflict when accessing PMU counters from userspace
-In-Reply-To: <CALk3wS0P-R9=HU1wYCWWYZ2w=7RjFoD4M=Vwzg-1ALRuRNMHUA@mail.gmail.com>
-References: <CALk3wS0P-R9=HU1wYCWWYZ2w=7RjFoD4M=Vwzg-1ALRuRNMHUA@mail.gmail.com>
-Message-ID: <20170908102806.GD13657@leverpostej>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 8 Sep 2017 13:24:05 +0200
+Subject: [PATCH v3 5/6] [media] exynos-gsc: Remove unnecessary compatible
+In-Reply-To: <1504850560-27950-6-git-send-email-hoegeun.kwon@samsung.com>
+References: <CGME20170908060309epcas1p4061542ce39ddfdd385b1b6b51eda2ace@epcas1p4.samsung.com>
+ <1504850560-27950-1-git-send-email-hoegeun.kwon@samsung.com>
+ <1504850560-27950-6-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <CAJKOXPfyrH66X3iPLaXK_OJgadU6HByyjTwfp_6xYasq8cS-Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 12:36:48PM -0700, Jason Teplitz wrote:
-> Hello,
+On Fri, Sep 8, 2017 at 8:02 AM, Hoegeun Kwon <hoegeun.kwon@samsung.com> wrote:
+> Currently, the compatible('samsung,exynos5-gsc') is not used.
+> Remove unnecessary compatible.
+>
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/media/exynos5-gsc.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/media/exynos5-gsc.txt b/Documentation/devicetree/bindings/media/exynos5-gsc.txt
+> index daa56d5..1ea05f1 100644
+> --- a/Documentation/devicetree/bindings/media/exynos5-gsc.txt
+> +++ b/Documentation/devicetree/bindings/media/exynos5-gsc.txt
+> @@ -3,9 +3,9 @@
+>  G-Scaler is used for scaling and color space conversion on EXYNOS5 SoCs.
+>
+>  Required properties:
+> -- compatible: should be "samsung,exynos5-gsc" (for Exynos 5250, 5420 and
+> -             5422 SoCs) or "samsung,exynos5433-gsc" (Exynos 5433)
+> -             or "samsung,exynos5250-gsc" or "samsung,exynos5420-gsc"
+> +- compatible: should be "samsung,exynos5250-gsc", "samsung,exynos5420-gsc"
+> +             or "samsung,exynos5433-gsc" (for Exynos 5250, 5420, 5422,
+> +             and 5433 SoCs)
 
-Hi,
+You should not remove the compatible (neither here nor in the driver)
+but mark it as deprecated. Removal should happen slightly later.
 
-> I'm reading the PMU counters from a userspace process, but the cycle
-> counter keeps getting reset. I don't believe any other running
-> processes are doing this. Is there something in the kernel that resets
-> the cycle counter periodically and if so is there an easy way to
-> disable it?
+Best regards,
+Krzysztof
 
-Reading the PMU counters directly from userspace is not supported, and
-we configure the CPU to trap such accesses.
-
-Ignoring explicit reset of the counters, there are a number of reasons
-why you will not see consistent values from userspace.
-
-Which kernel are you using (e.g. version? arm/arm64?), and how have you
-enabled userspace access?
-
-Thanks,
-Mark.
+>  - reg: should contain G-Scaler physical address location and length.
+>  - interrupts: should contain G-Scaler interrupt number
+>
+> @@ -16,7 +16,7 @@ Optional properties:
+>  Example:
+>
+>  gsc_0:  gsc at 0x13e00000 {
+> -       compatible = "samsung,exynos5-gsc";
+> +       compatible = "samsung,exynos5250-gsc;
+>         reg = <0x13e00000 0x1000>;
+>         interrupts = <0 85 0>;
+>  };
