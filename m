@@ -1,128 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 Sep 2017 16:11:53 +0100
-Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
- PE/COFF sections
-In-Reply-To: <CAKv+Gu8Aa7Y8SK2nJM2DXZzHbzZT6aq2Rt1wsgaLwz7_C3otJA@mail.gmail.com>
-References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
- <20170629081849.15081-6-ard.biesheuvel@linaro.org>
- <87r2vhs3il.fsf@free-electrons.com>
- <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
- <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
- <87mv65s1iu.fsf@free-electrons.com>
- <CAKv+Gu8e49ZmB6X=H2vE_dw1HA3CyOq0GN7cZOYJ+JpkTftGWA@mail.gmail.com>
- <87efrhs0gj.fsf@free-electrons.com>
- <CAKv+Gu8Aa7Y8SK2nJM2DXZzHbzZT6aq2Rt1wsgaLwz7_C3otJA@mail.gmail.com>
-Message-ID: <CAKv+Gu8hcT=_1iF4gaS==uGQWAb9-i0Y=XJ-MqgfQQyn1RmGtQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 9 Sep 2017 00:14:45 +0900
+Subject: [PATCH v4 6/6] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <CAL_Jsq+Da1=myQGEpA_0f+dEU0Rk6RB3BJHVCzq0M0MyJ3UDoQ@mail.gmail.com>
+References: <1504784522-26841-1-git-send-email-yamada.masahiro@socionext.com>
+ <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
+ <CAL_Jsq+Da1=myQGEpA_0f+dEU0Rk6RB3BJHVCzq0M0MyJ3UDoQ@mail.gmail.com>
+Message-ID: <CAK7LNARwusK2i2mp7LE4AW28oYs81tWxgXG7pgBa-hu=2ZTW7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2017 at 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 8 September 2017 at 15:56, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> Hi Ard,
->>
->>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>
->>> On 8 September 2017 at 15:33, Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> wrote:
->>>> Hi Ard,
->>>>
->>>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>
->>>>> On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>> On 8 September 2017 at 14:50, Gregory CLEMENT
->>>>>> <gregory.clement@free-electrons.com> wrote:
->>>>>>> Hi Ard,
->>>>>>>
->>>>>>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>>
->>>>>>>> To prevent unintended modifications to the kernel text (malicious or
->>>>>>>> otherwise) while running the EFI stub, describe the kernel image as
->>>>>>>> two separate sections: a .text section with read-execute permissions,
->>>>>>>> covering .text, .rodata, .piggytext and the GOT sections (which the
->>>>>>>> stub does not care about anyway), and a .data section with read-write
->>>>>>>> permissions, covering .data and .bss.
->>>>>>>>
->>>>>>>> This relies on the firmware to actually take the section permission
->>>>>>>> flags into account, but this is something that is currently being
->>>>>>>> implemented in EDK2, which means we will likely start seeing it in
->>>>>>>> the wild between one and two years from now.
->>>>>>>
->>>>>>> This patch had been merged in mainline yesterday and now prevent the
->>>>>>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
->>>>>>> that more Socs are impacted because the number of boot fail exploded
->>>>>>> according to kci:
->>>>>>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
->>>>>>>
->>>>>>
->>>>>> Ouch.
->>>>>>
->>>>>>> I found this patch after bisecting (I can provide the bisect log if
->>>>>>> needed).
->>>>>>>
->>>>>>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
->>>>>>> multi_v7_defconfig but not with mvebu_v7_defconfig.
->>>>>>>
->>>>>>> Currently the solution is to revert this patch.
->>>>>>>
->>>>>>> Have you a better option?
->>>>>>>
->>>>>>
->>>>>> I will investigate.
->>>>>
->>>>> I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
->>>>> locally built zImage as well as the one built by kernelci.
->>>>>
->>>>> Could you please try whether this fixes things? It does not explain
->>>>> anything but it will help me figure out what is going on (hopefully)
->>>>
->>>> I've just tested this change and it didn't fix anything.
->>>>
->>>> Gregory
->>>>
->>>>>
->>>>>
->>>>> diff --git a/arch/arm/boot/compressed/efi-header.S
->>>>> b/arch/arm/boot/compressed/efi-header.S
->>>>> index c94a88ae834d..671a6e5b7b99 100644
->>>>> --- a/arch/arm/boot/compressed/efi-header.S
->>>>> +++ b/arch/arm/boot/compressed/efi-header.S
->>>>> @@ -127,7 +127,7 @@ section_table:
->>>>>
->>>>>                 .set    section_count, (. - section_table) / 40
->>>>>
->>>>> -               .align  12
->>>>> +               .align  9
->>>>>  __efi_start:
->>>>>  #endif
->>>>>                 .endm
->>>>
->>>
->>>
->>> How about this?
->>
->> It fixed the bug! (I tested with and without your previous patch and it
->> worked in both case)
->>
->> When you will send your patch, you can add my:
->> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>
+Hi Rob,
 
-Would you mind checking whether this fixes the issue as well?
 
-diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
-index f72088495f43..5d52c556dd32 100644
---- a/arch/arm/boot/compressed/piggy.S
-+++ b/arch/arm/boot/compressed/piggy.S
-@@ -1,5 +1,6 @@
-        .section .piggydata,#alloc
-        .globl  input_data
-+       .align  2
- input_data:
-        .incbin "arch/arm/boot/compressed/piggy_data"
-        .globl  input_data_end
+2017-09-08 4:41 GMT+09:00 Rob Herring <robh+dt@kernel.org>:
+> On Thu, Sep 7, 2017 at 6:42 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> This GPIO controller device is used on UniPhier SoCs.
+>>
+>> It also serves as an interrupt controller, but interrupt signals are
+>> just delivered to the parent irqchip without any latching or OR'ing.
+>> This is implemented by using hierarchy IRQ domain.
+>>
+>> Implementation note:
+>> Unfortunately, the IRQ mapping from this controller to the parent is
+>> random. (48, 49, ..., 63, 154, 155, ...)
+>> If "interrupts" property is used, IRQ resources may be statically
+>> allocated when platform devices are populated from DT.  This can be
+>> a problem for the hierarchy IRQ domain because IRQ allocation must
+>> happen from the outer-most domain up to the root domain in order to
+>> build up the stacked IRQ.  (https://lkml.org/lkml/2017/7/6/758)
+>> Solutions to work around it could be to hard-code parent hwirqs or
+>> to invent a driver-specific DT property.
+>>
+>> Here, the new API irq_domain_push_irq() was merged by v4.14-rc1.
+>> It allows to add irq_data to the existing hierarchy.  It will help
+>> to make this driver work whether the parent has already initialized
+>> the hierarchy or not.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>> Changes in v4:
+>>   - Add COMPILE_TEST and select IRQ_DOMAIN_HIERARCHY
+>>   - Reimplement irqchip part by using irq_domain_push_irq()
+>>
+>> Changes in v3:
+>>   - Add .irq_set_affinity() hook
+>>   - Use irq_domain_create_hierarchy() instead of legacy
+>>     irq_domain_add_hierarchy()
+>>
+>> Changes in v2:
+>>   - Remove +32 offset for parent interrupts to follow the GIC
+>>     binding convention
+>>   - Let uniphier_gpio_irq_alloc() fail if nr_irqs != 1
+>>   - Allocate gpio_chip statically because just one instance is
+>>     supported
+>>   - Fix suspend and resume hooks
+>>
+>>  .../devicetree/bindings/gpio/gpio-uniphier.txt     |  43 ++
+>
+> What happened to my ack? One line here more that before, but I'm not
+> going to diff your patches for you.
 
-There may be other reasons than ksymtab entries that could result in
-piggydata ending up unaligned in the decompressor (which is what
-caused the issue before)
-This is a better fix, because it addresses the root cause.
+I changed the binding for this version.
+It includes a new one you have not acked yet.
+
+Maybe I was too worried about it.
+
+
+> BTW, it is preferred to split bindings to a separate patch.
+
+I will do so next time.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
