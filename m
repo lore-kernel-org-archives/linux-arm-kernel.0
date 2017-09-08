@@ -1,34 +1,156 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 08 Sep 2017 15:02:35 +0900
-Subject: [PATCH v3 1/6] [media] exynos-gsc: Add compatible for Exynos 5250
- and 5420 specific version
+Date: Fri, 08 Sep 2017 15:02:38 +0900
+Subject: [PATCH v3 4/6] [media] exynos-gsc: Add hardware rotation limits
 In-Reply-To: <1504850560-27950-1-git-send-email-hoegeun.kwon@samsung.com>
 References: <1504850560-27950-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170908060308epcas1p4cd62b065429a7ab1591593e94853c7b8@epcas1p4.samsung.com>
-Message-ID: <1504850560-27950-2-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170908060309epcas1p3d48dd0871d3fde02ba3c9921bbe5a7a6@epcas1p3.samsung.com>
+Message-ID: <1504850560-27950-5-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos 5250 and 5420 have different hardware rotation limits.
-Since we have to distinguish between these two, we add different
-compatible(samsung,exynos5250-gsc and samsung,exynos5420-gsc).
+The hardware rotation limits of gsc depends on SOC (Exynos
+5250/5420/5433). Distinguish them and add them to the driver data.
 
 Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 ---
- Documentation/devicetree/bindings/media/exynos5-gsc.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/media/platform/exynos-gsc/gsc-core.c | 96 ++++++++++++++++++++++++----
+ 1 file changed, 83 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/exynos5-gsc.txt b/Documentation/devicetree/bindings/media/exynos5-gsc.txt
-index 26ca25b..daa56d5 100644
---- a/Documentation/devicetree/bindings/media/exynos5-gsc.txt
-+++ b/Documentation/devicetree/bindings/media/exynos5-gsc.txt
-@@ -5,6 +5,7 @@ G-Scaler is used for scaling and color space conversion on EXYNOS5 SoCs.
- Required properties:
- - compatible: should be "samsung,exynos5-gsc" (for Exynos 5250, 5420 and
- 	      5422 SoCs) or "samsung,exynos5433-gsc" (Exynos 5433)
-+	      or "samsung,exynos5250-gsc" or "samsung,exynos5420-gsc"
- - reg: should contain G-Scaler physical address location and length.
- - interrupts: should contain G-Scaler interrupt number
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index 4380150..8f8636e 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -943,7 +943,37 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
+ 	return IRQ_HANDLED;
+ }
  
+-static struct gsc_pix_max gsc_v_100_max = {
++static struct gsc_pix_max gsc_v_5250_max = {
++	.org_scaler_bypass_w	= 8192,
++	.org_scaler_bypass_h	= 8192,
++	.org_scaler_input_w	= 4800,
++	.org_scaler_input_h	= 3344,
++	.real_rot_dis_w		= 4800,
++	.real_rot_dis_h		= 3344,
++	.real_rot_en_w		= 2016,
++	.real_rot_en_h		= 2016,
++	.target_rot_dis_w	= 4800,
++	.target_rot_dis_h	= 3344,
++	.target_rot_en_w	= 2016,
++	.target_rot_en_h	= 2016,
++};
++
++static struct gsc_pix_max gsc_v_5420_max = {
++	.org_scaler_bypass_w	= 8192,
++	.org_scaler_bypass_h	= 8192,
++	.org_scaler_input_w	= 4800,
++	.org_scaler_input_h	= 3344,
++	.real_rot_dis_w		= 4800,
++	.real_rot_dis_h		= 3344,
++	.real_rot_en_w		= 2048,
++	.real_rot_en_h		= 2048,
++	.target_rot_dis_w	= 4800,
++	.target_rot_dis_h	= 3344,
++	.target_rot_en_w	= 2016,
++	.target_rot_en_h	= 2016,
++};
++
++static struct gsc_pix_max gsc_v_5433_max = {
+ 	.org_scaler_bypass_w	= 8192,
+ 	.org_scaler_bypass_h	= 8192,
+ 	.org_scaler_input_w	= 4800,
+@@ -979,8 +1009,8 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
+ 	.target_h		= 2,  /* yuv420 : 2, others : 1 */
+ };
+ 
+-static struct gsc_variant gsc_v_100_variant = {
+-	.pix_max		= &gsc_v_100_max,
++static struct gsc_variant gsc_v_5250_variant = {
++	.pix_max		= &gsc_v_5250_max,
+ 	.pix_min		= &gsc_v_100_min,
+ 	.pix_align		= &gsc_v_100_align,
+ 	.in_buf_cnt		= 32,
+@@ -992,12 +1022,48 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
+ 	.local_sc_down		= 2,
+ };
+ 
+-static struct gsc_driverdata gsc_v_100_drvdata = {
++static struct gsc_variant gsc_v_5420_variant = {
++	.pix_max		= &gsc_v_5420_max,
++	.pix_min		= &gsc_v_100_min,
++	.pix_align		= &gsc_v_100_align,
++	.in_buf_cnt		= 32,
++	.out_buf_cnt		= 32,
++	.sc_up_max		= 8,
++	.sc_down_max		= 16,
++	.poly_sc_down_max	= 4,
++	.pre_sc_down_max	= 4,
++	.local_sc_down		= 2,
++};
++
++static struct gsc_variant gsc_v_5433_variant = {
++	.pix_max		= &gsc_v_5433_max,
++	.pix_min		= &gsc_v_100_min,
++	.pix_align		= &gsc_v_100_align,
++	.in_buf_cnt		= 32,
++	.out_buf_cnt		= 32,
++	.sc_up_max		= 8,
++	.sc_down_max		= 16,
++	.poly_sc_down_max	= 4,
++	.pre_sc_down_max	= 4,
++	.local_sc_down		= 2,
++};
++
++static struct gsc_driverdata gsc_v_5250_drvdata = {
+ 	.variant = {
+-		[0] = &gsc_v_100_variant,
+-		[1] = &gsc_v_100_variant,
+-		[2] = &gsc_v_100_variant,
+-		[3] = &gsc_v_100_variant,
++		[0] = &gsc_v_5250_variant,
++		[1] = &gsc_v_5250_variant,
++		[2] = &gsc_v_5250_variant,
++		[3] = &gsc_v_5250_variant,
++	},
++	.num_entities = 4,
++	.clk_names = { "gscl" },
++	.num_clocks = 1,
++};
++
++static struct gsc_driverdata gsc_v_5420_drvdata = {
++	.variant = {
++		[0] = &gsc_v_5420_variant,
++		[1] = &gsc_v_5420_variant,
+ 	},
+ 	.num_entities = 4,
+ 	.clk_names = { "gscl" },
+@@ -1006,9 +1072,9 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
+ 
+ static struct gsc_driverdata gsc_5433_drvdata = {
+ 	.variant = {
+-		[0] = &gsc_v_100_variant,
+-		[1] = &gsc_v_100_variant,
+-		[2] = &gsc_v_100_variant,
++		[0] = &gsc_v_5433_variant,
++		[1] = &gsc_v_5433_variant,
++		[2] = &gsc_v_5433_variant,
+ 	},
+ 	.num_entities = 3,
+ 	.clk_names = { "pclk", "aclk", "aclk_xiu", "aclk_gsclbend" },
+@@ -1017,8 +1083,12 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
+ 
+ static const struct of_device_id exynos_gsc_match[] = {
+ 	{
+-		.compatible = "samsung,exynos5-gsc",
+-		.data = &gsc_v_100_drvdata,
++		.compatible = "samsung,exynos5250-gsc",
++		.data = &gsc_v_5250_drvdata,
++	},
++	{
++		.compatible = "samsung,exynos5420-gsc",
++		.data = &gsc_v_5420_drvdata,
+ 	},
+ 	{
+ 		.compatible = "samsung,exynos5433-gsc",
 -- 
 1.9.1
