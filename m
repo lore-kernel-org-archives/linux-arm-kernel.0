@@ -1,93 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 8 Sep 2017 12:33:29 +0100
-Subject: [PATCH v3 2/6] ARM: dts: exynos: Add clean name of compatible.
-In-Reply-To: <1504850560-27950-3-git-send-email-hoegeun.kwon@samsung.com>
-References: <1504850560-27950-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170908060308epcas1p2b275c76f63f5742092a7bc4ef14c05a5@epcas1p2.samsung.com>
- <1504850560-27950-3-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <1a2dfeb9-b2e1-3bc6-772a-e3b55fc51b7f@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 8 Sep 2017 19:47:09 +0800
+Subject: [xlnx:master 869/1008] debug.c:(.text+0x20): multiple definition of
+ `dwc3_simple_check_quirks'
+Message-ID: <201709081905.UE3anAOI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/17 07:02, Hoegeun Kwon wrote:
-> Exynos 5250 and 5420 have different hardware rotation limits. However,
-> currently it uses only one compatible - "exynos5-gsc". Since we have
-> to distinguish between these two, we add different compatible.
-> 
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 8 ++++----
->  arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
->  2 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 8dbeb87..bf08101 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -637,7 +637,7 @@
->  		};
->  
->  		gsc_0:  gsc at 13e00000 {
-> -			compatible = "samsung,exynos5-gsc";
-> +			compatible = "samsung,exynos5-gsc", "samsung,exynos5250-gsc";
+Hi Anurag,
 
-These should be the other way round - the most specific compatible
-should come first, then the more general fallback afterwards.
+FYI, the error/warning still remains.
 
-(and similarly in all cases below)
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   fec1fe44076b1b2f8b7d6b2669697ea16b33a215
+commit: 244ddcbd8d1c0bc8df49172e973f0384abf7fe9f [869/1008] dwc3: Correct errors when dwc3 loaded as module
+config: i386-randconfig-s0-201736 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 244ddcbd8d1c0bc8df49172e973f0384abf7fe9f
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Robin.
+All errors (new ones prefixed by >>):
 
->  			reg = <0x13e00000 0x1000>;
->  			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
->  			power-domains = <&pd_gsc>;
-> @@ -647,7 +647,7 @@
->  		};
->  
->  		gsc_1:  gsc at 13e10000 {
-> -			compatible = "samsung,exynos5-gsc";
-> +			compatible = "samsung,exynos5-gsc", "samsung,exynos5250-gsc";
->  			reg = <0x13e10000 0x1000>;
->  			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->  			power-domains = <&pd_gsc>;
-> @@ -657,7 +657,7 @@
->  		};
->  
->  		gsc_2:  gsc at 13e20000 {
-> -			compatible = "samsung,exynos5-gsc";
-> +			compatible = "samsung,exynos5-gsc", "samsung,exynos5250-gsc";
->  			reg = <0x13e20000 0x1000>;
->  			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
->  			power-domains = <&pd_gsc>;
-> @@ -667,7 +667,7 @@
->  		};
->  
->  		gsc_3:  gsc at 13e30000 {
-> -			compatible = "samsung,exynos5-gsc";
-> +			compatible = "samsung,exynos5-gsc", "samsung,exynos5250-gsc";
->  			reg = <0x13e30000 0x1000>;
->  			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
->  			power-domains = <&pd_gsc>;
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 02d2f89..86afe77 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -658,7 +658,7 @@
->  		};
->  
->  		gsc_0: video-scaler at 13e00000 {
-> -			compatible = "samsung,exynos5-gsc";
-> +			compatible = "samsung,exynos5-gsc", "samsung,exynos5420-gsc";
->  			reg = <0x13e00000 0x1000>;
->  			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clock CLK_GSCL0>;
-> @@ -668,7 +668,7 @@
->  		};
->  
->  		gsc_1: video-scaler at 13e10000 {
-> -			compatible = "samsung,exynos5-gsc";
-> +			compatible = "samsung,exynos5-gsc", "samsung,exynos5420-gsc";
->  			reg = <0x13e10000 0x1000>;
->  			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clock CLK_GSCL1>;
-> 
+   drivers/usb/dwc3/debug.o: In function `dwc3_simple_wakeup_capable':
+   debug.c:(.text+0x0): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x410): first defined here
+   drivers/usb/dwc3/debug.o: In function `dwc3_set_simple_data':
+   debug.c:(.text+0x10): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x420): first defined here
+   drivers/usb/dwc3/debug.o: In function `dwc3_simple_check_quirks':
+>> debug.c:(.text+0x20): multiple definition of `dwc3_simple_check_quirks'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x430): first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
+   trace.c:(.text+0x0): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x410): first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_set_simple_data':
+   trace.c:(.text+0x10): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x420): first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_simple_check_quirks':
+   trace.c:(.text+0x20): multiple definition of `dwc3_simple_check_quirks'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x430): first defined here
+   drivers/usb/dwc3/gadget.o: In function `dwc3_simple_wakeup_capable':
+   gadget.c:(.text+0xd20): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x410): first defined here
+   drivers/usb/dwc3/gadget.o: In function `dwc3_set_simple_data':
+   gadget.c:(.text+0xd30): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x420): first defined here
+   drivers/usb/dwc3/gadget.o: In function `dwc3_simple_check_quirks':
+   gadget.c:(.text+0xd40): multiple definition of `dwc3_simple_check_quirks'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x430): first defined here
+   drivers/usb/dwc3/ep0.o: In function `dwc3_simple_wakeup_capable':
+   ep0.c:(.text+0x940): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x410): first defined here
+   drivers/usb/dwc3/ep0.o: In function `dwc3_set_simple_data':
+   ep0.c:(.text+0x950): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x420): first defined here
+   drivers/usb/dwc3/ep0.o: In function `dwc3_simple_check_quirks':
+   ep0.c:(.text+0x960): multiple definition of `dwc3_simple_check_quirks'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x430): first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
+   debugfs.c:(.text+0xc70): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x410): first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_set_simple_data':
+   debugfs.c:(.text+0xc80): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x420): first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_check_quirks':
+   debugfs.c:(.text+0xc90): multiple definition of `dwc3_simple_check_quirks'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x430): first defined here
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 29669 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/cba3488c/attachment-0001.gz>
