@@ -1,163 +1,126 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 8 Sep 2017 18:03:23 +0200
-Subject: [PATCH v1 07/10] iio:adc:at91-sama5d2: Support backup mode
-In-Reply-To: <20170908153604.28383-8-romain.izard.pro@gmail.com>
-References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
- <20170908153604.28383-8-romain.izard.pro@gmail.com>
-Message-ID: <760d7c25-afa4-2242-a278-e0989bca5478@microchip.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 8 Sep 2017 18:05:58 +0200
+Subject: [PATCH v3 4/5] KVM: arm/arm64: Support VGIC dist pend/active
+ changes for mapped IRQs
+In-Reply-To: <5579210b-9b62-b33d-ac36-df3cb835c1e7@redhat.com>
+References: <20170906122612.18050-1-cdall@linaro.org>
+ <20170906122612.18050-5-cdall@linaro.org>
+ <d51a40df-92f9-eeff-0d16-ea12fd451dea@redhat.com>
+ <2e1352d7-fb64-907d-7726-4d53d7af5768@arm.com>
+ <5579210b-9b62-b33d-ac36-df3cb835c1e7@redhat.com>
+Message-ID: <CAMJs5B89AsrDMhuNjC7La2ZP+ndiAWhY=7nqTbq1v6mp7=BDqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2017 at 17:36, Romain Izard wrote:
-> Support the backup mode for platform suspend, by restoring the hardware
-> registers on resume.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+On Fri, Sep 8, 2017 at 4:27 PM, Auger Eric <eric.auger@redhat.com> wrote:
+> Hi Marc,
+>
+> On 08/09/2017 15:32, Marc Zyngier wrote:
+>> On 08/09/17 14:04, Auger Eric wrote:
+>>> Hi Christoffer,
+>>>
+>>> On 06/09/2017 14:26, Christoffer Dall wrote:
+>>>> For mapped IRQs (with the HW bit set in the LR) we have to follow some
+>>>> rules of the architecture.  One of these rules is that VM must not be
+>>>> allowed to deactivate a virtual interrupt with the HW bit set unless the
+>>>> physical interrupt is also active.
+>>>>
+>>>> This works fine when injecting mapped interrupts, because we leave it up
+>>>> to the injector to either set EOImode==1 or manually set the active
+>>>> state of the physical interrupt.
+>>>>
+>>>> However, the guest can set virtual interrupt to be pending or active by
+>>>> writing to the virtual distributor, which could lead to deactivating a
+>>>> virtual interrupt with the HW bit set without the physical interrupt
+>>>> being active.
+>>>>
+>>>> We could set the physical interrupt to active whenever we are about to
+>>>> enter the VM with a HW interrupt either pending or active, but that
+>>>> would be really slow, especially on GICv2.  So we take the long way
+>>>> around and do the hard work when needed, which is expected to be
+>>>> extremely rare.
+>>>>
+>>>> When the VM sets the pending state for a HW interrupt on the virtual
+>>>> distributor we set the active state on the physical distributor, because
+>>>> the virtual interrupt can become active and then the guest can
+>>>> deactivate it.
+>>>>
+>>>> When the VM clears the pending state we also clear it on the physical
+>>>> side, because the injector might otherwise raise the interrupt.
+>>>>
+>>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-mmio.c | 33 +++++++++++++++++++++++++++++++++
+>>>>  virt/kvm/arm/vgic/vgic.c      |  7 +++++++
+>>>>  virt/kvm/arm/vgic/vgic.h      |  1 +
+>>>>  3 files changed, 41 insertions(+)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>>>> index c1e4bdd..00003ae 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>>>> @@ -131,6 +131,9 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+>>>>             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>>>>
+>>>>             spin_lock(&irq->irq_lock);
+>>>> +           if (irq->hw)
+>>>> +                   vgic_irq_set_phys_active(irq, true);
+>>>> +
+>>>>             irq->pending_latch = true;
+>>>>
+>>>>             vgic_queue_irq_unlock(vcpu->kvm, irq);
+>>>> @@ -149,6 +152,20 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+>>>>             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>>>>
+>>>>             spin_lock(&irq->irq_lock);
+>>>> +           /*
+>>>> +            * We don't want the guest to effectively mask the physical
+>>>> +            * interrupt by doing a write to SPENDR followed by a write to
+>>>> +            * CPENDR for HW interrupts, so we clear the active state on
+>>>> +            * the physical side here.  This may lead to taking an
+>>>> +            * additional interrupt on the host, but that should not be a
+>>>> +            * problem as the worst that can happen is an additional vgic
+>>>> +            * injection.  We also clear the pending state to maintain
+>>>> +            * proper semantics for edge HW interrupts.
+>>>> +            */
+>>>> +           if (irq->hw) {
+>>>> +                   vgic_irq_set_phys_pending(irq, false);
+>>>> +                   vgic_irq_set_phys_active(irq, false);
+>>> I fail in understanding why the active state is reset here. Can you
+>>> provide an example?
+>>
+>>
+>> If we're clearing the pending state on the virtual side, we need to be
+>> able to let an incoming physical interrupt fire so that it can be made
+>> pending again. We may have to check that the virtual active state is
+>> clear though.
+>>
+>>> If the physical dist has an active state can't the virtual IRQ be in
+>>> active state, in which case you may later on deactivate a phys IRQ which
+>>> is not active?
+>>
+>>
+>> Well, I think we must be able to handle both cases:
+>>
+>> - CPENDR write:
+>>       clear physical pending
+>>       if (virtual active clear)
+>>               clear physical active
+>>
+>> - CACTIVER write:
+>>       clear physical active
+>>
+>> Does this work for you?
+>
+> yes it does with that change!
+>
+I agree, I should fix that.
 
-Romain,
+But then I wondered, are we properly handling PPIs for
+setting/clearing the pending state?  Don't we actually need to do
+something similar like the active cpu where we check the requester CPU
+and make sure we're not fiddling with some random hardware state when
+accessed by userspace?
 
-Thanks for your series: definitively some of your patches need to be
-integrated (I've merged some of them in our current linux-4.9-at91 branch.
-However, It seems that some of your additions have already been
-submitted and/or accepted by maintainers.
-For instance an equivalent of this one seems already in Linus' tree:
-500a2eefd6b16ba141a8fb777ea6962d2eb65e3b ("iio: adc: at91-sama5d2_adc:
-add support for suspend/resume functionality").
-
-Please tell us if it fits what your observed on this driver (or others).
-
-Regards,
-
-> ---
->  drivers/iio/adc/at91-sama5d2_adc.c | 71 ++++++++++++++++++++++++++++++++------
->  1 file changed, 61 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-> index e10dca3ed74b..f9718c863363 100644
-> --- a/drivers/iio/adc/at91-sama5d2_adc.c
-> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-> @@ -200,6 +200,7 @@ struct at91_adc_state {
->  	u32				conversion_value;
->  	struct at91_adc_soc_info	soc_info;
->  	wait_queue_head_t		wq_data_available;
-> +	unsigned int			current_rate;
->  	/*
->  	 * lock to prevent concurrent 'single conversion' requests through
->  	 * sysfs.
-> @@ -269,6 +270,8 @@ static void at91_adc_setup_samp_freq(struct at91_adc_state *st, unsigned freq)
->  	mr |= AT91_SAMA5D2_MR_PRESCAL(prescal);
->  	at91_adc_writel(st, AT91_SAMA5D2_MR, mr);
->  
-> +	st->current_rate = freq;
-> +
->  	dev_dbg(&indio_dev->dev, "freq: %u, startup: %u, prescal: %u\n",
->  		freq, startup, prescal);
->  }
-> @@ -375,7 +378,9 @@ static int at91_adc_write_raw(struct iio_dev *indio_dev,
->  	    val > st->soc_info.max_sample_rate)
->  		return -EINVAL;
->  
-> +	mutex_lock(&st->lock);
->  	at91_adc_setup_samp_freq(st, val);
-> +	mutex_unlock(&st->lock);
->  
->  	return 0;
->  }
-> @@ -386,6 +391,21 @@ static const struct iio_info at91_adc_info = {
->  	.driver_module = THIS_MODULE,
->  };
->  
-> +static void at91_adc_init_hw(struct at91_adc_state *st, unsigned int freq)
-> +{
-> +	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
-> +	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
-> +	/*
-> +	 * Transfer field must be set to 2 according to the datasheet and
-> +	 * allows different analog settings for each channel.
-> +	 */
-> +	at91_adc_writel(st, AT91_SAMA5D2_MR,
-> +			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
-> +
-> +	at91_adc_setup_samp_freq(st, freq);
-> +
-> +}
-> +
->  static int at91_adc_probe(struct platform_device *pdev)
->  {
->  	struct iio_dev *indio_dev;
-> @@ -482,16 +502,7 @@ static int at91_adc_probe(struct platform_device *pdev)
->  		goto vref_disable;
->  	}
->  
-> -	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
-> -	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
-> -	/*
-> -	 * Transfer field must be set to 2 according to the datasheet and
-> -	 * allows different analog settings for each channel.
-> -	 */
-> -	at91_adc_writel(st, AT91_SAMA5D2_MR,
-> -			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
-> -
-> -	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
-> +	at91_adc_init_hw(st, st->soc_info.min_sample_rate);
->  
->  	ret = clk_prepare_enable(st->per_clk);
->  	if (ret)
-> @@ -541,12 +552,52 @@ static const struct of_device_id at91_adc_dt_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, at91_adc_dt_match);
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int at91_adc_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +	struct at91_adc_state *st = iio_priv(indio_dev);
-> +
-> +	clk_disable_unprepare(st->per_clk);
-> +
-> +	regulator_disable(st->vref);
-> +	regulator_disable(st->reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int at91_adc_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +	struct at91_adc_state *st = iio_priv(indio_dev);
-> +	int err;
-> +
-> +	err = regulator_enable(st->reg);
-> +	if (err)
-> +		return err;
-> +
-> +	err = regulator_enable(st->vref);
-> +	if (err)
-> +		return err;
-> +
-> +	at91_adc_init_hw(st, st->current_rate);
-> +
-> +	err = clk_prepare_enable(st->per_clk);
-> +	return err;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
-> +
->  static struct platform_driver at91_adc_driver = {
->  	.probe = at91_adc_probe,
->  	.remove = at91_adc_remove,
->  	.driver = {
->  		.name = "at91-sama5d2_adc",
->  		.of_match_table = at91_adc_dt_match,
-> +		.pm = &at91_adc_pm_ops,
->  	},
->  };
->  module_platform_driver(at91_adc_driver)
-> 
-
-
--- 
-Nicolas Ferre
+Thanks,
+-Christoffer
