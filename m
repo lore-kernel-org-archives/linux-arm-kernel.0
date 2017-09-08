@@ -1,226 +1,73 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 8 Sep 2017 09:43:25 +0200
-Subject: [PATCH v5 05/10] dt-bindings: net: dwmac-sun8i: update
- documentation about integrated PHY
-In-Reply-To: <20170908072538.rqsp6dobwsqmzrsr@flea.lan>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-6-clabbe.montjoie@gmail.com>
- <20170908072538.rqsp6dobwsqmzrsr@flea.lan>
-Message-ID: <20170908074325.GB29999@Red>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  8 Sep 2017 15:50:09 +0800
+Subject: [PATCH 1/8] ARM: dts: sun6i: Fix endpoint IDs in second display
+ pipeline
+In-Reply-To: <20170908075016.18657-1-wens@csie.org>
+References: <20170908075016.18657-1-wens@csie.org>
+Message-ID: <20170908075016.18657-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 08, 2017 at 09:25:38AM +0200, Maxime Ripard wrote:
-> On Fri, Sep 08, 2017 at 09:11:51AM +0200, Corentin Labbe wrote:
-> > This patch add documentation about the MDIO switch used on sun8i-h3-emac
-> > for integrated PHY.
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  .../devicetree/bindings/net/dwmac-sun8i.txt        | 127 +++++++++++++++++++--
-> >  1 file changed, 120 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-> > index 725f3b187886..3fa0e54825ea 100644
-> > --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-> > +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-> > @@ -39,7 +39,7 @@ Optional properties for the following compatibles:
-> >  - allwinner,leds-active-low: EPHY LEDs are active low
-> >  
-> >  Required child node of emac:
-> > -- mdio bus node: should be named mdio
-> > +- mdio bus node: should be labelled mdio
-> 
-> labels do not end up in the final DT (while the names do) so why are
-> you making this change?
-> 
+When the second display pipeline device nodes for the A31/A31s were
+added, it was not known that the TCONs could (through either DRCs)
+select either backend as their input. Thus in the endpoints connecting
+these components together, the endpoint IDs were set to 0, while in
+fact they should have been set to 1.
 
-I misunderstood label/name.
-Anyway, this contrainst should leave due to "snps,dwmac-mdio MDIOs are automatically registered"
+Fixes: 9a26882a7378 ("ARM: dts: sun6i: Add second display pipeline device
+		      nodes")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-> >  
-> >  Required properties of the mdio node:
-> >  - #address-cells: shall be 1
-> > @@ -48,14 +48,28 @@ Required properties of the mdio node:
-> >  The device node referenced by "phy" or "phy-handle" should be a child node
-> >  of the mdio node. See phy.txt for the generic PHY bindings.
-> >  
-> > -Required properties of the phy node with the following compatibles:
-> > +The following compatibles require an mdio-mux node called "mdio-mux":
-> > +  - "allwinner,sun8i-h3-emac"
-> > +  - "allwinner,sun8i-v3s-emac":
-> > +Required properties for the mdio-mux node:
-> > +  - compatible = "mdio-mux"
-> > +  - one child mdio for the integrated mdio
-> > +  - one child mdio for the external mdio if present (V3s have none)
-> > +Required properties for the mdio-mux children node:
-> > +  - reg: 0 for internal MDIO bus, 1 for external MDIO bus
-> > +
-> > +The following compatibles require a PHY node representing the integrated
-> > +PHY, under the integrated MDIO bus node if an mdio-mux node is used:
-> >    - "allwinner,sun8i-h3-emac",
-> >    - "allwinner,sun8i-v3s-emac":
-> > +
-> > +Required properties of the integrated phy node:
-> >  - clocks: a phandle to the reference clock for the EPHY
-> >  - resets: a phandle to the reset control for the EPHY
-> > +- phy-is-integrated
-> > +- Should be a child of the integrated mdio
-> 
-> I'm not sure what you mean by that, you ask that it should (so not
-> required?) be a child of the integrated mdio...
-> 
-
-I will change words to "must"
-
-> >  
-> > -Example:
-> > -
-> > +Example with integrated PHY:
-> >  emac: ethernet at 1c0b000 {
-> >  	compatible = "allwinner,sun8i-h3-emac";
-> >  	syscon = <&syscon>;
-> > @@ -72,13 +86,112 @@ emac: ethernet at 1c0b000 {
-> >  	phy-handle = <&int_mii_phy>;
-> >  	phy-mode = "mii";
-> >  	allwinner,leds-active-low;
-> > +
-> > +	mdio0: mdio {
-> 
-> (You don't label it mdio here, unlike what was asked before)
-> 
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		compatible = "snps,dwmac-mdio";
-> > +	};
-> 
-> I think Rob wanted that node gone?
-> 
-
-MDIO mux does not work without a parent MDIO, either gived by "parent-bus" or directly via mdio_mux_init() (like it is the case in dwmac-sun8i)
-
-> > +	mdio-mux {
-> > +		compatible = "mdio-mux";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		int_mdio: mdio at 1 {
-> > +			reg = <0>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			int_mii_phy: ethernet-phy at 1 {
-> > +				reg = <1>;
-> > +				clocks = <&ccu CLK_BUS_EPHY>;
-> > +				resets = <&ccu RST_BUS_EPHY>;
-> > +				phy-is-integrated
-> > +			};
-> > +		};
-> 
-> ... And in your example it's a child of the mdio mux?
-> 
-
-So I confirm, integrated PHY must be a child of integrated MDIO (that must be a child of mdio-mux).
-The example is good.
-
-> > +		ext_mdio: mdio at 0 {
-> > +			reg = <1>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +Example with external PHY:
-> > +emac: ethernet at 1c0b000 {
-> > +	compatible = "allwinner,sun8i-h3-emac";
-> > +	syscon = <&syscon>;
-> > +	reg = <0x01c0b000 0x104>;
-> > +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> > +	interrupt-names = "macirq";
-> > +	resets = <&ccu RST_BUS_EMAC>;
-> > +	reset-names = "stmmaceth";
-> > +	clocks = <&ccu CLK_BUS_EMAC>;
-> > +	clock-names = "stmmaceth";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +
-> > +	phy-handle = <&ext_rgmii_phy>;
-> > +	phy-mode = "rgmii";
-> > +	allwinner,leds-active-low;
-> > +
-> > +	mdio0: mdio {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		compatible = "snps,dwmac-mdio";
-> > +	};
-> > +
-> > +	mdio-mux {
-> > +		compatible = "mdio-mux";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		int_mdio: mdio at 1 {
-> > +			reg = <0>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			int_mii_phy: ethernet-phy at 1 {
-> > +				reg = <1>;
-> > +				clocks = <&ccu CLK_BUS_EPHY>;
-> > +				resets = <&ccu RST_BUS_EPHY>;
-> > +				phy-is-integrated
-> > +			};
-> > +		};
-> > +		ext_mdio: mdio at 0 {
-> > +			reg = <1>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			ext_rgmii_phy: ethernet-phy at 1 {
-> > +				reg = <1>;
-> > +			};
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +Example with SoC without integrated PHY
-> > +
-> > +emac: ethernet at 1c0b000 {
-> > +	compatible = "allwinner,sun8i-a83t-emac";
-> > +	syscon = <&syscon>;
-> > +	reg = <0x01c0b000 0x104>;
-> > +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> > +	interrupt-names = "macirq";
-> > +	resets = <&ccu RST_BUS_EMAC>;
-> > +	reset-names = "stmmaceth";
-> > +	clocks = <&ccu CLK_BUS_EMAC>;
-> > +	clock-names = "stmmaceth";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +
-> > +	phy-handle = <&ext_rgmii_phy>;
-> > +	phy-mode = "rgmii";
-> > +
-> >  	mdio: mdio {
-> > +		compatible = "snps,dwmac-mdio";
-> >  		#address-cells = <1>;
-> >  		#size-cells = <0>;
-> > -		int_mii_phy: ethernet-phy at 1 {
-> > +		ext_rgmii_phy: ethernet-phy at 1 {
-> >  			reg = <1>;
-> > -			clocks = <&ccu CLK_BUS_EPHY>;
-> > -			resets = <&ccu RST_BUS_EPHY>;
-> >  		};
-> >  	};
-> >  };
-> > -- 
-> > 2.13.5
-> > 
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
-Thanks for the review, I will fix all reported problem in next version.
-
-Regards
-Corentin Labbe
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index f3d74dc5b292..00a4c7614e0a 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -311,8 +311,8 @@
+ 					#size-cells = <0>;
+ 					reg = <0>;
+ 
+-					tcon1_in_drc1: endpoint at 0 {
+-						reg = <0>;
++					tcon1_in_drc1: endpoint at 1 {
++						reg = <1>;
+ 						remote-endpoint = <&drc1_out_tcon1>;
+ 					};
+ 				};
+@@ -1038,8 +1038,8 @@
+ 					#size-cells = <0>;
+ 					reg = <1>;
+ 
+-					be1_out_drc1: endpoint at 0 {
+-						reg = <0>;
++					be1_out_drc1: endpoint at 1 {
++						reg = <1>;
+ 						remote-endpoint = <&drc1_in_be1>;
+ 					};
+ 				};
+@@ -1068,8 +1068,8 @@
+ 					#size-cells = <0>;
+ 					reg = <0>;
+ 
+-					drc1_in_be1: endpoint at 0 {
+-						reg = <0>;
++					drc1_in_be1: endpoint at 1 {
++						reg = <1>;
+ 						remote-endpoint = <&be1_out_drc1>;
+ 					};
+ 				};
+@@ -1079,8 +1079,8 @@
+ 					#size-cells = <0>;
+ 					reg = <1>;
+ 
+-					drc1_out_tcon1: endpoint at 0 {
+-						reg = <0>;
++					drc1_out_tcon1: endpoint at 1 {
++						reg = <1>;
+ 						remote-endpoint = <&tcon1_in_drc1>;
+ 					};
+ 				};
+-- 
+2.14.1
