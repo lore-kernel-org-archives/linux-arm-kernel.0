@@ -1,18 +1,18 @@
 From: hch@infradead.org (Christoph Hellwig)
-Date: Fri, 8 Sep 2017 00:53:47 -0700
-Subject: [PATCH v6 05/11] arm64/mm: Add support for XPFO
-In-Reply-To: <20170907173609.22696-6-tycho@docker.com>
+Date: Fri, 8 Sep 2017 00:55:19 -0700
+Subject: [PATCH v6 10/11] mm: add a user_virt_to_phys symbol
+In-Reply-To: <20170907173609.22696-11-tycho@docker.com>
 References: <20170907173609.22696-1-tycho@docker.com>
- <20170907173609.22696-6-tycho@docker.com>
-Message-ID: <20170908075347.GC4957@infradead.org>
+ <20170907173609.22696-11-tycho@docker.com>
+Message-ID: <20170908075519.GD4957@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/*
-> + * Lookup the page table entry for a virtual address and return a pointer to
-> + * the entry. Based on x86 tree.
-> + */
-> +static pte_t *lookup_address(unsigned long addr)
+On Thu, Sep 07, 2017 at 11:36:08AM -0600, Tycho Andersen wrote:
+> We need someting like this for testing XPFO. Since it's architecture
+> specific, putting it in the test code is slightly awkward, so let's make it
+> an arch-specific symbol and export it for use in LKDTM.
 
-Seems like this should be moved to common arm64 mm code and used by
-kernel_page_present.
+We really should not add an export for this.
+
+I think you'll want to just open code it in your test module.
