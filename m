@@ -1,174 +1,38 @@
-From: tycho@docker.com (Tycho Andersen)
-Date: Fri, 8 Sep 2017 11:24:22 -0600
-Subject: [PATCH v6 05/11] arm64/mm: Add support for XPFO
-In-Reply-To: <20170908075347.GC4957@infradead.org>
-References: <20170907173609.22696-1-tycho@docker.com>
- <20170907173609.22696-6-tycho@docker.com>
- <20170908075347.GC4957@infradead.org>
-Message-ID: <20170908172422.rxmhwd2vl6eye2or@docker>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 8 Sep 2017 17:36:04 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHY2IDQvN10gYXJtNjQ6IGt2bTogc3VwcG9ydCB1c2Vy?=
+ =?gb2312?Q?_space_to_query_RAS_extension_feature?=
+In-Reply-To: <59B1747A.5030909@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
+ <59A84F9D.8030309@arm.com> <29951852-8d91-7c33-c68b-ad8b4bbdea54@huawei.com>
+ <59B1747A.5030909@arm.com>
+Message-ID: <0184EA26B2509940AA629AE1405DD7F2015F61EA@DGGEMA503-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 08, 2017 at 12:53:47AM -0700, Christoph Hellwig wrote:
-> > +/*
-> > + * Lookup the page table entry for a virtual address and return a pointer to
-> > + * the entry. Based on x86 tree.
-> > + */
-> > +static pte_t *lookup_address(unsigned long addr)
+HI James,
+
+[...]
 > 
-> Seems like this should be moved to common arm64 mm code and used by
-> kernel_page_present.
+> The code to signal memory-failure to user-space doesn't depend on the CPU's RAS-extensions.
+I roughly check your answer and agree with your general idea.
+late I will check it in detail.
 
-Sounds good, I'll include something like the patch below in the next
-series.
+I have a question, do you sure that if CPU does not support RAS-extensions kernel can still call memory-failure() to send signal to qemu?
 
-Unfortunately, adding an implementation of lookup_address seems to be
-slightly more complicated than necessary, because of the xen piece. We
-have to define lookup_address() with the level parameter, but it's not
-obvious to me to name the page levels. So for now I've just left it as
-a WARN() if someone supplies it.
+After my checking the code, the general flow is RAS module detects the error or CPU consumes the hardware poison data, happen exception, then EL3 firmware records the address to APEI table and send
+notification to kernel. Kernel parses the APEI table to get address and call memory_failure() to identify the page to poison. That is to say, usually, after RAS detect the error, it call memory_failure(),
+otherwise, it does not know whether this address is poison.
+I am worried about one thing, if hardware does not has RAS, OS cannot know which address is poison, so it cannot identify the address , then the address that is delivered to Qemu(user space) may not right.
 
-It seems like xen still does need this to be defined, because if I
-define it without level:
+As you said, kernel can also call memory_failure() even without RAS support. in this without RAS case, how it consider the address is poison and needs to send SIGBUS to QEMU?
 
-drivers/xen/xenbus/xenbus_client.c: In function ?xenbus_unmap_ring_vfree_pv?:
-drivers/xen/xenbus/xenbus_client.c:760:4: error: too many arguments to function ?lookup_address?
-    lookup_address(addr, &level)).maddr;
-    ^~~~~~~~~~~~~~
-In file included from ./arch/arm64/include/asm/page.h:37:0,
-                 from ./include/linux/mmzone.h:20,
-                 from ./include/linux/gfp.h:5,
-                 from ./include/linux/mm.h:9,
-                 from drivers/xen/xenbus/xenbus_client.c:33:
-./arch/arm64/include/asm/pgtable-types.h:67:15: note: declared here
- extern pte_t *lookup_address(unsigned long addr);
-               ^~~~~~~~~~~~~~
+> 
+> If Qemu supports notifying the guest about RAS errors using CPER records, it should generate a HEST describing firmware first. It can then
+> choose the notification methods, some of which may require optional KVM APIs to support.
+> 
+> Seattle has a HEST, it doesn't support the CPU RAS-extensions. The kernel can notify user-space about memory_failure() on this machine. I
+> would expect Qemu to be able to receive signals and describe memory errors to a guest (1).
 
-I've cc-d the xen folks, maybe they can suggest a way to untangle it?
-Alternatively, if someone can suggest a good naming scheme for the
-page levels, I can just do that.
-
-Cheers,
-
-Tycho
-
-
->From 0b3be95873e3e8caa39fa50efc0d06d57fc6eb5e Mon Sep 17 00:00:00 2001
-From: Tycho Andersen <tycho@docker.com>
-Date: Fri, 8 Sep 2017 10:43:26 -0600
-Subject: [PATCH] arm64: add lookup_address()
-
-Similarly to x86, let's add lookup_address() and use it in
-kernel_page_present(). We'll use it in the next patch for the
-implementation of XPFO as well.
-
-Signed-off-by: Tycho Andersen <tycho@docker.com>
----
- arch/arm64/include/asm/pgtable-types.h |  2 ++
- arch/arm64/mm/pageattr.c               | 47 ++++++++++++++++++++--------------
- include/xen/arm/page.h                 | 10 --------
- 3 files changed, 30 insertions(+), 29 deletions(-)
-
-diff --git a/arch/arm64/include/asm/pgtable-types.h b/arch/arm64/include/asm/pgtable-types.h
-index 345a072b5856..fad3db5a673f 100644
---- a/arch/arm64/include/asm/pgtable-types.h
-+++ b/arch/arm64/include/asm/pgtable-types.h
-@@ -64,4 +64,6 @@ typedef struct { pteval_t pgprot; } pgprot_t;
- #include <asm-generic/5level-fixup.h>
- #endif
- 
-+extern pte_t *lookup_address(unsigned long addr, unsigned int *level);
-+
- #endif	/* __ASM_PGTABLE_TYPES_H */
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index a682a0a2a0fa..437a12485873 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -138,6 +138,32 @@ int set_memory_valid(unsigned long addr, int numpages, int enable)
- 					__pgprot(PTE_VALID));
- }
- 
-+pte_t *lookup_address(unsigned long addr, unsigned int *level)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+
-+	if (unlikely(level)) {
-+		WARN(1, "level unused on arm64\n");
-+		*level = 0;
-+	}
-+
-+	pgd = pgd_offset_k(addr);
-+	if (pgd_none(*pgd))
-+		return NULL;
-+
-+	pud = pud_offset(pgd, addr);
-+	if (pud_none(*pud))
-+		return NULL;
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return NULL;
-+
-+	return pte_offset_kernel(pmd, addr);
-+}
-+
- #ifdef CONFIG_DEBUG_PAGEALLOC
- void __kernel_map_pages(struct page *page, int numpages, int enable)
- {
-@@ -156,29 +182,12 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
-  */
- bool kernel_page_present(struct page *page)
- {
--	pgd_t *pgd;
--	pud_t *pud;
--	pmd_t *pmd;
--	pte_t *pte;
- 	unsigned long addr = (unsigned long)page_address(page);
-+	pte_t *pte = lookup_address(addr);
- 
--	pgd = pgd_offset_k(addr);
--	if (pgd_none(*pgd))
--		return false;
--
--	pud = pud_offset(pgd, addr);
--	if (pud_none(*pud))
--		return false;
--	if (pud_sect(*pud))
--		return true;
--
--	pmd = pmd_offset(pud, addr);
--	if (pmd_none(*pmd))
-+	if (!pte)
- 		return false;
--	if (pmd_sect(*pmd))
--		return true;
- 
--	pte = pte_offset_kernel(pmd, addr);
- 	return pte_valid(*pte);
- }
- #endif /* CONFIG_HIBERNATION */
-diff --git a/include/xen/arm/page.h b/include/xen/arm/page.h
-index 415dbc6e43fd..6adc2a955340 100644
---- a/include/xen/arm/page.h
-+++ b/include/xen/arm/page.h
-@@ -84,16 +84,6 @@ static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
- 	BUG();
- }
- 
--/* TODO: this shouldn't be here but it is because the frontend drivers
-- * are using it (its rolled in headers) even though we won't hit the code path.
-- * So for right now just punt with this.
-- */
--static inline pte_t *lookup_address(unsigned long address, unsigned int *level)
--{
--	BUG();
--	return NULL;
--}
--
- extern int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
- 				   struct gnttab_map_grant_ref *kmap_ops,
- 				   struct page **pages, unsigned int count);
--- 
-2.11.0
+Usually we consider the address got from APEI table is poison. If so, I want to know, without RAS and APEI table, how it identify the address to hwpoison?
