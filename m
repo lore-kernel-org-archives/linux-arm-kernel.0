@@ -1,49 +1,43 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Fri,  8 Sep 2017 10:10:31 +0200
-Subject: [PATCH v4 1/3] PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on
- bus device
+Date: Fri,  8 Sep 2017 10:10:32 +0200
+Subject: [PATCH v4 2/3] PCI: Avoid bus reset for Cavium cn8xxx root ports
 In-Reply-To: <20170908081033.3025-1-jglauber@cavium.com>
 References: <20170908081033.3025-1-jglauber@cavium.com>
-Message-ID: <20170908081033.3025-2-jglauber@cavium.com>
+Message-ID: <20170908081033.3025-3-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-When checking to see if a PCI bus can safely be reset, we check to see
-if any of the children have their PCI_DEV_FLAGS_NO_BUS_RESET flag set.
-As these devices are known not to behave well after a bus reset.
-
-Some PCIe root port bridges also do not behave well after a bus reset,
-sometimes causing the devices behind the bridge to become unusable.
-
-Add a check for the PCI_DEV_FLAGS_NO_BUS_RESET flag being set in the
-bridge device to allow these bridges to be flagged, and prevent their
-buses from being reset.
-
-A follow on patch will add a quirk for this type of bridge.
+Root ports of cn8xxx do not function after bus reset when used with
+some e1000e and LSI HBA devices. Add a quirk to prevent bus reset on
+these root ports.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
-[jglauber at cavium.com: fixed typo]
+[jglauber at cavium.com: fixed typo and whitespaces]
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/pci/pci.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pci/quirks.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index fdf65a6c13f6..b2a46ca7f133 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4325,6 +4325,10 @@ static bool pci_bus_resetable(struct pci_bus *bus)
- {
- 	struct pci_dev *dev;
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 140760403f36..2e4e7b6d1a79 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -3364,6 +3364,14 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0032, quirk_no_bus_reset);
+ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x003c, quirk_no_bus_reset);
+ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0033, quirk_no_bus_reset);
  
++/*
++ * Root port on some Cavium CN8xxx chips do not successfully complete
++ * a bus reset when used with certain types of child devices. Config
++ * space access to the child may quit responding. Flag the root port
++ * as not supporting bus reset.
++ */
++DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_no_bus_reset);
 +
-+	if (bus->self && (bus->self->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET))
-+		return false;
-+
- 	list_for_each_entry(dev, &bus->devices, bus_list) {
- 		if (dev->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET ||
- 		    (dev->subordinate && !pci_bus_resetable(dev->subordinate)))
+ static void quirk_no_pm_reset(struct pci_dev *dev)
+ {
+ 	/*
 -- 
 2.9.0.rc0.21.g7777322
