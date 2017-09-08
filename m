@@ -1,111 +1,196 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 08 Sep 2017 11:48:30 +0900
-Subject: [PATCH v2 2/3] ARM: dts: exynos: Add clean name of compatible.
-In-Reply-To: <adb813cf-e4f3-a9c6-1f7a-8c6d1638c28c@samsung.com>
-References: <1504777143-29834-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170907093912epcas2p2c012de3af3915a58d889c2d48e283705@epcas2p2.samsung.com>
- <1504777143-29834-3-git-send-email-hoegeun.kwon@samsung.com>
- <adb813cf-e4f3-a9c6-1f7a-8c6d1638c28c@samsung.com>
-Message-ID: <56587be3-a08e-f9a0-6d55-287ed3e1aad9@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 8 Sep 2017 11:50:45 +0900
+Subject: [PATCH 09/14] arm64: kexec_file: add sha256 digest check in
+ purgatory
+In-Reply-To: <20170825104133.GB3127@leverpostej>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-10-takahiro.akashi@linaro.org>
+ <20170824170440.GD29665@leverpostej>
+ <20170825012103.GB7245@akashi-kouhiroshi-no-MacBook-Air.local>
+ <20170825104133.GB3127@leverpostej>
+Message-ID: <20170908025044.GD17186@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2017 08:27 PM, Marek Szyprowski wrote:
-> Hi Hoegeun,
->
-> On 2017-09-07 11:39, Hoegeun Kwon wrote:
->> Exynos 5250 and 5420 have different hardware rotation limits. However,
->> currently it uses only one compatible - "exynos5-gsc". Since we have
->> to distinguish between these two, we add different compatible.
->>
->> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
->
-> The new values (5250/5420 specific) should replace old exynos5-gsc, 
-> there is no
-> point providing both in dts.
->
+On Fri, Aug 25, 2017 at 11:41:33AM +0100, Mark Rutland wrote:
+> On Fri, Aug 25, 2017 at 10:21:06AM +0900, AKASHI Takahiro wrote:
+> > On Thu, Aug 24, 2017 at 06:04:40PM +0100, Mark Rutland wrote:
+> > > On Thu, Aug 24, 2017 at 05:18:06PM +0900, AKASHI Takahiro wrote:
+> > > > Most of sha256 code is based on crypto/sha256-glue.c, particularly using
+> > > > non-neon version.
+> > > > 
+> > > > Please note that we won't be able to re-use lib/mem*.S for purgatory
+> > > > because unaligned memory access is not allowed in purgatory where mmu
+> > > > is turned off.
+> > > > 
+> > > > Since purgatory is not linked with the other part of kernel, care must be
+> > > > taken of selecting an appropriate set of compiler options in order to
+> > > > prevent undefined symbol references from being generated.
+> > > 
+> > > What is the point in performing this check in the purgatory code, when
+> > > this will presumably have been checked when the image is loaded?
+> > 
+> > Well, this is what x86 does :)
+> > On powerpc, meanwhile, they don't have this check.
+> > 
+> > Maybe to avoid booting corrupted kernel after loading?
+> > (loaded data are now protected by making them unmapped, though.)
+> 
+> I'd really prefer to avoid this, since it seems to be what necessitates
+> all the complexity for executing C code (linking and all), and it's
+> going to be very slow to execute with the MMU off.
+> 
+> If you can deliberately corrupt the next kernel, you could also have
+> corrupted the purgatory to skip the check.
+> 
+> Unless we have a strong reason to want the hash check, I think it should
+> be dropped.
 
-Hi Marek,
+As I said, I will drop the code in v2 :)
 
-Thanks for your review.
+> > > > diff --git a/arch/arm64/purgatory/entry.S b/arch/arm64/purgatory/entry.S
+> > > > index bc4e6b3bf8a1..74d028b838bd 100644
+> > > > --- a/arch/arm64/purgatory/entry.S
+> > > > +++ b/arch/arm64/purgatory/entry.S
+> > > > @@ -6,6 +6,11 @@
+> > > >  .text
+> > > >  
+> > > >  ENTRY(purgatory_start)
+> > > > +	adr	x19, .Lstack
+> > > > +	mov	sp, x19
+> > > > +
+> > > > +	bl	purgatory
+> > > > +
+> > > >  	/* Start new image. */
+> > > >  	ldr	x17, arm64_kernel_entry
+> > > >  	ldr	x0, arm64_dtb_addr
+> > > > @@ -15,6 +20,14 @@ ENTRY(purgatory_start)
+> > > >  	br	x17
+> > > >  END(purgatory_start)
+> > > >  
+> > > > +.ltorg
+> > > > +
+> > > > +.align 4
+> > > > +	.rept	256
+> > > > +	.quad	0
+> > > > +	.endr
+> > > > +.Lstack:
+> > > > +
+> > > >  .data
+> > > 
+> > > Why is the stack in .text?
+> > 
+> > to call verify_sha256_digest() from asm
+> 
+> Won't that also work if the stack is in .data? or .bss?
+> 
+> ... or is there a particular need for it to be in .text?
+> 
+> > > Does this need to be zeroed?
+> > 
+> > No :)
+> 
+> Ok, so we can probably do:
+> 
+> 	.data
+> 	.align 4
+> 	. += PURGATORY_STACK_SIZE
+> .Lstack_ptr:
+> 
+> ... assuming we need to run C code.
+> 
+> [...]
+> 
+> > > > diff --git a/arch/arm64/purgatory/sha256.c b/arch/arm64/purgatory/sha256.c
+> > > > new file mode 100644
+> > > > index 000000000000..5d20d81767e3
+> > > > --- /dev/null
+> > > > +++ b/arch/arm64/purgatory/sha256.c
+> > > > @@ -0,0 +1,79 @@
+> > > > +#include <linux/kexec.h>
+> > > > +#include <linux/purgatory.h>
+> > > > +#include <linux/types.h>
+> > > > +
+> > > > +/*
+> > > > + * Under KASAN, those are defined as un-instrumented version, __memxxx()
+> > > > + */
+> > > > +#undef memcmp
+> > > > +#undef memcpy
+> > > > +#undef memset
+> > > 
+> > > This doesn't look like the right place for this undeffery; it looks
+> > > rather fragile.
+> > 
+> > Yeah, I agree, but if not there, __memxxx() are used.
+> 
+> Ok, but we'll have to add this to every C file used in the purgatory
+> code, or at the start of any header that uses a memxxx() function, or it
+> might still be overridden to use __memxxx(), before the undef takes
+> effect.
+> 
+> Can we define __memxxx() instead?
+> 
+> [...]
+> 
+> > > > +void *memcpy(void *dst, const void *src, size_t len)
+> > > > +{
+> > > > +	int i;
+> > > > +
+> > > > +	for (i = 0; i < len; i++)
+> > > > +		((u8 *)dst)[i] = ((u8 *)src)[i];
+> > > > +
+> > > > +	return NULL;
+> > > > +}
+> > > > +
+> > > > +void *memset(void *dst, int c, size_t len)
+> > > > +{
+> > > > +	int i;
+> > > > +
+> > > > +	for (i = 0; i < len; i++)
+> > > > +		((u8 *)dst)[i] = (u8)c;
+> > > > +
+> > > > +	return NULL;
+> > > > +}
+> > > > +
+> > > > +int memcmp(const void *src, const void *dst, size_t len)
+> > > > +{
+> > > > +	int i;
+> > > > +
+> > > > +	for (i = 0; i < len; i++)
+> > > > +		if (*(char *)src != *(char *)dst)
+> > > > +			return 1;
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > 
+> > > How is the compiler prevented from "optimising" these into calls to
+> > > themselves?
+> > 
+> > I don't get what you mean by "calls to themselves."
+> 
+> There are compiler optimizations that recognise sequences like:
+> 
+> 	for (i = 0; i < len; i++)
+> 		dst[i] = src[i];
+> 
+> ... and turn those into:
+> 
+> 	memcpy(dst, src, len);
+> 
+> ... these have been known to "optimize" memcpy implementations into
+> calls to themselves. Likewise for other string operations.
+> 
+> One way we avoid that today is by writing our memcpy in assembly.
 
-I used both compatibles to not modify v4l2.
-But v4l2 will also be fixed, so 'exynos5-gsc' will be removed.
+I see, thanks.
 
-And also, Thanks for your comment for of_device_get_match_data() of 
-patch(3/3).
+> Do we have a guarnatee that this will not happen here? e.g. do we pass
+> some compiler flag that prevents this?
 
-Best regards,
-Hoegeun
+I don't know any options to do this.
+(maybe -nostdlib?)
 
->> ---
->>   arch/arm/boot/dts/exynos5250.dtsi | 8 ++++----
->>   arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
->>   2 files changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi 
->> b/arch/arm/boot/dts/exynos5250.dtsi
->> index 8dbeb87..f795c76 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -637,7 +637,7 @@
->>           };
->>             gsc_0:  gsc at 13e00000 {
->> -            compatible = "samsung,exynos5-gsc";
->> +            compatible = "samsung,exynos5-gsc", 
->> samsung,exynos5250-gsc";
->>               reg = <0x13e00000 0x1000>;
->>               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
->>               power-domains = <&pd_gsc>;
->> @@ -647,7 +647,7 @@
->>           };
->>             gsc_1:  gsc at 13e10000 {
->> -            compatible = "samsung,exynos5-gsc";
->> +            compatible = "samsung,exynos5-gsc", 
->> samsung,exynos5250-gsc";
->>               reg = <0x13e10000 0x1000>;
->>               interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->>               power-domains = <&pd_gsc>;
->> @@ -657,7 +657,7 @@
->>           };
->>             gsc_2:  gsc at 13e20000 {
->> -            compatible = "samsung,exynos5-gsc";
->> +            compatible = "samsung,exynos5-gsc", 
->> samsung,exynos5250-gsc";
->>               reg = <0x13e20000 0x1000>;
->>               interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
->>               power-domains = <&pd_gsc>;
->> @@ -667,7 +667,7 @@
->>           };
->>             gsc_3:  gsc at 13e30000 {
->> -            compatible = "samsung,exynos5-gsc";
->> +            compatible = "samsung,exynos5-gsc", 
->> samsung,exynos5250-gsc";
->>               reg = <0x13e30000 0x1000>;
->>               interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
->>               power-domains = <&pd_gsc>;
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi 
->> b/arch/arm/boot/dts/exynos5420.dtsi
->> index 02d2f89..86afe77 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -658,7 +658,7 @@
->>           };
->>             gsc_0: video-scaler at 13e00000 {
->> -            compatible = "samsung,exynos5-gsc";
->> +            compatible = "samsung,exynos5-gsc", 
->> "samsung,exynos5420-gsc";
->>               reg = <0x13e00000 0x1000>;
->>               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
->>               clocks = <&clock CLK_GSCL0>;
->> @@ -668,7 +668,7 @@
->>           };
->>             gsc_1: video-scaler at 13e10000 {
->> -            compatible = "samsung,exynos5-gsc";
->> +            compatible = "samsung,exynos5-gsc", 
->> "samsung,exynos5420-gsc";
->>               reg = <0x13e10000 0x1000>;
->>               interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->>               clocks = <&clock CLK_GSCL1>;
->
-> Best regards
+-Takahiro AKASHI
+
+> Thanks,
+> Mark.
