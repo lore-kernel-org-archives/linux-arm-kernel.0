@@ -1,65 +1,52 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:35:55 +0200
-Subject: [PATCH v1 01/10] clk: at91: pmc: Wait for clocks when resuming
+Date: Fri,  8 Sep 2017 17:35:57 +0200
+Subject: [PATCH v1 03/10] clk: at91: pmc: Support backup for programmable
+ clocks
 In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-2-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-4-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wait for the syncronization of all clocks when resuming, not only the
-UPLL clock. Do not use regmap_read_poll_timeout, as it will call BUG()
-when interrupts are masked, which is the case in here.
+From: Romain Izard <romain.izard@mobile-devices.fr>
+
+Save and restore the System Clock and Programmable Clock register for
+the backup use case.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/clk/at91/pmc.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+ drivers/clk/at91/pmc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 775af473fe11..5c2b26de303e 100644
+index 07dc2861ad3f..5421b03553ec 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -107,10 +107,20 @@ static int pmc_suspend(void)
+@@ -66,6 +66,7 @@ static struct
+ 	u32 pcr[PMC_MAX_IDS];
+ 	u32 audio_pll0;
+ 	u32 audio_pll1;
++	u32 pckr[3];
+ } pmc_cache;
+ 
+ void pmc_register_id(u8 id)
+@@ -103,6 +104,8 @@ static int pmc_suspend(void)
+ 		regmap_read(pmcreg, AT91_PMC_PCR,
+ 			    &pmc_cache.pcr[registered_ids[i]]);
+ 	}
++	for (i = 0; i < 3; i++)
++		regmap_read(pmcreg, AT91_PMC_PCKR(i), &pmc_cache.pckr[i]);
+ 
  	return 0;
  }
- 
-+static bool pmc_ready(unsigned int mask)
-+{
-+	unsigned int status;
-+
-+	regmap_read(pmcreg, AT91_PMC_SR, &status);
-+
-+	return ((status & mask) == mask) ? 1 : 0;
-+}
-+
- static void pmc_resume(void)
- {
--	int i, ret = 0;
-+	int i;
- 	u32 tmp;
-+	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
- 
- 	regmap_read(pmcreg, AT91_PMC_MCKR, &tmp);
- 	if (pmc_cache.mckr != tmp)
-@@ -134,13 +144,11 @@ static void pmc_resume(void)
+@@ -143,6 +146,8 @@ static void pmc_resume(void)
+ 			     pmc_cache.pcr[registered_ids[i]] |
  			     AT91_PMC_PCR_CMD);
  	}
++	for (i = 0; i < 3; i++)
++		regmap_write(pmcreg, AT91_PMC_PCKR(i), pmc_cache.pckr[i]);
  
--	if (pmc_cache.uckr & AT91_PMC_UPLLEN) {
--		ret = regmap_read_poll_timeout(pmcreg, AT91_PMC_SR, tmp,
--					       !(tmp & AT91_PMC_LOCKU),
--					       10, 5000);
--		if (ret)
--			pr_crit("USB PLL didn't lock when resuming\n");
--	}
-+	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
-+		mask |= AT91_PMC_LOCKU;
-+
-+	while (!pmc_ready(mask))
-+		cpu_relax();
- }
- 
- static struct syscore_ops pmc_syscore_ops = {
+ 	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
+ 		mask |= AT91_PMC_LOCKU;
 -- 
 2.11.0
