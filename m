@@ -1,75 +1,89 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 Sep 2017 15:28:44 +0100
-Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
- PE/COFF sections
-In-Reply-To: <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
-References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
- <20170629081849.15081-6-ard.biesheuvel@linaro.org>
- <87r2vhs3il.fsf@free-electrons.com>
- <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
-Message-ID: <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 8 Sep 2017 23:44:13 +0900
+Subject: [PATCH net-next 2/3] net: ethernet: socionext: add AVE ethernet
+ driver
+In-Reply-To: <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1504875731-3680-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAK7LNASqfRbG08gvLxx4WxY2Vs2YYPkZ6NUpjj3_OOvOdEBKMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 8 September 2017 at 14:50, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> Hi Ard,
->>
->>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>
->>> To prevent unintended modifications to the kernel text (malicious or
->>> otherwise) while running the EFI stub, describe the kernel image as
->>> two separate sections: a .text section with read-execute permissions,
->>> covering .text, .rodata, .piggytext and the GOT sections (which the
->>> stub does not care about anyway), and a .data section with read-write
->>> permissions, covering .data and .bss.
->>>
->>> This relies on the firmware to actually take the section permission
->>> flags into account, but this is something that is currently being
->>> implemented in EDK2, which means we will likely start seeing it in
->>> the wild between one and two years from now.
->>
->> This patch had been merged in mainline yesterday and now prevent the
->> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
->> that more Socs are impacted because the number of boot fail exploded
->> according to kci:
->> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
->>
->
-> Ouch.
->
->> I found this patch after bisecting (I can provide the bisect log if
->> needed).
->>
->> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
->> multi_v7_defconfig but not with mvebu_v7_defconfig.
->>
->> Currently the solution is to revert this patch.
->>
->> Have you a better option?
->>
->
-> I will investigate.
+2017-09-08 22:02 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
 
-I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
-locally built zImage as well as the one built by kernelci.
-
-Could you please try whether this fixes things? It does not explain
-anything but it will help me figure out what is going on (hopefully)
+> diff --git a/drivers/net/ethernet/socionext/Kconfig b/drivers/net/ethernet/socionext/Kconfig
+> new file mode 100644
+> index 0000000..788f26f
+> --- /dev/null
+> +++ b/drivers/net/ethernet/socionext/Kconfig
+> @@ -0,0 +1,22 @@
+> +config NET_VENDOR_SOCIONEXT
+> +       bool "Socionext ethernet drivers"
+> +       default y
+> +       ---help---
+> +         Option to select ethernet drivers for Socionext platforms.
+> +
+> +         Note that the answer to this question doesn't directly affect the
+> +         kernel: saying N will just cause the configurator to skip all
+> +         the questions about Agere devices. If you say Y, you will be asked
+> +         for your specific card in the following questions.
 
 
-diff --git a/arch/arm/boot/compressed/efi-header.S
-b/arch/arm/boot/compressed/efi-header.S
-index c94a88ae834d..671a6e5b7b99 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -127,7 +127,7 @@ section_table:
+Agere?
 
-                .set    section_count, (. - section_table) / 40
 
--               .align  12
-+               .align  9
- __efi_start:
- #endif
-                .endm
+
+> +
+> +       dev_info(dev, "Socionext %c%c%c%c Ethernet IP %s (irq=%d, phy=%s)\n",
+> +                (ave_id >> 24) & 0xff, (ave_id >> 16) & 0xff,
+> +                (ave_id >> 8) & 0xff, (ave_id >> 0) & 0xff,
+> +                buf, ndev->irq, phy_modes(phy_mode));
+> +
+> +       return 0;
+> +err_netdev_register:
+
+Maybe, a bad label name.
+for ex. out_del_napi or whatever.
+
+Documentation/process/coding-style.rst says
+"Choose label names which say what the goto does ..."
+
+
+> +       netif_napi_del(&priv->napi_rx);
+> +       netif_napi_del(&priv->napi_tx);
+> +       mdiobus_unregister(priv->mdio);
+> +err_mdiobus_register:
+> +err_mdiobus_alloc:
+> +err_req_irq:
+
+These three should be merged, for ex.
+out_free_device.
+
+
+
+I ran sparse for you.
+
+Please take a look if it is worthwhile.
+Seems endianess around mac_addr.
+
+
+drivers/net/ethernet/socionext/sni_ave.c:423:15: warning: cast to
+restricted __le32
+drivers/net/ethernet/socionext/sni_ave.c:425:20: warning: cast to
+restricted __le16
+drivers/net/ethernet/socionext/sni_ave.c:1194:15: warning: cast to
+restricted __le32
+drivers/net/ethernet/socionext/sni_ave.c:1196:20: warning: cast to
+restricted __le16
+drivers/net/ethernet/socionext/sni_ave.c:1398:15: warning: cast to
+restricted __le32
+drivers/net/ethernet/socionext/sni_ave.c:1400:20: warning: cast to
+restricted __le16
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
