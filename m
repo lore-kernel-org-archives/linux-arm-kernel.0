@@ -1,41 +1,79 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Fri, 8 Sep 2017 15:46:36 -0500
-Subject: [PATCH 1/3] dt-bindings: spi: spi-davinci: Update binding for 66AK2Gx
- pwr dm property
+Date: Fri, 8 Sep 2017 15:46:37 -0500
+Subject: [PATCH 2/3] ARM: dts: keystone-k2g: Add SPI nodes
 In-Reply-To: <20170908204638.13149-1-fcooper@ti.com>
 References: <20170908204638.13149-1-fcooper@ti.com>
-Message-ID: <20170908204638.13149-2-fcooper@ti.com>
+Message-ID: <20170908204638.13149-3-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm-domains property which is required for 66AK2Gx. Also document 66AK2G
-unique clocks property usage.
+From: Vitaly Andrianov <vitalya@ti.com>
 
+Add nodes for the various SPI instances.
+
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- Documentation/devicetree/bindings/spi/spi-davinci.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/keystone-k2g.dtsi | 48 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-index f5916c9..1925277 100644
---- a/Documentation/devicetree/bindings/spi/spi-davinci.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-@@ -24,6 +24,16 @@ Required properties:
- 	based on a specific SoC configuration.
- - interrupts: interrupt number mapped to CPU.
- - clocks: spi clk phandle
-+          For 66AK2G this property should be set per binding,
-+          Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index 826b286..9f9e9e1 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -343,5 +343,53 @@
+ 			clock-names = "fck", "mmchsdb_fck";
+ 			status = "disabled";
+ 		};
 +
-+SoC-specific Required Properties:
++		spi0: spi at 21805400 {
++			compatible = "ti,keystone-spi";
++			reg = <0x21805400 0x200>;
++			num-cs = <4>;
++			ti,davinci-spi-intr-line = <0>;
++			interrupts = <GIC_SPI 64 IRQ_TYPE_EDGE_RISING>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			power-domains = <&k2g_pds 0x0010>;
++			clocks = <&k2g_clks 0x0010 0>;
++		};
 +
-+The following are mandatory properties for Keystone 2 66AK2G SoCs only:
++		spi1: spi at 21805800 {
++			compatible = "ti,keystone-spi";
++			reg = <0x21805800 0x200>;
++			num-cs = <4>;
++			ti,davinci-spi-intr-line = <0>;
++			interrupts = <GIC_SPI 66 IRQ_TYPE_EDGE_RISING>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			power-domains = <&k2g_pds 0x0011>;
++			clocks = <&k2g_clks 0x0011 0>;
++		};
 +
-+- power-domains:	Should contain a phandle to a PM domain provider node
-+			and an args specifier containing the SPI device id
-+			value. This property is as per the binding,
- 
- Optional:
- - cs-gpios: gpio chip selects
++		spi2: spi at 21805c00 {
++			compatible = "ti,keystone-spi";
++			reg = <0x21805C00 0x200>;
++			num-cs = <4>;
++			ti,davinci-spi-intr-line = <0>;
++			interrupts = <GIC_SPI 68 IRQ_TYPE_EDGE_RISING>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			power-domains = <&k2g_pds 0x0012>;
++			clocks = <&k2g_clks 0x0012 0>;
++		};
++
++		spi3: spi at 21806000 {
++			compatible = "ti,keystone-spi";
++			reg = <0x21806000 0x200>;
++			num-cs = <4>;
++			ti,davinci-spi-intr-line = <0>;
++			interrupts = <GIC_SPI 70 IRQ_TYPE_EDGE_RISING>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			power-domains = <&k2g_pds 0x0013>;
++			clocks = <&k2g_clks 0x0013 0>;
++		};
+ 	};
+ };
 -- 
 2.9.4.dirty
