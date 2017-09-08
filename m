@@ -1,28 +1,109 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 8 Sep 2017 08:44:22 -0700
-Subject: [PATCH v6 10/11] mm: add a user_virt_to_phys symbol
-In-Reply-To: <20170908075519.GD4957@infradead.org>
-References: <20170907173609.22696-1-tycho@docker.com>
- <20170907173609.22696-11-tycho@docker.com>
- <20170908075519.GD4957@infradead.org>
-Message-ID: <CAGXu5jL8wRg2307wKkGf9ASZHTtYZMwPzn10100-Mfmx9p2=Fg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 08 Sep 2017 17:39:17 +0200
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <20170908153143.27279-1-ard.biesheuvel@linaro.org> (Ard
+ Biesheuvel's message of "Fri, 8 Sep 2017 16:31:43 +0100")
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+Message-ID: <8760ctryhm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 8, 2017 at 12:55 AM, Christoph Hellwig <hch@infradead.org> wrote:
-> On Thu, Sep 07, 2017 at 11:36:08AM -0600, Tycho Andersen wrote:
->> We need someting like this for testing XPFO. Since it's architecture
->> specific, putting it in the test code is slightly awkward, so let's make it
->> an arch-specific symbol and export it for use in LKDTM.
->
-> We really should not add an export for this.
->
-> I think you'll want to just open code it in your test module.
+Hi Ard,
+ 
+ On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Isn't that going to be fragile? Why not an export?
+> As it turns out, building the ARM kernel with EFI support pulls in
+> a couple of sections that we don't really need in the decompressor.
+> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
+> memory map, which is an exported symbol pulled in from lib/sort.c.
+>
+> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
+> separate PE/COFF sections"), this resulted in the following layout
+> for the decompressor ELF binary.
+>
+>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
+>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
+>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
+>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
+>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
+>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
+>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
+>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
+>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
+>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
+>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
+>
+> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
+> UEFI firmware to map the decompressor with strict R-X/RW- permissions
+> before invoking it. Unfortunately, this turns out to break the boot on
+> some systems, because the linker now also moves the ksymtab/kcrctab
+> sections around, resulting in .piggydata to appear misaligned.
+>
+>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
+>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
+>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
+>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
+>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
+>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
+>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
+>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
+>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
+>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
+>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
+>
+> So let's align piggydata explicitly, and discard these sections from the
+> binary.
+>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
--Kees
+Actually I had not tested a kernel with these two changes in the same
+time. But now I've just done it, and it still works, so the patch and my
+tested-by remain valid.
+
+Thanks!
+
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/boot/compressed/piggy.S       | 1 +
+>  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
+> index f72088495f43..5d52c556dd32 100644
+> --- a/arch/arm/boot/compressed/piggy.S
+> +++ b/arch/arm/boot/compressed/piggy.S
+> @@ -1,5 +1,6 @@
+>  	.section .piggydata,#alloc
+>  	.globl	input_data
+> +	.align	2
+>  input_data:
+>  	.incbin	"arch/arm/boot/compressed/piggy_data"
+>  	.globl	input_data_end
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index 7a4c59154361..5c5265be4605 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -29,6 +29,7 @@ SECTIONS
+>       * of the text/got segments.
+>       */
+>      *(.data)
+> +    *(*ksymtab* *kcrctab*)
+>    }
+>  
+>    . = TEXT_START;
+> -- 
+> 2.11.0
+>
 
 -- 
-Kees Cook
-Pixel Security
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
