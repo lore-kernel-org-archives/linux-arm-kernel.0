@@ -1,70 +1,75 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 8 Sep 2017 16:37:10 +0200
-Subject: [PATCH 05/10] dmaengine: sun6i: Move number of
- pchans/vchans/request to device struct
-In-Reply-To: <3533197.81BdoSVRz8@sbruens-linux>
-References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
- <20170903224100.17893-6-stefan.bruens@rwth-aachen.de>
- <20170904074355.niloziky42aki7bg@flea>
- <3533197.81BdoSVRz8@sbruens-linux>
-Message-ID: <20170908143710.rhz6x3i776zrhbzo@flea.lan>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Sep 2017 15:28:44 +0100
+Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
+ PE/COFF sections
+In-Reply-To: <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
+References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
+ <20170629081849.15081-6-ard.biesheuvel@linaro.org>
+ <87r2vhs3il.fsf@free-electrons.com>
+ <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
+Message-ID: <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 02:30:59PM +0000, Br?ns, Stefan wrote:
-> On Montag, 4. September 2017 09:43:55 CEST Maxime Ripard wrote:
-> > On Mon, Sep 04, 2017 at 12:40:56AM +0200, Stefan Br?ns wrote:
-> > > Preparatory patch: If the same compatible is used for different SoCs which
-> > > have a common register layout, but different number of channels, the
-> > > channel count can no longer be stored in the config. Store it in the
-> > > device structure instead.
-> > > 
-> > > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-> > 
-> > As stated already, we already are going to have a different
-> > compatible, and this is not something that will change from one
-> > instance to the other. Having code is therefore:
-> >   A) Making the code more complex
-> >   B) For no particular reason.
-> 
-> If the dma channel count (which is a standard dma binding, likely for a 
-> reason) goes into the devicetree, it has to be moved out of the config.
+On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 8 September 2017 at 14:50, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> Hi Ard,
+>>
+>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
+>>> To prevent unintended modifications to the kernel text (malicious or
+>>> otherwise) while running the EFI stub, describe the kernel image as
+>>> two separate sections: a .text section with read-execute permissions,
+>>> covering .text, .rodata, .piggytext and the GOT sections (which the
+>>> stub does not care about anyway), and a .data section with read-write
+>>> permissions, covering .data and .bss.
+>>>
+>>> This relies on the firmware to actually take the section permission
+>>> flags into account, but this is something that is currently being
+>>> implemented in EDK2, which means we will likely start seeing it in
+>>> the wild between one and two years from now.
+>>
+>> This patch had been merged in mainline yesterday and now prevent the
+>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
+>> that more Socs are impacted because the number of boot fail exploded
+>> according to kci:
+>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
+>>
 >
-> The R40 (which has register manuals available) has the same register layout as 
-> the A64, but *does* have a different channel count. So you think it is a good 
-> idea to introduce a new compatible again?
-> 
-> If you had been half as picky when merging the H3 and A83T support, we would 
-> not have this mess now.
-> 
-> There is also the H6, where there is no register manual available yet, but I  
-> bet it has the H3 (and A64, H5, R40) register layout, but unlikely the same 
-> number of DMA channels *and* the same number of ports.
+> Ouch.
+>
+>> I found this patch after bisecting (I can provide the bisect log if
+>> needed).
+>>
+>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
+>> multi_v7_defconfig but not with mvebu_v7_defconfig.
+>>
+>> Currently the solution is to revert this patch.
+>>
+>> Have you a better option?
+>>
+>
+> I will investigate.
 
-The thing is that this kind of things usually grow organically until
-you can't just add a simple if case any more.
+I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
+locally built zImage as well as the one built by kernelci.
 
-I'm sorry you were at the tipping point, but I'm sure you also
-understand that adding more to the mess until the next one shows up
-isn't viable either.
+Could you please try whether this fixes things? It does not explain
+anything but it will help me figure out what is going on (hopefully)
 
-That being said, thinking a bit more on that one, if you add to the
-binding that we need to have both the current SoC compatible (to
-workaround any variation / bugs we might encounter in the future) and
-the "generation" one (to avoid adding one for each new IP), plus the
-mandatory dma-channels / dma-requests properties, that would work for
-me.
 
-Maxime
+diff --git a/arch/arm/boot/compressed/efi-header.S
+b/arch/arm/boot/compressed/efi-header.S
+index c94a88ae834d..671a6e5b7b99 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -127,7 +127,7 @@ section_table:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/67b516d8/attachment.sig>
+                .set    section_count, (. - section_table) / 40
+
+-               .align  12
++               .align  9
+ __efi_start:
+ #endif
+                .endm
