@@ -1,143 +1,130 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:36:01 +0200
-Subject: [PATCH v1 07/10] iio:adc:at91-sama5d2: Support backup mode
+Date: Fri,  8 Sep 2017 17:36:03 +0200
+Subject: [PATCH v1 09/10] atmel_flexcom: Support backup mode
 In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-8-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-10-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the backup mode for platform suspend, by restoring the hardware
-registers on resume.
+The controller used by a flexcom module is configured at boot, and left
+alone after this. As the configuration will be lost after backup mode,
+restore the state of the flexcom driver on resume.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/iio/adc/at91-sama5d2_adc.c | 71 ++++++++++++++++++++++++++++++++------
- 1 file changed, 61 insertions(+), 10 deletions(-)
+ drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 50 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-index e10dca3ed74b..f9718c863363 100644
---- a/drivers/iio/adc/at91-sama5d2_adc.c
-+++ b/drivers/iio/adc/at91-sama5d2_adc.c
-@@ -200,6 +200,7 @@ struct at91_adc_state {
- 	u32				conversion_value;
- 	struct at91_adc_soc_info	soc_info;
- 	wait_queue_head_t		wq_data_available;
-+	unsigned int			current_rate;
- 	/*
- 	 * lock to prevent concurrent 'single conversion' requests through
- 	 * sysfs.
-@@ -269,6 +270,8 @@ static void at91_adc_setup_samp_freq(struct at91_adc_state *st, unsigned freq)
- 	mr |= AT91_SAMA5D2_MR_PRESCAL(prescal);
- 	at91_adc_writel(st, AT91_SAMA5D2_MR, mr);
+diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+index 064bde9cff5a..ef1235c4a179 100644
+--- a/drivers/mfd/atmel-flexcom.c
++++ b/drivers/mfd/atmel-flexcom.c
+@@ -39,34 +39,44 @@
+ #define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
+ 				 FLEX_MR_OPMODE_MASK)
  
-+	st->current_rate = freq;
++struct atmel_flexcom {
++	void __iomem *base;
++	u32 opmode;
++	struct clk *clk;
++};
+ 
+ static int atmel_flexcom_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	struct clk *clk;
+ 	struct resource *res;
+-	void __iomem *base;
+-	u32 opmode;
++	struct atmel_flexcom *afc;
+ 	int err;
++	u32 val;
 +
- 	dev_dbg(&indio_dev->dev, "freq: %u, startup: %u, prescal: %u\n",
- 		freq, startup, prescal);
- }
-@@ -375,7 +378,9 @@ static int at91_adc_write_raw(struct iio_dev *indio_dev,
- 	    val > st->soc_info.max_sample_rate)
++	afc = devm_kzalloc(&pdev->dev, sizeof(*afc), GFP_KERNEL);
++	if (!afc)
++		return -ENOMEM;
+ 
+-	err = of_property_read_u32(np, "atmel,flexcom-mode", &opmode);
++	platform_set_drvdata(pdev, afc);
++
++	err = of_property_read_u32(np, "atmel,flexcom-mode", &afc->opmode);
+ 	if (err)
+ 		return err;
+ 
+-	if (opmode < ATMEL_FLEXCOM_MODE_USART ||
+-	    opmode > ATMEL_FLEXCOM_MODE_TWI)
++	if (afc->opmode < ATMEL_FLEXCOM_MODE_USART ||
++	    afc->opmode > ATMEL_FLEXCOM_MODE_TWI)
  		return -EINVAL;
  
-+	mutex_lock(&st->lock);
- 	at91_adc_setup_samp_freq(st, val);
-+	mutex_unlock(&st->lock);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
++	afc->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(afc->base))
++		return PTR_ERR(afc->base);
  
- 	return 0;
+-	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(clk))
+-		return PTR_ERR(clk);
++	afc->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(afc->clk))
++		return PTR_ERR(afc->clk);
+ 
+-	err = clk_prepare_enable(clk);
++	err = clk_prepare_enable(afc->clk);
+ 	if (err)
+ 		return err;
+ 
+@@ -76,9 +86,10 @@ static int atmel_flexcom_probe(struct platform_device *pdev)
+ 	 * inaccessible and are read as zero. Also the external I/O lines of the
+ 	 * Flexcom are muxed to reach the selected device.
+ 	 */
+-	writel(FLEX_MR_OPMODE(opmode), base + FLEX_MR);
++	val = FLEX_MR_OPMODE(afc->opmode);
++	writel(val, afc->base + FLEX_MR);
+ 
+-	clk_disable_unprepare(clk);
++	clk_disable_unprepare(afc->clk);
+ 
+ 	return devm_of_platform_populate(&pdev->dev);
  }
-@@ -386,6 +391,21 @@ static const struct iio_info at91_adc_info = {
- 	.driver_module = THIS_MODULE,
+@@ -89,10 +100,34 @@ static const struct of_device_id atmel_flexcom_of_match[] = {
  };
- 
-+static void at91_adc_init_hw(struct at91_adc_state *st, unsigned int freq)
-+{
-+	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
-+	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
-+	/*
-+	 * Transfer field must be set to 2 according to the datasheet and
-+	 * allows different analog settings for each channel.
-+	 */
-+	at91_adc_writel(st, AT91_SAMA5D2_MR,
-+			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
-+
-+	at91_adc_setup_samp_freq(st, freq);
-+
-+}
-+
- static int at91_adc_probe(struct platform_device *pdev)
- {
- 	struct iio_dev *indio_dev;
-@@ -482,16 +502,7 @@ static int at91_adc_probe(struct platform_device *pdev)
- 		goto vref_disable;
- 	}
- 
--	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
--	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
--	/*
--	 * Transfer field must be set to 2 according to the datasheet and
--	 * allows different analog settings for each channel.
--	 */
--	at91_adc_writel(st, AT91_SAMA5D2_MR,
--			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
--
--	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
-+	at91_adc_init_hw(st, st->soc_info.min_sample_rate);
- 
- 	ret = clk_prepare_enable(st->per_clk);
- 	if (ret)
-@@ -541,12 +552,52 @@ static const struct of_device_id at91_adc_dt_match[] = {
- };
- MODULE_DEVICE_TABLE(of, at91_adc_dt_match);
+ MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
  
 +#ifdef CONFIG_PM_SLEEP
-+static int at91_adc_suspend(struct device *dev)
++static int atmel_flexcom_resume(struct device *dev)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-+	struct at91_adc_state *st = iio_priv(indio_dev);
++	struct atmel_flexcom *afc = dev_get_drvdata(dev);
++	int err;
++	u32 val;
 +
-+	clk_disable_unprepare(st->per_clk);
++	err = clk_prepare_enable(afc->clk);
++	if (err)
++		return err;
 +
-+	regulator_disable(st->vref);
-+	regulator_disable(st->reg);
++	val = FLEX_MR_OPMODE(afc->opmode),
++	writel(val, afc->base + FLEX_MR);
++
++	clk_disable_unprepare(afc->clk);
 +
 +	return 0;
 +}
-+
-+static int at91_adc_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-+	struct at91_adc_state *st = iio_priv(indio_dev);
-+	int err;
-+
-+	err = regulator_enable(st->reg);
-+	if (err)
-+		return err;
-+
-+	err = regulator_enable(st->vref);
-+	if (err)
-+		return err;
-+
-+	at91_adc_init_hw(st, st->current_rate);
-+
-+	err = clk_prepare_enable(st->per_clk);
-+	return err;
-+}
 +#endif
 +
-+static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
++static SIMPLE_DEV_PM_OPS(atmel_flexcom_pm_ops, NULL,
++			 atmel_flexcom_resume);
 +
- static struct platform_driver at91_adc_driver = {
- 	.probe = at91_adc_probe,
- 	.remove = at91_adc_remove,
- 	.driver = {
- 		.name = "at91-sama5d2_adc",
- 		.of_match_table = at91_adc_dt_match,
-+		.pm = &at91_adc_pm_ops,
+ static struct platform_driver atmel_flexcom_driver = {
+ 	.probe	= atmel_flexcom_probe,
+ 	.driver	= {
+ 		.name		= "atmel_flexcom",
++		.pm		= &atmel_flexcom_pm_ops,
+ 		.of_match_table	= atmel_flexcom_of_match,
  	},
  };
- module_platform_driver(at91_adc_driver)
 -- 
 2.11.0
