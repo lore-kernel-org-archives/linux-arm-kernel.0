@@ -1,34 +1,72 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:36:00 +0200
-Subject: [PATCH v1 06/10] ehci-atmel: Power down during suspend is normal
+Date: Fri,  8 Sep 2017 17:35:58 +0200
+Subject: [PATCH v1 04/10] mtd: nand: atmel: Avoid ECC errors when leaving
+ backup mode
 In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-7-romain.izard.pro@gmail.com>
+Message-ID: <20170908153604.28383-5-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an Atmel SoC is suspended with the backup mode, the USB bus will be
-powered down. As this is expected, do not return an error to the driver
-core when ehci_resume detects it.
+During backup mode, the contents of all registers will be cleared as the
+SoC will be completely powered down. For a product that boots on NAND
+Flash memory, the bootloader will obviously use the related controller
+to read the Flash and correct any detected error in the memory, before
+handling back control to the kernel's resuming entry point.
+
+In normal devices, it is up to the driver's suspend/resume code to
+restore the registers in a valid state. But the PMECC is not a regular
+device in the driver model when used with the legacy device tree binding
+for the Atmel NAND controller, and suspend/resume code is not called.
+
+As in my case the bootloader leaves the PMECC controller in a programmed
+state, and the controller is only reset at boot or after a NAND access,
+the first NAND Flash access with the Atmel controller will report
+uncorrectable ECC errors.
+
+To avoid this, systematically reset the PMECC controller before using
+it.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/usb/host/ehci-atmel.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/atmel/pmecc.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 7440722bfbf0..2a8b9bdc0e57 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -205,7 +205,8 @@ static int __maybe_unused ehci_atmel_drv_resume(struct device *dev)
- 	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
+diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
+index 8c210a5776bc..8d1208f38025 100644
+--- a/drivers/mtd/nand/atmel/pmecc.c
++++ b/drivers/mtd/nand/atmel/pmecc.c
+@@ -777,6 +777,9 @@ int atmel_pmecc_enable(struct atmel_pmecc_user *user, int op)
  
- 	atmel_start_clock(atmel_ehci);
--	return ehci_resume(hcd, false);
-+	ehci_resume(hcd, false);
-+	return 0;
+ 	mutex_lock(&user->pmecc->lock);
+ 
++	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
++	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
++
+ 	cfg = user->cache.cfg;
+ 	if (op == NAND_ECC_WRITE)
+ 		cfg |= PMECC_CFG_WRITE_OP;
+@@ -797,10 +800,6 @@ EXPORT_SYMBOL_GPL(atmel_pmecc_enable);
+ 
+ void atmel_pmecc_disable(struct atmel_pmecc_user *user)
+ {
+-	struct atmel_pmecc *pmecc = user->pmecc;
+-
+-	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
+-	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
+ 	mutex_unlock(&user->pmecc->lock);
+ }
+ EXPORT_SYMBOL_GPL(atmel_pmecc_disable);
+@@ -856,10 +855,6 @@ static struct atmel_pmecc *atmel_pmecc_create(struct platform_device *pdev,
+ 	/* Disable all interrupts before registering the PMECC handler. */
+ 	writel(0xffffffff, pmecc->regs.base + ATMEL_PMECC_IDR);
+ 
+-	/* Reset the ECC engine */
+-	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
+-	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
+-
+ 	return pmecc;
  }
  
- #ifdef CONFIG_OF
 -- 
 2.11.0
