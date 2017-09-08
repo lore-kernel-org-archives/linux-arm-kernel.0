@@ -1,79 +1,53 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 8 Sep 2017 14:34:27 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIHY2IDQvN10gYXJtNjQ6IGt2bTogc3VwcG9ydCB1c2Vy?=
- =?gb2312?Q?_space_to_query_RAS_extension_feature?=
-In-Reply-To: <59B1747A.5030909@arm.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
- <59A84F9D.8030309@arm.com> <29951852-8d91-7c33-c68b-ad8b4bbdea54@huawei.com>
- <59B1747A.5030909@arm.com>
-Message-ID: <0184EA26B2509940AA629AE1405DD7F2015F5A1C@DGGEMA503-MBX.china.huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 8 Sep 2017 16:39:13 +0200
+Subject: [PATCH 3/3] dmaengine: sun6i: Add support for Allwinner A64
+In-Reply-To: <d3d32839-12a8-71fa-cfec-03055d64388d@arm.com>
+References: <20170830233609.13855-4-stefan.bruens@rwth-aachen.de>
+ <20170901003135.10058-1-andre.przywara@arm.com>
+ <20170901060445.vboici7qxfkztp3s@flea>
+ <743ae23a-372a-762b-c345-b914f09fd718@arm.com>
+ <20170904070415.e6nclz5n23bo7f4v@flea>
+ <d3d32839-12a8-71fa-cfec-03055d64388d@arm.com>
+Message-ID: <20170908143913.6ga64ssakvk2mjis@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-  Thanks a lot for your detailed comments.
+Hi,
 
-CC Peter.
+On Mon, Sep 04, 2017 at 09:14:52AM +0100, Andr? Przywara wrote:
+> > And obviously, while maintaining the stability of the binding of those
+> > hundreds properties.
+> > 
+> > Or, you can base all this on the compatible, and be done with it once
+> > and for all.
+> 
+> What I am after is to cover SoCs which *don't* have differences in their
+> register layout, for instance A83T, H3, A64, R40.
+> In an ideal world we could have reused the H3 compatible string,
+> adjusting the number of channels for each SoC in the DT.
+> 
+> So I see that having a generic compatible name will not fly, as we now
+> have differences which should not be modelled by DT properties.
+> But I still think we should try to cover those non-register differences
+> (number of channels) with a DT property, to allow reusing the existing
+> driver code whenever possible. As is stands with this series, the R40
+> support should just be a matter of:
+> 	compatible = "allwinner,sun8i-r40-dma",
+> 		     "allwinner,sun50i-a64-dma";
 
-Peter is Qemu expert. Let us see his suggestion.
+I just suggested the exact same thing, and then saw your mail, so I
+guess we have an agreement :)
 
-> 
-> Hi gengdongjiu,
-> 
-> On 05/09/17 08:18, gengdongjiu wrote:
-> > On 2017/9/1 2:04, James Morse wrote:
-> >> On 28/08/17 11:38, Dongjiu Geng wrote:
-> >>> Userspace will want to check if the CPU has the RAS extension.
-> >>
-> >> ... but user-space wants to know if it can inject SErrors with a specified ESR.
-> >>
-> >> What if we gain another way of doing this that isn't via the
-> >> RAS-extensions, now user-space has to check for two capabilities.
-> >>
-> >>
-> >>> If it has, it wil specify the virtual SError syndrome value,
-> >>> otherwise it will not be set. This patch adds support for querying
-> >>> the availability of this extension.
-> >>
-> >> I'm against telling user-space what features the CPU has unless it
-> >> can use them directly. In this case we are talking about a KVM API,
-> >> so we should describe the API not the CPU.
-> >
-> > shenglong (zhaoshenglong at huawei.com) who is Qemu maintainer suggested
-> > checking the CPU RAS-extensions to decide whether generate the APEI table and record CPER for the guest OS in the user space.
-> > he means if the host does not support RAS, user space may also not support RAS.
-> 
-> The code to signal memory-failure to user-space doesn't depend on the CPU's RAS-extensions.
-> 
-> If Qemu supports notifying the guest about RAS errors using CPER records, it should generate a HEST describing firmware first. It can then
-> choose the notification methods, some of which may require optional KVM APIs to support.
-> 
-> Seattle has a HEST, it doesn't support the CPU RAS-extensions. The kernel can notify user-space about memory_failure() on this machine. I
-> would expect Qemu to be able to receive signals and describe memory errors to a guest (1).
-> 
-> The question should be: 'How can Qemu know it can use SEI as a firmware-first notification?' It needs a KVM API to trigger an SError in the
-> guest with a specified ESR. The name of the KVM CAP needs to reflect the API (2).
-> 
-> Just because this is the first KVM API that needs the CPU to have the RAS extensions doesn't mean we should call it 'has RAS' and be done
-> with it.
-> 
-> We will eventually need another KVM API to configure trapping and emulating values in the RAS ERR registers so that Qemu can emulate a
-> machine without firmware-first. (This is likely to be a page of memory that backs the registers, there will need to be another KVM CAP to
-> describe this support (3)).
-> 
-> 
-> Exposing the CPUs support for RAS-extensions to support (2) means having per-platform support for (1). This is either creating extra work,
-> or not supporting as many platforms as we could. Both are bad.
-> Once we have (3) as well, any developer needs to know that 'has RAS' just meant the first API KVM implemented using RAS, and doesn't
-> mean later APIs also using RAS are supported by the kernel.
+Maxime
 
-
-Hi Peter/ shenglong,
-   What is your idea about it? We may need to consult with you about it.
-
-> 
-> 
-> Thanks,
-> 
-> James
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170908/01b3c576/attachment.sig>
