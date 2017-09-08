@@ -1,141 +1,87 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 Sep 2017 16:18:06 +0100
-Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
- PE/COFF sections
-In-Reply-To: <87a825rzio.fsf@free-electrons.com>
-References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
- <20170629081849.15081-6-ard.biesheuvel@linaro.org>
- <87r2vhs3il.fsf@free-electrons.com>
- <CAKv+Gu9DVRE6jGEvdkfWwaJDhmTeaF2-CMi=JdFx3GS2Qqdy3A@mail.gmail.com>
- <CAKv+Gu9UF7-Dyjijvbc97yEF6zehQMyjOcV=RxFEJkNEebakUw@mail.gmail.com>
- <87mv65s1iu.fsf@free-electrons.com>
- <CAKv+Gu8e49ZmB6X=H2vE_dw1HA3CyOq0GN7cZOYJ+JpkTftGWA@mail.gmail.com>
- <87efrhs0gj.fsf@free-electrons.com>
- <CAKv+Gu8Aa7Y8SK2nJM2DXZzHbzZT6aq2Rt1wsgaLwz7_C3otJA@mail.gmail.com>
- <CAKv+Gu8hcT=_1iF4gaS==uGQWAb9-i0Y=XJ-MqgfQQyn1RmGtQ@mail.gmail.com>
- <87a825rzio.fsf@free-electrons.com>
-Message-ID: <CAKv+Gu8+piFk6k8pL35i9GzNaFVKRxHztCipnB0XhXwytd3bvA@mail.gmail.com>
+Date: Fri,  8 Sep 2017 16:31:43 +0100
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+Message-ID: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2017 at 16:17, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ard,
->
->  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> On 8 September 2017 at 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>> On 8 September 2017 at 15:56, Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> wrote:
->>>> Hi Ard,
->>>>
->>>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>
->>>>> On 8 September 2017 at 15:33, Gregory CLEMENT
->>>>> <gregory.clement@free-electrons.com> wrote:
->>>>>> Hi Ard,
->>>>>>
->>>>>>  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>
->>>>>>> On 8 September 2017 at 14:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>>> On 8 September 2017 at 14:50, Gregory CLEMENT
->>>>>>>> <gregory.clement@free-electrons.com> wrote:
->>>>>>>>> Hi Ard,
->>>>>>>>>
->>>>>>>>>  On jeu., juin 29 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>>>>>
->>>>>>>>>> To prevent unintended modifications to the kernel text (malicious or
->>>>>>>>>> otherwise) while running the EFI stub, describe the kernel image as
->>>>>>>>>> two separate sections: a .text section with read-execute permissions,
->>>>>>>>>> covering .text, .rodata, .piggytext and the GOT sections (which the
->>>>>>>>>> stub does not care about anyway), and a .data section with read-write
->>>>>>>>>> permissions, covering .data and .bss.
->>>>>>>>>>
->>>>>>>>>> This relies on the firmware to actually take the section permission
->>>>>>>>>> flags into account, but this is something that is currently being
->>>>>>>>>> implemented in EDK2, which means we will likely start seeing it in
->>>>>>>>>> the wild between one and two years from now.
->>>>>>>>>
->>>>>>>>> This patch had been merged in mainline yesterday and now prevent the
->>>>>>>>> Marvell Armada 370 and the Armada XP based SoC to boot. I also suspect
->>>>>>>>> that more Socs are impacted because the number of boot fail exploded
->>>>>>>>> according to kci:
->>>>>>>>> https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.13-8899-g8dc5b3a6cb2f/
->>>>>>>>>
->>>>>>>>
->>>>>>>> Ouch.
->>>>>>>>
->>>>>>>>> I found this patch after bisecting (I can provide the bisect log if
->>>>>>>>> needed).
->>>>>>>>>
->>>>>>>>> The kernel failed to boot only if CONFIG_EFI is enabled so it occurs in
->>>>>>>>> multi_v7_defconfig but not with mvebu_v7_defconfig.
->>>>>>>>>
->>>>>>>>> Currently the solution is to revert this patch.
->>>>>>>>>
->>>>>>>>> Have you a better option?
->>>>>>>>>
->>>>>>>>
->>>>>>>> I will investigate.
->>>>>>>
->>>>>>> I cannot reproduce this on QEMU or my Beaglebone white. I have tried a
->>>>>>> locally built zImage as well as the one built by kernelci.
->>>>>>>
->>>>>>> Could you please try whether this fixes things? It does not explain
->>>>>>> anything but it will help me figure out what is going on (hopefully)
->>>>>>
->>>>>> I've just tested this change and it didn't fix anything.
->>>>>>
->>>>>> Gregory
->>>>>>
->>>>>>>
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/compressed/efi-header.S
->>>>>>> b/arch/arm/boot/compressed/efi-header.S
->>>>>>> index c94a88ae834d..671a6e5b7b99 100644
->>>>>>> --- a/arch/arm/boot/compressed/efi-header.S
->>>>>>> +++ b/arch/arm/boot/compressed/efi-header.S
->>>>>>> @@ -127,7 +127,7 @@ section_table:
->>>>>>>
->>>>>>>                 .set    section_count, (. - section_table) / 40
->>>>>>>
->>>>>>> -               .align  12
->>>>>>> +               .align  9
->>>>>>>  __efi_start:
->>>>>>>  #endif
->>>>>>>                 .endm
->>>>>>
->>>>>
->>>>>
->>>>> How about this?
->>>>
->>>> It fixed the bug! (I tested with and without your previous patch and it
->>>> worked in both case)
->>>>
->>>> When you will send your patch, you can add my:
->>>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>>
->>
->> Would you mind checking whether this fixes the issue as well?
->>
->> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
->> index f72088495f43..5d52c556dd32 100644
->> --- a/arch/arm/boot/compressed/piggy.S
->> +++ b/arch/arm/boot/compressed/piggy.S
->> @@ -1,5 +1,6 @@
->>         .section .piggydata,#alloc
->>         .globl  input_data
->> +       .align  2
->>  input_data:
->>         .incbin "arch/arm/boot/compressed/piggy_data"
->>         .globl  input_data_end
->>
->> There may be other reasons than ksymtab entries that could result in
->> piggydata ending up unaligned in the decompressor (which is what
->> caused the issue before)
->> This is a better fix, because it addresses the root cause.
->
-> I've tested this single patch and it does not fix the boot issue :(
->
+As it turns out, building the ARM kernel with EFI support pulls in
+a couple of sections that we don't really need in the decompressor.
+This is due to the fact the the UEFI stub uses sort() to sort the UEFI
+memory map, which is an exported symbol pulled in from lib/sort.c.
 
-OK, strange. Anyway, thanks for testing. I will post the original fix then.
+Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
+separate PE/COFF sections"), this resulted in the following layout
+for the decompressor ELF binary.
+
+  [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+  [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
+  [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
+  [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
+  [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
+  [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
+  [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
+  [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
+  [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
+  [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
+  [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
+  [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
+
+Commit e4bae4d0b5f3 made some changes to the linker script to allow the
+UEFI firmware to map the decompressor with strict R-X/RW- permissions
+before invoking it. Unfortunately, this turns out to break the boot on
+some systems, because the linker now also moves the ksymtab/kcrctab
+sections around, resulting in .piggydata to appear misaligned.
+
+  [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+  [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
+  [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
+  [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
+  [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
+  [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
+  [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
+  [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
+  [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
+  [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
+  [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
+  [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
+
+So let's align piggydata explicitly, and discard these sections from the
+binary.
+
+Cc: Russell King <linux@armlinux.org.uk>
+Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/boot/compressed/piggy.S       | 1 +
+ arch/arm/boot/compressed/vmlinux.lds.S | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
+index f72088495f43..5d52c556dd32 100644
+--- a/arch/arm/boot/compressed/piggy.S
++++ b/arch/arm/boot/compressed/piggy.S
+@@ -1,5 +1,6 @@
+ 	.section .piggydata,#alloc
+ 	.globl	input_data
++	.align	2
+ input_data:
+ 	.incbin	"arch/arm/boot/compressed/piggy_data"
+ 	.globl	input_data_end
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+index 7a4c59154361..5c5265be4605 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.S
++++ b/arch/arm/boot/compressed/vmlinux.lds.S
+@@ -29,6 +29,7 @@ SECTIONS
+      * of the text/got segments.
+      */
+     *(.data)
++    *(*ksymtab* *kcrctab*)
+   }
+ 
+   . = TEXT_START;
+-- 
+2.11.0
