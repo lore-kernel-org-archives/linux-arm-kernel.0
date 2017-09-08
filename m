@@ -1,41 +1,42 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  8 Sep 2017 17:35:59 +0200
-Subject: [PATCH v1 05/10] mtd: nand: atmel: Report PMECC failures as errors
-In-Reply-To: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
-Message-ID: <20170908153604.28383-6-romain.izard.pro@gmail.com>
+Date: Fri,  8 Sep 2017 17:35:54 +0200
+Subject: [PATCH v1 00/10] Various patches for SAMA5D2 backup mode
+Message-ID: <20170908153604.28383-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not normal for the PMECC to fail when trying to fix ECC errors.
-Report these cases as errors.
+While the core of the backup mode for SAMA5D2 has been integrated in
+v4.13, it is far from complete. Individual controllers in the chip have
+drivers that do not support the reset of the registers during suspend,
+and they need to be adapted to handle it.
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/mtd/nand/atmel/pmecc.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+The first patch uses the clock wakeup code from the prototype backup
+mode instead of the version integrated in the mainline, as the mainline
+version is not stable. During a test loop with two-second backup
+suspend, the mainline version will hang in less than one day, whereas
+the prototype version has been running the same test for more than a
+week without hanging.
 
-diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
-index 8d1208f38025..2a23f1ff945f 100644
---- a/drivers/mtd/nand/atmel/pmecc.c
-+++ b/drivers/mtd/nand/atmel/pmecc.c
-@@ -687,6 +687,8 @@ static int atmel_pmecc_err_location(struct atmel_pmecc_user *user)
- 	 * Number of roots does not match the degree of smu
- 	 * unable to correct error.
- 	 */
-+	dev_err(pmecc->dev,
-+		"PMECC: Impossible to calculate error location.\n");
- 	return -EBADMSG;
- }
- 
-@@ -729,7 +731,7 @@ int atmel_pmecc_correct_sector(struct atmel_pmecc_user *user, int sector,
- 			ptr = ecc + byte - sectorsize;
- 			area = "ECC";
- 		} else {
--			dev_dbg(pmecc->dev,
-+			dev_err(pmecc->dev,
- 				"Invalid errpos value (%d, max is %d)\n",
- 				errpos, (sectorsize + eccbytes) * 8);
- 			return -EINVAL;
+Romain Izard (10):
+  clk: at91: pmc: Wait for clocks when resuming
+  clk: at91: pmc: Save SCSR during suspend
+  clk: at91: pmc: Support backup for programmable clocks
+  mtd: nand: atmel: Avoid ECC errors when leaving backup mode
+  mtd: nand: atmel: Report PMECC failures as errors
+  ehci-atmel: Power down during suspend is normal
+  iio:adc:at91-sama5d2: Support backup mode
+  pwm: atmel-tcb: Support backup mode
+  atmel_flexcom: Support backup mode
+  tty/serial: atmel: Prevent a warning on suspend
+
+ drivers/clk/at91/pmc.c             | 33 ++++++++++++------
+ drivers/iio/adc/at91-sama5d2_adc.c | 71 ++++++++++++++++++++++++++++++++------
+ drivers/mfd/atmel-flexcom.c        | 65 ++++++++++++++++++++++++++--------
+ drivers/mtd/nand/atmel/pmecc.c     | 15 ++++----
+ drivers/pwm/pwm-atmel-tcb.c        | 63 +++++++++++++++++++++++++++++++--
+ drivers/tty/serial/atmel_serial.c  | 13 +++++++
+ drivers/usb/host/ehci-atmel.c      |  3 +-
+ 7 files changed, 216 insertions(+), 47 deletions(-)
+
 -- 
 2.11.0
