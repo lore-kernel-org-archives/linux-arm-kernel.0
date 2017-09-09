@@ -1,39 +1,87 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Sep 2017 16:30:20 +0100
-Subject: arm: Export save_stack_trace_tsk()
-In-Reply-To: <001b01d3203f$c04a4e40$40deeac0$@codeaurora.org>
-References: <001b01d3203f$c04a4e40$40deeac0$@codeaurora.org>
-Message-ID: <20170909153020.GC20805@n2100.armlinux.org.uk>
+From: labbott@redhat.com (Laura Abbott)
+Date: Sat, 9 Sep 2017 08:38:20 -0700
+Subject: [PATCH v6 09/11] arm64/mm: disable section/contiguous mappings if
+ XPFO is enabled
+In-Reply-To: <20170907173609.22696-10-tycho@docker.com>
+References: <20170907173609.22696-1-tycho@docker.com>
+ <20170907173609.22696-10-tycho@docker.com>
+Message-ID: <17b9b826-366e-48f1-a117-e650b7a5811f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 01:53:49PM -0700, Dustin Brown wrote:
-> The kernel watchdog is a great debugging tool for finding tasks that
-> consume a disproportionate amount of CPU time in contiguous chunks. One
-> can imagine building a similar watchdog for arbitrary driver threads
-> using save_stack_trace_tsk() and print_stack_trace(). However, this is
-> not viable for dynamically loaded driver modules on ARM platforms
-> because save_stack_trace_tsk() is not exported for those architectures.
-> Export save_stack_trace_tsk() for the ARM architecture to align with x86
-> and support various debugging use cases such as arbitrary driver thread
-> watchdog timers.
+On 09/07/2017 10:36 AM, Tycho Andersen wrote:
+> XPFO doesn't support section/contiguous mappings yet, so let's disable it
+> if XPFO is turned on.
+> 
+> Thanks to Laura Abbot for the simplification from v5, and Mark Rutland for
+> pointing out we need NO_CONT_MAPPINGS too.
+> 
+> CC: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Tycho Andersen <tycho@docker.com>
 
-Hi Dustin,
 
-I'm not sure why, but when I merged this, your commit log appears to be
-entirely on two very long lines.  Linux requires that commit messages
-are sensibly wrapped such that they can be read in git log on an 80
-column display - please take care in future to ensure that commit
-messages are appropriately wrapped.
+This should just be folded into the initial arm64 patch
+since it basically bugs out otherwise.
 
-I'm having to reformat the commit manually.
+Thanks,
+Laura
 
-There are cases where wrapping is not appropriate (eg, when quoting
-program output or kernel messages.)
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> ---
+>  arch/arm64/mm/mmu.c  | 2 +-
+>  include/linux/xpfo.h | 4 ++++
+>  mm/xpfo.c            | 6 ++++++
+>  3 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index f1eb15e0e864..34bb95303cce 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -420,7 +420,7 @@ static void __init map_mem(pgd_t *pgd)
+>  	struct memblock_region *reg;
+>  	int flags = 0;
+>  
+> -	if (debug_pagealloc_enabled())
+> +	if (debug_pagealloc_enabled() || xpfo_enabled())
+>  		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
+>  
+>  	/*
+> diff --git a/include/linux/xpfo.h b/include/linux/xpfo.h
+> index d37a06c9d62c..1693af1a0293 100644
+> --- a/include/linux/xpfo.h
+> +++ b/include/linux/xpfo.h
+> @@ -43,6 +43,8 @@ void xpfo_temp_map(const void *addr, size_t size, void **mapping,
+>  void xpfo_temp_unmap(const void *addr, size_t size, void **mapping,
+>  		     size_t mapping_len);
+>  
+> +bool xpfo_enabled(void);
+> +
+>  #else /* !CONFIG_XPFO */
+>  
+>  static inline void xpfo_kmap(void *kaddr, struct page *page) { }
+> @@ -65,6 +67,8 @@ static inline void xpfo_temp_unmap(const void *addr, size_t size,
+>  }
+>  
+>  
+> +static inline bool xpfo_enabled(void) { return false; }
+> +
+>  #endif /* CONFIG_XPFO */
+>  
+>  #endif /* _LINUX_XPFO_H */
+> diff --git a/mm/xpfo.c b/mm/xpfo.c
+> index f79075bf7d65..25fba05d01bd 100644
+> --- a/mm/xpfo.c
+> +++ b/mm/xpfo.c
+> @@ -70,6 +70,12 @@ struct page_ext_operations page_xpfo_ops = {
+>  	.init = init_xpfo,
+>  };
+>  
+> +bool __init xpfo_enabled(void)
+> +{
+> +	return !xpfo_disabled;
+> +}
+> +EXPORT_SYMBOL(xpfo_enabled);
+> +
+>  static inline struct xpfo *lookup_xpfo(struct page *page)
+>  {
+>  	struct page_ext *page_ext = lookup_page_ext(page);
+> 
