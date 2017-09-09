@@ -1,209 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 9 Sep 2017 17:42:57 +0200
-Subject: [PATCH 4/8] drm/sun4i: tcon: get TCON ID and matching engine
- with remote endpoint ID
-In-Reply-To: <20170908075016.18657-5-wens@csie.org>
-References: <20170908075016.18657-1-wens@csie.org>
- <20170908075016.18657-5-wens@csie.org>
-Message-ID: <20170909154257.wgwybldpmpr6snsc@flea.lan>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 9 Sep 2017 17:55:17 +0200
+Subject: [PATCH net-next 3/3] net: phy: realtek: add RTL8201F phy-id and
+ functions
+In-Reply-To: <CAJe_ZhciWBhw5npxEjTUGw2duS7DSfhzP5nzAOy_ig4-1XcPWw@mail.gmail.com>
+References: <1504875731-3680-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1504875731-3680-4-git-send-email-hayashi.kunihiko@socionext.com>
+ <4173a876-3cff-205a-ce87-ce049f419aa0@gmail.com>
+ <CAJe_ZhciWBhw5npxEjTUGw2duS7DSfhzP5nzAOy_ig4-1XcPWw@mail.gmail.com>
+Message-ID: <20170909155517.GB19117@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Sep 08, 2017 at 03:50:12PM +0800, Chen-Yu Tsai wrote:
-> The device tree binding for sun4i-drm says:
+On Sat, Sep 09, 2017 at 09:03:05AM +0530, Jassi Brar wrote:
+> On 9 September 2017 at 00:21, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > On 09/08/2017 06:02 AM, Kunihiko Hayashi wrote:
+> >> From: Jassi Brar <jaswinder.singh@linaro.org>
+> >>
+> >> Add RTL8201F phy-id and the related functions to the driver.
+> >>
+> >> The original patch is as follows:
+> >> https://patchwork.kernel.org/patch/2538341/
+> >>
+> >> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+> >> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> >> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> >> ---
+> >>  drivers/net/phy/realtek.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 45 insertions(+)
+> >>
+> >> diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
+> >> index 9cbe645..d9974ce 100644
+> >> --- a/drivers/net/phy/realtek.c
+> >> +++ b/drivers/net/phy/realtek.c
+> >> @@ -29,10 +29,23 @@
+> >>  #define RTL8211F_PAGE_SELECT 0x1f
+> >>  #define RTL8211F_TX_DELAY    0x100
+> >>
+> >> +#define RTL8201F_ISR         0x1e
+> >> +#define RTL8201F_PAGE_SELECT 0x1f
+> >
+> > We have a page select register define for the RTL8211F right above, so
+> > surely we can make that a common definition?
+> >
+> That is just for the sake of consistency.
+> I mean RTL8211 wouldn't look neat among everything else RTL8201.
 > 
->     For all connections between components up to the TCONs in the display
->     pipeline, when there are multiple components of the same type at the
->     same depth, the local endpoint ID must be the same as the remote
->     component's index. For example, if the remote endpoint is Frontend 1,
->     then the local endpoint ID must be 1.
-> 
-> We should be able to get the TCON's ID directly from any of the remote
-> endpoints from its input port. With the ID, we can then go through the
-> list of registered engines and find a matching one by ID.
-> 
-> However the A31 device tree is incorrect. We assumed that there were no
-> cross pipeline connections between the backends and TCONs. As a result,
-> in all the endpoints between the backends and TCONs of the second
-> display pipeline, the endpoint IDs were incorrectly set to 0, when in
-> fact they should've been set to 1.
-> 
-> To maintain compatibility with this incorrect device tree, we first
-> check if the TCON's input port has 1 or many endpoints. If there are
-> more than 1, then it is likely a fixed version, and we can proceed
-> with the new method. If there is only 1 endpoint, then it is possibly
-> an incorrect version, or it could be the SoC only has one pipeline.
-> In either case we fall back to using the old method of traversing
-> the input connections to find a matching engine, and then get its
-> ID.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 121 ++++++++++++++++++++++++++++++++++++-
->  1 file changed, 118 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 065654dbfb2c..33c20d2f9fb1 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -463,8 +463,9 @@ static int sun4i_tcon_init_regmap(struct device *dev,
->   * function in fact searches the corresponding engine, and the ID is
->   * requested via the get_id function of the engine.
->   */
-> -static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
-> -						   struct device_node *node)
-> +static struct sunxi_engine *
-> +sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
-> +				struct device_node *node)
->  {
->  	struct device_node *port, *ep, *remote;
->  	struct sunxi_engine *engine;
-> @@ -502,7 +503,7 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
->  		}
->  
->  		/* keep looking through upstream ports */
-> -		engine = sun4i_tcon_find_engine(drv, remote);
-> +		engine = sun4i_tcon_find_engine_traverse(drv, remote);
->  		if (!IS_ERR(engine)) {
->  			of_node_put(remote);
->  			of_node_put(port);
-> @@ -513,6 +514,120 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
->  	return ERR_PTR(-EINVAL);
->  }
->  
-> +/*
-> + * The device tree binding says that the remote endpoint ID of any
-> + * connection between components, up to and including the TCON, of
-> + * the display pipeline should be equal to the actual ID of the local
-> + * component. Thus we can look at any one of the input connections of
-> + * the TCONs, and use that connection's remote endpoint ID as our own.
-> + *
-> + * Since the user of this function already finds the input port,
-> + * the port is passed in directly without further checks.
-> + */
-> +static int sun4i_tcon_of_get_id_from_port(struct device_node *port)
-> +{
-> +	struct device_node *ep;
-> +	int ret = -EINVAL;
-> +
-> +	/* try finding an upstream endpoint */
-> +	for_each_available_child_of_node(port, ep) {
-> +		struct device_node *remote;
-> +		u32 reg;
-> +
-> +		remote = of_graph_get_remote_endpoint(ep);
-> +		if (!remote)
-> +			continue;
-> +
-> +		ret = of_property_read_u32(remote, "reg", &reg);
-> +		if (ret)
-> +			continue;
-> +
-> +		ret = reg;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/*
-> + * Once we know the TCON's id, we can look through the list of
-> + * engines to find a matching one. We assume all engines have
-> + * been probed and added to the list.
-> + */
-> +static struct sunxi_engine *sun4i_tcon_get_engine_by_id(struct sun4i_drv *drv,
-> +							int id)
-> +{
-> +	struct sunxi_engine *engine;
-> +
-> +	list_for_each_entry(engine, &drv->engine_list, list)
-> +		if (engine->id == id)
-> +			return engine;
-> +
-> +	return ERR_PTR(-EINVAL);
-> +}
-> +
-> +/*
-> + * On SoCs with the old display pipeline design (Display Engine 1.0),
-> + * we assumed the TCON was always tied to just one backend. However
-> + * this proved not to be the case. On the A31, the TCON can select
-> + * either backend as its source. On the A20 (and likely on the A10),
-> + * the backend can choose which TCON to output to.
-> + *
-> + * The device tree binding says that the remote endpoint ID of any
-> + * connection between components, up to and including the TCON, of
-> + * the display pipeline should be equal to the actual ID of the local
-> + * component. Thus we should be able to look at any one of the input
-> + * connections of the TCONs, and use that connection's remote endpoint
-> + * ID as our own.
-> + *
-> + * However  the connections between the backend and TCON were assumed
-> + * to be always singular, and their endpoit IDs were all incorrectly
-> + * set to 0. This means for these old device trees, we cannot just look
-> + * up the remote endpoint ID of a TCON input endpoint. TCON1 would be
-> + * incorrectly identified as TCON0.
-> + *
-> + * This function first checks if the TCON node has 2 input endpoints.
-> + * If so, then the device tree is a corrected version, and it will use
-> + * sun4i_tcon_of_get_id() and sun4i_tcon_get_engine_by_id() from above
-> + * to fetch the ID and engine directly. If not, then it is likely an
-> + * old device trees, where the endpoint IDs were incorrect, but did not
-> + * have endpoint connections between the backend and TCON across
-> + * different display pipelines. It will fall back to the old method of
-> + * traversing the  of_graph to try and find a matching engine by device
-> + * node.
-> + *
-> + * In the case of single display pipeline device trees, either method
-> + * works.
-> + */
-> +static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
-> +						   struct device_node *node)
-> +{
-> +	struct device_node *port;
-> +	struct sunxi_engine *engine;
-> +
-> +	port = of_graph_get_port_by_id(node, 0);
-> +	if (!port)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	/*
-> +	 * Is this a corrected device tree with cross pipeline
-> +	 * connections between the backend and TCON?
-> +	 */
-> +	if (of_get_child_count(port) > 1) {
-> +		/* Get our ID directly from an upstream endpoint */
-> +		int id = sun4i_tcon_of_get_id_from_port(port);
-> +
-> +		/* Get our engine by matching our ID */
-> +		engine = sun4i_tcon_get_engine_by_id(drv, id);
-> +
-> +		of_node_put(port);
-> +		return engine;
-> +	}
-> +
-> +	/* Fallback to old method by traversing input endpoints */
-> +	of_node_put(port);
-> +	return sun4i_tcon_find_engine_traverse(drv, node);
+> Also the page-select offsets just _happen_ to be same value...
 
-In the old DT case, I'd like to have a warning displayed in the log
-saying that the DT is too old and we won't be able to support the
-dual-pipeline properly, so that the users can at least know that they
-should update.
+If you look at all the other supported PHYs, they all consistently use
+the same page register across models. Marvell is always 22, mscc is
+always 31, vitesse is always 31.
 
-Can you add it in a follow-up?
+I would say it is a safe bet that all realtek PHYs will use 0x1f for
+page select. So please add a patch which renames RTL8211F_PAGE_SELECT
+to RTL821x_PAGE_SELECT.
 
-Thanks!
+It is best to do this now. I spent a while cleaning up the mess the
+Marvell driver had got into with its page select code. Lots of
+duplicate code and defines doing the same thing.
 
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170909/624f613a/attachment.sig>
+	  Andrew
