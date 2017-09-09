@@ -1,27 +1,47 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 09 Sep 2017 13:45:43 +0200
-Subject: [RESENT PATCH v7 2/7] arm64: dts: rockchip: Add rt5514 dsp for Gru
-In-Reply-To: <5927343.7rXO2nMfqk@phil>
-References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
- <20170824045227.15504-3-jeffy.chen@rock-chips.com> <5927343.7rXO2nMfqk@phil>
-Message-ID: <18355462.FN9gHMXt24@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 9 Sep 2017 08:48:49 -0300
+Subject: [PATCH v3] ARM: dts: Add initial Pistachio i.mx6q board support.
+In-Reply-To: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
+References: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
+Message-ID: <CAOMZO5Bsiw0z5Ab1oJ_MzsBeTueuEp1oZ3MpowwB8igKQApvew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 9. September 2017, 13:13:01 CEST schrieb Heiko Stuebner:
-> Am Donnerstag, 24. August 2017, 12:52:22 CEST schrieb Jeffy Chen:
-> > Add rt5514 dsp of_node to codec list for Gru boards.
-> > 
-> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> 
-> applied for 4.15
-> Second patch needs to wait a bit more for the binding to get accepted.
+On Sat, Sep 9, 2017 at 6:28 AM, Wig C <onlywig@gmail.com> wrote:
 
-just realized that
-	[PATCH v7 3/7] arm64: dts: rockchip: Update rt5514 devices' compatible for Gru
+> +&usdhc2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_usdhc2>;
+> +       bus-width = <4>;
+> +       vmmc-supply = <&wlan_en_reg>;
+> +       no-1-8-v;
+> +       keep-power-in-suspend;
+> +  non-removable;
+> +  cap-power-off-card;
 
-is also part of the 2-patch series adding the compatible, so I don't need
-to track it here anymore, so nevermind the comment above.
+As I mentioned previously the indentation is not correct here.
 
+You should use tab instead of spaces.
 
-Heiko
+checkpatch also complains about it:
+
+WARNING: please, no spaces at the start of a line
+#699: FILE: arch/arm/boot/dts/imx6q-pistachio.dts:654:
++  non-removable;$
+
+WARNING: please, no spaces at the start of a line
+#700: FILE: arch/arm/boot/dts/imx6q-pistachio.dts:655:
++  cap-power-off-card;$
+
+> +&wdog1 {
+> +       status = "okay";
+> +};
+
+Why don't you use like this as you intended in the original patch?
+
+&wdog1 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_wdog>;
+    fsl,ext-reset-output;
+    status = "okay";
+};
