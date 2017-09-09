@@ -1,36 +1,58 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Sat,  9 Sep 2017 07:28:37 -0500
-Subject: [PATCH RFC] davinci: da850: define edma-memcpy-channels
-Message-ID: <1504960117-24264-1-git-send-email-aford173@gmail.com>
+From: onlywig@gmail.com (Wig C)
+Date: Sat,  9 Sep 2017 20:45:10 +0800
+Subject: [PATCH v3] ARM: dts: Add initial Pistachio i.mx6q board support.
+In-Reply-To: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
+References: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
+Message-ID: <1504961110-9878-1-git-send-email-onlywig@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with a device tree, message appears:
-   memcpy is disabled
-When reading through the bindings for eDMA3, it shows that
-ti,edma-memcpy-channels is an optional property, but the example
-binding uses it.
+On Sat, Sep 9, 2017 at 6:28 AM, Wig C <onlywig@gmail.com> wrote:
 
-RFC:  I'll be the first to admit that I don't understand what
-this is doing, but it seems like a DMA enabled memcpy would
-improve performance.  Is this appropriate for da850?  Since there
-are two eDMA3-tpcc controllers, is there a set of channels we can
-use for each?
+> +&usdhc2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_usdhc2>;
+> +       bus-width = <4>;
+> +       vmmc-supply = <&wlan_en_reg>;
+> +       no-1-8-v;
+> +       keep-power-in-suspend;
+> +  non-removable;
+> +  cap-power-off-card;
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+As I mentioned previously the indentation is not correct here.
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index af68ef7..eacadb8 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -263,7 +263,7 @@
- 			interrupts = <11 12>;
- 			interrupt-names = "edma3_ccint", "edma3_ccerrint";
- 			#dma-cells = <2>;
--
-+			ti,edma-memcpy-channels = <20 21>;
- 			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
- 		};
- 		edma0_tptc0: tptc at 8000 {
--- 
-2.7.4
+You should use tab instead of spaces.
+
+checkpatch also complains about it:
+
+WARNING: please, no spaces at the start of a line
+#699: FILE: arch/arm/boot/dts/imx6q-pistachio.dts:654:
++  non-removable;$
+
+WARNING: please, no spaces at the start of a line
+#700: FILE: arch/arm/boot/dts/imx6q-pistachio.dts:655:
++  cap-power-off-card;$
+
+Hello Fabio:
+I will fix this on next patch, sorry I miss it.
+
+> +&wdog1 {
+> +       status = "okay";
+> +};
+
+Why don't you use like this as you intended in the original patch?
+
+&wdog1 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_wdog>;
+    fsl,ext-reset-output;
+    status = "okay";
+};
+
+My original patch has never support hardware watch dog as following link:
+https://www.spinics.net/lists/kernel/msg2594724.html
+
+I used soft reset on Pistachio, sorry for cause your misunderstand, and 
+thanks for your kindly correction.
+
+Wig
