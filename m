@@ -1,87 +1,69 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Sat, 9 Sep 2017 08:38:20 -0700
-Subject: [PATCH v6 09/11] arm64/mm: disable section/contiguous mappings if
- XPFO is enabled
-In-Reply-To: <20170907173609.22696-10-tycho@docker.com>
-References: <20170907173609.22696-1-tycho@docker.com>
- <20170907173609.22696-10-tycho@docker.com>
-Message-ID: <17b9b826-366e-48f1-a117-e650b7a5811f@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 9 Sep 2017 17:41:40 +0200
+Subject: [PATCH 0/8] drm/sun4i: Make both display pipeline work together
+In-Reply-To: <20170908075016.18657-1-wens@csie.org>
+References: <20170908075016.18657-1-wens@csie.org>
+Message-ID: <20170909154140.wmuh46kxamumyspz@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2017 10:36 AM, Tycho Andersen wrote:
-> XPFO doesn't support section/contiguous mappings yet, so let's disable it
-> if XPFO is turned on.
-> 
-> Thanks to Laura Abbot for the simplification from v5, and Mark Rutland for
-> pointing out we need NO_CONT_MAPPINGS too.
-> 
-> CC: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Tycho Andersen <tycho@docker.com>
+Hi,
 
-
-This should just be folded into the initial arm64 patch
-since it basically bugs out otherwise.
-
-Thanks,
-Laura
-
-> ---
->  arch/arm64/mm/mmu.c  | 2 +-
->  include/linux/xpfo.h | 4 ++++
->  mm/xpfo.c            | 6 ++++++
->  3 files changed, 11 insertions(+), 1 deletion(-)
+On Fri, Sep 08, 2017 at 03:50:08PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index f1eb15e0e864..34bb95303cce 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -420,7 +420,7 @@ static void __init map_mem(pgd_t *pgd)
->  	struct memblock_region *reg;
->  	int flags = 0;
->  
-> -	if (debug_pagealloc_enabled())
-> +	if (debug_pagealloc_enabled() || xpfo_enabled())
->  		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
->  
->  	/*
-> diff --git a/include/linux/xpfo.h b/include/linux/xpfo.h
-> index d37a06c9d62c..1693af1a0293 100644
-> --- a/include/linux/xpfo.h
-> +++ b/include/linux/xpfo.h
-> @@ -43,6 +43,8 @@ void xpfo_temp_map(const void *addr, size_t size, void **mapping,
->  void xpfo_temp_unmap(const void *addr, size_t size, void **mapping,
->  		     size_t mapping_len);
->  
-> +bool xpfo_enabled(void);
-> +
->  #else /* !CONFIG_XPFO */
->  
->  static inline void xpfo_kmap(void *kaddr, struct page *page) { }
-> @@ -65,6 +67,8 @@ static inline void xpfo_temp_unmap(const void *addr, size_t size,
->  }
->  
->  
-> +static inline bool xpfo_enabled(void) { return false; }
-> +
->  #endif /* CONFIG_XPFO */
->  
->  #endif /* _LINUX_XPFO_H */
-> diff --git a/mm/xpfo.c b/mm/xpfo.c
-> index f79075bf7d65..25fba05d01bd 100644
-> --- a/mm/xpfo.c
-> +++ b/mm/xpfo.c
-> @@ -70,6 +70,12 @@ struct page_ext_operations page_xpfo_ops = {
->  	.init = init_xpfo,
->  };
->  
-> +bool __init xpfo_enabled(void)
-> +{
-> +	return !xpfo_disabled;
-> +}
-> +EXPORT_SYMBOL(xpfo_enabled);
-> +
->  static inline struct xpfo *lookup_xpfo(struct page *page)
->  {
->  	struct page_ext *page_ext = lookup_page_ext(page);
+> Previously I added support for two display pipelines for the sun4i-drm
+> driver. At the time we did not have support for downstream encoders to
+> actually test the second pipeline, nor having both pipelines active at
+> the same time.
 > 
+> With HDMI encoder support now merged and support for it on sun6i in
+> progress, we are now able to test both pipelines being active at the
+> same time, with LCD output from one and HDMI from the other. Testing
+> has revealed some more issues, such as component probing order. Also,
+> we found out that muxing between the display backend and TCON was
+> possible, and required for the second pipeline to work as intended.
+> Last, the number of CRTCs provided to drm_vblank_init needs to be
+> increased for vblanks to work properly.
+> 
+> This patch series does a few things:
+> 
+>   - Fix endpoint IDs so they conform to what the DT binding stipulates.
+> 
+>   - Change the order the individual components are queued up.
+> 
+>   - Fix how the TCON gets its ID when the backend-TCON mux is present.
+> 
+>   - Support the input mux in the TCON (which selects which backend to
+>     use on the A31/A31s).
+> 
+>   - Fix the drm_vblank_init call and pass the correct number of crtcs.
+> 
+>   - Add the cross pipeline connections between the DRCs and TCONs on
+>     the A31, conforming to the DT binding and what the hardware is
+>     capable of.
+> 
+> More details are available in each individual commit. Please have a look.
+
+I've applied all the commits, with:
+patch 1 in our arm-soc fixes branch
+patch 2-7 in drm-misc-next
+patch 8 in sunxi/dt-for-4.15.
+
+I have a minor comment on one patch that can be fixed in a followup
+patch, so please have a look at my other mail.
+
+Thanks for this great work,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170909/2c2475c7/attachment.sig>
