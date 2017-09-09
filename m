@@ -1,62 +1,137 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 9 Sep 2017 17:55:17 +0200
-Subject: [PATCH net-next 3/3] net: phy: realtek: add RTL8201F phy-id and
- functions
-In-Reply-To: <CAJe_ZhciWBhw5npxEjTUGw2duS7DSfhzP5nzAOy_ig4-1XcPWw@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 9 Sep 2017 09:30:58 -0700
+Subject: [PATCH net-next 2/3] net: ethernet: socionext: add AVE ethernet
+ driver
+In-Reply-To: <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1504875731-3680-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1504875731-3680-4-git-send-email-hayashi.kunihiko@socionext.com>
- <4173a876-3cff-205a-ce87-ce049f419aa0@gmail.com>
- <CAJe_ZhciWBhw5npxEjTUGw2duS7DSfhzP5nzAOy_ig4-1XcPWw@mail.gmail.com>
-Message-ID: <20170909155517.GB19117@lunn.ch>
+ <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <46b1bd9e-35ff-dc7f-fa32-f8d22b37a403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 09, 2017 at 09:03:05AM +0530, Jassi Brar wrote:
-> On 9 September 2017 at 00:21, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> > On 09/08/2017 06:02 AM, Kunihiko Hayashi wrote:
-> >> From: Jassi Brar <jaswinder.singh@linaro.org>
-> >>
-> >> Add RTL8201F phy-id and the related functions to the driver.
-> >>
-> >> The original patch is as follows:
-> >> https://patchwork.kernel.org/patch/2538341/
-> >>
-> >> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
-> >> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> >> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> >> ---
-> >>  drivers/net/phy/realtek.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 45 insertions(+)
-> >>
-> >> diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
-> >> index 9cbe645..d9974ce 100644
-> >> --- a/drivers/net/phy/realtek.c
-> >> +++ b/drivers/net/phy/realtek.c
-> >> @@ -29,10 +29,23 @@
-> >>  #define RTL8211F_PAGE_SELECT 0x1f
-> >>  #define RTL8211F_TX_DELAY    0x100
-> >>
-> >> +#define RTL8201F_ISR         0x1e
-> >> +#define RTL8201F_PAGE_SELECT 0x1f
-> >
-> > We have a page select register define for the RTL8211F right above, so
-> > surely we can make that a common definition?
-> >
-> That is just for the sake of consistency.
-> I mean RTL8211 wouldn't look neat among everything else RTL8201.
+
+
+On 09/08/2017 06:02 AM, Kunihiko Hayashi wrote:
+> The UniPhier platform from Socionext provides the AVE ethernet
+> controller that includes MAC and MDIO bus supporting RGMII/RMII
+> modes. The controller is named AVE.
 > 
-> Also the page-select offsets just _happen_ to be same value...
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> ---
 
-If you look at all the other supported PHYs, they all consistently use
-the same page register across models. Marvell is always 22, mscc is
-always 31, vitesse is always 31.
+[snip]
 
-I would say it is a safe bet that all realtek PHYs will use 0x1f for
-page select. So please add a patch which renames RTL8211F_PAGE_SELECT
-to RTL821x_PAGE_SELECT.
+> +static int ave_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> +{
+> +	struct ave_private *priv = netdev_priv(ndev);
+> +	u32 proc_idx, done_idx, ndesc, cmdsts;
+> +	int freepkt;
+> +	unsigned char *buffptr = NULL; /* buffptr for descriptor */
+> +	unsigned int len;
+> +	dma_addr_t paddr;
+> +
+> +	proc_idx = priv->tx.proc_idx;
+> +	done_idx = priv->tx.done_idx;
+> +	ndesc = priv->tx.ndesc;
+> +	freepkt = ((done_idx + ndesc - 1) - proc_idx) % ndesc;
+> +
+> +	/* not enough entry, then we stop queue */
+> +	if (unlikely(freepkt < 2)) {
+> +		netif_stop_queue(ndev);
+> +		if (unlikely(freepkt < 1))
+> +			return NETDEV_TX_BUSY;
 
-It is best to do this now. I spent a while cleaning up the mess the
-Marvell driver had got into with its page select code. Lots of
-duplicate code and defines doing the same thing.
+This looks wrong, why are you checking first for less than 2
+descriptors, and if there is none, NETDEV_TX_BUSY? If you need 2 slots
+to complete a transmision, stop the transmit queue and return
+NETDEV_TX_BUSY.
 
-	  Andrew
+> +	}
+> +
+> +	priv->tx.desc[proc_idx].skbs = skb;
+> +
+> +	/* add padding for short packet */
+> +	if (skb_padto(skb, ETH_ZLEN)) {
+> +		dev_kfree_skb_any(skb);
+> +		return NETDEV_TX_OK;
+> +	}
+
+skb_padto() frees the SKB in case of error, that would lead to a double
+free here.
+
+> +
+> +	buffptr = skb->data - NET_IP_ALIGN;
+> +	len = max_t(unsigned int, ETH_ZLEN, skb->len);
+
+If you use skb_put_padto() if padding was necessary skb->len will be at
+least ETH_ZLEN, so you can remove this.
+
+> +
+> +	paddr = ave_dma_map(ndev, &priv->tx.desc[proc_idx], buffptr,
+> +			    len + NET_IP_ALIGN, DMA_TO_DEVICE);
+
+As mentioned before you can't assume this will never fail.
+
+> +	paddr += NET_IP_ALIGN;
+> +
+> +	/* set buffer address to descriptor */
+> +	ave_wdesc_addr(ndev, AVE_DESCID_TX, proc_idx, 4, paddr);
+
+Also mentioned in the other email, make this 4 a constant so we know
+it's an offset and not a length.
+
+> +
+> +	/* set flag and length to send */
+> +	cmdsts = AVE_STS_OWN | AVE_STS_1ST | AVE_STS_LAST
+> +		| (len & AVE_STS_PKTLEN_TX);
+
+AVE_STS_PKTLEN_TX would be better named with a _MASK suffix.
+
+> +
+> +	/* set interrupt per AVE_FORCE_TXINTCNT or when queue is stopped */
+> +	if (!(proc_idx % AVE_FORCE_TXINTCNT) || netif_queue_stopped(ndev))
+> +		cmdsts |= AVE_STS_INTR;
+> +
+> +	/* disable checksum calculation when skb doesn't calurate checksum */
+> +	if (skb->ip_summed == CHECKSUM_NONE ||
+> +	    skb->ip_summed == CHECKSUM_UNNECESSARY)
+> +		cmdsts |= AVE_STS_NOCSUM;
+> +
+> +	/* set cmdsts */
+> +	ave_wdesc(ndev, AVE_DESCID_TX, proc_idx, 0, cmdsts);
+> +
+> +	priv->tx.proc_idx = (proc_idx + 1) % ndesc;
+
+You should also check the ring space after transmission and assert flow
+control on the transmit queue if needed.
+
+> +
+> +	return NETDEV_TX_OK;
+> +}
+
+[snip]
+
+> +static struct net_device_stats *ave_stats(struct net_device *ndev)
+> +{
+> +	struct ave_private *priv = netdev_priv(ndev);
+> +	u32 drop_num = 0;
+> +
+> +	priv->stats.rx_errors = ave_r32(ndev, AVE_BFCR);
+> +
+> +	drop_num += ave_r32(ndev, AVE_RX0OVFFC);
+> +	drop_num += ave_r32(ndev, AVE_SN5FC);
+> +	drop_num += ave_r32(ndev, AVE_SN6FC);
+> +	drop_num += ave_r32(ndev, AVE_SN7FC);
+> +	priv->stats.rx_dropped = drop_num;
+> +
+
+You should consider switching to 64-bit statistics, this requires a
+little bit more work for 32-bit hosts (see
+include/linux/u64_stats_sync.h) but this allows you to keep statistics
+around above 4GB.
+
+> +	return &priv->stats;
+> +}
+> +-- 
+Florian
