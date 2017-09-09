@@ -1,18 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 9 Sep 2017 08:36:36 -0300
-Subject: [PATCH] ARM: dts: imx6sx: add vining-2000 board support
-In-Reply-To: <1504195599.1918.17.camel@googlemail.com>
-References: <1504195599.1918.17.camel@googlemail.com>
-Message-ID: <CAOMZO5ALWF4WJomwFfKpO0pROd2dkSXeBM1bXFmV-V5jEeSSRQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 09 Sep 2017 13:45:43 +0200
+Subject: [RESENT PATCH v7 2/7] arm64: dts: rockchip: Add rt5514 dsp for Gru
+In-Reply-To: <5927343.7rXO2nMfqk@phil>
+References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
+ <20170824045227.15504-3-jeffy.chen@rock-chips.com> <5927343.7rXO2nMfqk@phil>
+Message-ID: <18355462.FN9gHMXt24@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+Am Samstag, 9. September 2017, 13:13:01 CEST schrieb Heiko Stuebner:
+> Am Donnerstag, 24. August 2017, 12:52:22 CEST schrieb Jeffy Chen:
+> > Add rt5514 dsp of_node to codec list for Gru boards.
+> > 
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> 
+> applied for 4.15
+> Second patch needs to wait a bit more for the binding to get accepted.
 
-On Thu, Aug 31, 2017 at 1:06 PM, Christoph Fritz
-<chf.fritz@googlemail.com> wrote:
-> Add initial imx6sx-softing-vining-2000 board support.
->
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+just realized that
+	[PATCH v7 3/7] arm64: dts: rockchip: Update rt5514 devices' compatible for Gru
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+is also part of the 2-patch series adding the compatible, so I don't need
+to track it here anymore, so nevermind the comment above.
+
+
+Heiko
