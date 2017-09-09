@@ -1,97 +1,741 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Sep 2017 10:06:37 +0100
-Subject: [PATCH] scripts: make extract-vmlinux support armel/armhf
-In-Reply-To: <CAEQ9gEk6iGFY0hx36QbQHywKbttWTJdQxZzpOKULCgFLvS9TOw@mail.gmail.com>
-References: <20170831153631.31026-1-rogershimizu@gmail.com>
- <20170831154941.GS20805@n2100.armlinux.org.uk>
- <CAEQ9gEmBv-fb2MbedSzs+dWtrq-ChXwiMrisyofZ7zfu+jADYA@mail.gmail.com>
- <20170831161957.GU20805@n2100.armlinux.org.uk>
- <20170831174318.GM6008@atomide.com>
- <20170901231654.GY20805@n2100.armlinux.org.uk>
- <CAEQ9gEk6iGFY0hx36QbQHywKbttWTJdQxZzpOKULCgFLvS9TOw@mail.gmail.com>
-Message-ID: <20170909090637.GA20805@n2100.armlinux.org.uk>
+From: onlywig@gmail.com (Wig C)
+Date: Sat,  9 Sep 2017 17:28:28 +0800
+Subject: [PATCH v3] ARM: dts: Add initial Pistachio i.mx6q board support.
+Message-ID: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 09, 2017 at 04:33:55PM +0900, Roger Shimizu wrote:
-> On Sat, Sep 2, 2017 at 8:16 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Thu, Aug 31, 2017 at 10:43:19AM -0700, Tony Lindgren wrote:
-> >> I think the use case is to get the booted kernel size from zImage
-> >> to avoid overwriting dts or initramfs. Don't we already have that
-> >> at the end of zImage somewhere for kexec?
-> >
-> > We do, but finding where that is is difficult if a DTB has been appended
-> > as it's right at the end of the compressed data.  kexec doesn't use it,
-> > it just assumes there's a 5x expansion of the kernel compressed image.
-> 
-> My patch already take the appended DTB blob part into consideration.
-> It uses "unxz --single-stream" instead of "unxz" to extract, so unxz
-> just ignore the DTB.
+From: YuanCheng Cheng <onlywig@gmail.com>
 
-Sorry, I wasn't talking about the patch here.
+Working items:
 
-The whole point of _this_ method of replying, where the relevant context
-of the message being replied to is left and the reply is placed directly
-beneath the paragraph to which the reply is relevant is to make clear
-_what_ is being replied to.
+- 800MHz CPU
+- 2GB of RAM (DDR3)
+- 4GB of NAND FLASH
+- 1T1R WiFi 2.4 GHz
+- Power management support
+- 1x 10/100/1000 Mbps Ethernet WAN port
+- 2x USB 2.0 Host
+- PCIe
+- HDMI/VGA/LVDS display
+- 1x UART for RS232/422/485
+- 2x UART for RS232
+- 1x UART for serial console
+- 1x CAN bus
 
-My comments above are directly beneath a comment from Tony Lindgren asking
-about the size field, which is appended after the compressed kernel image
-data.  My reply was to Tony on that point alone, and why we aren't using
-that for kexec-tools.
+Specification: http://nutsboard.org/pistachio
 
-kexec-tools used to assume too small a size for the expansion of the
-kernel image, and that has been changed.
+Signed-off-by: YuanCheng Cheng <onlywig@gmail.com>
+---
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/imx6q-pistachio.dts | 687 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 688 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-pistachio.dts
 
-I'm afraid that I still haven't got around to looking at _any_ of the
-URLs you've provided so I'm still in the dark about (a) why this is
-needed and (b) why it's acceptable for this script to output a binary
-blob for ARM rather than an ELF file that it guarantees today.  It's
-annoying that elinks' SSL implementation is buggy and causes connections
-to certain SSL sites to fail, but alas that's the inconvenience that
-buggy software causes.
-
-Until I'm able to see some reasoning, I can't begin to consider this
-patch.
-
-Moreover, I'm not convinced by any of your arguments about why it's
-acceptable to defeat the check for the ELF object _for all users_ of
-this script.  What if some other architecture has multiple compressed
-objects in their image and the "vmlinux" is not the first.  Your
-argument seems to be "they should use a different script", yet you
-are the one changing the script from outputting the first compressed
-ELF object to merely producing the first compressed image.  "vmlinux"
-is the name of the ELF kernel image, and the script is called
-"extract-vmlinux" so this is obviously the right script which should
-be extracting the correct compressed ELF object.
-
-Hence, I don't buy your reasoning that in such a situation, another
-architecture's use of this script should use some other script because
-your changes fix it for ARM but cause a regression elsewhere.
-
-The way we work on the kernel, if a change causes a user visible
-regression, then the change was wrong and an alternative solution
-needs to be sought.
-
-I percieve the risk of this patch causing a regression on other
-architectures to be high because it gratuitously changes functionality
-of the script which didn't have to be there if all we cared about was
-extracting the first image.  Hence, it must have been added because
-there is a need for it.
-
-So far, nothing has been said that lowers that risk.
-
-It's not up to me to search around to try and evaluate risk - it's
-my responsibility to ask the question (I already did) and it's the
-submitter's responsibility to show that it's likely safe.
-
-Thus far, the reasoning seems to be purely "several people are having
-a problem with this script on ARM, here's a patch that fixes it for
-ARM but might break existing users, but we don't care about existing
-users."  That makes me even more wary.
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4b17f35..670254b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -427,6 +427,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-nitrogen6_som2.dtb \
+ 	imx6q-novena.dtb \
+ 	imx6q-phytec-pbab01.dtb \
++	imx6q-pistachio.dtb \
+ 	imx6q-rex-pro.dtb \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-pistachio.dts b/arch/arm/boot/dts/imx6q-pistachio.dts
+new file mode 100644
+index 0000000..d223af3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-pistachio.dts
+@@ -0,0 +1,687 @@
++/*
++ * Copyright (C) 2017 NutsBoard.Org
++ *
++ * Author: Wig Cheng <onlywig@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "imx6q.dtsi"
++
++/ {
++	model = "NutsBoard i.MX6 Quad Pistachio board";
++	compatible = "nutsboard,imx6q-pistachio", "fsl,imx6q";
++
++	chosen {
++		stdout-path = &uart4;
++	};
++
++	memory: memory {
++		reg = <0x10000000 0x80000000>;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	reg_1p8v: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
++	wlan_en_reg: regulator-wlan_en {
++		compatible = "regulator-fixed";
++		regulator-name = "wlan-en-regulator";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio2 24 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
++	reg_usb_otg_vbus: regulator-usb_vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		vin-supply = <&swbst_reg>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++
++		power {
++			label = "Power Button";
++			gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
++			gpio-key,wakeup;
++			linux,code = <KEY_POWER>;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx-sgtl5000",
++			   "fsl,imx-audio-sgtl5000";
++		model = "audio-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <3>;
++	};
++
++	backlight_lvds: backlight-lvds {
++		compatible = "pwm-backlight";
++		pwms = <&pwm1 0 50000>;
++		brightness-levels = <
++			0  /*1  2  3  4  5  6*/  7  8  9
++			10 11 12 13 14 15 16 17 18 19
++			20 21 22 23 24 25 26 27 28 29
++			30 31 32 33 34 35 36 37 38 39
++			40 41 42 43 44 45 46 47 48 49
++			50 51 52 53 54 55 56 57 58 59
++			60 61 62 63 64 65 66 67 68 69
++			70 71 72 73 74 75 76 77 78 79
++			80 81 82 83 84 85 86 87 88 89
++			90 91 92 93 94 95 96 97 98 99
++			100
++		>;
++		default-brightness-level = <94>;
++		status = "okay";
++	};
++
++	panel {
++		compatible = "hannstar,hsd100pxn1";
++		backlight = <&backlight_lvds>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
++
++&can2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	status = "okay";
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
++			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
++				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2c1_sgtl5000>;
++		reg = <0x0a>;
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		VDDA-supply = <&reg_1p8v>;
++		VDDIO-supply = <&reg_1p8v>;
++	};
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++
++	ar1021 at 4d {
++		compatible = "microchip,ar1021-i2c";
++		reg = <0x4d>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
++	};
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++
++	pinctrl_hog: hoggrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x1b0b0  /*pcie power*/
++			MX6QDL_PAD_EIM_A25__GPIO5_IO02	0x1b0b0   /*LCD power*/
++			MX6QDL_PAD_EIM_D16__GPIO3_IO16	0x1b0b0   /*backlight power*/
++			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b1 /*SD3 CD pin*/
++			MX6QDL_PAD_KEY_COL2__GPIO4_IO10	0x1b0b0 /*codec power*/
++			MX6QDL_PAD_EIM_A16__GPIO2_IO22	0x1b0b0 /*touch reset*/
++			MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x1b0b01 /*touch irq*/
++			MX6QDL_PAD_GPIO_7__GPIO1_IO07	 0x1b0b0/*backlight pwr*/
++			MX6QDL_PAD_GPIO_16__GPIO7_IO11	0x1b0b0 /*gpio 5V_1*/
++			MX6QDL_PAD_EIM_A19__GPIO2_IO19	0x1b0b0 /*gpio 5V_2*/
++			MX6QDL_PAD_EIM_A24__GPIO5_IO04	0x1b0b0 /*gpio 5V_3*/
++			MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0 /*gpio 5V_4*/
++			MX6QDL_PAD_NANDF_CLE__GPIO6_IO07	0x1b0b0 /*AUX_5V_EN*/
++			MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09	0x1b0b0 /*AUX_5VB_EN*/
++			MX6QDL_PAD_NANDF_RB0__GPIO6_IO10	0x1b0b0 /*AUX_3V3_EN*/
++			MX6QDL_PAD_EIM_D21__GPIO3_IO21	0x1b0b0 /*I2C expander pwr*/
++		>;
++	};
++
++	pinctrl_audmux: audmuxgrp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
++			MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
++			MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
++			MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
++		>;
++	};
++
++	pinctrl_ecspi1: ecspi1grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL1__ECSPI1_MISO	0x100b1
++			MX6QDL_PAD_KEY_ROW0__ECSPI1_MOSI	0x100b1
++			MX6QDL_PAD_KEY_COL0__ECSPI1_SCLK	0x100b1
++			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09		0x1b0b0
++		>;
++	};
++
++	pinctrl_enet: enetgrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
++			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++			/* AR8035 reset */
++			MX6QDL_PAD_EIM_A20__GPIO2_IO18		0x130b0
++			/* AR8035 interrupt */
++			MX6QDL_PAD_EIM_CS0__GPIO2_IO23		0x1b0b1
++			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b030
++			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
++			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
++			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
++			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
++			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
++			/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
++			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
++			/* AR8035 pin strapping: IO voltage: pull up */
++			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
++			/* AR8035 pin strapping: PHYADDR#0: pull down */
++			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x13030
++			/* AR8035 pin strapping: PHYADDR#1: pull down */
++			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x13030
++			/* AR8035 pin strapping: MODE#1: pull up */
++			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
++			/* AR8035 pin strapping: MODE#3: pull up */
++			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
++			/* AR8035 pin strapping: MODE#0: pull down */
++			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x13030
++		>;
++	};
++
++	pinctrl_flexcan2: flexcan2grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x1b0b0
++			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x1b0b0
++		>;
++	};
++
++	pinctrl_gpio_keys: gpio_keysgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_DAT4__GPIO2_IO12 0x1b0b0
++		>;
++	};
++
++	pinctrl_hdmi_cec: hdmicecgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x108b0
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
++			MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
++			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c1_sgtl5000: i2c1-sgtl5000grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_0__CCM_CLKO1			0x000b0 /* sys_mclk */
++			MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x130b0 /*headphone det*/
++			MX6QDL_PAD_GPIO_8__GPIO1_IO08			0x130b0 /*microphone det*/
++		>;
++	};
++
++	pinctrl_pwm1: pwm1grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_9__PWM1_OUT	    0x1b0b1
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT10__UART1_RX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT11__UART1_TX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D20__UART1_CTS_B	0x1b0b1
++			MX6QDL_PAD_EIM_D19__UART1_RTS_B	0x1b0b1
++			MX6QDL_PAD_EIM_D23__UART1_DCD_B	0x1b0b0
++			MX6QDL_PAD_EIM_D24__UART1_DTR_B	0x1b0b0
++			MX6QDL_PAD_EIM_D25__UART1_DSR_B	0x1b0b0
++		>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D28__UART2_CTS_B	0x1b0b1
++			MX6QDL_PAD_EIM_D29__UART2_RTS_B	0x1b0b1
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CLK__UART3_RX_DATA	0x1b0b1
++			MX6QDL_PAD_SD4_CMD__UART3_TX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D30__UART3_CTS_B		0x1b0b1
++			MX6QDL_PAD_EIM_D31__UART3_RTS_B		0x1b0b1
++		>;
++	};
++
++	pinctrl_uart4: uart4grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B	0x1b0b1
++		>;
++	};
++
++	pinctrl_uart5: uart5grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT14__UART5_TX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT15__UART5_RX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT18__UART5_RTS_B	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT19__UART5_CTS_B	0x1b0b1
++			MX6QDL_PAD_EIM_A21__GPIO2_IO17		 0x15059 /*BT_EN*/
++		>;
++	};
++
++	pinctrl_usbotg: usbotggrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
++			MX6QDL_PAD_SD1_CLK__SD1_CLK		0x10059
++			MX6QDL_PAD_SD1_DAT0__SD1_DATA0		0x17059
++			MX6QDL_PAD_SD1_DAT1__SD1_DATA1		0x17059
++			MX6QDL_PAD_SD1_DAT2__SD1_DATA2		0x17059
++			MX6QDL_PAD_SD1_DAT3__SD1_DATA3		0x17059
++			MX6QDL_PAD_NANDF_D0__SD1_DATA4		0x17059
++			MX6QDL_PAD_NANDF_D1__SD1_DATA5		0x17059
++			MX6QDL_PAD_NANDF_D2__SD1_DATA6		0x17059
++			MX6QDL_PAD_NANDF_D3__SD1_DATA7		0x17059
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
++			MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
++			MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
++			MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
++			MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
++			MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
++			MX6QDL_PAD_EIM_RW__GPIO2_IO26			0x15059 /*WL_EN_LDO*/
++			MX6QDL_PAD_EIM_CS1__GPIO2_IO24		0x15059 /*WL_EN*/
++			MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18	0x15059 /*WL_IRQ*/
++		>;
++	};
++
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17071
++			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10071
++			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17071
++			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17071
++			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17071
++			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17071
++		>;
++	};
++};
++
++&ldb {
++	status = "okay";
++
++	lvds-channel at 1 {
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <18>;
++		status = "okay";
++
++		port at 4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
++	};
++};
++
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
++&snvs_poweroff {
++	status = "okay";
++};
++
++&ssi1 {
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	uart-has-rtscts;
++	fsl,dte-mode;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	uart-has-rtscts;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	uart-has-rtscts;
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	uart-has-rtscts;
++	status = "okay";
++};
++
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	disable-over-current;
++	srp-disable;
++	hnp-disable;
++	adp-disable;
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbphy1 {
++	fsl,tx-d-cal = <0x5>;
++};
++
++&usbphy2 {
++	fsl,tx-d-cal = <0x5>;
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	bus-width = <8>;
++	keep-power-in-suspend;
++	vmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	bus-width = <4>;
++	vmmc-supply = <&wlan_en_reg>;
++	no-1-8-v;
++	keep-power-in-suspend;
++  non-removable;
++  cap-power-off-card;
++	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++	wlcore: wlcore at 2 {
++		compatible = "ti,wl1835";
++		reg = <2>;
++		interrupt-parent = <&gpio5>;
++		interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
++		ref-clock-frequency = <38400000>;
++		tcxo-clock-frequency = <26000000>;
++	};
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	bus-width = <4>;
++	cd-gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	keep-power-in-suspend;
++	wakeup-source;
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++};
++
++&wdog1 {
++	status = "okay";
++};
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
