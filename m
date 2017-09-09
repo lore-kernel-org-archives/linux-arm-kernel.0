@@ -1,24 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 09 Sep 2017 01:45:53 +0200
-Subject: [PATCH v8 2/3] ARM: dts: Add LVDS info for rk3288
-In-Reply-To: <1504351732-135989-1-git-send-email-hjc@rock-chips.com>
-References: <1504351723-135876-1-git-send-email-hjc@rock-chips.com>
- <1504351732-135989-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <35833616.zLl8rNldH8@phil>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Fri, 8 Sep 2017 19:07:36 -0500
+Subject: Prevent Kernel from resetting cycle counter
+In-Reply-To: <CALk3wS2cEFTnMXoyhrzyC1R_np159B4evzDRBMNK7MsAsc8UFA@mail.gmail.com>
+References: <CALk3wS2cEFTnMXoyhrzyC1R_np159B4evzDRBMNK7MsAsc8UFA@mail.gmail.com>
+Message-ID: <20170908190736.de99a221c13be31c10103643@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 2. September 2017, 19:28:52 CEST schrieb Sandy Huang:
-> add LVDS info in rk3288.dtsi for LVDS driver
-> This based on the patches from Mark yao and Heiko Stuebner.
-> 
-> Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+On Wed, 6 Sep 2017 17:36:36 -0700
+Jason Teplitz <jason@tensyr.com> wrote:
 
-applied for 4.15 after moving both the lvds node to its correct
-position (please always sort by address) and fixed the register
-addressing to honor the recent rk3288 64bit conversion.
+[adding linux-arm-kernel]
 
+> I'm reading the armv8 PMU cycle counter from userspace and noticing
+> that it gets periodically reset by something. Does anything inside the
+> kernel reset these counters? I am not using perf, so I'm not sure why
+> anything else would be touching them.
 
-Heiko
+PMCCNTR only shows up in kernel perf/PMU and KVM code, so yes, no
+reason for it to be reset, esp. if no arm-pmu interrupts are triggered.
+
+Is the period constant, as if to suggest a wraparound?  Can you use
+CNTVCT instead?
+
+Thanks,
+
+Kim
