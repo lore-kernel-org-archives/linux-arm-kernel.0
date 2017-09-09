@@ -1,384 +1,103 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Fri,  8 Sep 2017 18:53:07 -0700
-Subject: [PATCH v5 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <20170909015308.30001-1-brendanhiggins@google.com>
-References: <20170909015308.30001-1-brendanhiggins@google.com>
-Message-ID: <20170909015308.30001-3-brendanhiggins@google.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Sat, 9 Sep 2017 09:03:05 +0530
+Subject: [PATCH net-next 3/3] net: phy: realtek: add RTL8201F phy-id and
+ functions
+In-Reply-To: <4173a876-3cff-205a-ce87-ce049f419aa0@gmail.com>
+References: <1504875731-3680-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1504875731-3680-4-git-send-email-hayashi.kunihiko@socionext.com>
+ <4173a876-3cff-205a-ce87-ce049f419aa0@gmail.com>
+Message-ID: <CAJe_ZhciWBhw5npxEjTUGw2duS7DSfhzP5nzAOy_ig4-1XcPWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM750 BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+On 9 September 2017 at 00:21, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 09/08/2017 06:02 AM, Kunihiko Hayashi wrote:
+>> From: Jassi Brar <jaswinder.singh@linaro.org>
+>>
+>> Add RTL8201F phy-id and the related functions to the driver.
+>>
+>> The original patch is as follows:
+>> https://patchwork.kernel.org/patch/2538341/
+>>
+>> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+>> ---
+>>  drivers/net/phy/realtek.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 45 insertions(+)
+>>
+>> diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
+>> index 9cbe645..d9974ce 100644
+>> --- a/drivers/net/phy/realtek.c
+>> +++ b/drivers/net/phy/realtek.c
+>> @@ -29,10 +29,23 @@
+>>  #define RTL8211F_PAGE_SELECT 0x1f
+>>  #define RTL8211F_TX_DELAY    0x100
+>>
+>> +#define RTL8201F_ISR         0x1e
+>> +#define RTL8201F_PAGE_SELECT 0x1f
+>
+> We have a page select register define for the RTL8211F right above, so
+> surely we can make that a common definition?
+>
+That is just for the sake of consistency.
+I mean RTL8211 wouldn't look neat among everything else RTL8201.
 
-Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-Reviewed-by: Joel Stanley <joel@jms.id.au>
-Tested-by: Tomer Maimon <tmaimon77@gmail.com>
-Tested-by: Avi Fishman <avifishman70@gmail.com>
----
- .../arm/cpu-enable-method/nuvoton,npcm7xx-smp      |  42 +++++
- .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  57 +++++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 177 +++++++++++++++++++++
- include/dt-bindings/clock/nuvoton,npcm7xx-clks.h   |  39 +++++
- 5 files changed, 321 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
- create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
- create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+Also the page-select offsets just _happen_ to be same value...
+RTL8211E_INER_LINK_STATUS and RTL8211F_INER_LINK_STATUS are very
+different.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
-new file mode 100644
-index 000000000000..e81f85b400cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
-@@ -0,0 +1,42 @@
-+=========================================================
-+Secondary CPU enable-method "nuvoton,npcm7xx-smp" binding
-+=========================================================
-+
-+To apply to all CPUs, a single "nuvoton,npcm7xx-smp" enable method should be
-+defined in the "cpus" node.
-+
-+Enable method name:	"nuvoton,npcm7xx-smp"
-+Compatible machines:	"nuvoton,npcm750"
-+Compatible CPUs:	"arm,cortex-a9"
-+Related properties:	(none)
-+
-+Note:
-+This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
-+"nuvoton,npcm750-gcr".
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm7xx-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-new file mode 100644
-index 000000000000..2d87d9ecea85
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-@@ -0,0 +1,6 @@
-+NPCM Platforms Device Tree Bindings
-+-----------------------------------
-+NPCM750 SoC
-+Required root node properties:
-+	- compatible = "nuvoton,npcm750";
-+
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..e54a870d3ee0
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,57 @@
-+/*
-+ * DTS file for all NPCM750 SoCs
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
-+
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+
-+	chosen {
-+		stdout-path = &serial3;
-+		bootargs = "earlyprintk=serial,serial3,115200";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	cpus {
-+		enable-method = "nuvoton,npcm7xx-smp";
-+	};
-+};
-+
-+&clk {
-+	status = "okay";
-+};
-+
-+&watchdog1 {
-+	status = "okay";
-+};
-+
-+&serial0 {
-+	status = "okay";
-+};
-+
-+&serial1 {
-+	status = "okay";
-+};
-+
-+&serial2 {
-+	status = "okay";
-+};
-+
-+&serial3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..bca96b3ae9d3
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,177 @@
-+/*
-+ * DTSi file for the NPCM750 SoC
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	gcr: gcr at f0800000 {
-+		compatible = "nuvoton,npcm750-gcr", "syscon",
-+			"simple-mfd";
-+		reg = <0xf0800000 0x1000>;
-+	};
-+
-+	scu: scu at f03fe000 {
-+		compatible = "arm,cortex-a9-scu";
-+		reg = <0xf03fe000 0x1000>;
-+	};
-+
-+	l2: l2-cache at f03fc000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf03fc000 0x1000>;
-+		interrupts = <0 21 4>;
-+		cache-unified;
-+		cache-level = <2>;
-+		clocks = <&clk NPCM7XX_CLK_AXI>;
-+	};
-+
-+	gic: interrupt-controller at f03ff000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0xf03ff000 0x1000>,
-+		    <0xf03fe100 0x100>;
-+	};
-+
-+	clk: clock-controller at f0801000 {
-+		compatible = "nuvoton,npcm750-clk";
-+		#clock-cells = <1>;
-+		reg = <0xf0801000 0x1000>;
-+	};
-+
-+	/* external clock signal rg1refck, supplied by the phy */
-+	clk-rg1refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	/* external clock signal rg2refck, supplied by the phy */
-+	clk-rg2refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	clk-xin {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+	};
-+
-+	timer at f03fe600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xf03fe600 0x20>;
-+		interrupts = <1 13 0x304>;
-+		clocks = <&clk NPCM7XX_CLK_TIMER>;
-+	};
-+
-+	apb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		timer0: timer at f0000000 {
-+			compatible = "nuvoton,npcm750-timer";
-+			interrupts = <0 32 4>;
-+			reg = <0xf0000000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog0: watchdog at f0008000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 47 4>;
-+			reg = <0xf0008000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog1: watchdog at f0009000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 48 4>;
-+			reg = <0xf0009000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		watchdog2: watchdog at f000a000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 49 4>;
-+			reg = <0xf000a000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+		};
-+
-+		serial0: serial0 at f0001000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0001000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 2 4>;
-+			status = "disabled";
-+		};
-+
-+		serial1: serial1 at f0002000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0002000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 3 4>;
-+			status = "disabled";
-+		};
-+
-+		serial2: serial2 at f0003000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0003000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 4 4>;
-+			status = "disabled";
-+		};
-+
-+		serial3: serial3 at f0004000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0004000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			interrupts = <0 5 4>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-new file mode 100644
-index 000000000000..c69d3bbf7e42
---- /dev/null
-+++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2016 Nuvoton Technologies,  tali.perry at nuvoton.com
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_NPCM7XX_H
-+#define _DT_BINDINGS_CLK_NPCM7XX_H
-+
-+#define NPCM7XX_CLK_PLL0	0
-+#define NPCM7XX_CLK_PLL1	1
-+#define NPCM7XX_CLK_PLL2	2
-+#define NPCM7XX_CLK_GFX		3
-+#define NPCM7XX_CLK_APB1	4
-+#define NPCM7XX_CLK_APB2	5
-+#define NPCM7XX_CLK_APB3	6
-+#define NPCM7XX_CLK_APB4	7
-+#define NPCM7XX_CLK_APB5	8
-+#define NPCM7XX_CLK_MC		9
-+#define NPCM7XX_CLK_CPU		10
-+#define NPCM7XX_CLK_SPI0	11
-+#define NPCM7XX_CLK_SPI3	12
-+#define NPCM7XX_CLK_SPIX	13
-+#define NPCM7XX_CLK_UART_CORE	14
-+#define NPCM7XX_CLK_TIMER	15
-+#define NPCM7XX_CLK_HOST_UART	16
-+#define NPCM7XX_CLK_MMC		17
-+#define NPCM7XX_CLK_SDHC	18
-+#define NPCM7XX_CLK_ADC		19
-+#define NPCM7XX_CLK_GFX_MEM	20
-+#define NPCM7XX_CLK_USB_BRIDGE	21
-+#define NPCM7XX_CLK_AXI		22
-+#define NPCM7XX_CLK_AHB		23
-+#define NPCM7XX_CLK_EMC		24
-+#define NPCM7XX_CLK_GMAC	25
-+
-+#endif
--- 
-2.14.1.581.gf28d330327-goog
+>> +#define RTL8201F_IER         0x13
+>> +
+>>  MODULE_DESCRIPTION("Realtek PHY driver");
+>>  MODULE_AUTHOR("Johnson Leung");
+>>  MODULE_LICENSE("GPL");
+>>
+>> +static int rtl8201_ack_interrupt(struct phy_device *phydev)
+>> +{
+>> +     int err;
+>> +
+>> +     err = phy_read(phydev, RTL8201F_ISR);
+>> +
+>> +     return (err < 0) ? err : 0;
+>> +}
+>> +
+>>  static int rtl821x_ack_interrupt(struct phy_device *phydev)
+>>  {
+>>       int err;
+>> @@ -54,6 +67,25 @@ static int rtl8211f_ack_interrupt(struct phy_device *phydev)
+>>       return (err < 0) ? err : 0;
+>>  }
+>>
+>> +static int rtl8201_config_intr(struct phy_device *phydev)
+>> +{
+>> +     int err;
+>> +
+>> +     /* switch to page 7 */
+>> +     phy_write(phydev, RTL8201F_PAGE_SELECT, 0x7);
+>> +
+>> +     if (phydev->interrupts == PHY_INTERRUPT_ENABLED)
+>> +             err = phy_write(phydev, RTL8201F_IER,
+>> +                             BIT(13) | BIT(12) | BIT(11));
+>
+> Can you detail what bits 11, 12 and 13 do? Do they correspond to link,
+> duplex and pause changes by any chance?
+>
+Sorry no idea. The datasheet would say, and other functions too use
+such magic values.
+
+>> +     else
+>> +             err = phy_write(phydev, RTL8201F_IER, 0);
+>> +
+>> +     /* restore to default page 0 */
+>> +     phy_write(phydev, RTL8201F_PAGE_SELECT, 0x0);
+>> +
+>> +     return err;
+>> +}
+>> +
+>
+> Other than that, LGTM:
+>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+>
+Thank you.
