@@ -1,47 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 9 Sep 2017 08:48:49 -0300
-Subject: [PATCH v3] ARM: dts: Add initial Pistachio i.mx6q board support.
-In-Reply-To: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
-References: <1504949308-13552-1-git-send-email-onlywig@gmail.com>
-Message-ID: <CAOMZO5Bsiw0z5Ab1oJ_MzsBeTueuEp1oZ3MpowwB8igKQApvew@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 09 Sep 2017 13:54:11 +0200
+Subject: [PATCH 1/2] of: Add vendor prefix for Amarula Solutions
+In-Reply-To: <1503730303-11422-1-git-send-email-jteki@openedev.com>
+References: <1503730303-11422-1-git-send-email-jteki@openedev.com>
+Message-ID: <5018848.vFZiDtlIpl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 9, 2017 at 6:28 AM, Wig C <onlywig@gmail.com> wrote:
+Am Samstag, 26. August 2017, 12:21:42 CEST schrieb Jagan Teki:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> Added 'amarula' as a vendor prefix for Amarula Solutions,
+> specialist in Embedded and Opensource solutions.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-> +&usdhc2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc2>;
-> +       bus-width = <4>;
-> +       vmmc-supply = <&wlan_en_reg>;
-> +       no-1-8-v;
-> +       keep-power-in-suspend;
-> +  non-removable;
-> +  cap-power-off-card;
+applied for 4.15 with Rob's Ack
 
-As I mentioned previously the indentation is not correct here.
 
-You should use tab instead of spaces.
-
-checkpatch also complains about it:
-
-WARNING: please, no spaces at the start of a line
-#699: FILE: arch/arm/boot/dts/imx6q-pistachio.dts:654:
-+  non-removable;$
-
-WARNING: please, no spaces at the start of a line
-#700: FILE: arch/arm/boot/dts/imx6q-pistachio.dts:655:
-+  cap-power-off-card;$
-
-> +&wdog1 {
-> +       status = "okay";
-> +};
-
-Why don't you use like this as you intended in the original patch?
-
-&wdog1 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&pinctrl_wdog>;
-    fsl,ext-reset-output;
-    status = "okay";
-};
+Thanks
+Heiko
