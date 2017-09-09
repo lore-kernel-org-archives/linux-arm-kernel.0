@@ -1,122 +1,68 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri,  8 Sep 2017 23:58:55 -0500
-Subject: [RFC 2/2] DTS: davinci: da850evm: Enable LCD and Backlight
-In-Reply-To: <1504933135-29747-1-git-send-email-aford173@gmail.com>
-References: <1504933135-29747-1-git-send-email-aford173@gmail.com>
-Message-ID: <1504933135-29747-2-git-send-email-aford173@gmail.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Sat, 9 Sep 2017 16:33:55 +0900
+Subject: [PATCH] scripts: make extract-vmlinux support armel/armhf
+In-Reply-To: <20170901231654.GY20805@n2100.armlinux.org.uk>
+References: <20170831153631.31026-1-rogershimizu@gmail.com>
+ <20170831154941.GS20805@n2100.armlinux.org.uk>
+ <CAEQ9gEmBv-fb2MbedSzs+dWtrq-ChXwiMrisyofZ7zfu+jADYA@mail.gmail.com>
+ <20170831161957.GU20805@n2100.armlinux.org.uk>
+ <20170831174318.GM6008@atomide.com>
+ <20170901231654.GY20805@n2100.armlinux.org.uk>
+Message-ID: <CAEQ9gEk6iGFY0hx36QbQHywKbttWTJdQxZzpOKULCgFLvS9TOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using the board files the LCD works, but not with the DT.
-This adds enables the original da850-evm to work with the same
-LCD in device tree mode.
+On Sat, Sep 2, 2017 at 8:16 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Aug 31, 2017 at 10:43:19AM -0700, Tony Lindgren wrote:
+>> * Russell King - ARM Linux <linux@armlinux.org.uk> [170831 09:21]:
+>> > On Fri, Sep 01, 2017 at 01:05:16AM +0900, Roger Shimizu wrote:
+>> > > On Fri, Sep 1, 2017 at 12:49 AM, Russell King - ARM Linux
+>> > > <linux@armlinux.org.uk> wrote:
+>> > > > What's the use case - what are you using the output of this script with?
+>> > >
+>> > > I already provided a use case, to trace a Debian kernel issue caused
+>> > > by kernel size.
+>> > > - https://bugs.debian.org/870185#50
+>> >
+>> > Sorry, I haven't time to look - it needs me to use firefox on a
+>> > different machine.  Maybe you could help by providing some details
+>> > by email, otherwise I've got extra work to do at some point in the
+>> > future (probably days away) if I remember (your mail will get buried).
+>> > Much of my time is in front of a _textual_ _only_ interface, and elinks
+>> > does not work with several modern SSL-only sites.
+>> >
+>> > > I also see other people complaining this issue:
+>> > >  - https://bugs.launchpad.net/linaro-ubuntu/+bug/1050453
+>> > >  - https://bugs.linaro.org/show_bug.cgi?id=461
+>> > >
+>> > > By a random web search, I find another blog post on how to dissamble the kernel.
+>> > >  - https://blog.packagecloud.io/eng/2016/03/08/how-to-extract-and-disassmble-a-linux-kernel-image-vmlinuz/
+>> >
+>> > Yea, all SSL sites, I'm not going to try elinks with them, I don't
+>> > have the time to mess around.
+>>
+>> I think the use case is to get the booted kernel size from zImage
+>> to avoid overwriting dts or initramfs. Don't we already have that
+>> at the end of zImage somewhere for kexec?
+>
+> We do, but finding where that is is difficult if a DTB has been appended
+> as it's right at the end of the compressed data.  kexec doesn't use it,
+> it just assumes there's a 5x expansion of the kernel compressed image.
 
-RFC:  Currently, I cannot get the backlight to do anything other
-than 100%. I don't get the userspace files to write the brightness.
-Any suggestions on what I am dowing wrong?
+My patch already take the appended DTB blob part into consideration.
+It uses "unxz --single-stream" instead of "unxz" to extract, so unxz
+just ignore the DTB.
 
-RFC:  The board-file version enables the LCD, but the only way
-I can enable the LCD is the disable the VPIF display.  Should
-I use a new name for the this DTS file to maintain compatibility,
-or is there a better way to enable the LCD without losing VPIF
+I confirmed it works well on my armel box, which need to append a
+device specific DTB.
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+For the use case, I already provided several bug reports and blog posts.
+I think current script is broken for armel/armhf, which can be fixed
+by my patch.
+So please kindly consider this patch. Thank you!
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 67e72bc..10df630 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -10,6 +10,7 @@
- /dts-v1/;
- #include "da850.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pwm/pwm.h>
- 
- / {
- 	compatible = "ti,da850-evm", "ti,da850";
-@@ -30,6 +31,7 @@
- 					0x04 0x00011000 0x000ff000
- 				>;
- 			};
-+
- 			nand_pins: nand_pins {
- 				pinctrl-single,bits = <
- 					/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[4], EMA_CS[3] */
-@@ -152,6 +154,50 @@
- 			status = "okay";
- 		};
- 	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&ecap2 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 58 61 66 75 90 125 170 255>;
-+		default-brightness-level = <8>;
-+	};
-+
-+	panel {
-+		compatible = "ti,tilcdc,panel";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		status = "okay";
-+		panel-info {
-+			ac-bias		= <255>;
-+			ac-bias-intrpt	= <0>;
-+			dma-burst-sz	= <16>;
-+			bpp		= <16>;
-+			fdd		= <0x80>;
-+			sync-edge	= <0>;
-+			sync-ctrl	= <1>;
-+			raster-order	= <0>;
-+			fifo-th		= <0>;
-+		};
-+
-+		display-timings {
-+			480x272 {
-+				clock-frequency = <9000000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hfront-porch = <3>;
-+				hback-porch = <2>;
-+				hsync-len = <42>;
-+				vback-porch = <3>;
-+				vfront-porch = <4>;
-+				vsync-len = <11>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <1>;
-+			};
-+		};
-+	};
-+
- 	vbat: fixedregulator0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vbat";
-@@ -240,6 +286,16 @@
- 	};
- };
- 
-+&ecap2 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ecap2_pins>;
-+};
-+
-+&lcdc {
-+	status = "okay";
-+};
-+
- &mcasp0 {
- 	#sound-dai-cells = <0>;
- 	status = "okay";
-@@ -299,6 +355,6 @@
- 
- &vpif {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
-+	pinctrl-0 = <&vpif_capture_pins>/*, <&vpif_display_pins>*/;
- 	status = "okay";
- };
+Cheers,
 -- 
-2.7.4
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 4096R/6C6ACD6417B3ACB1
