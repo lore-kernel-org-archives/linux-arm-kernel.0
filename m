@@ -1,32 +1,66 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 10 Sep 2017 18:24:51 +0200
-Subject: [PATCH v2 2/3] watchdog: Add Realtek RTD1295
-In-Reply-To: <89c4a85d-fbc7-6fcf-6ff4-63c5580837f8@roeck-us.net>
-References: <20170904231602.29787-1-afaerber@suse.de>
- <20170904231602.29787-3-afaerber@suse.de>
- <89c4a85d-fbc7-6fcf-6ff4-63c5580837f8@roeck-us.net>
-Message-ID: <155916fd-1689-9a59-3e7c-9e9768a98057@suse.de>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Sun, 10 Sep 2017 20:56:40 +0200
+Subject: [PATCH v5 01/10] arm64: dts: allwinner: Restore EMAC changes
+In-Reply-To: <CAGb2v64K3XTLJwZwYmq3r64=3_bHHGTeGyC0gfoJfL5+Ty53ag@mail.gmail.com>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-2-clabbe.montjoie@gmail.com>
+ <20170908071954.j2bhtw4wqa27fald@flea.lan>
+ <20170908073657.GA29999@Red>
+ <CAGb2v64K3XTLJwZwYmq3r64=3_bHHGTeGyC0gfoJfL5+Ty53ag@mail.gmail.com>
+Message-ID: <20170910185640.GA17417@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 10.09.2017 um 17:17 schrieb Guenter Roeck:
-> On 09/04/2017 04:16 PM, Andreas F?rber wrote:
->> Add a watchdog driver for the Realtek RTD1295 SoC.
->>
->> Based on QNAP's arch/arm/mach-rtk119x/driver/rtk_watchdog.c code and
->> mach-rtk119x/driver/dc2vo/fpga/include/iso_reg.h register defines.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+On Fri, Sep 08, 2017 at 03:39:04PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Sep 8, 2017 at 3:36 PM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > On Fri, Sep 08, 2017 at 09:19:54AM +0200, Maxime Ripard wrote:
+> >> On Fri, Sep 08, 2017 at 09:11:47AM +0200, Corentin Labbe wrote:
+> >> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+> >> > index 1c2387bd5df6..968908761194 100644
+> >> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+> >> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+> >> > @@ -50,6 +50,7 @@
+> >> >     compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
+> >> >
+> >> >     aliases {
+> >> > +           ethernet0 = &emac;
+> >> >             serial0 = &uart0;
+> >> >     };
+> >> >
+> >> > @@ -108,6 +109,22 @@
+> >> >     status = "okay";
+> >> >  };
+> >> >
+> >> > +&emac {
+> >> > +   pinctrl-names = "default";
+> >> > +   pinctrl-0 = <&emac_rgmii_pins>;
+> >> > +   phy-supply = <&reg_gmac_3v3>;
+> >> > +   phy-handle = <&ext_rgmii_phy>;
+> >> > +   phy-mode = "rgmii";
+> >> > +   status = "okay";
+> >> > +};
+> >> > +
+> >> > +&mdio {
+> >> > +   ext_rgmii_phy: ethernet-phy at 7 {
+> >> > +           compatible = "ethernet-phy-ieee802.3-c22";
+> >> > +           reg = <7>;
+> >> > +   };
+> >> > +};
+> >> > +
+> >>
+> >> This won't compile, you don't have that node in the H5 DTSI.
+> >>
+> >
+> > Since H5 DTSI include arm/sunxi-h3-h5.dtsi it compiles.
+> > Furthermore, I restested just now and confirm, it compiles fine.
 > 
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> The order of your patches are wrong. No individual patch should
+> introduce build failures, not just the whole patch series.
+> 
 
-Thanks. Will patches 1-2 go through some watchdog tree, or should I
-queue them in my Realtek tree now?
+Yes, I just miss-understood the reason of build failure.
+I will fix the order in the next serie.
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks
+Corentin Labbe
