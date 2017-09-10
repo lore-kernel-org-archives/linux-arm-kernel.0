@@ -1,66 +1,66 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sun, 10 Sep 2017 20:56:40 +0200
-Subject: [PATCH v5 01/10] arm64: dts: allwinner: Restore EMAC changes
-In-Reply-To: <CAGb2v64K3XTLJwZwYmq3r64=3_bHHGTeGyC0gfoJfL5+Ty53ag@mail.gmail.com>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-2-clabbe.montjoie@gmail.com>
- <20170908071954.j2bhtw4wqa27fald@flea.lan>
- <20170908073657.GA29999@Red>
- <CAGb2v64K3XTLJwZwYmq3r64=3_bHHGTeGyC0gfoJfL5+Ty53ag@mail.gmail.com>
-Message-ID: <20170910185640.GA17417@Red>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Sep 2017 23:44:19 +0200
+Subject: [PATCH 0/5] I2C GPIO to use gpiolibs open drain
+Message-ID: <20170910214424.14945-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 08, 2017 at 03:39:04PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Sep 8, 2017 at 3:36 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > On Fri, Sep 08, 2017 at 09:19:54AM +0200, Maxime Ripard wrote:
-> >> On Fri, Sep 08, 2017 at 09:11:47AM +0200, Corentin Labbe wrote:
-> >> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-> >> > index 1c2387bd5df6..968908761194 100644
-> >> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-> >> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-> >> > @@ -50,6 +50,7 @@
-> >> >     compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
-> >> >
-> >> >     aliases {
-> >> > +           ethernet0 = &emac;
-> >> >             serial0 = &uart0;
-> >> >     };
-> >> >
-> >> > @@ -108,6 +109,22 @@
-> >> >     status = "okay";
-> >> >  };
-> >> >
-> >> > +&emac {
-> >> > +   pinctrl-names = "default";
-> >> > +   pinctrl-0 = <&emac_rgmii_pins>;
-> >> > +   phy-supply = <&reg_gmac_3v3>;
-> >> > +   phy-handle = <&ext_rgmii_phy>;
-> >> > +   phy-mode = "rgmii";
-> >> > +   status = "okay";
-> >> > +};
-> >> > +
-> >> > +&mdio {
-> >> > +   ext_rgmii_phy: ethernet-phy at 7 {
-> >> > +           compatible = "ethernet-phy-ieee802.3-c22";
-> >> > +           reg = <7>;
-> >> > +   };
-> >> > +};
-> >> > +
-> >>
-> >> This won't compile, you don't have that node in the H5 DTSI.
-> >>
-> >
-> > Since H5 DTSI include arm/sunxi-h3-h5.dtsi it compiles.
-> > Furthermore, I restested just now and confirm, it compiles fine.
-> 
-> The order of your patches are wrong. No individual patch should
-> introduce build failures, not just the whole patch series.
-> 
+I recently looked at this driver when testing the I2C GPIO
+on the Gemini platform.
 
-Yes, I just miss-understood the reason of build failure.
-I will fix the order in the next serie.
+It's one of the archectypical places in the kernel where we
+have open coded open drain emulation, also without much
+explanation. So I went in and fixed it.
 
-Thanks
-Corentin Labbe
+The fix is pretty brutal changing all boards and one MFD
+device using this, but I like the end result, making the
+code much more readable and skipping the intermediate step
+of looping through the old GPIO API.
+
+It would be nice to get some testing and ACKs on this if
+people agree.
+
+I imagine Wolfram would use the whole thing into the I2C
+tree but I could also carry a branch in GPIO to be merged
+through the GPIO tree if it is preferred (like e.g. Wolfram
+want me to get the heat for any regressions, hehe).
+
+Linus Walleij (5):
+  i2c: gpio: Convert to use descriptors
+  gpio: Make it possible for consumers to enforce open drain
+  i2c: gpio: Enforce open drain through gpiolib
+  i2c: gpio: Augment all boardfiles to use open drain
+  i2c: gpio: Local vars in probe
+
+ arch/arm/mach-ep93xx/core.c                  |  41 +++---
+ arch/arm/mach-ep93xx/edb93xx.c               |  15 +--
+ arch/arm/mach-ep93xx/include/mach/platform.h |   4 +-
+ arch/arm/mach-ep93xx/simone.c                |  12 +-
+ arch/arm/mach-ep93xx/snappercl15.c           |  12 +-
+ arch/arm/mach-ep93xx/vision_ep9307.c         |   7 +-
+ arch/arm/mach-ixp4xx/avila-setup.c           |  17 ++-
+ arch/arm/mach-ixp4xx/dsmg600-setup.c         |  16 ++-
+ arch/arm/mach-ixp4xx/fsg-setup.c             |  16 ++-
+ arch/arm/mach-ixp4xx/goramo_mlr.c            |  24 +---
+ arch/arm/mach-ixp4xx/ixdp425-setup.c         |  16 ++-
+ arch/arm/mach-ixp4xx/nas100d-setup.c         |  16 ++-
+ arch/arm/mach-ixp4xx/nslu2-setup.c           |  16 ++-
+ arch/arm/mach-ks8695/board-acs5k.c           |  15 ++-
+ arch/arm/mach-pxa/palmz72.c                  |  14 +-
+ arch/arm/mach-pxa/viper.c                    |  27 +++-
+ arch/arm/mach-sa1100/simpad.c                |  14 +-
+ arch/blackfin/mach-bf533/boards/blackstamp.c |  19 ++-
+ arch/blackfin/mach-bf533/boards/ezkit.c      |  18 ++-
+ arch/blackfin/mach-bf533/boards/stamp.c      |  18 ++-
+ arch/blackfin/mach-bf561/boards/ezkit.c      |  18 ++-
+ arch/mips/alchemy/board-gpr.c                |  23 +++-
+ arch/mips/ath79/mach-pb44.c                  |  16 ++-
+ drivers/gpio/gpiolib.c                       |  13 ++
+ drivers/i2c/busses/i2c-gpio.c                | 184 +++++++++++----------------
+ drivers/mfd/sm501.c                          |  49 +++----
+ include/linux/gpio/consumer.h                |   6 +
+ include/linux/i2c-gpio.h                     |   4 -
+ 28 files changed, 372 insertions(+), 278 deletions(-)
+
+-- 
+2.13.5
