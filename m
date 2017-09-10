@@ -1,83 +1,24 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 10 Sep 2017 17:00:40 +0100
-Subject: [PATCH] iio: stm32: fix adc/trigger link error
-In-Reply-To: <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
-References: <20170906125722.2522781-1-arnd@arndb.de>
- <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
-Message-ID: <20170910170040.7eb1f768@archlinux>
+From: metux@gmx.de (Enrico Weigelt, metux IT consult)
+Date: Sun, 10 Sep 2017 18:06:18 +0200
+Subject: dtc: imx6 warnings on unit address format errors
+Message-ID: <22d62057-c7a0-04d8-3c80-aefb9cbef1b8@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Sep 2017 18:16:33 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+Hi folks,
 
-> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:
-> > The ADC driver can trigger on either the timer or the lptim
-> > trigger, but it only uses a Kconfig 'select' statement
-> > to ensure that the first of the two is present. When the lptim
-> > trigger is enabled as a loadable module, and the adc driver
-> > is built-in, we now get a link error:
-> > 
-> > drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
-> > stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
-> > 
-> > We could use a second 'select' statement and always have both
-> > trigger drivers enabled when the adc driver is, but it seems that
-> > the lptimer trigger was intentionally left optional, so it seems
-> > better to keep it that way.  
-> Hi Arnd,
-> 
-> This is correct, not all stm32 have this hardware.
-> > 
-> > This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
-> > which avoids the link error, but instead leads to the lptimer trigger
-> > not being used in the broken configuration. I've added a runtime
-> > warning for this case to help users figure out what they did wrong
-> > if this should ever be done by accident.
-> > 
-> > Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>  
-> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-This may take me a few weeks to pick up.  I don't want to
-pull the mfd immutable branch in just to have this fix, so this will
-get sorted after rc1 is out.
+I'm getting lots of warnings from dtc about unit address format errors:
 
-As ever, poke me if it looks like I've forgotten about it.
-Sorry for the delay!
+For example in imx6q.dtsi:
 
-Jonathan
+      ocram: sram at 00900000 {
 
-> 
-> Many thanks for the fix,
-> Best Regards,
-> Fabrice
-> > ---
-> >  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
-> > index 34d59bfdce2d..464458d20b16 100644
-> > --- a/include/linux/iio/timer/stm32-lptim-trigger.h
-> > +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
-> > @@ -16,11 +16,14 @@
-> >  #define LPTIM2_OUT	"lptim2_out"
-> >  #define LPTIM3_OUT	"lptim3_out"
-> >  
-> > -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> > +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
-> >  #else
-> >  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
-> >  {
-> > +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> > +	pr_warn_once("stm32 lptim_trigger not linked in\n");
-> > +#endif
-> >  	return false;
-> >  }
-> >  #endif
-> >   
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The node name's address part has leading zeros which dtc doesn't like.
+It doesn't seem to have a big influence (yet ?), but I'd guess this
+warning is there for a reason.
+
+Should we fix this ?
+
+
+--mtx
