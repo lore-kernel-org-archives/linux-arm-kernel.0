@@ -1,36 +1,28 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 10 Sep 2017 20:13:23 +0800
-Subject: [PATCH v4 6/6] gpio: uniphier: add UniPhier GPIO controller driver
-In-Reply-To: <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <201709102009.mXD4Fpgu%fengguang.wu@intel.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 10 Sep 2017 20:40:04 +0800
+Subject: [PATCH 0/2] clk: sunxi-ng: Add several flags to H3 CCU
+Message-ID: <20170910124006.60250-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+The H3 CCU is the earliest driver that uses sunxi-ng clk framework, and
+some problems show when doing further development.
 
-[auto build test ERROR on tip/irq/core]
-[also build test ERROR on next-20170908]
-[cannot apply to v4.13]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This patchset fixes some issues by add several clock flags.
 
-url:    https://github.com/0day-ci/linux/commits/Masahiro-Yamada/irqdomain-gpio-expand-irq_domain_push_irq-for-DT-use-and-use-it-for-GPIO/20170910-160507
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+The first patch solves the problem that setting some PLL before ungating
+them will trigger timeout for waiting for lock by adds CLK_SET_RATE_UNGATE
+flag.
 
-All errors (new ones prefixed by >>):
+The second patch solves the problem that H3 GPU clock is not really tweaked
+by add CLK_SET_RATE_PARENT flag to it.
 
->> ERROR: "of_irq_count" [drivers/gpio/gpio-uniphier.ko] undefined!
+Icenowy Zheng (2):
+  clk: sunxi-ng: add CLK_SET_RATE_UNGATE to all H3 PLLs
+  clk: sunxi-ng: add CLK_SET_RATE_PARENT flag to H3 GPU clock
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60564 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170910/af601c03/attachment-0001.gz>
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+-- 
+2.13.5
