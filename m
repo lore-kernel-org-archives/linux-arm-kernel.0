@@ -1,38 +1,33 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 10 Sep 2017 20:40:06 +0800
-Subject: [PATCH 2/2] clk: sunxi-ng: add CLK_SET_RATE_PARENT flag to H3 GPU
- clock
-In-Reply-To: <20170910124006.60250-1-icenowy@aosc.io>
-References: <20170910124006.60250-1-icenowy@aosc.io>
-Message-ID: <20170910124006.60250-3-icenowy@aosc.io>
+From: chris.gekas@gmail.com (Christos Gkekas)
+Date: Sun, 10 Sep 2017 14:55:29 +0100
+Subject: [PATCH] spi: stm32: Fix logical error in stm32_spi_prepare_mbr()
+Message-ID: <1505051729-22270-1-git-send-email-chris.gekas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPU clock on H3 has only one parent, PLL-GPU, and the PLL is only
-the parent of the GPU clock. The GPU clock can be tweaked by tweaking
-the PLL-GPU clock.
+stm32_spi_prepare_mbr() is returning an error value when div is less
+than SPI_MBR_DIV_MIN *and* greater than SPI_MBR_DIV_MAX, which always
+evaluates to false. This should change to use *or*.
 
-Add CLK_SET_RATE_PARENT flag to allow tweaking the GPU clock via
-tweaking PLL-CPU.
-
-Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Christos Gkekas <chris.gekas@gmail.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-stm32.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 7a81c4885836..543c46d0e045 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -484,7 +484,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(mbus_clk, "mbus", mbus_parents,
- 				 0x15c, 0, 3, 24, 2, BIT(31), CLK_IS_CRITICAL);
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index 680cdf5..ba9743f 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -263,8 +263,8 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, u32 speed_hz)
+ 	 * no need to check it there.
+ 	 * However, we need to ensure the following calculations.
+ 	 */
+-	if ((div < SPI_MBR_DIV_MIN) &&
+-	    (div > SPI_MBR_DIV_MAX))
++	if (div < SPI_MBR_DIV_MIN ||
++	    div > SPI_MBR_DIV_MAX)
+ 		return -EINVAL;
  
- static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
--			     0x1a0, 0, 3, BIT(31), 0);
-+			     0x1a0, 0, 3, BIT(31), CLK_SET_RATE_PARENT);
- 
- static struct ccu_common *sun8i_h3_ccu_clks[] = {
- 	&pll_cpux_clk.common,
+ 	/* Determine the first power of 2 greater than or equal to div */
 -- 
-2.13.5
+2.7.4
