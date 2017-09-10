@@ -1,30 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 10 Sep 2017 13:09:54 -0300
-Subject: dtc: imx6 warnings on unit address format errors
-In-Reply-To: <22d62057-c7a0-04d8-3c80-aefb9cbef1b8@gmx.de>
-References: <22d62057-c7a0-04d8-3c80-aefb9cbef1b8@gmx.de>
-Message-ID: <CAOMZO5D-Fd4w1hJ4GuDXYncqqD2WsDvkRTJzWB2ZVvDWg32gsA@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 10 Sep 2017 18:24:51 +0200
+Subject: [PATCH v2 2/3] watchdog: Add Realtek RTD1295
+In-Reply-To: <89c4a85d-fbc7-6fcf-6ff4-63c5580837f8@roeck-us.net>
+References: <20170904231602.29787-1-afaerber@suse.de>
+ <20170904231602.29787-3-afaerber@suse.de>
+ <89c4a85d-fbc7-6fcf-6ff4-63c5580837f8@roeck-us.net>
+Message-ID: <155916fd-1689-9a59-3e7c-9e9768a98057@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 10, 2017 at 1:06 PM, Enrico Weigelt, metux IT consult
-<metux@gmx.de> wrote:
-> Hi folks,
->
->
-> I'm getting lots of warnings from dtc about unit address format errors:
->
-> For example in imx6q.dtsi:
->
->      ocram: sram at 00900000 {
->
-> The node name's address part has leading zeros which dtc doesn't like.
-> It doesn't seem to have a big influence (yet ?), but I'd guess this
-> warning is there for a reason.
->
-> Should we fix this ?
+Am 10.09.2017 um 17:17 schrieb Guenter Roeck:
+> On 09/04/2017 04:16 PM, Andreas F?rber wrote:
+>> Add a watchdog driver for the Realtek RTD1295 SoC.
+>>
+>> Based on QNAP's arch/arm/mach-rtk119x/driver/rtk_watchdog.c code and
+>> mach-rtk119x/driver/dc2vo/fpga/include/iso_reg.h register defines.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> 
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-Yes, feel free to submit a patch that fixes these warnings for all
-imx6 dts/dtsi files.
+Thanks. Will patches 1-2 go through some watchdog tree, or should I
+queue them in my Realtek tree now?
 
-Thanks
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
