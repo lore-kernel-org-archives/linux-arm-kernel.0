@@ -1,180 +1,282 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Sun, 10 Sep 2017 12:26:57 +0530
-Subject: [PATCH v9] vfio: platform: reset: Add Broadcom FlexRM reset module
-In-Reply-To: <1505026617-1399-1-git-send-email-anup.patel@broadcom.com>
-References: <1505026617-1399-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1505026617-1399-2-git-send-email-anup.patel@broadcom.com>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Sun, 10 Sep 2017 11:36:30 +0300
+Subject: [PATCH v5 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20170909015308.30001-2-brendanhiggins@google.com>
+References: <20170909015308.30001-1-brendanhiggins@google.com>
+ <20170909015308.30001-2-brendanhiggins@google.com>
+Message-ID: <CAP6Zq1jj08RbnUhPKaFuxn_06W1SzDmJoN6x8xV2pc05RKfngw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Broadcom FlexRM low-level reset for
-VFIO platform.
+On 9 September 2017 at 04:53, Brendan Higgins <brendanhiggins@google.com> wrote:
+> Adds basic support for the Nuvoton NPCM750 BMC.
+>
+> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+> ---
+>  arch/arm/Kconfig             |  2 +
+>  arch/arm/Makefile            |  1 +
+>  arch/arm/mach-npcm/Kconfig   | 48 ++++++++++++++++++++++++
+>  arch/arm/mach-npcm/Makefile  |  3 ++
+>  arch/arm/mach-npcm/headsmp.S | 17 +++++++++
+>  arch/arm/mach-npcm/npcm7xx.c | 34 +++++++++++++++++
+>  arch/arm/mach-npcm/platsmp.c | 88 ++++++++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 193 insertions(+)
+>  create mode 100644 arch/arm/mach-npcm/Kconfig
+>  create mode 100644 arch/arm/mach-npcm/Makefile
+>  create mode 100644 arch/arm/mach-npcm/headsmp.S
+>  create mode 100644 arch/arm/mach-npcm/npcm7xx.c
+>  create mode 100644 arch/arm/mach-npcm/platsmp.c
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 61a0cb15067e..05543f1cfbde 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -782,6 +782,8 @@ source "arch/arm/mach-netx/Kconfig"
+>
+>  source "arch/arm/mach-nomadik/Kconfig"
+>
+> +source "arch/arm/mach-npcm/Kconfig"
+> +
+>  source "arch/arm/mach-nspire/Kconfig"
+>
+>  source "arch/arm/plat-omap/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 47d3a1ab08d2..60ca50c7d762 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)             += mediatek
+>  machine-$(CONFIG_ARCH_MXS)             += mxs
+>  machine-$(CONFIG_ARCH_NETX)            += netx
+>  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
+> +machine-$(CONFIG_ARCH_NPCM)            += npcm
+>  machine-$(CONFIG_ARCH_NSPIRE)          += nspire
+>  machine-$(CONFIG_ARCH_OXNAS)           += oxnas
+>  machine-$(CONFIG_ARCH_OMAP1)           += omap1
+> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+> new file mode 100644
+> index 000000000000..21dfa8ce828f
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/Kconfig
+> @@ -0,0 +1,48 @@
+> +menuconfig ARCH_NPCM
+> +       bool "Nuvoton NPCM Architecture"
+> +       select ARCH_REQUIRE_GPIOLIB
+> +       select USE_OF
+> +       select PINCTRL
+> +       select PINCTRL_NPCM7XX
+> +
+> +if ARCH_NPCM
+> +
+> +comment "NPCMX50 CPU type"
+> +
+> +config CPU_NPCM750
+> +       depends on ARCH_NPCM && ARCH_MULTI_V7
+> +       bool "Support for NPCM750 BMC CPU (Poleg)"
+> +       select CACHE_L2X0
+> +       select CPU_V7
+> +       select ARM_GIC
+> +       select HAVE_SMP
+> +       select SMP
+> +       select SMP_ON_UP
+> +       select HAVE_ARM_SCU
+> +       select HAVE_ARM_TWD if SMP
+> +       select ARM_ERRATA_720789
+> +       select ARM_ERRATA_754322
+> +       select ARM_ERRATA_764369
+> +       select ARM_ERRATA_794072
+> +       select PL310_ERRATA_588369
+> +       select PL310_ERRATA_727915
+> +       select USB_EHCI_ROOT_HUB_TT
+> +       select USB_ARCH_HAS_HCD
+> +       select USB_ARCH_HAS_EHCI
+> +       select USB_EHCI_HCD
+> +       select USB_ARCH_HAS_OHCI
+> +       select USB_OHCI_HCD
+> +       select USB
+> +       select FIQ
+> +       select CPU_USE_DOMAINS
+> +       select GENERIC_CLOCKEVENTS
+> +       select CLKDEV_LOOKUP
+> +       select COMMON_CLK if OF
+> +       select NPCM750_TIMER
+> +       select MFD_SYSCON
+> +       help
+> +         Support for NPCM750 BMC CPU (Poleg).
+> +
+> +         Nuvoton NPCM750 BMC based on the Cortex A9.
+> +
+> +endif
+> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+> new file mode 100644
+> index 000000000000..78416055b854
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/Makefile
+> @@ -0,0 +1,3 @@
+> +AFLAGS_headsmp.o               += -march=armv7-a
+> +
+> +obj-$(CONFIG_CPU_NPCM750)      += npcm7xx.o platsmp.o headsmp.o
+> diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
+> new file mode 100644
+> index 000000000000..9fccbbd49ed4
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/headsmp.S
+> @@ -0,0 +1,17 @@
+> +/*
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/init.h>
+> +#include <asm/assembler.h>
+> +
+> +ENTRY(npcm7xx_secondary_startup)
+> +       safe_svcmode_maskall r0
+> +
+> +       b       secondary_startup
+> +ENDPROC(npcm7xx_secondary_startup)
+> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+> new file mode 100644
+> index 000000000000..132e9d587857
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/npcm7xx.c
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright (c) 2017 Nuvoton Technology corporation.
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +#define NPCM7XX_AUX_VAL (L310_AUX_CTRL_INSTR_PREFETCH |                               \
+> +                        L310_AUX_CTRL_DATA_PREFETCH |                         \
+> +                        L310_AUX_CTRL_NS_LOCKDOWN |                           \
+> +                        L310_AUX_CTRL_CACHE_REPLACE_RR |                      \
+> +                        L2C_AUX_CTRL_SHARED_OVERRIDE |                        \
+> +                        L310_AUX_CTRL_FULL_LINE_ZERO)
+> +
+> +static const char *const npcm7xx_dt_match[] = {
+> +       "nuvoton,npcm750",
+> +       NULL
+> +};
+> +
+> +DT_MACHINE_START(NPCM7XX_DT, "NPCMX50 Chip family")
+> +       .atag_offset    = 0x100,
+> +       .dt_compat      = npcm7xx_dt_match,
+> +       .l2c_aux_val    = NPCM7XX_AUX_VAL,
+> +       .l2c_aux_mask   = ~NPCM7XX_AUX_VAL,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
+> new file mode 100644
+> index 000000000000..450e83c3c531
+> --- /dev/null
+> +++ b/arch/arm/mach-npcm/platsmp.c
+> @@ -0,0 +1,88 @@
+> +/*
+> + * Copyright 2017 Google, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "PLATSMP: " fmt
+> +
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/smp.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/smp.h>
+> +#include <asm/smp_plat.h>
+> +#include <asm/smp_scu.h>
+> +
+> +#define NPCM7XX_SCRPAD_REG 0x13c
+> +
+> +extern void npcm7xx_secondary_startup(void);
+> +
+> +static int npcm7xx_smp_boot_secondary(unsigned int cpu,
+> +                                     struct task_struct *idle)
+> +{
+> +       struct device_node *gcr_np;
+> +       void __iomem *gcr_base;
+> +       int ret = 0;
+> +
+> +       gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
+> +       if (!gcr_np) {
+> +               pr_err("no gcr device node\n");
+> +               ret = -EFAULT;
+> +               goto out;
+> +       }
+> +       gcr_base = of_iomap(gcr_np, 0);
+> +       if (!gcr_base) {
+> +               pr_err("could not iomap gcr at: 0x%p\n", gcr_base);
+> +               ret = -EFAULT;
+> +               goto out;
+> +       }
+> +
+> +       /* give boot ROM kernel start address. */
+> +       iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
+> +                 NPCM7XX_SCRPAD_REG);
+> +       /* make sure npcm7xx_secondary_startup is seen by all observers. */
+> +       smp_wmb();
+> +       dsb_sev();
+> +       /* make sure write buffer is drained */
+> +       mb();
+> +
+> +       iounmap(gcr_base);
+> +out:
+> +       return ret;
+> +}
+> +
+> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +       struct device_node *scu_np;
+> +       void __iomem *scu_base;
+> +
+> +       scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+> +       if (!scu_np) {
+> +               pr_err("no scu device node\n");
+> +               return;
+> +       }
+> +       scu_base = of_iomap(scu_np, 0);
+> +       if (!scu_base) {
+> +               pr_err("could not iomap scu at: 0x%p\n", scu_base);
+> +               return;
+> +       }
+> +
+> +       scu_enable(scu_base);
+> +
+> +       iounmap(scu_base);
+> +}
+> +
+> +static struct smp_operations npcm7xx_smp_ops __initdata = {
+> +       .smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
+> +       .smp_boot_secondary = npcm7xx_smp_boot_secondary,
+> +};
+> +
+> +CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm7xx-smp", &npcm7xx_smp_ops);
+> --
+> 2.14.1.581.gf28d330327-goog
+>
 
-It will do the following:
-1. Disable/Deactivate each FlexRM ring
-2. Flush each FlexRM ring
-
-The cleanup sequence for FlexRM rings is adapted from
-Broadcom FlexRM mailbox driver.
-
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Oza Oza <oza.oza@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
----
- drivers/vfio/platform/reset/Kconfig                |   9 ++
- drivers/vfio/platform/reset/Makefile               |   1 +
- .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 116 +++++++++++++++++++++
- 3 files changed, 126 insertions(+)
- create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-
-diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-index 70cccc5..392e3c0 100644
---- a/drivers/vfio/platform/reset/Kconfig
-+++ b/drivers/vfio/platform/reset/Kconfig
-@@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
- 	  Enables the VFIO platform driver to handle reset for AMD XGBE
- 
- 	  If you don't know what to do here, say N.
-+
-+config VFIO_PLATFORM_BCMFLEXRM_RESET
-+	tristate "VFIO support for Broadcom FlexRM reset"
-+	depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
-+
-+	  If you don't know what to do here, say N.
-diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-index 93f4e23..8d9874b 100644
---- a/drivers/vfio/platform/reset/Makefile
-+++ b/drivers/vfio/platform/reset/Makefile
-@@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
- 
- obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
- obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
-+obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
-diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-new file mode 100644
-index 0000000..ca1cbd7
---- /dev/null
-+++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-@@ -0,0 +1,116 @@
-+/*
-+ * Copyright (C) 2017 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/*
-+ * This driver provides reset support for Broadcom FlexRM ring manager
-+ * to VFIO platform.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+
-+#include "vfio_platform_private.h"
-+
-+/* FlexRM configuration */
-+#define RING_REGS_SIZE					0x10000
-+#define RING_VER_MAGIC					0x76303031
-+
-+/* Per-Ring register offsets */
-+#define RING_VER					0x000
-+#define RING_CONTROL					0x034
-+#define RING_FLUSH_DONE					0x038
-+
-+/* Register RING_CONTROL fields */
-+#define CONTROL_FLUSH_SHIFT				5
-+
-+/* Register RING_FLUSH_DONE fields */
-+#define FLUSH_DONE_MASK					0x1
-+
-+static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
-+{
-+	unsigned int timeout;
-+
-+	/* Disable/inactivate ring */
-+	writel_relaxed(0x0, ring + RING_CONTROL);
-+
-+	/* Set ring flush state */
-+	timeout = 1000; /* timeout of 1s */
-+	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
-+	do {
-+		if (readl_relaxed(ring + RING_FLUSH_DONE) &
-+		    FLUSH_DONE_MASK)
-+			break;
-+		mdelay(1);
-+	} while (--timeout);
-+	if (!timeout)
-+		return -ETIMEDOUT;
-+
-+	/* Clear ring flush state */
-+	timeout = 1000; /* timeout of 1s */
-+	writel_relaxed(0x0, ring + RING_CONTROL);
-+	do {
-+		if (!(readl_relaxed(ring + RING_FLUSH_DONE) &
-+		      FLUSH_DONE_MASK))
-+			break;
-+		mdelay(1);
-+	} while (--timeout);
-+	if (!timeout)
-+		return -ETIMEDOUT;
-+
-+	return 0;
-+}
-+
-+static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
-+{
-+	void __iomem *ring;
-+	int rc = 0, ret = 0, ring_num = 0;
-+	struct vfio_platform_region *reg = &vdev->regions[0];
-+
-+	/* Map FlexRM ring registers if not mapped */
-+	if (!reg->ioaddr) {
-+		reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
-+		if (!reg->ioaddr)
-+			return -ENOMEM;
-+	}
-+
-+	/* Discover and shutdown each FlexRM ring */
-+	for (ring = reg->ioaddr;
-+	     ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
-+		if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC) {
-+			rc = vfio_platform_bcmflexrm_shutdown(ring);
-+			if (rc) {
-+				dev_warn(vdev->device,
-+					 "FlexRM ring%d shutdown error %d\n",
-+					 ring_num, rc);
-+				ret |= rc;
-+			}
-+			ring_num++;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
-+			  vfio_platform_bcmflexrm_reset);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
-+MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
--- 
-2.7.4
+Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+Tested-by: Avi Fishman <avifishman70@gmail.com>
