@@ -1,62 +1,83 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 10 Sep 2017 23:41:47 +0800
-Subject: [PATCH 8/9] arm64: enable KEXEC_FILE config
-In-Reply-To: <20170908031616.17916-9-takahiro.akashi@linaro.org>
-Message-ID: <201709102315.3pEUMBHR%fengguang.wu@intel.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 10 Sep 2017 17:00:40 +0100
+Subject: [PATCH] iio: stm32: fix adc/trigger link error
+In-Reply-To: <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
+References: <20170906125722.2522781-1-arnd@arndb.de>
+ <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
+Message-ID: <20170910170040.7eb1f768@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI,
+On Wed, 6 Sep 2017 18:16:33 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.13 next-20170908]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:
+> > The ADC driver can trigger on either the timer or the lptim
+> > trigger, but it only uses a Kconfig 'select' statement
+> > to ensure that the first of the two is present. When the lptim
+> > trigger is enabled as a loadable module, and the adc driver
+> > is built-in, we now get a link error:
+> > 
+> > drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
+> > stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
+> > 
+> > We could use a second 'select' statement and always have both
+> > trigger drivers enabled when the adc driver is, but it seems that
+> > the lptimer trigger was intentionally left optional, so it seems
+> > better to keep it that way.  
+> Hi Arnd,
+> 
+> This is correct, not all stm32 have this hardware.
+> > 
+> > This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
+> > which avoids the link error, but instead leads to the lptimer trigger
+> > not being used in the broken configuration. I've added a runtime
+> > warning for this case to help users figure out what they did wrong
+> > if this should ever be done by accident.
+> > 
+> > Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>  
+> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-url:    https://github.com/0day-ci/linux/commits/AKASHI-Takahiro/kexec-add-kexec_file_load-support/20170910-143930
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+This may take me a few weeks to pick up.  I don't want to
+pull the mfd immutable branch in just to have this fix, so this will
+get sorted after rc1 is out.
 
-Note: the linux-review/AKASHI-Takahiro/kexec-add-kexec_file_load-support/20170910-143930 HEAD caf976acefa5a78ad88489581c66b98cbc8f91fa builds fine.
-      It only hurts bisectibility.
+As ever, poke me if it looks like I've forgotten about it.
+Sorry for the delay!
 
-All errors (new ones prefixed by >>):
+Jonathan
 
->> arch/arm64/kernel/machine_kexec_file.c:22:28: fatal error: asm/kexec_file.h: No such file or directory
-    #include <asm/kexec_file.h>
-                               ^
-   compilation terminated.
-
-vim +22 arch/arm64/kernel/machine_kexec_file.c
-
-423cf6dc9f AKASHI Takahiro 2017-09-08  15  
-423cf6dc9f AKASHI Takahiro 2017-09-08  16  #include <linux/errno.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08  17  #include <linux/kernel.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08  18  #include <linux/kexec.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08  19  #include <linux/libfdt.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08  20  #include <linux/memblock.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08  21  #include <linux/of_fdt.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08 @22  #include <asm/kexec_file.h>
-423cf6dc9f AKASHI Takahiro 2017-09-08  23  
-
-:::::: The code at line 22 was first introduced by commit
-:::::: 423cf6dc9f06d95907902b2b7f84161bdc98f752 arm64: kexec_file: load initrd, device-tree and purgatory segments
-
-:::::: TO: AKASHI Takahiro <takahiro.akashi@linaro.org>
-:::::: CC: 0day robot <fengguang.wu@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56910 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170910/5af9ca30/attachment-0001.gz>
+> 
+> Many thanks for the fix,
+> Best Regards,
+> Fabrice
+> > ---
+> >  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
+> > index 34d59bfdce2d..464458d20b16 100644
+> > --- a/include/linux/iio/timer/stm32-lptim-trigger.h
+> > +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
+> > @@ -16,11 +16,14 @@
+> >  #define LPTIM2_OUT	"lptim2_out"
+> >  #define LPTIM3_OUT	"lptim3_out"
+> >  
+> > -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> > +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> >  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
+> >  #else
+> >  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
+> >  {
+> > +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> > +	pr_warn_once("stm32 lptim_trigger not linked in\n");
+> > +#endif
+> >  	return false;
+> >  }
+> >  #endif
+> >   
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
