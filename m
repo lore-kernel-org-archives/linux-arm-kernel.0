@@ -1,44 +1,62 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 10 Sep 2017 08:18:20 -0700
-Subject: [PATCH v2 3/3] arm64: dts: realtek: Add watchdog node for RTD1295
-In-Reply-To: <20170904231602.29787-4-afaerber@suse.de>
-References: <20170904231602.29787-1-afaerber@suse.de>
- <20170904231602.29787-4-afaerber@suse.de>
-Message-ID: <bf49f284-de9a-4990-a551-45aef2b4d0f2@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 10 Sep 2017 23:41:47 +0800
+Subject: [PATCH 8/9] arm64: enable KEXEC_FILE config
+In-Reply-To: <20170908031616.17916-9-takahiro.akashi@linaro.org>
+Message-ID: <201709102315.3pEUMBHR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2017 04:16 PM, Andreas F?rber wrote:
-> Add the watchdog node to the RTD1295 Device Tree.
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+Hi AKASHI,
 
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.13 next-20170908]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> ---
->   Depends on the pending clock nodes patch.
->   
->   v1 -> v2: Unchanged
->   
->   arch/arm64/boot/dts/realtek/rtd1295.dtsi | 6 ++++++
->   1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-> index fbbd6456079e..f39ab63f879d 100644
-> --- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-> +++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-> @@ -123,6 +123,12 @@
->   			#interrupt-cells = <1>;
->   		};
->   
-> +		watchdog at 98007680 {
-> +			compatible = "realtek,rtd1295-watchdog";
-> +			reg = <0x98007680 0x100>;
-> +			clocks = <&osc27M>;
-> +		};
-> +
->   		uart0: serial at 98007800 {
->   			compatible = "snps,dw-apb-uart";
->   			reg = <0x98007800 0x400>;
-> 
+url:    https://github.com/0day-ci/linux/commits/AKASHI-Takahiro/kexec-add-kexec_file_load-support/20170910-143930
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+Note: the linux-review/AKASHI-Takahiro/kexec-add-kexec_file_load-support/20170910-143930 HEAD caf976acefa5a78ad88489581c66b98cbc8f91fa builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+>> arch/arm64/kernel/machine_kexec_file.c:22:28: fatal error: asm/kexec_file.h: No such file or directory
+    #include <asm/kexec_file.h>
+                               ^
+   compilation terminated.
+
+vim +22 arch/arm64/kernel/machine_kexec_file.c
+
+423cf6dc9f AKASHI Takahiro 2017-09-08  15  
+423cf6dc9f AKASHI Takahiro 2017-09-08  16  #include <linux/errno.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08  17  #include <linux/kernel.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08  18  #include <linux/kexec.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08  19  #include <linux/libfdt.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08  20  #include <linux/memblock.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08  21  #include <linux/of_fdt.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08 @22  #include <asm/kexec_file.h>
+423cf6dc9f AKASHI Takahiro 2017-09-08  23  
+
+:::::: The code at line 22 was first introduced by commit
+:::::: 423cf6dc9f06d95907902b2b7f84161bdc98f752 arm64: kexec_file: load initrd, device-tree and purgatory segments
+
+:::::: TO: AKASHI Takahiro <takahiro.akashi@linaro.org>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56910 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170910/5af9ca30/attachment-0001.gz>
