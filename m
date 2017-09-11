@@ -1,57 +1,93 @@
-From: dustinb@codeaurora.org (Dustin Brown)
-Date: Mon, 11 Sep 2017 10:12:01 -0700
-Subject: arm: Export save_stack_trace_tsk()
-In-Reply-To: <20170909153020.GC20805@n2100.armlinux.org.uk>
-References: <001b01d3203f$c04a4e40$40deeac0$@codeaurora.org>
- <20170909153020.GC20805@n2100.armlinux.org.uk>
-Message-ID: <002801d32b21$15c42e90$414c8bb0$@codeaurora.org>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon, 11 Sep 2017 21:08:50 +0200
+Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
+ integrated/external MDIOs
+In-Reply-To: <20170911161124.GD27599@lunn.ch>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-11-clabbe.montjoie@gmail.com>
+ <20170908130520.GA11248@lunn.ch> <20170908132632.GA3037@Red>
+ <20170908140020.GC25219@lunn.ch> <20170908140832.GB3037@Red>
+ <20170908141736.GF25219@lunn.ch> <20170908142825.GC3037@Red>
+ <20170911161124.GD27599@lunn.ch>
+Message-ID: <20170911190850.GA2291@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Sep 11, 2017 at 06:11:24PM +0200, Andrew Lunn wrote:
+> On Fri, Sep 08, 2017 at 04:28:25PM +0200, Corentin Labbe wrote:
+> > On Fri, Sep 08, 2017 at 04:17:36PM +0200, Andrew Lunn wrote:
+> > > > > Do you know why the reset times out/fails?
+> > > > > 
+> > > > 
+> > > > Because there are nothing connected to it.
+> > > 
+> > > That should not be an issue. A read should just return 0xffff.  And it
+> > > should return 0xffff fast. The timing of the MDIO protocol is fixed. A
+> > > read or a write takes a fixed number of cycles, independent of if
+> > > there is a device there or not. The bus data line has a pullup, so if
+> > > you try to access a missing device, you automatically read 0xffff.
+> > > 
+> > 
+> > Perhaps, but the reality is that with nothing connected to it, the reset of the MAC timeout.
+> > Certainly, the MAC does not support finding no PHY.
+> 
+> Are you sure this is not because of the clock and reset?
+> 
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                               int_mii_phy: ethernet-phy at 1 {
+> +                                       compatible = "ethernet-phy-ieee802.3-c22";
+> +                                       reg = <1>;
+> +                                       clocks = <&ccu CLK_BUS_EPHY>;
+> +                                       resets = <&ccu RST_BUS_EPHY>;
+> 
+> The way you describe it here, the clock and reset are for the PHY. But
+> maybe it is actually for the bus? I can understand a bus timing out if
+> it has no clock, or it is held in reset. Try enabling the clock and
+> reset when the internal bus is selected, not when the PHY on the bus
+> is selected.
+> 
 
-I apologize for the trouble! I'm not sure how it happened (it looks fund
-below after all), but I will try to be extra careful in the future.
+Even with CLK_BUS_EPHY/RST_BUS_EPHY enabled, the MAC reset timeout.
+So no the CLK/RST are really for the PHY.
 
-Thanks,
+Regards
 
--Dustin
+PS: patch and result with "integrated CLK/RST always on"
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -659,7 +659,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
+        struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
+        u32 reg, val;
+        int ret = 0;
+-       bool need_reset = false;
++       bool need_reset = true;
+ 
+        if (current_child ^ desired_child) {
+                regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
+@@ -824,7 +824,7 @@ static int sun8i_dwmac_power_internal_phy(struct stmmac_priv *priv)
+        int ret;
+ 
+        if (!gmac->use_internal_phy)
+-               return 0;
++               dev_info(priv->device, "IPHY BYPASS\n");
+ 
+        ret = clk_prepare_enable(gmac->ephy_clk);
+        if (ret) {
 
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk] 
-Sent: Saturday, September 9, 2017 8:30 AM
-To: Dustin Brown <dustinb@codeaurora.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: Re: arm: Export save_stack_trace_tsk()
-
-On Mon, Aug 28, 2017 at 01:53:49PM -0700, Dustin Brown wrote:
-> The kernel watchdog is a great debugging tool for finding tasks that 
-> consume a disproportionate amount of CPU time in contiguous chunks. 
-> One can imagine building a similar watchdog for arbitrary driver 
-> threads using save_stack_trace_tsk() and print_stack_trace(). However, 
-> this is not viable for dynamically loaded driver modules on ARM 
-> platforms because save_stack_trace_tsk() is not exported for those
-architectures.
-> Export save_stack_trace_tsk() for the ARM architecture to align with 
-> x86 and support various debugging use cases such as arbitrary driver 
-> thread watchdog timers.
-
-Hi Dustin,
-
-I'm not sure why, but when I merged this, your commit log appears to be
-entirely on two very long lines.  Linux requires that commit messages are
-sensibly wrapped such that they can be read in git log on an 80 column
-display - please take care in future to ensure that commit messages are
-appropriately wrapped.
-
-I'm having to reformat the commit manually.
-
-There are cases where wrapping is not appropriate (eg, when quoting program
-output or kernel messages.)
-
-Thanks.
-
---
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+[   18.057162] dwmac-sun8i 1c30000.ethernet: Will use external PHY
+[   18.183789] dwmac-sun8i 1c30000.ethernet: IPHY BYPASS
+[   18.184136] dwmac-sun8i 1c30000.ethernet: Chain mode enabled
+[   18.184158] dwmac-sun8i 1c30000.ethernet: No HW DMA feature register supported
+[   18.184175] dwmac-sun8i 1c30000.ethernet: Normal descriptors
+[   18.184192] dwmac-sun8i 1c30000.ethernet: RX Checksum Offload Engine supported
+[   18.184214] dwmac-sun8i 1c30000.ethernet: COE Type 2
+[   18.184231] dwmac-sun8i 1c30000.ethernet: TX Checksum insertion supported
+[   18.185491] libphy: stmmac: probed
+[   18.188481] libphy: mdio_mux: probed
+[   18.188831] dwmac-sun8i 1c30000.ethernet: Switch mux to internal PHY
+[   18.288981] dwmac-sun8i 1c30000.ethernet: EMAC reset timeout
+[   18.289559] libphy: mdio_mux: probed
+[   18.289629] dwmac-sun8i 1c30000.ethernet: Switch mux to external PHY
+[   20.578316] EXT4-fs (mmcblk0p1): re-mounted. Opts: (null)
+[   31.240650] RTL8211E Gigabit Ethernet 0.1:00: attached PHY driver [RTL8211E Gigabit Ethernet] (mii_bus:phy_addr=0.1:00, irq=POLL)
