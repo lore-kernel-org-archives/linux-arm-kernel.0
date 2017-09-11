@@ -1,35 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 11 Sep 2017 11:52:28 +0530
-Subject: [PATCH RFC] davinci: da850: define edma-memcpy-channels
-In-Reply-To: <1504960117-24264-1-git-send-email-aford173@gmail.com>
-References: <1504960117-24264-1-git-send-email-aford173@gmail.com>
-Message-ID: <54b0fb00-0337-522a-d66a-6506f60a3679@ti.com>
+From: sunil.m@techveda.org (sunil.m at techveda.org)
+Date: Mon, 11 Sep 2017 12:00:16 +0530
+Subject: [RESEND PATCH] arm: dts: am33xx: Add spi alias to match SOC schematics
+Message-ID: <1505111416-21594-1-git-send-email-sunil.m@techveda.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+From: Suniel Mahesh <sunil.m@techveda.org>
 
-On Saturday 09 September 2017 05:58 PM, Adam Ford wrote:
-> When booting with a device tree, message appears:
->    memcpy is disabled
-> When reading through the bindings for eDMA3, it shows that
-> ti,edma-memcpy-channels is an optional property, but the example
-> binding uses it.
-> 
-> RFC:  I'll be the first to admit that I don't understand what
-> this is doing, but it seems like a DMA enabled memcpy would
-> improve performance.  Is this appropriate for da850?  Since there
-> are two eDMA3-tpcc controllers, is there a set of channels we can
-> use for each?
-> 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+Linux bus numbers should match the numbers defined by the chip
+manufacturer. This patch add's spi aliases to acheive that bus
+naming convention.
 
-This enables DMA-based memcpy (see drivers/dma/dmaetest.c for example).
-But does not accelerate any memcpy in kernel automatically.
+Signed-off-by: Suniel Mahesh <sunil.m@techveda.org>
+Signed-off-by: Karthik Tummala <karthik@techveda.org>
+Tested-by: Karthik Tummala <karthik@techveda.org>
+---
+Note:
+- Patch was compile tested and built(ARCH=arm) on next-20170911.
+- Patch was hardware tested on AM335x (McSPI controller) with
+  spi flash chips.
+- No build/run-time issues reported.
+- At present bus numbers are represented as spi1 and spi2 in sysfs
+  instead of spi0 and spi1, as defined in SOC schematics.
+- The commit:
+"spi: Pick spi bus number from Linux idr or spi alias"
+(SHA1:9b61e302210eba55768962f2f11e96bb508c2408)
+has introduced bus numbering which happens dynamically either
+via Linux IDR or spi alias for master drivers.
+- The commit:
+"spi: omap: Allocate bus number from spi framework"
+(SHA1:b590782afe0a99fca84f451252ed7e2d64b2f155)
+is now using spi framework to allocate bus numbers.
+---
+ arch/arm/boot/dts/am33xx.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-If this is done, it should be done in a board specific manner because
-the available channels you pick up for memcpy support can change from
-board to board.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 7d7ca05..e58fab8 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -36,6 +36,8 @@
+ 		phy1 = &usb1_phy;
+ 		ethernet0 = &cpsw_emac0;
+ 		ethernet1 = &cpsw_emac1;
++		spi0 = &spi0;
++		spi1 = &spi1;
+ 	};
+ 
+ 	cpus {
+-- 
+1.9.1
