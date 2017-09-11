@@ -1,25 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 11 Sep 2017 22:19:20 +0200
-Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
- integrated/external MDIOs
-In-Reply-To: <20170911190850.GA2291@Red>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-11-clabbe.montjoie@gmail.com>
- <20170908130520.GA11248@lunn.ch> <20170908132632.GA3037@Red>
- <20170908140020.GC25219@lunn.ch> <20170908140832.GB3037@Red>
- <20170908141736.GF25219@lunn.ch> <20170908142825.GC3037@Red>
- <20170911161124.GD27599@lunn.ch> <20170911190850.GA2291@Red>
-Message-ID: <20170911201920.GA5983@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 Sep 2017 15:24:03 -0500
+Subject: [PATCH v4 1/4] dt-bindings: Document the STM32 DMAMUX bindings
+In-Reply-To: <1504785168-26572-2-git-send-email-pierre-yves.mordret@st.com>
+References: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
+ <1504785168-26572-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20170911202403.hlrir7bbdi7abw5n@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Even with CLK_BUS_EPHY/RST_BUS_EPHY enabled, the MAC reset timeout.
-> So no the CLK/RST are really for the PHY.
+On Thu, Sep 07, 2017 at 01:52:45PM +0200, Pierre-Yves MORDRET wrote:
+> This patch adds the documentation of device tree bindings for the STM32
+> DMAMUX.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>  Version history:
+>     v4:
+>         * Add multi-master ability for STM32 DMAMUX
+>         * Get rid of st,dmamux properties
+>     v3:
+>         * Change compatible to st,stm32h7-dmamux to be mode Soc specific
+>         * Add verbosity in dma-cells
+>     v2:
+>         * Move clock bindings from optional to mandatory one
+>         * Drop channelID bindings as managed dynamically from now on by
+>           DMAMUX driver.
+> ---
+> ---
+>  .../devicetree/bindings/dma/stm32-dmamux.txt       | 84 ++++++++++++++++++++++
+>  1 file changed, 84 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
 
-Thanks for trying that.
-
-You said it was probably during scanning of the bus it times out. What
-address is causing the timeout? 0 or 1? If the internal bus can only
-have one PHY on it, maybe we need to set bus->phy_mask to 0x1?
-
-   Andrew
+Acked-by: Rob Herring <robh@kernel.org>
