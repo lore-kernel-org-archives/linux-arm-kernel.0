@@ -1,84 +1,64 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Mon, 11 Sep 2017 15:25:39 +0800
-Subject: [PATCH V2 00/10] clk: add imx7ulp clk support
-In-Reply-To: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
-References: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170911072539.GA19297@b29396-OptiPlex-7040>
+Date: Mon, 11 Sep 2017 15:28:06 +0800
+Subject: [PATCH 0/7] PM / OPP: per OPP node clock support and imx7ulp
+ cpufreq driver
+In-Reply-To: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170911072806.GB19297@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Viresh and Rafael,
 
-On Thu, Jul 13, 2017 at 07:47:05PM +0800, Dong Aisheng wrote:
-> This patch series intends to add imx7ulp clk support.
+On Thu, Aug 24, 2017 at 12:10:03AM +0800, Dong Aisheng wrote:
+> This patch series does three things:
+> 1) Add platform specific set_clk function
+> 2) Add per OPP node clock support
+> 3) Add imx7ulp cpufreq driver support
 > 
-> i.MX7ULP Clock functions are under joint control of the System
-> Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
-> modules, and Core Mode Controller (CMC)1 blocks
+> 3 is depends on 1 & 2.
 > 
-> The clocking scheme provides clear separation between M4 domain
-> and A7 domain. Except for a few clock sources shared between two
-> domains, such as the System Oscillator clock, the Slow IRC (SIRC),
-> and and the Fast IRC clock (FIRCLK), clock sources and clock
-> management are separated and contained within each domain.
+> MX7ULP supports HSRUN mode (528 Mhz), RUN mode (413 Mhz) and VLPR mode
+> (restricted to FIRC clock, usually 48 Mhz). This patch adds the cpufreq
+> driver support for HSRUN and RUN mode.
+> When in different modes, the A7 core is using different clocks:
+> RUN:	clk run_divcore
+> HSRUN:	clk hsrun_divcore
 > 
-> M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
-> A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+> Thus, this driver replies on the newly added features in OPP core framework
+> patch 1~6: e.g.
+> "PM / OPP: use OPP node clock to set CPU frequency"
 > 
-> Note: this series only adds A7 clock domain support as M4 clock
-> domain will be handled by M4 seperately.
+> And since IMX7ULP CPU clock setting is different from the generic
+> set OPP clock, we also implemented a private set_clk function.
 > 
-> Change Log:
-> v1->v2:
->  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
->  * use clk_hw apis to register clocks
->  * use of_clk_add_hw_provider
->  * split the clocks register process into two parts: early part for possible
->    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
->    the left normal peripheral clocks registered by a platform driver.
+> Dong Aisheng (7):
+>   PM / OPP: Add platform specific set_clk function
+>   dt-bindings: PM / OPP: add clocks per OPP node support
+>   PM / OPP: rename opp_table->clk to opp_table->cur_clk
+>   PM / OPP: use OPP node clock to set CPU frequency
+>   PM / OPP: Add dev_pm_opp_get_cur_clk()
+>   cpufreq: make cpufreq_generic_init transition_latency default to
+>     CPUFREQ_ETERNAL
+>   cpufreq: add imx7ulp cpufreq driver
+> 
 
-Would you please help review this new series when you're free?
-
-This has been pending for a long time.
+Do you have any comments about this series?
 
 Regards
 Dong Aisheng
 
-> 
-> Dong Aisheng (10):
->   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
->   clk: reparent orphans after critical clocks enabled
->   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
->   clk: imx: add pllv4 support
->   clk: imx: add pfdv2 support
->   clk: imx: add composite clk support
->   dt-bindings: clock: add imx7ulp clock binding doc
->   clk: imx: make mux parent strings const
->   clk: imx: implement new clk_hw based APIs
->   clk: imx: add imx7ulp clk driver
-> 
->  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++
->  drivers/clk/clk-divider.c                          | 100 ++++++++-
->  drivers/clk/clk-fractional-divider.c               |  10 +
->  drivers/clk/clk.c                                  |  39 ++--
->  drivers/clk/imx/Makefile                           |   6 +-
->  drivers/clk/imx/clk-busy.c                         |   2 +-
->  drivers/clk/imx/clk-composite.c                    |  90 ++++++++
->  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
->  drivers/clk/imx/clk-imx7ulp.c                      | 245 +++++++++++++++++++++
->  drivers/clk/imx/clk-pfdv2.c                        | 207 +++++++++++++++++
->  drivers/clk/imx/clk-pllv4.c                        | 188 ++++++++++++++++
->  drivers/clk/imx/clk.c                              |  22 ++
->  drivers/clk/imx/clk.h                              |  92 +++++++-
->  include/dt-bindings/clock/imx7ulp-clock.h          | 108 +++++++++
->  include/linux/clk-provider.h                       |  17 ++
->  15 files changed, 1159 insertions(+), 31 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
->  create mode 100644 drivers/clk/imx/clk-composite.c
->  create mode 100644 drivers/clk/imx/clk-imx7ulp.c
->  create mode 100644 drivers/clk/imx/clk-pfdv2.c
->  create mode 100644 drivers/clk/imx/clk-pllv4.c
->  create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
+>  Documentation/devicetree/bindings/opp/opp.txt |  52 ++++++
+>  drivers/base/power/opp/core.c                 | 155 ++++++++++++++---
+>  drivers/base/power/opp/of.c                   |   8 +
+>  drivers/base/power/opp/opp.h                  |  11 +-
+>  drivers/cpufreq/Kconfig.arm                   |   8 +
+>  drivers/cpufreq/Makefile                      |   1 +
+>  drivers/cpufreq/cpufreq.c                     |   2 +
+>  drivers/cpufreq/imx7ulp-cpufreq.c             | 234 ++++++++++++++++++++++++++
+>  include/linux/pm_opp.h                        |  16 ++
+>  9 files changed, 466 insertions(+), 21 deletions(-)
+>  create mode 100644 drivers/cpufreq/imx7ulp-cpufreq.c
 > 
 > -- 
 > 2.7.4
