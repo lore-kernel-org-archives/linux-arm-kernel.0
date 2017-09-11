@@ -1,52 +1,370 @@
-From: sunil.m@techveda.org (sunil.m at techveda.org)
-Date: Mon, 11 Sep 2017 12:00:16 +0530
-Subject: [RESEND PATCH] arm: dts: am33xx: Add spi alias to match SOC schematics
-Message-ID: <1505111416-21594-1-git-send-email-sunil.m@techveda.org>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 11 Sep 2017 14:47:54 +0800
+Subject: [PATCH 6/9] arm64: kexec_file: load initrd, device-tree and
+ purgatory segments
+In-Reply-To: <20170908031616.17916-7-takahiro.akashi@linaro.org>
+References: <20170908031616.17916-1-takahiro.akashi@linaro.org>
+ <20170908031616.17916-7-takahiro.akashi@linaro.org>
+Message-ID: <20170911064754.GA7332@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suniel Mahesh <sunil.m@techveda.org>
+Hi,
 
-Linux bus numbers should match the numbers defined by the chip
-manufacturer. This patch add's spi aliases to acheive that bus
-naming convention.
+On 09/08/17 at 12:16pm, AKASHI Takahiro wrote:
+> load_other_segments() sets up and adds all the memory segments necessary
+> other than kernel, including initrd, device-tree blob and purgatory.
+> Most of the code was borrowed from kexec-tools' counterpart.
+> 
+> In addition, arch_kexec_image_probe(), arch_kexec_image_load() and
+> arch_kexec_kernel_verify_sig() are added as stubs for supporting multiple
+> types of kernel image formats.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/kexec.h         |  19 +++
+>  arch/arm64/kernel/machine_kexec_file.c | 264 +++++++++++++++++++++++++++++++++
+>  2 files changed, 283 insertions(+)
+>  create mode 100644 arch/arm64/kernel/machine_kexec_file.c
+> 
+> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> index e17f0529a882..d74dc49670ad 100644
+> --- a/arch/arm64/include/asm/kexec.h
+> +++ b/arch/arm64/include/asm/kexec.h
+> @@ -93,6 +93,25 @@ static inline void crash_prepare_suspend(void) {}
+>  static inline void crash_post_resume(void) {}
+>  #endif
+>  
+> +#ifdef CONFIG_KEXEC_FILE
+> +#define ARCH_HAS_KIMAGE_ARCH
+> +
+> +struct kimage_arch {
+> +	void *dtb_buf;
+> +};
+> +
+> +struct kimage;
+> +
+> +extern int setup_dtb(struct kimage *image,
+> +		unsigned long initrd_load_addr, unsigned long initrd_len,
+> +		char *cmdline, unsigned long cmdline_len,
+> +		char **dtb_buf, size_t *dtb_buf_len);
+> +extern int load_other_segments(struct kimage *image,
+> +		unsigned long kernel_load_addr,
+> +		char *initrd, unsigned long initrd_len,
+> +		char *cmdline, unsigned long cmdline_len);
+> +#endif
+> +
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif
+> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> new file mode 100644
+> index 000000000000..a6d2c006b4f7
+> --- /dev/null
+> +++ b/arch/arm64/kernel/machine_kexec_file.c
+> @@ -0,0 +1,264 @@
+> +/*
+> + * kexec_file for arm64
+> + *
+> + * Copyright (C) 2017 Linaro Limited
+> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> + *
+> + * Most code is derived from arm64 port of kexec-tools
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "kexec_file: " fmt
+> +
+> +#include <linux/errno.h>
+> +#include <linux/kernel.h>
+> +#include <linux/kexec.h>
+> +#include <linux/libfdt.h>
+> +#include <linux/memblock.h>
+> +#include <linux/of_fdt.h>
+> +#include <asm/kexec_file.h>
+> +
+> +static int __dt_root_addr_cells;
+> +static int __dt_root_size_cells;
+> +
+> +static struct kexec_file_ops *kexec_file_loaders[0];
+> +
+> +int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> +				  unsigned long buf_len)
+> +{
+> +	struct kexec_file_ops *fops;
+> +	int i, ret;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(kexec_file_loaders); i++) {
+> +		fops = kexec_file_loaders[i];
+> +		if (!fops || !fops->probe)
+> +			continue;
+> +
+> +		ret = fops->probe(buf, buf_len);
+> +		if (!ret) {
+> +			image->fops = fops;
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return -ENOEXEC;
+> +}
+> +
+> +void *arch_kexec_kernel_image_load(struct kimage *image)
+> +{
+> +	if (!image->fops || !image->fops->load)
+> +		return ERR_PTR(-ENOEXEC);
+> +
+> +	return image->fops->load(image, image->kernel_buf,
+> +				 image->kernel_buf_len, image->initrd_buf,
+> +				 image->initrd_buf_len, image->cmdline_buf,
+> +				 image->cmdline_buf_len);
+> +}
+> +
+> +int arch_kimage_file_post_load_cleanup(struct kimage *image)
+> +{
+> +	vfree(image->arch.dtb_buf);
+> +	image->arch.dtb_buf = NULL;
+> +
+> +	vfree(image->arch.elf_headers);
+> +	image->arch.elf_headers = NULL;
+> +	image->arch.elf_headers_sz = 0;
+> +
+> +	if (!image->fops || !image->fops->cleanup)
+> +		return 0;
+> +
+> +	return image->fops->cleanup(image->image_loader_data);
+> +}
+> +
+> +#ifdef CONFIG_KEXEC_VERIFY_SIG
+> +int arch_kexec_kernel_verify_sig(struct kimage *image, void *kernel,
+> +				 unsigned long kernel_len)
+> +{
+> +	if (!image->fops || !image->fops->verify_sig) {
+> +		pr_debug("kernel loader does not support signature verification.\n");
+> +		return -EKEYREJECTED;
+> +	}
+> +
+> +	return image->fops->verify_sig(kernel, kernel_len);
+> +}
 
-Signed-off-by: Suniel Mahesh <sunil.m@techveda.org>
-Signed-off-by: Karthik Tummala <karthik@techveda.org>
-Tested-by: Karthik Tummala <karthik@techveda.org>
+
+arch_kexec_kernel_verify_sig now be duplicated so it can be put in the
+general function in kexec_file.c
+
+Also the probe and load function are also duplicated, they can be moved
+to common code as well.
+
+The x86 load function can be cleaned up with removing the vfree
+callback.
+
 ---
-Note:
-- Patch was compile tested and built(ARCH=arm) on next-20170911.
-- Patch was hardware tested on AM335x (McSPI controller) with
-  spi flash chips.
-- No build/run-time issues reported.
-- At present bus numbers are represented as spi1 and spi2 in sysfs
-  instead of spi0 and spi1, as defined in SOC schematics.
-- The commit:
-"spi: Pick spi bus number from Linux idr or spi alias"
-(SHA1:9b61e302210eba55768962f2f11e96bb508c2408)
-has introduced bus numbering which happens dynamically either
-via Linux IDR or spi alias for master drivers.
-- The commit:
-"spi: omap: Allocate bus number from spi framework"
-(SHA1:b590782afe0a99fca84f451252ed7e2d64b2f155)
-is now using spi framework to allocate bus numbers.
----
- arch/arm/boot/dts/am33xx.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/x86/kernel/machine_kexec_64.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 7d7ca05..e58fab8 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -36,6 +36,8 @@
- 		phy1 = &usb1_phy;
- 		ethernet0 = &cpsw_emac0;
- 		ethernet1 = &cpsw_emac1;
-+		spi0 = &spi0;
-+		spi1 = &spi1;
- 	};
+--- linux-x86.orig/arch/x86/kernel/machine_kexec_64.c
++++ linux-x86/arch/x86/kernel/machine_kexec_64.c
+@@ -384,9 +384,6 @@ int arch_kexec_kernel_image_probe(struct
  
- 	cpus {
--- 
-1.9.1
+ void *arch_kexec_kernel_image_load(struct kimage *image)
+ {
+-	vfree(image->arch.elf_headers);
+-	image->arch.elf_headers = NULL;
+-
+ 	if (!image->fops || !image->fops->load)
+ 		return ERR_PTR(-ENOEXEC);
+ 
+
+> +#endif
+> +
+> +int arch_kexec_walk_mem(struct kexec_buf *kbuf, int (*func)(u64, u64, void *))
+> +{
+> +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+> +		return walk_iomem_res_desc(crashk_res.desc,
+> +					IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
+> +					crashk_res.start, crashk_res.end,
+> +					kbuf, func);
+> +	else if (kbuf->top_down)
+> +		return walk_system_ram_res_rev(0, ULONG_MAX, kbuf, func);
+> +	else
+> +		return walk_system_ram_res(0, ULONG_MAX, kbuf, func);
+> +}
+> +
+> +int setup_dtb(struct kimage *image,
+> +		unsigned long initrd_load_addr, unsigned long initrd_len,
+> +		char *cmdline, unsigned long cmdline_len,
+> +		char **dtb_buf, size_t *dtb_buf_len)
+> +{
+> +	char *buf = NULL;
+> +	size_t buf_size;
+> +	int nodeoffset;
+> +	u64 value;
+> +	int range_len;
+> +	int ret;
+> +
+> +	/* duplicate dt blob */
+> +	buf_size = fdt_totalsize(initial_boot_params);
+> +	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
+> +
+> +	if (initrd_load_addr)
+> +		buf_size += fdt_prop_len("initrd-start", sizeof(u64))
+> +				+ fdt_prop_len("initrd-end", sizeof(u64));
+> +
+> +	if (cmdline)
+> +		buf_size += fdt_prop_len("bootargs", cmdline_len + 1);
+> +
+> +	buf = vmalloc(buf_size);
+> +	if (!buf) {
+> +		ret = -ENOMEM;
+> +		goto out_err;
+> +	}
+> +
+> +	ret = fdt_open_into(initial_boot_params, buf, buf_size);
+> +	if (ret)
+> +		goto out_err;
+> +
+> +	nodeoffset = fdt_path_offset(buf, "/chosen");
+> +	if (nodeoffset < 0)
+> +		goto out_err;
+> +
+> +	/* add bootargs */
+> +	if (cmdline) {
+> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
+> +						cmdline, cmdline_len + 1);
+> +		if (ret)
+> +			goto out_err;
+> +	}
+> +
+> +	/* add initrd-* */
+> +	if (initrd_load_addr) {
+> +		value = cpu_to_fdt64(initrd_load_addr);
+> +		ret = fdt_setprop(buf, nodeoffset, "initrd-start",
+> +				&value, sizeof(value));
+> +		if (ret)
+> +			goto out_err;
+> +
+> +		value = cpu_to_fdt64(initrd_load_addr + initrd_len);
+> +		ret = fdt_setprop(buf, nodeoffset, "initrd-end",
+> +				&value, sizeof(value));
+> +		if (ret)
+> +			goto out_err;
+> +	}
+> +
+> +	/* trim a buffer */
+> +	fdt_pack(buf);
+> +	*dtb_buf = buf;
+> +	*dtb_buf_len = fdt_totalsize(buf);
+> +
+> +	return 0;
+> +
+> +out_err:
+> +	vfree(buf);
+> +	return ret;
+> +}
+> +
+> +int load_other_segments(struct kimage *image, unsigned long kernel_load_addr,
+> +			char *initrd, unsigned long initrd_len,
+> +			char *cmdline, unsigned long cmdline_len)
+> +{
+> +	struct kexec_buf kbuf;
+> +	unsigned long initrd_load_addr = 0;
+> +	unsigned long purgatory_load_addr, dtb_load_addr;
+> +	char *dtb = NULL;
+> +	unsigned long dtb_len;
+> +	int ret = 0;
+> +
+> +	kbuf.image = image;
+> +	/* not allocate anything below the kernel */
+> +	kbuf.buf_min = kernel_load_addr;
+> +
+> +	/* Load initrd */
+> +	if (initrd) {
+> +		kbuf.buffer = initrd;
+> +		kbuf.bufsz = initrd_len;
+> +		kbuf.memsz = initrd_len;
+> +		kbuf.buf_align = PAGE_SIZE;
+> +		/* within 1GB-aligned window of up to 32GB in size */
+> +		kbuf.buf_max = round_down(kernel_load_addr, SZ_1G)
+> +						+ (unsigned long)SZ_1G * 31;
+> +		kbuf.top_down = 0;
+> +
+> +		ret = kexec_add_buffer(&kbuf);
+> +		if (ret)
+> +			goto out_err;
+> +		initrd_load_addr = kbuf.mem;
+> +
+> +		pr_debug("Loaded initrd at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+> +				initrd_load_addr, initrd_len, initrd_len);
+> +	}
+> +
+> +	/* Load dtb blob */
+> +	ret = setup_dtb(image, initrd_load_addr, initrd_len,
+> +				cmdline, cmdline_len, &dtb, &dtb_len);
+> +	if (ret) {
+> +		pr_err("Preparing for new dtb failed\n");
+> +		goto out_err;
+> +	}
+> +
+> +	kbuf.buffer = dtb;
+> +	kbuf.bufsz = dtb_len;
+> +	kbuf.memsz = dtb_len;
+> +	/* not across 2MB boundary */
+> +	kbuf.buf_align = SZ_2M;
+> +	kbuf.buf_max = ULONG_MAX;
+> +	kbuf.top_down = 1;
+> +
+> +	ret = kexec_add_buffer(&kbuf);
+> +	if (ret)
+> +		goto out_err;
+> +	dtb_load_addr = kbuf.mem;
+> +	image->arch.dtb_buf = dtb;
+> +
+> +	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+> +			dtb_load_addr, dtb_len, dtb_len);
+> +
+> +	/* Load purgatory  */
+> +	ret = kexec_load_purgatory(image, kernel_load_addr, ULONG_MAX, 1,
+> +				   &purgatory_load_addr);
+> +	if (ret) {
+> +		pr_err("Loading purgatory failed\n");
+> +		goto out_err;
+> +	}
+> +
+> +	ret = kexec_purgatory_get_set_symbol(image, "kernel_entry",
+> +				&kernel_load_addr, sizeof(kernel_load_addr), 0);
+> +	if (ret) {
+> +		pr_err("Setting symbol (kernel_entry) failed.\n");
+> +		goto out_err;
+> +	}
+> +
+> +	ret = kexec_purgatory_get_set_symbol(image, "dtb_addr",
+> +				&dtb_load_addr, sizeof(dtb_load_addr), 0);
+> +	if (ret) {
+> +		pr_err("Setting symbol (dtb_addr) failed.\n");
+> +		goto out_err;
+> +	}
+> +
+> +	pr_debug("Loaded purgatory at 0x%lx\n", purgatory_load_addr);
+> +
+> +	return 0;
+> +
+> +out_err:
+> +	vfree(dtb);
+> +	image->arch.dtb_buf = NULL;
+> +	return ret;
+> +}
+> -- 
+> 2.14.1
+> 
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
+
+Thanks
+Dave
