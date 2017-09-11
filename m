@@ -1,91 +1,47 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 11 Sep 2017 17:25:08 +0800
-Subject: [PATCH V2 1/1] clk: bulk: add of_clk_bulk_get()
-Message-ID: <1505121908-5782-1-git-send-email-aisheng.dong@nxp.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 11 Sep 2017 14:42:24 +0530
+Subject: [PATCH v4 5/6] ARM: dts: imx6dl-icore: Add touchscreen node
+In-Reply-To: <1505121145-9507-1-git-send-email-jteki@openedev.com>
+References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
+Message-ID: <1505121145-9507-5-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
-here to handle this for DT users without 'clock-names' specified.
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Reported-by: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+max11801 touchscreen on Engicam iCoreM6 DualLite/Solo module is
+connected via i2c1, so add max11801: touchscreen at 48 on i2c1.
 
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
-Changes since v1:
- * using %pOF instead of full_name
----
- drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
- include/linux/clk.h    |  8 ++++++++
- 2 files changed, 39 insertions(+)
+Changes for v4, v3,v2:
+- none
 
-diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-index c834f5a..896aa3b 100644
---- a/drivers/clk/clk-bulk.c
-+++ b/drivers/clk/clk-bulk.c
-@@ -19,6 +19,37 @@
- #include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/export.h>
-+#include <linux/of.h>
-+
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks)
-+{
-+	int ret;
-+	int i;
-+
-+	for (i = 0; i < num_clks; i++)
-+		clks[i].clk = NULL;
-+
-+	for (i = 0; i < num_clks; i++) {
-+		clks[i].clk = of_clk_get(np, i);
-+		if (IS_ERR(clks[i].clk)) {
-+			ret = PTR_ERR(clks[i].clk);
-+			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
-+			       np, i, ret);
-+			clks[i].clk = NULL;
-+			goto err;
-+		}
-+	}
-+
-+	return 0;
-+
-+err:
-+	clk_bulk_put(i, clks);
-+
-+	return ret;
-+}
-+#endif
+ arch/arm/boot/dts/imx6dl-icore.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
+index 360c32e..35211f3 100644
+--- a/arch/arm/boot/dts/imx6dl-icore.dts
++++ b/arch/arm/boot/dts/imx6dl-icore.dts
+@@ -58,6 +58,15 @@
+ 	status = "okay";
+ };
  
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 91bd464..c5281b3 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -658,10 +658,18 @@ static inline void clk_disable_unprepare(struct clk *clk)
- }
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks);
- struct clk *of_clk_get(struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-+static int of_clk_bulk_get(struct device_node *np, int num_clks,
-+			   struct clk_bulk_data *clks)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
++&i2c1 {
++	max11801: touchscreen at 48 {
++		compatible = "maxim,max11801";
++		reg = <0x48>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
++	};
++};
 +
- static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
+ &ldb {
+ 	status = "okay";
+ 
 -- 
 2.7.4
