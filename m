@@ -1,60 +1,48 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 11 Sep 2017 23:55:29 +0800
-Subject: [PATCH 4/4] ARM: sunxi: h3/h5: add simplefb nodes
-In-Reply-To: <20170911155529.62891-1-icenowy@aosc.io>
-References: <20170911155529.62891-1-icenowy@aosc.io>
-Message-ID: <20170911155529.62891-5-icenowy@aosc.io>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 11 Sep 2017 18:11:24 +0200
+Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
+ integrated/external MDIOs
+In-Reply-To: <20170908142825.GC3037@Red>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-11-clabbe.montjoie@gmail.com>
+ <20170908130520.GA11248@lunn.ch> <20170908132632.GA3037@Red>
+ <20170908140020.GC25219@lunn.ch> <20170908140832.GB3037@Red>
+ <20170908141736.GF25219@lunn.ch> <20170908142825.GC3037@Red>
+Message-ID: <20170911161124.GD27599@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3/H5 SoCs have a HDMI output and a TV Composite output.
+On Fri, Sep 08, 2017 at 04:28:25PM +0200, Corentin Labbe wrote:
+> On Fri, Sep 08, 2017 at 04:17:36PM +0200, Andrew Lunn wrote:
+> > > > Do you know why the reset times out/fails?
+> > > > 
+> > > 
+> > > Because there are nothing connected to it.
+> > 
+> > That should not be an issue. A read should just return 0xffff.  And it
+> > should return 0xffff fast. The timing of the MDIO protocol is fixed. A
+> > read or a write takes a fixed number of cycles, independent of if
+> > there is a device there or not. The bus data line has a pullup, so if
+> > you try to access a missing device, you automatically read 0xffff.
+> > 
+> 
+> Perhaps, but the reality is that with nothing connected to it, the reset of the MAC timeout.
+> Certainly, the MAC does not support finding no PHY.
 
-Add simplefb nodes for these outputs.
+Are you sure this is not because of the clock and reset?
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
++                               #address-cells = <1>;
++                               #size-cells = <0>;
++                               int_mii_phy: ethernet-phy at 1 {
++                                       compatible = "ethernet-phy-ieee802.3-c22";
++                                       reg = <1>;
++                                       clocks = <&ccu CLK_BUS_EPHY>;
++                                       resets = <&ccu RST_BUS_EPHY>;
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 76a4cbc99bdb..13850752dfda 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -53,6 +53,35 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
-+	chosen {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		framebuffer-hdmi {
-+			compatible = "allwinner,simple-framebuffer",
-+				     "simple-framebuffer";
-+			allwinner,pipeline = "mixer0-lcd0-hdmi";
-+			clocks = <&display_clocks CLK_BUS_MIXER0>,
-+				 <&ccu CLK_BUS_TCON0>, <&ccu CLK_BUS_HDMI>,
-+				 <&display_clocks CLK_MIXER0>,
-+				 <&ccu CLK_TCON0>, <&ccu CLK_HDMI>,
-+				 <&ccu CLK_HDMI_DDC>;
-+			status = "disabled";
-+		};
-+
-+		framebuffer-tve {
-+			compatible = "allwinner,simple-framebuffer",
-+				     "simple-framebuffer";
-+			allwinner,pipeline = "mixer1-lcd1-tve";
-+			clocks = <&display_clocks CLK_BUS_MIXER1>,
-+				 <&ccu CLK_BUS_TCON1>, <&ccu CLK_BUS_TVE>,
-+				 <&display_clocks CLK_MIXER1>,
-+				 <&ccu CLK_TVE>;
-+			status = "disabled";
-+		};
-+	};
-+
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-2.13.5
+The way you describe it here, the clock and reset are for the PHY. But
+maybe it is actually for the bus? I can understand a bus timing out if
+it has no clock, or it is held in reset. Try enabling the clock and
+reset when the internal bus is selected, not when the PHY on the bus
+is selected.
+
+	Andrew
