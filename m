@@ -1,78 +1,55 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 11 Sep 2017 02:58:03 +0200
-Subject: [PATCH 0/2] ARM: owl: Add CubieBoard6
-Message-ID: <20170911005805.10116-1-afaerber@suse.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 11 Sep 2017 10:58:40 +1000
+Subject: linux-next: manual merge of the watchdog tree with the arm-soc tree
+Message-ID: <20170911105840.55eee273@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Wim,
 
-This series prepares the Cubietech CubieBoard6, based on Actions Semi S500.
+Today's linux-next merge of the watchdog tree got a conflict in:
 
-Cf. https://en.opensuse.org/HCL:CubieBoard6
+  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
 
-With this Device Tree it starts to boot, but it gets stuck during earlycon:
+between commit:
 
-[    0.899855] cpuidle: using governor ladder
-[    0.904118] Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP ARM
-[    0.911498] Modules linked in:
-[    0.914552] CPU: 3 PID: 1 Comm: swapper/0 Not tainted 4.13.0-next-20170908-00003-gbc21950343e1 #38
-[    0.923486] Hardware name: Generic DT based system
-[    0.928263] task: ee833840 task.stack: ee834000
-[    0.932804] PC is at arch_hw_breakpoint_init+0xa0/0x2ac
-[    0.938015] LR is at arch_hw_breakpoint_init+0x88/0x2ac
-[    0.943223] pc : [<c09044a0>]    lr : [<c0904488>]    psr: 60000013
-[    0.949469] sp : ee835ef8  ip : c09005a0  fp : 00000000
-[    0.954676] r10: c092e83c  r9 : 0000009a  r8 : c0939624
-[    0.959882] r7 : c092e828  r6 : c0a3463c  r5 : c0a3463c  r4 : 00000001
-[    0.966388] r3 : 0000000f  r2 : 510002d0  r1 : 00000000  r0 : 00000003
-[    0.972898] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[    0.980013] Control: 10c5387d  Table: 0000404a  DAC: 00000051
-[    0.985740] Process swapper/0 (pid: 1, stack limit = 0xee834218)
-[    0.991727] Stack: (0xee835ef8 to 0xee836000)
-[    0.996069] 5ee0:                                                       c0a24844 c0a2b47c
-[    1.004228] 5f00: 00000000 c05adf6c 00000003 c0904400 00000000 c01019f0 0000009a 0000009a
-[    1.012388] 5f20: eeff7200 eeff72c9 c08a5aec 0000009a 0000009a c0137b54 c08a4ee4 00000000
-[    1.020546] 5f40: 00000003 00000003 eeff72c9 eeff72d1 c0a0b7f4 00000003 c0a34300 c0a34300
-[    1.028704] 5f60: 00000003 c0a34300 c0a34300 c0939624 0000009a c0900dd0 00000003 00000003
-[    1.036862] 5f80: 00000000 c09005a0 00000000 c06d6cac 00000000 00000000 00000000 00000000
-[    1.045020] 5fa0: 00000000 c06d6cb4 00000000 c01079e0 00000000 00000000 00000000 00000000
-[    1.053177] 5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    1.061335] 5fe0: 00000000 00000000 00000000 00000000 00000013 00000000 ffffffff ffffffff
-[    1.069521] [<c09044a0>] (arch_hw_breakpoint_init) from [<c01019f0>] (do_one_initcall+0x40/0x16c)
-[    1.078385] [<c01019f0>] (do_one_initcall) from [<c0900dd0>] (kernel_init_freeable+0x144/0x1e0)
-[    1.087081] [<c0900dd0>] (kernel_init_freeable) from [<c06d6cb4>] (kernel_init+0x8/0x110)
-[    1.095252] [<c06d6cb4>] (kernel_init) from [<c01079e0>] (ret_from_fork+0x14/0x34)
-[    1.102807] Code: 0a000002 e3500005 13a04000 ea000001 (ee114e91) 
-[    1.108892] ---[ end trace 7c7f41a8afd53875 ]---
-[    1.113517] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+  275e85971b7d ("ARM: mediatek: dts: Cleanup bindings documentation")
 
-The same kernel zImage binary boots fine on Guitar, where I instead get:
+from the arm-soc tree and commit:
 
-[    0.865476] cpuidle: using governor ladder
-[    0.866283] hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
-[    0.866385] hw-breakpoint: maximum watchpoint size is 4 bytes.
+  e8a7fc711c9a ("dt-bindings: watchdog: mediatek: add support for MediaTek MT7623 and MT7622 SoC")
 
-I have tested this both with and without owl_secondary_boot(), i.e. my SMP patch series.
+from the watchdog tree.
 
-Work branch for testing:
-https://github.com/afaerber/linux/commits/bg96-next
-
-Cheers,
-Andreas
-
-Cc: Ahha Lee <lee@cubietech.com>
-Cc: support at cubietech.com
-
-Andreas F?rber (2):
-  dt-bindings: arm: actions: Add CubieBoard6
-  ARM: dts: owl-s500: Add CubieBoard6
-
- Documentation/devicetree/bindings/arm/actions.txt |  1 +
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/owl-s500-cubieboard6.dts        | 44 +++++++++++++++++++++++
- 3 files changed, 46 insertions(+)
- create mode 100644 arch/arm/boot/dts/owl-s500-cubieboard6.dts
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
 
 -- 
-2.13.5
+Cheers,
+Stephen Rothwell
+
+diff --cc Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+index 20ada673ab0c,096bbfbbae1b..000000000000
+--- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+@@@ -3,9 -3,11 +3,11 @@@ Mediatek SoCs Watchdog time
+  Required properties:
+  
+  - compatible should contain:
+ -	* "mediatek,mt2701-wdt" for MT2701 compatible watchdog timers
+ -	* "mediatek,mt7622-wdt", "mediatek,mt6589-wdt": for MT7622
+ -	* "mediatek,mt7623-wdt", "mediatek,mt6589-wdt": for MT7623
+ -	* "mediatek,mt6589-wdt" for all compatible watchdog timers (MT2701,
+ -		MT6589)
+ +	"mediatek,mt2701-wdt", "mediatek,mt6589-wdt": for MT2701
+++	"mediatek,mt7622-wdt", "mediatek,mt6589-wdt": for MT7622
+++	"mediatek,mt7623-wdt", "mediatek,mt6589-wdt": for MT7623
+ +	"mediatek,mt6589-wdt": for MT6589
+ +	"mediatek,mt6797-wdt", "mediatek,mt6589-wdt": for MT6797
+  
+  - reg : Specifies base physical address and size of the registers.
+  
