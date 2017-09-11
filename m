@@ -1,109 +1,55 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 11 Sep 2017 22:01:02 +0900
-Subject: [PATCH 3/5] nvmem: mtk-efuse: fix different address space warnings of
- sparse
-In-Reply-To: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1505134864-11975-4-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 11 Sep 2017 22:00:59 +0900
+Subject: [PATCH 0/5] nvmem: some cleanups and sparse warning fixes
+Message-ID: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following sparse warnings:
 
-drivers/nvmem/mtk-efuse.c:24:30: warning: incorrect type in initializer (different address spaces)
-drivers/nvmem/mtk-efuse.c:24:30:    expected void [noderef] <asn:2>*base
-drivers/nvmem/mtk-efuse.c:24:30:    got void *context
-drivers/nvmem/mtk-efuse.c:37:30: warning: incorrect type in initializer (different address spaces)
-drivers/nvmem/mtk-efuse.c:37:30:    expected void [noderef] <asn:2>*base
-drivers/nvmem/mtk-efuse.c:37:30:    got void *context
-drivers/nvmem/mtk-efuse.c:69:23: warning: incorrect type in assignment (different address spaces)
-drivers/nvmem/mtk-efuse.c:69:23:    expected void *priv
-drivers/nvmem/mtk-efuse.c:69:23:    got void [noderef] <asn:2>*[assigned] base
+Socionext is trying to add a new nvmem driver.
 
-The type of nvmem_config->priv is (void *), so sparse complains
-about assignment of the base address with (void __iomem *) type.
+Before adding a new one, I'd like to be sure about the preferred
+coding style in this subsystem, and build-up cleaner code base.
 
-Even if we cast it out, sparse still warns:
-warning: cast removes address space of expression
+Please pick up what you like.  Please feel free to throw away
+what you do not like.
 
-Of course, we can shut up the sparse by marking __force, but a more
-correct way is to put the base address into driver private data.
+1/5, 2/5: convert kzalloc to stack because nvmem_config
+is small one-time use data.
+This is what we agreed in the discussion.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+3/5, 4/5: fix sparse warning
+For mtk-efuse, qfprom, the base address is the only private data
+but, assigning (void __iomem *) to ->priv directly causes sparse
+warnings.
 
- drivers/nvmem/mtk-efuse.c | 26 +++++++++++++++++---------
- 1 file changed, 17 insertions(+), 9 deletions(-)
+5/5: clean-up of owner settings - if the owner field matches
+nvmem->dev->driver->onwer, we need not set the onwer field
+explicitly.
 
-diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-index fa7a0f6..c4058b5 100644
---- a/drivers/nvmem/mtk-efuse.c
-+++ b/drivers/nvmem/mtk-efuse.c
-@@ -18,15 +18,19 @@
- #include <linux/nvmem-provider.h>
- #include <linux/platform_device.h>
- 
-+struct mtk_efuse_priv {
-+	void __iomem *base;
-+};
-+
- static int mtk_reg_read(void *context,
- 			unsigned int reg, void *_val, size_t bytes)
- {
--	void __iomem *base = context;
-+	struct mtk_efuse_priv *priv = context;
- 	u32 *val = _val;
- 	int i = 0, words = bytes / 4;
- 
- 	while (words--)
--		*val++ = readl(base + reg + (i++ * 4));
-+		*val++ = readl(priv->base + reg + (i++ * 4));
- 
- 	return 0;
- }
-@@ -34,12 +38,12 @@ static int mtk_reg_read(void *context,
- static int mtk_reg_write(void *context,
- 			 unsigned int reg, void *_val, size_t bytes)
- {
--	void __iomem *base = context;
-+	struct mtk_efuse_priv *priv = context;
- 	u32 *val = _val;
- 	int i = 0, words = bytes / 4;
- 
- 	while (words--)
--		writel(*val++, base + reg + (i++ * 4));
-+		writel(*val++, priv->base + reg + (i++ * 4));
- 
- 	return 0;
- }
-@@ -50,19 +54,23 @@ static int mtk_efuse_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct nvmem_config econfig = {};
--	void __iomem *base;
-+	struct mtk_efuse_priv *priv;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	priv->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
- 
- 	econfig.stride = 4;
- 	econfig.word_size = 4;
- 	econfig.reg_read = mtk_reg_read;
- 	econfig.reg_write = mtk_reg_write;
- 	econfig.size = resource_size(res);
--	econfig.priv = base;
-+	econfig.priv = priv;
- 	econfig.dev = dev;
- 	econfig.owner = THIS_MODULE;
- 	nvmem = nvmem_register(&econfig);
+
+
+Masahiro Yamada (5):
+  nvmem: imx-iim: use stack for nvmem_config instead of malloc'ing it
+  nvmem: mtk-efuse: use stack for nvmem_config instead of malloc'ing it
+  nvmem: mtk-efuse: fix different address space warnings of sparse
+  nvmem: qfprom: fix different address space warnings of sparse
+  nvmem: set nvmem->owner to nvmem->dev->driver->owner if unset
+
+ drivers/nvmem/bcm-ocotp.c      |  1 -
+ drivers/nvmem/core.c           |  2 ++
+ drivers/nvmem/imx-iim.c        | 24 +++++++++------------
+ drivers/nvmem/imx-ocotp.c      |  1 -
+ drivers/nvmem/lpc18xx_eeprom.c |  1 -
+ drivers/nvmem/lpc18xx_otp.c    |  1 -
+ drivers/nvmem/meson-efuse.c    |  1 -
+ drivers/nvmem/mtk-efuse.c      | 47 ++++++++++++++++++++++--------------------
+ drivers/nvmem/mxs-ocotp.c      |  1 -
+ drivers/nvmem/qfprom.c         | 27 +++++++++++++++---------
+ drivers/nvmem/rockchip-efuse.c |  1 -
+ drivers/nvmem/sunxi_sid.c      |  1 -
+ drivers/nvmem/vf610-ocotp.c    |  1 -
+ 13 files changed, 54 insertions(+), 55 deletions(-)
+
 -- 
 2.7.4
