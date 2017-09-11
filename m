@@ -1,62 +1,65 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 11 Sep 2017 13:08:00 +0000
-Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20170911130303.GA2533@kroah.com>
-References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
- <20170831160430.GB11200@kroah.com>
- <VI1PR0401MB185602CC352A4026BCD875CAEC680@VI1PR0401MB1856.eurprd04.prod.outlook.com>
- <20170911130303.GA2533@kroah.com>
-Message-ID: <VI1PR0401MB185683F6C359916200A2919EEC680@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 11 Sep 2017 15:09:54 +0200
+Subject: [PATCH 0/5] ARM: dts: rcar-gen2: Add reset control properties
+Message-ID: <1505135399-24840-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+	Hi Simon, Magnus,
 
+This patch series describes the reset topology on all R-Car Gen2 Socs, like
+was done before for R-Car Gen3 and RZ/G1.
 
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Monday, September 11, 2017 4:03 PM
-> 
-> On Mon, Sep 11, 2017 at 11:55:22AM +0000, Laurentiu Tudor wrote:
-> > Hi,
-> >
-> > > -----Original Message-----
-> > > From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> > > Sent: Thursday, August 31, 2017 7:05 PM
-> > >
-> > > On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com
-> wrote:
-> > > > From: Stuart Yoder <stuart.yoder@nxp.com>
-> > > >
-> > > > Move the source files out of staging into their final locations:
-> > > >   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
-> > > >   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
-> > > >   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
-> > > >   -README.txt, providing and overview of DPAA goes to
-> > > >    Documentation/dpaa2/overview.txt
-> > > >
-> > > > Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
-> > > > Update dpaa2_eth and dpio staging drivers.
-> > > >
-> > > > Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
-> > > > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> > > > [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
-> > > > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > >
-> > > This is going to have to wait until I get a chunk of time to do the review.
-> > > Probably after 4.13-final is out.
-> >
-> > Any updates on this? Any chances to make it in 4.14? Thanks!
-> 
-> No, it's too late for 4.14, it would have had to be in linux-next before 4.13-final
-> came out.  I'm at a conference all this week, 
+Resets usually match the corresponding module clocks.  Exceptions are:
+  - The audio module has resets for the Serial Sound Interfaces only,
+  - The display module has only a single reset for all DU channels, but
+    adding reset properties for the display is postponed upon request from
+    Laurent.
 
-Plumbers? :-)
+Note that this patch series contains hardware description only.
+Actual reset policy is to be defined and implemented separately.
+Also, this is an optional feature, to be enabled explicitly using
+CONFIG_RESET_CONTROLLER=y.  When enabled, an on-SoC device can be reset
+easily using device_reset(), or by using the reset_control_*() API when
+more fine-grained control is desired.
 
-> if I'm stuck in a boring talk, I'll try to do the review :)
+Possible use cases are (not exhaustive):
+  - Reset a device before use, to make sure it's in a predefined state, and
+    doesn't depend on earlier configuration by e.g. the boot loader,
+  - Reset a device after detecting an anomaly,
+  - Reset a device to verify suspend/resume is handled correctly by the
+    driver in case the device would be part of a power domain on a
+    different/future SoC.
 
-Great. Thanks a lot for taking the time!
+This has been tested on r8a7790/lager, r8a7791/koelsch, r8a7792/blanche,
+and r8a7794/alt (r8a7793/gose was offline).
 
----
-Best Regards, Laurentiu
+Thanks for applying!
+
+Geert Uytterhoeven (5):
+  ARM: dts: r8a7790: Add reset control properties
+  ARM: dts: r8a7791: Add reset control properties
+  ARM: dts: r8a7792: Add reset control properties
+  ARM: dts: r8a7793: Add reset control properties
+  ARM: dts: r8a7794: Add reset control properties
+
+ arch/arm/boot/dts/r8a7790.dtsi | 76 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7791.dtsi | 82 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7792.dtsi | 45 +++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7793.dtsi | 62 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7794.dtsi | 64 +++++++++++++++++++++++++++++++++
+ 5 files changed, 329 insertions(+)
+
+-- 
+2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
