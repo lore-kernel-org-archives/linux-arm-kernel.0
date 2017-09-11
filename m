@@ -1,27 +1,43 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Mon, 11 Sep 2017 13:39:36 +0200
-Subject: [PATCH v11 2/4] ACPI: parse SPCR and enable matching console
-In-Reply-To: <20170911110522.vwgwnohjrrj2twtk@bivouac.eciton.net> (Leif
- Lindholm's message of "Mon, 11 Sep 2017 12:05:22 +0100")
-References: <20160927151953.GB4371@kroah.com>
- <20160927205418.31529-1-aleksey.makarov@linaro.org>
- <20160927205418.31529-2-aleksey.makarov@linaro.org>
- <mvmzia1bnvu.fsf@suse.de>
- <20170911110522.vwgwnohjrrj2twtk@bivouac.eciton.net>
-Message-ID: <mvmingpbh1j.fsf@suse.de>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 11 Sep 2017 11:55:22 +0000
+Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20170831160430.GB11200@kroah.com>
+References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
+ <20170831160430.GB11200@kroah.com>
+Message-ID: <VI1PR0401MB185602CC352A4026BCD875CAEC680@VI1PR0401MB1856.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 11 2017, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+Hi,
 
-> Are you asking because you want to use a different console in a lab
-> setup or because there are issues with SPCR on your platform?
+> -----Original Message-----
+> From: Greg KH [mailto:gregkh at linuxfoundation.org]
+> Sent: Thursday, August 31, 2017 7:05 PM
+> 
+> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
+> > From: Stuart Yoder <stuart.yoder@nxp.com>
+> >
+> > Move the source files out of staging into their final locations:
+> >   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+> >   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+> >   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+> >   -README.txt, providing and overview of DPAA goes to
+> >    Documentation/dpaa2/overview.txt
+> >
+> > Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+> > Update dpaa2_eth and dpio staging drivers.
+> >
+> > Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> > [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> This is going to have to wait until I get a chunk of time to do the review.
+> Probably after 4.13-final is out.
 
-The console from the SPCR is not the one forwarded by the BMC.
+Any updates on this? Any chances to make it in 4.14? Thanks!
 
-Andreas.
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+---
+Best Regards, Laurentiu
