@@ -1,44 +1,75 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 11 Sep 2017 13:56:22 +0530
-Subject: [PATCH 2/2] ARM: dts: rockchip: rk3288-vyasa: Add hdmi ddc-i2c-bus
-In-Reply-To: <1505118382-6023-1-git-send-email-jteki@openedev.com>
-References: <1505118382-6023-1-git-send-email-jteki@openedev.com>
-Message-ID: <1505118382-6023-2-git-send-email-jteki@openedev.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 11 Sep 2017 10:58:19 +0200
+Subject: [PATCH 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
+References: <CGME20170911074100epcas2p15480963b2119f8954784f9b37ed8d26d@epcas2p1.samsung.com>
+ <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <f9b6af8e-6d1b-702d-40e0-944f5ecedf8a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On 09/11/2017 09:36 AM, Dong Aisheng wrote:
+> 'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
+> here to handle this for DT users without 'clock-names' specified.
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Reported-by: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>   drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
+>   include/linux/clk.h    |  8 ++++++++
+>   2 files changed, 39 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+> index c834f5a..3179f28 100644
+> --- a/drivers/clk/clk-bulk.c
+> +++ b/drivers/clk/clk-bulk.c
+> @@ -19,6 +19,37 @@
+>   #include <linux/clk.h>
+>   #include <linux/device.h>
+>   #include <linux/export.h>
+> +#include <linux/of.h>
+> +
+> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> +				 struct clk_bulk_data *clks)
+> +{
+> +	int ret;
+> +	int i;
+> +
+> +	for (i = 0; i < num_clks; i++)
+> +		clks[i].clk = NULL;
+> +
+> +	for (i = 0; i < num_clks; i++) {
+> +		clks[i].clk = of_clk_get(np, i);
+> +		if (IS_ERR(clks[i].clk)) {
+> +			ret = PTR_ERR(clks[i].clk);
 
-HDMI DDC bus is connected via i2c2 in rk3288-vyasa board,
-so add it and enable i2c22 node at same patch.
+> +			pr_err("%s: Failed to get clk index: %d ret: %d\n",
+> +			       np->full_name, i, ret);
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- arch/arm/boot/dts/rk3288-vyasa.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+AFAIU full_node is not supposed now to be dereferenced directly,
+since storing of the full path string for each node is going to be
+removed. %pOF needs to be used instead, e.g.
 
-diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
-index f70a52f..fdafe5c 100644
---- a/arch/arm/boot/dts/rk3288-vyasa.dts
-+++ b/arch/arm/boot/dts/rk3288-vyasa.dts
-@@ -83,6 +83,7 @@
- };
- 
- &hdmi {
-+	ddc-i2c-bus = <&i2c2>;
- 	status = "okay";
- };
- 
-@@ -279,6 +280,10 @@
- 	};
- };
- 
-+&i2c2 {
-+	status = "okay";
-+};
-+
- &sdmmc {
- 	status = "okay";
- 
+	pr_err("%pOF: failed to get clk %d: %d\n", np, i , ret);
+
+> +			clks[i].clk = NULL;
+> +			goto err;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +
+> +err:
+> +	clk_bulk_put(i, clks);
+> +
+> +	return ret;
+> +}
+> +#endif
+
 -- 
-2.7.4
+Regards,
+Sylwester
