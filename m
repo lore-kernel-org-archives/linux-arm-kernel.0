@@ -1,34 +1,75 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 11 Sep 2017 23:55:26 +0800
-Subject: [PATCH 1/4] dt-bindings: simplefb-sunxi: add pipelines for DE2
+Date: Mon, 11 Sep 2017 23:55:27 +0800
+Subject: [PATCH 2/4] ARM: sun8i: h3/h5: add DE2 CCU device node for H3
 In-Reply-To: <20170911155529.62891-1-icenowy@aosc.io>
 References: <20170911155529.62891-1-icenowy@aosc.io>
-Message-ID: <20170911155529.62891-2-icenowy@aosc.io>
+Message-ID: <20170911155529.62891-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're going to add simplefb support for Allwinner SoCs with DE2, add
-suitable pipeline strings in the device tree binding.
+The DE2 in H3/H5 has a clock control unit in it, and the behavior is
+slightly different between H3 and H5.
+
+Add the common parts in H3/H5 DTSI, and add the compatible string in H3
+DTSI.
+
+The compatible string of H5 DE2 CCU will be added in a separated patch.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- .../devicetree/bindings/display/simple-framebuffer-sunxi.txt          | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi    |  4 ++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 14 ++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/display/simple-framebuffer-sunxi.txt
-index a9168ae6946c..d693b8dc9a62 100644
---- a/Documentation/devicetree/bindings/display/simple-framebuffer-sunxi.txt
-+++ b/Documentation/devicetree/bindings/display/simple-framebuffer-sunxi.txt
-@@ -15,6 +15,10 @@ Required properties:
-   "de_be1-lcd1"
-   "de_be0-lcd0-hdmi"
-   "de_be1-lcd1-hdmi"
-+  "mixer0-lcd0"
-+  "mixer0-lcd0-hdmi"
-+  "mixer1-lcd1-hdmi"
-+  "mixer1-lcd1-tve"
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index b36f9f423c39..a8a1db79f362 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -85,6 +85,10 @@
+ 	compatible = "allwinner,sun8i-h3-ccu";
+ };
  
- Example:
++&display_clocks {
++	compatible = "allwinner,sun8i-a83t-de2-clk";
++};
++
+ &mmc0 {
+ 	compatible = "allwinner,sun7i-a20-mmc";
+ 	clocks = <&ccu CLK_BUS_MMC0>,
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 11240a8313c2..76a4cbc99bdb 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -40,9 +40,11 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
++#include <dt-bindings/clock/sun8i-de2.h>
+ #include <dt-bindings/clock/sun8i-h3-ccu.h>
+ #include <dt-bindings/clock/sun8i-r-ccu.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/reset/sun8i-de2.h>
+ #include <dt-bindings/reset/sun8i-h3-ccu.h>
+ #include <dt-bindings/reset/sun8i-r-ccu.h>
+ 
+@@ -85,6 +87,18 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		display_clocks: clock at 1000000 {
++			/* compatible is in per SoC .dtsi file */
++			reg = <0x01000000 0x100000>;
++			clocks = <&ccu CLK_DE>,
++				 <&ccu CLK_BUS_DE>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		syscon: syscon at 1c00000 {
+ 			compatible = "allwinner,sun8i-h3-system-controller",
+ 				"syscon";
 -- 
 2.13.5
