@@ -1,29 +1,22 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Sep 2017 11:14:33 +0200
-Subject: [PATCH 1/3] [media] s5p-mfc: Delete an error message for a
- failed memory allocation in s5p_mfc_probe()
-In-Reply-To: <ff8f7dcd-c3e8-2a12-c0db-997b514f5d94@users.sourceforge.net>
+Date: Mon, 11 Sep 2017 11:16:54 +0200
+Subject: [PATCH 2/3] [media] s5p-mfc: Improve a size determination in
+ s5p_mfc_alloc_memdev()
+In-Reply-To: <003abb1f-4dc6-91ca-9d03-cae13dc4ff6f@users.sourceforge.net>
 References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
- <ff8f7dcd-c3e8-2a12-c0db-997b514f5d94@users.sourceforge.net>
- <CGME20170911091439epcas1p3f8b62f55cae4255d250b1fe990fbf1ff@epcas1p3.samsung.com>
-Message-ID: <ccf6b04a-6e8a-231c-f456-0b37ba350acc@samsung.com>
+ <003abb1f-4dc6-91ca-9d03-cae13dc4ff6f@users.sourceforge.net>
+ <CGME20170911091700epcas1p1bd85f95a6b776581ad4cd6f3108d09ba@epcas1p1.samsung.com>
+Message-ID: <5b6fc74a-9927-cc1d-fd89-cd4578a14791@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2017 10:51 PM, SF Markus Elfring wrote:
-> Omit an extra message for a memory allocation failure in this function.
+On 09/08/2017 10:52 PM, SF Markus Elfring wrote:
+> Replace the specification of a data structure by a pointer dereference
+> as the parameter for the operator "sizeof" to make the corresponding size
+> determination a bit safer according to the Linux coding style convention.
 > 
 > This issue was detected by using the Coccinelle software.
 > 
 > Signed-off-by: Markus Elfring<elfring@users.sourceforge.net>
 
-Could you make the commit summary shorter, to keep it below 70
-characters [1]? With that changed feel free to add
-
 Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
---
-Regards,
-Sylwester
-
-[1] Documentation/process/submitting-patches.rst
