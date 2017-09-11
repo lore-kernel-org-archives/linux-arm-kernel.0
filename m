@@ -1,21 +1,69 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 11 Sep 2017 15:34:17 +0530
-Subject: [RFC 1/2] configs: davinci_all_defconfig: Enable Backlight PWM
- module
-In-Reply-To: <1504933135-29747-1-git-send-email-aford173@gmail.com>
-References: <1504933135-29747-1-git-send-email-aford173@gmail.com>
-Message-ID: <3ab8a360-2a64-d0a8-049e-0cc65b15244d@ti.com>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 11 Sep 2017 18:44:00 +0800
+Subject: [PATCH v8 0/4] Add Rockchip RGA V4l2 support
+Message-ID: <1505126644-18396-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 September 2017 10:28 AM, Adam Ford wrote:
-> The da850evm had an LCD that used ecap2 as the PWM brightness
-> 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module.
 
-Looks good, please rebase to latest master of my tree as it does not
-apply cleanly. Also, please use patch subject line conventions normally
-used with the file.
+Recently I tried to add protduff support for gstreamer on rockchip platform, and i found that API 
+were not very suitable for my purpose. 
+It shouldn't go upstream until we can figure out what people need, 
 
-Thanks,
-Sekhar
+change in V8:
+- remove protduff things
+
+change in V6,V7:
+- correct warning in checkpatch.pl
+
+change in V5:
+- v4l2-compliance: handle invalid pxielformat 
+- v4l2-compliance: add subscribe_event
+- add colorspace support
+
+change in V4:
+- document the controls.
+- change according to Hans's comments
+
+change in V3:
+- rename the controls.
+- add pm_runtime support.
+- enable node by default.
+- correct spelling in documents.
+
+change in V2:
+- generalize the controls.
+- map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+actively used systems.
+- remove status in dt-bindings examples.
+
+
+Jacob Chen (4):
+  rockchip/rga: v4l2 m2m support
+  ARM: dts: rockchip: add RGA device node for RK3288
+  arm64: dts: rockchip: add RGA device node for RK3399
+  dt-bindings: Document the Rockchip RGA bindings
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |   33 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   11 +
+ drivers/media/platform/Kconfig                     |   11 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/rockchip-rga/Makefile       |    3 +
+ drivers/media/platform/rockchip-rga/rga-buf.c      |  156 +++
+ drivers/media/platform/rockchip-rga/rga-hw.c       |  435 ++++++++
+ drivers/media/platform/rockchip-rga/rga-hw.h       |  437 +++++++++
+ drivers/media/platform/rockchip-rga/rga.c          | 1035 ++++++++++++++++++++
+ drivers/media/platform/rockchip-rga/rga.h          |  110 +++
+ 11 files changed, 2244 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip-rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.h
+
+-- 
+2.7.4
