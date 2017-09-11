@@ -1,77 +1,26 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 11 Sep 2017 14:42:25 +0530
-Subject: [PATCH v4 6/6] ARM: dts: imx6qdl-icore-rqs: Add CAN nodes
-In-Reply-To: <1505121145-9507-1-git-send-email-jteki@openedev.com>
-References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
-Message-ID: <1505121145-9507-6-git-send-email-jteki@openedev.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 11 Sep 2017 11:21:29 +0200
+Subject: [PATCH 3/3] [media] s5p-mfc: Adjust a null pointer check in
+ four functions
+In-Reply-To: <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
+References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
+ <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
+ <CGME20170911092134epcas2p1a1b11c056b52d68c3b0e4ea2e1e8f758@epcas2p1.samsung.com>
+Message-ID: <6c2d20b3-4437-0473-73d4-73c049ba52a9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On 09/08/2017 10:53 PM, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
 
-Add support for can1 and can2 nodes on Engicam i.CoreM6 RQS
-QDL module boards.
+> Date: Fri, 8 Sep 2017 22:37:00 +0200
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v4:
-- Moved can nodes from dts to dtsi 
-Changes for v3:
-- none
-Changes for v2:
-- s/flexcan/can
+Can you resend with that 4 lines removed? Are you using git send-email
+for sending patches?
 
- arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-index 6bb722a..9969e7f3 100644
---- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-@@ -145,6 +145,20 @@
- 	};
- };
- 
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_can1>;
-+	xceiver-supply = <&reg_3p3v>;
-+	status = "okay";
-+};
-+
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_can2>;
-+	xceiver-supply = <&reg_3p3v>;
-+	status = "okay";
-+};
-+
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>;
- 	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
-@@ -304,6 +318,20 @@
- 		>;
- 	};
- 
-+	pinctrl_can1: can1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
-+			MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x1b020
-+		>;
-+	};
-+
-+	pinctrl_can2: can2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX 0x1b020
-+			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX 0x1b020
-+		>;
-+	};
-+
- 	pinctrl_i2c1: i2c1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
--- 
-2.7.4
+--
+Thanks,
+Sylwester
