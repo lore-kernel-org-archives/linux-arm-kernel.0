@@ -1,110 +1,28 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 11 Sep 2017 16:11:51 +0900
-Subject: [PATCH net-next 1/3] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <0d9fb986-ca31-0f86-122f-b2679faeb2f4@gmail.com>
-References: <1504875731-3680-2-git-send-email-hayashi.kunihiko@socionext.com>
- <0d9fb986-ca31-0f86-122f-b2679faeb2f4@gmail.com>
-Message-ID: <20170911161151.671C.4A936039@socionext.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 11 Sep 2017 09:25:02 +0200
+Subject: [PATCH v3] ARM: dts: r8a7743: Add IIC cores to dtsi
+In-Reply-To: <1504705926-31625-1-git-send-email-chris.paterson2@renesas.com>
+References: <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
+ <1504705926-31625-1-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <20170911072502.GA10251@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On Fri, 8 Sep 2017 11:54:31 -0700 <f.fainelli@gmail.com> wrote:
-
-> On 09/08/2017 06:02 AM, Kunihiko Hayashi wrote:
-> > DT bindings for the AVE ethernet controller found on Socionext's
-> > UniPhier platforms.
-> > 
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> > ---
-> >  .../bindings/net/socionext,uniphier-ave4.txt       | 44 ++++++++++++++++++++++
-> >  1 file changed, 44 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > new file mode 100644
-> > index 0000000..57ae96d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > @@ -0,0 +1,44 @@
-> > +* Socionext AVE ethernet controller
-> > +
-> > +This describes the devicetree bindings for AVE ethernet controller
-> > +implemented on Socionext UniPhier SoCs.
-> > +
-> > +Required properties:
-> > + - compatible:  Should be "socionext,uniphier-ave4"
-> > + - reg: Address where registers are mapped and size of region.
-> > + - interrupts: IRQ common for mac and phy interrupts.
-> > + - phy-mode: See ethernet.txt in the same directory.
-> > + - #address-cells: Must be <1>.
-> > + - #size-cells: Must be <0>.
-> > + - Node, with 'reg' property, for each PHY on the MDIO bus.
-> > +
-> > +Optional properties:
-> > + - socionext,desc-bits: 32/64 descriptor size. Default 32.
+On Wed, Sep 06, 2017 at 02:52:06PM +0100, Chris Paterson wrote:
+> From: Biju Das <biju.das@bp.renesas.com>
 > 
-> 32 bits, this has an unit. Why is this configurable through Device Tree
-> and if this is describing the HW, as it should, why is not that inferred
-> from the compatible string?
-
-I've thought the common compatible string was reasonable for all UniPhier
-SoCs. However, since there are some different features among SoCs
-like "desc-bits" etc. and such feature would increase from now on,
-it's convenient to add compatible strings for each SoCs.
-
-> > + - local-mac-address: See ethernet.txt in the same directory.
-> > + - pinctrl-names: List of assigned state names, see pinctrl
-> > +	binding documentation.
-> > + - pinctrl-0: List of phandles to configure the GPIO pin used
-> > +	as interrupt line, see also generic and your platform
-> > +	specific pinctrl binding documentation.
-> > + - socionext,internal-phy-interrupt: Boolean to denote if the
-> > +	PHY interrupt is internally handled by the MAC.
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> ---
+> v2->v3
+> - Renamed lables to use iic instead of i2c.
 > 
-> Interesting, why do you need to declare this as opposed to also
-> determining this entirely from the compatible string of the Ethernet MAC?
-
-This property was added after determining to use common compatible string.
-I'll re-consider to use compatible strings for each SoCs.
-
+> v1->v2
+> - Corrected the resets property for i2c6 device node.
 > 
-> > +
-> > +
-> > +Example:
-> > +
-> > +	eth: ethernet at 65000000 {
-> > +		compatible = "socionext,uniphier-ave4";
-> > +		reg = <0x65000000 0x8500>;
-> > +		interrupts = <0 66 4>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_ether_rgmii>;
-> > +		phy-mode = "rgmii";
-> > +		socionext,desc-bits = <64>;
-> > +		local-mac-address = [00 00 00 00 00 00];
-> > +
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
+> This patch is based on renesas-devel tag renesas-devel-20170905-v4.13.
 > 
-> There is no phy-handle property, yet there clearly seems to be one
-> attached, and I think Andrew now also responded to that in the driver
-> patch, this needs fixing.
+> DT bindings has been accepted by Wolfram:
+> https://patchwork.kernel.org/patch/9888119
 
-Surely phy-handle is missing in this. I'll fix it with mdio node.
-
-> > +		ethphy: ethphy at 1 {
-> > +			reg = <1>;
-> > +		};
-> > +	};
-> > 
-> 
-> 
-> -- 
-> Florian
-
----
-Best Regards,
-Kunihiko Hayashi
+Thanks, applied.
