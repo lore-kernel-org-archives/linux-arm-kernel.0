@@ -1,33 +1,26 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 11 Sep 2017 18:14:54 +0300
-Subject: [PATCH] arm64: dts: marvell: enable AP806 watchdog
-Message-ID: <b2389a76625d17cd5d7a861d004ba26c6ae7ce81.1505142894.git.baruch@tkos.co.il>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Mon, 11 Sep 2017 08:26:27 -0700
+Subject: [PATCH v3 0/3] arm64: Add CONFIG_KUSER_HELPERS
+Message-ID: <20170911152635.95367-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This watchdog is ARM SBSA generic watchdog.
+Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
+config option (enabled by default). When disabled, all kuser
+helpers-related code is removed from the kernel and no mapping is done
+at the fixed high address (0xffff0000); any attempt to use a kuser
+helper from a 32-bit process will result in a segfault.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 4d360713ed12..6687dde4f95d 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -241,6 +241,12 @@
- 
- 			};
- 
-+			watchdog: watchdog at 600000 {
-+				compatible = "arm,sbsa-gwdt";
-+				reg = <0x610000 0x1000>, <0x600000 0x1000>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
- 			ap_sdhci0: sdhci at 6e0000 {
- 				compatible = "marvell,armada-ap806-sdhci";
- 				reg = <0x6e0000 0x300>;
--- 
-2.14.1
+v2:
+- vectors_page and compat_vdso_spec as array of 2
+- free sigpage if vectors allocation failed
+- adjust makefile so one line for each of the assembler source modules
+- split off assembler changes to a new previous patch in series to reduce churn
+- modify slightly the feature documentation to reduce its reach
+- modify slightly the feature documentation to rationalize the yes default.
+- There are more ifdefs as a result of the rebase.
+
+v3:
+- rebase (minor conflicts)
