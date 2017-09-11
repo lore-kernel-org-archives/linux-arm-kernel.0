@@ -1,93 +1,189 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 11 Sep 2017 21:08:50 +0200
-Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
- integrated/external MDIOs
-In-Reply-To: <20170911161124.GD27599@lunn.ch>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-11-clabbe.montjoie@gmail.com>
- <20170908130520.GA11248@lunn.ch> <20170908132632.GA3037@Red>
- <20170908140020.GC25219@lunn.ch> <20170908140832.GB3037@Red>
- <20170908141736.GF25219@lunn.ch> <20170908142825.GC3037@Red>
- <20170911161124.GD27599@lunn.ch>
-Message-ID: <20170911190850.GA2291@Red>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 11 Sep 2017 21:13:19 +0200
+Subject: [PATCH v9] vfio: platform: reset: Add Broadcom FlexRM reset module
+In-Reply-To: <1505026617-1399-2-git-send-email-anup.patel@broadcom.com>
+References: <1505026617-1399-1-git-send-email-anup.patel@broadcom.com>
+ <1505026617-1399-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <e079ebdf-8cfa-20fb-5132-1905d8b67623@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 11, 2017 at 06:11:24PM +0200, Andrew Lunn wrote:
-> On Fri, Sep 08, 2017 at 04:28:25PM +0200, Corentin Labbe wrote:
-> > On Fri, Sep 08, 2017 at 04:17:36PM +0200, Andrew Lunn wrote:
-> > > > > Do you know why the reset times out/fails?
-> > > > > 
-> > > > 
-> > > > Because there are nothing connected to it.
-> > > 
-> > > That should not be an issue. A read should just return 0xffff.  And it
-> > > should return 0xffff fast. The timing of the MDIO protocol is fixed. A
-> > > read or a write takes a fixed number of cycles, independent of if
-> > > there is a device there or not. The bus data line has a pullup, so if
-> > > you try to access a missing device, you automatically read 0xffff.
-> > > 
-> > 
-> > Perhaps, but the reality is that with nothing connected to it, the reset of the MAC timeout.
-> > Certainly, the MAC does not support finding no PHY.
-> 
-> Are you sure this is not because of the clock and reset?
-> 
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +                               int_mii_phy: ethernet-phy at 1 {
-> +                                       compatible = "ethernet-phy-ieee802.3-c22";
-> +                                       reg = <1>;
-> +                                       clocks = <&ccu CLK_BUS_EPHY>;
-> +                                       resets = <&ccu RST_BUS_EPHY>;
-> 
-> The way you describe it here, the clock and reset are for the PHY. But
-> maybe it is actually for the bus? I can understand a bus timing out if
-> it has no clock, or it is held in reset. Try enabling the clock and
-> reset when the internal bus is selected, not when the PHY on the bus
-> is selected.
-> 
+Hi Anup,
 
-Even with CLK_BUS_EPHY/RST_BUS_EPHY enabled, the MAC reset timeout.
-So no the CLK/RST are really for the PHY.
+On 10/09/2017 08:56, Anup Patel wrote:
+> This patch adds Broadcom FlexRM low-level reset for
+> VFIO platform.
+> 
+> It will do the following:
+> 1. Disable/Deactivate each FlexRM ring
+> 2. Flush each FlexRM ring
+> 
+> The cleanup sequence for FlexRM rings is adapted from
+> Broadcom FlexRM mailbox driver.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com> (again after the misc
+changes)
 
-Regards
+Thanks
 
-PS: patch and result with "integrated CLK/RST always on"
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -659,7 +659,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
-        struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
-        u32 reg, val;
-        int ret = 0;
--       bool need_reset = false;
-+       bool need_reset = true;
- 
-        if (current_child ^ desired_child) {
-                regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
-@@ -824,7 +824,7 @@ static int sun8i_dwmac_power_internal_phy(struct stmmac_priv *priv)
-        int ret;
- 
-        if (!gmac->use_internal_phy)
--               return 0;
-+               dev_info(priv->device, "IPHY BYPASS\n");
- 
-        ret = clk_prepare_enable(gmac->ephy_clk);
-        if (ret) {
-
-[   18.057162] dwmac-sun8i 1c30000.ethernet: Will use external PHY
-[   18.183789] dwmac-sun8i 1c30000.ethernet: IPHY BYPASS
-[   18.184136] dwmac-sun8i 1c30000.ethernet: Chain mode enabled
-[   18.184158] dwmac-sun8i 1c30000.ethernet: No HW DMA feature register supported
-[   18.184175] dwmac-sun8i 1c30000.ethernet: Normal descriptors
-[   18.184192] dwmac-sun8i 1c30000.ethernet: RX Checksum Offload Engine supported
-[   18.184214] dwmac-sun8i 1c30000.ethernet: COE Type 2
-[   18.184231] dwmac-sun8i 1c30000.ethernet: TX Checksum insertion supported
-[   18.185491] libphy: stmmac: probed
-[   18.188481] libphy: mdio_mux: probed
-[   18.188831] dwmac-sun8i 1c30000.ethernet: Switch mux to internal PHY
-[   18.288981] dwmac-sun8i 1c30000.ethernet: EMAC reset timeout
-[   18.289559] libphy: mdio_mux: probed
-[   18.289629] dwmac-sun8i 1c30000.ethernet: Switch mux to external PHY
-[   20.578316] EXT4-fs (mmcblk0p1): re-mounted. Opts: (null)
-[   31.240650] RTL8211E Gigabit Ethernet 0.1:00: attached PHY driver [RTL8211E Gigabit Ethernet] (mii_bus:phy_addr=0.1:00, irq=POLL)
+Eric
+> ---
+>  drivers/vfio/platform/reset/Kconfig                |   9 ++
+>  drivers/vfio/platform/reset/Makefile               |   1 +
+>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 116 +++++++++++++++++++++
+>  3 files changed, 126 insertions(+)
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> 
+> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+> index 70cccc5..392e3c0 100644
+> --- a/drivers/vfio/platform/reset/Kconfig
+> +++ b/drivers/vfio/platform/reset/Kconfig
+> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
+>  	  Enables the VFIO platform driver to handle reset for AMD XGBE
+>  
+>  	  If you don't know what to do here, say N.
+> +
+> +config VFIO_PLATFORM_BCMFLEXRM_RESET
+> +	tristate "VFIO support for Broadcom FlexRM reset"
+> +	depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
+> +	default ARCH_BCM_IPROC
+> +	help
+> +	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
+> +
+> +	  If you don't know what to do here, say N.
+> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+> index 93f4e23..8d9874b 100644
+> --- a/drivers/vfio/platform/reset/Makefile
+> +++ b/drivers/vfio/platform/reset/Makefile
+> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
+>  
+>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
+> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> new file mode 100644
+> index 0000000..ca1cbd7
+> --- /dev/null
+> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> @@ -0,0 +1,116 @@
+> +/*
+> + * Copyright (C) 2017 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +/*
+> + * This driver provides reset support for Broadcom FlexRM ring manager
+> + * to VFIO platform.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "vfio_platform_private.h"
+> +
+> +/* FlexRM configuration */
+> +#define RING_REGS_SIZE					0x10000
+> +#define RING_VER_MAGIC					0x76303031
+> +
+> +/* Per-Ring register offsets */
+> +#define RING_VER					0x000
+> +#define RING_CONTROL					0x034
+> +#define RING_FLUSH_DONE					0x038
+> +
+> +/* Register RING_CONTROL fields */
+> +#define CONTROL_FLUSH_SHIFT				5
+> +
+> +/* Register RING_FLUSH_DONE fields */
+> +#define FLUSH_DONE_MASK					0x1
+> +
+> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
+> +{
+> +	unsigned int timeout;
+> +
+> +	/* Disable/inactivate ring */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +
+> +	/* Set ring flush state */
+> +	timeout = 1000; /* timeout of 1s */
+> +	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
+> +	do {
+> +		if (readl_relaxed(ring + RING_FLUSH_DONE) &
+> +		    FLUSH_DONE_MASK)
+> +			break;
+> +		mdelay(1);
+> +	} while (--timeout);
+> +	if (!timeout)
+> +		return -ETIMEDOUT;
+> +
+> +	/* Clear ring flush state */
+> +	timeout = 1000; /* timeout of 1s */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +	do {
+> +		if (!(readl_relaxed(ring + RING_FLUSH_DONE) &
+> +		      FLUSH_DONE_MASK))
+> +			break;
+> +		mdelay(1);
+> +	} while (--timeout);
+> +	if (!timeout)
+> +		return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
+> +
+> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
+> +{
+> +	void __iomem *ring;
+> +	int rc = 0, ret = 0, ring_num = 0;
+> +	struct vfio_platform_region *reg = &vdev->regions[0];
+> +
+> +	/* Map FlexRM ring registers if not mapped */
+> +	if (!reg->ioaddr) {
+> +		reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
+> +		if (!reg->ioaddr)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	/* Discover and shutdown each FlexRM ring */
+> +	for (ring = reg->ioaddr;
+> +	     ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
+> +		if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC) {
+> +			rc = vfio_platform_bcmflexrm_shutdown(ring);
+> +			if (rc) {
+> +				dev_warn(vdev->device,
+> +					 "FlexRM ring%d shutdown error %d\n",
+> +					 ring_num, rc);
+> +				ret |= rc;
+> +			}
+> +			ring_num++;
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
+> +			  vfio_platform_bcmflexrm_reset);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
+> +MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
+> 
