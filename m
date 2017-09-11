@@ -1,43 +1,86 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 11 Sep 2017 11:43:36 +0800
-Subject: [PATCH v2 3/5] dmaengine: zynqmp_ps_pcie: Adding PS PCIe DMA
- driver
-In-Reply-To: <1504873388-29195-4-git-send-email-vjonnal@xilinx.com>
-Message-ID: <201709111147.xUUZAs2e%fengguang.wu@intel.com>
+From: andrew.donnellan@au1.ibm.com (Andrew Donnellan)
+Date: Mon, 11 Sep 2017 14:35:51 +1000
+Subject: [PATCH v3 2/3] drm: add fallback default device detection
+In-Reply-To: <20170901072744.2409-3-dja@axtens.net>
+References: <20170901072744.2409-1-dja@axtens.net>
+ <20170901072744.2409-3-dja@axtens.net>
+Message-ID: <ccea6f96-4658-b25a-a8ba-2959815318e3@au1.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
+On 01/09/17 17:27, Daniel Axtens wrote:
+> The VGA arbiter selects a default VGA device that is enabled and
+> reachable via the legacy VGA resources (mem 0xa0000-0xbffff, io
+> 0x3b0-0x3bb, io 0x3c0-0x3df, etc).
+> 
+> (As a special case for x86 and IA64, this can be overridden by
+> EFI.)
+> 
+> If there is no such device, e.g., because there's no enabled VGA
+> device, the host bridge doesn't support access to those legacy
+> resources, or a PCI-PCI bridge doesn't have VGA Enable set, a
+> platform may select an arbitrary device by calling
+> pci_set_default_display(). powerpc does this, for example.
+> 
+> If there is also no platform hook, there will be no default
+> device nominated. This is not necessarily what we want.
+> 
+> Add handling for devices that aren't handled by the vga arbiter or
+> platform by adding a late initcall and a class enable hook. If there
+> is no default from vgaarb or the platform then the first VGA card
+> that is enabled, has a driver bound, and can decode memory or I/O
+> will be marked as default.
+> 
+> This means single-card setups on systems without access to legacy
+> areas and without arch hooks will work. Multi-card setups on these
+> systems will nominate an arbitrary device, rather than no devices.
+> 
+> Signed-off-by: Daniel Axtens <dja@axtens.net>
+> 
+> ---
+> 
+> v3:
+> 
+> Split out from re-organisation for simplicity.
+> Add better description and better documentaion.
+> 
+> Thanks to (in no particular order), Daniel Vetter, Lorenzo Pieralisi,
+> Ard Biesheuvel and Dave Airlie. Special thanks to Ben Herrenschmidt
+> and Bjorn Helgass, whose prose I have borrowed.
+> 
+> v1:
+> 
+> Tested on:
+>   - x86_64 laptop
+>   - arm64 D05 board with hibmc card
+>   - qemu powerpc with tcg and bochs std-vga
+> 
+> I know this adds another config option and that's a bit sad, but
+> we can't include it unconditionally as it depends on PCI.
+> Suggestions welcome.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.13 next-20170908]
-[cannot apply to xlnx/master]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Tested on our iMac G5, the fallback handler doesn't fire (which should 
+be correct).
 
-url:    https://github.com/0day-ci/linux/commits/Ravi-Shankar-Jonnalagadda/dmaengine-ZynqMP-PS-PCIe-DMA-driver/20170911-052150
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Tested-by: Andrew Donnellan <andrew.donnellan@au1.ibm.com>
 
-Note: the linux-review/Ravi-Shankar-Jonnalagadda/dmaengine-ZynqMP-PS-PCIe-DMA-driver/20170911-052150 HEAD 442a00e11c4fa28ed29541773946aa1cda153e7e builds fine.
-      It only hurts bisectibility.
+> +static void vga_default_enable_hook(struct pci_dev *pdev)
+> +{
+> +       if (!vga_default_active)
+> +	       return;
+> +
+> +       if (pci_default_display())
+> +               return;
+> +
+> +       vga_default_try_device(pdev);
+> +}
+> +DECLARE_PCI_FIXUP_CLASS_ENABLE(PCI_ANY_ID, PCI_ANY_ID,
+> +			       PCI_CLASS_DISPLAY_VGA, 8,
+> +			       vga_default_enable_hook)
+> 
 
-All errors (new ones prefixed by >>):
+Looks like you have some spaces/tabs inconsistencies here.
 
->> make[4]: *** No rule to make target 'drivers/dma/xilinx/ps_pcie_platform.o', needed by 'drivers/dma/xilinx/ps_pcie_dma.o'.
-   make[4]: Target '__build' not remade because of errors.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56545 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170911/54499dfd/attachment-0001.gz>
+-- 
+Andrew Donnellan              OzLabs, ADL Canberra
+andrew.donnellan at au1.ibm.com  IBM Australia Limited
