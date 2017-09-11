@@ -1,57 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Sep 2017 22:00:57 +0200
-Subject: [PATCH] scsi: acornscsi: fix build error
-Message-ID: <20170911200115.3119398-1-arnd@arndb.de>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon, 11 Sep 2017 15:07:15 -0500
+Subject: [PATCH v3 1/2] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <57153767-6dee-a5b5-548c-f7b0dc104b46@ti.com>
+References: <20170908175448.3367-1-fcooper@ti.com>
+ <20170908175448.3367-2-fcooper@ti.com>
+ <57153767-6dee-a5b5-548c-f7b0dc104b46@ti.com>
+Message-ID: <f185afb9-e877-1916-fcbc-c2a28f23b0cc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A cleanup patch introduced a fatal typo from inbalanced curly
-braces:
 
-drivers/scsi/arm/acornscsi.c: In function 'acornscsi_host_reset':
-drivers/scsi/arm/acornscsi.c:2773:1: error: ISO C90 forbids mixed declarations and code [-Werror=declaration-after-statement]
-drivers/scsi/arm/acornscsi.c:2795:12: error: invalid storage class for function 'acornscsi_show_info'
- static int acornscsi_show_info(struct seq_file *m, struct Scsi_Host *instance)
 
-The same patch incorrectly changed the argument type of the reset
-handler, as shown by this warning:
+On 09/11/2017 06:29 AM, Sekhar Nori wrote:
+> On Friday 08 September 2017 11:24 PM, Franklin S Cooper Jr wrote:
+>> 66AK2G has I2C instances that are not apart of the ALWAYS_ON power domain
+>> like other Keystone 2 SoCs and OMAPL138. Therefore, pm_runtime
+> 
+> unlike ?
+> 
+>> is required to insure the power domain used by the specific I2C instance is
+>> properly turned on along with its functional clock.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+>> Version 3 changes:
+>> Remove several statements that set clk to NULL
+>> Fix error path
+>>
+>>  drivers/i2c/busses/i2c-davinci.c | 64 +++++++++++++++++++++++++++++++++-------
+>>  1 file changed, 53 insertions(+), 11 deletions(-)
+> 
+>> @@ -802,12 +821,22 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>  	dev->clk = devm_clk_get(&pdev->dev, NULL);
+>>  	if (IS_ERR(dev->clk))
+>>  		return PTR_ERR(dev->clk);
+>> -	clk_prepare_enable(dev->clk);
+>>  
+>>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>  	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+>>  	if (IS_ERR(dev->base)) {
+>> -		r = PTR_ERR(dev->base);
+>> +		return PTR_ERR(dev->base);
+>> +	}
+>> +
+>> +	pm_runtime_set_autosuspend_delay(dev->dev,
+>> +					 DAVINCI_I2C_PM_TIMEOUT);
+>> +	pm_runtime_use_autosuspend(dev->dev);
+>> +
+>> +	pm_runtime_enable(dev->dev);
+>> +
+>> +	r = pm_runtime_get_sync(dev->dev);
+>> +	if (r < 0) {
+>> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+>>  		goto err_unuse_clocks;
+> 
+> You end up doing a pm_runtime_put_sync() on failure here, instead of
+> pm_runtime_put_noidle() like rest of the patch.
+> 
+> May be handle this failure here instead of relying on the goto path.
 
-drivers/scsi/arm/acornscsi.c:2888:27: error: initialization of 'int (*)(struct scsi_cmnd *)' from incompatible pointer type 'int (*)(struct Scsi_Host *)' [-Werror=incompatible-pointer-types]
-  .eh_host_reset_handler = acornscsi_host_reset,
-
-This removes one the extraneous opening brace and reverts the
-argument type change.
-
-Fixes: 74fa80ee3fae ("scsi: acornscsi: move bus reset to host reset")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/scsi/arm/acornscsi.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
-index 690816f3c6af..8d54283a99b2 100644
---- a/drivers/scsi/arm/acornscsi.c
-+++ b/drivers/scsi/arm/acornscsi.c
-@@ -2725,9 +2725,9 @@ int acornscsi_abort(struct scsi_cmnd *SCpnt)
-  * Params   : SCpnt  - command causing reset
-  * Returns  : one of SCSI_RESET_ macros
-  */
--int acornscsi_host_reset(struct Scsi_Host *shpnt)
-+int acornscsi_host_reset(struct scsi_cmnd *SCpnt)
- {
--	AS_Host *host = (AS_Host *)shpnt->hostdata;
-+	AS_Host *host = (AS_Host *)SCpnt->device->host->hostdata;
- 	struct scsi_cmnd *SCptr;
-     
-     host->stats.resets += 1;
-@@ -2741,7 +2741,7 @@ int acornscsi_host_reset(struct Scsi_Host *shpnt)
- 
- 	printk(KERN_WARNING "acornscsi_reset: ");
- 	print_sbic_status(asr, ssr, host->scsi.phase);
--	for (devidx = 0; devidx < 9; devidx ++) {
-+	for (devidx = 0; devidx < 9; devidx ++)
- 	    acornscsi_dumplog(host, devidx);
-     }
- #endif
--- 
-2.9.0
+Ok
+> 
+>>  	}
+>>  
+>> @@ -849,27 +878,40 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>  	if (r)
+>>  		goto err_unuse_clocks;
+>>  
+>> +	pm_runtime_mark_last_busy(dev->dev);
+>> +	pm_runtime_put_autosuspend(dev->dev);
+>> +
+>>  	return 0;
+>>  
+>>  err_unuse_clocks:
+>> -	clk_disable_unprepare(dev->clk);
+>> -	dev->clk = NULL;
+>> +	pm_runtime_dont_use_autosuspend(dev->dev);
+>> +	pm_runtime_put_sync(dev->dev);
+>> +	pm_runtime_disable(dev->dev);
+>> +
+>>  	return r;
+>>  }
+> 
+> Thanks,
+> Sekhar
+> 
