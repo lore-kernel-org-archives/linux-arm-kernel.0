@@ -1,38 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Sep 2017 08:25:31 -0300
-Subject: [PATCH v4 4/6] ARM: dts: imx6dl-icore: Add LVDS support
-In-Reply-To: <1505121145-9507-4-git-send-email-jteki@openedev.com>
-References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
- <1505121145-9507-4-git-send-email-jteki@openedev.com>
-Message-ID: <CAOMZO5B0RAjdupLSe=S+tDEA-hpf-Si_4qjkcKC_ECX86PLScQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 11 Sep 2017 13:27:59 +0200
+Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
+In-Reply-To: <20170910214424.14945-2-linus.walleij@linaro.org>
+References: <20170910214424.14945-1-linus.walleij@linaro.org>
+ <20170910214424.14945-2-linus.walleij@linaro.org>
+Message-ID: <CAMuHMdXabvax2Wru8j+MC4X5F+z5hoUo1tEbX+zn2AUW6QENVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jagan,
+Hi Linus,
 
-On Mon, Sep 11, 2017 at 6:12 AM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+On Sun, Sep 10, 2017 at 11:44 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> This converts the GPIO-based I2C-driver to using GPIO
+> descriptors instead of the old global numberspace-based
+> GPIO interface. We:
+>
+> - Convert the driver to unconditionally grab two GPIOs
+>   from the device by index 0 (SDA) and 1 (SCL) which
+>   will work fine with device tree and descriptor tables.
+>   The existing device trees will continue to work just
+>   like before, but without any roundtrip through the
+>   global numberspace.
 
-> +&ldb {
-> +       status = "okay";
-> +
-> +       lvds-channel at 0 {
-> +               fsl,data-mapping = "spwg";
-> +               fsl,data-width = <18>;
-> +               status = "okay";
-> +
-> +               display-timings {
-> +                       native-mode = <&timing0>;
-> +                       timing0: timing0 {
-> +                               clock-frequency = <60000000>;
-> +                               hactive = <800>;
-> +                               vactive = <480>;
-> +                               hback-porch = <30>;
-> +                               hfront-porch = <30>;
-> +                               vback-porch = <5>;
-> +                               vfront-porch = <5>;
-> +                               hsync-len = <64>;
-> +                               vsync-len = <20>;
+FYI, I recently posted a series to deprecate (at least for DT) this error
+prone indexing, in favor of using named GPIOs:
 
-Please add the support of this panel to drivers/gpu/drm/panel/panel-simple.c.
+    [PATCH/RFC 0/3] i2c: gpio: Add support for named gpios in DT
+    http://www.spinics.net/lists/devicetree/msg191936.html
 
-Then you can refer its compatible in your board dts.
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
