@@ -1,26 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Sep 2017 16:07:21 -0500
-Subject: [PATCH v4] ARM: dts: stm32: change pinctrl bindings definition
-In-Reply-To: <1504104653-26804-2-git-send-email-alexandre.torgue@st.com>
-References: <1504104653-26804-1-git-send-email-alexandre.torgue@st.com>
- <1504104653-26804-2-git-send-email-alexandre.torgue@st.com>
-Message-ID: <20170911210721.ga6hjkksgzashzrc@rob-hp-laptop>
+From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
+Date: Mon, 11 Sep 2017 16:17:19 -0500
+Subject: [[RESEND]PATCHv6 1/2] dt-bindings: i2c: Add Altera I2C Controller
+Message-ID: <1505164640-26413-1-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 04:50:53PM +0200, Alexandre Torgue wrote:
-> Initially each pin was declared in "include/dt-bindings/stm32<SOC>-pinfunc.h"
-> and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
-> Since this approach was approved, the number of supported MCU has
-> increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
-> file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
-> a new approach which consist to use a macro to define pin muxing in device
-> tree. All STM32 will use the common macro to define pinmux. Furthermore, it
-> will make STM32 maintenance and integration of new SOC easier .
-> 
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> Reviewed-by: Vikas MANOCHA <vikas.manocha@st.com>
-> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
+Add the documentation to support the Altera synthesizable
+logic I2C Controller in FPGA.
+
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 Acked-by: Rob Herring <robh@kernel.org>
+---
+v2  Change the subject to identify dt-bindings
+    Add synthesizable logic to description.
+    Change compatible string to "altr,softip-i2c"
+    Make description of clock phandle singular since 1 clock.
+    Remove altr, from fifo-size
+    Specify fifo-size is in bytes.
+v3  Add version to compatible string "altr,softip-i2c-v1.0"
+    Add for use in FPGA in description.
+v4  No Change - Add Acked-by
+v5-6  No Change
+---
+ .../devicetree/bindings/i2c/i2c-altera.txt         | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-altera.txt
+
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-altera.txt b/Documentation/devicetree/bindings/i2c/i2c-altera.txt
+new file mode 100644
+index 000000000000..767664f448ec
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-altera.txt
+@@ -0,0 +1,39 @@
++* Altera I2C Controller
++* This is Altera's synthesizable logic block I2C Controller for use
++* in Altera's FPGAs.
++
++Required properties :
++ - compatible : should be "altr,softip-i2c-v1.0"
++ - reg        : Offset and length of the register set for the device
++ - interrupts : <IRQ> where IRQ is the interrupt number.
++ - clocks     : phandle to input clock.
++ - #address-cells = <1>;
++ - #size-cells = <0>;
++
++Recommended properties :
++ - clock-frequency : desired I2C bus clock frequency in Hz.
++
++Optional properties :
++ - fifo-size : Size of the RX and TX FIFOs in bytes.
++ - Child nodes conforming to i2c bus binding
++
++Example :
++
++	i2c at 100080000 {
++		compatible = "altr,softip-i2c-v1.0";
++		reg = <0x00000001 0x00080000 0x00000040>;
++		interrupt-parent = <&intc>;
++		interrupts = <0 43 4>;
++		clocks = <&clk_0>;
++		clock-frequency = <100000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		fifo-size = <4>;
++
++		eeprom at 51 {
++			compatible = "atmel,24c32";
++			reg = <0x51>;
++			pagesize = <32>;
++		};
++	};
++
+-- 
+2.7.4
