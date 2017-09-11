@@ -1,362 +1,261 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 10 Sep 2017 18:18:01 -0700
-Subject: [GIT PULL 1/3] ARM/arm64: SoC platform updates for v4.14
+Date: Sun, 10 Sep 2017 18:18:02 -0700
+Subject: [GIT PULL 2/3] ARM: SoC driver updates for v4.14
 In-Reply-To: <1505092683-19362-1-git-send-email-olof@lixom.net>
 References: <1505092683-19362-1-git-send-email-olof@lixom.net>
-Message-ID: <1505092683-19362-2-git-send-email-olof@lixom.net>
+Message-ID: <1505092683-19362-3-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains platform updates for 32- and 64-bit ARM,
-including defconfig updates to enable new options, drivers and
-platforms. There are also a few fixes and cleanups for some existing vendors.
+This branch contains platform-related driver updates for ARM and ARM64.
 
-Some of the things worth highlighting here are:
+Among them:
 
-- Enabling new crypt drivers on arm64 defconfig
-- QCOM IPQ8074 clocks and pinctrl drivers on arm64 defconfig
-- Debug support enabled for Renesas r8a7743
-- Various config updates for Renesas platforms (sound, USB, other drivers)
-- Platform support (including SMP) for TI dra762
-- OMAP cleanups: Move to use generic 8250 debug_ll, removal of stale DMA code
+- Reset driver updates:
++ New API for dealing with arrays of resets
++ Make unimplemented {de,}assert return success on shared resets
++ MSDKv1 driver
++ Removal of obsolete Gemini reset driver
++ Misc updates for sunxi and Uniphier
+
+- SoC drivers:
++ Platform SoC driver registration on Tegra
++ Shuffle of Qualcomm drivers into a submenu
++ Allwinner A64 support for SRAM
++ Renesas R-Car R3 support
++ Power domains for Rockchip RK3366
+
+- Misc updates and smaller fixes for TEE and memory driver subsystems
 
 Conflicts:
-imx_v6_v7_defconfig: Add/change: Keep everything but CONFIG_MEDIA_RC_SUPPORT.
+drivers/soc/qcom/Kconfig: Add/add conflict. Add new option under the menu.
 
 ----------------------------------------------------------------
 
-The following changes since commit d719518d9ce9132bad8a06e8029aeead328f66a3:
+The following changes since commit 319b36373008cb2a8e163f1d95b738c57c1fa043:
 
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc-next
+  Merge tag 'armsoc-platforms' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-platforms
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
 
-for you to fetch changes up to e9e3969fe2d84e56b3ee5cd4f7e00f4516a885cb:
+for you to fetch changes up to a48a7b6b54927159bac77735df00e5b9fc3415fb:
 
-  Merge branch 'next/defconfig' into next/soc
+  Merge tag 'scpi-fixes-4.14' of git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux into next/drivers
 
 ----------------------------------------------------------------
 
-Abhishek Sahu (1):
-      arm64: defconfig: Enable QCOM IPQ8074 clock and pinctrl
+Arnd Bergmann (12):
+      Merge tag 'tee-drv-for-4.14' of http://git.linaro.org/people/jens.wiklander/linux-tee into next/drivers
+      Merge tag 'v4.14-rockchip-drivers-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'qcom-drivers-for-4.14' of git://git.kernel.org/.../agross/linux into next/drivers
+      Merge tag 'renesas-drivers-for-v4.14' of https://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'amlogic-drivers' of git://git.kernel.org/.../khilman/linux-amlogic into next/drivers
+      Merge tag 'v4.13-next-soc' of https://github.com/mbgg/linux-mediatek into next/drivers
+      Merge tag 'tegra-for-4.14-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.14-firmware' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'reset-for-4.14' of git://git.pengutronix.de/git/pza/linux into next/drivers
+      Merge tag 'sunxi-drivers-for-4.14' of https://git.kernel.org/.../sunxi/linux into next/drivers
+      Merge tag 'samsung-drivers-4.14-2' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'scpi-fixes-4.14' of git://git.kernel.org/.../sudeep.holla/linux into next/drivers
 
-Alexander Sverdlin (3):
-      ARM: ep93xx: Add ADC clock
-      ARM: ep93xx: Add ADC platform device support to core
-      ARM: edb93xx: Add ADC platform device
+Arvind Yadav (3):
+      reset: zx2967: constify zx2967_reset_ops.
+      soc: mtk-pmic-wrap: make of_device_ids const.
+      tee: tee_shm: Constify dma_buf_ops structures.
 
-Ard Biesheuvel (1):
-      arm64: defconfig: add recently added crypto drivers as modules
+Bhumika Goyal (1):
+      tee: optee: add const to tee_driver_ops and tee_desc structures
 
-Arnd Bergmann (34):
-      ARM: s3c24xx: make H1940BT depend on RFKILL
-      Merge tag 'samsung-defconfig-4.14' of git://git.kernel.org/.../krzk/linux into next/defconfig
-      Merge tag 'samsung-defconfig-arm-cleanups-4.14' of git://git.kernel.org/.../krzk/linux into next/defconfig
-      Merge tag 'renesas-defconfig-for-v4.14' of https://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'renesas-arm64-defconfig-for-v4.14' of https://git.kernel.org/.../horms/renesas into next/arm64
-      Merge tag 'mvebu-arm64-4.14-1' of git://git.infradead.org/linux-mvebu into next/arm64
-      Merge tag 'hisi-defconfig-for-4.14' of git://github.com/hisilicon/linux-hisi into next/arm64
-      Merge tag 'sunxi-defconfig-for-4.14' of https://git.kernel.org/.../sunxi/linux into next/defconfig
-      Merge tag 'samsung-soc-4.14' of git://git.kernel.org/.../krzk/linux into next/soc
-      Merge tag 'arm-ep93xx-adc' of https://github.com/sverdlin/linux into next/soc
-      Merge tag 'hisi-fixes-for-4.14' of git://github.com/hisilicon/linux-hisi into next/cleanup
-      Merge tag 'omap-for-v4.14/fixes-not-urgent-dt-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      Merge tag 'renesas-soc-for-v4.14' of https://git.kernel.org/.../horms/renesas into next/soc
-      Merge tag 'omap-for-v4.14/soc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'omap-for-v4.14/debug-ll-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'mvebu-soc-4.14-1' of git://git.infradead.org/linux-mvebu into next/soc
-      Merge tag 'gemini-for-arm-soc-1' of git://git.kernel.org/.../linusw/linux-nomadik into next/soc
-      Merge tag 'omap-for-v4.14/defconfig-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
-      Merge tag 'v4.14-rockchip-soc32-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/soc
-      Merge tag 'keystone_config_4.14' of git://git.kernel.org/.../ssantosh/linux-keystone into next/defconfig
-      Merge tag 'renesas-defconfig2-for-v4.14' of https://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'arm-soc/for-4.14/defconfig' of http://github.com/Broadcom/stblinux into next/defconfig
-      Merge tag 'imx-defconfig-4.14' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
-      Merge tag 'tegra-for-4.14-arm-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
-      Merge tag 'tegra-for-4.14-arm-core' of git://git.kernel.org/.../tegra/linux into next/soc
-      Merge tag 'arm-soc/for-4.14/defconfig-arm64' of http://github.com/Broadcom/stblinux into next/arm64
-      Merge tag 'zte-soc-4.14' of git://git.kernel.org/.../shawnguo/linux into next/arm64
-      Merge tag 'qcom-arm64-defconfig-for-4.14' of git://git.kernel.org/.../agross/linux into next/arm64
-      Merge tag 'omap-for-v4.14/fixes-not-urgent-v2-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      Merge tag 'sunxi-config64-for-4.14' of https://git.kernel.org/.../sunxi/linux into next/arm64
-      Merge tag 'davinci-for-v4.14/defconfig' of git://git.kernel.org/.../nsekhar/linux-davinci into next/defconfig
-      Merge tag 'samsung-soc-4.14-2' of git://git.kernel.org/.../krzk/linux into next/soc
-      Merge tag 'aspeed-4.14-defconfig' of git://git.kernel.org/.../joel/aspeed into next/defconfig
-      Merge tag 'v4.14-rockchip-soc32-2' of git://git.kernel.org/.../mmind/linux-rockchip into next/soc
+Bjorn Andersson (1):
+      soc: qcom: mdt_loader: Use request_firmware_into_buf()
 
-Biju Das (2):
-      ARM: shmobile: defconfig: Enable Ethernet AVB
-      ARM: shmobile: Enable BQ32000 rtc in shmobile_defconfig
+Chen Zhong (1):
+      soc: mediatek: add header files required for MT7622 SCPSYS dt-binding
 
-Chris Paterson (1):
-      ARM: debug-ll: Add support for r8a7743
+David Wang (1):
+      tee: optee: sync with new naming of interrupts
 
-C?dric Le Goater (1):
-      ARM: configs: aspeed: Update Aspeed G4 with VMSPLIT_2G
+Elaine Zhang (3):
+      dt-bindings: power: add RK3366 SoCs header for power-domain
+      dt-bindings: add binding for rk3366 power domains
+      soc: rockchip: power-domain: add power domain support for rk3366
 
-David Lechner (1):
-      ARM: davinci_all_defconfig: enable tinydrm and ST7586
+Eugeniy Paltsev (1):
+      ARC: reset: introduce HSDKv1 reset driver
 
-Dmitry Osipenko (1):
-      ARM: defconfig: tegra: Enable ChipIdea UDC driver
-
-Fabio Estevam (3):
-      ARM: imx_v6_v7_defconfig: Enable SPI_GPIO
-      ARM: imx_v6_v7_defconfig: Enable GPIO_74X164
-      ARM: imx_v6_v7_defconfig: Select the coda driver as module
-
-Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2017-08-07' into defconfig/next
-
-Franklin S Cooper Jr (1):
-      ARM: configs: keystone: Enable D_CAN driver
-
-Geert Uytterhoeven (13):
-      ARM: shmobile: defconfig: Enable missing PCIE_RCAR dependency
-      ARM: shmobile: defconfig: Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
-      ARM: shmobile: defconfig: Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
-      ARM: shmobile: defconfig: Replace DRM_RCAR_HDMI by generic bridge options
-      ARM: shmobile: defconfig: Enable DMA for serial ports
-      ARM: shmobile: defconfig: Refresh
-      ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
-      ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic bridge options
-      ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports
-      ARM: shmobile: rcar-gen2: Obtain jump stub region from DT
-      ARM: shmobile: rcar-gen2: Add support for CPG/MSSR bindings
-      ARM: shmobile: rcar-gen2: Correct arch timer frequency on RZ/G1E
-      ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-
-Guodong Xu (3):
-      arm64: defconfig: enable support hi6421v530 PMIC
-      arm64: defconfig: enable CONFIG_SYSCON_REBOOT_MODE
-      arm64: defconfig: enable support for serial port connected device
-
-Gustavo A. R. Silva (1):
-      soc: versatile: remove unnecessary static in realview_soc_probe()
+Geert Uytterhoeven (4):
+      soc: renesas: Identify R-Car D3
+      soc: renesas: Add r8a77995 SYSC PM Domain Binding Definitions
+      soc: renesas: rcar-sysc: Add support for R-Car D3 power areas
+      soc: renesas: rcar-rst: Add support for R-Car D3
 
 Heiko Stuebner (1):
-      arm64: defconfig: enable rockchip graphics
+      Merge branch 'v4.14-shared/pdids' into v4.14-armsoc/drivers
 
-Jagan Teki (2):
-      arm64: defconfig: Enable MFD_AXP20X_RSB
-      arm64: defconfig: Enable REGULATOR_AXP20X
+Icenowy Zheng (4):
+      dt-bindings: add binding for Allwinner A64 SRAM controller and SRAM C
+      drivers: soc: sunxi: fix error processing on base address when claiming
+      drivers: soc: sunxi: add support for remapping func value to reg value
+      drivers: soc: sunxi: add support for A64 and its SRAM C
 
-Joel Stanley (1):
-      ARM: config: aspeed: Add I2C, VUART, LPC Snoop
+Jagan Teki (1):
+      bus: sunxi-rsb: Enable by default for ARM64
 
-Johan Hovold (1):
-      ARM: OMAP2+: omap_device: drop broken RPM status update from suspend_noirq
+Jens Wiklander (2):
+      tee: optee: fix uninitialized symbol 'parg'
+      tee: indicate privileged dev in gen_caps
 
-John Garry (1):
-      arm64: defconfig: enable SCSI_HISI_SAS_PCI
+Jerome Forissier (1):
+      tee: add forward declaration for struct device
 
-Keiji Hayashibara (1):
-      arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+Katsuhiro Suzuki (3):
+      reset: uniphier: add audio systems reset control
+      reset: uniphier: add video input subsystem reset control
+      reset: uniphier: add analog amplifiers reset control
 
-Kishon Vijay Abraham I (2):
-      bus: omap-ocp2scp: Fix error handling in omap_ocp2scp_probe
-      ARM: OMAP2+: Select PINCTRL_TI_IODELAY for SOC_DRA7XX
+Linus Walleij (1):
+      Revert "reset: Add a Gemini reset controller"
 
-Krzysztof Kozlowski (11):
-      ARM: multi_v7_defconfig: Cleanup from non-existing options
-      ARM: ixp4xx_defconfig: Cleanup from non-existing options
-      ARM: vexpress_defconfig: Cleanup from non-existing options
-      ARM: ezx_defconfig: Cleanup from non-existing options
-      ARM: qcom_defconfig: Cleanup from non-existing options
-      ARM: exynos_defconfig: Enable Bluetooth, mac80211, NFC and more USB drivers
-      ARM: exynos_defconfig: Enable NLS_UTF8 and some crypto algorithms
-      ARM: exynos_defconfig: Enable locking test options
-      ARM: s3c24xx: Remove non-existing CONFIG_CPU_S3C2413
-      ARM: s3c24xx: Remove non-existing SND_SOC_SMDK2443_WM9710
-      ARM: s3c24xx: Do not confuse local define with Kconfig
+Masahiro Yamada (2):
+      reset: uniphier: remove sLD3 SoC support
+      reset: uniphier: do not use per-SoC macro for system reset block
 
-Kuninori Morimoto (1):
-      arm64: defconfig: compile ak4613 and renesas sound as modules
+Neil Armstrong (2):
+      dt-bindings: arm: amlogic: Add SoC information bindings
+      soc: Add Amlogic SoC Information driver
 
-Linus Walleij (4):
-      ARM: gemini: tag the arch as having reset controller
-      ARM: gemini: select the clock controller
-      ARM: gemini: select ARM_AMBA
-      ARM: gemini: select pin controller
+Philipp Zabel (2):
+      reset: make (de)assert report success for self-deasserting reset drivers
+      reset: sunxi: fix number of reset lines
 
-Lokesh Vutla (7):
-      ARM: configs: keystone: Enable MMC and regulators
-      ARM: OMAP2+: board-generic: add support for dra762 family
-      ARM: dra762: Add support for device identification
-      ARM: dra7: hwmod: Register dra76x specific hwmod
-      ARM: dra762: Enable SMP for dra762
-      ARM: OMAP: dra7: powerdomain data: Register SoC specific powerdomains
-      ARM: omap2plus_defconfig: Enable LP87565
+Rob Clark (2):
+      soc: qcom: smsm: fix of_node refcnting problem
+      soc: qcom: wcnss_ctrl: add missing MODULE_DEVICE_TABLE()
 
-Marcin Wojtas (2):
-      arm64: defconfig: enable fine-grained task level IRQ time accounting
-      ARM: mvebu: enable ARM_GLOBAL_TIMER compilation Armada 38x platforms
+Rob Herring (5):
+      soc: samsung: Use kbasename instead of open coding
+      firmware: Convert to using %pOF instead of full_name
+      bus: Convert to using %pOF instead of full_name
+      soc: Convert to using %pOF instead of full_name
+      memory: Convert to using %pOF instead of full_name
 
-Markus Mayer (2):
-      arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
-      ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
+Sean Wang (4):
+      ARM: mediatek: add MT7623a smp bringup code
+      dt-bindings: soc: update the binding document for SCPSYS on MediaTek MT7622 SoC
+      soc: mediatek: reduce code duplication of scpsys_probe across all SoCs
+      soc: mediatek: add SCPSYS power domain driver for MediaTek MT7622 SoC
 
-Maxime Ripard (3):
-      arm: sunxi: refresh the defconfig
-      arm: sunxi: Add additional power supplies
-      arm: sunxi: Add AXP20X_ADC
+Shawn Lin (1):
+      soc: rockchip: disable jtag switching for RK3328 Soc
 
-Nishanth Menon (2):
-      ARM: configs: keystone: Enable Message Manager
-      ARM: configs: keystone: Enable TI-SCI protocol and genpd driver
+Srinivas Kandagatla (1):
+      soc: qcom: bring all qcom drivers into a submenu
 
-Olof Johansson (3):
-      Merge branch 'next/cleanup' into next/soc
-      Merge branch 'next/arm64' into next/soc
-      Merge branch 'next/defconfig' into next/soc
+Sudeep Holla (1):
+      firmware: arm_scpi: fix endianness of dev_id in struct dev_pstate_set
 
-Paul Kocialkowski (3):
-      ARM: tegra: Select appropriate DMA options for LPAE
-      ARM: tegra: Add Tegra I2S interfaces to defconfig
-      ARM: configs: Add Tegra I2S interfaces to multi_v7_defconfig
+Thierry Reding (3):
+      soc/tegra: Register SoC device
+      soc/tegra: Restrict SoC device registration to Tegra
+      soc/tegra: fuse: Add missing semi-colon
 
-Philipp Zabel (1):
-      ARM: rockchip: explicitly request exclusive reset control in smp code
+Timo Alho (1):
+      firmware: tegra: set drvdata earlier
 
-Rob Herring (1):
-      ARM: Convert to using %pOF instead of full_name
+Tuomas Tynkkynen (1):
+      soc/tegra: Fix bad of_node_put() in powergate init
 
-Robert Richter (1):
-      MAINTAINERS: Update Cavium ThunderX2 entry
+Vivek Gautam (1):
+      reset: Add APIs to manage array of resets
 
-Sekhar Nori (4):
-      ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
-      ARM: dts: dra71-evm: workaround incorrect DP83867 RX_CTRL pin strap
-      ARM: dts: dra72-evm-revc: workaround incorrect DP83867 RX_CTRL pin strap
-      ARM: omap2plus_defconfig: enable DP83867 phy driver
-
-Sergei Shtylyov (2):
-      ARM: OMAP3+: PRM: fix of_irq_get() result check
-      ARM: OMAP4+: PRM: fix of_irq_get() result checks
-
-Shawn Guo (2):
-      arm64: select PINCTRL for ZTE platform
-      MAINTAINERS: update ARM/ZTE entry
-
-Stefan Wahren (3):
-      ARM: bcm2835_defconfig: Enable Mini UART console support
-      ARM: bcm2835_defconfig: Increase CMA for VC4
-      ARM: bcm2835_defconfig: Enable wifi driver for RPi Zero W
-
-Steve Longerbeam (1):
-      ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers
-
-Suman Anna (1):
-      ARM: configs: keystone: Enable reset drivers
-
-Sylwester Nawrocki (1):
-      ARM: s3c24xx: Fix NAND ECC mode for mini2440 board
-
-Tao Huang (2):
-      ARM: rockchip: enable ZONE_DMA for non 64-bit capable peripherals
-      ARM: rockchip: select ARCH_DMA_ADDR_T_64BIT for LPAE
-
-Thierry Reding (1):
-      ARM: tegra: Update default configuration for v4.13-rc1
-
-Thomas Petazzoni (1):
-      arm64: defconfig: enable nop-xceiv PHY driver
-
-Tony Lindgren (5):
-      ARM: debug: Use generic 8250 debug_ll for omap2 and omap3/4/5 common uarts
-      ARM: debug: Use generic 8250 debug_ll for omap3/4/5
-      ARM: debug: Use generic 8250 debug_ll for ti81xx
-      ARM: debug: Use generic 8250 debug_ll for am3517 and am335x
-      ARM: OMAP2+: Remove unused legacy code for DMA
-
-Victor Chong (1):
-      arm64: defconfig: enable OP-TEE
-
-Viresh Kumar (1):
-      arm64: defconfig: Enable CONFIG_WQ_POWER_EFFICIENT_DEFAULT
-
-Wang Ruyi (1):
-      arm64: defconfig: enable DMA driver for hi3660
-
-Xiaowei Song (1):
-      arm64: defconfig: enable Kirin PCIe
-
-Yangbo Lu (1):
-      ARM: multi_v7_defconfig: make eSDHC driver built-in
-
-Yunzhi Li (1):
-      ARM: hisi: Fix typo in comment
+tiger-yu99 (1):
+      tee: optee: interruptible RPC sleep
 
 
- .../devicetree/bindings/arm/omap/omap.txt       |   3 +
- MAINTAINERS                                     |  26 +++-
- arch/arm/Kconfig.debug                          |  53 +++++--
- arch/arm/boot/dts/dra71-evm.dts                 |   2 +
- arch/arm/boot/dts/dra72-evm-revc.dts            |   2 +
- arch/arm/configs/aspeed_g4_defconfig            |   5 +-
- arch/arm/configs/aspeed_g5_defconfig            |   4 +-
- arch/arm/configs/bcm2835_defconfig              |   7 +
- arch/arm/configs/davinci_all_defconfig          |   2 +
- arch/arm/configs/exynos_defconfig               |  79 +++++++++-
- arch/arm/configs/ezx_defconfig                  |   1 -
- arch/arm/configs/imx_v6_v7_defconfig            |  15 +-
- arch/arm/configs/ixp4xx_defconfig               |   4 -
- arch/arm/configs/keystone_defconfig             |  13 ++
- arch/arm/configs/multi_v7_defconfig             |  17 +--
- arch/arm/configs/omap2plus_defconfig            |   4 +
- arch/arm/configs/qcom_defconfig                 |   1 -
- arch/arm/configs/shmobile_defconfig             |  18 ++-
- arch/arm/configs/sunxi_defconfig                |  15 +-
- arch/arm/configs/tegra_defconfig                |  12 +-
- arch/arm/configs/vexpress_defconfig             |   1 -
- arch/arm/include/debug/omap2plus.S              | 108 --------------
- arch/arm/kernel/cpuidle.c                       |   4 +-
- arch/arm/kernel/devtree.c                       |   5 +-
- arch/arm/kernel/topology.c                      |   3 +-
- arch/arm/mach-ep93xx/clock.c                    |   8 +
- arch/arm/mach-ep93xx/core.c                     |  24 +++
- arch/arm/mach-ep93xx/edb93xx.c                  |   1 +
- arch/arm/mach-ep93xx/include/mach/platform.h    |   1 +
- arch/arm/mach-ep93xx/soc.h                      |   1 +
- arch/arm/mach-exynos/suspend.c                  |   7 +-
- arch/arm/mach-gemini/Kconfig                    |   5 +
- arch/arm/mach-hisi/platsmp.c                    |   2 +-
- arch/arm/mach-imx/gpc.c                         |   4 +-
- arch/arm/mach-mvebu/Kconfig                     |   2 +
- arch/arm/mach-mvebu/kirkwood.c                  |   3 +-
- arch/arm/mach-omap2/Kconfig                     |   1 +
- arch/arm/mach-omap2/board-generic.c             |   1 +
- arch/arm/mach-omap2/dma.c                       | 148 +------------------
- arch/arm/mach-omap2/id.c                        |   9 ++
- arch/arm/mach-omap2/omap-smp.c                  |   4 +-
- arch/arm/mach-omap2/omap-wakeupgen.c            |   4 +-
- arch/arm/mach-omap2/omap_device.c               |  10 --
- arch/arm/mach-omap2/omap_hwmod.c                |   4 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c       |  11 +-
- arch/arm/mach-omap2/pdata-quirks.c              |  31 ++++
- arch/arm/mach-omap2/powerdomains7xx_data.c      |  33 ++++-
- arch/arm/mach-omap2/prm3xxx.c                   |   2 +-
- arch/arm/mach-omap2/prm44xx.c                   |   4 +-
- arch/arm/mach-omap2/soc.h                       |   5 +
- arch/arm/mach-rockchip/Kconfig                  |   2 +
- arch/arm/mach-rockchip/platsmp.c                |   6 +-
- arch/arm/mach-s3c24xx/Kconfig                   |   2 +-
- arch/arm/mach-s3c24xx/common.c                  |   2 +-
- arch/arm/mach-s3c24xx/include/mach/regs-clock.h |   4 +-
- arch/arm/mach-s3c24xx/mach-mini2440.c           |   2 +-
- arch/arm/mach-s3c24xx/mach-smdk2443.c           |   8 -
- arch/arm/mach-s3c24xx/sleep.S                   |  11 +-
- arch/arm/mach-shmobile/Kconfig                  |   4 -
- arch/arm/mach-shmobile/pm-rcar-gen2.c           |  33 ++++-
- arch/arm/mach-shmobile/pm-rmobile.c             |   7 +-
- arch/arm/mach-shmobile/setup-rcar-gen2.c        |  21 ++-
- arch/arm/mach-tegra/Kconfig                     |   2 +
- arch/arm/plat-samsung/include/plat/map-s3c.h    |   2 +-
- arch/arm64/Kconfig.platforms                    |   1 +
- arch/arm64/configs/defconfig                    |  40 ++++-
- drivers/bus/omap-ocp2scp.c                      |   9 +-
- drivers/soc/versatile/soc-realview.c            |   2 +-
- include/linux/platform_data/hsmmc-omap.h        |   3 +
- 69 files changed, 494 insertions(+), 396 deletions(-)
+ .../devicetree/bindings/arm/amlogic.txt         |  29 +++
+ .../bindings/power/renesas,rcar-sysc.txt        |   1 +
+ .../devicetree/bindings/reset/renesas,rst.txt   |   1 +
+ .../bindings/reset/uniphier-reset.txt           |  27 +-
+ .../devicetree/bindings/soc/mediatek/scpsys.txt |   3 +
+ .../bindings/soc/rockchip/power_domain.txt      |   3 +
+ .../devicetree/bindings/sram/sunxi-sram.txt     |   9 +-
+ MAINTAINERS                                     |   7 +
+ arch/arm/mach-mediatek/mediatek.c               |   2 +
+ arch/arm/mach-mediatek/platsmp.c                |   1 +
+ arch/arm/mach-tegra/tegra.c                     |  29 +--
+ drivers/bus/Kconfig                             |   2 +-
+ drivers/bus/arm-cci.c                           |  12 +-
+ drivers/bus/imx-weim.c                          |   8 +-
+ drivers/bus/sunxi-rsb.c                         |  22 +-
+ drivers/firmware/arm_scpi.c                     |   4 +-
+ drivers/firmware/psci.c                         |   4 +-
+ drivers/firmware/tegra/bpmp.c                   |   4 +-
+ drivers/memory/atmel-ebi.c                      |  17 +-
+ drivers/memory/jz4780-nemc.c                    |  12 +-
+ drivers/memory/mvebu-devbus.c                   |  12 +-
+ drivers/memory/omap-gpmc.c                      |  16 +-
+ drivers/reset/Kconfig                           |   9 +-
+ drivers/reset/Makefile                          |   2 +-
+ drivers/reset/core.c                            | 238 +++++++++++++++++-
+ drivers/reset/reset-gemini.c                    | 110 ---------
+ drivers/reset/reset-hsdk-v1.c                   | 137 ++++++++++
+ drivers/reset/reset-sunxi.c                     |   4 +-
+ drivers/reset/reset-uniphier.c                  | 117 ++++-----
+ drivers/reset/reset-zx2967.c                    |   2 +-
+ drivers/soc/Kconfig                             |   1 +
+ drivers/soc/Makefile                            |   1 +
+ drivers/soc/amlogic/Kconfig                     |  12 +
+ drivers/soc/amlogic/Makefile                    |   1 +
+ drivers/soc/amlogic/meson-gx-socinfo.c          | 177 +++++++++++++
+ drivers/soc/fsl/qbman/bman_ccsr.c               |  10 +-
+ drivers/soc/fsl/qbman/bman_portal.c             |   8 +-
+ drivers/soc/fsl/qbman/qman_ccsr.c               |  12 +-
+ drivers/soc/fsl/qbman/qman_portal.c             |  11 +-
+ drivers/soc/fsl/qe/gpio.c                       |   4 +-
+ drivers/soc/mediatek/mtk-pmic-wrap.c            |  10 +-
+ drivers/soc/mediatek/mtk-scpsys.c               | 247 +++++++++++--------
+ drivers/soc/qcom/Kconfig                        |   4 +
+ drivers/soc/qcom/mdt_loader.c                   |   5 +-
+ drivers/soc/qcom/smsm.c                         |   3 +-
+ drivers/soc/qcom/wcnss_ctrl.c                   |   1 +
+ drivers/soc/renesas/Kconfig                     |   7 +-
+ drivers/soc/renesas/Makefile                    |   1 +
+ drivers/soc/renesas/r8a77995-sysc.c             |  31 +++
+ drivers/soc/renesas/rcar-rst.c                  |   5 +-
+ drivers/soc/renesas/rcar-sysc.c                 |   9 +-
+ drivers/soc/renesas/rcar-sysc.h                 |   1 +
+ drivers/soc/renesas/renesas-soc.c               |   8 +
+ drivers/soc/rockchip/grf.c                      |  14 ++
+ drivers/soc/rockchip/pm_domains.c               |  32 +++
+ drivers/soc/samsung/pm_domains.c                |  10 +-
+ drivers/soc/sunxi/sunxi_sram.c                  |  57 ++++-
+ drivers/soc/tegra/Kconfig                       |   5 +
+ drivers/soc/tegra/fuse/fuse-tegra.c             |  56 ++++-
+ drivers/soc/tegra/pmc.c                         |   4 +-
+ drivers/tee/optee/core.c                        |  19 +-
+ drivers/tee/optee/optee_smc.h                   |  12 +-
+ drivers/tee/optee/rpc.c                         |  15 +-
+ drivers/tee/tee_core.c                          |   5 +
+ drivers/tee/tee_shm.c                           |   2 +-
+ include/dt-bindings/power/mt7622-power.h        |  22 ++
+ include/dt-bindings/power/r8a77995-sysc.h       |  23 ++
+ include/dt-bindings/power/rk3366-power.h        |  24 ++
+ include/dt-bindings/reset/snps,hsdk-v1-reset.h  |  17 ++
+ include/linux/reset.h                           |  68 +++++
+ include/linux/soc/mediatek/infracfg.h           |   7 +
+ include/linux/tee_drv.h                         |   1 +
+ include/soc/tegra/fuse.h                        |   2 +
+ include/uapi/linux/tee.h                        |   1 +
+ 74 files changed, 1347 insertions(+), 462 deletions(-)
+ delete mode 100644 drivers/reset/reset-gemini.c
+ create mode 100644 drivers/reset/reset-hsdk-v1.c
+ create mode 100644 drivers/soc/amlogic/Kconfig
+ create mode 100644 drivers/soc/amlogic/Makefile
+ create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
+ create mode 100644 drivers/soc/renesas/r8a77995-sysc.c
+ create mode 100644 include/dt-bindings/power/mt7622-power.h
+ create mode 100644 include/dt-bindings/power/r8a77995-sysc.h
+ create mode 100644 include/dt-bindings/power/rk3366-power.h
+ create mode 100644 include/dt-bindings/reset/snps,hsdk-v1-reset.h
