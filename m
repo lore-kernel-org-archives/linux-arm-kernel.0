@@ -1,43 +1,45 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 11 Sep 2017 11:55:22 +0000
-Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20170831160430.GB11200@kroah.com>
-References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
- <20170831160430.GB11200@kroah.com>
-Message-ID: <VI1PR0401MB185602CC352A4026BCD875CAEC680@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 11 Sep 2017 14:00:09 +0200
+Subject: [PATCH net-next 2/3] net: ethernet: socionext: add AVE ethernet
+ driver
+In-Reply-To: <20170911155047.6717.4A936039@socionext.com>
+References: <1504875731-3680-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <20170908135030.GA25219@lunn.ch>
+ <20170911155047.6717.4A936039@socionext.com>
+Message-ID: <20170911120009.GA24174@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Thursday, August 31, 2017 7:05 PM
+> > > +static irqreturn_t ave_interrupt(int irq, void *netdev)
+> > > +{
+> > > +	struct net_device *ndev = (struct net_device *)netdev;
+> > > +	struct ave_private *priv = netdev_priv(ndev);
+> > > +	u32 gimr_val, gisr_val;
+> > > +
+> > > +	gimr_val = ave_irq_disable_all(ndev);
+> > > +
+> > > +	/* get interrupt status */
+> > > +	gisr_val = ave_r32(ndev, AVE_GISR);
+> > > +
+> > > +	/* PHY */
+> > > +	if (gisr_val & AVE_GI_PHY) {
+> > > +		ave_w32(ndev, AVE_GISR, AVE_GI_PHY);
+> > > +		if (priv->internal_phy_interrupt)
+> > > +			phy_mac_interrupt(ndev->phydev, ndev->phydev->link);
+> > 
+> > Humm. I don't think this is correct. You are supposed to give it the
+> > new link state, not the old.
+> > 
+> > What does a PHY interrupt mean here? 
 > 
-> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
-> > From: Stuart Yoder <stuart.yoder@nxp.com>
-> >
-> > Move the source files out of staging into their final locations:
-> >   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
-> >   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
-> >   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
-> >   -README.txt, providing and overview of DPAA goes to
-> >    Documentation/dpaa2/overview.txt
-> >
-> > Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
-> > Update dpaa2_eth and dpio staging drivers.
-> >
-> > Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
-> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> > [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> In the general case, I think PHY events like changing link state are transmitted
+> to CPU as interrupt via interrupt controller, then PHY driver itself can handle
+> the interrupt.
 > 
-> This is going to have to wait until I get a chunk of time to do the review.
-> Probably after 4.13-final is out.
+> And in this case, PHY events are transmitted to MAC as one of its interrupt factor,
+> then I thought that MAC driver had to tell the events to PHY.
 
-Any updates on this? Any chances to make it in 4.14? Thanks!
+Could this be in-band SGMI signalling from the PHY to the MAC? Does
+the documentation give examples of when this interrupt will happen?
 
----
-Best Regards, Laurentiu
+    Andrew
