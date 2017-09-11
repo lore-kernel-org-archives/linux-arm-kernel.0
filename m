@@ -1,25 +1,43 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 11 Sep 2017 21:34:41 +0200
-Subject: [media] s5p-mfc: Delete an error message for a failed memory
- allocation in s5p_mfc_probe()
-In-Reply-To: <ccf6b04a-6e8a-231c-f456-0b37ba350acc@samsung.com>
-References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
- <ff8f7dcd-c3e8-2a12-c0db-997b514f5d94@users.sourceforge.net>
- <CGME20170911091439epcas1p3f8b62f55cae4255d250b1fe990fbf1ff@epcas1p3.samsung.com>
- <ccf6b04a-6e8a-231c-f456-0b37ba350acc@samsung.com>
-Message-ID: <2c99c46b-8798-7de1-5584-e979699db747@users.sourceforge.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Sep 2017 21:37:16 +0200
+Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
+In-Reply-To: <CAMuHMdXabvax2Wru8j+MC4X5F+z5hoUo1tEbX+zn2AUW6QENVA@mail.gmail.com>
+References: <20170910214424.14945-1-linus.walleij@linaro.org>
+ <20170910214424.14945-2-linus.walleij@linaro.org>
+ <CAMuHMdXabvax2Wru8j+MC4X5F+z5hoUo1tEbX+zn2AUW6QENVA@mail.gmail.com>
+Message-ID: <CACRpkdb4LQAqyWpRAWGRxUOcTbWVksNc3FTWdPnYNE-AUHtfgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Could you make the commit summary shorter, to keep it
-> below 70 characters [1]? With that changed feel free to add
-> 
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-?
-> [1] Documentation/process/submitting-patches.rst
+On Mon, Sep 11, 2017 at 1:27 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Sun, Sep 10, 2017 at 11:44 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> This converts the GPIO-based I2C-driver to using GPIO
+>> descriptors instead of the old global numberspace-based
+>> GPIO interface. We:
+>>
+>> - Convert the driver to unconditionally grab two GPIOs
+>>   from the device by index 0 (SDA) and 1 (SCL) which
+>>   will work fine with device tree and descriptor tables.
+>>   The existing device trees will continue to work just
+>>   like before, but without any roundtrip through the
+>>   global numberspace.
+>
+> FYI, I recently posted a series to deprecate (at least for DT) this error
+> prone indexing, in favor of using named GPIOs:
+>
+>     [PATCH/RFC 0/3] i2c: gpio: Add support for named gpios in DT
+>     http://www.spinics.net/lists/devicetree/msg191936.html
 
-Will it be sufficient that a patch committer will adjust
-the summary phrase a bit?
+Nice.
 
-Regards,
-Markus
+If Wolfram likes this series, I volunteer to rebase your patch
+(oh well rewrite patch 2 from scratch, haha) on top of it as well
+so he can apply the whole thing.
+
+They will need some adjustments, I volunteer to do them.
+Will provide feedback in the patches.
+
+Yours.
+Linus Walleij
