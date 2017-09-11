@@ -1,30 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 11 Sep 2017 09:57:38 +0200
-Subject: [PATCH] dt-bindings: qspi: Add r8a7743/5 to the compatible list
-In-Reply-To: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdXjQHMH=jUkL9eaHzwGOTxKN9Zqpkcwoyrvzif0Z87-Xg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 11 Sep 2017 13:35:02 +0530
+Subject: [PATCH] davinci: Add cpufreq support when booting with device tree
+In-Reply-To: <1504958709-23357-1-git-send-email-aford173@gmail.com>
+References: <1504958709-23357-1-git-send-email-aford173@gmail.com>
+Message-ID: <8f8633af-75a2-674f-9301-3876d72e84d9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 8, 2017 at 10:07 AM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
+Hi Adam,
 
-The oneline summary should be
+On Saturday 09 September 2017 05:35 PM, Adam Ford wrote:
+> While cpufreq itself doesn't appear to directly support the
+> device tree, we can register it inside da850_init_machine
+> when we register other devices.
+> 
+> Signed-off-by: Adam Ford <aford173@gmail.com>
 
-"dt-bindings: spi: rspi: Add r8a7743/5 to the compatible list"
+There is an OPP-based, DT-enabled cpufreq driver available. Please see
+support in drivers/cpufreq/cpufreq-dt-platdev.c
 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+We should use that instead of this platform specific hack.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Looking at Documentation/devicetree/bindings/opp/opp.txt, it seems like
+we should use the v2 bindings from the start. They do have useful
+features like disabling certain OPPs on certain parts depending on the
+parametrics[1]
 
-Gr{oetje,eeting}s,
+Thanks,
+Sekhar
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[1] http://www.ti.com/product/AM1808#parametrics
