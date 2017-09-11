@@ -1,75 +1,37 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 11 Sep 2017 23:55:27 +0800
-Subject: [PATCH 2/4] ARM: sun8i: h3/h5: add DE2 CCU device node for H3
+Date: Mon, 11 Sep 2017 23:55:28 +0800
+Subject: [PATCH 3/4] arm64: allwinner: h5: add compatible string for DE2 CCU
 In-Reply-To: <20170911155529.62891-1-icenowy@aosc.io>
 References: <20170911155529.62891-1-icenowy@aosc.io>
-Message-ID: <20170911155529.62891-3-icenowy@aosc.io>
+Message-ID: <20170911155529.62891-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DE2 in H3/H5 has a clock control unit in it, and the behavior is
-slightly different between H3 and H5.
+The DE2 CCU on Allwinner H5 SoC has a slightly different behavior than
+the one on H3, so the compatible string is not set in the common DTSI
+file.
 
-Add the common parts in H3/H5 DTSI, and add the compatible string in H3
-DTSI.
-
-The compatible string of H5 DE2 CCU will be added in a separated patch.
+Add the compatible string of H5 DE2 CCU in H5 DTSI file.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi    |  4 ++++
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 14 ++++++++++++++
- 2 files changed, 18 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index b36f9f423c39..a8a1db79f362 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -85,6 +85,10 @@
- 	compatible = "allwinner,sun8i-h3-ccu";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+index d9a720bff05d..e237c05cfdb4 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+@@ -98,6 +98,10 @@
+ 	compatible = "allwinner,sun50i-h5-ccu";
  };
  
 +&display_clocks {
-+	compatible = "allwinner,sun8i-a83t-de2-clk";
++	compatible = "allwinner,sun50i-h5-de2-clk";
 +};
 +
  &mmc0 {
- 	compatible = "allwinner,sun7i-a20-mmc";
- 	clocks = <&ccu CLK_BUS_MMC0>,
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 11240a8313c2..76a4cbc99bdb 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -40,9 +40,11 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include <dt-bindings/clock/sun8i-de2.h>
- #include <dt-bindings/clock/sun8i-h3-ccu.h>
- #include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
- #include <dt-bindings/reset/sun8i-h3-ccu.h>
- #include <dt-bindings/reset/sun8i-r-ccu.h>
- 
-@@ -85,6 +87,18 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		display_clocks: clock at 1000000 {
-+			/* compatible is in per SoC .dtsi file */
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-h3-system-controller",
- 				"syscon";
+ 	compatible = "allwinner,sun50i-h5-mmc",
+ 		     "allwinner,sun50i-a64-mmc";
 -- 
 2.13.5
