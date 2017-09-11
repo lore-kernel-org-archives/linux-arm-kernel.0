@@ -1,55 +1,38 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 11 Sep 2017 12:05:22 +0100
-Subject: [PATCH v11 2/4] ACPI: parse SPCR and enable matching console
-In-Reply-To: <mvmzia1bnvu.fsf@suse.de>
-References: <20160927151953.GB4371@kroah.com>
- <20160927205418.31529-1-aleksey.makarov@linaro.org>
- <20160927205418.31529-2-aleksey.makarov@linaro.org>
- <mvmzia1bnvu.fsf@suse.de>
-Message-ID: <20170911110522.vwgwnohjrrj2twtk@bivouac.eciton.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Sep 2017 08:25:31 -0300
+Subject: [PATCH v4 4/6] ARM: dts: imx6dl-icore: Add LVDS support
+In-Reply-To: <1505121145-9507-4-git-send-email-jteki@openedev.com>
+References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
+ <1505121145-9507-4-git-send-email-jteki@openedev.com>
+Message-ID: <CAOMZO5B0RAjdupLSe=S+tDEA-hpf-Si_4qjkcKC_ECX86PLScQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm afraid Aleksey is no longer assigned to Linaro (you will probably
-have seen a bounce).
+Hi Jagan,
 
-On Mon, Sep 11, 2017 at 11:11:49AM +0200, Andreas Schwab wrote:
-> On Sep 27 2016, Aleksey Makarov <aleksey.makarov@linaro.org> wrote:
-> 
-> > 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
-> > Console Redirection Table) [2] as a mandatory ACPI table that
-> > specifies the configuration of serial console.
-> >
-> > Defer initialization of DT earlycon until ACPI/DT decision is made.
-> >
-> > Parse the ACPI SPCR table, setup earlycon if required,
-> > enable specified console.
-> 
-> How can I tell the kernel to ignore this table and use the console on
-> the command line instead?
+On Mon, Sep 11, 2017 at 6:12 AM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
 
-I guess we could just ignore the table completely
-	if (console_set_on_cmdline)
-like its counterpart in of_console_check().
+> +&ldb {
+> +       status = "okay";
+> +
+> +       lvds-channel at 0 {
+> +               fsl,data-mapping = "spwg";
+> +               fsl,data-width = <18>;
+> +               status = "okay";
+> +
+> +               display-timings {
+> +                       native-mode = <&timing0>;
+> +                       timing0: timing0 {
+> +                               clock-frequency = <60000000>;
+> +                               hactive = <800>;
+> +                               vactive = <480>;
+> +                               hback-porch = <30>;
+> +                               hfront-porch = <30>;
+> +                               vback-porch = <5>;
+> +                               vfront-porch = <5>;
+> +                               hsync-len = <64>;
+> +                               vsync-len = <20>;
 
-Like so (not tested beyond compile testing):
+Please add the support of this panel to drivers/gpu/drm/panel/panel-simple.c.
 
-diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-index 324b35bfe781..c3cf0f1ebb8f 100644
---- a/drivers/acpi/spcr.c
-+++ b/drivers/acpi/spcr.c
-@@ -96,6 +96,9 @@ int __init parse_spcr(bool earlycon)
-        int baud_rate;
-	        int err;
-
-+       if (console_set_on_cmdline)
-+               return 0;
-+
-        if (acpi_disabled)
-	                return -ENODEV;
-
-Are you asking because you want to use a different console in a lab
-setup or because there are issues with SPCR on your platform?
-
-/
-    Leif
+Then you can refer its compatible in your board dts.
