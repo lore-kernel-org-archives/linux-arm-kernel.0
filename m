@@ -1,87 +1,73 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 11 Sep 2017 15:36:53 +0800
-Subject: [PATCH 1/1] clk: bulk: add of_clk_bulk_get()
-Message-ID: <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon, 11 Sep 2017 16:48:03 +0900
+Subject: [PATCH net-next 3/3] net: phy: realtek: add RTL8201F phy-id and
+ functions
+In-Reply-To: <20170909155517.GB19117@lunn.ch>
+References: <CAJe_ZhciWBhw5npxEjTUGw2duS7DSfhzP5nzAOy_ig4-1XcPWw@mail.gmail.com>
+ <20170909155517.GB19117@lunn.ch>
+Message-ID: <20170911164803.6720.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
-here to handle this for DT users without 'clock-names' specified.
+Hi Andrew,
+Thank your for reviewing.
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Reported-by: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+On Sat, 9 Sep 2017 17:55:17 +0200 <andrew@lunn.ch> wrote:
+
+> On Sat, Sep 09, 2017 at 09:03:05AM +0530, Jassi Brar wrote:
+> > On 9 September 2017 at 00:21, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > > On 09/08/2017 06:02 AM, Kunihiko Hayashi wrote:
+> > >> From: Jassi Brar <jaswinder.singh@linaro.org>
+> > >>
+> > >> Add RTL8201F phy-id and the related functions to the driver.
+> > >>
+> > >> The original patch is as follows:
+> > >> https://patchwork.kernel.org/patch/2538341/
+> > >>
+> > >> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+> > >> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> > >> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > >> ---
+> > >>  drivers/net/phy/realtek.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+> > >>  1 file changed, 45 insertions(+)
+> > >>
+> > >> diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
+> > >> index 9cbe645..d9974ce 100644
+> > >> --- a/drivers/net/phy/realtek.c
+> > >> +++ b/drivers/net/phy/realtek.c
+> > >> @@ -29,10 +29,23 @@
+> > >>  #define RTL8211F_PAGE_SELECT 0x1f
+> > >>  #define RTL8211F_TX_DELAY    0x100
+> > >>
+> > >> +#define RTL8201F_ISR         0x1e
+> > >> +#define RTL8201F_PAGE_SELECT 0x1f
+> > >
+> > > We have a page select register define for the RTL8211F right above, so
+> > > surely we can make that a common definition?
+> > >
+> > That is just for the sake of consistency.
+> > I mean RTL8211 wouldn't look neat among everything else RTL8201.
+> > 
+> > Also the page-select offsets just _happen_ to be same value...
+> 
+> If you look at all the other supported PHYs, they all consistently use
+> the same page register across models. Marvell is always 22, mscc is
+> always 31, vitesse is always 31.
+> 
+> I would say it is a safe bet that all realtek PHYs will use 0x1f for
+> page select. So please add a patch which renames RTL8211F_PAGE_SELECT
+> to RTL821x_PAGE_SELECT.
+> 
+> It is best to do this now. I spent a while cleaning up the mess the
+> Marvell driver had got into with its page select code. Lots of
+> duplicate code and defines doing the same thing.
+> 
+> 	  Andrew
+
+I see. In case of renaming to RTL821x_PAGE_SELECT, 
+I think that I'll make a patch series as realtek PHY series including this
+patch independent from the series of MAC driver.
+
 ---
- drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
- include/linux/clk.h    |  8 ++++++++
- 2 files changed, 39 insertions(+)
-
-diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-index c834f5a..3179f28 100644
---- a/drivers/clk/clk-bulk.c
-+++ b/drivers/clk/clk-bulk.c
-@@ -19,6 +19,37 @@
- #include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/export.h>
-+#include <linux/of.h>
-+
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks)
-+{
-+	int ret;
-+	int i;
-+
-+	for (i = 0; i < num_clks; i++)
-+		clks[i].clk = NULL;
-+
-+	for (i = 0; i < num_clks; i++) {
-+		clks[i].clk = of_clk_get(np, i);
-+		if (IS_ERR(clks[i].clk)) {
-+			ret = PTR_ERR(clks[i].clk);
-+			pr_err("%s: Failed to get clk index: %d ret: %d\n",
-+			       np->full_name, i, ret);
-+			clks[i].clk = NULL;
-+			goto err;
-+		}
-+	}
-+
-+	return 0;
-+
-+err:
-+	clk_bulk_put(i, clks);
-+
-+	return ret;
-+}
-+#endif
- 
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 91bd464..c5281b3 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -658,10 +658,18 @@ static inline void clk_disable_unprepare(struct clk *clk)
- }
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks);
- struct clk *of_clk_get(struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-+static int of_clk_bulk_get(struct device_node *np, int num_clks,
-+			   struct clk_bulk_data *clks)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
-+
- static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
--- 
-2.7.4
+Best Regards,
+Kunihiko Hayashi
