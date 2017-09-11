@@ -1,43 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Sep 2017 21:37:16 +0200
-Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
-In-Reply-To: <CAMuHMdXabvax2Wru8j+MC4X5F+z5hoUo1tEbX+zn2AUW6QENVA@mail.gmail.com>
-References: <20170910214424.14945-1-linus.walleij@linaro.org>
- <20170910214424.14945-2-linus.walleij@linaro.org>
- <CAMuHMdXabvax2Wru8j+MC4X5F+z5hoUo1tEbX+zn2AUW6QENVA@mail.gmail.com>
-Message-ID: <CACRpkdb4LQAqyWpRAWGRxUOcTbWVksNc3FTWdPnYNE-AUHtfgg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Sep 2017 22:00:57 +0200
+Subject: [PATCH] scsi: acornscsi: fix build error
+Message-ID: <20170911200115.3119398-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 11, 2017 at 1:27 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Sun, Sep 10, 2017 at 11:44 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->> This converts the GPIO-based I2C-driver to using GPIO
->> descriptors instead of the old global numberspace-based
->> GPIO interface. We:
->>
->> - Convert the driver to unconditionally grab two GPIOs
->>   from the device by index 0 (SDA) and 1 (SCL) which
->>   will work fine with device tree and descriptor tables.
->>   The existing device trees will continue to work just
->>   like before, but without any roundtrip through the
->>   global numberspace.
->
-> FYI, I recently posted a series to deprecate (at least for DT) this error
-> prone indexing, in favor of using named GPIOs:
->
->     [PATCH/RFC 0/3] i2c: gpio: Add support for named gpios in DT
->     http://www.spinics.net/lists/devicetree/msg191936.html
+A cleanup patch introduced a fatal typo from inbalanced curly
+braces:
 
-Nice.
+drivers/scsi/arm/acornscsi.c: In function 'acornscsi_host_reset':
+drivers/scsi/arm/acornscsi.c:2773:1: error: ISO C90 forbids mixed declarations and code [-Werror=declaration-after-statement]
+drivers/scsi/arm/acornscsi.c:2795:12: error: invalid storage class for function 'acornscsi_show_info'
+ static int acornscsi_show_info(struct seq_file *m, struct Scsi_Host *instance)
 
-If Wolfram likes this series, I volunteer to rebase your patch
-(oh well rewrite patch 2 from scratch, haha) on top of it as well
-so he can apply the whole thing.
+The same patch incorrectly changed the argument type of the reset
+handler, as shown by this warning:
 
-They will need some adjustments, I volunteer to do them.
-Will provide feedback in the patches.
+drivers/scsi/arm/acornscsi.c:2888:27: error: initialization of 'int (*)(struct scsi_cmnd *)' from incompatible pointer type 'int (*)(struct Scsi_Host *)' [-Werror=incompatible-pointer-types]
+  .eh_host_reset_handler = acornscsi_host_reset,
 
-Yours.
-Linus Walleij
+This removes one the extraneous opening brace and reverts the
+argument type change.
+
+Fixes: 74fa80ee3fae ("scsi: acornscsi: move bus reset to host reset")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/scsi/arm/acornscsi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
+index 690816f3c6af..8d54283a99b2 100644
+--- a/drivers/scsi/arm/acornscsi.c
++++ b/drivers/scsi/arm/acornscsi.c
+@@ -2725,9 +2725,9 @@ int acornscsi_abort(struct scsi_cmnd *SCpnt)
+  * Params   : SCpnt  - command causing reset
+  * Returns  : one of SCSI_RESET_ macros
+  */
+-int acornscsi_host_reset(struct Scsi_Host *shpnt)
++int acornscsi_host_reset(struct scsi_cmnd *SCpnt)
+ {
+-	AS_Host *host = (AS_Host *)shpnt->hostdata;
++	AS_Host *host = (AS_Host *)SCpnt->device->host->hostdata;
+ 	struct scsi_cmnd *SCptr;
+     
+     host->stats.resets += 1;
+@@ -2741,7 +2741,7 @@ int acornscsi_host_reset(struct Scsi_Host *shpnt)
+ 
+ 	printk(KERN_WARNING "acornscsi_reset: ");
+ 	print_sbic_status(asr, ssr, host->scsi.phase);
+-	for (devidx = 0; devidx < 9; devidx ++) {
++	for (devidx = 0; devidx < 9; devidx ++)
+ 	    acornscsi_dumplog(host, devidx);
+     }
+ #endif
+-- 
+2.9.0
