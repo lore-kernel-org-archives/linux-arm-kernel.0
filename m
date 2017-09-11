@@ -1,55 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 11 Sep 2017 13:57:46 +0800
-Subject: [PATCH] clk: bulk: call of_clk_get() when id is NULL
-In-Reply-To: <AM3PR04MB3065706564AA81D56E03E4580680@AM3PR04MB306.eurprd04.prod.outlook.com>
-References: <1502243442-28055-1-git-send-email-shawnguo@kernel.org>
- <20170809173318.GD2146@codeaurora.org>
- <20170813141851.GD31819@dragon>
- <AM3PR04MB3064504A935B4AA0CBEE962809C0@AM3PR04MB306.eurprd04.prod.outlook.com>
- <20170831052630.GU21656@codeaurora.org>
- <AM3PR04MB3065706564AA81D56E03E4580680@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <20170911055745.GF3787@dragon>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 11 Sep 2017 11:52:28 +0530
+Subject: [PATCH RFC] davinci: da850: define edma-memcpy-channels
+In-Reply-To: <1504960117-24264-1-git-send-email-aford173@gmail.com>
+References: <1504960117-24264-1-git-send-email-aford173@gmail.com>
+Message-ID: <54b0fb00-0337-522a-d66a-6506f60a3679@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 11, 2017 at 04:51:28AM +0000, A.s. Dong wrote:
-> Hi Shawn,
-> 
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> > Sent: Thursday, August 31, 2017 1:27 PM
-> > To: A.s. Dong
-> > Cc: Shawn Guo; Michael Turquette; linux-clk at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; Shawn Guo
-> > Subject: Re: [PATCH] clk: bulk: call of_clk_get() when id is NULL
-> > 
-> > On 08/30, A.s. Dong wrote:
-> 
-> [...]
-> 
-> > > Flags may be better used for extending per clk feature support in the
-> > future.
-> > >
-> > > IMHO how about implement a of_clk_bulk_get() to handle this issue as
-> > > we already have a of_clk_get?
-> > > e.g.
-> > >
-> > > int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-> > >                               struct clk_bulk_data *clks) {
-> > >         for (i = 0; i < num_clks; i++) {
-> > >                 clks[i].clk = of_clk_get(dev, clks[i].id); ...
-> > >
-> > > }
-> > >
-> > > Then it's less intrusive.
-> > >
-> > 
-> > This looks ok too. Go ahead and send this version instead.
-> > 
-> 
-> I did not see you send a update version.
-> If you will not do it, would you mind me to help send it with a Reported-by: tag from you?
+Hi Adam,
 
-Sure, go ahead.
+On Saturday 09 September 2017 05:58 PM, Adam Ford wrote:
+> When booting with a device tree, message appears:
+>    memcpy is disabled
+> When reading through the bindings for eDMA3, it shows that
+> ti,edma-memcpy-channels is an optional property, but the example
+> binding uses it.
+> 
+> RFC:  I'll be the first to admit that I don't understand what
+> this is doing, but it seems like a DMA enabled memcpy would
+> improve performance.  Is this appropriate for da850?  Since there
+> are two eDMA3-tpcc controllers, is there a set of channels we can
+> use for each?
+> 
+> Signed-off-by: Adam Ford <aford173@gmail.com>
 
-Shawn
+This enables DMA-based memcpy (see drivers/dma/dmaetest.c for example).
+But does not accelerate any memcpy in kernel automatically.
+
+If this is done, it should be done in a board specific manner because
+the available channels you pick up for memcpy support can change from
+board to board.
+
+Thanks,
+Sekhar
