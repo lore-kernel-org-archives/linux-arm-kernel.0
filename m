@@ -1,273 +1,89 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 11 Sep 2017 11:01:34 +0200
-Subject: [PATCH v3 01/11] iio: Add hardware consumer support
-In-Reply-To: <2f1ea8dc-ff6b-3526-bc9e-50dde1ae9a66@st.com>
-References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
- <1489759704-30217-2-git-send-email-arnaud.pouliquen@st.com>
- <2f1ea8dc-ff6b-3526-bc9e-50dde1ae9a66@st.com>
-Message-ID: <eea6504a-314f-3d30-ec5a-e42e8a2e24f6@st.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 11 Sep 2017 17:13:58 +0800
+Subject: [PATCH 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <f9b6af8e-6d1b-702d-40e0-944f5ecedf8a@samsung.com>
+References: <CGME20170911074100epcas2p15480963b2119f8954784f9b37ed8d26d@epcas2p1.samsung.com>
+ <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
+ <f9b6af8e-6d1b-702d-40e0-944f5ecedf8a@samsung.com>
+Message-ID: <20170911091358.GC19297@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lars,
-
-New gentlemen Reminder.
-
-I suppose that you have to treat a lot of subjects with more priority
-than this one, but on my side I'm starting to have a lot of pressure
-from project, as STM32 DFSDM upstream is blocked since close to 6 months.
-
-As you proposed the interface, I would be fair you could push it for
-upstream this month.
-
-If you don't have time for this, another solution could be that I push
-it for you.
-Please tell me your preference.
-
-Regards,
-Arnaud
-
-
-On 06/06/2017 12:15 PM, Arnaud Pouliquen wrote:
-> Hello Lars,
+On Mon, Sep 11, 2017 at 10:58:19AM +0200, Sylwester Nawrocki wrote:
+> On 09/11/2017 09:36 AM, Dong Aisheng wrote:
+> >'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
+> >here to handle this for DT users without 'clock-names' specified.
+> >
+> >Cc: Stephen Boyd <sboyd@codeaurora.org>
+> >Cc: Michael Turquette <mturquette@baylibre.com>
+> >Cc: Russell King <linux@arm.linux.org.uk>
+> >Reported-by: Shawn Guo <shawnguo@kernel.org>
+> >Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >---
+> >  drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
+> >  include/linux/clk.h    |  8 ++++++++
+> >  2 files changed, 39 insertions(+)
+> >
+> >diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+> >index c834f5a..3179f28 100644
+> >--- a/drivers/clk/clk-bulk.c
+> >+++ b/drivers/clk/clk-bulk.c
+> >@@ -19,6 +19,37 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/device.h>
+> >  #include <linux/export.h>
+> >+#include <linux/of.h>
+> >+
+> >+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> >+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> >+				 struct clk_bulk_data *clks)
+> >+{
+> >+	int ret;
+> >+	int i;
+> >+
+> >+	for (i = 0; i < num_clks; i++)
+> >+		clks[i].clk = NULL;
+> >+
+> >+	for (i = 0; i < num_clks; i++) {
+> >+		clks[i].clk = of_clk_get(np, i);
+> >+		if (IS_ERR(clks[i].clk)) {
+> >+			ret = PTR_ERR(clks[i].clk);
 > 
-> Any news on the upstream of your HW consumer interface, prerequisite for
-> my STM32 DFSDM upstream?
-> Don't hesitate if i can help...
+> >+			pr_err("%s: Failed to get clk index: %d ret: %d\n",
+> >+			       np->full_name, i, ret);
 > 
-> Regards
-> Arnaud
+> AFAIU full_node is not supposed now to be dereferenced directly,
+> since storing of the full path string for each node is going to be
+> removed. %pOF needs to be used instead, e.g.
 > 
+> 	pr_err("%pOF: failed to get clk %d: %d\n", np, i , ret);
 > 
-> On 03/17/2017 03:08 PM, Arnaud POULIQUEN wrote:
->> From: Lars-Peter Clausen <lars@metafoo.de>
->>
->> Hardware consumer's can be used when one IIO device has a direct connection
->> to another device in hardware.
->>
->> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
->> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->> ---
->> V2 -> V3:
->> 	 Just Adding sign off.  No update but Jonathan comment.
->>          Need to be taken into account (in agreement with Lars)
->>          when transforming rfc in patch.
->> ---
->>  drivers/iio/Kconfig             |   6 ++
->>  drivers/iio/Makefile            |   1 +
->>  drivers/iio/hw_consumer.c       | 156 ++++++++++++++++++++++++++++++++++++++++
->>  include/linux/iio/hw_consumer.h |  12 ++++
->>  4 files changed, 175 insertions(+)
->>  create mode 100644 drivers/iio/hw_consumer.c
->>  create mode 100644 include/linux/iio/hw_consumer.h
->>
->> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
->> index 6743b18..956dd18 100644
->> --- a/drivers/iio/Kconfig
->> +++ b/drivers/iio/Kconfig
->> @@ -30,6 +30,12 @@ config IIO_CONFIGFS
->>  	  (e.g. software triggers). For more info see
->>  	  Documentation/iio/iio_configfs.txt.
->>  
->> +config IIO_HW_CONSUMER
->> +	tristate
->> +	help
->> +	  Hardware consumer buffer
->> +
->> +
->>  config IIO_TRIGGER
->>  	bool "Enable triggered sampling support"
->>  	help
->> diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
->> index 87e4c43..8472b97 100644
->> --- a/drivers/iio/Makefile
->> +++ b/drivers/iio/Makefile
->> @@ -6,6 +6,7 @@ obj-$(CONFIG_IIO) += industrialio.o
->>  industrialio-y := industrialio-core.o industrialio-event.o inkern.o
->>  industrialio-$(CONFIG_IIO_BUFFER) += industrialio-buffer.o
->>  industrialio-$(CONFIG_IIO_TRIGGER) += industrialio-trigger.o
->> +obj-$(CONFIG_IIO_HW_CONSUMER) += hw_consumer.o
->>  
->>  obj-$(CONFIG_IIO_CONFIGFS) += industrialio-configfs.o
->>  obj-$(CONFIG_IIO_SW_DEVICE) += industrialio-sw-device.o
->> diff --git a/drivers/iio/hw_consumer.c b/drivers/iio/hw_consumer.c
->> new file mode 100644
->> index 0000000..66f0732
->> --- /dev/null
->> +++ b/drivers/iio/hw_consumer.c
->> @@ -0,0 +1,156 @@
->> +#include <linux/err.h>
->> +#include <linux/export.h>
->> +#include <linux/slab.h>
->> +#include <linux/mutex.h>
->> +#include <linux/of.h>
->> +
->> +#include <linux/iio/iio.h>
->> +#include "iio_core.h"
->> +#include <linux/iio/machine.h>
->> +#include <linux/iio/driver.h>
->> +#include <linux/iio/consumer.h>
->> +#include <linux/iio/hw_consumer.h>
->> +#include <linux/iio/buffer.h>
->> +
->> +struct iio_hw_consumer {
->> +	struct list_head buffers;
->> +	struct iio_channel *channels;
->> +};
->> +
->> +struct hw_consumer_buffer {
->> +	struct list_head head;
->> +	struct iio_dev *indio_dev;
->> +	struct iio_buffer buffer;
->> +};
->> +
->> +static struct hw_consumer_buffer *iio_buffer_to_hw_consumer_buffer(
->> +	struct iio_buffer *buffer)
->> +{
->> +	return container_of(buffer, struct hw_consumer_buffer, buffer);
->> +}
->> +
->> +static void iio_hw_buf_release(struct iio_buffer *buffer)
->> +{
->> +	struct hw_consumer_buffer *hw_buf =
->> +		iio_buffer_to_hw_consumer_buffer(buffer);
->> +	kfree(hw_buf->buffer.scan_mask);
->> +	kfree(hw_buf);
->> +}
->> +
->> +static const struct iio_buffer_access_funcs iio_hw_buf_access = {
->> +	.release = &iio_hw_buf_release,
->> +	.modes = INDIO_BUFFER_HARDWARE,
->> +};
->> +
->> +static struct hw_consumer_buffer *iio_hw_consumer_get_buffer(
->> +	struct iio_hw_consumer *hwc, struct iio_dev *indio_dev)
->> +{
->> +	struct hw_consumer_buffer *buf;
->> +
->> +	list_for_each_entry(buf, &hwc->buffers, head) {
->> +		if (buf->indio_dev == indio_dev)
->> +			return buf;
->> +	}
->> +
->> +	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
->> +	if (!buf)
->> +		return NULL;
->> +
->> +	buf->buffer.access = &iio_hw_buf_access;
->> +	buf->indio_dev = indio_dev;
->> +	buf->buffer.scan_mask = kcalloc(BITS_TO_LONGS(indio_dev->masklength),
->> +		sizeof(long), GFP_KERNEL);
->> +	if (!buf->buffer.scan_mask)
->> +		goto err_free_buf;
->> +
->> +	iio_buffer_init(&buf->buffer);
->> +	list_add_tail(&buf->head, &hwc->buffers);
->> +
->> +	return buf;
->> +
->> +err_free_buf:
->> +	kfree(buf);
->> +	return NULL;
->> +}
->> +
->> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev)
->> +{
->> +	struct hw_consumer_buffer *buf;
->> +	struct iio_hw_consumer *hwc;
->> +	struct iio_channel *chan;
->> +	int ret;
->> +
->> +	hwc = kzalloc(sizeof(*hwc), GFP_KERNEL);
->> +	if (!hwc)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	INIT_LIST_HEAD(&hwc->buffers);
->> +
->> +	hwc->channels = iio_channel_get_all(dev);
->> +	if (IS_ERR(hwc->channels)) {
->> +		ret = PTR_ERR(hwc->channels);
->> +		goto err_free_hwc;
->> +	}
->> +
->> +	chan = &hwc->channels[0];
->> +	while (chan->indio_dev) {
->> +		buf = iio_hw_consumer_get_buffer(hwc, chan->indio_dev);
->> +		if (buf == NULL) {
->> +			ret = -ENOMEM;
->> +			goto err_put_buffers;
->> +		}
->> +		set_bit(chan->channel->scan_index, buf->buffer.scan_mask);
->> +		chan++;
->> +	}
->> +
->> +	return hwc;
->> +
->> +err_put_buffers:
->> +	list_for_each_entry(buf, &hwc->buffers, head)
->> +		iio_buffer_put(&buf->buffer);
->> +	iio_channel_release_all(hwc->channels);
->> +err_free_hwc:
->> +	kfree(hwc);
->> +	return ERR_PTR(ret);
->> +}
->> +EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
->> +
->> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
->> +{
->> +	struct hw_consumer_buffer *buf;
->> +
->> +	iio_channel_release_all(hwc->channels);
->> +	list_for_each_entry(buf, &hwc->buffers, head)
->> +		iio_buffer_put(&buf->buffer);
->> +	kfree(hwc);
->> +}
->> +EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
->> +
->> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc)
->> +{
->> +	struct hw_consumer_buffer *buf;
->> +	int ret;
->> +
->> +	list_for_each_entry(buf, &hwc->buffers, head) {
->> +		ret = iio_update_buffers(buf->indio_dev, &buf->buffer, NULL);
->> +		if (ret)
->> +			goto err_disable_buffers;
->> +	}
->> +
->> +	return 0;
->> +
->> +err_disable_buffers:
->> +	list_for_each_entry_continue_reverse(buf, &hwc->buffers, head)
->> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(iio_hw_consumer_enable);
->> +
->> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc)
->> +{
->> +	struct hw_consumer_buffer *buf;
->> +
->> +	list_for_each_entry(buf, &hwc->buffers, head)
->> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
->> +}
->> +EXPORT_SYMBOL_GPL(iio_hw_consumer_disable);
->> diff --git a/include/linux/iio/hw_consumer.h b/include/linux/iio/hw_consumer.h
->> new file mode 100644
->> index 0000000..f12653d
->> --- /dev/null
->> +++ b/include/linux/iio/hw_consumer.h
->> @@ -0,0 +1,12 @@
->> +#ifndef LINUX_IIO_HW_CONSUMER_BUFFER_H
->> +#define LINUX_IIO_HW_CONSUMER_BUFFER_H
->> +
->> +struct device;
->> +struct iio_hw_consumer;
->> +
->> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
->> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
->> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
->> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
->> +
->> +#endif
->>
+
+Thanks for telling this.
+Just see Rob sent patches to clean up it some days ago.
+Will update the patch.
+
+Regards
+Dong Aisheng
+
+> >+			clks[i].clk = NULL;
+> >+			goto err;
+> >+		}
+> >+	}
+> >+
+> >+	return 0;
+> >+
+> >+err:
+> >+	clk_bulk_put(i, clks);
+> >+
+> >+	return ret;
+> >+}
+> >+#endif
+> 
+> -- 
+> Regards,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
