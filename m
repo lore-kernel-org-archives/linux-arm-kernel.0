@@ -1,66 +1,217 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 12 Sep 2017 08:40:36 +0800
-Subject: [PATCH v5 3/3] arm64: dts: rockchip: Handle pcie wake in pcie
- driver for Gru
-In-Reply-To: <20170911151029.25185-4-jeffy.chen@rock-chips.com>
-References: <20170911151029.25185-1-jeffy.chen@rock-chips.com>
- <20170911151029.25185-4-jeffy.chen@rock-chips.com>
-Message-ID: <fb363e50-6a88-c546-2ae9-4abb28a931f0@rock-chips.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Tue, 12 Sep 2017 09:58:42 +0800
+Subject: [PATCH v4 1/2] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <20170911201145.31257-2-fcooper@ti.com>
+References: <20170911201145.31257-1-fcooper@ti.com>
+ <20170911201145.31257-2-fcooper@ti.com>
+Message-ID: <CAMz4kuLGVes6a4iCF0VbG1ErWPR5at=HKgeGv3cMr1zv7aLzJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 2017/9/11 23:10, Jeffy Chen wrote:
-> Currently we are handling pcie wake irq in mrvl wifi driver.
-> Move it to rockchip pcie driver for Gru boards.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+On 12 September 2017 at 04:11, Franklin S Cooper Jr <fcooper@ti.com> wrote:
+> 66AK2G has I2C instances that are not apart of the ALWAYS_ON power domain
+> unlike other Keystone 2 SoCs and OMAPL138. Therefore, pm_runtime
+> is required to insure the power domain used by the specific I2C instance is
+> properly turned on along with its functional clock.
+>
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 > ---
-> 
-
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
-
-> Changes in v5:
-> Use "wakeup" instead of "wake"
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 15 +++++++++------
->   1 file changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> index 199a5118b20d..9e0269a13ced 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> @@ -707,7 +707,15 @@ ap_i2c_audio: &i2c8 {
->   
->   	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
->   	pinctrl-names = "default";
-> -	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
-> +	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
+> Version 4 changes:
+> Fix wording on error message
+> Fix additional error path
+>
+> Version 3 changes:
+> Remove several statements that set clk to NULL
+> Fix error path
+>
+>  drivers/i2c/busses/i2c-davinci.c | 67 +++++++++++++++++++++++++++++++++-------
+>  1 file changed, 55 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index b8c4353..a2d9f7c 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -36,6 +36,7 @@
+>  #include <linux/gpio.h>
+>  #include <linux/of_device.h>
+>  #include <linux/platform_data/i2c-davinci.h>
+> +#include <linux/pm_runtime.h>
+>
+>  /* ----- global defines ----------------------------------------------- */
+>
+> @@ -122,6 +123,9 @@
+>  /* set the SDA GPIO low */
+>  #define DAVINCI_I2C_DCLR_PDCLR1        BIT(1)
+>
+> +/* timeout for pm runtime autosuspend */
+> +#define DAVINCI_I2C_PM_TIMEOUT 1000    /* ms */
 > +
-> +	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
-> +			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
-> +			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
-> +			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
-> +	interrupt-names = "sys", "legacy", "client", "wakeup";
-> +	/delete-property/ interrupts;
+>  struct davinci_i2c_dev {
+>         struct device           *dev;
+>         void __iomem            *base;
+> @@ -541,10 +545,17 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>
+>         dev_dbg(dev->dev, "%s: msgs: %d\n", __func__, num);
+>
+> +       ret = pm_runtime_get_sync(dev->dev);
+> +       if (ret < 0) {
+> +               dev_err(dev->dev, "Failed to runtime_get device: %d\n", ret);
+> +               pm_runtime_put_noidle(dev->dev);
+> +               return ret;
+> +       }
 > +
->   	vpcie3v3-supply = <&pp3300_wifi_bt>;
->   	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
->   	vpcie0v9-supply = <&pp900_pcie>;
-> @@ -722,11 +730,6 @@ ap_i2c_audio: &i2c8 {
->   			compatible = "pci1b4b,2b42";
->   			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
->   			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
-> -			interrupt-parent = <&gpio0>;
-> -			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&wlan_host_wake_l>;
-> -			wakeup-source;
->   		};
->   	};
->   };
-> 
+>         ret = i2c_davinci_wait_bus_not_busy(dev);
+>         if (ret < 0) {
+>                 dev_warn(dev->dev, "timeout waiting for bus ready\n");
+> -               return ret;
+> +               goto out;
+>         }
+>
+>         for (i = 0; i < num; i++) {
+> @@ -552,14 +563,19 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>                 dev_dbg(dev->dev, "%s [%d/%d] ret: %d\n", __func__, i + 1, num,
+>                         ret);
+>                 if (ret < 0)
+> -                       return ret;
+> +                       goto out;
+>         }
+>
+> +       ret = num;
+>  #ifdef CONFIG_CPU_FREQ
+>         complete(&dev->xfr_complete);
+>  #endif
+>
+> -       return num;
+> +out:
+> +       pm_runtime_mark_last_busy(dev->dev);
+> +       pm_runtime_put_autosuspend(dev->dev);
+> +
+> +       return ret;
+>  }
+>
+>  static u32 i2c_davinci_func(struct i2c_adapter *adap)
+> @@ -599,6 +615,9 @@ static irqreturn_t i2c_davinci_isr(int this_irq, void *dev_id)
+>         int count = 0;
+>         u16 w;
+>
+> +       if (pm_runtime_suspended(dev->dev))
+> +               return IRQ_NONE;
+> +
+>         while ((stat = davinci_i2c_read_reg(dev, DAVINCI_I2C_IVR_REG))) {
+>                 dev_dbg(dev->dev, "%s: stat=0x%x\n", __func__, stat);
+>                 if (count++ == 100) {
+> @@ -802,13 +821,24 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>         dev->clk = devm_clk_get(&pdev->dev, NULL);
+>         if (IS_ERR(dev->clk))
+>                 return PTR_ERR(dev->clk);
+> -       clk_prepare_enable(dev->clk);
+
+You removed clk enable here, I think it can not work if we did not
+open CONFIG_PM macro. I think you should keep clk enable here, and set
+rpm active by pm_runtime_set_active() before issuing
+pm_runtime_enable().
+
+>
+>         mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>         dev->base = devm_ioremap_resource(&pdev->dev, mem);
+>         if (IS_ERR(dev->base)) {
+> -               r = PTR_ERR(dev->base);
+> -               goto err_unuse_clocks;
+> +               return PTR_ERR(dev->base);
+> +       }
+> +
+> +       pm_runtime_set_autosuspend_delay(dev->dev,
+> +                                        DAVINCI_I2C_PM_TIMEOUT);
+> +       pm_runtime_use_autosuspend(dev->dev);
+> +
+> +       pm_runtime_enable(dev->dev);
+> +
+> +       r = pm_runtime_get_sync(dev->dev);
+> +       if (r < 0) {
+> +               dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+> +               pm_runtime_put_noidle(dev->dev);
+> +               return r;
+>         }
+>
+>         i2c_davinci_init(dev);
+> @@ -849,27 +879,40 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>         if (r)
+>                 goto err_unuse_clocks;
+>
+> +       pm_runtime_mark_last_busy(dev->dev);
+> +       pm_runtime_put_autosuspend(dev->dev);
+> +
+>         return 0;
+>
+>  err_unuse_clocks:
+> -       clk_disable_unprepare(dev->clk);
+> -       dev->clk = NULL;
+> +       pm_runtime_dont_use_autosuspend(dev->dev);
+> +       pm_runtime_put_sync(dev->dev);
+> +       pm_runtime_disable(dev->dev);
+> +
+>         return r;
+>  }
+>
+>  static int davinci_i2c_remove(struct platform_device *pdev)
+>  {
+>         struct davinci_i2c_dev *dev = platform_get_drvdata(pdev);
+> +       int ret;
+>
+>         i2c_davinci_cpufreq_deregister(dev);
+>
+>         i2c_del_adapter(&dev->adapter);
+>
+> -       clk_disable_unprepare(dev->clk);
+> -       dev->clk = NULL;
+> +       ret = pm_runtime_get_sync(&pdev->dev);
+> +       if (ret < 0) {
+> +               pm_runtime_put_noidle(&pdev->dev);
+> +               return ret;
+> +       }
+>
+>         davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, 0);
+>
+> +       pm_runtime_dont_use_autosuspend(dev->dev);
+> +       pm_runtime_put_sync(dev->dev);
+> +       pm_runtime_disable(dev->dev);
+> +
+>         return 0;
+>  }
+>
+> @@ -880,7 +923,6 @@ static int davinci_i2c_suspend(struct device *dev)
+>
+>         /* put I2C into reset */
+>         davinci_i2c_reset_ctrl(i2c_dev, 0);
+> -       clk_disable_unprepare(i2c_dev->clk);
+>
+>         return 0;
+>  }
+> @@ -889,7 +931,6 @@ static int davinci_i2c_resume(struct device *dev)
+>  {
+>         struct davinci_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+>
+> -       clk_prepare_enable(i2c_dev->clk);
+>         /* take I2C out of reset */
+>         davinci_i2c_reset_ctrl(i2c_dev, 1);
+>
+> @@ -899,6 +940,8 @@ static int davinci_i2c_resume(struct device *dev)
+>  static const struct dev_pm_ops davinci_i2c_pm = {
+>         .suspend        = davinci_i2c_suspend,
+>         .resume         = davinci_i2c_resume,
+> +       SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> +                                     pm_runtime_force_resume)
+>  };
+>
+>  #define davinci_i2c_pm_ops (&davinci_i2c_pm)
+> --
+> 2.9.4.dirty
+>
+
+
+
+-- 
+Baolin.wang
+Best Regards
