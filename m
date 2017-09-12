@@ -1,38 +1,72 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 12 Sep 2017 19:41:28 +0200
-Subject: [media] s5p-mfc: Adjust a null pointer check in four functions
-In-Reply-To: <5b8eb902-d97c-3308-5ba9-64469320e0e2@users.sourceforge.net>
-References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
- <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
- <CGME20170911092134epcas2p1a1b11c056b52d68c3b0e4ea2e1e8f758@epcas2p1.samsung.com>
- <6c2d20b3-4437-0473-73d4-73c049ba52a9@samsung.com>
- <a68020cc-2477-5d6c-bc61-d753253b755a@users.sourceforge.net>
- <0fa9a180-be67-3a33-682c-bff819c36c6a@samsung.com>
- <5b8eb902-d97c-3308-5ba9-64469320e0e2@users.sourceforge.net>
-Message-ID: <ee8ba7fd-1de4-b1b9-8aa0-130c86c38f30@samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 12 Sep 2017 10:56:34 -0700
+Subject: [PATCH] [v2] soc: bcm: brcmstb: fix ARM build errors
+In-Reply-To: <20170911201324.3423067-1-arnd@arndb.de>
+References: <20170911201324.3423067-1-arnd@arndb.de>
+Message-ID: <95917630-de47-cb0c-f7bf-5742927e11f1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2017 05:00 PM, SF Markus Elfring wrote:
->>> * Do you care to preserve an information like the author date?
->> In this case not, but actually the Date line is not an issue.
-> Thanks for your information.
+On 09/11/2017 01:13 PM, Arnd Bergmann wrote:
+> When building the new PM driver on older ARM architectures, we can
+> run into one of two build errors:
 > 
-> It seems then that you quoted a line too much.
+> drivers/soc/bcm/brcmstb/pm/pm-arm.c: In function 'brcmstb_do_pmsm_power_down':
+> drivers/soc/bcm/brcmstb/pm/pm-arm.c:334:2: error: implicit declaration of function 'wfi' [-Werror=implicit-function-declaration]
+> 
+> drivers/soc/bcm/brcmstb/pm/pm-arm.o: In function `brcmstb_pm_s3_finish':
+> pm-arm.c:(.text+0x860): undefined reference to `cpu_resume'
+> 
+> The first one requires at least ARMv6K, the second one requires the CPU
+> suspend/resume logic which is not available on some of the older CPUs,
+> and needs to be selected explicitly.
+> 
+> This adds the extra Kconfig statements to enforce this, limiting
+> compilation on ARM to the STB platform that is guaranteed to be
+> ARMv7. We could enable compile-testing for other ARMv7 platforms,
+> but there seems to be little value as an allmodconfig kernel
+> already includes it.
+
+Thanks, can you pick that change directly and/or fold it in:
+
+6274ca43eba1b2ebcac96f3c9b41fbc4945c0af0 ("soc: bcm: brcmstb: Add
+support for S2/S3/S5 suspend states (ARM)")?
+
+Thanks!
+
+> 
+> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: change Makefile as well
+> ---
+>  drivers/soc/bcm/brcmstb/Kconfig  | 3 ++-
+>  drivers/soc/bcm/brcmstb/Makefile | 2 +-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/soc/bcm/brcmstb/Kconfig b/drivers/soc/bcm/brcmstb/Kconfig
+> index d05bfce82e71..d36f6e03c1a6 100644
+> --- a/drivers/soc/bcm/brcmstb/Kconfig
+> +++ b/drivers/soc/bcm/brcmstb/Kconfig
+> @@ -4,6 +4,7 @@ config BRCMSTB_PM
+>  	bool "Support suspend/resume for STB platforms"
+>  	default y
+>  	depends on PM
+> -	depends on ARM || BMIPS_GENERIC
+> +	depends on ARCH_BRCMSTB || BMIPS_GENERIC
+> +	select ARM_CPU_SUSPEND if ARM
 >  
->> Anyway the patch is malformed, ?
- >
-> I have got doubts for this view because the file was automatically generated
-> by the command ?git format-patch? also for the discussed three update steps.
+>  endif # SOC_BRCMSTB
+> diff --git a/drivers/soc/bcm/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
+> index ee5b4de741b8..01687c26535b 100644
+> --- a/drivers/soc/bcm/brcmstb/Makefile
+> +++ b/drivers/soc/bcm/brcmstb/Makefile
+> @@ -1,2 +1,2 @@
+>  obj-y				+= common.o biuctrl.o
+> -obj-y				+= pm/
+> +obj-$(CONFIG_BRCMSTB_PM)	+= pm/
+> 
 
-Generating patch is only part of the story, it seems the patch is not sent
-properly and tags which should be in SMTP header end up in the message
-body. I think there would not be such issues if you have used git format-patch
-+ git send-email.
-
-I normally do amend things like this while applying, I will do that this time 
-as well. It's already too much time wasted for such a dubious patch.
 
 -- 
-Thanks,
-Sylwester
+Florian
