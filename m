@@ -1,45 +1,79 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 12 Sep 2017 09:54:15 +0200
-Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
- integrated/external MDIOs
-In-Reply-To: <20170911201920.GA5983@lunn.ch>
-References: <20170908071156.5115-11-clabbe.montjoie@gmail.com>
- <20170908130520.GA11248@lunn.ch> <20170908132632.GA3037@Red>
- <20170908140020.GC25219@lunn.ch> <20170908140832.GB3037@Red>
- <20170908141736.GF25219@lunn.ch> <20170908142825.GC3037@Red>
- <20170911161124.GD27599@lunn.ch> <20170911190850.GA2291@Red>
- <20170911201920.GA5983@lunn.ch>
-Message-ID: <20170912075415.GA1358@Red>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 12 Sep 2017 13:55:52 +0530
+Subject: [PATCH v3 1/2] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <94b7a185-4cde-03e6-cc17-f64d5d28c9f2@ti.com>
+References: <20170908175448.3367-1-fcooper@ti.com>
+ <20170908175448.3367-2-fcooper@ti.com>
+ <57153767-6dee-a5b5-548c-f7b0dc104b46@ti.com>
+ <f185afb9-e877-1916-fcbc-c2a28f23b0cc@ti.com>
+ <94b7a185-4cde-03e6-cc17-f64d5d28c9f2@ti.com>
+Message-ID: <5d8778d8-281c-8926-fec3-f9acf82e342c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 11, 2017 at 10:19:20PM +0200, Andrew Lunn wrote:
-> > Even with CLK_BUS_EPHY/RST_BUS_EPHY enabled, the MAC reset timeout.
-> > So no the CLK/RST are really for the PHY.
+On Tuesday 12 September 2017 01:41 AM, Grygorii Strashko wrote:
 > 
-> Thanks for trying that.
 > 
-> You said it was probably during scanning of the bus it times out. What
-> address is causing the timeout? 0 or 1? If the internal bus can only
-> have one PHY on it, maybe we need to set bus->phy_mask to 0x1?
+> On 09/11/2017 03:07 PM, Franklin S Cooper Jr wrote:
+>>
+>>
+>> On 09/11/2017 06:29 AM, Sekhar Nori wrote:
+>>> On Friday 08 September 2017 11:24 PM, Franklin S Cooper Jr wrote:
+>>>> 66AK2G has I2C instances that are not apart of the ALWAYS_ON power domain
+>>>> like other Keystone 2 SoCs and OMAPL138. Therefore, pm_runtime
+>>>
+>>> unlike ?
+>>>
+>>>> is required to insure the power domain used by the specific I2C instance is
+>>>> properly turned on along with its functional clock.
+>>>>
+>>>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>>>> ---
+>>>> Version 3 changes:
+>>>> Remove several statements that set clk to NULL
+>>>> Fix error path
+>>>>
+>>>>   drivers/i2c/busses/i2c-davinci.c | 64 +++++++++++++++++++++++++++++++++-------
+>>>>   1 file changed, 53 insertions(+), 11 deletions(-)
+>>>
+>>>> @@ -802,12 +821,22 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>>>   	dev->clk = devm_clk_get(&pdev->dev, NULL);
+>>>>   	if (IS_ERR(dev->clk))
+>>>>   		return PTR_ERR(dev->clk);
+>>>> -	clk_prepare_enable(dev->clk);
+>>>>   
+>>>>   	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>>   	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+>>>>   	if (IS_ERR(dev->base)) {
+>>>> -		r = PTR_ERR(dev->base);
+>>>> +		return PTR_ERR(dev->base);
+>>>> +	}
+>>>> +
+>>>> +	pm_runtime_set_autosuspend_delay(dev->dev,
+>>>> +					 DAVINCI_I2C_PM_TIMEOUT);
+>>>> +	pm_runtime_use_autosuspend(dev->dev);
+>>>> +
+>>>> +	pm_runtime_enable(dev->dev);
+>>>> +
+>>>> +	r = pm_runtime_get_sync(dev->dev);
+>>>> +	if (r < 0) {
+>>>> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+>>>>   		goto err_unuse_clocks;
+>>>
+>>> You end up doing a pm_runtime_put_sync() on failure here, instead of
+>>> pm_runtime_put_noidle() like rest of the patch.
+>>>
+>>> May be handle this failure here instead of relying on the goto path.
+>>
+>> Ok
 > 
+> I think, it's not necessary - pm_runtime_put_sync() can be used in this case
+>  (and used the same way in many other drivers).
+> In case, of failure in this place - pm_runtime_put_sync() will just decrement usage counter.
 
-I have added a trace in begin and end of stmmac_mdio_read()
+Can you please explain why this is the case? At least on DA850, I see
+the runtime_idle callback invoked from rpm_idle() if
+pm_runtime_put_sync() is used in the failure path.
 
-[   18.145451] libphy: stmmac: probed
-[   18.148398] libphy: mdio_mux: probed
-[   18.148650] dwmac-sun8i 1c30000.ethernet: Switch mux to internal PHY
-[   18.248751] dwmac-sun8i 1c30000.ethernet: EMAC reset timeout
-[   18.249297] libphy: mdio_mux: probed
-[   18.249362] dwmac-sun8i 1c30000.ethernet: Switch mux to external PHY
-[   18.249391] stmmac_mdio_read 0 2
-[   18.249598] stmmac_mdio_read 0 2 1c
-[   18.249623] stmmac_mdio_read 0 3
-[   18.249811] stmmac_mdio_read 0 3 c915
-[   20.737271] EXT4-fs (mmcblk0p1): re-mounted. Opts: (null)
-[   31.294868] stmmac_mdio_read 0 0
-[   31.295311] stmmac_mdio_read 0 0 1140
-
-It seems that the timeout is unrelated to MDIO bus.
-
-Regards
+Thanks
+Sekhar
