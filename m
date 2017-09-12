@@ -1,32 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Sep 2017 16:19:30 +0200
-Subject: [PATCH] pinctrl: uniphier: make arrays static, reduces object
- code size
-In-Reply-To: <20170912112124.1143-1-colin.king@canonical.com>
-References: <20170912112124.1143-1-colin.king@canonical.com>
-Message-ID: <CACRpkdZXPJEjQMfCekdXOCgRKwiZ8mv9wwskfuz8EgxXJyGmAA@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 12 Sep 2017 17:00:55 +0200
+Subject: [media] s5p-mfc: Adjust a null pointer check in four functions
+In-Reply-To: <0fa9a180-be67-3a33-682c-bff819c36c6a@samsung.com>
+References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
+ <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
+ <CGME20170911092134epcas2p1a1b11c056b52d68c3b0e4ea2e1e8f758@epcas2p1.samsung.com>
+ <6c2d20b3-4437-0473-73d4-73c049ba52a9@samsung.com>
+ <a68020cc-2477-5d6c-bc61-d753253b755a@users.sourceforge.net>
+ <0fa9a180-be67-3a33-682c-bff819c36c6a@samsung.com>
+Message-ID: <5b8eb902-d97c-3308-5ba9-64469320e0e2@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 1:21 PM, Colin King <colin.king@canonical.com> wrote:
 
-> From: Colin Ian King <colin.king@canonical.com>
+>> * Do you care to preserve an information like the author date?
 >
-> Don't populate const arrays on the stack, instead make them
-> static.  Makes the object code smaller nearly 1000 bytes. Also
-> line break wide lines to avoid checkpatch warnings.
->
-> Before:
->    text    data     bss     dec     hex filename
->   13112    1996       0   15108    3b04 pinctrl-uniphier-core.o
->
-> After:
->    text    data     bss     dec     hex filename
->   11642    2476       0   14118    3726 pinctrl-uniphier-core.o
->
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> In this case not, but actually the Date line is not an issue.
 
-Patch applied with Masahiro's ACK.
+Thanks for your information.
 
-Yours,
-Linus Walleij
+It seems then that you quoted a line too much.
+
+
+> Anyway the patch is malformed, ?
+
+I have got doubts for this view because the file was automatically generated
+by the command ?git format-patch? also for the discussed three update steps.
+
+Regards,
+Markus
