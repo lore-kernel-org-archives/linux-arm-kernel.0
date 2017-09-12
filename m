@@ -1,53 +1,47 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 12 Sep 2017 17:01:38 +0800
-Subject: [xlnx:master 823/1014] drivers/usb/dwc3/host.c:24:6: error:
- redefinition of 'dwc3_host_wakeup_capable'
-Message-ID: <201709121735.LuyVTEhT%fengguang.wu@intel.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 12 Sep 2017 17:07:40 +0800
+Subject: mmc: mediatek: add support of mt2701/mt2712 
+Message-ID: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anurag,
+  This serial of patches are adding support of mt2701/mt2712.
+there are many changes and HW improvement between mt8173 and
+mt2701/mt2712, below is a list of these changes:
+  1. enlarge CLKDIV bits from 8 to 12
+  2. remove the PAD_TUNE register and add a new PAD_TUNE0 register
+  3. add data sync and async fifo feature
+  4. add busy_check feature
+  5. add stop_clk fix
+  6. add enhance_rx support
+  7. add a seperate CG of source clock
 
-FYI, the error/warning still remains.
+mt2712 supports full of these features, mt2701 supports part of it, and
+add a "mediatek,latch-ck" to work-around as it do not support stop-clk
+fix.
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   223c3aa24a63bb837169d7253fac666965383934
-commit: 80ac0da9010ebabef6ed1d66b6607b345fd14cb4 [823/1014] dwc3: Add support for clock disabling during suspend
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 80ac0da9010ebabef6ed1d66b6607b345fd14cb4
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+Note: As Pinctrl/CCF are not ready now, so that current patches do not
+include DTS part.
 
-All errors (new ones prefixed by >>):
 
->> drivers/usb/dwc3/host.c:24:6: error: redefinition of 'dwc3_host_wakeup_capable'
-    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-         ^~~~~~~~~~~~~~~~~~~~~~~~
-   In file included from drivers/usb/dwc3/host.c:20:0:
-   include/linux/usb/xhci_pdriver.h:25:6: note: previous definition of 'dwc3_host_wakeup_capable' was here
-    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-         ^~~~~~~~~~~~~~~~~~~~~~~~
+Chaotian Jing (12):
+  mmc: dt-bindings: update Mediatek MMC bindings
+  arm64: dts: mt8173: remove "mediatek,mt8135-mmc" from mmc nodes
+  mmc: mediatek: add support of mt2701/mt2712
+  mmc: mediatek: make hs400_tune_response only for mt8173
+  mmc: mediatek: add pad_tune0 support
+  mmc: mediatek: add async fifo and data tune support
+  mmc: mediatek: add busy_check support
+  mmc: mediatek: add stop_clk fix and enhance_rx support
+  mmc: mediatek: add support of source_cg clock
+  mmc: mediatek: add latch-ck support
+  mmc: mediatek: improve eMMC hs400 mode read performance
+  mmc: mediatek: perfer to use rise edge latching for cmd line
 
-vim +/dwc3_host_wakeup_capable +24 drivers/usb/dwc3/host.c
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |  13 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi         |  12 +-
+ drivers/mmc/host/mtk-sd.c                        | 298 ++++++++++++++++++++---
+ 3 files changed, 275 insertions(+), 48 deletions(-)
 
-    23	
-  > 24	void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-    25	{
-    26		dwc3_simple_wakeup_capable(dev, wakeup);
-    27	}
-    28	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45285 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170912/fbaded62/attachment-0001.gz>
+-- 
+1.9.1
