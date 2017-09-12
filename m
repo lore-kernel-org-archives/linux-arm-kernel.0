@@ -1,64 +1,69 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Tue, 12 Sep 2017 10:28:33 -0500
-Subject: da850.dtsi Naming convention Question
-In-Reply-To: <d92f726f-8a84-14ac-571e-f405255fed0b@ti.com>
-References: <CAHCN7xJ7N6W2Pz1vsVV192V-s0g6q+ozvNBR21rx6LufJ4kR6g@mail.gmail.com>
- <d92f726f-8a84-14ac-571e-f405255fed0b@ti.com>
-Message-ID: <CAHCN7xJosHuuPWUkr=ettc8gWgx9m6PvbFe90f2FnvT0meZVUA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 12 Sep 2017 17:41:56 +0200
+Subject: [PATCH] mtd: oxnas_nand: Fix error handling in oxnas_nand_probe()
+In-Reply-To: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
+References: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
+Message-ID: <66c9e0a2-f216-181c-d35e-1e09434a923a@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 8:59 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Hi Adam,
->
-> On Tuesday 12 September 2017 07:13 PM, Adam Ford wrote:
->> I am confused by the naming convention of the da850.dtsi file, and I
->> am hoping someone can clarify how this works.
->>
->> Specifically, is defined int he device tree as "gpio: gpio at 226000"
->>
->> Other TI boards (like omap3.dtsi) use a convention with the address
->> after the @ symbol.
->>
->> (in omap3.dtsi, the gpio bank1 is configured as gpio1: gpio at 48310000
->> where 48310000 is the address of the register)
->>
->> An attempt was made to correct this in:
->>
->> c2a3b4bca53a ("ARM: dts: davinci: use proper address after @")  where
->> an fix was made to make gpio: gpio at 1e26000  which would match the
->> address in the TRM.  Unfortunately, it looks as if it was undone
->> almost right away.
->
-> I think you are reading that commit in reverse. The fix was to make the
-> unit address match the reg property (make it gpio at 226000)
->
+On 09/09/2017 12:00 AM, Alexey Khoroshilov wrote:
+> oxnas_nand_probe() does not disable clock on error paths.
+> The patch adds disabling using devm interface.
+> 
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+> ---
+>  drivers/mtd/nand/oxnas_nand.c | 22 +++++++++++++++-------
+>  1 file changed, 15 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+> index 1b207aac840c..8abc69a285dd 100644
+> --- a/drivers/mtd/nand/oxnas_nand.c
+> +++ b/drivers/mtd/nand/oxnas_nand.c
+> @@ -103,16 +103,26 @@ static int oxnas_nand_probe(struct platform_device *pdev)
+>  	if (IS_ERR(oxnas->io_base))
+>  		return PTR_ERR(oxnas->io_base);
+>  
+> -	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(oxnas->clk))
+> -		oxnas->clk = NULL;
+> -
+>  	/* Only a single chip node is supported */
+>  	count = of_get_child_count(np);
+>  	if (count > 1)
+>  		return -EINVAL;
+>  
+> -	clk_prepare_enable(oxnas->clk);
+> +	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(oxnas->clk)) {
+> +		oxnas->clk = NULL;
+> +	} else {
+> +		err = clk_prepare_enable(oxnas->clk);
+> +		if (err)
+> +			return err;
+> +
+> +		err = devm_add_action_or_reset(&pdev->dev,
+> +				(void(*)(void *))clk_disable_unprepare,
+> +				oxnas->clk);
+> +		if (err)
+> +			return err;
+> +	}
+> +
+>  	device_reset_optional(&pdev->dev);
+>  
+>  	for_each_child_of_node(np, nand_np) {
+> @@ -167,8 +177,6 @@ static int oxnas_nand_remove(struct platform_device *pdev)
+>  	if (oxnas->chips[0])
+>  		nand_release(nand_to_mtd(oxnas->chips[0]));
+>  
+> -	clk_disable_unprepare(oxnas->clk);
+> -
+>  	return 0;
+>  }
+>  
+> 
 
-Thanks.  I typed the git diff instruction backwards.
 
->>
->> My question is this:  Where did the 226000 number originate, and why
->> would we not want to use the actual address of the 1e26000 as defined
->> in the Techincal Reference manual?
->
-> Because we define these nodes as being under the "soc" node at offset
-> 1c00000.
->
-
-That makes a lot of sense, but I have a followup question.  Why would
-we only have 1 gpio registered at 22600 when we have multiple banks?
-Again, I am comparing this to the Omap3 because I have more experience
-with that, and they register each bank separately.
-
-The datasheet breaks it up into small banks, 0-1, 2-3, 4-5, 6-7 and 8
-yet the device tree shows ti,ngpio = <144> and
-ti,davinci-gpio-unbanked = <0>;
-
-I only ask as I am trying to get more familiar with this platform, and
-I am trying to enhance improve the da850-evm which I realize has been
-replaced by the lcdk.
-
-adam
-
-> Thanks,
-> Sekhar
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
