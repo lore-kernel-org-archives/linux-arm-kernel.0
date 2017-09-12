@@ -1,35 +1,53 @@
-From: itaru.kitayama@riken.jp (Itaru Kitayama)
-Date: Tue, 12 Sep 2017 17:55:55 +0900
-Subject: ThunderX BMC initialization failure
-Message-ID: <087dcefa-1402-2d9f-da8d-18782df9eea3@riken.jp>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 12 Sep 2017 17:01:38 +0800
+Subject: [xlnx:master 823/1014] drivers/usb/dwc3/host.c:24:6: error:
+ redefinition of 'dwc3_host_wakeup_capable'
+Message-ID: <201709121735.LuyVTEhT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Anurag,
 
-We're seeing below on our ThunderX
+FYI, the error/warning still remains.
 
-$ sudo systemctl start ipmi
-Job for ipmi.service failed because the control process exited with 
-error code. See "systemctl status ipmi.service" and "journalctl -xe" for 
-details.
-$ sudo journalctl -xe
-...
--- Unit ipmi.service has begun starting up.
-Sep 12 15:54:52 satsuma kernel: ipmi message handler version 39.2
-Sep 12 15:54:53 satsuma kernel: IPMI System Interface driver.
-Sep 12 15:54:53 satsuma kernel: ipmi_si: probing via SMBIOS
-Sep 12 15:54:53 satsuma kernel: ipmi_si: Unable to find any System 
-Interface(s)
-Sep 12 15:54:53 satsuma openipmi-helper[2800]: Startup failed.
-Sep 12 15:54:53 satsuma systemd[1]: ipmi.service: main process exited, 
-code=exited, status=1/FAILURE
-Sep 12 15:54:53 satsuma systemd[1]: Failed to start IPMI Driver.
--- Subject: Unit ipmi.service has failed
-...
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   223c3aa24a63bb837169d7253fac666965383934
+commit: 80ac0da9010ebabef6ed1d66b6607b345fd14cb4 [823/1014] dwc3: Add support for clock disabling during suspend
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 80ac0da9010ebabef6ed1d66b6607b345fd14cb4
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-Is it caused by the IPMI driver that comes with CentOS 7 or the BIOS?
+All errors (new ones prefixed by >>):
 
-Thanks,
+>> drivers/usb/dwc3/host.c:24:6: error: redefinition of 'dwc3_host_wakeup_capable'
+    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
+         ^~~~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/usb/dwc3/host.c:20:0:
+   include/linux/usb/xhci_pdriver.h:25:6: note: previous definition of 'dwc3_host_wakeup_capable' was here
+    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
+         ^~~~~~~~~~~~~~~~~~~~~~~~
 
-Itaru
+vim +/dwc3_host_wakeup_capable +24 drivers/usb/dwc3/host.c
+
+    23	
+  > 24	void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
+    25	{
+    26		dwc3_simple_wakeup_capable(dev, wakeup);
+    27	}
+    28	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 45285 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170912/fbaded62/attachment-0001.gz>
