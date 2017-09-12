@@ -1,58 +1,27 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 12 Sep 2017 22:33:16 +0200
-Subject: [media] s5p-mfc: Adjust a null pointer check in four functions
-In-Reply-To: <ee8ba7fd-1de4-b1b9-8aa0-130c86c38f30@samsung.com>
-References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
- <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
- <CGME20170911092134epcas2p1a1b11c056b52d68c3b0e4ea2e1e8f758@epcas2p1.samsung.com>
- <6c2d20b3-4437-0473-73d4-73c049ba52a9@samsung.com>
- <a68020cc-2477-5d6c-bc61-d753253b755a@users.sourceforge.net>
- <0fa9a180-be67-3a33-682c-bff819c36c6a@samsung.com>
- <5b8eb902-d97c-3308-5ba9-64469320e0e2@users.sourceforge.net>
- <ee8ba7fd-1de4-b1b9-8aa0-130c86c38f30@samsung.com>
-Message-ID: <ecb9823b-007c-f2c2-29bb-fbd08429385c@users.sourceforge.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 12 Sep 2017 23:37:16 +0300
+Subject: [PATCH 00/11] Add R8A77970/Eagle board support
+Message-ID: <20170912203716.238067587@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Generating patch is only part of the story,
+Hello.
 
-I can follow this view in principle.
+   Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20170911v2-v4.13' tag. I'm adding the device tree support for
+the R8A77970-based Eagle board. The necessary SYS-DMAC, [H]SCIF, and EtherAVB
+bindings updates have been posted earlier.
 
+[01/11] soc: renesas: identify R-Car V3M
+[02/11] soc: renesas: rcar-rst: add R8A77970 support
+[03/11] dt-bindings: power: add R8A77970 SYSC power domain definitions
+[04/11] soc: renesas: rcar-sysc: add R8A77970 support
+[05/11] arm64: dts: renesas: initial R8A77970 SoC device tree
+[06/11] arm64: dts: renesas: r8a77970: add SYS-DMAC support
+[07/11] arm64: dts: renesas: r8a77970: add [H]SCIF support
+[08/11] arm64: dts: renesas: r8a77970: add EtherAVB support
+[09/11] arm64: renesas: document Eagle board
+[11/11] arm64: dts: renesas: initial Eagle board device tree
+[11/11] arm64: dts: renesas: eagle: add EtherAVB support
 
-> it seems the patch is not sent properly
-
-I got an other impression.
-
-
-> and tags which should be in SMTP header end up in the message body.
-
-I agree that extra message fields were presented by the git software for
-a reason.
-You might have got other opinions about the original reason (than me).
-
-
-> I think there would not be such issues if you have used git
-> format-patch + git send-email.
-
-I have got also doubts about your corresponding expectations when you
-would find
-the proposed commit message itself acceptable (besides the small source
-code changes).
-
-
-> I normally do amend things like this while applying,
-
-That is interesting.
-
-
-> I will do that this time as well.
-
-Such an action can also be nice.
-
-
-> It's already too much time wasted for such a dubious patch.
-
-A bit of time is needed to resolve a temporary disagreement.
-
-Regards,
-Markus
+WBR, Sergei
