@@ -1,12 +1,11 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 12 Sep 2017 23:37:21 +0300
-Subject: [PATCH 05/11] arm64: dts: renesas: initial R8A77970 SoC device tree
-Message-ID: <20170912210523.663877115@cogentembedded.com>
+Date: Tue, 12 Sep 2017 23:37:22 +0300
+Subject: [PATCH 06/11] arm64: dts: renesas: r8a77970: add SYS-DMAC support
+Message-ID: <20170912210527.851901553@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial R8A77970 SoC device tree including Cortex-A53 CPU, GIC, timer,
-CPG, RST, and SYSC.
+Describe SYS-DMAC1/2 in the R8A77970 device tree.
 
 Based on the original (and large) patch by Daisuke Matsushita
 <daisuke.matsushita.ns@hitachi.com>.
@@ -15,137 +14,64 @@ Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi |  126 ++++++++++++++++++++++++++++++
- 1 file changed, 126 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi |   48 ++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
 Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
 ===================================================================
---- /dev/null
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
 +++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -0,0 +1,126 @@
-+/*
-+ * Device Tree Source for the r8a77970 SoC
-+ *
-+ * Copyright (C) 2016-2017 Renesas Electronics Corp.
-+ * Copyright (C) 2017 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+@@ -122,5 +122,53 @@
+ 			compatible = "renesas,prr";
+ 			reg = <0 0xfff00044 0 4>;
+ 		};
 +
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/renesas-cpg-mssr.h>
-+#include <dt-bindings/power/r8a77970-sysc.h>
-+
-+/ {
-+	compatible = "renesas,r8a77970";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		a53_0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0>;
-+			clocks = <&cpg CPG_CORE 0>;
-+			power-domains = <&sysc R8A77970_PD_CA53_CPU0>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
-+		L2_CA53: cache-controller {
-+			compatible = "cache";
-+			power-domains = <&sysc R8A77970_PD_CA53_SCU>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	extalr_clk: extalr {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at f1010000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0 0xf1010000 0 0x1000>,
-+			      <0 0xf1020000 0 0x20000>,
-+			      <0 0xf1040000 0 0x20000>,
-+			      <0 0xf1060000 0 0x20000>;
-+			interrupts = <GIC_PPI 9	(GIC_CPU_MASK_SIMPLE(1) |
-+				      IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
++		dmac1: dma-controller at e7300000 {
++			compatible = "renesas,dmac-r8a77970",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7300000 0 0x10000>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					  "ch0", "ch1", "ch2", "ch3",
++					  "ch4", "ch5", "ch6", "ch7";
++			clocks = <&cpg CPG_MOD 218>;
++			clock-names = "fck";
 +			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 408>;
++			resets = <&cpg 218>;
++			#dma-cells = <1>;
++			dma-channels = <8>;
 +		};
 +
-+		timer {
-+			compatible = "arm,armv8-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>;
++		dmac2: dma-controller at e7310000 {
++			compatible = "renesas,dmac-r8a77970",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7310000 0 0x10000>;
++			interrupts = <GIC_SPI 307 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 319 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					  "ch0", "ch1", "ch2", "ch3",
++					  "ch4", "ch5", "ch6", "ch7";
++			clocks = <&cpg CPG_MOD 217>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 217>;
++			#dma-cells = <1>;
++			dma-channels = <8>;
 +		};
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a77970-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk>, <&extalr_clk>;
-+			clock-names = "extal", "extalr";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
-+		};
-+
-+		rst: reset-controller at e6160000 {
-+			compatible = "renesas,r8a77970-rst";
-+			reg = <0 0xe6160000 0 0x200>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a77970-sysc";
-+			reg = <0 0xe6180000 0 0x440>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+	};
-+};
+ 	};
+ };
