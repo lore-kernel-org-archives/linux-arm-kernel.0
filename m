@@ -1,47 +1,53 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 12 Sep 2017 17:07:40 +0800
-Subject: mmc: mediatek: add support of mt2701/mt2712 
-Message-ID: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
+Date: Tue, 12 Sep 2017 17:07:41 +0800
+Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  This serial of patches are adding support of mt2701/mt2712.
-there are many changes and HW improvement between mt8173 and
-mt2701/mt2712, below is a list of these changes:
-  1. enlarge CLKDIV bits from 8 to 12
-  2. remove the PAD_TUNE register and add a new PAD_TUNE0 register
-  3. add data sync and async fifo feature
-  4. add busy_check feature
-  5. add stop_clk fix
-  6. add enhance_rx support
-  7. add a seperate CG of source clock
+Change the comptiable for support of multi-platform
+Add description for reg
+Add description for source_cg
+Add description for mediatek,latch-ck
 
-mt2712 supports full of these features, mt2701 supports part of it, and
-add a "mediatek,latch-ck" to work-around as it do not support stop-clk
-fix.
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-Note: As Pinctrl/CCF are not ready now, so that current patches do not
-include DTS part.
-
-
-Chaotian Jing (12):
-  mmc: dt-bindings: update Mediatek MMC bindings
-  arm64: dts: mt8173: remove "mediatek,mt8135-mmc" from mmc nodes
-  mmc: mediatek: add support of mt2701/mt2712
-  mmc: mediatek: make hs400_tune_response only for mt8173
-  mmc: mediatek: add pad_tune0 support
-  mmc: mediatek: add async fifo and data tune support
-  mmc: mediatek: add busy_check support
-  mmc: mediatek: add stop_clk fix and enhance_rx support
-  mmc: mediatek: add support of source_cg clock
-  mmc: mediatek: add latch-ck support
-  mmc: mediatek: improve eMMC hs400 mode read performance
-  mmc: mediatek: perfer to use rise edge latching for cmd line
-
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |  13 +-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi         |  12 +-
- drivers/mmc/host/mtk-sd.c                        | 298 ++++++++++++++++++++---
- 3 files changed, 275 insertions(+), 48 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index 4182ea3..405cd06 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
+ and the properties used by the msdc driver.
+ 
+ Required properties:
+-- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
++- compatible: value should be either of the following.
++	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
++	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
++	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
++	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
++- reg: physical base address of the controller and length
+ - interrupts: Should contain MSDC interrupt number
+-- clocks: MSDC source clock, HCLK
+-- clock-names: "source", "hclk"
++- clocks: MSDC source clock, HCLK, source_cg
++- clock-names: "source", "hclk", "source_cg"
+ - pinctrl-names: should be "default", "state_uhs"
+ - pinctrl-0: should contain default/high speed pin ctrl
+ - pinctrl-1: should contain uhs mode pin ctrl
+@@ -30,6 +35,8 @@ Optional properties:
+ - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
+ 				       If present,HS400 command responses are sampled on rising edges.
+ 				       If not present,HS400 command responses are sampled on falling edges.
++- mediatek,latch-ck: Some projects do not support enhance_rx, need set correct latch-ck to avoid data crc
++		     error caused by stop clock(fifo full)
+ 
+ Examples:
+ mmc0: mmc at 11230000 {
 -- 
-1.9.1
+1.8.1.1.dirty
