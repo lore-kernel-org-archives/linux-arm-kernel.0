@@ -1,53 +1,63 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 12 Sep 2017 11:27:13 +0800
-Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
-In-Reply-To: <20170817130139.GA17795@red-moon>
-References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
- <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
- <20170811093348.GC26039@red-moon>
- <CAGHbJ3AgEvbpsPdeqJ+bFWa5hBMqxBX6g1eC4HiUvHarJf8H+g@mail.gmail.com>
- <20170815171525.GB13707@e107981-lin.cambridge.arm.com>
- <de1b88e0-57d5-b73b-bc49-3c28070df6b1@linaro.org>
- <20170817130139.GA17795@red-moon>
-Message-ID: <96c8b5d8-eff2-6583-04da-cb3fdab8e6cb@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 12 Sep 2017 13:43:52 +0900
+Subject: [PATCH 8/9] arm64: enable KEXEC_FILE config
+In-Reply-To: <201709102315.3pEUMBHR%fengguang.wu@intel.com>
+References: <20170908031616.17916-9-takahiro.akashi@linaro.org>
+ <201709102315.3pEUMBHR%fengguang.wu@intel.com>
+Message-ID: <20170912044350.GG17186@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Sun, Sep 10, 2017 at 11:41:47PM +0800, kbuild test robot wrote:
+> Hi AKASHI,
+> 
+> [auto build test ERROR on arm64/for-next/core]
+> [also build test ERROR on v4.13 next-20170908]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/AKASHI-Takahiro/kexec-add-kexec_file_load-support/20170910-143930
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+> config: arm64-allmodconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
+> 
+> Note: the linux-review/AKASHI-Takahiro/kexec-add-kexec_file_load-support/20170910-143930 HEAD caf976acefa5a78ad88489581c66b98cbc8f91fa builds fine.
+>       It only hurts bisectibility.
+> 
+> All errors (new ones prefixed by >>):
+> 
+> >> arch/arm64/kernel/machine_kexec_file.c:22:28: fatal error: asm/kexec_file.h: No such file or directory
+>     #include <asm/kexec_file.h>
+>                                ^
 
-On 2017/8/17 21:01, Lorenzo Pieralisi wrote:
-> On Thu, Aug 17, 2017 at 03:49:37PM +0800, Hanjun Guo wrote:
-> 
-> [...]
-> 
->>>   /**
->>>    * iort_get_platform_device_domain() - Find MSI domain related to a
->>>    * platform device
->>> @@ -1159,6 +1207,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->>>   	/* Configure DMA for the page table walker */
->>>   	acpi_dma_configure(&pdev->dev, attr);
->>> +	iort_set_device_domain(&pdev->dev, node);
->>
->> This is fine to me, but I think we still need to retrieve
->> the output ID as the request id for ITS, which means we
->> need to do that in iort_pmsi_get_dev_id(), right?
-> 
-> Yes, probably we can add code there like:
-> 
-> ret = iort_get_id_mapping_index(&index);
-> if (!ret)
-> 	iort_node_get_id(node, &id, index);
-> 	...
-> 
-> This requires updating iort_node_get_id() to allow single mappings
-> for SMMU/PMCG as you flagged up before.
-> 
-> I will think a bit more to see if there is a cleaner way to reshuffle
-> the mapping API.
+Will fix it in the next version, v3.
 
-I would like to send a updated version after the merge window to gather
-more comments, and at the same time we can work on the cleaner way to
-reshuffle the mapping API, what do you thing?
+-Takahiro AKASHI
 
-Thanks
-Hanjun
+>    compilation terminated.
+> 
+> vim +22 arch/arm64/kernel/machine_kexec_file.c
+> 
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  15  
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  16  #include <linux/errno.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  17  #include <linux/kernel.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  18  #include <linux/kexec.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  19  #include <linux/libfdt.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  20  #include <linux/memblock.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  21  #include <linux/of_fdt.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08 @22  #include <asm/kexec_file.h>
+> 423cf6dc9f AKASHI Takahiro 2017-09-08  23  
+> 
+> :::::: The code at line 22 was first introduced by commit
+> :::::: 423cf6dc9f06d95907902b2b7f84161bdc98f752 arm64: kexec_file: load initrd, device-tree and purgatory segments
+> 
+> :::::: TO: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> :::::: CC: 0day robot <fengguang.wu@intel.com>
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
