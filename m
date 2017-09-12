@@ -1,31 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Sep 2017 14:18:08 +0530
-Subject: [PATCH v4 1/2] i2c: davinci: Add PM Runtime Support
-In-Reply-To: <CAMz4kuLGVes6a4iCF0VbG1ErWPR5at=HKgeGv3cMr1zv7aLzJg@mail.gmail.com>
-References: <20170911201145.31257-1-fcooper@ti.com>
- <20170911201145.31257-2-fcooper@ti.com>
- <CAMz4kuLGVes6a4iCF0VbG1ErWPR5at=HKgeGv3cMr1zv7aLzJg@mail.gmail.com>
-Message-ID: <021a99bb-3670-fff5-6835-b14d28827929@ti.com>
+From: itaru.kitayama@riken.jp (Itaru Kitayama)
+Date: Tue, 12 Sep 2017 17:55:55 +0900
+Subject: ThunderX BMC initialization failure
+Message-ID: <087dcefa-1402-2d9f-da8d-18782df9eea3@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 September 2017 07:28 AM, Baolin Wang wrote:
->> @@ -802,13 +821,24 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->>         dev->clk = devm_clk_get(&pdev->dev, NULL);
->>         if (IS_ERR(dev->clk))
->>                 return PTR_ERR(dev->clk);
->> -       clk_prepare_enable(dev->clk);
+Hi,
 
-> You removed clk enable here, I think it can not work if we did not
-> open CONFIG_PM macro. I think you should keep clk enable here, and set
+We're seeing below on our ThunderX
 
-What do you mean by "open CONFIG_PM macro" ?
+$ sudo systemctl start ipmi
+Job for ipmi.service failed because the control process exited with 
+error code. See "systemctl status ipmi.service" and "journalctl -xe" for 
+details.
+$ sudo journalctl -xe
+...
+-- Unit ipmi.service has begun starting up.
+Sep 12 15:54:52 satsuma kernel: ipmi message handler version 39.2
+Sep 12 15:54:53 satsuma kernel: IPMI System Interface driver.
+Sep 12 15:54:53 satsuma kernel: ipmi_si: probing via SMBIOS
+Sep 12 15:54:53 satsuma kernel: ipmi_si: Unable to find any System 
+Interface(s)
+Sep 12 15:54:53 satsuma openipmi-helper[2800]: Startup failed.
+Sep 12 15:54:53 satsuma systemd[1]: ipmi.service: main process exited, 
+code=exited, status=1/FAILURE
+Sep 12 15:54:53 satsuma systemd[1]: Failed to start IPMI Driver.
+-- Subject: Unit ipmi.service has failed
+...
 
-> rpm active by pm_runtime_set_active() before issuing
-> pm_runtime_enable().
-
-Can you explain why you want to do this instead of relying on
-pm_runtime_get_sync() to enable clock?
+Is it caused by the IPMI driver that comes with CentOS 7 or the BIOS?
 
 Thanks,
-Sekhar
+
+Itaru
