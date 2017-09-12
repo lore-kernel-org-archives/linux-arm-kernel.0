@@ -1,43 +1,116 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Tue, 12 Sep 2017 17:14:42 +0800
-Subject: [PATCH v4 1/2] i2c: davinci: Add PM Runtime Support
-In-Reply-To: <021a99bb-3670-fff5-6835-b14d28827929@ti.com>
-References: <20170911201145.31257-1-fcooper@ti.com>
- <20170911201145.31257-2-fcooper@ti.com>
- <CAMz4kuLGVes6a4iCF0VbG1ErWPR5at=HKgeGv3cMr1zv7aLzJg@mail.gmail.com>
- <021a99bb-3670-fff5-6835-b14d28827929@ti.com>
-Message-ID: <CAMz4ku+_saDS8VBf1kXb+HMDqvx2O2o4qwcU4dEjFvtyE_9JKg@mail.gmail.com>
+From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
+Date: Tue, 12 Sep 2017 17:44:55 +0800
+Subject: [1/9] i2c: designware: Fix system suspend
+In-Reply-To: <CAPDyKFq0W2NXXGzNgKq2xeiFsj=kt8JG+LzEzOb=38RWBqi+YA@mail.gmail.com>
+References: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+ <5597d9a7-8b1a-d45d-e8d5-d1c0b46ddb7a@hisilicon.com>
+ <CAPDyKFq0W2NXXGzNgKq2xeiFsj=kt8JG+LzEzOb=38RWBqi+YA@mail.gmail.com>
+Message-ID: <e14d2021-b385-c0ac-603a-d0acccc8b8f3@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12 September 2017 at 16:48, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Tuesday 12 September 2017 07:28 AM, Baolin Wang wrote:
->>> @@ -802,13 +821,24 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->>>         dev->clk = devm_clk_get(&pdev->dev, NULL);
->>>         if (IS_ERR(dev->clk))
->>>                 return PTR_ERR(dev->clk);
->>> -       clk_prepare_enable(dev->clk);
->
->> You removed clk enable here, I think it can not work if we did not
->> open CONFIG_PM macro. I think you should keep clk enable here, and set
->
-> What do you mean by "open CONFIG_PM macro" ?
-
-If you did not open CONFIG_PM macro, then the pm_runtime_xxx() will be
-dummy functions, but now the i2c driver can not work since you did not
-enable clock, right?
-
->
->> rpm active by pm_runtime_set_active() before issuing
->> pm_runtime_enable().
->
-> Can you explain why you want to do this instead of relying on
-> pm_runtime_get_sync() to enable clock?
-
-What I mean is you should compatible whether CONFIG_PM is enabled or not.
-
--- 
-Baolin.wang
-Best Regards
+OK, this patch can also fix the problem.
+On 2017/9/8 16:29, Ulf Hansson wrote:
+> On 8 September 2017 at 05:23, Wangtao (Kevin, Kirin)
+> <kevin.wangtao@hisilicon.com> wrote:
+>>
+>> This patch can fix the issue we found on hikey960 that i2c doesn't skip
+>> system suspend when it is runtime suspended.
+> 
+> We decided to go with a slightly different version. You may try out
+> the below and see if that also fixes your problem.
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a23318feeff662c8d25d21623daebdd2e55ec221
+> 
+> Kind regards
+> Uffe
+> 
+>>
+>>
+>> ? 2017/6/22 3:21, Ulf Hansson ??:
+>>>
+>>> The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
+>>> during system suspend"), may suggest to the PM core to try out the so
+>>> called direct_complete path for system sleep. In this path, the PM core
+>>> treats a runtime suspended device as it's already in a proper low power
+>>> state for system sleep, which makes it skip calling the system sleep
+>>> callbacks for the device, except for the ->prepare() and the ->complete()
+>>> callback.
+>>>
+>>> Moreover, under certain circumstances the PM core may unset the
+>>> direct_complete flag for a parent device, in case its child device are
+>>> being system suspended before. In other words, the PM core doesn't skip
+>>> calling the system sleep callbacks, no matter if the device is runtime
+>>> suspended or not.
+>>>
+>>> In cases of an i2c slave device, the above situation is triggered.
+>>> Unfortunate, this also breaks the assumption that the i2c device is always
+>>> runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
+>>> invoked, which then leads to a regression.
+>>>
+>>> More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
+>>> clk_core_unprepare(), for an already disabled/unprepared clock, leading to
+>>> complaints about clocks calls being wrongly balanced.
+>>>
+>>> In cases when the i2c device is attached to the ACPI PM domain, the
+>>> problem
+>>> doesn't occur. That's because ACPI's ->suspend() callback, assigned to
+>>> acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
+>>>
+>>> To make a simple fix for this regression, let's runtime resume the i2c
+>>> device in the ->prepare() callback, assigned to dw_i2c_plat_prepare().
+>>> This
+>>> prevents the direct_complete path from being executed by the PM core and
+>>> guarantees the dw_i2c_plat_suspend() is called with the i2c device always
+>>> being runtime resumed.
+>>>
+>>> Of course this change is suboptimal, because to always force a runtime
+>>> resume of the i2c device in ->prepare() is a waste, especially in those
+>>> cases when it could have remained runtime suspended during the entire
+>>> system sleep sequence. However, to accomplish that behaviour a bigger
+>>> change is needed, so defer that to future changes not applicable as fixes
+>>> or for stable.
+>>>
+>>> Fixes: 8503ff166504 ("i2c: designware: Avoid unnecessary resuming...")
+>>> Cc: stable at vger.linux.org
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> ---
+>>>    drivers/i2c/busses/i2c-designware-platdrv.c | 11 ++---------
+>>>    1 file changed, 2 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> b/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> index d1263b8..2b7fa75 100644
+>>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> @@ -375,17 +375,11 @@ MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
+>>>    #ifdef CONFIG_PM_SLEEP
+>>>    static int dw_i2c_plat_prepare(struct device *dev)
+>>>    {
+>>> -       return pm_runtime_suspended(dev);
+>>> -}
+>>> -
+>>> -static void dw_i2c_plat_complete(struct device *dev)
+>>> -{
+>>> -       if (dev->power.direct_complete)
+>>> -               pm_request_resume(dev);
+>>> +       pm_runtime_resume(dev);
+>>> +       return 0;
+>>>    }
+>>>    #else
+>>>    #define dw_i2c_plat_prepare   NULL
+>>> -#define dw_i2c_plat_complete   NULL
+>>>    #endif
+>>>      #ifdef CONFIG_PM
+>>> @@ -413,7 +407,6 @@ static int dw_i2c_plat_resume(struct device *dev)
+>>>      static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
+>>>          .prepare = dw_i2c_plat_prepare,
+>>> -       .complete = dw_i2c_plat_complete,
+>>>          SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
+>>>          SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
+>>>    };
+>>>
+>>
+> 
+> .
+> 
