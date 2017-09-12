@@ -1,43 +1,50 @@
-From: sz.lin@moxa.com (SZ Lin)
-Date: Tue, 12 Sep 2017 14:49:25 +0800
-Subject: [RESEND PATCH] ARM: dts: ls1021a: Add support for QSPI with ls1021a
- SoC
-Message-ID: <20170912064925.24571-1-sz.lin@moxa.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 12 Sep 2017 07:51:06 +0100
+Subject: [PATCH v2 00/29] implement KASLR for ARM
+In-Reply-To: <20170906200805.GN5024@atomide.com>
+References: <20170906162222.GI5024@atomide.com>
+ <CAKv+Gu__-WeHKDGwg4rNM9Dw8V471wNQX=J3mfz_AUKHVUza_g@mail.gmail.com>
+ <20170906163100.GJ5024@atomide.com>
+ <CAKv+Gu-HGM6T6cV25bo6_bBcZaV-x3qpc9XoYUA4AEx68Joz=A@mail.gmail.com>
+ <20170906171253.GK5024@atomide.com>
+ <CAKv+Gu8ngWMvkmNr77SzL8fEvSc5K-OntoZQ53vgWVLHhAajaw@mail.gmail.com>
+ <20170906175308.GL5024@atomide.com>
+ <CAKv+Gu8qd8oz4wuEjAaR1E3ZUxt4Xr-j4NcLidRrNisVFefzCQ@mail.gmail.com>
+ <20170906182247.GM5024@atomide.com>
+ <CAKv+Gu8N_cjm_5aH=kWt6EKc6sGgQoWDVmdVAVw1Ru_xz1UWEw@mail.gmail.com>
+ <20170906200805.GN5024@atomide.com>
+Message-ID: <CAKv+Gu8mT_2+Rom627pZZ0x=KU=ddR8nobWgfWVNtvxC1BgZvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add QSPI node support, and this function is disabled by default
-This setting could be overwritten in board-level definitions
+On 6 September 2017 at 21:08, Tony Lindgren <tony@atomide.com> wrote:
+> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 11:25]:
+>> Did you capture the image_size and pa_start/pa_end as well?
+>
+> Sorry I guess that was an incomplete copy & paste, but here's
+> another one:
+>
+> regions.image_size:00e08000
+> regions.pa_start:80000000
+> regions.pa_end:871f8000
+> regions.zimage_start:81000000
+> regions.zimage_size:004379e8
+> regions.dtb_start:86feb000
+> regions.dtb_size:00012000
+> regions.initrd_start:00000000
+> regions.initrd_size:00000000
+> count:00000028
+> num:00000025
+> *kaslr_offset:05e00000
+> Uncompressing Linux... done, booting the kernel.
+> Warning: Neither atags nor dtb found
+>
+>> In any case, this is the exact same offset that failed before, so the
+>> rounding of pa_start wasn't the problem.
+>
+> OK
+>
 
-Signed-off-by: SZ Lin <sz.lin@moxa.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 7bb9df2c1460..9da876e47810 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -154,6 +154,20 @@
- 			big-endian;
- 		};
- 
-+		qspi: quadspi at 1550000 {
-+			compatible = "fsl,ls1021a-qspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x1550000 0x0 0x10000>,
-+			      <0x0 0x40000000 0x0 0x40000000>;
-+			reg-names = "QuadSPI", "QuadSPI-memory";
-+			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "qspi_en", "qspi";
-+			clocks = <&clockgen 4 1>, <&clockgen 4 1>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
- 		esdhc: esdhc at 1560000 {
- 			compatible = "fsl,esdhc";
- 			reg = <0x0 0x1560000 0x0 0x10000>;
--- 
-2.14.1
+I am pretty sure this is an issue with .bss, which is not covered by
+image_size (and which is absolutely *huge* btw [8+ MB] on
+omap2plus_defconfig, due to lockdep being enabled by default)
