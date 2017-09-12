@@ -1,69 +1,70 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 12 Sep 2017 17:41:56 +0200
-Subject: [PATCH] mtd: oxnas_nand: Fix error handling in oxnas_nand_probe()
-In-Reply-To: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
-References: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
-Message-ID: <66c9e0a2-f216-181c-d35e-1e09434a923a@baylibre.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 12 Sep 2017 08:44:09 -0700
+Subject: [PATCH v4 6/6] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <CACRpkdZLG=ezxj62R=WkULh2vfpQwqh8P-6FhtONzU7yRbyeuA@mail.gmail.com>
+References: <1504784522-26841-1-git-send-email-yamada.masahiro@socionext.com>
+ <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdZLG=ezxj62R=WkULh2vfpQwqh8P-6FhtONzU7yRbyeuA@mail.gmail.com>
+Message-ID: <7e46f2a3-114f-0c34-d3c5-49e6422b9200@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2017 12:00 AM, Alexey Khoroshilov wrote:
-> oxnas_nand_probe() does not disable clock on error paths.
-> The patch adds disabling using devm interface.
+On 09/12/2017 07:03 AM, Linus Walleij wrote:
+> On Thu, Sep 7, 2017 at 1:42 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
 > 
-> Found by Linux Driver Verification project (linuxtesting.org).
+>> This GPIO controller device is used on UniPhier SoCs.
+>>
+>> It also serves as an interrupt controller, but interrupt signals are
+>> just delivered to the parent irqchip without any latching or OR'ing.
+>> This is implemented by using hierarchy IRQ domain.
+>>
+>> Implementation note:
+>> Unfortunately, the IRQ mapping from this controller to the parent is
+>> random. (48, 49, ..., 63, 154, 155, ...)
+>> If "interrupts" property is used, IRQ resources may be statically
+>> allocated when platform devices are populated from DT.  This can be
+>> a problem for the hierarchy IRQ domain because IRQ allocation must
+>> happen from the outer-most domain up to the root domain in order to
+>> build up the stacked IRQ.  (https://lkml.org/lkml/2017/7/6/758)
+>> Solutions to work around it could be to hard-code parent hwirqs or
+>> to invent a driver-specific DT property.
+>>
+>> Here, the new API irq_domain_push_irq() was merged by v4.14-rc1.
+>> It allows to add irq_data to the existing hierarchy.  It will help
+>> to make this driver work whether the parent has already initialized
+>> the hierarchy or not.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>> Changes in v4:
+>>    - Add COMPILE_TEST and select IRQ_DOMAIN_HIERARCHY
+>>    - Reimplement irqchip part by using irq_domain_push_irq()
 > 
-> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
-> ---
->  drivers/mtd/nand/oxnas_nand.c | 22 +++++++++++++++-------
->  1 file changed, 15 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
-> index 1b207aac840c..8abc69a285dd 100644
-> --- a/drivers/mtd/nand/oxnas_nand.c
-> +++ b/drivers/mtd/nand/oxnas_nand.c
-> @@ -103,16 +103,26 @@ static int oxnas_nand_probe(struct platform_device *pdev)
->  	if (IS_ERR(oxnas->io_base))
->  		return PTR_ERR(oxnas->io_base);
->  
-> -	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(oxnas->clk))
-> -		oxnas->clk = NULL;
-> -
->  	/* Only a single chip node is supported */
->  	count = of_get_child_count(np);
->  	if (count > 1)
->  		return -EINVAL;
->  
-> -	clk_prepare_enable(oxnas->clk);
-> +	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(oxnas->clk)) {
-> +		oxnas->clk = NULL;
-> +	} else {
-> +		err = clk_prepare_enable(oxnas->clk);
-> +		if (err)
-> +			return err;
-> +
-> +		err = devm_add_action_or_reset(&pdev->dev,
-> +				(void(*)(void *))clk_disable_unprepare,
-> +				oxnas->clk);
-> +		if (err)
-> +			return err;
-> +	}
-> +
->  	device_reset_optional(&pdev->dev);
->  
->  	for_each_child_of_node(np, nand_np) {
-> @@ -167,8 +177,6 @@ static int oxnas_nand_remove(struct platform_device *pdev)
->  	if (oxnas->chips[0])
->  		nand_release(nand_to_mtd(oxnas->chips[0]));
->  
-> -	clk_disable_unprepare(oxnas->clk);
-> -
->  	return 0;
->  }
->  
-> 
+> Awesome improvement. There was a build error and I also
+> would like David Daney to have a look at this so we know we
+> use things the right way,
+
+It looks correct to me.
+
+I haven't verified it, but I think the OF device-tree probing code for 
+the platform devices will automatically xlat-and-map all those irqs, so 
+that the  irq_domain_push_irq() is required to get the domain hierarchy 
+properly configured.  It would be similar to the PCI case where we 
+configure all the MSI-X and then do the irq_domain_push_irq() in the 
+Cavium ThunderX driver.
+
+If interrupt handling has been verified to work with this driver, I 
+would say that we are probably using things "the right way".
+
+David.
 
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+
+> but overall I am happy after this
+> so I hope I will be able to apply next version.
+> 
+> Yours,
+> Linus Walleij
+> 
