@@ -1,39 +1,74 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Sep 2017 14:52:02 +0530
-Subject: [PATCH v4 1/2] i2c: davinci: Add PM Runtime Support
-In-Reply-To: <CAMz4ku+_saDS8VBf1kXb+HMDqvx2O2o4qwcU4dEjFvtyE_9JKg@mail.gmail.com>
-References: <20170911201145.31257-1-fcooper@ti.com>
- <20170911201145.31257-2-fcooper@ti.com>
- <CAMz4kuLGVes6a4iCF0VbG1ErWPR5at=HKgeGv3cMr1zv7aLzJg@mail.gmail.com>
- <021a99bb-3670-fff5-6835-b14d28827929@ti.com>
- <CAMz4ku+_saDS8VBf1kXb+HMDqvx2O2o4qwcU4dEjFvtyE_9JKg@mail.gmail.com>
-Message-ID: <d8ee0f47-fa69-3aca-6c5d-24f25505fa05@ti.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 12 Sep 2017 18:24:01 +0900
+Subject: [PATCH net-next 2/3] net: ethernet: socionext: add AVE ethernet
+ driver
+In-Reply-To: <20170911120009.GA24174@lunn.ch>
+References: <20170911155047.6717.4A936039@socionext.com>
+ <20170911120009.GA24174@lunn.ch>
+Message-ID: <20170912182400.180E.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 September 2017 02:44 PM, Baolin Wang wrote:
-> Hi,
-> 
-> On 12 September 2017 at 16:48, Sekhar Nori <nsekhar@ti.com> wrote:
->> On Tuesday 12 September 2017 07:28 AM, Baolin Wang wrote:
->>>> @@ -802,13 +821,24 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->>>>         dev->clk = devm_clk_get(&pdev->dev, NULL);
->>>>         if (IS_ERR(dev->clk))
->>>>                 return PTR_ERR(dev->clk);
->>>> -       clk_prepare_enable(dev->clk);
->>
->>> You removed clk enable here, I think it can not work if we did not
->>> open CONFIG_PM macro. I think you should keep clk enable here, and set
->>
->> What do you mean by "open CONFIG_PM macro" ?
-> 
-> If you did not open CONFIG_PM macro, then the pm_runtime_xxx() will be
-> dummy functions, but now the i2c driver can not work since you did not
-> enable clock, right?
+Hi Andrew,
 
-Ah, okay. I am not sure thats a concern on platforms on which this
-driver is used. Without PM runtime support, most likely the platforms
-will not boot and multiple drivers will fail.
+On Mon, 11 Sep 2017 14:00:09 +0200 Andrew Lunn <andrew@lunn.ch> wrote:
 
-Thanks,
-Sekhar
+> > > > +static irqreturn_t ave_interrupt(int irq, void *netdev)
+> > > > +{
+> > > > +	struct net_device *ndev = (struct net_device *)netdev;
+> > > > +	struct ave_private *priv = netdev_priv(ndev);
+> > > > +	u32 gimr_val, gisr_val;
+> > > > +
+> > > > +	gimr_val = ave_irq_disable_all(ndev);
+> > > > +
+> > > > +	/* get interrupt status */
+> > > > +	gisr_val = ave_r32(ndev, AVE_GISR);
+> > > > +
+> > > > +	/* PHY */
+> > > > +	if (gisr_val & AVE_GI_PHY) {
+> > > > +		ave_w32(ndev, AVE_GISR, AVE_GI_PHY);
+> > > > +		if (priv->internal_phy_interrupt)
+> > > > +			phy_mac_interrupt(ndev->phydev, ndev->phydev->link);
+> > > 
+> > > Humm. I don't think this is correct. You are supposed to give it the
+> > > new link state, not the old.
+> > > 
+> > > What does a PHY interrupt mean here? 
+> > 
+> > In the general case, I think PHY events like changing link state are transmitted
+> > to CPU as interrupt via interrupt controller, then PHY driver itself can handle
+> > the interrupt.
+> > 
+> > And in this case, PHY events are transmitted to MAC as one of its interrupt factor,
+> > then I thought that MAC driver had to tell the events to PHY.
+> 
+> Could this be in-band SGMI signalling from the PHY to the MAC? Does
+> the documentation give examples of when this interrupt will happen?
+> 
+>     Andrew
+
+Unfortunately this MAC doesn't support SGMII.
+And there aren't any examples of when this interrupt will happen.
+This interrupt happens after ave_open() is called and link is established.
+
+However, I found that auto negotiation didn't start when this interrupt wasn't handled.
+
+Although ave_init() calls phy_start_aneg(), it doesn't make sense
+because phy driver doesn't start yet.
+
+And according to Florian's comment in ave_init(),
+
+> +	phy_start_interrupts(phydev);
+> +
+> +	phy_start_aneg(phydev);
+>
+> No, no, phy_start() would take care of all of that correctly for you,
+> you don't have have to do it just there because ave_open() eventually
+> calls phy_start() for you, so just drop these two calls.
+
+When moving phy_start_aneg() to ave_open(), the handler doesn't need to call
+phy_mac_interrupt() and I can remove it from the handler.
+
+---
+Best Regards,
+Kunihiko Hayashi
