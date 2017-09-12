@@ -1,59 +1,122 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 Sep 2017 16:51:43 +0100
-Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
-In-Reply-To: <96c8b5d8-eff2-6583-04da-cb3fdab8e6cb@linaro.org>
-References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
- <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
- <20170811093348.GC26039@red-moon>
- <CAGHbJ3AgEvbpsPdeqJ+bFWa5hBMqxBX6g1eC4HiUvHarJf8H+g@mail.gmail.com>
- <20170815171525.GB13707@e107981-lin.cambridge.arm.com>
- <de1b88e0-57d5-b73b-bc49-3c28070df6b1@linaro.org>
- <20170817130139.GA17795@red-moon>
- <96c8b5d8-eff2-6583-04da-cb3fdab8e6cb@linaro.org>
-Message-ID: <20170912155143.GA29684@red-moon>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Sep 2017 11:15:46 -0500
+Subject: [PATCH v1 1/3] dt-bindings: nvmem: add description for UniPhier
+ eFuse
+In-Reply-To: <000001d32615$38e1b0c0$aaa51240$@socionext.com>
+References: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1504221620-358-2-git-send-email-hayashibara.keiji@socionext.com>
+ <CAK7LNASLh4vYqZhM9g2AL1uUtieviAmmWOp_Mzoj0zG=Ejz0cA@mail.gmail.com>
+ <000001d32615$38e1b0c0$aaa51240$@socionext.com>
+Message-ID: <20170912161546.q5xr5pfdxin3qujf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 11:27:13AM +0800, Hanjun Guo wrote:
-> Hi Lorenzo,
+On Tue, Sep 05, 2017 at 04:04:31PM +0900, Keiji Hayashibara wrote:
+> Hello Yamada-san,
 > 
-> On 2017/8/17 21:01, Lorenzo Pieralisi wrote:
-> >On Thu, Aug 17, 2017 at 03:49:37PM +0800, Hanjun Guo wrote:
-> >
-> >[...]
-> >
-> >>>  /**
-> >>>   * iort_get_platform_device_domain() - Find MSI domain related to a
-> >>>   * platform device
-> >>>@@ -1159,6 +1207,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> >>>  	/* Configure DMA for the page table walker */
-> >>>  	acpi_dma_configure(&pdev->dev, attr);
-> >>>+	iort_set_device_domain(&pdev->dev, node);
-> >>
-> >>This is fine to me, but I think we still need to retrieve
-> >>the output ID as the request id for ITS, which means we
-> >>need to do that in iort_pmsi_get_dev_id(), right?
-> >
-> >Yes, probably we can add code there like:
-> >
-> >ret = iort_get_id_mapping_index(&index);
-> >if (!ret)
-> >	iort_node_get_id(node, &id, index);
-> >	...
-> >
-> >This requires updating iort_node_get_id() to allow single mappings
-> >for SMMU/PMCG as you flagged up before.
-> >
-> >I will think a bit more to see if there is a cleaner way to reshuffle
-> >the mapping API.
+> Thank you for your comment.
 > 
-> I would like to send a updated version after the merge window to gather
-> more comments, and at the same time we can work on the cleaner way to
-> reshuffle the mapping API, what do you thing?
+> > From: Masahiro Yamada [mailto:yamada.masahiro at socionext.com]
+> > Sent: Monday, September 4, 2017 9:56 PM
+> > 
+> > 2017-09-01 8:20 GMT+09:00 Keiji Hayashibara
+> > <hayashibara.keiji@socionext.com>:
+> > > Add uniphier-efuse dt-bindings documentation.
+> > >
+> > > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+> > > ---
+> > >  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 45
+> > ++++++++++++++++++++++
+> > >  1 file changed, 45 insertions(+)
+> > >  create mode 100644
+> > > Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
 
-I think you should send an updated patch at -rc1 with comments above, we
-can rework the API later or I can do it on top of your patches for the
-upcoming merge window.
+> > > +Example:
+> > > +
+> > > +       soc-glue at 5f900000 {
+> > > +               compatible = "socionext,uniphier-ld20-soc-glue-debug",
+> > > +                            "simple-mfd";
+> > > +               #address-cells = <1>;
+> > > +               #size-cells = <1>;
+> > > +               ranges = <0x0 0x5f900000 0x2000>;
+> > 
+> > 
+> > IMHO, I think an empty "ranges;" will clarify the code, but it is up to
+> > your taste.
+> > 
+> > 
+> > > +
+> > > +               efuse {
+> > > +                       compatible = "socionext,uniphier-efuse",
+> > > +                                    "syscon";
+> > 
+> > 
+> > You are adding a dedicated driver for "socionext,uniphier-efuse".
+> > 
+> > Then, "syscon" as well?
+> > 
+> 
+> Since I was using the syscon interface to implement the driver,
+> I specified "syscon". It's interface is syscon_node_to_regmap().
+> 
+> I will rethink this in v2.
+> 
+> > 
+> > 
+> > > +                       reg = <0x100 0xf00>;
+> > 
+> > 
+> > Not so many efuse registers exist on the SoC.
+> > 
+> > reg = <0x100 0x200>; will be enough.
+> > 
+> > 
+> > Or if you want to be strict to the hw spec, you can write as follows:
+> > 
+> >         soc-glue at 5f900000 {
+> >                compatible = "socionext,uniphier-ld20-soc-glue-debug";
+> >                             "simple-mfd";
+> >                #address-cells = <1>;
+> >                #size-cells = <1>;
+> >                ranges = <0x0 0x5f900000 0x2000>;
+> > 
+> >                efuse at 100 {
+> >                            compatible = "socionext,uniphier-efuse";
+> >                            reg = <0x100 0x28>;
+> >                };
+> > 
+> >                efuse at 200 {
+> >                            compatible = "socionext,uniphier-efuse";
+> >                            reg = <0x200 0x68>;
+> >                };
+> >        };
+> > 
+> > 
+> > 
+> > 
+> > > +                       #address-cells = <1>;
+> > > +                       #size-cells = <1>;
+> > > +
+> > > +                       /* Data cells */
+> > > +                       usb_mon: usb_mon {
+> > > +                               reg = <0x154 0xc>;
+> > > +                       };
+> > 
+> > 
+> > This <0x154 0xc> represents 0x5f900254 in CPU address view.
+> > (0x5f900000 + 0x100 + 0x154)
+> > 
+> > So many ranges conversion, and how error-prone..
+> > 
+> 
+> Yes, indeed...
+> I will modify as below.
 
-Thanks !
-Lorenzo
+Please don't. A non-empty ranges is preferred. It limits the scope and 
+chance for errors (smaller range allows fewer possible values and 
+limits the chances of having address ranges duplicated in multiple 
+nodes). But yes, it does add the requirement of doing addition and/or 
+OR operations. I can't review whether the address ends up being correct 
+either way, but having non-empty ranges helps enforce the other things.
+
+Rob
