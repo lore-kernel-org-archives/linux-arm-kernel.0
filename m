@@ -1,116 +1,67 @@
-From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
-Date: Tue, 12 Sep 2017 17:44:55 +0800
-Subject: [1/9] i2c: designware: Fix system suspend
-In-Reply-To: <CAPDyKFq0W2NXXGzNgKq2xeiFsj=kt8JG+LzEzOb=38RWBqi+YA@mail.gmail.com>
-References: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
- <5597d9a7-8b1a-d45d-e8d5-d1c0b46ddb7a@hisilicon.com>
- <CAPDyKFq0W2NXXGzNgKq2xeiFsj=kt8JG+LzEzOb=38RWBqi+YA@mail.gmail.com>
-Message-ID: <e14d2021-b385-c0ac-603a-d0acccc8b8f3@hisilicon.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 12 Sep 2017 10:54:28 +0100
+Subject: [PATCH v2] arm64: fix unwind_frame() for filtered out fn for
+ function graph tracing
+In-Reply-To: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
+References: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
+Message-ID: <59B7AED4.1070106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, this patch can also fix the problem.
-On 2017/9/8 16:29, Ulf Hansson wrote:
-> On 8 September 2017 at 05:23, Wangtao (Kevin, Kirin)
-> <kevin.wangtao@hisilicon.com> wrote:
->>
->> This patch can fix the issue we found on hikey960 that i2c doesn't skip
->> system suspend when it is runtime suspended.
+Hi Pratyush,
+
+On 01/09/17 06:48, Pratyush Anand wrote:
+> do_task_stat() calls get_wchan(), which further does unbind_frame().
+> unbind_frame() restores frame->pc to original value in case function
+> graph tracer has modified a return address (LR) in a stack frame to hook
+> a function return. However, if function graph tracer has hit a filtered
+> function, then we can't unwind it as ftrace_push_return_trace() has
+> biased the index(frame->graph) with a 'huge negative'
+> offset(-FTRACE_NOTRACE_DEPTH).
 > 
-> We decided to go with a slightly different version. You may try out
-> the below and see if that also fixes your problem.
+> Moreover, arm64 stack walker defines index(frame->graph) as unsigned
+> int, which can not compare a -ve number.
 > 
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a23318feeff662c8d25d21623daebdd2e55ec221
+> Similar problem we can have with calling of walk_stackframe() from
+> save_stack_trace_tsk() or dump_backtrace().
 > 
-> Kind regards
-> Uffe
-> 
->>
->>
->> ? 2017/6/22 3:21, Ulf Hansson ??:
->>>
->>> The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
->>> during system suspend"), may suggest to the PM core to try out the so
->>> called direct_complete path for system sleep. In this path, the PM core
->>> treats a runtime suspended device as it's already in a proper low power
->>> state for system sleep, which makes it skip calling the system sleep
->>> callbacks for the device, except for the ->prepare() and the ->complete()
->>> callback.
->>>
->>> Moreover, under certain circumstances the PM core may unset the
->>> direct_complete flag for a parent device, in case its child device are
->>> being system suspended before. In other words, the PM core doesn't skip
->>> calling the system sleep callbacks, no matter if the device is runtime
->>> suspended or not.
->>>
->>> In cases of an i2c slave device, the above situation is triggered.
->>> Unfortunate, this also breaks the assumption that the i2c device is always
->>> runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
->>> invoked, which then leads to a regression.
->>>
->>> More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
->>> clk_core_unprepare(), for an already disabled/unprepared clock, leading to
->>> complaints about clocks calls being wrongly balanced.
->>>
->>> In cases when the i2c device is attached to the ACPI PM domain, the
->>> problem
->>> doesn't occur. That's because ACPI's ->suspend() callback, assigned to
->>> acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
->>>
->>> To make a simple fix for this regression, let's runtime resume the i2c
->>> device in the ->prepare() callback, assigned to dw_i2c_plat_prepare().
->>> This
->>> prevents the direct_complete path from being executed by the PM core and
->>> guarantees the dw_i2c_plat_suspend() is called with the i2c device always
->>> being runtime resumed.
->>>
->>> Of course this change is suboptimal, because to always force a runtime
->>> resume of the i2c device in ->prepare() is a waste, especially in those
->>> cases when it could have remained runtime suspended during the entire
->>> system sleep sequence. However, to accomplish that behaviour a bigger
->>> change is needed, so defer that to future changes not applicable as fixes
->>> or for stable.
->>>
->>> Fixes: 8503ff166504 ("i2c: designware: Avoid unnecessary resuming...")
->>> Cc: stable at vger.linux.org
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> ---
->>>    drivers/i2c/busses/i2c-designware-platdrv.c | 11 ++---------
->>>    1 file changed, 2 insertions(+), 9 deletions(-)
->>>
->>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
->>> b/drivers/i2c/busses/i2c-designware-platdrv.c
->>> index d1263b8..2b7fa75 100644
->>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
->>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
->>> @@ -375,17 +375,11 @@ MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
->>>    #ifdef CONFIG_PM_SLEEP
->>>    static int dw_i2c_plat_prepare(struct device *dev)
->>>    {
->>> -       return pm_runtime_suspended(dev);
->>> -}
->>> -
->>> -static void dw_i2c_plat_complete(struct device *dev)
->>> -{
->>> -       if (dev->power.direct_complete)
->>> -               pm_request_resume(dev);
->>> +       pm_runtime_resume(dev);
->>> +       return 0;
->>>    }
->>>    #else
->>>    #define dw_i2c_plat_prepare   NULL
->>> -#define dw_i2c_plat_complete   NULL
->>>    #endif
->>>      #ifdef CONFIG_PM
->>> @@ -413,7 +407,6 @@ static int dw_i2c_plat_resume(struct device *dev)
->>>      static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
->>>          .prepare = dw_i2c_plat_prepare,
->>> -       .complete = dw_i2c_plat_complete,
->>>          SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
->>>          SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
->>>    };
->>>
->>
-> 
-> .
+> This patch fixes unwind_frame() to test the index for -ve value and
+> restore index accordingly before we can restore frame->pc.
+
+I've just spotted arm64's profile_pc, which does this:
+>From arch/arm64/kernel/time.c:profile_pc():
+> #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> 	frame.graph = -1; /* no task info */
+> #endif
+
+Is this another elaborate way of hitting this problem?
+
+I guess the options are skip any return-address restore in the unwinder if
+frame.graph is -1. (and profile_pc may have a bug here). Or, put
+current->curr_ret_stack in there.
+
+profile_pc() always passes tsk=NULL, so the unwinder assumes its current...
+kernel/profile.c pulls the pt_regs from a per-cpu irq_regs variable, that is
+updated by handle_IPI ... so it looks like this should always be current...
+
+
+Thanks,
+
+James
+
+
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index 09d37d66b630..4c47147d0554 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -75,6 +75,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>  	if (tsk->ret_stack &&
+>  			(frame->pc == (unsigned long)return_to_handler)) {
+> +		if (frame->graph < 0)
+> +			frame->graph += FTRACE_NOTRACE_DEPTH;
+> +
+>  		/*
+>  		 * This is a case where function graph tracer has
+>  		 * modified a return address (LR) in a stack frame
 > 
