@@ -1,39 +1,41 @@
-From: jason@tensyr.com (Jason Teplitz)
-Date: Tue, 12 Sep 2017 11:57:48 -0700
-Subject: Prevent Kernel from resetting cycle counter
-In-Reply-To: <20170908190736.de99a221c13be31c10103643@arm.com>
-References: <CALk3wS2cEFTnMXoyhrzyC1R_np159B4evzDRBMNK7MsAsc8UFA@mail.gmail.com>
- <20170908190736.de99a221c13be31c10103643@arm.com>
-Message-ID: <CALk3wS0Wjo3dyYB09bFf+FrPZmWGAcCbv+Kh0i1V6KxnMYqHPw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Sep 2017 21:26:16 +0100
+Subject: Page fault while link_path_walk for path_len > 4060 bytes
+In-Reply-To: <b13b3a27e92c5413d168ad775163ea91@codeaurora.org>
+References: <08e7e3332dc86c535dd2961ac1cde0b5@codeaurora.org>
+ <54083a824d6705a93d972ca5ef3a7b35@codeaurora.org>
+ <3958983ccec4aca494bf72c397f34bfa@codeaurora.org>
+ <953068e79da559bfd4f13e46e31c5a4e@codeaurora.org>
+ <20170822125747.GB28024@arm.com>
+ <b13b3a27e92c5413d168ad775163ea91@codeaurora.org>
+Message-ID: <20170912202615.GA9432@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kim,
+On Mon, Aug 28, 2017 at 09:53:00AM +0530, ankijain at codeaurora.org wrote:
+> Hi Will Deacon/ Al viro
+> 
+> 
+> -->Please find the attached kmsg.txt
+> <3>[17620.275249] BUG: sleeping function called from invalid context at /local/mnt/workspace/lnxbuild/project/trees_in_use/free_tree_platform_manifest_refs_tags_AU_LINUX_ANDROID_LA.UM.5.7.07.01.01.287.725_sdm660_64_commander_26168534/checkout/kernel/msm-4.4/arch/arm64/mm/fault.c:313
+> <3>[17620.276504] in_atomic(): 0, irqs_disabled(): 0, pid: 10290, name:
+> stress-ng-dirde
+> <6>[17620.298995] ------------[ cut here ]------------
+> <2>[17620.299009] kernel BUG at /local/mnt/workspace/lnxbuild/project/trees_in_use/free_tree_platform_manifest_refs_tags_AU_LINUX_ANDROID_LA.UM.5.7.07.01.01.287.725_sdm660_64_commander_26168534/checkout/kernel/msm-4.4/kernel/sched/core.c:8528!
+> <6>[17620.306372] ------------[ cut here ]------------
+> <2>[17620.327239] kernel BUG at /local/mnt/workspace/lnxbuild/project/trees_in_use/free_tree_platform_manifest_refs_tags_AU_LINUX_ANDROID_LA.UM.5.7.07.01.01.287.725_sdm660_64_commander_26168534/checkout/kernel/msm-4.4/kernel/sched/core.c:8528!
+> 
+> 
+> --> we are using arm64 machine with kernel 4.4.
+> --> can you please guide us, how to capture ESR value while taking the
+> fault?
+> -->
+> -    { do_page_fault,    SIGSEGV, SEGV_MAPERR,    "level 3 translation
+> fault"    },
+> +    { do_translation_fault,    SIGSEGV, SEGV_MAPERR,    "level 3
+> translation fault"    },
+> we will try with above changes and get back to you.
 
-Thanks for your response.
-I talked a bit with Mark Rutland from Arm about this. He told me that
-perf can reset or modify the cycle counter from kernelspace as it
-pleases even if the user is not using perf. Reading the cycle counter
-directly from userspace is not supported. The only supported way to
-read the cycle counter is to go through the VDSO.
+Did you test with this change?
 
-On Fri, Sep 8, 2017 at 5:07 PM, Kim Phillips <kim.phillips@arm.com> wrote:
-> On Wed, 6 Sep 2017 17:36:36 -0700
-> Jason Teplitz <jason@tensyr.com> wrote:
->
-> [adding linux-arm-kernel]
->
->> I'm reading the armv8 PMU cycle counter from userspace and noticing
->> that it gets periodically reset by something. Does anything inside the
->> kernel reset these counters? I am not using perf, so I'm not sure why
->> anything else would be touching them.
->
-> PMCCNTR only shows up in kernel perf/PMU and KVM code, so yes, no
-> reason for it to be reset, esp. if no arm-pmu interrupts are triggered.
->
-> Is the period constant, as if to suggest a wraparound?  Can you use
-> CNTVCT instead?
->
-> Thanks,
->
-> Kim
+Will
