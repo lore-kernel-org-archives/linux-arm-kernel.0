@@ -1,54 +1,43 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Tue, 12 Sep 2017 13:55:21 +0800
-Subject: [PATCH 3/9] kexec_file: factor out crashdump elf header function
- from x86
-In-Reply-To: <20170908031616.17916-4-takahiro.akashi@linaro.org>
-References: <20170908031616.17916-1-takahiro.akashi@linaro.org>
- <20170908031616.17916-4-takahiro.akashi@linaro.org>
-Message-ID: <20170912055521.GA8787@dhcp-128-65.nay.redhat.com>
+From: sz.lin@moxa.com (SZ Lin)
+Date: Tue, 12 Sep 2017 14:49:25 +0800
+Subject: [RESEND PATCH] ARM: dts: ls1021a: Add support for QSPI with ls1021a
+ SoC
+Message-ID: <20170912064925.24571-1-sz.lin@moxa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 09/08/17 at 12:16pm, AKASHI Takahiro wrote:
-[snip]
-> --- a/include/linux/kexec.h
-> +++ b/include/linux/kexec.h
-> @@ -162,6 +162,25 @@ int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
->  			       int (*func)(u64, u64, void *));
->  extern int kexec_add_buffer(struct kexec_buf *kbuf);
->  int kexec_locate_mem_hole(struct kexec_buf *kbuf);
-> +#ifdef CONFIG_CRASH_CORE
-> +extern int prepare_elf_headers(struct kimage *image, void **addr,
-> +				unsigned long *sz);
-> +
-> +/* This primarily represents number of split ranges due to exclusion */
-> +#define CRASH_MAX_RANGES        16
-> +
-> +struct crash_mem_range {
-> +	u64 start, end;
-> +};
-> +
-> +struct crash_mem {
-> +	unsigned int nr_ranges;
-> +	struct crash_mem_range ranges[CRASH_MAX_RANGES];
-> +};
-> +
-> +extern int exclude_mem_range(struct crash_mem *mem,
-> +		unsigned long long mstart, unsigned long long mend);
-> +#endif /* CONFIG_CRASH_CORE */
+Add QSPI node support, and this function is disabled by default
+This setting could be overwritten in board-level definitions
 
-Maybe I did not say it clear when reviewing the v1.
+Signed-off-by: SZ Lin <sz.lin@moxa.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-I suggested to move the code from to kexec_file.c because the
-CONFIG_CRASH_CORE originally was introduced for the common code for
-vmcoreinfo stuff when Hari worked on sharing code between powerpc
-fadump and kdump.
-
-I'm not sure we need the #ifdef CONFIG_CRASH_CORE here for these
-kexec file load functions. Since they are already in kexec_file.c
-so I think no need to add the #ifdef
-
->  #endif /* CONFIG_KEXEC_FILE */
-Thanks
-Dave
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 7bb9df2c1460..9da876e47810 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -154,6 +154,20 @@
+ 			big-endian;
+ 		};
+ 
++		qspi: quadspi at 1550000 {
++			compatible = "fsl,ls1021a-qspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x1550000 0x0 0x10000>,
++			      <0x0 0x40000000 0x0 0x40000000>;
++			reg-names = "QuadSPI", "QuadSPI-memory";
++			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
++			clock-names = "qspi_en", "qspi";
++			clocks = <&clockgen 4 1>, <&clockgen 4 1>;
++			big-endian;
++			status = "disabled";
++		};
++
+ 		esdhc: esdhc at 1560000 {
+ 			compatible = "fsl,esdhc";
+ 			reg = <0x0 0x1560000 0x0 0x10000>;
+-- 
+2.14.1
