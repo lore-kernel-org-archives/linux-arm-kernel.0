@@ -1,36 +1,30 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 12 Sep 2017 22:33:35 +0900
-Subject: [PATCH] pinctrl: uniphier: make arrays static, reduces object
- code size
-In-Reply-To: <20170912112124.1143-1-colin.king@canonical.com>
-References: <20170912112124.1143-1-colin.king@canonical.com>
-Message-ID: <CAK7LNAS+gobUD_rxfSoG8v1jB564=Oa3=jVuVUV7J4odefrTRw@mail.gmail.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Tue, 12 Sep 2017 08:43:10 -0500
+Subject: da850.dtsi Naming convention Question
+Message-ID: <CAHCN7xJ7N6W2Pz1vsVV192V-s0g6q+ozvNBR21rx6LufJ4kR6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-09-12 20:21 GMT+09:00 Colin King <colin.king@canonical.com>:
-> From: Colin Ian King <colin.king@canonical.com>
->
-> Don't populate const arrays on the stack, instead make them
-> static.  Makes the object code smaller nearly 1000 bytes. Also
-> line break wide lines to avoid checkpatch warnings.
->
-> Before:
->    text    data     bss     dec     hex filename
->   13112    1996       0   15108    3b04 pinctrl-uniphier-core.o
->
-> After:
->    text    data     bss     dec     hex filename
->   11642    2476       0   14118    3726 pinctrl-uniphier-core.o
->
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+I am confused by the naming convention of the da850.dtsi file, and I
+am hoping someone can clarify how this works.
 
+Specifically, is defined int he device tree as "gpio: gpio at 226000"
 
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Other TI boards (like omap3.dtsi) use a convention with the address
+after the @ symbol.
 
+(in omap3.dtsi, the gpio bank1 is configured as gpio1: gpio at 48310000
+where 48310000 is the address of the register)
 
-Thanks!
+An attempt was made to correct this in:
 
--- 
-Best Regards
-Masahiro Yamada
+c2a3b4bca53a ("ARM: dts: davinci: use proper address after @")  where
+an fix was made to make gpio: gpio at 1e26000  which would match the
+address in the TRM.  Unfortunately, it looks as if it was undone
+almost right away.
+
+My question is this:  Where did the 226000 number originate, and why
+would we not want to use the actual address of the 1e26000 as defined
+in the Techincal Reference manual?
+
+adam
