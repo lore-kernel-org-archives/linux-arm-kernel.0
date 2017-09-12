@@ -1,70 +1,59 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 12 Sep 2017 08:44:09 -0700
-Subject: [PATCH v4 6/6] gpio: uniphier: add UniPhier GPIO controller driver
-In-Reply-To: <CACRpkdZLG=ezxj62R=WkULh2vfpQwqh8P-6FhtONzU7yRbyeuA@mail.gmail.com>
-References: <1504784522-26841-1-git-send-email-yamada.masahiro@socionext.com>
- <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdZLG=ezxj62R=WkULh2vfpQwqh8P-6FhtONzU7yRbyeuA@mail.gmail.com>
-Message-ID: <7e46f2a3-114f-0c34-d3c5-49e6422b9200@caviumnetworks.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 12 Sep 2017 16:51:43 +0100
+Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
+In-Reply-To: <96c8b5d8-eff2-6583-04da-cb3fdab8e6cb@linaro.org>
+References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
+ <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
+ <20170811093348.GC26039@red-moon>
+ <CAGHbJ3AgEvbpsPdeqJ+bFWa5hBMqxBX6g1eC4HiUvHarJf8H+g@mail.gmail.com>
+ <20170815171525.GB13707@e107981-lin.cambridge.arm.com>
+ <de1b88e0-57d5-b73b-bc49-3c28070df6b1@linaro.org>
+ <20170817130139.GA17795@red-moon>
+ <96c8b5d8-eff2-6583-04da-cb3fdab8e6cb@linaro.org>
+Message-ID: <20170912155143.GA29684@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2017 07:03 AM, Linus Walleij wrote:
-> On Thu, Sep 7, 2017 at 1:42 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
+On Tue, Sep 12, 2017 at 11:27:13AM +0800, Hanjun Guo wrote:
+> Hi Lorenzo,
 > 
->> This GPIO controller device is used on UniPhier SoCs.
->>
->> It also serves as an interrupt controller, but interrupt signals are
->> just delivered to the parent irqchip without any latching or OR'ing.
->> This is implemented by using hierarchy IRQ domain.
->>
->> Implementation note:
->> Unfortunately, the IRQ mapping from this controller to the parent is
->> random. (48, 49, ..., 63, 154, 155, ...)
->> If "interrupts" property is used, IRQ resources may be statically
->> allocated when platform devices are populated from DT.  This can be
->> a problem for the hierarchy IRQ domain because IRQ allocation must
->> happen from the outer-most domain up to the root domain in order to
->> build up the stacked IRQ.  (https://lkml.org/lkml/2017/7/6/758)
->> Solutions to work around it could be to hard-code parent hwirqs or
->> to invent a driver-specific DT property.
->>
->> Here, the new API irq_domain_push_irq() was merged by v4.14-rc1.
->> It allows to add irq_data to the existing hierarchy.  It will help
->> to make this driver work whether the parent has already initialized
->> the hierarchy or not.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> ---
->>
->> Changes in v4:
->>    - Add COMPILE_TEST and select IRQ_DOMAIN_HIERARCHY
->>    - Reimplement irqchip part by using irq_domain_push_irq()
+> On 2017/8/17 21:01, Lorenzo Pieralisi wrote:
+> >On Thu, Aug 17, 2017 at 03:49:37PM +0800, Hanjun Guo wrote:
+> >
+> >[...]
+> >
+> >>>  /**
+> >>>   * iort_get_platform_device_domain() - Find MSI domain related to a
+> >>>   * platform device
+> >>>@@ -1159,6 +1207,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+> >>>  	/* Configure DMA for the page table walker */
+> >>>  	acpi_dma_configure(&pdev->dev, attr);
+> >>>+	iort_set_device_domain(&pdev->dev, node);
+> >>
+> >>This is fine to me, but I think we still need to retrieve
+> >>the output ID as the request id for ITS, which means we
+> >>need to do that in iort_pmsi_get_dev_id(), right?
+> >
+> >Yes, probably we can add code there like:
+> >
+> >ret = iort_get_id_mapping_index(&index);
+> >if (!ret)
+> >	iort_node_get_id(node, &id, index);
+> >	...
+> >
+> >This requires updating iort_node_get_id() to allow single mappings
+> >for SMMU/PMCG as you flagged up before.
+> >
+> >I will think a bit more to see if there is a cleaner way to reshuffle
+> >the mapping API.
 > 
-> Awesome improvement. There was a build error and I also
-> would like David Daney to have a look at this so we know we
-> use things the right way,
+> I would like to send a updated version after the merge window to gather
+> more comments, and at the same time we can work on the cleaner way to
+> reshuffle the mapping API, what do you thing?
 
-It looks correct to me.
+I think you should send an updated patch at -rc1 with comments above, we
+can rework the API later or I can do it on top of your patches for the
+upcoming merge window.
 
-I haven't verified it, but I think the OF device-tree probing code for 
-the platform devices will automatically xlat-and-map all those irqs, so 
-that the  irq_domain_push_irq() is required to get the domain hierarchy 
-properly configured.  It would be similar to the PCI case where we 
-configure all the MSI-X and then do the irq_domain_push_irq() in the 
-Cavium ThunderX driver.
-
-If interrupt handling has been verified to work with this driver, I 
-would say that we are probably using things "the right way".
-
-David.
-
-
-
-> but overall I am happy after this
-> so I hope I will be able to apply next version.
-> 
-> Yours,
-> Linus Walleij
-> 
+Thanks !
+Lorenzo
