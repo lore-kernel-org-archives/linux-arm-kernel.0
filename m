@@ -1,43 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Sep 2017 19:29:09 +0530
-Subject: da850.dtsi Naming convention Question
-In-Reply-To: <CAHCN7xJ7N6W2Pz1vsVV192V-s0g6q+ozvNBR21rx6LufJ4kR6g@mail.gmail.com>
-References: <CAHCN7xJ7N6W2Pz1vsVV192V-s0g6q+ozvNBR21rx6LufJ4kR6g@mail.gmail.com>
-Message-ID: <d92f726f-8a84-14ac-571e-f405255fed0b@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Sep 2017 16:03:56 +0200
+Subject: [PATCH v4 6/6] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
+References: <1504784522-26841-1-git-send-email-yamada.masahiro@socionext.com>
+ <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdZLG=ezxj62R=WkULh2vfpQwqh8P-6FhtONzU7yRbyeuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+On Thu, Sep 7, 2017 at 1:42 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-On Tuesday 12 September 2017 07:13 PM, Adam Ford wrote:
-> I am confused by the naming convention of the da850.dtsi file, and I
-> am hoping someone can clarify how this works.
-> 
-> Specifically, is defined int he device tree as "gpio: gpio at 226000"
-> 
-> Other TI boards (like omap3.dtsi) use a convention with the address
-> after the @ symbol.
-> 
-> (in omap3.dtsi, the gpio bank1 is configured as gpio1: gpio at 48310000
-> where 48310000 is the address of the register)
-> 
-> An attempt was made to correct this in:
-> 
-> c2a3b4bca53a ("ARM: dts: davinci: use proper address after @")  where
-> an fix was made to make gpio: gpio at 1e26000  which would match the
-> address in the TRM.  Unfortunately, it looks as if it was undone
-> almost right away.
+> This GPIO controller device is used on UniPhier SoCs.
+>
+> It also serves as an interrupt controller, but interrupt signals are
+> just delivered to the parent irqchip without any latching or OR'ing.
+> This is implemented by using hierarchy IRQ domain.
+>
+> Implementation note:
+> Unfortunately, the IRQ mapping from this controller to the parent is
+> random. (48, 49, ..., 63, 154, 155, ...)
+> If "interrupts" property is used, IRQ resources may be statically
+> allocated when platform devices are populated from DT.  This can be
+> a problem for the hierarchy IRQ domain because IRQ allocation must
+> happen from the outer-most domain up to the root domain in order to
+> build up the stacked IRQ.  (https://lkml.org/lkml/2017/7/6/758)
+> Solutions to work around it could be to hard-code parent hwirqs or
+> to invent a driver-specific DT property.
+>
+> Here, the new API irq_domain_push_irq() was merged by v4.14-rc1.
+> It allows to add irq_data to the existing hierarchy.  It will help
+> to make this driver work whether the parent has already initialized
+> the hierarchy or not.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+> Changes in v4:
+>   - Add COMPILE_TEST and select IRQ_DOMAIN_HIERARCHY
+>   - Reimplement irqchip part by using irq_domain_push_irq()
 
-I think you are reading that commit in reverse. The fix was to make the
-unit address match the reg property (make it gpio at 226000)
+Awesome improvement. There was a build error and I also
+would like David Daney to have a look at this so we know we
+use things the right way, but overall I am happy after this
+so I hope I will be able to apply next version.
 
-> 
-> My question is this:  Where did the 226000 number originate, and why
-> would we not want to use the actual address of the 1e26000 as defined
-> in the Techincal Reference manual?
-
-Because we define these nodes as being under the "soc" node at offset
-1c00000.
-
-Thanks,
-Sekhar
+Yours,
+Linus Walleij
