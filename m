@@ -1,145 +1,27 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 12 Sep 2017 21:00:36 +0800
-Subject: [PATCH v2 1/3] iommu/arm-smmu-v3: put off the execution of TLBI* to
- reduce lock confliction
-In-Reply-To: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1505221238-9428-2-git-send-email-thunder.leizhen@huawei.com>
+Date: Tue, 12 Sep 2017 21:00:35 +0800
+Subject: [PATCH v2 0/3] arm-smmu: performance optimization
+Message-ID: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because all TLBI commands should be followed by a SYNC command, to make
-sure that it has been completely finished. So we can just add the TLBI
-commands into the queue, and put off the execution until meet SYNC or
-other commands. To prevent the followed SYNC command waiting for a long
-time because of too many commands have been delayed, restrict the max
-delayed number.
+v1 -> v2:
+base on (add02cfdc9bc2 "iommu: Introduce Interface for IOMMU TLB Flushing")
 
-According to my test, I got the same performance data as I replaced writel
-with writel_relaxed in queue_inc_prod.
+Zhen Lei (3):
+  iommu/arm-smmu-v3: put off the execution of TLBI* to reduce lock
+    confliction
+  iommu/arm-smmu-v3: add support for unmap an iova range with only one
+    tlb sync
+  iommu/arm-smmu: add support for unmap a memory range with only one tlb
+    sync
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 37 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu-v3.c        | 52 ++++++++++++++++++++++++++++++++++----
+ drivers/iommu/arm-smmu.c           | 10 ++++++++
+ drivers/iommu/io-pgtable-arm-v7s.c | 32 +++++++++++++++--------
+ drivers/iommu/io-pgtable-arm.c     | 30 ++++++++++++++--------
+ drivers/iommu/io-pgtable.h         |  1 +
+ 5 files changed, 99 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e67ba6c..ef42c4b 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -337,6 +337,7 @@
- /* Command queue */
- #define CMDQ_ENT_DWORDS			2
- #define CMDQ_MAX_SZ_SHIFT		8
-+#define CMDQ_MAX_DELAYED		32
- 
- #define CMDQ_ERR_SHIFT			24
- #define CMDQ_ERR_MASK			0x7f
-@@ -482,6 +483,7 @@ struct arm_smmu_cmdq_ent {
- 			};
- 		} cfgi;
- 
-+		#define CMDQ_OP_TLBI_NH_ALL	0x10
- 		#define CMDQ_OP_TLBI_NH_ASID	0x11
- 		#define CMDQ_OP_TLBI_NH_VA	0x12
- 		#define CMDQ_OP_TLBI_EL2_ALL	0x20
-@@ -509,6 +511,7 @@ struct arm_smmu_cmdq_ent {
- 
- struct arm_smmu_queue {
- 	int				irq; /* Wired interrupt */
-+	u32				nr_delay;
- 
- 	__le64				*base;
- 	dma_addr_t			base_dma;
-@@ -745,11 +748,16 @@ static int queue_sync_prod(struct arm_smmu_queue *q)
- 	return ret;
- }
- 
--static void queue_inc_prod(struct arm_smmu_queue *q)
-+static void queue_inc_swprod(struct arm_smmu_queue *q)
- {
--	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
-+	u32 prod = q->prod + 1;
- 
- 	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
-+}
-+
-+static void queue_inc_prod(struct arm_smmu_queue *q)
-+{
-+	queue_inc_swprod(q);
- 	writel(q->prod, q->prod_reg);
- }
- 
-@@ -791,13 +799,24 @@ static void queue_write(__le64 *dst, u64 *src, size_t n_dwords)
- 		*dst++ = cpu_to_le64(*src++);
- }
- 
--static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
-+static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent, int optimize)
- {
- 	if (queue_full(q))
- 		return -ENOSPC;
- 
- 	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
--	queue_inc_prod(q);
-+
-+	/*
-+	 * We don't want too many commands to be delayed, this may lead the
-+	 * followed sync command to wait for a long time.
-+	 */
-+	if (optimize && (++q->nr_delay < CMDQ_MAX_DELAYED)) {
-+		queue_inc_swprod(q);
-+	} else {
-+		queue_inc_prod(q);
-+		q->nr_delay = 0;
-+	}
-+
- 	return 0;
- }
- 
-@@ -939,6 +958,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
- static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 				    struct arm_smmu_cmdq_ent *ent)
- {
-+	int optimize = 0;
- 	u64 cmd[CMDQ_ENT_DWORDS];
- 	unsigned long flags;
- 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-@@ -950,8 +970,17 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 		return;
- 	}
- 
-+	/*
-+	 * All TLBI commands should be followed by a sync command later.
-+	 * The CFGI commands is the same, but they are rarely executed.
-+	 * So just optimize TLBI commands now, to reduce the "if" judgement.
-+	 */
-+	if ((ent->opcode >= CMDQ_OP_TLBI_NH_ALL) &&
-+	    (ent->opcode <= CMDQ_OP_TLBI_NSNH_ALL))
-+		optimize = 1;
-+
- 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
--	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-+	while (queue_insert_raw(q, cmd, optimize) == -ENOSPC) {
- 		if (queue_poll_cons(q, false, wfe))
- 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
- 	}
-@@ -2001,6 +2030,8 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
- 		     << Q_BASE_LOG2SIZE_SHIFT;
- 
- 	q->prod = q->cons = 0;
-+	q->nr_delay = 0;
-+
- 	return 0;
- }
- 
-@@ -2584,6 +2615,7 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 		dev_err(smmu->dev, "unit-length command queue not supported\n");
- 		return -ENXIO;
- 	}
-+	BUILD_BUG_ON(CMDQ_MAX_DELAYED >= (1 << CMDQ_MAX_SZ_SHIFT));
- 
- 	smmu->evtq.q.max_n_shift = min((u32)EVTQ_MAX_SZ_SHIFT,
- 				       reg >> IDR1_EVTQ_SHIFT & IDR1_EVTQ_MASK);
 -- 
 2.5.0
