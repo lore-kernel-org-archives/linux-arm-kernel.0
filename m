@@ -1,76 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Sep 2017 11:52:20 -0500
-Subject: [PATCH 06/10] arm64: allwinner: a64: Add devicetree binding for
- DMA controller
-In-Reply-To: <20170903224100.17893-7-stefan.bruens@rwth-aachen.de>
-References: <20170903224100.17893-1-stefan.bruens@rwth-aachen.de>
- <20170903224100.17893-7-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170912165220.yj4bcpd4yg3wujyh@rob-hp-laptop>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 12 Sep 2017 19:41:28 +0200
+Subject: [media] s5p-mfc: Adjust a null pointer check in four functions
+In-Reply-To: <5b8eb902-d97c-3308-5ba9-64469320e0e2@users.sourceforge.net>
+References: <482a6c92-a85e-0bcd-edf7-3c2f63ea74c5@users.sourceforge.net>
+ <e794361b-8f2a-7457-007f-72ef4fa66d02@users.sourceforge.net>
+ <CGME20170911092134epcas2p1a1b11c056b52d68c3b0e4ea2e1e8f758@epcas2p1.samsung.com>
+ <6c2d20b3-4437-0473-73d4-73c049ba52a9@samsung.com>
+ <a68020cc-2477-5d6c-bc61-d753253b755a@users.sourceforge.net>
+ <0fa9a180-be67-3a33-682c-bff819c36c6a@samsung.com>
+ <5b8eb902-d97c-3308-5ba9-64469320e0e2@users.sourceforge.net>
+Message-ID: <ee8ba7fd-1de4-b1b9-8aa0-130c86c38f30@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 12:40:57AM +0200, Stefan Br?ns wrote:
-> The A64 is register compatible with the H3, but has a different number
-> of dma channels and request ports.
+On 09/12/2017 05:00 PM, SF Markus Elfring wrote:
+>>> * Do you care to preserve an information like the author date?
+>> In this case not, but actually the Date line is not an issue.
+> Thanks for your information.
 > 
-> Attach additional properties to the node to allow future reuse of the
-> compatible for controllers with different number of channels/requests.
-> 
-> If dma-requests is not specified, the register layout defined maximum
-> of 32 is used.
-
-This belongs in the binding.
-
-> 
-> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-> ---
->  .../devicetree/bindings/dma/sun6i-dma.txt          | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> index 6b267045f522..66195fb31296 100644
-> --- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> @@ -26,6 +26,32 @@ Example:
->  		#dma-cells = <1>;
->  	};
+> It seems then that you quoted a line too much.
 >  
-> +------------------------------------------------------------------------------
-> +For A64 DMA controller:
-> +
-> +Required properties:
-> +- compatible:	"allwinner,sun50i-a64-dma"
-> +- dma-channels: Number of DMA channels supported by the controller.
-> +		Refer to Documentation/devicetree/bindings/dma/dma.txt
+>> Anyway the patch is malformed, ?
+ >
+> I have got doubts for this view because the file was automatically generated
+> by the command ?git format-patch? also for the discussed three update steps.
 
-dma.txt already explains what these properties are. You just need to 
-state what are valid values.
+Generating patch is only part of the story, it seems the patch is not sent
+properly and tags which should be in SMTP header end up in the message
+body. I think there would not be such issues if you have used git format-patch
++ git send-email.
 
-> +- all properties above, i.e. reg, interrupts, clocks, resets and #dma-cells
-> +
-> +Optional properties:
-> +- dma-requests: Number of DMA request signals supported by the controller.
-> +		Refer to Documentation/devicetree/bindings/dma/dma.txt
-> +
-> +Example:
-> +	dma: dma-controller at 01c02000 {
+I normally do amend things like this while applying, I will do that this time 
+as well. It's already too much time wasted for such a dubious patch.
 
-Drop the leading 0. Building dtbs with W=2 will tell you this.
-
-> +		compatible = "allwinner,sun50i-a64-dma";
-> +		reg = <0x01c02000 0x1000>;
-> +		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&ccu CLK_BUS_DMA>;
-> +		dma-channels = <8>;
-> +		dma-requests = <27>;
-> +		resets = <&ccu RST_BUS_DMA>;
-> +		#dma-cells = <1>;
-> +	};
-> +------------------------------------------------------------------------------
-> +
->  Clients:
->  
->  DMA clients connected to the A31 DMA controller must use the format
-> -- 
-> 2.14.1
-> 
+-- 
+Thanks,
+Sylwester
