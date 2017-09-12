@@ -1,122 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Sep 2017 11:15:46 -0500
-Subject: [PATCH v1 1/3] dt-bindings: nvmem: add description for UniPhier
- eFuse
-In-Reply-To: <000001d32615$38e1b0c0$aaa51240$@socionext.com>
-References: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
- <1504221620-358-2-git-send-email-hayashibara.keiji@socionext.com>
- <CAK7LNASLh4vYqZhM9g2AL1uUtieviAmmWOp_Mzoj0zG=Ejz0cA@mail.gmail.com>
- <000001d32615$38e1b0c0$aaa51240$@socionext.com>
-Message-ID: <20170912161546.q5xr5pfdxin3qujf@rob-hp-laptop>
+Date: Tue, 12 Sep 2017 11:39:58 -0500
+Subject: [PATCH 1/2] drm: bridge: Add bindings for TI THS8134
+In-Reply-To: <20170901094038.4312-1-linus.walleij@linaro.org>
+References: <20170901094038.4312-1-linus.walleij@linaro.org>
+Message-ID: <20170912163958.xr5qxt5doqlk44dp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 05, 2017 at 04:04:31PM +0900, Keiji Hayashibara wrote:
-> Hello Yamada-san,
+On Fri, Sep 01, 2017 at 11:40:37AM +0200, Linus Walleij wrote:
+> This adds device tree bindings for the Texas Instruments
+> THS8134A and THS8134B VGA DACs by extending and renaming the
+> existing bindings for THS8135.
 > 
-> Thank you for your comment.
+> These DACs are used for the VGA outputs on the ARM reference
+> designs such as Integrator, Versatile and RealView.
 > 
-> > From: Masahiro Yamada [mailto:yamada.masahiro at socionext.com]
-> > Sent: Monday, September 4, 2017 9:56 PM
-> > 
-> > 2017-09-01 8:20 GMT+09:00 Keiji Hayashibara
-> > <hayashibara.keiji@socionext.com>:
-> > > Add uniphier-efuse dt-bindings documentation.
-> > >
-> > > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> > > ---
-> > >  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 45
-> > ++++++++++++++++++++++
-> > >  1 file changed, 45 insertions(+)
-> > >  create mode 100644
-> > > Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+> Cc: devicetree at vger.kernel.org
+> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}        | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+>  rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt => ti,ths813x.txt} (73%)
 
-> > > +Example:
-> > > +
-> > > +       soc-glue at 5f900000 {
-> > > +               compatible = "socionext,uniphier-ld20-soc-glue-debug",
-> > > +                            "simple-mfd";
-> > > +               #address-cells = <1>;
-> > > +               #size-cells = <1>;
-> > > +               ranges = <0x0 0x5f900000 0x2000>;
-> > 
-> > 
-> > IMHO, I think an empty "ranges;" will clarify the code, but it is up to
-> > your taste.
-> > 
-> > 
-> > > +
-> > > +               efuse {
-> > > +                       compatible = "socionext,uniphier-efuse",
-> > > +                                    "syscon";
-> > 
-> > 
-> > You are adding a dedicated driver for "socionext,uniphier-efuse".
-> > 
-> > Then, "syscon" as well?
-> > 
-> 
-> Since I was using the syscon interface to implement the driver,
-> I specified "syscon". It's interface is syscon_node_to_regmap().
-> 
-> I will rethink this in v2.
-> 
-> > 
-> > 
-> > > +                       reg = <0x100 0xf00>;
-> > 
-> > 
-> > Not so many efuse registers exist on the SoC.
-> > 
-> > reg = <0x100 0x200>; will be enough.
-> > 
-> > 
-> > Or if you want to be strict to the hw spec, you can write as follows:
-> > 
-> >         soc-glue at 5f900000 {
-> >                compatible = "socionext,uniphier-ld20-soc-glue-debug";
-> >                             "simple-mfd";
-> >                #address-cells = <1>;
-> >                #size-cells = <1>;
-> >                ranges = <0x0 0x5f900000 0x2000>;
-> > 
-> >                efuse at 100 {
-> >                            compatible = "socionext,uniphier-efuse";
-> >                            reg = <0x100 0x28>;
-> >                };
-> > 
-> >                efuse at 200 {
-> >                            compatible = "socionext,uniphier-efuse";
-> >                            reg = <0x200 0x68>;
-> >                };
-> >        };
-> > 
-> > 
-> > 
-> > 
-> > > +                       #address-cells = <1>;
-> > > +                       #size-cells = <1>;
-> > > +
-> > > +                       /* Data cells */
-> > > +                       usb_mon: usb_mon {
-> > > +                               reg = <0x154 0xc>;
-> > > +                       };
-> > 
-> > 
-> > This <0x154 0xc> represents 0x5f900254 in CPU address view.
-> > (0x5f900000 + 0x100 + 0x154)
-> > 
-> > So many ranges conversion, and how error-prone..
-> > 
-> 
-> Yes, indeed...
-> I will modify as below.
-
-Please don't. A non-empty ranges is preferred. It limits the scope and 
-chance for errors (smaller range allows fewer possible values and 
-limits the chances of having address ranges duplicated in multiple 
-nodes). But yes, it does add the requirement of doing addition and/or 
-OR operations. I can't review whether the address ends up being correct 
-either way, but having non-empty ranges helps enforce the other things.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
