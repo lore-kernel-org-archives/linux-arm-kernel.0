@@ -1,25 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Sep 2017 09:35:21 +0200
-Subject: [PATCH] pinctrl: uniphier: include <linux/build_bug.h> instead of
- <linux/bug.h>
-In-Reply-To: <1504373178-1022-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1504373178-1022-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZjbaAEjUGmA0Auk_auMPQaaHrOu8rYAjVyCwPt_eRg-Q@mail.gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 12 Sep 2017 09:54:15 +0200
+Subject: [PATCH v5 10/10] net: stmmac: dwmac-sun8i: Handle
+ integrated/external MDIOs
+In-Reply-To: <20170911201920.GA5983@lunn.ch>
+References: <20170908071156.5115-11-clabbe.montjoie@gmail.com>
+ <20170908130520.GA11248@lunn.ch> <20170908132632.GA3037@Red>
+ <20170908140020.GC25219@lunn.ch> <20170908140832.GB3037@Red>
+ <20170908141736.GF25219@lunn.ch> <20170908142825.GC3037@Red>
+ <20170911161124.GD27599@lunn.ch> <20170911190850.GA2291@Red>
+ <20170911201920.GA5983@lunn.ch>
+Message-ID: <20170912075415.GA1358@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 2, 2017 at 7:26 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Mon, Sep 11, 2017 at 10:19:20PM +0200, Andrew Lunn wrote:
+> > Even with CLK_BUS_EPHY/RST_BUS_EPHY enabled, the MAC reset timeout.
+> > So no the CLK/RST are really for the PHY.
+> 
+> Thanks for trying that.
+> 
+> You said it was probably during scanning of the bus it times out. What
+> address is causing the timeout? 0 or 1? If the internal bus can only
+> have one PHY on it, maybe we need to set bus->phy_mask to 0x1?
+> 
 
-> The #includes <linux/bug.h> is here to use BUILD_BUG_ON_ZERO().
->
-> Thanks to commit bc6245e5efd7 ("bug: split BUILD_BUG stuff out into
-> <linux/build_bug.h>"), it is now possible to reduce the number of
-> headers pulled in.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+I have added a trace in begin and end of stmmac_mdio_read()
 
-Patch applied for fixes.
+[   18.145451] libphy: stmmac: probed
+[   18.148398] libphy: mdio_mux: probed
+[   18.148650] dwmac-sun8i 1c30000.ethernet: Switch mux to internal PHY
+[   18.248751] dwmac-sun8i 1c30000.ethernet: EMAC reset timeout
+[   18.249297] libphy: mdio_mux: probed
+[   18.249362] dwmac-sun8i 1c30000.ethernet: Switch mux to external PHY
+[   18.249391] stmmac_mdio_read 0 2
+[   18.249598] stmmac_mdio_read 0 2 1c
+[   18.249623] stmmac_mdio_read 0 3
+[   18.249811] stmmac_mdio_read 0 3 c915
+[   20.737271] EXT4-fs (mmcblk0p1): re-mounted. Opts: (null)
+[   31.294868] stmmac_mdio_read 0 0
+[   31.295311] stmmac_mdio_read 0 0 1140
 
-Yours,
-Linus Walleij
+It seems that the timeout is unrelated to MDIO bus.
+
+Regards
