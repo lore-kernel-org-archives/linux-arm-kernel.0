@@ -1,107 +1,213 @@
-From: seokjoo.lee@lge.com (Seokjoo Lee)
-Date: Wed, 13 Sep 2017 16:15:57 +0900
-Subject: [PATCH] ARM: Fix oops at csum_and_copy_from_user()
-Message-ID: <1505286957-11576-1-git-send-email-seokjoo.lee@lge.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 13 Sep 2017 15:32:10 +0800
+Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
+ userspace
+In-Reply-To: <59B17438.5070501@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-7-git-send-email-gengdongjiu@huawei.com>
+ <59B17438.5070501@arm.com>
+Message-ID: <2a42d1ea-3456-2873-c9ea-d8a027b59789@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "seokjoo.lee" <seokjoo.lee@lge.com>
+Hi James,
 
-fix code corruption by fixup part of csum_partial_copy_from_user()
-due to invalid stack offset of err_ptr for CONFIG_CPU_SW_DOMAIN_PAN.
 
-For a kernel built for arm architecture with CONFIG_CPU_SW_DOMAIN_PAN,
-if an application calls 'sendto' with *invalid parameter* which might
-cause fault within csum_paritial_copy_from_user, then the fixup part of
-csum_partial_copy_from_user try to overwrite code area stored at 'lr'.
-Then, kernel generates oops with undefined instruction 0xfffffff2 at
-csum_and_copy_from_iter triggered from the next 'sendto' call.
-This behavior is not gracefully returning *err_ptr with -EFAULT value as
-designed.
+On 2017/9/8 0:30, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 28/08/17 11:38, Dongjiu Geng wrote:
+>> when userspace gets SIGBUS signal, it does not know whether
+>> this is a synchronous external abort or SError,
+> 
+> Why would Qemu/kvmtool need to know if the original notification (if there was
+> one) was synchronous or asynchronous? This is between firmware and the kernel.
+there are two reasons:
 
-Originally 'save_regs' macro stores 8 registers - (r1, r2, r4 - r8, lr)
-and the err_ptr was passed at '[sp, #8*4]'.
-Since commit a5e090acbf54 ("ARM: software-based priviledged-no-access
-support") introducing CONFIG_CPU_SW_DOMAIN_PAN, this bug lurks in fixup
-part below the screen.
-If CONFIG_CPU_SW_DOMAIN_PAN is defined, the 'save_regs' macro stores 9
-registers - '(r1, r2, r4 - r8, ip, lr)' into stack and the err_ptr is
-passed at '[sp, #9*4]' instead of '[sp, #8*4]' because of 'ip' register
-adopted to save value of Domain Access Control register.
-After then, fault handling mechanism triggered by *invalid parameter*
-jumps into fixup part of csum_paritial_copy_from_user, regardlessly
-stores -EFAULT value to [[sp, #8*4]] which is actually '[lr]'. Finally,
-this try to overwrite caller of 'csum_partial_copy_from_user', i.e.
-'csum_and_copy_from_iter' - as 0xfffffff2.
+1. Let us firstly discuss the SEA and SEI, there are different workflow for the two different Errors.
+2. when record the CPER in the user space, it needs to know the error type, because SEA and SEI are different Error source,
+   so they have different offset in the APEI table, that is to say they will be recorded to different place of the APEI table.
 
-Fix by defining ERR_PTR_OFFSET properly within #if block near
-'save_regs/load_regs' pair to reduce the chance of mistake, and
-by replacing the constant 8 in fixup part with ERR_PTR_OFFSET to deal
-with CONFIG_CPU_SW_DOMAIN_PAN.
 
----
-A kernel with CONFIG_CPU_SW_DOMAIN_PAN produces panic as follows.
+         etc/acpi/tables                               etc/hardware_errors
+        ====================                    ==========================================
+    + +--------------------------+            +------------------+
+    | | HEST                     |            |    address       |              +--------------+
+    | +--------------------------+            |    registers     |              | Error Status |
+    | | GHES0                    |            | +----------------+              | Data Block 0 |
+    | +--------------------------+ +--------->| |status_address0 |------------->| +------------+
+    | | .................        | |          | +----------------+              | |  CPER      |
+    | | error_status_address-----+-+ +------->| |status_address1 |----------+   | |  CPER      |
+    | | .................        |   |        | +----------------+          |   | |  ....      |
+    | | read_ack_register--------+-+ |        |  .............   |          |   | |  CPER      |
+    | | read_ack_preserve        | | |        +------------------+          |   | +-+------------+
+    | | read_ack_write           | | | +----->| |status_address10|--------+ |   | Error Status |
+    + +--------------------------+ | | |      | +----------------+        | |   | Data Block 1 |
+    | | GHES1                    | +-+-+----->| | ack_value0     |        | +-->| +------------+
+    + +--------------------------+   | |      | +----------------+        |     | |  CPER      |
+    | | .................        |   | | +--->| | ack_value1     |        |     | |  CPER      |
+    | | error_status_address-----+---+ | |    | +----------------+        |     | |  ....      |
+    | | .................        |     | |    | |  ............. |        |     | |  CPER      |
+    | | read_ack_register--------+-----+-+    | +----------------+        |     +-+------------+
+    | | read_ack_preserve        |     |   +->| | ack_value10    |        |     | |..........  |
+    | | read_ack_write           |     |   |  | +----------------+        |     | +------------+
+    + +--------------------------|     |   |                              |     | Error Status |
+    | | ...............          |     |   |                              |     | Data Block 10|
+    + +--------------------------+     |   |                              +---->| +------------+
+    | | GHES10                   |     |   |                                    | |  CPER      |
+    + +--------------------------+     |   |                                    | |  CPER      |
+    | | .................        |     |   |                                    | |  ....      |
+    | | error_status_address-----+-----+   |                                    | |  CPER      |
+    | | .................        |         |                                    +-+------------+
+    | | read_ack_register--------+---------+
+    | | read_ack_preserve        |
+    | | read_ack_write           |
+    + +--------------------------+
 
-Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP ARM
-CPU: 3 PID: 2685 Comm: connmand Tainted: P           O    4.4.3-132 #1
-Hardware name: LG Electronics DTV SoC
-task: ab7cc200 ti: bbb40000 task.ti: bbb40000
-PC is at csum_and_copy_from_iter+0x140/0x50c
-LR is at csum_and_copy_from_iter+0x140/0x50c
-pc : [<803b2148>]    lr : [<803b2148>]    psr: 40010013
-sp : bbb41c90  ip : 00000051  fp : 00000000
-r10: 00000028  r9 : b4921c2c  r8 : b4921c24
-r7 : bbb41ee4  r6 : 00000000  r5 : 00000028  r4 : bbb41ef4
-r3 : 00000000  r2 : 00000028  r1 : b4921c2c  r0 : 00000000
-.....
-Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-Control: 10c5383d  Table: 3b64806a  DAC: 00000051
-[<803b2148>] (csum_and_copy_from_iter) from [<80a9aebc>] (ip_generic_getfrag+0x3c/0xc0)
-[<80a9aebc>] (ip_generic_getfrag) from [<80a9ac0c>] (__ip_append_data+0x7c8/0x9dc)
-[<80a9ac0c>] (__ip_append_data) from [<80a9c730>] (ip_make_skb+0xb0/0xec)
-[<80a9c730>] (ip_make_skb) from [<80ac3a4c>] (udp_sendmsg+0x270/0x828)
-[<80ac3a4c>] (udp_sendmsg) from [<80a43a8c>] (sock_sendmsg+0x14/0x24)
-[<80a43a8c>] (sock_sendmsg) from [<80a44ec8>] (SyS_sendto+0xb4/0xe8)
-[<80a44ec8>] (SyS_sendto) from [<80090280>] (ret_fast_syscall+0x0/0x3c)
-Code: e58d2000 e1a01009 e1a02005 ebffad40 (fffffff2)
----[ end trace 6870c0e483440b32 ]---
+> 
+> 
+> I think I can see why you need this: to choose whether to emulate SEA or SEI,
+emulating SEA or SEI is one reason, another reason is that the CPER will be recorded to different place of APEI.
 
-Signed-off-by: Seokjoo Lee <seokjoo.lee@lge.com>
-Signed-off-by: Jaeguk Lee <jaeguk.lee@lge.com>
-Cc: Jongsung Kim <neidhard.kim@lge.com>
-Cc: Chanho Min <chanho.min@lge.com>
----
- arch/arm/lib/csumpartialcopyuser.S | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
-index 1712f13..0772bce 100644
---- a/arch/arm/lib/csumpartialcopyuser.S
-+++ b/arch/arm/lib/csumpartialcopyuser.S
-@@ -29,6 +29,7 @@
- 		mcr	p15, 0, ip, c3, c0, 0
- 		ret	lr
- 		.endm
-+#define ERR_PTR_OFFSET 9
- #else
- 		.macro	save_regs
- 		stmfd	sp!, {r1, r2, r4 - r8, lr}
-@@ -37,6 +38,7 @@
- 		.macro	load_regs
- 		ldmfd	sp!, {r1, r2, r4 - r8, pc}
- 		.endm
-+#define ERR_PTR_OFFSET 8
- #endif
- 
- 		.macro	load1b,	reg1
-@@ -85,7 +87,7 @@
- 		.pushsection .text.fixup,"ax"
- 		.align	4
- 9001:		mov	r4, #-EFAULT
--		ldr	r5, [sp, #8*4]		@ *err_ptr
-+		ldr	r5, [sp, #ERR_PTR_OFFSET*4]		@ *err_ptr
- 		str	r4, [r5]
- 		ldmia	sp, {r1, r2}		@ retrieve dst, len
- 		add	r2, r2, r1
--- 
-2.7.4
+> but what if the guest wasn't running? Or the guest was running, but it wasn't
+> guest-memory that is affected.
+If the guest was not running, host firmware will directly notify EL1 host kernel to handle the error, not notify hypervisor
+only if the guest was running host firmware can notify the Error to hypervisor.
+
+If the user space is Qemu, and the error is from Qemu, and guest-memory is not involve.
+I will not handle it, please see the code for arm64.
+
+void kvm_arch_on_sigbus_vcpu(CPUState *c, int code, void *addr)
+{
+    ram_addr_t ram_addr;
+    hwaddr paddr;
+
+    ARMCPU *cpu = ARM_CPU(c);
+    CPUARMState *env = &cpu->env;
+    assert(code == BUS_MCEERR_AR || code == BUS_MCEERR_AO);
+    if (addr) {
+        ram_addr = qemu_ram_addr_from_host(addr);
+        if (ram_addr != RAM_ADDR_INVALID &&
+            kvm_physical_memory_addr_from_host(c->kvm_state, addr, &paddr)) {
+            kvm_cpu_synchronize_state(c);
+            kvm_hwpoison_page_add(ram_addr);
+            if (is_abort_sea(env->exception.syndrome)) {
+                ghes_update_guest(ACPI_HEST_NOTIFY_SEA, paddr);
+                kvm_inject_arm_sea(c);
+            } else if (is_abort_sei(env->exception.syndrome)) {
+                ghes_update_guest(ACPI_HEST_NOTIFY_SEI, paddr);
+                kvm_inject_arm_sei(c);
+            }
+            return;
+        }
+        fprintf(stderr, "Hardware memory error for memory used by "
+                "QEMU itself instead of guest system!\n");
+    }
+
+    if (code == BUS_MCEERR_AR) {
+        fprintf(stderr, "Hardware memory error!\n");
+        exit(1);
+    }
+}
+
+
+For the x86, it also does not handle it, it only print "Hardware memory error for memory used by QEMU itself instead of guest system!"
+
+void kvm_arch_on_sigbus_vcpu(CPUState *c, int code, void *addr)
+{
+    X86CPU *cpu = X86_CPU(c);
+    CPUX86State *env = &cpu->env;
+    ram_addr_t ram_addr;
+    hwaddr paddr;
+
+    /* If we get an action required MCE, it has been injected by KVM
+     * while the VM was running.  An action optional MCE instead should
+     * be coming from the main thread, which qemu_init_sigbus identifies
+     * as the "early kill" thread.
+     */
+    assert(code == BUS_MCEERR_AR || code == BUS_MCEERR_AO);
+
+    if ((env->mcg_cap & MCG_SER_P) && addr) {
+        ram_addr = qemu_ram_addr_from_host(addr);
+        if (ram_addr != RAM_ADDR_INVALID &&
+            kvm_physical_memory_addr_from_host(c->kvm_state, addr, &paddr)) {
+            kvm_hwpoison_page_add(ram_addr);
+            kvm_mce_inject(cpu, paddr, code);
+            return;
+        }
+
+        fprintf(stderr, "Hardware memory error for memory used by "
+                "QEMU itself instead of guest system!\n");
+    }
+
+    if (code == BUS_MCEERR_AR) {
+        hardware_memory_error();
+    }
+
+    /* Hope we are lucky for AO MCE */
+}
+
+
+> 
+> What happens if the dram-scrub hardware spots an error in guest memory, but the
+> guest wasn't running? KVM won't have a relevant ESR value to give you.
+if the dram-scrub hardware spots an error in guest memory, it will generate
+IRQ in DDR controller, not SEA or SEI exception. I still do not consider the GSIV.
+For GSIV, may be we can only handle it in the host OS.
+
+
+> 
+> What happens if we start swapping a page of guest memory to disk, and discover
+> the memory is corrupt. This is synchronous, but it wasn't the guest, and KVM
+> still can't give you an ESR.
+I think this Error is reported by IRQ(GSIV), GSIV is not SEA/SEI, we should not give the ESR to them.
+
+
+> 
+> What about CPER records discovered through the polled interface? What happens if
+> I write a PFN into the corrupt-pfn sysfs interface?
+I do not understand this question.
+I think in the process it should report SEA notification when CPU consume the error page.
+
+
+> 
+> 
+> I think what you need is some way of knowing if the BUS_MCEERR_A* was directly
+> caused by a user-space (or guest) access, and if so was it a data or instruction
+when user space received the signal, it will judge whether the memory address is user-space (or guest) address
+
+
+> fetch. These can become SEA notifications.
+In fact, it can be SEI, not always SEA, why it will always SEA notifications?
+If the memory properties of data is device type, it may become SEI notification.
+
+
+> 
+> KVM's user-space shouldn't be a special-case where the kernel behaves
+> differently: if we tinker with this it needs to make sense for all user space
+> processes and mean something on all architectures.
+> 
+> I think this information could be useful to other users of these signals, e.g. a
+> JVM could silently regenerate/reload code/data for a non-direct-access fault
+> instead of exit-ing (or throwing an exception) for a direct access.
+> 
+> For BUS_MCEERR_A* from memory_failure() we can't know if they are caused by an
+> access or not. When the mm code gets -EHWPOISON when trying to resolve a
+
+Because of that, so I allow  userspace getting exception information
+
+> user-space fault we know it was due to a direct-access. (I don't know if/how x86
+> can know if it was code or data). Faulting guest accesses through KVM are just a
+> special version of this where KVM fixes-up stage2.
+> 
+> ... but for any of this to work we need the address of the corrupt memory.
+> (-> cover letter)
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> .
+> 
