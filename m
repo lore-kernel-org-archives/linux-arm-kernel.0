@@ -1,26 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 13 Sep 2017 13:07:34 -0500
-Subject: [PATCH v5 02/10] dt-bindings: net: Restore sun8i dwmac binding
-In-Reply-To: <20170908071156.5115-3-clabbe.montjoie@gmail.com>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-3-clabbe.montjoie@gmail.com>
-Message-ID: <20170913180734.xvazvf7thpqtssgz@rob-hp-laptop>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 13 Sep 2017 21:08:30 +0300
+Subject: [PATCH] arm64: fix documentation on kernel pages mappings to HYP VA
+Message-ID: <20170913180830.8608-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 08, 2017 at 09:11:48AM +0200, Corentin Labbe wrote:
-> This patch restore dt-bindings documentation about dwmac-sun8i
-> This reverts commit 8aa33ec2f481 ("dt-bindings: net: Revert sun8i dwmac binding")
+The Documentation/arm64/memory.txt says:
+When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+offset from the kernel VA (top 24bits of the kernel VA set to zero):
 
-Why?
+In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
+which has more options, and none of them assumes clearing of top 24bits
+of the kernel VA.
 
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ++++++++++++++++++++++
->  1 file changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ Documentation/arm64/memory.txt | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+index d7273a5f6456..c39895d7e3a2 100644
+--- a/Documentation/arm64/memory.txt
++++ b/Documentation/arm64/memory.txt
+@@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
+  +-------------------------------------------------> [63] TTBR0/1
+ 
+ 
+-When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+-offset from the kernel VA (top 24bits of the kernel VA set to zero):
+-
+-Start			End			Size		Use
+------------------------------------------------------------------------
+-0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
++When using KVM without Virtualization Host Extensions, the hypervisor maps
++kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
++or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
++ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
++VA set to zero if CPU has Reduced HYP mapping offset capability. See
++kern_hyp_va macro.
++
++When using KVM with Virtualization Host Extensions, no additional mappings
++created as host kernel already operates in EL2.
+-- 
+2.11.0
