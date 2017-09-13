@@ -1,79 +1,94 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 13 Sep 2017 16:47:27 +0100
-Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
- STE.S1STALLD and CD.S
-In-Reply-To: <2f952821-afc3-46dd-17eb-40e8626bd6e5@huawei.com>
-References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
- <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
- <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
- <20170913030643.GD12411@arm.com>
- <2f952821-afc3-46dd-17eb-40e8626bd6e5@huawei.com>
-Message-ID: <e214b851-efa8-a45f-7deb-b99f3873564b@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Sep 2017 09:31:27 -0700
+Subject: n900 in next-20170901
+In-Reply-To: <20170913075516.GA25036@js1304-P5Q-DELUXE>
+References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
+ <20170905233241.GA19231@js1304-P5Q-DELUXE>
+ <20170906133057.GH5024@atomide.com>
+ <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+ <20170913075516.GA25036@js1304-P5Q-DELUXE>
+Message-ID: <20170913163126.GS5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/17 11:11, Yisheng Xie wrote:
-> Hi Will,
+* Joonsoo Kim <iamjoonsoo.kim@lge.com> [170913 00:54]:
+> On Thu, Sep 07, 2017 at 09:16:51AM -0700, Tony Lindgren wrote:
+> > I doubt that QEMU n900 boots in secure mode but instead shows
+> > the SoC as general purpose SoC. If so, you'd have to patch the
+> > omap3_save_secure_ram_context() to attempt to save secure RAM
+> > context in all cases. If that works then debugging with any
+> > omap3 board like beagleboard in QEMU should work.
 > 
-> On 2017/9/13 11:06, Will Deacon wrote:
->> On Tue, Sep 05, 2017 at 01:54:19PM +0100, Jean-Philippe Brucker wrote:
->>> On 31/08/17 09:20, Yisheng Xie wrote:
->>>> It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
->>>> means we should not disable stall mode if stall/terminate mode is not
->>>> configuable.
->>>>
->>>> Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
->>>> means if stall mode is force we should always set CD.S.
->>>>
->>>> This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
->>>> TERMINATE feature checking to ensue above ILLEGAL cases from happening.
->>>>
->>>> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
->>>> ---
->>>>? drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
->>>>? 1 file changed, 16 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>>> index dbda2eb..0745522 100644
->>>> --- a/drivers/iommu/arm-smmu-v3.c
->>>> +++ b/drivers/iommu/arm-smmu-v3.c
->>>> @@ -55,6 +55,7 @@
->>>>? #define IDR0_STALL_MODEL_SHIFT???????????? 24
->>>>? #define IDR0_STALL_MODEL_MASK????????????? 0x3
->>>>? #define IDR0_STALL_MODEL_STALL???????????? (0 << IDR0_STALL_MODEL_SHIFT)
->>>> +#define IDR0_STALL_MODEL_NS??????????????? (1 << IDR0_STALL_MODEL_SHIFT)
->>>>? #define IDR0_STALL_MODEL_FORCE???????????? (2 << IDR0_STALL_MODEL_SHIFT)
->>>>? #define IDR0_TTENDIAN_SHIFT??????????????? 21
->>>>? #define IDR0_TTENDIAN_MASK???????? 0x3
->>>> @@ -766,6 +767,7 @@ struct arm_smmu_device {
->>>>? #define ARM_SMMU_FEAT_SVM????????? (1 << 15)
->>>>? #define ARM_SMMU_FEAT_HA?????????? (1 << 16)
->>>>? #define ARM_SMMU_FEAT_HD?????????? (1 << 17)
->>>> +#define ARM_SMMU_FEAT_TERMINATE??????????? (1 << 18)
->>>
->>> I'd rather introduce something like "ARM_SMMU_FEAT_STALL_FORCE" instead.
->>> Terminate model has another meaning, and is defined by a different bit in
->>> IDR0.
->> 
->> Yes. What we need to do is:
->> 
->> - If STALL_MODEL is 0b00, then set S1STALLD
+> Sorry for late response.
 > 
-> Yes, and within this case, we can only set the S1STALLD for masters which can
-> not stall in the future?
-> 
->> - If STALL_MODEL is 0b01, then we're ok (in future, avoiding trying to use
->>?? stalls, even for masters that claim to support it)
->> - If STALL_MODEL is 0b10, then force all PCI devices and any platform
->>?? devices that don't claim to support stalls into bypass (depending on
->>?? disable_bypass).
->> 
->> Reasonable? We could actually knock up a fix for mainline to do most of
->> this already.
-> This sound reasonable to me. And I can be a volunteer to prepare this patch if
-> Jean-Philippe do not oppose :)
+> I tried to emulate beagle board by using QEMU and now I find the way
+> and it works. However, it doesn't call omap3_save_secure_ram_context()
+> due to different omap_type(). And, even if I call it forcibly, the
+> system dies with prefetch abort regardless of commit 9caf25f996e8.
 
-Sure go ahead, I'll rebase the platform SVM work on top of it.
+OK
 
-Thanks,
-Jean
+> Could you let me know the better way to test your situation?
+
+Hmm yeah it seems to always return 0x19 on GP devices at least
+with the following test hack. But maybe that's enough for you
+to still see some differences with your patches.
+
+> Anyway, could you test linux-next with 'CONFIG_HIGHMEM = n'?
+> I'd like to know if the issue is related to the change that
+> all CMA memory is managed like as highmem.
+
+Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
+you need to remove it from arch/arm/mach-omap2/Kconfig that
+selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
+
+Regards,
+
+Tony
+
+8< ------
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -114,7 +114,7 @@ static void omap3_save_secure_ram_context(void)
+ 	u32 ret;
+ 	int mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+ 
+-	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
++	if (1 || omap_type() != OMAP2_DEVICE_TYPE_GP) {
+ 		/*
+ 		 * MPU next state must be set to POWER_ON temporarily,
+ 		 * otherwise the WFI executed inside the ROM code
+@@ -440,7 +440,7 @@ void omap_push_sram_idle(void)
+ {
+ 	omap3_do_wfi_sram = omap_sram_push(omap3_do_wfi, omap3_do_wfi_sz);
+ 
+-	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
++	if (1 || omap_type() != OMAP2_DEVICE_TYPE_GP)
+ 		_omap_save_secure_sram = omap_sram_push(save_secure_ram_context,
+ 				save_secure_ram_context_sz);
+ }
+@@ -551,7 +551,7 @@ int __init omap3_pm_init(void)
+ 		clkdm_add_wkdep(per_clkdm, wkup_clkdm);
+ 
+ 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
+-	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
++	if (1 || omap_type() != OMAP2_DEVICE_TYPE_GP) {
+ 		omap3_secure_ram_storage =
+ 			kmalloc(0x803F, GFP_KERNEL);
+ 		if (!omap3_secure_ram_storage)
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -114,7 +114,7 @@ ENTRY(save_secure_ram_context)
+ 	mov	r6, #0xff
+ 	dsb				@ data write barrier
+ 	dmb				@ data memory barrier
+-	smc	#1			@ call SMI monitor (smi #1)
++	@smc	#1			@ call SMI monitor (smi #1)
+ 	nop
+ 	nop
+ 	nop
+-- 
+2.14.1
