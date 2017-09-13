@@ -1,45 +1,138 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 13 Sep 2017 11:31:13 +0900
-Subject: [PATCH v2 2/3] ARM: dts: exynos: Add clean name of compatible.
-In-Reply-To: <201709100314.wmGSSdNC%fengguang.wu@intel.com>
-References: <CGME20170909195841epcas1p37badd9da52c773e6167523ebfb2ac7ae@epcas1p3.samsung.com>
- <201709100314.wmGSSdNC%fengguang.wu@intel.com>
-Message-ID: <77404c7b-b54d-22e8-63b2-70401520b6e4@samsung.com>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Wed, 13 Sep 2017 11:31:16 +0900
+Subject: [PATCH v1 1/3] dt-bindings: nvmem: add description for UniPhier
+ eFuse
+In-Reply-To: <20170912161546.q5xr5pfdxin3qujf@rob-hp-laptop>
+References: <1504221620-358-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1504221620-358-2-git-send-email-hayashibara.keiji@socionext.com>
+ <CAK7LNASLh4vYqZhM9g2AL1uUtieviAmmWOp_Mzoj0zG=Ejz0cA@mail.gmail.com>
+ <000001d32615$38e1b0c0$aaa51240$@socionext.com>
+ <20170912161546.q5xr5pfdxin3qujf@rob-hp-laptop>
+Message-ID: <000301d32c38$5fe8a830$1fb9f890$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2017 04:57 AM, kbuild test robot wrote:
-> Hi Hoegeun,
->
-> [auto build test ERROR on robh/for-next]
-> [also build test ERROR on v4.13 next-20170908]
-> [cannot apply to drm-exynos/exynos-drm/for-next]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Hoegeun-Kwon/drm-exynos-gsc-Support-the-hardware-rotation-limits/20170910-015155
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-> config: arm-at91_dt_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->          chmod +x ~/bin/make.cross
->          # save the attached .config to linux build tree
->          make.cross ARCH=arm
->
-> All errors (new ones prefixed by >>):
->
->>> Error: arch/arm/boot/dts/exynos5250.dtsi:640.40-41 syntax error
->     FATAL ERROR: Unable to parse input tree
+Hello Rob,
 
-Thank you for your check.
+Thank you for your comment.
 
-This problem was caused by typos.
-ver3 has been modified.
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Wednesday, September 13, 2017 1:16 AM
+> 
+> On Tue, Sep 05, 2017 at 04:04:31PM +0900, Keiji Hayashibara wrote:
+> > Hello Yamada-san,
+> >
+> > Thank you for your comment.
+> >
+> > > From: Masahiro Yamada [mailto:yamada.masahiro at socionext.com]
+> > > Sent: Monday, September 4, 2017 9:56 PM
+> > >
+> > > 2017-09-01 8:20 GMT+09:00 Keiji Hayashibara
+> > > <hayashibara.keiji@socionext.com>:
+> > > > Add uniphier-efuse dt-bindings documentation.
+> > > >
+> > > > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+> > > > ---
+> > > >  .../devicetree/bindings/nvmem/uniphier-efuse.txt   | 45
+> > > ++++++++++++++++++++++
+> > > >  1 file changed, 45 insertions(+)
+> > > >  create mode 100644
+> > > > Documentation/devicetree/bindings/nvmem/uniphier-efuse.txt
+> 
+> > > > +Example:
+> > > > +
+> > > > +       soc-glue at 5f900000 {
+> > > > +               compatible =
+> "socionext,uniphier-ld20-soc-glue-debug",
+> > > > +                            "simple-mfd";
+> > > > +               #address-cells = <1>;
+> > > > +               #size-cells = <1>;
+> > > > +               ranges = <0x0 0x5f900000 0x2000>;
+> > >
+> > >
+> > > IMHO, I think an empty "ranges;" will clarify the code, but it is up
+> > > to your taste.
+> > >
+> > >
+> > > > +
+> > > > +               efuse {
+> > > > +                       compatible = "socionext,uniphier-efuse",
+> > > > +                                    "syscon";
+> > >
+> > >
+> > > You are adding a dedicated driver for "socionext,uniphier-efuse".
+> > >
+> > > Then, "syscon" as well?
+> > >
+> >
+> > Since I was using the syscon interface to implement the driver, I
+> > specified "syscon". It's interface is syscon_node_to_regmap().
+> >
+> > I will rethink this in v2.
+> >
+> > >
+> > >
+> > > > +                       reg = <0x100 0xf00>;
+> > >
+> > >
+> > > Not so many efuse registers exist on the SoC.
+> > >
+> > > reg = <0x100 0x200>; will be enough.
+> > >
+> > >
+> > > Or if you want to be strict to the hw spec, you can write as follows:
+> > >
+> > >         soc-glue at 5f900000 {
+> > >                compatible =
+> "socionext,uniphier-ld20-soc-glue-debug";
+> > >                             "simple-mfd";
+> > >                #address-cells = <1>;
+> > >                #size-cells = <1>;
+> > >                ranges = <0x0 0x5f900000 0x2000>;
+> > >
+> > >                efuse at 100 {
+> > >                            compatible = "socionext,uniphier-efuse";
+> > >                            reg = <0x100 0x28>;
+> > >                };
+> > >
+> > >                efuse at 200 {
+> > >                            compatible = "socionext,uniphier-efuse";
+> > >                            reg = <0x200 0x68>;
+> > >                };
+> > >        };
+> > >
+> > >
+> > >
+> > >
+> > > > +                       #address-cells = <1>;
+> > > > +                       #size-cells = <1>;
+> > > > +
+> > > > +                       /* Data cells */
+> > > > +                       usb_mon: usb_mon {
+> > > > +                               reg = <0x154 0xc>;
+> > > > +                       };
+> > >
+> > >
+> > > This <0x154 0xc> represents 0x5f900254 in CPU address view.
+> > > (0x5f900000 + 0x100 + 0x154)
+> > >
+> > > So many ranges conversion, and how error-prone..
+> > >
+> >
+> > Yes, indeed...
+> > I will modify as below.
+> 
+> Please don't. A non-empty ranges is preferred. It limits the scope and
+chance
+> for errors (smaller range allows fewer possible values and limits the
+> chances of having address ranges duplicated in multiple nodes). But yes,
+> it does add the requirement of doing addition and/or OR operations. I
+can't
+> review whether the address ends up being correct either way, but having
+> non-empty ranges helps enforce the other things.
 
-Best regards,
-Hoegeun
+I see. 
+I will proceed with implementation by non-empty ranges.
 
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Best Regards,
+Keiji Hayashibara
