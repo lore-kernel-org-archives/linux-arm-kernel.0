@@ -1,62 +1,66 @@
-From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Wed, 13 Sep 2017 18:05:40 +0100
-Subject: [PATCH 7/8] ARM: dts: r8a7745: Add QSPI support
-In-Reply-To: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <1505322341-9480-8-git-send-email-chris.paterson2@renesas.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Sep 2017 18:11:59 +0100
+Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
+ STE.S1STALLD and CD.S
+In-Reply-To: <2f952821-afc3-46dd-17eb-40e8626bd6e5@huawei.com>
+References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
+ <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
+ <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
+ <20170913030643.GD12411@arm.com>
+ <2f952821-afc3-46dd-17eb-40e8626bd6e5@huawei.com>
+Message-ID: <20170913171159.GB14955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On Wed, Sep 13, 2017 at 06:11:13PM +0800, Yisheng Xie wrote:
+> On 2017/9/13 11:06, Will Deacon wrote:
+> > On Tue, Sep 05, 2017 at 01:54:19PM +0100, Jean-Philippe Brucker wrote:
+> >> On 31/08/17 09:20, Yisheng Xie wrote:
+> >>> It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
+> >>> means we should not disable stall mode if stall/terminate mode is not
+> >>> configuable.
+> >>>
+> >>> Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
+> >>> means if stall mode is force we should always set CD.S.
+> >>>
+> >>> This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
+> >>> TERMINATE feature checking to ensue above ILLEGAL cases from happening.
+> >>>
+> >>> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> >>> ---
+> >>>  drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
+> >>>  1 file changed, 16 insertions(+), 6 deletions(-)
+> >>>
+> >>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> >>> index dbda2eb..0745522 100644
+> >>> --- a/drivers/iommu/arm-smmu-v3.c
+> >>> +++ b/drivers/iommu/arm-smmu-v3.c
+> >>> @@ -55,6 +55,7 @@
+> >>>  #define IDR0_STALL_MODEL_SHIFT		24
+> >>>  #define IDR0_STALL_MODEL_MASK		0x3
+> >>>  #define IDR0_STALL_MODEL_STALL		(0 << IDR0_STALL_MODEL_SHIFT)
+> >>> +#define IDR0_STALL_MODEL_NS		(1 << IDR0_STALL_MODEL_SHIFT)
+> >>>  #define IDR0_STALL_MODEL_FORCE		(2 << IDR0_STALL_MODEL_SHIFT)
+> >>>  #define IDR0_TTENDIAN_SHIFT		21
+> >>>  #define IDR0_TTENDIAN_MASK		0x3
+> >>> @@ -766,6 +767,7 @@ struct arm_smmu_device {
+> >>>  #define ARM_SMMU_FEAT_SVM		(1 << 15)
+> >>>  #define ARM_SMMU_FEAT_HA		(1 << 16)
+> >>>  #define ARM_SMMU_FEAT_HD		(1 << 17)
+> >>> +#define ARM_SMMU_FEAT_TERMINATE		(1 << 18)
+> >>
+> >> I'd rather introduce something like "ARM_SMMU_FEAT_STALL_FORCE" instead.
+> >> Terminate model has another meaning, and is defined by a different bit in
+> >> IDR0.
+> > 
+> > Yes. What we need to do is:
+> > 
+> > - If STALL_MODEL is 0b00, then set S1STALLD
+> 
+> Yes, and within this case, we can only set the S1STALLD for masters which can
+> not stall in the future?
 
-Add the DT node for the QSPI interface to the SoC dtsi.
+Yeah, something like that. I'd probably predicate it on having afault
+handler registered too.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
----
-This patch is based on renesas-devel-20170913-v4.13.
-
-This patch is dependant on:
-- "dt-bindings: qspi: Add r8a7743/5 to the compatible list"
-
-
- arch/arm/boot/dts/r8a7745.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 37c0fac..b819ec5 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -25,6 +25,7 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		spi0 = &qspi;
- 	};
- 
- 	cpus {
-@@ -752,6 +753,22 @@
- 			status = "disabled";
- 		};
- 
-+		qspi: spi at e6b10000 {
-+			compatible = "renesas,qspi-r8a7745", "renesas,qspi";
-+			reg = <0 0xe6b10000 0 0x2c>;
-+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 917>;
-+			dmas = <&dmac0 0x17>, <&dmac0 0x18>,
-+			       <&dmac1 0x17>, <&dmac1 0x18>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			resets = <&cpg 917>;
-+			status = "disabled";
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7745";
- 			reg = <0 0xee100000 0 0x328>;
--- 
-1.9.1
+Will
