@@ -1,62 +1,71 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Sep 2017 10:36:23 +0200
-Subject: [PATCH 04/11] soc: renesas: rcar-sysc: add R8A77970 support
-In-Reply-To: <20170912210518.203740259@cogentembedded.com>
-References: <20170912210518.203740259@cogentembedded.com>
-Message-ID: <CAMuHMdXLbg2WwtWvG+zBa5MOT3qXr2Fv-U4AJ0=eLfE2VG1LKg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 13 Sep 2017 17:56:29 +0900
+Subject: [PATCH v5 2/3] dt-bindings: gpio: uniphier: add UniPhier GPIO binding
+In-Reply-To: <1505292990-22957-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1505292990-22957-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1505292990-22957-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+This GPIO controller is used on UniPhier SoC family.
 
-On Tue, Sep 12, 2017 at 10:37 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add support for R-Car V3M (R8A77970) SoC power areas to the R-Car SYSC
-> driver.
->
-> Based on the original (and large) patch by Daisuke Matsushita
-> <daisuke.matsushita.ns@hitachi.com>.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-> --- /dev/null
-> +++ renesas/drivers/soc/renesas/r8a77970-sysc.c
-> @@ -0,0 +1,39 @@
 
-> +#include <linux/bug.h>
+ .../devicetree/bindings/gpio/gpio-uniphier.txt     | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
 
-I think this include is no longer needed since commit c7acec713d14c6ce
-("kernel.h: handle pointers to arrays better in container_of()").
-
-> +static const struct rcar_sysc_area r8a77970_areas[] __initconst = {
-
-> +       { "a3ir",       0x180, 0, R8A77970_PD_A3IR,     R8A77970_PD_ALWAYS_ON },
-> +       { "a2ir0",      0x400, 0, R8A77970_PD_A2IR0,    R8A77970_PD_ALWAYS_ON },
-> +       { "a2ir1",      0x400, 1, R8A77970_PD_A2IR1,    R8A77970_PD_A2IR0 },
-> +       { "a2ir2",      0x400, 2, R8A77970_PD_A2IR2,    R8A77970_PD_A2IR0 },
-> +       { "a2ir3",      0x400, 3, R8A77970_PD_A2IR3,    R8A77970_PD_A2IR0 },
-> +       { "a2sc0",      0x400, 4, R8A77970_PD_A2SC0,    R8A77970_PD_ALWAYS_ON },
-> +       { "a2sc1",      0x400, 5, R8A77970_PD_A2SC1,    R8A77970_PD_A2SC0 },
-
-According to Figure 9.2(b) "Power domain structure (R-Car V3M)" and Table 9.4
-"Power domains", all of A2IR[0-3] and A2SC[01] are direct children of A3IR.
-
-BTW, the bit indices "4" resp. "5" for A2SC[01] don't match Section 9.2.5
-"Power Control Registers for A2IR" (which uses "0" resp. "1"), but I assume
-that's just a typo in the datasheet, as those would conflict with A2IR[01], and
-the would conflict with the documentation for other R-Car Gen3 SoCs.
-
-With the above fixed:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+new file mode 100644
+index 0000000..0a371bdd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+@@ -0,0 +1,43 @@
++UniPhier GPIO controller
++
++Required properties:
++- compatible: Should be "socionext,uniphier-gpio".
++- reg: Specifies offset and length of the register set for the device.
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be 2.  The first cell is the pin number and the second
++  cell is used to specify optional parameters.
++- interrupt-parent: Specifies the parent interrupt controller.
++- interrupts: Specifies interrupts connected to the parent interrupt controller.
++- interrupt-controller: Marks the device node as an interrupt controller.
++- #interrupt-cells: Should be 2.  The first cell defines the interrupt number.
++  The second cell bits[3:0] is used to specify trigger type as follows:
++    1 = low-to-high edge triggered
++    2 = high-to-low edge triggered
++    4 = active high level-sensitive
++    8 = active low level-sensitive
++  Valid combinations are 1, 2, 3, 4, 8.
++- ngpios: Specifies the number of GPIO lines.
++- gpio-ranges: Mapping to pin controller pins (as described in gpio.txt)
++
++Optional properties:
++- gpio-ranges-group-names: Used for named gpio ranges (as described in gpio.txt)
++
++Example:
++	gpio: gpio at 55000000 {
++		compatible = "socionext,uniphier-gpio";
++		reg = <0x55000000 0x200>;
++		interrupt-parent = <&aidet>;
++		interrupts = <48 0>, <49 0>, <50 0>, <51 0>,
++			     <52 0>, <53 0>, <54 0>, <55 0>,
++			     <56 0>, <57 0>, <58 0>, <59 0>,
++			     <60 0>, <61 0>, <62 0>, <63 0>,
++			     <154 0>, <155 0>, <156 0>, <157 0>,
++			     <158 0>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-ranges = <&pinctrl 0 0 0>;
++		gpio-ranges-group-names = "gpio_range";
++		ngpios = <248>;
++	};
+-- 
+2.7.4
