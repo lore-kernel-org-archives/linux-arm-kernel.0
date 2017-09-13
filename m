@@ -1,253 +1,79 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 13 Sep 2017 16:39:40 +0100
-Subject: [PATCH v2 07/28] arm64/sve: Low-level SVE architectural state
- manipulation functions
-In-Reply-To: <1504198860-12951-8-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-8-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87mv5ya9qb.fsf@linaro.org>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Wed, 13 Sep 2017 16:47:27 +0100
+Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
+ STE.S1STALLD and CD.S
+In-Reply-To: <2f952821-afc3-46dd-17eb-40e8626bd6e5@huawei.com>
+References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
+ <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
+ <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
+ <20170913030643.GD12411@arm.com>
+ <2f952821-afc3-46dd-17eb-40e8626bd6e5@huawei.com>
+Message-ID: <e214b851-efa8-a45f-7deb-b99f3873564b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13/09/17 11:11, Yisheng Xie wrote:
+> Hi Will,
+> 
+> On 2017/9/13 11:06, Will Deacon wrote:
+>> On Tue, Sep 05, 2017 at 01:54:19PM +0100, Jean-Philippe Brucker wrote:
+>>> On 31/08/17 09:20, Yisheng Xie wrote:
+>>>> It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
+>>>> means we should not disable stall mode if stall/terminate mode is not
+>>>> configuable.
+>>>>
+>>>> Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
+>>>> means if stall mode is force we should always set CD.S.
+>>>>
+>>>> This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
+>>>> TERMINATE feature checking to ensue above ILLEGAL cases from happening.
+>>>>
+>>>> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+>>>> ---
+>>>>? drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
+>>>>? 1 file changed, 16 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>>> index dbda2eb..0745522 100644
+>>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>>> @@ -55,6 +55,7 @@
+>>>>? #define IDR0_STALL_MODEL_SHIFT???????????? 24
+>>>>? #define IDR0_STALL_MODEL_MASK????????????? 0x3
+>>>>? #define IDR0_STALL_MODEL_STALL???????????? (0 << IDR0_STALL_MODEL_SHIFT)
+>>>> +#define IDR0_STALL_MODEL_NS??????????????? (1 << IDR0_STALL_MODEL_SHIFT)
+>>>>? #define IDR0_STALL_MODEL_FORCE???????????? (2 << IDR0_STALL_MODEL_SHIFT)
+>>>>? #define IDR0_TTENDIAN_SHIFT??????????????? 21
+>>>>? #define IDR0_TTENDIAN_MASK???????? 0x3
+>>>> @@ -766,6 +767,7 @@ struct arm_smmu_device {
+>>>>? #define ARM_SMMU_FEAT_SVM????????? (1 << 15)
+>>>>? #define ARM_SMMU_FEAT_HA?????????? (1 << 16)
+>>>>? #define ARM_SMMU_FEAT_HD?????????? (1 << 17)
+>>>> +#define ARM_SMMU_FEAT_TERMINATE??????????? (1 << 18)
+>>>
+>>> I'd rather introduce something like "ARM_SMMU_FEAT_STALL_FORCE" instead.
+>>> Terminate model has another meaning, and is defined by a different bit in
+>>> IDR0.
+>> 
+>> Yes. What we need to do is:
+>> 
+>> - If STALL_MODEL is 0b00, then set S1STALLD
+> 
+> Yes, and within this case, we can only set the S1STALLD for masters which can
+> not stall in the future?
+> 
+>> - If STALL_MODEL is 0b01, then we're ok (in future, avoiding trying to use
+>>?? stalls, even for masters that claim to support it)
+>> - If STALL_MODEL is 0b10, then force all PCI devices and any platform
+>>?? devices that don't claim to support stalls into bypass (depending on
+>>?? disable_bypass).
+>> 
+>> Reasonable? We could actually knock up a fix for mainline to do most of
+>> this already.
+> This sound reasonable to me. And I can be a volunteer to prepare this patch if
+> Jean-Philippe do not oppose :)
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Sure go ahead, I'll rebase the platform SVM work on top of it.
 
-> Manipulating the SVE architectural state, including the vector and
-> predicate registers, first-fault register and the vector length,
-> requires the use of dedicated instructions added by SVE.
->
-> This patch adds suitable assembly functions for saving and
-> restoring the SVE registers and querying the vector length.
-> Setting of the vector length is done as part of register restore.
->
-> Since people building kernels may not all get an SVE-enabled
-> toolchain for a while, this patch uses macros that generate
-> explicit opcodes in place of assembler mnemonics.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-
-It took me a while to find a way to properly dissemble the resulting
-binaries, in the end needing to run a native objdump in Stretch. I'd
-hopped my gdb-multiarch was bleeding edge enough but no ;-)
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
->
-> ---
->
-> Changes since v1
-> ----------------
->
-> Requested by Alex Benn?e:
->
-> * Annotate instruction generation macros with the canonical
-> architectural syntax so that people can cross-reference more easily
-> against the architectural documentation.
-> ---
->  arch/arm64/include/asm/fpsimd.h       |   5 ++
->  arch/arm64/include/asm/fpsimdmacros.h | 148 ++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/entry-fpsimd.S      |  17 ++++
->  3 files changed, 170 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index 410c481..026a7c7 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -67,6 +67,11 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
->
->  extern void fpsimd_flush_task_state(struct task_struct *target);
->
-> +extern void sve_save_state(void *state, u32 *pfpsr);
-> +extern void sve_load_state(void const *state, u32 const *pfpsr,
-> +			   unsigned long vq_minus_1);
-> +extern unsigned int sve_get_vl(void);
-> +
->  /* For use by EFI runtime services calls only */
->  extern void __efi_fpsimd_begin(void);
->  extern void __efi_fpsimd_end(void);
-> diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-> index 0f5fdd3..e050d76 100644
-> --- a/arch/arm64/include/asm/fpsimdmacros.h
-> +++ b/arch/arm64/include/asm/fpsimdmacros.h
-> @@ -75,3 +75,151 @@
->  	ldr	w\tmpnr, [\state, #16 * 2 + 4]
->  	fpsimd_restore_fpcr x\tmpnr, \state
->  .endm
-> +
-> +/* Sanity-check macros to help avoid encoding garbage instructions */
-> +
-> +.macro _check_general_reg nr
-> +	.if (\nr) < 0 || (\nr) > 30
-> +		.error "Bad register number \nr."
-> +	.endif
-> +.endm
-> +
-> +.macro _sve_check_zreg znr
-> +	.if (\znr) < 0 || (\znr) > 31
-> +		.error "Bad Scalable Vector Extension vector register number \znr."
-> +	.endif
-> +.endm
-> +
-> +.macro _sve_check_preg pnr
-> +	.if (\pnr) < 0 || (\pnr) > 15
-> +		.error "Bad Scalable Vector Extension predicate register number \pnr."
-> +	.endif
-> +.endm
-> +
-> +.macro _check_num n, min, max
-> +	.if (\n) < (\min) || (\n) > (\max)
-> +		.error "Number \n out of range [\min,\max]"
-> +	.endif
-> +.endm
-> +
-> +/* SVE instruction encodings for non-SVE-capable assemblers */
-> +
-> +/* STR (vector): STR Z\nz, [X\nxbase, #\offset, MUL VL] */
-> +.macro _sve_str_v nz, nxbase, offset=0
-> +	_sve_check_zreg \nz
-> +	_check_general_reg \nxbase
-> +	_check_num (\offset), -0x100, 0xff
-> +	.inst	0xe5804000			\
-> +		| (\nz)				\
-> +		| ((\nxbase) << 5)		\
-> +		| (((\offset) & 7) << 10)	\
-> +		| (((\offset) & 0x1f8) << 13)
-> +.endm
-> +
-> +/* LDR (vector): LDR Z\nz, [X\nxbase, #\offset, MUL VL] */
-> +.macro _sve_ldr_v nz, nxbase, offset=0
-> +	_sve_check_zreg \nz
-> +	_check_general_reg \nxbase
-> +	_check_num (\offset), -0x100, 0xff
-> +	.inst	0x85804000			\
-> +		| (\nz)				\
-> +		| ((\nxbase) << 5)		\
-> +		| (((\offset) & 7) << 10)	\
-> +		| (((\offset) & 0x1f8) << 13)
-> +.endm
-> +
-> +/* STR (predicate): STR P\np, [X\nxbase, #\offset, MUL VL] */
-> +.macro _sve_str_p np, nxbase, offset=0
-> +	_sve_check_preg \np
-> +	_check_general_reg \nxbase
-> +	_check_num (\offset), -0x100, 0xff
-> +	.inst	0xe5800000			\
-> +		| (\np)				\
-> +		| ((\nxbase) << 5)		\
-> +		| (((\offset) & 7) << 10)	\
-> +		| (((\offset) & 0x1f8) << 13)
-> +.endm
-> +
-> +/* LDR (predicate): LDR P\np, [X\nxbase, #\offset, MUL VL] */
-> +.macro _sve_ldr_p np, nxbase, offset=0
-> +	_sve_check_preg \np
-> +	_check_general_reg \nxbase
-> +	_check_num (\offset), -0x100, 0xff
-> +	.inst	0x85800000			\
-> +		| (\np)				\
-> +		| ((\nxbase) << 5)		\
-> +		| (((\offset) & 7) << 10)	\
-> +		| (((\offset) & 0x1f8) << 13)
-> +.endm
-> +
-> +/* RDVL X\nx, #\imm */
-> +.macro _sve_rdvl nx, imm
-> +	_check_general_reg \nx
-> +	_check_num (\imm), -0x20, 0x1f
-> +	.inst	0x04bf5000			\
-> +		| (\nx)				\
-> +		| (((\imm) & 0x3f) << 5)
-> +.endm
-> +
-> +/* RDFFR (unpredicated): RDFFR P\np.B */
-> +.macro _sve_rdffr np
-> +	_sve_check_preg \np
-> +	.inst	0x2519f000			\
-> +		| (\np)
-> +.endm
-> +
-> +/* WRFFR P\np.B */
-> +.macro _sve_wrffr np
-> +	_sve_check_preg \np
-> +	.inst	0x25289000			\
-> +		| ((\np) << 5)
-> +.endm
-> +
-> +.macro __for from:req, to:req
-> +	.if (\from) == (\to)
-> +		_for__body \from
-> +	.else
-> +		__for \from, (\from) + ((\to) - (\from)) / 2
-> +		__for (\from) + ((\to) - (\from)) / 2 + 1, \to
-> +	.endif
-> +.endm
-> +
-> +.macro _for var:req, from:req, to:req, insn:vararg
-> +	.macro _for__body \var:req
-> +		\insn
-> +	.endm
-> +
-> +	__for \from, \to
-> +
-> +	.purgem _for__body
-> +.endm
-> +
-> +.macro sve_save nxbase, xpfpsr, nxtmp
-> + _for n, 0, 31,	_sve_str_v	\n, \nxbase, \n - 34
-> + _for n, 0, 15,	_sve_str_p	\n, \nxbase, \n - 16
-> +		_sve_rdffr	0
-> +		_sve_str_p	0, \nxbase
-> +		_sve_ldr_p	0, \nxbase, -16
-> +
-> +		mrs		x\nxtmp, fpsr
-> +		str		w\nxtmp, [\xpfpsr]
-> +		mrs		x\nxtmp, fpcr
-> +		str		w\nxtmp, [\xpfpsr, #4]
-> +.endm
-> +
-> +.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp
-> +		mrs_s		x\nxtmp, SYS_ZCR_EL1
-> +		bic		x\nxtmp, x\nxtmp, ZCR_ELx_LEN_MASK
-> +		orr		x\nxtmp, x\nxtmp, \xvqminus1
-> +		msr_s		SYS_ZCR_EL1, x\nxtmp	// self-synchronising
-> +
-> + _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
-> +		_sve_ldr_p	0, \nxbase
-> +		_sve_wrffr	0
-> + _for n, 0, 15,	_sve_ldr_p	\n, \nxbase, \n - 16
-> +
-> +		ldr		w\nxtmp, [\xpfpsr]
-> +		msr		fpsr, x\nxtmp
-> +		ldr		w\nxtmp, [\xpfpsr, #4]
-> +		msr		fpcr, x\nxtmp
-> +.endm
-> diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-> index 6a27cd6..73f17bf 100644
-> --- a/arch/arm64/kernel/entry-fpsimd.S
-> +++ b/arch/arm64/kernel/entry-fpsimd.S
-> @@ -41,3 +41,20 @@ ENTRY(fpsimd_load_state)
->  	fpsimd_restore x0, 8
->  	ret
->  ENDPROC(fpsimd_load_state)
-> +
-> +#ifdef CONFIG_ARM64_SVE
-> +ENTRY(sve_save_state)
-> +	sve_save 0, x1, 2
-> +	ret
-> +ENDPROC(sve_save_state)
-> +
-> +ENTRY(sve_load_state)
-> +	sve_load 0, x1, x2, 3
-> +	ret
-> +ENDPROC(sve_load_state)
-> +
-> +ENTRY(sve_get_vl)
-> +	_sve_rdvl	0, 1
-> +	ret
-> +ENDPROC(sve_get_vl)
-> +#endif /* CONFIG_ARM64_SVE */
-
-
---
-Alex Benn?e
+Thanks,
+Jean
