@@ -1,69 +1,32 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 13 Sep 2017 10:29:19 +0530
-Subject: [PATCH v2] arm64: fix unwind_frame() for filtered out fn for
- function graph tracing
-In-Reply-To: <20170913024218.GB12411@arm.com>
-References: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
- <59B7AED4.1070106@arm.com> <20170913024218.GB12411@arm.com>
-Message-ID: <71e650af-4141-1bc1-3ced-6f109f3e7bbe@redhat.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 13 Sep 2017 11:05:33 +0530
+Subject: da850.dtsi Naming convention Question
+In-Reply-To: <CAHCN7xJosHuuPWUkr=ettc8gWgx9m6PvbFe90f2FnvT0meZVUA@mail.gmail.com>
+References: <CAHCN7xJ7N6W2Pz1vsVV192V-s0g6q+ozvNBR21rx6LufJ4kR6g@mail.gmail.com>
+ <d92f726f-8a84-14ac-571e-f405255fed0b@ti.com>
+ <CAHCN7xJosHuuPWUkr=ettc8gWgx9m6PvbFe90f2FnvT0meZVUA@mail.gmail.com>
+Message-ID: <27e31de3-ec41-80e1-d1a3-d468df1f5282@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 13 September 2017 08:12 AM, Will Deacon wrote:
-> On Tue, Sep 12, 2017 at 10:54:28AM +0100, James Morse wrote:
->> Hi Pratyush,
->>
->> On 01/09/17 06:48, Pratyush Anand wrote:
->>> do_task_stat() calls get_wchan(), which further does unbind_frame().
->>> unbind_frame() restores frame->pc to original value in case function
->>> graph tracer has modified a return address (LR) in a stack frame to hook
->>> a function return. However, if function graph tracer has hit a filtered
->>> function, then we can't unwind it as ftrace_push_return_trace() has
->>> biased the index(frame->graph) with a 'huge negative'
->>> offset(-FTRACE_NOTRACE_DEPTH).
->>>
->>> Moreover, arm64 stack walker defines index(frame->graph) as unsigned
->>> int, which can not compare a -ve number.
->>>
->>> Similar problem we can have with calling of walk_stackframe() from
->>> save_stack_trace_tsk() or dump_backtrace().
->>>
->>> This patch fixes unwind_frame() to test the index for -ve value and
->>> restore index accordingly before we can restore frame->pc.
->>
->> I've just spotted arm64's profile_pc, which does this:
->>  From arch/arm64/kernel/time.c:profile_pc():
->>> #ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>> 	frame.graph = -1; /* no task info */
->>> #endif
->>
->> Is this another elaborate way of hitting this problem?
->>
->> I guess the options are skip any return-address restore in the unwinder if
->> frame.graph is -1. (and profile_pc may have a bug here). Or, put
->> current->curr_ret_stack in there.
-
-I think we should go with latter, ie assign frame.graph = 
-current->curr_ret_stack in profile_pc().
-
->>
->> profile_pc() always passes tsk=NULL, so the unwinder assumes its current...
->> kernel/profile.c pulls the pt_regs from a per-cpu irq_regs variable, that is
->> updated by handle_IPI ... so it looks like this should always be current...
+On Tuesday 12 September 2017 08:58 PM, Adam Ford wrote:
+> That makes a lot of sense, but I have a followup question.  Why would
+> we only have 1 gpio registered at 22600 when we have multiple banks?
+> Again, I am comparing this to the Omap3 because I have more experience
+> with that, and they register each bank separately.
 > 
-> Hmmm... is profile_pc the *only* case where frame->graph isn't equal to
-> tsk->curr_ret_stack in unwind_frame? If so, maybe unwind_frame should just
+> The datasheet breaks it up into small banks, 0-1, 2-3, 4-5, 6-7 and 8
+> yet the device tree shows ti,ngpio = <144> and
+> ti,davinci-gpio-unbanked = <0>;
 
-Yes, it is the only place.
+Adding Keerthy for this. He maintains the DaVinci GPIO driver and is
+much more familiar with it.
 
-> use that, and we could kill the graph member of struct stackframe completely?
-> 
+> I only ask as I am trying to get more familiar with this platform, and
+> I am trying to enhance improve the da850-evm which I realize has been
+> replaced by the lcdk.
 
-Humm, not sure, we initialize frame->graph out of the while loop in 
-unwind_frame()'s caller and then keep in decrementing it in looped function.
+No problem. Thanks for your work on this platform!
 
--- 
-Regards
-Pratyush
+Regards,
+Sekhar
