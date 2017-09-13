@@ -1,177 +1,64 @@
-From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
-Date: Wed, 13 Sep 2017 10:45:36 +0800
-Subject: [PATCH v2 1/2] mtd: nand: introduce NAND_ROW_ADDR_3 flag
-In-Reply-To: <1505268351-31941-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1505268351-31941-1-git-send-email-yamada.masahiro@socionext.com>
- <1505268351-31941-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <b7bc2678-bb43-07e1-4661-1510d8518412@Microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Sep 2017 04:06:44 +0100
+Subject: [RFC PATCH 6/6] iommu/arm-smmu-v3: Avoid ILLEGAL setting of
+ STE.S1STALLD and CD.S
+In-Reply-To: <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
+References: <1504167642-14922-1-git-send-email-xieyisheng1@huawei.com>
+ <1504167642-14922-7-git-send-email-xieyisheng1@huawei.com>
+ <738977bb-4cd7-7d86-0ea0-0c88b6af721c@arm.com>
+Message-ID: <20170913030643.GD12411@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 05, 2017 at 01:54:19PM +0100, Jean-Philippe Brucker wrote:
+> On 31/08/17 09:20, Yisheng Xie wrote:
+> > It is ILLEGAL to set STE.S1STALLD if STALL_MODEL is not 0b00, which
+> > means we should not disable stall mode if stall/terminate mode is not
+> > configuable.
+> > 
+> > Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
+> > means if stall mode is force we should always set CD.S.
+> > 
+> > This patch add ARM_SMMU_FEAT_TERMINATE feature bit for smmu, and use
+> > TERMINATE feature checking to ensue above ILLEGAL cases from happening.
+> > 
+> > Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> > ---
+> >  drivers/iommu/arm-smmu-v3.c | 22 ++++++++++++++++------
+> >  1 file changed, 16 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> > index dbda2eb..0745522 100644
+> > --- a/drivers/iommu/arm-smmu-v3.c
+> > +++ b/drivers/iommu/arm-smmu-v3.c
+> > @@ -55,6 +55,7 @@
+> >  #define IDR0_STALL_MODEL_SHIFT		24
+> >  #define IDR0_STALL_MODEL_MASK		0x3
+> >  #define IDR0_STALL_MODEL_STALL		(0 << IDR0_STALL_MODEL_SHIFT)
+> > +#define IDR0_STALL_MODEL_NS		(1 << IDR0_STALL_MODEL_SHIFT)
+> >  #define IDR0_STALL_MODEL_FORCE		(2 << IDR0_STALL_MODEL_SHIFT)
+> >  #define IDR0_TTENDIAN_SHIFT		21
+> >  #define IDR0_TTENDIAN_MASK		0x3
+> > @@ -766,6 +767,7 @@ struct arm_smmu_device {
+> >  #define ARM_SMMU_FEAT_SVM		(1 << 15)
+> >  #define ARM_SMMU_FEAT_HA		(1 << 16)
+> >  #define ARM_SMMU_FEAT_HD		(1 << 17)
+> > +#define ARM_SMMU_FEAT_TERMINATE		(1 << 18)
+> 
+> I'd rather introduce something like "ARM_SMMU_FEAT_STALL_FORCE" instead.
+> Terminate model has another meaning, and is defined by a different bit in
+> IDR0.
 
+Yes. What we need to do is:
 
-On 2017/9/13 10:05, Masahiro Yamada wrote:
-> Several drivers check ->chipsize to see if the third row address cycle
-> is needed.  Instead of embedding magic sizes such as 32MB, 128MB in
-> drivers, introduce a new flag NAND_ROW_ADDR_3 for clean-up.  Since
-> nand_scan_ident() knows well about the device, it can handle this
-> properly.  The flag is set if the row address bit width is greater
-> than 16.
->
-> Delete comments such as "One more address cycle for ..." because
-> intention is now clear enough from the code.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+- If STALL_MODEL is 0b00, then set S1STALLD
+- If STALL_MODEL is 0b01, then we're ok (in future, avoiding trying to use
+  stalls, even for masters that claim to support it)
+- If STALL_MODEL is 0b10, then force all PCI devices and any platform
+  devices that don't claim to support stalls into bypass (depending on
+  disable_bypass).
 
-For atmel/nand-controller,
-Acked-by: Wenyou Yang <wenyou.yang@microchip.com>
+Reasonable? We could actually knock up a fix for mainline to do most of
+this already.
 
-> ---
->
-> Changes in v2:
->   - Fix build error
->
->   drivers/mtd/nand/atmel/nand-controller.c | 3 +--
->   drivers/mtd/nand/au1550nd.c              | 3 +--
->   drivers/mtd/nand/diskonchip.c            | 3 +--
->   drivers/mtd/nand/hisi504_nand.c          | 3 +--
->   drivers/mtd/nand/mxc_nand.c              | 3 +--
->   drivers/mtd/nand/nand_base.c             | 9 +++++----
->   drivers/mtd/nand/nuc900_nand.c           | 2 +-
->   include/linux/mtd/rawnand.h              | 3 +++
->   8 files changed, 14 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-> index f25eca7..7bc8d20 100644
-> --- a/drivers/mtd/nand/atmel/nand-controller.c
-> +++ b/drivers/mtd/nand/atmel/nand-controller.c
-> @@ -718,8 +718,7 @@ static void atmel_nfc_set_op_addr(struct nand_chip *chip, int page, int column)
->   		nc->op.addrs[nc->op.naddrs++] = page;
->   		nc->op.addrs[nc->op.naddrs++] = page >> 8;
->   
-> -		if ((mtd->writesize > 512 && chip->chipsize > SZ_128M) ||
-> -		    (mtd->writesize <= 512 && chip->chipsize > SZ_32M))
-> +		if (chip->options & NAND_ROW_ADDR_3)
->   			nc->op.addrs[nc->op.naddrs++] = page >> 16;
->   	}
->   }
-> diff --git a/drivers/mtd/nand/au1550nd.c b/drivers/mtd/nand/au1550nd.c
-> index 9d4a28f..8ab827e 100644
-> --- a/drivers/mtd/nand/au1550nd.c
-> +++ b/drivers/mtd/nand/au1550nd.c
-> @@ -331,8 +331,7 @@ static void au1550_command(struct mtd_info *mtd, unsigned command, int column, i
->   
->   			ctx->write_byte(mtd, (u8)(page_addr >> 8));
->   
-> -			/* One more address cycle for devices > 32MiB */
-> -			if (this->chipsize > (32 << 20))
-> +			if (this->options & NAND_ROW_ADDR_3)
->   				ctx->write_byte(mtd,
->   						((page_addr >> 16) & 0x0f));
->   		}
-> diff --git a/drivers/mtd/nand/diskonchip.c b/drivers/mtd/nand/diskonchip.c
-> index c3aa53c..72671dc 100644
-> --- a/drivers/mtd/nand/diskonchip.c
-> +++ b/drivers/mtd/nand/diskonchip.c
-> @@ -705,8 +705,7 @@ static void doc2001plus_command(struct mtd_info *mtd, unsigned command, int colu
->   		if (page_addr != -1) {
->   			WriteDOC((unsigned char)(page_addr & 0xff), docptr, Mplus_FlashAddress);
->   			WriteDOC((unsigned char)((page_addr >> 8) & 0xff), docptr, Mplus_FlashAddress);
-> -			/* One more address cycle for higher density devices */
-> -			if (this->chipsize & 0x0c000000) {
-> +			if (this->options & NAND_ROW_ADDR_3) {
->   				WriteDOC((unsigned char)((page_addr >> 16) & 0x0f), docptr, Mplus_FlashAddress);
->   				printk("high density\n");
->   			}
-> diff --git a/drivers/mtd/nand/hisi504_nand.c b/drivers/mtd/nand/hisi504_nand.c
-> index d9ee1a7..0897261 100644
-> --- a/drivers/mtd/nand/hisi504_nand.c
-> +++ b/drivers/mtd/nand/hisi504_nand.c
-> @@ -432,8 +432,7 @@ static void set_addr(struct mtd_info *mtd, int column, int page_addr)
->   		host->addr_value[0] |= (page_addr & 0xffff)
->   			<< (host->addr_cycle * 8);
->   		host->addr_cycle    += 2;
-> -		/* One more address cycle for devices > 128MiB */
-> -		if (chip->chipsize > (128 << 20)) {
-> +		if (chip->options & NAND_ROW_ADDR_3) {
->   			host->addr_cycle += 1;
->   			if (host->command == NAND_CMD_ERASE1)
->   				host->addr_value[0] |= ((page_addr >> 16) & 0xff) << 16;
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 53e5e03..bacdd04 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -859,8 +859,7 @@ static void mxc_do_addr_cycle(struct mtd_info *mtd, int column, int page_addr)
->   				host->devtype_data->send_addr(host,
->   						(page_addr >> 8) & 0xff, true);
->   		} else {
-> -			/* One more address cycle for higher density devices */
-> -			if (mtd->size >= 0x4000000) {
-> +			if (nand_chip->options & NAND_ROW_ADDR_3) {
->   				/* paddr_8 - paddr_15 */
->   				host->devtype_data->send_addr(host,
->   						(page_addr >> 8) & 0xff,
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index bcc8cef1..3bc4404 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -727,8 +727,7 @@ static void nand_command(struct mtd_info *mtd, unsigned int command,
->   		chip->cmd_ctrl(mtd, page_addr, ctrl);
->   		ctrl &= ~NAND_CTRL_CHANGE;
->   		chip->cmd_ctrl(mtd, page_addr >> 8, ctrl);
-> -		/* One more address cycle for devices > 32MiB */
-> -		if (chip->chipsize > (32 << 20))
-> +		if (chip->options & NAND_ROW_ADDR_3)
->   			chip->cmd_ctrl(mtd, page_addr >> 16, ctrl);
->   	}
->   	chip->cmd_ctrl(mtd, NAND_CMD_NONE, NAND_NCE | NAND_CTRL_CHANGE);
-> @@ -854,8 +853,7 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
->   			chip->cmd_ctrl(mtd, page_addr, ctrl);
->   			chip->cmd_ctrl(mtd, page_addr >> 8,
->   				       NAND_NCE | NAND_ALE);
-> -			/* One more address cycle for devices > 128MiB */
-> -			if (chip->chipsize > (128 << 20))
-> +			if (chip->options & NAND_ROW_ADDR_3)
->   				chip->cmd_ctrl(mtd, page_addr >> 16,
->   					       NAND_NCE | NAND_ALE);
->   		}
-> @@ -4000,6 +3998,9 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
->   		chip->chip_shift += 32 - 1;
->   	}
->   
-> +	if (chip->chip_shift - chip->page_shift > 16)
-> +		chip->options |= NAND_ROW_ADDR_3;
-> +
->   	chip->badblockbits = 8;
->   	chip->erase = single_erase;
->   
-> diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
-> index 7bb4d2e..af5b32c9 100644
-> --- a/drivers/mtd/nand/nuc900_nand.c
-> +++ b/drivers/mtd/nand/nuc900_nand.c
-> @@ -154,7 +154,7 @@ static void nuc900_nand_command_lp(struct mtd_info *mtd, unsigned int command,
->   		if (page_addr != -1) {
->   			write_addr_reg(nand, page_addr);
->   
-> -			if (chip->chipsize > (128 << 20)) {
-> +			if (chip->options & NAND_ROW_ADDR_3) {
->   				write_addr_reg(nand, page_addr >> 8);
->   				write_addr_reg(nand, page_addr >> 16 | ENDADDR);
->   			} else {
-> diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-> index 2b05f42..749bb08 100644
-> --- a/include/linux/mtd/rawnand.h
-> +++ b/include/linux/mtd/rawnand.h
-> @@ -177,6 +177,9 @@ enum nand_ecc_algo {
->    */
->   #define NAND_NEED_SCRAMBLING	0x00002000
->   
-> +/* Device needs 3rd row address cycle */
-> +#define NAND_ROW_ADDR_3		0x00004000
-> +
->   /* Options valid for Samsung large page devices */
->   #define NAND_SAMSUNG_LP_OPTIONS NAND_CACHEPRG
->   
-
-Regards,
-Wenyou Yang
+Will
