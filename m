@@ -1,36 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Sep 2017 20:42:41 +0200
-Subject: [PATCH 0/2] clk: sunxi-ng: Add several flags to H3 CCU
-In-Reply-To: <20170910124006.60250-1-icenowy@aosc.io>
-References: <20170910124006.60250-1-icenowy@aosc.io>
-Message-ID: <20170913184241.b3dypwygczkfxrvx@flea.lan>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 13 Sep 2017 20:06:12 +0100
+Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
+ length
+In-Reply-To: <20170913172911.3ca2h6cpju7etifi@localhost>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
+ <20170913172911.3ca2h6cpju7etifi@localhost>
+Message-ID: <20170913190611.GC23415@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 10, 2017 at 08:40:04PM +0800, Icenowy Zheng wrote:
-> The H3 CCU is the earliest driver that uses sunxi-ng clk framework, and
-> some problems show when doing further development.
+On Wed, Sep 13, 2017 at 10:29:11AM -0700, Catalin Marinas wrote:
+> On Thu, Aug 31, 2017 at 06:00:46PM +0100, Dave P Martin wrote:
+> > This patch implements the core logic for changing a task's vector
+> > length on request from userspace.  This will be used by the ptrace
+> > and prctl frontends that are implemented in later patches.
+> > 
+> > The SVE architecture permits, but does not require, implementations
+> > to support vector lengths that are not a power of two.  To handle
+> > this, logic is added to check a requested vector length against a
+> > possibly sparse bitmap of available vector lengths at runtime, so
+> > that the best supported value can be chosen.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
 > 
-> This patchset fixes some issues by add several clock flags.
-> 
-> The first patch solves the problem that setting some PLL before ungating
-> them will trigger timeout for waiting for lock by adds CLK_SET_RATE_UNGATE
-> flag.
-> 
-> The second patch solves the problem that H3 GPU clock is not really tweaked
-> by add CLK_SET_RATE_PARENT flag to it.
+> Can this be merged with patch 20? It seems to add the PR_ definitions
+> which get actually used later when the prctl interface is added.
 
-Queued both for 4.15, thanks!
-Maxime
+This patch is used both by patch 19 and by patch 20, which I preferred
+not to merge with each other: ptrace and prctl are significantly
+different things.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170913/338f42ed/attachment.sig>
+The prctl bit definitions are added here because they are the canonical
+definitions used by both interfaces.  The ptrace #defines are based on
+them.
+
+Does it make sense if I merge patch 20 into this one and apply patch 19
+on top?  This avoide the appearance of prctl #defines with no prctl
+implementation.
+
+Cheers
+---Dave
