@@ -1,75 +1,66 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 13 Sep 2017 11:20:23 +0530
-Subject: da850.dtsi Naming convention Question
-In-Reply-To: <27e31de3-ec41-80e1-d1a3-d468df1f5282@ti.com>
-References: <CAHCN7xJ7N6W2Pz1vsVV192V-s0g6q+ozvNBR21rx6LufJ4kR6g@mail.gmail.com>
- <d92f726f-8a84-14ac-571e-f405255fed0b@ti.com>
- <CAHCN7xJosHuuPWUkr=ettc8gWgx9m6PvbFe90f2FnvT0meZVUA@mail.gmail.com>
- <27e31de3-ec41-80e1-d1a3-d468df1f5282@ti.com>
-Message-ID: <29f004d7-0a3e-65a0-bbdc-535ea37a274d@ti.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Wed, 13 Sep 2017 08:04:57 +0200
+Subject: [PATCH] sysrq : fix Show Regs call trace on ARM
+In-Reply-To: <17da8267-c4aa-dc0f-1150-4fd5efe0073c@windriver.com>
+References: <20170911031142.254308-1-jibin.xu@windriver.com>
+ <8c09c309-e088-1dd6-8d6f-f8929acf0f5f@suse.cz>
+ <5dd5bb30-15af-ab44-8b56-57c3c1d53bc4@windriver.com>
+ <17da8267-c4aa-dc0f-1150-4fd5efe0073c@windriver.com>
+Message-ID: <ac1a099b-2e7e-8001-24a2-679a0b7077a5@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/11/2017, 01:22 PM, Jibin Xu wrote:
+> Hi,Jiri: 
+> 
+> I tested get_irq_regs() behave in the softirq context,
+> I called get_irq_regs() by a tasklet, It returns NULL.My understanding is get_irq_regs() can return the right result
+> only in hardware IRQ,otherwise it returns ?????????L.
+> So I think in_irq() would be better.
 
+Hi,
 
-On Wednesday 13 September 2017 11:05 AM, Sekhar Nori wrote:
-> On Tuesday 12 September 2017 08:58 PM, Adam Ford wrote:
->> That makes a lot of sense, but I have a followup question.  Why would
->> we only have 1 gpio registered at 22600 when we have multiple banks?
->> Again, I am comparing this to the Omap3 because I have more experience
->> with that, and they register each bank separately.
+tasklets are run in the process context (in a kthread). But what about
+timers? HARDIRQ is decremented, SOFTIRQ remains set and sysrq handlers
+are called in such conditions (in_interrupt() is true, in_irq() is
+false). At that moment, irq_regs are still set and valid IMO.
+
+But I would believe for now that sysrq handlers are not invoked from
+softirq context. AFAIK they are called only from hardirq (serial port or
+keyboard IRQ handler) or process context (write to /proc/sysrq-trigger).
+So this change *should* be safe unless someone else objects there are
+some kgdb special cases or something.
+
+> thanks,
+> Jibin Xu
+> 
+> On 2017???09???11??? 17:55, Jibin Xu wrote:
+> 
+>> Hi,Jiri:
+>> get_irq_regs() in the softirq context return NULL.
+>> thanks,
+>> Jibin Xu
+>> On 2017???09???11??? 13:24, Jiri Slaby wrote:
+>>> On 09/11/2017, 05:11 AM, Jibin Xu wrote:
+>>> ...
+>>>> --- a/drivers/tty/sysrq.c
+>>>> +++ b/drivers/tty/sysrq.c
+>>>> @@ -245,8 +245,10 @@ static void sysrq_handle_showallcpus(int key)
+>>>> ???????????? * architecture has no support for it:
+>>>> ???????????? */
+>>>> ?????????? if (!trigger_all_cpu_backtrace()) {
+>>>> -?????????????? struct pt_regs *regs = get_irq_regs();
+>>>> +?????????????? struct pt_regs *regs = NULL;
+>>>> ?? 
+>>>> +?????????????? if (in_irq())
+>>>> +?????????????????????? regs = get_irq_regs();
+>>> Maybe a stupid question: how does get_irq_regs() behave in the softirq
+>>> context? I.e. what about s/in_irq/in_interrupt/?
+>>> thanks,
 >>
->> The datasheet breaks it up into small banks, 0-1, 2-3, 4-5, 6-7 and 8
->> yet the device tree shows ti,ngpio = <144> and
->> ti,davinci-gpio-unbanked = <0>;
-Adam,
-
-Yes there are 9 banks and each of them have a banked interrupt. Hence
-
-gpio: gpio at 226000 {
-                        compatible = "ti,dm6441-gpio";
-                        gpio-controller;
-                        #gpio-cells = <2>;
-                        reg = <0x226000 0x1000>;
-                        interrupts = <42 IRQ_TYPE_EDGE_BOTH
-                                43 IRQ_TYPE_EDGE_BOTH 44 IRQ_TYPE_EDGE_BOTH
-                                45 IRQ_TYPE_EDGE_BOTH 46 IRQ_TYPE_EDGE_BOTH
-                                47 IRQ_TYPE_EDGE_BOTH 48 IRQ_TYPE_EDGE_BOTH
-                                49 IRQ_TYPE_EDGE_BOTH 50
-IRQ_TYPE_EDGE_BOTH>;
-                        ti,ngpio = <144>;
-                        ti,davinci-gpio-unbanked = <0>;
-                        status = "disabled";
-                        interrupt-controller;
-                        #interrupt-cells = <2>;
-                };
-
-So this one node caters to all of the 9 banks. Instead of adding all
-banks separately in device tree i was suggested to add one node which
-caters to all 9 banks. Each of the 9 banks have a banked interrupt.
-I have seen OMAPs having multiple DT nodes for every 32 GPIOs.
-
-Check this commit id: b5cf3fd827d2e11355c126b44ea625650ebf4d39
-
-Also the discussion where in was suggested to have one big gpio chip:
-
-https://www.spinics.net/lists/linux-omap/msg132869.html
-
-
 > 
-> Adding Keerthy for this. He maintains the DaVinci GPIO driver and is
-> much more familiar with it.
-> 
->> I only ask as I am trying to get more familiar with this platform, and
->> I am trying to enhance improve the da850-evm which I realize has been
->> replaced by the lcdk.
 
-Thanks,
-Keerthy
 
-> 
-> No problem. Thanks for your work on this platform!
-> 
-> Regards,
-> Sekhar
-> 
+-- 
+js
+suse labs
