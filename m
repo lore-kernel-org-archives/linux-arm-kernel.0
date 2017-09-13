@@ -1,69 +1,21 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed, 13 Sep 2017 16:55:17 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20170907161650.GP5024@atomide.com>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <20170905233241.GA19231@js1304-P5Q-DELUXE>
- <20170906133057.GH5024@atomide.com>
- <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170907161650.GP5024@atomide.com>
-Message-ID: <20170913075516.GA25036@js1304-P5Q-DELUXE>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 13 Sep 2017 09:57:53 +0200
+Subject: [PATCH 02/11] soc: renesas: rcar-rst: add R8A77970 support
+In-Reply-To: <CAMuHMdXF96znGDaSb6d96WCDu7unkPiNUPAzV9zgKciUd-bqbA@mail.gmail.com>
+References: <20170912210510.955132498@cogentembedded.com>
+ <CAMuHMdXF96znGDaSb6d96WCDu7unkPiNUPAzV9zgKciUd-bqbA@mail.gmail.com>
+Message-ID: <20170913075752.GI6756@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 09:16:51AM -0700, Tony Lindgren wrote:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170907 00:30]:
-> > On Wed, Sep 06, 2017 at 06:30:57AM -0700, Tony Lindgren wrote:
-> > > Hi,
-> > > 
-> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170905 16:32]:
-> > > > I think that I made a mistake for configuration CONFIG_HIGHMEM=y and
-> > > > CONFIG_HAVE_MEMBLOCK_NODE_MAP=y. In this case, the MOVABLE_ZONE can
-> > > > be *!highmem*. Could you check that your configuration have above
-> > > > options?
-> > > 
-> > > CONFIG_HIGHMEM is set yeah.
-> > > 
-> > > > And, could you check that following patch works for you?
-> > > 
-> > > Does not seem to help, tried against next with just 9caf25f996e8
-> > > revert and also with 9caf25f996e8.
-> > 
-> > Oops. I misunderstood your problem. Could you test with
-> > CONFIG_DEBUG_VIRTUAL?
+On Wed, Sep 13, 2017 at 09:52:23AM +0200, Geert Uytterhoeven wrote:
+> On Tue, Sep 12, 2017 at 10:37 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > Add support for R-Car V3M (R8A77970) to the R-Car RST driver -- this driver
+> > is  needed  for the clock driver to work.
+> >
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Sure.
-> 
-> > After commit 9caf25f996e8, user for CMA memory should use to check
-> > PageHighmem in order to get proper virtual address of the page. If
-> > someone doesn't use it, it is possible to use wrong virtual address
-> > and it then causes the use of wrong physical address.
-> > CONFIG_DEBUG_VIRTUAL would catch this case.
-> 
-> OK, no extra output of current next with CONFIG_DEBUG_VIRTUAL=y.
-> Booting of n900 hangs with just the same error:
-> 
-> save_secure_sram() returns 0000ff02
-> 
-> > If it doesn't help, is there a way to test n900 configuration in QEMU?
-> 
-> I doubt that QEMU n900 boots in secure mode but instead shows
-> the SoC as general purpose SoC. If so, you'd have to patch the
-> omap3_save_secure_ram_context() to attempt to save secure RAM
-> context in all cases. If that works then debugging with any
-> omap3 board like beagleboard in QEMU should work.
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Sorry for late response.
-
-I tried to emulate beagle board by using QEMU and now I find the way
-and it works. However, it doesn't call omap3_save_secure_ram_context()
-due to different omap_type(). And, even if I call it forcibly, the
-system dies with prefetch abort regardless of commit 9caf25f996e8.
-
-Could you let me know the better way to test your situation?
-
-Anyway, could you test linux-next with 'CONFIG_HIGHMEM = n'?
-I'd like to know if the issue is related to the change that
-all CMA memory is managed like as highmem.
-
-Thanks.
+Thanks, applied.
