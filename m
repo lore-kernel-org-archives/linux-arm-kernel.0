@@ -1,35 +1,73 @@
 From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Wed, 13 Sep 2017 18:05:33 +0100
-Subject: [PATCH 0/8] ARM: renesas: Latest r8a774[35] dts updates
-Message-ID: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+Date: Wed, 13 Sep 2017 18:05:39 +0100
+Subject: [PATCH 6/8] ARM: dts: iwg20m: Add SPI NOR support
+In-Reply-To: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <1505322341-9480-7-git-send-email-chris.paterson2@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains multiple additions to the r8a774[35] device trees.
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-I've bundled them into a series to help avoid merge issues due to multiple
-changes to the same files. Hopefully this doesn't add too much confusion!
+Add support for the SPI NOR device used to boot up the system
+to the System on Module DT.
+
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+This patch is based on renesas-devel-20170913-v4.13.
+
+This patch is dependant on:
+- "of: add vendor prefix for Silicon Storage Technology Inc."
+- "doc: dt: mtd: Add sst25vf016b to the list of supported chip names"
 
 
-Kind regards, Chris
+ arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-
-Fabrizio Castro (8):
-  ARM: dts: r8a7745: Add APMU node and second CPU core
-  ARM: dts: r8a7745: Add SDHI controllers
-  ARM: dts: iwg22m: Enable SDHI1 controller
-  ARM: dts: iwg22d: Enable SDHI0 controller
-  ARM: dts: r8a7743: Add QSPI support
-  ARM: dts: iwg20m: Add SPI NOR support
-  ARM: dts: r8a7745: Add QSPI support
-  ARM: drs: iwg22m: Add SPI NOR support
-
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi       | 26 ++++++++++
- arch/arm/boot/dts/r8a7743.dtsi              | 17 +++++++
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 37 ++++++++++++++
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi       | 43 +++++++++++++++++
- arch/arm/boot/dts/r8a7745.dtsi              | 75 +++++++++++++++++++++++++++++
- 5 files changed, 198 insertions(+)
-
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+index 4119737..75a8ca5 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
++++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+@@ -44,6 +44,11 @@
+ 		function = "mmc";
+ 	};
+ 
++	qspi_pins: qspi {
++		groups = "qspi_ctrl", "qspi_data2";
++		function = "qspi";
++	};
++
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
+@@ -61,6 +66,27 @@
+ 	status = "okay";
+ };
+ 
++&qspi {
++	pinctrl-0 = <&qspi_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	/* WARNING - This device contains the bootloader. Handle with care. */
++	flash: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "sst,sst25vf016b", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++		spi-tx-bus-width = <1>;
++		spi-rx-bus-width = <1>;
++		m25p,fast-read;
++		spi-cpol;
++		spi-cpha;
++	};
++};
++
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
