@@ -1,151 +1,58 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 13 Sep 2017 15:48:59 +0100
-Subject: [PATCH v2 06/28] arm64/sve: System register and exception
- syndrome definitions
-In-Reply-To: <1504198860-12951-7-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-7-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87o9qeac2s.fsf@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 13 Sep 2017 09:34:15 -0500
+Subject: [PATCH 2/7] dt-bindings: gpu: mali-utgard: add optional supply
+ regulator
+In-Reply-To: <5517832.4TA9c0NYD6@diego>
+References: <20170905105739.8330-1-heiko@sntech.de>
+ <20170905105739.8330-3-heiko@sntech.de>
+ <20170912220920.nfg33wbqikja3gml@rob-hp-laptop>
+ <5517832.4TA9c0NYD6@diego>
+Message-ID: <20170913143415.fcds556hdqwnhsvm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 13, 2017 at 12:12:24AM +0200, Heiko St?bner wrote:
+> Hi Rob,
+> 
+> Am Dienstag, 12. September 2017, 17:09:20 CEST schrieb Rob Herring:
+> > On Tue, Sep 05, 2017 at 12:57:34PM +0200, Heiko Stuebner wrote:
+> > > Mali GPUs have a separate supplying regulator in a lot of socs,
+> > > so describe a mali-supply property. The already described
+> > > operating points will likely also need access to this regulator.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > > 
+> > >  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> > > b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt index
+> > > 3b7f6f72f032..bcaa640c883f 100644
+> > > --- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> > > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> > > 
+> > > @@ -39,6 +39,9 @@ Optional properties:
+> > >      Memory region to allocate from, as defined in
+> > >      Documentation/devicetree/bindi/reserved-memory/reserved-memory.txt
+> > > 
+> > > +  - mali-supply : Phandle to regulator for the Mali device. Refer to
+> > > +    Documentation/devicetree/bindings/regulator/regulator.txt for
+> > > details.
+> > 
+> > Wouldn't a power domain be more appropriate?
+> 
+> At least on Rockchip socs there is a power-domain, but also the separate 
+> additional regulator. See the similar mali-midgard binding.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+And that regulator's state is independent of the power domain's state? 
 
-> The SVE architecture adds some system registers, ID register fields
-> and a dedicated ESR exception class.
->
-> This patch adds the appropriate definitions that will be needed by
-> the kernel.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
+But I guess OPPs need a regulator. Really we should allow OPPs to be 
+tied to the power domain. Maybe we do, I can't keep up with the ever 
+evolving PM stuff.
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+So, given we already have it for midgard,
 
->
-> ---
->
-> Changes since v1
-> ----------------
->
-> Requested by Alex Benn?e:
->
-> * Add comments to clarify CPACR_EL1_ZEN_ELxEN bit meanings.
-> * Add comment clarifying the status of the LEN field expansion bits.
-> ---
->  arch/arm64/include/asm/esr.h     |  3 ++-
->  arch/arm64/include/asm/kvm_arm.h |  1 +
->  arch/arm64/include/asm/sysreg.h  | 21 +++++++++++++++++++++
->  arch/arm64/kernel/traps.c        |  1 +
->  4 files changed, 25 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index 66ed8b6..014d7d8 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -43,7 +43,8 @@
->  #define ESR_ELx_EC_HVC64	(0x16)
->  #define ESR_ELx_EC_SMC64	(0x17)
->  #define ESR_ELx_EC_SYS64	(0x18)
-> -/* Unallocated EC: 0x19 - 0x1E */
-> +#define ESR_ELx_EC_SVE		(0x19)
-> +/* Unallocated EC: 0x1A - 0x1E */
->  #define ESR_ELx_EC_IMP_DEF	(0x1f)
->  #define ESR_ELx_EC_IABT_LOW	(0x20)
->  #define ESR_ELx_EC_IABT_CUR	(0x21)
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 61d694c..dbf0537 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -185,6 +185,7 @@
->  #define CPTR_EL2_TCPAC	(1 << 31)
->  #define CPTR_EL2_TTA	(1 << 20)
->  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-> +#define CPTR_EL2_TZ	(1 << 8)
->  #define CPTR_EL2_DEFAULT	0x000033ff
->
->  /* Hyp Debug Configuration Register bits */
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 480ecd6..36fe2ae 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -145,6 +145,7 @@
->
->  #define SYS_ID_AA64PFR0_EL1		sys_reg(3, 0, 0, 4, 0)
->  #define SYS_ID_AA64PFR1_EL1		sys_reg(3, 0, 0, 4, 1)
-> +#define SYS_ID_AA64ZFR0_EL1		sys_reg(3, 0, 0, 4, 4)
->
->  #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
->  #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
-> @@ -163,6 +164,8 @@
->  #define SYS_ACTLR_EL1			sys_reg(3, 0, 1, 0, 1)
->  #define SYS_CPACR_EL1			sys_reg(3, 0, 1, 0, 2)
->
-> +#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
-> +
->  #define SYS_TTBR0_EL1			sys_reg(3, 0, 2, 0, 0)
->  #define SYS_TTBR1_EL1			sys_reg(3, 0, 2, 0, 1)
->  #define SYS_TCR_EL1			sys_reg(3, 0, 2, 0, 2)
-> @@ -253,6 +256,8 @@
->
->  #define SYS_PMCCFILTR_EL0		sys_reg (3, 3, 14, 15, 7)
->
-> +#define SYS_ZCR_EL2			sys_reg(3, 4, 1, 2, 0)
-> +
->  #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
->  #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
->  #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
-> @@ -335,6 +340,7 @@
->  #define ID_AA64ISAR1_DPB_SHIFT		0
->
->  /* id_aa64pfr0 */
-> +#define ID_AA64PFR0_SVE_SHIFT		32
->  #define ID_AA64PFR0_GIC_SHIFT		24
->  #define ID_AA64PFR0_ASIMD_SHIFT		20
->  #define ID_AA64PFR0_FP_SHIFT		16
-> @@ -343,6 +349,7 @@
->  #define ID_AA64PFR0_EL1_SHIFT		4
->  #define ID_AA64PFR0_EL0_SHIFT		0
->
-> +#define ID_AA64PFR0_SVE			0x1
->  #define ID_AA64PFR0_FP_NI		0xf
->  #define ID_AA64PFR0_FP_SUPPORTED	0x0
->  #define ID_AA64PFR0_ASIMD_NI		0xf
-> @@ -444,6 +451,20 @@
->  #endif
->
->
-> +/*
-> + * The ZCR_ELx_LEN_* definitions intentionally include bits [8:4] which
-> + * are reserved by the SVE architecture for future expansion of the LEN
-> + * field, with compatible semantics.
-> + */
-> +#define ZCR_ELx_LEN_SHIFT	0
-> +#define ZCR_ELx_LEN_SIZE	9
-> +#define ZCR_ELx_LEN_MASK	0x1ff
-> +
-> +#define CPACR_EL1_ZEN_EL1EN	(1 << 16) /* enable EL1 access */
-> +#define CPACR_EL1_ZEN_EL0EN	(1 << 17) /* enable EL0 access, if EL1EN set */
-> +#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN | CPACR_EL1_ZEN_EL0EN)
-> +
-> +
->  /* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:0 */
->  #define SYS_MPIDR_SAFE_VAL		(1UL << 31)
->
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 5ea4b85..f202932 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -603,6 +603,7 @@ static const char *esr_class_str[] = {
->  	[ESR_ELx_EC_HVC64]		= "HVC (AArch64)",
->  	[ESR_ELx_EC_SMC64]		= "SMC (AArch64)",
->  	[ESR_ELx_EC_SYS64]		= "MSR/MRS (AArch64)",
-> +	[ESR_ELx_EC_SVE]		= "SVE",
->  	[ESR_ELx_EC_IMP_DEF]		= "EL3 IMP DEF",
->  	[ESR_ELx_EC_IABT_LOW]		= "IABT (lower EL)",
->  	[ESR_ELx_EC_IABT_CUR]		= "IABT (current EL)",
+Acked-by: Rob Herring <robh@kernel.org>
 
-
---
-Alex Benn?e
+Rob
