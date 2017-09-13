@@ -1,43 +1,68 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 13 Sep 2017 11:11:23 +0200
-Subject: [PATCH v3 4/6] [media] exynos-gsc: Add hardware rotation limits
-In-Reply-To: <bb025fcb-e316-dfe9-a8eb-8a9535f35b93@samsung.com>
-References: <1504850560-27950-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170908060309epcas1p3d48dd0871d3fde02ba3c9921bbe5a7a6@epcas1p3.samsung.com>
- <1504850560-27950-5-git-send-email-hoegeun.kwon@samsung.com>
- <27b46679-e6c7-2471-f10e-3f0634178ebf@samsung.com>
- <bb025fcb-e316-dfe9-a8eb-8a9535f35b93@samsung.com>
-Message-ID: <a915a1f7-2c01-472b-b9ee-5367c488a89f@samsung.com>
+From: douly.fnst@cn.fujitsu.com (Dou Liyang)
+Date: Wed, 13 Sep 2017 17:17:54 +0800
+Subject: [PATCH v9] ACPI / init: Invoke early ACPI initialization earlier
+In-Reply-To: <1505293975-26005-1-git-send-email-douly.fnst@cn.fujitsu.com>
+References: <1505293975-26005-1-git-send-email-douly.fnst@cn.fujitsu.com>
+Message-ID: <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hoegeun,
+Linux uses acpi_early_init() to put the ACPI table management into the
+late stage from the early stage. This two stages are different. the
+mapped ACPI tables in early stage is temporary and should be unmapped,
+but in late stage, it is permanent and don't need to be unmapped.
 
-On 09/13/2017 04:33 AM, Hoegeun Kwon wrote:
->>> @@ -1017,8 +1083,12 @@ static irqreturn_t gsc_irq_handler(int irq,
->>> void *priv)
->>>      static const struct of_device_id exynos_gsc_match[] = {
->>>        {
->>> -        .compatible = "samsung,exynos5-gsc",
->>> -        .data = &gsc_v_100_drvdata,
->> Can you keep the "samsung,exynos5-gsc" entry with the gsc_v_5250_variant
->> data, so that it can work with "samsung,exynos5-gsc" compatible in DT
->> on both exynos5250 and exynos5420 SoCs?
->>
-> Thank you for your question.
-> 
-> Exynos 5250 and 5420 have different hardware rotation limits.
-> Exynos 5250 is '.real_rot_en_w/h = 2016' and 5420 is '.real_rot_en_w/h =
-> 2048'.
-> 
-> So my opinion they must have different compatible.
+Originally, mapping and parsing the DMAR table should be in the late stage.
+However, Initializing interrupt delivery mode earlier will move it into
+the early stage. This causes an ACPI error warning when Linux reallocates
+the ACPI root tables.
 
-I think there is some misunderstanding, mu suggestion was to keep the 
-"samsung,exynos5-gsc" compatible entry in addition to the new introduced 
-ones: "samsung,exynos5250-gsc" and "samsung,exynos5420-gsc". That's in
-order to make your changes possibly backward compatible, in theory 
-the updated driver should still work without changes in dts.
+Commit b064a8fa77df ("ACPI / init: Switch over platform to the ACPI mode
+later") splits the ACPI early initialization code into acpi_early_init()
+and acpi_subsystem_init(). This makes acpi_early_init() more independently
 
+So, invoke acpi_early_init() earlier before late_time_init(), Keep the DMAR
+be mapped and parsed in late stage like before.
+
+Reported-by: Xiaolong Ye <xiaolong.ye@intel.com>
+Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
+Cc: linux-acpi at vger.kernel.org
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Zheng, Lv <lv.zheng@intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Fenghua Yu <fenghua.yu@intel.com>
+Cc: linux-ia64 at vger.kernel.org
+Cc: yinghai at kernel.org
+Cc: bhe at redhat.com
+Cc: bp at alien8.de
+---
+ init/main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/init/main.c b/init/main.c
+index 0ee9c686..2fb98a4 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -664,12 +664,12 @@ asmlinkage __visible void __init start_kernel(void)
+ 	debug_objects_mem_init();
+ 	setup_per_cpu_pageset();
+ 	numa_policy_init();
++	acpi_early_init();
+ 	if (late_time_init)
+ 		late_time_init();
+ 	calibrate_delay();
+ 	pidmap_init();
+ 	anon_vma_init();
+-	acpi_early_init();
+ #ifdef CONFIG_X86
+ 	if (efi_enabled(EFI_RUNTIME_SERVICES))
+ 		efi_enter_virtual_mode();
 -- 
-Regards,
-Sylwester
+2.5.5
