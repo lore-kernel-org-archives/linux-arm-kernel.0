@@ -1,39 +1,46 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 13 Sep 2017 21:21:30 +0800
-Subject: [PATCH] ARM: sun7i: a20: enable ac/battery power supplies for Lamobo
- R1 board
-Message-ID: <20170913132130.56551-1-icenowy@aosc.io>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Sep 2017 06:32:06 -0700
+Subject: [PATCH v2 10/28] arm64/sve: Low-level CPU setup
+In-Reply-To: <1504198860-12951-11-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170913133206.rwobtu7ft5nrsh4p@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Lamobo R1 board connected the ACIN of the AXP209 PMIC to a MicroUSB
-port, and the battery input is connected to a generic connector.
+On Thu, Aug 31, 2017 at 06:00:42PM +0100, Dave P Martin wrote:
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 877d42f..dd22ef2 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -27,6 +27,7 @@
+>  #include <asm/pgtable-hwdef.h>
+>  #include <asm/cpufeature.h>
+>  #include <asm/alternative.h>
+> +#include <asm/sysreg.h>
+>  
+>  #ifdef CONFIG_ARM64_64K_PAGES
+>  #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+> @@ -186,8 +187,17 @@ ENTRY(__cpu_setup)
+>  	tlbi	vmalle1				// Invalidate local TLB
+>  	dsb	nsh
+>  
+> -	mov	x0, #3 << 20
+> -	msr	cpacr_el1, x0			// Enable FP/ASIMD
+> +	mov	x0, #3 << 20			// FEN
+> +
+> +	/* SVE */
+> +	mrs	x5, id_aa64pfr0_el1
+> +	ubfx	x5, x5, #ID_AA64PFR0_SVE_SHIFT, #4
+> +	cbz	x5, 1f
+> +
+> +	bic	x0, x0, #CPACR_EL1_ZEN
+> +	orr	x0, x0, #CPACR_EL1_ZEN_EL1EN	// SVE: trap for EL0, not EL1
+> +1:	msr	cpacr_el1, x0			// Enable FP/ASIMD
 
-Enable these two power supplies in the device tree.
+For EL1, I wonder whether we could move this later to cpufeature.c. IIRC
+I tried to do the same with FPSIMD but hit an issue with EFI run-time
+services (I may be wrong though).
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-index 004b6ddac813..6ab2a6649eb1 100644
---- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-@@ -241,6 +241,14 @@
- 
- #include "axp209.dtsi"
- 
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &reg_ahci_5v {
- 	gpio = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
- 	status = "okay";
 -- 
-2.13.5
+Catalin
