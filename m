@@ -1,71 +1,88 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 13 Sep 2017 16:12:10 +0800
-Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
- exceptions to el2
-In-Reply-To: <59B17449.6010201@arm.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
- <59B17449.6010201@arm.com>
-Message-ID: <761bca49-7257-75a6-f6a9-e8e5e2af9ad0@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 13 Sep 2017 17:31:26 +0900
+Subject: [PATCH v4 6/6] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <7e46f2a3-114f-0c34-d3c5-49e6422b9200@caviumnetworks.com>
+References: <1504784522-26841-1-git-send-email-yamada.masahiro@socionext.com>
+ <1504784522-26841-7-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdZLG=ezxj62R=WkULh2vfpQwqh8P-6FhtONzU7yRbyeuA@mail.gmail.com>
+ <7e46f2a3-114f-0c34-d3c5-49e6422b9200@caviumnetworks.com>
+Message-ID: <CAK7LNAQpO+NYu2uOwEx+c1srabO8=uOjQ-9+sh6-Q1eDP0TOSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi.
 
-
-On 2017/9/8 0:31, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 28/08/17 11:38, Dongjiu Geng wrote:
->> ARMv8.2 adds a new bit HCR_EL2.TEA which controls to
->> route synchronous external aborts to EL2, and adds a
->> trap control bit HCR_EL2.TERR which controls to
->> trap all Non-secure EL1&0 error record accesses to EL2.
+2017-09-13 0:44 GMT+09:00 David Daney <ddaney@caviumnetworks.com>:
+> On 09/12/2017 07:03 AM, Linus Walleij wrote:
 >>
->> This patch enables the two bits for the guest OS.
->> when an synchronous abort is generated in the guest OS,
-> 
->> it will trap to EL3 firmware, EL3 firmware will check the
->> HCR_EL2.TEA value to decide to jump to hypervisor or host
->> OS.
-> 
-> (This is what you are using this for, the patch has nothing to do with EL3.)
+>> On Thu, Sep 7, 2017 at 1:42 PM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>
+>>> This GPIO controller device is used on UniPhier SoCs.
+>>>
+>>> It also serves as an interrupt controller, but interrupt signals are
+>>> just delivered to the parent irqchip without any latching or OR'ing.
+>>> This is implemented by using hierarchy IRQ domain.
+>>>
+>>> Implementation note:
+>>> Unfortunately, the IRQ mapping from this controller to the parent is
+>>> random. (48, 49, ..., 63, 154, 155, ...)
+>>> If "interrupts" property is used, IRQ resources may be statically
+>>> allocated when platform devices are populated from DT.  This can be
+>>> a problem for the hierarchy IRQ domain because IRQ allocation must
+>>> happen from the outer-most domain up to the root domain in order to
+>>> build up the stacked IRQ.  (https://lkml.org/lkml/2017/7/6/758)
+>>> Solutions to work around it could be to hard-code parent hwirqs or
+>>> to invent a driver-specific DT property.
+>>>
+>>> Here, the new API irq_domain_push_irq() was merged by v4.14-rc1.
+>>> It allows to add irq_data to the existing hierarchy.  It will help
+>>> to make this driver work whether the parent has already initialized
+>>> the hierarchy or not.
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> ---
+>>>
+>>> Changes in v4:
+>>>    - Add COMPILE_TEST and select IRQ_DOMAIN_HIERARCHY
+>>>    - Reimplement irqchip part by using irq_domain_push_irq()
+>>
+>>
+>> Awesome improvement. There was a build error and I also
+>> would like David Daney to have a look at this so we know we
+>> use things the right way,
+>
+>
+> It looks correct to me.
+>
+> I haven't verified it, but I think the OF device-tree probing code for the
+> platform devices will automatically xlat-and-map all those irqs, so that the
+> irq_domain_push_irq() is required to get the domain hierarchy properly
+> configured.  It would be similar to the PCI case where we configure all the
+> MSI-X and then do the irq_domain_push_irq() in the Cavium ThunderX driver.
+>
+> If interrupt handling has been verified to work with this driver, I would
+> say that we are probably using things "the right way".
+>
+> David.
+>
 
-No, EL3 will check the HCR_EL2.TEA to decide to jump to hypervisor or host kernel.
+V4 depends on 5 patches that got negative feedback in irqdomain subsystem.
+One more problem for this approach is to virtual IRQs are statically
+allocated during the driver probe.
+This looks a step backward to me.
+Recently, gpio_irqchip migrated to on-the-fly allocation in case some
+controllers may have lots of
+GPIO lines.
 
 
-> 
-> 
->> Enabling HCR_EL2.TERR makes error record access
->> from guest trap to EL2.
-> 
-> 
-> KVM already handles external aborts from lower exception levels, no more work
-> needs doing for TEA.
-when SCR_EL3.EA is set, TEA will not workable, El3 only check its value to decide to hypervisor or EL1 host kernel.
+Finally, I came up with another (I think, better) solution.
+I think v5 is less controversial,
+and works very well in on-the-fly manner.
 
-> 
-> What happens when a guest access the RAS-Error-Record registers?
-it will trap to EL2 kvm
+I am sending it shortly...
 
-> 
-> Before we can set HCR_EL2.TERR I think we need to add some minimal emulation for
-> the registers it traps. Most of them should be RAZ/WI, so it should be
-> straightforward. (I think KVMs default is to emulate an undef for unknown traps).
 
-if KVM default handling is to emulate an undef for unknown traps, how about we use its default way? because no one access
-the ERR RAS register in the guest .
-
-> 
-> Eventually we will want to back this with a page of memory that lets
-> Qemu/kvmtool configure what the guest can see. (i.e. the emulated machine's
-> errors for kernel-first handling.)
-I think emulate it to an undef for unknown traps can be enough, no one access the ERR register in the guest.
-
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> .
-> 
+-- 
+Best Regards
+Masahiro Yamada
