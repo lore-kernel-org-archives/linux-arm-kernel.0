@@ -1,47 +1,30 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 13 Sep 2017 09:57:47 +0200
-Subject: [PATCH 0/3] Tango PCIe host bridge MSI support + required API
-In-Reply-To: <f10055cc-4430-ff30-f892-3d3d6f24354c@sigmadesigns.com>
-References: <f10055cc-4430-ff30-f892-3d3d6f24354c@sigmadesigns.com>
-Message-ID: <a016bb7e-bb17-174d-92de-dd07cdf3a7ee@sigmadesigns.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Sep 2017 09:59:42 +0200
+Subject: [PATCH 01/11] soc: renesas: identify R-Car V3M
+In-Reply-To: <20170912210506.997827638@cogentembedded.com>
+References: <20170912210506.997827638@cogentembedded.com>
+Message-ID: <CAMuHMdWy=dFSt=3rpy8XTQisUBS=0FTAx1s1twAJD7pPV2zZYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/2017 16:19, Marc Gonzalez wrote:
-
-> Bjorn, Marc Z,
-> 
-> This patch-set includes:
+On Tue, Sep 12, 2017 at 10:37 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add support for identifying the R-Car V3M (R8A77970) SoC.
 >
-> o [PATCH v11] PCI: tango: Add MSI controller support
-> with the doorbell address parsed from DT instead of hard-coded
-> in the driver.
-> 
-> o A wrapper to parse dma-ranges was added to drivers/of/address.c
-> 
-> o A few drivers were converted to use the new wrapper
-> 
-> Marc Gonzalez (3):
->    of/pci: Add dma-ranges parsing support
->    PCI: Use of_pci_dma_range_parser_init API
->    PCI: tango: Add MSI controller support
-> 
->   drivers/of/address.c             |  19 +++-
->   drivers/pci/host/pci-ftpci100.c  |  20 +---
->   drivers/pci/host/pci-rcar-gen2.c |  20 +---
->   drivers/pci/host/pci-xgene.c     |  20 +---
->   drivers/pci/host/pcie-iproc.c    |  20 +---
->   drivers/pci/host/pcie-rcar.c     |  20 +---
->   drivers/pci/host/pcie-tango.c    | 205 ++++++++++++++++++++++++++++++++++++++-
->   include/linux/of_address.h       |  10 +-
->   8 files changed, 232 insertions(+), 102 deletions(-)
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-What's the word on this patch series?
+(identical to what I wrote for topic/r8a77970-integration, which is no
+surprise ;-)
 
-Marc Z, Robin: is the computation of pcie->msi_doorbell alright?
-(Is u64 the correct type for a PCI address?)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Should the first two patches be squashed together, in case reverting
-is required?
+Gr{oetje,eeting}s,
 
-Regards.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
