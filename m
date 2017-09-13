@@ -1,21 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 13 Sep 2017 12:26:15 -0500
-Subject: [PATCH v3 1/3] dt-bindings: sdhci-omap: Add bindings for the
- sdhci-omap controller
-In-Reply-To: <20170906114556.32532-2-kishon@ti.com>
-References: <20170906114556.32532-1-kishon@ti.com>
- <20170906114556.32532-2-kishon@ti.com>
-Message-ID: <20170913172615.vakksoc3pow6uyzo@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Sep 2017 10:29:11 -0700
+Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
+ length
+In-Reply-To: <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170913172911.3ca2h6cpju7etifi@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 06, 2017 at 05:15:54PM +0530, Kishon Vijay Abraham I wrote:
-> Add binding for the TI's sdhci-omap controller.
+On Thu, Aug 31, 2017 at 06:00:46PM +0100, Dave P Martin wrote:
+> This patch implements the core logic for changing a task's vector
+> length on request from userspace.  This will be used by the ptrace
+> and prctl frontends that are implemented in later patches.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/mmc/sdhci-omap.txt | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+> The SVE architecture permits, but does not require, implementations
+> to support vector lengths that are not a power of two.  To handle
+> this, logic is added to check a requested vector length against a
+> possibly sparse bitmap of available vector lengths at runtime, so
+> that the best supported value can be chosen.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Can this be merged with patch 20? It seems to add the PR_ definitions
+which get actually used later when the prctl interface is added.
+
+-- 
+Catalin
