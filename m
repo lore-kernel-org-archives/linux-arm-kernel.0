@@ -1,47 +1,69 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 13 Sep 2017 15:52:14 +0800
-Subject: [PATCH v11 6/6] target-arm: kvm64: Handle SError interrupt for
- the guest OS
-In-Reply-To: <CAFEAcA8J5wZ23kQypzcbUScUResjWnN6rDG0b0idD1rv7F5Fsw@mail.gmail.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015FE17F@DGGEMA503-MBX.china.huawei.com>
- <CAFEAcA8J5wZ23kQypzcbUScUResjWnN6rDG0b0idD1rv7F5Fsw@mail.gmail.com>
-Message-ID: <5552cf68-b998-686b-8e7e-710399c2b014@huawei.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 13 Sep 2017 16:55:17 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20170907161650.GP5024@atomide.com>
+References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
+ <20170905233241.GA19231@js1304-P5Q-DELUXE>
+ <20170906133057.GH5024@atomide.com>
+ <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+Message-ID: <20170913075516.GA25036@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/9/12 0:39, Peter Maydell wrote:
->>>> +    return  kvm_vcpu_ioctl(CPU(cpu), KVM_ARM_SEI, &syndrome);
->>> This looks odd. If we don't have the RAS extension why do we need to do anything at all here ?
->> This is because Qemu may need to support non-RAS extension as discussed with ARM James before.
->> That is to say host hardware CPU does not support RAS, but guest supports.
->> That is under discussion.
->> When host hardware supports RAS, specify the syndrome to a valid value, otherwise, set it to 0.
-> If the guest CPU doesn't support the RAS extension then we have
-> no mechanism for delivering it a notification about the
-> memory problem at all, so setting the syndrome to anything
-> doesn't make sense.
+On Thu, Sep 07, 2017 at 09:16:51AM -0700, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170907 00:30]:
+> > On Wed, Sep 06, 2017 at 06:30:57AM -0700, Tony Lindgren wrote:
+> > > Hi,
+> > > 
+> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170905 16:32]:
+> > > > I think that I made a mistake for configuration CONFIG_HIGHMEM=y and
+> > > > CONFIG_HAVE_MEMBLOCK_NODE_MAP=y. In this case, the MOVABLE_ZONE can
+> > > > be *!highmem*. Could you check that your configuration have above
+> > > > options?
+> > > 
+> > > CONFIG_HIGHMEM is set yeah.
+> > > 
+> > > > And, could you check that following patch works for you?
+> > > 
+> > > Does not seem to help, tried against next with just 9caf25f996e8
+> > > revert and also with 9caf25f996e8.
+> > 
+> > Oops. I misunderstood your problem. Could you test with
+> > CONFIG_DEBUG_VIRTUAL?
 > 
-> I'm not sure what you should do in the case of "host
-> supports telling us about a memory problem and has
-> done so, but guest does not support being told about it",
-> but I'm pretty sure it shouldn't be this.
-Hi peter,
-   thanks for the comments.
+> Sure.
+> 
+> > After commit 9caf25f996e8, user for CMA memory should use to check
+> > PageHighmem in order to get proper virtual address of the page. If
+> > someone doesn't use it, it is possible to use wrong virtual address
+> > and it then causes the use of wrong physical address.
+> > CONFIG_DEBUG_VIRTUAL would catch this case.
+> 
+> OK, no extra output of current next with CONFIG_DEBUG_VIRTUAL=y.
+> Booting of n900 hangs with just the same error:
+> 
+> save_secure_sram() returns 0000ff02
+> 
+> > If it doesn't help, is there a way to test n900 configuration in QEMU?
+> 
+> I doubt that QEMU n900 boots in secure mode but instead shows
+> the SoC as general purpose SoC. If so, you'd have to patch the
+> omap3_save_secure_ram_context() to attempt to save secure RAM
+> context in all cases. If that works then debugging with any
+> omap3 board like beagleboard in QEMU should work.
 
-   in short, if the hardware CPU does not support RAS extension, do you think whether the Qemu or guest OS
-needs to support RAS(generate APEI table / record CPER / Error recovery).
+Sorry for late response.
 
-CC James,
+I tried to emulate beagle board by using QEMU and now I find the way
+and it works. However, it doesn't call omap3_save_secure_ram_context()
+due to different omap_type(). And, even if I call it forcibly, the
+system dies with prefetch abort regardless of commit 9caf25f996e8.
 
-Hi James,
-  you ever have below comments:
+Could you let me know the better way to test your situation?
 
------------------------------------------------------------------------
-But you can use APEI in a guest on CPUs without the RAS extensions: the host may
-signal memory errors to Qemu for any number of reasons.
-------------------------------------------------------------------
+Anyway, could you test linux-next with 'CONFIG_HIGHMEM = n'?
+I'd like to know if the issue is related to the change that
+all CMA memory is managed like as highmem.
 
-in fact, I have a concern about it. If CPU without the RAS extension, the host should not deliver the sigbus.
-in which case in your test that host still deliver sigbus without RAS?
+Thanks.
