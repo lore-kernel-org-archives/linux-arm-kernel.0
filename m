@@ -1,66 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 13 Sep 2017 15:21:29 -0700
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20170913191707.GD23415@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913172605.hjrwjf34kyy7coh4@localhost>
- <20170913191707.GD23415@e103592.cambridge.arm.com>
-Message-ID: <20170913222129.vi3lidawdp33zzjd@localhost>
+From: vdumpa@nvidia.com (Krishna Reddy)
+Date: Wed, 13 Sep 2017 16:01:54 -0700
+Subject: [PATCH] arm64: tegra: Add SMMU node for Tegra186
+Message-ID: <1505343714-22359-1-git-send-email-vdumpa@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 08:17:07PM +0100, Dave P Martin wrote:
-> On Wed, Sep 13, 2017 at 10:26:05AM -0700, Catalin Marinas wrote:
-> > On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
-> > > +/*
-> > > + * Trapped SVE access
-> > > + */
-> > > +void do_sve_acc(unsigned int esr, struct pt_regs *regs)
-> > > +{
-> > > +	/* Even if we chose not to use SVE, the hardware could still trap: */
-> > > +	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
-> > > +		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> > > +		return;
-> > > +	}
-> > > +
-> > > +	task_fpsimd_save();
-> > > +
-> > > +	sve_alloc(current);
-> > > +	fpsimd_to_sve(current);
-> > > +	if (test_and_set_thread_flag(TIF_SVE))
-> > > +		WARN_ON(1); /* SVE access shouldn't have trapped */
-> > > +
-> > > +	task_fpsimd_load();
-> > > +}
-> > 
-> > When this function is entered, do we expect TIF_SVE to always be
-> > cleared? It's worth adding a comment on the expected conditions. If
-> 
-> Yes, and this is required for correctness, as you observe.
-> 
-> I had a BUG_ON() here which I removed, but it makes sense to add a
-> comment to capture the precondition here, and how it is satisfied.
-> 
-> > that's the case, task_fpsimd_save() would only save the FPSIMD state
-> > which is fine. However, you subsequently transfer the FPSIMD state to
-> > SVE, set TIF_SVE and restore the full SVE state. If we don't care about
-> > the SVE state here, can we call task_fpsimd_load() *before* setting
-> > TIF_SVE?
-> 
-> There should be no way to reach this code with TIF_SVE set, unless
-> task_fpsimd_load() sets the CPACR trap bit wrongly, or the hardware is
-> broken -- either of which is a bug.
+Add the DT node for ARM SMMU on Tegra186.
 
-Thanks for confirming my assumptions. What I meant was rewriting the
-above function as:
+Signed-off-by: Krishna Reddy <vdumpa@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 73 ++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
 
-	/* reset the SVE state (other than FPSIMD) */
-	task_fpsimd_save();
-	task_fpsimd_load();
-
-	sve_alloc(current);
-	set_thread_flag(TIF_SVE);
-
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+index 0b0552c9f7dd..e2c3ad203c93 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+@@ -355,6 +355,79 @@
+ 		nvidia,bpmp = <&bpmp>;
+ 	};
+ 
++	smmu: iommu at 12000000 {
++		compatible = "arm,mmu-500";
++		reg = <0 0x12000000 0 0x800000>;
++		#global-interrupts = <1>;
++		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		stream-match-mask = <0x7F80>;
++	};
++
+ 	gpu at 17000000 {
+ 		compatible = "nvidia,gp10b";
+ 		reg = <0x0 0x17000000 0x0 0x1000000>,
 -- 
-Catalin
+2.1.4
