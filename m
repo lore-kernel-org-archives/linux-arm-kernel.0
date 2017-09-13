@@ -1,46 +1,76 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 13 Sep 2017 14:13:45 +0200
-Subject: [PATCH v4 4/4] [media] exynos-gsc: Add hardware rotation limits
-In-Reply-To: <1505302915-15699-5-git-send-email-hoegeun.kwon@samsung.com>
-References: <1505302915-15699-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170913114215epcas2p346dd3987cf25481bc780e0eef8b91ed8@epcas2p3.samsung.com>
- <1505302915-15699-5-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <509750b5-22d0-77ee-8295-0e52679e0d1e@samsung.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 13 Sep 2017 14:15:30 +0200
+Subject: [PATCH v1 01/10] clk: at91: pmc: Wait for clocks when resuming
+In-Reply-To: <20170908153604.28383-2-romain.izard.pro@gmail.com>
+References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+ <20170908153604.28383-2-romain.izard.pro@gmail.com>
+Message-ID: <14fb5261-bb03-a6bd-6653-2a2c655b04ee@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2017 01:41 PM, Hoegeun Kwon wrote:
-> @@ -1004,11 +1088,33 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
->   	.num_clocks = 1,
->   };
->   
-> +static struct gsc_driverdata gsc_v_5250_drvdata = {
-> +	.variant = {
-> +		[0] = &gsc_v_5250_variant,
-> +		[1] = &gsc_v_5250_variant,
-> +		[2] = &gsc_v_5250_variant,
-> +		[3] = &gsc_v_5250_variant,
-> +	},
-> +	.num_entities = 4,
-> +	.clk_names = { "gscl" },
-> +	.num_clocks = 1,
-> +};
+On 08/09/2017 at 17:35, Romain Izard wrote:
+> Wait for the syncronization of all clocks when resuming, not only the
+> UPLL clock. Do not use regmap_read_poll_timeout, as it will call BUG()
+> when interrupts are masked, which is the case in here.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> ---
+>  drivers/clk/at91/pmc.c | 24 ++++++++++++++++--------
+>  1 file changed, 16 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 775af473fe11..5c2b26de303e 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -107,10 +107,20 @@ static int pmc_suspend(void)
+>  	return 0;
+>  }
+>  
+> +static bool pmc_ready(unsigned int mask)
+> +{
+> +	unsigned int status;
 > +
-> +static struct gsc_driverdata gsc_v_5420_drvdata = {
-> +	.variant = {
-> +		[0] = &gsc_v_5420_variant,
-> +		[1] = &gsc_v_5420_variant,
-> +	},
-> +	.num_entities = 4,
-
-Shouldn't num_enities be 2 here? You don't need to resend, I can
-amend that when applying.
-
-> +	.clk_names = { "gscl" },
-> +	.num_clocks = 1,
-> +};
+> +	regmap_read(pmcreg, AT91_PMC_SR, &status);
 > +
+> +	return ((status & mask) == mask) ? 1 : 0;
+> +}
+> +
+>  static void pmc_resume(void)
+>  {
+> -	int i, ret = 0;
+> +	int i;
+>  	u32 tmp;
+> +	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
+>  
+>  	regmap_read(pmcreg, AT91_PMC_MCKR, &tmp);
+>  	if (pmc_cache.mckr != tmp)
+> @@ -134,13 +144,11 @@ static void pmc_resume(void)
+>  			     AT91_PMC_PCR_CMD);
+>  	}
+>  
+> -	if (pmc_cache.uckr & AT91_PMC_UPLLEN) {
+> -		ret = regmap_read_poll_timeout(pmcreg, AT91_PMC_SR, tmp,
+> -					       !(tmp & AT91_PMC_LOCKU),
+> -					       10, 5000);
+> -		if (ret)
+> -			pr_crit("USB PLL didn't lock when resuming\n");
+> -	}
+> +	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
+> +		mask |= AT91_PMC_LOCKU;
+> +
+> +	while (!pmc_ready(mask))
+> +		cpu_relax();
 
---
+Okay, but I would prefer to keep the timeout property in it. So we may
+need to re-implement a timeout way-out here.
+
 Regards,
-Sylwester
+
+>  }
+>  
+>  static struct syscore_ops pmc_syscore_ops = {
+> 
+
+
+-- 
+Nicolas Ferre
