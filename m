@@ -1,44 +1,25 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 13 Sep 2017 20:06:12 +0100
-Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <20170913172911.3ca2h6cpju7etifi@localhost>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
- <20170913172911.3ca2h6cpju7etifi@localhost>
-Message-ID: <20170913190611.GC23415@e103592.cambridge.arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 13 Sep 2017 12:15:33 -0700
+Subject: [PATCH] clk: spear: make clk_ops const
+In-Reply-To: <1503407690-13541-1-git-send-email-bhumirks@gmail.com>
+References: <1503407690-13541-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170913191533.GA11836@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 10:29:11AM -0700, Catalin Marinas wrote:
-> On Thu, Aug 31, 2017 at 06:00:46PM +0100, Dave P Martin wrote:
-> > This patch implements the core logic for changing a task's vector
-> > length on request from userspace.  This will be used by the ptrace
-> > and prctl frontends that are implemented in later patches.
-> > 
-> > The SVE architecture permits, but does not require, implementations
-> > to support vector lengths that are not a power of two.  To handle
-> > this, logic is added to check a requested vector length against a
-> > possibly sparse bitmap of available vector lengths at runtime, so
-> > that the best supported value can be chosen.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+On 22-08-17, 18:44, Bhumika Goyal wrote:
+> Make these const as they are only stored in the const field of a
+> clk_init_data structure.
 > 
-> Can this be merged with patch 20? It seems to add the PR_ definitions
-> which get actually used later when the prctl interface is added.
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> ---
+>  drivers/clk/spear/clk-aux-synth.c  | 2 +-
+>  drivers/clk/spear/clk-frac-synth.c | 2 +-
+>  drivers/clk/spear/clk-gpt-synth.c  | 2 +-
+>  drivers/clk/spear/clk-vco-pll.c    | 4 ++--
+>  4 files changed, 5 insertions(+), 5 deletions(-)
 
-This patch is used both by patch 19 and by patch 20, which I preferred
-not to merge with each other: ptrace and prctl are significantly
-different things.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The prctl bit definitions are added here because they are the canonical
-definitions used by both interfaces.  The ptrace #defines are based on
-them.
-
-Does it make sense if I merge patch 20 into this one and apply patch 19
-on top?  This avoide the appearance of prctl #defines with no prctl
-implementation.
-
-Cheers
----Dave
+-- 
+viresh
