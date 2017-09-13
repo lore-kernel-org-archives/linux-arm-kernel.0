@@ -1,76 +1,23 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 13 Sep 2017 14:15:30 +0200
-Subject: [PATCH v1 01/10] clk: at91: pmc: Wait for clocks when resuming
-In-Reply-To: <20170908153604.28383-2-romain.izard.pro@gmail.com>
-References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
- <20170908153604.28383-2-romain.izard.pro@gmail.com>
-Message-ID: <14fb5261-bb03-a6bd-6653-2a2c655b04ee@microchip.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 13 Sep 2017 14:20:08 +0200
+Subject: [PATCH v4 0/4] Exynos-gsc: Support the hardware rotation limits
+In-Reply-To: <1505302915-15699-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <CGME20170913114214epcas2p11a7b99e0c69236a87506e3c5db4858fa@epcas2p1.samsung.com>
+ <1505302915-15699-1-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <899da01a-5e53-c9ef-1d26-11c1e64423a4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2017 at 17:35, Romain Izard wrote:
-> Wait for the syncronization of all clocks when resuming, not only the
-> UPLL clock. Do not use regmap_read_poll_timeout, as it will call BUG()
-> when interrupts are masked, which is the case in here.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
->  drivers/clk/at91/pmc.c | 24 ++++++++++++++++--------
->  1 file changed, 16 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-> index 775af473fe11..5c2b26de303e 100644
-> --- a/drivers/clk/at91/pmc.c
-> +++ b/drivers/clk/at91/pmc.c
-> @@ -107,10 +107,20 @@ static int pmc_suspend(void)
->  	return 0;
->  }
->  
-> +static bool pmc_ready(unsigned int mask)
-> +{
-> +	unsigned int status;
-> +
-> +	regmap_read(pmcreg, AT91_PMC_SR, &status);
-> +
-> +	return ((status & mask) == mask) ? 1 : 0;
-> +}
-> +
->  static void pmc_resume(void)
->  {
-> -	int i, ret = 0;
-> +	int i;
->  	u32 tmp;
-> +	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
->  
->  	regmap_read(pmcreg, AT91_PMC_MCKR, &tmp);
->  	if (pmc_cache.mckr != tmp)
-> @@ -134,13 +144,11 @@ static void pmc_resume(void)
->  			     AT91_PMC_PCR_CMD);
->  	}
->  
-> -	if (pmc_cache.uckr & AT91_PMC_UPLLEN) {
-> -		ret = regmap_read_poll_timeout(pmcreg, AT91_PMC_SR, tmp,
-> -					       !(tmp & AT91_PMC_LOCKU),
-> -					       10, 5000);
-> -		if (ret)
-> -			pr_crit("USB PLL didn't lock when resuming\n");
-> -	}
-> +	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
-> +		mask |= AT91_PMC_LOCKU;
-> +
-> +	while (!pmc_ready(mask))
-> +		cpu_relax();
+On 09/13/2017 01:41 PM, Hoegeun Kwon wrote:
+> Hoegeun Kwon (4):
+>    [media] exynos-gsc: Add compatible for Exynos 5250 and 5420 specific
+>      version
+>    ARM: dts: exynos: Add clean name of compatible.
+>    drm/exynos/gsc: Add hardware rotation limits
+>    [media] exynos-gsc: Add hardware rotation limits
 
-Okay, but I would prefer to keep the timeout property in it. So we may
-need to re-implement a timeout way-out here.
-
-Regards,
-
->  }
->  
->  static struct syscore_ops pmc_syscore_ops = {
-> 
-
+Thanks Hoegeung, I have applied patches 1 nad 4 from this series.
 
 -- 
-Nicolas Ferre
+Regards,
+Sylwester
