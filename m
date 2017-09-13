@@ -1,28 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Sep 2017 09:52:23 +0200
-Subject: [PATCH 02/11] soc: renesas: rcar-rst: add R8A77970 support
-In-Reply-To: <20170912210510.955132498@cogentembedded.com>
-References: <20170912210510.955132498@cogentembedded.com>
-Message-ID: <CAMuHMdXF96znGDaSb6d96WCDu7unkPiNUPAzV9zgKciUd-bqbA@mail.gmail.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 13 Sep 2017 15:52:14 +0800
+Subject: [PATCH v11 6/6] target-arm: kvm64: Handle SError interrupt for
+ the guest OS
+In-Reply-To: <CAFEAcA8J5wZ23kQypzcbUScUResjWnN6rDG0b0idD1rv7F5Fsw@mail.gmail.com>
+References: <0184EA26B2509940AA629AE1405DD7F2015FE17F@DGGEMA503-MBX.china.huawei.com>
+ <CAFEAcA8J5wZ23kQypzcbUScUResjWnN6rDG0b0idD1rv7F5Fsw@mail.gmail.com>
+Message-ID: <5552cf68-b998-686b-8e7e-710399c2b014@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 10:37 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add support for R-Car V3M (R8A77970) to the R-Car RST driver -- this driver
-> is  needed  for the clock driver to work.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Gr{oetje,eeting}s,
+On 2017/9/12 0:39, Peter Maydell wrote:
+>>>> +    return  kvm_vcpu_ioctl(CPU(cpu), KVM_ARM_SEI, &syndrome);
+>>> This looks odd. If we don't have the RAS extension why do we need to do anything at all here ?
+>> This is because Qemu may need to support non-RAS extension as discussed with ARM James before.
+>> That is to say host hardware CPU does not support RAS, but guest supports.
+>> That is under discussion.
+>> When host hardware supports RAS, specify the syndrome to a valid value, otherwise, set it to 0.
+> If the guest CPU doesn't support the RAS extension then we have
+> no mechanism for delivering it a notification about the
+> memory problem at all, so setting the syndrome to anything
+> doesn't make sense.
+> 
+> I'm not sure what you should do in the case of "host
+> supports telling us about a memory problem and has
+> done so, but guest does not support being told about it",
+> but I'm pretty sure it shouldn't be this.
+Hi peter,
+   thanks for the comments.
 
-                        Geert
+   in short, if the hardware CPU does not support RAS extension, do you think whether the Qemu or guest OS
+needs to support RAS(generate APEI table / record CPER / Error recovery).
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+CC James,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Hi James,
+  you ever have below comments:
+
+-----------------------------------------------------------------------
+But you can use APEI in a guest on CPUs without the RAS extensions: the host may
+signal memory errors to Qemu for any number of reasons.
+------------------------------------------------------------------
+
+in fact, I have a concern about it. If CPU without the RAS extension, the host should not deliver the sigbus.
+in which case in your test that host still deliver sigbus without RAS?
