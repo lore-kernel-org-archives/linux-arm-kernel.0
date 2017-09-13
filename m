@@ -1,178 +1,53 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 13 Sep 2017 11:33:45 +0900
-Subject: [PATCH v3 4/6] [media] exynos-gsc: Add hardware rotation limits
-In-Reply-To: <27b46679-e6c7-2471-f10e-3f0634178ebf@samsung.com>
-References: <1504850560-27950-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170908060309epcas1p3d48dd0871d3fde02ba3c9921bbe5a7a6@epcas1p3.samsung.com>
- <1504850560-27950-5-git-send-email-hoegeun.kwon@samsung.com>
- <27b46679-e6c7-2471-f10e-3f0634178ebf@samsung.com>
-Message-ID: <bb025fcb-e316-dfe9-a8eb-8a9535f35b93@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Sep 2017 03:42:19 +0100
+Subject: [PATCH v2] arm64: fix unwind_frame() for filtered out fn for
+ function graph tracing
+In-Reply-To: <59B7AED4.1070106@arm.com>
+References: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
+ <59B7AED4.1070106@arm.com>
+Message-ID: <20170913024218.GB12411@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Tue, Sep 12, 2017 at 10:54:28AM +0100, James Morse wrote:
+> Hi Pratyush,
+> 
+> On 01/09/17 06:48, Pratyush Anand wrote:
+> > do_task_stat() calls get_wchan(), which further does unbind_frame().
+> > unbind_frame() restores frame->pc to original value in case function
+> > graph tracer has modified a return address (LR) in a stack frame to hook
+> > a function return. However, if function graph tracer has hit a filtered
+> > function, then we can't unwind it as ftrace_push_return_trace() has
+> > biased the index(frame->graph) with a 'huge negative'
+> > offset(-FTRACE_NOTRACE_DEPTH).
+> > 
+> > Moreover, arm64 stack walker defines index(frame->graph) as unsigned
+> > int, which can not compare a -ve number.
+> > 
+> > Similar problem we can have with calling of walk_stackframe() from
+> > save_stack_trace_tsk() or dump_backtrace().
+> > 
+> > This patch fixes unwind_frame() to test the index for -ve value and
+> > restore index accordingly before we can restore frame->pc.
+> 
+> I've just spotted arm64's profile_pc, which does this:
+> From arch/arm64/kernel/time.c:profile_pc():
+> > #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> > 	frame.graph = -1; /* no task info */
+> > #endif
+> 
+> Is this another elaborate way of hitting this problem?
+> 
+> I guess the options are skip any return-address restore in the unwinder if
+> frame.graph is -1. (and profile_pc may have a bug here). Or, put
+> current->curr_ret_stack in there.
+> 
+> profile_pc() always passes tsk=NULL, so the unwinder assumes its current...
+> kernel/profile.c pulls the pt_regs from a per-cpu irq_regs variable, that is
+> updated by handle_IPI ... so it looks like this should always be current...
 
-On 09/11/2017 06:35 PM, Sylwester Nawrocki wrote:
-> On 09/08/2017 08:02 AM, Hoegeun Kwon wrote:
->> The hardware rotation limits of gsc depends on SOC (Exynos
->> 5250/5420/5433). Distinguish them and add them to the driver data.
->>
->> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
->> ---
->>   drivers/media/platform/exynos-gsc/gsc-core.c | 96 
->> ++++++++++++++++++++++++----
->>   1 file changed, 83 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c 
->> b/drivers/media/platform/exynos-gsc/gsc-core.c
->> index 4380150..8f8636e 100644
->> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
->> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
->> @@ -943,7 +943,37 @@ static irqreturn_t gsc_irq_handler(int irq, void 
->> *priv)
->>       return IRQ_HANDLED;
->>   }
->>   -static struct gsc_pix_max gsc_v_100_max = {
->> +static struct gsc_pix_max gsc_v_5250_max = {
->> +    .org_scaler_bypass_w    = 8192,
->> +    .org_scaler_bypass_h    = 8192,
->> +    .org_scaler_input_w    = 4800,
->> +    .org_scaler_input_h    = 3344,
->> +    .real_rot_dis_w        = 4800,
->> +    .real_rot_dis_h        = 3344,
->> +    .real_rot_en_w        = 2016,
->> +    .real_rot_en_h        = 2016,
->> +    .target_rot_dis_w    = 4800,
->> +    .target_rot_dis_h    = 3344,
->> +    .target_rot_en_w    = 2016,
->> +    .target_rot_en_h    = 2016,
->> +};
->> +
->> +static struct gsc_pix_max gsc_v_5420_max = {
->> +    .org_scaler_bypass_w    = 8192,
->> +    .org_scaler_bypass_h    = 8192,
->> +    .org_scaler_input_w    = 4800,
->> +    .org_scaler_input_h    = 3344,
->> +    .real_rot_dis_w        = 4800,
->> +    .real_rot_dis_h        = 3344,
->> +    .real_rot_en_w        = 2048,
->> +    .real_rot_en_h        = 2048,
->> +    .target_rot_dis_w    = 4800,
->> +    .target_rot_dis_h    = 3344,
->> +    .target_rot_en_w    = 2016,
->> +    .target_rot_en_h    = 2016,
->> +};
->> +
->> +static struct gsc_pix_max gsc_v_5433_max = {
->>       .org_scaler_bypass_w    = 8192,
->>       .org_scaler_bypass_h    = 8192,
->>       .org_scaler_input_w    = 4800,
->> @@ -979,8 +1009,8 @@ static irqreturn_t gsc_irq_handler(int irq, void 
->> *priv)
->>       .target_h        = 2,  /* yuv420 : 2, others : 1 */
->>   };
->>   -static struct gsc_variant gsc_v_100_variant = {
->> -    .pix_max        = &gsc_v_100_max,
->> +static struct gsc_variant gsc_v_5250_variant = {
->> +    .pix_max        = &gsc_v_5250_max,
->>       .pix_min        = &gsc_v_100_min,
->>       .pix_align        = &gsc_v_100_align,
->>       .in_buf_cnt        = 32,
->> @@ -992,12 +1022,48 @@ static irqreturn_t gsc_irq_handler(int irq, 
->> void *priv)
->>       .local_sc_down        = 2,
->>   };
->>   -static struct gsc_driverdata gsc_v_100_drvdata = {
->> +static struct gsc_variant gsc_v_5420_variant = {
->> +    .pix_max        = &gsc_v_5420_max,
->> +    .pix_min        = &gsc_v_100_min,
->> +    .pix_align        = &gsc_v_100_align,
->> +    .in_buf_cnt        = 32,
->> +    .out_buf_cnt        = 32,
->> +    .sc_up_max        = 8,
->> +    .sc_down_max        = 16,
->> +    .poly_sc_down_max    = 4,
->> +    .pre_sc_down_max    = 4,
->> +    .local_sc_down        = 2,
->> +};
->> +
->> +static struct gsc_variant gsc_v_5433_variant = {
->> +    .pix_max        = &gsc_v_5433_max,
->> +    .pix_min        = &gsc_v_100_min,
->> +    .pix_align        = &gsc_v_100_align,
->> +    .in_buf_cnt        = 32,
->> +    .out_buf_cnt        = 32,
->> +    .sc_up_max        = 8,
->> +    .sc_down_max        = 16,
->> +    .poly_sc_down_max    = 4,
->> +    .pre_sc_down_max    = 4,
->> +    .local_sc_down        = 2,
->> +};
->> +
->> +static struct gsc_driverdata gsc_v_5250_drvdata = {
->>       .variant = {
->> -        [0] = &gsc_v_100_variant,
->> -        [1] = &gsc_v_100_variant,
->> -        [2] = &gsc_v_100_variant,
->> -        [3] = &gsc_v_100_variant,
->> +        [0] = &gsc_v_5250_variant,
->> +        [1] = &gsc_v_5250_variant,
->> +        [2] = &gsc_v_5250_variant,
->> +        [3] = &gsc_v_5250_variant,
->> +    },
->> +    .num_entities = 4,
->> +    .clk_names = { "gscl" },
->> +    .num_clocks = 1,
->> +};
->> +
->> +static struct gsc_driverdata gsc_v_5420_drvdata = {
->> +    .variant = {
->> +        [0] = &gsc_v_5420_variant,
->> +        [1] = &gsc_v_5420_variant,
->>       },
->>       .num_entities = 4,
->>       .clk_names = { "gscl" },
->> @@ -1006,9 +1072,9 @@ static irqreturn_t gsc_irq_handler(int irq, 
->> void *priv)
->>     static struct gsc_driverdata gsc_5433_drvdata = {
->>       .variant = {
->> -        [0] = &gsc_v_100_variant,
->> -        [1] = &gsc_v_100_variant,
->> -        [2] = &gsc_v_100_variant,
->> +        [0] = &gsc_v_5433_variant,
->> +        [1] = &gsc_v_5433_variant,
->> +        [2] = &gsc_v_5433_variant,
->>       },
->>       .num_entities = 3,
->>       .clk_names = { "pclk", "aclk", "aclk_xiu", "aclk_gsclbend" },
->> @@ -1017,8 +1083,12 @@ static irqreturn_t gsc_irq_handler(int irq, 
->> void *priv)
->>     static const struct of_device_id exynos_gsc_match[] = {
->>       {
->> -        .compatible = "samsung,exynos5-gsc",
->> -        .data = &gsc_v_100_drvdata,
->
-> Can you keep the "samsung,exynos5-gsc" entry with the gsc_v_5250_variant
-> data, so that it can work with "samsung,exynos5-gsc" compatible in DT
-> on both exynos5250 and exynos5420 SoCs?
->
+Hmmm... is profile_pc the *only* case where frame->graph isn't equal to
+tsk->curr_ret_stack in unwind_frame? If so, maybe unwind_frame should just
+use that, and we could kill the graph member of struct stackframe completely?
 
-Thank you for your question.
-
-Exynos 5250 and 5420 have different hardware rotation limits.
-Exynos 5250 is '.real_rot_en_w/h = 2016' and 5420 is '.real_rot_en_w/h = 
-2048'.
-
-So my opinion they must have different compatible.
-
-Best regards,
-Hoegeun
-
->> +        .compatible = "samsung,exynos5250-gsc",
->> +        .data = &gsc_v_5250_drvdata,
->> +    },
->> +    {
->> +        .compatible = "samsung,exynos5420-gsc",
->> +        .data = &gsc_v_5420_drvdata,
->>       },
->
+Will
