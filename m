@@ -1,48 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 13 Sep 2017 19:03:10 +0200
-Subject: [PATCH v1 03/10] clk: at91: pmc: Support backup for programmable
- clocks
-In-Reply-To: <b0c7e816-4a7c-609d-2bc7-281fc6ca751d@microchip.com>
-References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
- <20170908153604.28383-4-romain.izard.pro@gmail.com>
- <b0c7e816-4a7c-609d-2bc7-281fc6ca751d@microchip.com>
-Message-ID: <20170913170310.grfv7j5xvh7chjdo@piout.net>
+From: ankijain@codeaurora.org (ankijain at codeaurora.org)
+Date: Wed, 13 Sep 2017 22:35:40 +0530
+Subject: Page fault while link_path_walk for path_len > 4060 bytes
+In-Reply-To: <20170912202615.GA9432@arm.com>
+References: <08e7e3332dc86c535dd2961ac1cde0b5@codeaurora.org>
+ <54083a824d6705a93d972ca5ef3a7b35@codeaurora.org>
+ <3958983ccec4aca494bf72c397f34bfa@codeaurora.org>
+ <953068e79da559bfd4f13e46e31c5a4e@codeaurora.org>
+ <20170822125747.GB28024@arm.com>
+ <b13b3a27e92c5413d168ad775163ea91@codeaurora.org>
+ <20170912202615.GA9432@arm.com>
+Message-ID: <a897c645c0af69a9a47fbafda441a9e4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/2017 at 14:29:35 +0200, Nicolas Ferre wrote:
-> On 08/09/2017 at 17:35, Romain Izard wrote:
-> > From: Romain Izard <romain.izard@mobile-devices.fr>
-> > 
-> > Save and restore the System Clock and Programmable Clock register for
-> > the backup use case.
-> 
-> "System Clock" seems to be handled in another patch.
-> 
-> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> > ---
-> >  drivers/clk/at91/pmc.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-> > index 07dc2861ad3f..5421b03553ec 100644
-> > --- a/drivers/clk/at91/pmc.c
-> > +++ b/drivers/clk/at91/pmc.c
-> > @@ -66,6 +66,7 @@ static struct
-> >  	u32 pcr[PMC_MAX_IDS];
-> >  	u32 audio_pll0;
-> >  	u32 audio_pll1;
-> > +	u32 pckr[3];
-> 
-> Some products have different numbers of PCK (only 2 on at91sam9x5 for
-> instance)...
-> 
-
-My opinion is that it will be time to change that when multiple SoCs
-will need to save their registers.
+Hi Will
 
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+
+>> -    { do_page_fault,    SIGSEGV, SEGV_MAPERR,    "level 3 translation
+>> fault"    },
+>> +    { do_translation_fault,    SIGSEGV, SEGV_MAPERR,    "level 3
+>> translation fault"    },
+>> we will try with above changes and get back to you.
+
+we didn't try yet with above changes.
+we will start the test soon and update you.
+
+Regards,
+Ankit Jain
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
+Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+Linux Foundation Collaborative Project
+
+
+
+On 2017-09-13 01:56, Will Deacon wrote:
+> On Mon, Aug 28, 2017 at 09:53:00AM +0530, ankijain at codeaurora.org 
+> wrote:
+>> Hi Will Deacon/ Al viro
+>> 
+>> 
+>> -->Please find the attached kmsg.txt
+>> <3>[17620.275249] BUG: sleeping function called from invalid context 
+>> at 
+>> /local/mnt/workspace/lnxbuild/project/trees_in_use/free_tree_platform_manifest_refs_tags_AU_LINUX_ANDROID_LA.UM.5.7.07.01.01.287.725_sdm660_64_commander_26168534/checkout/kernel/msm-4.4/arch/arm64/mm/fault.c:313
+>> <3>[17620.276504] in_atomic(): 0, irqs_disabled(): 0, pid: 10290, 
+>> name:
+>> stress-ng-dirde
+>> <6>[17620.298995] ------------[ cut here ]------------
+>> <2>[17620.299009] kernel BUG at 
+>> /local/mnt/workspace/lnxbuild/project/trees_in_use/free_tree_platform_manifest_refs_tags_AU_LINUX_ANDROID_LA.UM.5.7.07.01.01.287.725_sdm660_64_commander_26168534/checkout/kernel/msm-4.4/kernel/sched/core.c:8528!
+>> <6>[17620.306372] ------------[ cut here ]------------
+>> <2>[17620.327239] kernel BUG at 
+>> /local/mnt/workspace/lnxbuild/project/trees_in_use/free_tree_platform_manifest_refs_tags_AU_LINUX_ANDROID_LA.UM.5.7.07.01.01.287.725_sdm660_64_commander_26168534/checkout/kernel/msm-4.4/kernel/sched/core.c:8528!
+>> 
+>> 
+>> --> we are using arm64 machine with kernel 4.4.
+>> --> can you please guide us, how to capture ESR value while taking the
+>> fault?
+>> -->
+>> -    { do_page_fault,    SIGSEGV, SEGV_MAPERR,    "level 3 translation
+>> fault"    },
+>> +    { do_translation_fault,    SIGSEGV, SEGV_MAPERR,    "level 3
+>> translation fault"    },
+>> we will try with above changes and get back to you.
+> 
+> Did you test with this change?
+> 
+> Will
