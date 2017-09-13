@@ -1,65 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 13 Sep 2017 12:06:21 +0800
-Subject: [PATCH 1/1] clk: bulk: add of_clk_bulk_get()
-In-Reply-To: <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <201709131101.wAXlpdBK%fengguang.wu@intel.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 13 Sep 2017 10:29:19 +0530
+Subject: [PATCH v2] arm64: fix unwind_frame() for filtered out fn for
+ function graph tracing
+In-Reply-To: <20170913024218.GB12411@arm.com>
+References: <3c175a7a1f7c2e08098f6d5e84dc247ce94846d2.1504244801.git.panand@redhat.com>
+ <59B7AED4.1070106@arm.com> <20170913024218.GB12411@arm.com>
+Message-ID: <71e650af-4141-1bc1-3ced-6f109f3e7bbe@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.13 next-20170912]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-bulk-add-of_clk_bulk_get/20170913-075645
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: powerpc-defconfig (attached as .config)
-compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=powerpc 
+On Wednesday 13 September 2017 08:12 AM, Will Deacon wrote:
+> On Tue, Sep 12, 2017 at 10:54:28AM +0100, James Morse wrote:
+>> Hi Pratyush,
+>>
+>> On 01/09/17 06:48, Pratyush Anand wrote:
+>>> do_task_stat() calls get_wchan(), which further does unbind_frame().
+>>> unbind_frame() restores frame->pc to original value in case function
+>>> graph tracer has modified a return address (LR) in a stack frame to hook
+>>> a function return. However, if function graph tracer has hit a filtered
+>>> function, then we can't unwind it as ftrace_push_return_trace() has
+>>> biased the index(frame->graph) with a 'huge negative'
+>>> offset(-FTRACE_NOTRACE_DEPTH).
+>>>
+>>> Moreover, arm64 stack walker defines index(frame->graph) as unsigned
+>>> int, which can not compare a -ve number.
+>>>
+>>> Similar problem we can have with calling of walk_stackframe() from
+>>> save_stack_trace_tsk() or dump_backtrace().
+>>>
+>>> This patch fixes unwind_frame() to test the index for -ve value and
+>>> restore index accordingly before we can restore frame->pc.
+>>
+>> I've just spotted arm64's profile_pc, which does this:
+>>  From arch/arm64/kernel/time.c:profile_pc():
+>>> #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>>> 	frame.graph = -1; /* no task info */
+>>> #endif
+>>
+>> Is this another elaborate way of hitting this problem?
+>>
+>> I guess the options are skip any return-address restore in the unwinder if
+>> frame.graph is -1. (and profile_pc may have a bug here). Or, put
+>> current->curr_ret_stack in there.
 
-All errors (new ones prefixed by >>):
+I think we should go with latter, ie assign frame.graph = 
+current->curr_ret_stack in profile_pc().
 
-   In file included from include/linux/cpufreq.h:14:0,
-                    from arch/powerpc/oprofile/op_model_cell.c:17:
-   include/linux/clk.h: In function 'of_clk_bulk_get':
->> include/linux/clk.h:692:9: error: return makes integer from pointer without a cast [-Werror=int-conversion]
-     return ERR_PTR(-ENOENT);
-            ^~~~~~~~~~~~~~~~
-   At top level:
->> include/linux/clk.h:689:12: error: 'of_clk_bulk_get' defined but not used [-Werror=unused-function]
-    static int of_clk_bulk_get(struct device_node *np, int num_clks,
-               ^~~~~~~~~~~~~~~
-   cc1: all warnings being treated as errors
+>>
+>> profile_pc() always passes tsk=NULL, so the unwinder assumes its current...
+>> kernel/profile.c pulls the pt_regs from a per-cpu irq_regs variable, that is
+>> updated by handle_IPI ... so it looks like this should always be current...
+> 
+> Hmmm... is profile_pc the *only* case where frame->graph isn't equal to
+> tsk->curr_ret_stack in unwind_frame? If so, maybe unwind_frame should just
 
-vim +692 include/linux/clk.h
+Yes, it is the only place.
 
-   681	
-   682	#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-   683	int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-   684					 struct clk_bulk_data *clks);
-   685	struct clk *of_clk_get(struct device_node *np, int index);
-   686	struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
-   687	struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
-   688	#else
- > 689	static int of_clk_bulk_get(struct device_node *np, int num_clks,
-   690				   struct clk_bulk_data *clks)
-   691	{
- > 692		return ERR_PTR(-ENOENT);
-   693	}
-   694	
+> use that, and we could kill the graph member of struct stackframe completely?
+> 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23686 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170913/087319d3/attachment-0001.gz>
+Humm, not sure, we initialize frame->graph out of the while loop in 
+unwind_frame()'s caller and then keep in decrementing it in looped function.
+
+-- 
+Regards
+Pratyush
