@@ -1,94 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Sep 2017 09:31:27 -0700
-Subject: n900 in next-20170901
-In-Reply-To: <20170913075516.GA25036@js1304-P5Q-DELUXE>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <20170905233241.GA19231@js1304-P5Q-DELUXE>
- <20170906133057.GH5024@atomide.com>
- <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170907161650.GP5024@atomide.com>
- <20170913075516.GA25036@js1304-P5Q-DELUXE>
-Message-ID: <20170913163126.GS5024@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 13 Sep 2017 19:03:10 +0200
+Subject: [PATCH v1 03/10] clk: at91: pmc: Support backup for programmable
+ clocks
+In-Reply-To: <b0c7e816-4a7c-609d-2bc7-281fc6ca751d@microchip.com>
+References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+ <20170908153604.28383-4-romain.izard.pro@gmail.com>
+ <b0c7e816-4a7c-609d-2bc7-281fc6ca751d@microchip.com>
+Message-ID: <20170913170310.grfv7j5xvh7chjdo@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joonsoo Kim <iamjoonsoo.kim@lge.com> [170913 00:54]:
-> On Thu, Sep 07, 2017 at 09:16:51AM -0700, Tony Lindgren wrote:
-> > I doubt that QEMU n900 boots in secure mode but instead shows
-> > the SoC as general purpose SoC. If so, you'd have to patch the
-> > omap3_save_secure_ram_context() to attempt to save secure RAM
-> > context in all cases. If that works then debugging with any
-> > omap3 board like beagleboard in QEMU should work.
+On 13/09/2017 at 14:29:35 +0200, Nicolas Ferre wrote:
+> On 08/09/2017 at 17:35, Romain Izard wrote:
+> > From: Romain Izard <romain.izard@mobile-devices.fr>
+> > 
+> > Save and restore the System Clock and Programmable Clock register for
+> > the backup use case.
 > 
-> Sorry for late response.
+> "System Clock" seems to be handled in another patch.
 > 
-> I tried to emulate beagle board by using QEMU and now I find the way
-> and it works. However, it doesn't call omap3_save_secure_ram_context()
-> due to different omap_type(). And, even if I call it forcibly, the
-> system dies with prefetch abort regardless of commit 9caf25f996e8.
+> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> > ---
+> >  drivers/clk/at91/pmc.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> > index 07dc2861ad3f..5421b03553ec 100644
+> > --- a/drivers/clk/at91/pmc.c
+> > +++ b/drivers/clk/at91/pmc.c
+> > @@ -66,6 +66,7 @@ static struct
+> >  	u32 pcr[PMC_MAX_IDS];
+> >  	u32 audio_pll0;
+> >  	u32 audio_pll1;
+> > +	u32 pckr[3];
+> 
+> Some products have different numbers of PCK (only 2 on at91sam9x5 for
+> instance)...
+> 
 
-OK
+My opinion is that it will be time to change that when multiple SoCs
+will need to save their registers.
 
-> Could you let me know the better way to test your situation?
 
-Hmm yeah it seems to always return 0x19 on GP devices at least
-with the following test hack. But maybe that's enough for you
-to still see some differences with your patches.
-
-> Anyway, could you test linux-next with 'CONFIG_HIGHMEM = n'?
-> I'd like to know if the issue is related to the change that
-> all CMA memory is managed like as highmem.
-
-Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
-you need to remove it from arch/arm/mach-omap2/Kconfig that
-selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
-
-Regards,
-
-Tony
-
-8< ------
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -114,7 +114,7 @@ static void omap3_save_secure_ram_context(void)
- 	u32 ret;
- 	int mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
- 
--	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
-+	if (1 || omap_type() != OMAP2_DEVICE_TYPE_GP) {
- 		/*
- 		 * MPU next state must be set to POWER_ON temporarily,
- 		 * otherwise the WFI executed inside the ROM code
-@@ -440,7 +440,7 @@ void omap_push_sram_idle(void)
- {
- 	omap3_do_wfi_sram = omap_sram_push(omap3_do_wfi, omap3_do_wfi_sz);
- 
--	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-+	if (1 || omap_type() != OMAP2_DEVICE_TYPE_GP)
- 		_omap_save_secure_sram = omap_sram_push(save_secure_ram_context,
- 				save_secure_ram_context_sz);
- }
-@@ -551,7 +551,7 @@ int __init omap3_pm_init(void)
- 		clkdm_add_wkdep(per_clkdm, wkup_clkdm);
- 
- 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
--	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
-+	if (1 || omap_type() != OMAP2_DEVICE_TYPE_GP) {
- 		omap3_secure_ram_storage =
- 			kmalloc(0x803F, GFP_KERNEL);
- 		if (!omap3_secure_ram_storage)
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -114,7 +114,7 @@ ENTRY(save_secure_ram_context)
- 	mov	r6, #0xff
- 	dsb				@ data write barrier
- 	dmb				@ data memory barrier
--	smc	#1			@ call SMI monitor (smi #1)
-+	@smc	#1			@ call SMI monitor (smi #1)
- 	nop
- 	nop
- 	nop
 -- 
-2.14.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
