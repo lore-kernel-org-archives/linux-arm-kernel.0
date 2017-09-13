@@ -1,83 +1,58 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 13 Sep 2017 20:17:07 +0100
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20170913172605.hjrwjf34kyy7coh4@localhost>
+Date: Wed, 13 Sep 2017 20:21:11 +0100
+Subject: [PATCH v2 10/28] arm64/sve: Low-level CPU setup
+In-Reply-To: <20170913133206.rwobtu7ft5nrsh4p@localhost>
 References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913172605.hjrwjf34kyy7coh4@localhost>
-Message-ID: <20170913191707.GD23415@e103592.cambridge.arm.com>
+ <1504198860-12951-11-git-send-email-Dave.Martin@arm.com>
+ <20170913133206.rwobtu7ft5nrsh4p@localhost>
+Message-ID: <20170913192110.GE23415@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 10:26:05AM -0700, Catalin Marinas wrote:
-> On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
-> > +el0_sve_acc:
-> > +	/*
-> > +	 * Scalable Vector Extension access
-> > +	 */
-> > +	enable_dbg
-> > +	ct_user_exit
-> > +	mov	x0, x25
-> > +	mov	x1, sp
-> > +	bl	do_sve_acc
-> > +	b	ret_to_user
+On Wed, Sep 13, 2017 at 06:32:06AM -0700, Catalin Marinas wrote:
+> On Thu, Aug 31, 2017 at 06:00:42PM +0100, Dave P Martin wrote:
+> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > index 877d42f..dd22ef2 100644
+> > --- a/arch/arm64/mm/proc.S
+> > +++ b/arch/arm64/mm/proc.S
+> > @@ -27,6 +27,7 @@
+> >  #include <asm/pgtable-hwdef.h>
+> >  #include <asm/cpufeature.h>
+> >  #include <asm/alternative.h>
+> > +#include <asm/sysreg.h>
+> >  
+> >  #ifdef CONFIG_ARM64_64K_PAGES
+> >  #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+> > @@ -186,8 +187,17 @@ ENTRY(__cpu_setup)
+> >  	tlbi	vmalle1				// Invalidate local TLB
+> >  	dsb	nsh
+> >  
+> > -	mov	x0, #3 << 20
+> > -	msr	cpacr_el1, x0			// Enable FP/ASIMD
+> > +	mov	x0, #3 << 20			// FEN
+> > +
+> > +	/* SVE */
+> > +	mrs	x5, id_aa64pfr0_el1
+> > +	ubfx	x5, x5, #ID_AA64PFR0_SVE_SHIFT, #4
+> > +	cbz	x5, 1f
+> > +
+> > +	bic	x0, x0, #CPACR_EL1_ZEN
+> > +	orr	x0, x0, #CPACR_EL1_ZEN_EL1EN	// SVE: trap for EL0, not EL1
+> > +1:	msr	cpacr_el1, x0			// Enable FP/ASIMD
 > 
-> I think do_sve_acc() runs with interrupts disabled. We may have some
-> high latency for large SVE states.
+> For EL1, I wonder whether we could move this later to cpufeature.c. IIRC
+> I tried to do the same with FPSIMD but hit an issue with EFI run-time
+> services (I may be wrong though).
 
-Historically I wanted to play safe.
+I'll take a look at this -- I believe it should be safe to disable this
+trap for EL1 relatively late.  This is needed before probing for
+available vector lengths, but apart from that the kernel shouldn't touch
+SVE until/unless some user task uses SVE.
 
-I meant to change this to enable_dbg_and_irq now, but it looks like I
-forgot to do it.
+This would change if we eventually enable kernel-mode SVE, but I wouldn't
+expect that to get used in early boot before the cpufeatures code runs.
 
-I'll double-check that do_sve_acc() does nothing that makes it unsafe to
-enable irqs, but it should be OK.  It's certainly _intended_ to be
-irq-safe.
-
-> > +/*
-> > + * Trapped SVE access
-> > + */
-> > +void do_sve_acc(unsigned int esr, struct pt_regs *regs)
-> > +{
-> > +	/* Even if we chose not to use SVE, the hardware could still trap: */
-> > +	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
-> > +		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> > +		return;
-> > +	}
-> > +
-> > +	task_fpsimd_save();
-> > +
-> > +	sve_alloc(current);
-> > +	fpsimd_to_sve(current);
-> > +	if (test_and_set_thread_flag(TIF_SVE))
-> > +		WARN_ON(1); /* SVE access shouldn't have trapped */
-> > +
-> > +	task_fpsimd_load();
-> > +}
-> 
-> When this function is entered, do we expect TIF_SVE to always be
-> cleared? It's worth adding a comment on the expected conditions. If
-
-Yes, and this is required for correctness, as you observe.
-
-I had a BUG_ON() here which I removed, but it makes sense to add a
-comment to capture the precondition here, and how it is satisfied.
-
-> that's the case, task_fpsimd_save() would only save the FPSIMD state
-> which is fine. However, you subsequently transfer the FPSIMD state to
-> SVE, set TIF_SVE and restore the full SVE state. If we don't care about
-> the SVE state here, can we call task_fpsimd_load() *before* setting
-> TIF_SVE?
-
-There should be no way to reach this code with TIF_SVE set, unless
-task_fpsimd_load() sets the CPACR trap bit wrongly, or the hardware is
-broken -- either of which is a bug.
-
-> I may as well have confused myself with the state bouncing between
-> FPSIMD and SVE (more reasons to document the data flow better ;)).
-
-Agreed, I think this does need more explanation...  I'm currently
-trying to figure out the best way to describe it.
+Ard may have a view on this.
 
 Cheers
 ---Dave
