@@ -1,67 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 13 Sep 2017 09:10:26 -0500
-Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
- <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Sep 2017 07:33:25 -0700
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170913143325.hi4cfcajbts3bbao@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
-> Change the comptiable for support of multi-platform
-> Add description for reg
-> Add description for source_cg
-> Add description for mediatek,latch-ck
+On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
+> +/*
+> + * Handle SVE state across fork():
+> + *
+> + * dst and src must not end up with aliases of the same sve_state.
+> + * Because a task cannot fork except in a syscall, we can discard SVE
+> + * state for dst here, so long as we take care to retain the FPSIMD
+> + * subset of the state if SVE is in use.  Reallocation of the SVE state
+> + * will be deferred until dst tries to use SVE.
+> + */
+> +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
+> +{
+> +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
+> +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
+> +		sve_to_fpsimd(dst);
+> +	}
+> +
+> +	dst->thread.sve_state = NULL;
+> +}
 
-This is at least the 3rd patch with exactly the same vague subject. 
-Please make the subject somewhat unique.
+I first thought the thread flags are not visible in dst yet since
+dup_task_struct() calls arch_dup_task_struct() before
+setup_thread_stack(). However, at the end of the last year we enabled
+CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
+on this.
 
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index 4182ea3..405cd06 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
->  and the properties used by the msdc driver.
->  
->  Required properties:
-> -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> +- compatible: value should be either of the following.
-> +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> +- reg: physical base address of the controller and length
->  - interrupts: Should contain MSDC interrupt number
-> -- clocks: MSDC source clock, HCLK
-> -- clock-names: "source", "hclk"
-> +- clocks: MSDC source clock, HCLK, source_cg
-> +- clock-names: "source", "hclk", "source_cg"
+Anyway, IIUC we don't need sve_to_fpsimd() here. The
+arch_dup_task_struct() already called fpsimd_preserve_current_state()
+for src, so the FPSIMD state (which we care about) is transferred during
+the *dst = *src assignment. So you'd only need the last statement,
+possibly with a different function name like fpsimd_erase_sve (and maybe
+make the function static inline in the header).
 
-All chips support source_cg? That's not backwards compatible for 
-existing compatible strings if the driver requires it.
+[...]
+>  int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+> @@ -246,6 +247,9 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+>  	if (current->mm)
+>  		fpsimd_preserve_current_state();
+>  	*dst = *src;
+> +
+> +	fpsimd_dup_sve(dst, src);
+> +
+>  	return 0;
+>  }
 
->  - pinctrl-names: should be "default", "state_uhs"
->  - pinctrl-0: should contain default/high speed pin ctrl
->  - pinctrl-1: should contain uhs mode pin ctrl
-> @@ -30,6 +35,8 @@ Optional properties:
->  - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
->  				       If present,HS400 command responses are sampled on rising edges.
->  				       If not present,HS400 command responses are sampled on falling edges.
-> +- mediatek,latch-ck: Some projects do not support enhance_rx, need set correct latch-ck to avoid data crc
-
-What's a project?
-
-> +		     error caused by stop clock(fifo full)
->  
->  Examples:
->  mmc0: mmc at 11230000 {
-> -- 
-> 1.8.1.1.dirty
-> 
+-- 
+Catalin
