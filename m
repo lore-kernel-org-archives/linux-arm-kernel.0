@@ -1,62 +1,66 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 13 Sep 2017 08:34:24 +0800
-Subject: [PATCH 1/1] clk: bulk: add of_clk_bulk_get()
-In-Reply-To: <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <201709130826.AnbwLF3k%fengguang.wu@intel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 13 Sep 2017 09:46:47 +0900
+Subject: [PATCH 3/9] kexec_file: factor out crashdump elf header function
+ from x86
+In-Reply-To: <20170912055521.GA8787@dhcp-128-65.nay.redhat.com>
+References: <20170908031616.17916-1-takahiro.akashi@linaro.org>
+ <20170908031616.17916-4-takahiro.akashi@linaro.org>
+ <20170912055521.GA8787@dhcp-128-65.nay.redhat.com>
+Message-ID: <20170913004645.GI17186@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
+On Tue, Sep 12, 2017 at 01:55:21PM +0800, Dave Young wrote:
+> Hi,
+> On 09/08/17 at 12:16pm, AKASHI Takahiro wrote:
+> [snip]
+> > --- a/include/linux/kexec.h
+> > +++ b/include/linux/kexec.h
+> > @@ -162,6 +162,25 @@ int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> >  			       int (*func)(u64, u64, void *));
+> >  extern int kexec_add_buffer(struct kexec_buf *kbuf);
+> >  int kexec_locate_mem_hole(struct kexec_buf *kbuf);
+> > +#ifdef CONFIG_CRASH_CORE
+> > +extern int prepare_elf_headers(struct kimage *image, void **addr,
+> > +				unsigned long *sz);
+> > +
+> > +/* This primarily represents number of split ranges due to exclusion */
+> > +#define CRASH_MAX_RANGES        16
+> > +
+> > +struct crash_mem_range {
+> > +	u64 start, end;
+> > +};
+> > +
+> > +struct crash_mem {
+> > +	unsigned int nr_ranges;
+> > +	struct crash_mem_range ranges[CRASH_MAX_RANGES];
+> > +};
+> > +
+> > +extern int exclude_mem_range(struct crash_mem *mem,
+> > +		unsigned long long mstart, unsigned long long mend);
+> > +#endif /* CONFIG_CRASH_CORE */
+> 
+> Maybe I did not say it clear when reviewing the v1.
+> 
+> I suggested to move the code from to kexec_file.c because the
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on v4.13 next-20170912]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+(from crash_core.c)
 
-url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-bulk-add-of_clk_bulk_get/20170913-075645
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: x86_64-randconfig-x001-201737 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+> CONFIG_CRASH_CORE originally was introduced for the common code for
+> vmcoreinfo stuff when Hari worked on sharing code between powerpc
+> fadump and kdump.
+> 
+> I'm not sure we need the #ifdef CONFIG_CRASH_CORE here for these
+> kexec file load functions. Since they are already in kexec_file.c
+> so I think no need to add the #ifdef
 
-All warnings (new ones prefixed by >>):
+Right. CRASH_CORE is always selected, in arch/Kconfig, by KEXEC_CORE
+which is selected by KEXEC_FILE.
+(In this sense, CRASH_CORE has no use any more.)
 
-   In file included from include/linux/dma/dw.h:15:0,
-                    from drivers//tty/serial/8250/8250_lpss.c:18:
-   include/linux/clk.h: In function 'of_clk_bulk_get':
->> include/linux/clk.h:692:9: warning: return makes integer from pointer without a cast [-Wint-conversion]
-     return ERR_PTR(-ENOENT);
-            ^~~~~~~~~~~~~~~~
-   At top level:
-   include/linux/clk.h:689:12: warning: 'of_clk_bulk_get' defined but not used [-Wunused-function]
-    static int of_clk_bulk_get(struct device_node *np, int num_clks,
-               ^~~~~~~~~~~~~~~
+Thanks,
+-Takahiro AKASHI
 
-vim +692 include/linux/clk.h
-
-   681	
-   682	#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-   683	int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-   684					 struct clk_bulk_data *clks);
-   685	struct clk *of_clk_get(struct device_node *np, int index);
-   686	struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
-   687	struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
-   688	#else
-   689	static int of_clk_bulk_get(struct device_node *np, int num_clks,
-   690				   struct clk_bulk_data *clks)
-   691	{
- > 692		return ERR_PTR(-ENOENT);
-   693	}
-   694	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25166 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170913/13567e64/attachment-0001.gz>
+> >  #endif /* CONFIG_KEXEC_FILE */
+> Thanks
+> Dave
