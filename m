@@ -1,41 +1,61 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 13 Sep 2017 19:51:56 +0800
-Subject: [PATCH v11 6/6] target-arm: kvm64: Handle SError interrupt for
- the guest OS
-In-Reply-To: <CAFEAcA_zO_-kDYb0MkW=p5oY6tQPk4PpCqZoG0_01pn=sa3upw@mail.gmail.com>
-References: <0184EA26B2509940AA629AE1405DD7F2015FE17F@DGGEMA503-MBX.china.huawei.com>
- <CAFEAcA8J5wZ23kQypzcbUScUResjWnN6rDG0b0idD1rv7F5Fsw@mail.gmail.com>
- <5552cf68-b998-686b-8e7e-710399c2b014@huawei.com>
- <CAFEAcA_zO_-kDYb0MkW=p5oY6tQPk4PpCqZoG0_01pn=sa3upw@mail.gmail.com>
-Message-ID: <c105c670-6aec-32cd-d32b-30642819323e@huawei.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 13 Sep 2017 14:10:41 +0200
+Subject: [PATCH v1 02/10] clk: at91: pmc: Save SCSR during suspend
+In-Reply-To: <20170908153604.28383-3-romain.izard.pro@gmail.com>
+References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+ <20170908153604.28383-3-romain.izard.pro@gmail.com>
+Message-ID: <318420d4-044f-d018-f70e-3ed4fcfb0fd0@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/09/2017 at 17:35, Romain Izard wrote:
+> The contents of the System Clock Status Register (SCSR) needs to be
+> restored into the System Clock Enable Register (SCER).
+> 
+> As the bootloader will restore some clocks by itself, the issue can be
+> missed as only the USB controller, the LCD controller, the Image Sensor
+> controller and the programmable clocks will be impacted.
+> 
+> Fix the obvious typo in the suspend/resume code, as the IMR register
+> does not need to be saved twice.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+
+Yes, it looks like a typo:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+I didn't experienced the issue with LCD nor USB though.
+
+Regards,
+
+> ---
+>  drivers/clk/at91/pmc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 5c2b26de303e..07dc2861ad3f 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -86,7 +86,7 @@ static int pmc_suspend(void)
+>  {
+>  	int i;
+>  
+> -	regmap_read(pmcreg, AT91_PMC_IMR, &pmc_cache.scsr);
+> +	regmap_read(pmcreg, AT91_PMC_SCSR, &pmc_cache.scsr);
+>  	regmap_read(pmcreg, AT91_PMC_PCSR, &pmc_cache.pcsr0);
+>  	regmap_read(pmcreg, AT91_CKGR_UCKR, &pmc_cache.uckr);
+>  	regmap_read(pmcreg, AT91_CKGR_MOR, &pmc_cache.mor);
+> @@ -129,7 +129,7 @@ static void pmc_resume(void)
+>  	if (pmc_cache.pllar != tmp)
+>  		pr_warn("PLLAR was not configured properly by the firmware\n");
+>  
+> -	regmap_write(pmcreg, AT91_PMC_IMR, pmc_cache.scsr);
+> +	regmap_write(pmcreg, AT91_PMC_SCER, pmc_cache.scsr);
+>  	regmap_write(pmcreg, AT91_PMC_PCER, pmc_cache.pcsr0);
+>  	regmap_write(pmcreg, AT91_CKGR_UCKR, pmc_cache.uckr);
+>  	regmap_write(pmcreg, AT91_CKGR_MOR, pmc_cache.mor);
+> 
 
 
-On 2017/9/13 18:52, Peter Maydell wrote:
-> This question seems to be not really related to the review
-> comment that it is responding to.
-> 
-> (1) If the host does not support notifying us about
-> errors, then there is clearly nothing to do in this
-> code, because we will never get a notification.
-> 
-> (2) If the host does support notifying us about errors,
-> but we choose not to expose RAS to the guest, then
-> there's not much to do either. We probably just want
-> to take whatever the default behaviour is for any
-> application when it touches memory that's bad.
-> We definitely don't want to tell the guest anything.
-> 
-> (3) If the host supports notification, and we choose
-> to expose RAS to the guest, then we need to do
-> whatever we have to do to notify the guest.
-> 
-> If we're in this signal handler and also
-> arm_feature(env, ARM_FEATURE_RAS) is false then that
-> is case (2), and my point is that doing anything with
-> the guest 'syndrome' value looks like the wrong thing.
-
-Peter,
-  your explanation is clear. OK, understand, thanks.
+-- 
+Nicolas Ferre
