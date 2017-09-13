@@ -1,67 +1,62 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 13 Sep 2017 03:08:14 +0300
-Subject: [PATCH 1/2] drm: bridge: Add bindings for TI THS8134
-In-Reply-To: <20170901094038.4312-1-linus.walleij@linaro.org>
-References: <20170901094038.4312-1-linus.walleij@linaro.org>
-Message-ID: <2446705.uuxjYiEYNm@avalon>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 13 Sep 2017 08:34:24 +0800
+Subject: [PATCH 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <1505115413-25483-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <201709130826.AnbwLF3k%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Dong,
 
-Thank you for the patch.
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on v4.13 next-20170912]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On Friday, 1 September 2017 12:40:37 EEST Linus Walleij wrote:
-> This adds device tree bindings for the Texas Instruments
-> THS8134A and THS8134B VGA DACs by extending and renaming the
-> existing bindings for THS8135.
-> 
-> These DACs are used for the VGA outputs on the ARM reference
-> designs such as Integrator, Versatile and RealView.
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}        | 12 ++++++---
->  1 file changed, 8 insertions(+), 4 deletions(-)
->  rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt =>
-> ti,ths813x.txt} (73%)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-> similarity index 73%
-> rename from Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> rename to Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-> index 6ec1a880ac18..608435f04796 100644
-> --- a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> +++ b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-> @@ -1,11 +1,15 @@
-> -THS8135 Video DAC
-> ------------------
-> +THS8134 and THS8135 Video DAC
-> +-----------------------------
-> 
-> -This is the binding for Texas Instruments THS8135 Video DAC bridge.
-> +This is the binding for Texas Instruments THS8134A, THS8134B and THS8135
-> +Video DAC bridge.
-> 
->  Required properties:
-> 
-> -- compatible: Must be "ti,ths8135"
-> +- compatible: Must be one of
-> +  "ti,ths8134a"
-> +  "ti,ths8134b"
-> +  "ti,ths8135"
+url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-bulk-add-of_clk_bulk_get/20170913-075645
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: x86_64-randconfig-x001-201737 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-As mentioned in the review of patch 2/2, would it make sense to also introduce 
-a ti,ths813x compatible string ? I haven't checked the datasheets so the 
-answer might very well be no.
+All warnings (new ones prefixed by >>):
 
->  Required nodes:
+   In file included from include/linux/dma/dw.h:15:0,
+                    from drivers//tty/serial/8250/8250_lpss.c:18:
+   include/linux/clk.h: In function 'of_clk_bulk_get':
+>> include/linux/clk.h:692:9: warning: return makes integer from pointer without a cast [-Wint-conversion]
+     return ERR_PTR(-ENOENT);
+            ^~~~~~~~~~~~~~~~
+   At top level:
+   include/linux/clk.h:689:12: warning: 'of_clk_bulk_get' defined but not used [-Wunused-function]
+    static int of_clk_bulk_get(struct device_node *np, int num_clks,
+               ^~~~~~~~~~~~~~~
 
+vim +692 include/linux/clk.h
 
--- 
-Regards,
+   681	
+   682	#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+   683	int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+   684					 struct clk_bulk_data *clks);
+   685	struct clk *of_clk_get(struct device_node *np, int index);
+   686	struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+   687	struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+   688	#else
+   689	static int of_clk_bulk_get(struct device_node *np, int num_clks,
+   690				   struct clk_bulk_data *clks)
+   691	{
+ > 692		return ERR_PTR(-ENOENT);
+   693	}
+   694	
 
-Laurent Pinchart
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 25166 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170913/13567e64/attachment-0001.gz>
