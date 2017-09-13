@@ -1,30 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 13 Sep 2017 10:29:11 -0700
-Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170913172911.3ca2h6cpju7etifi@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 13 Sep 2017 12:45:36 -0500
+Subject: [PATCH v4 3/4] dt-bindings: stm32-dma: add a property to handle
+ STM32 DMAMUX
+In-Reply-To: <1504785168-26572-4-git-send-email-pierre-yves.mordret@st.com>
+References: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
+ <1504785168-26572-4-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20170913174536.2hy6ubeef2s55t7y@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 06:00:46PM +0100, Dave P Martin wrote:
-> This patch implements the core logic for changing a task's vector
-> length on request from userspace.  This will be used by the ptrace
-> and prctl frontends that are implemented in later patches.
+On Thu, Sep 07, 2017 at 01:52:47PM +0200, Pierre-Yves MORDRET wrote:
+> STM32 DMA controller has to exposed its number of request line to be
+> addressed via STM32 DMAMUX.
 > 
-> The SVE architecture permits, but does not require, implementations
-> to support vector lengths that are not a power of two.  To handle
-> this, logic is added to check a requested vector length against a
-> possibly sparse bitmap of available vector lengths at runtime, so
-> that the best supported value can be chosen.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>  Version history:
+>     v4:
+>         * get rid of st,dmamux property
+>         * number of DMA requests is exposed for DMAMUX
+>     v3:
+>         * None
+>     v2:
+>         * Typo fix
+> ---
+> ---
+>  Documentation/devicetree/bindings/dma/stm32-dma.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
-Can this be merged with patch 20? It seems to add the PR_ definitions
-which get actually used later when the prctl interface is added.
-
--- 
-Catalin
+Acked-by: Rob Herring <robh@kernel.org>
