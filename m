@@ -1,56 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Sep 2017 08:43:00 +0100
-Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170914074146.dnibkvom4yuzejf3@dell>
-References: <20170913193723.16234-1-robert.jarzmik@free.fr>
- <20170913193723.16234-3-robert.jarzmik@free.fr>
- <20170914074146.dnibkvom4yuzejf3@dell>
-Message-ID: <20170914074300.iobuwn2hrmnf6sen@dell>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 14 Sep 2017 09:54:40 +0200
+Subject: [PATCH] ARM: sun7i: a20: enable ac/battery power supplies for
+ Lamobo R1 board
+In-Reply-To: <20170913132130.56551-1-icenowy@aosc.io>
+References: <20170913132130.56551-1-icenowy@aosc.io>
+Message-ID: <20170914075440.6tpmom4l26wm6g6b@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Sep 2017, Lee Jones wrote:
-
-> On Wed, 13 Sep 2017, Robert Jarzmik wrote:
+On Wed, Sep 13, 2017 at 09:21:30PM +0800, Icenowy Zheng wrote:
+> The Lamobo R1 board connected the ACIN of the AXP209 PMIC to a MicroUSB
+> port, and the battery input is connected to a generic connector.
 > 
-> > The WM9705, WM9712 and WM9713 are highly integrated codecs, with an
-> > audio codec, DAC and ADC, GPIO unit and a touchscreen interface.
-> > 
-> > Historically the support was spread across drivers/input/touchscreen and
-> > sound/soc/codecs. The sharing was done through ac97 bus sharing. This
-> > model will not withstand the new AC97 bus model, where codecs are
-> > discovered on runtime.
-> > 
-> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> > Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> > Since v3:
-> >  - added a "depends on AC97_BUS_NEW" Kconfig statement
-> >  - added default values for wm9705, wm9712 per Charles's comment
-> > Since v4:
-> >  - added Charles's ack
-> > Since v5:
-> >  - took into account Lee's comments
-> > Since v6:
-> >  - took into account Lee's comments
-> > ---
-> >  drivers/mfd/Kconfig        |  14 ++
-> >  drivers/mfd/Makefile       |   1 +
-> >  drivers/mfd/wm97xx-core.c  | 366 +++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/wm97xx.h |  25 ++++
-> >  4 files changed, 406 insertions(+)
-> >  create mode 100644 drivers/mfd/wm97xx-core.c
-> >  create mode 100644 include/linux/mfd/wm97xx.h
+> Enable these two power supplies in the device tree.
 > 
-> Applied, thanks.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Change of plan.  It looks like there are deps.
-
-Unapplied.
+Applied for 4.15, thanks!
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170914/00bf11de/attachment.sig>
