@@ -1,65 +1,157 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Sep 2017 10:27:17 -0700 (PDT)
-Subject: Applied "ASoC: rockchip: i2s: fix unbalanced clk_disable" to the asoc
- tree
-In-Reply-To: <20170914155855.28768-1-john@metanate.com>
-Message-ID: <20170914172717.1B3CE4400D2@finisterre.ee.mobilebroadband>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Sep 2017 19:22:08 +0100
+Subject: [kernel-hardening] [PATCH v6 05/11] arm64/mm: Add support for XPFO
+In-Reply-To: <20170907173609.22696-6-tycho@docker.com>
+References: <20170907173609.22696-1-tycho@docker.com>
+ <20170907173609.22696-6-tycho@docker.com>
+Message-ID: <20170914182205.GA1711@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi,
 
-   ASoC: rockchip: i2s: fix unbalanced clk_disable
+On Thu, Sep 07, 2017 at 11:36:03AM -0600, Tycho Andersen wrote:
+> From: Juerg Haefliger <juerg.haefliger@canonical.com>
+> 
+> Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 and
+> provide a hook for updating a single kernel page table entry (which is
+> required by the generic XPFO code).
+> 
+> v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+> 
+> CC: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
+> Signed-off-by: Tycho Andersen <tycho@docker.com>
+> ---
+>  arch/arm64/Kconfig     |  1 +
+>  arch/arm64/mm/Makefile |  2 ++
+>  arch/arm64/mm/xpfo.c   | 58 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 61 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index dfd908630631..44fa44ef02ec 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -121,6 +121,7 @@ config ARM64
+>  	select SPARSE_IRQ
+>  	select SYSCTL_EXCEPTION_TRACE
+>  	select THREAD_INFO_IN_TASK
+> +	select ARCH_SUPPORTS_XPFO
 
-has been applied to the asoc tree at
+A bit of a nit, but this list is (intended to be) organised alphabetically.
+Could you please try to retain that?
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+i.e. place this between ARCH_SUPPORTS_NUMA_BALANCING and
+ARCH_WANT_COMPAT_IPC_PARSE_VERSION.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+>  	help
+>  	  ARM 64-bit (AArch64) Linux support.
+>  
+> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+> index 9b0ba191e48e..22e5cab543d8 100644
+> --- a/arch/arm64/mm/Makefile
+> +++ b/arch/arm64/mm/Makefile
+> @@ -11,3 +11,5 @@ KASAN_SANITIZE_physaddr.o	+= n
+>  
+>  obj-$(CONFIG_KASAN)		+= kasan_init.o
+>  KASAN_SANITIZE_kasan_init.o	:= n
+> +
+> +obj-$(CONFIG_XPFO)		+= xpfo.o
+> diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
+> new file mode 100644
+> index 000000000000..678e2be848eb
+> --- /dev/null
+> +++ b/arch/arm64/mm/xpfo.c
+> @@ -0,0 +1,58 @@
+> +/*
+> + * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
+> + * Copyright (C) 2016 Brown University. All rights reserved.
+> + *
+> + * Authors:
+> + *   Juerg Haefliger <juerg.haefliger@hpe.com>
+> + *   Vasileios P. Kemerlis <vpk@cs.brown.edu>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + */
+> +
+> +#include <linux/mm.h>
+> +#include <linux/module.h>
+> +
+> +#include <asm/tlbflush.h>
+> +
+> +/*
+> + * Lookup the page table entry for a virtual address and return a pointer to
+> + * the entry. Based on x86 tree.
+> + */
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Is this intended for kernel VAs, user VAs, or both?
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+There are different constraints for fiddling with either (e.g. holding
+mmap_sem), so we should be clear regarding the intended use-case.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> +static pte_t *lookup_address(unsigned long addr)
+> +{
+> +	pgd_t *pgd;
+> +	pud_t *pud;
+> +	pmd_t *pmd;
+> +
+> +	pgd = pgd_offset_k(addr);
+> +	if (pgd_none(*pgd))
+> +		return NULL;
+> +
+> +	pud = pud_offset(pgd, addr);
+> +	if (pud_none(*pud))
+> +		return NULL;
+
+What if it's not none, but not a table?
+
+I think we chould check pud_sect() here, and/or pud_bad().
+
+> +
+> +	pmd = pmd_offset(pud, addr);
+> +	if (pmd_none(*pmd))
+> +		return NULL;
+
+Likewise.
+
+> +
+> +	return pte_offset_kernel(pmd, addr);
+> +}
+
+Given this expects a pte, it might make more sense to call this
+lookup_address_pte() to make that clear.
+
+> +
+> +/* Update a single kernel page table entry */
+> +inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)
+> +{
+> +	pte_t *pte = lookup_address((unsigned long)kaddr);
+> +
+> +	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
+
+We can get NULL from lookup_address(), so this doesn't look right.
+
+If NULL implies an error, drop a BUG_ON(!pte) before the set_pte.
+
+> +}
+> +
+> +inline void xpfo_flush_kernel_tlb(struct page *page, int order)
+> +{
+> +	unsigned long kaddr = (unsigned long)page_address(page);
+> +	unsigned long size = PAGE_SIZE;
+
+unsigned long size = PAGE_SIZE << order;
+
+> +
+> +	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
+
+... and this can be simpler.
+
+I haven't brought myself back up to speed, so it might not be possible, but I
+still think it would be preferable for XPFO to call flush_tlb_kernel_range()
+directly.
 
 Thanks,
-Mark
-
->From 32debfcd3ff0939c93238ddde03ffcc96cca5c60 Mon Sep 17 00:00:00 2001
-From: John Keeping <john@metanate.com>
-Date: Thu, 14 Sep 2017 16:58:55 +0100
-Subject: [PATCH] ASoC: rockchip: i2s: fix unbalanced clk_disable
-
-mclk is enabled and disabled only in i2s_runtime_{resume,suspend}() and
-we ensure that the device is runtime suspended before reaching this
-clk_disable_unprepare() call, so it is wrong to call it again here.
-
-Signed-off-by: John Keeping <john@metanate.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/rockchip/rockchip_i2s.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 199338fdeda0..a7972c2d4e7b 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -694,7 +694,6 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
- 	if (!pm_runtime_status_suspended(&pdev->dev))
- 		i2s_runtime_suspend(&pdev->dev);
- 
--	clk_disable_unprepare(i2s->mclk);
- 	clk_disable_unprepare(i2s->hclk);
- 
- 	return 0;
--- 
-2.13.2
+Mark.
