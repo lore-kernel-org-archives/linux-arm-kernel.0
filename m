@@ -1,43 +1,38 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 14 Sep 2017 17:28:13 +0300
-Subject: [PATCH 2/3] ARM: dts: at91: sama5d27_som1_ek: fix typos
-In-Reply-To: <1505399294-20041-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1505399294-20041-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1505399294-20041-3-git-send-email-claudiu.beznea@microchip.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 14 Sep 2017 16:34:54 +0200
+Subject: [PATCH] net: phy: Fix mask value write on gmii2rgmii converter
+ speed register.
+In-Reply-To: <1505373391-18697-1-git-send-email-fahad.kunnathadi@dexceldesigns.com>
+References: <1505373391-18697-1-git-send-email-fahad.kunnathadi@dexceldesigns.com>
+Message-ID: <20170914143454.GB27601@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@microchip.com>
+On Thu, Sep 14, 2017 at 12:46:31PM +0530, Fahad Kunnathadi wrote:
+> To clear Speed Selection in MDIO control register(0x10),
+> ie, clear bits 6 and 13 to zero while keeping other bits same.
+> Before AND operation,The Mask value has to be perform with bitwise NOT
+> operation (ie, ~ operator)
+> 
+> This patch clears current speed selection before writing the
+> new speed settings to gmii2rgmii converter
 
-Fix typos that prevent proper using of uart2 and uart4 devices.
+Hi Fahad
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I expect you will find other issues with this driver. I pointed some
+out at the time it is submitted, but the developers went quiet as soon
+as it was accepted.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-index f13ef4fbab60..be5cd913f274 100644
---- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-@@ -120,7 +120,7 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mikrobus2_uart>;
- 				atmel,use-dma-rx;
--				atmel-use-dma-tx;
-+				atmel,use-dma-tx;
- 				status = "okay";
- 			};
- 
-@@ -178,7 +178,7 @@
- 			uart4: serial at fc00c000 {
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
--				pinctrl-name = "default";
-+				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mikrobus1_uart>;
- 				status = "okay";
- 			};
--- 
-2.7.4
+Anyway, please ensure David Miller <davem@davemloft.net> gets a copy.
+
+The subject line should be:
+
+[PATCH net] net: phy: Fix mask value write on gmii2rgmii converter speed register.
+
+and include a fixes tag:
+
+Fixes: f411a6160bd4 ("net: phy: Add gmiitorgmii converter support")
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+    Andrew
