@@ -1,54 +1,65 @@
 From: b18965@freescale.com (Alison Wang)
-Date: Thu, 14 Sep 2017 14:53:40 +0800
-Subject: [PATCH 1/2] drm/fsl-dcu: Fix DCU pixel clock issue in suspend/resume
+Date: Thu, 14 Sep 2017 14:53:41 +0800
+Subject: [PATCH 2/2] drm/fsl-dcu: Fix the interrupt issue in suspend/resume
  functions
-Message-ID: <20170914065341.17615-1-b18965@freescale.com>
+In-Reply-To: <20170914065341.17615-1-b18965@freescale.com>
+References: <20170914065341.17615-1-b18965@freescale.com>
+Message-ID: <20170914065341.17615-2-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As there is not corresponding clk_prepare_enable() for
-fsl_dev->pix_clk in previous contexts, clk_disable_unprepare() for
-fsl_dcu->pix_clk in suspend function will fail.
+drm_atomic_helper_suspend()/drm_atomic_helper_resume() are used in
+suspend/resume functions. Interrupt can not be disabled when calling
+drm_atomic_helper_resume(). Or else vblank interrupt will not generate
+and the error about vblank wait timed out will occur.
 
-This patch will add clk_prepare_enable() for fsl_dev->pix_clk in
-previous contexts and resume function to fix the issue.
+This patch will enable interrupt before calling
+drm_atomic_helper_resume().
 
-This patch is verified on LS1021ATWR board.
+The patch is verified on LS1021ATWR board.
 
 Signed-off-by: Alison Wang <alison.wang@nxp.com>
 ---
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
-index 58e9e0601a61..875b0fdc4274 100644
+index 875b0fdc4274..aa0393d32661 100644
 --- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
 +++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
-@@ -230,6 +230,12 @@ static int fsl_dcu_drm_pm_resume(struct device *dev)
+@@ -192,7 +192,6 @@ static int fsl_dcu_drm_pm_suspend(struct device *dev)
+ 	if (!fsl_dev)
+ 		return 0;
+ 
+-	disable_irq(fsl_dev->irq);
+ 	drm_kms_helper_poll_disable(fsl_dev->drm);
+ 
+ 	console_lock();
+@@ -210,6 +209,8 @@ static int fsl_dcu_drm_pm_suspend(struct device *dev)
+ 		return PTR_ERR(fsl_dev->state);
+ 	}
+ 
++	disable_irq(fsl_dev->irq);
++
+ 	clk_disable_unprepare(fsl_dev->pix_clk);
+ 	clk_disable_unprepare(fsl_dev->clk);
+ 
+@@ -236,6 +237,8 @@ static int fsl_dcu_drm_pm_resume(struct device *dev)
  		return ret;
  	}
  
-+	ret = clk_prepare_enable(fsl_dev->pix_clk);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable dcu pix clk\n");
-+		return ret;
-+	}
++	enable_irq(fsl_dev->irq);
 +
  	if (fsl_dev->tcon)
  		fsl_tcon_bypass_enable(fsl_dev->tcon);
  	fsl_dcu_drm_init_planes(fsl_dev->drm);
-@@ -351,6 +357,12 @@ static int fsl_dcu_drm_probe(struct platform_device *pdev)
- 		goto disable_clk;
- 	}
+@@ -246,7 +249,6 @@ static int fsl_dcu_drm_pm_resume(struct device *dev)
+ 	console_unlock();
  
-+	ret = clk_prepare_enable(fsl_dev->pix_clk);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable dcu pix clk\n");
-+		return ret;
-+	}
-+
- 	fsl_dev->tcon = fsl_tcon_init(dev);
+ 	drm_kms_helper_poll_enable(fsl_dev->drm);
+-	enable_irq(fsl_dev->irq);
  
- 	drm = drm_dev_alloc(driver, dev);
+ 	return 0;
+ }
 -- 
 2.14.1
