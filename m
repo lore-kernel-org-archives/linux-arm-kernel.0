@@ -1,49 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Sep 2017 08:41:47 +0100
-Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170913193723.16234-3-robert.jarzmik@free.fr>
-References: <20170913193723.16234-1-robert.jarzmik@free.fr>
- <20170913193723.16234-3-robert.jarzmik@free.fr>
-Message-ID: <20170914074146.dnibkvom4yuzejf3@dell>
+From: romain.izard@mobile-devices.fr (romain izard)
+Date: Thu, 14 Sep 2017 09:41:36 +0200
+Subject: [PATCH v1 03/10] clk: at91: pmc: Support backup for programmable
+ clocks
+In-Reply-To: <20170913170310.grfv7j5xvh7chjdo@piout.net>
+References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+ <20170908153604.28383-4-romain.izard.pro@gmail.com>
+ <b0c7e816-4a7c-609d-2bc7-281fc6ca751d@microchip.com>
+ <20170913170310.grfv7j5xvh7chjdo@piout.net>
+Message-ID: <CAGkQfmOZBi4tzUSEAD7J+w_v+pZ_yFgPRBaYaLnW-ptFZO0rvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Sep 2017, Robert Jarzmik wrote:
+2017-09-13 19:03 GMT+02:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> On 13/09/2017 at 14:29:35 +0200, Nicolas Ferre wrote:
+>> On 08/09/2017 at 17:35, Romain Izard wrote:
+>> > From: Romain Izard <romain.izard@mobile-devices.fr>
+>> >
+>> > Save and restore the System Clock and Programmable Clock register for
+>> > the backup use case.
+>>
+>> "System Clock" seems to be handled in another patch.
+>>
+>> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+>> > ---
+>> >  drivers/clk/at91/pmc.c | 5 +++++
+>> >  1 file changed, 5 insertions(+)
+>> >
+>> > diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+>> > index 07dc2861ad3f..5421b03553ec 100644
+>> > --- a/drivers/clk/at91/pmc.c
+>> > +++ b/drivers/clk/at91/pmc.c
+>> > @@ -66,6 +66,7 @@ static struct
+>> >     u32 pcr[PMC_MAX_IDS];
+>> >     u32 audio_pll0;
+>> >     u32 audio_pll1;
+>> > +   u32 pckr[3];
+>>
+>> Some products have different numbers of PCK (only 2 on at91sam9x5 for
+>> instance)...
+>>
+>
+> My opinion is that it will be time to change that when multiple SoCs will
+> need to save their registers.
+>
+For the next version, I'll add a #define. But as this code requires a
+device tree node with the compatible string "atmel,sama5d2-pmc", I believe
+that we can ignore other chips for now.
 
-> The WM9705, WM9712 and WM9713 are highly integrated codecs, with an
-> audio codec, DAC and ADC, GPIO unit and a touchscreen interface.
-> 
-> Historically the support was spread across drivers/input/touchscreen and
-> sound/soc/codecs. The sharing was done through ac97 bus sharing. This
-> model will not withstand the new AC97 bus model, where codecs are
-> discovered on runtime.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> Since v3:
->  - added a "depends on AC97_BUS_NEW" Kconfig statement
->  - added default values for wm9705, wm9712 per Charles's comment
-> Since v4:
->  - added Charles's ack
-> Since v5:
->  - took into account Lee's comments
-> Since v6:
->  - took into account Lee's comments
-> ---
->  drivers/mfd/Kconfig        |  14 ++
->  drivers/mfd/Makefile       |   1 +
->  drivers/mfd/wm97xx-core.c  | 366 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/wm97xx.h |  25 ++++
->  4 files changed, 406 insertions(+)
->  create mode 100644 drivers/mfd/wm97xx-core.c
->  create mode 100644 include/linux/mfd/wm97xx.h
-
-Applied, thanks.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Romain Izard
