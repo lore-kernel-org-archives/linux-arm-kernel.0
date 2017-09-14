@@ -1,64 +1,69 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu, 14 Sep 2017 18:35:10 -0400
-Subject: [PATCH v8 04/11] sparc64: simplify vmemmap_populate
+Date: Thu, 14 Sep 2017 18:35:12 -0400
+Subject: [PATCH v8 06/11] mm: zero struct pages during initialization
 In-Reply-To: <20170914223517.8242-1-pasha.tatashin@oracle.com>
 References: <20170914223517.8242-1-pasha.tatashin@oracle.com>
-Message-ID: <20170914223517.8242-5-pasha.tatashin@oracle.com>
+Message-ID: <20170914223517.8242-7-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicating code by using common functions
-vmemmap_pud_populate and vmemmap_pgd_populate.
+Add struct page zeroing as a part of initialization of other fields in
+__init_single_page().
+
+This single thread performance collected on: Intel(R) Xeon(R) CPU E7-8895
+v3 @ 2.60GHz with 1T of memory (268400646 pages in 8 nodes):
+
+                        BASE            FIX
+sparse_init     11.244671836s   0.007199623s
+zone_sizes_init  4.879775891s   8.355182299s
+                  --------------------------
+Total           16.124447727s   8.362381922s
+
+sparse_init is where memory for struct pages is zeroed, and the zeroing
+part is moved later in this patch into __init_single_page(), which is
+called from zone_sizes_init().
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
 Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
-Acked-by: David S. Miller <davem@davemloft.net>
+Acked-by: Michal Hocko <mhocko@suse.com>
 ---
- arch/sparc/mm/init_64.c | 23 ++++++-----------------
- 1 file changed, 6 insertions(+), 17 deletions(-)
+ include/linux/mm.h | 9 +++++++++
+ mm/page_alloc.c    | 1 +
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-index 078f1352736e..fc47afa518f5 100644
---- a/arch/sparc/mm/init_64.c
-+++ b/arch/sparc/mm/init_64.c
-@@ -2642,30 +2642,19 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
- 	vstart = vstart & PMD_MASK;
- 	vend = ALIGN(vend, PMD_SIZE);
- 	for (; vstart < vend; vstart += PMD_SIZE) {
--		pgd_t *pgd = pgd_offset_k(vstart);
-+		pgd_t *pgd = vmemmap_pgd_populate(vstart, node);
- 		unsigned long pte;
- 		pud_t *pud;
- 		pmd_t *pmd;
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index f8c10d336e42..50b74d628243 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -94,6 +94,15 @@ extern int mmap_rnd_compat_bits __read_mostly;
+ #define mm_forbids_zeropage(X)	(0)
+ #endif
  
--		if (pgd_none(*pgd)) {
--			pud_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
-+		if (!pgd)
-+			return -ENOMEM;
- 
--			if (!new)
--				return -ENOMEM;
--			pgd_populate(&init_mm, pgd, new);
--		}
--
--		pud = pud_offset(pgd, vstart);
--		if (pud_none(*pud)) {
--			pmd_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
--
--			if (!new)
--				return -ENOMEM;
--			pud_populate(&init_mm, pud, new);
--		}
-+		pud = vmemmap_pud_populate(pgd, vstart, node);
-+		if (!pud)
-+			return -ENOMEM;
- 
- 		pmd = pmd_offset(pud, vstart);
--
- 		pte = pmd_val(*pmd);
- 		if (!(pte & _PAGE_VALID)) {
- 			void *block = vmemmap_alloc_block(PMD_SIZE, node);
++/*
++ * On some architectures it is expensive to call memset() for small sizes.
++ * Those architectures should provide their own implementation of "struct page"
++ * zeroing by defining this macro in <asm/pgtable.h>.
++ */
++#ifndef mm_zero_struct_page
++#define mm_zero_struct_page(pp)  ((void)memset((pp), 0, sizeof(struct page)))
++#endif
++
+ /*
+  * Default maximum number of active map areas, this limits the number of vmas
+  * per mm struct. Users can overwrite this number by sysctl but there is a
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index a8dbd405ed94..4b630ee91430 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1170,6 +1170,7 @@ static void free_one_page(struct zone *zone,
+ static void __meminit __init_single_page(struct page *page, unsigned long pfn,
+ 				unsigned long zone, int nid)
+ {
++	mm_zero_struct_page(page);
+ 	set_page_links(page, zone, nid, pfn);
+ 	init_page_count(page);
+ 	page_mapcount_reset(page);
 -- 
 2.14.1
