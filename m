@@ -1,56 +1,57 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 14 Sep 2017 13:35:26 +0100
-Subject: [PATCH v6 3/7] acpi: apei: remove the unused code
-In-Reply-To: <b06c680c-93a3-7e20-1118-c6a9a24704df@huawei.com>
+Date: Thu, 14 Sep 2017 13:36:41 +0100
+Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
+ exceptions to el2
+In-Reply-To: <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
 References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-4-git-send-email-gengdongjiu@huawei.com>
- <59A84C51.3000506@arm.com> <45c69f99-61dd-e847-368b-20acb61b4d50@huawei.com>
- <59B2DEBA.6030608@arm.com> <b06c680c-93a3-7e20-1118-c6a9a24704df@huawei.com>
-Message-ID: <59BA778E.5000804@arm.com>
+ <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
+ <59B17449.6010201@arm.com> <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
+Message-ID: <59BA77D9.4080201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi gengdongjiu,
 
-On 11/09/17 13:04, gengdongjiu wrote:
-> On 2017/9/9 2:17, James Morse wrote:
->> On 04/09/17 12:43, gengdongjiu wrote:
->>> On 2017/9/1 1:50, James Morse wrote:
->>>> On 28/08/17 11:38, Dongjiu Geng wrote:
->>>> If you aren't handling the notification, why is this is in the HEST at all?
->>>> (and if its not: its not firmware-first)
+On 14/09/17 12:12, gengdongjiu wrote:
+> On 2017/9/8 0:31, James Morse wrote:
+>> KVM already handles external aborts from lower exception levels, no more work
+>> needs doing for TEA.
+
+> If it is firmware first solution, that is SCR_EL3.EA=1, all SError interrupt and synchronous External
+> Abort exceptions are taken to EL3, so EL3 firmware will handle it, KVM no needs to handle it.
+
+... and presumably your firmware generates a fake-Synchronous-external-abort to
+hand to EL2 as an APEI SEA notification? My point: this is fine, KVM already
+handles synchronous-external aborts, no more work needed for this trap, (in
+contrast to the TERR, which you've fixed)
+
+
+> HCR_EL3.TEA is only for EL3 to check its value to decide to jump to hypervisor or kernel.
+
+HCR_EL3!?!
+
+
+>> What happens when a guest access the RAS-Error-Record registers?
 >>
->>> For the SEI notification, may be we can parse and handle the CPER record other than the Error physical address
->>
->> Sure, but I only see this cleanup patch in this series, where does APEI learn
->> about NOTIFY_SEI? As this is nothing will ever touch those CPER records, if
->> you're using GHESv2 firmware will be prevented from delivering subsequent
->> notifications.
+>> Before we can set HCR_EL2.TERR I think we need to add some minimal emulation for
+>> the registers it traps. Most of them should be RAZ/WI, so it should be
+>> straightforward. (I think KVMs default is to emulate an undef for unknown traps).
 
-> James, whether it is possible you can review the previous v5 patch which adds the support for
+> Today I added the support to do some minimal emulation for RAS-Error-Record registers, thanks
+> for the good suggestion.
 
-Spreading 'current discussion' over two versions is a problem for anyone trying
-to follow this series.
+Thanks. Software has the bad habit of living much longer than we think, if KVM
+traps part of the architecture then we have to emulate it... Some bright spark
+might boot a future Linux-v4.42 guest on a Linux-v4.16 host.
 
-If you post a newer version its normal for people to delete the older versions.
-When you post a new version you should be happy that its the latest and greatest.
+I had a run through the RAS spec: if we make ERRIDR_EL1 RAZ/WI then we can do
+the same with ERRSELR_EL1. Then following the rules for 'If ERRSELR_EL1.SEL is
+[>=]  ERRIDR_EL1.NUM' that makes the ERX* registers RAZ/WI too.
 
 
-> NOTIFY_SEI? thanks in advancecIn that patch, I share the SEI notification
-handling with the SEA
-> notification handling to avoid duplicated code.
-
-You may be able to share some of the code, but I don't think you should share
-the list of GHES between notification methods.
-This leads to races between the firmware and OS: If CPU-A has received an SEI
-firmware would have to avoid generating an SEA on CPU-B as the SEI-handler
-running on CPU-A may find and process the second set of CPER records. CPU-B then
-gets a spurious notification.
-
-Why is this a problem? KVM needs to know if APEI handled the error, or whether
-the Synchronous-External-Abort/SError-Interrupt was due to something else, in
-which case we invoke todays default behaviour, which isn't appropriate for a RAS
-event.
+>> Eventually we will want to back this with a page of memory that lets
+>> Qemu/kvmtool configure what the guest can see. (i.e. the emulated machine's
+>> errors for kernel-first handling.)
 
 
 Thanks,
