@@ -1,100 +1,60 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Wed, 13 Sep 2017 16:01:54 -0700
-Subject: [PATCH] arm64: tegra: Add SMMU node for Tegra186
-Message-ID: <1505343714-22359-1-git-send-email-vdumpa@nvidia.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Thu, 14 Sep 2017 09:55:48 +0900
+Subject: [PATCH v4 4/4] [media] exynos-gsc: Add hardware rotation limits
+In-Reply-To: <509750b5-22d0-77ee-8295-0e52679e0d1e@samsung.com>
+References: <1505302915-15699-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170913114215epcas2p346dd3987cf25481bc780e0eef8b91ed8@epcas2p3.samsung.com>
+ <1505302915-15699-5-git-send-email-hoegeun.kwon@samsung.com>
+ <509750b5-22d0-77ee-8295-0e52679e0d1e@samsung.com>
+Message-ID: <8171b8d8-f14b-21ba-9e3b-7c6a2e442f3d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT node for ARM SMMU on Tegra186.
+On 09/13/2017 09:13 PM, Sylwester Nawrocki wrote:
+> On 09/13/2017 01:41 PM, Hoegeun Kwon wrote:
+>> @@ -1004,11 +1088,33 @@ static irqreturn_t gsc_irq_handler(int irq, 
+>> void *priv)
+>>       .num_clocks = 1,
+>>   };
+>>   +static struct gsc_driverdata gsc_v_5250_drvdata = {
+>> +    .variant = {
+>> +        [0] = &gsc_v_5250_variant,
+>> +        [1] = &gsc_v_5250_variant,
+>> +        [2] = &gsc_v_5250_variant,
+>> +        [3] = &gsc_v_5250_variant,
+>> +    },
+>> +    .num_entities = 4,
+>> +    .clk_names = { "gscl" },
+>> +    .num_clocks = 1,
+>> +};
+>> +
+>> +static struct gsc_driverdata gsc_v_5420_drvdata = {
+>> +    .variant = {
+>> +        [0] = &gsc_v_5420_variant,
+>> +        [1] = &gsc_v_5420_variant,
+>> +    },
+>> +    .num_entities = 4,
+>
+> Shouldn't num_enities be 2 here? You don't need to resend, I can
+> amend that when applying.
+>
 
-Signed-off-by: Krishna Reddy <vdumpa@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 73 ++++++++++++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index 0b0552c9f7dd..e2c3ad203c93 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -355,6 +355,79 @@
- 		nvidia,bpmp = <&bpmp>;
- 	};
- 
-+	smmu: iommu at 12000000 {
-+		compatible = "arm,mmu-500";
-+		reg = <0 0x12000000 0 0x800000>;
-+		#global-interrupts = <1>;
-+		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		stream-match-mask = <0x7F80>;
-+	};
-+
- 	gpu at 17000000 {
- 		compatible = "nvidia,gp10b";
- 		reg = <0x0 0x17000000 0x0 0x1000000>,
--- 
-2.1.4
+Yes, num_enities is 2.
+Sorry I made a mistake.
+
+Thanks Sylwester.
+
+Best regards,
+Hoegeun
+
+>> +    .clk_names = { "gscl" },
+>> +    .num_clocks = 1,
+>> +};
+>> +
+>
+> -- 
+> Regards,
+> Sylwester
+>
+>
