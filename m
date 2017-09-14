@@ -1,94 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Sep 2017 19:34:02 +0100
-Subject: [kernel-hardening] [PATCH v6 10/11] mm: add a user_virt_to_phys
- symbol
-In-Reply-To: <20170907173609.22696-11-tycho@docker.com>
-References: <20170907173609.22696-1-tycho@docker.com>
- <20170907173609.22696-11-tycho@docker.com>
-Message-ID: <20170914183401.GC1711@remoulade>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 14 Sep 2017 13:45:57 -0500
+Subject: [PATCH 0/6] Support PPTT for ARM64
+Message-ID: <20170914184610.20269-1-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 07, 2017 at 11:36:08AM -0600, Tycho Andersen wrote:
-> We need someting like this for testing XPFO. Since it's architecture
-> specific, putting it in the test code is slightly awkward, so let's make it
-> an arch-specific symbol and export it for use in LKDTM.
-> 
-> v6: * add a definition of user_virt_to_phys in the !CONFIG_XPFO case
-> 
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: x86 at kernel.org
-> Signed-off-by: Tycho Andersen <tycho@docker.com>
-> Tested-by: Marco Benatto <marco.antonio.780@gmail.com>
-> ---
->  arch/arm64/mm/xpfo.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++
->  arch/x86/mm/xpfo.c   | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/xpfo.h |  5 +++++
->  3 files changed, 113 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
-> index 342a9ccb93c1..94a667d94e15 100644
-> --- a/arch/arm64/mm/xpfo.c
-> +++ b/arch/arm64/mm/xpfo.c
-> @@ -74,3 +74,54 @@ void xpfo_dma_map_unmap_area(bool map, const void *addr, size_t size,
->  
->  	xpfo_temp_unmap(addr, size, mapping, sizeof(mapping[0]) * num_pages);
->  }
-> +
-> +/* Convert a user space virtual address to a physical address.
-> + * Shamelessly copied from slow_virt_to_phys() and lookup_address() in
-> + * arch/x86/mm/pageattr.c
-> + */
+ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+used to describe the processor and cache topologies. Ideally it is
+used to extend/override information provided by the hardware, but
+right now ARM64 is entirely dependent on firmware provided tables.
 
-When can this be called? What prevents concurrent modification of the user page
-tables?
+This patch parses the table for the cache topology and CPU topology.
+For the latter we also add an additional topology_cod_id() macro,
+and a package_id for arm64. Initially the physical id will match
+the cluster id, but we update users of the cluster to utilize
+the new macro. When we enable PPTT for the arm64 the cluster/socket
+starts to differ. Because of this we also make some dynamic decisions
+about mapping thread/core/cod/socket to the thread/socket used by the
+scheduler.
 
-i.e. must mmap_sem be held?
+For example on juno:
 
-> +phys_addr_t user_virt_to_phys(unsigned long addr)
+[root at mammon-juno-rh topology]# lstopo-no-graphics
+Machine (7048MB)
+  Package L#0
+    L2 L#0 (1024KB) + Core L#0
+      L1d L#0 (32KB) + L1i L#0 (32KB) + PU L#0 (P#0)
+      L1d L#1 (32KB) + L1i L#1 (32KB) + PU L#1 (P#1)
+      L1d L#2 (32KB) + L1i L#2 (32KB) + PU L#2 (P#2)
+      L1d L#3 (32KB) + L1i L#3 (32KB) + PU L#3 (P#3)
+    L2 L#1 (2048KB) + Core L#1
+      L1d L#4 (32KB) + L1i L#4 (48KB) + PU L#4 (P#4)
+      L1d L#5 (32KB) + L1i L#5 (48KB) + PU L#5 (P#5)
+  HostBridge L#0
+    PCIBridge
+      PCIBridge
+        PCIBridge
+          PCI 1095:3132
+            Block(Disk) L#0 "sda"
+        PCIBridge
+          PCI 1002:68f9
+            GPU L#1 "renderD128"
+            GPU L#2 "card0"
+            GPU L#3 "controlD64"
+        PCIBridge
+          PCI 11ab:4380
+            Net L#4 "enp8s0"
 
-Does this really need to be architecture specific?
 
-Core mm code manages to walk user page tables just fine...
+Jeremy Linton (6):
+  ACPI/PPTT: Add Processor Properties Topology Table parsing
+  ACPI: Enable PPTT support on ARM64
+  drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
+    tables
+  Topology: Add cluster on die macros and arm64 decoding
+  arm64: Fixup users of topology_physical_package_id
+  arm64: topology: Enable ACPI/PPTT based CPU topology.
 
-> +{
-> +	phys_addr_t phys_addr;
-> +	unsigned long offset;
-> +	pgd_t *pgd;
-> +	p4d_t *p4d;
-> +	pud_t *pud;
-> +	pmd_t *pmd;
-> +	pte_t *pte;
-> +
-> +	pgd = pgd_offset(current->mm, addr);
-> +	if (pgd_none(*pgd))
-> +		return 0;
+ arch/arm64/Kconfig                |   1 +
+ arch/arm64/include/asm/topology.h |   4 +-
+ arch/arm64/kernel/cacheinfo.c     |  23 +-
+ arch/arm64/kernel/topology.c      |  76 +++++-
+ drivers/acpi/Makefile             |   1 +
+ drivers/acpi/arm64/Kconfig        |   3 +
+ drivers/acpi/pptt.c               | 508 ++++++++++++++++++++++++++++++++++++++
+ drivers/base/cacheinfo.c          |  17 +-
+ drivers/clk/clk-mb86s7x.c         |   2 +-
+ drivers/cpufreq/arm_big_little.c  |   2 +-
+ drivers/firmware/psci_checker.c   |   2 +-
+ include/linux/cacheinfo.h         |  10 +-
+ include/linux/topology.h          |   5 +
+ 13 files changed, 634 insertions(+), 20 deletions(-)
+ create mode 100644 drivers/acpi/pptt.c
 
-Can we please separate the address and return value? e.g. pass the PA by
-reference and return an error code.
-
-AFAIK, zero is a valid PA, and even if the tables exist, they might point there
-in the presence of an error.
-
-> +
-> +	p4d = p4d_offset(pgd, addr);
-> +	if (p4d_none(*p4d))
-> +		return 0;
-> +
-> +	pud = pud_offset(p4d, addr);
-> +	if (pud_none(*pud))
-> +		return 0;
-> +
-> +	if (pud_sect(*pud) || !pud_present(*pud)) {
-> +		phys_addr = (unsigned long)pud_pfn(*pud) << PAGE_SHIFT;
-
-Was there some problem with:
-
-	phys_addr = pmd_page_paddr(*pud);
-
-... and similar for the other levels?
-
-... I'd rather introduce new helpers than more open-coded calculations.
-
-Thanks,
-Mark.
+-- 
+2.13.5
