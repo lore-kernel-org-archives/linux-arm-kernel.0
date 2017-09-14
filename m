@@ -1,112 +1,171 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 14 Sep 2017 09:47:05 +0100
-Subject: [PATCH v2 12/28] arm64/sve: Support vector length resetting for
- new processes
-In-Reply-To: <1504198860-12951-13-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-13-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87k211acqe.fsf@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 14 Sep 2017 10:51:43 +0200
+Subject: [PATCH] Revert "arm64: dts: rockchip: Add basic cpu frequencies for
+ RK3368"
+Message-ID: <20170914085143.10112-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reverts commit 6f2dea1f5fdb73eb2e050d9ebe990121d557e519.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Without accurate cpu regulators being set for boards this will wreak havoc
+when cpufreq-dt begins to set new frequencies without adjusting the core
+frequency.
 
-> It's desirable to be able to reset the vector length to some sane
-> default for new processes, since the new binary and its libraries
-> processes may or may not be SVE-aware.
->
-> This patch tracks the desired post-exec vector length (if any) in a
-> new thread member sve_vl_onexec, and adds a new thread flag
-> TIF_SVE_VL_INHERIT to control whether to inherit or reset the
-> vector length.  Currently these are inactive.  Subsequent patches
-> will provide the capability to configure them.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
+Additionally the rk3368 has an unsolved issue in that it has two separate
+cpu clusters with separate clock lines but only one cpu supply regulator
+for both clusters, which causes even more problems.
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+While it seems that originally only one cluster was supposed to be active
+at a time (big or little), talking with real users of the hardware
+revealed that having all 8 cores accessible at 1.2GHz max is way more
+liked than having 4 cores at 1.5GHz max. Such an approach needs changes
+to cpufreq and/or opp though to control the two separate clock lines when
+setting both clusters to the same frequencies.
 
->
-> ---
->
-> Changes since v1
-> ----------------
->
-> Requested by Alex Benn?e:
->
-> * Make sve_vl_onexec an unsigned int: that's the type used virtually
-> everywhere else, and the memory saving is too minor to be interesting.
-> ---
->  arch/arm64/include/asm/processor.h   |  1 +
->  arch/arm64/include/asm/thread_info.h |  1 +
->  arch/arm64/kernel/fpsimd.c           | 16 ++++++++++++----
->  3 files changed, 14 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 4831d28..3faceac 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -87,6 +87,7 @@ struct thread_struct {
->  	struct fpsimd_state	fpsimd_state;
->  	void			*sve_state;	/* SVE registers, if any */
->  	unsigned int		sve_vl;		/* SVE vector length */
-> +	unsigned int		sve_vl_onexec;	/* SVE vl after next exec */
->  	unsigned long		fault_address;	/* fault info */
->  	unsigned long		fault_code;	/* ESR_EL1 value */
->  	struct debug_info	debug;		/* debugging */
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index f0880fc..d3568ab 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -92,6 +92,7 @@ void arch_setup_new_exec(void);
->  #define TIF_SINGLESTEP		21
->  #define TIF_32BIT		22	/* 32bit process */
->  #define TIF_SVE			23	/* Scalable Vector Extension in use */
-> +#define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
->
->  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
->  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 9b1ebd7..e20b44d 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -106,6 +106,9 @@
->   */
->  static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
->
-> +/* Default VL for tasks that don't set it explicitly: */
-> +static int sve_default_vl = SVE_VL_MIN;
-> +
->  static void sve_free(struct task_struct *task)
->  {
->  	kfree(task->thread.sve_state);
-> @@ -380,15 +383,20 @@ void fpsimd_flush_thread(void)
->  		 * If a bug causes this to go wrong, we make some noise and
->  		 * try to fudge thread.sve_vl to a safe value here.
->  		 */
-> -		vl = current->thread.sve_vl;
-> -
-> -		if (vl == 0)
-> -			vl = SVE_VL_MIN;
-> +		vl = current->thread.sve_vl_onexec ?
-> +			current->thread.sve_vl_onexec : sve_default_vl;
->
->  		if (WARN_ON(!sve_vl_valid(vl)))
->  			vl = SVE_VL_MIN;
->
->  		current->thread.sve_vl = vl;
-> +
-> +		/*
-> +		 * If the task is not set to inherit, ensure that the vector
-> +		 * length will be reset by a subsequent exec:
-> +		 */
-> +		if (!test_thread_flag(TIF_SVE_VL_INHERIT))
-> +			current->thread.sve_vl_onexec = 0;
->  	}
->
->  	set_thread_flag(TIF_FOREIGN_FPSTATE);
+In any case, having the OPPs in the dts at this point in time is
+undesireable, so remove them again for now.
 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+My rk3368 board in my testfarm was offline for a bit, so I only realized
+that we're missing cpu regulators a short while ago when the resurrected
+board stopped booting once cpufreq took up its job.
 
---
-Alex Benn?e
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 72 +-------------------------------
+ 1 file changed, 2 insertions(+), 70 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index e0518b4bc6c2..19fbaa5e7bdd 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -113,8 +113,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKL>;
+-			operating-points-v2 = <&cluster0_opp>;
++
+ 			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+@@ -123,8 +122,6 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKL>;
+-			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu_l2: cpu at 2 {
+@@ -132,8 +129,6 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKL>;
+-			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu_l3: cpu at 3 {
+@@ -141,8 +136,6 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKL>;
+-			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu_b0: cpu at 100 {
+@@ -150,8 +143,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x100>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKB>;
+-			operating-points-v2 = <&cluster1_opp>;
++
+ 			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+@@ -160,8 +152,6 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x101>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKB>;
+-			operating-points-v2 = <&cluster1_opp>;
+ 		};
+ 
+ 		cpu_b2: cpu at 102 {
+@@ -169,8 +159,6 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x102>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKB>;
+-			operating-points-v2 = <&cluster1_opp>;
+ 		};
+ 
+ 		cpu_b3: cpu at 103 {
+@@ -178,62 +166,6 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x103>;
+ 			enable-method = "psci";
+-			clocks = <&cru ARMCLKB>;
+-			operating-points-v2 = <&cluster1_opp>;
+-		};
+-	};
+-
+-	cluster0_opp: opp-table0 {
+-		compatible = "operating-points-v2";
+-		opp-shared;
+-
+-		opp00 {
+-			opp-hz = /bits/ 64 <312000000>;
+-			opp-microvolt = <950000>;
+-			clock-latency-ns = <40000>;
+-		};
+-		opp01 {
+-			opp-hz = /bits/ 64 <408000000>;
+-			opp-microvolt = <950000>;
+-		};
+-		opp02 {
+-			opp-hz = /bits/ 64 <600000000>;
+-			opp-microvolt = <950000>;
+-		};
+-		opp03 {
+-			opp-hz = /bits/ 64 <816000000>;
+-			opp-microvolt = <1025000>;
+-		};
+-		opp04 {
+-			opp-hz = /bits/ 64 <1008000000>;
+-			opp-microvolt = <1125000>;
+-		};
+-	};
+-
+-	cluster1_opp: opp-table1 {
+-		compatible = "operating-points-v2";
+-		opp-shared;
+-
+-		opp00 {
+-			opp-hz = /bits/ 64 <312000000>;
+-			opp-microvolt = <950000>;
+-			clock-latency-ns = <40000>;
+-		};
+-		opp01 {
+-			opp-hz = /bits/ 64 <408000000>;
+-			opp-microvolt = <950000>;
+-		};
+-		opp02 {
+-			opp-hz = /bits/ 64 <600000000>;
+-			opp-microvolt = <950000>;
+-		};
+-		opp03 {
+-			opp-hz = /bits/ 64 <816000000>;
+-			opp-microvolt = <975000>;
+-		};
+-		opp04 {
+-			opp-hz = /bits/ 64 <1008000000>;
+-			opp-microvolt = <1050000>;
+ 		};
+ 	};
+ 
+-- 
+2.14.1
