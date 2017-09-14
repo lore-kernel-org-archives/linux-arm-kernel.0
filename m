@@ -1,82 +1,62 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 14 Sep 2017 13:58:54 +0100
-Subject: [PATCH v2 10/16] arm64: kernel: Survive corrected RAS errors
- notified by SError
-In-Reply-To: <eba92679-bbb7-6cb7-843c-7cfdbc793b6b@codeaurora.org>
-References: <20170728141019.9084-1-james.morse@arm.com>
- <20170728141019.9084-11-james.morse@arm.com>
- <eba92679-bbb7-6cb7-843c-7cfdbc793b6b@codeaurora.org>
-Message-ID: <59BA7D0E.6020500@arm.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
+Date: Thu, 14 Sep 2017 13:57:52 +0100
+Subject: [PATCH v7 1/5] Doc: iommu/arm-smmu-v3: Add workaround for HiSilicon
+ erratum 161010801
+In-Reply-To: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
+References: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+From: John Garry <john.garry@huawei.com>
 
-On 13/09/17 21:52, Baicar, Tyler wrote:
-> On 7/28/2017 8:10 AM, James Morse wrote:
->> On v8.0, SError is an uncontainable fatal exception. The v8.2 RAS
->> extensions use SError to notify software about RAS errors, these can be
->> contained by the ESB instruction.
->>
->> An ACPI system with firmware-first may use SError as its 'SEI'
->> notification. Future patches may add code to 'claim' this SError as
->> notification.
->>
->> Other systems can distinguish these RAS errors from the SError ESR and
->> use the AET bits and additional data from RAS-Error registers to handle
->> the error.  Future patches may add this kernel-first handling.
->>
->> In the meantime, on both kinds of system we can safely ignore corrected
->> errors.
+The HiSilicon erratum 161010801 describes the limitation of HiSilicon platforms
+hip06/hip07 to support the SMMU mappings for MSI transactions.
 
-> Here you just have corrected and restartable errors being ignored and all other
-> errors panic. For corrected and restartable errors, we should at least be
-> logging that an error happened and provide the syndrome info (address, context,
-> etc.). 
+On these platforms, GICv3 ITS translator is presented with the deviceID
+by extending the MSI payload data to 64 bits to include the deviceID.
+Hence, the PCIe controller on this platforms has to differentiate the MSI
+payload against other DMA payload and has to modify the MSI payload.
+This basically makes it difficult for this platforms to have a SMMU
+translation for MSI.
 
-Yes, that would be great, but its all wrapped up in 'kernel first handling' for
-RAS... which we don't yet have.
+This patch adds a SMMUv3 binding to flag that the SMMU breaks msi
+translation at ITS.
 
-This series is 'fixing' the kernel's SError mask behaviour so that the SEI
-firmware-first mechanism can (almost) always deliver its notifications, and has
-somewhere to hook the APEI code into, (like you did for do_sea()).
+Also, the arm64 silicon errata is updated with this same erratum.
 
-Of course not all systems will have this firmware, so if we took a v8.2 RAS
-SError on bare-metal we need to do something. This selective-ignoring is an
-interim fudge to avoid bringing the machine down for something that isn't (yet?)
-a problem.
+Signed-off-by: John Garry <john.garry@huawei.com>
+Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+---
+ Documentation/arm64/silicon-errata.txt                  | 1 +
+ Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 3 +++
+ 2 files changed, 4 insertions(+)
 
-
->From the commit message:
-> Future patches may add this kernel-first handling.
-> In the meantime, on both kinds of system we can safely ignore corrected
-> errors.
-
-
-> We also should be triggering a trace event to notify the user space that
-> an error happened so that tools like RAS Daemon can report the error. This will
-> involve a new trace event since the current ones are based of the CPER
-> structures from the firmware-first case.
-
-Hmm, so RAS Daemon is going to end up knowing whether an error was handled
-kernel-first or firmware-first, that is unfortunate for RAS-Daemon (more code)
-and means we have duplicate trace points.
-
-
-> Recoverable UEs should not need to trigger the panic, we should be able to do
-> the recovery similar to the memory fault handling in mm/memory-failure.c code.
-> The recoverable UEs should also trigger a trace event to user space since they
-> won't cause a panic as well.
-
-I agree, but only once we have code to dig in v8.2's RAS ERR registers to pick
-out the class of error and affected component or address. Until then we can't
-know the component or address, so can't handle the error.
-
-This is still an improvement over a non-v8.2-RAS aware kernel, as that would
-panic() for corrected errors too, (depending on when they arrived ... the SError
-masking is somewhat broken).
-
-
-Thanks,
-
-James
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 66e8ce1..02816b1 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -70,6 +70,7 @@ stable kernels.
+ |                |                 |                 |                             |
+ | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
+ | Hisilicon      | Hip0{6,7}       | #161010701      | N/A                         |
++| Hisilicon      | Hip0{6,7}       | #161010801      | N/A                         |
+ |                |                 |                 |                             |
+ | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+index c9abbf3..1f5f7f9 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+@@ -55,6 +55,9 @@ the PCIe specification.
+ - hisilicon,broken-prefetch-cmd
+                     : Avoid sending CMD_PREFETCH_* commands to the SMMU.
+ 
++- hisilicon,broken-untranslated-msi
++                    : Reserve ITS HW region to avoid translating msi.
++
+ - cavium,cn9900-broken-page1-regspace
+                     : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
+ 		      PRIQ_PROD/CONS register access with page 0 offsets.
+-- 
+1.9.1
