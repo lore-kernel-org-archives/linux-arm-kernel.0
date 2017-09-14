@@ -1,86 +1,60 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 14 Sep 2017 14:32:09 +0100
-Subject: [PATCH v2 24/28] arm64/sve: KVM: Hide SVE from CPU features
- exposed to guests
-In-Reply-To: <1504198860-12951-25-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-25-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87377p9zja.fsf@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 14 Sep 2017 15:38:41 +0200
+Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return
+ code
+In-Reply-To: <20170914110709.3591691-1-arnd@arndb.de>
+References: <20170914110709.3591691-1-arnd@arndb.de>
+Message-ID: <CAMuHMdU3AqGkvwDQ+hE2=3PhgCKUh1HvBx8Hkvba6XsLHAuBbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> KVM guests cannot currently use SVE, because SVE is always
-> configured to trap to EL2.
+On Thu, Sep 14, 2017 at 1:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> If we send zero-length data to stm32_qspi_tx_poll() on older
+> compiler versions such as gcc-4.6, we get warned that the
+> return code is uninitialized:
 >
-> However, a guest that sees SVE reported as present in
-> ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
-> use it.  Instead of working, the guest will receive an injected
-> undef exception, which may cause the guest to oops or go into a
-> spin.
+> drivers/mtd/spi-nor/stm32-quadspi.c:248:2: error: ?ret? may be used uninitialized in this function [-Werror=uninitialized]
 >
-> To avoid misleading the guest into believing that SVE will work,
-> this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
-> guest attempts to read this register.  No support is explicitly
-> added for ID_AA64ZFR0_EL1 either, so that is still emulated as
-> reading as zero, which is consistent with SVE not being
-> implemented.
+> On newer compiler versions, the return code is always zero
+> in this case, as the local variable gets optimized away and
+> is assumed to be zero after the loop completes without error.
 >
-> This is a temporary measure, and will be removed in a later series
-> when full KVM support for SVE is implemented.
+> This changes the function to instead return -EINVAL if it
+> ever gets called with a zero length buffer.
 >
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
->
+> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82203
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
+>  drivers/mtd/spi-nor/stm32-quadspi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Changes since v1
-> ----------------
+> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+> index 86c0931543c5..711cfe7aa4bf 100644
+> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+> @@ -227,7 +227,7 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
+>         void (*tx_fifo)(u8 *, void __iomem *);
+>         u32 len = cmd->len, sr;
+>         u8 *buf = cmd->buf;
+> -       int ret;
+> +       int ret = -EINVAL;
 >
-> Requested by Marc Zyngier:
->
-> * Use pr_err() instead inventing "kvm_info_once" ad-hoc.
-> ---
->  arch/arm64/kvm/sys_regs.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index b1f7552..a0ee9b0 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -23,6 +23,7 @@
->  #include <linux/bsearch.h>
->  #include <linux/kvm_host.h>
->  #include <linux/mm.h>
-> +#include <linux/printk.h>
->  #include <linux/uaccess.h>
->
->  #include <asm/cacheflush.h>
-> @@ -897,8 +898,17 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
->  {
->  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
->  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-> +	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
->
-> -	return raz ? 0 : read_sanitised_ftr_reg(id);
-> +	if (id == SYS_ID_AA64PFR0_EL1) {
-> +		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
-> +			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
-> +				    task_pid_nr(current));
-> +
-> +		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-> +	}
-> +
-> +	return val;
->  }
->
->  /* cpufeature ID register access trap handlers */
+>         if (cmd->qspimode == CCR_FMODE_INDW)
+>                 tx_fifo = stm32_qspi_write_fifo;
 
+See also "[PATCH] mtd: spi-nor: stm32-quadspi: Fix uninitialized error
+return code"
+(https://patchwork.kernel.org/patch/9842173/)
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 --
-Alex Benn?e
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
