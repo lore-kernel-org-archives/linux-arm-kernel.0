@@ -1,85 +1,63 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu, 14 Sep 2017 18:35:08 -0400
-Subject: [PATCH v8 02/11] sparc64/mm: setting fields in deferred pages
-In-Reply-To: <20170914223517.8242-1-pasha.tatashin@oracle.com>
-References: <20170914223517.8242-1-pasha.tatashin@oracle.com>
-Message-ID: <20170914223517.8242-3-pasha.tatashin@oracle.com>
+From: itaru.kitayama@riken.jp (Itaru Kitayama)
+Date: Fri, 15 Sep 2017 08:17:40 +0900
+Subject: ThunderX BMC initialization failure
+In-Reply-To: <CALdTtnst3PFaTo-ku85hj1QTp4kN4B1eOF3bYsmQrHWrpNGPTg@mail.gmail.com>
+References: <087dcefa-1402-2d9f-da8d-18782df9eea3@riken.jp>
+ <CALdTtnst3PFaTo-ku85hj1QTp4kN4B1eOF3bYsmQrHWrpNGPTg@mail.gmail.com>
+Message-ID: <04d91939-a4a5-cc39-12d2-b99ef8053592@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
-flags and other fields in "struct page"es are never changed prior to first
-initializing struct pages by going through __init_single_page().
+Dann,
 
-With deferred struct page feature enabled there is a case where we set some
-fields prior to initializing:
+Thanks for the information. Will try to upgrade the kernel when I have 
+an opportunity.
 
-mem_init() {
-     register_page_bootmem_info();
-     free_all_bootmem();
-     ...
-}
+$ sudo dmidecode |grep IPMI
+IPMI Device Information
 
-When register_page_bootmem_info() is called only non-deferred struct pages
-are initialized. But, this function goes through some reserved pages which
-might be part of the deferred, and thus are not yet initialized.
+Does the above something I should expect to see?
 
-mem_init
-register_page_bootmem_info
-register_page_bootmem_info_node
- get_page_bootmem
-  .. setting fields here ..
-  such as: page->freelist = (void *)type;
-
-free_all_bootmem()
-free_low_memory_core_early()
- for_each_reserved_mem_region()
-  reserve_bootmem_region()
-   init_reserved_page() <- Only if this is deferred reserved page
-    __init_single_pfn()
-     __init_single_page()
-      memset(0) <-- Loose the set fields here
-
-We end-up with similar issue as in the previous patch, where currently we
-do not observe problem as memory is zeroed. But, if flag asserts are
-changed we can start hitting issues.
-
-Also, because in this patch series we will stop zeroing struct page memory
-during allocation, we must make sure that struct pages are properly
-initialized prior to using them.
-
-The deferred-reserved pages are initialized in free_all_bootmem().
-Therefore, the fix is to switch the above calls.
-
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
-Acked-by: David S. Miller <davem@davemloft.net>
----
- arch/sparc/mm/init_64.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-index b2ba410b26f4..078f1352736e 100644
---- a/arch/sparc/mm/init_64.c
-+++ b/arch/sparc/mm/init_64.c
-@@ -2539,9 +2539,15 @@ void __init mem_init(void)
- {
- 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
- 
--	register_page_bootmem_info();
- 	free_all_bootmem();
- 
-+	/* Must be done after boot memory is put on freelist, because here we
-+	 * might set fields in deferred struct pages that have not yet been
-+	 * initialized, and free_all_bootmem() initializes all the reserved
-+	 * deferred pages for us.
-+	 */
-+	register_page_bootmem_info();
-+
- 	/*
- 	 * Set up the zero page, mark it reserved, so that page count
- 	 * is not manipulated when freeing the page from user ptes.
--- 
-2.14.1
+On 9/15/17 8:10 AM, dann frazier wrote:
+> On Tue, Sep 12, 2017 at 2:55 AM, Itaru Kitayama <itaru.kitayama@riken.jp> wrote:
+>> Hi,
+>>
+>> We're seeing below on our ThunderX
+>>
+>> $ sudo systemctl start ipmi
+>> Job for ipmi.service failed because the control process exited with error
+>> code. See "systemctl status ipmi.service" and "journalctl -xe" for details.
+>> $ sudo journalctl -xe
+>> ...
+>> -- Unit ipmi.service has begun starting up.
+>> Sep 12 15:54:52 satsuma kernel: ipmi message handler version 39.2
+>> Sep 12 15:54:53 satsuma kernel: IPMI System Interface driver.
+>> Sep 12 15:54:53 satsuma kernel: ipmi_si: probing via SMBIOS
+>> Sep 12 15:54:53 satsuma kernel: ipmi_si: Unable to find any System
+>> Interface(s)
+>> Sep 12 15:54:53 satsuma openipmi-helper[2800]: Startup failed.
+>> Sep 12 15:54:53 satsuma systemd[1]: ipmi.service: main process exited,
+>> code=exited, status=1/FAILURE
+>> Sep 12 15:54:53 satsuma systemd[1]: Failed to start IPMI Driver.
+>> -- Subject: Unit ipmi.service has failed
+>> ...
+>>
+>> Is it caused by the IPMI driver that comes with CentOS 7 or the BIOS?
+> Itaru,
+>
+> There could be multiple things going on here. For one, I don't believe
+> openipmi's upstream initscript knows about the ipmi_ssif driver yet.
+> This issue may also impact CentOS (and probably needs fixing in
+> upstream openipmi):
+>    https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=875537
+>
+> And your kernel needs to be new enough and have the right drivers
+> enabled to support it.
+> v4.12 should be new enough. Tests for that are described here:
+>   https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1688132
+>
+> Finally, your BIOS does need to have SMBIOS tables that describe the
+> interface. Make sure this returns something:
+> $ sudo dmidecode | grep IPMI
+>
+>    -dann
