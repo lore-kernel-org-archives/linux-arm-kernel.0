@@ -1,206 +1,256 @@
 From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 14 Sep 2017 14:02:50 +0100
-Subject: [PATCH v2 20/28] arm64/sve: Add prctl controls for userspace
- vector length management
-In-Reply-To: <1504198860-12951-21-git-send-email-Dave.Martin@arm.com>
+Date: Thu, 14 Sep 2017 14:28:28 +0100
+Subject: [PATCH v2 22/28] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <1504198860-12951-23-git-send-email-Dave.Martin@arm.com>
 References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-21-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87a81xa0w5.fsf@linaro.org>
+ <1504198860-12951-23-git-send-email-Dave.Martin@arm.com>
+Message-ID: <877ex19zpf.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Dave Martin <Dave.Martin@arm.com> writes:
 
-> This patch adds two arm64-specific prctls, to permit userspace to
-> control its vector length:
+> Until KVM has full SVE support, guests must not be allowed to
+> execute SVE instructions.
 >
->  * PR_SVE_SET_VL: set the thread's SVE vector length and vector
->    length inheritance mode.
+> This patch enables the necessary traps, and also ensures that the
+> traps are disabled again on exit from the guest so that the host
+> can still use SVE if it wants to.
 >
->  * PR_SVE_GET_VL: get the same information.
+> This patch introduces another instance of
+> __this_cpu_write(fpsimd_last_state, NULL), so this flush operation
+> is abstracted out as a separate helper fpsimd_flush_cpu_state().
+> Other instances are ported appropriately.
 >
-> Although these calls shadow instruction set features in the SVE
-> architecture, these prctls provide additional control: the vector
-> length inheritance mode is Linux-specific and nothing to do with
-> the architecture, and the architecture does not permit EL0 to set
-> its own vector length directly.  Both can be used in portable tools
-> without requiring the use of SVE instructions.
+> As a side effect of this refactoring, a this_cpu_write() in
+> fpsimd_cpu_pm_notifier() is changed to __this_cpu_write().  This
+> should be fine, since cpu_pm_enter() is supposed to be called only
+> with interrupts disabled.
 >
 > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
-> ---
->  arch/arm64/include/asm/fpsimd.h    | 14 ++++++++++++
->  arch/arm64/include/asm/processor.h |  4 ++++
->  arch/arm64/kernel/fpsimd.c         | 46 ++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/prctl.h         |  4 ++++
->  kernel/sys.c                       | 12 ++++++++++
->  5 files changed, 80 insertions(+)
 >
+> ---
+>
+> Changes since v1
+> ----------------
+>
+> Requested by Marc Zyngier:
+>
+> * Avoid the verbose arithmetic for CPTR_EL2_DEFAULT, and just
+> describe it in terms of the set of bits known to be RES1 in
+> CPTR_EL2.
+>
+> Other:
+>
+> * Fixup to drop task SVE state cached in the CPU registers across
+> guest entry/exit.
+>
+> Without this, we may enter an EL0 process with wrong data in the
+> extended SVE bits and/or wrong trap configuration.
+>
+> This is not a problem for the FPSIMD part of the state because KVM
+> explicitly restores the host FPSIMD state on guest exit; but this
+> restore is sufficient to corrupt the extra SVE bits even if nothing
+> else does.
+>
+> * The fpsimd_flush_cpu_state() function, which was supposed to abstract
+> the underlying flush operation, wasn't used. [sparse]
+>
+> This patch is now ported to use it.  Other users of the same idiom are
+> ported too (which was the original intention).
+>
+> fpsimd_flush_cpu_state() is marked inline, since all users are
+> ifdef'd and the function may be unused.  Plus, it's trivially
+> suitable for inlining.
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>  arch/arm64/include/asm/fpsimd.h   |  1 +
+>  arch/arm64/include/asm/kvm_arm.h  |  4 +++-
+>  arch/arm64/include/asm/kvm_host.h | 11 +++++++++++
+>  arch/arm64/kernel/fpsimd.c        | 31 +++++++++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/switch.c       |  6 +++---
+>  virt/kvm/arm/arm.c                |  3 +++
+>  7 files changed, 53 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 127e2dd..fa4a442 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -299,4 +299,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+>
+> +/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+> +static inline void kvm_fpsimd_flush_cpu_state(void) {}
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
 > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index 2723cca..d084968 100644
+> index d084968..5605fc1 100644
 > --- a/arch/arm64/include/asm/fpsimd.h
 > +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -17,6 +17,7 @@
->  #define __ASM_FP_H
+> @@ -74,6 +74,7 @@ extern void fpsimd_restore_current_state(void);
+>  extern void fpsimd_update_current_state(struct fpsimd_state *state);
 >
->  #include <asm/ptrace.h>
-> +#include <asm/errno.h>
+>  extern void fpsimd_flush_task_state(struct task_struct *target);
+> +extern void sve_flush_cpu_state(void);
 >
->  #ifndef __ASSEMBLY__
+>  /* Maximum VL that SVE VL-agnostic software can transparently support */
+>  #define SVE_VL_ARCH_MAX 0x100
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index dbf0537..7f069ff 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -186,7 +186,8 @@
+>  #define CPTR_EL2_TTA	(1 << 20)
+>  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+>  #define CPTR_EL2_TZ	(1 << 8)
+> -#define CPTR_EL2_DEFAULT	0x000033ff
+> +#define CPTR_EL2_RES1	0x000032ff /* known RES1 bits in CPTR_EL2 */
+> +#define CPTR_EL2_DEFAULT	CPTR_EL2_RES1
 >
-> @@ -99,6 +100,9 @@ extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
->  extern int sve_set_vector_length(struct task_struct *task,
->  				 unsigned long vl, unsigned long flags);
+>  /* Hyp Debug Configuration Register bits */
+>  #define MDCR_EL2_TPMS		(1 << 14)
+> @@ -237,5 +238,6 @@
 >
-> +extern int sve_set_current_vl(unsigned long arg);
-> +extern int sve_get_current_vl(void);
-> +
->  extern void __init sve_init_vq_map(void);
->  extern void sve_update_vq_map(void);
->  extern int sve_verify_vq_map(void);
-> @@ -114,6 +118,16 @@ static void __maybe_unused sve_sync_to_fpsimd(struct task_struct *task) { }
->  static void __maybe_unused sve_sync_from_fpsimd_zeropad(
->  	struct task_struct *task) { }
+>  #define CPACR_EL1_FPEN		(3 << 20)
+>  #define CPACR_EL1_TTA		(1 << 28)
+> +#define CPACR_EL1_DEFAULT	(CPACR_EL1_FPEN | CPACR_EL1_ZEN_EL1EN)
 >
-> +static int __maybe_unused sve_set_current_vl(unsigned long arg)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +static int __maybe_unused sve_get_current_vl(void)
-> +{
-> +	return -EINVAL;
-> +}
-> +
->  static void __maybe_unused sve_init_vq_map(void) { }
->  static void __maybe_unused sve_update_vq_map(void) { }
->  static int __maybe_unused sve_verify_vq_map(void) { return 0; }
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 3faceac..df66452 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -197,4 +197,8 @@ static inline void spin_lock_prefetch(const void *ptr)
->  int cpu_enable_pan(void *__unused);
->  int cpu_enable_cache_maint_trap(void *__unused);
->
-> +/* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
-> +#define SVE_SET_VL(arg)	sve_set_current_vl(arg)
-> +#define SVE_GET_VL()	sve_get_current_vl()
-> +
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 361c019..42e8331 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -27,6 +27,7 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/percpu.h>
-> +#include <linux/prctl.h>
->  #include <linux/preempt.h>
->  #include <linux/prctl.h>
->  #include <linux/ptrace.h>
-> @@ -420,6 +421,51 @@ int sve_set_vector_length(struct task_struct *task,
->  	return 0;
+>  #endif /* __ARM64_KVM_ARM_H__ */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index d686300..05d8373 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -25,6 +25,7 @@
+>  #include <linux/types.h>
+>  #include <linux/kvm_types.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/fpsimd.h>
+>  #include <asm/kvm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+> @@ -390,4 +391,14 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
 >  }
 >
 > +/*
-> + * Encode the current vector length and flags for return.
-> + * This is only required for prctl(): ptrace has separate fields
+> + * All host FP/SIMD state is restored on guest exit, so nothing needs
+> + * doing here except in the SVE case:
+> +*/
+> +static inline void kvm_fpsimd_flush_cpu_state(void)
+> +{
+> +	if (system_supports_sve())
+> +		sve_flush_cpu_state();
+> +}
+> +
+>  #endif /* __ARM64_KVM_HOST_H__ */
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index b430ee0..7837ced 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -875,6 +875,33 @@ void fpsimd_flush_task_state(struct task_struct *t)
+>  	t->thread.fpsimd_state.cpu = NR_CPUS;
+>  }
+>
+> +static inline void fpsimd_flush_cpu_state(void)
+> +{
+> +	__this_cpu_write(fpsimd_last_state, NULL);
+> +}
+> +
+> +/*
+> + * Invalidate any task SVE state currently held in this CPU's regs.
+> + *
+> + * This is used to prevent the kernel from trying to reuse SVE register data
+> + * that is detroyed by KVM guest enter/exit.  This function should go away when
+> + * KVM SVE support is implemented.  Don't use it for anything else.
 > + */
-> +static int sve_prctl_status(void)
+> +#ifdef CONFIG_ARM64_SVE
+> +void sve_flush_cpu_state(void)
 > +{
-> +	int ret = current->thread.sve_vl;
+> +	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+> +	struct task_struct *tsk;
 > +
-> +	if (test_thread_flag(TIF_SVE_VL_INHERIT))
-> +		ret |= PR_SVE_VL_INHERIT;
+> +	if (!fpstate)
+> +		return;
 > +
-> +	return ret;
+> +	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+> +	if (test_tsk_thread_flag(tsk, TIF_SVE))
+> +		fpsimd_flush_cpu_state();
 > +}
+> +#endif /* CONFIG_ARM64_SVE */
 > +
-> +/* PR_SVE_SET_VL */
-> +int sve_set_current_vl(unsigned long arg)
-> +{
-> +	unsigned long vl, flags;
-> +	int ret;
-> +
-> +	vl = arg & PR_SVE_VL_LEN_MASK;
-> +	flags = arg & ~vl;
-> +
-> +	if (!system_supports_sve())
-> +		return -EINVAL;
-> +
-> +	preempt_disable();
-> +	ret = sve_set_vector_length(current, vl, flags);
-> +	preempt_enable();
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	return sve_prctl_status();
-> +}
-> +
-> +/* PR_SVE_GET_VL */
-> +int sve_get_current_vl(void)
-> +{
-> +	if (!system_supports_sve())
-> +		return -EINVAL;
-> +
-> +	return sve_prctl_status();
-> +}
-> +
->  static unsigned long *sve_alloc_vq_map(void)
->  {
->  	return kzalloc(BITS_TO_LONGS(SVE_VQ_MAX) * sizeof(unsigned long),
-> diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
-> index 1b64901..1ef9370 100644
-> --- a/include/uapi/linux/prctl.h
-> +++ b/include/uapi/linux/prctl.h
-> @@ -198,7 +198,11 @@ struct prctl_mm_map {
->  # define PR_CAP_AMBIENT_CLEAR_ALL	4
+>  #ifdef CONFIG_KERNEL_MODE_NEON
 >
->  /* arm64 Scalable Vector Extension controls */
-> +/* Flag values must be kept in sync with ptrace NT_ARM_SVE interface */
-> +#define PR_SVE_SET_VL			48	/* set task vector length */
->  # define PR_SVE_SET_VL_ONEXEC		(1 << 18) /* defer effect until exec */
-> +#define PR_SVE_GET_VL			49	/* get task vector length */
-> +/* Bits common to PR_SVE_SET_VL and PR_SVE_GET_VL */
->  # define PR_SVE_VL_LEN_MASK		0xffff
->  # define PR_SVE_VL_INHERIT		(1 << 17) /* inherit across exec */
+>  DEFINE_PER_CPU(bool, kernel_neon_busy);
+> @@ -915,7 +942,7 @@ void kernel_neon_begin(void)
+>  	}
 >
-> diff --git a/kernel/sys.c b/kernel/sys.c
-> index 2855ee7..f8215a6 100644
-> --- a/kernel/sys.c
-> +++ b/kernel/sys.c
-> @@ -110,6 +110,12 @@
->  #ifndef SET_FP_MODE
->  # define SET_FP_MODE(a,b)	(-EINVAL)
->  #endif
-> +#ifndef SVE_SET_VL
-> +# define SVE_SET_VL(a)		(-EINVAL)
-> +#endif
-> +#ifndef SVE_GET_VL
-> +# define SVE_GET_VL()		(-EINVAL)
-> +#endif
+>  	/* Invalidate any task state remaining in the fpsimd regs: */
+> -	__this_cpu_write(fpsimd_last_state, NULL);
+> +	fpsimd_flush_cpu_state();
 >
->  /*
->   * this is where the system-wide overflow UID and GID are defined, for
-> @@ -2389,6 +2395,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
->  	case PR_GET_FP_MODE:
->  		error = GET_FP_MODE(me);
+>  	preempt_disable();
+>
+> @@ -1032,7 +1059,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+>  	case CPU_PM_ENTER:
+>  		if (current->mm)
+>  			task_fpsimd_save();
+> -		this_cpu_write(fpsimd_last_state, NULL);
+> +		fpsimd_flush_cpu_state();
 >  		break;
-> +	case PR_SVE_SET_VL:
-> +		error = SVE_SET_VL(arg2);
-> +		break;
-> +	case PR_SVE_GET_VL:
-> +		error = SVE_GET_VL();
-> +		break;
->  	default:
->  		error = -EINVAL;
->  		break;
+>  	case CPU_PM_EXIT:
+>  		if (current->mm)
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 35a90b8..951f3eb 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -48,7 +48,7 @@ static void __hyp_text __activate_traps_vhe(void)
+>
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+> -	val &= ~CPACR_EL1_FPEN;
+> +	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+>  	write_sysreg(val, cpacr_el1);
+>
+>  	write_sysreg(__kvm_hyp_vector, vbar_el1);
+> @@ -59,7 +59,7 @@ static void __hyp_text __activate_traps_nvhe(void)
+>  	u64 val;
+>
+>  	val = CPTR_EL2_DEFAULT;
+> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
+> +	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+>  	write_sysreg(val, cptr_el2);
+>  }
+>
+> @@ -117,7 +117,7 @@ static void __hyp_text __deactivate_traps_vhe(void)
+>
+>  	write_sysreg(mdcr_el2, mdcr_el2);
+>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+> -	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+> +	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+>  	write_sysreg(vectors, vbar_el1);
+>  }
+>
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index a39a1e1..af9f5da 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -647,6 +647,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		 */
+>  		preempt_disable();
+>
+> +		/* Flush FP/SIMD state that can't survive guest entry/exit */
+> +		kvm_fpsimd_flush_cpu_state();
+> +
+>  		kvm_pmu_flush_hwstate(vcpu);
+>
+>  		kvm_timer_flush_hwstate(vcpu);
 
 
 --
