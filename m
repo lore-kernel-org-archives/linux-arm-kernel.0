@@ -1,29 +1,24 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Thu, 14 Sep 2017 11:43:14 +0800
-Subject: [PATCH 0/3] Add support rockchip RGB output interface
-Message-ID: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
+From: wenyou.yang@microchip.com (Wenyou Yang)
+Date: Thu, 14 Sep 2017 13:11:08 +0800
+Subject: [PATCH v2 0/3] media: ov7670: Add entity init and power operation
+Message-ID: <20170914051111.18197-1-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches add support some rockchip Soc like rv1108, the VOP can directly
-output parallel and serial RGB data to panel or to conversion chip. So we add
-this driver to probe encoder and connector to support this case.
+This patch set is to add the media entity pads initialization,
+the s_power operation and get_fmt callback support.
 
-Sandy Huang (3):
-  dt-bindings: Add document for rockchip RGB output interface
-  drm/rockchip: Add support for Rockchip Soc RGB output interface
-  drm/rockchip: vop: Add more RGB output interface type
+Changes in v2:
+ - Add the patch to support the get_fmt ops.
+ - Remove the redundant invoking ov7670_init_gpio().
 
- .../bindings/display/rockchip/rockchip-rgb.txt     |  80 +++++
- drivers/gpu/drm/rockchip/Kconfig                   |   9 +
- drivers/gpu/drm/rockchip/Makefile                  |   1 +
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |   2 +
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |   1 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
- drivers/gpu/drm/rockchip/rockchip_rgb.c            | 327 +++++++++++++++++++++
- 7 files changed, 422 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
- create mode 100644 drivers/gpu/drm/rockchip/rockchip_rgb.c
+Wenyou Yang (3):
+  media: ov7670: Add entity pads initialization
+  media: ov7670: Add the get_fmt callback
+  media: ov7670: Add the s_power operation
+
+ drivers/media/i2c/ov7670.c | 71 ++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 65 insertions(+), 6 deletions(-)
 
 -- 
-2.7.4
+2.13.0
