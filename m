@@ -1,146 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Sep 2017 15:00:14 +0100
-Subject: [v4 07/11] soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
-In-Reply-To: <1503607075-28970-8-git-send-email-roy.pledge@nxp.com>
-References: <1503607075-28970-1-git-send-email-roy.pledge@nxp.com>
- <1503607075-28970-8-git-send-email-roy.pledge@nxp.com>
-Message-ID: <20170914140014.taz7qwphfqm66kw7@localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 14 Sep 2017 07:06:58 -0700
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
+ register range for ACPI case
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F884340@lhreml507-mbx>
+References: <20160920140518.GD13855@localhost>
+ <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+ <20160920191744.GA4941@localhost> <20160921140549.GA11968@red-moon>
+ <20160921180457.GB20006@localhost> <20160922094955.GB18637@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8815A9@lhreml507-mbx>
+ <20160922124446.GA21681@red-moon>
+ <20160922183101.GA14510@localhost> <20160922221042.GA1514@localhost>
+ <20160923101145.GA31120@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F884340@lhreml507-mbx>
+Message-ID: <CAKv+Gu8x0j-O3WPE7Cvi4oX5J5Cq1vUhDNB_UdjE88eQh83DDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 04:37:51PM -0400, Roy Pledge wrote:
-> diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
-> index ff8998f..e31c843 100644
-> --- a/drivers/soc/fsl/qbman/bman.c
-> +++ b/drivers/soc/fsl/qbman/bman.c
-> @@ -154,7 +154,7 @@ struct bm_mc {
->  };
->  
->  struct bm_addr {
-> -	void __iomem *ce;	/* cache-enabled */
-> +	void *ce;		/* cache-enabled */
->  	void __iomem *ci;	/* cache-inhibited */
->  };
+(remove most cc's)
 
-You dropped __iomem from ce, which is fine since it is now set via
-memremap. However, I haven't seen (at least not in this patch), a change
-to bm_ce_in() which still uses __raw_readl().
+Hi all,
 
-(it may be worth checking this code with sparse, it may warn about this)
+Apologies for digging up this old thread.
 
-> diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-> index 39b39c8..bb03503 100644
-> --- a/drivers/soc/fsl/qbman/bman_portal.c
-> +++ b/drivers/soc/fsl/qbman/bman_portal.c
-> @@ -91,7 +91,6 @@ static int bman_portal_probe(struct platform_device *pdev)
->  	struct device_node *node = dev->of_node;
->  	struct bm_portal_config *pcfg;
->  	struct resource *addr_phys[2];
-> -	void __iomem *va;
->  	int irq, cpu;
->  
->  	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
-> @@ -123,23 +122,34 @@ static int bman_portal_probe(struct platform_device *pdev)
->  	}
->  	pcfg->irq = irq;
->  
-> -	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
-> -	if (!va) {
-> -		dev_err(dev, "ioremap::CE failed\n");
-> +	/*
-> +	 * TODO: Ultimately we would like to use a cacheable/non-shareable
-> +	 * (coherent) mapping for the portal on both architectures but that
-> +	 * isn't currently available in the kernel.  Because of HW differences
-> +	 * PPC needs to be mapped cacheable while ARM SoCs will work with non
-> +	 * cacheable mappings
-> +	 */
+I am currently looking into whether it is feasible to refactor some of
+the ACPI PCI quirk code we have so it can apply to more instances of
+the Synopsys Designware PCIe (i.e., for Marvell and Socionext SOCs),
+which all suffer from the same issue that type 0 config TLPs are not
+filtered before being sent out on the link, resulting in devices
+appearing multiple times.
 
-This comment mentions "cacheable/non-shareable (coherent)". Was this
-meant for ARM platforms? Because non-shareable is not coherent, nor is
-this combination guaranteed to work with different CPUs and
-interconnects.
+The pci-hisi.c quirk already appears to do exactly what would solve
+the problem on other SoCs as well. So I will try to refactor this code
+into something that I could propose for upstream, while probably
+getting the ARM SBSA authors to offer some guidance that this IP must
+not be used for new designs.
 
-> +#ifdef CONFIG_PPC
-> +	/* PPC requires a cacheable/non-coherent mapping of the portal */
-> +	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-> +				resource_size(addr_phys[0]), MEMREMAP_WB);
-> +#else
-> +	/* ARM can use a write combine mapping. */
-> +	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-> +				resource_size(addr_phys[0]), MEMREMAP_WC);
-> +#endif
+In any case, the chances of any such changes being acceptable upstream
+are probably higher if we can reuse the exact same quirk as we have
+already implemented for HiSilicon, so I wonder if anyone from Huawei
+could comment on some questions I have:
+- Why does the config space accessor override use 32-bit accesses only
+for bus #0? Is that really necessary?
+- Why does the Hisi quirk use different config base addresses for bus
+#0 and the other buses? Is this simply because the firmware does not
+use contiguous iATU windows for bus #0 and buses #1 and up? So is
+there anything mapped in the 1 MB slice at the base of the respective
+256 MB mappings that generate type1 config cycles?
 
-Nitpick: you could define something like QBMAN_MAP_ATTR to be different
-between PPC and the rest and just keep a single memremap() call.
+Having just a shared set of config space accessor overrides would
+already be an improvement, given that they can be shared with a DT
+based driver for this IP in ECAM mode as well.
 
-One may complain that "ce" is no longer "cache enabled" but I'm
-personally fine to keep the same name for historical reasons.
-
-> diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
-> index 81a9a5e..0a1d573 100644
-> --- a/drivers/soc/fsl/qbman/dpaa_sys.h
-> +++ b/drivers/soc/fsl/qbman/dpaa_sys.h
-> @@ -51,12 +51,12 @@
->  
->  static inline void dpaa_flush(void *p)
->  {
-> +	/*
-> +	 * Only PPC needs to flush the cache currently - on ARM the mapping
-> +	 * is non cacheable
-> +	 */
->  #ifdef CONFIG_PPC
->  	flush_dcache_range((unsigned long)p, (unsigned long)p+64);
-> -#elif defined(CONFIG_ARM)
-> -	__cpuc_flush_dcache_area(p, 64);
-> -#elif defined(CONFIG_ARM64)
-> -	__flush_dcache_area(p, 64);
->  #endif
->  }
-
-Dropping the private API cache maintenance is fine and the memory is WC
-now for ARM (mapping to Normal NonCacheable). However, do you require
-any barriers here? Normal NC doesn't guarantee any ordering.
-
-> diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-> index cbacdf4..41fe33a 100644
-> --- a/drivers/soc/fsl/qbman/qman_portal.c
-> +++ b/drivers/soc/fsl/qbman/qman_portal.c
-> @@ -224,7 +224,6 @@ static int qman_portal_probe(struct platform_device *pdev)
->  	struct device_node *node = dev->of_node;
->  	struct qm_portal_config *pcfg;
->  	struct resource *addr_phys[2];
-> -	void __iomem *va;
->  	int irq, cpu, err;
->  	u32 val;
->  
-> @@ -262,23 +261,34 @@ static int qman_portal_probe(struct platform_device *pdev)
->  	}
->  	pcfg->irq = irq;
->  
-> -	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
-> -	if (!va) {
-> -		dev_err(dev, "ioremap::CE failed\n");
-> +	/*
-> +	 * TODO: Ultimately we would like to use a cacheable/non-shareable
-> +	 * (coherent) mapping for the portal on both architectures but that
-> +	 * isn't currently available in the kernel.  Because of HW differences
-> +	 * PPC needs to be mapped cacheable while ARM SoCs will work with non
-> +	 * cacheable mappings
-> +	 */
-
-Same comment as above non non-shareable.
-
-> +#ifdef CONFIG_PPC
-> +	/* PPC requires a cacheable mapping of the portal */
-> +	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-> +				resource_size(addr_phys[0]), MEMREMAP_WB);
-> +#else
-> +	/* ARM can use write combine mapping for the cacheable area */
-> +	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-> +				resource_size(addr_phys[0]), MEMREMAP_WT);
-> +#endif
-
-Same nitpick: a single memremap() call.
-
--- 
-Catalin
+Thanks,
+Ard.
