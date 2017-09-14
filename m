@@ -1,79 +1,51 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 14 Sep 2017 11:41:34 +0100
-Subject: [PATCH v6 05/11] arm64/mm: Add support for XPFO
-In-Reply-To: <20170908172422.rxmhwd2vl6eye2or@docker>
-References: <20170907173609.22696-1-tycho@docker.com>
- <20170907173609.22696-6-tycho@docker.com>
- <20170908075347.GC4957@infradead.org>
- <20170908172422.rxmhwd2vl6eye2or@docker>
-Message-ID: <d637a56d-399d-fefa-806b-a9e2b0babb75@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 14 Sep 2017 11:52:22 +0100
+Subject: [PATCH v2 17/28] arm64/sve: Preserve SVE registers around
+ kernel-mode NEON use
+In-Reply-To: <1504198860-12951-18-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-18-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87efr9a6xl.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-CC Juergen, Boris and Stefano.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-On 08/09/17 18:24, Tycho Andersen wrote:
-> On Fri, Sep 08, 2017 at 12:53:47AM -0700, Christoph Hellwig wrote:
->>> +/*
->>> + * Lookup the page table entry for a virtual address and return a pointer to
->>> + * the entry. Based on x86 tree.
->>> + */
->>> +static pte_t *lookup_address(unsigned long addr)
->>
->> Seems like this should be moved to common arm64 mm code and used by
->> kernel_page_present.
-> 
-> Sounds good, I'll include something like the patch below in the next
-> series.
-> 
-> Unfortunately, adding an implementation of lookup_address seems to be
-> slightly more complicated than necessary, because of the xen piece. We
-> have to define lookup_address() with the level parameter, but it's not
-> obvious to me to name the page levels. So for now I've just left it as
-> a WARN() if someone supplies it.
-> 
-> It seems like xen still does need this to be defined, because if I
-> define it without level:
-> 
-> drivers/xen/xenbus/xenbus_client.c: In function ?xenbus_unmap_ring_vfree_pv?:
-> drivers/xen/xenbus/xenbus_client.c:760:4: error: too many arguments to function ?lookup_address?
->      lookup_address(addr, &level)).maddr;
->      ^~~~~~~~~~~~~~
-> In file included from ./arch/arm64/include/asm/page.h:37:0,
->                   from ./include/linux/mmzone.h:20,
->                   from ./include/linux/gfp.h:5,
->                   from ./include/linux/mm.h:9,
->                   from drivers/xen/xenbus/xenbus_client.c:33:
-> ./arch/arm64/include/asm/pgtable-types.h:67:15: note: declared here
->   extern pte_t *lookup_address(unsigned long addr);
->                 ^~~~~~~~~~~~~~
-> 
-> I've cc-d the xen folks, maybe they can suggest a way to untangle it?
-> Alternatively, if someone can suggest a good naming scheme for the
-> page levels, I can just do that.
+> Kernel-mode NEON will corrupt the SVE vector registers, due to the
+> way they alias the FPSIMD vector registers in the hardware.
+>
+> This patch ensures that any live SVE register content for the task
+> is saved by kernel_neon_begin().  The data will be restored in the
+> usual way on return to userspace.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The implementation of lookup_address(...) on ARM for Xen (see 
-include/xen/arm/page.h) is just a BUG(). This is because this code 
-should never be called (only used for x86 PV code).
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
-Furthermore, xenbus client does not use at all the level. It is just to 
-cope with the x86 version of lookup_address.
+> ---
+>  arch/arm64/kernel/fpsimd.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index cea05a7..dd89acf 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -744,8 +744,10 @@ void kernel_neon_begin(void)
+>  	__this_cpu_write(kernel_neon_busy, true);
+>
+>  	/* Save unsaved task fpsimd state, if any: */
+> -	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+> -		fpsimd_save_state(&current->thread.fpsimd_state);
+> +	if (current->mm) {
+> +		task_fpsimd_save();
+> +		set_thread_flag(TIF_FOREIGN_FPSTATE);
+> +	}
+>
+>  	/* Invalidate any task state remaining in the fpsimd regs: */
+>  	__this_cpu_write(fpsimd_last_state, NULL);
 
-So one way to solve the problem would be to introduce 
-xen_lookup_address(addr) that would be implemented as:
-	- on x86
-		unsigned int level;
 
-		return lookup_address(addr, &level).maddr;
-	- on ARM
-		BUG();
-
-With that there would be no prototype clash and avoid introducing a 
-level parameter.
-
-Cheers,
-
--- 
-Julien Grall
+--
+Alex Benn?e
