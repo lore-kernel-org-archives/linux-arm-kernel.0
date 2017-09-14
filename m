@@ -1,58 +1,110 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Thu, 14 Sep 2017 14:38:51 +0200
-Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return
- code
-In-Reply-To: <20170914110709.3591691-1-arnd@arndb.de>
-References: <20170914110709.3591691-1-arnd@arndb.de>
-Message-ID: <da56f3dc-bbf8-748e-fabd-1874cf596bfd@st.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 14 Sep 2017 13:38:52 +0100
+Subject: =?gbk?Q?=B4=F0=B8=B4=3A_=5BPATCH_v6_4/7=5D_arm64=3A_?=
+ =?gbk?Q?kvm=3A_support_user_space_to_query_RAS_extension_?=
+ =?gbk?Q?feature?=
+In-Reply-To: <0184EA26B2509940AA629AE1405DD7F2015F61EA@DGGEMA503-MBX.china.huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-5-git-send-email-gengdongjiu@huawei.com>
+ <59A84F9D.8030309@arm.com> <29951852-8d91-7c33-c68b-ad8b4bbdea54@huawei.com>
+ <59B1747A.5030909@arm.com>
+ <0184EA26B2509940AA629AE1405DD7F2015F61EA@DGGEMA503-MBX.china.huawei.com>
+Message-ID: <59BA785C.40504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Arnd
+Hi gengdongjiu,
 
-thx Arnd for compilation warning (gcc <= 4.6)
+On 08/09/17 18:36, gengdongjiu wrote:
+>> The code to signal memory-failure to user-space doesn't depend on the CPU's RAS-extensions.
+> I roughly check your answer and agree with your general idea.
+> late I will check it in detail.
 
-Acked-by: Ludovic Barre <ludovic.barre@st.com>
+> I have a question, do you sure that if CPU does not support RAS-extensions kernel can still call
+> memory-failure() to send signal to qemu?
 
-PS: at runtime stm32_qspi_tx_poll can't be call,
-because stm32_qspi_tx check if there is tx data available
-	if (!cmd->tx_data)
-		return 0;
+If CONFIG_MEMORY_FAILURE is selected then the kernel has the code to send
+SIGBUS_MCCERR_A* signals to user space.
+This can be triggered by any GHES. A case in point: the 'AMD Seattle Overdrive'
+under my desk has a HEST with four polled GHES entries. If any of these generate
+a memory error the kernel will trigger the memory_failure() code.
 
-BR
-Ludo
+Without all the ACPI stuff we still have CONFIG_HWPOISON_INJECT,
+madvise(MADV_HWPOISON).
+sysfs's: 'soft_offline_page' and 'hard_offline_page' as mechanisms that may
+trigger memory_failure().
 
-On 09/14/2017 01:06 PM, Arnd Bergmann wrote:
-> If we send zero-length data to stm32_qspi_tx_poll() on older
-> compiler versions such as gcc-4.6, we get warned that the
-> return code is uninitialized:
+User space shouldn't try and guess whether its likely to get one of these.
+
+I've been using these mechanisms to test SDEI virtualisation with kvmtool.
+
+
+> After my checking the code, the general flow is RAS module detects the error or CPU consumes the
+> hardware poison data, happen exception, then EL3 firmware records the address
+to APEI table and
+> send notification to kernel. Kernel parses the APEI table to get address and
+call memory_failure() to
+> identify the page to poison. That is to say, usually, after RAS detect the
+error, it call memory_failure(),
+> otherwise, it does not know whether this address is poison.
+
+> I am worried about one thing, if hardware does not has RAS, OS cannot know which address is poison,
+> so it cannot identify the address , then the address that is delivered to
+Qemu(user space) may not right.
+
+You've switched from talking about the CPU's 'ARM v8.2 RAS extensions' to 'RAS'.
+Supporting memory_failure() is a linux:RAS feature, it doesn't depend on the
+cpu:'ARM v8.2 RAS extensions'.
+
+> As you said, kernel can also call memory_failure() even without RAS support. in this without RAS case,
+> how it consider the address is poison and needs to send SIGBUS to QEMU?
+
+Which component doesn't have RAS? The CPU? Okay, what about the memory controller:
+The memory controller may catch a parity error during dram refresh/scrub, and
+signal firmware via an interrupt. Firmware can then read the affected address
+from the memory-controller's error registers and report it to the OS as a
+firmware-first error.
+The CPU doesn't need any RAS features for this to work.
+
+To caricature your argument: 'the CPU doesn't have this particular version of
+this particular RAS feature, thus no component in the system has any RAS feature'.
+
+APEI's firmware-first is an abstraction so that we don't need to know which
+system components have RAS features (or how to drive them) , we let firmware do
+the work and tell us the results.
+
+
+>> If Qemu supports notifying the guest about RAS errors using CPER records, it should generate a HEST describing firmware first. It can then
+>> choose the notification methods, some of which may require optional KVM APIs to support.
+>>
+>> Seattle has a HEST, it doesn't support the CPU RAS-extensions. The kernel can notify user-space about memory_failure() on this machine. I
+>> would expect Qemu to be able to receive signals and describe memory errors to a guest (1).
 > 
-> drivers/mtd/spi-nor/stm32-quadspi.c:248:2: error: ?ret? may be used uninitialized in this function [-Werror=uninitialized]
-> 
-> On newer compiler versions, the return code is always zero
-> in this case, as the local variable gets optimized away and
-> is assumed to be zero after the loop completes without error.
-> 
-> This changes the function to instead return -EINVAL if it
-> ever gets called with a zero length buffer.
-> 
-> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82203
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->   drivers/mtd/spi-nor/stm32-quadspi.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-> index 86c0931543c5..711cfe7aa4bf 100644
-> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
-> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-> @@ -227,7 +227,7 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
->   	void (*tx_fifo)(u8 *, void __iomem *);
->   	u32 len = cmd->len, sr;
->   	u8 *buf = cmd->buf;
-> -	int ret;
-> +	int ret = -EINVAL;
->   
->   	if (cmd->qspimode == CCR_FMODE_INDW)
->   		tx_fifo = stm32_qspi_write_fifo;
-> 
+> Usually we consider the address got from APEI table is poison. If so, I want to know, without RAS and APEI table, how it identify the address to hwpoison?
+
+~s/APEI/CPER/
+
+I agree the main path into memory_failure() is from APEI, and we get the address
+from the CPER records. This isn't the only path into memory_failure, and there
+may be more in the future.
+None of the firmware-first stuff depends on CPU RAS features, it may be
+reporting errors from some other component in the system.
+
+Back to the issue at hand: should qemu/kvmtool generate a HEST?
+If these tools want to inject emulated errors into a guest: yes. (this may be
+totally independent of what the host supports)
+If these tools want to pass memory-failure notifications for guest-memory into a
+guest: yes.
+You may want to make this depend on whether the host supports memory-failure
+notifications, but you  shouldn't care where they come from.
+
+Does the host support memory-failure notifications?
+You can poke around in /proc to find this out, /proc/sys/vm has:
+> memory_failure_early_kill
+> memory_failure_recovery
+when the kernel was built with CONFIG_MEMORY_FAILURE, but it user-space has
+support for this stuff I don't know why you wouldn't unconditionally turn it on.
+(what happens if you migrate between hosts with different support...)
+
+
+James
