@@ -1,61 +1,88 @@
-From: york.sun@nxp.com (York Sun)
-Date: Thu, 14 Sep 2017 19:54:41 +0000
-Subject: [PATCH] config: ls1012aqds: Add USB EHCI support for ls1012aqds
-References: <1501148945-11775-1-git-send-email-yinbo.zhu@nxp.com>
-Message-ID: <VI1PR04MB20781CC22A5EDB904EF1D3259A6F0@VI1PR04MB2078.eurprd04.prod.outlook.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 14 Sep 2017 20:55:56 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20170913143325.hi4cfcajbts3bbao@localhost>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+ <20170913143325.hi4cfcajbts3bbao@localhost>
+Message-ID: <20170914195555.GB24231@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2017 03:05 AM, yinbo.zhu at nxp.com wrote:
-> From: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+On Wed, Sep 13, 2017 at 07:33:25AM -0700, Catalin Marinas wrote:
+> On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
+> > +/*
+> > + * Handle SVE state across fork():
+> > + *
+> > + * dst and src must not end up with aliases of the same sve_state.
+> > + * Because a task cannot fork except in a syscall, we can discard SVE
+> > + * state for dst here, so long as we take care to retain the FPSIMD
+> > + * subset of the state if SVE is in use.  Reallocation of the SVE state
+> > + * will be deferred until dst tries to use SVE.
+> > + */
+> > +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
+> > +{
+> > +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
+> > +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
+> > +		sve_to_fpsimd(dst);
+> > +	}
+> > +
+> > +	dst->thread.sve_state = NULL;
+> > +}
 > 
-> Add USB EHCI support for ls1012aqds platform
-> 
-> Signed-off-by: Rajat Srivastava <rajat.srivastava@nxp.com>
-> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
-> ---
->   arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h | 1 +
->   include/configs/ls1012aqds.h                           | 2 ++
->   include/usb/ehci-ci.h                                  | 2 +-
->   3 files changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h b/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
-> index 8ad199f..4afc338 100644
-> --- a/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
-> +++ b/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
-> @@ -35,6 +35,7 @@
->   #define CONFIG_SYS_XHCI_USB1_ADDR		(CONFIG_SYS_IMMR + 0x01f00000)
->   #define CONFIG_SYS_XHCI_USB2_ADDR		(CONFIG_SYS_IMMR + 0x02000000)
->   #define CONFIG_SYS_XHCI_USB3_ADDR		(CONFIG_SYS_IMMR + 0x02100000)
-> +#define CONFIG_SYS_EHCI_USB1_ADDR		(CONFIG_SYS_IMMR + 0x07600000)
->   #define CONFIG_SYS_PCIE1_ADDR			(CONFIG_SYS_IMMR + 0x2400000)
->   #define CONFIG_SYS_PCIE2_ADDR			(CONFIG_SYS_IMMR + 0x2500000)
->   #define CONFIG_SYS_PCIE3_ADDR			(CONFIG_SYS_IMMR + 0x2600000)
-> diff --git a/include/configs/ls1012aqds.h b/include/configs/ls1012aqds.h
-> index 5b8500b..55f2578 100644
-> --- a/include/configs/ls1012aqds.h
-> +++ b/include/configs/ls1012aqds.h
-> @@ -115,6 +115,8 @@
->   
->   #ifdef CONFIG_HAS_FSL_DR_USB
->   #define CONFIG_USB_EHCI_FSL
-> +#define CONFIG_USB_ULPI
-> +#define CONFIG_USB_ULPI_VIEWPORT
->   #define CONFIG_EHCI_HCD_INIT_AFTER_RESET
->   #endif
->   
-> diff --git a/include/usb/ehci-ci.h b/include/usb/ehci-ci.h
-> index 847b698..cd3eb47 100644
-> --- a/include/usb/ehci-ci.h
-> +++ b/include/usb/ehci-ci.h
-> @@ -156,7 +156,7 @@
->   #elif defined(CONFIG_MPC85xx)
->   #define CONFIG_SYS_FSL_USB1_ADDR CONFIG_SYS_MPC85xx_USB1_ADDR
->   #define CONFIG_SYS_FSL_USB2_ADDR CONFIG_SYS_MPC85xx_USB2_ADDR
-> -#elif defined(CONFIG_ARCH_LS1021A)
-> +#elif defined(CONFIG_LS102XA) || defined(CONFIG_ARCH_LS1012A)
+> I first thought the thread flags are not visible in dst yet since
+> dup_task_struct() calls arch_dup_task_struct() before
+> setup_thread_stack(). However, at the end of the last year we enabled
+> CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
+> on this.
 
-Please use CONFIG_ARCH_LS1021A, not CONFIG_LS102XA.
+Hmmm, I see your point, but there are some sequencing issues here.
 
-York
+> Anyway, IIUC we don't need sve_to_fpsimd() here. The
+> arch_dup_task_struct() already called fpsimd_preserve_current_state()
+
+I consider SVE discard as an optional side effect of task_fpsimd_save(),
+not something that is guaranteed to happen -- the decision about whether
+to do so may become more intelligent later on.  So, for src, we may
+discard SVE (because syscall), but for dst we must NULL .sve_state (and
+therefore clear TIF_SVE) simply to avoid aliasing of src->sve_state and
+dst->sve_state.
+
+The latter requires operating on the thread_flags of dst.  I'll need to
+check whether there's another suitable hook for updating the thread flags
+of dst, if we aren't confident that they will always have been
+initialised by the time arch_dup_task_struct() is called.
+
+
+Either way, there would be an intra-thread ordering requirement between
+the task_struct and thread_info updates here, _if_ dst were schedulable:
+dst:TIF_SVE must be cleared before dst->sve_state is NULLed.
+
+dst is not schedulable until fork is done though, so maybe this doesn't
+really matter...
+
+> for src, so the FPSIMD state (which we care about) is transferred during
+> the *dst = *src assignment. So you'd only need the last statement,
+> possibly with a different function name like fpsimd_erase_sve (and maybe
+> make the function static inline in the header).
+
+Not quite: TIF_SVE must be cleared so that a context switch or
+kernel_neon_begin() after dst is scheduled doesn't try to save state in
+the (NULL) dst->sve_state.
+
+> 
+> [...]
+> >  int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+> > @@ -246,6 +247,9 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+> >  	if (current->mm)
+> >  		fpsimd_preserve_current_state();
+> >  	*dst = *src;
+> > +
+> > +	fpsimd_dup_sve(dst, src);
+> > +
+> >  	return 0;
+> >  }
+
+
+Cheers
+---Dave
