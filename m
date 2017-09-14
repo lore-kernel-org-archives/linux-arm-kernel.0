@@ -1,108 +1,43 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Thu, 14 Sep 2017 15:30:13 -0400
-Subject: [PATCH] perf: qcom_l2_pmu: add event names
-Message-ID: <1505417413-30757-1-git-send-email-nleeder@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 14 Sep 2017 12:31:53 -0700
+Subject: [PATCH] arm64: efi: ignore EFI_MEMORY_XP attribute if RP and/or WP
+ are set
+Message-ID: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add event names so that common events can be
-specified symbolically, for example:
+The UEFI memory map is a bit vague about how to interpret the
+EFI_MEMORY_XP attribute when it is combined with EFI_MEMORY_RP and/or
+EFI_MEMORY_WP, which have retroactively been redefined as cacheability
+attributes rather than permission attributes.
 
-l2cache_0/total-reads/,l2cache_0/cycles/
+So let's ignore EFI_MEMORY_XP if _RP and/or _WP are also set. In this
+case, it is likely that they are being used to describe the capability
+of the region (i.e., whether it has the controls to reconfigure it as
+non-executable) rather than the nature of the contents of the region
+(i.e., whether it contains data that we will never attempt to execute)
 
-Event names are displayed in 'perf list'.
-
-Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/perf/qcom_l2_pmu.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ arch/arm64/kernel/efi.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
-index b242cce..4fdc848 100644
---- a/drivers/perf/qcom_l2_pmu.c
-+++ b/drivers/perf/qcom_l2_pmu.c
-@@ -92,6 +92,21 @@
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 82cd07592519..f85ac58d08a3 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -48,7 +48,9 @@ static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
+ 		return pgprot_val(PAGE_KERNEL_ROX);
  
- #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
+ 	/* RW- */
+-	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
++	if (((attr & (EFI_MEMORY_RP | EFI_MEMORY_WP | EFI_MEMORY_XP)) ==
++	     EFI_MEMORY_XP) ||
++	    type != EFI_RUNTIME_SERVICES_CODE)
+ 		return pgprot_val(PAGE_KERNEL);
  
-+/*
-+ * Events
-+ */
-+#define L2_EVENT_CYCLES                    0xfe
-+#define L2_EVENT_DCACHE_OPS                0x400
-+#define L2_EVENT_ICACHE_OPS                0x401
-+#define L2_EVENT_TLBI                      0x402
-+#define L2_EVENT_BARRIERS                  0x403
-+#define L2_EVENT_TOTAL_READS               0x405
-+#define L2_EVENT_TOTAL_WRITES              0x406
-+#define L2_EVENT_TOTAL_REQUESTS            0x407
-+#define L2_EVENT_LDREX                     0x420
-+#define L2_EVENT_STREX                     0x421
-+#define L2_EVENT_CLREX                     0x422
-+
- static DEFINE_RAW_SPINLOCK(l2_access_lock);
- 
- /**
-@@ -700,9 +715,12 @@ static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
- /* CCG format for perf RAW codes. */
- PMU_FORMAT_ATTR(l2_code,   "config:4-11");
- PMU_FORMAT_ATTR(l2_group,  "config:0-3");
-+PMU_FORMAT_ATTR(event,     "config:0-11");
-+
- static struct attribute *l2_cache_pmu_formats[] = {
- 	&format_attr_l2_code.attr,
- 	&format_attr_l2_group.attr,
-+	&format_attr_event.attr,
- 	NULL,
- };
- 
-@@ -711,9 +729,45 @@ static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
- 	.attrs = l2_cache_pmu_formats,
- };
- 
-+static ssize_t l2cache_pmu_event_show(struct device *dev,
-+				      struct device_attribute *attr, char *page)
-+{
-+	struct perf_pmu_events_attr *pmu_attr;
-+
-+	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
-+	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
-+}
-+
-+#define L2CACHE_EVENT_ATTR(_name, _id)					     \
-+	(&((struct perf_pmu_events_attr[]) {				     \
-+		{ .attr = __ATTR(_name, 0444, l2cache_pmu_event_show, NULL), \
-+		  .id = _id, }						     \
-+	})[0].attr.attr)
-+
-+static struct attribute *l2_cache_pmu_events[] = {
-+	L2CACHE_EVENT_ATTR(cycles, L2_EVENT_CYCLES),
-+	L2CACHE_EVENT_ATTR(dcache-ops, L2_EVENT_DCACHE_OPS),
-+	L2CACHE_EVENT_ATTR(icache-ops, L2_EVENT_ICACHE_OPS),
-+	L2CACHE_EVENT_ATTR(tlbi, L2_EVENT_TLBI),
-+	L2CACHE_EVENT_ATTR(barriers, L2_EVENT_BARRIERS),
-+	L2CACHE_EVENT_ATTR(total-reads, L2_EVENT_TOTAL_READS),
-+	L2CACHE_EVENT_ATTR(total-writes, L2_EVENT_TOTAL_WRITES),
-+	L2CACHE_EVENT_ATTR(total-requests, L2_EVENT_TOTAL_REQUESTS),
-+	L2CACHE_EVENT_ATTR(ldrex, L2_EVENT_LDREX),
-+	L2CACHE_EVENT_ATTR(strex, L2_EVENT_STREX),
-+	L2CACHE_EVENT_ATTR(clrex, L2_EVENT_CLREX),
-+	NULL
-+};
-+
-+static struct attribute_group l2_cache_pmu_events_group = {
-+	.name = "events",
-+	.attrs = l2_cache_pmu_events,
-+};
-+
- static const struct attribute_group *l2_cache_pmu_attr_grps[] = {
- 	&l2_cache_pmu_format_group,
- 	&l2_cache_pmu_cpumask_group,
-+	&l2_cache_pmu_events_group,
- 	NULL,
- };
- 
+ 	/* RWX */
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.11.0
