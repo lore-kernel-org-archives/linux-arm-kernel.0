@@ -1,67 +1,77 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 14 Sep 2017 16:28:38 +0200
-Subject: [PATCH v4 4/5] ARM: dts: stm32: Add I2C1 support for STM32F746 SoC
-In-Reply-To: <1505399319-14782-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1505399319-14782-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1505399319-14782-5-git-send-email-pierre-yves.mordret@st.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 14 Sep 2017 17:28:12 +0300
+Subject: [PATCH 1/3] ARM: dts: at91: sama5d27_som1_ek: update pinmux/pinconf
+ for LEDs and USB
+In-Reply-To: <1505399294-20041-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1505399294-20041-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1505399294-20041-2-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds I2C1 support for STM32F746 SoC.
+From: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
- Version history:
-    v4:
-    v3:
-        * None
-    v2:
-        * Update I2C SoC device tree with latest Linux version
----
----
- arch/arm/boot/dts/stm32f746.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+There are some changes from the prototype board concerning LEDs and USB
+pins:
+- USBB power enable and red LED pins are inverted.
+- The polarity of LEDs is inverted too.
 
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 4506eb9..ddd8f2c 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -361,6 +361,16 @@
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+index 9c9088c99cc4..f13ef4fbab60 100644
+--- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+@@ -67,7 +67,7 @@
+ 
+ 		usb1: ohci at 00400000 {
+ 			num-ports = <3>;
+-			atmel,vbus-gpio = <&pioA PIN_PA10 GPIO_ACTIVE_HIGH>;
++			atmel,vbus-gpio = <&pioA PIN_PA27 GPIO_ACTIVE_HIGH>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_usb_default>;
+ 			status = "okay";
+@@ -330,7 +330,7 @@
+ 				};
+ 
+ 				pinctrl_led_gpio_default: led_gpio_default {
+-					pinmux = <PIN_PA27__GPIO>,
++					pinmux = <PIN_PA10__GPIO>,
+ 						 <PIN_PB1__GPIO>,
+ 						 <PIN_PA31__GPIO>;
+ 					bias-pull-up;
+@@ -396,7 +396,7 @@
+ 				};
+ 
+ 				pinctrl_usb_default: usb_default {
+-					pinmux = <PIN_PA10__GPIO>,
++					pinmux = <PIN_PA27__GPIO>,
+ 						 <PIN_PD19__GPIO>;
  					bias-disable;
  				};
- 			};
-+
-+			i2c1_pins_b: i2c1 at 0 {
-+				pins {
-+					pinmux = <STM32F746_PB9_FUNC_I2C1_SDA>,
-+						 <STM32F746_PB8_FUNC_I2C1_SCL>;
-+					bias-disable;
-+					drive-open-drain;
-+					slew-rate = <0>;
-+				};
-+			};
+@@ -520,17 +520,17 @@
+ 
+ 		red {
+ 			label = "red";
+-			gpios = <&pioA PIN_PA27 GPIO_ACTIVE_LOW>;
++			gpios = <&pioA PIN_PA10 GPIO_ACTIVE_HIGH>;
  		};
  
- 		crc: crc at 40023000 {
-@@ -380,6 +390,18 @@
- 			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
- 			assigned-clock-rates = <1000000>;
+ 		green {
+ 			label = "green";
+-			gpios = <&pioA PIN_PB1 GPIO_ACTIVE_LOW>;
++			gpios = <&pioA PIN_PB1 GPIO_ACTIVE_HIGH>;
  		};
-+
-+		i2c1: i2c at 40005400 {
-+			compatible = "st,stm32f7-i2c";
-+			reg = <0x40005400 0x400>;
-+			interrupts = <31>,
-+				     <32>;
-+			resets = <&rcc STM32F7_APB1_RESET(I2C1)>;
-+			clocks = <&rcc 1 CLK_I2C1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
+ 
+ 		blue {
+ 			label = "blue";
+-			gpios = <&pioA PIN_PA31 GPIO_ACTIVE_LOW>;
++			gpios = <&pioA PIN_PA31 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
  	};
- };
- 
 -- 
 2.7.4
