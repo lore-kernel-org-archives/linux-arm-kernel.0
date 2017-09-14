@@ -1,23 +1,68 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Thu, 14 Sep 2017 17:19:20 -0600
-Subject: ThunderX BMC initialization failure
-In-Reply-To: <04d91939-a4a5-cc39-12d2-b99ef8053592@riken.jp>
-References: <087dcefa-1402-2d9f-da8d-18782df9eea3@riken.jp>
- <CALdTtnst3PFaTo-ku85hj1QTp4kN4B1eOF3bYsmQrHWrpNGPTg@mail.gmail.com>
- <04d91939-a4a5-cc39-12d2-b99ef8053592@riken.jp>
-Message-ID: <CALdTtntvrsVw+G8GjSfy6U8+zrWVm5qZ0X6iye3y4UEt9n4nxQ@mail.gmail.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Thu, 14 Sep 2017 16:19:27 -0700
+Subject: [PATCH] thermal: brcmstb: disable trip points properly when needed
+In-Reply-To: <CAGt4E5vbM-eyQVH5X3EK_6sUg7iOeYYoh72oG=+pAsTnu8dr0w@mail.gmail.com>
+References: <CAGt4E5vbM-eyQVH5X3EK_6sUg7iOeYYoh72oG=+pAsTnu8dr0w@mail.gmail.com>
+Message-ID: <20170914231928.45542-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 5:17 PM, Itaru Kitayama <itaru.kitayama@riken.jp> wrote:
-> Dann,
->
-> Thanks for the information. Will try to upgrade the kernel when I have an
-> opportunity.
->
-> $ sudo dmidecode |grep IPMI
-> IPMI Device Information
->
-> Does the above something I should expect to see?
+From: Markus Mayer <mmayer@broadcom.com>
 
-Yes.
+The code checking for low and high temperature points was still based
+on an earlier implementation of the driver. It wasn't working properly
+with the data types currently being used.
+
+We fix this by disabling the high trip point if our high temperature is
+INT_MAX and disabling the low trip point if our low temperature is -INT_MAX
+(or lower).
+
+Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+---
+
+Here is my patch for the issue described. Please let me know if I should be
+squashing this into the driver patch and re-submit the entire series.
+
+ drivers/thermal/broadcom/brcmstb_thermal.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
+index 87b8e7a..1919f91 100644
+--- a/drivers/thermal/broadcom/brcmstb_thermal.c
++++ b/drivers/thermal/broadcom/brcmstb_thermal.c
+@@ -277,22 +277,23 @@ static int brcmstb_set_trips(void *data, int low, int high)
+ 
+ 	dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
+ 
+-	if (low) {
+-		if (low > INT_MAX)
+-			low = INT_MAX;
++	/*
++	 * Disable low-temp if "low" is too small. As per thermal framework
++	 * API, we use -INT_MAX rather than INT_MIN.
++	 */
++	if (low <= -INT_MAX) {
++		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 0);
++	} else {
+ 		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
+ 		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
+-	} else {
+-		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 0);
+ 	}
+ 
+-	if (high < ULONG_MAX) {
+-		if (high > INT_MAX)
+-			high = INT_MAX;
++	/* Disable high-temp if "high" is too big. */
++	if (high == INT_MAX) {
++		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 0);
++	} else {
+ 		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
+ 		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
+-	} else {
+-		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 0);
+ 	}
+ 
+ 	return 0;
+-- 
+2.7.4
