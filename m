@@ -1,39 +1,108 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 14 Sep 2017 21:19:49 +0200
-Subject: [PATCH v5 05/10] dt-bindings: net: dwmac-sun8i: update
- documentation about integrated PHY
-In-Reply-To: <20170914185301.GB4021@Red>
-References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
- <20170908071156.5115-6-clabbe.montjoie@gmail.com>
- <20170908072538.rqsp6dobwsqmzrsr@flea.lan>
- <20170908074325.GB29999@Red>
- <20170913182004.uniyo5opeilcfk7r@rob-hp-laptop>
- <20170914185301.GB4021@Red>
-Message-ID: <20170914191949.GA3796@lunn.ch>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Thu, 14 Sep 2017 15:30:13 -0400
+Subject: [PATCH] perf: qcom_l2_pmu: add event names
+Message-ID: <1505417413-30757-1-git-send-email-nleeder@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Is the MDIO controller "allwinner,sun8i-h3-emac" or "snps,dwmac-mdio"? 
-> > If the latter, then I think the node is fine, but then the mux should be 
-> > a child node of it. IOW, the child of an MDIO controller should either 
-> > be a mux node or slave devices.
+Add event names so that common events can be
+specified symbolically, for example:
 
-Hi Rob
+l2cache_0/total-reads/,l2cache_0/cycles/
 
-Up until now, children of an MDIO bus have been MDIO devices. Those
-MDIO devices are either Ethernet PHYs, Ethernet Switches, or the
-oddball devices that Broadcom iProc has, like generic PHYs.
+Event names are displayed in 'perf list'.
 
-We have never had MDIO-muxes as MDIO children. A Mux is not an MDIO
-device, and does not have the properties of an MDIO device. It is not
-addressable on the MDIO bus. The current MUXes are addressed via GPIOs
-or MMIO.
+Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+---
+ drivers/perf/qcom_l2_pmu.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-There other similar cases. i2c-mux-gpio is not a child of an i2c bus,
-nor i2c-mux-reg or gpio-mux. nxp,pca9548 is however a child of the i2c
-bus, because it is an i2c device itself...
-
-If the MDIO mux was an MDIO device, i would agree with you. Bit it is
-not, so lets not make it a child.
-
-	    Andrew
+diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
+index b242cce..4fdc848 100644
+--- a/drivers/perf/qcom_l2_pmu.c
++++ b/drivers/perf/qcom_l2_pmu.c
+@@ -92,6 +92,21 @@
+ 
+ #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
+ 
++/*
++ * Events
++ */
++#define L2_EVENT_CYCLES                    0xfe
++#define L2_EVENT_DCACHE_OPS                0x400
++#define L2_EVENT_ICACHE_OPS                0x401
++#define L2_EVENT_TLBI                      0x402
++#define L2_EVENT_BARRIERS                  0x403
++#define L2_EVENT_TOTAL_READS               0x405
++#define L2_EVENT_TOTAL_WRITES              0x406
++#define L2_EVENT_TOTAL_REQUESTS            0x407
++#define L2_EVENT_LDREX                     0x420
++#define L2_EVENT_STREX                     0x421
++#define L2_EVENT_CLREX                     0x422
++
+ static DEFINE_RAW_SPINLOCK(l2_access_lock);
+ 
+ /**
+@@ -700,9 +715,12 @@ static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
+ /* CCG format for perf RAW codes. */
+ PMU_FORMAT_ATTR(l2_code,   "config:4-11");
+ PMU_FORMAT_ATTR(l2_group,  "config:0-3");
++PMU_FORMAT_ATTR(event,     "config:0-11");
++
+ static struct attribute *l2_cache_pmu_formats[] = {
+ 	&format_attr_l2_code.attr,
+ 	&format_attr_l2_group.attr,
++	&format_attr_event.attr,
+ 	NULL,
+ };
+ 
+@@ -711,9 +729,45 @@ static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
+ 	.attrs = l2_cache_pmu_formats,
+ };
+ 
++static ssize_t l2cache_pmu_event_show(struct device *dev,
++				      struct device_attribute *attr, char *page)
++{
++	struct perf_pmu_events_attr *pmu_attr;
++
++	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
++	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
++}
++
++#define L2CACHE_EVENT_ATTR(_name, _id)					     \
++	(&((struct perf_pmu_events_attr[]) {				     \
++		{ .attr = __ATTR(_name, 0444, l2cache_pmu_event_show, NULL), \
++		  .id = _id, }						     \
++	})[0].attr.attr)
++
++static struct attribute *l2_cache_pmu_events[] = {
++	L2CACHE_EVENT_ATTR(cycles, L2_EVENT_CYCLES),
++	L2CACHE_EVENT_ATTR(dcache-ops, L2_EVENT_DCACHE_OPS),
++	L2CACHE_EVENT_ATTR(icache-ops, L2_EVENT_ICACHE_OPS),
++	L2CACHE_EVENT_ATTR(tlbi, L2_EVENT_TLBI),
++	L2CACHE_EVENT_ATTR(barriers, L2_EVENT_BARRIERS),
++	L2CACHE_EVENT_ATTR(total-reads, L2_EVENT_TOTAL_READS),
++	L2CACHE_EVENT_ATTR(total-writes, L2_EVENT_TOTAL_WRITES),
++	L2CACHE_EVENT_ATTR(total-requests, L2_EVENT_TOTAL_REQUESTS),
++	L2CACHE_EVENT_ATTR(ldrex, L2_EVENT_LDREX),
++	L2CACHE_EVENT_ATTR(strex, L2_EVENT_STREX),
++	L2CACHE_EVENT_ATTR(clrex, L2_EVENT_CLREX),
++	NULL
++};
++
++static struct attribute_group l2_cache_pmu_events_group = {
++	.name = "events",
++	.attrs = l2_cache_pmu_events,
++};
++
+ static const struct attribute_group *l2_cache_pmu_attr_grps[] = {
+ 	&l2_cache_pmu_format_group,
+ 	&l2_cache_pmu_cpumask_group,
++	&l2_cache_pmu_events_group,
+ 	NULL,
+ };
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
