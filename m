@@ -1,36 +1,21 @@
-From: fahad.kunnathadi@dexceldesigns.com (Fahad Kunnathadi)
-Date: Thu, 14 Sep 2017 12:46:31 +0530
-Subject: [PATCH] net: phy: Fix mask value write on gmii2rgmii converter speed
- register.
-Message-ID: <1505373391-18697-1-git-send-email-fahad.kunnathadi@dexceldesigns.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 14 Sep 2017 10:26:35 +0300
+Subject: [PATCH v3 2/3] mmc: sdhci-omap: Add OMAP SDHCI driver
+In-Reply-To: <20170906114556.32532-3-kishon@ti.com>
+References: <20170906114556.32532-1-kishon@ti.com>
+ <20170906114556.32532-3-kishon@ti.com>
+Message-ID: <cdb5251f-e725-e5ca-0c36-a3b2544ffbdc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To clear Speed Selection in MDIO control register(0x10),
-ie, clear bits 6 and 13 to zero while keeping other bits same.
-Before AND operation,The Mask value has to be perform with bitwise NOT
-operation (ie, ~ operator)
+On 06/09/17 14:45, Kishon Vijay Abraham I wrote:
+> Create a new sdhci-omap driver to configure the eMMC/SD/SDIO controller
+> in TI's OMAP SoCs making use of the SDHCI core library. For OMAP specific
+> configurations, populate sdhci_ops with OMAP specific callbacks and use
+> SDHCI quirks.
+> Enable only high speed mode for both SD and eMMC here and add other
+> UHS mode support later.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-This patch clears current speed selection before writing the
-new speed settings to gmii2rgmii converter
-
-Signed-off-by: Fahad Kunnathadi <fahad.kunnathadi@dexceldesigns.com>
----
- drivers/net/phy/xilinx_gmii2rgmii.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-index d15dd39..2e5150b 100644
---- a/drivers/net/phy/xilinx_gmii2rgmii.c
-+++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-@@ -44,7 +44,7 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
- 	priv->phy_drv->read_status(phydev);
- 
- 	val = mdiobus_read(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG);
--	val &= XILINX_GMII2RGMII_SPEED_MASK;
-+	val &= ~XILINX_GMII2RGMII_SPEED_MASK;
- 
- 	if (phydev->speed == SPEED_1000)
- 		val |= BMCR_SPEED1000;
--- 
-1.9.1
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
