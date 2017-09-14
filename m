@@ -1,35 +1,85 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Thu, 14 Sep 2017 19:12:06 +0800
-Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
- exceptions to el2
-In-Reply-To: <59B17449.6010201@arm.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
- <59B17449.6010201@arm.com>
-Message-ID: <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Thu, 14 Sep 2017 13:29:57 +0200
+Subject: [PATCH v6 05/11] arm64/mm: Add support for XPFO
+In-Reply-To: <d637a56d-399d-fefa-806b-a9e2b0babb75@arm.com>
+References: <20170907173609.22696-1-tycho@docker.com>
+ <20170907173609.22696-6-tycho@docker.com>
+ <20170908075347.GC4957@infradead.org>
+ <20170908172422.rxmhwd2vl6eye2or@docker>
+ <d637a56d-399d-fefa-806b-a9e2b0babb75@arm.com>
+Message-ID: <f2716a4f-58ca-d385-2ae5-d3804b53fac3@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
-
-On 2017/9/8 0:31, James Morse wrote:
-> KVM already handles external aborts from lower exception levels, no more work
-> needs doing for TEA.
-If it is firmware first solution, that is SCR_EL3.EA=1, all SError interrupt and synchronous External
-Abort exceptions are taken to EL3, so EL3 firmware will handle it, KVM no needs to handle it.
-
-HCR_EL3.TEA is only for EL3 to check its value to decide to jump to hypervisor or kernel.
-
+On 14/09/17 12:41, Julien Grall wrote:
+> Hi,
 > 
-> What happens when a guest access the RAS-Error-Record registers?
+> CC Juergen, Boris and Stefano.
 > 
-> Before we can set HCR_EL2.TERR I think we need to add some minimal emulation for
-> the registers it traps. Most of them should be RAZ/WI, so it should be
-> straightforward. (I think KVMs default is to emulate an undef for unknown traps).
-Today I added the support to do some minimal emulation for RAS-Error-Record registers, thanks
-for the good suggestion.
+> On 08/09/17 18:24, Tycho Andersen wrote:
+>> On Fri, Sep 08, 2017 at 12:53:47AM -0700, Christoph Hellwig wrote:
+>>>> +/*
+>>>> + * Lookup the page table entry for a virtual address and return a
+>>>> pointer to
+>>>> + * the entry. Based on x86 tree.
+>>>> + */
+>>>> +static pte_t *lookup_address(unsigned long addr)
+>>>
+>>> Seems like this should be moved to common arm64 mm code and used by
+>>> kernel_page_present.
+>>
+>> Sounds good, I'll include something like the patch below in the next
+>> series.
+>>
+>> Unfortunately, adding an implementation of lookup_address seems to be
+>> slightly more complicated than necessary, because of the xen piece. We
+>> have to define lookup_address() with the level parameter, but it's not
+>> obvious to me to name the page levels. So for now I've just left it as
+>> a WARN() if someone supplies it.
+>>
+>> It seems like xen still does need this to be defined, because if I
+>> define it without level:
+>>
+>> drivers/xen/xenbus/xenbus_client.c: In function
+>> ?xenbus_unmap_ring_vfree_pv?:
+>> drivers/xen/xenbus/xenbus_client.c:760:4: error: too many arguments to
+>> function ?lookup_address?
+>> ???? lookup_address(addr, &level)).maddr;
+>> ???? ^~~~~~~~~~~~~~
+>> In file included from ./arch/arm64/include/asm/page.h:37:0,
+>> ????????????????? from ./include/linux/mmzone.h:20,
+>> ????????????????? from ./include/linux/gfp.h:5,
+>> ????????????????? from ./include/linux/mm.h:9,
+>> ????????????????? from drivers/xen/xenbus/xenbus_client.c:33:
+>> ./arch/arm64/include/asm/pgtable-types.h:67:15: note: declared here
+>> ? extern pte_t *lookup_address(unsigned long addr);
+>> ??????????????? ^~~~~~~~~~~~~~
+>>
+>> I've cc-d the xen folks, maybe they can suggest a way to untangle it?
+>> Alternatively, if someone can suggest a good naming scheme for the
+>> page levels, I can just do that.
+> 
+> The implementation of lookup_address(...) on ARM for Xen (see
+> include/xen/arm/page.h) is just a BUG(). This is because this code
+> should never be called (only used for x86 PV code).
+> 
+> Furthermore, xenbus client does not use at all the level. It is just to
+> cope with the x86 version of lookup_address.
+> 
+> So one way to solve the problem would be to introduce
+> xen_lookup_address(addr) that would be implemented as:
+> ????- on x86
+> ??????? unsigned int level;
+> 
+> ??????? return lookup_address(addr, &level).maddr;
+> ????- on ARM
+> ??????? BUG();
+> 
+> With that there would be no prototype clash and avoid introducing a
+> level parameter.
 
-> 
-> Eventually we will want to back this with a page of memory that lets
-> Qemu/kvmtool configure what the guest can see. (i.e. the emulated machine's
-> errors for kernel-first handling.)
+I'd rather add some #ifdef CONFIG_XEN_PV and remove the *_pv functions
+from ARM completely this way. I'm sending a patch soon...
+
+
+Juergen
