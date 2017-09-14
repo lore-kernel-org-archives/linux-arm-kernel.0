@@ -1,26 +1,38 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 14 Sep 2017 13:44:14 +0200
-Subject: [PATCH v2 1/2] watchdog: dw_wdt: add stop watchdog operation
-In-Reply-To: <20170914113013.19157-1-o.rempel@pengutronix.de>
-References: <20170914113013.19157-1-o.rempel@pengutronix.de>
-Message-ID: <1505389454.10100.5.camel@pengutronix.de>
+From: alex@asyring.de (Alexander Syring)
+Date: Thu, 14 Sep 2017 14:05:19 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix missing CLK_SET_RATE_PARENT in
+ ccu-sun4i-a10.c
+Message-ID: <20170914120519.2006-1-alex@asyring.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-09-14 at 13:30 +0200, Oleksij Rempel wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> The only way of stopping the watchdog is by resetting it.
-> Add the watchdog op for stopping the device and reset if
-> a reset line is provided.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: linux-watchdog at vger.kernel.org
+When using cpufreq-dt with default govenor other than "performance"
+system freezes while booting.
+Adding CLK_SET_RATE_PARENT | CLK_IS_CRITICAL to clk_cpu fixes the
+problem.
 
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+Tested on Cubietruck (A20).
 
-regards
-Philipp
+Fixes: c84f5683f6E ("clk: sunxi-ng: Add sun4i/sun7i CCU driver")
+
+Reported-by: Alexander Syring <alex@asyring.de>
+Signed-off-by: Alexander Syring <alex@asyring.de>
+---
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun4i-a10.c b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+index 286b0049b7b6..a48fde191c0a 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
++++ b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+@@ -223,7 +223,7 @@ static struct ccu_mux cpu_clk = {
+ 		.hw.init	= CLK_HW_INIT_PARENTS("cpu",
+ 						      cpu_parents,
+ 						      &ccu_mux_ops,
+-						      CLK_IS_CRITICAL),
++						      CLK_SET_RATE_PARENT | CLK_IS_CRITICAL),
+ 	}
+ };
+ 
+-- 
+2.11.0
