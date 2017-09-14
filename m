@@ -1,56 +1,79 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 14 Sep 2017 12:17:39 +0200
-Subject: [PATCH v1 1/2] watchdog: dw_wdt: add stop watchdog operation
-In-Reply-To: <20170914081402.7893-1-o.rempel@pengutronix.de>
-References: <20170914081402.7893-1-o.rempel@pengutronix.de>
-Message-ID: <1505384259.10100.2.camel@pengutronix.de>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 14 Sep 2017 11:41:34 +0100
+Subject: [PATCH v6 05/11] arm64/mm: Add support for XPFO
+In-Reply-To: <20170908172422.rxmhwd2vl6eye2or@docker>
+References: <20170907173609.22696-1-tycho@docker.com>
+ <20170907173609.22696-6-tycho@docker.com>
+ <20170908075347.GC4957@infradead.org>
+ <20170908172422.rxmhwd2vl6eye2or@docker>
+Message-ID: <d637a56d-399d-fefa-806b-a9e2b0babb75@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksij,
+Hi,
 
-On Thu, 2017-09-14 at 10:14 +0200, Oleksij Rempel wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+CC Juergen, Boris and Stefano.
+
+On 08/09/17 18:24, Tycho Andersen wrote:
+> On Fri, Sep 08, 2017 at 12:53:47AM -0700, Christoph Hellwig wrote:
+>>> +/*
+>>> + * Lookup the page table entry for a virtual address and return a pointer to
+>>> + * the entry. Based on x86 tree.
+>>> + */
+>>> +static pte_t *lookup_address(unsigned long addr)
+>>
+>> Seems like this should be moved to common arm64 mm code and used by
+>> kernel_page_present.
 > 
-> The only way of stopping the watchdog is by resetting it.
-> Add the watchdog op for stopping the device and reset if
-> a reset line is provided.
+> Sounds good, I'll include something like the patch below in the next
+> series.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: linux-watchdog at vger.kernel.org
-> ---
-> ?drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
-> ?1 file changed, 16 insertions(+)
+> Unfortunately, adding an implementation of lookup_address seems to be
+> slightly more complicated than necessary, because of the xen piece. We
+> have to define lookup_address() with the level parameter, but it's not
+> obvious to me to name the page levels. So for now I've just left it as
+> a WARN() if someone supplies it.
 > 
-> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> index 36be987ff9ef..50d8a6a5b5ac 100644
-> --- a/drivers/watchdog/dw_wdt.c
-> +++ b/drivers/watchdog/dw_wdt.c
-> @@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device
-> *wdd)
-> ?	return 0;
-> ?}
-> ?
-> +static int dw_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
-> +
-> +	if (IS_ERR(dw_wdt->rst)) {
+> It seems like xen still does need this to be defined, because if I
+> define it without level:
+> 
+> drivers/xen/xenbus/xenbus_client.c: In function ?xenbus_unmap_ring_vfree_pv?:
+> drivers/xen/xenbus/xenbus_client.c:760:4: error: too many arguments to function ?lookup_address?
+>      lookup_address(addr, &level)).maddr;
+>      ^~~~~~~~~~~~~~
+> In file included from ./arch/arm64/include/asm/page.h:37:0,
+>                   from ./include/linux/mmzone.h:20,
+>                   from ./include/linux/gfp.h:5,
+>                   from ./include/linux/mm.h:9,
+>                   from drivers/xen/xenbus/xenbus_client.c:33:
+> ./arch/arm64/include/asm/pgtable-types.h:67:15: note: declared here
+>   extern pte_t *lookup_address(unsigned long addr);
+>                 ^~~~~~~~~~~~~~
+> 
+> I've cc-d the xen folks, maybe they can suggest a way to untangle it?
+> Alternatively, if someone can suggest a good naming scheme for the
+> page levels, I can just do that.
 
-	if (!dw_wdt->rst) {
+The implementation of lookup_address(...) on ARM for Xen (see 
+include/xen/arm/page.h) is just a BUG(). This is because this code 
+should never be called (only used for x86 PV code).
 
-Since commit 65a3b6935d92 ("watchdog: dw_wdt: get reset lines from dt"),
-the reset control is requested as optional, meaning dw_wdt->rst == NULL
-if the reset line is not present. If an error is value is stored into
-dw_wdt->rst, the probe function does not succeed.
+Furthermore, xenbus client does not use at all the level. It is just to 
+cope with the x86 version of lookup_address.
 
-> +		dev_warn(wdd->parent, "No reset line. Will not
-> stop.\n");
-> +		return PTR_ERR(dw_wdt->rst);
-> +	}
+So one way to solve the problem would be to introduce 
+xen_lookup_address(addr) that would be implemented as:
+	- on x86
+		unsigned int level;
 
-regards
-Philipp
+		return lookup_address(addr, &level).maddr;
+	- on ARM
+		BUG();
+
+With that there would be no prototype clash and avoid introducing a 
+level parameter.
+
+Cheers,
+
+-- 
+Julien Grall
