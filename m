@@ -1,64 +1,38 @@
-From: loic.poulain@gmail.com (Loic Poulain)
-Date: Thu, 14 Sep 2017 22:48:00 +0200
-Subject: [PATCH] ARM: dts: bcm283x: Fix console path on RPi3
-Message-ID: <1505422080-14336-1-git-send-email-loic.poulain@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Sep 2017 14:24:37 -0700
+Subject: [PATCH v1 2/3] cpufreq: rockchip: add support for rk3328 soc
+In-Reply-To: <1503477632-9661-3-git-send-email-cl@rock-chips.com>
+References: <1503477632-9661-1-git-send-email-cl@rock-chips.com>
+ <1503477632-9661-3-git-send-email-cl@rock-chips.com>
+Message-ID: <20170914212437.GC11836@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to other RPi devices, RPi3 uses uart0 to communicate with
-the BCM43438 bluetooth controller. uart1 is then used for the console.
-Today, the console configuration is inherited from the bcm283x dtsi
-(bootargs) which is not the correct one for the RPi3. This leads to
-routing issue and confuses the Bluetooth controller with unexpected
-data.
+On 23-08-17, 16:40, cl at rock-chips.com wrote:
+> From: Liang Chen <cl@rock-chips.com>
+> 
+> Add compatible rockchip,rk3328 to the machines table to
+> launch cpufreq-dt driver for rk3328 soc.
+> 
+> Signed-off-by: Liang Chen <cl@rock-chips.com>
+> ---
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index 1c26292..f16c3ba 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -76,6 +76,7 @@
+>  	{ .compatible = "rockchip,rk3188", },
+>  	{ .compatible = "rockchip,rk3228", },
+>  	{ .compatible = "rockchip,rk3288", },
+> +	{ .compatible = "rockchip,rk3328", },
+>  	{ .compatible = "rockchip,rk3366", },
+>  	{ .compatible = "rockchip,rk3368", },
+>  	{ .compatible = "rockchip,rk3399", },
 
-This patch introduces chosen/stdout path to configure console to uart0
-on bcm283x family and overwrite it to uart1 in the RPi3 dts.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Create serial0/1 aliases referring to uart0 ant uart1 paths.
-Remove unneeded earlyprintk.
-
-Fixes: 4188ea2aeb6d ("ARM: bcm283x: Define UART pinmuxing on board level")
-Signed-off-by: Loic Poulain <loic.poulain@gmail.com>
----
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 5 +++++
- arch/arm/boot/dts/bcm283x.dtsi        | 7 ++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index 20725ca..f1c0811 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -8,6 +8,11 @@
- 	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
- 	model = "Raspberry Pi 3 Model B";
- 
-+	chosen {
-+		/* 8250 auxiliar UART instead of pl011 */
-+		stdout-path = "serial1:115200n8";
-+	};
-+
- 	memory {
- 		reg = <0 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 431dcfc..013431e 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -20,8 +20,13 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
- 	chosen {
--		bootargs = "earlyprintk console=ttyAMA0";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	thermal-zones {
 -- 
-1.9.1
+viresh
