@@ -1,79 +1,62 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 14 Sep 2017 13:49:12 -0500
-Subject: [PATCH 0/6] Support PPTT for ARM64
+Date: Thu, 14 Sep 2017 13:49:17 -0500
+Subject: [PATCH 5/6] arm64: Fixup users of topology_physical_package_id
 In-Reply-To: <20170914184918.20406-1-jeremy.linton@arm.com>
 References: <20170914184918.20406-1-jeremy.linton@arm.com>
-Message-ID: <20170914184918.20406-8-jeremy.linton@arm.com>
+Message-ID: <20170914184918.20406-13-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
-used to describe the processor and cache topologies. Ideally it is
-used to extend/override information provided by the hardware, but
-right now ARM64 is entirely dependent on firmware provided tables.
+There are a few arm64 specific users (cpufreq, psci, etc) which really
+want the cluster rather than the topology_physical_package_id(). Lets
+convert those users to topology_cod_id(). That way when we start
+differentiating the socket/cluster they will continue to behave correctly.
 
-This patch parses the table for the cache topology and CPU topology.
-For the latter we also add an additional topology_cod_id() macro,
-and a package_id for arm64. Initially the physical id will match
-the cluster id, but we update users of the cluster to utilize
-the new macro. When we enable PPTT for the arm64 the cluster/socket
-starts to differ. Because of this we also make some dynamic decisions
-about mapping thread/core/cod/socket to the thread/socket used by the
-scheduler.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ drivers/clk/clk-mb86s7x.c        | 2 +-
+ drivers/cpufreq/arm_big_little.c | 2 +-
+ drivers/firmware/psci_checker.c  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-For example on juno:
-
-[root at mammon-juno-rh topology]# lstopo-no-graphics
-Machine (7048MB)
-  Package L#0
-    L2 L#0 (1024KB) + Core L#0
-      L1d L#0 (32KB) + L1i L#0 (32KB) + PU L#0 (P#0)
-      L1d L#1 (32KB) + L1i L#1 (32KB) + PU L#1 (P#1)
-      L1d L#2 (32KB) + L1i L#2 (32KB) + PU L#2 (P#2)
-      L1d L#3 (32KB) + L1i L#3 (32KB) + PU L#3 (P#3)
-    L2 L#1 (2048KB) + Core L#1
-      L1d L#4 (32KB) + L1i L#4 (48KB) + PU L#4 (P#4)
-      L1d L#5 (32KB) + L1i L#5 (48KB) + PU L#5 (P#5)
-  HostBridge L#0
-    PCIBridge
-      PCIBridge
-        PCIBridge
-          PCI 1095:3132
-            Block(Disk) L#0 "sda"
-        PCIBridge
-          PCI 1002:68f9
-            GPU L#1 "renderD128"
-            GPU L#2 "card0"
-            GPU L#3 "controlD64"
-        PCIBridge
-          PCI 11ab:4380
-            Net L#4 "enp8s0"
-
-
-Jeremy Linton (6):
-  ACPI/PPTT: Add Processor Properties Topology Table parsing
-  ACPI: Enable PPTT support on ARM64
-  drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
-    tables
-  Topology: Add cluster on die macros and arm64 decoding
-  arm64: Fixup users of topology_physical_package_id
-  arm64: topology: Enable ACPI/PPTT based CPU topology.
-
- arch/arm64/Kconfig                |   1 +
- arch/arm64/include/asm/topology.h |   4 +-
- arch/arm64/kernel/cacheinfo.c     |  23 +-
- arch/arm64/kernel/topology.c      |  76 +++++-
- drivers/acpi/Makefile             |   1 +
- drivers/acpi/arm64/Kconfig        |   3 +
- drivers/acpi/pptt.c               | 508 ++++++++++++++++++++++++++++++++++++++
- drivers/base/cacheinfo.c          |  17 +-
- drivers/clk/clk-mb86s7x.c         |   2 +-
- drivers/cpufreq/arm_big_little.c  |   2 +-
- drivers/firmware/psci_checker.c   |   2 +-
- include/linux/cacheinfo.h         |  10 +-
- include/linux/topology.h          |   5 +
- 13 files changed, 634 insertions(+), 20 deletions(-)
- create mode 100644 drivers/acpi/pptt.c
-
+diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
+index 2a83a3ff1d09..da4b456f9afc 100644
+--- a/drivers/clk/clk-mb86s7x.c
++++ b/drivers/clk/clk-mb86s7x.c
+@@ -338,7 +338,7 @@ static struct clk_hw *mb86s7x_clclk_register(struct device *cpu_dev)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	clc->hw.init = &init;
+-	clc->cluster = topology_physical_package_id(cpu_dev->id);
++	clc->cluster = topology_cod_id(cpu_dev->id);
+ 
+ 	init.name = dev_name(cpu_dev);
+ 	init.ops = &clk_clc_ops;
+diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+index 17504129fd77..6ee69b3820de 100644
+--- a/drivers/cpufreq/arm_big_little.c
++++ b/drivers/cpufreq/arm_big_little.c
+@@ -72,7 +72,7 @@ static struct mutex cluster_lock[MAX_CLUSTERS];
+ 
+ static inline int raw_cpu_to_cluster(int cpu)
+ {
+-	return topology_physical_package_id(cpu);
++	return topology_cod_id(cpu);
+ }
+ 
+ static inline int cpu_to_cluster(int cpu)
+diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
+index 6523ce962865..a9465f5d344a 100644
+--- a/drivers/firmware/psci_checker.c
++++ b/drivers/firmware/psci_checker.c
+@@ -202,7 +202,7 @@ static int hotplug_tests(void)
+ 	 */
+ 	for (i = 0; i < nb_cluster; ++i) {
+ 		int cluster_id =
+-			topology_physical_package_id(cpumask_any(clusters[i]));
++			topology_cod_id(cpumask_any(clusters[i]));
+ 		ssize_t len = cpumap_print_to_pagebuf(true, page_buf,
+ 						      clusters[i]);
+ 		/* Remove trailing newline. */
 -- 
 2.13.5
