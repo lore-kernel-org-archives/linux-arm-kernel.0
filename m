@@ -1,151 +1,79 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 14 Sep 2017 13:49:11 -0500
-Subject: [PATCH 6/6] arm64: topology: Enable ACPI/PPTT based CPU topology.
+Date: Thu, 14 Sep 2017 13:49:12 -0500
+Subject: [PATCH 0/6] Support PPTT for ARM64
 In-Reply-To: <20170914184918.20406-1-jeremy.linton@arm.com>
 References: <20170914184918.20406-1-jeremy.linton@arm.com>
-Message-ID: <20170914184918.20406-7-jeremy.linton@arm.com>
+Message-ID: <20170914184918.20406-8-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Propagate the topology information from the PPTT tree to the
-cpu_topology array. We can get the thread id, core_id and
-cluster_id by assuming certain levels of the PPTT tree correspond
-to those concepts. The package_id is flagged in the tree and can be
-found by passing an arbitrary large level to setup_acpi_cpu_topology()
-which terminates its search when it finds an ACPI node flagged
-as the physical package. If the tree doesn't contain enough
-levels to represent all of thread/core/cod/package then the package
-id will be used for the missing levels.
+ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+used to describe the processor and cache topologies. Ideally it is
+used to extend/override information provided by the hardware, but
+right now ARM64 is entirely dependent on firmware provided tables.
 
-Since arm64 machines can have 3 distinct topology levels, and the
-scheduler only handles sockets/threads well today, we compromise
-by collapsing into one of three diffrent configurations. These are
-thread/socket, thread/cluster or cluster/socket depending on whether
-the machine has threading and multisocket, threading in a single
-socket, or doesn't have threading.
+This patch parses the table for the cache topology and CPU topology.
+For the latter we also add an additional topology_cod_id() macro,
+and a package_id for arm64. Initially the physical id will match
+the cluster id, but we update users of the cluster to utilize
+the new macro. When we enable PPTT for the arm64 the cluster/socket
+starts to differ. Because of this we also make some dynamic decisions
+about mapping thread/core/cod/socket to the thread/socket used by the
+scheduler.
 
-This code is loosely based on a combination of code from:
-Xiongfeng Wang <wangxiongfeng2@huawei.com>
-John Garry <john.garry@huawei.com>
-Jeffrey Hugo <jhugo@codeaurora.org>
+For example on juno:
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/kernel/topology.c | 68 +++++++++++++++++++++++++++++++++++++++++++-
- include/linux/topology.h     |  2 ++
- 2 files changed, 69 insertions(+), 1 deletion(-)
+[root at mammon-juno-rh topology]# lstopo-no-graphics
+Machine (7048MB)
+  Package L#0
+    L2 L#0 (1024KB) + Core L#0
+      L1d L#0 (32KB) + L1i L#0 (32KB) + PU L#0 (P#0)
+      L1d L#1 (32KB) + L1i L#1 (32KB) + PU L#1 (P#1)
+      L1d L#2 (32KB) + L1i L#2 (32KB) + PU L#2 (P#2)
+      L1d L#3 (32KB) + L1i L#3 (32KB) + PU L#3 (P#3)
+    L2 L#1 (2048KB) + Core L#1
+      L1d L#4 (32KB) + L1i L#4 (48KB) + PU L#4 (P#4)
+      L1d L#5 (32KB) + L1i L#5 (48KB) + PU L#5 (P#5)
+  HostBridge L#0
+    PCIBridge
+      PCIBridge
+        PCIBridge
+          PCI 1095:3132
+            Block(Disk) L#0 "sda"
+        PCIBridge
+          PCI 1002:68f9
+            GPU L#1 "renderD128"
+            GPU L#2 "card0"
+            GPU L#3 "controlD64"
+        PCIBridge
+          PCI 11ab:4380
+            Net L#4 "enp8s0"
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 9147e5b6326d..8ee5cc5ba9bd 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -11,6 +11,7 @@
-  * for more details.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/arch_topology.h>
- #include <linux/cpu.h>
- #include <linux/cpumask.h>
-@@ -22,6 +23,7 @@
- #include <linux/sched.h>
- #include <linux/sched/topology.h>
- #include <linux/slab.h>
-+#include <linux/smp.h>
- #include <linux/string.h>
- 
- #include <asm/cpu.h>
-@@ -304,6 +306,68 @@ static void __init reset_cpu_topology(void)
- 	}
- }
- 
-+#ifdef CONFIG_ACPI
-+/*
-+ * Propagate the topology information of the processor_topology_node tree to the
-+ * cpu_topology array.
-+ */
-+static int __init parse_acpi_topology(void)
-+{
-+	u64 is_threaded;
-+	int is_multisocket;
-+	int cpu;
-+	int topology_id;
-+	/* set a large depth, to hit ACPI_PPTT_PHYSICAL_PACKAGE if one exists */
-+	const int max_topo = 0xFF;
-+
-+	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
-+	is_multisocket = acpi_multisocket_count();
-+	if (is_multisocket < 0)
-+		return is_multisocket;
-+
-+	for_each_possible_cpu(cpu) {
-+		topology_id = setup_acpi_cpu_topology(cpu, 0);
-+		if (topology_id < 0)
-+			return topology_id;
-+
-+		if ((is_threaded) && (is_multisocket > 1)) {
-+			/* MT per core, and multiple sockets */
-+			cpu_topology[cpu].thread_id = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, 1);
-+			cpu_topology[cpu].core_id   = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, 2);
-+			cpu_topology[cpu].cluster_id = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
-+			cpu_topology[cpu].package_id = topology_id;
-+		} else if (is_threaded) {
-+			/* mutltiple threads, but only a single socket */
-+			cpu_topology[cpu].thread_id  = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, 1);
-+			cpu_topology[cpu].core_id    = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, 2);
-+			cpu_topology[cpu].cluster_id = topology_id;
-+			cpu_topology[cpu].package_id = topology_id;
-+		} else {
-+			/* no threads, clusters behave like threads */
-+			cpu_topology[cpu].thread_id  = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, 1);
-+			cpu_topology[cpu].core_id    = topology_id;
-+			cpu_topology[cpu].cluster_id = topology_id;
-+			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
-+			cpu_topology[cpu].package_id = topology_id;
-+		}
-+	}
-+	return 0;
-+}
-+
-+#else
-+static int __init parse_acpi_topology(void)
-+{
-+	/*ACPI kernels should be built with PPTT support*/
-+	return -EINVAL;
-+}
-+#endif
-+
- void __init init_cpu_topology(void)
- {
- 	reset_cpu_topology();
-@@ -312,6 +376,8 @@ void __init init_cpu_topology(void)
- 	 * Discard anything that was parsed if we hit an error so we
- 	 * don't use partial information.
- 	 */
--	if (of_have_populated_dt() && parse_dt_topology())
-+	if ((!acpi_disabled) && parse_acpi_topology())
-+		reset_cpu_topology();
-+	else if (of_have_populated_dt() && parse_dt_topology())
- 		reset_cpu_topology();
- }
-diff --git a/include/linux/topology.h b/include/linux/topology.h
-index 4660749a7303..08bf736be7c1 100644
---- a/include/linux/topology.h
-+++ b/include/linux/topology.h
-@@ -43,6 +43,8 @@
- 		if (nr_cpus_node(node))
- 
- int arch_update_cpu_topology(void);
-+int setup_acpi_cpu_topology(unsigned int cpu, int level);
-+int acpi_multisocket_count(void);
- 
- /* Conform to ACPI 2.0 SLIT distance definitions */
- #define LOCAL_DISTANCE		10
+
+Jeremy Linton (6):
+  ACPI/PPTT: Add Processor Properties Topology Table parsing
+  ACPI: Enable PPTT support on ARM64
+  drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
+    tables
+  Topology: Add cluster on die macros and arm64 decoding
+  arm64: Fixup users of topology_physical_package_id
+  arm64: topology: Enable ACPI/PPTT based CPU topology.
+
+ arch/arm64/Kconfig                |   1 +
+ arch/arm64/include/asm/topology.h |   4 +-
+ arch/arm64/kernel/cacheinfo.c     |  23 +-
+ arch/arm64/kernel/topology.c      |  76 +++++-
+ drivers/acpi/Makefile             |   1 +
+ drivers/acpi/arm64/Kconfig        |   3 +
+ drivers/acpi/pptt.c               | 508 ++++++++++++++++++++++++++++++++++++++
+ drivers/base/cacheinfo.c          |  17 +-
+ drivers/clk/clk-mb86s7x.c         |   2 +-
+ drivers/cpufreq/arm_big_little.c  |   2 +-
+ drivers/firmware/psci_checker.c   |   2 +-
+ include/linux/cacheinfo.h         |  10 +-
+ include/linux/topology.h          |   5 +
+ 13 files changed, 634 insertions(+), 20 deletions(-)
+ create mode 100644 drivers/acpi/pptt.c
+
 -- 
 2.13.5
