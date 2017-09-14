@@ -1,39 +1,48 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 14 Sep 2017 09:34:51 +0300
-Subject: [PATCH v1 5/5] mmc: Kconfig: Enable CONFIG_MMC_SDHCI_IO_ACCESSORS
-In-Reply-To: <1504097509-58983-6-git-send-email-vviswana@codeaurora.org>
-References: <1504097509-58983-1-git-send-email-vviswana@codeaurora.org>
- <1504097509-58983-6-git-send-email-vviswana@codeaurora.org>
-Message-ID: <f10addc2-5d67-3d0e-fb61-50d42f96125e@intel.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu, 14 Sep 2017 08:49:40 +0200
+Subject: [PATCH v1] ARM: dts: socfpga: fix nand compatible
+Message-ID: <20170914064940.5639-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/17 15:51, Vijay Viswanath wrote:
-> Enable CONFIG_MMC_SDHCI_IO_ACCESSORS so that SDHC controller specific
-> register read and write APIs, if registered, can be used.
+the compatible was changed with patch:
+|commit a56609c4c3f34de76d905e39160511b3c53310ac
+|Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+|Date:   Thu Mar 30 15:45:53 2017 +0900
+|
+| mtd: nand: denali_dt: enable HW_ECC_FIXUP for Altera SOCFPGA variant
+|
+| There are various customizable parameters, so several variants for
+| this IP.  A generic compatible like "denali,denali-nand-dt" is
+| useless.  Moreover, there are multiple things wrong with this string.
+|  (Refer to Rob's comment [1])
+|
+| The "denali,denali-nand-dt" was added by Altera for the SOCFPGA port.
+| Replace it with a more specific string "altr,socfpga-denali-nand".
+| There are no users (in upstream) of the old compatible string.
+|
+| The Denali IP on SOCFPGA incorporates the hardware ECC fixup engine.
+| So, this capability should be associated with the compatible.
+|
+| [1] https://lkml.org/lkml/2016/12/1/450
 
-Missing signed-off
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ arch/arm/boot/dts/socfpga.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Why don't you put this patch earlier in the patch set and then you don't
-need all the ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS ?
-
-> ---
->  drivers/mmc/host/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 2db84dd..64a9298 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -420,6 +420,7 @@ config MMC_SDHCI_MSM
->  	tristate "Qualcomm SDHCI Controller Support"
->  	depends on ARCH_QCOM || (ARM && COMPILE_TEST)
->  	depends on MMC_SDHCI_PLTFM
-> +	select CONFIG_MMC_SDHCI_IO_ACCESSORS
-
-CONFIG_MMC_SDHCI_IO_ACCESSORS -> MMC_SDHCI_IO_ACCESSORS
-
->  	help
->  	  This selects the Secure Digital Host Controller Interface (SDHCI)
->  	  support present in Qualcomm SOCs. The controller supports
-> 
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 7e24dc8e82d4..d697f5062624 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -744,7 +744,7 @@
+ 		nand0: nand at ff900000 {
+ 			#address-cells = <0x1>;
+ 			#size-cells = <0x1>;
+-			compatible = "denali,denali-nand-dt";
++			compatible = "altr,socfpga-denali-nand";
+ 			reg = <0xff900000 0x100000>,
+ 			      <0xffb80000 0x10000>;
+ 			reg-names = "nand_data", "denali_reg";
+-- 
+2.11.0
