@@ -1,186 +1,41 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 14 Sep 2017 12:01:26 +0100
-Subject: [PATCH v2 18/28] arm64/sve: Preserve SVE registers around EFI
- runtime service calls
-In-Reply-To: <1504198860-12951-19-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-19-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87d16ta6ih.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Sep 2017 13:06:59 +0200
+Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return code
+Message-ID: <20170914110709.3591691-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If we send zero-length data to stm32_qspi_tx_poll() on older
+compiler versions such as gcc-4.6, we get warned that the
+return code is uninitialized:
 
-Dave Martin <Dave.Martin@arm.com> writes:
+drivers/mtd/spi-nor/stm32-quadspi.c:248:2: error: ?ret? may be used uninitialized in this function [-Werror=uninitialized]
 
-> The EFI runtime services ABI allows EFI to make free use of the
-> FPSIMD registers during EFI runtime service calls, subject to the
-> callee-save requirements of the AArch64 procedure call standard.
->
-> However, the SVE architecture allows upper bits of the SVE vector
-> registers to be zeroed as a side-effect of FPSIMD V-register
-> writes.  This means that the SVE vector registers must be saved in
-> their entirety in order to avoid data loss: non-SVE-aware EFI
-> implementations cannot restore them correctly.
->
-> The non-IRQ case is already handled gracefully by
-> kernel_neon_begin().  For the IRQ case, this patch allocates a
-> suitable per-CPU stash buffer for the full SVE register state and
-> uses it to preserve the affected registers around EFI calls.  It is
-> currently unclear how the EFI runtime services ABI will be
-> clarified with respect to SVE, so it safest to assume that the
-> predicate registers and FFR must be saved and restored too.
->
-> No attempt is made to restore the restore the vector length after
-> a call, for now.  It is deemed rather insane for EFI to change it,
-> and contemporary EFI implementations certainly won't.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On newer compiler versions, the return code is always zero
+in this case, as the local variable gets optimized away and
+is assumed to be zero after the loop completes without error.
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+This changes the function to instead return -EINVAL if it
+ever gets called with a zero length buffer.
 
->
-> ---
->
-> Changes since v1
-> ----------------
->
-> Requested by Ard Biesheuvel:
->
-> * Fix unbalanced ifelse bracing to conform to the kernel coding style.
->
-> * Make efi_sve_state_used static.
->
-> Changes related to Alex Benn?e's comments:
->
-> * Migrate away from magic numbers for SVE_VQ_BYTES.
->
-> Other:
->
-> * Rename sve_kernel_mode_neon_setup() to sve_efi_setup().
-> The EFI FPSIMD code is something semi-independent from kernel-mode NEON
-> now, so the "neon" in the names no longer really makes sense.
->
-> * Make the EFI FPSIMD setup code dependent on CONFIG_EFI (it's not
-> supposed to work with CONFIG_EFI=n anyway).
-> ---
->  arch/arm64/kernel/fpsimd.c | 60 +++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 54 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index dd89acf..fff9fcf 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -118,11 +118,13 @@ static int sve_default_vl = -1;
->  int __ro_after_init sve_max_vl = -1;
->  /* Set of available vector lengths, as vq_to_bit(vq): */
->  static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> +static void __percpu *efi_sve_state;
->
->  #else /* ! CONFIG_ARM64_SVE */
->
->  /* Dummy declaration for code that will be optimised out: */
->  extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> +extern void __percpu *efi_sve_state;
->
->  #endif /* ! CONFIG_ARM64_SVE */
->
-> @@ -447,6 +449,23 @@ int sve_verify_vq_map(void)
->  	return ret;
->  }
->
-> +static void __init sve_efi_setup(void)
-> +{
-> +	if (!IS_ENABLED(CONFIG_EFI))
-> +		return;
-> +
-> +	/*
-> +	 * alloc_percpu() warns and prints a backtrace if this goes wrong.
-> +	 * This is evidence of a crippled system and we are returning void,
-> +	 * so no attempt is made to handle this situation here.
-> +	 */
-> +	BUG_ON(!sve_vl_valid(sve_max_vl));
-> +	efi_sve_state = __alloc_percpu(
-> +		SVE_SIG_REGS_SIZE(sve_vq_from_vl(sve_max_vl)), SVE_VQ_BYTES);
-> +	if (!efi_sve_state)
-> +		panic("Cannot allocate percpu memory for EFI SVE save/restore");
-> +}
-> +
->  void __init sve_setup(void)
->  {
->  	u64 zcr;
-> @@ -482,6 +501,8 @@ void __init sve_setup(void)
->  		sve_max_vl);
->  	pr_info("SVE: default vector length %u bytes per vector\n",
->  		sve_default_vl);
-> +
-> +	sve_efi_setup();
->  }
->
->  void fpsimd_release_thread(struct task_struct *dead_task)
-> @@ -783,6 +804,7 @@ EXPORT_SYMBOL(kernel_neon_end);
->
->  static DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
->  static DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
-> +static DEFINE_PER_CPU(bool, efi_sve_state_used);
->
->  /*
->   * EFI runtime services support functions
-> @@ -808,10 +830,24 @@ void __efi_fpsimd_begin(void)
->
->  	WARN_ON(preemptible());
->
-> -	if (may_use_simd())
-> +	if (may_use_simd()) {
->  		kernel_neon_begin();
-> -	else {
-> -		fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
-> +	} else {
-> +		/*
-> +		 * If !efi_sve_state, SVE can't be in use yet and doesn't need
-> +		 * preserving:
-> +		 */
-> +		if (system_supports_sve() && likely(efi_sve_state)) {
-> +			char *sve_state = this_cpu_ptr(efi_sve_state);
-> +
-> +			__this_cpu_write(efi_sve_state_used, true);
-> +
-> +			sve_save_state(sve_state + sve_ffr_offset(sve_max_vl),
-> +				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr);
-> +		} else {
-> +			fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
-> +		}
-> +
->  		__this_cpu_write(efi_fpsimd_state_used, true);
->  	}
->  }
-> @@ -824,10 +860,22 @@ void __efi_fpsimd_end(void)
->  	if (!system_supports_fpsimd())
->  		return;
->
-> -	if (__this_cpu_xchg(efi_fpsimd_state_used, false))
-> -		fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
-> -	else
-> +	if (!__this_cpu_xchg(efi_fpsimd_state_used, false)) {
->  		kernel_neon_end();
-> +	} else {
-> +		if (system_supports_sve() &&
-> +		    likely(__this_cpu_read(efi_sve_state_used))) {
-> +			char const *sve_state = this_cpu_ptr(efi_sve_state);
-> +
-> +			sve_load_state(sve_state + sve_ffr_offset(sve_max_vl),
-> +				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr,
-> +				       sve_vq_from_vl(sve_get_vl()) - 1);
-> +
-> +			__this_cpu_write(efi_sve_state_used, false);
-> +		} else {
-> +			fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
-> +		}
-> +	}
->  }
->
->  #endif /* CONFIG_KERNEL_MODE_NEON */
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82203
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mtd/spi-nor/stm32-quadspi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
---
-Alex Benn?e
+diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+index 86c0931543c5..711cfe7aa4bf 100644
+--- a/drivers/mtd/spi-nor/stm32-quadspi.c
++++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+@@ -227,7 +227,7 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
+ 	void (*tx_fifo)(u8 *, void __iomem *);
+ 	u32 len = cmd->len, sr;
+ 	u8 *buf = cmd->buf;
+-	int ret;
++	int ret = -EINVAL;
+ 
+ 	if (cmd->qspimode == CCR_FMODE_INDW)
+ 		tx_fifo = stm32_qspi_write_fifo;
+-- 
+2.9.0
