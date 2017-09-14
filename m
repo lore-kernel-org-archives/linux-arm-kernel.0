@@ -1,51 +1,102 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 14 Sep 2017 12:33:40 -0700
-Subject: [PATCH] arm64: efi: ignore EFI_MEMORY_XP attribute if RP and/or
- WP are set
-In-Reply-To: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
-References: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9R7ThZA_nhAMCX8+eh9V1hVXBM7PJ6BoUeeZAw0Wi5aA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 14 Sep 2017 20:40:41 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20170913222129.vi3lidawdp33zzjd@localhost>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+ <20170913172605.hjrwjf34kyy7coh4@localhost>
+ <20170913191707.GD23415@e103592.cambridge.arm.com>
+ <20170913222129.vi3lidawdp33zzjd@localhost>
+Message-ID: <20170914193944.GA24231@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 September 2017 at 12:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The UEFI memory map
+On Wed, Sep 13, 2017 at 03:21:29PM -0700, Catalin Marinas wrote:
+> On Wed, Sep 13, 2017 at 08:17:07PM +0100, Dave P Martin wrote:
+> > On Wed, Sep 13, 2017 at 10:26:05AM -0700, Catalin Marinas wrote:
+> > > On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
+> > > > +/*
+> > > > + * Trapped SVE access
+> > > > + */
+> > > > +void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+> > > > +{
+> > > > +	/* Even if we chose not to use SVE, the hardware could still trap: */
+> > > > +	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
+> > > > +		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+> > > > +		return;
+> > > > +	}
+> > > > +
+> > > > +	task_fpsimd_save();
+> > > > +
+> > > > +	sve_alloc(current);
+> > > > +	fpsimd_to_sve(current);
+> > > > +	if (test_and_set_thread_flag(TIF_SVE))
+> > > > +		WARN_ON(1); /* SVE access shouldn't have trapped */
+> > > > +
+> > > > +	task_fpsimd_load();
+> > > > +}
+> > > 
+> > > When this function is entered, do we expect TIF_SVE to always be
+> > > cleared? It's worth adding a comment on the expected conditions. If
+> > 
+> > Yes, and this is required for correctness, as you observe.
+> > 
+> > I had a BUG_ON() here which I removed, but it makes sense to add a
+> > comment to capture the precondition here, and how it is satisfied.
+> > 
+> > > that's the case, task_fpsimd_save() would only save the FPSIMD state
+> > > which is fine. However, you subsequently transfer the FPSIMD state to
+> > > SVE, set TIF_SVE and restore the full SVE state. If we don't care about
+> > > the SVE state here, can we call task_fpsimd_load() *before* setting
+> > > TIF_SVE?
+> > 
+> > There should be no way to reach this code with TIF_SVE set, unless
+> > task_fpsimd_load() sets the CPACR trap bit wrongly, or the hardware is
+> > broken -- either of which is a bug.
+> 
+> Thanks for confirming my assumptions. What I meant was rewriting the
+> above function as:
+> 
+> 	/* reset the SVE state (other than FPSIMD) */
+> 	task_fpsimd_save();
+> 	task_fpsimd_load();
 
-*spec*
+I think this works, but can you explain your rationale?
 
-> is a bit vague about how to interpret the
-> EFI_MEMORY_XP attribute when it is combined with EFI_MEMORY_RP and/or
-> EFI_MEMORY_WP, which have retroactively been redefined as cacheability
-> attributes rather than permission attributes.
->
-> So let's ignore EFI_MEMORY_XP if _RP and/or _WP are also set. In this
-> case, it is likely that they are being used to describe the capability
-> of the region (i.e., whether it has the controls to reconfigure it as
-> non-executable) rather than the nature of the contents of the region
-> (i.e., whether it contains data that we will never attempt to execute)
->
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 82cd07592519..f85ac58d08a3 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -48,7 +48,9 @@ static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
->                 return pgprot_val(PAGE_KERNEL_ROX);
->
->         /* RW- */
-> -       if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
-> +       if (((attr & (EFI_MEMORY_RP | EFI_MEMORY_WP | EFI_MEMORY_XP)) ==
-> +            EFI_MEMORY_XP) ||
-> +           type != EFI_RUNTIME_SERVICES_CODE)
->                 return pgprot_val(PAGE_KERNEL);
->
->         /* RWX */
-> --
-> 2.11.0
->
+I think the main effect of your suggestion is that it is cheaper, due
+to eliminating some unnecessary load/store operations.
+
+We could go one better, and do
+
+	mov	v0.16b, v0.16b
+	mov	v1.16b, v1.16b
+	// ...
+	mov	v31.16b, v31.16b
+
+which doesn't require any memory access.
+
+But I still prefer to zero p0..p15, ffr for cleanliness, even though
+the SVE programmer's model doesn't require this (unlike for the Z-reg
+high bits where we do need to zero them in order not to violate the
+programmer's model).
+
+Currently sve_alloc()+task_fpsimd_load() ensures that all the non-FPSIMD
+regs are zeroed too, in addition to the Z-reg high bits.
+
+So we might want a special-purpose helper -- if so, we can do it all
+with no memory access.
+
+	pfalse	p0.b
+	// ..
+	pfalse	p15.b
+	wrffr	p0.b
+
+This would allow the memset-zero an sve_alloc() to be removed, but I
+would need to check what other code is relying on it.
+
+I guess I hadn't done this because I viewed it as an optimisation.
+
+Thoughts?
+
+Cheers
+---Dave
