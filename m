@@ -1,58 +1,112 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 14 Sep 2017 10:14:01 +0200
-Subject: [PATCH v1 1/2] watchdog: dw_wdt: add stop watchdog operation
-Message-ID: <20170914081402.7893-1-o.rempel@pengutronix.de>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 14 Sep 2017 09:47:05 +0100
+Subject: [PATCH v2 12/28] arm64/sve: Support vector length resetting for
+ new processes
+In-Reply-To: <1504198860-12951-13-git-send-email-Dave.Martin@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-13-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87k211acqe.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-The only way of stopping the watchdog is by resetting it.
-Add the watchdog op for stopping the device and reset if
-a reset line is provided.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-watchdog at vger.kernel.org
----
- drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> It's desirable to be able to reset the vector length to some sane
+> default for new processes, since the new binary and its libraries
+> processes may or may not be SVE-aware.
+>
+> This patch tracks the desired post-exec vector length (if any) in a
+> new thread member sve_vl_onexec, and adds a new thread flag
+> TIF_SVE_VL_INHERIT to control whether to inherit or reset the
+> vector length.  Currently these are inactive.  Subsequent patches
+> will provide the capability to configure them.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-index 36be987ff9ef..50d8a6a5b5ac 100644
---- a/drivers/watchdog/dw_wdt.c
-+++ b/drivers/watchdog/dw_wdt.c
-@@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
- 	return 0;
- }
- 
-+static int dw_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
-+
-+	if (IS_ERR(dw_wdt->rst)) {
-+		dev_warn(wdd->parent, "No reset line. Will not stop.\n");
-+		return PTR_ERR(dw_wdt->rst);
-+	}
-+
-+	reset_control_assert(dw_wdt->rst);
-+	reset_control_deassert(dw_wdt->rst);
-+
-+	return 0;
-+}
-+
- static int dw_wdt_restart(struct watchdog_device *wdd,
- 			  unsigned long action, void *data)
- {
-@@ -173,6 +188,7 @@ static const struct watchdog_info dw_wdt_ident = {
- static const struct watchdog_ops dw_wdt_ops = {
- 	.owner		= THIS_MODULE,
- 	.start		= dw_wdt_start,
-+	.stop		= dw_wdt_stop,
- 	.ping		= dw_wdt_ping,
- 	.set_timeout	= dw_wdt_set_timeout,
- 	.get_timeleft	= dw_wdt_get_timeleft,
--- 
-2.11.0
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+>
+> ---
+>
+> Changes since v1
+> ----------------
+>
+> Requested by Alex Benn?e:
+>
+> * Make sve_vl_onexec an unsigned int: that's the type used virtually
+> everywhere else, and the memory saving is too minor to be interesting.
+> ---
+>  arch/arm64/include/asm/processor.h   |  1 +
+>  arch/arm64/include/asm/thread_info.h |  1 +
+>  arch/arm64/kernel/fpsimd.c           | 16 ++++++++++++----
+>  3 files changed, 14 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 4831d28..3faceac 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -87,6 +87,7 @@ struct thread_struct {
+>  	struct fpsimd_state	fpsimd_state;
+>  	void			*sve_state;	/* SVE registers, if any */
+>  	unsigned int		sve_vl;		/* SVE vector length */
+> +	unsigned int		sve_vl_onexec;	/* SVE vl after next exec */
+>  	unsigned long		fault_address;	/* fault info */
+>  	unsigned long		fault_code;	/* ESR_EL1 value */
+>  	struct debug_info	debug;		/* debugging */
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index f0880fc..d3568ab 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -92,6 +92,7 @@ void arch_setup_new_exec(void);
+>  #define TIF_SINGLESTEP		21
+>  #define TIF_32BIT		22	/* 32bit process */
+>  #define TIF_SVE			23	/* Scalable Vector Extension in use */
+> +#define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
+>
+>  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+>  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 9b1ebd7..e20b44d 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -106,6 +106,9 @@
+>   */
+>  static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+>
+> +/* Default VL for tasks that don't set it explicitly: */
+> +static int sve_default_vl = SVE_VL_MIN;
+> +
+>  static void sve_free(struct task_struct *task)
+>  {
+>  	kfree(task->thread.sve_state);
+> @@ -380,15 +383,20 @@ void fpsimd_flush_thread(void)
+>  		 * If a bug causes this to go wrong, we make some noise and
+>  		 * try to fudge thread.sve_vl to a safe value here.
+>  		 */
+> -		vl = current->thread.sve_vl;
+> -
+> -		if (vl == 0)
+> -			vl = SVE_VL_MIN;
+> +		vl = current->thread.sve_vl_onexec ?
+> +			current->thread.sve_vl_onexec : sve_default_vl;
+>
+>  		if (WARN_ON(!sve_vl_valid(vl)))
+>  			vl = SVE_VL_MIN;
+>
+>  		current->thread.sve_vl = vl;
+> +
+> +		/*
+> +		 * If the task is not set to inherit, ensure that the vector
+> +		 * length will be reset by a subsequent exec:
+> +		 */
+> +		if (!test_thread_flag(TIF_SVE_VL_INHERIT))
+> +			current->thread.sve_vl_onexec = 0;
+>  	}
+>
+>  	set_thread_flag(TIF_FOREIGN_FPSTATE);
+
+
+--
+Alex Benn?e
