@@ -1,32 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Sep 2017 09:54:40 +0200
-Subject: [PATCH] ARM: sun7i: a20: enable ac/battery power supplies for
- Lamobo R1 board
-In-Reply-To: <20170913132130.56551-1-icenowy@aosc.io>
-References: <20170913132130.56551-1-icenowy@aosc.io>
-Message-ID: <20170914075440.6tpmom4l26wm6g6b@flea.lan>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 14 Sep 2017 09:56:50 +0200
+Subject: [PATCH 0/2] stm32 clocksource driver rework
+Message-ID: <1505375812-19037-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 09:21:30PM +0800, Icenowy Zheng wrote:
-> The Lamobo R1 board connected the ACIN of the AXP209 PMIC to a MicroUSB
-> port, and the battery input is connected to a generic connector.
-> 
-> Enable these two power supplies in the device tree.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+These patch implements clocksource and clockevent by using only one hardware block.
+It also limits usage of clocksource to 32 bits timers because 16 bits ones
+aren't enough accurate.
+Series includes minor clean up in structures, function prototypes and driver name.
 
-Applied for 4.15, thanks!
-Maxime
+Since 16 bits timers become useless it also removes them from stm32f4 and
+stm32f7 devicetree.
+
+Benjamin Gaignard (2):
+  clocksource: stm32: rework driver to use only one timer
+  arm: dts: stm32: remove useless clocksource nodes
+
+ arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
+ arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
+ drivers/clocksource/timer-stm32.c | 259 +++++++++++++++++++++++---------------
+ 3 files changed, 155 insertions(+), 168 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170914/00bf11de/attachment.sig>
+2.7.4
