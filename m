@@ -1,75 +1,57 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Sep 2017 10:35:28 +0100
-Subject: [PATCH v2 15/28] arm64: cpufeature: Move sys_caps_initialised
- declarations
-In-Reply-To: <1504198860-12951-16-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-16-git-send-email-Dave.Martin@arm.com>
-Message-ID: <b963c108-ed26-3459-0ce1-ccf885050aff@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 14 Sep 2017 11:38:45 +0200
+Subject: [PATCH v1 03/10] clk: at91: pmc: Support backup for programmable
+ clocks
+In-Reply-To: <CAGkQfmOZBi4tzUSEAD7J+w_v+pZ_yFgPRBaYaLnW-ptFZO0rvg@mail.gmail.com>
+References: <20170908153604.28383-1-romain.izard.pro@gmail.com>
+ <20170908153604.28383-4-romain.izard.pro@gmail.com>
+ <b0c7e816-4a7c-609d-2bc7-281fc6ca751d@microchip.com>
+ <20170913170310.grfv7j5xvh7chjdo@piout.net>
+ <CAGkQfmOZBi4tzUSEAD7J+w_v+pZ_yFgPRBaYaLnW-ptFZO0rvg@mail.gmail.com>
+Message-ID: <dc318434-cf3e-6cb9-2072-7b8ec45aed97@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/17 18:00, Dave Martin wrote:
-> update_cpu_features() currently cannot tell whether it is being
-> called during early or late secondary boot.  This doesn't
-> desperately matter for anything it currently does.
->
-> However, SVE will need to know here whether the set of available
-> vector lengths is fixed of still to be determined when booting a
-> CPU so that it can be updated appropriately.
->
-> This patch simply moves the sys_caps_initialised stuff to the top
-> of the file so that it can be more widely.  There doesn't seem to
-> be a more obvious place to put it.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
-> ---
->  arch/arm64/kernel/cpufeature.c | 30 +++++++++++++++---------------
->  1 file changed, 15 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index cd52d36..43ba8df 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -51,6 +51,21 @@ unsigned int compat_elf_hwcap2 __read_mostly;
->  DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->  EXPORT_SYMBOL(cpu_hwcaps);
->
-> +/*
-> + * Flag to indicate if we have computed the system wide
-> + * capabilities based on the boot time active CPUs. This
-> + * will be used to determine if a new booting CPU should
-> + * go through the verification process to make sure that it
-> + * supports the system capabilities, without using a hotplug
-> + * notifier.
-> + */
-> +static bool sys_caps_initialised;
-> +
-> +static inline void set_sys_caps_initialised(void)
-> +{
-> +	sys_caps_initialised = true;
-> +}
-> +
->  static int dump_cpu_hwcaps(struct notifier_block *self, unsigned long v, void *p)
->  {
->  	/* file-wide pr_fmt adds "CPU features: " prefix */
-> @@ -1041,21 +1056,6 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
->  }
->
->  /*
-> - * Flag to indicate if we have computed the system wide
-> - * capabilities based on the boot time active CPUs. This
-> - * will be used to determine if a new booting CPU should
-> - * go through the verification process to make sure that it
-> - * supports the system capabilities, without using a hotplug
-> - * notifier.
-> - */
-> -static bool sys_caps_initialised;
-> -
-> -static inline void set_sys_caps_initialised(void)
-> -{
-> -	sys_caps_initialised = true;
-> -}
+On 14/09/2017 at 09:41, romain izard wrote:
+> 2017-09-13 19:03 GMT+02:00 Alexandre Belloni
+> <alexandre.belloni@free-electrons.com>:
+>> On 13/09/2017 at 14:29:35 +0200, Nicolas Ferre wrote:
+>>> On 08/09/2017 at 17:35, Romain Izard wrote:
+>>>> From: Romain Izard <romain.izard@mobile-devices.fr>
+>>>>
+>>>> Save and restore the System Clock and Programmable Clock register for
+>>>> the backup use case.
+>>>
+>>> "System Clock" seems to be handled in another patch.
+>>>
+>>>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+>>>> ---
+>>>>  drivers/clk/at91/pmc.c | 5 +++++
+>>>>  1 file changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+>>>> index 07dc2861ad3f..5421b03553ec 100644
+>>>> --- a/drivers/clk/at91/pmc.c
+>>>> +++ b/drivers/clk/at91/pmc.c
+>>>> @@ -66,6 +66,7 @@ static struct
+>>>>     u32 pcr[PMC_MAX_IDS];
+>>>>     u32 audio_pll0;
+>>>>     u32 audio_pll1;
+>>>> +   u32 pckr[3];
+>>>
+>>> Some products have different numbers of PCK (only 2 on at91sam9x5 for
+>>> instance)...
+>>>
+>>
+>> My opinion is that it will be time to change that when multiple SoCs will
+>> need to save their registers.
+>>
+> For the next version, I'll add a #define. But as this code requires a
+> device tree node with the compatible string "atmel,sama5d2-pmc", I believe
+> that we can ignore other chips for now.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Fair enough, let's go for this.
+
+Bye,
+-- 
+Nicolas Ferre
