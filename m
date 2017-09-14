@@ -1,108 +1,71 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Thu, 14 Sep 2017 13:11:11 +0800
-Subject: [PATCH v2 3/3] media: ov7670: Add the s_power operation
-In-Reply-To: <20170914051111.18197-1-wenyou.yang@microchip.com>
-References: <20170914051111.18197-1-wenyou.yang@microchip.com>
-Message-ID: <20170914051111.18197-4-wenyou.yang@microchip.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 14 Sep 2017 13:08:42 +0800
+Subject: [PATCH] iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD
+Message-ID: <1505365722-45418-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the s_power operation which is responsible for manipulating the
-power dowm mode through the PWDN pin and the reset operation through
-the RESET pin.
+According to Spec, it is ILLEGAL to set STE.S1STALLD if STALL_MODEL
+is not 0b00, which means we should not disable stall mode if stall
+or terminate mode is not configuable.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+As Jean-Philippe's suggestion, this patch introduce a feature bit
+ARM_SMMU_FEAT_STALL_FORCE, which means smmu only supports stall force.
+Therefore, we can avoid the ILLEGAL setting of STE.S1STALLD.by checking
+ARM_SMMU_FEAT_STALL_FORCE.
+
+This patch keeps the ARM_SMMU_FEAT_STALLS as the meaning of stall supported
+(force or configuable) to easy to expand the future function, i.e. we can
+only use ARM_SMMU_FEAT_STALLS to check whether we should register fault
+handle or enable master can_stall, etc to supporte platform SVM.
+
+After apply this patch, the feature bit and S1STALLD setting will be like:
+STALL_MODEL  FEATURE                                              S1STALLD
+0b00         ARM_SMMU_FEAT_STALLS                                 0b1
+0b01         !ARM_SMMU_FEAT_STALLS && !ARM_SMMU_FEAT_STALL_FORCE  0b0
+0b10         ARM_SMMU_FEAT_STALLS && ARM_SMMU_FEAT_STALL_FORCE    0b0
+
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
 ---
+ drivers/iommu/arm-smmu-v3.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-Changes in v2:
- - Add the patch to support the get_fmt ops.
- - Remove the redundant invoking ov7670_init_gpio().
-
- drivers/media/i2c/ov7670.c | 32 +++++++++++++++++++++++++++-----
- 1 file changed, 27 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
-index efc738112e2a..d1211ae48f63 100644
---- a/drivers/media/i2c/ov7670.c
-+++ b/drivers/media/i2c/ov7670.c
-@@ -1530,6 +1530,22 @@ static int ov7670_s_register(struct v4l2_subdev *sd, const struct v4l2_dbg_regis
- }
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e67ba6c..d2a3627 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -603,7 +603,8 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_TRANS_S1		(1 << 9)
+ #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
+ #define ARM_SMMU_FEAT_STALLS		(1 << 11)
+-#define ARM_SMMU_FEAT_HYP		(1 << 12)
++#define ARM_SMMU_FEAT_STALL_FORCE	(1 << 12)
++#define ARM_SMMU_FEAT_HYP		(1 << 13)
+ 	u32				features;
+ 
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+@@ -1112,7 +1113,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
  #endif
+ 			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
  
-+static int ov7670_s_power(struct v4l2_subdev *sd, int on)
-+{
-+	struct ov7670_info *info = to_state(sd);
-+
-+	if (info->pwdn_gpio)
-+		gpiod_direction_output(info->pwdn_gpio, !on);
-+	if (on && info->resetb_gpio) {
-+		gpiod_set_value(info->resetb_gpio, 1);
-+		usleep_range(500, 1000);
-+		gpiod_set_value(info->resetb_gpio, 0);
-+		usleep_range(3000, 5000);
-+	}
-+
-+	return 0;
-+}
-+
- /* ----------------------------------------------------------------------- */
+-		if (smmu->features & ARM_SMMU_FEAT_STALLS)
++		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
++		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
  
- static const struct v4l2_subdev_core_ops ov7670_core_ops = {
-@@ -1539,6 +1555,7 @@ static const struct v4l2_subdev_core_ops ov7670_core_ops = {
- 	.g_register = ov7670_g_register,
- 	.s_register = ov7670_s_register,
- #endif
-+	.s_power = ov7670_s_power,
- };
+ 		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+@@ -2536,9 +2538,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ 			 coherent ? "true" : "false");
  
- static const struct v4l2_subdev_video_ops ov7670_video_ops = {
-@@ -1645,23 +1662,25 @@ static int ov7670_probe(struct i2c_client *client,
- 	if (ret)
- 		return ret;
- 
--	ret = ov7670_init_gpio(client, info);
--	if (ret)
--		goto clk_disable;
--
- 	info->clock_speed = clk_get_rate(info->clk) / 1000000;
- 	if (info->clock_speed < 10 || info->clock_speed > 48) {
- 		ret = -EINVAL;
- 		goto clk_disable;
+ 	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
+-	case IDR0_STALL_MODEL_STALL:
+-		/* Fallthrough */
+ 	case IDR0_STALL_MODEL_FORCE:
++		smmu->features |= ARM_SMMU_FEAT_STALL_FORCE;
++		/* Fallthrough */
++	case IDR0_STALL_MODEL_STALL:
+ 		smmu->features |= ARM_SMMU_FEAT_STALLS;
  	}
- 
-+	ret = ov7670_init_gpio(client, info);
-+	if (ret)
-+		goto clk_disable;
-+
-+	ov7670_s_power(sd, 1);
-+
- 	/* Make sure it's an ov7670 */
- 	ret = ov7670_detect(sd);
- 	if (ret) {
- 		v4l_dbg(1, debug, client,
- 			"chip found @ 0x%x (%s) is not an ov7670 chip.\n",
- 			client->addr << 1, client->adapter->name);
--		goto clk_disable;
-+		goto power_off;
- 	}
- 	v4l_info(client, "chip found @ 0x%02x (%s)\n",
- 			client->addr << 1, client->adapter->name);
-@@ -1734,6 +1753,8 @@ static int ov7670_probe(struct i2c_client *client,
- 	media_entity_cleanup(&info->sd.entity);
- hdl_free:
- 	v4l2_ctrl_handler_free(&info->hdl);
-+power_off:
-+	ov7670_s_power(sd, 0);
- clk_disable:
- 	clk_disable_unprepare(info->clk);
- 	return ret;
-@@ -1749,6 +1770,7 @@ static int ov7670_remove(struct i2c_client *client)
- 	v4l2_ctrl_handler_free(&info->hdl);
- 	clk_disable_unprepare(info->clk);
- 	media_entity_cleanup(&info->sd.entity);
-+	ov7670_s_power(sd, 0);
- 	return 0;
- }
  
 -- 
-2.13.0
+1.7.12.4
