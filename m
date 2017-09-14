@@ -1,62 +1,72 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 14 Sep 2017 13:30:12 +0200
-Subject: [PATCH v2 1/2] watchdog: dw_wdt: add stop watchdog operation
-Message-ID: <20170914113013.19157-1-o.rempel@pengutronix.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 14 Sep 2017 20:40:04 +0900
+Subject: [PATCH] arm64: remove unneeded copy to init_utsname()->machine
+Message-ID: <1505389204-17231-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+As you see in init/version.c, init_uts_ns.name.machine is initially
+set to UTS_MACHINE.  There is no point to copy the same string.
 
-The only way of stopping the watchdog is by resetting it.
-Add the watchdog op for stopping the device and reset if
-a reset line is provided.
+I dug the git history to figure out why this line is here.  My best
+guess is like this:
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-watchdog at vger.kernel.org
+ - This line has been around here since the initial support of arm64
+   by commit 9703d9d7f77c ("arm64: Kernel booting and initialisation").
+   If ARCH (=arm64) and UTS_MACHINE (=aarch64) do not match,
+   arch/$(ARCH)/Makefile is supposed to override UTS_MACHINE, but the
+   initial version of arch/arm64/Makefile missed to do that.  Instead,
+   the boot code copied "aarch64" to init_utsname()->machine.
+
+ - Commit 94ed1f2cb5d4 ("arm64: setup: report ELF_PLATFORM as the
+   machine for utsname") replaced "aarch64" with ELF_PLATFORM to
+   make "uname" to reflect the endianness.
+
+ - ELF_PLATFORM does not help to provide the UTS machine name to rpm
+   target, so commit cfa88c79462d ("arm64: Set UTS_MACHINE in the
+   Makefile") fixed it.  The commit simply replaced ELF_PLATFORM with
+   UTS_MACHINE, but missed the fact the string copy itself is no longer
+   needed.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
-changes v2:
- - test if dw_wdt->rst is NULL instead of IS_ERR
+ arch/arm64/kernel/Makefile | 2 --
+ arch/arm64/kernel/setup.c  | 2 --
+ 2 files changed, 4 deletions(-)
 
- drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-index 36be987ff9ef..a507f36302e1 100644
---- a/drivers/watchdog/dw_wdt.c
-+++ b/drivers/watchdog/dw_wdt.c
-@@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
- 	return 0;
- }
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index f2b4e81..29764d7 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -10,8 +10,6 @@ CFLAGS_REMOVE_ftrace.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
  
-+static int dw_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
-+
-+	if (!dw_wdt->rst) {
-+		dev_warn(wdd->parent, "No reset line. Will not stop.\n");
-+		return -EOPNOTSUPP;
-+	}
-+
-+	reset_control_assert(dw_wdt->rst);
-+	reset_control_deassert(dw_wdt->rst);
-+
-+	return 0;
-+}
-+
- static int dw_wdt_restart(struct watchdog_device *wdd,
- 			  unsigned long action, void *data)
+-CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
+-
+ # Object file lists.
+ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index d4b7405..b2fdb59 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -23,7 +23,6 @@
+ #include <linux/stddef.h>
+ #include <linux/ioport.h>
+ #include <linux/delay.h>
+-#include <linux/utsname.h>
+ #include <linux/initrd.h>
+ #include <linux/console.h>
+ #include <linux/cache.h>
+@@ -246,7 +245,6 @@ void __init setup_arch(char **cmdline_p)
  {
-@@ -173,6 +188,7 @@ static const struct watchdog_info dw_wdt_ident = {
- static const struct watchdog_ops dw_wdt_ops = {
- 	.owner		= THIS_MODULE,
- 	.start		= dw_wdt_start,
-+	.stop		= dw_wdt_stop,
- 	.ping		= dw_wdt_ping,
- 	.set_timeout	= dw_wdt_set_timeout,
- 	.get_timeleft	= dw_wdt_get_timeleft,
+ 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+ 
+-	sprintf(init_utsname()->machine, UTS_MACHINE);
+ 	init_mm.start_code = (unsigned long) _text;
+ 	init_mm.end_code   = (unsigned long) _etext;
+ 	init_mm.end_data   = (unsigned long) _edata;
 -- 
-2.11.0
+2.7.4
