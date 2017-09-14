@@ -1,41 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Sep 2017 13:06:59 +0200
-Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return code
-Message-ID: <20170914110709.3591691-1-arnd@arndb.de>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Thu, 14 Sep 2017 19:12:06 +0800
+Subject: [PATCH v6 5/7] arm64: kvm: route synchronous external abort
+ exceptions to el2
+In-Reply-To: <59B17449.6010201@arm.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-6-git-send-email-gengdongjiu@huawei.com>
+ <59B17449.6010201@arm.com>
+Message-ID: <fb7da3e3-d0f7-7ac6-b088-888a563d7ee7@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we send zero-length data to stm32_qspi_tx_poll() on older
-compiler versions such as gcc-4.6, we get warned that the
-return code is uninitialized:
+James,
 
-drivers/mtd/spi-nor/stm32-quadspi.c:248:2: error: ?ret? may be used uninitialized in this function [-Werror=uninitialized]
+On 2017/9/8 0:31, James Morse wrote:
+> KVM already handles external aborts from lower exception levels, no more work
+> needs doing for TEA.
+If it is firmware first solution, that is SCR_EL3.EA=1, all SError interrupt and synchronous External
+Abort exceptions are taken to EL3, so EL3 firmware will handle it, KVM no needs to handle it.
 
-On newer compiler versions, the return code is always zero
-in this case, as the local variable gets optimized away and
-is assumed to be zero after the loop completes without error.
+HCR_EL3.TEA is only for EL3 to check its value to decide to jump to hypervisor or kernel.
 
-This changes the function to instead return -EINVAL if it
-ever gets called with a zero length buffer.
+> 
+> What happens when a guest access the RAS-Error-Record registers?
+> 
+> Before we can set HCR_EL2.TERR I think we need to add some minimal emulation for
+> the registers it traps. Most of them should be RAZ/WI, so it should be
+> straightforward. (I think KVMs default is to emulate an undef for unknown traps).
+Today I added the support to do some minimal emulation for RAS-Error-Record registers, thanks
+for the good suggestion.
 
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82203
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/mtd/spi-nor/stm32-quadspi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-index 86c0931543c5..711cfe7aa4bf 100644
---- a/drivers/mtd/spi-nor/stm32-quadspi.c
-+++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-@@ -227,7 +227,7 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
- 	void (*tx_fifo)(u8 *, void __iomem *);
- 	u32 len = cmd->len, sr;
- 	u8 *buf = cmd->buf;
--	int ret;
-+	int ret = -EINVAL;
- 
- 	if (cmd->qspimode == CCR_FMODE_INDW)
- 		tx_fifo = stm32_qspi_write_fifo;
--- 
-2.9.0
+> 
+> Eventually we will want to back this with a page of memory that lets
+> Qemu/kvmtool configure what the guest can see. (i.e. the emulated machine's
+> errors for kernel-first handling.)
