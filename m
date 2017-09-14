@@ -1,41 +1,41 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Thu, 14 Sep 2017 09:19:15 +0800
-Subject: [PATCH v9 2/4] ARM: dts: rockchip: add RGA device node for RK3288
+Date: Thu, 14 Sep 2017 09:19:16 +0800
+Subject: [PATCH v9 3/4] arm64: dts: rockchip: add RGA device node for RK3399
 In-Reply-To: <1505351957-14479-1-git-send-email-jacob-chen@iotwrt.com>
 References: <1505351957-14479-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1505351957-14479-3-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1505351957-14479-4-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the RGA dt config of rk3288 SoC.
+This patch add the RGA dt config of RK3399 SoC.
 
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 11 +++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
  1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 595d395..ca6c63a 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -953,6 +953,17 @@
- 		status = "okay";
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 5b78ce1..fa15770 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1153,6 +1153,17 @@
+ 		status = "disabled";
  	};
  
-+	rga: rga at ff920000 {
-+		compatible = "rockchip,rk3288-rga";
-+		reg = <0xff920000 0x180>;
-+		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA>;
++	rga: rga at ff680000 {
++		compatible = "rockchip,rk3399-rga";
++		reg = <0x0 0xff680000 0x0 0x10000>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH 0>;
++		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
 +		clock-names = "aclk", "hclk", "sclk";
-+		power-domains = <&power RK3288_PD_VIO>;
-+		resets = <&cru SRST_RGA_CORE>, <&cru SRST_RGA_AXI>, <&cru SRST_RGA_AHB>;
++		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
 +		reset-names = "core", "axi", "ahb";
++		power-domains = <&power RK3399_PD_RGA>;
 +	};
 +
- 	vopb: vop at ff930000 {
- 		compatible = "rockchip,rk3288-vop";
- 		reg = <0xff930000 0x19c>;
+ 	efuse0: efuse at ff690000 {
+ 		compatible = "rockchip,rk3399-efuse";
+ 		reg = <0x0 0xff690000 0x0 0x80>;
 -- 
 2.7.4
