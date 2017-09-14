@@ -1,192 +1,223 @@
 From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Thu, 14 Sep 2017 13:57:54 +0100
-Subject: [PATCH v7 3/5] iommu/of: Add msi address regions reservation helper
+Date: Thu, 14 Sep 2017 13:57:53 +0100
+Subject: [PATCH v7 2/5] ACPI/IORT: Add msi address regions reservation helper
 In-Reply-To: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
 References: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170914125756.14836-4-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170914125756.14836-3-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Garry <john.garry@huawei.com>
+On some platforms msi parent address regions have to be excluded from
+normal IOVA allocation in that they are detected and decoded in a HW
+specific way by system components and so they cannot be considered normal
+IOVA address space.
 
-On some platforms msi-controller address regions have to be excluded
-from normal IOVA allocation in that they are detected and decoded in
-a HW specific way by system components and so they cannot be considered
-normal IOVA address space.
+Add a helper function that retrieves ITS address regions - the msi
+parent - through IORT device <-> ITS mappings and reserves it so that
+these regions will not be translated by IOMMU and will be excluded from
+IOVA allocations.
 
-Add a helper function that retrieves msi address regions through device
-tree msi mapping, so that these regions will not be translated by IOMMU
-and will be excluded from IOVA allocations.
-
-Signed-off-by: John Garry <john.garry@huawei.com>
 Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+[lorenzo.pieralisi at arm.com: updated commit log/added comments]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/iommu/of_iommu.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_iommu.h |  10 ++++
- 2 files changed, 127 insertions(+)
+ drivers/acpi/arm64/iort.c        | 96 ++++++++++++++++++++++++++++++++++++++--
+ drivers/irqchip/irq-gic-v3-its.c |  3 +-
+ include/linux/acpi_iort.h        |  7 ++-
+ 3 files changed, 101 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 8cb6082..f2d1a76 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -21,6 +21,7 @@
- #include <linux/iommu.h>
- #include <linux/limits.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_iommu.h>
- #include <linux/of_pci.h>
- #include <linux/slab.h>
-@@ -246,6 +247,122 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	return ops;
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index a3215ee..b2e9150 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -39,6 +39,7 @@
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+ 	struct fwnode_handle	*fw_node;
++	phys_addr_t		base_addr;
+ 	u32			translation_id;
+ };
+ 
+@@ -136,14 +137,16 @@ typedef acpi_status (*iort_find_node_callback)
+ static DEFINE_SPINLOCK(iort_msi_chip_lock);
+ 
+ /**
+- * iort_register_domain_token() - register domain token and related ITS ID
+- * to the list from where we can get it back later on.
++ * iort_register_domain_token() - register domain token along with related
++ * ITS ID and base address to the list from where we can get it back later on.
+  * @trans_id: ITS ID.
++ * @base: ITS base address.
+  * @fw_node: Domain token.
+  *
+  * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+  */
+-int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
++int iort_register_domain_token(int trans_id, phys_addr_t base,
++			       struct fwnode_handle *fw_node)
+ {
+ 	struct iort_its_msi_chip *its_msi_chip;
+ 
+@@ -153,6 +156,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+ 
+ 	its_msi_chip->fw_node = fw_node;
+ 	its_msi_chip->translation_id = trans_id;
++	its_msi_chip->base_addr = base;
+ 
+ 	spin_lock(&iort_msi_chip_lock);
+ 	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+@@ -481,6 +485,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+ 	return -ENODEV;
  }
  
++static int __maybe_unused iort_find_its_base(u32 its_id, phys_addr_t *base)
++{
++	struct iort_its_msi_chip *its_msi_chip;
++	bool match = false;
++
++	spin_lock(&iort_msi_chip_lock);
++	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
++		if (its_msi_chip->translation_id == its_id) {
++			*base = its_msi_chip->base_addr;
++			match = true;
++			break;
++		}
++	}
++	spin_unlock(&iort_msi_chip_lock);
++
++	return match ? 0 : -ENODEV;
++}
++
+ /**
+  * iort_dev_find_its_id() - Find the ITS identifier for a device
+  * @dev: The device.
+@@ -639,6 +661,72 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+ 
+ 	return err;
+ }
++
 +/**
-+ * of_iommu_msi_get_resv_regions - Reserved region driver helper
++ * iort_iommu_msi_get_resv_regions - Reserved region driver helper
 + * @dev: Device from iommu_get_resv_regions()
 + * @list: Reserved region list from iommu_get_resv_regions()
 + *
-+ * Returns: Number of reserved regions on success (0 if no associated
-+ *          msi parent), appropriate error value otherwise.
++ * Returns: Number of reserved regions on success (0 if no associated msi
++ *	     regions), appropriate error value otherwise. The ITS regions
++ *	     associated with the device are the msi reserved regions.
 + */
-+int of_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
++int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
 +{
-+	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+	struct iommu_resv_region *region;
-+	struct device_node *np;
-+	struct resource res;
-+	int i, resv = 0, mappings = 0;
++	struct acpi_iort_its_group *its;
++	struct acpi_iort_node *node, *its_node = NULL;
++	int i, resv = 0;
 +
++	node = iort_find_dev_node(dev);
++	if (!node)
++		return -ENODEV;
++
++	/*
++	 * Current logic to reserve ITS regions relies on HW topologies
++	 * where a given PCI or named component maps its IDs to only one
++	 * ITS group; if a PCI or named component can map its IDs to
++	 * different ITS groups through IORT mappings this function has
++	 * to be reworked to ensure we reserve regions for all ITS groups
++	 * a given PCI or named component may map IDs to.
++	 */
 +	if (dev_is_pci(dev)) {
-+		struct device *dma_dev, *bridge;
-+		struct of_phandle_args iommu_spec;
-+		struct pci_dev *pdev = to_pci_dev(dev);
-+		int err, count;
-+		u32 rid, map_mask;
-+		const __be32 *msi_map;
++		u32 rid;
 +
-+		bridge = pci_get_host_bridge_device(pdev);
-+		dma_dev = bridge->parent;
-+		pci_put_host_bridge_device(bridge);
-+
-+		if (!dma_dev->of_node)
-+			return -ENODEV;
-+
-+		iommu_spec.args_count = 1;
-+		np = iommu_spec.np = dma_dev->of_node;
-+		pci_for_each_dma_alias(pdev, __get_pci_rid, &iommu_spec);
-+
-+		rid = iommu_spec.args[0];
-+		if (!of_property_read_u32(np, "msi-map-mask", &map_mask))
-+			rid &= map_mask;
-+
-+		msi_map = of_get_property(np, "msi-map", NULL);
-+		if (!msi_map)
-+			return -ENODEV;
-+
-+		mappings = of_count_phandle_with_args(np, "msi-map", NULL) / 4;
-+
-+		for (i = 0, count = mappings; i < count; i++, msi_map += 4) {
-+			struct device_node *msi_node;
-+			u32 rid_base, rid_len, phandle;
-+
-+			rid_base = be32_to_cpup(msi_map + 0);
-+			phandle = be32_to_cpup(msi_map + 1);
-+			rid_len = be32_to_cpup(msi_map + 3);
-+
-+			/* check rid is within range */
-+			if (rid < rid_base || rid >= rid_base + rid_len) {
-+				mappings--;
-+				continue;
-+			}
-+
-+			msi_node = of_find_node_by_phandle(phandle);
-+			if (!msi_node)
-+				return -ENODEV;
-+
-+			err = of_address_to_resource(msi_node, 0, &res);
-+			of_node_put(msi_node);
-+			if (err)
-+				return err;
-+
-+			region = iommu_alloc_resv_region(res.start,
-+							 resource_size(&res),
-+							 prot, IOMMU_RESV_MSI);
-+			if (region) {
-+				list_add_tail(&region->list, head);
-+				resv++;
-+			}
-+		}
-+	} else if (dev->of_node) {
-+		struct device_node *msi_np;
-+		int index = 0;
-+		int tuples;
-+
-+		np = dev->of_node;
-+
-+		tuples = of_count_phandle_with_args(np, "msi-parent", NULL);
-+
-+		while (index < tuples) {
-+			int msi_cells = 0;
-+			int err;
-+
-+			msi_np = of_parse_phandle(np, "msi-parent", index);
-+			if (!msi_np)
-+				return -ENODEV;
-+
-+			of_property_read_u32(msi_np, "#msi-cells", &msi_cells);
-+
-+			err = of_address_to_resource(msi_np, 0, &res);
-+			of_node_put(msi_np);
-+			if (err)
-+				return err;
-+
-+			mappings++;
-+
-+			region = iommu_alloc_resv_region(res.start,
-+							 resource_size(&res),
-+							 prot, IOMMU_RESV_MSI);
-+			if (region) {
-+				list_add_tail(&region->list, head);
-+				resv++;
-+			}
-+			index += 1 + msi_cells;
++		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
++		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
++	} else {
++		for (i = 0; i < node->mapping_count; i++) {
++			its_node = iort_node_map_platform_id(node, NULL,
++							 IORT_MSI_TYPE, i);
++			if (its_node)
++				break;
 +		}
 +	}
 +
-+	return (resv == mappings) ? resv : -ENODEV;
++	if (!its_node)
++		return 0;
++
++	/* Move to ITS specific data */
++	its = (struct acpi_iort_its_group *)its_node->node_data;
++
++	for (i = 0; i < its->its_count; i++) {
++		phys_addr_t base;
++
++		if (!iort_find_its_base(its->identifiers[i], &base)) {
++			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++			struct iommu_resv_region *region;
++
++			region = iommu_alloc_resv_region(base, SZ_128K, prot,
++							 IOMMU_RESV_MSI);
++			if (region) {
++				list_add_tail(&region->list, head);
++				resv++;
++			}
++		}
++	}
++
++	return (resv == its->its_count) ? resv : -ENODEV;
 +}
-+
- static int __init of_iommu_init(void)
- {
- 	struct device_node *np;
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 13394ac..9267772 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -14,6 +14,9 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- extern const struct iommu_ops *of_iommu_configure(struct device *dev,
- 					struct device_node *master_np);
- 
-+extern int of_iommu_msi_get_resv_regions(struct device *dev,
-+					struct list_head *head);
-+
  #else
+ static inline
+ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+@@ -646,6 +734,8 @@ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+ static inline
+ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+ { return 0; }
++int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
++{ return -ENODEV; }
+ #endif
  
- static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-@@ -29,6 +32,13 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	return NULL;
- }
+ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 284738a..cd41780 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1951,7 +1951,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+ 		return -ENOMEM;
+ 	}
  
-+static int of_iommu_msi_get_resv_regions(struct device *dev,
-+					struct list_head *head)
-+{
-+	return -ENODEV;
-+}
-+
-+
- #endif	/* CONFIG_OF_IOMMU */
+-	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
++	err = iort_register_domain_token(its_entry->translation_id, res.start,
++					 dom_handle);
+ 	if (err) {
+ 		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+ 		       &res.start, its_entry->translation_id);
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index 8379d40..586fb95 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -26,7 +26,8 @@
+ #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
+ #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
  
- extern struct of_device_id __iommu_of_table;
+-int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
++int iort_register_domain_token(int trans_id, phys_addr_t base,
++			       struct fwnode_handle *fw_node);
+ void iort_deregister_domain_token(int trans_id);
+ struct fwnode_handle *iort_find_domain_token(int trans_id);
+ #ifdef CONFIG_ACPI_IORT
+@@ -38,6 +39,7 @@
+ /* IOMMU interface */
+ void iort_set_dma_mask(struct device *dev);
+ const struct iommu_ops *iort_iommu_configure(struct device *dev);
++int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head);
+ #else
+ static inline void acpi_iort_init(void) { }
+ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+@@ -51,6 +53,9 @@ static inline void iort_set_dma_mask(struct device *dev) { }
+ static inline
+ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ { return NULL; }
++static inline
++int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
++{ return -ENODEV; }
+ #endif
+ 
+ #endif /* __ACPI_IORT_H__ */
 -- 
 1.9.1
