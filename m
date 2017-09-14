@@ -1,58 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Sep 2017 23:38:19 +0200
-Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return
- code
-In-Reply-To: <f372a1cb-e255-b5de-510d-77ca944903b3@st.com>
-References: <20170914110709.3591691-1-arnd@arndb.de>
- <CAMuHMdU3AqGkvwDQ+hE2=3PhgCKUh1HvBx8Hkvba6XsLHAuBbg@mail.gmail.com>
- <feb9b51e-7b77-d184-2ed6-f0d33a06bbcf@st.com>
- <CAMuHMdV6G8WeWgjPcYrMYiSiu=atOSkFZHxwvSsvcwmsv9J+oA@mail.gmail.com>
- <f372a1cb-e255-b5de-510d-77ca944903b3@st.com>
-Message-ID: <CAK8P3a3WoUdxpaXAiMsC3MTWSyxyUK793R+igaQjTxdO7t+a6g@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Sep 2017 14:40:32 -0700
+Subject: [PATCH RESEND 1/1] cpufreq: imx6q: switch to Use clk_bulk_get to
+ refine clk operations
+In-Reply-To: <1504179837-18842-1-git-send-email-aisheng.dong@nxp.com>
+References: <1504179837-18842-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170914214032.GE11836@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 6:55 PM, Ludovic BARRE <ludovic.barre@st.com> wrote:
->
->
-> On 09/14/2017 05:24 PM, Geert Uytterhoeven wrote:
->>
->> Hi Ludovic,
->>
->> On Thu, Sep 14, 2017 at 5:13 PM, Ludovic BARRE <ludovic.barre@st.com>
->> wrote:
->>>
->>> On 09/14/2017 03:38 PM, Geert Uytterhoeven wrote:
->>>
->>> hi Arnd, Geert
->>>
->>> sorry, I was forgot this thread while my holidays
->>>
->>> Geert: what do you mean like "similar bugs in the future" in "If you
->>> initialized ret at the beginning, you lose the ability to catch newly
->>> introduced similar bugs in the future."
->>
->>
->> If you pre-initialize ret at the top, you loose the ability of the
->> compiler
->> to detect at compile-time if ret is never written to later. It will just
->> return
->> -EINVAL at runtime.
->>
->> With my version, if the code is modified later and another "return ret" is
->> added, the compiler will detect if there's a code path that forgets
->> to assign a value to ret.
->
-> Ok, it's clear for me.
-> I favor geert's solution.
-> Arnd what do you think ?
+On 31-08-17, 19:43, Dong Aisheng wrote:
+> Use clk_bulk_get to ease the driver clocks handling.
+> 
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Anson Huang <anson.huang@nxp.com>
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> --
+> The original one is here which depends on clk_bulk APIs.
+> https://patchwork.kernel.org/patch/9737337/
+> Now the clk_bulk APIs are already in kernel, so resend the patch.
+> (Patch title changed a bit to be more specific.)
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
+>  1 file changed, 56 insertions(+), 69 deletions(-)
 
-I usually follow the same rule that Geert explained (and quote
-https://rusty.ozlabs.org/?p=232 when I do so). In this case, there
-did not seem to be much value as the variable is not used
-afterwards, and I kept the 'single return statement' guideline.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-In the end, either version seems totally fine to me here, so
-please use Geert's if you prefer that.
-
-        Arnd
+-- 
+viresh
