@@ -1,48 +1,39 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 14 Sep 2017 08:49:40 +0200
-Subject: [PATCH v1] ARM: dts: socfpga: fix nand compatible
-Message-ID: <20170914064940.5639-1-o.rempel@pengutronix.de>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Thu, 14 Sep 2017 07:07:01 +0000
+Subject: [PATCH 8/8] ARM: drs: iwg22m: Add SPI NOR support
+In-Reply-To: <1505322341-9480-9-git-send-email-chris.paterson2@renesas.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-9-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <KL1PR06MB1702D65F9959E43ACA9789F8B86F0@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the compatible was changed with patch:
-|commit a56609c4c3f34de76d905e39160511b3c53310ac
-|Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-|Date:   Thu Mar 30 15:45:53 2017 +0900
-|
-| mtd: nand: denali_dt: enable HW_ECC_FIXUP for Altera SOCFPGA variant
-|
-| There are various customizable parameters, so several variants for
-| this IP.  A generic compatible like "denali,denali-nand-dt" is
-| useless.  Moreover, there are multiple things wrong with this string.
-|  (Refer to Rob's comment [1])
-|
-| The "denali,denali-nand-dt" was added by Altera for the SOCFPGA port.
-| Replace it with a more specific string "altr,socfpga-denali-nand".
-| There are no users (in upstream) of the old compatible string.
-|
-| The Denali IP on SOCFPGA incorporates the hardware ECC fixup engine.
-| So, this capability should be associated with the compatible.
-|
-| [1] https://lkml.org/lkml/2016/12/1/450
+Hi,
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> -----Original Message-----
+> From: devicetree-owner at vger.kernel.org [mailto:devicetree-
+> owner at vger.kernel.org] On Behalf Of Chris Paterson
+> Sent: 13 September 2017 18:06
+> To: Simon Horman <horms@verge.net.au>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
+> Russell King <linux@armlinux.org.uk>; Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com>; devicetree at vger.kernel.org; linux-renesas-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chris Paterson
+> <Chris.Paterson2@renesas.com>
+> Subject: [PATCH 8/8] ARM: drs: iwg22m: Add SPI NOR support
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 7e24dc8e82d4..d697f5062624 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -744,7 +744,7 @@
- 		nand0: nand at ff900000 {
- 			#address-cells = <0x1>;
- 			#size-cells = <0x1>;
--			compatible = "denali,denali-nand-dt";
-+			compatible = "altr,socfpga-denali-nand";
- 			reg = <0xff900000 0x100000>,
- 			      <0xffb80000 0x10000>;
- 			reg-names = "nand_data", "denali_reg";
--- 
-2.11.0
+Subject should be " ARM: dts: iwg22m: Add SPI NOR support"
+
+> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+>
+> Add support for the SPI NOR device used to boot up the system to the System on
+> Module DT.
+>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
