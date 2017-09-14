@@ -1,71 +1,66 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Thu, 14 Sep 2017 13:08:42 +0800
-Subject: [PATCH] iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD
-Message-ID: <1505365722-45418-1-git-send-email-xieyisheng1@huawei.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 14 Sep 2017 09:20:30 +0300
+Subject: [PATCH v1 1/5] mmc: sdhci-msm: fix issue with power irq
+In-Reply-To: <1504097509-58983-2-git-send-email-vviswana@codeaurora.org>
+References: <1504097509-58983-1-git-send-email-vviswana@codeaurora.org>
+ <1504097509-58983-2-git-send-email-vviswana@codeaurora.org>
+Message-ID: <1ff495dd-cb66-f49b-ed23-6994e5ccdc0f@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Spec, it is ILLEGAL to set STE.S1STALLD if STALL_MODEL
-is not 0b00, which means we should not disable stall mode if stall
-or terminate mode is not configuable.
+On 30/08/17 15:51, Vijay Viswanath wrote:
+> From: Subhash Jadavani <subhashj@codeaurora.org>
+> 
+> SDCC controller reset (SW_RST) during probe may trigger power irq if
+> previous status of PWRCTL was either BUS_ON or IO_HIGH_V. So before we
+> enable the power irq interrupt in GIC (by registering the interrupt
+> handler), we need to ensure that any pending power irq interrupt status
+> is acknowledged otherwise power irq interrupt handler would be fired
+> prematurely.
+> 
+> Signed-off-by: Subhash Jadavani <subhashj@codeaurora.org>
+> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
 
-As Jean-Philippe's suggestion, this patch introduce a feature bit
-ARM_SMMU_FEAT_STALL_FORCE, which means smmu only supports stall force.
-Therefore, we can avoid the ILLEGAL setting of STE.S1STALLD.by checking
-ARM_SMMU_FEAT_STALL_FORCE.
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-This patch keeps the ARM_SMMU_FEAT_STALLS as the meaning of stall supported
-(force or configuable) to easy to expand the future function, i.e. we can
-only use ARM_SMMU_FEAT_STALLS to check whether we should register fault
-handle or enable master can_stall, etc to supporte platform SVM.
-
-After apply this patch, the feature bit and S1STALLD setting will be like:
-STALL_MODEL  FEATURE                                              S1STALLD
-0b00         ARM_SMMU_FEAT_STALLS                                 0b1
-0b01         !ARM_SMMU_FEAT_STALLS && !ARM_SMMU_FEAT_STALL_FORCE  0b0
-0b10         ARM_SMMU_FEAT_STALLS && ARM_SMMU_FEAT_STALL_FORCE    0b0
-
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e67ba6c..d2a3627 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -603,7 +603,8 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_S1		(1 << 9)
- #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
- #define ARM_SMMU_FEAT_STALLS		(1 << 11)
--#define ARM_SMMU_FEAT_HYP		(1 << 12)
-+#define ARM_SMMU_FEAT_STALL_FORCE	(1 << 12)
-+#define ARM_SMMU_FEAT_HYP		(1 << 13)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -1112,7 +1113,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- #endif
- 			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
- 
--		if (smmu->features & ARM_SMMU_FEAT_STALLS)
-+		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
-+		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
- 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
- 
- 		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
-@@ -2536,9 +2538,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 			 coherent ? "true" : "false");
- 
- 	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
--	case IDR0_STALL_MODEL_STALL:
--		/* Fallthrough */
- 	case IDR0_STALL_MODEL_FORCE:
-+		smmu->features |= ARM_SMMU_FEAT_STALL_FORCE;
-+		/* Fallthrough */
-+	case IDR0_STALL_MODEL_STALL:
- 		smmu->features |= ARM_SMMU_FEAT_STALLS;
- 	}
- 
--- 
-1.7.12.4
+> ---
+>  drivers/mmc/host/sdhci-msm.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+> index 9d601dc..d636251 100644
+> --- a/drivers/mmc/host/sdhci-msm.c
+> +++ b/drivers/mmc/host/sdhci-msm.c
+> @@ -1250,6 +1250,21 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>  			       CORE_VENDOR_SPEC_CAPABILITIES0);
+>  	}
+>  
+> +	/*
+> +	 * Power on reset state may trigger power irq if previous status of
+> +	 * PWRCTL was either BUS_ON or IO_HIGH_V. So before enabling pwr irq
+> +	 * interrupt in GIC, any pending power irq interrupt should be
+> +	 * acknowledged. Otherwise power irq interrupt handler would be
+> +	 * fired prematurely.
+> +	 */
+> +	sdhci_msm_voltage_switch(host);
+> +
+> +	/*
+> +	 * Ensure that above writes are propogated before interrupt enablement
+> +	 * in GIC.
+> +	 */
+> +	mb();
+> +
+>  	/* Setup IRQ for handling power/voltage tasks with PMIC */
+>  	msm_host->pwr_irq = platform_get_irq_byname(pdev, "pwr_irq");
+>  	if (msm_host->pwr_irq < 0) {
+> @@ -1259,6 +1274,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>  		goto clk_disable;
+>  	}
+>  
+> +	/* Enable pwr irq interrupts */
+> +	writel_relaxed(INT_MASK, msm_host->core_mem + CORE_PWRCTL_MASK);
+> +
+>  	ret = devm_request_threaded_irq(&pdev->dev, msm_host->pwr_irq, NULL,
+>  					sdhci_msm_pwr_irq, IRQF_ONESHOT,
+>  					dev_name(&pdev->dev), host);
+> 
