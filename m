@@ -1,77 +1,32 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 14 Sep 2017 07:52:08 -0700
-Subject: [PATCH v2 1/2] watchdog: dw_wdt: add stop watchdog operation
-In-Reply-To: <20170914113013.19157-1-o.rempel@pengutronix.de>
-References: <20170914113013.19157-1-o.rempel@pengutronix.de>
-Message-ID: <20170914145208.GC7337@roeck-us.net>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 14 Sep 2017 22:52:45 +0800
+Subject: [PATCH v4 0/6] IIO-based thermal sensor driver for Allwinner H3 SoC
+Message-ID: <20170914145251.21784-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 01:30:12PM +0200, Oleksij Rempel wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> The only way of stopping the watchdog is by resetting it.
-> Add the watchdog op for stopping the device and reset if
-> a reset line is provided.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: linux-watchdog at vger.kernel.org
-> ---
-> 
-> changes v2:
->  - test if dw_wdt->rst is NULL instead of IS_ERR
-> 
->  drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> index 36be987ff9ef..a507f36302e1 100644
-> --- a/drivers/watchdog/dw_wdt.c
-> +++ b/drivers/watchdog/dw_wdt.c
-> @@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
->  	return 0;
->  }
->  
-> +static int dw_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
-> +
-> +	if (!dw_wdt->rst) {
-> +		dev_warn(wdd->parent, "No reset line. Will not stop.\n");
-> +		return -EOPNOTSUPP;
+Allwiner H3 SoC has a thermal sensor, which is a large refactored version of
+the old Allwinner "GPADC" (although it have already only thermal part left
+in A33).
 
-Sorry, not the way to go. It now reports an error to user space when
-there was none previously, and it still reboots the system. Plus, this
-was a perfectly fine condition previously, and the reset line is optional.
-It is not appropriate to generate a warning for a perfectly valid
-condition.
+This patch tried to add support for the sensor in H3 based on the A33 thermal
+sensor driver by Quentin Schulz, which is already merged.
 
-You can not change behavior for existing users.
+Icenowy Zheng (6):
+  dt-bindings: update the Allwinner GPADC device tree binding for H3
+  iio: adc: sun4i-gpadc-iio: rename A33-specified registers to contain
+    A33
+  iio: adc: sun4i-gpadc-iio: rework code for supporting newer THS
+    variants
+  iio: adc: sun4i-gpadc-iio: add support for H3 thermal sensor
+  ARM: sun8i: h3: add support for the thermal sensor in H3
+  ARM: sun8i: h3: add partial CPU thermal zone
 
-Guenter
+ .../devicetree/bindings/mfd/sun4i-gpadc.txt        |  30 +++-
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  26 ++++
+ drivers/iio/adc/sun4i-gpadc-iio.c                  | 173 ++++++++++++++++++++-
+ include/linux/mfd/sun4i-gpadc.h                    |  33 +++-
+ 4 files changed, 249 insertions(+), 13 deletions(-)
 
-> +	}
-> +
-> +	reset_control_assert(dw_wdt->rst);
-> +	reset_control_deassert(dw_wdt->rst);
-> +
-> +	return 0;
-> +}
-> +
->  static int dw_wdt_restart(struct watchdog_device *wdd,
->  			  unsigned long action, void *data)
->  {
-> @@ -173,6 +188,7 @@ static const struct watchdog_info dw_wdt_ident = {
->  static const struct watchdog_ops dw_wdt_ops = {
->  	.owner		= THIS_MODULE,
->  	.start		= dw_wdt_start,
-> +	.stop		= dw_wdt_stop,
->  	.ping		= dw_wdt_ping,
->  	.set_timeout	= dw_wdt_set_timeout,
->  	.get_timeleft	= dw_wdt_get_timeleft,
-> -- 
-> 2.11.0
-> 
+-- 
+2.13.5
