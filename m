@@ -1,62 +1,96 @@
 From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Thu, 14 Sep 2017 13:57:52 +0100
-Subject: [PATCH v7 1/5] Doc: iommu/arm-smmu-v3: Add workaround for HiSilicon
- erratum 161010801
+Date: Thu, 14 Sep 2017 13:57:56 +0100
+Subject: [PATCH v7 5/5] iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum
+ 161010801
 In-Reply-To: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
 References: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170914125756.14836-6-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Garry <john.garry@huawei.com>
+The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
 
-The HiSilicon erratum 161010801 describes the limitation of HiSilicon platforms
-hip06/hip07 to support the SMMU mappings for MSI transactions.
-
-On these platforms, GICv3 ITS translator is presented with the deviceID
+On these platforms GICv3 ITS translator is presented with the deviceID
 by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the MSI
-payload against other DMA payload and has to modify the MSI payload.
+Hence, the PCIe controller on this platforms has to differentiate the
+MSI payload against other DMA payload and has to modify the MSI payload.
 This basically makes it difficult for this platforms to have a SMMU
 translation for MSI.
 
-This patch adds a SMMUv3 binding to flag that the SMMU breaks msi
-translation at ITS.
+This patch implements a quirk to reserve the hw msi regions in the
+smmu-v3 driver which means these address regions will not be
+translated and will be excluded from iova allocations.
 
-Also, the arm64 silicon errata is updated with this same erratum.
-
-Signed-off-by: John Garry <john.garry@huawei.com>
 Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+[John: add DT support]
+Signed-off-by: John Garry <john.garry@huawei.com>
 ---
- Documentation/arm64/silicon-errata.txt                  | 1 +
- Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 3 +++
- 2 files changed, 4 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 66e8ce1..02816b1 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -70,6 +70,7 @@ stable kernels.
- |                |                 |                 |                             |
- | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
- | Hisilicon      | Hip0{6,7}       | #161010701      | N/A                         |
-+| Hisilicon      | Hip0{6,7}       | #161010801      | N/A                         |
- |                |                 |                 |                             |
- | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
- | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-index c9abbf3..1f5f7f9 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-@@ -55,6 +55,9 @@ the PCIe specification.
- - hisilicon,broken-prefetch-cmd
-                     : Avoid sending CMD_PREFETCH_* commands to the SMMU.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 568c400..8503f4d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -608,6 +608,7 @@ struct arm_smmu_device {
  
-+- hisilicon,broken-untranslated-msi
-+                    : Reserve ITS HW region to avoid translating msi.
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+ #define ARM_SMMU_OPT_PAGE0_REGS_ONLY	(1 << 1)
++#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 2)
+ 	u32				options;
+ 
+ 	struct arm_smmu_cmdq		cmdq;
+@@ -674,6 +675,7 @@ struct arm_smmu_option_prop {
+ 
+ static struct arm_smmu_option_prop arm_smmu_options[] = {
+ 	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
++	{ ARM_SMMU_OPT_RESV_HW_MSI, "hisilicon,broken-untranslated-msi" },
+ 	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium,cn9900-broken-page1-regspace"},
+ 	{ 0, NULL},
+ };
+@@ -1934,14 +1936,29 @@ static void arm_smmu_get_resv_regions(struct device *dev,
+ 				      struct list_head *head)
+ {
+ 	struct iommu_resv_region *region;
++	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
++	struct arm_smmu_device *smmu = master->smmu;
+ 	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++	int resv = 0;
+ 
+-	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+-					 prot, IOMMU_RESV_SW_MSI);
+-	if (!region)
+-		return;
++	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
+ 
+-	list_add_tail(&region->list, head);
++		resv = iommu_dma_get_msi_resv_regions(dev, head);
 +
- - cavium,cn9900-broken-page1-regspace
-                     : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
- 		      PRIQ_PROD/CONS register access with page 0 offsets.
++		if (resv < 0) {
++			dev_warn(dev, "HW MSI region resv failed: %d\n", resv);
++			return;
++		}
++	}
++
++	if (!resv) {
++		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
++						 prot, IOMMU_RESV_SW_MSI);
++		if (!region)
++			return;
++
++		list_add_tail(&region->list, head);
++	}
+ 
+ 	iommu_dma_get_resv_regions(dev, head);
+ }
+@@ -2667,6 +2684,7 @@ static void acpi_smmu_get_options(u32 model, struct arm_smmu_device *smmu)
+ 		break;
+ 	case ACPI_IORT_SMMU_HISILICON_HI161X:
+ 		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
++		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
+ 		break;
+ 	}
+ 
 -- 
 1.9.1
