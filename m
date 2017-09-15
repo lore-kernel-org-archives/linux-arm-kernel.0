@@ -1,35 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 15 Sep 2017 14:58:09 -0700
-Subject: [GIT PULL] ARM: actions: dt64 for v4.14
-In-Reply-To: <20170905223252.9478-2-afaerber@suse.de>
-References: <20170905223252.9478-1-afaerber@suse.de>
- <20170905223252.9478-2-afaerber@suse.de>
-Message-ID: <CAOesGMgJH_LEjOr_JAj+J9LRr-dYHy2zS2PAAJM96+hece=HUw@mail.gmail.com>
+Date: Fri, 15 Sep 2017 14:59:14 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for 4.14 (round 3, late)
+In-Reply-To: <7hr2vlarbn.fsf@baylibre.com>
+References: <7hr2vlarbn.fsf@baylibre.com>
+Message-ID: <CAOesGMjKjAE=OOcOK0KRzwvBO8NS2+qB7bt5zK19ryLopZhT-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 5, 2017 at 3:32 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Olof and Arnd,
+Hi,
+
+On Tue, Sep 5, 2017 at 12:17 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Olof, Arnd,
 >
-> Here's a (late) dt64 pull for Actions Semi.
-> This clock node is needed to make use of the new full serial driver.
+> I'm aware this is pretty late, so feel free to include in a late branch,
+> or we can wait and send after -rc1.  It's late because the corresponding
+> drivers/mmc change just got merged.
 >
-> Regards,
-> Andreas
+> Thanks,
 >
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> Kevin
 >
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>
+> The following changes since commit 47884c5c746ee7c02e06fbf60480e0f13aa11dfe:
+>
+>   ARM64: dts: meson-gxl-libretech-cc: Add GPIO lines names (2017-08-22 15:37:50 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.14
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
 >
-> for you to fetch changes up to f0e12dd55384d5ef53c6e15673d39133dfca5f0a:
+> for you to fetch changes up to 485a308f05d843034b6e82f688704c44888aecde:
 >
->   arm64: dts: actions: s900-bubblegum-96: Add fake uart5 clock (2017-09-06 00:14:38 +0200)
+>   ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode (2017-09-05 12:05:01 -0700)
+>
+> ----------------------------------------------------------------
+> Amlogic 64-bit DT updates for v4.14 (round 3)
+> - updates for new MMC driver features/fixes
+> - support high-speed modes
 
-Merged into next/late. Thanks!
+I decided to merge into next/late, will send this afternoon or
+tomorrow together with a few other changes.
 
 
 -Olof
