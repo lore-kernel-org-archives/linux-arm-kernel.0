@@ -1,44 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Sep 2017 20:28:53 +0300
-Subject: [PATCH 10/11] arm64: dts: renesas: initial Eagle board device tree
-In-Reply-To: <d6f9d5ef-4864-3ffb-9406-acd65bff10aa@cogentembedded.com>
-References: <20170912210543.810219167@cogentembedded.com>
- <d6f9d5ef-4864-3ffb-9406-acd65bff10aa@cogentembedded.com>
-Message-ID: <5c680bad-39c8-a6c7-ee2a-6a2e72c33026@cogentembedded.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 15 Sep 2017 19:28:45 +0200
+Subject: [PATCH 1/2] [media] stm32-dcmi: Delete an error message for a failed
+ memory allocation in two functions
+In-Reply-To: <730b535e-39a5-2c2b-f463-e76da967a723@users.sourceforge.net>
+References: <730b535e-39a5-2c2b-f463-e76da967a723@users.sourceforge.net>
+Message-ID: <3aef408b-3e36-a777-cf78-76c98b93b63b@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2017 12:19 AM, Sergei Shtylyov wrote:
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Fri, 15 Sep 2017 18:38:25 +0200
 
->> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
->> The board has 1 debug serial port (SCIF0); include support for it,
->> so that the serial console can work.
->>
->> Based on the original (and large) patch by Vladimir Barinov
->> <vladimir.barinov@cogentembedded.com>.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
-> [...]
->> Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->> ===================================================================
->> --- /dev/null
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->> @@ -0,0 +1,45 @@
-> [...]
->> +&extal_clk {
->> +    clock-frequency = <16666666>;
->> +};
->> +
->> +&extalr_clk {
->> +    clock-frequency = <32768>;
->> +};
->> +
-> 
->     Forgot to specify SCIF_CLK -- it's populated.
+Omit an extra message for a memory allocation failure in these functions.
 
-    Unfortunately, the kernel hangs after ttySC0 is registered if I specify 
-this frequency...
+This issue was detected by using the Coccinelle software.
 
-MBR, Sergei
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/media/platform/stm32/stm32-dcmi.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 35ba6f211b79..df12d10bd230 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -1374,6 +1374,4 @@ static int dcmi_formats_init(struct stm32_dcmi *dcmi)
+ 					GFP_KERNEL);
+-	if (!dcmi->sd_formats) {
+-		dev_err(dcmi->dev, "Could not allocate memory\n");
++	if (!dcmi->sd_formats)
+ 		return -ENOMEM;
+-	}
+ 
+@@ -1410,7 +1408,5 @@ static int dcmi_framesizes_init(struct stm32_dcmi *dcmi)
+ 					   GFP_KERNEL);
+-	if (!dcmi->sd_framesizes) {
+-		dev_err(dcmi->dev, "Could not allocate memory\n");
++	if (!dcmi->sd_framesizes)
+ 		return -ENOMEM;
+-	}
+ 
+ 	/* Fill array with sensor supported framesizes */
+-- 
+2.14.1
