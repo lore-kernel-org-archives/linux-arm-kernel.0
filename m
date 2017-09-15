@@ -1,34 +1,84 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Sep 2017 22:43:24 +0300
-Subject: [PATCH v2 6/8] arm64: renesas: document Eagle board bindings
-Message-ID: <20170915194442.464361390@cogentembedded.com>
+Date: Fri, 15 Sep 2017 22:43:25 +0300
+Subject: [PATCH v2 7/8] arm64: dts: renesas: initial Eagle board device tree
+Message-ID: <20170915194445.950496886@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the Eagle device tree bindings, listing it as a supported board.
+Add the initial device  tree for  the R8A77970 SoC based Eagle board.
+The board has 1 debug serial port (SCIF0); include support for it,
+so that the serial console can work.
 
-This allows to use checkpatch.pl to validate .dts files referring to the
-Eagle board.
+Based on the original (and large) patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
-Changes in version 2:
-- renamed the patch.
+ arch/arm64/boot/dts/renesas/Makefile           |    1 
+ arch/arm64/boot/dts/renesas/r8a77970-eagle.dts |   45 +++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
 
- Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
- 1 file changed, 2 insertions(+)
-
-Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+Index: renesas/arch/arm64/boot/dts/renesas/Makefile
 ===================================================================
---- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -59,6 +59,8 @@ Boards:
-     compatible = "renesas,bockw", "renesas,r8a7778"
-   - Draak (RTP0RC77995SEB0010S)
-     compatible = "renesas,draak", "renesas,r8a77995"
-+  - Eagle (RTP0RC77970SEB0010S)
-+    compatible = "renesas,eagle", "renesas,r8a77970";
-   - Genmai (RTK772100BC00000BR)
-     compatible = "renesas,genmai", "renesas,r7s72100"
-   - GR-Peach (X28A-M01-E/F)
+--- renesas.orig/arch/arm64/boot/dts/renesas/Makefile
++++ renesas/arch/arm64/boot/dts/renesas/Makefile
+@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-sa
+ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-xs.dtb
+ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb r8a7795-es1-h3ulcb.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
++dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb
+ dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
+ 
+ always		:= $(dtb-y)
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+@@ -0,0 +1,45 @@
++/*
++ * Device Tree Source for the Eagle board
++ *
++ * Copyright (C) 2016-2017 Renesas Electronics Corp.
++ * Copyright (C) 2017 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a77970.dtsi"
++
++/ {
++	model = "Renesas Eagle board based on r8a77970";
++	compatible = "renesas,eagle", "renesas,r8a77970";
++
++	aliases {
++		serial0 = &scif0;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x38000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <16666666>;
++};
++
++&extalr_clk {
++	clock-frequency = <32768>;
++};
++
++&scif0 {
++	status = "okay";
++};
