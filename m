@@ -1,31 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Sep 2017 09:45:51 +0200
-Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
-In-Reply-To: <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <20170915074551.GF3924@verge.net.au>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 15 Sep 2017 09:49:41 +0200
+Subject: [PATCH] net: phy: Fix mask value write on gmii2rgmii converter
+ speed register.
+In-Reply-To: <20170914143454.GB27601@lunn.ch>
+References: <1505373391-18697-1-git-send-email-fahad.kunnathadi@dexceldesigns.com>
+ <20170914143454.GB27601@lunn.ch>
+Message-ID: <5f4bd003-d251-5a14-497a-9cc72dd0f160@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc Geert]
-
-On Wed, Sep 13, 2017 at 06:05:34PM +0100, Chris Paterson wrote:
-> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On 14.9.2017 16:34, Andrew Lunn wrote:
+> On Thu, Sep 14, 2017 at 12:46:31PM +0530, Fahad Kunnathadi wrote:
+>> To clear Speed Selection in MDIO control register(0x10),
+>> ie, clear bits 6 and 13 to zero while keeping other bits same.
+>> Before AND operation,The Mask value has to be perform with bitwise NOT
+>> operation (ie, ~ operator)
+>>
+>> This patch clears current speed selection before writing the
+>> new speed settings to gmii2rgmii converter
 > 
-> Add DT node for the Advanced Power Management Unit (APMU), add the
-> second CPU core, and use "renesas,apmu" as "enable-method".
+> Hi Fahad
 > 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> ---
-> This patch is based on renesas-devel-20170913-v4.13.
+> I expect you will find other issues with this driver. I pointed some
+> out at the time it is submitted, but the developers went quiet as soon
+> as it was accepted.
 
-Hi,
+Can you please point me to that email?
+I will create ticket about it in our system to get them resolved.
 
-with reference to "[PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2"
-is the CNTVOFF initialised in the boot loader of boards (in upstream)
-for this SoC? If not I expect you will have trouble with the arch timer
-on secondary CPU cores.
-
-The patch itself looks good to me.
+Thanks,
+Michal
