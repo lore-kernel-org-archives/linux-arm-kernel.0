@@ -1,65 +1,84 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Sep 2017 15:19:47 -0700
-Subject: [PATCH v4 0/7] Handle forwarded level-triggered interrupts
-Message-ID: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
+Date: Fri, 15 Sep 2017 15:19:50 -0700
+Subject: [PATCH v4 3/7] KVM: arm/arm64: Don't cache the timer IRQ level
+In-Reply-To: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
+References: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1505513994-77939-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-This series illustrates an alternative approach to Eric Auger's direct EOI
-setup patches [1] in terms of the KVM VGIC support.
+The timer was modeled after a strict idea of modelling an interrupt line
+level in software, meaning that only transitions in the level needed to
+be reported to the VGIC.  This works well for the timer, because the
+arch timer code is in complete control of the device and can track the
+transitions of the line.
 
-The idea is to maintain existing semantics for the VGIC for mapped
-level-triggered IRQs and also support the timer using mapped IRQs with
-the same VGIC support as VFIO interrupts.
+However, as we are about to support using the HW bit in the VGIC not
+just for the timer, but also for VFIO which cannot track transitions of
+the interrupt line, we have to decide on an interface for level
+triggered mapped interrupts to the GIC, which both the timer and VFIO
+can use.
 
-Based on v4.13
+VFIO only sees an asserting transition of the physical interrupt line,
+and tells the VGIC when that happens.  That means that part of the
+interrupt flow is offloaded to the hardware.
 
-Changes since v3:
- - Added a number of patches and moved patches around a bit.
- - Check for uaccesses in the mmio handler functions
- - Fixed bugs in the mmio handler functions
+To use the same interface for VFIO devices and the timer, we therefore
+have to change the timer (we cannot change VFIO because it doesn't know
+the details of the device it is assigning to a VM).
 
-Changes since v2:
- - Removed patch 5 from v2 and integrating the changes in what's now
-   patch 5 to make it easier to reuse code when adding VFIO integration.
- - Changed the virtual distributor MMIO handling to use the
-   pending_latch and more closely match the semantics of SPENDR and
-   CPENDR for both level and edge mapped interrupts.
+Luckily, changing the timer is simple, we just need to stop 'caching'
+the line level, but instead let the VGIC know the state of the timer on
+every entry to the guest, and the VGIC can ignore notifications using
+its validate mechanism.
 
-Changes since v1:
- - Added necessary changes to the timer (Patch 1)
- - Added handling of guest MMIO accesses to the virtual distributor
-   (Patch 4)
- - Addressed Marc's comments from the initial RFC (mostly renames)
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-Thanks,
--Christoffer
-
-
-Christoffer Dall (6):
-  KVM: arm/arm64: Remove redundant preemptible checks
-  KVM: arm/arm64: Factor out functionality to get vgic mmio
-    requester_vcpu
-  KVM: arm/arm64: Don't cache the timer IRQ level
-  KVM: arm/arm64: vgic: Support level-triggered mapped interrupts
-  KVM: arm/arm64: Provide a vgic interrupt line level sample function
-  KVM: arm/arm64: Support VGIC dist pend/active changes for mapped IRQs
-
-Eric Auger (1):
-  KVM: arm/arm64: vgic: restructure kvm_vgic_(un)map_phys_irq
-
- include/kvm/arm_arch_timer.h  |   2 +
- include/kvm/arm_vgic.h        |  19 +++++--
- virt/kvm/arm/arch_timer.c     |  52 ++++++++----------
- virt/kvm/arm/arm.c            |   2 -
- virt/kvm/arm/vgic/vgic-mmio.c | 122 +++++++++++++++++++++++++++++++++---------
- virt/kvm/arm/vgic/vgic-v2.c   |  29 ++++++++++
- virt/kvm/arm/vgic/vgic-v3.c   |  29 ++++++++++
- virt/kvm/arm/vgic/vgic.c      |  96 +++++++++++++++++++++++++++------
- virt/kvm/arm/vgic/vgic.h      |   8 +++
- 9 files changed, 286 insertions(+), 73 deletions(-)
-
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 8e89d63..2a5f877 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -219,9 +219,10 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	int ret;
+ 
+ 	timer_ctx->active_cleared_last = false;
++	if (timer_ctx->irq.level != new_level)
++		trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
++					   new_level);
+ 	timer_ctx->irq.level = new_level;
+-	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+-				   timer_ctx->irq.level);
+ 
+ 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
+ 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+@@ -241,6 +242,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
++	bool level;
+ 
+ 	/*
+ 	 * If userspace modified the timer registers via SET_ONE_REG before
+@@ -251,11 +253,11 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	if (unlikely(!timer->enabled))
+ 		return;
+ 
+-	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
++	level = kvm_timer_should_fire(vtimer);
++	kvm_timer_update_irq(vcpu, level, vtimer);
+ 
+-	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
++	level = kvm_timer_should_fire(ptimer);
++	kvm_timer_update_irq(vcpu, level, ptimer);
+ }
+ 
+ /* Schedule the background timer for the emulated timer. */
 -- 
 2.7.4
