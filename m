@@ -1,41 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 15 Sep 2017 10:57:24 -0700
-Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
-In-Reply-To: <20170915175439.izhfpx2ztep4evet@ninjato>
-References: <20170910214424.14945-1-linus.walleij@linaro.org>
- <20170910214424.14945-2-linus.walleij@linaro.org>
- <CAOesGMitNqwjEHugsiwsmRAVSinUEv=eprJXHRRhSHUypm=b1A@mail.gmail.com>
- <20170915175439.izhfpx2ztep4evet@ninjato>
-Message-ID: <CAOesGMi5Jx+hDGtUV_3sE8-7Rc+KronFyUmRzT55hZuRn28OPQ@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 15 Sep 2017 11:16:28 -0700
+Subject: [PATCH 2/2] [media] stm32-dcmi: Improve four size determinations
+In-Reply-To: <f4e400ea-9660-05cd-3194-cdf2495a2376@users.sourceforge.net>
+References: <730b535e-39a5-2c2b-f463-e76da967a723@users.sourceforge.net>
+ <f4e400ea-9660-05cd-3194-cdf2495a2376@users.sourceforge.net>
+Message-ID: <1505499388.27581.13.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 15, 2017 at 10:54 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Fri, Sep 15, 2017 at 10:51:28AM -0700, Olof Johansson wrote:
->> On Sun, Sep 10, 2017 at 2:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> [...]
->> > Cc: arm at kernel.org
->> > Cc: Steven Miao <realmz6@gmail.com>
->> > Cc: Ralf Baechle <ralf@linux-mips.org>
->> > Cc: Lee Jones <lee.jones@linaro.org>
->> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> > ---
->> > ARM SoC folks: requesting ACK for Wolfram to take this patch.
->> > Steven (Blackfin): requesting ACK for Wolfram to take this patch.
->> > Ralf (MIPS): requesting ACK for Wolfram to take this patch.
->> > Lee: requesting ACK for Wolfram to take this patch.
->>
->> Acked-by: Olof Johansson <olof@lixom.net>
->>
->> Wolfram: Same thing here, maybe this and the other patch can go on one
->> branch for merge in case of conflicts.
->
-> Yes, I am fine with picking all these up. However, we already found out
-> there needs to be a V2 because Geert had another series cleaning up the
-> i2c-gpio driver and it was decided to merge those two series.
+On Fri, 2017-09-15 at 19:29 +0200, SF Markus Elfring wrote:
+> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+[]
+> @@ -1372,9 +1372,8 @@ static int dcmi_formats_init(struct stm32_dcmi *dcmi)
+>  	dcmi->sd_formats = devm_kcalloc(dcmi->dev,
+> -					num_fmts, sizeof(struct dcmi_format *),
+> +					num_fmts, sizeof(*dcmi->sd_formats),
+>  					GFP_KERNEL);
+>  	if (!dcmi->sd_formats)
+>  		return -ENOMEM;
+>  
+> -	memcpy(dcmi->sd_formats, sd_fmts,
+> -	       num_fmts * sizeof(struct dcmi_format *));
+> +	memcpy(dcmi->sd_formats, sd_fmts, num_fmts * sizeof(*dcmi->sd_formats));
 
-Yep, that approach makes sense. I suspect the arm mach pieces will
-still look the same so the ack can stay in that case.
-
-
--Olof
+devm_kmemdup
