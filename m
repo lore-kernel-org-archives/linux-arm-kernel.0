@@ -1,48 +1,80 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Sep 2017 10:05:30 +0200
-Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
-In-Reply-To: <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
+Date: Fri, 15 Sep 2017 10:11:44 +0200
+Subject: [PATCH 3/8] ARM: dts: iwg22m: Enable SDHI1 controller
+In-Reply-To: <1505322341-9480-4-git-send-email-chris.paterson2@renesas.com>
 References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <20170915080530.GH3924@verge.net.au>
+ <1505322341-9480-4-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <20170915081144.GI3924@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 06:05:37PM +0100, Chris Paterson wrote:
+On Wed, Sep 13, 2017 at 06:05:36PM +0100, Chris Paterson wrote:
 > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > 
-> Enable the SDHI0 controller on iWave RZ/G1E carrier board.
-
-...
-
-> @@ -63,3 +88,15 @@
->  		micrel,led-mode = <1>;
+> Enable the SDHI1 controller on iWave RZ/G1E SoM.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> ---
+> This patch is based on renesas-devel-20170913-v4.13.
+> 
+> 
+>  arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> index e306e7c..f7f9cef 100644
+> --- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> +++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> @@ -9,6 +9,7 @@
+>   */
+>  
+>  #include "r8a7745.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+>  	compatible = "iwave,g22m", "renesas,r8a7745";
+> @@ -38,6 +39,12 @@
+>  		function = "mmc";
 >  	};
->  };
+>  
+> +	sdhi1_pins: sd1 {
+> +		groups = "sdhi1_data4", "sdhi1_ctrl";
+> +		function = "sdhi1";
+> +		power-source = <3300>;
+> +	};
 > +
-> +&sdhi0 {
-> +	pinctrl-0 = <&sdhi0_pins>;
-> +	pinctrl-1 = <&sdhi0_pins_uhs>;
-> +	pinctrl-names = "default", "state_uhs";
+>  	i2c3_pins: i2c3 {
+>  		groups = "i2c3_b";
+>  		function = "i2c3";
+> @@ -54,6 +61,16 @@
+>  	status = "okay";
+>  };
+>  
+> +&sdhi1 {
+> +	pinctrl-0 = <&sdhi1_pins>;
+> +	pinctrl-names = "default";
 > +
 > +	vmmc-supply = <&reg_3p3v>;
-> +	vqmmc-supply = <&vccq_sdhi0>;
-> +	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+> +	vqmmc-supply = <&reg_3p3v>;
+> +	cd-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
 
-I take that the absence of a wp-gpio means that that this is a ?SD slot.
-Could you help me by documenting this correctly on
-http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds ?
+No wp-gpios property means this is a ?SD slot, right?
 
-For some reason I thought that SDHI0 wasn't exposed at all, so I guess
-my reading of the documentation was incorrect.
+Do you have any plans to enable sdr-50 and sdr-104?
+Is it not supported for some reason?
 
+I don't mind if its not enabled in this patch but I would like to
+know if it can be enabled or not and reflect that information in the wiki.
 
-I think you also want sd-uhs-sdr50 here too.
-You can test it by removing the sd-uhs-sdr104 property.
+http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds
 
-> +	sd-uhs-sdr104;
 > +	status = "okay";
 > +};
+> +
+>  &i2c3 {
+>  	pinctrl-0 = <&i2c3_pins>;
+>  	pinctrl-names = "default";
 > -- 
 > 1.9.1
 > 
