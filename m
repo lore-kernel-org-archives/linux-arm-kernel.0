@@ -1,18 +1,36 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu, 14 Sep 2017 21:30:28 -0400
-Subject: [PATCH v8 10/11] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <20170915011035.GA6936@remoulade>
-References: <20170914223517.8242-1-pasha.tatashin@oracle.com>
- <20170914223517.8242-11-pasha.tatashin@oracle.com>
- <20170915011035.GA6936@remoulade>
-Message-ID: <c76f72fc-21ed-62d0-014e-8509c0374f96@oracle.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 15 Sep 2017 09:49:11 +0800
+Subject: [PATCH 1/5] dt-bindings: rockchip-thermal: Support the RV1108 SoC
+ compatible
+In-Reply-To: <1503570475-7850-2-git-send-email-rocky.hao@rock-chips.com>
+References: <1503570475-7850-1-git-send-email-rocky.hao@rock-chips.com>
+ <1503570475-7850-2-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <12073627-41af-3480-6379-839e07f5e8f3@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Rocky,
 
-Thank you for looking at this. We can't do this because page table is 
-not set until cpu_replace_ttbr1() is called. So, we can't do memset() on 
-this memory until then.
+? 2017?08?24? 18:27, Rocky Hao ??:
+> Add a new compatible for thermal founding on RV1108 SoCs.
+>
+> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
+> ---
+>   Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> index e3a6234fb1ac..43d744e5305e 100644
+> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -2,6 +2,7 @@
+>   
+>   Required properties:
+>   - compatible : should be "rockchip,<name>-tsadc"
+> +   "rockchip,rv1108-tsadc": found on RV1108 SoCs
 
-Pasha
+According to the order,  we should put the string after the 
+"rockchip,rk3399-tsadc"..., not here.
+>      "rockchip,rk3228-tsadc": found on RK3228 SoCs
+>      "rockchip,rk3288-tsadc": found on RK3288 SoCs
+>      "rockchip,rk3328-tsadc": found on RK3328 SoCs
