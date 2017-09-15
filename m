@@ -1,51 +1,30 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 15 Sep 2017 19:29:42 +0200
-Subject: [PATCH 2/2] [media] stm32-dcmi: Improve four size determinations
-In-Reply-To: <730b535e-39a5-2c2b-f463-e76da967a723@users.sourceforge.net>
-References: <730b535e-39a5-2c2b-f463-e76da967a723@users.sourceforge.net>
-Message-ID: <f4e400ea-9660-05cd-3194-cdf2495a2376@users.sourceforge.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 15 Sep 2017 10:51:28 -0700
+Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
+In-Reply-To: <20170910214424.14945-2-linus.walleij@linaro.org>
+References: <20170910214424.14945-1-linus.walleij@linaro.org>
+ <20170910214424.14945-2-linus.walleij@linaro.org>
+Message-ID: <CAOesGMitNqwjEHugsiwsmRAVSinUEv=eprJXHRRhSHUypm=b1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 15 Sep 2017 18:48:14 +0200
+On Sun, Sep 10, 2017 at 2:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+[...]
+> Cc: arm at kernel.org
+> Cc: Steven Miao <realmz6@gmail.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: requesting ACK for Wolfram to take this patch.
+> Steven (Blackfin): requesting ACK for Wolfram to take this patch.
+> Ralf (MIPS): requesting ACK for Wolfram to take this patch.
+> Lee: requesting ACK for Wolfram to take this patch.
 
-Replace the specification of data types by pointer dereferences
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
+Acked-by: Olof Johansson <olof@lixom.net>
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Wolfram: Same thing here, maybe this and the other patch can go on one
+branch for merge in case of conflicts.
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index df12d10bd230..c4895cc95cc1 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -1372,9 +1372,8 @@ static int dcmi_formats_init(struct stm32_dcmi *dcmi)
- 	dcmi->sd_formats = devm_kcalloc(dcmi->dev,
--					num_fmts, sizeof(struct dcmi_format *),
-+					num_fmts, sizeof(*dcmi->sd_formats),
- 					GFP_KERNEL);
- 	if (!dcmi->sd_formats)
- 		return -ENOMEM;
- 
--	memcpy(dcmi->sd_formats, sd_fmts,
--	       num_fmts * sizeof(struct dcmi_format *));
-+	memcpy(dcmi->sd_formats, sd_fmts, num_fmts * sizeof(*dcmi->sd_formats));
- 	dcmi->sd_format = dcmi->sd_formats[0];
-@@ -1406,3 +1405,3 @@ static int dcmi_framesizes_init(struct stm32_dcmi *dcmi)
- 	dcmi->sd_framesizes = devm_kcalloc(dcmi->dev, num_fsize,
--					   sizeof(struct dcmi_framesize),
-+					   sizeof(*dcmi->sd_framesizes),
- 					   GFP_KERNEL);
-@@ -1570,5 +1569,5 @@ static int dcmi_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	dcmi = devm_kzalloc(&pdev->dev, sizeof(struct stm32_dcmi), GFP_KERNEL);
-+	dcmi = devm_kzalloc(&pdev->dev, sizeof(*dcmi), GFP_KERNEL);
- 	if (!dcmi)
--- 
-2.14.1
+
+-Olof
