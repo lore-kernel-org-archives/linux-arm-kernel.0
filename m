@@ -1,55 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Sep 2017 22:43:26 +0300
-Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
-Message-ID: <20170915194449.538504992@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Sep 2017 21:45:12 +0200
+Subject: [PATCH] omap: hwmod: fix section mismatch warnings
+Message-ID: <20170915194527.1171677-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Eagle board  dependent part of the EtherAVB device node.
-Enable DHCP  and NFS root for the kernel booting.
+Older compilers choose not to inline _setup_clkctrl_provider(),
+leading to a harmless warning:
 
-Based  on the original (and large) patch by Vladimir Barinov.
+WARNING: vmlinux.o(.text+0x27b34): Section mismatch in reference from the function _setup_clkctrl_provider() to the function .init.text:memblock_virt_alloc_try_nid()
+The function _setup_clkctrl_provider() references
+the function __init memblock_virt_alloc_try_nid().
+This is often because _setup_clkctrl_provider lacks a __init
+annotation or the annotation of memblock_virt_alloc_try_nid is wrong.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+This annotates it as __init as well, which lets the linker
+see that it is actually correct.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Changes in version 2:
-- uncommented the "renesas,no-ether-link" property;
-- removed the "max-speed" property from the PHY node.
+ arch/arm/mach-omap2/omap_hwmod.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm64/boot/dts/renesas/r8a77970-eagle.dts |   14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-@@ -18,10 +18,11 @@
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 2dbd63239c54..91ec0ca4822b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -732,7 +732,7 @@ static int _match_clkdm(struct clockdomain *clkdm, void *user)
+ 	return 0;
+ }
  
- 	aliases {
- 		serial0 = &scif0;
-+		ethernet0 = &avb;
- 	};
+-static int _setup_clkctrl_provider(struct device_node *np)
++static int __init _setup_clkctrl_provider(struct device_node *np)
+ {
+ 	const __be32 *addrp;
+ 	struct clkctrl_provider *provider;
+@@ -761,7 +761,7 @@ static int _setup_clkctrl_provider(struct device_node *np)
+ 	return 0;
+ }
  
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -43,3 +44,14 @@
- &scif0 {
- 	status = "okay";
- };
-+
-+&avb {
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <1500>;
-+		reg = <0>;
-+	};
-+};
+-static int _init_clkctrl_providers(void)
++static int __init _init_clkctrl_providers(void)
+ {
+ 	struct device_node *np;
+ 	int ret = 0;
+-- 
+2.9.0
