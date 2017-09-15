@@ -1,143 +1,54 @@
 From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 15 Sep 2017 15:54:26 +0800
-Subject: [PATCH] arm64: dts: move berlin SoC files from marvell dir to
- synaptics dir
-Message-ID: <20170915155426.17fdf674@xhacker.debian>
+Date: Fri, 15 Sep 2017 15:57:08 +0800
+Subject: [PATCH] MAINTAINERS: Marvell berlin is now Synaptics berlin
+Message-ID: <20170915155708.1f09cc85@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Move and update device tree files as part of transition from Marvell
-berlin to Synaptics berlin.
-
-The changes are to:
- * rename dts/marvell/berlin4ct.dtsi to synaptics/berlin4ct.dtsi, and
-   update SoC to be "syna,berlin"
- * rename dts/marvell/berlin4ct-stb.dts to synaptics/berlin4ct-stb.dts
-   and update board name string.
- * rename dts/marvell/berlin4ct-dmp.dts to synaptics/berlin4ct-dmp.dts
-   and update board name string.
- * Update dts/marvell/Makefile not to build berlin dtbs
+Now that the dts files are moved to the new location, update the berlin
+entry in the MAINTAINERS.
 
 Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 ---
- arch/arm64/boot/dts/marvell/Makefile                         | 4 ----
- arch/arm64/boot/dts/synaptics/Makefile                       | 7 +++++++
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-dmp.dts | 7 ++++---
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-stb.dts | 7 ++++---
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi    | 5 +++--
- 5 files changed, 18 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm64/boot/dts/synaptics/Makefile
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-dmp.dts (90%)
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-stb.dts (90%)
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi (98%)
+ MAINTAINERS | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index 6cff81eeaae2..28f94a95c2fc 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -1,7 +1,3 @@
--# Berlin SoC Family
--dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
--dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 209306019483..d0854bc98f24 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1530,15 +1530,6 @@ ARM/MAGICIAN MACHINE SUPPORT
+ M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
+ 
+-ARM/Marvell Berlin SoC support
+-M:	Jisheng Zhang <jszhang@marvell.com>
+-M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	arch/arm/mach-berlin/
+-F:	arch/arm/boot/dts/berlin*
+-F:	arch/arm64/boot/dts/marvell/berlin*
 -
- # Mvebu SoC Family
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
-diff --git a/arch/arm64/boot/dts/synaptics/Makefile b/arch/arm64/boot/dts/synaptics/Makefile
-new file mode 100644
-index 000000000000..e2e81dd476ad
---- /dev/null
-+++ b/arch/arm64/boot/dts/synaptics/Makefile
-@@ -0,0 +1,7 @@
-+# Berlin SoC Family
-+dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
-+dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
+ ARM/Marvell Dove/MV78xx0/Orion SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
+@@ -1933,6 +1924,15 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
+ N:	stm32
+ F:	drivers/clocksource/armv7m_systick.c
+ 
++ARM/Synaptics Berlin SoC support
++M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
++M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-berlin/
++F:	arch/arm/boot/dts/berlin*
++F:	arch/arm64/boot/dts/synaptics/berlin*
 +
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
-similarity index 90%
-rename from arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-rename to arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
-index fae6c6924705..8c6bef792d34 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-+++ b/arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
-@@ -1,7 +1,8 @@
- /*
-+ * Copyright (C) 2017 Synaptics Incorporated
-  * Copyright (C) 2015 Marvell Technology Group Ltd.
-  *
-- * Author: Jisheng Zhang <jszhang@marvell.com>
-+ * Author: Jisheng Zhang <jszhang@kernel.org>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPLv2 or the X11 license, at your option. Note that this dual
-@@ -47,8 +48,8 @@
- #include "berlin4ct.dtsi"
- 
- / {
--	model = "Marvell BG4CT DMP board";
--	compatible = "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
-+	model = "Synaptics BG4CT DMP board";
-+	compatible = "syna,berlin4ct-dmp", "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
- 
- 	chosen {
- 		stdout-path = "serial0:115200n8";
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
-similarity index 90%
-rename from arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-rename to arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
-index d47edad13e68..ef18bf2d3542 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-+++ b/arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
-@@ -1,7 +1,8 @@
- /*
-+ * Copyright (C) 2017 Synaptics Incorporated
-  * Copyright (C) 2015 Marvell Technology Group Ltd.
-  *
-- * Author: Jisheng Zhang <jszhang@marvell.com>
-+ * Author: Jisheng Zhang <jszhang@kernel.org>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPLv2 or the X11 license, at your option. Note that this dual
-@@ -47,8 +48,8 @@
- #include "berlin4ct.dtsi"
- 
- / {
--	model = "Marvell BG4CT STB board";
--	compatible = "marvell,berlin4ct-stb", "marvell,berlin4ct", "marvell,berlin";
-+	model = "Synaptics BG4CT STB board";
-+	compatible = "syna,berlin4ct-stb", "marvell,berlin4ct-stb", "marvell,berlin4ct", "marvell,berlin";
- 
- 	chosen {
- 		stdout-path = "serial0:115200n8";
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/synaptics/berlin4ct.dtsi
-similarity index 98%
-rename from arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-rename to arch/arm64/boot/dts/synaptics/berlin4ct.dtsi
-index d6b800fd26d0..642ea37a25ae 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/synaptics/berlin4ct.dtsi
-@@ -1,7 +1,8 @@
- /*
-+ * Copyright (C) 2017 Synaptics Incorporated
-  * Copyright (C) 2015 Marvell Technology Group Ltd.
-  *
-- * Author: Jisheng Zhang <jszhang@marvell.com>
-+ * Author: Jisheng Zhang <jszhang@kernel.org>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPLv2 or the X11 license, at your option. Note that this dual
-@@ -45,7 +46,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
--	compatible = "marvell,berlin4ct", "marvell,berlin";
-+	compatible = "syna,berlin", "marvell,berlin4ct", "marvell,berlin";
- 	interrupt-parent = <&gic>;
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+ ARM/TANGO ARCHITECTURE
+ M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+ L:	linux-arm-kernel at lists.infradead.org
 -- 
 2.14.1
