@@ -1,835 +1,238 @@
-From: hamohammed.sa@gmail.com (Haneen Mohammed)
-Date: Fri, 15 Sep 2017 00:47:42 -0600
-Subject: [PATCH] gpu: drm: rockchip: Replace dev_* with DRM_DEV_*
-Message-ID: <20170915064742.GA8367@Haneen>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 15 Sep 2017 15:56:09 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20170913163126.GS5024@atomide.com>
+References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
+ <20170905233241.GA19231@js1304-P5Q-DELUXE>
+ <20170906133057.GH5024@atomide.com>
+ <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+ <20170913075516.GA25036@js1304-P5Q-DELUXE>
+ <20170913163126.GS5024@atomide.com>
+Message-ID: <20170915065608.GA8567@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replace instances of dev_info/err/debug with
-DRM_DEV_INFO/ERROR/WARN respectively inorder to use a drm-formatted
-specific log messages. Issue corrected with the help of the following
-Coccinelle script:
+On Wed, Sep 13, 2017 at 09:31:27AM -0700, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170913 00:54]:
+> > On Thu, Sep 07, 2017 at 09:16:51AM -0700, Tony Lindgren wrote:
+> > > I doubt that QEMU n900 boots in secure mode but instead shows
+> > > the SoC as general purpose SoC. If so, you'd have to patch the
+> > > omap3_save_secure_ram_context() to attempt to save secure RAM
+> > > context in all cases. If that works then debugging with any
+> > > omap3 board like beagleboard in QEMU should work.
+> > 
+> > Sorry for late response.
+> > 
+> > I tried to emulate beagle board by using QEMU and now I find the way
+> > and it works. However, it doesn't call omap3_save_secure_ram_context()
+> > due to different omap_type(). And, even if I call it forcibly, the
+> > system dies with prefetch abort regardless of commit 9caf25f996e8.
+> 
+> OK
+> 
+> > Could you let me know the better way to test your situation?
+> 
+> Hmm yeah it seems to always return 0x19 on GP devices at least
+> with the following test hack. But maybe that's enough for you
+> to still see some differences with your patches.
 
-@r@
-@@
+Hmm... I cannot see any difference with this test hack.
+Without 'smc' instruction, r0 should always be 0x19 (#25) and
+it's not possible to see any difference.
 
-(
--dev_info
-+DRM_DEV_INFO
-|
--dev_err
-+DRM_DEV_ERROR
-|
--dev_dbg
-+DRM_DEV_DEBUG
-)
+Anyway, I did various test in my QEMU and I cannot see any difference
+with my patches. It seems that I need to ask your help more.
 
-Signed-off-by: Haneen Mohammed <hamohammed.sa@gmail.com>
----
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 26 +++----
- drivers/gpu/drm/rockchip/cdn-dp-reg.c           |  2 +-
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c          | 90 ++++++++++++++-----------
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     | 19 +++---
- drivers/gpu/drm/rockchip/inno_hdmi.c            | 14 ++--
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c     | 12 ++--
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c      |  8 ++-
- drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c   | 18 +++--
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 32 ++++-----
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c     |  2 +-
- 10 files changed, 125 insertions(+), 98 deletions(-)
+> 
+> > Anyway, could you test linux-next with 'CONFIG_HIGHMEM = n'?
+> > I'd like to know if the issue is related to the change that
+> > all CMA memory is managed like as highmem.
+> 
+> Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
+> you need to remove it from arch/arm/mach-omap2/Kconfig that
+> selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
 
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 9606121..4d3f6ad 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -88,7 +88,7 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
- 	if (!analogix_dp_psr_supported(dp->dev))
- 		return;
+Okay. Problem would be related to address traslation. I'd like to
+check address traslation more. Could you apply following patch and
+test it? And, please send me the dmesg log and your kernel config.
+Please test this with CONFIG_DEBUG_VIRTUAL = n and CONFIG_CMA_DEBUG=y and
+CONFIG_HIGHMEM=y and with kernel bootparam 'ignore_loglevel'.
+
+It would be really appreciate if you send me two logs for before/after
+commit 9caf25f996e8.
+
+Thanks.
+
+
+-------------------->8------------------------
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 1f54e4e..545993d 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -220,6 +220,9 @@ extern const void *__pv_table_begin, *__pv_table_end;
+ 	: "r" (x), "I" (__PV_BITS_31_24)		\
+ 	: "cc")
  
--	dev_dbg(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
-+	DRM_DEV_DEBUG(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
- 
- 	spin_lock_irqsave(&dp->psr_lock, flags);
- 	if (enabled)
-@@ -110,7 +110,7 @@ static void analogix_dp_psr_work(struct work_struct *work)
- 	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
- 					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
- 	if (ret) {
--		dev_err(dp->dev, "line flag interrupt did not arrive\n");
-+		DRM_DEV_ERROR(dp->dev, "line flag interrupt did not arrive\n");
- 		return;
++extern void __virt_to_phys_debug(unsigned long x, phys_addr_t t);
++extern void __phys_to_virt_debug(phys_addr_t x, unsigned long t);
++
+ static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+ {
+ 	phys_addr_t t;
+@@ -230,6 +233,8 @@ static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+ 		__pv_stub_mov_hi(t);
+ 		__pv_add_carry_stub(x, t);
  	}
- 
-@@ -140,13 +140,13 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
- 
- 	ret = clk_prepare_enable(dp->pclk);
- 	if (ret < 0) {
--		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
-+		DRM_DEV_ERROR(dp->dev, "failed to enable pclk %d\n", ret);
- 		return ret;
- 	}
- 
- 	ret = rockchip_dp_pre_init(dp);
- 	if (ret < 0) {
--		dev_err(dp->dev, "failed to dp pre init %d\n", ret);
-+		DRM_DEV_ERROR(dp->dev, "failed to dp pre init %d\n", ret);
- 		clk_disable_unprepare(dp->pclk);
- 		return ret;
- 	}
-@@ -211,17 +211,17 @@ static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder)
- 	else
- 		val = dp->data->lcdsel_big;
- 
--	dev_dbg(dp->dev, "vop %s output to dp\n", (ret) ? "LIT" : "BIG");
-+	DRM_DEV_DEBUG(dp->dev, "vop %s output to dp\n", (ret) ? "LIT" : "BIG");
- 
- 	ret = clk_prepare_enable(dp->grfclk);
- 	if (ret < 0) {
--		dev_err(dp->dev, "failed to enable grfclk %d\n", ret);
-+		DRM_DEV_ERROR(dp->dev, "failed to enable grfclk %d\n", ret);
- 		return;
- 	}
- 
- 	ret = regmap_write(dp->grf, dp->data->lcdsel_grf_reg, val);
- 	if (ret != 0)
--		dev_err(dp->dev, "Could not write to GRF: %d\n", ret);
-+		DRM_DEV_ERROR(dp->dev, "Could not write to GRF: %d\n", ret);
- 
- 	clk_disable_unprepare(dp->grfclk);
++
++	__virt_to_phys_debug(x, t);
+ 	return t;
  }
-@@ -277,7 +277,7 @@ static int rockchip_dp_init(struct rockchip_dp_device *dp)
  
- 	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
- 	if (IS_ERR(dp->grf)) {
--		dev_err(dev, "failed to get rockchip,grf property\n");
-+		DRM_DEV_ERROR(dev, "failed to get rockchip,grf property\n");
- 		return PTR_ERR(dp->grf);
- 	}
+@@ -244,6 +249,8 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+ 	 * in place where 'r' 32 bit operand is expected.
+ 	 */
+ 	__pv_stub((unsigned long) x, t, "sub", __PV_BITS_31_24);
++
++	__phys_to_virt_debug(x, t);
+ 	return t;
+ }
  
-@@ -287,31 +287,31 @@ static int rockchip_dp_init(struct rockchip_dp_device *dp)
- 	} else if (PTR_ERR(dp->grfclk) == -EPROBE_DEFER) {
- 		return -EPROBE_DEFER;
- 	} else if (IS_ERR(dp->grfclk)) {
--		dev_err(dev, "failed to get grf clock\n");
-+		DRM_DEV_ERROR(dev, "failed to get grf clock\n");
- 		return PTR_ERR(dp->grfclk);
- 	}
+@@ -265,8 +272,7 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+ #endif
  
- 	dp->pclk = devm_clk_get(dev, "pclk");
- 	if (IS_ERR(dp->pclk)) {
--		dev_err(dev, "failed to get pclk property\n");
-+		DRM_DEV_ERROR(dev, "failed to get pclk property\n");
- 		return PTR_ERR(dp->pclk);
- 	}
+ #define virt_to_pfn(kaddr) \
+-	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+-	 PHYS_PFN_OFFSET)
++	PHYS_PFN(__virt_to_phys_nodebug((unsigned long)kaddr))
  
- 	dp->rst = devm_reset_control_get(dev, "dp");
- 	if (IS_ERR(dp->rst)) {
--		dev_err(dev, "failed to get dp reset control\n");
-+		DRM_DEV_ERROR(dev, "failed to get dp reset control\n");
- 		return PTR_ERR(dp->rst);
- 	}
+ #define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
  
- 	ret = clk_prepare_enable(dp->pclk);
- 	if (ret < 0) {
--		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
-+		DRM_DEV_ERROR(dp->dev, "failed to enable pclk %d\n", ret);
- 		return ret;
- 	}
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 841ba19..7728535 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -103,6 +103,21 @@ static void omap3_core_restore_context(void)
+ 	omap_dma_global_context_restore();
+ }
  
- 	ret = rockchip_dp_pre_init(dp);
- 	if (ret < 0) {
--		dev_err(dp->dev, "failed to pre init %d\n", ret);
-+		DRM_DEV_ERROR(dp->dev, "failed to pre init %d\n", ret);
- 		clk_disable_unprepare(dp->pclk);
- 		return ret;
- 	}
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-index b14d211..eb3042c 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-@@ -323,7 +323,7 @@ int cdn_dp_load_firmware(struct cdn_dp_device *dp, const u32 *i_mem,
- 	reg = readl(dp->regs + VER_LIB_H_ADDR) & 0xff;
- 	dp->fw_version |= reg << 24;
++static void omap3_print_secure_ram_context(void)
++{
++	int i;
++	int *sram_ctx_api_params;
++
++	sram_ctx_api_params = (int *)_omap_save_secure_sram;
++	sram_ctx_api_params += (save_secure_ram_context_sz / 4);
++	sram_ctx_api_params -= 5;
++
++	for (i = 0; i < 5; i++) {
++		pr_err("save_secure_sram()'s param: %d: 0x%x\n",
++			i, sram_ctx_api_params[i]);
++	}
++}
++
+ /*
+  * FIXME: This function should be called before entering off-mode after
+  * OMAP3 secure services have been accessed. Currently it is only called
+@@ -127,6 +142,7 @@ static void omap3_save_secure_ram_context(void)
+ 		/* Following is for error tracking, it should not happen */
+ 		if (ret) {
+ 			pr_err("save_secure_sram() returns %08x\n", ret);
++			omap3_print_secure_ram_context();
+ 			while (1)
+ 				;
+ 		}
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 38f0fde..519c294 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -615,6 +615,9 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
+ 	struct page *page;
+ 	void *ptr = NULL;
  
--	dev_dbg(dp->dev, "firmware version: %x\n", dp->fw_version);
-+	DRM_DEV_DEBUG(dp->dev, "firmware version: %x\n", dp->fw_version);
++	printk("%s\n", __func__);
++	dump_stack();
++
+ 	page = dma_alloc_from_contiguous(dev, count, order, gfp);
+ 	if (!page)
+ 		return NULL;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e46a6a4..1793024 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1651,3 +1651,23 @@ void __init early_mm_init(const struct machine_desc *mdesc)
+ 	build_mem_type_table();
+ 	early_paging_init(mdesc);
+ }
++
++extern bool cma_check_addr(phys_addr_t x);
++
++void __virt_to_phys_debug(unsigned long x, phys_addr_t t)
++{
++	if (!cma_check_addr(t))
++		return;
++
++	printk("CMA_ADDR: %s: 0x%lx to 0x%lx\n", __func__, x, (unsigned long)t);
++	dump_stack();
++}
++
++void __phys_to_virt_debug(phys_addr_t x, unsigned long t)
++{
++	if (!cma_check_addr(x))
++		return;
++
++	printk("CMA_ADDR: %s: 0x%lx to 0x%lx\n", __func__, (unsigned long)x, t);
++	dump_stack();
++}
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index a5bc92d..1fc7487 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -57,6 +57,9 @@ void *omap_sram_push_address(unsigned long size)
+ 	new_ceil = ROUND_DOWN(new_ceil, FNCPY_ALIGN);
+ 	omap_sram_ceil = IOMEM(new_ceil);
+ 
++	printk("SRAM_ADDR: %s: 0x%lx - 0x%lx\n",
++		__func__, omap_sram_ceil, omap_sram_ceil + size);
++
+ 	return (void *)omap_sram_ceil;
+ }
+ 
+@@ -89,6 +92,11 @@ void __init omap_map_sram(unsigned long start, unsigned long size,
+ 
+ 	omap_sram_reset();
+ 
++	printk("SRAM_ADDR: %s: P: 0x%lx - 0x%lx\n",
++		__func__, start, start + size);
++	printk("SRAM_ADDR: %s: V: 0x%lx - 0x%lx\n",
++		__func__, omap_sram_base, omap_sram_base + size);
++
+ 	/*
+ 	 * Looks like we need to preserve some bootloader code@the
+ 	 * beginning of SRAM for jumping to flash for reboot to work...
+diff --git a/mm/cma.c b/mm/cma.c
+index a8ababb..33a0455 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -577,3 +577,21 @@ int cma_for_each_area(int (*it)(struct cma *cma, void *data), void *data)
  
  	return 0;
  }
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 9a20b9d..ad40d15 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -430,9 +430,9 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 
- 	testdin = max_mbps_to_testdin(dsi->lane_mbps);
- 	if (testdin < 0) {
--		dev_err(dsi->dev,
--			"failed to get testdin for %dmbps lane clock\n",
--			dsi->lane_mbps);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "failed to get testdin for %dmbps lane clock\n",
-+			      dsi->lane_mbps);
- 		return testdin;
- 	}
- 
-@@ -443,7 +443,7 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 
- 	ret = clk_prepare_enable(dsi->phy_cfg_clk);
- 	if (ret) {
--		dev_err(dsi->dev, "Failed to enable phy_cfg_clk\n");
-+		DRM_DEV_ERROR(dsi->dev, "Failed to enable phy_cfg_clk\n");
- 		return ret;
- 	}
- 
-@@ -501,7 +501,7 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
--		dev_err(dsi->dev, "failed to wait for phy lock state\n");
-+		DRM_DEV_ERROR(dsi->dev, "failed to wait for phy lock state\n");
- 		goto phy_init_end;
- 	}
- 
-@@ -509,8 +509,8 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 				 val, val & STOP_STATE_CLK_LANE, 1000,
- 				 PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0)
--		dev_err(dsi->dev,
--			"failed to wait for phy clk lane stop state\n");
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "failed to wait for phy clk lane stop state\n");
- 
- phy_init_end:
- 	clk_disable_unprepare(dsi->phy_cfg_clk);
-@@ -529,8 +529,9 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
- 
- 	bpp = mipi_dsi_pixel_format_to_bpp(dsi->format);
- 	if (bpp < 0) {
--		dev_err(dsi->dev, "failed to get bpp for pixel format %d\n",
--			dsi->format);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "failed to get bpp for pixel format %d\n",
-+			      dsi->format);
- 		return bpp;
- 	}
- 
-@@ -541,7 +542,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
- 		if (tmp < max_mbps)
- 			target_mbps = tmp;
- 		else
--			dev_err(dsi->dev, "DPHY clock frequency is out of range\n");
-+			DRM_DEV_ERROR(dsi->dev,
-+				      "DPHY clock frequency is out of range\n");
- 	}
- 
- 	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
-@@ -582,8 +584,9 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
- 	struct dw_mipi_dsi *dsi = host_to_dsi(host);
- 
- 	if (device->lanes > dsi->pdata->max_data_lanes) {
--		dev_err(dsi->dev, "the number of data lanes(%u) is too many\n",
--			device->lanes);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "the number of data lanes(%u) is too many\n",
-+			      device->lanes);
- 		return -EINVAL;
- 	}
- 
-@@ -632,7 +635,8 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 				 val, !(val & GEN_CMD_FULL), 1000,
- 				 CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
--		dev_err(dsi->dev, "failed to get available command FIFO\n");
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "failed to get available command FIFO\n");
- 		return ret;
- 	}
- 
-@@ -643,7 +647,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 				 val, (val & mask) == mask,
- 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
--		dev_err(dsi->dev, "failed to write command FIFO\n");
-+		DRM_DEV_ERROR(dsi->dev, "failed to write command FIFO\n");
- 		return ret;
- 	}
- 
-@@ -663,8 +667,9 @@ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
- 		data |= tx_buf[1] << 8;
- 
- 	if (msg->tx_len > 2) {
--		dev_err(dsi->dev, "too long tx buf length %zu for short write\n",
--			msg->tx_len);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "too long tx buf length %zu for short write\n",
-+			      msg->tx_len);
- 		return -EINVAL;
- 	}
- 
-@@ -682,8 +687,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 	u32 val;
- 
- 	if (msg->tx_len < 3) {
--		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
--			msg->tx_len);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "wrong tx buf length %zu for long write\n",
-+			      msg->tx_len);
- 		return -EINVAL;
- 	}
- 
-@@ -704,8 +710,8 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 					 val, !(val & GEN_PLD_W_FULL), 1000,
- 					 CMD_PKT_STATUS_TIMEOUT_US);
- 		if (ret < 0) {
--			dev_err(dsi->dev,
--				"failed to get available write payload FIFO\n");
-+			DRM_DEV_ERROR(dsi->dev,
-+				      "failed to get available write payload FIFO\n");
- 			return ret;
- 		}
- 	}
-@@ -731,8 +737,8 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
- 		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
- 		break;
- 	default:
--		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
--			msg->type);
-+		DRM_DEV_ERROR(dsi->dev, "unsupported message type 0x%02x\n",
-+			      msg->type);
- 		ret = -EINVAL;
- 	}
- 
-@@ -935,7 +941,8 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- 		return;
- 
- 	if (clk_prepare_enable(dsi->pclk)) {
--		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "%s: Failed to enable pclk\n", __func__);
- 		return;
- 	}
- 
-@@ -967,7 +974,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 		return;
- 
- 	if (clk_prepare_enable(dsi->pclk)) {
--		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
-+		DRM_DEV_ERROR(dsi->dev,
-+			      "%s: Failed to enable pclk\n", __func__);
- 		return;
- 	}
- 
-@@ -991,7 +999,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 	 */
- 	ret = clk_prepare_enable(dsi->grf_clk);
- 	if (ret) {
--		dev_err(dsi->dev, "Failed to enable grf_clk: %d\n", ret);
-+		DRM_DEV_ERROR(dsi->dev, "Failed to enable grf_clk: %d\n", ret);
- 		return;
- 	}
- 
-@@ -1004,7 +1012,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 
- 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
- 	if (drm_panel_prepare(dsi->panel))
--		dev_err(dsi->dev, "failed to prepare panel\n");
-+		DRM_DEV_ERROR(dsi->dev, "failed to prepare panel\n");
- 
- 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
- 	drm_panel_enable(dsi->panel);
-@@ -1017,7 +1025,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 		val = pdata->dsi0_en_bit << 16;
- 
- 	regmap_write(dsi->grf_regmap, pdata->grf_switch_reg, val);
--	dev_dbg(dsi->dev, "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
-+	DRM_DEV_DEBUG(dsi->dev,
-+		      "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
- 	dsi->dpms_mode = DRM_MODE_DPMS_ON;
- 
- 	clk_disable_unprepare(dsi->grf_clk);
-@@ -1111,7 +1120,7 @@ static int dw_mipi_dsi_register(struct drm_device *drm,
- 	ret = drm_encoder_init(drm, &dsi->encoder, &dw_mipi_dsi_encoder_funcs,
- 			       DRM_MODE_ENCODER_DSI, NULL);
- 	if (ret) {
--		dev_err(dev, "Failed to initialize encoder with drm\n");
-+		DRM_DEV_ERROR(dev, "Failed to initialize encoder with drm\n");
- 		return ret;
- 	}
- 
-@@ -1133,7 +1142,7 @@ static int rockchip_mipi_parse_dt(struct dw_mipi_dsi *dsi)
- 
- 	dsi->grf_regmap = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
- 	if (IS_ERR(dsi->grf_regmap)) {
--		dev_err(dsi->dev, "Unable to get rockchip,grf\n");
-+		DRM_DEV_ERROR(dsi->dev, "Unable to get rockchip,grf\n");
- 		return PTR_ERR(dsi->grf_regmap);
- 	}
- 
-@@ -1205,14 +1214,15 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	dsi->pllref_clk = devm_clk_get(dev, "ref");
- 	if (IS_ERR(dsi->pllref_clk)) {
- 		ret = PTR_ERR(dsi->pllref_clk);
--		dev_err(dev, "Unable to get pll reference clock: %d\n", ret);
-+		DRM_DEV_ERROR(dev,
-+			      "Unable to get pll reference clock: %d\n", ret);
- 		return ret;
- 	}
- 
- 	dsi->pclk = devm_clk_get(dev, "pclk");
- 	if (IS_ERR(dsi->pclk)) {
- 		ret = PTR_ERR(dsi->pclk);
--		dev_err(dev, "Unable to get pclk: %d\n", ret);
-+		DRM_DEV_ERROR(dev, "Unable to get pclk: %d\n", ret);
- 		return ret;
- 	}
- 
-@@ -1226,7 +1236,8 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		if (ret == -ENOENT) {
- 			apb_rst = NULL;
- 		} else {
--			dev_err(dev, "Unable to get reset control: %d\n", ret);
-+			DRM_DEV_ERROR(dev,
-+				      "Unable to get reset control: %d\n", ret);
- 			return ret;
- 		}
- 	}
-@@ -1234,7 +1245,8 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	if (apb_rst) {
- 		ret = clk_prepare_enable(dsi->pclk);
- 		if (ret) {
--			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
-+			DRM_DEV_ERROR(dev,
-+				      "%s: Failed to enable pclk\n", __func__);
- 			return ret;
- 		}
- 
-@@ -1249,7 +1261,8 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
- 		if (IS_ERR(dsi->phy_cfg_clk)) {
- 			ret = PTR_ERR(dsi->phy_cfg_clk);
--			dev_err(dev, "Unable to get phy_cfg_clk: %d\n", ret);
-+			DRM_DEV_ERROR(dev,
-+				      "Unable to get phy_cfg_clk: %d\n", ret);
- 			return ret;
- 		}
- 	}
-@@ -1258,20 +1271,21 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		dsi->grf_clk = devm_clk_get(dev, "grf");
- 		if (IS_ERR(dsi->grf_clk)) {
- 			ret = PTR_ERR(dsi->grf_clk);
--			dev_err(dev, "Unable to get grf_clk: %d\n", ret);
-+			DRM_DEV_ERROR(dev, "Unable to get grf_clk: %d\n", ret);
- 			return ret;
- 		}
- 	}
- 
- 	ret = clk_prepare_enable(dsi->pllref_clk);
- 	if (ret) {
--		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
-+		DRM_DEV_ERROR(dev,
-+			      "%s: Failed to enable pllref_clk\n", __func__);
- 		return ret;
- 	}
- 
- 	ret = dw_mipi_dsi_register(drm, dsi);
- 	if (ret) {
--		dev_err(dev, "Failed to register mipi_dsi: %d\n", ret);
-+		DRM_DEV_ERROR(dev, "Failed to register mipi_dsi: %d\n", ret);
- 		goto err_pllref;
- 	}
- 
-@@ -1281,7 +1295,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 	dsi->dsi_host.dev = dev;
- 	ret = mipi_dsi_host_register(&dsi->dsi_host);
- 	if (ret) {
--		dev_err(dev, "Failed to register MIPI host: %d\n", ret);
-+		DRM_DEV_ERROR(dev, "Failed to register MIPI host: %d\n", ret);
- 		goto err_cleanup;
- 	}
- 
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index ccd5d59..1eb02a8 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -168,7 +168,7 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 
- 	hdmi->regmap = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
- 	if (IS_ERR(hdmi->regmap)) {
--		dev_err(hdmi->dev, "Unable to get rockchip,grf\n");
-+		DRM_DEV_ERROR(hdmi->dev, "Unable to get rockchip,grf\n");
- 		return PTR_ERR(hdmi->regmap);
- 	}
- 
-@@ -178,7 +178,7 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 	} else if (PTR_ERR(hdmi->vpll_clk) == -EPROBE_DEFER) {
- 		return -EPROBE_DEFER;
- 	} else if (IS_ERR(hdmi->vpll_clk)) {
--		dev_err(hdmi->dev, "failed to get grf clock\n");
-+		DRM_DEV_ERROR(hdmi->dev, "failed to get grf clock\n");
- 		return PTR_ERR(hdmi->vpll_clk);
- 	}
- 
-@@ -188,13 +188,14 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 	} else if (PTR_ERR(hdmi->grf_clk) == -EPROBE_DEFER) {
- 		return -EPROBE_DEFER;
- 	} else if (IS_ERR(hdmi->grf_clk)) {
--		dev_err(hdmi->dev, "failed to get grf clock\n");
-+		DRM_DEV_ERROR(hdmi->dev, "failed to get grf clock\n");
- 		return PTR_ERR(hdmi->grf_clk);
- 	}
- 
- 	ret = clk_prepare_enable(hdmi->vpll_clk);
- 	if (ret) {
--		dev_err(hdmi->dev, "Failed to enable HDMI vpll: %d\n", ret);
-+		DRM_DEV_ERROR(hdmi->dev,
-+			      "Failed to enable HDMI vpll: %d\n", ret);
- 		return ret;
- 	}
- 
-@@ -259,17 +260,17 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 
- 	ret = clk_prepare_enable(hdmi->grf_clk);
- 	if (ret < 0) {
--		dev_err(hdmi->dev, "failed to enable grfclk %d\n", ret);
-+		DRM_DEV_ERROR(hdmi->dev, "failed to enable grfclk %d\n", ret);
- 		return;
- 	}
- 
- 	ret = regmap_write(hdmi->regmap, hdmi->chip_data->lcdsel_grf_reg, val);
- 	if (ret != 0)
--		dev_err(hdmi->dev, "Could not write to GRF: %d\n", ret);
-+		DRM_DEV_ERROR(hdmi->dev, "Could not write to GRF: %d\n", ret);
- 
- 	clk_disable_unprepare(hdmi->grf_clk);
--	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
--		ret ? "LIT" : "BIG");
-+	DRM_DEV_DEBUG(hdmi->dev, "vop %s output to hdmi\n",
-+		      ret ? "LIT" : "BIG");
- }
- 
- static int
-@@ -368,7 +369,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 
- 	ret = rockchip_hdmi_parse_dt(hdmi);
- 	if (ret) {
--		dev_err(hdmi->dev, "Unable to parse OF data\n");
-+		DRM_DEV_ERROR(hdmi->dev, "Unable to parse OF data\n");
- 		return ret;
- 	}
- 
-diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-index 7a251a5..ee584d8 100644
---- a/drivers/gpu/drm/rockchip/inno_hdmi.c
-+++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-@@ -224,7 +224,7 @@ static void inno_hdmi_set_pwr_mode(struct inno_hdmi *hdmi, int mode)
- 		break;
- 
- 	default:
--		dev_err(hdmi->dev, "Unknown power mode %d\n", mode);
-+		DRM_DEV_ERROR(hdmi->dev, "Unknown power mode %d\n", mode);
- 	}
- }
- 
-@@ -742,8 +742,9 @@ static int inno_hdmi_i2c_xfer(struct i2c_adapter *adap,
- 	hdmi_writeb(hdmi, HDMI_INTERRUPT_STATUS1, m_INT_EDID_READY);
- 
- 	for (i = 0; i < num; i++) {
--		dev_dbg(hdmi->dev, "xfer: num: %d/%d, len: %d, flags: %#x\n",
--			i + 1, num, msgs[i].len, msgs[i].flags);
-+		DRM_DEV_DEBUG(hdmi->dev,
-+			      "xfer: num: %d/%d, len: %d, flags: %#x\n",
-+			      i + 1, num, msgs[i].len, msgs[i].flags);
- 
- 		if (msgs[i].flags & I2C_M_RD)
- 			ret = inno_hdmi_i2c_read(hdmi, &msgs[i]);
-@@ -806,7 +807,7 @@ static struct i2c_adapter *inno_hdmi_i2c_adapter(struct inno_hdmi *hdmi)
- 
- 	hdmi->i2c = i2c;
- 
--	dev_info(hdmi->dev, "registered %s I2C bus driver\n", adap->name);
-+	DRM_DEV_INFO(hdmi->dev, "registered %s I2C bus driver\n", adap->name);
- 
- 	return adap;
- }
-@@ -838,13 +839,14 @@ static int inno_hdmi_bind(struct device *dev, struct device *master,
- 
- 	hdmi->pclk = devm_clk_get(hdmi->dev, "pclk");
- 	if (IS_ERR(hdmi->pclk)) {
--		dev_err(hdmi->dev, "Unable to get HDMI pclk clk\n");
-+		DRM_DEV_ERROR(hdmi->dev, "Unable to get HDMI pclk clk\n");
- 		return PTR_ERR(hdmi->pclk);
- 	}
- 
- 	ret = clk_prepare_enable(hdmi->pclk);
- 	if (ret) {
--		dev_err(hdmi->dev, "Cannot enable HDMI pclk clock: %d\n", ret);
-+		DRM_DEV_ERROR(hdmi->dev,
-+			      "Cannot enable HDMI pclk clock: %d\n", ret);
- 		return ret;
- 	}
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index ff3d0f5..698fef1 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -58,7 +58,7 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
- 
- 	ret = iommu_attach_device(private->domain, dev);
- 	if (ret) {
--		dev_err(dev, "Failed to attach iommu device\n");
-+		DRM_DEV_ERROR(dev, "Failed to attach iommu device\n");
- 		return ret;
- 	}
- 
-@@ -373,8 +373,9 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
- 
- 		iommu = of_parse_phandle(port->parent, "iommus", 0);
- 		if (!iommu || !of_device_is_available(iommu->parent)) {
--			dev_dbg(dev, "no iommu attached for %pOF, using non-iommu buffers\n",
--				port->parent);
-+			DRM_DEV_DEBUG(dev,
-+				      "no iommu attached for %pOF, using non-iommu buffers\n",
-+				      port->parent);
- 			/*
- 			 * if there is a crtc not support iommu, force set all
- 			 * crtc use non-iommu buffer.
-@@ -389,12 +390,13 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
- 	}
- 
- 	if (i == 0) {
--		dev_err(dev, "missing 'ports' property\n");
-+		DRM_DEV_ERROR(dev, "missing 'ports' property\n");
- 		return -ENODEV;
- 	}
- 
- 	if (!found) {
--		dev_err(dev, "No available vop found for display-subsystem.\n");
-+		DRM_DEV_ERROR(dev,
-+			      "No available vop found for display-subsystem.\n");
- 		return -ENODEV;
- 	}
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index 7077304..cd2ace0 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -100,8 +100,9 @@ rockchip_fb_alloc(struct drm_device *dev, const struct drm_mode_fb_cmd2 *mode_cm
- 	ret = drm_framebuffer_init(dev, &rockchip_fb->fb,
- 				   &rockchip_drm_fb_funcs);
- 	if (ret) {
--		dev_err(dev->dev, "Failed to initialize framebuffer: %d\n",
--			ret);
-+		DRM_DEV_ERROR(dev->dev,
-+			      "Failed to initialize framebuffer: %d\n",
-+			      ret);
- 		kfree(rockchip_fb);
- 		return ERR_PTR(ret);
- 	}
-@@ -134,7 +135,8 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
- 
- 		obj = drm_gem_object_lookup(file_priv, mode_cmd->handles[i]);
- 		if (!obj) {
--			dev_err(dev->dev, "Failed to lookup GEM object\n");
-+			DRM_DEV_ERROR(dev->dev,
-+				      "Failed to lookup GEM object\n");
- 			ret = -ENXIO;
- 			goto err_gem_object_unreference;
- 		}
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-index 724579e..e665055 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-@@ -76,7 +76,7 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
- 
- 	fbi = drm_fb_helper_alloc_fbi(helper);
- 	if (IS_ERR(fbi)) {
--		dev_err(dev->dev, "Failed to create framebuffer info.\n");
-+		DRM_DEV_ERROR(dev->dev, "Failed to create framebuffer info.\n");
- 		ret = PTR_ERR(fbi);
- 		goto out;
- 	}
-@@ -84,7 +84,8 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
- 	helper->fb = rockchip_drm_framebuffer_init(dev, &mode_cmd,
- 						   private->fbdev_bo);
- 	if (IS_ERR(helper->fb)) {
--		dev_err(dev->dev, "Failed to allocate DRM framebuffer.\n");
-+		DRM_DEV_ERROR(dev->dev,
-+			      "Failed to allocate DRM framebuffer.\n");
- 		ret = PTR_ERR(helper->fb);
- 		goto out;
- 	}
-@@ -138,21 +139,24 @@ int rockchip_drm_fbdev_init(struct drm_device *dev)
- 
- 	ret = drm_fb_helper_init(dev, helper, ROCKCHIP_MAX_CONNECTOR);
- 	if (ret < 0) {
--		dev_err(dev->dev, "Failed to initialize drm fb helper - %d.\n",
--			ret);
-+		DRM_DEV_ERROR(dev->dev,
-+			      "Failed to initialize drm fb helper - %d.\n",
-+			      ret);
- 		return ret;
- 	}
- 
- 	ret = drm_fb_helper_single_add_all_connectors(helper);
- 	if (ret < 0) {
--		dev_err(dev->dev, "Failed to add connectors - %d.\n", ret);
-+		DRM_DEV_ERROR(dev->dev,
-+			      "Failed to add connectors - %d.\n", ret);
- 		goto err_drm_fb_helper_fini;
- 	}
- 
- 	ret = drm_fb_helper_initial_config(helper, PREFERRED_BPP);
- 	if (ret < 0) {
--		dev_err(dev->dev, "Failed to set initial hw config - %d.\n",
--			ret);
-+		DRM_DEV_ERROR(dev->dev,
-+			      "Failed to set initial hw config - %d.\n",
-+			      ret);
- 		goto err_drm_fb_helper_fini;
- 	}
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index bf9ed0e..19128b4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -160,7 +160,7 @@ static void vop_reg_set(struct vop *vop, const struct vop_reg *reg,
- 	int offset, mask, shift;
- 
- 	if (!reg || !reg->mask) {
--		dev_dbg(vop->dev, "Warning: not support %s\n", reg_name);
-+		DRM_DEV_DEBUG(vop->dev, "Warning: not support %s\n", reg_name);
- 		return;
- 	}
- 
-@@ -499,7 +499,7 @@ static int vop_enable(struct drm_crtc *crtc)
- 
- 	ret = pm_runtime_get_sync(vop->dev);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
-+		DRM_DEV_ERROR(vop->dev, "failed to get pm runtime: %d\n", ret);
- 		return ret;
- 	}
- 
-@@ -523,7 +523,8 @@ static int vop_enable(struct drm_crtc *crtc)
- 	 */
- 	ret = rockchip_drm_dma_attach_device(vop->drm_dev, vop->dev);
- 	if (ret) {
--		dev_err(vop->dev, "failed to attach dma mapping, %d\n", ret);
-+		DRM_DEV_ERROR(vop->dev,
-+			      "failed to attach dma mapping, %d\n", ret);
- 		goto err_disable_aclk;
- 	}
- 
-@@ -1361,42 +1362,42 @@ static int vop_initial(struct vop *vop)
- 
- 	vop->hclk = devm_clk_get(vop->dev, "hclk_vop");
- 	if (IS_ERR(vop->hclk)) {
--		dev_err(vop->dev, "failed to get hclk source\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to get hclk source\n");
- 		return PTR_ERR(vop->hclk);
- 	}
- 	vop->aclk = devm_clk_get(vop->dev, "aclk_vop");
- 	if (IS_ERR(vop->aclk)) {
--		dev_err(vop->dev, "failed to get aclk source\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to get aclk source\n");
- 		return PTR_ERR(vop->aclk);
- 	}
- 	vop->dclk = devm_clk_get(vop->dev, "dclk_vop");
- 	if (IS_ERR(vop->dclk)) {
--		dev_err(vop->dev, "failed to get dclk source\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to get dclk source\n");
- 		return PTR_ERR(vop->dclk);
- 	}
- 
- 	ret = pm_runtime_get_sync(vop->dev);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
-+		DRM_DEV_ERROR(vop->dev, "failed to get pm runtime: %d\n", ret);
- 		return ret;
- 	}
- 
- 	ret = clk_prepare(vop->dclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare dclk\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to prepare dclk\n");
- 		goto err_put_pm_runtime;
- 	}
- 
- 	/* Enable both the hclk and aclk to setup the vop */
- 	ret = clk_prepare_enable(vop->hclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare/enable hclk\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to prepare/enable hclk\n");
- 		goto err_unprepare_dclk;
- 	}
- 
- 	ret = clk_prepare_enable(vop->aclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare/enable aclk\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to prepare/enable aclk\n");
- 		goto err_disable_hclk;
- 	}
- 
-@@ -1405,7 +1406,7 @@ static int vop_initial(struct vop *vop)
- 	 */
- 	ahb_rst = devm_reset_control_get(vop->dev, "ahb");
- 	if (IS_ERR(ahb_rst)) {
--		dev_err(vop->dev, "failed to get ahb reset\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to get ahb reset\n");
- 		ret = PTR_ERR(ahb_rst);
- 		goto err_disable_aclk;
- 	}
-@@ -1434,7 +1435,7 @@ static int vop_initial(struct vop *vop)
- 	 */
- 	vop->dclk_rst = devm_reset_control_get(vop->dev, "dclk");
- 	if (IS_ERR(vop->dclk_rst)) {
--		dev_err(vop->dev, "failed to get dclk reset\n");
-+		DRM_DEV_ERROR(vop->dev, "failed to get dclk reset\n");
- 		ret = PTR_ERR(vop->dclk_rst);
- 		goto err_disable_aclk;
- 	}
-@@ -1511,7 +1512,7 @@ int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
- 	vop_line_flag_irq_disable(vop);
- 
- 	if (jiffies_left == 0) {
--		dev_err(vop->dev, "Timeout waiting for IRQ\n");
-+		DRM_DEV_ERROR(vop->dev, "Timeout waiting for IRQ\n");
- 		return -ETIMEDOUT;
- 	}
- 
-@@ -1558,7 +1559,7 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
--		dev_err(dev, "cannot find irq for vop\n");
-+		DRM_DEV_ERROR(dev, "cannot find irq for vop\n");
- 		return irq;
- 	}
- 	vop->irq = (unsigned int)irq;
-@@ -1584,7 +1585,8 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 
- 	ret = vop_initial(vop);
- 	if (ret < 0) {
--		dev_err(&pdev->dev, "cannot initial vop dev - err %d\n", ret);
-+		DRM_DEV_ERROR(&pdev->dev,
-+			      "cannot initial vop dev - err %d\n", ret);
- 		goto err_disable_pm_runtime;
- 	}
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 94de7b9..4a39049 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -533,7 +533,7 @@ static int vop_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 
- 	if (!dev->of_node) {
--		dev_err(dev, "can't find vop devices\n");
-+		DRM_DEV_ERROR(dev, "can't find vop devices\n");
- 		return -ENODEV;
- 	}
- 
--- 
-2.7.4
++
++bool cma_check_addr(phys_addr_t x)
++{
++	int i;
++	struct cma *cma;
++	phys_addr_t s, e;
++
++	for (i = 0; i < cma_area_count; i++) {
++		cma = &cma_areas[i];
++		s = cma_get_base(cma);
++		e = s + cma_get_size(cma);
++
++		if (s <= x && x < e)
++			return true;
++	}
++
++	return false;
++}
