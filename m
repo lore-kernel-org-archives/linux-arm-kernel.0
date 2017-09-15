@@ -1,80 +1,121 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Sep 2017 10:35:17 +0200
-Subject: [PATCH 6/8] ARM: dts: iwg20m: Add SPI NOR support
-In-Reply-To: <1505322341-9480-7-git-send-email-chris.paterson2@renesas.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-7-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <20170915083517.GJ3924@verge.net.au>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 15 Sep 2017 12:06:39 +0200
+Subject: [PATCH] mtd: spi-nor: stm32-quadspi: Fix uninitialized error
+ return code
+In-Reply-To: <CAMuHMdUv69s21werL07ScowwPyjJ_V_D=QHkrnmkJM2aq-Pj4Q@mail.gmail.com>
+References: <1500105641-14161-1-git-send-email-geert@linux-m68k.org>
+ <1962615c-d606-2e93-d256-47f15e1b1035@st.com>
+ <CAMuHMdUv69s21werL07ScowwPyjJ_V_D=QHkrnmkJM2aq-Pj4Q@mail.gmail.com>
+Message-ID: <ca80511a-794f-eb74-38a9-be15d48f9e20@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 06:05:39PM +0100, Chris Paterson wrote:
-> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> 
-> Add support for the SPI NOR device used to boot up the system
-> to the System on Module DT.
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> ---
-> This patch is based on renesas-devel-20170913-v4.13.
-> 
-> This patch is dependant on:
-> - "of: add vendor prefix for Silicon Storage Technology Inc."
-> - "doc: dt: mtd: Add sst25vf016b to the list of supported chip names"
-> 
-> 
->  arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-> index 4119737..75a8ca5 100644
-> --- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-> +++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-> @@ -44,6 +44,11 @@
->  		function = "mmc";
->  	};
->  
-> +	qspi_pins: qspi {
-> +		groups = "qspi_ctrl", "qspi_data2";
-> +		function = "qspi";
-> +	};
-> +
->  	sdhi0_pins: sd0 {
->  		groups = "sdhi0_data4", "sdhi0_ctrl";
->  		function = "sdhi0";
-> @@ -61,6 +66,27 @@
->  	status = "okay";
->  };
->  
-> +&qspi {
-> +	pinctrl-0 = <&qspi_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	status = "okay";
-> +
-> +	/* WARNING - This device contains the bootloader. Handle with care. */
-> +	flash: flash at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "sst,sst25vf016b", "jedec,spi-nor";
-> +		reg = <0>;
-> +		spi-max-frequency = <50000000>;
-> +		spi-tx-bus-width = <1>;
-> +		spi-rx-bus-width = <1>;
-> +		m25p,fast-read;
-> +		spi-cpol;
-> +		spi-cpha;
-> +	};
 
-Does the device have partitions?
-If so, should they be described here?
 
-> +};
-> +
->  &sdhi0 {
->  	pinctrl-0 = <&sdhi0_pins>;
->  	pinctrl-names = "default";
-> -- 
-> 1.9.1
+On 07/17/2017 12:22 PM, Geert Uytterhoeven wrote:
+> Hi Ludovic,
+> 
+> On Mon, Jul 17, 2017 at 11:56 AM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>> Today only write_reg could be call with len=0 (spi-nor.c:
+>> write_enable/disable, set_4byte, erase_chip)
+>>
+>> But your remark make sense to prevent: gcc warning and framework evolution
+>> ...
+>>
+>>
+>> -In stm32-quadspi.c transfer data is enabled if tx_data is true (some
+>> actions under this bool)
+>>
+>> stm32_qspi_write_reg has already this protection with "!!(buf && len > 0);"
+>>
+>> but we could extend this protection
+>>
+>> -    cmd.tx_data = true;
+>> +    cmd.tx_data = !!(len > 0);
+>>
+>> In : stm32_qspi_read, stm32_qspi_write, stm32_qspi_read_reg
+> 
+> Ah, I missed the check for !cmd->tx_data at the top of stm32_qspi_tx()
+> 
+>> -And to avoid gcc warning: I prefer initialize "ret" in the beginning of
+>> function
+>>
+>> -    int ret;
+>> +    int ret = 0;
+>>
+>> I tested this changes, and it's ok for me.
+>>
+>> Geert could you resend a new version, or do you prefer that I take care of
+>> it
+> 
+> If you initialized ret at the beginning, you lose the ability to catch newly
+> introduced similar bugs in the future.
+like discuss in thread https://patchwork.kernel.org/patch/9952849/ with 
+Arnd and Geert
+
+Cyrille, Marek: could you take geert patch and abandon
+https://patchwork.kernel.org/patch/9952849/
+thanks
+
+Acked-by: Ludovic Barre <ludovic.barre@st.com>
+
+> 
+>> On 07/15/2017 10:00 AM, Geert Uytterhoeven wrote:
+>>>
+>>> With gcc 4.1.2:
+>>>
+>>>       drivers/mtd/spi-nor/stm32-quadspi.c: In function
+>>> ?stm32_qspi_tx_poll?:
+>>>       drivers/mtd/spi-nor/stm32-quadspi.c:230: warning: ?ret? may be used
+>>> uninitialized in this function
+>>>
+>>> Indeed, if stm32_qspi_cmd.len is zero, ret will be uninitialized.
+>>> This length is passed from outside the driver using the
+>>> spi_nor.{read,write}{,_reg}() callbacks.
+>>>
+>>> Several functions in drivers/mtd/spi-nor/spi-nor.c (e.g. write_enable(),
+>>> write_disable(), and erase_chip()) call spi_nor.write_reg() with a zero
+>>> length.
+>>>
+>>> Fix this by returning an explicit zero on success.
+>>>
+>>> Fixes: 0d43d7ab277a048c ("mtd: spi-nor: add driver for STM32 quad spi
+>>> flash controller")
+>>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>>> ---
+>>>    drivers/mtd/spi-nor/stm32-quadspi.c | 4 ++--
+>>>    1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c
+>>> b/drivers/mtd/spi-nor/stm32-quadspi.c
+>>> index 86c0931543c538c3..ad6a3e1844cbe5ec 100644
+>>> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+>>> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+>>> @@ -240,12 +240,12 @@ static int stm32_qspi_tx_poll(struct stm32_qspi
+>>> *qspi,
+>>>
+>>> STM32_QSPI_FIFO_TIMEOUT_US);
+>>>                  if (ret) {
+>>>                          dev_err(qspi->dev, "fifo timeout (stat:%#x)\n",
+>>> sr);
+>>> -                       break;
+>>> +                       return ret;
+>>>                  }
+>>>                  tx_fifo(buf++, qspi->io_base + QUADSPI_DR);
+>>>          }
+>>>    -     return ret;
+>>> +       return 0;
+>>>    }
+>>>      static int stm32_qspi_tx_mm(struct stm32_qspi *qspi,
+> 
+> Gr{oetje,eeting}s,
+> 
+>                          Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
 > 
