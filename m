@@ -1,269 +1,78 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 15 Sep 2017 19:59:32 +0900
-Subject: [PATCH v3 10/10] arm64: kexec_file: add Image format support
-In-Reply-To: <20170915105932.25338-1-takahiro.akashi@linaro.org>
-References: <20170915105932.25338-1-takahiro.akashi@linaro.org>
-Message-ID: <20170915105932.25338-11-takahiro.akashi@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Sep 2017 13:06:09 +0200
+Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
+In-Reply-To: <TY1PR06MB0895763DA6DE79A64B9981ECC06C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
+ <20170915074551.GF3924@verge.net.au>
+ <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
+ <TY1PR06MB0895763DA6DE79A64B9981ECC06C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <20170915110609.GL3924@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "Image" binary will be loaded at the offset of TEXT_OFFSET from
-the start of system memory. TEXT_OFFSET is determined from the header
-of the image.
+On Fri, Sep 15, 2017 at 08:57:53AM +0000, Fabrizio Castro wrote:
+> Hi Simon, Geert,
+> 
+> > -----Original Message-----
+> > From: linux-renesas-soc-owner at vger.kernel.org [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Geert
+> > Uytterhoeven
+> > Sent: 15 September 2017 09:05
+> > To: Simon Horman <horms@verge.net.au>; Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Cc: Chris Paterson <Chris.Paterson2@renesas.com>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> > Magnus Damm <magnus.damm@gmail.com>; Russell King <linux@armlinux.org.uk>; devicetree at vger.kernel.org; Linux-Renesas
+> > <linux-renesas-soc@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; Geert Uytterhoeven <geert+renesas@glider.be>
+> > Subject: Re: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
+> >
+> > Hi Simon, Fabrizio,
+> >
+> > On Fri, Sep 15, 2017 at 9:45 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Wed, Sep 13, 2017 at 06:05:34PM +0100, Chris Paterson wrote:
+> > >> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > >>
+> > >> Add DT node for the Advanced Power Management Unit (APMU), add the
+> > >> second CPU core, and use "renesas,apmu" as "enable-method".
+> > >>
+> > >> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > >> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> > >> ---
+> > >> This patch is based on renesas-devel-20170913-v4.13.
+> > >
+> > > Hi,
+> > >
+> > > with reference to "[PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2"
+> > > is the CNTVOFF initialised in the boot loader of boards (in upstream)
+> > > for this SoC? If not I expect you will have trouble with the arch timer
+> > > on secondary CPU cores.
+> 
+> I can confirm that this patch relies on:
+> * "ARM: Add definition for monitor mode", and
+> * "ARM: shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15 "
+> as the bootloader doesn't initialize CNTVOFF.
+> 
+> >
+> > Exactly my question.
+> >
+> > Fabrizio: Given your feedback on "[PATCH v3 0/3] ARM: renesas: Enable SMP on
+> > R-Car E2", I think SMP enablement on RZ/G1E has to be postponed until "ARM:
+> > shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15" has been
+> > accepted upstream.
+> 
+> You are right, somehow we missed the comment made by Simon on Monday:
+> 
+> " I would like to deffer the third and last patch until v4.16 to avoid
+> an awkward branch dependency on the above - the branches are different
+> even though the tree is the same. Please resubmit this patch once the
+> above dependencies are present in an rc release, which at this stage
+> I expect to be v4.15-rc1."
+> 
+> Apologies for this, we will send this patch later on, once both patches have been
+> accepted upstream.
 
-Regarding kernel signature verification, it will be done through
-verify_pefile_signature() as arm64's "Image" binary can be seen as
-in PE format. This approach is consistent with x86 implementation.
+No problem, I will mark this one as deferred.
 
-we can sign an image with sbsign command.
+> Simon, is this going to make the application of the remaining patches
+> problematic?  Please, let me (or Chris) know if you want us to rebase and
+> resend without this patch.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig                     |   7 +++
- arch/arm64/include/asm/kexec.h         |  66 +++++++++++++++++++++
- arch/arm64/kernel/Makefile             |   1 +
- arch/arm64/kernel/kexec_image.c        | 105 +++++++++++++++++++++++++++++++++
- arch/arm64/kernel/machine_kexec_file.c |   3 +
- 5 files changed, 182 insertions(+)
- create mode 100644 arch/arm64/kernel/kexec_image.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fa7299f08cc6..b7f1a760434a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -769,10 +769,17 @@ config KEXEC_FILE
- 	  In addition to this option, you need to enable a specific type
- 	  of image support.
- 
-+config KEXEC_FILE_IMAGE_FMT
-+	bool "Enable Image support"
-+	depends on KEXEC_FILE
-+	---help---
-+	  Select this option to enable 'Image' kernel loading.
-+
- config KEXEC_VERIFY_SIG
- 	bool "Verify kernel signature during kexec_file_load() syscall"
- 	depends on KEXEC_FILE
- 	select SYSTEM_DATA_VERIFICATION
-+	select SIGNED_PE_FILE_VERIFICATION if KEXEC_FILE_IMAGE_FMT
- 	---help---
- 	  Select this option to verify a signature with loaded kernel
- 	  image. If configured, any attempt of loading a image without
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index edb702e64a8a..7ec529e11a8b 100644
---- a/arch/arm64/include/asm/kexec.h
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -104,6 +104,72 @@ struct kimage_arch {
- 	unsigned long elf_load_addr;
- };
- 
-+/**
-+ * struct arm64_image_header - arm64 kernel image header
-+ *
-+ * @pe_sig: Optional PE format 'MZ' signature
-+ * @branch_code: Instruction to branch to stext
-+ * @text_offset: Image load offset, little endian
-+ * @image_size: Effective image size, little endian
-+ * @flags:
-+ *	Bit 0: Kernel endianness. 0=little endian, 1=big endian
-+ * @reserved: Reserved
-+ * @magic: Magic number, "ARM\x64"
-+ * @pe_header: Optional offset to a PE format header
-+ **/
-+
-+struct arm64_image_header {
-+	u8 pe_sig[2];
-+	u8 pad[2];
-+	u32 branch_code;
-+	u64 text_offset;
-+	u64 image_size;
-+	u64 flags;
-+	u64 reserved[3];
-+	u8 magic[4];
-+	u32 pe_header;
-+};
-+
-+static const u8 arm64_image_magic[4] = {'A', 'R', 'M', 0x64U};
-+static const u8 arm64_image_pe_sig[2] = {'M', 'Z'};
-+
-+/**
-+ * arm64_header_check_magic - Helper to check the arm64 image header.
-+ *
-+ * Returns non-zero if header is OK.
-+ */
-+
-+static inline int arm64_header_check_magic(const struct arm64_image_header *h)
-+{
-+	if (!h)
-+		return 0;
-+
-+	if (!h->text_offset)
-+		return 0;
-+
-+	return (h->magic[0] == arm64_image_magic[0]
-+		&& h->magic[1] == arm64_image_magic[1]
-+		&& h->magic[2] == arm64_image_magic[2]
-+		&& h->magic[3] == arm64_image_magic[3]);
-+}
-+
-+/**
-+ * arm64_header_check_pe_sig - Helper to check the arm64 image header.
-+ *
-+ * Returns non-zero if 'MZ' signature is found.
-+ */
-+
-+static inline int arm64_header_check_pe_sig(const struct arm64_image_header *h)
-+{
-+	if (!h)
-+		return 0;
-+
-+	return (h->pe_sig[0] == arm64_image_pe_sig[0]
-+		&& h->pe_sig[1] == arm64_image_pe_sig[1]);
-+}
-+
-+extern struct kexec_file_ops kexec_image_ops;
-+
- struct kimage;
- 
- #define arch_kimage_file_post_load_cleanup arch_kimage_file_post_load_cleanup
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5df003d6157c..a1161bab6810 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -51,6 +51,7 @@ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
- arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
-+arm64-obj-$(CONFIG_KEXEC_FILE_IMAGE_FMT)	+= kexec_image.o
- arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
- arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
-diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-new file mode 100644
-index 000000000000..b19538af2f3d
---- /dev/null
-+++ b/arch/arm64/kernel/kexec_image.c
-@@ -0,0 +1,105 @@
-+/*
-+ * Kexec image loader
-+
-+ * Copyright (C) 2017 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define pr_fmt(fmt)	"kexec_file(Image): " fmt
-+
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/kexec.h>
-+#include <linux/verification.h>
-+#include <asm/byteorder.h>
-+#include <asm/memory.h>
-+
-+static int image_probe(const char *kernel_buf, unsigned long kernel_len)
-+{
-+	const struct arm64_image_header *h;
-+
-+	h = (const struct arm64_image_header *)(kernel_buf);
-+
-+	if ((kernel_len < sizeof(*h)) || !arm64_header_check_magic(h))
-+		return -EINVAL;
-+
-+	pr_debug("PE format: %s\n",
-+			(arm64_header_check_pe_sig(h) ? "yes" : "no"));
-+
-+	return 0;
-+}
-+
-+static void *image_load(struct kimage *image, char *kernel,
-+			    unsigned long kernel_len, char *initrd,
-+			    unsigned long initrd_len, char *cmdline,
-+			    unsigned long cmdline_len)
-+{
-+	struct kexec_buf kbuf;
-+	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
-+	unsigned long text_offset, kernel_load_addr;
-+	int ret;
-+
-+	/* Create elf core header segment */
-+	ret = load_crashdump_segments(image);
-+	if (ret)
-+		goto out;
-+
-+	/* Load the kernel */
-+	kbuf.image = image;
-+	if (image->type == KEXEC_TYPE_CRASH) {
-+		kbuf.buf_min = crashk_res.start;
-+		kbuf.buf_max = crashk_res.end + 1;
-+	} else {
-+		kbuf.buf_min = 0;
-+		kbuf.buf_max = ULONG_MAX;
-+	}
-+	kbuf.top_down = 0;
-+
-+	kbuf.buffer = kernel;
-+	kbuf.bufsz = kernel_len;
-+	kbuf.memsz = le64_to_cpu(h->image_size);
-+	text_offset = le64_to_cpu(h->text_offset);
-+	kbuf.buf_align = SZ_2M;
-+
-+	/* Adjust kernel segment with TEXT_OFFSET */
-+	kbuf.memsz += text_offset;
-+
-+	ret = kexec_add_buffer(&kbuf);
-+	if (ret)
-+		goto out;
-+
-+	image->segment[image->nr_segments - 1].mem += text_offset;
-+	image->segment[image->nr_segments - 1].memsz -= text_offset;
-+	kernel_load_addr = kbuf.mem + text_offset;
-+
-+	pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-+		 kernel_load_addr, kbuf.bufsz, kbuf.memsz);
-+
-+	/* Load additional data */
-+	ret = load_other_segments(image, kernel_load_addr,
-+			    initrd, initrd_len, cmdline, cmdline_len);
-+
-+out:
-+	return ERR_PTR(ret);
-+}
-+
-+#ifdef CONFIG_KEXEC_VERIFY_SIG
-+static int image_verify_sig(const char *kernel, unsigned long kernel_len)
-+{
-+	return verify_pefile_signature(kernel, kernel_len, NULL,
-+				       VERIFYING_KEXEC_PE_SIGNATURE);
-+}
-+#endif
-+
-+struct kexec_file_ops kexec_image_ops = {
-+	.probe = image_probe,
-+	.load = image_load,
-+#ifdef CONFIG_KEXEC_VERIFY_SIG
-+	.verify_sig = image_verify_sig,
-+#endif
-+};
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index e4671610fb12..fbf1cb4b58df 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -24,6 +24,9 @@ static int __dt_root_addr_cells;
- static int __dt_root_size_cells;
- 
- struct kexec_file_ops *kexec_file_loaders[] = {
-+#ifdef CONFIG_KEXEC_FILE_IMAGE_FMT
-+	&kexec_image_ops,
-+#endif
- 	NULL
- };
- 
--- 
-2.14.1
+No, I don't think you need to rebase and repost due to this.
