@@ -1,54 +1,66 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 15 Sep 2017 19:35:43 +0100
-Subject: [PATCH] arm64: Unconditionally support ARCH_HAVE_NMI_SAFE_CMPXCHG
-In-Reply-To: <20170915011915.7993-1-sboyd@codeaurora.org>
-References: <20170915011915.7993-1-sboyd@codeaurora.org>
-Message-ID: <59BC1D7F.4090107@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 15 Sep 2017 20:44:16 +0200
+Subject: [PATCH 10/11] arm64: dts: renesas: initial Eagle board device tree
+In-Reply-To: <5c680bad-39c8-a6c7-ee2a-6a2e72c33026@cogentembedded.com>
+References: <20170912210543.810219167@cogentembedded.com>
+ <d6f9d5ef-4864-3ffb-9406-acd65bff10aa@cogentembedded.com>
+ <5c680bad-39c8-a6c7-ee2a-6a2e72c33026@cogentembedded.com>
+Message-ID: <CAMuHMdU+DYBCu1bKLh_VjuSR-cSfjwPQuAxTsaU2JW-3d-5QUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Sergei,
 
-On 15/09/17 02:19, Stephen Boyd wrote:
-> From what I can see there isn't anything about ACPI_APEI_SEA that
-> means the arm64 architecture can or cannot support NMI safe
-> cmpxchg, so the if condition here is not important. 
+On Fri, Sep 15, 2017 at 7:28 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 09/13/2017 12:19 AM, Sergei Shtylyov wrote:
+>>> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
+>>> The board has 1 debug serial port (SCIF0); include support for it,
+>>> so that the serial console can work.
+>>>
+>>> Based on the original (and large) patch by Vladimir Barinov
+>>> <vladimir.barinov@cogentembedded.com>.
+>>>
+>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>
+>> [...]
+>>>
+>>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>>> ===================================================================
+>>> --- /dev/null
+>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>>> @@ -0,0 +1,45 @@
+>>
+>> [...]
+>>>
+>>> +&extal_clk {
+>>> +    clock-frequency = <16666666>;
+>>> +};
+>>> +
+>>> +&extalr_clk {
+>>> +    clock-frequency = <32768>;
+>>> +};
+>>> +
+>>
+>>     Forgot to specify SCIF_CLK -- it's populated.
+>
+>    Unfortunately, the kernel hangs after ttySC0 is registered if I specify
+> this frequency...
 
-Yup, it was to match 'HAVE_NMI', which was new with ACPI_APEI_SEA and pulls in
-some printk() stuff.
+Is the crystal populated?
 
-... how come you don't need to change HAVE_NMI too?
+When doing initial bringup of the remote Eagle I have access to, the SCIF
+registers didn't indicate SCIF_CLK was being used from U-Boot, while it
+is used on R-Car Gen2 boards that have it populated.
 
+Gr{oetje,eeting}s,
 
-> Let's remove
-> it. Doing that allows us to support ftrace histograms via
-> CONFIG_HIST_TRIGGERS that depends on the arch having this config
-> selected.
+                        Geert
 
-What does CONFIG_HIST_TRIGGERS need this for? I can't see any
-cmpxchg use in kernel/trace/trace_events_hist.c
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-Regardless,
-
-Acked-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
-
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0df64a6a56d4..27ce2ab7b080 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -21,7 +21,7 @@ config ARM64
->  	select ARCH_HAS_STRICT_KERNEL_RWX
->  	select ARCH_HAS_STRICT_MODULE_RWX
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> -	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
-> +	select ARCH_HAVE_NMI_SAFE_CMPXCHG
->  	select ARCH_USE_CMPXCHG_LOCKREF
->  	select ARCH_SUPPORTS_MEMORY_FAILURE
->  	select ARCH_SUPPORTS_ATOMIC_RMW
-> 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
