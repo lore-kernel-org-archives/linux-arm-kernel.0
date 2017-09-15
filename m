@@ -1,37 +1,48 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 15 Sep 2017 14:29:38 +0300
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20170619155003.13218-1-ynorov@caviumnetworks.com>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
-Message-ID: <20170915112938.mrkz7ivryctqjnhe@yury-thinkpad>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 15 Sep 2017 15:18:18 +0200
+Subject: n900 in next-20170901
+In-Reply-To: <20170907161650.GP5024@atomide.com>
+References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
+ <20170905233241.GA19231@js1304-P5Q-DELUXE>
+ <20170906133057.GH5024@atomide.com>
+ <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+Message-ID: <20170915131817.GA19486@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi!
 
-Linaro has announced the support for ILP32-enabled cross-toolchain:
-https://lists.linaro.org/pipermail/linaro-toolchain/2017-September/006247.html
+> > After commit 9caf25f996e8, user for CMA memory should use to check
+> > PageHighmem in order to get proper virtual address of the page. If
+> > someone doesn't use it, it is possible to use wrong virtual address
+> > and it then causes the use of wrong physical address.
+> > CONFIG_DEBUG_VIRTUAL would catch this case.
+> 
+> OK, no extra output of current next with CONFIG_DEBUG_VIRTUAL=y.
+> Booting of n900 hangs with just the same error:
+> 
+> save_secure_sram() returns 0000ff02
+> 
+> > If it doesn't help, is there a way to test n900 configuration in QEMU?
+> 
+> I doubt that QEMU n900 boots in secure mode but instead shows
+> the SoC as general purpose SoC. If so, you'd have to patch the
+> omap3_save_secure_ram_context() to attempt to save secure RAM
+> context in all cases. If that works then debugging with any
+> omap3 board like beagleboard in QEMU should work.
 
-Files:
-http://snapshots.linaro.org/components/toolchain/binaries/7.1-2017.08-rc1/aarch64-linux-gnu_ilp32/
+Okay, linux-next from today still does not boot on n900. Is it
+something new, or was this still not fixed in -next?
 
-Yury
-
-On Mon, Jun 19, 2017 at 06:49:43PM +0300, Yury Norov wrote:
-> This series enables aarch64 with ilp32 mode.
-> 
-> As supporting work, it introduces ARCH_32BIT_OFF_T configuration
-> option that is enabled for existing 32-bit architectures but disabled
-> for new arches (so 64-bit off_t userspace type is used by new userspace).
-> Also it deprecates getrlimit and setrlimit syscalls prior to prlimit64.
-> 
-> This version is based on linux-next from 2017-06-16. It works with
-> glibc-2.25, and tested with LTP, glibc testsuite, trinity, lmbench,
-> CPUSpec.
-> 
-> Patches 1, 2, 3 and 8 are general, and may be applied separately.
-> 
-> Kernel, GLIBC and OpenSUSE-based distro:
-> https://github.com/norov/linux/tree/ilp32-20170616.0
-> https://github.com/norov/glibc/tree/dev9
-> https://build.opensuse.org/project/show/devel:ARM:Factory:Contrib:ILP32
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170915/1fdb70e2/attachment.sig>
