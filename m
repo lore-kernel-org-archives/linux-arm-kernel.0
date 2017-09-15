@@ -1,43 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Sep 2017 22:51:48 +0100
-Subject: [PATCH v8 10/11] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <bff836ec-3922-1783-6cb4-94d1be92544b@oracle.com>
-References: <20170914223517.8242-1-pasha.tatashin@oracle.com>
- <20170914223517.8242-11-pasha.tatashin@oracle.com>
- <20170915011035.GA6936@remoulade>
- <c76f72fc-21ed-62d0-014e-8509c0374f96@oracle.com>
- <20170915203852.GA10749@remoulade>
- <bff836ec-3922-1783-6cb4-94d1be92544b@oracle.com>
-Message-ID: <20170915215147.GA11849@remoulade>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Sep 2017 15:19:47 -0700
+Subject: [PATCH v4 0/7] Handle forwarded level-triggered interrupts
+Message-ID: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 15, 2017 at 05:20:59PM -0400, Pavel Tatashin wrote:
-> Hi Mark,
-> 
-> I had this option? back upto version 3, where zero flag was passed into
-> vmemmap_alloc_block(), but I was asked to remove it, because it required too
-> many changes in other places.
+From: Christoffer Dall <cdall@linaro.org>
 
-Ok. Sorry for bringing back a point that had already been covered.
+This series illustrates an alternative approach to Eric Auger's direct EOI
+setup patches [1] in terms of the KVM VGIC support.
 
-> So, the current approach is cleaner, but the idea is that kasan should use
-> its own version of vmemmap_populate() for both x86 and ARM, but I think it is
-> outside of the scope of this work.
+The idea is to maintain existing semantics for the VGIC for mapped
+level-triggered IRQs and also support the timer using mapped IRQs with
+the same VGIC support as VFIO interrupts.
 
-I appreciate that this is unrelated to your ultimate goal, and that this is
-somewhat frustrating given the KASAN code is arguably abusing the
-vmemmap_populate() interface.
+Based on v4.13
 
-However, I do think we need to migrate the KASAN code to a proper interface
-immediately, rather than making it worse in the interim.
+Changes since v3:
+ - Added a number of patches and moved patches around a bit.
+ - Check for uaccesses in the mmio handler functions
+ - Fixed bugs in the mmio handler functions
 
-> If you think I should add these function in this project, than sure I can
-> send a new version with kasanmap_populate() functions.
+Changes since v2:
+ - Removed patch 5 from v2 and integrating the changes in what's now
+   patch 5 to make it easier to reuse code when adding VFIO integration.
+ - Changed the virtual distributor MMIO handling to use the
+   pending_latch and more closely match the semantics of SPENDR and
+   CPENDR for both level and edge mapped interrupts.
 
-I would very much appreciate if you could send a version with a
-kasan_map_populate() interface. I'm more than happy to review/test that portion
-of the series, or to help if there's some problem which makes that difficult.
+Changes since v1:
+ - Added necessary changes to the timer (Patch 1)
+ - Added handling of guest MMIO accesses to the virtual distributor
+   (Patch 4)
+ - Addressed Marc's comments from the initial RFC (mostly renames)
 
 Thanks,
-Mark.
+-Christoffer
+
+
+Christoffer Dall (6):
+  KVM: arm/arm64: Remove redundant preemptible checks
+  KVM: arm/arm64: Factor out functionality to get vgic mmio
+    requester_vcpu
+  KVM: arm/arm64: Don't cache the timer IRQ level
+  KVM: arm/arm64: vgic: Support level-triggered mapped interrupts
+  KVM: arm/arm64: Provide a vgic interrupt line level sample function
+  KVM: arm/arm64: Support VGIC dist pend/active changes for mapped IRQs
+
+Eric Auger (1):
+  KVM: arm/arm64: vgic: restructure kvm_vgic_(un)map_phys_irq
+
+ include/kvm/arm_arch_timer.h  |   2 +
+ include/kvm/arm_vgic.h        |  19 +++++--
+ virt/kvm/arm/arch_timer.c     |  52 ++++++++----------
+ virt/kvm/arm/arm.c            |   2 -
+ virt/kvm/arm/vgic/vgic-mmio.c | 122 +++++++++++++++++++++++++++++++++---------
+ virt/kvm/arm/vgic/vgic-v2.c   |  29 ++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c   |  29 ++++++++++
+ virt/kvm/arm/vgic/vgic.c      |  96 +++++++++++++++++++++++++++------
+ virt/kvm/arm/vgic/vgic.h      |   8 +++
+ 9 files changed, 286 insertions(+), 73 deletions(-)
+
+-- 
+2.7.4
