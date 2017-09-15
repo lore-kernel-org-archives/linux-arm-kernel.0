@@ -1,32 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 15 Sep 2017 15:50:29 -0700
-Subject: [PATCH] arm64: efi: ignore EFI_MEMORY_XP attribute if RP and/or
- WP are set
-In-Reply-To: <20170915185355.GC3349@codeaurora.org>
-References: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
- <20170915185355.GC3349@codeaurora.org>
-Message-ID: <CAKv+Gu_YEZAZL7X5oE9nPnoYi31xsrktLoik8_Gt442AsaLhWQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 15 Sep 2017 16:49:58 -0700
+Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
+In-Reply-To: <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+ <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
+ <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
+Message-ID: <5DDF9572-B2D1-4316-B307-14749365221E@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2017 at 11:53, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 09/14, Ard Biesheuvel wrote:
->> The UEFI memory map is a bit vague about how to interpret the
->> EFI_MEMORY_XP attribute when it is combined with EFI_MEMORY_RP and/or
->> EFI_MEMORY_WP, which have retroactively been redefined as cacheability
->> attributes rather than permission attributes.
->>
->> So let's ignore EFI_MEMORY_XP if _RP and/or _WP are also set. In this
->> case, it is likely that they are being used to describe the capability
->> of the region (i.e., whether it has the controls to reconfigure it as
->> non-executable) rather than the nature of the contents of the region
->> (i.e., whether it contains data that we will never attempt to execute)
->>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
+On September 4, 2017 11:11:47 PM PDT, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>Florian,
 >
-> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+>On Saturday 02 September 2017 07:46 AM, Florian Fainelli wrote:
+>> 
+>> 
+>> On 08/25/2017 10:51 AM, Al Cooper wrote:
+>>> Add a new USB Phy driver for Broadcom STB SoCs. This driver
+>>> supports Broadcom STB ARM SoCs. This driver in
+>>> combination with the Broadcom STB ohci, ehci and xhci
+>>> drivers will enable USB1.1, USB2.0 and USB3.0 support.
+>>> This Phy driver also supports the Broadcom BDC gadget
+>>> driver.
+>> 
+>> Thanks Al! Kishon, feel free to merge everything through your tree
+>there
+>> should not be any conflicts with drivers/soc/bcm/brcmstb/common.c and
+>> include/linux/soc/brcmstb/brcmstb.h.
 >
-> I will test early next week and provide a tested-by. Thanks.
->
+>I'll start merging once 4.14 -rc1 is tagged.
 
-Great, thanks.
+OK, does not that mean we will be missing this driver in 4.14? I suppose that's fine. Thanks!
+Hi Kishon,
+-- 
+Florian
