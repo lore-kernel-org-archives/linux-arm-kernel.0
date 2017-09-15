@@ -1,207 +1,100 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Sep 2017 15:19:51 -0700
-Subject: [PATCH v4 4/7] KVM: arm/arm64: vgic: restructure
- kvm_vgic_(un)map_phys_irq
+Date: Fri, 15 Sep 2017 15:19:49 -0700
+Subject: [PATCH v4 2/7] KVM: arm/arm64: Factor out functionality to get vgic
+ mmio requester_vcpu
 In-Reply-To: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
 References: <1505513994-77939-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1505513994-77939-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1505513994-77939-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+From: Christoffer Dall <cdall@linaro.org>
 
-We want to reuse the core of the map/unmap functions for IRQ forwarding.
-Let's move the computation of the hwirq in kvm_vgic_map_phys_irq and
-pass the linux IRQ as parameter.
+We are about to distinguish between userspace accesses and mmio traps
+for a number of the mmio handlers.  When the requester vcpu is NULL, it
+mens we are handling a userspace acccess.
 
-The host_irq is added to struct vgic_irq because it is needed in later
-patches which manipulate the physical GIC state to support forwarded
-IRQs.
+Factor out the functionality to get the request vcpu into its own
+function, mostly so we have a common place to document the semantics of
+the return value.
 
-We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq handle
-as a parameter.
+Also take the chance to move the functionality outside of holding a
+spinlock and instead explicitly disable and enable preemption.  This
+supports PREEMPT_RT kernels as well.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h    |  8 ++++---
- virt/kvm/arm/arch_timer.c | 24 +------------------
- virt/kvm/arm/vgic/vgic.c  | 60 +++++++++++++++++++++++++++++++++++------------
- 3 files changed, 51 insertions(+), 41 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio.c | 43 +++++++++++++++++++++++++++----------------
+ 1 file changed, 27 insertions(+), 16 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 34dba51..53f631b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -116,6 +116,7 @@ struct vgic_irq {
- 	bool hw;			/* Tied to HW IRQ */
- 	struct kref refcount;		/* Used for LPIs */
- 	u32 hwintid;			/* HW INTID number */
-+	unsigned int host_irq;		/* linux irq corresponding to hwintid */
- 	union {
- 		u8 targets;			/* GICv2 target VCPUs mask */
- 		u32 mpidr;			/* GICv3 target VCPU */
-@@ -307,9 +308,10 @@ void kvm_vgic_init_cpu_hardware(void);
- 
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level, void *owner);
--int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
--int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
--bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
-+			  u32 vintid);
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 2a5f877..c4fa675 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -649,9 +649,6 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
--	struct irq_desc *desc;
--	struct irq_data *data;
--	int phys_irq;
- 	int ret;
- 
- 	if (timer->enabled)
-@@ -669,26 +666,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	}
- 
--	/*
--	 * Find the physical IRQ number corresponding to the host_vtimer_irq
--	 */
--	desc = irq_to_desc(host_vtimer_irq);
--	if (!desc) {
--		kvm_err("%s: no interrupt descriptor\n", __func__);
--		return -EINVAL;
--	}
--
--	data = irq_desc_get_irq_data(desc);
--	while (data->parent_data)
--		data = data->parent_data;
--
--	phys_irq = data->hwirq;
--
--	/*
--	 * Tell the VGIC that the virtual interrupt is tied to a
--	 * physical interrupt. We do that once per VCPU.
--	 */
--	ret = kvm_vgic_map_phys_irq(vcpu, vtimer->irq.irq, phys_irq);
-+	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
- 	if (ret)
- 		return ret;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index fed717e..9d557efd 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -17,6 +17,8 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/list_sort.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
- 
- #include "vgic.h"
- 
-@@ -403,38 +405,66 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index c1e4bdd..f3087f6 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -120,6 +120,26 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+ 	return value;
  }
  
--int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
-+/* @irq->irq_lock must be held */
-+static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-+			    unsigned int host_irq)
++/*
++ * This function will return the VCPU that performed the MMIO access and
++ * trapped from twithin the VM, and will return NULL if this is a userspace
++ * access.
++ *
++ * We can disable preemption locally around accessing the per-CPU variable
++ * because even if the current thread is migrated to another CPU, reading the
++ * per-CPU value later will give us the same value as we update the per-CPU
++ * variable in the preempt notifier handlers.
++ */
++static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
++{
++	struct kvm_vcpu *vcpu;
++
++	preempt_disable();
++	vcpu = kvm_arm_get_running_vcpu();
++	preempt_enable();
++	return vcpu;
++}
++
+ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+ 			      gpa_t addr, unsigned int len,
+ 			      unsigned long val)
+@@ -180,23 +200,9 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 				    bool new_active_state)
  {
--	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	struct irq_desc *desc;
-+	struct irq_data *data;
- 
--	BUG_ON(!irq);
--
+-	struct kvm_vcpu *requester_vcpu;
 -	spin_lock(&irq->irq_lock);
-+	/*
-+	 * Find the physical IRQ number corresponding to @host_irq
-+	 */
-+	desc = irq_to_desc(host_irq);
-+	if (!desc) {
-+		kvm_err("%s: no interrupt descriptor\n", __func__);
-+		return -EINVAL;
-+	}
-+	data = irq_desc_get_irq_data(desc);
-+	while (data->parent_data)
-+		data = data->parent_data;
++	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
  
- 	irq->hw = true;
--	irq->hwintid = phys_irq;
-+	irq->host_irq = host_irq;
-+	irq->hwintid = data->hwirq;
-+	return 0;
-+}
-+
-+/* @irq->irq_lock must be held */
-+static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
-+{
-+	irq->hw = false;
-+	irq->hwintid = 0;
-+}
-+
-+int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
-+			  u32 vintid)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
-+	int ret;
- 
-+	BUG_ON(!irq);
-+
+-	/*
+-	 * The vcpu parameter here can mean multiple things depending on how
+-	 * this function is called; when handling a trap from the kernel it
+-	 * depends on the GIC version, and these functions are also called as
+-	 * part of save/restore from userspace.
+-	 *
+-	 * Therefore, we have to figure out the requester in a reliable way.
+-	 *
+-	 * When accessing VGIC state from user space, the requester_vcpu is
+-	 * NULL, which is fine, because we guarantee that no VCPUs are running
+-	 * when accessing VGIC state from user space so irq->vcpu->cpu is
+-	 * always -1.
+-	 */
+-	requester_vcpu = kvm_arm_get_running_vcpu();
 +	spin_lock(&irq->irq_lock);
-+	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
  
--	return 0;
-+	return ret;
- }
- 
--int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
- {
- 	struct vgic_irq *irq;
- 
- 	if (!vgic_initialized(vcpu->kvm))
- 		return -EAGAIN;
- 
--	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	BUG_ON(!irq);
- 
- 	spin_lock(&irq->irq_lock);
--
--	irq->hw = false;
--	irq->hwintid = 0;
--
-+	kvm_vgic_unmap_irq(irq);
- 	spin_unlock(&irq->irq_lock);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
-@@ -772,9 +802,9 @@ void vgic_kick_vcpus(struct kvm *kvm)
- 	}
- }
- 
--bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid)
- {
--	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	bool map_is_active;
- 
- 	spin_lock(&irq->irq_lock);
+ 	/*
+ 	 * If this virtual IRQ was written into a list register, we
+@@ -208,6 +214,11 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
+ 	 * so we release and re-acquire the spin_lock to let the other thread
+ 	 * sync back the IRQ.
++	 *
++	 * When accessing VGIC state from user space, requester_vcpu is
++	 * NULL, which is fine, because we guarantee that no VCPUs are running
++	 * when accessing VGIC state from user space so irq->vcpu->cpu is
++	 * always -1.
+ 	 */
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+ 	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
 -- 
 2.7.4
