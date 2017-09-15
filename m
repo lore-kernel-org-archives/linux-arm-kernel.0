@@ -1,116 +1,109 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 16 Sep 2017 02:27:21 +0800
-Subject: [PATCH 1/2] clocksource: stm32: rework driver to use only one
- timer
-In-Reply-To: <1505375812-19037-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <201709160224.qv6Npq2c%fengguang.wu@intel.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 15 Sep 2017 19:33:18 +0100
+Subject: [PATCH v3 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <52d2868c-79cd-8ff8-8e1d-6078d02d5a0c@huawei.com>
+References: <1504770316-4327-1-git-send-email-xiexiuqi@huawei.com>
+ <1504770316-4327-2-git-send-email-xiexiuqi@huawei.com>
+ <59B2DE26.4060002@arm.com> <52d2868c-79cd-8ff8-8e1d-6078d02d5a0c@huawei.com>
+Message-ID: <59BC1CEE.8010708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
+Hi Xie XiuQi,
 
-[auto build test WARNING on tip/timers/core]
-[also build test WARNING on next-20170915]
-[cannot apply to robh/for-next v4.13]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 11/09/17 15:11, Xie XiuQi wrote:
+> I first describe the approach of this patchset:
+> 
+> A memory access error on the execution path usually triggers SEA.
+> According to the existing process, errors occurred in the kernel,
+> leading to direct panic, if it occurred the user-space, we should
+> just kill process.
+> 
+> But there is a class of error, in fact, is not necessary to kill
+> process, you can recover and continue to run the process. Such as
+> the instruction data corrupted, where the memory page might be
+> read-only, which is has not been modified, the disk might have the
+> correct data, so you can directly drop the page, ant reload it when
+> necessary.
+> 
+> So this patchset is just try to solve such problem: if the error is
+> consumed in user-space and the error occurs on a clean page, you can
+> directly drop the memory page without killing process.
+> 
+> This is implemented in memory_failure, which is generic process.
 
-url:    https://github.com/0day-ci/linux/commits/Benjamin-Gaignard/stm32-clocksource-driver-rework/20170915-220617
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> The error reported by SEA should be handled before re-enter the process,
+> or we must kill the process to prevent error propagation.
+> 
+> memory_failure_queue() is asynchronous, in which, error info was saved
+> at ghes_proc, but handled in kworker. During this period there is a context
+> switching, so we can not determine which process would be switch to. So
+> memory_failure_queue is not suitable for handling the problem.
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+Thanks for this summary. I see the problem you're trying to solve is when
+memory_failure() runs, in your scenario its not guaranteed to run before we
+return to user space.
 
-All warnings (new ones prefixed by >>):
+What is the user-visible symptom of this? SIGBUS, code=0 instead of SIGBUS,
+code=...MCEERR_A?
 
-   drivers/clocksource/timer-stm32.c: In function 'stm32_timer_init':
->> drivers/clocksource/timer-stm32.c:180:11: warning: 'err' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     int irq, err;
-              ^~~
+..in which case I'm looking at this as a race with the memory_failure() bottom
+half via schedule_work().
 
-vim +/err +180 drivers/clocksource/timer-stm32.c
+How does x86 avoid this same problem?
 
-   173	
-   174	static int __init stm32_timer_init(struct device_node *node)
-   175	{
-   176		struct reset_control *rstc;
-   177		void __iomem *timer_base;
-   178		unsigned long max_arr;
-   179		struct clk *clk;
- > 180		int irq, err;
-   181	
-   182		timer_base = of_io_request_and_map(node, 0, of_node_full_name(node));
-   183		if (IS_ERR(timer_base)) {
-   184			pr_err("Can't map registers\n");
-   185			goto out;
-   186		}
-   187	
-   188		irq = irq_of_parse_and_map(node, 0);
-   189		if (irq <= 0) {
-   190			pr_err("Can't parse IRQ\n");
-   191			goto out_unmap;
-   192		}
-   193	
-   194		clk = of_clk_get(node, 0);
-   195		if (IS_ERR(clk)) {
-   196			pr_err("Can't get timer clock\n");
-   197			goto out_unmap;
-   198		}
-   199	
-   200		rstc = of_reset_control_get(node, NULL);
-   201		if (!IS_ERR(rstc)) {
-   202			reset_control_assert(rstc);
-   203			reset_control_deassert(rstc);
-   204		}
-   205	
-   206		err = clk_prepare_enable(clk);
-   207		if (err) {
-   208			pr_err("Couldn't enable parent clock\n");
-   209			goto out_clk;
-   210		}
-   211	
-   212		/* Detect whether the timer is 16 or 32 bits */
-   213		writel_relaxed(~0U, timer_base + TIM_ARR);
-   214		max_arr = readl_relaxed(timer_base + TIM_ARR);
-   215		if (max_arr != ~0U) {
-   216			err = -EINVAL;
-   217			pr_err("32 bits timer is needed\n");
-   218			goto out_unprepare;
-   219		}
-   220	
-   221		err = stm32_clocksource_init(node, timer_base, clk);
-   222		if (err)
-   223			goto out_unprepare;
-   224	
-   225		err = stm32_clockevent_init(node, timer_base, clk, irq);
-   226		if (err)
-   227			goto out_unprepare;
-   228	
-   229		return 0;
-   230	
-   231	out_unprepare:
-   232		clk_disable_unprepare(clk);
-   233	out_clk:
-   234		clk_put(clk);
-   235	out_unmap:
-   236		iounmap(timer_base);
-   237	out:
-   238		return err;
-   239	}
-   240	
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62854 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170916/fb7d9a6c/attachment-0001.gz>
+> And memory_failure is not nmi-safe, so it can not be called directly in the
+> SEA context. So we just handle this error at SEA exit path, and before context
+> switching.
+
+(I need to look more into which locks memory_failure() is taking)
+
+
+> In FFH mode, physical address can only be obtained by parsing the GHES table.
+> But we only care about SEA, so the error handling is tied to the type of notification.
+
+I care about all the notification methods. Once the notification has been passed
+to APEI I want them to behave the same so that we don't have subtle bugs between
+the 11 different ways we could get a notification. This code is rarely tested
+enough as it is.
+
+>From the arch code I just want to call out to APEI asking 'is this yours?'. If
+so I expect APEI to have done all the work, if not we take the v8.0 behaviour.
+
+
+Here you need APEI and the arch code to spot 'SEA' and treat it differently,
+invoking some arm64-specific behaviour for APEI, and some
+not-really-arch-specific code under /arch/arm64. There is nothing arm64 specific
+about your arm_process_error(), how come the core APEI code doesn't need to do this?
+
+
+I think this is caused by the way memory_failure() schedules its work, and that
+is where I'd like to try and fix this, so that its the same for all notification
+methods and all (cough: both) architectures.
+
+
+> The TIF flag is checked on a generic path, but it will only be set when SEA occurs.
+> And if we use unlikely optimization, it should have little impact on performance.
+
+Yes, the arch code checks _TIF_WORK_MASK in one go so there is no performance
+problem for code that hasn't taken the RAS-Error. (and once we've taken a RAS
+error performance is out the window!)
+
+
+> And the TIF flag approach was used on x86 platform for years, until commit d4812e169d
+
+... so x86 doesn't do this ...
+
+> (x86, mce: Get rid of TIF_MCE_NOTIFY and associated mce tricks)[0]. On currently arm64
+> platform, there is no IST interrupt[1] function, so we could not call memory_failure
+> directly in SEA context. So the way to use TIF notification, is also a good choice,
+> after all, the same way on x86 platform is verified.
+
+Thanks, looks like I need to read more of the history of x86's kernel-first
+handling...
+
+
+Thanks,
+
+James
