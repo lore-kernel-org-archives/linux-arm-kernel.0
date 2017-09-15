@@ -1,38 +1,23 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Fri, 15 Sep 2017 15:39:16 +0000
-Subject: [PATCH 2/8] ARM: dts: r8a7745: Add SDHI controllers
-In-Reply-To: <20170915075415.GG3924@verge.net.au>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-3-git-send-email-chris.paterson2@renesas.com>
- <20170915075415.GG3924@verge.net.au>
-Message-ID: <TY1PR06MB0702D6FD85B738B2B93627EEB76C0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 15 Sep 2017 18:00:07 +0200
+Subject: [PATCH 0/2] [media] C8SECTPFE: Adjustments for
+ c8sectpfe_frontend_attach()
+Message-ID: <3e5fcfbe-828a-8c15-12d4-c74e8a1f20f1@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Fri, 15 Sep 2017 17:55:43 +0200
 
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: 15 September 2017 08:54
-> 
-> On Wed, Sep 13, 2017 at 06:05:35PM +0100, Chris Paterson wrote:
-> > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> >
-> > Add the SDHI controllers to the r8a7745 device tree.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> 
-> Thanks, applied.
+Two update suggestions were taken into account
+from static source code analysis.
 
-Thank you!
+Markus Elfring (2):
+  Delete an error message for a failed memory allocation
+  Improve two size determinations
 
-> 
-> > ---
-> > This patch is based on renesas-devel-20170913-v4.13.
-> >
-> > This patch is dependant on:
-> > - "dt-bindings: mmc: sh_mmcif: Document r8a7745 DT bindings"
-> 
-> I think that should be "[PATCH v3] mmc: renesas_sdhi: Add r8a7743/5
-> support"
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-Correct. Sorry for the confusion!
+-- 
+2.14.1
