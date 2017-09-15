@@ -1,12 +1,12 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Sep 2017 22:43:20 +0300
-Subject: [PATCH v2 2/8] arm64: dts: renesas: initial R8A77970 SoC device tree
-Message-ID: <20170915194425.473842426@cogentembedded.com>
+Date: Fri, 15 Sep 2017 22:43:19 +0300
+Subject: [PATCH v2 1/8] soc: renesas: rcar-sysc: add R8A77970 support
+Message-ID: <20170915194421.403764714@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial R8A77970 SoC device tree including Cortex-A53 CPU, GIC, timer,
-CPG, RST, and SYSC.
+Add support for R-Car V3M (R8A77970) SoC power areas to the R-Car SYSC
+driver.
 
 Based on the original (and large) patch by Daisuke Matsushita
 <daisuke.matsushita.ns@hitachi.com>.
@@ -17,141 +17,131 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 Changes in version 2:
-- removed #include <dt-bindings/clock/r8a77970-cpg-mssr.h>, replacing the
-  #define's from it with the bare numbers;
-- declared PSCI 0.2 compatibility in the PSCI node;
+- removed #include <linux/bug.h>;
+- fixed the parents for the A2IR[0123] and A2SC[01] power domains;
 - added Geert's tag.
 
- arch/arm64/boot/dts/renesas/r8a77970.dtsi |  125 ++++++++++++++++++++++++++++++
- 1 file changed, 125 insertions(+)
+ Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt |    1 
+ drivers/soc/renesas/Kconfig                                   |    5 +
+ drivers/soc/renesas/Makefile                                  |    1 
+ drivers/soc/renesas/r8a77970-sysc.c                           |   38 ++++++++++
+ drivers/soc/renesas/rcar-sysc.c                               |    3 
+ drivers/soc/renesas/rcar-sysc.h                               |    1 
+ 6 files changed, 49 insertions(+)
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+Index: renesas/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
+===================================================================
+--- renesas.orig/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
++++ renesas/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
+@@ -17,6 +17,7 @@ Required properties:
+       - "renesas,r8a7794-sysc" (R-Car E2)
+       - "renesas,r8a7795-sysc" (R-Car H3)
+       - "renesas,r8a7796-sysc" (R-Car M3-W)
++      - "renesas,r8a77970-sysc" (R-Car V3M)
+       - "renesas,r8a77995-sysc" (R-Car D3)
+   - reg: Address start and address range for the device.
+   - #power-domain-cells: Must be 1.
+Index: renesas/drivers/soc/renesas/Kconfig
+===================================================================
+--- renesas.orig/drivers/soc/renesas/Kconfig
++++ renesas/drivers/soc/renesas/Kconfig
+@@ -14,6 +14,7 @@ config SOC_RENESAS
+ 	select SYSC_R8A7794 if ARCH_R8A7794
+ 	select SYSC_R8A7795 if ARCH_R8A7795
+ 	select SYSC_R8A7796 if ARCH_R8A7796
++	select SYSC_R8A77970 if ARCH_R8A77970
+ 	select SYSC_R8A77995 if ARCH_R8A77995
+ 
+ if SOC_RENESAS
+@@ -55,6 +56,10 @@ config SYSC_R8A7796
+ 	bool "R-Car M3-W System Controller support" if COMPILE_TEST
+ 	select SYSC_RCAR
+ 
++config SYSC_R8A77970
++	bool "R-Car V3M System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
++
+ config SYSC_R8A77995
+ 	bool "R-Car D3 System Controller support" if COMPILE_TEST
+ 	select SYSC_RCAR
+Index: renesas/drivers/soc/renesas/Makefile
+===================================================================
+--- renesas.orig/drivers/soc/renesas/Makefile
++++ renesas/drivers/soc/renesas/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_SYSC_R8A7792)	+= r8a7792-sy
+ obj-$(CONFIG_SYSC_R8A7794)	+= r8a7794-sysc.o
+ obj-$(CONFIG_SYSC_R8A7795)	+= r8a7795-sysc.o
+ obj-$(CONFIG_SYSC_R8A7796)	+= r8a7796-sysc.o
++obj-$(CONFIG_SYSC_R8A77970)	+= r8a77970-sysc.o
+ obj-$(CONFIG_SYSC_R8A77995)	+= r8a77995-sysc.o
+ 
+ # Family
+Index: renesas/drivers/soc/renesas/r8a77970-sysc.c
 ===================================================================
 --- /dev/null
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -0,0 +1,125 @@
++++ renesas/drivers/soc/renesas/r8a77970-sysc.c
+@@ -0,0 +1,38 @@
 +/*
-+ * Device Tree Source for the r8a77970 SoC
++ * Renesas R-Car V3M System Controller
 + *
-+ * Copyright (C) 2016-2017 Renesas Electronics Corp.
-+ * Copyright (C) 2017 Cogent Embedded, Inc.
++ * Copyright (C) 2017 Cogent Embedded Inc.
 + *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/renesas-cpg-mssr.h>
++#include <linux/kernel.h>
 +
-+/ {
-+	compatible = "renesas,r8a77970";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
++#include <dt-bindings/power/r8a77970-sysc.h>
 +
-+	psci {
-+		compatible = "arm,psci-1.0", "arm,psci-0.2";
-+		method = "smc";
-+	};
++#include "rcar-sysc.h"
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		a53_0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0>;
-+			clocks = <&cpg CPG_CORE 0>;
-+			power-domains = <&sysc 5>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
-+		L2_CA53: cache-controller {
-+			compatible = "cache";
-+			power-domains = <&sysc 21>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	extalr_clk: extalr {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at f1010000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0 0xf1010000 0 0x1000>,
-+			      <0 0xf1020000 0 0x20000>,
-+			      <0 0xf1040000 0 0x20000>,
-+			      <0 0xf1060000 0 0x20000>;
-+			interrupts = <GIC_PPI 9	(GIC_CPU_MASK_SIMPLE(1) |
-+				      IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 408>;
-+		};
-+
-+		timer {
-+			compatible = "arm,armv8-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) |
-+						  IRQ_TYPE_LEVEL_LOW)>;
-+		};
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a77970-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk>, <&extalr_clk>;
-+			clock-names = "extal", "extalr";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
-+		};
-+
-+		rst: reset-controller at e6160000 {
-+			compatible = "renesas,r8a77970-rst";
-+			reg = <0 0xe6160000 0 0x200>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a77970-sysc";
-+			reg = <0 0xe6180000 0 0x440>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+	};
++static const struct rcar_sysc_area r8a77970_areas[] __initconst = {
++	{ "always-on",	    0, 0, R8A77970_PD_ALWAYS_ON, -1, PD_ALWAYS_ON },
++	{ "ca53-scu",	0x140, 0, R8A77970_PD_CA53_SCU,	R8A77970_PD_ALWAYS_ON,
++	  PD_SCU },
++	{ "ca53-cpu0",	0x200, 0, R8A77970_PD_CA53_CPU0, R8A77970_PD_CA53_SCU,
++	  PD_CPU_NOCR },
++	{ "ca53-cpu1",	0x200, 1, R8A77970_PD_CA53_CPU1, R8A77970_PD_CA53_SCU,
++	  PD_CPU_NOCR },
++	{ "cr7",	0x240, 0, R8A77970_PD_CR7,	R8A77970_PD_ALWAYS_ON },
++	{ "a3ir",	0x180, 0, R8A77970_PD_A3IR,	R8A77970_PD_ALWAYS_ON },
++	{ "a2ir0",	0x400, 0, R8A77970_PD_A2IR0,	R8A77970_PD_A3IR },
++	{ "a2ir1",	0x400, 1, R8A77970_PD_A2IR1,	R8A77970_PD_A3IR },
++	{ "a2ir2",	0x400, 2, R8A77970_PD_A2IR2,	R8A77970_PD_A3IR },
++	{ "a2ir3",	0x400, 3, R8A77970_PD_A2IR3,	R8A77970_PD_A3IR },
++	{ "a2sc0",	0x400, 4, R8A77970_PD_A2SC0,	R8A77970_PD_A3IR },
++	{ "a2sc1",	0x400, 5, R8A77970_PD_A2SC1,	R8A77970_PD_A3IR },
 +};
++
++const struct rcar_sysc_info r8a77970_sysc_info __initconst = {
++	.areas = r8a77970_areas,
++	.num_areas = ARRAY_SIZE(r8a77970_areas),
++};
+Index: renesas/drivers/soc/renesas/rcar-sysc.c
+===================================================================
+--- renesas.orig/drivers/soc/renesas/rcar-sysc.c
++++ renesas/drivers/soc/renesas/rcar-sysc.c
+@@ -284,6 +284,9 @@ static const struct of_device_id rcar_sy
+ #ifdef CONFIG_SYSC_R8A7796
+ 	{ .compatible = "renesas,r8a7796-sysc", .data = &r8a7796_sysc_info },
+ #endif
++#ifdef CONFIG_SYSC_R8A77970
++	{ .compatible = "renesas,r8a77970-sysc", .data = &r8a77970_sysc_info },
++#endif
+ #ifdef CONFIG_SYSC_R8A77995
+ 	{ .compatible = "renesas,r8a77995-sysc", .data = &r8a77995_sysc_info },
+ #endif
+Index: renesas/drivers/soc/renesas/rcar-sysc.h
+===================================================================
+--- renesas.orig/drivers/soc/renesas/rcar-sysc.h
++++ renesas/drivers/soc/renesas/rcar-sysc.h
+@@ -58,6 +58,7 @@ extern const struct rcar_sysc_info r8a77
+ extern const struct rcar_sysc_info r8a7794_sysc_info;
+ extern const struct rcar_sysc_info r8a7795_sysc_info;
+ extern const struct rcar_sysc_info r8a7796_sysc_info;
++extern const struct rcar_sysc_info r8a77970_sysc_info;
+ extern const struct rcar_sysc_info r8a77995_sysc_info;
+ 
+ 
