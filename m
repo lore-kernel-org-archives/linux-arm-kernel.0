@@ -1,56 +1,47 @@
-From: rfefw@gmail.hu (rfefw at gmail.hu)
-Date: Fri, 15 Sep 2017 15:51:58 +0200
-Subject: arm assembly, how to write a character to the mobile phone's screen
- at boot =?UTF-8?Q?time=3F?=
-Message-ID: <e0b45c8396a6cee9d34ca5ca4316e537@gmail.hu>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 15 Sep 2017 16:04:02 +0200
+Subject: [PATCH v2 0/9] Various patches for SAMA5D2 backup mode
+Message-ID: <20170915140411.31716-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi list
+While the core of the backup mode for SAMA5D2 has been integrated in
+v4.13, it is far from complete. Individual controllers in the chip have
+drivers that do not support the reset of the registers during suspend,
+and they need to be adapted to handle it.
 
-i would like to code a hello world like program that would be placed on 
-a
-phone's ?or an emulator image.
+The first patch uses the clock wakeup code from the prototype backup
+mode instead of the version integrated in the mainline, as the mainline
+version is not stable. During a test loop with two-second backup
+suspend, the mainline version will hang in less than one day, whereas
+the prototype version has been running the same test for more than a
+week without hanging.
 
-i have been checking out the current source for the boot record where i
-found a code for 'puts' which prints out a text
+Changes in v2:
+* drop the IIO patch duplicating existing code
+* determine the number of programmable clocks to save dynamically
+* declare a required local variable in the tty/serial patch
 
-?
-   // linux/arch/arm/boot/compressed/head.S
+Romain Izard (9):
+  clk: at91: pmc: Wait for clocks when resuming
+  clk: at91: pmc: Save SCSR during suspend
+  clk: at91: pmc: Support backup for programmable clocks
+  mtd: nand: atmel: Avoid ECC errors when leaving backup mode
+  mtd: nand: atmel: Report PMECC failures as errors
+  ehci-atmel: Power down during suspend is normal
+  pwm: atmel-tcb: Support backup mode
+  atmel_flexcom: Support backup mode
+  tty/serial: atmel: Prevent a warning on suspend
 
+ drivers/clk/at91/clk-programmable.c |  2 ++
+ drivers/clk/at91/pmc.c              | 55 +++++++++++++++++++++++++------
+ drivers/clk/at91/pmc.h              |  2 ++
+ drivers/mfd/atmel-flexcom.c         | 65 ++++++++++++++++++++++++++++---------
+ drivers/mtd/nand/atmel/pmecc.c      | 15 ++++-----
+ drivers/pwm/pwm-atmel-tcb.c         | 63 +++++++++++++++++++++++++++++++++--
+ drivers/tty/serial/atmel_serial.c   | 14 ++++++++
+ drivers/usb/host/ehci-atmel.c       |  3 +-
+ 8 files changed, 182 insertions(+), 37 deletions(-)
 
-@ puts corrupts {r0, r1, r2, r3}
-puts:		loadsp	r3, r1
-1:		ldrb	r2, [r0], #1
-		teq	r2, #0
-		moveq	pc, lr
-2:		writeb	r2, r3
-		mov	r1, #0x00020000
-3:		subs	r1, r1, #1
-		bne	3b
-		teq	r2, #'\n'
-		moveq	r2, #'\r'
-		beq	2b
-		teq	r0, #0
-		bne	1b
-		mov	pc, lr
-@ putc corrupts {r0, r1, r2, r3}
-putc:
-		mov	r2, r0
-		mov	r0, #0
-		loadsp	r3, r1
-		b	2b
-...
-
-
-it calls the macro 'writeb' which is defined as (well it has multiple 
-definitions, but one of them for instance):
-
-mcr	p14, 0, \ch, c0, c5, 0
-
-what are these magical p14 and c0 c5 registers? is there a 
-documentation for these?
-
-but may be i am on the wrong track, if so, how do i print out a 
-character at the boot code's level? is there something like a "video 
-memory" where i can write to? or a "bios" interrupt call?
+-- 
+2.11.0
