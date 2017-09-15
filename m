@@ -1,48 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Sep 2017 21:45:12 +0200
-Subject: [PATCH] omap: hwmod: fix section mismatch warnings
-Message-ID: <20170915194527.1171677-1-arnd@arndb.de>
+Date: Fri, 15 Sep 2017 21:54:34 +0200
+Subject: [PATCH] [media] exynos4-is: properly initialize frame format
+Message-ID: <20170915195441.1505586-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Older compilers choose not to inline _setup_clkctrl_provider(),
-leading to a harmless warning:
+We copy the subdev frame format from a partially initialized
+structure, which is not entirely well-defined. Older compilers
+like gcc-4.4 can copy uninitialized stack data here and warn
+about it:
 
-WARNING: vmlinux.o(.text+0x27b34): Section mismatch in reference from the function _setup_clkctrl_provider() to the function .init.text:memblock_virt_alloc_try_nid()
-The function _setup_clkctrl_provider() references
-the function __init memblock_virt_alloc_try_nid().
-This is often because _setup_clkctrl_provider lacks a __init
-annotation or the annotation of memblock_virt_alloc_try_nid is wrong.
+drivers/media/platform/exynos4-is/fimc-isp.c: In function 'fimc_isp_subdev_open':
+drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.reserved[10u]' may be used uninitialized in this function
+drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.reserved[9u]' may be used uninitialized in this function
+...
+drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.reserved[0u]' may be used uninitialized in this function
+drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.xfer_func' may be used uninitialized in this function
 
-This annotates it as __init as well, which lets the linker
-see that it is actually correct.
+On newer compilers, only the initialized fields get copied, but
+we should not rely on that, so this changes the code to zero-out
+the remaining fields first.
 
+Fixes: 9a761e436843 ("[media] exynos4-is: Add Exynos4x12 FIMC-IS driver")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-omap2/omap_hwmod.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/media/platform/exynos4-is/fimc-isp.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 2dbd63239c54..91ec0ca4822b 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -732,7 +732,7 @@ static int _match_clkdm(struct clockdomain *clkdm, void *user)
- 	return 0;
- }
- 
--static int _setup_clkctrl_provider(struct device_node *np)
-+static int __init _setup_clkctrl_provider(struct device_node *np)
+diff --git a/drivers/media/platform/exynos4-is/fimc-isp.c b/drivers/media/platform/exynos4-is/fimc-isp.c
+index fd793d3ac072..9a48c0f69320 100644
+--- a/drivers/media/platform/exynos4-is/fimc-isp.c
++++ b/drivers/media/platform/exynos4-is/fimc-isp.c
+@@ -366,16 +366,16 @@ static int fimc_isp_subdev_s_power(struct v4l2_subdev *sd, int on)
+ static int fimc_isp_subdev_open(struct v4l2_subdev *sd,
+ 				struct v4l2_subdev_fh *fh)
  {
- 	const __be32 *addrp;
- 	struct clkctrl_provider *provider;
-@@ -761,7 +761,7 @@ static int _setup_clkctrl_provider(struct device_node *np)
- 	return 0;
- }
+-	struct v4l2_mbus_framefmt fmt;
+ 	struct v4l2_mbus_framefmt *format;
++	struct v4l2_mbus_framefmt fmt = {
++		.colorspace = V4L2_COLORSPACE_SRGB,
++		.code = fimc_isp_formats[0].mbus_code,
++		.width = DEFAULT_PREVIEW_STILL_WIDTH + FIMC_ISP_CAC_MARGIN_WIDTH,
++		.height = DEFAULT_PREVIEW_STILL_HEIGHT + FIMC_ISP_CAC_MARGIN_HEIGHT,
++		.field = V4L2_FIELD_NONE,
++	};
  
--static int _init_clkctrl_providers(void)
-+static int __init _init_clkctrl_providers(void)
- {
- 	struct device_node *np;
- 	int ret = 0;
+ 	format = v4l2_subdev_get_try_format(sd, fh->pad, FIMC_ISP_SD_PAD_SINK);
+-
+-	fmt.colorspace = V4L2_COLORSPACE_SRGB;
+-	fmt.code = fimc_isp_formats[0].mbus_code;
+-	fmt.width = DEFAULT_PREVIEW_STILL_WIDTH + FIMC_ISP_CAC_MARGIN_WIDTH;
+-	fmt.height = DEFAULT_PREVIEW_STILL_HEIGHT + FIMC_ISP_CAC_MARGIN_HEIGHT;
+-	fmt.field = V4L2_FIELD_NONE;
+ 	*format = fmt;
+ 
+ 	format = v4l2_subdev_get_try_format(sd, fh->pad, FIMC_ISP_SD_PAD_SRC_FIFO);
 -- 
 2.9.0
