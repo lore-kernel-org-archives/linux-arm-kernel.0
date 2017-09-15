@@ -1,59 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Sep 2017 21:54:34 +0200
-Subject: [PATCH] [media] exynos4-is: properly initialize frame format
-Message-ID: <20170915195441.1505586-1-arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Sep 2017 21:38:53 +0100
+Subject: [PATCH v8 10/11] arm64/kasan: explicitly zero kasan shadow memory
+In-Reply-To: <c76f72fc-21ed-62d0-014e-8509c0374f96@oracle.com>
+References: <20170914223517.8242-1-pasha.tatashin@oracle.com>
+ <20170914223517.8242-11-pasha.tatashin@oracle.com>
+ <20170915011035.GA6936@remoulade>
+ <c76f72fc-21ed-62d0-014e-8509c0374f96@oracle.com>
+Message-ID: <20170915203852.GA10749@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We copy the subdev frame format from a partially initialized
-structure, which is not entirely well-defined. Older compilers
-like gcc-4.4 can copy uninitialized stack data here and warn
-about it:
+On Thu, Sep 14, 2017 at 09:30:28PM -0400, Pavel Tatashin wrote:
+> Hi Mark,
+> 
+> Thank you for looking at this. We can't do this because page table is not
+> set until cpu_replace_ttbr1() is called. So, we can't do memset() on this
+> memory until then.
 
-drivers/media/platform/exynos4-is/fimc-isp.c: In function 'fimc_isp_subdev_open':
-drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.reserved[10u]' may be used uninitialized in this function
-drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.reserved[9u]' may be used uninitialized in this function
-...
-drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.reserved[0u]' may be used uninitialized in this function
-drivers/media/platform/exynos4-is/fimc-isp.c:379: error: 'fmt.xfer_func' may be used uninitialized in this function
+I see. Sorry, I had missed that we were on the temporary tables at this point
+in time.
 
-On newer compilers, only the initialized fields get copied, but
-we should not rely on that, so this changes the code to zero-out
-the remaining fields first.
+I'm still not keen on duplicating the iteration. Can we split the vmemmap code
+so that we have a variant that takes a GFP? 
 
-Fixes: 9a761e436843 ("[media] exynos4-is: Add Exynos4x12 FIMC-IS driver")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/media/platform/exynos4-is/fimc-isp.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+That way we could explicitly pass __GFP_ZERO for those cases where we want a
+zeroed page, and are happy to pay the cost of initialization.
 
-diff --git a/drivers/media/platform/exynos4-is/fimc-isp.c b/drivers/media/platform/exynos4-is/fimc-isp.c
-index fd793d3ac072..9a48c0f69320 100644
---- a/drivers/media/platform/exynos4-is/fimc-isp.c
-+++ b/drivers/media/platform/exynos4-is/fimc-isp.c
-@@ -366,16 +366,16 @@ static int fimc_isp_subdev_s_power(struct v4l2_subdev *sd, int on)
- static int fimc_isp_subdev_open(struct v4l2_subdev *sd,
- 				struct v4l2_subdev_fh *fh)
- {
--	struct v4l2_mbus_framefmt fmt;
- 	struct v4l2_mbus_framefmt *format;
-+	struct v4l2_mbus_framefmt fmt = {
-+		.colorspace = V4L2_COLORSPACE_SRGB,
-+		.code = fimc_isp_formats[0].mbus_code,
-+		.width = DEFAULT_PREVIEW_STILL_WIDTH + FIMC_ISP_CAC_MARGIN_WIDTH,
-+		.height = DEFAULT_PREVIEW_STILL_HEIGHT + FIMC_ISP_CAC_MARGIN_HEIGHT,
-+		.field = V4L2_FIELD_NONE,
-+	};
- 
- 	format = v4l2_subdev_get_try_format(sd, fh->pad, FIMC_ISP_SD_PAD_SINK);
--
--	fmt.colorspace = V4L2_COLORSPACE_SRGB;
--	fmt.code = fimc_isp_formats[0].mbus_code;
--	fmt.width = DEFAULT_PREVIEW_STILL_WIDTH + FIMC_ISP_CAC_MARGIN_WIDTH;
--	fmt.height = DEFAULT_PREVIEW_STILL_HEIGHT + FIMC_ISP_CAC_MARGIN_HEIGHT;
--	fmt.field = V4L2_FIELD_NONE;
- 	*format = fmt;
- 
- 	format = v4l2_subdev_get_try_format(sd, fh->pad, FIMC_ISP_SD_PAD_SRC_FIFO);
--- 
-2.9.0
+Thanks
+Mark.
