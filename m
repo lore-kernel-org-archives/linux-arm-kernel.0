@@ -1,39 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Sep 2017 21:28:30 +0200
-Subject: [PATCH] clk: mediatek: mark mtk_infrasys_init_early __init
-Message-ID: <20170915192848.649455-1-arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 15 Sep 2017 22:43:18 +0300
+Subject: [PATCH v2 0/8] Add Renesas R8A77970/Eagle board support
+Message-ID: <20170915193718.359780292@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On gcc-4.6, we get a harmless link-time warning:
+Hello.
 
-WARNING: vmlinux.o(.text.unlikely+0x196a0): Section mismatch in reference from the function mtk_infrasys_init_early() to the function .init.text:mtk_clk_register_cpumuxes()
-The function mtk_infrasys_init_early() references
-the function __init mtk_clk_register_cpumuxes().
-This is often because mtk_infrasys_init_early lacks a __init
-annotation or the annotation of mtk_clk_register_cpumuxes is wrong.
+   Here's the set of 8 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20170915-v4.13' tag. I'm adding the device tree support for
+the R8A77970-based Eagle board. Already merged patches will not be reposted.
+The necessary SYS-DMAC, [H]SCIF, and EtherAVB bindings updates have been
+posted earlier.
 
-Newer compilers inline this function so they don't warn, but
-marking it __init is the right solution for all versions.
+[1/8] soc: renesas: rcar-sysc: add R8A77970 support
+[2/8] arm64: dts: renesas: initial R8A77970 SoC device tree
+[3/8] arm64: dts: renesas: r8a77970: add SYS-DMAC support
+[4/8] arm64: dts: renesas: r8a77970: add [H]SCIF support
+[5/8] arm64: dts: renesas: r8a77970: add EtherAVB support
+[6/8] arm64: renesas: document Eagle board bindings
+[7/8] arm64: dts: renesas: initial Eagle board device tree
+[8/8] arm64: dts: renesas: eagle: add EtherAVB support
 
-Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/clk/mediatek/clk-mt2701.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
-index 9598889f972b..8e7f16fd87c9 100644
---- a/drivers/clk/mediatek/clk-mt2701.c
-+++ b/drivers/clk/mediatek/clk-mt2701.c
-@@ -750,7 +750,7 @@ static const struct mtk_fixed_factor infra_fixed_divs[] = {
- 
- static struct clk_onecell_data *infra_clk_data;
- 
--static void mtk_infrasys_init_early(struct device_node *node)
-+static void __init mtk_infrasys_init_early(struct device_node *node)
- {
- 	int r, i;
- 
--- 
-2.9.0
+WBR, Sergei
