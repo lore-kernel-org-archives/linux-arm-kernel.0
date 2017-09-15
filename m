@@ -1,40 +1,31 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 15 Sep 2017 21:52:36 +0300
-Subject: [PATCH] dmaengine: edma: Align the memcpy acnt array size with
- the transfer
-In-Reply-To: <20170915164707.GD27343@kroah.com>
-References: <20170915072328.7415-1-peter.ujfalusi@ti.com>
- <20170915164707.GD27343@kroah.com>
-Message-ID: <aa913f99-189a-fda0-9867-a3897a5e0fa3@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 15 Sep 2017 11:53:55 -0700
+Subject: [PATCH] arm64: efi: ignore EFI_MEMORY_XP attribute if RP and/or
+ WP are set
+In-Reply-To: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
+References: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170915185355.GC3349@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+On 09/14, Ard Biesheuvel wrote:
+> The UEFI memory map is a bit vague about how to interpret the
+> EFI_MEMORY_XP attribute when it is combined with EFI_MEMORY_RP and/or
+> EFI_MEMORY_WP, which have retroactively been redefined as cacheability
+> attributes rather than permission attributes.
+> 
+> So let's ignore EFI_MEMORY_XP if _RP and/or _WP are also set. In this
+> case, it is likely that they are being used to describe the capability
+> of the region (i.e., whether it has the controls to reconfigure it as
+> non-executable) rather than the nature of the contents of the region
+> (i.e., whether it contains data that we will never attempt to execute)
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
 
-On 09/15/2017 07:47 PM, Greg KH wrote:
-> On Fri, Sep 15, 2017 at 10:23:28AM +0300, Peter Ujfalusi wrote:
->> ?Memory to Memory transfers does not have any special alignment needs
->> regarding to acnt array size, but if one of the areas are in memory mapped
->> regions (like PCIe memory), we need to make sure that the acnt array size
->> is aligned with the mem copy parameters.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  drivers/dma/edma.c | 19 ++++++++++++++++---
->>  1 file changed, 16 insertions(+), 3 deletions(-)
-> 
-> <formletter>
-> 
-> This is not the correct way to submit patches for inclusion in the
-> stable kernel tree.  Please read:
->     https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-> for how to do this properly.
-> 
-> </formletter>
+Reported-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Sorry, I forgot to add the CC to the patch itself. I will resend it with the
-correct form.
+I will test early next week and provide a tested-by. Thanks.
 
 -- 
-P?ter
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
