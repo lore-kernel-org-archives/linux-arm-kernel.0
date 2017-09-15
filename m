@@ -1,45 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 15 Sep 2017 14:59:14 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for 4.14 (round 3, late)
-In-Reply-To: <7hr2vlarbn.fsf@baylibre.com>
-References: <7hr2vlarbn.fsf@baylibre.com>
-Message-ID: <CAOesGMjKjAE=OOcOK0KRzwvBO8NS2+qB7bt5zK19ryLopZhT-Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Sep 2017 22:51:48 +0100
+Subject: [PATCH v8 10/11] arm64/kasan: explicitly zero kasan shadow memory
+In-Reply-To: <bff836ec-3922-1783-6cb4-94d1be92544b@oracle.com>
+References: <20170914223517.8242-1-pasha.tatashin@oracle.com>
+ <20170914223517.8242-11-pasha.tatashin@oracle.com>
+ <20170915011035.GA6936@remoulade>
+ <c76f72fc-21ed-62d0-014e-8509c0374f96@oracle.com>
+ <20170915203852.GA10749@remoulade>
+ <bff836ec-3922-1783-6cb4-94d1be92544b@oracle.com>
+Message-ID: <20170915215147.GA11849@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 15, 2017 at 05:20:59PM -0400, Pavel Tatashin wrote:
+> Hi Mark,
+> 
+> I had this option? back upto version 3, where zero flag was passed into
+> vmemmap_alloc_block(), but I was asked to remove it, because it required too
+> many changes in other places.
 
-On Tue, Sep 5, 2017 at 12:17 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Olof, Arnd,
->
-> I'm aware this is pretty late, so feel free to include in a late branch,
-> or we can wait and send after -rc1.  It's late because the corresponding
-> drivers/mmc change just got merged.
->
-> Thanks,
->
-> Kevin
->
->
-> The following changes since commit 47884c5c746ee7c02e06fbf60480e0f13aa11dfe:
->
->   ARM64: dts: meson-gxl-libretech-cc: Add GPIO lines names (2017-08-22 15:37:50 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
->
-> for you to fetch changes up to 485a308f05d843034b6e82f688704c44888aecde:
->
->   ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode (2017-09-05 12:05:01 -0700)
->
-> ----------------------------------------------------------------
-> Amlogic 64-bit DT updates for v4.14 (round 3)
-> - updates for new MMC driver features/fixes
-> - support high-speed modes
+Ok. Sorry for bringing back a point that had already been covered.
 
-I decided to merge into next/late, will send this afternoon or
-tomorrow together with a few other changes.
+> So, the current approach is cleaner, but the idea is that kasan should use
+> its own version of vmemmap_populate() for both x86 and ARM, but I think it is
+> outside of the scope of this work.
 
+I appreciate that this is unrelated to your ultimate goal, and that this is
+somewhat frustrating given the KASAN code is arguably abusing the
+vmemmap_populate() interface.
 
--Olof
+However, I do think we need to migrate the KASAN code to a proper interface
+immediately, rather than making it worse in the interim.
+
+> If you think I should add these function in this project, than sure I can
+> send a new version with kasanmap_populate() functions.
+
+I would very much appreciate if you could send a version with a
+kasan_map_populate() interface. I'm more than happy to review/test that portion
+of the series, or to help if there's some problem which makes that difficult.
+
+Thanks,
+Mark.
