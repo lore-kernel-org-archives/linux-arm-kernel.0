@@ -1,37 +1,53 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 15 Sep 2017 19:59:27 +0900
-Subject: [PATCH v3 05/10] asm-generic: add kexec_file_load system call to
- unistd.h
+Date: Fri, 15 Sep 2017 19:59:31 +0900
+Subject: [PATCH v3 09/10] arm64: enable KEXEC_FILE config
 In-Reply-To: <20170915105932.25338-1-takahiro.akashi@linaro.org>
 References: <20170915105932.25338-1-takahiro.akashi@linaro.org>
-Message-ID: <20170915105932.25338-6-takahiro.akashi@linaro.org>
+Message-ID: <20170915105932.25338-10-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial user of this system call number is arm64.
+Modify arm64/Kconfig and Makefile to enable kexec_file_load support.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/uapi/asm-generic/unistd.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index 061185a5eb51..086697fe3917 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -731,9 +731,11 @@ __SYSCALL(__NR_pkey_alloc,    sys_pkey_alloc)
- __SYSCALL(__NR_pkey_free,     sys_pkey_free)
- #define __NR_statx 291
- __SYSCALL(__NR_statx,     sys_statx)
-+#define __NR_kexec_file_load 292
-+__SYSCALL(__NR_kexec_file_load,     sys_kexec_file_load)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index dfd908630631..fa7299f08cc6 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -756,6 +756,28 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
  
- #undef __NR_syscalls
--#define __NR_syscalls 292
-+#define __NR_syscalls 293
- 
- /*
-  * All syscalls below here should go away really,
++config KEXEC_FILE
++	bool "kexec file based system call"
++	select KEXEC_CORE
++	select BUILD_BIN2C
++	---help---
++	  This is new version of kexec system call. This system call is
++	  file based and takes file descriptors as system call argument
++	  for kernel and initramfs as opposed to list of segments as
++	  accepted by previous system call.
++
++	  In addition to this option, you need to enable a specific type
++	  of image support.
++
++config KEXEC_VERIFY_SIG
++	bool "Verify kernel signature during kexec_file_load() syscall"
++	depends on KEXEC_FILE
++	select SYSTEM_DATA_VERIFICATION
++	---help---
++	  Select this option to verify a signature with loaded kernel
++	  image. If configured, any attempt of loading a image without
++	  valid signature will fail.
++
+ config CRASH_DUMP
+ 	bool "Build kdump crash kernel"
+ 	help
 -- 
 2.14.1
