@@ -1,116 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 15 Sep 2017 11:18:11 +0200
-Subject: [PATCH v2 7/8] ARM: dts: rockchip: add gpu nodes on rk3066/rk3188
-In-Reply-To: <20170915091812.13368-1-heiko@sntech.de>
-References: <20170915091812.13368-1-heiko@sntech.de>
-Message-ID: <20170915091812.13368-8-heiko@sntech.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 Sep 2017 11:47:00 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix missing CLK_SET_RATE_PARENT in
+ ccu-sun4i-a10.c
+In-Reply-To: <CAGb2v677Ed4-iX6fkYEYZ1N9ZLKXfQQF2hhdbcbBCaB0-g174A@mail.gmail.com>
+References: <20170914120519.2006-1-alex@asyring.de>
+ <CAGb2v677Ed4-iX6fkYEYZ1N9ZLKXfQQF2hhdbcbBCaB0-g174A@mail.gmail.com>
+Message-ID: <20170915094700.j7hykv3iq5n2iksk@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old Cortex-A9 socs use Mali400 GPUs with 4 pixel processors.
-This adds the core gpu nodes with the per-soc interrupts but sharing
-the core node.
+On Thu, Sep 14, 2017 at 08:14:10PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Sep 14, 2017 at 8:05 PM, Alexander Syring <alex@asyring.de> wrote:
+> > When using cpufreq-dt with default govenor other than "performance"
+> > system freezes while booting.
+> > Adding CLK_SET_RATE_PARENT | CLK_IS_CRITICAL to clk_cpu fixes the
+> > problem.
+> >
+> > Tested on Cubietruck (A20).
+> >
+> > Fixes: c84f5683f6E ("clk: sunxi-ng: Add sun4i/sun7i CCU driver")
+> >
+> > Reported-by: Alexander Syring <alex@asyring.de>
+> 
+> You typically don't need this if you yourself are the reporter.
 
-Rockchip SoCs use only one clock to supply the GPUs
+Queued for 4.15.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3066a.dtsi | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/rk3188.dtsi  | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi  | 11 +++++++++++
- 3 files changed, 59 insertions(+)
+Thanks!
+Maxime
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index f50481fd8e5c..b76119dd5733 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -610,6 +610,30 @@
- 	};
- };
- 
-+&gpu {
-+	compatible = "rockchip,rk3066-mali", "arm,mali-400";
-+	interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "gp",
-+			  "gpmmu",
-+			  "pp0",
-+			  "pp0mmu",
-+			  "pp1",
-+			  "pp1mmu",
-+			  "pp2",
-+			  "pp2mmu",
-+			  "pp3",
-+			  "pp3mmu";
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_xfer>;
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 1399bc04ea77..9e24d0ffadac 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -553,6 +553,30 @@
- 	interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
- };
- 
-+&gpu {
-+	compatible = "rockchip,rk3188-mali", "arm,mali-400";
-+	interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "gp",
-+			  "gpmmu",
-+			  "pp0",
-+			  "pp0mmu",
-+			  "pp1",
-+			  "pp1mmu",
-+			  "pp2",
-+			  "pp2mmu",
-+			  "pp3",
-+			  "pp3mmu";
-+};
-+
- &i2c0 {
- 	compatible = "rockchip,rk3188-i2c";
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 4aa6f60d6a22..49584b6a4195 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -117,6 +117,17 @@
- 		clock-output-names = "xin24m";
- 	};
- 
-+	gpu: gpu at 10090000 {
-+		compatible = "arm,mali-400";
-+		reg = <0x10090000 0x10000>;
-+		clocks = <&cru ACLK_GPU>, <&cru ACLK_GPU>;
-+		clock-names = "core", "bus";
-+		assigned-clocks = <&cru ACLK_GPU>;
-+		assigned-clock-rates = <100000000>;
-+		resets = <&cru SRST_GPU>;
-+		status = "disabled";
-+	};
-+
- 	L2: l2-cache-controller at 10138000 {
- 		compatible = "arm,pl310-cache";
- 		reg = <0x10138000 0x1000>;
 -- 
-2.14.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170915/a3c00af5/attachment.sig>
