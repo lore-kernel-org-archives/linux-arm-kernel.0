@@ -1,37 +1,43 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 15 Sep 2017 18:01:13 +0200
-Subject: [PATCH 1/2] [media] c8sectpfe: Delete an error message for a failed
- memory allocation in c8sectpfe_frontend_attach()
+Date: Fri, 15 Sep 2017 18:02:14 +0200
+Subject: [PATCH 2/2] [media] c8sectpfe: Improve two size determinations in
+ c8sectpfe_frontend_attach()
 In-Reply-To: <3e5fcfbe-828a-8c15-12d4-c74e8a1f20f1@users.sourceforge.net>
 References: <3e5fcfbe-828a-8c15-12d4-c74e8a1f20f1@users.sourceforge.net>
-Message-ID: <04a4e480-c7a2-fe8c-ca38-8d0b32b42307@users.sourceforge.net>
+Message-ID: <432261cc-ecf1-0673-b8e2-9ca317ceb772@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 15 Sep 2017 17:20:48 +0200
+Date: Fri, 15 Sep 2017 17:30:38 +0200
 
-Omit an extra message for a memory allocation failure in this function.
-
-This issue was detected by using the Coccinelle software.
+Replace the specification of data structures by pointer dereferences
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-index 2c0015b1264d..1b23b188cd65 100644
+index 1b23b188cd65..c3b09a9e30ec 100644
 --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
 +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-@@ -166,7 +166,4 @@ int c8sectpfe_frontend_attach(struct dvb_frontend **fe,
+@@ -164,12 +164,10 @@ int c8sectpfe_frontend_attach(struct dvb_frontend **fe,
+ 		tda18212 = devm_kzalloc(c8sectpfe->device,
+-					sizeof(struct tda18212_config),
++					sizeof(*tda18212),
  					GFP_KERNEL);
--		if (!tda18212) {
--			dev_err(c8sectpfe->device,
--				"%s: devm_kzalloc failed\n", __func__);
-+		if (!tda18212)
+ 		if (!tda18212)
  			return -ENOMEM;
--		}
  
+-		memcpy(tda18212, &tda18212_conf,
+-			sizeof(struct tda18212_config));
+-
++		memcpy(tda18212, &tda18212_conf, sizeof(*tda18212));
+ 		tda18212->fe = (*fe);
+ 
+ 		tda18212_info.platform_data = tda18212;
 -- 
 2.14.1
