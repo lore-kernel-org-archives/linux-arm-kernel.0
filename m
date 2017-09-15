@@ -1,42 +1,19 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 15 Sep 2017 09:08:31 +0200
-Subject: [PATCH 2/3] ARM: dts: at91: usb_a9g20: fix rtc node
-In-Reply-To: <20170915020004.24272-2-alexandre.belloni@free-electrons.com>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Fri, 15 Sep 2017 09:13:26 +0200
+Subject: [PATCH 3/3] powerpc/5200: dts: digsy_mtc.dts: fix rv3029
+ compatible
+In-Reply-To: <20170915020004.24272-3-alexandre.belloni@free-electrons.com>
 References: <20170915020004.24272-1-alexandre.belloni@free-electrons.com>
- <20170915020004.24272-2-alexandre.belloni@free-electrons.com>
-Message-ID: <bf64c774-9057-d73e-8f39-7fcc5f32725c@microchip.com>
+ <20170915020004.24272-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20170915091326.4b93bde1@crub>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2017 at 04:00, Alexandre Belloni wrote:
-> The rv3029 compatible is missing its vendor string, add it.
-> Also fix the node name to be a proper generic name.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Fri, 15 Sep 2017 04:00:04 +0200
+Alexandre Belloni alexandre.belloni at free-electrons.com wrote:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>The proper compatible for rv3029 is microcrystal,rv3029.
+>
+>Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-> ---
->  arch/arm/boot/dts/usb_a9g20_common.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/usb_a9g20_common.dtsi b/arch/arm/boot/dts/usb_a9g20_common.dtsi
-> index 088c2c3685ab..81c3fe0465d9 100644
-> --- a/arch/arm/boot/dts/usb_a9g20_common.dtsi
-> +++ b/arch/arm/boot/dts/usb_a9g20_common.dtsi
-> @@ -20,8 +20,8 @@
->  	};
->  
->  	i2c-gpio-0 {
-> -		rv3029c2 at 56 {
-> -			compatible = "rv3029c2";
-> +		rtc at 56 {
-> +			compatible = "microcrystal,rv3029";
->  			reg = <0x56>;
->  		};
->  	};
-> 
-
-
--- 
-Nicolas Ferre
+Acked-by: Anatolij Gustschin <agust@denx.de>
