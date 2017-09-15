@@ -1,49 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Sep 2017 10:05:23 +0200
-Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
-In-Reply-To: <20170915074551.GF3924@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Sep 2017 10:05:30 +0200
+Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
+In-Reply-To: <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
 References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
- <20170915074551.GF3924@verge.net.au>
-Message-ID: <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
+ <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <20170915080530.GH3924@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon, Fabrizio,
+On Wed, Sep 13, 2017 at 06:05:37PM +0100, Chris Paterson wrote:
+> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> 
+> Enable the SDHI0 controller on iWave RZ/G1E carrier board.
 
-On Fri, Sep 15, 2017 at 9:45 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Sep 13, 2017 at 06:05:34PM +0100, Chris Paterson wrote:
->> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
->>
->> Add DT node for the Advanced Power Management Unit (APMU), add the
->> second CPU core, and use "renesas,apmu" as "enable-method".
->>
->> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
->> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
->> ---
->> This patch is based on renesas-devel-20170913-v4.13.
->
-> Hi,
->
-> with reference to "[PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2"
-> is the CNTVOFF initialised in the boot loader of boards (in upstream)
-> for this SoC? If not I expect you will have trouble with the arch timer
-> on secondary CPU cores.
+...
 
-Exactly my question.
+> @@ -63,3 +88,15 @@
+>  		micrel,led-mode = <1>;
+>  	};
+>  };
+> +
+> +&sdhi0 {
+> +	pinctrl-0 = <&sdhi0_pins>;
+> +	pinctrl-1 = <&sdhi0_pins_uhs>;
+> +	pinctrl-names = "default", "state_uhs";
+> +
+> +	vmmc-supply = <&reg_3p3v>;
+> +	vqmmc-supply = <&vccq_sdhi0>;
+> +	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
 
-Fabrizio: Given your feedback on "[PATCH v3 0/3] ARM: renesas: Enable SMP on
-R-Car E2", I think SMP enablement on RZ/G1E has to be postponed until "ARM:
-shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15" has been
-accepted upstream.
+I take that the absence of a wp-gpio means that that this is a ?SD slot.
+Could you help me by documenting this correctly on
+http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds ?
 
-Gr{oetje,eeting}s,
+For some reason I thought that SDHI0 wasn't exposed at all, so I guess
+my reading of the documentation was incorrect.
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+I think you also want sd-uhs-sdr50 here too.
+You can test it by removing the sd-uhs-sdr104 property.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	sd-uhs-sdr104;
+> +	status = "okay";
+> +};
+> -- 
+> 1.9.1
+> 
