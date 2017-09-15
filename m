@@ -1,31 +1,20 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Sep 2017 11:53:55 -0700
-Subject: [PATCH] arm64: efi: ignore EFI_MEMORY_XP attribute if RP and/or
- WP are set
-In-Reply-To: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
-References: <20170914193153.18520-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170915185355.GC3349@codeaurora.org>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 15 Sep 2017 20:54:44 +0200
+Subject: [media] stm32-dcmi: Improve four size determinations
+In-Reply-To: <1505499388.27581.13.camel@perches.com>
+References: <730b535e-39a5-2c2b-f463-e76da967a723@users.sourceforge.net>
+ <f4e400ea-9660-05cd-3194-cdf2495a2376@users.sourceforge.net>
+ <1505499388.27581.13.camel@perches.com>
+Message-ID: <fdcd16a7-0345-9a6c-1ef8-85ac32eb9448@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14, Ard Biesheuvel wrote:
-> The UEFI memory map is a bit vague about how to interpret the
-> EFI_MEMORY_XP attribute when it is combined with EFI_MEMORY_RP and/or
-> EFI_MEMORY_WP, which have retroactively been redefined as cacheability
-> attributes rather than permission attributes.
+>> +	memcpy(dcmi->sd_formats, sd_fmts, num_fmts * sizeof(*dcmi->sd_formats));
 > 
-> So let's ignore EFI_MEMORY_XP if _RP and/or _WP are also set. In this
-> case, it is likely that they are being used to describe the capability
-> of the region (i.e., whether it has the controls to reconfigure it as
-> non-executable) rather than the nature of the contents of the region
-> (i.e., whether it contains data that we will never attempt to execute)
-> 
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> devm_kmemdup
 
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+Are function variants provided which handle memory duplications
+for arrays explicitly?
 
-I will test early next week and provide a tested-by. Thanks.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Markus
