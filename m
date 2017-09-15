@@ -1,410 +1,105 @@
-From: hanetzer@startmail.com (Marty E. Plummer)
-Date: Thu, 14 Sep 2017 22:56:36 -0500
-Subject: [RFC PATCH 3/3] arm: dts: add Hi3521A dts
-In-Reply-To: <20170915035636.9903-1-hanetzer@startmail.com>
-References: <20170915035636.9903-1-hanetzer@startmail.com>
-Message-ID: <20170915035636.9903-4-hanetzer@startmail.com>
+From: rocky.hao@rock-chips.com (rocky.hao)
+Date: Fri, 15 Sep 2017 14:32:07 +0800
+Subject: [PATCH 4/5] arm: dts: rockchip: add thermal nodes for RV1108 SoC
+In-Reply-To: <1503570475-7850-5-git-send-email-rocky.hao@rock-chips.com>
+References: <1503570475-7850-1-git-send-email-rocky.hao@rock-chips.com>
+ <1503570475-7850-5-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <71ddf0e0-c980-90c3-a7b2-dfaf805e1c37@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hi3521a.dtsi and hi3521a-rs-dm290e.dts for RaySharp CCTV systems,
-marketed under the name Samsung SDR-B74301N
 
-Signed-off-by: Marty E. Plummer <hanetzer@startmail.com>
----
- arch/arm/boot/dts/Makefile              |   2 +
- arch/arm/boot/dts/hi3521a-rs-dm290e.dts |  52 ++++++
- arch/arm/boot/dts/hi3521a.dtsi          | 310 ++++++++++++++++++++++++++++++++
- 3 files changed, 364 insertions(+)
- create mode 100644 arch/arm/boot/dts/hi3521a-rs-dm290e.dts
- create mode 100644 arch/arm/boot/dts/hi3521a.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faf46abaa4a2..e7b9b5dde20f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -189,6 +189,8 @@ dtb-$(CONFIG_ARCH_GEMINI) += \
- 	gemini-sq201.dtb \
- 	gemini-wbd111.dtb \
- 	gemini-wbd222.dtb
-+dtb-$(CONFIG_ARCH_HI3521A) += \
-+	hi3521a-rs-dm290e.dtb
- dtb-$(CONFIG_ARCH_HI3xxx) += \
- 	hi3620-hi4511.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += \
-diff --git a/arch/arm/boot/dts/hi3521a-rs-dm290e.dts b/arch/arm/boot/dts/hi3521a-rs-dm290e.dts
-new file mode 100644
-index 000000000000..b32c8392c93f
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3521a-rs-dm290e.dts
-@@ -0,0 +1,52 @@
-+/*
-+ * Copyright (C) 2017 Marty Plummer <hanetzer@startmail.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 3 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/dts-v1/;
-+#include "hi3521a.dtsi"
-+
-+/ {
-+	model = "RaySharp RS-DM-290E DVR Board";
-+	compatible = "hisilicon,hi3521a";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0xf00000>;
-+	};
-+};
-+
-+&hi_sfc {
-+	status = "okay";
-+	spi-nor at 0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <104000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dual_timer0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/hi3521a.dtsi b/arch/arm/boot/dts/hi3521a.dtsi
-new file mode 100644
-index 000000000000..069b34627073
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3521a.dtsi
-@@ -0,0 +1,310 @@
-+/*
-+ * Copyright (C) 2017 Marty Plummer <hanetzer@startmail.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 3 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <dt-bindings/clock/hi3521a-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	chosen { };
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0>;
-+		};
-+	};
-+
-+	hi_sfc: spi-nor-controller at 10000000 {
-+		compatible = "hisilicon,hi3521a-spi-nor", "hisilicon,fmc-spi-nor";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x10000000 0x10000>, <0x14000000 0x1000000>;
-+		reg-names = "control", "memory";
-+		clocks = <&crg HI3521A_FMC_CLK>;
-+		status = "disabled";
-+	};
-+
-+	gic: interrupt-controller at 10300000 {
-+		compatible = "arm,pl390";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x10301000 0x1000>, <0x10302000 0x1000>;
-+	};
-+
-+	clk_3m: clk_3m {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <3000000>;
-+	};
-+
-+	crg: clock-reset-controller at 12040000 {
-+		compatible = "hisilicon,hi3521a-crg";
-+		#clock-cells = <1>;
-+		#reset-cells = <2>;
-+		reg = <0x12040000 0x10000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		dmac: dma at 10060000 {
-+			compatible = "arm,pl080", "arm,primcell";
-+			reg = <0x10060000 0x1000>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		dual_timer0: timer at 12000000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x12000000 0x1000>;
-+			clocks = <&clk_3m>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		dual_timer1: timer at 12010000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x12010000 0x1000>;
-+			clocks = <&clk_3m>;
-+			clock-name = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		dual_timer2: timer at 12020000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x12020000 0x1000>;
-+			clocks = <&clk_3m>;
-+			clock-name = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		dual_timer3: timer at 12030000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x12030000 0x1000>;
-+			clocks = <&clk_3m>;
-+			clock-name = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		wdt0: watchdog at 12070000 {
-+			compatible = "arm,sp805", "arm,primecell";
-+			arm,primecell-periphid = <0x00141805>;
-+			reg = <0x12070000 0x1000>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_3m>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		uart0: serial at 12080000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12080000 0x1000>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HI3521A_UART0_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 12090000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12090000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HI3521A_UART1_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 120a0000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x120a0000 0x1000>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HI3521A_UART2_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio0: gpio at 12150000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12150000 0x1000>;
-+			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio1: gpio at 12160000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12160000 0x1000>;
-+			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio2: gpio at 12170000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12170000 0x1000>;
-+			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio3: gpio at 12180000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12180000 0x1000>;
-+			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio4: gpio at 12190000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12190000 0x1000>;
-+			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio5: gpio at 121a0000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x121a0000 0x1000>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio6: gpio at 121b0000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x121b0000 0x1000>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio7: gpio at 121c0000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x121c0000 0x1000>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio8: gpio at 121d0000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x121d0000 0x1000>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio9: gpio at 121e0000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x121e0000 0x1000>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio10: gpio at 121f0000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x121f0000 0x1000>;
-+			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio11: gpio at 12200000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12200000 0x1000>;
-+			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio12: gpio at 12210000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12210000 0x1000>;
-+			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+
-+		gpio13: gpio at 12220000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x12220000 0x1000>;
-+			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-2.14.1
+? 2017/8/24 18:27, Rocky Hao ??:
+> Add thermal zone and dynamic CPU power coefficients for RV1108
+> 
+> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
+> ---
+>   arch/arm/boot/dts/rv1108.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+> index dbdd8c2180e7..cae920b6a145 100644
+> --- a/arch/arm/boot/dts/rv1108.dtsi
+> +++ b/arch/arm/boot/dts/rv1108.dtsi
+> @@ -43,6 +43,7 @@
+>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>   #include <dt-bindings/clock/rv1108-cru.h>
+>   #include <dt-bindings/pinctrl/rockchip.h>
+> +#include <dt-bindings/thermal/thermal.h>
+>   / {
+>   	#address-cells = <1>;
+>   	#size-cells = <1>;
+> @@ -69,6 +70,8 @@
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a7";
+>   			reg = <0xf00>;
+> +			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <75>;
+>   		};
+>   	};
+>   
+> @@ -275,6 +278,43 @@
+>   		status = "disabled";
+>   	};
+>   
+> +	thermal-zones {
+> +		soc_thermal: soc-thermal {
+> +			polling-delay-passive = <20>;
+> +			polling-delay = <1000>;
+> +			sustainable-power = <50>;
+> +
+> +			thermal-sensors = <&tsadc 0>;
+> +
+> +			trips {
+> +				threshold: trip-point0 {
+> +					temperature = <70000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +				target: trip-point1 {
+> +					temperature = <85000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +				soc_crit: soc-crit {
+> +					temperature = <95000>;
+Hi Caesar,
+
+For now, dsp is not supported by upstream code, 95000 is proper setting 
+for arm core. Arm core is the only cooling device controlled by IPA(a 
+good thermal control policy) policy. Once dsp is supported by upstream 
+code one day in the feature, its heating is controlled by userspace 
+code, initially. So we should change soc-crit from 95000 to 115000.
+
+If dsp is added and control also by IPA(thermal control policy ) policy 
+in kernel space, we should update threshold, target, soc_crit settings.
+
+Hi Heiko,
+Considering the dsp may be supported, changing soc_crit from 95000 to 
+115000 is okay for me. Still it looks strange why target is 85000 but 
+soc_crit is 115000.
+
+Thanks & Best Wishes,
+Rocky
+
+> +					hysteresis = <2000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +				map0 {
+> +					trip = <&target>;
+> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +					contribution = <4096>;
+> +				};
+> +			};
+> +		};
+> +
+> +	};
+> +
+>   	tsadc: tsadc at 10370000 {
+>   		compatible = "rockchip,rv1108-tsadc";
+>   		reg = <0x10370000 0x100>;
+> 
