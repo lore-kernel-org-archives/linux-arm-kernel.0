@@ -1,29 +1,93 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 15 Sep 2017 09:47:07 -0700
-Subject: [PATCH] dmaengine: edma: Align the memcpy acnt array size with
- the transfer
-In-Reply-To: <20170915072328.7415-1-peter.ujfalusi@ti.com>
-References: <20170915072328.7415-1-peter.ujfalusi@ti.com>
-Message-ID: <20170915164707.GD27343@kroah.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 15 Sep 2017 12:05:06 -0500
+Subject: [PATCH 0/6] Support PPTT for ARM64
+In-Reply-To: <20170914184918.20406-1-jeremy.linton@arm.com>
+References: <20170914184918.20406-1-jeremy.linton@arm.com>
+Message-ID: <d55429dd-79d4-81cf-2a70-d47de74b2d91@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 15, 2017 at 10:23:28AM +0300, Peter Ujfalusi wrote:
-> ?Memory to Memory transfers does not have any special alignment needs
-> regarding to acnt array size, but if one of the areas are in memory mapped
-> regions (like PCIe memory), we need to make sure that the acnt array size
-> is aligned with the mem copy parameters.
+On 09/14/2017 01:49 PM, Jeremy Linton wrote:
+> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+> used to describe the processor and cache topologies. Ideally it is
+> used to extend/override information provided by the hardware, but
+> right now ARM64 is entirely dependent on firmware provided tables.
+
+Hi,
+
+So there is a problem with this patch set when cache nodes are 
+referenced by cpu nodes with the intention that the resulting caches 
+aren't shared, even though the PPTT cache node is shared. The code uses 
+the node reference when determining if caches are shared. This means 
+that it makes a mistake and thinks that all the (say L1) caches are 
+shared because they share a PPTT cache node.
+
+Its a fairly small tweak, I will re-post this set.
+
+
+
+
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  drivers/dma/edma.c | 19 ++++++++++++++++---
->  1 file changed, 16 insertions(+), 3 deletions(-)
-
-<formletter>
-
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read:
-    https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-for how to do this properly.
-
-</formletter>
+> This patch parses the table for the cache topology and CPU topology.
+> For the latter we also add an additional topology_cod_id() macro,
+> and a package_id for arm64. Initially the physical id will match
+> the cluster id, but we update users of the cluster to utilize
+> the new macro. When we enable PPTT for the arm64 the cluster/socket
+> starts to differ. Because of this we also make some dynamic decisions
+> about mapping thread/core/cod/socket to the thread/socket used by the
+> scheduler.
+> 
+> For example on juno:
+> 
+> [root at mammon-juno-rh topology]# lstopo-no-graphics
+> Machine (7048MB)
+>    Package L#0
+>      L2 L#0 (1024KB) + Core L#0
+>        L1d L#0 (32KB) + L1i L#0 (32KB) + PU L#0 (P#0)
+>        L1d L#1 (32KB) + L1i L#1 (32KB) + PU L#1 (P#1)
+>        L1d L#2 (32KB) + L1i L#2 (32KB) + PU L#2 (P#2)
+>        L1d L#3 (32KB) + L1i L#3 (32KB) + PU L#3 (P#3)
+>      L2 L#1 (2048KB) + Core L#1
+>        L1d L#4 (32KB) + L1i L#4 (48KB) + PU L#4 (P#4)
+>        L1d L#5 (32KB) + L1i L#5 (48KB) + PU L#5 (P#5)
+>    HostBridge L#0
+>      PCIBridge
+>        PCIBridge
+>          PCIBridge
+>            PCI 1095:3132
+>              Block(Disk) L#0 "sda"
+>          PCIBridge
+>            PCI 1002:68f9
+>              GPU L#1 "renderD128"
+>              GPU L#2 "card0"
+>              GPU L#3 "controlD64"
+>          PCIBridge
+>            PCI 11ab:4380
+>              Net L#4 "enp8s0"
+> 
+> 
+> Jeremy Linton (6):
+>    ACPI/PPTT: Add Processor Properties Topology Table parsing
+>    ACPI: Enable PPTT support on ARM64
+>    drivers: base: cacheinfo: arm64: Add support for ACPI based firmware
+>      tables
+>    Topology: Add cluster on die macros and arm64 decoding
+>    arm64: Fixup users of topology_physical_package_id
+>    arm64: topology: Enable ACPI/PPTT based CPU topology.
+> 
+>   arch/arm64/Kconfig                |   1 +
+>   arch/arm64/include/asm/topology.h |   4 +-
+>   arch/arm64/kernel/cacheinfo.c     |  23 +-
+>   arch/arm64/kernel/topology.c      |  76 +++++-
+>   drivers/acpi/Makefile             |   1 +
+>   drivers/acpi/arm64/Kconfig        |   3 +
+>   drivers/acpi/pptt.c               | 508 ++++++++++++++++++++++++++++++++++++++
+>   drivers/base/cacheinfo.c          |  17 +-
+>   drivers/clk/clk-mb86s7x.c         |   2 +-
+>   drivers/cpufreq/arm_big_little.c  |   2 +-
+>   drivers/firmware/psci_checker.c   |   2 +-
+>   include/linux/cacheinfo.h         |  10 +-
+>   include/linux/topology.h          |   5 +
+>   13 files changed, 634 insertions(+), 20 deletions(-)
+>   create mode 100644 drivers/acpi/pptt.c
+> 
