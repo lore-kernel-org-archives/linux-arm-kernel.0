@@ -1,48 +1,26 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 15 Sep 2017 15:18:18 +0200
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 15 Sep 2017 15:28:44 +0200
 Subject: n900 in next-20170901
-In-Reply-To: <20170907161650.GP5024@atomide.com>
+In-Reply-To: <20170907073038.GA2111@js1304-P5Q-DELUXE>
 References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
  <20170905233241.GA19231@js1304-P5Q-DELUXE>
  <20170906133057.GH5024@atomide.com>
  <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170907161650.GP5024@atomide.com>
-Message-ID: <20170915131817.GA19486@amd>
+Message-ID: <20170915132844.GW32278@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thursday 07 September 2017 16:30:38 Joonsoo Kim wrote:
+> If it doesn't help, is there a way to test n900 configuration in QEMU?
 
-> > After commit 9caf25f996e8, user for CMA memory should use to check
-> > PageHighmem in order to get proper virtual address of the page. If
-> > someone doesn't use it, it is possible to use wrong virtual address
-> > and it then causes the use of wrong physical address.
-> > CONFIG_DEBUG_VIRTUAL would catch this case.
-> 
-> OK, no extra output of current next with CONFIG_DEBUG_VIRTUAL=y.
-> Booting of n900 hangs with just the same error:
-> 
-> save_secure_sram() returns 0000ff02
-> 
-> > If it doesn't help, is there a way to test n900 configuration in QEMU?
-> 
-> I doubt that QEMU n900 boots in secure mode but instead shows
-> the SoC as general purpose SoC. If so, you'd have to patch the
-> omap3_save_secure_ram_context() to attempt to save secure RAM
-> context in all cases. If that works then debugging with any
-> omap3 board like beagleboard in QEMU should work.
+Hi Joonsoo, linaro version of QEMU has support for n900 machine. For
+more information how to prepare & run kernel image see this email:
+https://lists.denx.de/pipermail/u-boot/2015-January/200171.html
+(instead u-boot.bin you would supply kernel's zImage)
 
-Okay, linux-next from today still does not boot on n900. Is it
-something new, or was this still not fixed in -next?
+But QEMU does not support HS mode, so there is probably no secure ram.
+IIRC smc instructions should not be used in normal GP mode.
 
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170915/1fdb70e2/attachment.sig>
+Pali Roh?r
+pali.rohar at gmail.com
