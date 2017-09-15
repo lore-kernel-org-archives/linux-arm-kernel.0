@@ -1,70 +1,49 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 15 Sep 2017 09:59:05 +0200
-Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return
- code
-In-Reply-To: <CAK8P3a3WoUdxpaXAiMsC3MTWSyxyUK793R+igaQjTxdO7t+a6g@mail.gmail.com>
-References: <20170914110709.3591691-1-arnd@arndb.de>
- <CAMuHMdU3AqGkvwDQ+hE2=3PhgCKUh1HvBx8Hkvba6XsLHAuBbg@mail.gmail.com>
- <feb9b51e-7b77-d184-2ed6-f0d33a06bbcf@st.com>
- <CAMuHMdV6G8WeWgjPcYrMYiSiu=atOSkFZHxwvSsvcwmsv9J+oA@mail.gmail.com>
- <f372a1cb-e255-b5de-510d-77ca944903b3@st.com>
- <CAK8P3a3WoUdxpaXAiMsC3MTWSyxyUK793R+igaQjTxdO7t+a6g@mail.gmail.com>
-Message-ID: <fd0da95e-8e82-7293-4b6b-644f5ae1fefb@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 15 Sep 2017 10:05:23 +0200
+Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
+In-Reply-To: <20170915074551.GF3924@verge.net.au>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
+ <20170915074551.GF3924@verge.net.au>
+Message-ID: <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon, Fabrizio,
 
-
-On 09/14/2017 11:38 PM, Arnd Bergmann wrote:
-> On Thu, Sep 14, 2017 at 6:55 PM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+On Fri, Sep 15, 2017 at 9:45 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Sep 13, 2017 at 06:05:34PM +0100, Chris Paterson wrote:
+>> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 >>
+>> Add DT node for the Advanced Power Management Unit (APMU), add the
+>> second CPU core, and use "renesas,apmu" as "enable-method".
 >>
->> On 09/14/2017 05:24 PM, Geert Uytterhoeven wrote:
->>>
->>> Hi Ludovic,
->>>
->>> On Thu, Sep 14, 2017 at 5:13 PM, Ludovic BARRE <ludovic.barre@st.com>
->>> wrote:
->>>>
->>>> On 09/14/2017 03:38 PM, Geert Uytterhoeven wrote:
->>>>
->>>> hi Arnd, Geert
->>>>
->>>> sorry, I was forgot this thread while my holidays
->>>>
->>>> Geert: what do you mean like "similar bugs in the future" in "If you
->>>> initialized ret at the beginning, you lose the ability to catch newly
->>>> introduced similar bugs in the future."
->>>
->>>
->>> If you pre-initialize ret at the top, you loose the ability of the
->>> compiler
->>> to detect at compile-time if ret is never written to later. It will just
->>> return
->>> -EINVAL at runtime.
->>>
->>> With my version, if the code is modified later and another "return ret" is
->>> added, the compiler will detect if there's a code path that forgets
->>> to assign a value to ret.
->>
->> Ok, it's clear for me.
->> I favor geert's solution.
->> Arnd what do you think ?
-> 
-> I usually follow the same rule that Geert explained (and quote
-> https://rusty.ozlabs.org/?p=232 when I do so). In this case, there
-> did not seem to be much value as the variable is not used
-> afterwards, and I kept the 'single return statement' guideline.
-> 
-> In the end, either version seems totally fine to me here, so
-> please use Geert's if you prefer that.
+>> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+>> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+>> ---
+>> This patch is based on renesas-devel-20170913-v4.13.
+>
+> Hi,
+>
+> with reference to "[PATCH v3 0/3] ARM: renesas: Enable SMP on R-Car E2"
+> is the CNTVOFF initialised in the boot loader of boards (in upstream)
+> for this SoC? If not I expect you will have trouble with the arch timer
+> on secondary CPU cores.
 
-thank Arnd for your answer, great link :-)
-we take geert's patch.
+Exactly my question.
 
-Geert: I will acked your patch.
+Fabrizio: Given your feedback on "[PATCH v3 0/3] ARM: renesas: Enable SMP on
+R-Car E2", I think SMP enablement on RZ/G1E has to be postponed until "ARM:
+shmobile: rcar-gen2: Make sure CNTVOFF is initialized on CA7/15" has been
+accepted upstream.
 
-thanks everybody
-> 
->          Arnd
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
