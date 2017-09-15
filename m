@@ -1,67 +1,55 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 15 Sep 2017 11:01:45 +0200
-Subject: [PATCH 2/7] dt-bindings: gpu: mali-utgard: add optional supply
- regulator
-In-Reply-To: <20170913143415.fcds556hdqwnhsvm@rob-hp-laptop>
-References: <20170905105739.8330-1-heiko@sntech.de> <5517832.4TA9c0NYD6@diego>
- <20170913143415.fcds556hdqwnhsvm@rob-hp-laptop>
-Message-ID: <11237143.FSQKKME6IQ@phil>
+Date: Fri, 15 Sep 2017 11:18:04 +0200
+Subject: [PATCH v2 0/8] ARM: dts: rockchip: add Utgard Mali nodes for some socs
+Message-ID: <20170915091812.13368-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 13. September 2017, 09:34:15 CEST schrieb Rob Herring:
-> On Wed, Sep 13, 2017 at 12:12:24AM +0200, Heiko St?bner wrote:
-> > Hi Rob,
-> > 
-> > Am Dienstag, 12. September 2017, 17:09:20 CEST schrieb Rob Herring:
-> > > On Tue, Sep 05, 2017 at 12:57:34PM +0200, Heiko Stuebner wrote:
-> > > > Mali GPUs have a separate supplying regulator in a lot of socs,
-> > > > so describe a mali-supply property. The already described
-> > > > operating points will likely also need access to this regulator.
-> > > > 
-> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > ---
-> > > > 
-> > > >  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 3 +++
-> > > >  1 file changed, 3 insertions(+)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > > > b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt index
-> > > > 3b7f6f72f032..bcaa640c883f 100644
-> > > > --- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > > > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > > > 
-> > > > @@ -39,6 +39,9 @@ Optional properties:
-> > > >      Memory region to allocate from, as defined in
-> > > >      Documentation/devicetree/bindi/reserved-memory/reserved-memory.txt
-> > > > 
-> > > > +  - mali-supply : Phandle to regulator for the Mali device. Refer to
-> > > > +    Documentation/devicetree/bindings/regulator/regulator.txt for
-> > > > details.
-> > > 
-> > > Wouldn't a power domain be more appropriate?
-> > 
-> > At least on Rockchip socs there is a power-domain, but also the separate 
-> > additional regulator. See the similar mali-midgard binding.
-> 
-> And that regulator's state is independent of the power domain's state? 
->
-> But I guess OPPs need a regulator. Really we should allow OPPs to be 
-> tied to the power domain. Maybe we do, I can't keep up with the ever 
-> evolving PM stuff.
+This adds a mali-supply similar to the Midgard binding, the
+compatibles for 3 Rockchip socs and the nodes for these.
 
-Yep, the external gpu regulator state is completely independent of the
-power-domain inside the soc and is most of the time one of the regulators
-coming from the external pmic or sometimes even a completely separate
-i2c-connected ic.
+The rk3036 and rk3188 gpus were tested, on the boards that
+get their gpus enabled, using the current Lima resurrection
+project and were able to probe the gpus sucessfully and draw
+a nice red-triangle in an off-screen application.
 
-It's the same for the cpu cores on Rockchip socs, they have power-domains
-for controlling the actual on/off state and need separate supplying
-i2c-connected regulators that still have to be enabled on their own.
+The only special thing Rockchip Malis do, is that all MMUs have
+a shared interrupt and all PPs also have a shared interrupt, but
+that works out well with the current binding.
 
 
-> So, given we already have it for midgard,
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+changes in v2:
+- adapt to Rob's comment for the compatibles, not sure how I could miss
+  the long compatible list at the top in the first place :-)
+- add Rob's Ack for patch 2 and adapt styling to match the other properties
+- add power-domains as optional property
 
-Thanks, added for v2.
+
+The power-domains are missing from the actual devicetree patches for now,
+as the rk3036 does not have any and I just submitted power-domain support
+for rk3188 in a separate series. So while the rk3188 needs a power-domain
+it's driver is still in-flight :-)
+
+
+Heiko Stuebner (8):
+  dt-bindings: gpu: mali-utgard: Add Rockchip Utgard Malis
+  dt-bindings: gpu: mali-utgard: add optional supply regulator
+  dt-bindings: gpu: mali-utgard: add optional power-domain reference
+  ARM: dts: rockchip: add rk3036 gpu node
+  ARM: dts: rockchip: enable the gpu on rk3036-kylin boards
+  ARM: dts: rockchip: add rk322x gpu node
+  ARM: dts: rockchip: add gpu nodes on rk3066/rk3188
+  ARM: dts: rockchip: enable gpu on rk3188-radxarock
+
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 16 +++++++++++++++
+ arch/arm/boot/dts/rk3036-kylin.dts                 |  5 +++++
+ arch/arm/boot/dts/rk3036.dtsi                      | 19 +++++++++++++++++
+ arch/arm/boot/dts/rk3066a.dtsi                     | 24 ++++++++++++++++++++++
+ arch/arm/boot/dts/rk3188-radxarock.dts             |  4 ++++
+ arch/arm/boot/dts/rk3188.dtsi                      | 24 ++++++++++++++++++++++
+ arch/arm/boot/dts/rk322x.dtsi                      | 21 +++++++++++++++++++
+ arch/arm/boot/dts/rk3xxx.dtsi                      | 11 ++++++++++
+ 8 files changed, 124 insertions(+)
+
+-- 
+2.14.1
