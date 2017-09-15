@@ -1,54 +1,70 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 15 Sep 2017 15:57:08 +0800
-Subject: [PATCH] MAINTAINERS: Marvell berlin is now Synaptics berlin
-Message-ID: <20170915155708.1f09cc85@xhacker.debian>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 15 Sep 2017 09:59:05 +0200
+Subject: [PATCH] mtd: spi-nor: stm32-quadspi: avoid unintialized return
+ code
+In-Reply-To: <CAK8P3a3WoUdxpaXAiMsC3MTWSyxyUK793R+igaQjTxdO7t+a6g@mail.gmail.com>
+References: <20170914110709.3591691-1-arnd@arndb.de>
+ <CAMuHMdU3AqGkvwDQ+hE2=3PhgCKUh1HvBx8Hkvba6XsLHAuBbg@mail.gmail.com>
+ <feb9b51e-7b77-d184-2ed6-f0d33a06bbcf@st.com>
+ <CAMuHMdV6G8WeWgjPcYrMYiSiu=atOSkFZHxwvSsvcwmsv9J+oA@mail.gmail.com>
+ <f372a1cb-e255-b5de-510d-77ca944903b3@st.com>
+ <CAK8P3a3WoUdxpaXAiMsC3MTWSyxyUK793R+igaQjTxdO7t+a6g@mail.gmail.com>
+Message-ID: <fd0da95e-8e82-7293-4b6b-644f5ae1fefb@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Now that the dts files are moved to the new location, update the berlin
-entry in the MAINTAINERS.
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- MAINTAINERS | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+On 09/14/2017 11:38 PM, Arnd Bergmann wrote:
+> On Thu, Sep 14, 2017 at 6:55 PM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>>
+>>
+>> On 09/14/2017 05:24 PM, Geert Uytterhoeven wrote:
+>>>
+>>> Hi Ludovic,
+>>>
+>>> On Thu, Sep 14, 2017 at 5:13 PM, Ludovic BARRE <ludovic.barre@st.com>
+>>> wrote:
+>>>>
+>>>> On 09/14/2017 03:38 PM, Geert Uytterhoeven wrote:
+>>>>
+>>>> hi Arnd, Geert
+>>>>
+>>>> sorry, I was forgot this thread while my holidays
+>>>>
+>>>> Geert: what do you mean like "similar bugs in the future" in "If you
+>>>> initialized ret at the beginning, you lose the ability to catch newly
+>>>> introduced similar bugs in the future."
+>>>
+>>>
+>>> If you pre-initialize ret at the top, you loose the ability of the
+>>> compiler
+>>> to detect at compile-time if ret is never written to later. It will just
+>>> return
+>>> -EINVAL at runtime.
+>>>
+>>> With my version, if the code is modified later and another "return ret" is
+>>> added, the compiler will detect if there's a code path that forgets
+>>> to assign a value to ret.
+>>
+>> Ok, it's clear for me.
+>> I favor geert's solution.
+>> Arnd what do you think ?
+> 
+> I usually follow the same rule that Geert explained (and quote
+> https://rusty.ozlabs.org/?p=232 when I do so). In this case, there
+> did not seem to be much value as the variable is not used
+> afterwards, and I kept the 'single return statement' guideline.
+> 
+> In the end, either version seems totally fine to me here, so
+> please use Geert's if you prefer that.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 209306019483..d0854bc98f24 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1530,15 +1530,6 @@ ARM/MAGICIAN MACHINE SUPPORT
- M:	Philipp Zabel <philipp.zabel@gmail.com>
- S:	Maintained
- 
--ARM/Marvell Berlin SoC support
--M:	Jisheng Zhang <jszhang@marvell.com>
--M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
--F:	arch/arm/mach-berlin/
--F:	arch/arm/boot/dts/berlin*
--F:	arch/arm64/boot/dts/marvell/berlin*
--
- ARM/Marvell Dove/MV78xx0/Orion SOC support
- M:	Jason Cooper <jason@lakedaemon.net>
- M:	Andrew Lunn <andrew@lunn.ch>
-@@ -1933,6 +1924,15 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
- N:	stm32
- F:	drivers/clocksource/armv7m_systick.c
- 
-+ARM/Synaptics Berlin SoC support
-+M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-+M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-berlin/
-+F:	arch/arm/boot/dts/berlin*
-+F:	arch/arm64/boot/dts/synaptics/berlin*
-+
- ARM/TANGO ARCHITECTURE
- M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
- L:	linux-arm-kernel at lists.infradead.org
--- 
-2.14.1
+thank Arnd for your answer, great link :-)
+we take geert's patch.
+
+Geert: I will acked your patch.
+
+thanks everybody
+> 
+>          Arnd
+> 
