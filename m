@@ -1,80 +1,155 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Sep 2017 10:11:44 +0200
-Subject: [PATCH 3/8] ARM: dts: iwg22m: Enable SDHI1 controller
-In-Reply-To: <1505322341-9480-4-git-send-email-chris.paterson2@renesas.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-4-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <20170915081144.GI3924@verge.net.au>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 15 Sep 2017 10:33:57 +0200
+Subject: [PATCH 9/9] ARM: dts: rockchip: add rk3066/rk3188 power-domains
+In-Reply-To: <20170915083357.11296-1-heiko@sntech.de>
+References: <20170915083357.11296-1-heiko@sntech.de>
+Message-ID: <20170915083357.11296-10-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 06:05:36PM +0100, Chris Paterson wrote:
-> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> 
-> Enable the SDHI1 controller on iWave RZ/G1E SoM.
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> ---
-> This patch is based on renesas-devel-20170913-v4.13.
-> 
-> 
->  arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-> index e306e7c..f7f9cef 100644
-> --- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-> +++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-> @@ -9,6 +9,7 @@
->   */
->  
->  #include "r8a7745.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	compatible = "iwave,g22m", "renesas,r8a7745";
-> @@ -38,6 +39,12 @@
->  		function = "mmc";
->  	};
->  
-> +	sdhi1_pins: sd1 {
-> +		groups = "sdhi1_data4", "sdhi1_ctrl";
-> +		function = "sdhi1";
-> +		power-source = <3300>;
-> +	};
-> +
->  	i2c3_pins: i2c3 {
->  		groups = "i2c3_b";
->  		function = "i2c3";
-> @@ -54,6 +61,16 @@
->  	status = "okay";
->  };
->  
-> +&sdhi1 {
-> +	pinctrl-0 = <&sdhi1_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	vmmc-supply = <&reg_3p3v>;
-> +	vqmmc-supply = <&reg_3p3v>;
-> +	cd-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
+Add the power-domain nodes to both rk3066 and rk3188 including
+their clocks and qos connections.
 
-No wp-gpios property means this is a ?SD slot, right?
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3066a.dtsi | 51 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3188.dtsi  | 48 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
 
-Do you have any plans to enable sdr-50 and sdr-104?
-Is it not supported for some reason?
-
-I don't mind if its not enabled in this patch but I would like to
-know if it can be enabled or not and reflect that information in the wiki.
-
-http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds
-
-> +	status = "okay";
-> +};
-> +
->  &i2c3 {
->  	pinctrl-0 = <&i2c3_pins>;
->  	pinctrl-names = "default";
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index b76119dd5733..8f8ce8cc9caf 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -44,6 +44,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3066a-cru.h>
++#include <dt-bindings/power/rk3066-power.h>
+ #include "rk3xxx.dtsi"
+ 
+ / {
+@@ -680,6 +681,56 @@
+ 	dma-names = "rx-tx";
+ };
+ 
++&pmu {
++	power: power-controller {
++		compatible = "rockchip,rk3066-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pd_vio at RK3066_PD_VIO {
++			reg = <RK3066_PD_VIO>;
++			clocks = <&cru ACLK_LCDC0>,
++				 <&cru ACLK_LCDC1>,
++				 <&cru DCLK_LCDC0>,
++				 <&cru DCLK_LCDC1>,
++				 <&cru HCLK_LCDC0>,
++				 <&cru HCLK_LCDC1>,
++				 <&cru SCLK_CIF1>,
++				 <&cru ACLK_CIF1>,
++				 <&cru HCLK_CIF1>,
++				 <&cru SCLK_CIF0>,
++				 <&cru ACLK_CIF0>,
++				 <&cru HCLK_CIF0>,
++				 <&cru ACLK_IPP>,
++				 <&cru HCLK_IPP>,
++				 <&cru ACLK_RGA>,
++				 <&cru HCLK_RGA>;
++			pm_qos = <&qos_lcdc0>,
++				 <&qos_lcdc1>,
++				 <&qos_cif0>,
++				 <&qos_cif1>,
++				 <&qos_ipp>,
++				 <&qos_rga>;
++		};
++
++		pd_video at RK3066_PD_VIDEO {
++			reg = <RK3066_PD_VIDEO>;
++			clocks = <&cru ACLK_VDPU>,
++				 <&cru ACLK_VEPU>,
++				 <&cru HCLK_VDPU>,
++				 <&cru HCLK_VEPU>;
++			pm_qos = <&qos_vpu>;
++		};
++
++		pd_gpu at RK3066_PD_GPU {
++			reg = <RK3066_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++			pm_qos = <&qos_gpu>;
++		};
++	};
++};
++
+ &pwm0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm0_out>;
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 9e24d0ffadac..261daddc24a5 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -44,6 +44,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3188-cru.h>
++#include <dt-bindings/power/rk3188-power.h>
+ #include "rk3xxx.dtsi"
+ 
+ / {
+@@ -607,6 +608,53 @@
+ 	pinctrl-0 = <&i2c4_xfer>;
+ };
+ 
++&pmu {
++	power: power-controller {
++		compatible = "rockchip,rk3188-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pd_vio at RK3188_PD_VIO {
++			reg = <RK3188_PD_VIO>;
++			clocks = <&cru ACLK_LCDC0>,
++				 <&cru ACLK_LCDC1>,
++				 <&cru DCLK_LCDC0>,
++				 <&cru DCLK_LCDC1>,
++				 <&cru HCLK_LCDC0>,
++				 <&cru HCLK_LCDC1>,
++				 <&cru SCLK_CIF0>,
++				 <&cru ACLK_CIF0>,
++				 <&cru HCLK_CIF0>,
++				 <&cru ACLK_IPP>,
++				 <&cru HCLK_IPP>,
++				 <&cru ACLK_RGA>,
++				 <&cru HCLK_RGA>;
++			pm_qos = <&qos_lcdc0>,
++				 <&qos_lcdc1>,
++				 <&qos_cif0>,
++				 <&qos_cif1>,
++				 <&qos_ipp>,
++				 <&qos_rga>;
++		};
++
++		pd_video at RK3188_PD_VIDEO {
++			reg = <RK3188_PD_VIDEO>;
++			clocks = <&cru ACLK_VDPU>,
++				 <&cru ACLK_VEPU>,
++				 <&cru HCLK_VDPU>,
++				 <&cru HCLK_VEPU>;
++			pm_qos = <&qos_vpu>;
++		};
++
++		pd_gpu at RK3188_PD_GPU {
++			reg = <RK3188_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++			pm_qos = <&qos_gpu>;
++		};
++	};
++};
++
+ &pwm0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm0_out>;
+-- 
+2.14.1
