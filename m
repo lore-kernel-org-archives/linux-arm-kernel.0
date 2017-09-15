@@ -1,76 +1,89 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Thu, 14 Sep 2017 16:25:34 -0700
-Subject: [PATCH] thermal: brcmstb: disable trip points properly when needed
-In-Reply-To: <20170914231928.45542-1-code@mmayer.net>
-References: <CAGt4E5vbM-eyQVH5X3EK_6sUg7iOeYYoh72oG=+pAsTnu8dr0w@mail.gmail.com>
- <20170914231928.45542-1-code@mmayer.net>
-Message-ID: <CAGt4E5sBikXQ84Suz28+FXpfcMJdrO8JipTgbBJkWWxZRy2utg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 15 Sep 2017 01:04:24 +0100
+Subject: [PATCH v2 02/28] arm64: KVM: Hide unsupported AArch64 CPU
+ features from guests
+In-Reply-To: <87r2vaacll.fsf@linaro.org>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-3-git-send-email-Dave.Martin@arm.com>
+ <87r2vaacll.fsf@linaro.org>
+Message-ID: <20170915000424.GD24231@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 September 2017 at 16:19, Markus Mayer <code@mmayer.net> wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
->
-> The code checking for low and high temperature points was still based
-> on an earlier implementation of the driver. It wasn't working properly
-> with the data types currently being used.
->
-> We fix this by disabling the high trip point if our high temperature is
-> INT_MAX and disabling the low trip point if our low temperature is -INT_MAX
-> (or lower).
->
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> ---
->
-> Here is my patch for the issue described. Please let me know if I should be
-> squashing this into the driver patch and re-submit the entire series.
+On Wed, Sep 13, 2017 at 03:37:42PM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
 
-Looks like my attempt at adding this patch to the existing thread may
-not have worked out so well.
+[...]
 
-Here's a link: https://marc.info/?l=linux-pm&m=150472721929919&w=2
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 945e79c..35a90b8 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -81,11 +81,17 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> >  	 * it will cause an exception.
+> >  	 */
+> >  	val = vcpu->arch.hcr_el2;
+> > +
+> >  	if (!(val & HCR_RW) && system_supports_fpsimd()) {
+> >  		write_sysreg(1 << 30, fpexc32_el2);
+> >  		isb();
+> >  	}
+> > +
+> > +	if (val & HCR_RW) /* for AArch64 only: */
+> > +		val |= HCR_TID3; /* TID3: trap feature register accesses */
+> > +
+> 
+> I wondered as this is the hyp switch can we make use of testing val &
+> HCR_RW for both this and above. But it seems minimal in the generated
+> code so probably not.
 
->  drivers/thermal/broadcom/brcmstb_thermal.c | 21 +++++++++++----------
->  1 file changed, 11 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
-> index 87b8e7a..1919f91 100644
-> --- a/drivers/thermal/broadcom/brcmstb_thermal.c
-> +++ b/drivers/thermal/broadcom/brcmstb_thermal.c
-> @@ -277,22 +277,23 @@ static int brcmstb_set_trips(void *data, int low, int high)
->
->         dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
->
-> -       if (low) {
-> -               if (low > INT_MAX)
-> -                       low = INT_MAX;
-> +       /*
-> +        * Disable low-temp if "low" is too small. As per thermal framework
-> +        * API, we use -INT_MAX rather than INT_MIN.
-> +        */
-> +       if (low <= -INT_MAX) {
-> +               avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 0);
-> +       } else {
->                 avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
->                 avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
-> -       } else {
-> -               avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 0);
->         }
->
-> -       if (high < ULONG_MAX) {
-> -               if (high > INT_MAX)
-> -                       high = INT_MAX;
-> +       /* Disable high-temp if "high" is too big. */
-> +       if (high == INT_MAX) {
-> +               avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 0);
-> +       } else {
->                 avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
->                 avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
-> -       } else {
-> -               avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 0);
->         }
->
->         return 0;
-> --
-> 2.7.4
->
+I figured that the code was cleaner ths way, since they're independent
+bits of code that both happen to be applicable only to AArch64 guests.
+
+[...]
+
+> > +
+> > +	/*
+> > +	 * ID regs: all ID_SANITISED() entries here must have corresponding
+> > +	 * entries in arm64_ftr_regs[].
+> > +	 */
+> 
+> arm64_ftr_regs isn't updated in this commit. Does this break bisection?
+
+This commit only adds ID_SANITISED() entries for regs that are already
+present in arm64_ftr_regs[].  (If you spot any that are missing, give me
+a shout...)
+
+SVE only adds one new ID register, ID_AA64ZFR0_EL1 -- but SVE defines no
+fields in there yet, so I just leave it ID_UNALLOCATED() which will
+cause it to read as zero for the guest.
+
+> > +
+> > +	/* AArch64 mappings of the AArch32 ID registers */
+> > +	/* CRm=1 */
+> > +	ID_SANITISED(ID_PFR0_EL1),
+> > +	ID_SANITISED(ID_PFR1_EL1),
+
+[...]
+
+> > +	/* CRm=7 */
+> > +	ID_SANITISED(ID_AA64MMFR0_EL1),
+> > +	ID_SANITISED(ID_AA64MMFR1_EL1),
+> > +	ID_SANITISED(ID_AA64MMFR2_EL1),
+> > +	ID_UNALLOCATED(7,3),
+> > +	ID_UNALLOCATED(7,4),
+> > +	ID_UNALLOCATED(7,5),
+> > +	ID_UNALLOCATED(7,6),
+> > +	ID_UNALLOCATED(7,7),
+> > +
+> 
+> I think it might be worthwhile adding a test to kvm-unit-tests to walk
+> all the ID registers to check this.
+
+Sounds sensible, I'll take a look at that.
+
+[...]
+
+Cheers
+---Dave
