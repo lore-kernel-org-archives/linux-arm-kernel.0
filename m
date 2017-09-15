@@ -1,42 +1,27 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 15 Sep 2017 10:50:07 +0300
-Subject: [PATCH] arm64: dt marvell: extend AP806 system controller size
-Message-ID: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Sep 2017 09:54:15 +0200
+Subject: [PATCH 2/8] ARM: dts: r8a7745: Add SDHI controllers
+In-Reply-To: <1505322341-9480-3-git-send-email-chris.paterson2@renesas.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-3-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <20170915075415.GG3924@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the container size to 0x2000 to include the gpio controller at
-offset 0x1040.
+On Wed, Sep 13, 2017 at 06:05:35PM +0100, Chris Paterson wrote:
+> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> 
+> Add the SDHI controllers to the r8a7745 device tree.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-While at it, add start address notation to the gpio node name to match
-its 'offset' property.
+Thanks, applied.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> ---
+> This patch is based on renesas-devel-20170913-v4.13.
+> 
+> This patch is dependant on:
+> - "dt-bindings: mmc: sh_mmcif: Document r8a7745 DT bindings"
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 4d360713ed12..30d48ecf46e0 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -254,7 +254,7 @@
- 
- 			ap_syscon: system-controller at 6f4000 {
- 				compatible = "syscon", "simple-mfd";
--				reg = <0x6f4000 0x1000>;
-+				reg = <0x6f4000 0x2000>;
- 
- 				ap_clk: clock {
- 					compatible = "marvell,ap806-clock";
-@@ -265,7 +265,7 @@
- 					compatible = "marvell,ap806-pinctrl";
- 				};
- 
--				ap_gpio: gpio {
-+				ap_gpio: gpio at 1040 {
- 					compatible = "marvell,armada-8k-gpio";
- 					offset = <0x1040>;
- 					ngpios = <20>;
--- 
-2.14.1
+I think that should be "[PATCH v3] mmc: renesas_sdhi: Add r8a7743/5 support"
