@@ -1,72 +1,28 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 16 Sep 2017 15:17:34 -0700
-Subject: [PATCH v4 6/6] ARM: sun8i: h3: add partial CPU thermal zone
-In-Reply-To: <b41a80ec-23d5-a614-f6cc-d09c5a459e03@free-electrons.com>
-References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-7-icenowy@aosc.io>
- <b41a80ec-23d5-a614-f6cc-d09c5a459e03@free-electrons.com>
-Message-ID: <20170916151734.10968b7a@archlinux>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 17 Sep 2017 00:25:12 +0200
+Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
+In-Reply-To: <20170914093509.uwk47vt3wnm3rtqb@dell>
+References: <20170910214424.14945-1-linus.walleij@linaro.org>
+ <20170910214424.14945-2-linus.walleij@linaro.org>
+ <20170914093509.uwk47vt3wnm3rtqb@dell>
+Message-ID: <CACRpkdZYDALXSoEE9jdo7A5P4XZczVbh_uiLkE54=sRtA3rNDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 Sep 2017 12:05:49 +0200
-Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+On Thu, Sep 14, 2017 at 11:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Hi Icenowy,
-> 
-> On 14/09/2017 16:52, Icenowy Zheng wrote:
-> > Because of the restriction of the OF thermal framework, the thermal
-> > sensor will fail to probe if the thermal zone doesn't exist.
-> >   
-> 
-> Oh no, that's not good.
-> 
-> We discussed about it on IRC and I even proposed a patch for it, telling
-> you I would post it on the mailing list soon after. Of course, I forgot
-> and you definitely should have yelled at me for not doing it :)
-> 
-> I won't be able to test the patch soon. I can send it to you so that you
-> can test it and integrate it in your patch series so it won't block you.
-> Otherwise, we'll have to wait for a week or two for me to test it.
-> 
-> Thanks and sorry for forgetting to post the patch you need,
-> Quentin
+>>  drivers/mfd/sm501.c                          |  49 +++++-----
+>
+> I'd prefer for this to be applied with a Tested-by.  I appreciate that
+> this is an old driver, but can you attempt to contact one of the
+> authors or someone else who might have hardware please?
 
-Other this outstanding issue I'm happy with the series, so hopefully
-with Quentin's patch added we should be good to merge this one.
+For SM501 specifically I guess.
 
-Jonathan
+OK makes sense as it is the most invasive one, paging around...
 
-> 
-> > Add a partial thermal zone which claims the H3 THS as the thermal sensor.
-> > 
-> > The cooling device (CPU DVFS) is still not added as it's not ready, and
-> > the trip points are also not added yet.
-> > 
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > ---
-> >  arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > index 3220da3ad790..687c6457d214 100644
-> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > @@ -89,6 +89,15 @@
-> >  		};
-> >  	};
-> >  
-> > +	thermal-zones {
-> > +		cpu-thermal {
-> > +			/* milliseconds */
-> > +			polling-delay-passive = <250>;
-> > +			polling-delay = <1000>;
-> > +			thermal-sensors = <&ths>;
-> > +		};
-> > +	};
-> > +
-> >  	timer {
-> >  		compatible = "arm,armv7-timer";
-> >  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> >   
-> 
+Ben, Ville, Magnus, Heiko, Guenther: is one of you still using this
+hardware so you can test the patch set?
+
+Yours,
+Linus Walleij
