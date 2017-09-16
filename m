@@ -1,94 +1,122 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 16 Sep 2017 15:12:24 -0700
-Subject: [PATCH v4 1/6] dt-bindings: update the Allwinner GPADC device
- tree binding for H3
-In-Reply-To: <20170914145251.21784-2-icenowy@aosc.io>
+Date: Sat, 16 Sep 2017 15:16:28 -0700
+Subject: [PATCH v4 4/6] iio: adc: sun4i-gpadc-iio: add support for H3
+ thermal sensor
+In-Reply-To: <445ea236-35e9-8d5a-e580-b2bdcf5f7776@free-electrons.com>
 References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-2-icenowy@aosc.io>
-Message-ID: <20170916151224.777e5b56@archlinux>
+ <20170914145251.21784-5-icenowy@aosc.io>
+ <445ea236-35e9-8d5a-e580-b2bdcf5f7776@free-electrons.com>
+Message-ID: <20170916151628.001dc421@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Sep 2017 22:52:46 +0800
-Icenowy Zheng <icenowy@aosc.io> wrote:
+On Sat, 16 Sep 2017 11:45:47 +0200
+Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
-> Allwinner H3 features a thermal sensor like the one in A33, but has its
-> register re-arranged, the clock divider moved to CCU (originally the
-> clock divider is in ADC) and added a pair of bus clock and reset.
+> Hi Icenowy,
 > 
-> Update the binding document to cover H3.
+> On 14/09/2017 16:52, Icenowy Zheng wrote:
+> > This adds support for the Allwinner H3 thermal sensor.
+> > 
+> > Allwinner H3 has a thermal sensor like the one in A33, but have its
+> > registers nearly all re-arranged, sample clock moved to CCU and a pair
+> > of bus clock and reset added. It's also the base of newer SoCs' thermal
+> > sensors.
+> > 
+> > The thermal sensors on A64 and H5 is like the one on H3, but with of
+> > course different formula factors.
+> > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > ---
+> > Changes in v4:
+> > - Splitted out some code refactors.
+> > - Code sequence changed back. (The gpadc_data went back to the start of
+> >   the source file)
+> > 
+> >  drivers/iio/adc/sun4i-gpadc-iio.c | 48 +++++++++++++++++++++++++++++++++++++++
+> >  include/linux/mfd/sun4i-gpadc.h   | 27 ++++++++++++++++++++++
+> >  2 files changed, 75 insertions(+)  
+> [...]
+> > diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> > index 78d31984a222..5c2a12101052 100644
+> > --- a/include/linux/mfd/sun4i-gpadc.h
+> > +++ b/include/linux/mfd/sun4i-gpadc.h  
+> [...]
+> > +#define SUN8I_H3_GPADC_CTRL2_T_ACQ1(x)			((GENMASK(15, 0) * (x)) << 16)
+> > +  
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v4:
-> - Add nvmem calibration data (not yet used by the driver)
-> Changes in v3:
-> - Clock name changes.
-> - Example node name changes.
-> - Add interupts (not yet used by the driver).
+> You want to replace * by &.
 > 
->  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30 ++++++++++++++++++++--
->  1 file changed, 28 insertions(+), 2 deletions(-)
+> ((GENMASK(15, 0) & (x)) << 16)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> index badff3611a98..6c470d584bf9 100644
-> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
->  and sometimes as a touchscreen controller.
->  
->  Required properties:
-> -  - compatible: "allwinner,sun8i-a33-ths",
-> +  - compatible: must contain one of the following compatibles:
-> +		- "allwinner,sun8i-a33-ths"
-> +		- "allwinner,sun8i-h3-ths"
->    - reg: mmio address range of the chip,
->    - #thermal-sensor-cells: shall be 0,
->    - #io-channel-cells: shall be 0,
->  
-> -Example:
-> +Optional properties:
-> +  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
-> +                 If unspecified default values shall be used.
-> +  - nvmem-cell-names: Should be "calibration-data"
+> Would ((GENMASK(31, 16) & ((x) << 16)) make the bits you set even more
+> obvious?
 
-I think a cross reference to the nvmem binding docs would be good here.
-It wasn't something I could remember coming across before.  Obviously
-grep gets you there quickly enough, but a cross reference would be even
-better.
-
-Also would it make sense to have an example with these in?
+Agreed. Would act as better 'documentation'.
 
 Jonathan
-> +
-> +Required properties for the following compatibles:
-> +		- "allwinner,sun8i-h3-ths"
-> +  - clocks: the bus clock and the input clock of the ADC,
-> +  - clock-names: should be "bus" and "mod",
-> +  - resets: the bus reset of the ADC,
-> +  - interrupts: the sampling interrupt of the ADC,
-> +
-> +Example for A33:
->  	ths: ths at 01c25000 {
->  		compatible = "allwinner,sun8i-a33-ths";
->  		reg = <0x01c25000 0x100>;
-> @@ -17,6 +31,18 @@ Example:
->  		#io-channel-cells = <0>;
->  	};
->  
-> +Example for H3:
-> +	ths: thermal-sensor at 1c25000 {
-> +		compatible = "allwinner,sun8i-h3-ths";
-> +		reg = <0x01c25000 0x400>;
-> +		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-> +		clock-names = "bus", "mod";
-> +		resets = <&ccu RST_BUS_THS>;
-> +		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +		#thermal-sensor-cells = <0>;
-> +		#io-channel-cells = <0>;
-> +	};
-> +
->  sun4i, sun5i and sun6i SoCs are also supported via the older binding:
->  
->  sun4i resistive touchscreen controller
+> 
+> >  #define SUN4I_GPADC_CTRL3				0x0c
+> > +/*
+> > + * This register is named "Average filter Control Register" in H3 Datasheet,
+> > + * but the register's definition is the same as the old CTRL3 register.
+> > + */
+> > +#define SUN8I_H3_GPADC_CTRL3				0x70
+> >    
+> 
+> I would name it as it is in the documentation:
+> SUN8I_H3_THS_FILTER
+> 
+> No need for comments then.
+> 
+> >  #define SUN4I_GPADC_CTRL3_FILTER_EN			BIT(2)
+> >  #define SUN4I_GPADC_CTRL3_FILTER_TYPE(x)		(GENMASK(1, 0) & (x))
+> > @@ -71,6 +84,13 @@
+> >  #define SUN4I_GPADC_INT_FIFOC_TP_UP_IRQ_EN		BIT(1)
+> >  #define SUN4I_GPADC_INT_FIFOC_TP_DOWN_IRQ_EN		BIT(0)
+> >  
+> > +#define SUN8I_H3_GPADC_INTC				0x44
+> > +
+> > +#define SUN8I_H3_GPADC_INTC_TEMP_PERIOD(x)		((GENMASK(19, 0) & (x)) << 12)
+> > +#define SUN8I_H3_GPADC_INTC_TEMP_DATA			BIT(8)
+> > +#define SUN8I_H3_GPADC_INTC_TEMP_SHUT			BIT(4)
+> > +#define SUN8I_H3_GPADC_INTC_TEMP_ALARM			BIT(0)
+> > +  
+> 
+> Since it isn't an ADC anymore but rather just a THS, why don't you use
+> SUN8I_H3_THS instead of SUN8I_H3_GPADC? That way, it also matches the
+> datasheet.
+> 
+> >  #define SUN4I_GPADC_INT_FIFOS				0x14
+> >  
+> >  #define SUN4I_GPADC_INT_FIFOS_TEMP_DATA_PENDING		BIT(18)
+> > @@ -80,9 +100,16 @@
+> >  #define SUN4I_GPADC_INT_FIFOS_TP_UP_PENDING		BIT(1)
+> >  #define SUN4I_GPADC_INT_FIFOS_TP_DOWN_PENDING		BIT(0)
+> >  
+> > +#define SUN8I_H3_GPADC_INTS				0x44  
+> 
+> 0x48
+> 
+> [...]
+> 
+> 1) You're not using irqs, why would you define registers that will never
+> be used?
+> 
+> 2) Why aren't you using irqs? I remember we discussed on IRC that you
+> had some problems with the H3 when resuming or when probing the driver.
+> The register would have a zero in it until you have a first sample that
+> arrived (i.e. after the sample rate you set with T_ACQ) that would make
+> the thermal framework panic since the thermal sensor would return
+> something way too hot and shutdown your board?
+> 
+> The H3 apparently supports IRQs, why do you not support them for the
+> temperature? They might be broken as it is on A33 but then it might be a
+> good idea to write it down in a comment in the driver (and not adding
+> the unused registers in the header file) or at least in the commit log.
+> 
+> 3) Now that you have support for clocks, wouldn't it be a good idea to
+> disable them during suspend?
+> 
+> Thanks,
+> Quentin
