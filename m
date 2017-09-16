@@ -1,122 +1,72 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 16 Sep 2017 15:16:28 -0700
-Subject: [PATCH v4 4/6] iio: adc: sun4i-gpadc-iio: add support for H3
- thermal sensor
-In-Reply-To: <445ea236-35e9-8d5a-e580-b2bdcf5f7776@free-electrons.com>
+Date: Sat, 16 Sep 2017 15:17:34 -0700
+Subject: [PATCH v4 6/6] ARM: sun8i: h3: add partial CPU thermal zone
+In-Reply-To: <b41a80ec-23d5-a614-f6cc-d09c5a459e03@free-electrons.com>
 References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-5-icenowy@aosc.io>
- <445ea236-35e9-8d5a-e580-b2bdcf5f7776@free-electrons.com>
-Message-ID: <20170916151628.001dc421@archlinux>
+ <20170914145251.21784-7-icenowy@aosc.io>
+ <b41a80ec-23d5-a614-f6cc-d09c5a459e03@free-electrons.com>
+Message-ID: <20170916151734.10968b7a@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 Sep 2017 11:45:47 +0200
+On Sat, 16 Sep 2017 12:05:49 +0200
 Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
 > Hi Icenowy,
 > 
 > On 14/09/2017 16:52, Icenowy Zheng wrote:
-> > This adds support for the Allwinner H3 thermal sensor.
+> > Because of the restriction of the OF thermal framework, the thermal
+> > sensor will fail to probe if the thermal zone doesn't exist.
+> >   
+> 
+> Oh no, that's not good.
+> 
+> We discussed about it on IRC and I even proposed a patch for it, telling
+> you I would post it on the mailing list soon after. Of course, I forgot
+> and you definitely should have yelled at me for not doing it :)
+> 
+> I won't be able to test the patch soon. I can send it to you so that you
+> can test it and integrate it in your patch series so it won't block you.
+> Otherwise, we'll have to wait for a week or two for me to test it.
+> 
+> Thanks and sorry for forgetting to post the patch you need,
+> Quentin
+
+Other this outstanding issue I'm happy with the series, so hopefully
+with Quentin's patch added we should be good to merge this one.
+
+Jonathan
+
+> 
+> > Add a partial thermal zone which claims the H3 THS as the thermal sensor.
 > > 
-> > Allwinner H3 has a thermal sensor like the one in A33, but have its
-> > registers nearly all re-arranged, sample clock moved to CCU and a pair
-> > of bus clock and reset added. It's also the base of newer SoCs' thermal
-> > sensors.
-> > 
-> > The thermal sensors on A64 and H5 is like the one on H3, but with of
-> > course different formula factors.
+> > The cooling device (CPU DVFS) is still not added as it's not ready, and
+> > the trip points are also not added yet.
 > > 
 > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > > ---
-> > Changes in v4:
-> > - Splitted out some code refactors.
-> > - Code sequence changed back. (The gpadc_data went back to the start of
-> >   the source file)
+> >  arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
 > > 
-> >  drivers/iio/adc/sun4i-gpadc-iio.c | 48 +++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/sun4i-gpadc.h   | 27 ++++++++++++++++++++++
-> >  2 files changed, 75 insertions(+)  
-> [...]
-> > diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-> > index 78d31984a222..5c2a12101052 100644
-> > --- a/include/linux/mfd/sun4i-gpadc.h
-> > +++ b/include/linux/mfd/sun4i-gpadc.h  
-> [...]
-> > +#define SUN8I_H3_GPADC_CTRL2_T_ACQ1(x)			((GENMASK(15, 0) * (x)) << 16)
-> > +  
-> 
-> You want to replace * by &.
-> 
-> ((GENMASK(15, 0) & (x)) << 16)
-> 
-> Would ((GENMASK(31, 16) & ((x) << 16)) make the bits you set even more
-> obvious?
-
-Agreed. Would act as better 'documentation'.
-
-Jonathan
-> 
-> >  #define SUN4I_GPADC_CTRL3				0x0c
-> > +/*
-> > + * This register is named "Average filter Control Register" in H3 Datasheet,
-> > + * but the register's definition is the same as the old CTRL3 register.
-> > + */
-> > +#define SUN8I_H3_GPADC_CTRL3				0x70
-> >    
-> 
-> I would name it as it is in the documentation:
-> SUN8I_H3_THS_FILTER
-> 
-> No need for comments then.
-> 
-> >  #define SUN4I_GPADC_CTRL3_FILTER_EN			BIT(2)
-> >  #define SUN4I_GPADC_CTRL3_FILTER_TYPE(x)		(GENMASK(1, 0) & (x))
-> > @@ -71,6 +84,13 @@
-> >  #define SUN4I_GPADC_INT_FIFOC_TP_UP_IRQ_EN		BIT(1)
-> >  #define SUN4I_GPADC_INT_FIFOC_TP_DOWN_IRQ_EN		BIT(0)
+> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > index 3220da3ad790..687c6457d214 100644
+> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > @@ -89,6 +89,15 @@
+> >  		};
+> >  	};
 > >  
-> > +#define SUN8I_H3_GPADC_INTC				0x44
+> > +	thermal-zones {
+> > +		cpu-thermal {
+> > +			/* milliseconds */
+> > +			polling-delay-passive = <250>;
+> > +			polling-delay = <1000>;
+> > +			thermal-sensors = <&ths>;
+> > +		};
+> > +	};
 > > +
-> > +#define SUN8I_H3_GPADC_INTC_TEMP_PERIOD(x)		((GENMASK(19, 0) & (x)) << 12)
-> > +#define SUN8I_H3_GPADC_INTC_TEMP_DATA			BIT(8)
-> > +#define SUN8I_H3_GPADC_INTC_TEMP_SHUT			BIT(4)
-> > +#define SUN8I_H3_GPADC_INTC_TEMP_ALARM			BIT(0)
-> > +  
+> >  	timer {
+> >  		compatible = "arm,armv7-timer";
+> >  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> >   
 > 
-> Since it isn't an ADC anymore but rather just a THS, why don't you use
-> SUN8I_H3_THS instead of SUN8I_H3_GPADC? That way, it also matches the
-> datasheet.
-> 
-> >  #define SUN4I_GPADC_INT_FIFOS				0x14
-> >  
-> >  #define SUN4I_GPADC_INT_FIFOS_TEMP_DATA_PENDING		BIT(18)
-> > @@ -80,9 +100,16 @@
-> >  #define SUN4I_GPADC_INT_FIFOS_TP_UP_PENDING		BIT(1)
-> >  #define SUN4I_GPADC_INT_FIFOS_TP_DOWN_PENDING		BIT(0)
-> >  
-> > +#define SUN8I_H3_GPADC_INTS				0x44  
-> 
-> 0x48
-> 
-> [...]
-> 
-> 1) You're not using irqs, why would you define registers that will never
-> be used?
-> 
-> 2) Why aren't you using irqs? I remember we discussed on IRC that you
-> had some problems with the H3 when resuming or when probing the driver.
-> The register would have a zero in it until you have a first sample that
-> arrived (i.e. after the sample rate you set with T_ACQ) that would make
-> the thermal framework panic since the thermal sensor would return
-> something way too hot and shutdown your board?
-> 
-> The H3 apparently supports IRQs, why do you not support them for the
-> temperature? They might be broken as it is on A33 but then it might be a
-> good idea to write it down in a comment in the driver (and not adding
-> the unused registers in the header file) or at least in the commit log.
-> 
-> 3) Now that you have support for clocks, wouldn't it be a good idea to
-> disable them during suspend?
-> 
-> Thanks,
-> Quentin
