@@ -1,59 +1,49 @@
-From: amworsley@gmail.com (Andrew Worsley)
-Date: Sat, 16 Sep 2017 13:02:52 +1000
-Subject: [PATCH] Fix Bug for cadence i2c interrupt overrunning buffer
-Message-ID: <20170916030252.10680-1-amworsley@gmail.com>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Sat, 16 Sep 2017 17:33:59 +0800
+Subject: [I2C] About warning 'DMA-API: device driver maps memory from
+ stack'
+In-Reply-To: <20170902215829.3jpwmbyy27cpu5rm@ninjato>
+References: <1504354088.31793.48.camel@mhfsdcap03>
+ <20170902215829.3jpwmbyy27cpu5rm@ninjato>
+Message-ID: <1505554439.31793.76.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c interrupt handler was not checking against the length of
-supplied buffer so if the hardware supplied more data than requested in
-the i2c transfer it happily copies it right past the end of the buffer!
+On Sat, 2017-09-02 at 23:58 +0200, Wolfram Sang wrote:
+> Hi,
+> 
+> nice to see someone else interested in the I2C & DMA topic.
+> 
+> Please check this series which I sent out recently:
+> 
+> "[RFC PATCH v4 0/6] i2c: document DMA handling and add helpers for it"
+> 
+> In that series, I proposed...
+> 
+> > 3. kmalloc data buffer instead of local variables buf in function
+> > i2c_smbus_xfer_emulated(...)
+> 
+> ... this solution. Although I have to check Mauro's general response to
+> the series first. I'd be interested in what you think of the series,
+> too.
+Sorry for late reply.
 
-Signed-off-by: Andrew Worsley <amworsley@gmail.com>
----
+As you said in "[RFC,v4,3/6]i2c: add docs to clarify DMA handling". Most
+i2c_msgs are register accesses and thus, small messages. And
+"[RFC,v4,4/6] i2c: sh_mobile: use helper to decide if DMA is useful".
 
-  This bug reliably caused a stack corruption when the hardware provided more data than
-asked for in the i2c request. The hardware (a tpm) very occasionally appends a burst of
-0xff to the end of the data requested and the i2c interrupt handler mindlessly copies all
-the data right past the end of the buffer and in my case across the stack. :-(
+Maybe the solution as below will be better. Other drivers which will use
+i2c would not have to make buffer DMA safe especially register
+accesses(they like to use local variables when data_len = 1 or 2).
 
-  With this patch the transfer now terminates with an -EIO but with out voilating the
-buffer boundaries. I would prefer to just make the transfer succeed while not retrieving
-additional bytes but I wasn't able to find an easy way to do this. As this is definitely a
-fault that causes a kernel oops I just wanted to get a fix out there for others to avoid
-the problem as it has taken me a few weeks to chase down this oops. If someone has a
-better or nicer fix I would appreciate it or a pointer to how to do this.
+solution:
+2. use FIFO mode when length<=fifo_depth(mtk i2c fifo_depth=8), use
+the flag "I2C_M_DMA_SAFE" to check buffer for DMA mode when
+length>fifo_depth in i2c-mt65xx.c .
 
-    Thanks
-
-    Andrew
- drivers/i2c/busses/i2c-cadence.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index b13605718291..c1f61ca6843e 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -234,6 +234,7 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
- 	if (id->p_recv_buf &&
- 	    ((isr_status & CDNS_I2C_IXR_COMP) ||
- 	     (isr_status & CDNS_I2C_IXR_DATA))) {
-+		unsigned char *p = id->p_recv_buf;
- 		/* Read data if receive data valid is set */
- 		while (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) &
- 		       CDNS_I2C_SR_RXDV) {
-@@ -246,6 +247,12 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
- 			    !id->bus_hold_flag)
- 				cdns_i2c_clear_bus_hold(id);
- 
-+			if (id->recv_count == 0) {
-+				pr_notice("%s: i2c receive buffer filled : %u aborting transfer %p - %p\n",
-+					__func__, (id->p_recv_buf - p));
-+				break;
-+			}
-+
- 			*(id->p_recv_buf)++ =
- 				cdns_i2c_readreg(CDNS_I2C_DATA_OFFSET);
- 			id->recv_count--;
--- 
-2.11.0
+Thanks.
+> 
+> Kind regards,
+> 
+>    Wolfram
+> 
