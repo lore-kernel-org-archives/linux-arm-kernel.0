@@ -1,45 +1,29 @@
-From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Sun, 17 Sep 2017 05:19:56 +0200
-Subject: [PATCH v2 10/10] arm64: allwinner: a64: add dma controller references
- to spi nodes
-In-Reply-To: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
-References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170917031956.28010-11-stefan.bruens@rwth-aachen.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 17 Sep 2017 09:32:33 +0200
+Subject: [PATCH v4 3/3] ARM: dts: exynos: Remove the display-timing and
+ delay from rinato dts
+In-Reply-To: <CAJKOXPc0oOmx7jVbmDrSWnb-GWvO6Re1qgwiOF6CzL4Mbmx-1A@mail.gmail.com>
+References: <1499912443-3671-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170713022057epcas1p464b817a426638cc1566e665aa7903ed7@epcas1p4.samsung.com>
+ <1499912443-3671-4-git-send-email-hoegeun.kwon@samsung.com>
+ <2be78f06-8c3a-0076-a19b-07d501c3d460@samsung.com>
+ <CAJKOXPc0oOmx7jVbmDrSWnb-GWvO6Re1qgwiOF6CzL4Mbmx-1A@mail.gmail.com>
+Message-ID: <20170917073233.GA19716@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi controller nodes omit the dma controller/channel references, add
-it.
+On Tue, Aug 29, 2017 at 07:58:52AM +0200, Krzysztof Kozlowski wrote:
+> On Tue, Aug 29, 2017 at 4:52 AM, Hoegeun Kwon <hoegeun.kwon@samsung.com> wrote:
+> > Hi Krzysztof,
+> >
+> > The driver has been merged into exynos-drm-misc.
+> > Could you please check this patch(3/3).
+> 
+> Hi, OK, no problems for me but it is too late for current cycle so it
+> will go in for v4.15.
+>
 
-This does not yet enable DMA for SPI transfers, as the spi-sun6i driver
-lacks support for DMA, but always uses PIO to the FIFO.
+Patch does not apply. Could you rebase on current mainline (v4.14-rc1) and resend?
 
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 4f060ecdb061..ec71c48b393d 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -476,6 +476,8 @@
- 			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 23>, <&dma 23>;
-+			dma-names = "rx", "tx";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&spi0_pins>;
- 			resets = <&ccu RST_BUS_SPI0>;
-@@ -491,6 +493,8 @@
- 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 24>, <&dma 24>;
-+			dma-names = "rx", "tx";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&spi1_pins>;
- 			resets = <&ccu RST_BUS_SPI1>;
--- 
-2.14.1
+Best regards,
+Krzysztof
