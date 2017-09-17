@@ -1,87 +1,80 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 17 Sep 2017 11:37:14 +0100
-Subject: [PATCH v7 0/3] nvmem: upstream snvs_lpgpr driver
-In-Reply-To: <6081c4e0-b9f3-7fae-624d-d3515a509b67@mobi-wize.com>
-References: <20170620070932.10353-1-o.rempel@pengutronix.de>
- <07198c02-ac87-ec1f-accd-75ad6fd0ac30@pengutronix.de>
- <e0abdef9-91af-8c7b-957c-b55be48ca7b4@linaro.org>
- <6081c4e0-b9f3-7fae-624d-d3515a509b67@mobi-wize.com>
-Message-ID: <707da9f2-5d78-9f06-c379-4d3b9694f13c@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 17 Sep 2017 12:39:52 +0200 (CEST)
+Subject: [PATCH] ARM: dts: bcm283x: Fix console path on RPi3
+In-Reply-To: <1505422080-14336-1-git-send-email-loic.poulain@gmail.com>
+References: <1505422080-14336-1-git-send-email-loic.poulain@gmail.com>
+Message-ID: <940601883.58031.1505644792507@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Loic,
 
+> Loic Poulain <loic.poulain@gmail.com> hat am 14. September 2017 um 22:48 geschrieben:
+> 
+> 
+> Contrary to other RPi devices, RPi3 uses uart0 to communicate with
+> the BCM43438 bluetooth controller. uart1 is then used for the console.
+> Today, the console configuration is inherited from the bcm283x dtsi
+> (bootargs) which is not the correct one for the RPi3. This leads to
+> routing issue and confuses the Bluetooth controller with unexpected
+> data.
+> 
+> This patch introduces chosen/stdout path to configure console to uart0
+> on bcm283x family and overwrite it to uart1 in the RPi3 dts.
+> 
+> Create serial0/1 aliases referring to uart0 ant uart1 paths.
+> Remove unneeded earlyprintk.
+> 
+> Fixes: 4188ea2aeb6d ("ARM: bcm283x: Define UART pinmuxing on board level")
+> Signed-off-by: Loic Poulain <loic.poulain@gmail.com>
+> ---
+>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 5 +++++
+>  arch/arm/boot/dts/bcm283x.dtsi        | 7 ++++++-
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> index 20725ca..f1c0811 100644
+> --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> @@ -8,6 +8,11 @@
+>  	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
+>  	model = "Raspberry Pi 3 Model B";
+>  
+> +	chosen {
+> +		/* 8250 auxiliar UART instead of pl011 */
+> +		stdout-path = "serial1:115200n8";
+> +	};
+> +
+>  	memory {
+>  		reg = <0 0x40000000>;
+>  	};
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index 431dcfc..013431e 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -20,8 +20,13 @@
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+>  
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
 
-On 17/09/17 08:35, Guy Shapiro wrote:
-> On 26/07/2017 12:01, Srinivas Kandagatla wrote:
->>
->> On 18/07/17 05:52, Oleksij Rempel wrote:
->>> Hallo all,
->>>
->>> Here Gentle Ping to the Old King ;)
->>>
->>> DT is already ACKed.
->>
->> Thanks for patience, As this is a new driver it will be queued for 4.14 just before 4.13-rc5 is released.
->>
->> thanks,
->> srini
-> Looks like this patchset is not included in 4.14-rc1.
-> Is it still on someone's queue?
+looks good, but since the bcm2835-rpi-zero-w.dts also defines this, please remove it there.
 
-Not sure Why I missed this patch..!!Sorry about that !!
-
-Just sent them to Greg Now to pick it up for 4.14 next rc..
-
-thanks,
-srini
-
->>>
->>> On 20.06.2017 09:09, Oleksij Rempel wrote:
->>>> changes v7:
->>>>   - split imx6ul patch and squash it with with main patches.
->>>>   - spell fixes in the binding documentation
->>>>   - return regmap_bulk_read directly.
->>>>
->>>> changes v6:
->>>>   - check if device is writable by reading GPR_SL and GPR_HL bits
->>>>   - use regmap_bulk_* functions instead of while() { regmap_read/write }
->>>>   - add patch for imx6ul
->>>>
->>>> changes v5:
->>>>   - use dcfg->offset instead of priv->offset.
->>>>
->>>> changes v4:
->>>>   - change dependencies in Kconfig
->>>>   - remove unused includes and order them alphabetically
->>>>   - set MODULE_LICENSE = GPL v2
->>>>   - remove unused int err variable
->>>>
->>>> changes v3:
->>>>   - remove regmap and offset properties.
->>>>
->>>> changes v2:
->>>>   - correct typos: Registe, parrent...
->>>>
->>>> Oleksij Rempel (3):
->>>>    nvmem: dt: document SNVS LPGPR binding
->>>>    nvmem: add snvs_lpgpr driver
->>>>    ARM: dts: imx6qdl.dtsi/imx6ul.dtsi: add "fsl,imx6q-snvs-lpgpr" node
->>>>
->>>>   .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  20 +++
->>>>   arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
->>>>   arch/arm/boot/dts/imx6ul.dtsi                      |   4 +
->>>>   drivers/nvmem/Kconfig                              |  10 ++
->>>>   drivers/nvmem/Makefile                             |   2 +
->>>>   drivers/nvmem/snvs_lpgpr.c                         | 155 +++++++++++++++++++++
->>>>   6 files changed, 195 insertions(+)
->>>>   create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->>>>   create mode 100644 drivers/nvmem/snvs_lpgpr.c
->>>>
+>  	chosen {
+> -		bootargs = "earlyprintk console=ttyAMA0";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  
+>  	thermal-zones {
+> -- 
+> 1.9.1
 > 
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
