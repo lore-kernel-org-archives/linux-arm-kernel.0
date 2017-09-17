@@ -1,127 +1,93 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Sun, 17 Sep 2017 05:19:47 +0200
-Subject: [PATCH v2 01/10] dmaengine: sun6i: Correct setting of clock
- autogating register for A83T/H3
+Date: Sun, 17 Sep 2017 05:19:53 +0200
+Subject: [PATCH v2 07/10] dmaengine: sun6i: Retrieve channel count/max request
+ from devicetree
 In-Reply-To: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
 References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170917031956.28010-2-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170917031956.28010-8-stefan.bruens@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H83T uses a compatible string different from the A23, but requires
-the same clock autogating register setting.
+To avoid introduction of a new compatible for each small SoC/DMA controller
+variation, move the definition of the channel count to the devicetree.
 
-The H3 also requires setting the clock autogating register, but has
-the register at a different offset.
-
-Add three suitable callbacks for the existing controller generations
-and set it in the controller config structure.
+The number of vchans is no longer explicit, but limited by the highest
+port/DMA request number. The result is a slight overallocation for SoCs
+with a sparse port mapping.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 ---
- drivers/dma/sun6i-dma.c | 31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
+ drivers/dma/sun6i-dma.c | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index bcd496edc70f..45bcd5271d94 100644
+index 245a147f718f..b5ecc97a0d5a 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -48,6 +48,9 @@
- #define SUN8I_DMA_GATE		0x20
- #define SUN8I_DMA_GATE_ENABLE	0x4
+@@ -42,6 +42,9 @@
  
-+#define SUNXI_H3_SECURE_REG		0x20
-+#define SUNXI_H3_DMA_GATE		0x28
-+#define SUNXI_H3_DMA_GATE_ENABLE	0x4
+ #define DMA_STAT		0x30
+ 
++/* Offset between DMA_IRQ_EN and DMA_IRQ_STAT limits number of channels */
++#define DMA_MAX_CHANNELS	(DMA_IRQ_CHAN_NR * 0x10 / 4)
++
  /*
-  * Channels specific registers
+  * sun8i specific registers
   */
-@@ -111,7 +114,7 @@ struct sun6i_dma_config {
- 	 * however these SoCs really have and need this bit, as seen in the
- 	 * BSP kernel source code.
- 	 */
--	bool gate_needed;
-+	void (*clock_autogate_enable)();
- };
+@@ -65,7 +68,8 @@
+ #define DMA_CHAN_LLI_ADDR	0x08
  
- /*
-@@ -267,6 +270,20 @@ static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
- 	return addr_width >> 1;
- }
- 
-+static void sun6i_enable_clock_autogate_noop(struct sun6i_dma_dev *sdev)
-+{
-+}
-+
-+static void sun6i_enable_clock_autogate_a23(struct sun6i_dma_dev *sdev)
-+{
-+	writel(SUN8I_DMA_GATE_ENABLE, sdev->base + SUN8I_DMA_GATE);
-+}
-+
-+static void sun6i_enable_clock_autogate_h3(struct sun6i_dma_dev *sdev)
-+{
-+	writel(SUNXI_H3_DMA_GATE_ENABLE, sdev->base + SUNXI_H3_DMA_GATE);
-+}
-+
- static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
+ #define DMA_CHAN_CUR_CFG	0x0c
+-#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
++#define DMA_CHAN_MAX_DRQ		0x1f
++#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & DMA_CHAN_MAX_DRQ)
+ #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
+ #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
+ #define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
+@@ -1157,6 +1161,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+ static int sun6i_dma_probe(struct platform_device *pdev)
  {
- 	struct sun6i_desc *txd = pchan->desc;
-@@ -1009,6 +1026,7 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
- 	.nr_max_channels = 16,
- 	.nr_max_requests = 30,
- 	.nr_max_vchans   = 53,
-+	.clock_autogate_enable = sun6i_enable_clock_autogate_noop;
- };
+ 	const struct of_device_id *device;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct sun6i_dma_dev *sdc;
+ 	struct resource *res;
+ 	int ret, i;
+@@ -1232,6 +1237,36 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->num_vchans = sdc->cfg->nr_max_vchans;
+ 	sdc->max_request = sdc->cfg->nr_max_requests;
  
- /*
-@@ -1020,24 +1038,28 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
- 	.nr_max_channels = 8,
- 	.nr_max_requests = 24,
- 	.nr_max_vchans   = 37,
--	.gate_needed	 = true,
-+	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
- };
- 
- static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
- 	.nr_max_channels = 8,
- 	.nr_max_requests = 28,
- 	.nr_max_vchans   = 39,
-+	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
- };
- 
- /*
-  * The H3 has 12 physical channels, a maximum DRQ port id of 27,
-  * and a total of 34 usable source and destination endpoints.
-+ * It also supports additional burst lengths and bus widths,
-+ * and the burst length fields have different offsets.
-  */
- 
- static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_channels = 12,
- 	.nr_max_requests = 27,
- 	.nr_max_vchans   = 34,
-+	.clock_autogate_enable = sun6i_enable_clock_autogate_h3;
- };
- 
- /*
-@@ -1049,7 +1071,7 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
- 	.nr_max_channels = 8,
- 	.nr_max_requests = 23,
- 	.nr_max_vchans   = 24,
--	.gate_needed	 = true,
-+	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
- };
- 
- static const struct of_device_id sun6i_dma_match[] = {
-@@ -1199,8 +1221,7 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 		goto err_dma_unregister;
- 	}
- 
--	if (sdc->cfg->gate_needed)
--		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
-+	sdc->cfg->clock_autogate_enable();
- 
- 	return 0;
- 
++	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
++	if (ret && !sdc->num_pchans) {
++		dev_err(&pdev->dev, "Can't get dma-channels.\n");
++		return ret;
++	}
++
++	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
++		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
++		return -EINVAL;
++	}
++
++	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
++	if (ret && !sdc->max_request) {
++		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
++			 DMA_CHAN_MAX_DRQ);
++		sdc->max_request = DMA_CHAN_MAX_DRQ;
++	}
++
++	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
++		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
++		return -EINVAL;
++	}
++
++	/*
++	 * If the number of vchans is not specified, derive it from the
++	 * highest port number, at most one channel per port and direction.
++	 */
++	if (!sdc->num_vchans)
++		sdc->num_vchans = 2 * (sdc->max_request + 1);
++
+ 	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
+ 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
+ 	if (!sdc->pchans)
 -- 
 2.14.1
