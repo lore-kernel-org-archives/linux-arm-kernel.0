@@ -1,35 +1,37 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 16 Sep 2017 17:14:42 -0700
-Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
-In-Reply-To: <CACRpkdZYDALXSoEE9jdo7A5P4XZczVbh_uiLkE54=sRtA3rNDQ@mail.gmail.com>
-References: <20170910214424.14945-1-linus.walleij@linaro.org>
- <20170910214424.14945-2-linus.walleij@linaro.org>
- <20170914093509.uwk47vt3wnm3rtqb@dell>
- <CACRpkdZYDALXSoEE9jdo7A5P4XZczVbh_uiLkE54=sRtA3rNDQ@mail.gmail.com>
-Message-ID: <7f67dfa0-31da-0967-0929-28ae105bb2b5@roeck-us.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 16 Sep 2017 21:46:26 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_MUX_MMIO
+Message-ID: <1505609186-21727-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2017 03:25 PM, Linus Walleij wrote:
-> On Thu, Sep 14, 2017 at 11:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
->>>   drivers/mfd/sm501.c                          |  49 +++++-----
->>
->> I'd prefer for this to be applied with a Tested-by.  I appreciate that
->> this is an old driver, but can you attempt to contact one of the
->> authors or someone else who might have hardware please?
-> 
-> For SM501 specifically I guess.
-> 
-> OK makes sense as it is the most invasive one, paging around...
-> 
-> Ben, Ville, Magnus, Heiko, Guenther: is one of you still using this
-> hardware so you can test the patch set?
-> 
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-qemu supports it. I _think_ my commit for this driver was to fix a warning
-I saw when running some qemu test. Unfortunately, I have no idea how that
-message was triggered in my tests, or in other words which qemu machine
-actually uses it. I'll try to find out, but no promises.
+In order to get ADV7180 analog video decoder to probe on a Gateworks
+GW51xx we need select CONFIG_MUX_MMIO, otherwise /dev/media node does
+not get created.
 
-Guenter
+Select CONFIG_MUX_MMIO, so that the ADV7180 driver can be correctly
+probed.
+
+Reported-by: Tim Harvey <tharvey@gateworks.com>
+Suggested-by: Steve Longerbeam <slongerbeam@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 32acac9..addac53 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -365,6 +365,7 @@ CONFIG_PWM=y
+ CONFIG_PWM_FSL_FTM=y
+ CONFIG_PWM_IMX=y
+ CONFIG_NVMEM_IMX_OCOTP=y
++CONFIG_MUX_MMIO=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+-- 
+2.7.4
