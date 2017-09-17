@@ -1,38 +1,62 @@
-From: hanetzer@startmail.com (Marty E. Plummer)
-Date: Sun, 17 Sep 2017 03:23:24 -0500
-Subject: [RFC RESEND 0/3] Add support for Hisilicon Hi3521A SoC
-Message-ID: <20170917082327.10058-1-hanetzer@startmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 17 Sep 2017 11:38:59 +0200
+Subject: [PATCH 0/7] I2C GPIO to use gpiolibs open drain
+Message-ID: <20170917093906.16325-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+This augments the I2C GPIO driver to use open drain emulation
+or hardware support for open drain from the GPIO driver.
 
-I'd like the community's feedback on the following patchset. I've attempted to
-split my changes up in what I believe to be a sensible setup.
+This version layers Geert Uytterhoeven's idea to use explicit
+sda-gpios and scl-gpios for the GPIO lines, and strongly
+encourage the (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN) flags to be
+used in all device trees.
 
-The device I'm working against is the 'SamsungSV SDR-B74301' HD CCTV surveillance
-system, which uses a Hisilicon Hi3521A arm SoC as its basis.
+We have collected ACKs from the ARM SoC maintainers and the
+MFD maintainer and are looking for testers to try this out.
 
-Resending due to a typo, s/primcell/primecell/
+Geert Uytterhoeven (1):
+  dt-bindings: i2c: i2c-gpio: Add support for named gpios
 
-Marty E. Plummer (3):
-  clk: hisilicon: add CRG driver Hi3521A SoC
-  arm: hisi: enable Hi3521A SoC
-  arm: dts: add Hi3521A dts
+Linus Walleij (6):
+  i2c: gpio: Convert to use descriptors
+  gpio: Make it possible for consumers to enforce open drain
+  i2c: gpio: Enforce open drain through gpiolib
+  i2c: gpio: Augment all boardfiles to use open drain
+  i2c: gpio: Local vars in probe
+  i2c: gpio: Add support for named gpios in DT
 
- arch/arm/boot/dts/Makefile                |   2 +
- arch/arm/boot/dts/hi3521a-rs-dm290e.dts   |  52 +++++
- arch/arm/boot/dts/hi3521a.dtsi            | 310 ++++++++++++++++++++++++++++++
- arch/arm/mach-hisi/Kconfig                |   6 +
- drivers/clk/hisilicon/Kconfig             |   7 +
- drivers/clk/hisilicon/Makefile            |   1 +
- drivers/clk/hisilicon/crg-hi3521a.c       | 207 ++++++++++++++++++++
- include/dt-bindings/clock/hi3521a-clock.h |  34 ++++
- 8 files changed, 619 insertions(+)
- create mode 100644 arch/arm/boot/dts/hi3521a-rs-dm290e.dts
- create mode 100644 arch/arm/boot/dts/hi3521a.dtsi
- create mode 100644 drivers/clk/hisilicon/crg-hi3521a.c
- create mode 100644 include/dt-bindings/clock/hi3521a-clock.h
+ Documentation/devicetree/bindings/i2c/i2c-gpio.txt |  32 +++-
+ arch/arm/mach-ep93xx/core.c                        |  41 ++--
+ arch/arm/mach-ep93xx/edb93xx.c                     |  15 +-
+ arch/arm/mach-ep93xx/include/mach/platform.h       |   4 +-
+ arch/arm/mach-ep93xx/simone.c                      |  12 +-
+ arch/arm/mach-ep93xx/snappercl15.c                 |  12 +-
+ arch/arm/mach-ep93xx/vision_ep9307.c               |   7 +-
+ arch/arm/mach-ixp4xx/avila-setup.c                 |  17 +-
+ arch/arm/mach-ixp4xx/dsmg600-setup.c               |  16 +-
+ arch/arm/mach-ixp4xx/fsg-setup.c                   |  16 +-
+ arch/arm/mach-ixp4xx/goramo_mlr.c                  |  24 +--
+ arch/arm/mach-ixp4xx/ixdp425-setup.c               |  16 +-
+ arch/arm/mach-ixp4xx/nas100d-setup.c               |  16 +-
+ arch/arm/mach-ixp4xx/nslu2-setup.c                 |  16 +-
+ arch/arm/mach-ks8695/board-acs5k.c                 |  15 +-
+ arch/arm/mach-pxa/palmz72.c                        |  14 +-
+ arch/arm/mach-pxa/viper.c                          |  27 ++-
+ arch/arm/mach-sa1100/simpad.c                      |  14 +-
+ arch/blackfin/mach-bf533/boards/blackstamp.c       |  19 +-
+ arch/blackfin/mach-bf533/boards/ezkit.c            |  18 +-
+ arch/blackfin/mach-bf533/boards/stamp.c            |  18 +-
+ arch/blackfin/mach-bf561/boards/ezkit.c            |  18 +-
+ arch/mips/alchemy/board-gpr.c                      |  23 ++-
+ arch/mips/ath79/mach-pb44.c                        |  16 +-
+ drivers/gpio/gpiolib.c                             |  13 ++
+ drivers/i2c/busses/i2c-gpio.c                      | 213 ++++++++++-----------
+ drivers/mfd/sm501.c                                |  49 ++---
+ include/linux/gpio/consumer.h                      |   6 +
+ include/linux/i2c-gpio.h                           |   4 -
+ 29 files changed, 423 insertions(+), 288 deletions(-)
 
 -- 
-2.14.1
+2.13.5
