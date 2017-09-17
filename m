@@ -1,44 +1,45 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Sun, 17 Sep 2017 05:19:55 +0200
-Subject: [PATCH v2 09/10] arm64: allwinner: a64: Add device node for DMA
- controller
+Date: Sun, 17 Sep 2017 05:19:56 +0200
+Subject: [PATCH v2 10/10] arm64: allwinner: a64: add dma controller references
+ to spi nodes
 In-Reply-To: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
 References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170917031956.28010-10-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170917031956.28010-11-stefan.bruens@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 SoC has a DMA controller that supports 8 DMA channels
-to and from various peripherals. The last used DRQ port is 27.
+The spi controller nodes omit the dma controller/channel references, add
+it.
 
-Add a device node for it.
+This does not yet enable DMA for SPI transfers, as the spi-sun6i driver
+lacks support for DMA, but always uses PIO to the FIFO.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index e9a9d7fb01c8..4f060ecdb061 100644
+index 4f060ecdb061..ec71c48b393d 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -136,6 +136,17 @@
- 			reg = <0x01c00000 0x1000>;
- 		};
- 
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun50i-a64-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DMA>;
-+			dma-channels = <8>;
-+			dma-requests = <27>;
-+			resets = <&ccu RST_BUS_DMA>;
-+			#dma-cells = <1>;
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun50i-a64-mmc";
- 			reg = <0x01c0f000 0x1000>;
+@@ -476,6 +476,8 @@
+ 			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 23>, <&dma 23>;
++			dma-names = "rx", "tx";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&spi0_pins>;
+ 			resets = <&ccu RST_BUS_SPI0>;
+@@ -491,6 +493,8 @@
+ 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 24>, <&dma 24>;
++			dma-names = "rx", "tx";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&spi1_pins>;
+ 			resets = <&ccu RST_BUS_SPI1>;
 -- 
 2.14.1
