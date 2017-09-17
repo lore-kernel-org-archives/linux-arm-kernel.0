@@ -1,48 +1,46 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 17 Sep 2017 09:37:43 +0200
-Subject: [PATCH 3/4] arm: dts: exynos: add exynos5422 cpu
- capacity-dmips-mhz information
-In-Reply-To: <20170830144120.9312-4-dietmar.eggemann@arm.com>
-References: <20170830144120.9312-1-dietmar.eggemann@arm.com>
- <20170830144120.9312-4-dietmar.eggemann@arm.com>
-Message-ID: <20170917073743.GD19716@kozik-book>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Sun, 17 Sep 2017 16:00:50 +0800
+Subject: [PATCH v4 3/5] dt-bindings: mfd: Add bindings for the keys as subnode
+ of PMIC
+In-Reply-To: <1505635252-27716-1-git-send-email-chen.zhong@mediatek.com>
+References: <1505635252-27716-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1505635252-27716-4-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 03:41:19PM +0100, Dietmar Eggemann wrote:
-> The following 'capacity-dmips-mhz' dt property values are used:
-> 
-> Cortex-A15: 1024, Cortex-A7: 539
-> 
-> They have been derived form the cpu_efficiency values:
-> 
-> Cortex-A15: 3891, Cortex-A7: 2048
-> 
-> by scaling them so that the Cortex-A15s (big cores) use 1024.
-> 
-> The cpu_efficiency values were originally derived from the "Big.LITTLE
-> Processing with ARM Cortex?-A15 & Cortex-A7" white paper
-> (http://www.cl.cam.ac.uk/~rdm34/big.LITTLE.pdf). Table 1 lists 1.9x
-> (3891/2048) as the Cortex-A15 vs Cortex-A7 performance ratio for the
-> Dhrystone benchmark.
-> 
-> The following platforms are affected once cpu-invariant accounting
-> support is re-connected to the task scheduler:
-> 
-> odroidxu3, odroidxu3-lite, odroidxu4
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> ---
->  arch/arm/boot/dts/exynos5422-cpus.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
+This patch adds documentation for device tree bindings for keys support
+as the subnode of MT6397/MT6323 PMIC.
 
-Thanks, applied.
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ Documentation/devicetree/bindings/mfd/mt6397.txt |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Best regards,
-Krzysztof
+diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+index 522a3bb..d1df77f 100644
+--- a/Documentation/devicetree/bindings/mfd/mt6397.txt
++++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
+@@ -7,6 +7,7 @@ MT6397/MT6323 is a multifunction device with the following sub modules:
+ - GPIO
+ - Clock
+ - LED
++- Keys
+ 
+ It is interfaced to host controller using SPI interface by a proprietary hardware
+ called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
+@@ -40,6 +41,11 @@ Optional subnodes:
+ 		- compatible: "mediatek,mt6323-led"
+ 	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
+ 
++- keys
++	Required properties:
++		- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
++	see Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
++
+ Example:
+ 	pwrap: pwrap at 1000f000 {
+ 		compatible = "mediatek,mt8135-pwrap";
+-- 
+1.7.9.5
