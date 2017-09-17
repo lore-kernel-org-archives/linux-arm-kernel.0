@@ -1,107 +1,92 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 17 Sep 2017 11:39:04 +0200
-Subject: [PATCH 5/7] i2c: gpio: Local vars in probe
+Date: Sun, 17 Sep 2017 11:39:05 +0200
+Subject: [PATCH 6/7] dt-bindings: i2c: i2c-gpio: Add support for named gpios
 In-Reply-To: <20170917093906.16325-1-linus.walleij@linaro.org>
 References: <20170917093906.16325-1-linus.walleij@linaro.org>
-Message-ID: <20170917093906.16325-6-linus.walleij@linaro.org>
+Message-ID: <20170917093906.16325-7-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By creating local variables for *dev and *np, the code become
-much easier to read, in my opinion.
+From: Geert Uytterhoeven <geert+renesas () glider ! be>
 
+The current i2c-gpio DT bindings use a single unnamed "gpios" property
+to refer to the SDA and SCL signal lines by index.  This is error-prone
+for the casual DT writer and reviewer, as one has to look up the order
+in the DT bindings.
+
+Fix this by amending the DT bindings to use two separate named gpios
+properties, and deprecate the old unnamed variant.
+
+Take this opportunity to clearly deprecate the "i2c-gpio,sda-open-drain"
+and "i2c-gpio,scl-open-drain" flags as well. The commit describes
+in detail what these flags actually mean, and why they should not be
+used in new device trees.
+
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[Augmented to what I and Rob would like]
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-I put this at the end of the series because compared to the
-rest of the patches it is completely unimportant.
+ChangeLog v1->v2:
+- Create a special section for the deprecated bindings
+- Also deprecate the open drain bool properties
+- Update the example to use the new style of bindings
 ---
- drivers/i2c/busses/i2c-gpio.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+ Documentation/devicetree/bindings/i2c/i2c-gpio.txt | 32 ++++++++++++++++------
+ 1 file changed, 23 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-index 97b9c29e9429..beb5ce523684 100644
---- a/drivers/i2c/busses/i2c-gpio.c
-+++ b/drivers/i2c/busses/i2c-gpio.c
-@@ -88,10 +88,12 @@ static int i2c_gpio_probe(struct platform_device *pdev)
- 	struct i2c_gpio_platform_data *pdata;
- 	struct i2c_algo_bit_data *bit_data;
- 	struct i2c_adapter *adap;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
- 	enum gpiod_flags gflags;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-gpio.txt b/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
+index 4f8ec947c6bd..38a05562d1d2 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
+@@ -2,25 +2,39 @@ Device-Tree bindings for i2c gpio driver
  
--	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
- 		return -ENOMEM;
+ Required properties:
+ 	- compatible = "i2c-gpio";
+-	- gpios: sda and scl gpio
+-
++	- sda-gpios: gpio used for the sda signal, this should be flagged as
++	  active high using open drain with (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)
++	  from <dt-bindings/gpio/gpio.h> since the signal is by definition
++	  open drain.
++	- scl-gpios: gpio used for the scl signal, this should be flagged as
++	  active high using open drain with (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)
++	  from <dt-bindings/gpio/gpio.h> since the signal is by definition
++	  open drain.
  
-@@ -99,15 +101,15 @@ static int i2c_gpio_probe(struct platform_device *pdev)
- 	bit_data = &priv->bit_data;
- 	pdata = &priv->pdata;
+ Optional properties:
+-	- i2c-gpio,sda-open-drain: sda as open drain
+-	- i2c-gpio,scl-open-drain: scl as open drain
+ 	- i2c-gpio,scl-output-only: scl as output only
+ 	- i2c-gpio,delay-us: delay between GPIO operations (may depend on each platform)
+ 	- i2c-gpio,timeout-ms: timeout to get data
  
--	if (pdev->dev.of_node) {
--		of_i2c_gpio_get_props(pdev->dev.of_node, pdata);
-+	if (np) {
-+		of_i2c_gpio_get_props(np, pdata);
- 	} else {
- 		/*
- 		 * If all platform data settings are zero it is OK
- 		 * to not provide any platform data from the board.
- 		 */
--		if (dev_get_platdata(&pdev->dev))
--			memcpy(pdata, dev_get_platdata(&pdev->dev),
-+		if (dev_get_platdata(dev))
-+			memcpy(pdata, dev_get_platdata(dev),
- 			       sizeof(*pdata));
- 	}
++Deprecated properties, do not use in new device tree sources:
++	- gpios: sda and scl gpio, alternative for {sda,scl}-gpios
++	- i2c-gpio,sda-open-drain: this means that something outside of our
++	  control has put the GPIO line used for SDA into open drain mode, and
++	  that something is not the GPIO chip. It is essentially an
++	  inconsistency flag.
++	- i2c-gpio,scl-open-drain: this means that something outside of our
++	  control has put the GPIO line used for SCL into open drain mode, and
++	  that something is not the GPIO chip. It is essentially an
++	  inconsistency flag.
++
+ Example nodes:
  
-@@ -123,7 +125,7 @@ static int i2c_gpio_probe(struct platform_device *pdev)
- 		gflags = GPIOD_OUT_HIGH;
- 	else
- 		gflags = GPIOD_OUT_HIGH_OPEN_DRAIN;
--	priv->sda = devm_gpiod_get_index(&pdev->dev, NULL, 0, gflags);
-+	priv->sda = devm_gpiod_get_index(dev, NULL, 0, gflags);
- 	if (IS_ERR(priv->sda)) {
- 		ret = PTR_ERR(priv->sda);
- 		/* FIXME: hack in the old code, is this really necessary? */
-@@ -142,7 +144,7 @@ static int i2c_gpio_probe(struct platform_device *pdev)
- 		gflags = GPIOD_OUT_LOW;
- 	else
- 		gflags = GPIOD_OUT_LOW_OPEN_DRAIN;
--	priv->scl = devm_gpiod_get_index(&pdev->dev, NULL, 1, gflags);
-+	priv->scl = devm_gpiod_get_index(dev, NULL, 1, gflags);
- 	if (IS_ERR(priv->scl)) {
- 		ret = PTR_ERR(priv->scl);
- 		/* FIXME: hack in the old code, is this really necessary? */
-@@ -173,15 +175,15 @@ static int i2c_gpio_probe(struct platform_device *pdev)
- 	bit_data->data = priv;
- 
- 	adap->owner = THIS_MODULE;
--	if (pdev->dev.of_node)
--		strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name));
-+	if (np)
-+		strlcpy(adap->name, dev_name(dev), sizeof(adap->name));
- 	else
- 		snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
- 
- 	adap->algo_data = bit_data;
- 	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
--	adap->dev.parent = &pdev->dev;
--	adap->dev.of_node = pdev->dev.of_node;
-+	adap->dev.parent = dev;
-+	adap->dev.of_node = np;
- 
- 	adap->nr = pdev->id;
- 	ret = i2c_bit_add_numbered_bus(adap);
-@@ -195,7 +197,7 @@ static int i2c_gpio_probe(struct platform_device *pdev)
- 	 * get accessors to get the actual name of the GPIO line,
- 	 * from the descriptor, then provide that instead.
- 	 */
--	dev_info(&pdev->dev, "using lines %u (SDA) and %u (SCL%s)\n",
-+	dev_info(dev, "using lines %u (SDA) and %u (SCL%s)\n",
- 		 desc_to_gpio(priv->sda), desc_to_gpio(priv->scl),
- 		 pdata->scl_is_output_only
- 		 ? ", no clock stretching" : "");
++#include <dt-bindings/gpio/gpio.h>
++
+ i2c at 0 {
+ 	compatible = "i2c-gpio";
+-	gpios = <&pioA 23 0 /* sda */
+-		 &pioA 24 0 /* scl */
+-		>;
+-	i2c-gpio,sda-open-drain;
+-	i2c-gpio,scl-open-drain;
++	sda-gpios = <&pioA 23 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
++	scl-gpios = <&pioA 24 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+ 	i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
 -- 
 2.13.5
