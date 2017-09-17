@@ -1,32 +1,20 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Sun, 17 Sep 2017 13:43:10 +0100
-Subject: [PATCH] rtc: sun6i: fix memory leak
-Message-ID: <1505652190-4942-1-git-send-email-sudipm.mukherjee@gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Sun, 17 Sep 2017 15:34:23 +0200
+Subject: [PATCH 2/2] arm: dts: stm32: remove useless clocksource nodes
+In-Reply-To: <20170915210347.GA1831@mai>
+References: <1505375812-19037-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1505375812-19037-3-git-send-email-benjamin.gaignard@linaro.org>
+ <20170915210347.GA1831@mai>
+Message-ID: <CA+M3ks6WjdJ-z5pcfXDk7va5CS0zQ6gud85GGHRS9zh2d6YSuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If 'clk_data' is not allocated we returned but we failed to free 'rtc'.
+2017-09-15 23:03 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On Thu, Sep 14, 2017 at 09:56:52AM +0200, Benjamin Gaignard wrote:
+>> 16 bits timers aren't accurate enough to be used as
+>> clocksource, remove them from stm32f4 and stm32f7 devicetree.
+>
+> Do you really want to remove the description? The timers are disabled, aren't they?
 
-Signed-off-by: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
----
- drivers/rtc/rtc-sun6i.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-index 3d2216c..5bc28ee 100644
---- a/drivers/rtc/rtc-sun6i.c
-+++ b/drivers/rtc/rtc-sun6i.c
-@@ -201,8 +201,10 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
- 
- 	clk_data = kzalloc(sizeof(*clk_data) + (sizeof(*clk_data->hws) * 2),
- 			   GFP_KERNEL);
--	if (!clk_data)
-+	if (!clk_data) {
-+		kfree(rtc);
- 		return;
-+	}
- 
- 	spin_lock_init(&rtc->lock);
- 
--- 
-2.7.4
+Yes because they are 16 bits timers and they won't be accepted anymore in
+driver's probe function.
