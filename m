@@ -1,44 +1,185 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 17 Sep 2017 16:26:18 +0200
-Subject: [PATCH] ARM: defconfig: update Gemini defconfig
-Message-ID: <20170917142618.2126-1-linus.walleij@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sun, 17 Sep 2017 07:43:14 -0700
+Subject: [PATCH v2 03/11] KVM: arm64: Change hyp_panic()s dependency on
+ tpidr_el2
+In-Reply-To: <20170808164616.25949-4-james.morse@arm.com>
+References: <20170808164616.25949-1-james.morse@arm.com>
+ <20170808164616.25949-4-james.morse@arm.com>
+Message-ID: <20170917144314.GA99021@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the Gemini defconfig with drivers merged
-for v4.13 or v4.14:
-- ATA driver is merged
-- DMA driver is merged
-- RTC driver gets selected from default Kconfig
+On Tue, Aug 08, 2017 at 05:46:08PM +0100, James Morse wrote:
+> Make tpidr_el2 a cpu-offset for per-cpu variables in the same way the
+> host uses tpidr_el1. This lets tpidr_el{1,2} have the same value, and
+> on VHE they can be the same register.
+> 
+> KVM calls hyp_panic() when anything unexpected happens. This may occur
+> while a guest owns the EL1 registers. KVM stashes the vcpu pointer in
+> tpidr_el2, which it uses to find the host context in order to restore
+> the host EL1 registers before parachuting into the host's panic().
+> 
+> The host context is a struct kvm_cpu_context allocated in the per-cpu
+> area, and mapped to hyp. Given the per-cpu offset for this CPU, this is
+> easy to find. Change hyp_panic() to take a pointer to the
+> struct kvm_cpu_context. Wrap these calls with an asm function that
+> retrieves the struct kvm_cpu_context from the host's per-cpu area.
+> 
+> Copy the per-cpu offset from the hosts tpidr_el1 into tpidr_el2 during
+> kvm init. (Later patches will make this unnecessary for VHE hosts)
+> 
+> We print out the vcpu pointer as part of the panic message. Add a back
+> reference to the 'running vcpu' in the host cpu context to preserve this.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+> Changes since v1:
+>  * Added a comment explaining how =kvm_host_cpu_state gets from a host-va
+>    to a hyp va.
+>  * Added the first paragraph to the commit message.
+> 
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/kvm/hyp/hyp-entry.S    | 12 ++++++++++++
+>  arch/arm64/kvm/hyp/s2-setup.c     |  3 +++
+>  arch/arm64/kvm/hyp/switch.c       | 25 +++++++++++++------------
+>  4 files changed, 30 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index d68630007b14..7733492d9a35 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -191,6 +191,8 @@ struct kvm_cpu_context {
+>  		u64 sys_regs[NR_SYS_REGS];
+>  		u32 copro[NR_COPRO_REGS];
+>  	};
+> +
+> +	struct kvm_vcpu *__hyp_running_vcpu;
+>  };
+>  
+>  typedef struct kvm_cpu_context kvm_cpu_context_t;
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index fce7cc507e0a..e4f37b9dd47c 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -163,6 +163,18 @@ ENTRY(__hyp_do_panic)
+>  	eret
+>  ENDPROC(__hyp_do_panic)
+>  
+> +ENTRY(__hyp_panic)
+> +	/*
+> +	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> +	 * not be accessible by this address from EL2, hyp_panic() converts
+> +	 * it with kern_hyp_va() before use.
+> +	 */
+> +	ldr	x0, =kvm_host_cpu_state
+> +	mrs	x1, tpidr_el2
+> +	add	x0, x0, x1
+> +	b	hyp_panic
+> +ENDPROC(__hyp_panic)
+> +
+>  .macro invalid_vector	label, target = __hyp_panic
+>  	.align	2
+>  \label:
+> diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
+> index b81f4091c909..eb401dbb285e 100644
+> --- a/arch/arm64/kvm/hyp/s2-setup.c
+> +++ b/arch/arm64/kvm/hyp/s2-setup.c
+> @@ -84,5 +84,8 @@ u32 __hyp_text __init_stage2_translation(void)
+>  
+>  	write_sysreg(val, vtcr_el2);
+>  
+> +	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
+> +	write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+> +
+>  	return parange;
+>  }
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 945e79c641c4..235d615cee30 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -286,9 +286,9 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  	u64 exit_code;
+>  
+>  	vcpu = kern_hyp_va(vcpu);
+> -	write_sysreg(vcpu, tpidr_el2);
+>  
+>  	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> +	host_ctxt->__hyp_running_vcpu = vcpu;
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly for v4.14-rc:s.
----
- arch/arm/configs/gemini_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I'm fine with this for now, but eventually when we optimize KVM further
+we may want to avoid doing this in every world-switch.  One option is to
+just set this pointer in vcpu_get and vcpu_load, but would it also be
+possible to use the kvm_arm_running_vcpu per-cpu array directly?
 
-diff --git a/arch/arm/configs/gemini_defconfig b/arch/arm/configs/gemini_defconfig
-index d2d75fa664a6..2a63fa10c813 100644
---- a/arch/arm/configs/gemini_defconfig
-+++ b/arch/arm/configs/gemini_defconfig
-@@ -32,6 +32,7 @@ CONFIG_BLK_DEV_RAM_SIZE=16384
- CONFIG_BLK_DEV_SD=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_ATA=y
-+CONFIG_PATA_FTIDE010=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-@@ -55,8 +56,8 @@ CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_GEMINI=y
- CONFIG_DMADEVICES=y
-+CONFIG_AMBA_PL08X=y
- # CONFIG_DNOTIFY is not set
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
--- 
-2.13.5
+>  	guest_ctxt = &vcpu->arch.ctxt;
+>  
+>  	__sysreg_save_host_state(host_ctxt);
+> @@ -393,7 +393,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  
+>  static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+>  
+> -static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+> +static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+> +					     struct kvm_vcpu *vcpu)
+>  {
+>  	unsigned long str_va;
+>  
+> @@ -407,35 +408,35 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+>  	__hyp_do_panic(str_va,
+>  		       spsr,  elr,
+>  		       read_sysreg(esr_el2),   read_sysreg_el2(far),
+> -		       read_sysreg(hpfar_el2), par,
+> -		       (void *)read_sysreg(tpidr_el2));
+> +		       read_sysreg(hpfar_el2), par, vcpu);
+>  }
+>  
+> -static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par)
+> +static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
+> +					    struct kvm_vcpu *vcpu)
+>  {
+>  	panic(__hyp_panic_string,
+>  	      spsr,  elr,
+>  	      read_sysreg_el2(esr),   read_sysreg_el2(far),
+> -	      read_sysreg(hpfar_el2), par,
+> -	      (void *)read_sysreg(tpidr_el2));
+> +	      read_sysreg(hpfar_el2), par, vcpu);
+>  }
+>  
+>  static hyp_alternate_select(__hyp_call_panic,
+>  			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
+>  			    ARM64_HAS_VIRT_HOST_EXTN);
+>  
+> -void __hyp_text __noreturn __hyp_panic(void)
+> +void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *__host_ctxt)
+>  {
+> +	struct kvm_vcpu *vcpu = NULL;
+> +
+>  	u64 spsr = read_sysreg_el2(spsr);
+>  	u64 elr = read_sysreg_el2(elr);
+>  	u64 par = read_sysreg(par_el1);
+>  
+>  	if (read_sysreg(vttbr_el2)) {
+> -		struct kvm_vcpu *vcpu;
+>  		struct kvm_cpu_context *host_ctxt;
+>  
+> -		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
+> -		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> +		host_ctxt = kern_hyp_va(__host_ctxt);
+> +		vcpu = host_ctxt->__hyp_running_vcpu;
+>  		__timer_save_state(vcpu);
+>  		__deactivate_traps(vcpu);
+>  		__deactivate_vm(vcpu);
+> @@ -443,7 +444,7 @@ void __hyp_text __noreturn __hyp_panic(void)
+>  	}
+>  
+>  	/* Call panic for real */
+> -	__hyp_call_panic()(spsr, elr, par);
+> +	__hyp_call_panic()(spsr, elr, par, vcpu);
+>  
+>  	unreachable();
+>  }
+> -- 
+> 2.13.3
+> 
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
