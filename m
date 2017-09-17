@@ -1,149 +1,63 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Sun, 17 Sep 2017 05:19:48 +0200
-Subject: [PATCH v2 02/10] dmaengine: sun6i: Correct burst length field offsets
- for H3
+Date: Sun, 17 Sep 2017 05:19:54 +0200
+Subject: [PATCH v2 08/10] dmaengine: sun6i: Add support for Allwinner A64 and
+ compatibles
 In-Reply-To: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
 References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170917031956.28010-3-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170917031956.28010-9-stefan.bruens@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the H3, the burst lengths field offsets in the channel configuration
-register differs from earlier SoC generations.
-
-Using the A31 register macros actually configured the H3 controller
-do to bursts of length 1 always, which although working leads to higher
-bus utilisation.
+The A64 SoC has the same dma engine as the H3 (sun8i), with a
+reduced amount of physical channels. To allow future reuse of the
+compatible, leave the channel count etc. in the config data blank
+and retrieve it from the devicetree.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 ---
- drivers/dma/sun6i-dma.c | 36 +++++++++++++++++++++++++++---------
- 1 file changed, 27 insertions(+), 9 deletions(-)
+ drivers/dma/sun6i-dma.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 45bcd5271d94..a6fc066a0ac6 100644
+index b5ecc97a0d5a..118b29bb1eac 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -68,13 +68,15 @@
- #define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
- #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
- #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
--#define DMA_CHAN_CFG_SRC_BURST(x)	(((x) & 0x3) << 7)
-+#define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
-+#define DMA_CHAN_CFG_SRC_BURST_H3(x)	(((x) & 0x3) << 6)
- #define DMA_CHAN_CFG_SRC_WIDTH(x)	(((x) & 0x3) << 9)
- 
- #define DMA_CHAN_CFG_DST_DRQ(x)		(DMA_CHAN_CFG_SRC_DRQ(x) << 16)
- #define DMA_CHAN_CFG_DST_IO_MODE	(DMA_CHAN_CFG_SRC_IO_MODE << 16)
- #define DMA_CHAN_CFG_DST_LINEAR_MODE	(DMA_CHAN_CFG_SRC_LINEAR_MODE << 16)
--#define DMA_CHAN_CFG_DST_BURST(x)	(DMA_CHAN_CFG_SRC_BURST(x) << 16)
-+#define DMA_CHAN_CFG_DST_BURST_A31(x)	(DMA_CHAN_CFG_SRC_BURST_A31(x) << 16)
-+#define DMA_CHAN_CFG_DST_BURST_H3(x)	(DMA_CHAN_CFG_SRC_BURST_H3(x) << 16)
- #define DMA_CHAN_CFG_DST_WIDTH(x)	(DMA_CHAN_CFG_SRC_WIDTH(x) << 16)
- 
- #define DMA_CHAN_CUR_SRC	0x10
-@@ -115,6 +117,7 @@ struct sun6i_dma_config {
- 	 * BSP kernel source code.
- 	 */
- 	void (*clock_autogate_enable)();
-+	void (*set_burst_length)(u32 *p_cfg, s8 src_burst, s8 dst_burst);
+@@ -1127,6 +1127,28 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+ 			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
  };
  
- /*
-@@ -284,6 +287,18 @@ static void sun6i_enable_clock_autogate_h3(struct sun6i_dma_dev *sdev)
- 	writel(SUNXI_H3_DMA_GATE_ENABLE, sdev->base + SUNXI_H3_DMA_GATE);
- }
- 
-+static void sun6i_set_burst_length_a31(u32 *p_cfg, s8 src_burst, s8 dst_burst)
-+{
-+	*p_cfg |= DMA_CHAN_CFG_SRC_BURST_A31(src_burst) |
-+		  DMA_CHAN_CFG_DST_BURST_A31(dst_burst);
-+}
-+
-+static void sun6i_set_burst_length_h3(u32 *p_cfg, s8 src_burst, s8 dst_burst)
-+{
-+	*p_cfg |= DMA_CHAN_CFG_SRC_BURST_H3(src_burst) |
-+		  DMA_CHAN_CFG_DST_BURST_H3(dst_burst);
-+}
-+
- static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
- {
- 	struct sun6i_desc *txd = pchan->desc;
-@@ -563,11 +578,11 @@ static int set_config(struct sun6i_dma_dev *sdev,
- 	if (dst_width < 0)
- 		return dst_width;
- 
--	*p_cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
--		DMA_CHAN_CFG_SRC_WIDTH(src_width) |
--		DMA_CHAN_CFG_DST_BURST(dst_burst) |
-+	*p_cfg = DMA_CHAN_CFG_SRC_WIDTH(src_width) |
- 		DMA_CHAN_CFG_DST_WIDTH(dst_width);
- 
-+	sdev->cfg->set_burst_length(p_cfg, src_burst, dst_burst);
-+
- 	return 0;
- }
- 
-@@ -610,11 +625,11 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
- 		DMA_CHAN_CFG_DST_DRQ(DRQ_SDRAM) |
- 		DMA_CHAN_CFG_DST_LINEAR_MODE |
- 		DMA_CHAN_CFG_SRC_LINEAR_MODE |
--		DMA_CHAN_CFG_SRC_BURST(burst) |
- 		DMA_CHAN_CFG_SRC_WIDTH(width) |
--		DMA_CHAN_CFG_DST_BURST(burst) |
- 		DMA_CHAN_CFG_DST_WIDTH(width);
- 
-+	sdev->cfg->set_burst_length(v_lli->cfg, burst, burst);
-+
- 	sun6i_dma_lli_add(NULL, v_lli, p_lli, txd);
- 
- 	sun6i_dma_dump_lli(vchan, v_lli);
-@@ -1027,6 +1042,7 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
- 	.nr_max_requests = 30,
- 	.nr_max_vchans   = 53,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_noop;
-+	.set_burst_length = sun6i_set_burst_length_a31;
- };
- 
- /*
-@@ -1039,6 +1055,7 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
- 	.nr_max_requests = 24,
- 	.nr_max_vchans   = 37,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
-+	.set_burst_length = sun6i_set_burst_length_a31;
- };
- 
- static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
-@@ -1046,13 +1063,12 @@ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
- 	.nr_max_requests = 28,
- 	.nr_max_vchans   = 39,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
-+	.set_burst_length = sun6i_set_burst_length_a31;
- };
- 
- /*
-  * The H3 has 12 physical channels, a maximum DRQ port id of 27,
-  * and a total of 34 usable source and destination endpoints.
-- * It also supports additional burst lengths and bus widths,
-- * and the burst length fields have different offsets.
-  */
- 
- static struct sun6i_dma_config sun8i_h3_dma_cfg = {
-@@ -1060,6 +1076,7 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_requests = 27,
- 	.nr_max_vchans   = 34,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_h3;
++/*
++ * The A64 binding uses the number of dma channels from the
++ * device tree node.
++ */
++static struct sun6i_dma_config sun50i_a64_dma_cfg = {
++	.nr_max_channels = 0,
++	.nr_max_requests = 0,
++	.nr_max_vchans   = 0,
++	.clock_autogate_enable = sun6i_enable_clock_autogate_h3;
 +	.set_burst_length = sun6i_set_burst_length_h3;
- };
- 
++	.src_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16);
++	.dst_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16);
++	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
++	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
++};
++
  /*
-@@ -1072,6 +1089,7 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
- 	.nr_max_requests = 23,
- 	.nr_max_vchans   = 24,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
-+	.set_burst_length = sun6i_set_burst_length_a31;
+  * The V3s have only 8 physical channels, a maximum DRQ port id of 23,
+  * and a total of 24 usable source and destination endpoints.
+@@ -1154,6 +1176,7 @@ static const struct of_device_id sun6i_dma_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
++	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
+ 	{ /* sentinel */ }
  };
- 
- static const struct of_device_id sun6i_dma_match[] = {
+ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
 -- 
 2.14.1
