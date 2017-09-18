@@ -1,98 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 18 Sep 2017 11:50:52 +0200
-Subject: [PATCH v2 4/9] mtd: nand: atmel: Avoid ECC errors when leaving
- backup mode
-In-Reply-To: <20170915140411.31716-5-romain.izard.pro@gmail.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-5-romain.izard.pro@gmail.com>
-Message-ID: <20170918115052.4606d8e5@bbrezillon>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Mon, 18 Sep 2017 09:52:17 +0000
+Subject: [PATCHv3 0/3] arm64: dts: add ls2088a and 1088a pcie DT nodes
+In-Reply-To: <20170918093223.33364-1-Zhiqiang.Hou@nxp.com>
+References: <20170918093223.33364-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <AM5PR0402MB2771422484B12A966BC06B9D84630@AM5PR0402MB2771.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+Hi Shawn,
 
-On Fri, 15 Sep 2017 16:04:06 +0200
-Romain Izard <romain.izard.pro@gmail.com> wrote:
+The LS1088 and LS2088 driver patch set has been applied to Linux-next.
 
-> During backup mode, the contents of all registers will be cleared as the
-> SoC will be completely powered down. For a product that boots on NAND
-> Flash memory, the bootloader will obviously use the related controller
-> to read the Flash and correct any detected error in the memory, before
-> handling back control to the kernel's resuming entry point.
+> -----Original Message-----
+> From: Zhiqiang Hou [mailto:Zhiqiang.Hou at nxp.com]
+> Sent: 2017?9?18? 17:32
+> To: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> will.deacon at arm.com; shawnguo at kernel.org; Prabhakar Kushwaha
+> <prabhakar.kushwaha@nxp.com>
+> Cc: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv3 0/3] arm64: dts: add ls2088a and 1088a pcie DT nodes
 > 
-> In normal devices, it is up to the driver's suspend/resume code to
-> restore the registers in a valid state. But the PMECC is not a regular
-> device in the driver model when used with the legacy device tree binding
-> for the Atmel NAND controller, and suspend/resume code is not called.
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> As in my case the bootloader leaves the PMECC controller in a programmed
-> state, and the controller is only reset at boot or after a NAND access,
-> the first NAND Flash access with the Atmel controller will report
-> uncorrectable ECC errors.
+> Add GICv3 ITS DT node for ls1088a, because the PCIe nodes must have a
+> msi-parent.
 > 
-> To avoid this, systematically reset the PMECC controller before using
-> it.
+> Hou Zhiqiang (3):
+>   arm64: dts: ls2088a: add pcie support
+>   arm64: dts: ls1088a: add gicv3 ITS DT node
+>   arm64: dts: ls1088a: add PCIe controller DT nodes
 > 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
->  drivers/mtd/nand/atmel/pmecc.c | 11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 82
+> ++++++++++++++++++++++++++
+> arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi |  4 ++
+>  2 files changed, 86 insertions(+)
 > 
-> diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
-> index 8c210a5776bc..8d1208f38025 100644
-> --- a/drivers/mtd/nand/atmel/pmecc.c
-> +++ b/drivers/mtd/nand/atmel/pmecc.c
-> @@ -777,6 +777,9 @@ int atmel_pmecc_enable(struct atmel_pmecc_user *user, int op)
->  
->  	mutex_lock(&user->pmecc->lock);
->  
-> +	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
-> +	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
-> +
->  	cfg = user->cache.cfg;
->  	if (op == NAND_ECC_WRITE)
->  		cfg |= PMECC_CFG_WRITE_OP;
-> @@ -797,10 +800,6 @@ EXPORT_SYMBOL_GPL(atmel_pmecc_enable);
->  
->  void atmel_pmecc_disable(struct atmel_pmecc_user *user)
->  {
-> -	struct atmel_pmecc *pmecc = user->pmecc;
-> -
-> -	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
-> -	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
+> --
+> 2.14.1
 
-So know you leave the ECC engine enabled even when it's not in use? Not
-sure what kind of implication this has on power-consumption, but I
-think I'd prefer to keep the write RST+DISABLE sequence in the disable
-path.
-
-How about creating a atmel_pmecc_reset() function that you'd call from
-the nand-controller resume hook. Something like:
-
-void atmel_pmecc_reset(struct atmel_pmecc *pmecc)
-{
-	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
-	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
-}
-
-This way you can re-use the same function and call it from the probe
-and disable path as well.
-
-Regards,
-
-Boris
-
->  	mutex_unlock(&user->pmecc->lock);
->  }
->  EXPORT_SYMBOL_GPL(atmel_pmecc_disable);
-> @@ -856,10 +855,6 @@ static struct atmel_pmecc *atmel_pmecc_create(struct platform_device *pdev,
->  	/* Disable all interrupts before registering the PMECC handler. */
->  	writel(0xffffffff, pmecc->regs.base + ATMEL_PMECC_IDR);
->  
-> -	/* Reset the ECC engine */
-> -	writel(PMECC_CTRL_RST, pmecc->regs.base + ATMEL_PMECC_CTRL);
-> -	writel(PMECC_CTRL_DISABLE, pmecc->regs.base + ATMEL_PMECC_CTRL);
-> -
->  	return pmecc;
->  }
->  
+Thanks,
+Zhiqiang
