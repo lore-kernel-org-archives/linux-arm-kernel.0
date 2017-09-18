@@ -1,94 +1,65 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Mon, 18 Sep 2017 23:47:25 +0800
-Subject: [linux-sunxi] Re: [PATCH v4 1/6] dt-bindings: update the
- Allwinner GPADC device tree binding for H3
-In-Reply-To: <20170918083045.7bfiialtbm7w6i7j@flea.lan>
-References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-2-icenowy@aosc.io>
- <20170918073336.j7finend3g76chsu@flea.lan>
- <310CE549-B8CE-4C0C-95B1-B545E38BDAF5@aosc.io>
- <20170918083045.7bfiialtbm7w6i7j@flea.lan>
-Message-ID: <e73ead447af89031749e85207cac1e69@aosc.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Sep 2017 17:47:50 +0200
+Subject: [PATCH] ARM: defconfig: FRAMEBUFFER_CONSOLE can no longer be =m
+Message-ID: <20170918154827.1654377-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-09-18 16:30?Maxime Ripard ???
-> On Mon, Sep 18, 2017 at 03:36:43PM +0800, Icenowy Zheng wrote:
->> ? 2017?9?18? GMT+08:00 ??3:33:36, Maxime Ripard 
->> <maxime.ripard@free-electrons.com> ??:
->> >On Thu, Sep 14, 2017 at 10:52:46PM +0800, Icenowy Zheng wrote:
->> >> Allwinner H3 features a thermal sensor like the one in A33, but has
->> >its
->> >> register re-arranged, the clock divider moved to CCU (originally the
->> >> clock divider is in ADC) and added a pair of bus clock and reset.
->> >>
->> >> Update the binding document to cover H3.
->> >>
->> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >> Changes in v4:
->> >> - Add nvmem calibration data (not yet used by the driver)
->> >> Changes in v3:
->> >> - Clock name changes.
->> >> - Example node name changes.
->> >> - Add interupts (not yet used by the driver).
->> >>
->> >>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30
->> >++++++++++++++++++++--
->> >>  1 file changed, 28 insertions(+), 2 deletions(-)
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> >b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> >> index badff3611a98..6c470d584bf9 100644
->> >> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> >> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> >> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can also
->> >act as a thermal sensor
->> >>  and sometimes as a touchscreen controller.
->> >>
->> >>  Required properties:
->> >> -  - compatible: "allwinner,sun8i-a33-ths",
->> >> +  - compatible: must contain one of the following compatibles:
->> >> +		- "allwinner,sun8i-a33-ths"
->> >> +		- "allwinner,sun8i-h3-ths"
->> >>    - reg: mmio address range of the chip,
->> >>    - #thermal-sensor-cells: shall be 0,
->> >>    - #io-channel-cells: shall be 0,
->> >>
->> >> -Example:
->> >> +Optional properties:
->> >> +  - nvmem-cells: A phandle to the calibration data provided by a
->> >nvmem device.
->> >> +                 If unspecified default values shall be used.
->> >> +  - nvmem-cell-names: Should be "calibration-data"
->> >
->> >I'd prefer to have which sensor it applies to here. It wouldn't change
->> >anything for the H3, but it definitely does for example for the A83t
->> >that has two sensors, one for each cluster, and one for the GPU, each
->> >with calibration data.
->> >
->> >What about cluster0-calibration?
+It is no longer possible to load this at runtime, so let's
+change the few remaining users to have it built-in all
+the time.
 
-I prefer sensor0-calibration to sensor3-calibration now.
-(Theortically the new generation THS can support up to 4 sensors)
+arch/arm/configs/zeus_defconfig:115:warning: symbol value 'm' invalid for FRAMEBUFFER_CONSOLE
+arch/arm/configs/viper_defconfig:116:warning: symbol value 'm' invalid for FRAMEBUFFER_CONSOLE
+arch/arm/configs/pxa_defconfig:474:warning: symbol value 'm' invalid for FRAMEBUFFER_CONSOLE
 
->> 
->> The calibration data is in fact a 2 word (8 bytes) zone,
->> which is reserved for 4 sensors on all SoCs, even on H3.
->> It's half word per sensor.
->> 
->> I prefer to just assume a 2 word cell for every SoC.
-> 
-> You have three different data sources, it should be reprensented as
-> such.
-> 
-> Otherwise, the client has to get some knowledge of how the data are
-> stored in the provider, which is an abstraction violation.
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Reported-by: kernelci.org bot <bot@kernelci.org>
+Fixes: 6104c37094e7 ("fbcon: Make fbcon a built-time depency for fbdev")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/configs/pxa_defconfig   | 2 +-
+ arch/arm/configs/viper_defconfig | 2 +-
+ arch/arm/configs/zeus_defconfig  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/configs/pxa_defconfig b/arch/arm/configs/pxa_defconfig
+index 64e3a2a8cede..d5e1370ec303 100644
+--- a/arch/arm/configs/pxa_defconfig
++++ b/arch/arm/configs/pxa_defconfig
+@@ -471,7 +471,7 @@ CONFIG_LCD_PLATFORM=m
+ CONFIG_LCD_TOSA=m
+ CONFIG_BACKLIGHT_PWM=m
+ CONFIG_BACKLIGHT_TOSA=m
+-CONFIG_FRAMEBUFFER_CONSOLE=m
++CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=m
+diff --git a/arch/arm/configs/viper_defconfig b/arch/arm/configs/viper_defconfig
+index 44d4fa57ba0a..070e5074f1ee 100644
+--- a/arch/arm/configs/viper_defconfig
++++ b/arch/arm/configs/viper_defconfig
+@@ -113,7 +113,7 @@ CONFIG_FB_PXA_PARAMETERS=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_BACKLIGHT_PWM=m
+ # CONFIG_VGA_CONSOLE is not set
+-CONFIG_FRAMEBUFFER_CONSOLE=m
++CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=m
+ CONFIG_SND=m
+diff --git a/arch/arm/configs/zeus_defconfig b/arch/arm/configs/zeus_defconfig
+index 8d4c0c926c34..09e7050d5653 100644
+--- a/arch/arm/configs/zeus_defconfig
++++ b/arch/arm/configs/zeus_defconfig
+@@ -112,7 +112,7 @@ CONFIG_FB_PXA=m
+ CONFIG_FB_PXA_PARAMETERS=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ # CONFIG_VGA_CONSOLE is not set
+-CONFIG_FRAMEBUFFER_CONSOLE=m
++CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=m
+ CONFIG_SND=m
+-- 
+2.9.0
