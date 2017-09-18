@@ -1,36 +1,38 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon, 18 Sep 2017 09:15:39 +0100
-Subject: [PATCH][V2] i2c: i2c-stm32f7: make structure stm32f7_setup static
- const
-Message-ID: <20170918081539.26512-1-colin.king@canonical.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Sep 2017 09:29:48 +0100
+Subject: [PATCH v4 2/6] iio: adc: sun4i-gpadc-iio: rename A33-specified
+ registers to contain A33
+In-Reply-To: <20170914145251.21784-3-icenowy@aosc.io>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-3-icenowy@aosc.io>
+Message-ID: <20170918082948.2bl5e44tzsufdj7n@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Thu, 14 Sep 2017, Icenowy Zheng wrote:
 
-The structure stm32f7_setup is local to the source and does not need
-to be in global scope, make it static const.
+> As the H3 SoC, which is also in sun8i line, has totally different
+> register map for the thermal sensor (a cut down version of GPADC), we
+> should rename A23/A33-specified registers to contain A33, in order to
+> prevent obfuscation with H3 registers. Currently these registers are
+> only prefixed "SUN8I", not "SUN8I_A33".
+> 
+> Add "_A33" after "SUN8I" on the register names.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v4:
+> - Change A23 to A33, as the driver never supports A23.
+> 
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 2 +-
 
-Cleans up sparse warning:
-symbol 'stm32f7_setup' was not declared. Should it be static?
+>  include/linux/mfd/sun4i-gpadc.h   | 6 +++---
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/i2c/busses/i2c-stm32f7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index 47c67b0ca896..3eae4fc96884 100644
---- a/drivers/i2c/busses/i2c-stm32f7.c
-+++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -265,7 +265,7 @@ static struct stm32f7_i2c_spec i2c_specs[] = {
- 	},
- };
- 
--struct stm32f7_i2c_setup stm32f7_setup = {
-+static const struct stm32f7_i2c_setup stm32f7_setup = {
- 	.rise_time = STM32F7_I2C_RISE_TIME_DEFAULT,
- 	.fall_time = STM32F7_I2C_FALL_TIME_DEFAULT,
- 	.dnf = STM32F7_I2C_DNF_DEFAULT,
 -- 
-2.14.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
