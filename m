@@ -1,90 +1,63 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 18 Sep 2017 11:16:26 +0300
-Subject: [PATCH v2] dmaengine: edma: Align the memcpy acnt array size with the
- transfer
-Message-ID: <20170918081626.12878-1-peter.ujfalusi@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Sep 2017 10:18:24 +0200
+Subject: [PATCH v2 07/10] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <20170917031956.28010-8-stefan.bruens@rwth-aachen.de>
+References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
+ <20170917031956.28010-8-stefan.bruens@rwth-aachen.de>
+Message-ID: <20170918081824.iiebcj63wvnean57@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?Memory to Memory transfers does not have any special alignment needs
-regarding to acnt array size, but if one of the areas are in memory mapped
-regions (like PCIe memory), we need to make sure that the acnt array size
-is aligned with the mem copy parameters.
-
-Before "dmaengine: edma: Optimize memcpy operation" change the memcpy was set
-up in a different way: acnt == number of bytes in a word based on
-__ffs((src | dest | len), bcnt and ccnt for looping the necessary number of
-words to comlete the trasnfer.
-
-Instead of reverting the commit we can fix it to make sure that the ACNT size
-is aligned to the traswnfer.
-
-Fixes: df6694f80365a (dmaengine: edma: Optimize memcpy operation)
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: stable at vger.kernel.org
----
 Hi,
 
-Changes since v1:
-- Added Cc and Fixes tags to the commit massage for proper Stable handling.
-- Extended the commit message a bit to explain the issue a bit more.
+On Sun, Sep 17, 2017 at 05:19:53AM +0200, Stefan Br?ns wrote:
+> +	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
+> +	if (ret && !sdc->num_pchans) {
+> +		dev_err(&pdev->dev, "Can't get dma-channels.\n");
+> +		return ret;
+> +	}
+> +
+> +	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
+> +		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
+> +	if (ret && !sdc->max_request) {
+> +		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
+> +			 DMA_CHAN_MAX_DRQ);
+> +		sdc->max_request = DMA_CHAN_MAX_DRQ;
+> +	}
+> +
+> +	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
+> +		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
+> +		return -EINVAL;
+> +	}
 
-Regards,
-Peter
+I'm not really convinced about these two checks. They don't catch all
+errors (the range between the actual number of channels / DRQ and the
+maximum allowed per the registers), they might increase in the future
+too, and if we want to make that check actually working, we would have
+to duplicate the number of requests and channels into the driver.
 
- drivers/dma/edma.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+Which is kind of the opposite of what we're trying to do here :)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 14c52574262c..2f880010297d 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -1169,11 +1169,24 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
- 	struct edma_desc *edesc;
- 	struct device *dev = chan->device->dev;
- 	struct edma_chan *echan = to_edma_chan(chan);
--	unsigned int width, pset_len;
-+	unsigned int width, pset_len, array_size;
- 
- 	if (unlikely(!echan || !len))
- 		return NULL;
- 
-+	/* Align the array size (acnt block) with the transfer properties */
-+	switch (__ffs((src | dest | len))) {
-+	case 0:
-+		array_size = SZ_32K - 1;
-+		break;
-+	case 1:
-+		array_size = SZ_32K - 2;
-+		break;
-+	default:
-+		array_size = SZ_32K - 4;
-+		break;
-+	}
-+
- 	if (len < SZ_64K) {
- 		/*
- 		 * Transfer size less than 64K can be handled with one paRAM
-@@ -1195,7 +1208,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
- 		 * When the full_length is multibple of 32767 one slot can be
- 		 * used to complete the transfer.
- 		 */
--		width = SZ_32K - 1;
-+		width = array_size;
- 		pset_len = rounddown(len, width);
- 		/* One slot is enough for lengths multiple of (SZ_32K -1) */
- 		if (unlikely(pset_len == len))
-@@ -1243,7 +1256,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
- 		}
- 		dest += pset_len;
- 		src += pset_len;
--		pset_len = width = len % (SZ_32K - 1);
-+		pset_len = width = len % array_size;
- 
- 		ret = edma_config_pset(chan, &edesc->pset[1], src, dest, 1,
- 				       width, pset_len, DMA_MEM_TO_MEM);
+Once removed,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Maxime
+
+
+
 -- 
-2.14.1
-
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/981ea7d7/attachment.sig>
