@@ -1,45 +1,62 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Sep 2017 11:09:12 +0200
-Subject: [PATCH 0/4] arm64: dts: renesas: Add Support for R-Car D3 and
- Draak
-In-Reply-To: <20170727151622.GG16143@verge.net.au>
-References: <1500555277-22921-1-git-send-email-geert+renesas@glider.be>
- <20170727151622.GG16143@verge.net.au>
-Message-ID: <20170918090909.GF4644@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 18 Sep 2017 11:11:31 +0200
+Subject: [PATCH 5/7] i2c: gpio: Local vars in probe
+In-Reply-To: <20170917093906.16325-6-linus.walleij@linaro.org>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-6-linus.walleij@linaro.org>
+Message-ID: <CAMuHMdX=AyJ2JVSBO8YwcfCMxEFAwEHe7Wxd_d4OreZaWFoF=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 05:16:23PM +0200, Simon Horman wrote:
-> On Thu, Jul 20, 2017 at 02:54:33PM +0200, Geert Uytterhoeven wrote:
-> > 	Hi Simon, Magnus,
-> > 
-> > This patch series adds minimal support for the R-Car D3 SoC and the
-> > Draak development board, allowing to boot from a ramdisk using a serial
-> > console.
-> > 
-> >   - The first two patches add DT sources for R-Car D3 and Draak.
-> >     Due to the use of hardcoded constants, they have no further (build)
-> >     dependencies (obviously there is a runtime dependency).
-> >   - The last two patches replace the hardcoded constants by symbols from
-> >     DT binding headers, and thus depend on those headers.  Hence it
-> >     should be postponed to v4.15.
-> > 
-> > For proper operation, this depends on the 3 series I have just sent:
-> >   - [PATCH 0/3] arm64: renesas: Base R-Car D3 support,
-> 
-> I have applied the above patchset for v4.14.
-> 
-> >   - [PATCH 0/4] soc: renesas: Add R-Car D3 support,
-> 
-> And this one too.
-> 
-> >   - [PATCH 0/4] clk: renesas: Add R-Car D3 support.
-> 
-> And this one seems to have been acked, so I assume you will
-> apply it once you are back from holidays.
-> 
-> So I have applied the first two patches for v4.14.
-> Please repost the remaining two after v4.13-rc6 at which time I should
-> be able to queue them up for v4.15.
+Hi Linus,
 
-I have now done so.
+On Sun, Sep 17, 2017 at 11:39 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> By creating local variables for *dev and *np, the code become
+> much easier to read, in my opinion.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I put this at the end of the series because compared to the
+> rest of the patches it is completely unimportant.
+> ---
+>  drivers/i2c/busses/i2c-gpio.c | 26 ++++++++++++++------------
+>  1 file changed, 14 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
+> index 97b9c29e9429..beb5ce523684 100644
+> --- a/drivers/i2c/busses/i2c-gpio.c
+> +++ b/drivers/i2c/busses/i2c-gpio.c
+
+> @@ -99,15 +101,15 @@ static int i2c_gpio_probe(struct platform_device *pdev)
+>         bit_data = &priv->bit_data;
+>         pdata = &priv->pdata;
+>
+> -       if (pdev->dev.of_node) {
+> -               of_i2c_gpio_get_props(pdev->dev.of_node, pdata);
+> +       if (np) {
+> +               of_i2c_gpio_get_props(np, pdata);
+>         } else {
+>                 /*
+>                  * If all platform data settings are zero it is OK
+>                  * to not provide any platform data from the board.
+>                  */
+> -               if (dev_get_platdata(&pdev->dev))
+> -                       memcpy(pdata, dev_get_platdata(&pdev->dev),
+> +               if (dev_get_platdata(dev))
+> +                       memcpy(pdata, dev_get_platdata(dev),
+>                                sizeof(*pdata));
+
+This fits on one line again (you have to do something to offset the LoC
+increase 14 insertions(+), 12 deletions(-) ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
