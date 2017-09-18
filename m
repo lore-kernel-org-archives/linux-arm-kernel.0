@@ -1,29 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Sep 2017 11:06:32 +0100
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20170904115450.fv5fyvmwlbo5nxra@yury-thinkpad>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
- <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
- <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
- <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
- <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
- <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
- <20170821102124.xcqnzdzhs73gzbcf@yury-thinkpad>
- <20170904115450.fv5fyvmwlbo5nxra@yury-thinkpad>
-Message-ID: <20170918100632.w62dfexqkuehskg6@localhost>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 18 Sep 2017 12:14:09 +0200
+Subject: [PATCH] mtd: oxnas_nand: Fix error handling in oxnas_nand_probe()
+In-Reply-To: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
+References: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
+Message-ID: <20170918121409.03e4b978@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 04, 2017 at 02:54:50PM +0300, Yury Norov wrote:
-> This is 4.13-based and next-20170901-based ilp32 patches. 
-> https://github.com/norov/linux/tree/ilp32-4.13
+Hi Alexey,
 
-Thanks. I'll mirror it on kernel.org sometime this week after doing some
-tests (I've been mostly away for the past two weeks).
+On Sat,  9 Sep 2017 01:00:38 +0300
+Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
 
-Regarding the generic patches in this series, could you please post them
-to linux-arch (without the whole ILP32 series)? It would be good to get
-them merged for 4.15.
+> oxnas_nand_probe() does not disable clock on error paths.
+> The patch adds disabling using devm interface.
+> 
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+> ---
+>  drivers/mtd/nand/oxnas_nand.c | 22 +++++++++++++++-------
+>  1 file changed, 15 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+> index 1b207aac840c..8abc69a285dd 100644
+> --- a/drivers/mtd/nand/oxnas_nand.c
+> +++ b/drivers/mtd/nand/oxnas_nand.c
+> @@ -103,16 +103,26 @@ static int oxnas_nand_probe(struct platform_device *pdev)
+>  	if (IS_ERR(oxnas->io_base))
+>  		return PTR_ERR(oxnas->io_base);
+>  
+> -	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(oxnas->clk))
+> -		oxnas->clk = NULL;
+> -
+>  	/* Only a single chip node is supported */
+>  	count = of_get_child_count(np);
+>  	if (count > 1)
+>  		return -EINVAL;
+>  
+> -	clk_prepare_enable(oxnas->clk);
+> +	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(oxnas->clk)) {
+> +		oxnas->clk = NULL;
+> +	} else {
+> +		err = clk_prepare_enable(oxnas->clk);
+> +		if (err)
+> +			return err;
+> +
+> +		err = devm_add_action_or_reset(&pdev->dev,
+> +				(void(*)(void *))clk_disable_unprepare,
+> +				oxnas->clk);
+> +		if (err)
+> +			return err;
+> +	}
+> +
 
--- 
-Catalin
+Looks like something that should be made available at the CCF level
+either with a devm_clk_get_prepare_enable() or with a
+devm_clk_prepare_enable() helper. Would you care proposing this change
+to the CCF ML?
+
+In the meantime can you provide a simpler fix that just adds the
+missing clk_disable_unprepare() call in the error path?
+
+>  	device_reset_optional(&pdev->dev);
+>  
+>  	for_each_child_of_node(np, nand_np) {
+> @@ -167,8 +177,6 @@ static int oxnas_nand_remove(struct platform_device *pdev)
+>  	if (oxnas->chips[0])
+>  		nand_release(nand_to_mtd(oxnas->chips[0]));
+>  
+> -	clk_disable_unprepare(oxnas->clk);
+> -
+>  	return 0;
+>  }
+>  
