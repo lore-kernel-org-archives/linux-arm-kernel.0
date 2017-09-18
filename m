@@ -1,121 +1,173 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 18 Sep 2017 12:15:24 -0700
-Subject: [PATCH v11 2/2] ASoC: rockchip: Use bus_type to distinguish
- rt5514 dsp from rt5514 codec
-In-Reply-To: <20170918111435.11411-2-jeffy.chen@rock-chips.com>
-References: <20170918111435.11411-1-jeffy.chen@rock-chips.com>
- <20170918111435.11411-2-jeffy.chen@rock-chips.com>
-Message-ID: <20170918191524.GI173745@google.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 18 Sep 2017 14:28:23 -0500
+Subject: [PATCH v3 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170901102646.GQ20634@localhost>
+References: <20170724212454.27574-1-d-gerlach@ti.com>
+ <20170724212454.27574-3-d-gerlach@ti.com> <20170901102646.GQ20634@localhost>
+Message-ID: <0a7ae26c-fdcf-07cd-2abd-232d5e20fc6a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Mon, Sep 18, 2017 at 07:14:35PM +0800 Jeffy Chen ha dit:
-
-> Currently rt5514 dsp and rt5514 codec are sharing the same compatible.
-> Use bus_type to distinguish rt5514 dsp from rt5514 codec.
-
-This is a better solution than the compatible hack, thanks!
-
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
+On 09/01/2017 05:26 AM, Johan Hovold wrote:
+> On Mon, Jul 24, 2017 at 04:24:54PM -0500, Dave Gerlach wrote:
+>> Certain SoCs like Texas Instruments AM335x and AM437x require parts
+>> of the EMIF PM code to run late in the suspend sequence from SRAM,
+>> such as saving and restoring the EMIF context and placing the memory
+>> into self-refresh.
+>>
+>> One requirement for these SoCs to suspend and enter its lowest power
+>> mode, called DeepSleep0, is that the PER power domain must be shut off.
+>> Because the EMIF (DDR Controller) resides within this power domain, it
+>> will lose context during a suspend operation, so we must save it so we
+>> can restore once we resume. However, we cannot execute this code from
+>> external memory, as it is not available at this point, so the code must
+>> be executed late in the suspend path from SRAM.
+>>
+>> This patch introduces a ti-emif-sram driver that includes several
+>> functions written in ARM ASM that are relocatable so the PM SRAM
+>> code can use them. It also allocates a region of writable SRAM to
+>> be used by the code running in the executable region of SRAM to save
+>> and restore the EMIF context. It can export a table containing the
+>> absolute addresses of the available PM functions so that other SRAM
+>> code can branch to them. This code is required for suspend/resume on
+>> AM335x and AM437x to work.
+>>
+>> In addition to this, to be able to share data structures between C and
+>> the ti-emif-sram-pm assembly code, we can automatically generate all of
+>> the C struct member offsets and sizes as macros by making use of the ARM
+>> asm-offsets file. In the same header that we define our data structures
+>> in we also define all the macros in an inline function and by adding a
+>> call to this in the asm_offsets file all macros are properly generated
+>> and available to the assembly code without cluttering up the asm-offsets
+>> file.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>> v2->v3:
+>> * Move all static vars into common struct and instead point to one static
+>>   instance of this struct and pass this struct around for internal calls.
+>> * Rename ti_emif_prepare_push_sram to ti_emif_alloc_sram
+>> * Clean up probe path to avoid leftover vairable values from being used
+>>   after probe defer or failure.
+>> * Fix mistake in ASM code that stored EMIF_POWER_MANAGEMENT_CONTROL into
+>>   location for shadow register.
+>> * Avoid extern definition for asm-offsets definition and use a stub instead
+>>   of defining out in asm-offsets.
+>> * A few general fixups to code.
 > 
-> Changes in v11: None
-> Changes in v10: None
-> Changes in v9: None
+> Just got back from my vacation this week, so sorry about the late reply.
 > 
->  sound/soc/rockchip/rk3399_gru_sound.c | 57 +++++++++++++++++++++++++++--------
->  1 file changed, 45 insertions(+), 12 deletions(-)
+> It indeed looks like you've addressed my comments on v2, but I still
+> have few comments below. Just minor nits.
 > 
-> diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-> index 0513fe480353..f8028f1f3266 100644
-> --- a/sound/soc/rockchip/rk3399_gru_sound.c
-> +++ b/sound/soc/rockchip/rk3399_gru_sound.c
-> @@ -23,6 +23,7 @@
->  #include <linux/of_gpio.h>
->  #include <linux/delay.h>
->  #include <linux/spi/spi.h>
-> +#include <linux/i2c.h>
->  #include <linux/input.h>
->  #include <sound/core.h>
->  #include <sound/jack.h>
-> @@ -329,15 +330,6 @@ enum {
->  	DAILINK_RT5514_DSP,
->  };
->  
-> -static const char * const dailink_compat[] = {
-> -	[DAILINK_CDNDP] = "rockchip,rk3399-cdn-dp",
-> -	[DAILINK_DA7219] = "dlg,da7219",
-> -	[DAILINK_DMIC] = "dmic-codec",
-> -	[DAILINK_MAX98357A] = "maxim,max98357a",
-> -	[DAILINK_RT5514] = "realtek,rt5514-i2c",
-> -	[DAILINK_RT5514_DSP] = "realtek,rt5514-spi",
-> -};
-> -
->  static const struct snd_soc_dai_link rockchip_dais[] = {
->  	[DAILINK_CDNDP] = {
->  		.name = "DP",
-> @@ -391,13 +383,54 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
->  	},
->  };
->  
-> +struct dailink_match_data {
-> +	const char *compatible;
-> +	struct bus_type *bus_type;
-> +};
-> +
-> +static const struct dailink_match_data dailink_match[] = {
-> +	[DAILINK_CDNDP] = {
-> +		.compatible = "rockchip,rk3399-cdn-dp",
-> +	},
-> +	[DAILINK_DA7219] = {
-> +		.compatible = "dlg,da7219",
-> +	},
-> +	[DAILINK_DMIC] = {
-> +		.compatible = "dmic-codec",
-> +	},
-> +	[DAILINK_MAX98357A] = {
-> +		.compatible = "maxim,max98357a",
-> +	},
-> +	[DAILINK_RT5514] = {
-> +		.compatible = "realtek,rt5514",
-> +		.bus_type = &i2c_bus_type,
-> +	},
-> +	[DAILINK_RT5514_DSP] = {
-> +		.compatible = "realtek,rt5514",
-> +		.bus_type = &spi_bus_type,
-> +	},
-> +};
-> +
-> +static int of_dev_node_match(struct device *dev, void *data)
-> +{
-> +	return dev->of_node == data;
-> +}
+>> +	/* Save physical address to calculate resume offset during pm init */
+>> +	emif_data->ti_emif_sram_data_phys =
+>> +		gen_pool_virt_to_phys(emif_data->sram_pool_data,
+> 
+> I try to indent continuation lines at least two tabs further (at least
+> when not matching open parentheses) which tends to improve readability
+> and conforms better to the coding standard.
 
-The same is done in different places, even with the same function name
-(drivers/i2c/i2c-core-of.c, drivers/mux/mux-core.c, ...), which
-suggests that we might want to have this function in <linux/of.h>
+Here I had to pick this to avoid going way over 80 chars on the line.
 
->  static int rockchip_sound_codec_node_match(struct device_node *np_codec)
->  {
->  	int i;
->  
-> -	for (i = 0; i < ARRAY_SIZE(dailink_compat); i++) {
-> -		if (of_device_is_compatible(np_codec, dailink_compat[i]))
-> -			return i;
-> +	for (i = 0; i < ARRAY_SIZE(dailink_match); i++) {
-> +		if (!of_device_is_compatible(np_codec,
-> +					     dailink_match[i].compatible))
-> +			continue;
-> +
-> +		if (dailink_match[i].bus_type
-> +		    && !bus_find_device(dailink_match[i].bus_type,
-> +					NULL, np_codec, of_dev_node_match))
-> +			continue;
-> +
-> +		return i;
->  	}
->  	return -1;
->  }
+> 
+>> +				      emif_data->ti_emif_sram_data_virt);
+> 
+>> +/**
+>> + * ti_emif_copy_pm_function_table - copy mapping of pm funcs in sram
+>> + * @sram_pool: pointer to struct gen_pool where dst resides
+>> + * @dst: void * to address that table should be copied
+>> + *
+>> + * Returns 0 if success other error code if table is not available
+>> + */
+>> +int ti_emif_copy_pm_function_table(struct gen_pool *sram_pool, void *dst)
+>> +{
+>> +	void *copy_addr;
+>> +
+>> +	if (!(emif_instance && emif_instance->ti_emif_sram_virt))
+>> +		return -EINVAL;
+> 
+> Perhaps this can now be simplified as 
+> 
+> 	if (!emif_instance)
+> 		return -EINVAL;
+> 
+> since when the driver has been successfully bound all fields would have
+> been initialised.
+> 
+> Use -ENODEV for consistency?
 
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
+Agreed to all of the above, if emif_instance has been set then that means
+everything else is already populated.
+
+> 
+>> +
+>> +	copy_addr = sram_exec_copy(sram_pool, dst,
+>> +				   &emif_instance->pm_functions,
+>> +				   sizeof(emif_instance->pm_functions));
+>> +	if (!copy_addr)
+>> +		return -ENODEV;
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(ti_emif_copy_pm_function_table);
+>> +
+>> +/**
+>> + * ti_emif_get_mem_type - return type for memory type in use
+>> + *
+>> + * Returns memory type value read from EMIF or error code if fails
+>> + */
+>> +int ti_emif_get_mem_type(void)
+>> +{
+>> +	unsigned long temp;
+>> +
+>> +	if (!(emif_instance &&
+>> +	      !IS_ERR_OR_NULL(emif_instance->pm_data.ti_emif_base_addr_virt)))
+> 
+> And this would also be more readable as simply !emif_instance.
+
+Yes, agreed.
+
+> 
+>> +		return -ENODEV;
+>> +
+>> +	temp = readl(emif_instance->pm_data.ti_emif_base_addr_virt +
+>> +		     EMIF_SDRAM_CONFIG);
+>> +
+>> +	temp = (temp & SDRAM_TYPE_MASK) >> SDRAM_TYPE_SHIFT;
+>> +	return temp;
+>> +}
+>> +EXPORT_SYMBOL_GPL(ti_emif_get_mem_type);
+> 
+>> +static int ti_emif_remove(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +
+>> +	pm_runtime_put_sync(dev);
+>> +	pm_runtime_disable(dev);
+>> +
+>> +	ti_emif_free_sram(emif_instance);
+>> +
+>> +	emif_instance = NULL;
+> 
+> Nothing is of course preventing the remove() callback from racing with
+> the global functions above, but I'd still prefer to reset emif_instance
+> before releasing the memory.
+> 
+> In fact, given the register access in ti_emif_get_mem_type() you may
+> even want to clear emif_instance before the pm_runtime_put_sync().
+
+That's a good point I will move it up, thanks.
+
+Regards,
+Dave
+
+> 
+>> +
+>> +	return 0;
+>> +}
+> 
+> Thanks,
+> Johan
+> 
