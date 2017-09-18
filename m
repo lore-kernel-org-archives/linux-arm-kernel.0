@@ -1,159 +1,300 @@
-From: tomasz.nowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Mon, 18 Sep 2017 12:56:54 +0200
-Subject: [PATCH 1/1] iommu/iova: Make rcache flush optional on IOVA allocation
- failure
-In-Reply-To: <1505732214-9052-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-References: <1505732214-9052-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-Message-ID: <1505732214-9052-2-git-send-email-tomasz.nowicki@caviumnetworks.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 18 Sep 2017 16:36:33 +0530
+Subject: [PATCH 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <87y3pcmgv6.fsf@linux.intel.com>
+References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20170918100944eucas1p2735d3d6a6ee562b927fb9dfaeb0d4090@eucas1p2.samsung.com>
+ <1505729371-6509-1-git-send-email-andrzej.p@samsung.com>
+ <87y3pcmgv6.fsf@linux.intel.com>
+Message-ID: <e1e1b4e5-0678-faaf-e97b-b18095342af2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since IOVA allocation failure is not unusual case we need to flush
-CPUs' rcache in hope we will succeed in next round.
+Hi,
 
-However, it is useful to decide whether we need rcache flush step because
-of two reasons:
-- Not scalability. On large system with ~100 CPUs iterating and flushing
-  rcache for each CPU becomes serious bottleneck so we may want to deffer it.
-- free_cpu_cached_iovas() does not care about max PFN we are interested in.
-  Thus we may flush our rcaches and still get no new IOVA like in the
-  commonly used scenario:
+On Monday 18 September 2017 04:08 PM, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Andrzej Pietrasiewicz <andrzej.p@samsung.com> writes:
+>> From: Vivek Gautam <gautam.vivek@samsung.com>
+>>
+>> Adding phy calibration sequence for USB 3.0 DRD PHY present on
+>> Exynos5420/5800 systems.
+>> This calibration facilitates setting certain PHY parameters viz.
+>> the Loss-of-Signal (LOS) Detector Threshold Level, as well as
+>> Tx-Vboost-Level for Super-Speed operations.
+>> Additionally we also set proper time to wait for RxDetect measurement,
+>> for desired PHY reference clock, so as to solve issue with enumeration
+>> of few USB 3.0 devices, like Samsung SUM-TSB16S 3.0 USB drive
+>> on the controller.
+>>
+>> We are using CR_port for this purpose to send required data
+>> to override the LOS values.
+>>
+>> On testing with USB 3.0 devices on USB 3.0 port present on
+>> SMDK5420, and peach-pit boards should see following message:
+>> usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
+>>
+>> and without this patch, should see below shown message:
+>> usb 1-1: new high-speed USB device number 2 using xhci-hcd
+>>
+>> [Also removed unnecessary extra lines in the register macro definitions]
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> [adapted to use phy_reset as entry point]
+>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+>> ---
+>>  drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
+>>  drivers/usb/dwc3/core.c                  |   8 +-
+>>  2 files changed, 189 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/phy/samsung/phy-exynos5-usbdrd.c b/drivers/phy/samsung/phy-exynos5-usbdrd.c
+>> index 7c41daa..f7de067 100644
+>> --- a/drivers/phy/samsung/phy-exynos5-usbdrd.c
+>> +++ b/drivers/phy/samsung/phy-exynos5-usbdrd.c
+>> @@ -89,7 +89,17 @@
+>>  #define PHYCLKRST_COMMONONN			BIT(0)
+>>  
+>>  #define EXYNOS5_DRD_PHYREG0			0x14
+>> +#define PHYREG0_SSC_REF_CLK_SEL			BIT(21)
+>> +#define PHYREG0_SSC_RANGE			BIT(20)
+>> +#define PHYREG0_CR_WRITE			BIT(19)
+>> +#define PHYREG0_CR_READ				BIT(18)
+>> +#define PHYREG0_CR_DATA_IN(_x)			((_x) << 2)
+>> +#define PHYREG0_CR_CAP_DATA			BIT(1)
+>> +#define PHYREG0_CR_CAP_ADDR			BIT(0)
+>> +
+>>  #define EXYNOS5_DRD_PHYREG1			0x18
+>> +#define PHYREG1_CR_DATA_OUT(_x)			((_x) << 1)
+>> +#define PHYREG1_CR_ACK				BIT(0)
+>>  
+>>  #define EXYNOS5_DRD_PHYPARAM0			0x1c
+>>  
+>> @@ -118,6 +128,25 @@
+>>  #define EXYNOS5_DRD_PHYRESUME			0x34
+>>  #define EXYNOS5_DRD_LINKPORT			0x44
+>>  
+>> +/* USB 3.0 DRD PHY SS Function Control Reg; accessed by CR_PORT */
+>> +#define EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN		(0x15)
+>> +#define LOSLEVEL_OVRD_IN_LOS_BIAS_5420			(0x5 << 13)
+>> +#define LOSLEVEL_OVRD_IN_LOS_BIAS_DEFAULT		(0x0 << 13)
+>> +#define LOSLEVEL_OVRD_IN_EN				(0x1 << 10)
+>> +#define LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT		(0x9 << 0)
+>> +
+>> +#define EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN	(0x12)
+>> +#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420		(0x5 << 13)
+>> +#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_DEFAULT		(0x4 << 13)
+>> +
+>> +#define EXYNOS5_DRD_PHYSS_LANE0_TX_DEBUG		(0x1010)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M		(0x4 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_24M		(0x8 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_25M_26M		(0x8 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M	(0x20 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_62M5		(0x20 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_96M_100M		(0x40 << 4)
+>> +
+>>  #define KHZ	1000
+>>  #define MHZ	(KHZ * KHZ)
+>>  
+>> @@ -526,6 +555,151 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+>>  	return 0;
+>>  }
+>>  
+>> +static int crport_handshake(struct exynos5_usbdrd_phy *phy_drd,
+>> +						u32 val, u32 cmd)
+>> +{
+>> +	u32 usec = 100;
+>> +	unsigned int result;
+>> +
+>> +	writel(val | cmd, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +
+>> +	do {
+>> +		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+>> +		if (result & PHYREG1_CR_ACK)
+>> +			break;
+>> +
+>> +		udelay(1);
+>> +	} while (usec-- > 0);
+>> +
+>> +	if (!usec) {
+>> +		dev_err(phy_drd->dev,
+>> +			"CRPORT handshake timeout1 (0x%08x)\n", val);
+>> +		return -ETIME;
+>> +	}
+>> +
+>> +	usec = 100;
+>> +
+>> +	writel(val, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +
+>> +	do {
+>> +		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+>> +		if (!(result & PHYREG1_CR_ACK))
+>> +			break;
+>> +
+>> +		udelay(1);
+>> +	} while (usec-- > 0);
+>> +
+>> +	if (!usec) {
+>> +		dev_err(phy_drd->dev,
+>> +			"CRPORT handshake timeout2 (0x%08x)\n", val);
+>> +		return -ETIME;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int crport_ctrl_write(struct exynos5_usbdrd_phy *phy_drd,
+>> +						u32 addr, u32 data)
+>> +{
+>> +	int ret;
+>> +
+>> +	/* Write Address */
+>> +	writel(PHYREG0_CR_DATA_IN(addr),
+>> +		phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +	ret = crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(addr),
+>> +				PHYREG0_CR_CAP_ADDR);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/* Write Data */
+>> +	writel(PHYREG0_CR_DATA_IN(data),
+>> +		phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +	ret = crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
+>> +				PHYREG0_CR_CAP_DATA);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
+>> +				PHYREG0_CR_WRITE);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>> + * Calibrate few PHY parameters using CR_PORT register to meet
+>> + * SuperSpeed requirements on Exynos5420 and Exynos5800 systems,
+>> + * which have 28nm USB 3.0 DRD PHY.
+>> + */
+>> +static int exynos5420_usbdrd_phy_calibrate(struct exynos5_usbdrd_phy *phy_drd)
+>> +{
+>> +	unsigned int temp;
+>> +	int ret = 0;
+>> +
+>> +	/*
+>> +	 * Change los_bias to (0x5) for 28nm PHY from a
+>> +	 * default value (0x0); los_level is set as default
+>> +	 * (0x9) as also reflected in los_level[30:26] bits
+>> +	 * of PHYPARAM0 register.
+>> +	 */
+>> +	temp = LOSLEVEL_OVRD_IN_LOS_BIAS_5420 |
+>> +		LOSLEVEL_OVRD_IN_EN |
+>> +		LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT;
+>> +	ret = crport_ctrl_write(phy_drd,
+>> +				EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN,
+>> +				temp);
+>> +	if (ret) {
+>> +		dev_err(phy_drd->dev,
+>> +		 "Failed setting Loss-of-Signal level for SuperSpeed\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	/*
+>> +	 * Set tx_vboost_lvl to (0x5) for 28nm PHY Tuning,
+>> +	 * to raise Tx signal level from its default value of (0x4)
+>> +	 */
+>> +	temp = TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420;
+>> +	ret = crport_ctrl_write(phy_drd,
+>> +				EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN,
+>> +				temp);
+>> +	if (ret) {
+>> +		dev_err(phy_drd->dev,
+>> +		 "Failed setting Tx-Vboost-Level for SuperSpeed\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	/*
+>> +	 * Set proper time to wait for RxDetect measurement, for
+>> +	 * desired reference clock of PHY, by tuning the CR_PORT
+>> +	 * register LANE0.TX_DEBUG which is internal to PHY.
+>> +	 * This fixes issue with few USB 3.0 devices, which are
+>> +	 * not detected (not even generate interrupts on the bus
+>> +	 * on insertion) without this change.
+>> +	 * e.g. Samsung SUM-TSB16S 3.0 USB drive.
+>> +	 */
+>> +	switch (phy_drd->extrefclk) {
+>> +	case EXYNOS5_FSEL_50MHZ:
+>> +		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M;
+>> +		break;
+>> +	case EXYNOS5_FSEL_20MHZ:
+>> +	case EXYNOS5_FSEL_19MHZ2:
+>> +		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M;
+>> +		break;
+>> +	case EXYNOS5_FSEL_24MHZ:
+>> +	default:
+>> +		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_24M;
+>> +		break;
+>> +	}
+>> +
+>> +	ret = crport_ctrl_write(phy_drd,
+>> +				EXYNOS5_DRD_PHYSS_LANE0_TX_DEBUG,
+>> +				temp);
+>> +	if (ret)
+>> +		dev_err(phy_drd->dev,
+>> +		 "Failed setting RxDetect measurement time for SuperSpeed\n");
+>> +
+>> +	return ret;
+>> +}
+>> +
+>>  static struct phy *exynos5_usbdrd_phy_xlate(struct device *dev,
+>>  					struct of_phandle_args *args)
+>>  {
+>> @@ -537,11 +711,20 @@ static struct phy *exynos5_usbdrd_phy_xlate(struct device *dev,
+>>  	return phy_drd->phys[args->args[0]].phy;
+>>  }
+>>  
+>> +static int exynos5_usbdrd_phy_reset(struct phy *phy)
+>> +{
+>> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+>> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+>> +
+>> +	return exynos5420_usbdrd_phy_calibrate(phy_drd);
+>> +}
+>> +
+>>  static const struct phy_ops exynos5_usbdrd_phy_ops = {
+>>  	.init		= exynos5_usbdrd_phy_init,
+>>  	.exit		= exynos5_usbdrd_phy_exit,
+>>  	.power_on	= exynos5_usbdrd_phy_power_on,
+>>  	.power_off	= exynos5_usbdrd_phy_power_off,
+>> +	.reset		= exynos5_usbdrd_phy_reset,
+>>  	.owner		= THIS_MODULE,
+>>  };
+>>  
+>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>> index 03474d3..1d5836e 100644
+>> --- a/drivers/usb/dwc3/core.c
+>> +++ b/drivers/usb/dwc3/core.c
+>> @@ -156,9 +156,10 @@ static void __dwc3_set_mode(struct work_struct *work)
+>>  		} else {
+>>  			if (dwc->usb2_phy)
+>>  				otg_set_vbus(dwc->usb2_phy->otg, true);
+>> -			if (dwc->usb2_generic_phy)
+>> +			if (dwc->usb2_generic_phy) {
+>>  				phy_set_mode(dwc->usb2_generic_phy, PHY_MODE_USB_HOST);
+>> -
+>> +				phy_reset(dwc->usb2_generic_phy);
+> 
+> it doesn't look like this is the best place to reset the phy. Also,
 
-    if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
-        iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
+right, phy_reset is done during initialization before phy_power_on/phy_init or
+in error cases.
 
-    if (!iova)
-        iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
+> ->reset() doesn't seem to match correctly with a calibration. That seems
+> to be more fitting to a ->power_on() or ->init() implementation.
 
-   1. First alloc_iova_fast() call is limited to DMA_BIT_MASK(32) to get
-      PCI devices a SAC address
-   2. alloc_iova() fails due to full 32-bit space
-   3. rcaches contain PFNs out of 32-bit space so free_cpu_cached_iovas()
-      throws entries away for nothing and alloc_iova() fails again
-   4. Next alloc_iova_fast() call cannot take advantage of rcache since we
-      have just defeated caches. In this case we pick the slowest option
-      to proceed.
+yeah, the initial patch seems to calibrate in phy_init(). Not sure why it's
+modified.
 
-This patch reworks flushed_rcache local flag to be additional function
-argument instead and control rcache flush step. Also, it updates all users
-to do the flush as the last chance.
-
-Signed-off-by: Tomasz Nowicki <Tomasz.Nowicki@caviumnetworks.com>
----
- drivers/iommu/amd_iommu.c   | 5 +++--
- drivers/iommu/dma-iommu.c   | 6 ++++--
- drivers/iommu/intel-iommu.c | 5 +++--
- drivers/iommu/iova.c        | 7 +++----
- include/linux/iova.h        | 5 +++--
- 5 files changed, 16 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index 8d2ec60..ce68986 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -1604,10 +1604,11 @@ static unsigned long dma_ops_alloc_iova(struct device *dev,
- 
- 	if (dma_mask > DMA_BIT_MASK(32))
- 		pfn = alloc_iova_fast(&dma_dom->iovad, pages,
--				      IOVA_PFN(DMA_BIT_MASK(32)));
-+				      IOVA_PFN(DMA_BIT_MASK(32)), false);
- 
- 	if (!pfn)
--		pfn = alloc_iova_fast(&dma_dom->iovad, pages, IOVA_PFN(dma_mask));
-+		pfn = alloc_iova_fast(&dma_dom->iovad, pages,
-+				      IOVA_PFN(dma_mask), true);
- 
- 	return (pfn << PAGE_SHIFT);
- }
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 191be9c..25914d3 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -370,10 +370,12 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
- 
- 	/* Try to get PCI devices a SAC address */
- 	if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
--		iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
-+		iova = alloc_iova_fast(iovad, iova_len,
-+				       DMA_BIT_MASK(32) >> shift, false);
- 
- 	if (!iova)
--		iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
-+		iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift,
-+				       true);
- 
- 	return (dma_addr_t)iova << shift;
- }
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 05c0c3a..75c8320 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -3460,11 +3460,12 @@ static unsigned long intel_alloc_iova(struct device *dev,
- 		 * from higher range
- 		 */
- 		iova_pfn = alloc_iova_fast(&domain->iovad, nrpages,
--					   IOVA_PFN(DMA_BIT_MASK(32)));
-+					   IOVA_PFN(DMA_BIT_MASK(32)), false);
- 		if (iova_pfn)
- 			return iova_pfn;
- 	}
--	iova_pfn = alloc_iova_fast(&domain->iovad, nrpages, IOVA_PFN(dma_mask));
-+	iova_pfn = alloc_iova_fast(&domain->iovad, nrpages,
-+				   IOVA_PFN(dma_mask), true);
- 	if (unlikely(!iova_pfn)) {
- 		pr_err("Allocating %ld-page iova for %s failed",
- 		       nrpages, dev_name(dev));
-diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
-index f88acad..1a18b14 100644
---- a/drivers/iommu/iova.c
-+++ b/drivers/iommu/iova.c
-@@ -358,9 +358,8 @@ EXPORT_SYMBOL_GPL(free_iova);
- */
- unsigned long
- alloc_iova_fast(struct iova_domain *iovad, unsigned long size,
--		unsigned long limit_pfn)
-+		unsigned long limit_pfn, bool flush_rcache)
- {
--	bool flushed_rcache = false;
- 	unsigned long iova_pfn;
- 	struct iova *new_iova;
- 
-@@ -373,11 +372,11 @@ alloc_iova_fast(struct iova_domain *iovad, unsigned long size,
- 	if (!new_iova) {
- 		unsigned int cpu;
- 
--		if (flushed_rcache)
-+		if (!flush_rcache)
- 			return 0;
- 
- 		/* Try replenishing IOVAs by flushing rcache. */
--		flushed_rcache = true;
-+		flush_rcache = false;
- 		for_each_online_cpu(cpu)
- 			free_cpu_cached_iovas(cpu, iovad);
- 		goto retry;
-diff --git a/include/linux/iova.h b/include/linux/iova.h
-index 58c2a36..8fdcb66 100644
---- a/include/linux/iova.h
-+++ b/include/linux/iova.h
-@@ -97,7 +97,7 @@ struct iova *alloc_iova(struct iova_domain *iovad, unsigned long size,
- void free_iova_fast(struct iova_domain *iovad, unsigned long pfn,
- 		    unsigned long size);
- unsigned long alloc_iova_fast(struct iova_domain *iovad, unsigned long size,
--			      unsigned long limit_pfn);
-+			      unsigned long limit_pfn, bool flush_rcache);
- struct iova *reserve_iova(struct iova_domain *iovad, unsigned long pfn_lo,
- 	unsigned long pfn_hi);
- void copy_reserved_iova(struct iova_domain *from, struct iova_domain *to);
-@@ -151,7 +151,8 @@ static inline void free_iova_fast(struct iova_domain *iovad,
- 
- static inline unsigned long alloc_iova_fast(struct iova_domain *iovad,
- 					    unsigned long size,
--					    unsigned long limit_pfn)
-+					    unsigned long limit_pfn,
-+					    bool flush_rcache)
- {
- 	return 0;
- }
--- 
-2.7.4
+Thanks
+Kishon
