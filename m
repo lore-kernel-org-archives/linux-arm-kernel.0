@@ -1,133 +1,132 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 18 Sep 2017 16:39:36 -0400
-Subject: [v5 01/12] soc/fsl/qbman: Add common routine for QBMan private
- allocations
+Date: Mon, 18 Sep 2017 16:39:39 -0400
+Subject: [v5 04/12] dt-bindings: soc/fsl: Update reserved memory binding for
+ QBMan
 In-Reply-To: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
 References: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1505767187-4596-2-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1505767187-4596-5-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The QBMan device uses several memory regions to manage frame
-queues and buffers. Add a common routine for extracting and
-initializing these reserved memory areas.
+Updates the QMan and BMan device tree bindings for reserved memory
+nodes. This makes the reserved memory allocation compatible with
+the shared-dma-pool usage.
 
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/Makefile   |  2 +-
- drivers/soc/fsl/qbman/dpaa_sys.c | 78 ++++++++++++++++++++++++++++++++++++++++
- drivers/soc/fsl/qbman/dpaa_sys.h |  4 +++
- 3 files changed, 83 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/fsl/qbman/dpaa_sys.c
+ Documentation/devicetree/bindings/soc/fsl/bman.txt | 12 +++++-----
+ Documentation/devicetree/bindings/soc/fsl/qman.txt | 26 ++++++++++++++++------
+ 2 files changed, 26 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/Makefile b/drivers/soc/fsl/qbman/Makefile
-index 7ae199f..3cbd08a 100644
---- a/drivers/soc/fsl/qbman/Makefile
-+++ b/drivers/soc/fsl/qbman/Makefile
-@@ -1,6 +1,6 @@
- obj-$(CONFIG_FSL_DPAA)                          += bman_ccsr.o qman_ccsr.o \
- 						   bman_portal.o qman_portal.o \
--						   bman.o qman.o
-+						   bman.o qman.o dpaa_sys.o
+diff --git a/Documentation/devicetree/bindings/soc/fsl/bman.txt b/Documentation/devicetree/bindings/soc/fsl/bman.txt
+index 47ac834..48eed14 100644
+--- a/Documentation/devicetree/bindings/soc/fsl/bman.txt
++++ b/Documentation/devicetree/bindings/soc/fsl/bman.txt
+@@ -65,8 +65,8 @@ to the respective BMan instance
+ BMan Private Memory Node
  
- obj-$(CONFIG_FSL_BMAN_TEST)                     += bman-test.o
- bman-test-y                                      = bman_test.o
-diff --git a/drivers/soc/fsl/qbman/dpaa_sys.c b/drivers/soc/fsl/qbman/dpaa_sys.c
-new file mode 100644
-index 0000000..9436aa8
---- /dev/null
-+++ b/drivers/soc/fsl/qbman/dpaa_sys.c
-@@ -0,0 +1,78 @@
-+/* Copyright 2017 NXP Semiconductor, Inc.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *	 notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above copyright
-+ *	 notice, this list of conditions and the following disclaimer in the
-+ *	 documentation and/or other materials provided with the distribution.
-+ *     * Neither the name of NXP Semiconductor nor the
-+ *	 names of its contributors may be used to endorse or promote products
-+ *	 derived from this software without specific prior written permission.
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY NXP Semiconductor ``AS IS'' AND ANY
-+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-+ * DISCLAIMED. IN NO EVENT SHALL NXP Semiconductor BE LIABLE FOR ANY
-+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#include <linux/dma-mapping.h>
-+#include "dpaa_sys.h"
-+
-+/*
-+ * Initialize a devices private memory region
-+ */
-+int qbman_init_private_mem(struct device *dev, int idx, dma_addr_t *addr,
-+				size_t *size)
-+{
-+	int ret;
-+	struct device_node *mem_node;
-+	u64 size64;
-+
-+	ret = of_reserved_mem_device_init_by_idx(dev, dev->of_node, idx);
-+	if (ret) {
-+		dev_err(dev,
-+			"of_reserved_mem_device_init_by_idx(%d) failed 0x%x\n",
-+			idx, ret);
-+		return -ENODEV;
-+	}
-+	mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
-+	if (mem_node) {
-+		ret = of_property_read_u64(mem_node, "size", &size64);
-+		if (ret) {
-+			dev_err(dev, "of_address_to_resource fails 0x%x\n",
-+			        ret);
-+			return -ENODEV;
-+		}
-+		*size = size64;
-+	} else {
-+		dev_err(dev, "No memory-region found for index %d\n", idx);
-+		return -ENODEV;
-+	}
-+
-+	if (!dma_zalloc_coherent(dev, *size, addr, 0)) {
-+		dev_err(dev, "DMA Alloc memory failed\n");
-+		return -ENODEV;
-+	}
-+
-+	/*
-+	 * Disassociate the reserved memory area from the device
-+	 * because a device can only have one DMA memory area. This
-+	 * should be fine since the memory is allocated and initialized
-+	 * and only ever accessed by the QBMan device from now on
-+	 */
-+	of_reserved_mem_device_release(dev);
-+	return 0;
-+}
-diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
-index 2ce394a..676af82 100644
---- a/drivers/soc/fsl/qbman/dpaa_sys.h
-+++ b/drivers/soc/fsl/qbman/dpaa_sys.h
-@@ -102,4 +102,8 @@ static inline u8 dpaa_cyc_diff(u8 ringsize, u8 first, u8 last)
- /* Offset applied to genalloc pools due to zero being an error return */
- #define DPAA_GENALLOC_OFF	0x80000000
+ BMan requires a contiguous range of physical memory used for the backing store
+-for BMan Free Buffer Proxy Records (FBPR). This memory is reserved/allocated as a
+-node under the /reserved-memory node
++for BMan Free Buffer Proxy Records (FBPR). This memory is reserved/allocated as
++a node under the /reserved-memory node.
  
-+/* Initialize the devices private memory region */
-+int qbman_init_private_mem(struct device *dev, int idx, dma_addr_t *addr,
-+				size_t *size);
+ The BMan FBPR memory node must be named "bman-fbpr"
+ 
+@@ -75,7 +75,9 @@ PROPERTIES
+ - compatible
+ 	Usage:		required
+ 	Value type:	<stringlist>
+-	Definition:	Must inclide "fsl,bman-fbpr"
++	Definition:	PPC platforms: Must include "fsl,bman-fbpr"
++			ARM platforms: Must include "shared-dma-pool"
++				       as well as the "no-map" property
+ 
+ The following constraints are relevant to the FBPR private memory:
+ 	- The size must be 2^(size + 1), with size = 11..33. That is 4 KiB to
+@@ -100,10 +102,10 @@ The example below shows a BMan FBPR dynamic allocation memory node
+ 		ranges;
+ 
+ 		bman_fbpr: bman-fbpr {
+-			compatible = "fsl,bman-fbpr";
+-			alloc-ranges = <0 0 0x10 0>;
++			compatible = "shared-mem-pool";
+ 			size = <0 0x1000000>;
+ 			alignment = <0 0x1000000>;
++			no-map;
+ 		};
+ 	};
+ 
+diff --git a/Documentation/devicetree/bindings/soc/fsl/qman.txt b/Documentation/devicetree/bindings/soc/fsl/qman.txt
+index 556ebb8..ee96afd 100644
+--- a/Documentation/devicetree/bindings/soc/fsl/qman.txt
++++ b/Documentation/devicetree/bindings/soc/fsl/qman.txt
+@@ -60,6 +60,12 @@ are located at offsets 0xbf8 and 0xbfc
+ 	Value type:	<prop-encoded-array>
+ 	Definition:	Reference input clock. Its frequency is half of the
+ 			platform clock
++- memory-regions
++	Usage:		Required for ARM
++	Value type:	<phandle array>
++	Definition:	List of phandles referencing the QMan private memory
++			nodes (described below). The qman-fqd node must be
++			first followed by qman-pfdr node. Only used on ARM
+ 
+ Devices connected to a QMan instance via Direct Connect Portals (DCP) must link
+ to the respective QMan instance
+@@ -74,7 +80,9 @@ QMan Private Memory Nodes
+ 
+ QMan requires two contiguous range of physical memory used for the backing store
+ for QMan Frame Queue Descriptor (FQD) and Packed Frame Descriptor Record (PFDR).
+-This memory is reserved/allocated as a nodes under the /reserved-memory node
++This memory is reserved/allocated as a node under the /reserved-memory node.
 +
- #endif	/* __DPAA_SYS_H */
++For additional details about reserved memory regions see reserved-memory.txt
+ 
+ The QMan FQD memory node must be named "qman-fqd"
+ 
+@@ -83,7 +91,9 @@ PROPERTIES
+ - compatible
+ 	Usage:		required
+ 	Value type:	<stringlist>
+-	Definition:	Must inclide "fsl,qman-fqd"
++	Definition:	PPC platforms: Must include "fsl,qman-fqd"
++			ARM platforms: Must include "shared-dma-pool"
++				       as well as the "no-map" property
+ 
+ The QMan PFDR memory node must be named "qman-pfdr"
+ 
+@@ -92,7 +102,9 @@ PROPERTIES
+ - compatible
+ 	Usage:		required
+ 	Value type:	<stringlist>
+-	Definition:	Must inclide "fsl,qman-pfdr"
++	Definition:	PPC platforms: Must include "fsl,qman-pfdr"
++			ARM platforms: Must include "shared-dma-pool"
++				       as well as the "no-map" property
+ 
+ The following constraints are relevant to the FQD and PFDR private memory:
+ 	- The size must be 2^(size + 1), with size = 11..29. That is 4 KiB to
+@@ -117,16 +129,16 @@ The example below shows a QMan FQD and a PFDR dynamic allocation memory nodes
+ 		ranges;
+ 
+ 		qman_fqd: qman-fqd {
+-			compatible = "fsl,qman-fqd";
+-			alloc-ranges = <0 0 0x10 0>;
++			compatible = "shared-dma-pool";
+ 			size = <0 0x400000>;
+ 			alignment = <0 0x400000>;
++			no-map;
+ 		};
+ 		qman_pfdr: qman-pfdr {
+-			compatible = "fsl,qman-pfdr";
+-			alloc-ranges = <0 0 0x10 0>;
++			compatible = "shared-dma-pool";
+ 			size = <0 0x2000000>;
+ 			alignment = <0 0x2000000>;
++			no-map;
+ 		};
+ 	};
+ 
 -- 
 2.7.4
