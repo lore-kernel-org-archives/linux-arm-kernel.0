@@ -1,54 +1,26 @@
-From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Tue, 19 Sep 2017 17:26:57 +0800
-Subject: [PATCH 4/5] arm64: dts: ls1012a: Add PCIe controller DT node
-In-Reply-To: <20170919092658.22482-1-Zhiqiang.Hou@nxp.com>
-References: <20170919092658.22482-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20170919092658.22482-5-Zhiqiang.Hou@nxp.com>
+From: dcb314@hotmail.com (David Binderman)
+Date: Mon, 18 Sep 2017 16:37:27 +0000
+Subject: linux-4.14-rc1/drivers/clk/clk-stm32h7.c: 2 * possible typo ?
+Message-ID: <HE1PR0802MB2331E50765AE7D68D32A85759C630@HE1PR0802MB2331.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Hello there,
 
-Add PCIe controller node for ls1012a platform.
+1.
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+linux-4.14-rc1/drivers/clk/clk-stm32h7.c:387]: (style) Same expression on both sides of '&&'.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index a7698ac7264b..140570d45ff3 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -478,5 +478,29 @@
- 			msi-controller;
- 			interrupts = <0 126 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		pcie at 3400000 {
-+			compatible = "fsl,ls1012a-pcie", "snps,dw-pcie";
-+			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
-+			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
-+			reg-names = "regs", "config";
-+			interrupts = <0 118 0x4>, /* controller interrupt */
-+				     <0 117 0x4>; /* PME interrupt */
-+			interrupt-names = "aer", "pme";
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			device_type = "pci";
-+			num-lanes = <4>;
-+			bus-range = <0x0 0xff>;
-+			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-+				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
-+			msi-parent = <&msi>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 7>;
-+			interrupt-map = <0000 0 0 1 &gic 0 110 IRQ_TYPE_LEVEL_HIGH>,
-+					<0000 0 0 2 &gic 0 111 IRQ_TYPE_LEVEL_HIGH>,
-+					<0000 0 0 3 &gic 0 112 IRQ_TYPE_LEVEL_HIGH>,
-+					<0000 0 0 4 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
-+		};
- 	};
- };
--- 
-2.14.1
+Source code is
+
+    if (gcfg->mux && gcfg->mux) {
+
+2.
+
+[linux-4.14-rc1/drivers/clk/clk-stm32h7.c:413]: (style) Same expression on both sides of '&&'.
+
+Duplicate.
+
+Regards
+
+David Binderman
