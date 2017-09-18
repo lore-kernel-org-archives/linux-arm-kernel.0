@@ -1,61 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 18 Sep 2017 12:00:51 +0200
-Subject: [PATCH v2 5/9] mtd: nand: atmel: Report PMECC failures as errors
-In-Reply-To: <20170915140411.31716-6-romain.izard.pro@gmail.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-6-romain.izard.pro@gmail.com>
-Message-ID: <20170918120051.298bdabf@bbrezillon>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Mon, 18 Sep 2017 12:02:12 +0200
+Subject: [PATCH 0/2] dwc3 on XU3 and XU4
+References: <CGME20170918100229eucas1p24733d7108dfbcf16a59476c1efd7d56a@eucas1p2.samsung.com>
+Message-ID: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+Hi all,
 
-On Fri, 15 Sep 2017 16:04:07 +0200
-Romain Izard <romain.izard.pro@gmail.com> wrote:
+this short series addresses two issues.
 
-> It is not normal for the PMECC to fail when trying to fix ECC errors.
-> Report these cases as errors.
+The first issue is devices not enumerating when connected to an Odroid XU4,
+to its 3.0 root hub. The interplay between refactoring certain parts of
+dwc3's code and handling the SUSPHY quirk results in the said problem.
+Please see: https://patchwork.kernel.org/patch/9535235/
+Actually using the quirk solves it.
 
-I'm not sure we want to have ECC error messages at this level. ECC
-errors are rather unusual but not impossible, and sometimes it's even
-not a real error (I'm thinking of bitflips in erased pages for
-example, which are not necessarily detected/fixed in hardware).
+The second issue is devices not enumerating and/or wrongly enumerating
+as high speed instead of super speed on an Odroid XU3. There was a patch
+series from Vivek Gautam in circulation, but it got lost somehow.
+Please see:
 
-If we decide to print error messages when unfixable bitflips are
-detected, it should be done in the nand-controller driver (somewhere
-along those lines [1]).
+https://lkml.org/lkml/2014/9/2/166
+https://lkml.org/lkml/2015/2/2/257
 
-Regards,
+I adapted his patch so that it does not use a hacky solution to force
+additional initialization in order for calibration to happen.
+Instead I used the .reset() in phy_ops. I could have used the .set_mode(),
+but the calibration must happen only after dwc3_host_init() but
+phy_set_mode() is called either after of before it. With this patch
+enumeration happens correctly and a super speed device is recognized as such.
 
-Boris
+Rebased onto v4.13. It also applies cleanly to Felipe's testing/next.
 
-[1]http://elixir.free-electrons.com/linux/latest/source/drivers/mtd/nand/atmel/nand-controller.c#L827
+Andrzej Pietrasiewicz (1):
+  ARM: dts: exynos: Add dwc3 SUSPHY quirk
 
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
->  drivers/mtd/nand/atmel/pmecc.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
-> index 8d1208f38025..2a23f1ff945f 100644
-> --- a/drivers/mtd/nand/atmel/pmecc.c
-> +++ b/drivers/mtd/nand/atmel/pmecc.c
-> @@ -687,6 +687,8 @@ static int atmel_pmecc_err_location(struct atmel_pmecc_user *user)
->  	 * Number of roots does not match the degree of smu
->  	 * unable to correct error.
->  	 */
-> +	dev_err(pmecc->dev,
-> +		"PMECC: Impossible to calculate error location.\n");
->  	return -EBADMSG;
->  }
->  
-> @@ -729,7 +731,7 @@ int atmel_pmecc_correct_sector(struct atmel_pmecc_user *user, int sector,
->  			ptr = ecc + byte - sectorsize;
->  			area = "ECC";
->  		} else {
-> -			dev_dbg(pmecc->dev,
-> +			dev_err(pmecc->dev,
->  				"Invalid errpos value (%d, max is %d)\n",
->  				errpos, (sectorsize + eccbytes) * 8);
->  			return -EINVAL;
+Vivek Gautam (1):
+  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
+
+ arch/arm/boot/dts/exynos54xx.dtsi        |   2 +
+ drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
+ drivers/usb/dwc3/core.c                  |   8 +-
+ 3 files changed, 191 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
