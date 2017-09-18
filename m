@@ -1,110 +1,156 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 18 Sep 2017 18:48:57 +0000
-Subject: [v4 07/11] soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
-References: <1503607075-28970-1-git-send-email-roy.pledge@nxp.com>
- <1503607075-28970-8-git-send-email-roy.pledge@nxp.com>
- <20170914140014.taz7qwphfqm66kw7@localhost>
- <DB6PR04MB29990A7A076761DDACCC1904866F0@DB6PR04MB2999.eurprd04.prod.outlook.com>
- <20170915214902.5argyl7d7bz4wykf@localhost>
-Message-ID: <DB6PR04MB29996429111F806DADFEA28386630@DB6PR04MB2999.eurprd04.prod.outlook.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 18 Sep 2017 13:54:26 -0500
+Subject: [PATCH 4/6] Topology: Add cluster on die macros and arm64 decoding
+In-Reply-To: <e95a0b2a-9dd0-654a-20fe-cad1cf0eed94@huawei.com>
+References: <20170914184918.20406-1-jeremy.linton@arm.com>
+ <20170914184918.20406-5-jeremy.linton@arm.com>
+ <e95a0b2a-9dd0-654a-20fe-cad1cf0eed94@huawei.com>
+Message-ID: <8e145e4b-e1d2-cb15-2cf9-cace5fed524f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/15/2017 5:49 PM, Catalin Marinas wrote:
-> On Thu, Sep 14, 2017 at 07:07:50PM +0000, Roy Pledge wrote:
->> On 9/14/2017 10:00 AM, Catalin Marinas wrote:
->>> On Thu, Aug 24, 2017 at 04:37:51PM -0400, Roy Pledge wrote:
->>>> @@ -123,23 +122,34 @@ static int bman_portal_probe(struct platform_device *pdev)
->>>>    	}
->>>>    	pcfg->irq = irq;
->>>>    
->>>> -	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
->>>> -	if (!va) {
->>>> -		dev_err(dev, "ioremap::CE failed\n");
->>>> +	/*
->>>> +	 * TODO: Ultimately we would like to use a cacheable/non-shareable
->>>> +	 * (coherent) mapping for the portal on both architectures but that
->>>> +	 * isn't currently available in the kernel.  Because of HW differences
->>>> +	 * PPC needs to be mapped cacheable while ARM SoCs will work with non
->>>> +	 * cacheable mappings
->>>> +	 */
->>>
->>> This comment mentions "cacheable/non-shareable (coherent)". Was this
->>> meant for ARM platforms? Because non-shareable is not coherent, nor is
->>> this combination guaranteed to work with different CPUs and
->>> interconnects.
->>
->> My wording is poor I should have been clearer that non-shareable ==
->> non-coherent.  I will fix this.
->>
->> We do understand that cacheable/non shareable isn't supported on all
->> CPU/interconnect combinations but we have verified with ARM that for the
->> CPU/interconnects we have integrated QBMan on our use is OK. The note is
->> here to try to explain why the mapping is different right now. Once we
->> get the basic QBMan support integrated for ARM we do plan to try to have
->> patches integrated that enable the cacheable mapping as it gives a
->> significant performance boost.
-> 
-> I will definitely not ack those patches (at least not in the form I've
-> seen, assuming certain eviction order of the bytes in a cacheline). The
-> reason is that it is incredibly fragile, highly dependent on the CPU
-> microarchitecture and interconnects. Assuming that you ever only have a
-> single SoC with this device, you may get away with #ifdefs in the
-> driver. But if you support two or more SoCs with different behaviours,
-> you'd have to make run-time decisions in the driver or run-time code
-> patching. We are very keen on single kernel binary image/drivers and
-> architecturally compliant code (the cacheable mapping hacks are well
-> outside the architecture behaviour).
-> 
+Hi,
 
-Let's put this particular point on hold for now, I would like to focus 
-on getting the basic functions merged in ASAP. I removed the comment in 
-question (it sort of happened naturally when I applied your other 
-comments) in the next revision of the patchset.  I have submitted the 
-patches to our automated test system for sanity checking and I will sent 
-a new patchset once I get the results.
 
-Thanks again for your comments - they have been very useful and have 
-improved the quality of the code for sure.
-
->>>> diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
->>>> index 81a9a5e..0a1d573 100644
->>>> --- a/drivers/soc/fsl/qbman/dpaa_sys.h
->>>> +++ b/drivers/soc/fsl/qbman/dpaa_sys.h
->>>> @@ -51,12 +51,12 @@
->>>>    
->>>>    static inline void dpaa_flush(void *p)
->>>>    {
->>>> +	/*
->>>> +	 * Only PPC needs to flush the cache currently - on ARM the mapping
->>>> +	 * is non cacheable
->>>> +	 */
->>>>    #ifdef CONFIG_PPC
->>>>    	flush_dcache_range((unsigned long)p, (unsigned long)p+64);
->>>> -#elif defined(CONFIG_ARM)
->>>> -	__cpuc_flush_dcache_area(p, 64);
->>>> -#elif defined(CONFIG_ARM64)
->>>> -	__flush_dcache_area(p, 64);
->>>>    #endif
->>>>    }
->>>
->>> Dropping the private API cache maintenance is fine and the memory is WC
->>> now for ARM (mapping to Normal NonCacheable). However, do you require
->>> any barriers here? Normal NC doesn't guarantee any ordering.
->>
->> The barrier is done in the code where the command is formed. We follow
->> this pattern
->> a) Zero the command cache line (the device never reacts to a 0 command
->> verb so a cast out of this will have no effect)
->> b) Fill in everything in the command except the command verb (byte 0)
->> c) Execute a memory barrier
->> d) Set the command verb (byte 0)
->> e) Flush the command
->> If a castout happens between d) and e) doesn't matter since it was about
->> to be flushed anyway .  Any castout before d) will not cause HW to
->> process the command because verb is still 0. The barrier at c) prevents
->> reordering so the HW cannot see the verb set before the command is formed.
+On 09/17/2017 08:50 PM, Xiongfeng Wang wrote:
+> Hi Jeremy,
 > 
-> I think that's fine, the dpaa_flush() can be a no-op with non-cacheable
-> memory (I had forgotten the details).
+> On 2017/9/15 2:49, Jeremy Linton wrote:
+>> Many modern machines have cluster on die (COD) non-uniformity
+>> as well as the traditional multi-socket architectures. Reusing
+>> the multi-socket or NUMA on die concepts for these (as arm64 does)
+>> breaks down when presented with actual multi-socket/COD machines.
+>> Similar, problems are also visible on some x86 machines so it
+>> seems appropriate to start abstracting and making these topologies
+>> visible.
+>>
+>> To start, a topology_cod_id() macro is added which defaults to returning
+>> the same information as topology_physical_package_id(). Moving forward
+>> we can start to spit out the differences.
+>>
+>> For arm64, an additional package_id is added to the cpu_topology array.
+>> Initially this will be equal to the cluster_id as well.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   arch/arm64/include/asm/topology.h | 4 +++-
+>>   arch/arm64/kernel/topology.c      | 8 ++++++--
+>>   include/linux/topology.h          | 3 +++
+>>   3 files changed, 12 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+>> index 8b57339823e9..bd7517960d39 100644
+>> --- a/arch/arm64/include/asm/topology.h
+>> +++ b/arch/arm64/include/asm/topology.h
+>> @@ -7,13 +7,15 @@ struct cpu_topology {
+>>   	int thread_id;
+>>   	int core_id;
+>>   	int cluster_id;
+>> +	int package_id;
+>>   	cpumask_t thread_sibling;
+>>   	cpumask_t core_sibling;
+>>   };
+> 
+> 'core_sibling' will be updated by 'update_siblings_masks()' to represent cores in a cluster;
+> Can we add a cpumask_t field to represent cores in a package? So that 'lstopo' can use this
+> cpumask_t to display the right information.
+
+So, the change below modifies update_siblings_mask() to utilize the 
+package_id. Per the ABI the ..cpuX/topology/physical_package_id is 
+shared between the core_siblings/core_siblings_list. What 
+physical_package_id means can vary per architecture, but the siblings 
+list needs to be the cores with the same phyiscal_package (AFAIK, feel 
+free to correct my understanding). That rule should be enforced by this 
+patch set.
+
+I suspect if your running these patches, and the lstopo output looks 
+strange its because your on a machine where the thread_id has been 
+assigned the cluster_id in the later patch set.
+
+
+> 
+> Thanks,
+> Xiongfeng Wang
+> 
+>>   
+>>   extern struct cpu_topology cpu_topology[NR_CPUS];
+>>   
+>> -#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
+>> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].package_id)
+>> +#define topology_cod_id(cpu)		(cpu_topology[cpu].cluster_id)
+>>   #define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+>>   #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
+>>   #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 8d48b233e6ce..9147e5b6326d 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -67,6 +67,8 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>>   			leaf = false;
+>>   			cpu = get_cpu_for_node(t);
+>>   			if (cpu >= 0) {
+>> +				/* maintain DT cluster == package behavior */
+>> +				cpu_topology[cpu].package_id = cluster_id;
+>>   				cpu_topology[cpu].cluster_id = cluster_id;
+>>   				cpu_topology[cpu].core_id = core_id;
+>>   				cpu_topology[cpu].thread_id = i;
+>> @@ -88,7 +90,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>>   			       core);
+>>   			return -EINVAL;
+>>   		}
+>> -
+>> +		cpu_topology[cpu].package_id = cluster_id;
+>>   		cpu_topology[cpu].cluster_id = cluster_id;
+>>   		cpu_topology[cpu].core_id = core_id;
+>>   	} else if (leaf) {
+>> @@ -228,7 +230,7 @@ static void update_siblings_masks(unsigned int cpuid)
+>>   	for_each_possible_cpu(cpu) {
+>>   		cpu_topo = &cpu_topology[cpu];
+>>   
+>> -		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
+>> +		if (cpuid_topo->package_id != cpu_topo->package_id)
+
+(note here that core_siblings now reflect the package_id rather than the 
+cluster_id. This only matters if cluster_id!=package_id).
+
+>>   			continue;
+>>   
+>>   		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+>> @@ -273,6 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
+>>   					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
+>>   					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+>>   	}
+>> +	cpuid_topo->package_id = cpuid_topo->cluster_id;
+>>   
+>>   	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
+>>   		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
+>> @@ -292,6 +295,7 @@ static void __init reset_cpu_topology(void)
+>>   		cpu_topo->thread_id = -1;
+>>   		cpu_topo->core_id = 0;
+>>   		cpu_topo->cluster_id = -1;
+>> +		cpu_topo->package_id = -1;
+>>   
+>>   		cpumask_clear(&cpu_topo->core_sibling);
+>>   		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+>> diff --git a/include/linux/topology.h b/include/linux/topology.h
+>> index cb0775e1ee4b..4660749a7303 100644
+>> --- a/include/linux/topology.h
+>> +++ b/include/linux/topology.h
+>> @@ -184,6 +184,9 @@ static inline int cpu_to_mem(int cpu)
+>>   #ifndef topology_physical_package_id
+>>   #define topology_physical_package_id(cpu)	((void)(cpu), -1)
+>>   #endif
+>> +#ifndef topology_cod_id				/* cluster on die */
+>> +#define topology_cod_id(cpu)			topology_physical_package_id(cpu)
+>> +#endif
+>>   #ifndef topology_core_id
+>>   #define topology_core_id(cpu)			((void)(cpu), 0)
+>>   #endif
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
