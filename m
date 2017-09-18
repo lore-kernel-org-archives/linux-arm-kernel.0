@@ -1,86 +1,74 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Mon, 18 Sep 2017 21:49:25 +0800
-Subject: consult a question about 'inject_abt64()'
-In-Reply-To: <D8D110F4-5AC4-4AEF-817B-038F506B8D7D@arm.com>
-References: <a9ec4c60-a1b1-9535-89a2-30db4facaf1f@huawei.com>
- <D8D110F4-5AC4-4AEF-817B-038F506B8D7D@arm.com>
-Message-ID: <1f06664f-c60d-5551-70e7-13219210ef97@huawei.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 18 Sep 2017 15:52:17 +0200
+Subject: [PATCH 5/9] arm64: dts: marvell: mcbin: add comphy references to
+ Ethernet ports
+In-Reply-To: <20170918130437.GA12118@lunn.ch>
+References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
+ <20170918075814.27405-6-antoine.tenart@free-electrons.com>
+ <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
+ <20170918130437.GA12118@lunn.ch>
+Message-ID: <20170918135217.GE20017@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To KVM mailing List about below question, thanks.
+Hi Andrew,
 
+On Mon, Sep 18, 2017 at 03:04:37PM +0200, Andrew Lunn wrote:
+> On Mon, Sep 18, 2017 at 11:50:12AM +0300, Baruch Siach wrote:
+> > On Mon, Sep 18, 2017 at 09:58:10AM +0200, Antoine Tenart wrote:
+> > > This patch adds comphy phandles to the Ethernet ports in the mcbin
+> > > device tree. The comphy is used to configure the serdes PHYs used by
+> > > these ports.
+> > > 
+> > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > > ---
+> > >  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> > > index acf5c7d16d79..9a3b4a1fd445 100644
+> > > --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> > > +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> > > @@ -223,6 +223,7 @@
+> > >  &cpm_eth0 {
+> > >  	status = "okay";
+> > >  	phy = <&phy0>;
+> > > +	phys = <&cpm_comphy4 0>;
+> > >  	phy-mode = "10gbase-kr";
+> > 
+> > Since the 'phys' generic PHY property is unrelated to the 'phy*' Ethernet PHY 
+> > properties that surround it, its location might be confusing. I think it 
+> > should appear below those two other properties like you did below ...
+> 
+> Yes, i agree. It is confusing enough as it is, so we should not make
+> it worse.
+> 
+> I even wonder if it is worth doing some renaming?
+> 
+>   	phy = <&ethernet_phy0>;
+>   	phy-mode = "10gbase-kr";
+>  	phys = <&cpm_generic_comphy4 0>;
 
+We could also add an extra comment without renaming the comphy node, something
+like:
 
-On 2017/9/18 21:17, Matt Evans wrote:
-> Hi Gengdongjiu,
-> 
-> 
->> On 18 Sep 2017, at 07:39, gengdongjiu <gengdongjiu@huawei.com> wrote:
->>
->> Hi Matt,
->>   sorry to disturb you, I want to consult you a question about the function inject_abt64();
->> For this function, the abort EC can be ESR_ELx_EC_DABT_LOW or ESR_ELx_EC_DABT_CUR according to *vcpu_cpsr(vcpu);
->> why it always ESR_ELx_EC_DABT_LOW?  thanks!
->>
->> As you can see the Iabort, when injecting the Iabort, it will check the cpsr to decide to inject the ESR_ELx_EC_IABT_LOW or ESR_ELx_EC_IABT_CUR.
->> but I do not know why the Dabort will always be ESR_ELx_EC_DABT_LOW when injecting.
->>
->>        /*
->>         * Here, the guest runs in AArch64 mode when in EL1. If we get
->>         * an AArch32 fault, it means we managed to trap an EL0 fault.
->>         */
->>        if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
->>                esr |= (ESR_ELx_EC_IABT_LOW << ESR_ELx_EC_SHIFT);
->>        else
->>                esr |= (ESR_ELx_EC_IABT_CUR << ESR_ELx_EC_SHIFT);
-> 
-> I think you're right.  When I fixed that line I had noticed the lack of left-shift but didn't think about the actual ESR value.
-> 
-> The injected vector is calculated correctly (between current-EL or lower-EL vectors) by get_except_vector() but the EC should also correspond to current-EL or lower-EL.
-> 
-> It is worth following this up on the ARM KVM mailing list!  (To be fair, your question should have been sent there too :) )
-> 
-> Thanks,
-> 
-> 
-> Matt
-> 
-> 
-> 
->>
->>
->>
->> commit e4fe9e7dc3828bf6a5714eb3c55aef6260d823a2
->> Author: Matt Evans <matt.evans@arm.com>
->> Date:   Mon May 16 13:54:56 2016 +0100
->>
->>    kvm: arm64: Fix EC field in inject_abt64
->>
->>    The EC field of the constructed ESR is conditionally modified by ORing in
->>    ESR_ELx_EC_DABT_LOW for a data abort.  However, ESR_ELx_EC_SHIFT is missing
->>    from this condition.
->>
->>    Signed-off-by: Matt Evans <matt.evans@arm.com>
->>    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>    Cc: <stable@vger.kernel.org>
->>    Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>
->> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
->> index 4d1ac81870d2..e9e0e6db73f6 100644
->> --- a/arch/arm64/kvm/inject_fault.c
->> +++ b/arch/arm64/kvm/inject_fault.c
->> @@ -162,7 +162,7 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
->>                esr |= (ESR_ELx_EC_IABT_CUR << ESR_ELx_EC_SHIFT);
->>
->>        if (!is_iabt)
->> -               esr |= ESR_ELx_EC_DABT_LOW;
->> +               esr |= ESR_ELx_EC_DABT_LOW << ESR_ELx_EC_SHIFT;
->>
->>        vcpu_sys_reg(vcpu, ESR_EL1) = esr | ESR_ELx_FSC_EXTABT;
->> }
->>
-> 
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
-> 
-> 
+	/* Network PHY */
+	phy = <&ethernet_phy0>;
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cpm_comphy4 0>;
+
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/0161fae3/attachment.sig>
