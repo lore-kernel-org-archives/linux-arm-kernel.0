@@ -1,132 +1,37 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Mon, 18 Sep 2017 10:35:30 +0300
-Subject: [PATCH v4 3/3] media: ov7670: Add the s_power operation
-In-Reply-To: <20170918064514.6841-4-wenyou.yang@microchip.com>
-References: <20170918064514.6841-1-wenyou.yang@microchip.com>
- <20170918064514.6841-4-wenyou.yang@microchip.com>
-Message-ID: <20170918073529.wssxfbgfwgd2jzpl@valkosipuli.retiisi.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Sep 2017 09:36:01 +0200
+Subject: [PATCH v4 3/6] iio: adc: sun4i-gpadc-iio: rework code for
+ supporting newer THS variants
+In-Reply-To: <20170914145251.21784-4-icenowy@aosc.io>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-4-icenowy@aosc.io>
+Message-ID: <20170918073601.oiqshnhhl7yb6fv2@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
-
-Thanks for the update.
-
-The driver exposes controls that are accessible through the sub-device node
-even if the device hasn't been powered on.
-
-Many ISP and bridge drivers will also power the sensor down once the last
-user of the user space device nodes disappears. You could keep the device
-powered at all times or change the behaviour so that controls can be
-accessed when the power is off.
-
-The best option would be to convert the driver to use runtime PM. An
-example of this can be found in drivers/media/i2c/ov13858.c .
-
-On Mon, Sep 18, 2017 at 02:45:14PM +0800, Wenyou Yang wrote:
-> Add the s_power operation which is responsible for manipulating the
-> power dowm mode through the PWDN pin and the reset operation through
-> the RESET pin.
+On Thu, Sep 14, 2017 at 10:52:48PM +0800, Icenowy Zheng wrote:
+> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
+> inputs (bus clock and sampling clock) and a reset. The registers are
+> also re-arranged.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
-> ---
+> This commit reworks the code, adds the process of the clocks and
+> resets, and allows the sampling start/end code and the position of value
+> readout register to be altered.
 > 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2:
->  - Add the patch to support the get_fmt ops.
->  - Remove the redundant invoking ov7670_init_gpio().
-> 
->  drivers/media/i2c/ov7670.c | 32 +++++++++++++++++++++++++++-----
->  1 file changed, 27 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
-> index 456f48057605..304abc769a67 100644
-> --- a/drivers/media/i2c/ov7670.c
-> +++ b/drivers/media/i2c/ov7670.c
-> @@ -1542,6 +1542,22 @@ static int ov7670_s_register(struct v4l2_subdev *sd, const struct v4l2_dbg_regis
->  }
->  #endif
->  
-> +static int ov7670_s_power(struct v4l2_subdev *sd, int on)
-> +{
-> +	struct ov7670_info *info = to_state(sd);
-> +
-> +	if (info->pwdn_gpio)
-> +		gpiod_direction_output(info->pwdn_gpio, !on);
-> +	if (on && info->resetb_gpio) {
-> +		gpiod_set_value(info->resetb_gpio, 1);
-> +		usleep_range(500, 1000);
-> +		gpiod_set_value(info->resetb_gpio, 0);
-> +		usleep_range(3000, 5000);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static void ov7670_get_default_format(struct v4l2_subdev *sd,
->  				      struct v4l2_mbus_framefmt *format)
->  {
-> @@ -1575,6 +1591,7 @@ static const struct v4l2_subdev_core_ops ov7670_core_ops = {
->  	.g_register = ov7670_g_register,
->  	.s_register = ov7670_s_register,
->  #endif
-> +	.s_power = ov7670_s_power,
->  };
->  
->  static const struct v4l2_subdev_video_ops ov7670_video_ops = {
-> @@ -1692,23 +1709,25 @@ static int ov7670_probe(struct i2c_client *client,
->  	if (ret)
->  		return ret;
->  
-> -	ret = ov7670_init_gpio(client, info);
-> -	if (ret)
-> -		goto clk_disable;
-> -
->  	info->clock_speed = clk_get_rate(info->clk) / 1000000;
->  	if (info->clock_speed < 10 || info->clock_speed > 48) {
->  		ret = -EINVAL;
->  		goto clk_disable;
->  	}
->  
-> +	ret = ov7670_init_gpio(client, info);
-> +	if (ret)
-> +		goto clk_disable;
-> +
-> +	ov7670_s_power(sd, 1);
-> +
->  	/* Make sure it's an ov7670 */
->  	ret = ov7670_detect(sd);
->  	if (ret) {
->  		v4l_dbg(1, debug, client,
->  			"chip found @ 0x%x (%s) is not an ov7670 chip.\n",
->  			client->addr << 1, client->adapter->name);
-> -		goto clk_disable;
-> +		goto power_off;
->  	}
->  	v4l_info(client, "chip found @ 0x%02x (%s)\n",
->  			client->addr << 1, client->adapter->name);
-> @@ -1787,6 +1806,8 @@ static int ov7670_probe(struct i2c_client *client,
->  #endif
->  hdl_free:
->  	v4l2_ctrl_handler_free(&info->hdl);
-> +power_off:
-> +	ov7670_s_power(sd, 0);
->  clk_disable:
->  	clk_disable_unprepare(info->clk);
->  	return ret;
-> @@ -1804,6 +1825,7 @@ static int ov7670_remove(struct i2c_client *client)
->  #if defined(CONFIG_MEDIA_CONTROLLER)
->  	media_entity_cleanup(&info->sd.entity);
->  #endif
-> +	ov7670_s_power(sd, 0);
->  	return 0;
->  }
->  
-> -- 
-> 2.13.0
-> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+
+Please split that into separate commits.
+
+Maxime
 
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/ba964250/attachment.sig>
