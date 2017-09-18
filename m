@@ -1,35 +1,120 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 18 Sep 2017 09:58:07 +0200
-Subject: [PATCH 2/9] arm64: defconfig: enable Marvell CP110 comphy
+Date: Mon, 18 Sep 2017 09:58:09 +0200
+Subject: [PATCH 4/9] arm64: dts: marvell: add comphy nodes on cp110 master and
+ slave
 In-Reply-To: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
 References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170918075814.27405-3-antoine.tenart@free-electrons.com>
+Message-ID: <20170918075814.27405-5-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Miquel Raynal <miquel.raynal@free-electrons.com>
+This patch describes the comphy available in the cp110 master and slave.
+This comphy provides serdes lanes used by various controllers such as
+the network one.
 
-The comphy is an hardware block giving access to common PHYs that can be
-used by various other engines (Network, SATA, ...). This is used on
-Marvell 7k/8k platforms for now. Enable the corresponding driver.
-
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 38 ++++++++++++++++++++++
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 38 ++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4c9d4f6692dc..8495b88a0966 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -535,6 +535,7 @@ CONFIG_PWM_TEGRA=m
- CONFIG_PHY_RCAR_GEN3_USB2=y
- CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_SUN4I_USB=y
-+CONFIG_PHY_MVEBU_CP110_COMPHY=y
- CONFIG_PHY_ROCKCHIP_INNO_USB2=y
- CONFIG_PHY_ROCKCHIP_EMMC=y
- CONFIG_PHY_ROCKCHIP_PCIE=m
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index faf7d4a497aa..a26948ff72b4 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -109,6 +109,44 @@
+ 				};
+ 			};
+ 
++			cpm_comphy: phy at 120000 {
++				compatible = "marvell,comphy-cp110";
++				reg = <0x120000 0x6000>;
++				marvell,system-controller = <&cpm_syscon0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				cpm_comphy0: phy at 0 {
++					reg = <0>;
++					#phy-cells = <1>;
++				};
++
++				cpm_comphy1: phy at 1 {
++					reg = <1>;
++					#phy-cells = <1>;
++				};
++
++				cpm_comphy2: phy at 2 {
++					reg = <2>;
++					#phy-cells = <1>;
++				};
++
++				cpm_comphy3: phy at 3 {
++					reg = <3>;
++					#phy-cells = <1>;
++				};
++
++				cpm_comphy4: phy at 4 {
++					reg = <4>;
++					#phy-cells = <1>;
++				};
++
++				cpm_comphy5: phy at 5 {
++					reg = <5>;
++					#phy-cells = <1>;
++				};
++			};
++
+ 			cpm_mdio: mdio at 12a200 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 02d6e2f1a7bf..fe326074edb6 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -109,6 +109,44 @@
+ 				};
+ 			};
+ 
++			cps_comphy: phy at 120000 {
++				compatible = "marvell,comphy-cp110";
++				reg = <0x120000 0x6000>;
++				marvell,system-controller = <&cps_syscon0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				cps_comphy0: phy at 0 {
++					reg = <0>;
++					#phy-cells = <1>;
++				};
++
++				cps_comphy1: phy at 1 {
++					reg = <1>;
++					#phy-cells = <1>;
++				};
++
++				cps_comphy2: phy at 2 {
++					reg = <2>;
++					#phy-cells = <1>;
++				};
++
++				cps_comphy3: phy at 3 {
++					reg = <3>;
++					#phy-cells = <1>;
++				};
++
++				cps_comphy4: phy at 4 {
++					reg = <4>;
++					#phy-cells = <1>;
++				};
++
++				cps_comphy5: phy at 5 {
++					reg = <5>;
++					#phy-cells = <1>;
++				};
++			};
++
+ 			cps_mdio: mdio at 12a200 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
 2.13.5
