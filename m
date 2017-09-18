@@ -1,81 +1,61 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Mon, 18 Sep 2017 15:49:45 +1000
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <20170901072744.2409-1-dja@axtens.net>
-References: <20170901072744.2409-1-dja@axtens.net>
-Message-ID: <87d16oeeti.fsf@linkitivity.dja.id.au>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 18 Sep 2017 08:29:54 +0200
+Subject: [PATCH 5/9] dt-bindings: add compatibles for rk3066/rk3188 power
+ controllers
+In-Reply-To: <c2f4f70e-e5e7-9432-035d-fdf885eb53d0@gmail.com>
+References: <20170915083357.11296-1-heiko@sntech.de>
+ <20170915083357.11296-6-heiko@sntech.de>
+ <c2f4f70e-e5e7-9432-035d-fdf885eb53d0@gmail.com>
+Message-ID: <13237503.R9C4DGAk4Y@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Am Samstag, 16. September 2017, 23:04:48 CEST schrieb Julien Chauveau:
+> Hello Heiko,
+> 
+> There are a few copy/paste errors in the documentation.
+> 
+> 
+> Le 15/09/2017 ? 10:33, Heiko Stuebner a ?crit :
+> > Add the compatible values for the power-domain controllers found on
+> > rk3066 and rk3188.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >   Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 4 ++++
+> >   1 file changed, 4 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> > index 301d2a9bc1b8..1c42c5b7ca6a 100644
+> > --- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> > +++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> > @@ -5,6 +5,8 @@ powered up/down by software based on different application scenes to save power.
+> >   
+> >   Required properties for power domain controller:
+> >   - compatible: Should be one of the following.
+> > +	"rockchip,rk3066-power-controller" - for RK3288 SoCs.
+> > +	"rockchip,rk3188-power-controller" - for RK3288 SoCs.
+> These should be for RK3066 and RK3188.
+> >   	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+> >   	"rockchip,rk3328-power-controller" - for RK3328 SoCs.
+> >   	"rockchip,rk3366-power-controller" - for RK3366 SoCs.
+> > @@ -17,6 +19,8 @@ Required properties for power domain controller:
+> >   
+> >   Required properties for power domain sub nodes:
+> >   - reg: index of the power domain, should use macros in:
+> > +	"include/dt-bindings/power/rk3066-power.h" - for RK3288 type power domain.
+> > +	"include/dt-bindings/power/rk3188-power.h" - for RK3288 type power domain.
+> Same here.
 
-The merge window is well over by now - is there anything else I can do
-to get this series to a mergeable state? I'm not particularly across the
-rules for drm-misc, so please let me know if there are things I need to
-be doing.
+bah ... thanks for noticing. Will fix in a v2 shortly.
 
-Regards,
-Daniel
 
-Daniel Axtens <dja@axtens.net> writes:
+Thanks
+Heiko
 
-> This patch set:
->
->  - splits the default display handling out from VGA arbiter, into its
->    own file and behind its own Kconfig option (and gives the functions
->    better names).
->
->  - adds extra detection of default devices. To be nominated, the vga
->    arbiter and platform hooks must not have nominated a default. A
->    card will then only be nominated if it has a driver attached and
->    has IO or memory decoding enabled.
->
->  - adds relevant documentation.
->
-> The practical impact of this is improved X autoconfiguration on some
-> arm64 systems.
->
-> Changes in v3:
->
->  - Add documentation - thanks Daniel Vetter for pointing it out.
->
->  - Clarify explanations. Thanks to everyone for continuing to bear
->    with my incomplete understanding of PCI and provide some clarity.
->
->  - Split refactoring and adding functionality.
->
-> Changes in v2: https://www.spinics.net/lists/linux-pci/msg64007.html
->
-> Drop all the powerpc patches. [explanation snipped]
->
-> v1: https://www.spinics.net/lists/linux-pci/msg63581.html
->
-> Regards,
-> Daniel
->
-> Daniel Axtens (3):
->   drm: split default display handler out of VGA arbiter
->   drm: add fallback default device detection
->   drm: documentation for default display device
->
->  Documentation/gpu/default_display.rst |  93 +++++++++++++++++++
->  Documentation/gpu/index.rst           |   1 +
->  arch/ia64/pci/fixup.c                 |   6 +-
->  arch/powerpc/kernel/pci-common.c      |   6 +-
->  arch/x86/pci/fixup.c                  |   6 +-
->  arch/x86/video/fbdev.c                |   4 +-
->  drivers/gpu/vga/Kconfig               |  12 +++
->  drivers/gpu/vga/Makefile              |   1 +
->  drivers/gpu/vga/default_display.c     | 163 ++++++++++++++++++++++++++++++++++
->  drivers/gpu/vga/vga_switcheroo.c      |   8 +-
->  drivers/gpu/vga/vgaarb.c              |  61 +++----------
->  drivers/pci/pci-sysfs.c               |   4 +-
->  include/linux/default_display.h       |  44 +++++++++
->  include/linux/vgaarb.h                |  15 ----
->  14 files changed, 344 insertions(+), 80 deletions(-)
->  create mode 100644 Documentation/gpu/default_display.rst
->  create mode 100644 drivers/gpu/vga/default_display.c
->  create mode 100644 include/linux/default_display.h
->
-> -- 
-> 2.11.0
+> >   	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+> >   	"include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
+> >   	"include/dt-bindings/power/rk3366-power.h" - for RK3366 type power domain.
+> Julien
+> 
+> 
