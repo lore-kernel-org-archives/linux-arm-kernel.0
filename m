@@ -1,58 +1,43 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 18 Sep 2017 14:57:36 -0500
-Subject: [PATCH v3 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170831140332.GD23750@n2100.armlinux.org.uk>
-References: <20170724212454.27574-1-d-gerlach@ti.com>
- <20170724212454.27574-3-d-gerlach@ti.com>
- <20170831140332.GD23750@n2100.armlinux.org.uk>
-Message-ID: <d68b90bb-fa93-24e5-08f0-ab6d7bd2df22@ti.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Mon, 18 Sep 2017 15:04:34 -0500
+Subject: [[RESEND]PATCHv6 2/2] i2c: altera: Add Altera I2C Controller
+ driver
+In-Reply-To: <20170913205038.ndlkaivkdgxa3ee2@ninjato>
+References: <1505164640-26413-1-git-send-email-thor.thayer@linux.intel.com>
+ <1505164640-26413-2-git-send-email-thor.thayer@linux.intel.com>
+ <20170913205038.ndlkaivkdgxa3ee2@ninjato>
+Message-ID: <3f9fe0a6-0e8d-7038-28e6-eacc6ed2e7ad@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-On 08/31/2017 09:03 AM, Russell King - ARM Linux wrote:
-> On Mon, Jul 24, 2017 at 04:24:54PM -0500, Dave Gerlach wrote:
->> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> index 608008229c7d..46a7a6c41db7 100644
->> --- a/arch/arm/kernel/asm-offsets.c
->> +++ b/arch/arm/kernel/asm-offsets.c
->> @@ -28,6 +28,7 @@
->>  #include <asm/vdso_datapage.h>
->>  #include <asm/hardware/cache-l2x0.h>
->>  #include <linux/kbuild.h>
->> +#include <linux/ti-emif-sram.h>
->>  
->>  /*
->>   * Make sure that the compiler and target are compatible.
->> @@ -183,5 +184,8 @@ int main(void)
->>  #ifdef CONFIG_VDSO
->>    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
->>  #endif
->> +  BLANK();
->> +  ti_emif_offsets();
->> +
->>    return 0; 
->>  }
+On 09/13/2017 03:50 PM, Wolfram Sang wrote:
+> On Mon, Sep 11, 2017 at 04:17:20PM -0500, thor.thayer at linux.intel.com wrote:
+>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>
+>> Add driver support for the Altera I2C Controller. The I2C
+>> controller is soft IP for use in FPGAs.
+>>
+>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+>> ---
 > 
-> This doesn't make me happy - I've been thinking about this for some time,
-> and I think it's completely wrong for drivers to hook into asm-offsets.
+> Applied to for-next (will be in v4.14), thanks!
 > 
-> Looking at the top-level Kbuild file, it looks like it would be easy
-> for emif to auto-generate its own offsets.h header - it looks like it's
-> a matter of using linux/kbuild.h to get the definitions, compiling to
-> assembly (using $(call if_changed_dep,cc_s_c)) and then converting the
-> assembly to the header file format ( using
-> $(call filechk,offsets,__ASM_OFFSETS_H__), replacing __ASM_OFFSETS_H__
-> with a more appropriate symbol.)
+>> +	if (finish) {
+>> +		/* Wait for the Core to finish */
+>> +		ret = readl_poll_timeout_atomic(idev->base + ALTR_I2C_STATUS,
 > 
-> Could you please check whether this is possible, so we don't end up
-> needing to hook lots of driver-specific assembly offsets stuff into
-> the arch files?
+> I wonder a bit about polling in an interrupt handler (maybe threaded
+> irqs?) but we can fix that later, I think.
 > 
 
-I was able to try this out and was successful, I will send an updated version
-that generates a local emif-asm-offsets.h. Thanks for the suggestion.
+Yes, based on your previous feedback, I changed to a threaded IRQ as 
+shown below. The altr_i2c_isr_quick wakes up this IRQ handler if the 
+status is non-zero.
 
-Regards,
-Dave
++
++	ret = devm_request_threaded_irq(&pdev->dev, irq, altr_i2c_isr_quick,
++					altr_i2c_isr, IRQF_ONESHOT,
++					pdev->name, idev);
+
+Thanks for the review and applying the patch!
