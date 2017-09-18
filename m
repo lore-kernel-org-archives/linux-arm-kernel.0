@@ -1,29 +1,67 @@
 From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 18 Sep 2017 09:29:24 +0800
-Subject: [PATCH v3 0/3] media: ov7670: Add entity init and power operation
-Message-ID: <20170918012928.13278-1-wenyou.yang@microchip.com>
+Date: Mon, 18 Sep 2017 09:29:25 +0800
+Subject: [PATCH v3 1/3] media: ov7670: Add entity pads initialization
+In-Reply-To: <20170918012928.13278-1-wenyou.yang@microchip.com>
+References: <20170918012928.13278-1-wenyou.yang@microchip.com>
+Message-ID: <20170918012928.13278-2-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is to add the media entity pads initialization,
-the s_power operation and get_fmt callback support.
+Add the media entity pads initialization.
 
-Changes in v3:
- - Keep tried format info in the try_fmt member of
-   v4l2_subdev__pad_config struct.
- - Add the internal_ops callback to set default format.
+Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+---
 
-Changes in v2:
- - Add the patch to support the get_fmt ops.
- - Remove the redundant invoking ov7670_init_gpio().
+Changes in v3: None
+Changes in v2: None
 
-Wenyou Yang (3):
-  media: ov7670: Add entity pads initialization
-  media: ov7670: Add the get_fmt callback
-  media: ov7670: Add the s_power operation
+ drivers/media/i2c/ov7670.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
- drivers/media/i2c/ov7670.c | 103 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 96 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
+index e88549f0e704..5c8460ee65c3 100644
+--- a/drivers/media/i2c/ov7670.c
++++ b/drivers/media/i2c/ov7670.c
+@@ -213,6 +213,7 @@ struct ov7670_devtype {
+ struct ov7670_format_struct;  /* coming later */
+ struct ov7670_info {
+ 	struct v4l2_subdev sd;
++	struct media_pad pad;
+ 	struct v4l2_ctrl_handler hdl;
+ 	struct {
+ 		/* gain cluster */
+@@ -1688,14 +1689,23 @@ static int ov7670_probe(struct i2c_client *client,
+ 	v4l2_ctrl_auto_cluster(2, &info->auto_exposure,
+ 			       V4L2_EXPOSURE_MANUAL, false);
+ 	v4l2_ctrl_cluster(2, &info->saturation);
++
++	info->pad.flags = MEDIA_PAD_FL_SOURCE;
++	info->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
++	ret = media_entity_pads_init(&info->sd.entity, 1, &info->pad);
++	if (ret < 0)
++		goto hdl_free;
++
+ 	v4l2_ctrl_handler_setup(&info->hdl);
+ 
+ 	ret = v4l2_async_register_subdev(&info->sd);
+ 	if (ret < 0)
+-		goto hdl_free;
++		goto entity_cleanup;
+ 
+ 	return 0;
+ 
++entity_cleanup:
++	media_entity_cleanup(&info->sd.entity);
+ hdl_free:
+ 	v4l2_ctrl_handler_free(&info->hdl);
+ clk_disable:
+@@ -1712,6 +1722,7 @@ static int ov7670_remove(struct i2c_client *client)
+ 	v4l2_device_unregister_subdev(sd);
+ 	v4l2_ctrl_handler_free(&info->hdl);
+ 	clk_disable_unprepare(info->clk);
++	media_entity_cleanup(&info->sd.entity);
+ 	return 0;
+ }
+ 
 -- 
 2.13.0
