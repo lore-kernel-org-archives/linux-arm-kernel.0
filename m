@@ -1,32 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 Sep 2017 13:07:42 -0300
-Subject: [PATCH 2/2] dts: Enable building of LWN's Display5 board
-In-Reply-To: <1505746765-965-2-git-send-email-lukma@denx.de>
-References: <1505746765-965-1-git-send-email-lukma@denx.de>
- <1505746765-965-2-git-send-email-lukma@denx.de>
-Message-ID: <CAOMZO5DLuVfpHuMhJsP5G8oiAAKgZbXFATSme6wEtDJpTP5tXA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Sep 2017 17:12:48 +0100
+Subject: [PATCH] arm64: dts: foundation-v8: Enable PSCI mode
+In-Reply-To: <20170918153832.16356-1-daniel.thompson@linaro.org>
+References: <20170918153832.16356-1-daniel.thompson@linaro.org>
+Message-ID: <20170918161248.GB5106@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+Hi Daniel,
 
-On Mon, Sep 18, 2017 at 11:59 AM, Lukasz Majewski <lukma@denx.de> wrote:
-> This commit enables building of display5 related dtbs.
->
-> Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> ---
->  arch/arm/boot/dts/Makefile | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 4b17f35..c293bbb 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -400,6 +400,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->         imx6q-cm-fx6.dtb \
->         imx6q-cubox-i.dtb \
->         imx6q-dfi-fs700-m60.dtb \
-> +       imx6q-display5-tianma-tm070-1280x768.dtb \
-> +       imx6q-display5-mitsubishi-aa070-800x480.dtb \
+On Mon, Sep 18, 2017 at 04:38:32PM +0100, Daniel Thompson wrote:
+> Currently if the Foundation model is running ARM Trusted Firmware then
+> the kernel, which is configured to use spin tables, cannot start secondary
+> processors or "power off" the simulation.
+> 
+> Add a couple of labels to the include file, and introduce a new .dts
+> file that uses these to override the enable-method.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 
-This should be part of the first patch.
+This looks good, but has the unfortunate effect of leaving the
+(irrelevant) cpu-release-addr property in the PSCI dts files, as that's
+in the underlying dtsi file.
+
+Could we split spin-table / PSCI parts into separate dtsi files?
+
+e.g. have:
+
+* foundation-v8.dtsi
+* foundation-v8-gicv{2,3}.dtsi
+* foundation-v8-{psci,spin-table}.dtsi
+
+... and then combine those to build the dts files we want.
+
+FWIW, with that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
