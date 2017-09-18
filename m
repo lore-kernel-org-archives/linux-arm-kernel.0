@@ -1,156 +1,27 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 18 Sep 2017 13:54:26 -0500
-Subject: [PATCH 4/6] Topology: Add cluster on die macros and arm64 decoding
-In-Reply-To: <e95a0b2a-9dd0-654a-20fe-cad1cf0eed94@huawei.com>
-References: <20170914184918.20406-1-jeremy.linton@arm.com>
- <20170914184918.20406-5-jeremy.linton@arm.com>
- <e95a0b2a-9dd0-654a-20fe-cad1cf0eed94@huawei.com>
-Message-ID: <8e145e4b-e1d2-cb15-2cf9-cace5fed524f@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Sep 2017 21:00:18 +0200
+Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
+In-Reply-To: <20170918083629.qn4dlrmk7ffipfsz@dell>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-2-linus.walleij@linaro.org>
+ <20170918083629.qn4dlrmk7ffipfsz@dell>
+Message-ID: <CACRpkdb8jDRZxuTUNoosLORqDbF4PP4RSHj3avtUqzvW2RwpmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 18, 2017 at 10:36 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Sun, 17 Sep 2017, Linus Walleij wrote:
 
+>> Lee: requesting ACK for Wolfram to take this patch.
+>
+> This ...
+>
+>> SM501 users: requesting Tested-by on this patch.
+>
+> ... loosely depends on this (until it doesn't).
 
-On 09/17/2017 08:50 PM, Xiongfeng Wang wrote:
-> Hi Jeremy,
-> 
-> On 2017/9/15 2:49, Jeremy Linton wrote:
->> Many modern machines have cluster on die (COD) non-uniformity
->> as well as the traditional multi-socket architectures. Reusing
->> the multi-socket or NUMA on die concepts for these (as arm64 does)
->> breaks down when presented with actual multi-socket/COD machines.
->> Similar, problems are also visible on some x86 machines so it
->> seems appropriate to start abstracting and making these topologies
->> visible.
->>
->> To start, a topology_cod_id() macro is added which defaults to returning
->> the same information as topology_physical_package_id(). Moving forward
->> we can start to spit out the differences.
->>
->> For arm64, an additional package_id is added to the cpu_topology array.
->> Initially this will be equal to the cluster_id as well.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   arch/arm64/include/asm/topology.h | 4 +++-
->>   arch/arm64/kernel/topology.c      | 8 ++++++--
->>   include/linux/topology.h          | 3 +++
->>   3 files changed, 12 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
->> index 8b57339823e9..bd7517960d39 100644
->> --- a/arch/arm64/include/asm/topology.h
->> +++ b/arch/arm64/include/asm/topology.h
->> @@ -7,13 +7,15 @@ struct cpu_topology {
->>   	int thread_id;
->>   	int core_id;
->>   	int cluster_id;
->> +	int package_id;
->>   	cpumask_t thread_sibling;
->>   	cpumask_t core_sibling;
->>   };
-> 
-> 'core_sibling' will be updated by 'update_siblings_masks()' to represent cores in a cluster;
-> Can we add a cpumask_t field to represent cores in a package? So that 'lstopo' can use this
-> cpumask_t to display the right information.
+Yeah I did my best to scout around the commit logs
+to figure out who's been contributing to the SM501 and
+using it, I hope someone will step up and test it.
 
-So, the change below modifies update_siblings_mask() to utilize the 
-package_id. Per the ABI the ..cpuX/topology/physical_package_id is 
-shared between the core_siblings/core_siblings_list. What 
-physical_package_id means can vary per architecture, but the siblings 
-list needs to be the cores with the same phyiscal_package (AFAIK, feel 
-free to correct my understanding). That rule should be enforced by this 
-patch set.
-
-I suspect if your running these patches, and the lstopo output looks 
-strange its because your on a machine where the thread_id has been 
-assigned the cluster_id in the later patch set.
-
-
-> 
-> Thanks,
-> Xiongfeng Wang
-> 
->>   
->>   extern struct cpu_topology cpu_topology[NR_CPUS];
->>   
->> -#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
->> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].package_id)
->> +#define topology_cod_id(cpu)		(cpu_topology[cpu].cluster_id)
->>   #define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
->>   #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
->>   #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
->> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->> index 8d48b233e6ce..9147e5b6326d 100644
->> --- a/arch/arm64/kernel/topology.c
->> +++ b/arch/arm64/kernel/topology.c
->> @@ -67,6 +67,8 @@ static int __init parse_core(struct device_node *core, int cluster_id,
->>   			leaf = false;
->>   			cpu = get_cpu_for_node(t);
->>   			if (cpu >= 0) {
->> +				/* maintain DT cluster == package behavior */
->> +				cpu_topology[cpu].package_id = cluster_id;
->>   				cpu_topology[cpu].cluster_id = cluster_id;
->>   				cpu_topology[cpu].core_id = core_id;
->>   				cpu_topology[cpu].thread_id = i;
->> @@ -88,7 +90,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
->>   			       core);
->>   			return -EINVAL;
->>   		}
->> -
->> +		cpu_topology[cpu].package_id = cluster_id;
->>   		cpu_topology[cpu].cluster_id = cluster_id;
->>   		cpu_topology[cpu].core_id = core_id;
->>   	} else if (leaf) {
->> @@ -228,7 +230,7 @@ static void update_siblings_masks(unsigned int cpuid)
->>   	for_each_possible_cpu(cpu) {
->>   		cpu_topo = &cpu_topology[cpu];
->>   
->> -		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
->> +		if (cpuid_topo->package_id != cpu_topo->package_id)
-
-(note here that core_siblings now reflect the package_id rather than the 
-cluster_id. This only matters if cluster_id!=package_id).
-
->>   			continue;
->>   
->>   		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
->> @@ -273,6 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
->>   					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
->>   					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
->>   	}
->> +	cpuid_topo->package_id = cpuid_topo->cluster_id;
->>   
->>   	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
->>   		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
->> @@ -292,6 +295,7 @@ static void __init reset_cpu_topology(void)
->>   		cpu_topo->thread_id = -1;
->>   		cpu_topo->core_id = 0;
->>   		cpu_topo->cluster_id = -1;
->> +		cpu_topo->package_id = -1;
->>   
->>   		cpumask_clear(&cpu_topo->core_sibling);
->>   		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
->> diff --git a/include/linux/topology.h b/include/linux/topology.h
->> index cb0775e1ee4b..4660749a7303 100644
->> --- a/include/linux/topology.h
->> +++ b/include/linux/topology.h
->> @@ -184,6 +184,9 @@ static inline int cpu_to_mem(int cpu)
->>   #ifndef topology_physical_package_id
->>   #define topology_physical_package_id(cpu)	((void)(cpu), -1)
->>   #endif
->> +#ifndef topology_cod_id				/* cluster on die */
->> +#define topology_cod_id(cpu)			topology_physical_package_id(cpu)
->> +#endif
->>   #ifndef topology_core_id
->>   #define topology_core_id(cpu)			((void)(cpu), 0)
->>   #endif
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Linus
