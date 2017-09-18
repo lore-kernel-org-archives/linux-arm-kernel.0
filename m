@@ -1,32 +1,74 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 19 Sep 2017 08:00:10 +1000
-Subject: Linux-next broken for 2 weeks was Re: n900 in next-20170901
-In-Reply-To: <20170918081109.GA11661@amd>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <20170905233241.GA19231@js1304-P5Q-DELUXE>
- <20170906133057.GH5024@atomide.com>
- <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170907161650.GP5024@atomide.com> <20170915131817.GA19486@amd>
- <20170918020126.GA19200@js1304-P5Q-DELUXE>
- <20170918081109.GA11661@amd>
-Message-ID: <20170919080000.59a79ba2@canb.auug.org.au>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 19 Sep 2017 06:15:44 +0800
+Subject: [nomadik:i2c-gpio-descriptors 12/19]
+ arch/arm/mach-sa1100/simpad.c:330:27: note: in expansion of macro
+ 'GPIO_GPIO21'
+Message-ID: <201709190642.WAcWiXTe%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git i2c-gpio-descriptors
+head:   1aac5fb7b595170dc7943b8da83fe73d1f5c6052
+commit: 903a5946b2c6329e9eee224fe2934d071ce7c3d3 [12/19] i2c: gpio: Convert to use descriptors
+config: arm-sa1100 (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 903a5946b2c6329e9eee224fe2934d071ce7c3d3
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-On Mon, 18 Sep 2017 10:11:09 +0200 Pavel Machek <pavel@ucw.cz> wrote:
->
-> Unfortunately, rest of the world can reproduce the error, and it means
-> linux-next is useless for us.
-> 
-> I'd expect you to drop the relevant tree from linux-next when the
-> error was reported. Clearly, those patches are unsuitable for 4.15, as
-> they are broken, so they should not be in linux-next.
+All warnings (new ones prefixed by >>):
 
-Andrew has asked me to drop the patches from linux-next today and I
-have done so.
+   In file included from arch/arm/mach-sa1100/simpad.c:19:0:
+>> arch/arm/mach-sa1100/include/mach/SA-1100.h:1117:18: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+                     (0x00000001 << (Nb))
+                     ^
+   include/linux/gpio/machine.h:55:16: note: in definition of macro 'GPIO_LOOKUP_IDX'
+     .chip_hwnum = _chip_hwnum,                                        \
+                   ^~~~~~~~~~~
+>> arch/arm/mach-sa1100/include/mach/SA-1100.h:1139:21: note: in expansion of macro 'GPIO_GPIO'
+    #define GPIO_GPIO21 GPIO_GPIO (21) /* GPIO [21]                       */
+                        ^~~~~~~~~
+>> arch/arm/mach-sa1100/simpad.c:330:27: note: in expansion of macro 'GPIO_GPIO21'
+      GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0, GPIO_ACTIVE_HIGH),
+                              ^~~~~~~~~~~
+>> arch/arm/mach-sa1100/include/mach/SA-1100.h:1117:18: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+                     (0x00000001 << (Nb))
+                     ^
+   include/linux/gpio/machine.h:55:16: note: in definition of macro 'GPIO_LOOKUP_IDX'
+     .chip_hwnum = _chip_hwnum,                                        \
+                   ^~~~~~~~~~~
+   arch/arm/mach-sa1100/include/mach/SA-1100.h:1143:21: note: in expansion of macro 'GPIO_GPIO'
+    #define GPIO_GPIO25 GPIO_GPIO (25) /* GPIO [25]                       */
+                        ^~~~~~~~~
+>> arch/arm/mach-sa1100/simpad.c:331:27: note: in expansion of macro 'GPIO_GPIO25'
+      GPIO_LOOKUP_IDX("gpio", GPIO_GPIO25, NULL, 1, GPIO_ACTIVE_HIGH),
+                              ^~~~~~~~~~~
 
--- 
-Cheers,
-Stephen Rothwell
+vim +/GPIO_GPIO21 +330 arch/arm/mach-sa1100/simpad.c
+
+   323	
+   324	/*
+   325	 * i2c
+   326	 */
+   327	static struct gpiod_lookup_table simpad_i2c_gpiod_table = {
+   328		.dev_id = "i2c-gpio",
+   329		.table = {
+ > 330			GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0, GPIO_ACTIVE_HIGH),
+ > 331			GPIO_LOOKUP_IDX("gpio", GPIO_GPIO25, NULL, 1, GPIO_ACTIVE_HIGH),
+   332		},
+   333	};
+   334	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 24023 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/77e4e33d/attachment-0001.gz>
