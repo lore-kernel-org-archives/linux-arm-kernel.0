@@ -1,70 +1,38 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 18 Sep 2017 23:50:11 +0200
-Subject: [PATCH 0/4] arm64: Add initial Actions Semi S700 and CubieBoard7
- support
-In-Reply-To: <20170911022241.11603-1-afaerber@suse.de>
+Date: Mon, 18 Sep 2017 23:52:07 +0200
+Subject: [PATCH 3/4] clocksource: owl: Prepare S700
+In-Reply-To: <20170911022241.11603-4-afaerber@suse.de>
 References: <20170911022241.11603-1-afaerber@suse.de>
-Message-ID: <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
+ <20170911022241.11603-4-afaerber@suse.de>
+Message-ID: <b62d9ae5-8aac-14a5-d887-9a54759a3bbe@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-
-
 On 11/09/2017 04:22, Andreas F?rber wrote:
-> Hello,
+> S700 has two 2Hz timers like S500, and four TIMx timers like S900.
 > 
-> This series prepares the Actions Semi S700 SoC and Cubietech CubieBoard7.
-> It boots equally far as the S900 based Bubblegum-96 these patches are based on,
-> i.e. into an initrd with serial and all four cores up.
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  drivers/clocksource/owl-timer.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> I have not yet managed to download the CubieBoard7 sources from Baidu, and the
-> Mega download has not yet been fixed, so this is based on the S700 datasheet
-> and /proc/device-tree/ from the preinstalled Android.
-> 
-> Lacking sources and instructions to replace the bootloader on eMMC or to try
-> booting from SD, the only working way I've found to boot mainline kernels
-> appears to be booting into Android, then issuing "reboot bootloader". U-Boot
-> is lacking the saveenv command, so it wasn't possible to change the bootdelay
-> to facilitate this.
-> 
-> Cf. https://en.opensuse.org/HCL:CubieBoard7
-> 
-> Work branch:
-> https://github.com/afaerber/linux/commits/bg96-next
-> 
-> Have a lot of fun!
-> 
-> Cheers,
-> Andreas
-> 
-> Cc: Ahha Lee <lee@cubietech.com>
-> Cc: support at cubietech.com
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> 
-> Andreas F?rber (4):
->   dt-bindings: arm: actions: Add S700 and CubieBoard7
->   dt-bindings: timer: Add Actions Semi S700
->   clocksource: owl: Prepare S700
->   arm64: dts: actions: Add S700 and CubieBoard7
-> 
->  Documentation/devicetree/bindings/arm/actions.txt  |  15 ++
->  .../bindings/timer/actions,owl-timer.txt           |   1 +
+> diff --git a/drivers/clocksource/owl-timer.c b/drivers/clocksource/owl-timer.c
+> index d19c53c11094..d5f3f72c10ee 100644
+> --- a/drivers/clocksource/owl-timer.c
+> +++ b/drivers/clocksource/owl-timer.c
+> @@ -169,4 +169,5 @@ static int __init owl_timer_init(struct device_node *node)
+>  	return 0;
+>  }
+>  CLOCKSOURCE_OF_DECLARE(owl_s500, "actions,s500-timer", owl_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(owl_s700, "actions,s700-timer", owl_timer_init);
+>  CLOCKSOURCE_OF_DECLARE(owl_s900, "actions,s900-timer", owl_timer_init);
 
-Usually sub system maintainers are also Cc'ed with Dt bindings
-definitions and usage.
+Can you take the opportunity to fix the deprecated
+CLOCKSOURCE_OF_DECLARE by replacing it by TIMER_OF_DECLARE ?
 
->  arch/arm64/boot/dts/actions/Makefile               |   2 +
->  arch/arm64/boot/dts/actions/s700-cubieboard7.dts   |  47 ++++++
->  arch/arm64/boot/dts/actions/s700.dtsi              | 164 +++++++++++++++++++++
->  drivers/clocksource/owl-timer.c                    |   1 +
->  6 files changed, 230 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/actions/s700-cubieboard7.dts
->  create mode 100644 arch/arm64/boot/dts/actions/s700.dtsi
-> 
+Thanks.
+
+  -- Daniel
 
 
 -- 
