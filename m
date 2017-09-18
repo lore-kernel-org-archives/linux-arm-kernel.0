@@ -1,79 +1,60 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Mon, 18 Sep 2017 09:46:03 +0800
-Subject: [PATCH] Asoc: rockchip: Init dapm routes dynamically
-In-Reply-To: <20170916005407.GH173745@google.com>
-References: <20170905041401.23866-1-jeffy.chen@rock-chips.com>
- <20170916005407.GH173745@google.com>
-Message-ID: <59BF255B.2040203@rock-chips.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Mon, 18 Sep 2017 11:54:24 +0900
+Subject: [RESEND PATCH v4 3/3] ARM: dts: exynos: Remove the display-timing
+ and delay from rinato dts
+References: <CGME20170918025448epcas2p22a44b6c8efeac613e7e90c3c49b3eb8a@epcas2p2.samsung.com>
+Message-ID: <1505703264-6704-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+ The display-timing and delay are included in the panel driver. So it
+ should be removed in dts.
 
-Thanks for your test and review.
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+---
 
-On 09/16/2017 08:54 AM, Matthias Kaehlcke wrote:
->> -static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
->> >-	/* Input Lines */
->> >-	{"MIC", NULL, "Headset Mic"},
->> >-	{"DMIC1L", NULL, "Int Mic"},
->> >-	{"DMIC1R", NULL, "Int Mic"},
->> >-
->> >-	/* Output Lines */
->> >-	{"Headphones", NULL, "HPL"},
->> >-	{"Headphones", NULL, "HPR"},
->> >-	{"Speakers", NULL, "Speaker"},
->> >+	SND_SOC_DAPM_LINE("HDMI", NULL),
-> The HDMI items are newly added, I think a separate patch would be
-> preferable.
-ok, will do
+Hi Krzysztof,
 
->
->> >  };
->> >
->> >  static const struct snd_kcontrol_new rockchip_controls[] = {
->> >@@ -66,6 +55,7 @@ static const struct snd_kcontrol_new rockchip_controls[] = {
->> >  	SOC_DAPM_PIN_SWITCH("Speakers"),
->> >  	SOC_DAPM_PIN_SWITCH("Headset Mic"),
->> >  	SOC_DAPM_PIN_SWITCH("Int Mic"),
->> >+	SOC_DAPM_PIN_SWITCH("HDMI"),
->> >  };
->> >
->> >  static int rockchip_sound_max98357a_hw_params(struct snd_pcm_substream *substream,
->> >@@ -314,8 +304,6 @@ static struct snd_soc_card rockchip_sound_card = {
->> >  	.owner = THIS_MODULE,
->> >  	.dapm_widgets = rockchip_dapm_widgets,
->> >  	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
->> >-	.dapm_routes = rockchip_dapm_routes,
->> >-	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
->> >  	.controls = rockchip_controls,
->> >  	.num_controls = ARRAY_SIZE(rockchip_controls),
->> >  };
->> >@@ -391,6 +379,65 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
->> >  	},
->> >  };
->> >
->> >+static const struct snd_soc_dapm_route rockchip_sound_cdndp_routes[] = {
->> >+	/* Output */
->> >+	{"HDMI", NULL, "TX"},
->> >+};
->> >+
->> >+static const struct snd_soc_dapm_route rockchip_sound_da7219_routes[] = {
->> >+	/* Output */
->> >+	{"Headphones", NULL, "HPL"},
->> >+	{"Headphones", NULL, "HPR"},
->> >+
->> >+	/* Input */
->> >+	{"MIC", NULL, "Headset Mic"},
->> >+};
->> >+
->> >+static const struct snd_soc_dapm_route rockchip_sound_dmic_routes[] = {
->> >+	/* Input */
->> >+	{"Dmic", NULL, "Int Mic"},
-> Should be "DMic" as in dmic_dapm_widgets of the dmic codec driver.
->
-> This route is also new and would probably be better added in a
-> separate patch.
+This patch was rebased to the mainline (v4.14-rc1).
 
-ok, will do
->
+Best regards,
+Hoegeun
+
+ arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
+ 1 file changed, 22 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 0b45467..ff792ff 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -227,28 +227,6 @@
+ 		vci-supply = <&ldo20_reg>;
+ 		reset-gpios = <&gpe0 1 GPIO_ACTIVE_LOW>;
+ 		te-gpios = <&gpx0 6 GPIO_ACTIVE_HIGH>;
+-		power-on-delay= <30>;
+-		power-off-delay= <120>;
+-		reset-delay = <5>;
+-		init-delay = <100>;
+-		flip-horizontal;
+-		flip-vertical;
+-		panel-width-mm = <29>;
+-		panel-height-mm = <29>;
+-
+-		display-timings {
+-			timing-0 {
+-				clock-frequency = <4600000>;
+-				hactive = <320>;
+-				vactive = <320>;
+-				hfront-porch = <1>;
+-				hback-porch = <1>;
+-				hsync-len = <1>;
+-				vfront-porch = <150>;
+-				vback-porch = <1>;
+-				vsync-len = <2>;
+-			};
+-		};
+ 	};
+ };
+ 
+-- 
+1.9.1
