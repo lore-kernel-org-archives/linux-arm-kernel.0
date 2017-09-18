@@ -1,110 +1,86 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 18 Sep 2017 14:39:23 +0800
-Subject: [PATCH v2 3/5] media: atmel-isc: Enable the clocks during probe
-In-Reply-To: <20170918063925.6372-1-wenyou.yang@microchip.com>
-References: <20170918063925.6372-1-wenyou.yang@microchip.com>
-Message-ID: <20170918063925.6372-4-wenyou.yang@microchip.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Sep 2017 09:33:36 +0200
+Subject: [PATCH v4 1/6] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3
+In-Reply-To: <20170914145251.21784-2-icenowy@aosc.io>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-2-icenowy@aosc.io>
+Message-ID: <20170918073336.j7finend3g76chsu@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To meet the relationship, enable the HCLOCK and ispck during the
-device probe, "isc_pck frequency is less than or equal to isc_ispck,
-and isc_ispck is greater than or equal to HCLOCK."
-Meanwhile, call the pm_runtime_enable() in the right place.
+On Thu, Sep 14, 2017 at 10:52:46PM +0800, Icenowy Zheng wrote:
+> Allwinner H3 features a thermal sensor like the one in A33, but has its
+> register re-arranged, the clock divider moved to CCU (originally the
+> clock divider is in ADC) and added a pair of bus clock and reset.
+> 
+> Update the binding document to cover H3.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v4:
+> - Add nvmem calibration data (not yet used by the driver)
+> Changes in v3:
+> - Clock name changes.
+> - Example node name changes.
+> - Add interupts (not yet used by the driver).
+> 
+>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30 ++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> index badff3611a98..6c470d584bf9 100644
+> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+>  and sometimes as a touchscreen controller.
+>  
+>  Required properties:
+> -  - compatible: "allwinner,sun8i-a33-ths",
+> +  - compatible: must contain one of the following compatibles:
+> +		- "allwinner,sun8i-a33-ths"
+> +		- "allwinner,sun8i-h3-ths"
+>    - reg: mmio address range of the chip,
+>    - #thermal-sensor-cells: shall be 0,
+>    - #io-channel-cells: shall be 0,
+>  
+> -Example:
+> +Optional properties:
+> +  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
+> +                 If unspecified default values shall be used.
+> +  - nvmem-cell-names: Should be "calibration-data"
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
+I'd prefer to have which sensor it applies to here. It wouldn't change
+anything for the H3, but it definitely does for example for the A83t
+that has two sensors, one for each cluster, and one for the GPU, each
+with calibration data.
 
-Changes in v2: None
+What about cluster0-calibration?
 
- drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+> +
+> +Required properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +  - clocks: the bus clock and the input clock of the ADC,
+> +  - clock-names: should be "bus" and "mod",
+> +  - resets: the bus reset of the ADC,
+> +  - interrupts: the sampling interrupt of the ADC,
 
-diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index 8b9c1cafa348..3ecd2bf016a8 100644
---- a/drivers/media/platform/atmel/atmel-isc.c
-+++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -1593,6 +1593,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 	struct isc_subdev_entity *sd_entity;
- 	struct video_device *vdev = &isc->video_dev;
- 	struct vb2_queue *q = &isc->vb2_vidq;
-+	struct device *dev = isc->dev;
- 	int ret;
- 
- 	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
-@@ -1676,6 +1677,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 		return ret;
- 	}
- 
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+	pm_request_idle(dev);
-+
- 	return 0;
- }
- 
-@@ -1855,25 +1860,37 @@ static int atmel_isc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	ret = clk_prepare_enable(isc->hclock);
-+	if (ret) {
-+		dev_err(dev, "failed to enable hclock: %d\n", ret);
-+		return ret;
-+	}
-+
- 	ret = isc_clk_init(isc);
- 	if (ret) {
- 		dev_err(dev, "failed to init isc clock: %d\n", ret);
--		goto clean_isc_clk;
-+		goto unprepare_hclk;
- 	}
- 
- 	isc->ispck = isc->isc_clks[ISC_ISPCK].clk;
- 
-+	ret = clk_prepare_enable(isc->ispck);
-+	if (ret) {
-+		dev_err(dev, "failed to enable ispck: %d\n", ret);
-+		goto unprepare_hclk;
-+	}
-+
- 	/* ispck should be greater or equal to hclock */
- 	ret = clk_set_rate(isc->ispck, clk_get_rate(isc->hclock));
- 	if (ret) {
- 		dev_err(dev, "failed to set ispck rate: %d\n", ret);
--		goto clean_isc_clk;
-+		goto unprepare_clk;
- 	}
- 
- 	ret = v4l2_device_register(dev, &isc->v4l2_dev);
- 	if (ret) {
- 		dev_err(dev, "unable to register v4l2 device.\n");
--		goto clean_isc_clk;
-+		goto unprepare_clk;
- 	}
- 
- 	ret = isc_parse_dt(dev, isc);
-@@ -1906,8 +1923,6 @@ static int atmel_isc_probe(struct platform_device *pdev)
- 			break;
- 	}
- 
--	pm_runtime_enable(dev);
--
- 	return 0;
- 
- cleanup_subdev:
-@@ -1916,7 +1931,11 @@ static int atmel_isc_probe(struct platform_device *pdev)
- unregister_v4l2_device:
- 	v4l2_device_unregister(&isc->v4l2_dev);
- 
--clean_isc_clk:
-+unprepare_clk:
-+	clk_disable_unprepare(isc->ispck);
-+unprepare_hclk:
-+	clk_disable_unprepare(isc->hclock);
-+
- 	isc_clk_cleanup(isc);
- 
- 	return ret;
+For resets and interrupts, you should list all of them. If there's
+only one, then there's no point telling which one it is.
+
+
+Thanks,
+Maxime
+
 -- 
-2.13.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/6f3914d7/attachment.sig>
