@@ -1,97 +1,179 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Mon, 18 Sep 2017 13:27:14 +0200
-Subject: [PATCH 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <e1e1b4e5-0678-faaf-e97b-b18095342af2@ti.com>
-References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
- <CGME20170918100944eucas1p2735d3d6a6ee562b927fb9dfaeb0d4090@eucas1p2.samsung.com>
- <1505729371-6509-1-git-send-email-andrzej.p@samsung.com>
- <87y3pcmgv6.fsf@linux.intel.com>
- <e1e1b4e5-0678-faaf-e97b-b18095342af2@ti.com>
-Message-ID: <96001441-2a67-ac9c-a606-eac66138d09e@samsung.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 18 Sep 2017 16:58:29 +0530
+Subject: [PATCH v5 1/5] ARM: dts: imx6qdl-icore: Add Sound card support
+Message-ID: <1505734113-9708-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 18.09.2017 o?13:06, Kishon Vijay Abraham I pisze:
-> Hi,
-> 
-> On Monday 18 September 2017 04:08 PM, Felipe Balbi wrote:
->>
->> Hi,
->>
->> Andrzej Pietrasiewicz <andrzej.p@samsung.com> writes:
->>> From: Vivek Gautam <gautam.vivek@samsung.com>
->>>
->>> Adding phy calibration sequence for USB 3.0 DRD PHY present on
->>> Exynos5420/5800 systems.
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-<snip>
+Linux Sound card now uses generic simple-audio-card, so add
+the same along with related audmux and codec(via u2c3) for
+i.CoreM6 QDL module boards.
 
->>>   
->>> +static int exynos5_usbdrd_phy_reset(struct phy *phy)
->>> +{
->>> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
->>> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
->>> +
->>> +	return exynos5420_usbdrd_phy_calibrate(phy_drd);
->>> +}
->>> +
->>>   static const struct phy_ops exynos5_usbdrd_phy_ops = {
->>>   	.init		= exynos5_usbdrd_phy_init,
->>>   	.exit		= exynos5_usbdrd_phy_exit,
->>>   	.power_on	= exynos5_usbdrd_phy_power_on,
->>>   	.power_off	= exynos5_usbdrd_phy_power_off,
->>> +	.reset		= exynos5_usbdrd_phy_reset,
->>>   	.owner		= THIS_MODULE,
->>>   };
->>>   
->>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->>> index 03474d3..1d5836e 100644
->>> --- a/drivers/usb/dwc3/core.c
->>> +++ b/drivers/usb/dwc3/core.c
->>> @@ -156,9 +156,10 @@ static void __dwc3_set_mode(struct work_struct *work)
->>>   		} else {
->>>   			if (dwc->usb2_phy)
->>>   				otg_set_vbus(dwc->usb2_phy->otg, true);
->>> -			if (dwc->usb2_generic_phy)
->>> +			if (dwc->usb2_generic_phy) {
->>>   				phy_set_mode(dwc->usb2_generic_phy, PHY_MODE_USB_HOST);
->>> -
->>> +				phy_reset(dwc->usb2_generic_phy);
->>
->> it doesn't look like this is the best place to reset the phy. Also,
-> 
-> right, phy_reset is done during initialization before phy_power_on/phy_init or
-> in error cases.
-> 
->> ->reset() doesn't seem to match correctly with a calibration. That seems
->> to be more fitting to a ->power_on() or ->init() implementation.
-> 
-> yeah, the initial patch seems to calibrate in phy_init(). Not sure why it's
-> modified.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v5:
+- Add adumux
+- Update simple-audio-card,widgets
+- Add ssi1 fsl,mode
+- Add #sound-dai-cells in codec
+Changes for v4:
+- Moved sgtl5000 node into dtsi instead of multiple copies of
+  same in dts files
+Changes for v3:
+- Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+Changes for v2:
+- Use proper [label:] node-name[@unit-address] for codec
 
-The original patch used a hack like below, in xhci_plat_probe():
+ arch/arm/boot/dts/imx6qdl-icore.dtsi | 97 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
 
-+       /* Initialize and power-on USB 3.0 PHY */
-+       xhci->shared_hcd->phy->init_count = 0;
-+       ret = phy_init(xhci->shared_hcd->phy);
-+       if (ret)
-+               goto dealloc_usb3_hcd;
+diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+index 56d0c5d..9682ae2 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+@@ -42,6 +42,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/sound/fsl-imx-audmux.h>
+ 
+ / {
+ 	memory {
+@@ -55,6 +56,25 @@
+ 		default-brightness-level = <7>;
+ 	};
+ 
++	reg_1p8v: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
 +
-+       xhci->shared_hcd->phy->power_count = 0;
-+       ret = phy_power_on(xhci->shared_hcd->phy);
-+       if (ret) {
-+               phy_exit(xhci->shared_hcd->phy);
-+               goto dealloc_usb3_hcd;
-+       }
 +
-
-Manually setting init_count to 0 in order for the subsequent phy_init() to
-happen probably does not look good.
-
-The calibration is clearly needed. However, I don't have any strong opinions
-on from which place exactly to trigger the calibration process.
-The original patch did not make it upstream, but if that patch is ok,
-it is perfectly fine with me to drop my version and take that one instead.
-
-Andrzej
++	reg_2p5v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "2P5V";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
+ 	reg_3p3v: regulator-3p3v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "3P3V";
+@@ -87,6 +107,59 @@
+ 		#clock-cells = <0>;
+ 		clock-frequency = <25000000>;  /* 25MHz for example */
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "imx6qdl-icore-sgtl5000";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Headphone", "Headphone Jack",
++			"Line", "Line In Jack",
++			"Speaker", "Line Out Jack",
++			"Speaker", "Ext Spk";
++		simple-audio-card,routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&ssi1>;
++		};
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++
++
++	audmux_ssi1 {
++		fsl,audmux-port = <MX51_AUDMUX_PORT1_SSI0>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TFSEL(MX51_AUDMUX_PORT4) |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR |
++			IMX_AUDMUX_V2_PTCR_TCSEL(MX51_AUDMUX_PORT4) |
++			IMX_AUDMUX_V2_PTCR_SYN)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT4)
++		>;
++	};
++
++	audmux_aud4 {
++		fsl,audmux-port = <MX51_AUDMUX_PORT4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT1_SSI0)
++		>;
++	};
+ };
+ 
+ &can1 {
+@@ -141,6 +214,16 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+ 	status = "okay";
++
++	sgtl5000: codec at a {
++		#sound-dai-cells = <0>;
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_3p3v>;
++		VDDD-supply = <&reg_1p8v>;
++	};
+ };
+ 
+ &pwm3 {
+@@ -149,6 +232,11 @@
+ 	status = "okay";
+ };
+ 
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart4>;
+@@ -178,6 +266,15 @@
+ };
+ 
+ &iomuxc {
++	pinctrl_audmux: audmux {
++		fsl,pins = <
++			MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
++			MX6QDL_PAD_DISP0_DAT21__AUD4_TXD 0x110b0
++			MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS  0x130b0
++			MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
++		>;
++	};
++
+ 	pinctrl_enet: enetgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
+-- 
+2.7.4
