@@ -1,50 +1,75 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 19 Sep 2017 05:39:47 +0800
-Subject: [nomadik:gemini-dir-685-pinctrl-flashswap 2/2] Error:
- arch/arm/boot/dts/gemini-sq201.dts:10.1-2 syntax error
-Message-ID: <201709190544.1JzB6SAj%fengguang.wu@intel.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 Sep 2017 23:50:11 +0200
+Subject: [PATCH 0/4] arm64: Add initial Actions Semi S700 and CubieBoard7
+ support
+In-Reply-To: <20170911022241.11603-1-afaerber@suse.de>
+References: <20170911022241.11603-1-afaerber@suse.de>
+Message-ID: <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-pinctrl-flashswap
-head:   3623f5e7196c4ccbf66047102b9375f73f5749d2
-commit: 3623f5e7196c4ccbf66047102b9375f73f5749d2 [2/2] flash hack
-config: arm-omap2plus_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 3623f5e7196c4ccbf66047102b9375f73f5749d2
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi Andreas,
 
-All errors (new ones prefixed by >>):
 
->> Error: arch/arm/boot/dts/gemini-sq201.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-rut1xx.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-wbd111.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-nas4220b.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-dlink-dir-685.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-wbd222.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
+On 11/09/2017 04:22, Andreas F?rber wrote:
+> Hello,
+> 
+> This series prepares the Actions Semi S700 SoC and Cubietech CubieBoard7.
+> It boots equally far as the S900 based Bubblegum-96 these patches are based on,
+> i.e. into an initrd with serial and all four cores up.
+> 
+> I have not yet managed to download the CubieBoard7 sources from Baidu, and the
+> Mega download has not yet been fixed, so this is based on the S700 datasheet
+> and /proc/device-tree/ from the preinstalled Android.
+> 
+> Lacking sources and instructions to replace the bootloader on eMMC or to try
+> booting from SD, the only working way I've found to boot mainline kernels
+> appears to be booting into Android, then issuing "reboot bootloader". U-Boot
+> is lacking the saveenv command, so it wasn't possible to change the bootdelay
+> to facilitate this.
+> 
+> Cf. https://en.opensuse.org/HCL:CubieBoard7
+> 
+> Work branch:
+> https://github.com/afaerber/linux/commits/bg96-next
+> 
+> Have a lot of fun!
+> 
+> Cheers,
+> Andreas
+> 
+> Cc: Ahha Lee <lee@cubietech.com>
+> Cc: support at cubietech.com
+> 
+> Cc: devicetree at vger.kernel.org
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> 
+> Andreas F?rber (4):
+>   dt-bindings: arm: actions: Add S700 and CubieBoard7
+>   dt-bindings: timer: Add Actions Semi S700
+>   clocksource: owl: Prepare S700
+>   arm64: dts: actions: Add S700 and CubieBoard7
+> 
+>  Documentation/devicetree/bindings/arm/actions.txt  |  15 ++
+>  .../bindings/timer/actions,owl-timer.txt           |   1 +
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30142 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/2da14b1c/attachment-0001.gz>
+Usually sub system maintainers are also Cc'ed with Dt bindings
+definitions and usage.
+
+>  arch/arm64/boot/dts/actions/Makefile               |   2 +
+>  arch/arm64/boot/dts/actions/s700-cubieboard7.dts   |  47 ++++++
+>  arch/arm64/boot/dts/actions/s700.dtsi              | 164 +++++++++++++++++++++
+>  drivers/clocksource/owl-timer.c                    |   1 +
+>  6 files changed, 230 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+>  create mode 100644 arch/arm64/boot/dts/actions/s700.dtsi
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
