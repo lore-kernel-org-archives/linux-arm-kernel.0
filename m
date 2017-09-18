@@ -1,92 +1,110 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 18 Sep 2017 14:45:21 -0400
-Subject: [PATCH 3/4] iommu/arm-smmu: Disable stalling faults for all
- endpoints
-In-Reply-To: <20170918173351.GJ11343@arm.com>
-References: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
- <1471525542-14969-4-git-send-email-will.deacon@arm.com>
- <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
- <20161216115413.GE13191@arm.com>
- <CAF6AEGssw_-rSexP9gCCFfgoa1JPt1ChR98-5Ev7EUcXwWfkyA@mail.gmail.com>
- <20170918173351.GJ11343@arm.com>
-Message-ID: <CAF6AEGt4hX5bg4z8-FqD+O5pGYQdGhacBbWgeCk4qcjoDbFjaA@mail.gmail.com>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Mon, 18 Sep 2017 18:48:57 +0000
+Subject: [v4 07/11] soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
+References: <1503607075-28970-1-git-send-email-roy.pledge@nxp.com>
+ <1503607075-28970-8-git-send-email-roy.pledge@nxp.com>
+ <20170914140014.taz7qwphfqm66kw7@localhost>
+ <DB6PR04MB29990A7A076761DDACCC1904866F0@DB6PR04MB2999.eurprd04.prod.outlook.com>
+ <20170915214902.5argyl7d7bz4wykf@localhost>
+Message-ID: <DB6PR04MB29996429111F806DADFEA28386630@DB6PR04MB2999.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 1:33 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 13, 2017 at 03:31:20PM -0400, Rob Clark wrote:
->> On Fri, Dec 16, 2016 at 6:54 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > Hi Rob,
->> >
->> > On Tue, Dec 06, 2016 at 06:30:21PM -0500, Rob Clark wrote:
->> >> On Thu, Aug 18, 2016 at 9:05 AM, Will Deacon <will.deacon@arm.com> wrote:
->> >> > Enabling stalling faults can result in hardware deadlock on poorly
->> >> > designed systems, particularly those with a PCI root complex upstream of
->> >> > the SMMU.
->> >> >
->> >> > Although it's not really Linux's job to save hardware integrators from
->> >> > their own misfortune, it *is* our job to stop userspace (e.g. VFIO
->> >> > clients) from hosing the system for everybody else, even if they might
->> >> > already be required to have elevated privileges.
->> >> >
->> >> > Given that the fault handling code currently executes entirely in IRQ
->> >> > context, there is nothing that can sensibly be done to recover from
->> >> > things like page faults anyway, so let's rip this code out for now and
->> >> > avoid the potential for deadlock.
->> >>
->> >> so, I'd like to re-introduce this feature, I *guess* as some sort of
->> >> opt-in quirk (ie. disabled by default unless something in DT tells you
->> >> otherwise??  But I'm open to suggestions.  I'm not entirely sure what
->> >> hw was having problems due to this feature.)
->> >>
->> >> On newer snapdragon devices we are using arm-smmu for the GPU, and
->> >> halting the GPU so the driver's fault handler can dump some GPU state
->> >> on faults is enormously helpful for debugging and tracking down where
->> >> in the gpu cmdstream the fault was triggered.  In addition, we will
->> >> eventually want the ability to update pagetables from fault handler
->> >> and resuming the faulting transition.
->> >
->> > I'm not against reintroducing this, but it would certainly need to be
->> > opt-in, as you suggest. If we want to try to use stall faults to enable
->> > demand paging for DMA, then that means running core mm code to resolve
->> > the fault and we can't do that in irq context. Consequently, we have to
->> > hand this off to a thread, which means the hardware must allow the SS
->> > bit to remain set without immediately reasserting the interrupt line.
->> > Furthermore, we can't handle multiple faults on a context-bank, so we'd
->> > need to restrict ourselves to one device (i.e. faulting stream) per
->> > domain (CB).
->> >
->> > I think that means we want both specific compatible strings to identify
->> > the SS bit behaviour, but also a way to opt-in for the stall model as a
->> > separate property to indicate that the SoC integration can support this
->> > without e.g. deadlocking.
->> >
+On 9/15/2017 5:49 PM, Catalin Marinas wrote:
+> On Thu, Sep 14, 2017 at 07:07:50PM +0000, Roy Pledge wrote:
+>> On 9/14/2017 10:00 AM, Catalin Marinas wrote:
+>>> On Thu, Aug 24, 2017 at 04:37:51PM -0400, Roy Pledge wrote:
+>>>> @@ -123,23 +122,34 @@ static int bman_portal_probe(struct platform_device *pdev)
+>>>>    	}
+>>>>    	pcfg->irq = irq;
+>>>>    
+>>>> -	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
+>>>> -	if (!va) {
+>>>> -		dev_err(dev, "ioremap::CE failed\n");
+>>>> +	/*
+>>>> +	 * TODO: Ultimately we would like to use a cacheable/non-shareable
+>>>> +	 * (coherent) mapping for the portal on both architectures but that
+>>>> +	 * isn't currently available in the kernel.  Because of HW differences
+>>>> +	 * PPC needs to be mapped cacheable while ARM SoCs will work with non
+>>>> +	 * cacheable mappings
+>>>> +	 */
+>>>
+>>> This comment mentions "cacheable/non-shareable (coherent)". Was this
+>>> meant for ARM platforms? Because non-shareable is not coherent, nor is
+>>> this combination guaranteed to work with different CPUs and
+>>> interconnects.
 >>
->> How do you feel about a short-term step to keep things in irq context,
->> but enable stall mode?  I'm debugging an issue, where it appears that
->> the gpu cannot handle a non-stalled fault (triggers some fairly
->> bizarre follow-on problems).  So I think even if we don't add a fault
->> handler callback, we still want to set the CFCFG bit and
->> RESUME_TERMINATE in the fault handler on this hardware.
->
-> Hmm, colour me unconvinced. Why does enabling stalls fix this problem?
-> I'd rather we bite the bullet and implement things properly on top of
-> a workqueue so that you can build on the same basic infrastructure as
-> the SVM work that Jean-Philippe is looking at, particular as you also
-> have a use-case for running fault code in non-atomic context.
->
+>> My wording is poor I should have been clearer that non-shareable ==
+>> non-coherent.  I will fix this.
+>>
+>> We do understand that cacheable/non shareable isn't supported on all
+>> CPU/interconnect combinations but we have verified with ARM that for the
+>> CPU/interconnects we have integrated QBMan on our use is OK. The note is
+>> here to try to explain why the mapping is different right now. Once we
+>> get the basic QBMan support integrated for ARM we do plan to try to have
+>> patches integrated that enable the cacheable mapping as it gives a
+>> significant performance boost.
+> 
+> I will definitely not ack those patches (at least not in the form I've
+> seen, assuming certain eviction order of the bytes in a cacheline). The
+> reason is that it is incredibly fragile, highly dependent on the CPU
+> microarchitecture and interconnects. Assuming that you ever only have a
+> single SoC with this device, you may get away with #ifdefs in the
+> driver. But if you support two or more SoCs with different behaviours,
+> you'd have to make run-time decisions in the driver or run-time code
+> patching. We are very keen on single kernel binary image/drivers and
+> architecturally compliant code (the cacheable mapping hacks are well
+> outside the architecture behaviour).
+> 
 
-So, it seems like setting either CFCFG or HUPCF (which is what
-downstream android kernel apparently does) avoids this issue.
+Let's put this particular point on hold for now, I would like to focus 
+on getting the basic functions merged in ASAP. I removed the comment in 
+question (it sort of happened naturally when I applied your other 
+comments) in the next revision of the patchset.  I have submitted the 
+patches to our automated test system for sanity checking and I will sent 
+a new patchset once I get the results.
 
-It seems like some sort of hw bug, but not sure if in the iommu or the
-gpu.. you'd probably have to ask someone @qcom about the details, but
-without setting either of these bits, it seems that other concurrent
-memory transactions to the one triggering fault and up returning bogus
-values to the GPU.  So the CP (which is reading cmdstream somewhat far
-ahead of the DRAW or COMPUTE shader that triggers a fault) ends up
-reading bogus cmdstream values and triggers all sorts of spectacular
-fireworks.
+Thanks again for your comments - they have been very useful and have 
+improved the quality of the code for sure.
 
-BR,
--R
+>>>> diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
+>>>> index 81a9a5e..0a1d573 100644
+>>>> --- a/drivers/soc/fsl/qbman/dpaa_sys.h
+>>>> +++ b/drivers/soc/fsl/qbman/dpaa_sys.h
+>>>> @@ -51,12 +51,12 @@
+>>>>    
+>>>>    static inline void dpaa_flush(void *p)
+>>>>    {
+>>>> +	/*
+>>>> +	 * Only PPC needs to flush the cache currently - on ARM the mapping
+>>>> +	 * is non cacheable
+>>>> +	 */
+>>>>    #ifdef CONFIG_PPC
+>>>>    	flush_dcache_range((unsigned long)p, (unsigned long)p+64);
+>>>> -#elif defined(CONFIG_ARM)
+>>>> -	__cpuc_flush_dcache_area(p, 64);
+>>>> -#elif defined(CONFIG_ARM64)
+>>>> -	__flush_dcache_area(p, 64);
+>>>>    #endif
+>>>>    }
+>>>
+>>> Dropping the private API cache maintenance is fine and the memory is WC
+>>> now for ARM (mapping to Normal NonCacheable). However, do you require
+>>> any barriers here? Normal NC doesn't guarantee any ordering.
+>>
+>> The barrier is done in the code where the command is formed. We follow
+>> this pattern
+>> a) Zero the command cache line (the device never reacts to a 0 command
+>> verb so a cast out of this will have no effect)
+>> b) Fill in everything in the command except the command verb (byte 0)
+>> c) Execute a memory barrier
+>> d) Set the command verb (byte 0)
+>> e) Flush the command
+>> If a castout happens between d) and e) doesn't matter since it was about
+>> to be flushed anyway .  Any castout before d) will not cause HW to
+>> process the command because verb is still 0. The barrier at c) prevents
+>> reordering so the HW cannot see the verb set before the command is formed.
+> 
+> I think that's fine, the dpaa_flush() can be a no-op with non-cacheable
+> memory (I had forgotten the details).
+> 
