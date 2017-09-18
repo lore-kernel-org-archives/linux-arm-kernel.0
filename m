@@ -1,132 +1,54 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 18 Sep 2017 16:38:32 +0100
-Subject: [PATCH] arm64: dts: foundation-v8: Enable PSCI mode
-Message-ID: <20170918153832.16356-1-daniel.thompson@linaro.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 18 Sep 2017 23:42:04 +0800
+Subject: [PATCH] nvmem: sunxi-sid: add support for A64/H5's SID controller
+Message-ID: <20170918154204.54427-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently if the Foundation model is running ARM Trusted Firmware then
-the kernel, which is configured to use spin tables, cannot start secondary
-processors or "power off" the simulation.
+Allwinner A64/H5 SoCs come with a SID controller like the one in H3, but
+without the silicon bug that makes the initial value at 0x200 wrong, so
+the value at 0x200 can be directly read.
 
-Add a couple of labels to the include file, and introduce a new .dts
-file that uses these to override the enable-method.
+Add support for this kind of SID controller.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/arm/Makefile                   |  3 +-
- .../boot/dts/arm/foundation-v8-gicv3-psci.dts      | 51 ++++++++++++++++++++++
- arch/arm64/boot/dts/arm/foundation-v8.dtsi         |  8 ++--
- 3 files changed, 57 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts
+ Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
+ drivers/nvmem/sunxi_sid.c                                       | 6 ++++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index 75cc2aa10101..c9ec88809f3d 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,4 +1,5 @@
--dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb foundation-v8-gicv3.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += \
-+	foundation-v8.dtb foundation-v8-gicv3.dtb foundation-v8-gicv3-psci.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb juno-r2.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
-diff --git a/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts b/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts
-new file mode 100644
-index 000000000000..94a249095104
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * ARM Ltd.
-+ *
-+ * ARMv8 Foundation model DTS (GICv3 configuration)
-+ */
-+
-+#include "foundation-v8.dtsi"
-+
-+/ {
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	gic: interrupt-controller at 2f000000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		interrupt-controller;
-+		reg =	<0x0 0x2f000000 0x0 0x10000>,
-+			<0x0 0x2f100000 0x0 0x200000>,
-+			<0x0 0x2c000000 0x0 0x2000>,
-+			<0x0 0x2c010000 0x0 0x2000>,
-+			<0x0 0x2c02f000 0x0 0x2000>;
-+		interrupts = <1 9 4>;
-+
-+		its: its at 2f020000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x0 0x2f020000 0x0 0x20000>;
-+		};
-+	};
+diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+index ef06d061913c..6ea0836939ee 100644
+--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
++++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+@@ -5,6 +5,7 @@ Required properties:
+   "allwinner,sun4i-a10-sid"
+   "allwinner,sun7i-a20-sid"
+   "allwinner,sun8i-h3-sid"
++  "allwinner,sun50i-a64-sid"
+ 
+ - reg: Should contain registers location and length
+ 
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index 0d6648be93b8..3c9fd4fb9207 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -199,10 +199,16 @@ static const struct sunxi_sid_cfg sun8i_h3_cfg = {
+ 	.need_register_readout = true,
+ };
+ 
++static const struct sunxi_sid_cfg sun50i_a64_cfg = {
++	.value_offset = 0x200,
++	.size = 0x100,
 +};
 +
-+&cpu0 {
-+	enable-method = "psci";
-+};
-+
-+&cpu1 {
-+	enable-method = "psci";
-+};
-+
-+&cpu2 {
-+	enable-method = "psci";
-+};
-+
-+&cpu3 {
-+	enable-method = "psci";
-+};
-diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dtsi b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
-index 8ecdd4331980..8c7f8c4f090a 100644
---- a/arch/arm64/boot/dts/arm/foundation-v8.dtsi
-+++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
-@@ -28,7 +28,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <0>;
-
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x0>;
-@@ -36,7 +36,7 @@
- 			cpu-release-addr = <0x0 0x8000fff8>;
- 			next-level-cache = <&L2_0>;
- 		};
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x1>;
-@@ -44,7 +44,7 @@
- 			cpu-release-addr = <0x0 0x8000fff8>;
- 			next-level-cache = <&L2_0>;
- 		};
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x2>;
-@@ -52,7 +52,7 @@
- 			cpu-release-addr = <0x0 0x8000fff8>;
- 			next-level-cache = <&L2_0>;
- 		};
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x3>;
---
-2.9.5
+ static const struct of_device_id sunxi_sid_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-sid", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun7i-a20-sid", .data = &sun7i_a20_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-sid", .data = &sun8i_h3_cfg },
++	{ .compatible = "allwinner,sun50i-a64-sid", .data = &sun50i_a64_cfg },
+ 	{/* sentinel */},
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_sid_of_match);
+-- 
+2.13.5
