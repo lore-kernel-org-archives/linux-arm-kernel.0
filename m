@@ -1,109 +1,161 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 18 Sep 2017 09:29:27 +0800
-Subject: [PATCH v3 3/3] media: ov7670: Add the s_power operation
-In-Reply-To: <20170918012928.13278-1-wenyou.yang@microchip.com>
-References: <20170918012928.13278-1-wenyou.yang@microchip.com>
-Message-ID: <20170918012928.13278-4-wenyou.yang@microchip.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Mon, 18 Sep 2017 09:37:30 +0800
+Subject: [PATCH 6/6] arm64: topology: Enable ACPI/PPTT based CPU topology.
+In-Reply-To: <20170914184918.20406-7-jeremy.linton@arm.com>
+References: <20170914184918.20406-1-jeremy.linton@arm.com>
+ <20170914184918.20406-7-jeremy.linton@arm.com>
+Message-ID: <93846e2c-df62-fda6-200a-f55bfb9955c4@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the s_power operation which is responsible for manipulating the
-power dowm mode through the PWDN pin and the reset operation through
-the RESET pin.
+Hi Jeremy,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
+On 2017/9/15 2:49, Jeremy Linton wrote:
+> Propagate the topology information from the PPTT tree to the
+> cpu_topology array. We can get the thread id, core_id and
+> cluster_id by assuming certain levels of the PPTT tree correspond
+> to those concepts. The package_id is flagged in the tree and can be
+> found by passing an arbitrary large level to setup_acpi_cpu_topology()
+> which terminates its search when it finds an ACPI node flagged
+> as the physical package. If the tree doesn't contain enough
+> levels to represent all of thread/core/cod/package then the package
+> id will be used for the missing levels.
+> 
+> Since arm64 machines can have 3 distinct topology levels, and the
+> scheduler only handles sockets/threads well today, we compromise
+> by collapsing into one of three diffrent configurations. These are
+> thread/socket, thread/cluster or cluster/socket depending on whether
+> the machine has threading and multisocket, threading in a single
+> socket, or doesn't have threading.
+> 
+> This code is loosely based on a combination of code from:
+> Xiongfeng Wang <wangxiongfeng2@huawei.com>
+> John Garry <john.garry@huawei.com>
+> Jeffrey Hugo <jhugo@codeaurora.org>
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/topology.c | 68 +++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/topology.h     |  2 ++
+>  2 files changed, 69 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 9147e5b6326d..8ee5cc5ba9bd 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -11,6 +11,7 @@
+>   * for more details.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/arch_topology.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpumask.h>
+> @@ -22,6 +23,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/sched/topology.h>
+>  #include <linux/slab.h>
+> +#include <linux/smp.h>
+>  #include <linux/string.h>
+>  
+>  #include <asm/cpu.h>
+> @@ -304,6 +306,68 @@ static void __init reset_cpu_topology(void)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +/*
+> + * Propagate the topology information of the processor_topology_node tree to the
+> + * cpu_topology array.
+> + */
+> +static int __init parse_acpi_topology(void)
+> +{
+> +	u64 is_threaded;
+> +	int is_multisocket;
+> +	int cpu;
+> +	int topology_id;
+> +	/* set a large depth, to hit ACPI_PPTT_PHYSICAL_PACKAGE if one exists */
+> +	const int max_topo = 0xFF;
+> +
+> +	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+> +	is_multisocket = acpi_multisocket_count();
+> +	if (is_multisocket < 0)
+> +		return is_multisocket;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		topology_id = setup_acpi_cpu_topology(cpu, 0);
+> +		if (topology_id < 0)
+> +			return topology_id;
+> +
+> +		if ((is_threaded) && (is_multisocket > 1)) {
+> +			/* MT per core, and multiple sockets */
+> +			cpu_topology[cpu].thread_id = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, 1);
+> +			cpu_topology[cpu].core_id   = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, 2);
+> +			cpu_topology[cpu].cluster_id = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
+> +			cpu_topology[cpu].package_id = topology_id;
+> +		} else if (is_threaded) {
+> +			/* mutltiple threads, but only a single socket */
+> +			cpu_topology[cpu].thread_id  = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, 1);
+> +			cpu_topology[cpu].core_id    = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, 2);
+> +			cpu_topology[cpu].cluster_id = topology_id;
+> +			cpu_topology[cpu].package_id = topology_id;
+> +		} else {
+> +			/* no threads, clusters behave like threads */
+> +			cpu_topology[cpu].thread_id  = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, 1);
+> +			cpu_topology[cpu].core_id    = topology_id;
+> +			cpu_topology[cpu].cluster_id = topology_id;
+> +			topology_id = setup_acpi_cpu_topology(cpu, max_topo);
+> +			cpu_topology[cpu].package_id = topology_id;
 
-Changes in v3: None
-Changes in v2:
- - Add the patch to support the get_fmt ops.
- - Remove the redundant invoking ov7670_init_gpio().
+I can not understand why should we consider cores in a cluster as threads. The scheduler will
+be effected a lot by this. And the 'lstopo' may display wrong information.
 
- drivers/media/i2c/ov7670.c | 32 +++++++++++++++++++++++++++-----
- 1 file changed, 27 insertions(+), 5 deletions(-)
+Thanks,
+Xiongfeng Wang
 
-diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
-index 5d6f1859a39b..66b9bf2111f7 100644
---- a/drivers/media/i2c/ov7670.c
-+++ b/drivers/media/i2c/ov7670.c
-@@ -1529,6 +1529,22 @@ static int ov7670_s_register(struct v4l2_subdev *sd, const struct v4l2_dbg_regis
- }
- #endif
- 
-+static int ov7670_s_power(struct v4l2_subdev *sd, int on)
-+{
-+	struct ov7670_info *info = to_state(sd);
-+
-+	if (info->pwdn_gpio)
-+		gpiod_direction_output(info->pwdn_gpio, !on);
-+	if (on && info->resetb_gpio) {
-+		gpiod_set_value(info->resetb_gpio, 1);
-+		usleep_range(500, 1000);
-+		gpiod_set_value(info->resetb_gpio, 0);
-+		usleep_range(3000, 5000);
-+	}
-+
-+	return 0;
-+}
-+
- static void ov7670_get_default_format(struct v4l2_subdev *sd,
- 				      struct v4l2_mbus_framefmt *format)
- {
-@@ -1560,6 +1576,7 @@ static const struct v4l2_subdev_core_ops ov7670_core_ops = {
- 	.g_register = ov7670_g_register,
- 	.s_register = ov7670_s_register,
- #endif
-+	.s_power = ov7670_s_power,
- };
- 
- static const struct v4l2_subdev_video_ops ov7670_video_ops = {
-@@ -1673,23 +1690,25 @@ static int ov7670_probe(struct i2c_client *client,
- 	if (ret)
- 		return ret;
- 
--	ret = ov7670_init_gpio(client, info);
--	if (ret)
--		goto clk_disable;
--
- 	info->clock_speed = clk_get_rate(info->clk) / 1000000;
- 	if (info->clock_speed < 10 || info->clock_speed > 48) {
- 		ret = -EINVAL;
- 		goto clk_disable;
- 	}
- 
-+	ret = ov7670_init_gpio(client, info);
-+	if (ret)
-+		goto clk_disable;
-+
-+	ov7670_s_power(sd, 1);
-+
- 	/* Make sure it's an ov7670 */
- 	ret = ov7670_detect(sd);
- 	if (ret) {
- 		v4l_dbg(1, debug, client,
- 			"chip found @ 0x%x (%s) is not an ov7670 chip.\n",
- 			client->addr << 1, client->adapter->name);
--		goto clk_disable;
-+		goto power_off;
- 	}
- 	v4l_info(client, "chip found @ 0x%02x (%s)\n",
- 			client->addr << 1, client->adapter->name);
-@@ -1764,6 +1783,8 @@ static int ov7670_probe(struct i2c_client *client,
- 	media_entity_cleanup(&info->sd.entity);
- hdl_free:
- 	v4l2_ctrl_handler_free(&info->hdl);
-+power_off:
-+	ov7670_s_power(sd, 0);
- clk_disable:
- 	clk_disable_unprepare(info->clk);
- 	return ret;
-@@ -1779,6 +1800,7 @@ static int ov7670_remove(struct i2c_client *client)
- 	v4l2_ctrl_handler_free(&info->hdl);
- 	clk_disable_unprepare(info->clk);
- 	media_entity_cleanup(&info->sd.entity);
-+	ov7670_s_power(sd, 0);
- 	return 0;
- }
- 
--- 
-2.13.0
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
+> +#else
+> +static int __init parse_acpi_topology(void)
+> +{
+> +	/*ACPI kernels should be built with PPTT support*/
+> +	return -EINVAL;
+> +}
+> +#endif
+> +
+>  void __init init_cpu_topology(void)
+>  {
+>  	reset_cpu_topology();
+> @@ -312,6 +376,8 @@ void __init init_cpu_topology(void)
+>  	 * Discard anything that was parsed if we hit an error so we
+>  	 * don't use partial information.
+>  	 */
+> -	if (of_have_populated_dt() && parse_dt_topology())
+> +	if ((!acpi_disabled) && parse_acpi_topology())
+> +		reset_cpu_topology();
+> +	else if (of_have_populated_dt() && parse_dt_topology())
+>  		reset_cpu_topology();
+>  }
+> diff --git a/include/linux/topology.h b/include/linux/topology.h
+> index 4660749a7303..08bf736be7c1 100644
+> --- a/include/linux/topology.h
+> +++ b/include/linux/topology.h
+> @@ -43,6 +43,8 @@
+>  		if (nr_cpus_node(node))
+>  
+>  int arch_update_cpu_topology(void);
+> +int setup_acpi_cpu_topology(unsigned int cpu, int level);
+> +int acpi_multisocket_count(void);
+>  
+>  /* Conform to ACPI 2.0 SLIT distance definitions */
+>  #define LOCAL_DISTANCE		10
+> 
