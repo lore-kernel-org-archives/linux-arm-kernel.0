@@ -1,36 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Sep 2017 09:58:37 +0200
-Subject: [PATCH v2 02/10] dmaengine: sun6i: Correct burst length field
- offsets for H3
-In-Reply-To: <20170917031956.28010-3-stefan.bruens@rwth-aachen.de>
-References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
- <20170917031956.28010-3-stefan.bruens@rwth-aachen.de>
-Message-ID: <20170918075837.quzrgygzzpdsooh2@flea.lan>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 18 Sep 2017 09:58:10 +0200
+Subject: [PATCH 5/9] arm64: dts: marvell: mcbin: add comphy references to
+ Ethernet ports
+In-Reply-To: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
+References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170918075814.27405-6-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 17, 2017 at 05:19:48AM +0200, Stefan Br?ns wrote:
-> For the H3, the burst lengths field offsets in the channel configuration
-> register differs from earlier SoC generations.
-> 
-> Using the A31 register macros actually configured the H3 controller
-> do to bursts of length 1 always, which although working leads to higher
-> bus utilisation.
-> 
-> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+This patch adds comphy phandles to the Ethernet ports in the mcbin
+device tree. The comphy is used to configure the serdes PHYs used by
+these ports.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Maxime
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index acf5c7d16d79..9a3b4a1fd445 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -223,6 +223,7 @@
+ &cpm_eth0 {
+ 	status = "okay";
+ 	phy = <&phy0>;
++	phys = <&cpm_comphy4 0>;
+ 	phy-mode = "10gbase-kr";
+ };
+ 
+@@ -258,6 +259,7 @@
+ &cps_eth0 {
+ 	status = "okay";
+ 	phy = <&phy8>;
++	phys = <&cps_comphy4 0>;
+ 	phy-mode = "10gbase-kr";
+ };
+ 
+@@ -266,6 +268,7 @@
+ 	status = "okay";
+ 	phy = <&ge_phy>;
+ 	phy-mode = "sgmii";
++	phys = <&cps_comphy0 1>;
+ };
+ 
+ &cps_pinctrl {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/76d8c1ac/attachment.sig>
+2.13.5
