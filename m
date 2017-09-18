@@ -1,37 +1,74 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 18 Sep 2017 16:39:46 -0400
-Subject: [v5 11/12] soc/fsl/qbman: Add missing headers on ARM
+Date: Mon, 18 Sep 2017 16:39:40 -0400
+Subject: [v5 05/12] soc/fsl/qbman: Drop set/clear_bits usage
 In-Reply-To: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
 References: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1505767187-4596-12-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1505767187-4596-6-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Claudiu Manoil <claudiu.manoil@nxp.com>
+From: Madalin Bucur <madalin.bucur@nxp.com>
 
-Unlike PPC builds, ARM builds need following headers
-explicitly:
-+#include <linux/io.h>		for ioread32be()
-+#include <linux/delay.h>		for udelay()
+Replace PPC specific set/clear_bits API with standard
+bit twiddling so driver is portalable outside PPC.
 
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/dpaa_sys.h | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/soc/fsl/qbman/bman.c | 2 +-
+ drivers/soc/fsl/qbman/qman.c | 8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
-index 5a2c0af..9f37900 100644
---- a/drivers/soc/fsl/qbman/dpaa_sys.h
-+++ b/drivers/soc/fsl/qbman/dpaa_sys.h
-@@ -44,6 +44,8 @@
- #include <linux/prefetch.h>
- #include <linux/genalloc.h>
- #include <asm/cacheflush.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
+diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
+index 604e45c..ff8998f 100644
+--- a/drivers/soc/fsl/qbman/bman.c
++++ b/drivers/soc/fsl/qbman/bman.c
+@@ -616,7 +616,7 @@ int bman_p_irqsource_add(struct bman_portal *p, u32 bits)
+ 	unsigned long irqflags;
  
- /* For 2-element tables related to cache-inhibited and cache-enabled mappings */
- #define DPAA_PORTAL_CE 0
+ 	local_irq_save(irqflags);
+-	set_bits(bits & BM_PIRQ_VISIBLE, &p->irq_sources);
++	p->irq_sources |= bits & BM_PIRQ_VISIBLE;
+ 	bm_out(&p->p, BM_REG_IER, p->irq_sources);
+ 	local_irq_restore(irqflags);
+ 	return 0;
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index 1bcfc51..25419e1 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -908,12 +908,12 @@ static inline int qm_mc_result_timeout(struct qm_portal *portal,
+ 
+ static inline void fq_set(struct qman_fq *fq, u32 mask)
+ {
+-	set_bits(mask, &fq->flags);
++	fq->flags |= mask;
+ }
+ 
+ static inline void fq_clear(struct qman_fq *fq, u32 mask)
+ {
+-	clear_bits(mask, &fq->flags);
++	fq->flags &= ~mask;
+ }
+ 
+ static inline int fq_isset(struct qman_fq *fq, u32 mask)
+@@ -1574,7 +1574,7 @@ void qman_p_irqsource_add(struct qman_portal *p, u32 bits)
+ 	unsigned long irqflags;
+ 
+ 	local_irq_save(irqflags);
+-	set_bits(bits & QM_PIRQ_VISIBLE, &p->irq_sources);
++	p->irq_sources |= bits & QM_PIRQ_VISIBLE;
+ 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
+ 	local_irq_restore(irqflags);
+ }
+@@ -1597,7 +1597,7 @@ void qman_p_irqsource_remove(struct qman_portal *p, u32 bits)
+ 	 */
+ 	local_irq_save(irqflags);
+ 	bits &= QM_PIRQ_VISIBLE;
+-	clear_bits(bits, &p->irq_sources);
++	p->irq_sources &= ~bits;
+ 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
+ 	ier = qm_in(&p->p, QM_REG_IER);
+ 	/*
 -- 
 2.7.4
