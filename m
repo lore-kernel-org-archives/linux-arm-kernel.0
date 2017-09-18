@@ -1,94 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Sep 2017 10:30:45 +0200
-Subject: [PATCH v4 1/6] dt-bindings: update the Allwinner GPADC device
- tree binding for H3
-In-Reply-To: <310CE549-B8CE-4C0C-95B1-B545E38BDAF5@aosc.io>
-References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-2-icenowy@aosc.io>
- <20170918073336.j7finend3g76chsu@flea.lan>
- <310CE549-B8CE-4C0C-95B1-B545E38BDAF5@aosc.io>
-Message-ID: <20170918083045.7bfiialtbm7w6i7j@flea.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Sep 2017 09:36:29 +0100
+Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
+In-Reply-To: <20170917093906.16325-2-linus.walleij@linaro.org>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-2-linus.walleij@linaro.org>
+Message-ID: <20170918083629.qn4dlrmk7ffipfsz@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 03:36:43PM +0800, Icenowy Zheng wrote:
-> ? 2017?9?18? GMT+08:00 ??3:33:36, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Thu, Sep 14, 2017 at 10:52:46PM +0800, Icenowy Zheng wrote:
-> >> Allwinner H3 features a thermal sensor like the one in A33, but has
-> >its
-> >> register re-arranged, the clock divider moved to CCU (originally the
-> >> clock divider is in ADC) and added a pair of bus clock and reset.
-> >> 
-> >> Update the binding document to cover H3.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >> Changes in v4:
-> >> - Add nvmem calibration data (not yet used by the driver)
-> >> Changes in v3:
-> >> - Clock name changes.
-> >> - Example node name changes.
-> >> - Add interupts (not yet used by the driver).
-> >> 
-> >>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30
-> >++++++++++++++++++++--
-> >>  1 file changed, 28 insertions(+), 2 deletions(-)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> >b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> >> index badff3611a98..6c470d584bf9 100644
-> >> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> >> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> >> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can also
-> >act as a thermal sensor
-> >>  and sometimes as a touchscreen controller.
-> >>  
-> >>  Required properties:
-> >> -  - compatible: "allwinner,sun8i-a33-ths",
-> >> +  - compatible: must contain one of the following compatibles:
-> >> +		- "allwinner,sun8i-a33-ths"
-> >> +		- "allwinner,sun8i-h3-ths"
-> >>    - reg: mmio address range of the chip,
-> >>    - #thermal-sensor-cells: shall be 0,
-> >>    - #io-channel-cells: shall be 0,
-> >>  
-> >> -Example:
-> >> +Optional properties:
-> >> +  - nvmem-cells: A phandle to the calibration data provided by a
-> >nvmem device.
-> >> +                 If unspecified default values shall be used.
-> >> +  - nvmem-cell-names: Should be "calibration-data"
-> >
-> >I'd prefer to have which sensor it applies to here. It wouldn't change
-> >anything for the H3, but it definitely does for example for the A83t
-> >that has two sensors, one for each cluster, and one for the GPU, each
-> >with calibration data.
-> >
-> >What about cluster0-calibration?
+On Sun, 17 Sep 2017, Linus Walleij wrote:
+
+> This converts the GPIO-based I2C-driver to using GPIO
+> descriptors instead of the old global numberspace-based
+> GPIO interface. We:
+
+[STUFF]
+
+> - The MFD Silicon Motion SM501 is a special case. It dynamically
+>   spawns an I2C bus off the MFD using sm501_create_subdev().
+>   We use an approach to dynamically create a machine descriptor
+>   table and attach this to the "SM501-LOW" or "SM501-HIGH"
+>   gpiochip. We use chip-local offsets to grab the right lines.
+>   We can get rid of two local static inline helpers as part
+>   of this refactoring.
 > 
-> The calibration data is in fact a 2 word (8 bytes) zone,
-> which is reserved for 4 sensors on all SoCs, even on H3.
-> It's half word per sensor.
+> Cc: Steven Miao <realmz6@gmail.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+> Cc: Heiko Schocher <hs@denx.de>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Fix a minor typo in error path (scl was sda from copy-paste)
+> - Collected Olof's ACK
 > 
-> I prefer to just assume a 2 word cell for every SoC.
+> Steven (Blackfin): requesting ACK for Wolfram to take this patch.
+> Ralf (MIPS): requesting ACK for Wolfram to take this patch.
+> Lee: requesting ACK for Wolfram to take this patch.
 
-You have three different data sources, it should be reprensented as
-such.
+This ...
 
-Otherwise, the client has to get some knowledge of how the data are
-stored in the provider, which is an abstraction violation.
+> SM501 users: requesting Tested-by on this patch.
 
-Maxime
+... loosely depends on this (until it doesn't).
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/f7a804e9/attachment-0001.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
