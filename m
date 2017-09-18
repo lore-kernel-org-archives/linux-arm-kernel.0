@@ -1,31 +1,31 @@
-From: nickey.yang@rock-chips.com (Nickey Yang)
-Date: Mon, 18 Sep 2017 16:36:53 +0800
-Subject: [PATCH 1/3] of: Add vendor prefix for kingdisplay
-Message-ID: <1505723813-5942-1-git-send-email-nickey.yang@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 18 Sep 2017 10:49:46 +0200
+Subject: [PATCH v2 4/8] arm64: dts: renesas: r8a77970: add [H]SCIF support
+In-Reply-To: <20170915194433.872217806@cogentembedded.com>
+References: <20170915194433.872217806@cogentembedded.com>
+Message-ID: <CAMuHMdVTrZdi7CKUX9vrD14TvawVotsxvqM43J61FDHsS6OsnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kingdisplay Technology Co., Ltd, established in
-China Shenzhen in 2006, is a national high-tech
-enterprise specializing in the R&D, manufacturing
-and marketing of TFT-LCM and touch panel.
+On Fri, Sep 15, 2017 at 9:43 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe [H]SCIF ports in the R8A77970 device tree.
+>
+> Based on the original (and large) patch by Daisuke Matsushita
+> <daisuke.matsushita.ns@hitachi.com>.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Nickey Yang <nickey.yang@rock-chips.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 1ea1fd4..506aaa3 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -173,6 +173,7 @@ keithkoep	Keith & Koep GmbH
- keymile	Keymile GmbH
- khadas	Khadas
- kinetic Kinetic Technologies
-+kingdisplay	King & Display Technology Co., Ltd.
- kingnovel	Kingnovel Technology Co., Ltd.
- kosagi	Sutajio Ko-Usagi PTE Ltd.
- kyo	Kyocera Corporation
--- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
