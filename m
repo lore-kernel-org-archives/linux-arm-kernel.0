@@ -1,36 +1,79 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 18 Sep 2017 11:07:17 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20170915132844.GW32278@pali>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <20170905233241.GA19231@js1304-P5Q-DELUXE>
- <20170906133057.GH5024@atomide.com>
- <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170915132844.GW32278@pali>
-Message-ID: <20170918020716.GB19200@js1304-P5Q-DELUXE>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Mon, 18 Sep 2017 09:46:03 +0800
+Subject: [PATCH] Asoc: rockchip: Init dapm routes dynamically
+In-Reply-To: <20170916005407.GH173745@google.com>
+References: <20170905041401.23866-1-jeffy.chen@rock-chips.com>
+ <20170916005407.GH173745@google.com>
+Message-ID: <59BF255B.2040203@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Matthias,
 
-On Fri, Sep 15, 2017 at 03:28:44PM +0200, Pali Roh?r wrote:
-> On Thursday 07 September 2017 16:30:38 Joonsoo Kim wrote:
-> > If it doesn't help, is there a way to test n900 configuration in QEMU?
-> 
-> Hi Joonsoo, linaro version of QEMU has support for n900 machine. For
-> more information how to prepare & run kernel image see this email:
-> https://lists.denx.de/pipermail/u-boot/2015-January/200171.html
-> (instead u-boot.bin you would supply kernel's zImage)
+Thanks for your test and review.
 
-I tried to search to download required tools but cannot find a qflasher.
-Looks like you have qflasher and other *.bin for n900 image.
-Could you share them to me, please?
+On 09/16/2017 08:54 AM, Matthias Kaehlcke wrote:
+>> -static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
+>> >-	/* Input Lines */
+>> >-	{"MIC", NULL, "Headset Mic"},
+>> >-	{"DMIC1L", NULL, "Int Mic"},
+>> >-	{"DMIC1R", NULL, "Int Mic"},
+>> >-
+>> >-	/* Output Lines */
+>> >-	{"Headphones", NULL, "HPL"},
+>> >-	{"Headphones", NULL, "HPR"},
+>> >-	{"Speakers", NULL, "Speaker"},
+>> >+	SND_SOC_DAPM_LINE("HDMI", NULL),
+> The HDMI items are newly added, I think a separate patch would be
+> preferable.
+ok, will do
 
-> But QEMU does not support HS mode, so there is probably no secure ram.
-> IIRC smc instructions should not be used in normal GP mode.
+>
+>> >  };
+>> >
+>> >  static const struct snd_kcontrol_new rockchip_controls[] = {
+>> >@@ -66,6 +55,7 @@ static const struct snd_kcontrol_new rockchip_controls[] = {
+>> >  	SOC_DAPM_PIN_SWITCH("Speakers"),
+>> >  	SOC_DAPM_PIN_SWITCH("Headset Mic"),
+>> >  	SOC_DAPM_PIN_SWITCH("Int Mic"),
+>> >+	SOC_DAPM_PIN_SWITCH("HDMI"),
+>> >  };
+>> >
+>> >  static int rockchip_sound_max98357a_hw_params(struct snd_pcm_substream *substream,
+>> >@@ -314,8 +304,6 @@ static struct snd_soc_card rockchip_sound_card = {
+>> >  	.owner = THIS_MODULE,
+>> >  	.dapm_widgets = rockchip_dapm_widgets,
+>> >  	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
+>> >-	.dapm_routes = rockchip_dapm_routes,
+>> >-	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
+>> >  	.controls = rockchip_controls,
+>> >  	.num_controls = ARRAY_SIZE(rockchip_controls),
+>> >  };
+>> >@@ -391,6 +379,65 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
+>> >  	},
+>> >  };
+>> >
+>> >+static const struct snd_soc_dapm_route rockchip_sound_cdndp_routes[] = {
+>> >+	/* Output */
+>> >+	{"HDMI", NULL, "TX"},
+>> >+};
+>> >+
+>> >+static const struct snd_soc_dapm_route rockchip_sound_da7219_routes[] = {
+>> >+	/* Output */
+>> >+	{"Headphones", NULL, "HPL"},
+>> >+	{"Headphones", NULL, "HPR"},
+>> >+
+>> >+	/* Input */
+>> >+	{"MIC", NULL, "Headset Mic"},
+>> >+};
+>> >+
+>> >+static const struct snd_soc_dapm_route rockchip_sound_dmic_routes[] = {
+>> >+	/* Input */
+>> >+	{"Dmic", NULL, "Int Mic"},
+> Should be "DMic" as in dmic_dapm_widgets of the dmic codec driver.
+>
+> This route is also new and would probably be better added in a
+> separate patch.
 
-Okay. Thanks for information. I'm not sure that I can regenerate the
-error with n900 QEMU emulation but that would be my best so I will
-try.
-
-Thanks.
+ok, will do
+>
