@@ -1,29 +1,134 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 18 Sep 2017 11:02:13 +0200
-Subject: [PATCH v2 0/2] stm32 clocksource driver rework
-Message-ID: <1505725335-27081-1-git-send-email-benjamin.gaignard@linaro.org>
+Date: Mon, 18 Sep 2017 11:02:15 +0200
+Subject: [PATCH v2 2/2] arm: dts: stm32: remove useless clocksource nodes
+In-Reply-To: <1505725335-27081-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1505725335-27081-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1505725335-27081-3-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-version 2:
-- fix uninitialized variable
+16 bits timers aren't accurate enough to be used as
+clocksource, remove them from stm32f4 and stm32f7 devicetree.
 
-These patch implements clocksource and clockevent by using only one hardware block.
-It also limits usage of clocksource to 32 bits timers because 16 bits ones
-aren't enough accurate.
-Series includes minor clean up in structures, function prototypes and driver name.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 32 --------------------------------
+ arch/arm/boot/dts/stm32f746.dtsi | 32 --------------------------------
+ 2 files changed, 64 deletions(-)
 
-Since 16 bits timers become useless it also removes them from stm32f4 and
-stm32f7 devicetree.
-
-Benjamin Gaignard (2):
-  clocksource: stm32: rework driver to use only one timer
-  arm: dts: stm32: remove useless clocksource nodes
-
- arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
- arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
- drivers/clocksource/timer-stm32.c | 259 +++++++++++++++++++++++---------------
- 3 files changed, 155 insertions(+), 168 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index a8113dc..fd211cb 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -108,14 +108,6 @@
+ 			};
+ 		};
+ 
+-		timer3: timer at 40000400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000400 0x400>;
+-			interrupts = <29>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM3)>;
+-			status = "disabled";
+-		};
+-
+ 		timers3: timers at 40000400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -137,14 +129,6 @@
+ 			};
+ 		};
+ 
+-		timer4: timer at 40000800 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000800 0x400>;
+-			interrupts = <30>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM4)>;
+-			status = "disabled";
+-		};
+-
+ 		timers4: timers at 40000800 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -194,14 +178,6 @@
+ 			};
+ 		};
+ 
+-		timer6: timer at 40001000 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001000 0x400>;
+-			interrupts = <54>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM6)>;
+-			status = "disabled";
+-		};
+-
+ 		timers6: timers at 40001000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -218,14 +194,6 @@
+ 			};
+ 		};
+ 
+-		timer7: timer at 40001400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001400 0x400>;
+-			interrupts = <55>;
+-			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM7)>;
+-			status = "disabled";
+-		};
+-
+ 		timers7: timers at 40001400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index 4506eb9..c4d0273 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -82,22 +82,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		timer3: timer at 40000400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000400 0x400>;
+-			interrupts = <29>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM3)>;
+-			status = "disabled";
+-		};
+-
+-		timer4: timer at 40000800 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40000800 0x400>;
+-			interrupts = <30>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM4)>;
+-			status = "disabled";
+-		};
+-
+ 		timer5: timer at 40000c00 {
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000c00 0x400>;
+@@ -105,22 +89,6 @@
+ 			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM5)>;
+ 		};
+ 
+-		timer6: timer at 40001000 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001000 0x400>;
+-			interrupts = <54>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM6)>;
+-			status = "disabled";
+-		};
+-
+-		timer7: timer at 40001400 {
+-			compatible = "st,stm32-timer";
+-			reg = <0x40001400 0x400>;
+-			interrupts = <55>;
+-			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM7)>;
+-			status = "disabled";
+-		};
+-
+ 		rtc: rtc at 40002800 {
+ 			compatible = "st,stm32-rtc";
+ 			reg = <0x40002800 0x400>;
 -- 
 2.7.4
