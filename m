@@ -1,36 +1,110 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 18 Sep 2017 13:31:17 +0100
-Subject: Tegra baseline test results for v4.14-rc1
-In-Reply-To: <78b1e33f-cc9f-85c6-c7ae-3ecf0f1c2da4@nvidia.com>
-References: <78b1e33f-cc9f-85c6-c7ae-3ecf0f1c2da4@nvidia.com>
-Message-ID: <c79d5bcd-ad30-e93e-3e5e-01070b379fee@nvidia.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Mon, 18 Sep 2017 15:43:47 +0300
+Subject: [PATCH 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <5c90f022-5cb1-c746-6015-c93a58805cfe@samsung.com>
+References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20170918100944eucas1p2735d3d6a6ee562b927fb9dfaeb0d4090@eucas1p2.samsung.com>
+ <1505729371-6509-1-git-send-email-andrzej.p@samsung.com>
+ <87y3pcmgv6.fsf@linux.intel.com>
+ <e1e1b4e5-0678-faaf-e97b-b18095342af2@ti.com>
+ <96001441-2a67-ac9c-a606-eac66138d09e@samsung.com>
+ <5c90f022-5cb1-c746-6015-c93a58805cfe@samsung.com>
+Message-ID: <87vakgmb24.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 18/09/17 12:35, Jon Hunter wrote:
-> Here are some basic Tegra test results for Linux v4.14-rc1.
-> Logs and other details at:
-> 
->     https://nvtb.github.io//linux/test_v4.14-rc1/20170916163103/
-> 
-> 
-> Test summary
-> ------------
-> 
-> Build: zImage:
->     FAIL: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Hi,
 
-Build failures are occurring in Tegra DRM driver and a fix is available
-here [0]. With this fix in place we are seeing some failures in system
-suspend for Tegra30/114/124 and this is being discussed here [1].
+Andrzej Pietrasiewicz <andrzej.p@samsung.com> writes:
+>>>>> +static int exynos5_usbdrd_phy_reset(struct phy *phy)
+>>>>> +{
+>>>>> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+>>>>> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+>>>>> +
+>>>>> +	return exynos5420_usbdrd_phy_calibrate(phy_drd);
+>>>>> +}
+>>>>> +
+>>>>>    static const struct phy_ops exynos5_usbdrd_phy_ops = {
+>>>>>    	.init		= exynos5_usbdrd_phy_init,
+>>>>>    	.exit		= exynos5_usbdrd_phy_exit,
+>>>>>    	.power_on	= exynos5_usbdrd_phy_power_on,
+>>>>>    	.power_off	= exynos5_usbdrd_phy_power_off,
+>>>>> +	.reset		= exynos5_usbdrd_phy_reset,
+>>>>>    	.owner		= THIS_MODULE,
+>>>>>    };
+>>>>>    
+>>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>>>> index 03474d3..1d5836e 100644
+>>>>> --- a/drivers/usb/dwc3/core.c
+>>>>> +++ b/drivers/usb/dwc3/core.c
+>>>>> @@ -156,9 +156,10 @@ static void __dwc3_set_mode(struct work_struct *work)
+>>>>>    		} else {
+>>>>>    			if (dwc->usb2_phy)
+>>>>>    				otg_set_vbus(dwc->usb2_phy->otg, true);
+>>>>> -			if (dwc->usb2_generic_phy)
+>>>>> +			if (dwc->usb2_generic_phy) {
+>>>>>    				phy_set_mode(dwc->usb2_generic_phy, PHY_MODE_USB_HOST);
+>>>>> -
+>>>>> +				phy_reset(dwc->usb2_generic_phy);
+>>>>
+>>>> it doesn't look like this is the best place to reset the phy. Also,
+>>>
+>>> right, phy_reset is done during initialization before phy_power_on/phy_init or
+>>> in error cases.
+>>>
+>>>> ->reset() doesn't seem to match correctly with a calibration. That seems
+>>>> to be more fitting to a ->power_on() or ->init() implementation.
+>>>
+>>> yeah, the initial patch seems to calibrate in phy_init(). Not sure why it's
+>>> modified.
+>> 
+>> The original patch used a hack like below, in xhci_plat_probe():
+>> 
+>> +       /* Initialize and power-on USB 3.0 PHY */
+>> +       xhci->shared_hcd->phy->init_count = 0;
+>> +       ret = phy_init(xhci->shared_hcd->phy);
+>> +       if (ret)
+>> +               goto dealloc_usb3_hcd;
+>> +
+>> +       xhci->shared_hcd->phy->power_count = 0;
+>> +       ret = phy_power_on(xhci->shared_hcd->phy);
+>> +       if (ret) {
+>> +               phy_exit(xhci->shared_hcd->phy);
+>> +               goto dealloc_usb3_hcd;
+>> +       }
+>> +
+>> 
+>> Manually setting init_count to 0 in order for the subsequent phy_init() to
+>> happen probably does not look good.
+>> 
+>> The calibration is clearly needed. However, I don't have any strong opinions
+>> on from which place exactly to trigger the calibration process.
+>> The original patch did not make it upstream, but if that patch is ok,
+>> it is perfectly fine with me to drop my version and take that one instead.
+>
+> Me bad, I did not write about an important issue.
+> The calibration must happen after usb_add_hcd(), otherwise
+> usb_add_hcd() indirectly triggers overwriting the effects of calibration.
 
-Cheers
-Jon
+in that case, you should do that from xhci-plat indeed. I think the
+whole idea with init_count is just to make sure you don't initialize it
+twice.
 
-[0]
-https://cgit.freedesktop.org/tegra/linux/commit/?h=drm/tegra/for-next&id=65d5d30ccebd555de9ad8fd2b5dfc50291922337
-[1] https://marc.info/?l=linux-tegra&m=150471582826806&w=2
+One thing's for sure, ->reset() doesn't seem to be the matching callback
+for you to use and, given your explanation above, dwc3 doesn't seem to
+be the right place to fiddle with that.
+
+Seems like we need an extension of the generic PHY framework to cope
+with your requirement.
 
 -- 
-nvpublic
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/9b31d644/attachment.sig>
