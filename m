@@ -1,31 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 18 Sep 2017 12:55:20 +0200
-Subject: [RFC RESEND 0/3] Add support for Hisilicon Hi3521A SoC
-In-Reply-To: <20170917082327.10058-1-hanetzer@startmail.com>
-References: <20170917082327.10058-1-hanetzer@startmail.com>
-Message-ID: <20170918105520.GA2837@kroah.com>
+From: tomasz.nowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Mon, 18 Sep 2017 12:56:53 +0200
+Subject: [PATCH 0/1] Optimise IOVA allocations for PCI devices
+Message-ID: <1505732214-9052-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 17, 2017 at 03:23:24AM -0500, Marty E. Plummer wrote:
-> Greetings,
-> 
-> I'd like the community's feedback on the following patchset. I've attempted to
-> split my changes up in what I believe to be a sensible setup.
-> 
-> The device I'm working against is the 'SamsungSV SDR-B74301' HD CCTV surveillance
-> system, which uses a Hisilicon Hi3521A arm SoC as its basis.
-> 
-> Resending due to a typo, s/primcell/primecell/
-> 
-> Marty E. Plummer (3):
->   clk: hisilicon: add CRG driver Hi3521A SoC
->   arm: hisi: enable Hi3521A SoC
->   arm: dts: add Hi3521A dts
+Here is my test setup where I have stareted performance measurements.
 
-Seems reasonable to me, but I'll let the clk maintainers/developers give
-you a better review...
+ ------------  PCIe  -------------   TX   -------------  PCIe  -----
+| ThunderX2  |------| Intel XL710 | ---> | Intel XL710 |------| X86 |
+| (128 cpus) |      |   40GbE     |      |    40GbE    |       -----
+ ------------        -------------        -------------
 
-thanks,
+As the reference lets take v4.13 host, SMMUv3 off and 1-thread iperf
+taskset to one CPU. The performance results I got:
 
-greg k-h
+SMMU off -> 100%
+SMMU on -> 0,02%
+
+I followed down the DMA mapping path and found out IOVA 32-bit space
+full so that kernel was flushing rcaches for all CPUs in (1).
+For 128 CPUs, this kills the performance. Furthermore, for my case, rcaches
+contained PFNs > 32-bit mostly so the second round of IOVA allocation failed
+as well. As the consequence IOVA had to be allocated outside of 32-bit (2)
+from scratch since all rcaches have been flushed in (1).
+
+    if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
+(1)-->  iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
+
+    if (!iova)
+(2)-->  iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
+
+My fix simply introduces parameter for alloc_iova_fast() to decide whether
+rcache flush has to be done or not. All users follow mentioned scenario
+so they should let flush as the last chance to avoid time costly iteration
+over all CPUs.
+
+This bring my iperf performance back to 100% with SMMU on.
+
+My bad feelings regarding this solution is that machines with relatively
+small numbers of CPUs may get DAC addresses more frequently for PCI
+devices. Please let me know your thoughts.
+
+Tomasz Nowicki (1):
+  iommu/iova: Make rcache flush optional on IOVA allocation failure
+
+ drivers/iommu/amd_iommu.c   | 5 +++--
+ drivers/iommu/dma-iommu.c   | 6 ++++--
+ drivers/iommu/intel-iommu.c | 5 +++--
+ drivers/iommu/iova.c        | 7 +++----
+ include/linux/iova.h        | 5 +++--
+ 5 files changed, 16 insertions(+), 12 deletions(-)
+
+-- 
+2.7.4
