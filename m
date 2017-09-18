@@ -1,164 +1,73 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon, 18 Sep 2017 19:18:01 +0800
-Subject: [RESEND PATCH v2 3/3] ASoC: rockchip: Init dapm routes dynamically
-In-Reply-To: <20170918111801.12881-1-jeffy.chen@rock-chips.com>
-References: <20170918111801.12881-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170918111801.12881-3-jeffy.chen@rock-chips.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 18 Sep 2017 16:49:20 +0530
+Subject: [PATCH 0/2] dwc3 on XU3 and XU4
+In-Reply-To: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
+References: <CGME20170918100229eucas1p24733d7108dfbcf16a59476c1efd7d56a@eucas1p2.samsung.com>
+ <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
+Message-ID: <CANAwSgRuDMsbFW4UTFcc4zgefLLxA-SC0cPjBBjtT8=h_+-kjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are using a fixed list of dapm routes.
+Hi Andrzej,
 
-Init dapm routes dynamically when parsing dailinks, since we are
-supporting optional codecs.
+On 18 September 2017 at 15:32, Andrzej Pietrasiewicz
+<andrzej.p@samsung.com> wrote:
+> Hi all,
+>
+> this short series addresses two issues.
+>
+> The first issue is devices not enumerating when connected to an Odroid XU4,
+> to its 3.0 root hub. The interplay between refactoring certain parts of
+> dwc3's code and handling the SUSPHY quirk results in the said problem.
+> Please see: https://patchwork.kernel.org/patch/9535235/
+> Actually using the quirk solves it.
+>
+> The second issue is devices not enumerating and/or wrongly enumerating
+> as high speed instead of super speed on an Odroid XU3. There was a patch
+> series from Vivek Gautam in circulation, but it got lost somehow.
+> Please see:
+>
+> https://lkml.org/lkml/2014/9/2/166
+> https://lkml.org/lkml/2015/2/2/257
+>
+> I adapted his patch so that it does not use a hacky solution to force
+> additional initialization in order for calibration to happen.
+> Instead I used the .reset() in phy_ops. I could have used the .set_mode(),
+> but the calibration must happen only after dwc3_host_init() but
+> phy_set_mode() is called either after of before it. With this patch
+> enumeration happens correctly and a super speed device is recognized as such.
+>
+> Rebased onto v4.13. It also applies cleanly to Felipe's testing/next.
+>
+> Andrzej Pietrasiewicz (1):
+>   ARM: dts: exynos: Add dwc3 SUSPHY quirk
+>
+> Vivek Gautam (1):
+>   phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
+>
+>  arch/arm/boot/dts/exynos54xx.dtsi        |   2 +
+>  drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
+>  drivers/usb/dwc3/core.c                  |   8 +-
+>  3 files changed, 191 insertions(+), 2 deletions(-)
+>
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
----
+Thanks for rending this patch series.
 
-Changes in v2:
-Fix DMic typo.
+I would like to suggestion some more pointer to this issue.
+Both the usb 2.0 phy and usb 3.0 tune and calibrate are missing in the
+current driver.
+Lately I have searched on this topic on github so accidentally landed on.
 
- sound/soc/rockchip/rk3399_gru_sound.c | 88 ++++++++++++++++++++++++++++-------
- 1 file changed, 72 insertions(+), 16 deletions(-)
+[0] https://github.com/wanam/Adam-Kernel-GalaxyS6-G920F/blob/master/drivers/usb/phy/phy-samsung-usb3-cal.c
+[1] https://github.com/wanam/Adam-Kernel-GalaxyS6-G920F/blob/master/drivers/usb/phy/phy-samsung-usb2-cal.c
 
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index ad19e391c4a6..fab868850d3a 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -50,20 +50,6 @@ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
- 	SND_SOC_DAPM_LINE("HDMI", NULL),
- };
- 
--static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
--	/* Input Lines */
--	{"MIC", NULL, "Headset Mic"},
--	{"DMIC1L", NULL, "Int Mic"},
--	{"DMIC1R", NULL, "Int Mic"},
--	{"DMic", NULL, "Int Mic"},
--
--	/* Output Lines */
--	{"Headphones", NULL, "HPL"},
--	{"Headphones", NULL, "HPR"},
--	{"Speakers", NULL, "Speaker"},
--	{"HDMI", NULL, "TX"},
--};
--
- static const struct snd_kcontrol_new rockchip_controls[] = {
- 	SOC_DAPM_PIN_SWITCH("Headphones"),
- 	SOC_DAPM_PIN_SWITCH("Speakers"),
-@@ -318,8 +304,6 @@ static struct snd_soc_card rockchip_sound_card = {
- 	.owner = THIS_MODULE,
- 	.dapm_widgets = rockchip_dapm_widgets,
- 	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
--	.dapm_routes = rockchip_dapm_routes,
--	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
- 	.controls = rockchip_controls,
- 	.num_controls = ARRAY_SIZE(rockchip_controls),
- };
-@@ -395,6 +379,65 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
- 	},
- };
- 
-+static const struct snd_soc_dapm_route rockchip_sound_cdndp_routes[] = {
-+	/* Output */
-+	{"HDMI", NULL, "TX"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_da7219_routes[] = {
-+	/* Output */
-+	{"Headphones", NULL, "HPL"},
-+	{"Headphones", NULL, "HPR"},
-+
-+	/* Input */
-+	{"MIC", NULL, "Headset Mic"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_dmic_routes[] = {
-+	/* Input */
-+	{"DMic", NULL, "Int Mic"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_max98357a_routes[] = {
-+	/* Output */
-+	{"Speakers", NULL, "Speaker"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_rt5514_routes[] = {
-+	/* Input */
-+	{"DMIC1L", NULL, "Int Mic"},
-+	{"DMIC1R", NULL, "Int Mic"},
-+};
-+
-+struct rockchip_sound_route {
-+	const struct snd_soc_dapm_route *routes;
-+	int num_routes;
-+};
-+
-+static const struct rockchip_sound_route rockchip_routes[] = {
-+	[DAILINK_CDNDP] = {
-+		.routes = rockchip_sound_cdndp_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_cdndp_routes),
-+	},
-+	[DAILINK_DA7219] = {
-+		.routes = rockchip_sound_da7219_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_da7219_routes),
-+	},
-+	[DAILINK_DMIC] = {
-+		.routes = rockchip_sound_dmic_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_dmic_routes),
-+	},
-+	[DAILINK_MAX98357A] = {
-+		.routes = rockchip_sound_max98357a_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_max98357a_routes),
-+	},
-+	[DAILINK_RT5514] = {
-+		.routes = rockchip_sound_rt5514_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_rt5514_routes),
-+	},
-+	[DAILINK_RT5514_DSP] = {},
-+};
-+
- static int rockchip_sound_codec_node_match(struct device_node *np_codec)
- {
- 	int i;
-@@ -412,6 +455,7 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 	struct device_node *np_cpu, *np_cpu0, *np_cpu1;
- 	struct device_node *np_codec;
- 	struct snd_soc_dai_link *dai;
-+	struct snd_soc_dapm_route *routes;
- 	int i, index;
- 
- 	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
-@@ -419,9 +463,16 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 	if (!card->dai_link)
- 		return -ENOMEM;
- 
-+	routes = devm_kzalloc(dev, sizeof(rockchip_routes),
-+			      GFP_KERNEL);
-+	if (!routes)
-+		return -ENOMEM;
-+	card->dapm_routes = routes;
-+
- 	np_cpu0 = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
- 	np_cpu1 = of_parse_phandle(dev->of_node, "rockchip,cpu", 1);
- 
-+	card->num_dapm_routes = 0;
- 	card->num_links = 0;
- 	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++) {
- 		np_codec = of_parse_phandle(dev->of_node,
-@@ -449,6 +500,11 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 		dai->codec_of_node = np_codec;
- 		dai->platform_of_node = np_cpu;
- 		dai->cpu_of_node = np_cpu;
-+
-+		memcpy(routes + card->num_dapm_routes,
-+		       rockchip_routes[index].routes,
-+		       rockchip_routes[index].num_routes * sizeof(*routes));
-+		card->num_dapm_routes += rockchip_routes[index].num_routes;
- 	}
- 
- 	return 0;
--- 
-2.11.0
+I have tried to mapped few of the change and was able to partially
+stabilize the driver.
+
+But few of the changes are mixed with other platform soc probably Exynos 5433.
+
+Would it be possible for you to look into into this new approach to
+fix and stabilize this driver.
+
+Best Regards
+-Anand Moon
