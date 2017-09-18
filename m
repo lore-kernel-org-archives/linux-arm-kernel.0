@@ -1,31 +1,25 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 18 Sep 2017 22:17:10 +0530
-Subject: [PATCH] ARM: OMAP2+: make omap_dma_dev_info __initdata
-Message-ID: <1505753230-14014-1-git-send-email-bhumirks@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Sep 2017 09:52:04 -0700
+Subject: [PATCH] omap: hwmod: fix section mismatch warnings
+In-Reply-To: <20170915194527.1171677-1-arnd@arndb.de>
+References: <20170915194527.1171677-1-arnd@arndb.de>
+Message-ID: <20170918165204.GX5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make this __initdata as it is only modified only during the initialisation
-phase in the function omap2_system_dma_init_dev and after this it is not
-referenced anywhere in the kernel.
+* Arnd Bergmann <arnd@arndb.de> [170915 12:46]:
+> Older compilers choose not to inline _setup_clkctrl_provider(),
+> leading to a harmless warning:
+> 
+> WARNING: vmlinux.o(.text+0x27b34): Section mismatch in reference from the function _setup_clkctrl_provider() to the function .init.text:memblock_virt_alloc_try_nid()
+> The function _setup_clkctrl_provider() references
+> the function __init memblock_virt_alloc_try_nid().
+> This is often because _setup_clkctrl_provider lacks a __init
+> annotation or the annotation of memblock_virt_alloc_try_nid is wrong.
+> 
+> This annotates it as __init as well, which lets the linker
+> see that it is actually correct.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- arch/arm/mach-omap2/dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-index 694ce09..a005e2a 100644
---- a/arch/arm/mach-omap2/dma.c
-+++ b/arch/arm/mach-omap2/dma.c
-@@ -223,7 +223,7 @@ static unsigned configure_dma_errata(void)
- 	.dma_read	= dma_read,
- };
- 
--static struct platform_device_info omap_dma_dev_info = {
-+static struct platform_device_info omap_dma_dev_info __initdata = {
- 	.name = "omap-dma-engine",
- 	.id = -1,
- 	.dma_mask = DMA_BIT_MASK(32),
--- 
-1.9.1
+Acked-by: Tony Lindgren <tony@atomide.com>
