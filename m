@@ -1,52 +1,140 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 18 Sep 2017 15:04:37 +0200
-Subject: [PATCH 5/9] arm64: dts: marvell: mcbin: add comphy references to
- Ethernet ports
-In-Reply-To: <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
-References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
- <20170918075814.27405-6-antoine.tenart@free-electrons.com>
- <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
-Message-ID: <20170918130437.GA12118@lunn.ch>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 18 Sep 2017 15:16:55 +0200
+Subject: [PATCH] ARM: dts: stm32: Add lptimer definitions to stm32h743
+Message-ID: <1505740615-24920-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 11:50:12AM +0300, Baruch Siach wrote:
-> Hi Antoine,
-> 
-> On Mon, Sep 18, 2017 at 09:58:10AM +0200, Antoine Tenart wrote:
-> > This patch adds comphy phandles to the Ethernet ports in the mcbin
-> > device tree. The comphy is used to configure the serdes PHYs used by
-> > these ports.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > index acf5c7d16d79..9a3b4a1fd445 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > @@ -223,6 +223,7 @@
-> >  &cpm_eth0 {
-> >  	status = "okay";
-> >  	phy = <&phy0>;
-> > +	phys = <&cpm_comphy4 0>;
-> >  	phy-mode = "10gbase-kr";
-> 
-> Since the 'phys' generic PHY property is unrelated to the 'phy*' Ethernet PHY 
-> properties that surround it, its location might be confusing. I think it 
-> should appear below those two other properties like you did below ...
+Add lptimer definitions, depending on features they provide:
+- lptimer1 & 2 can act as PWM, trigger and encoder/counter
+- lptimer3 can act as PWM and trigger
+- lptimer4 & 5 can act as PWM
 
-Hi Baruch, Antoine
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/boot/dts/stm32h743.dtsi | 103 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
-Yes, i agree. It is confusing enough as it is, so we should not make
-it worse.
-
-I even wonder if it is worth doing some renaming?
-
-  	phy = <&ethernet_phy0>;
-  	phy-mode = "10gbase-kr";
- 	phys = <&cpm_generic_comphy4 0>;
-
-	Andrew
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 58ec227..de54123 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -66,6 +66,32 @@
+ 			clocks = <&timer_clk>;
+ 		};
+ 
++		lptimer1: timer at 0x40002400 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32-lptimer";
++			reg = <0x40002400 0x400>;
++			clocks = <&timer_clk>;
++			clock-names = "mux";
++			status = "disabled";
++
++			pwm {
++				compatible = "st,stm32-pwm-lp";
++				status = "disabled";
++			};
++
++			trigger at 0 {
++				compatible = "st,stm32-lptimer-trigger";
++				reg = <0>;
++				status = "disabled";
++			};
++
++			counter {
++				compatible = "st,stm32-lptimer-counter";
++				status = "disabled";
++			};
++		};
++
+ 		usart2: serial at 40004400 {
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40004400 0x400>;
+@@ -172,6 +198,83 @@
+ 			};
+ 		};
+ 
++		lptimer2: timer at 0x58002400 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32-lptimer";
++			reg = <0x58002400 0x400>;
++			clocks = <&timer_clk>;
++			clock-names = "mux";
++			status = "disabled";
++
++			pwm {
++				compatible = "st,stm32-pwm-lp";
++				status = "disabled";
++			};
++
++			trigger at 1 {
++				compatible = "st,stm32-lptimer-trigger";
++				reg = <1>;
++				status = "disabled";
++			};
++
++			counter {
++				compatible = "st,stm32-lptimer-counter";
++				status = "disabled";
++			};
++		};
++
++		lptimer3: timer at 0x58002800 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32-lptimer";
++			reg = <0x58002800 0x400>;
++			clocks = <&timer_clk>;
++			clock-names = "mux";
++			status = "disabled";
++
++			pwm {
++				compatible = "st,stm32-pwm-lp";
++				status = "disabled";
++			};
++
++			trigger at 2 {
++				compatible = "st,stm32-lptimer-trigger";
++				reg = <2>;
++				status = "disabled";
++			};
++		};
++
++		lptimer4: timer at 0x58002c00 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32-lptimer";
++			reg = <0x58002c00 0x400>;
++			clocks = <&timer_clk>;
++			clock-names = "mux";
++			status = "disabled";
++
++			pwm {
++				compatible = "st,stm32-pwm-lp";
++				status = "disabled";
++			};
++		};
++
++		lptimer5: timer at 0x58003000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32-lptimer";
++			reg = <0x58003000 0x400>;
++			clocks = <&timer_clk>;
++			clock-names = "mux";
++			status = "disabled";
++
++			pwm {
++				compatible = "st,stm32-pwm-lp";
++				status = "disabled";
++			};
++		};
++
+ 		adc_3: adc at 58026000 {
+ 			compatible = "st,stm32h7-adc-core";
+ 			reg = <0x58026000 0x400>;
+-- 
+1.9.1
