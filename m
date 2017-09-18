@@ -1,41 +1,45 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 18 Sep 2017 06:21:20 -0700
-Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
-In-Reply-To: <59BF5483.9020403@denx.de>
-References: <20170910214424.14945-1-linus.walleij@linaro.org>
- <20170910214424.14945-2-linus.walleij@linaro.org>
- <20170914093509.uwk47vt3wnm3rtqb@dell>
- <CACRpkdZYDALXSoEE9jdo7A5P4XZczVbh_uiLkE54=sRtA3rNDQ@mail.gmail.com>
- <59BF5483.9020403@denx.de>
-Message-ID: <0c3eaa74-6e94-825c-5830-2cfc71efaf4f@roeck-us.net>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 18 Sep 2017 16:26:49 +0300
+Subject: [PATCH v4 3/3] media: ov7670: Add the s_power operation
+In-Reply-To: <dd9ca418-e634-beb3-235f-b93e6abccbf5@Microchip.com>
+References: <20170918064514.6841-1-wenyou.yang@microchip.com>
+ <20170918064514.6841-4-wenyou.yang@microchip.com>
+ <20170918073529.wssxfbgfwgd2jzpl@valkosipuli.retiisi.org.uk>
+ <dd9ca418-e634-beb3-235f-b93e6abccbf5@Microchip.com>
+Message-ID: <20170918132649.njqvbs3zq6b5iuej@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2017 10:07 PM, Heiko Schocher wrote:
-> Hello Linux,
-> 
-> Am 17.09.2017 um 00:25 schrieb Linus Walleij:
->> On Thu, Sep 14, 2017 at 11:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->>>> ? drivers/mfd/sm501.c????????????????????????? |? 49 +++++-----
->>>
->>> I'd prefer for this to be applied with a Tested-by.? I appreciate that
->>> this is an old driver, but can you attempt to contact one of the
->>> authors or someone else who might have hardware please?
->>
->> For SM501 specifically I guess.
->>
->> OK makes sense as it is the most invasive one, paging around...
->>
->> Ben, Ville, Magnus, Heiko, Guenther: is one of you still using this
->> hardware so you can test the patch set?
-> 
-> I am Sorry, I do not have the hardware anymore so no chance to test
-> it :-(
-> 
+Hi Wenyou,
 
-I had a look into the kernel and qemu code. The only machine actually using
-it is an arm system names Anubis, which qemu does not support. No help here
-either, sorry.
+On Mon, Sep 18, 2017 at 05:26:16PM +0800, Yang, Wenyou wrote:
+> Hi Sakari,
+> 
+> 
+> On 2017/9/18 15:35, Sakari Ailus wrote:
+> > Hi Wenyou,
+> > 
+> > Thanks for the update.
+> > 
+> > The driver exposes controls that are accessible through the sub-device node
+> > even if the device hasn't been powered on.
+> > 
+> > Many ISP and bridge drivers will also power the sensor down once the last
+> > user of the user space device nodes disappears. You could keep the device
+> > powered at all times or change the behaviour so that controls can be
+> > accessed when the power is off.
+> > 
+> > The best option would be to convert the driver to use runtime PM.
+> Yes, I agree with you.
+> I also noticed there are a lot of things needed to improve except for it,
+> such as the platform data via device tree.
+> I would like do it in another patch set. I will continue to work on it.
 
-Guenter
+Adding runtime PM support later on sound good to me.
+
+> > An example of this can be found in drivers/media/i2c/ov13858.c .
+> A good example, thank you for your providing.
+
+-- 
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
