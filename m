@@ -1,42 +1,212 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 19 Sep 2017 02:34:59 +0800
-Subject: [xlnx:master 823/1027] debug.c:(.text+0x0): multiple definition of
- `dwc3_simple_wakeup_capable'
-Message-ID: <201709190254.sMtxu9iF%fengguang.wu@intel.com>
+Date: Tue, 19 Sep 2017 02:37:31 +0800
+Subject: [xlnx:master 688/1027] include/linux/kernel.h:836:48: error:
+ initialization from incompatible pointer type
+Message-ID: <201709190225.cgYvkaNG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anurag,
+Hi Daniel,
 
 FYI, the error/warning still remains.
 
 tree:   https://github.com/Xilinx/linux-xlnx master
 head:   f9658a41c361182381160edbcea3c1de3b76dc9d
-commit: 80ac0da9010ebabef6ed1d66b6607b345fd14cb4 [823/1027] dwc3: Add support for clock disabling during suspend
-config: x86_64-rhel (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+commit: 472236088ad190937efa1be2d96965f9bb7c9bcb [688/1027] kbuild: Add option to turn incompatible pointer check into error
+config: ia64-allyesconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
 reproduce:
-        git checkout 80ac0da9010ebabef6ed1d66b6607b345fd14cb4
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 472236088ad190937efa1be2d96965f9bb7c9bcb
         # save the attached .config to linux build tree
-        make ARCH=x86_64 
+        make.cross ARCH=ia64 
 
 All errors (new ones prefixed by >>):
 
-   drivers/usb/dwc3/debug.o: In function `dwc3_simple_wakeup_capable':
->> debug.c:(.text+0x0): multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
-   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
-   trace.c:(.text+0x1880): multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
-   drivers/usb/dwc3/gadget.o: In function `dwc3_simple_wakeup_capable':
-   gadget.c:(.text+0x10b0): multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
-   drivers/usb/dwc3/ep0.o: In function `dwc3_simple_wakeup_capable':
-   ep0.c:(.text+0xa10): multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
-   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
-   debugfs.c:(.text+0xd40): multiple definition of `dwc3_simple_wakeup_capable'
-   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/misc/jesd204b/xilinx_jesd204b.c:28:17: error: field 'hw' has incomplete type
+     struct clk_hw  hw;
+                    ^~
+   In file included from include/linux/clk.h:16:0,
+                    from drivers/misc/jesd204b/xilinx_jesd204b.c:11:
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_enable':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:214:2: note: in expansion of macro 'to_clk_priv'
+     to_clk_priv(hw)->enabled = true;
+     ^~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_disable':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:221:2: note: in expansion of macro 'to_clk_priv'
+     to_clk_priv(hw)->enabled = false;
+     ^~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_is_enabled':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:226:9: note: in expansion of macro 'to_clk_priv'
+     return to_clk_priv(hw)->enabled;
+            ^~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c: At top level:
+   drivers/misc/jesd204b/xilinx_jesd204b.c:229:21: error: variable 'clkout_ops' has initializer but incomplete type
+    static const struct clk_ops clkout_ops = {
+                        ^~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:230:2: error: unknown field 'recalc_rate' specified in initializer
+     .recalc_rate = jesd204b_clk_recalc_rate,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:230:17: warning: excess elements in struct initializer
+     .recalc_rate = jesd204b_clk_recalc_rate,
+                    ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:230:17: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c:231:2: error: unknown field 'enable' specified in initializer
+     .enable = jesd204b_clk_enable,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:231:12: warning: excess elements in struct initializer
+     .enable = jesd204b_clk_enable,
+               ^~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:231:12: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c:232:2: error: unknown field 'disable' specified in initializer
+     .disable = jesd204b_clk_disable,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:232:13: warning: excess elements in struct initializer
+     .disable = jesd204b_clk_disable,
+                ^~~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:232:13: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c:233:2: error: unknown field 'is_enabled' specified in initializer
+     .is_enabled = jesd204b_clk_is_enabled,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:233:16: warning: excess elements in struct initializer
+     .is_enabled = jesd204b_clk_is_enabled,
+                   ^~~~~~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:233:16: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_probe':
+   drivers/misc/jesd204b/xilinx_jesd204b.c:251:23: error: storage size of 'init' isn't known
+     struct clk_init_data init;
+                          ^~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:251:23: warning: unused variable 'init' [-Wunused-variable]
+   drivers/misc/jesd204b/xilinx_jesd204b.c: At top level:
+   drivers/misc/jesd204b/xilinx_jesd204b.c:229:29: error: storage size of 'clkout_ops' isn't known
+    static const struct clk_ops clkout_ops = {
+                                ^~~~~~~~~~
+   cc1: some warnings being treated as errors
+--
+   drivers/misc//jesd204b/xilinx_jesd204b.c:28:17: error: field 'hw' has incomplete type
+     struct clk_hw  hw;
+                    ^~
+   In file included from include/linux/clk.h:16:0,
+                    from drivers/misc//jesd204b/xilinx_jesd204b.c:11:
+   drivers/misc//jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_enable':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:214:2: note: in expansion of macro 'to_clk_priv'
+     to_clk_priv(hw)->enabled = true;
+     ^~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_disable':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:221:2: note: in expansion of macro 'to_clk_priv'
+     to_clk_priv(hw)->enabled = false;
+     ^~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_is_enabled':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:226:9: note: in expansion of macro 'to_clk_priv'
+     return to_clk_priv(hw)->enabled;
+            ^~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c: At top level:
+   drivers/misc//jesd204b/xilinx_jesd204b.c:229:21: error: variable 'clkout_ops' has initializer but incomplete type
+    static const struct clk_ops clkout_ops = {
+                        ^~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:230:2: error: unknown field 'recalc_rate' specified in initializer
+     .recalc_rate = jesd204b_clk_recalc_rate,
+     ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:230:17: warning: excess elements in struct initializer
+     .recalc_rate = jesd204b_clk_recalc_rate,
+                    ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:230:17: note: (near initialization for 'clkout_ops')
+   drivers/misc//jesd204b/xilinx_jesd204b.c:231:2: error: unknown field 'enable' specified in initializer
+     .enable = jesd204b_clk_enable,
+     ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:231:12: warning: excess elements in struct initializer
+     .enable = jesd204b_clk_enable,
+               ^~~~~~~~~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:231:12: note: (near initialization for 'clkout_ops')
+   drivers/misc//jesd204b/xilinx_jesd204b.c:232:2: error: unknown field 'disable' specified in initializer
+     .disable = jesd204b_clk_disable,
+     ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:232:13: warning: excess elements in struct initializer
+     .disable = jesd204b_clk_disable,
+                ^~~~~~~~~~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:232:13: note: (near initialization for 'clkout_ops')
+   drivers/misc//jesd204b/xilinx_jesd204b.c:233:2: error: unknown field 'is_enabled' specified in initializer
+     .is_enabled = jesd204b_clk_is_enabled,
+     ^
+   drivers/misc//jesd204b/xilinx_jesd204b.c:233:16: warning: excess elements in struct initializer
+     .is_enabled = jesd204b_clk_is_enabled,
+                   ^~~~~~~~~~~~~~~~~~~~~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:233:16: note: (near initialization for 'clkout_ops')
+   drivers/misc//jesd204b/xilinx_jesd204b.c: In function 'jesd204b_probe':
+   drivers/misc//jesd204b/xilinx_jesd204b.c:251:23: error: storage size of 'init' isn't known
+     struct clk_init_data init;
+                          ^~~~
+   drivers/misc//jesd204b/xilinx_jesd204b.c:251:23: warning: unused variable 'init' [-Wunused-variable]
+   drivers/misc//jesd204b/xilinx_jesd204b.c: At top level:
+   drivers/misc//jesd204b/xilinx_jesd204b.c:229:29: error: storage size of 'clkout_ops' isn't known
+    static const struct clk_ops clkout_ops = {
+                                ^~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +836 include/linux/kernel.h
+
+^1da177e Linus Torvalds 2005-04-16  820  
+91f68b73 Wu Fengguang   2009-01-07  821  
+91f68b73 Wu Fengguang   2009-01-07  822  /*
+91f68b73 Wu Fengguang   2009-01-07  823   * swap - swap value of @a and @b
+91f68b73 Wu Fengguang   2009-01-07  824   */
+ac7b9004 Peter Zijlstra 2009-02-04  825  #define swap(a, b) \
+ac7b9004 Peter Zijlstra 2009-02-04  826  	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
+91f68b73 Wu Fengguang   2009-01-07  827  
+^1da177e Linus Torvalds 2005-04-16  828  /**
+^1da177e Linus Torvalds 2005-04-16  829   * container_of - cast a member of a structure out to the containing structure
+^1da177e Linus Torvalds 2005-04-16  830   * @ptr:	the pointer to the member.
+^1da177e Linus Torvalds 2005-04-16  831   * @type:	the type of the container struct this is embedded in.
+^1da177e Linus Torvalds 2005-04-16  832   * @member:	the name of the member within the struct.
+^1da177e Linus Torvalds 2005-04-16  833   *
+^1da177e Linus Torvalds 2005-04-16  834   */
+^1da177e Linus Torvalds 2005-04-16  835  #define container_of(ptr, type, member) ({			\
+^1da177e Linus Torvalds 2005-04-16 @836  	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+^1da177e Linus Torvalds 2005-04-16  837  	(type *)( (char *)__mptr - offsetof(type,member) );})
+^1da177e Linus Torvalds 2005-04-16  838  
+
+:::::: The code at line 836 was first introduced by commit
+:::::: 1da177e4c3f41524e886b7f1b8a0c1fc7321cac2 Linux-2.6.12-rc2
+
+:::::: TO: Linus Torvalds <torvalds@ppc970.osdl.org>
+:::::: CC: Linus Torvalds <torvalds@ppc970.osdl.org>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -45,6 +215,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 38234 bytes
+Size: 48166 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/cd0a98ce/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/d7381d14/attachment-0001.gz>
