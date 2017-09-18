@@ -1,40 +1,37 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 18 Sep 2017 12:35:54 +0100
-Subject: Tegra baseline test results for v4.14-rc1
-Message-ID: <78b1e33f-cc9f-85c6-c7ae-3ecf0f1c2da4@nvidia.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 18 Sep 2017 17:09:51 +0530
+Subject: [PATCH] arm: omap: dra7xx: Set OPT_CLKS_IN_RESET flag for gpio1
+In-Reply-To: <1504694038-32159-1-git-send-email-j-keerthy@ti.com>
+References: <1504694038-32159-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <c8768202-96e1-8bda-7e09-ddf296c19c57@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.14-rc1.
-Logs and other details at:
-
-    https://nvtb.github.io//linux/test_v4.14-rc1/20170916163103/
 
 
-Test summary
-------------
+On Wednesday 06 September 2017 04:03 PM, Keerthy wrote:
+> gpio1 soft reset fails in the kexec path as the optional clock
+> is not enabled hence enable the HWMOD_CONTROL_OPT_CLKS_IN_RESET
+> flag for gpio1 hwmod.
 
-Build: zImage:
-    FAIL: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+A gentle ping on this as well.
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-
-vmlinux object size
-(delta in bytes from test_v4.13 (569dbb88e80deb68974ef6fdd6a13edb9d686261)):
-   text     data      bss    total  kernel
-+147008  +131988    +1024  +280020  defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.13 (569dbb88e80deb68974ef6fdd6a13edb9d686261))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-    -252k     252k        .        .      qemu-vexpress64            defconfig           __internal
-    -248k     248k        .        .      tegra132-norrin            defconfig      tegra132-norrin
-    -216k     216k        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-    -220k     220k        .        .       tegra210-smaug            defconfig       tegra210-smaug
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 7cc3247..6ae729a 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1037,6 +1037,7 @@ struct omap_hwmod dra7xx_sha0_hwmod = {
+>  	.name		= "gpio1",
+>  	.class		= &dra7xx_gpio_hwmod_class,
+>  	.clkdm_name	= "wkupaon_clkdm",
+> +	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+>  	.main_clk	= "wkupaon_iclk_mux",
+>  	.prcm = {
+>  		.omap4 = {
+> 
