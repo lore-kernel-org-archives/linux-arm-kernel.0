@@ -1,39 +1,81 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Mon, 18 Sep 2017 07:07:15 +0200
-Subject: [PATCH 1/5] i2c: gpio: Convert to use descriptors
-In-Reply-To: <CACRpkdZYDALXSoEE9jdo7A5P4XZczVbh_uiLkE54=sRtA3rNDQ@mail.gmail.com>
-References: <20170910214424.14945-1-linus.walleij@linaro.org>
- <20170910214424.14945-2-linus.walleij@linaro.org>
- <20170914093509.uwk47vt3wnm3rtqb@dell>
- <CACRpkdZYDALXSoEE9jdo7A5P4XZczVbh_uiLkE54=sRtA3rNDQ@mail.gmail.com>
-Message-ID: <59BF5483.9020403@denx.de>
+From: dja@axtens.net (Daniel Axtens)
+Date: Mon, 18 Sep 2017 15:49:45 +1000
+Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
+In-Reply-To: <20170901072744.2409-1-dja@axtens.net>
+References: <20170901072744.2409-1-dja@axtens.net>
+Message-ID: <87d16oeeti.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linux,
+Hi all,
 
-Am 17.09.2017 um 00:25 schrieb Linus Walleij:
-> On Thu, Sep 14, 2017 at 11:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
->
->>>   drivers/mfd/sm501.c                          |  49 +++++-----
->>
->> I'd prefer for this to be applied with a Tested-by.  I appreciate that
->> this is an old driver, but can you attempt to contact one of the
->> authors or someone else who might have hardware please?
->
-> For SM501 specifically I guess.
->
-> OK makes sense as it is the most invasive one, paging around...
->
-> Ben, Ville, Magnus, Heiko, Guenther: is one of you still using this
-> hardware so you can test the patch set?
+The merge window is well over by now - is there anything else I can do
+to get this series to a mergeable state? I'm not particularly across the
+rules for drm-misc, so please let me know if there are things I need to
+be doing.
 
-I am Sorry, I do not have the hardware anymore so no chance to test
-it :-(
+Regards,
+Daniel
 
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-52   Fax: +49-8142-66989-80   Email: hs at denx.de
+Daniel Axtens <dja@axtens.net> writes:
+
+> This patch set:
+>
+>  - splits the default display handling out from VGA arbiter, into its
+>    own file and behind its own Kconfig option (and gives the functions
+>    better names).
+>
+>  - adds extra detection of default devices. To be nominated, the vga
+>    arbiter and platform hooks must not have nominated a default. A
+>    card will then only be nominated if it has a driver attached and
+>    has IO or memory decoding enabled.
+>
+>  - adds relevant documentation.
+>
+> The practical impact of this is improved X autoconfiguration on some
+> arm64 systems.
+>
+> Changes in v3:
+>
+>  - Add documentation - thanks Daniel Vetter for pointing it out.
+>
+>  - Clarify explanations. Thanks to everyone for continuing to bear
+>    with my incomplete understanding of PCI and provide some clarity.
+>
+>  - Split refactoring and adding functionality.
+>
+> Changes in v2: https://www.spinics.net/lists/linux-pci/msg64007.html
+>
+> Drop all the powerpc patches. [explanation snipped]
+>
+> v1: https://www.spinics.net/lists/linux-pci/msg63581.html
+>
+> Regards,
+> Daniel
+>
+> Daniel Axtens (3):
+>   drm: split default display handler out of VGA arbiter
+>   drm: add fallback default device detection
+>   drm: documentation for default display device
+>
+>  Documentation/gpu/default_display.rst |  93 +++++++++++++++++++
+>  Documentation/gpu/index.rst           |   1 +
+>  arch/ia64/pci/fixup.c                 |   6 +-
+>  arch/powerpc/kernel/pci-common.c      |   6 +-
+>  arch/x86/pci/fixup.c                  |   6 +-
+>  arch/x86/video/fbdev.c                |   4 +-
+>  drivers/gpu/vga/Kconfig               |  12 +++
+>  drivers/gpu/vga/Makefile              |   1 +
+>  drivers/gpu/vga/default_display.c     | 163 ++++++++++++++++++++++++++++++++++
+>  drivers/gpu/vga/vga_switcheroo.c      |   8 +-
+>  drivers/gpu/vga/vgaarb.c              |  61 +++----------
+>  drivers/pci/pci-sysfs.c               |   4 +-
+>  include/linux/default_display.h       |  44 +++++++++
+>  include/linux/vgaarb.h                |  15 ----
+>  14 files changed, 344 insertions(+), 80 deletions(-)
+>  create mode 100644 Documentation/gpu/default_display.rst
+>  create mode 100644 drivers/gpu/vga/default_display.c
+>  create mode 100644 include/linux/default_display.h
+>
+> -- 
+> 2.11.0
