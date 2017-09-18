@@ -1,31 +1,37 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 18 Sep 2017 09:58:06 +0200
-Subject: [PATCH 1/9] arm64: defconfig: enable the Marvell 10G PHY as a module
+Date: Mon, 18 Sep 2017 09:58:13 +0200
+Subject: [PATCH 8/9] arm64: dts: marvell: 7040-db: enable the SFP port
 In-Reply-To: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
 References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170918075814.27405-2-antoine.tenart@free-electrons.com>
+Message-ID: <20170918075814.27405-9-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell 10G PHY is present on mvebu platforms. Enable it as a module
-so that the network works on these platforms.
+This patch enables the SFP port on the Armada 7040 DB as this port
+is now supported by the PPv2 driver (since the PHY is now optional).
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Tested-by: Marcin Wojtas <mw@semihalf.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34480e9af2e7..4c9d4f6692dc 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -204,6 +204,7 @@ CONFIG_STMMAC_ETH=m
- CONFIG_MDIO_BUS_MUX_MMIOREG=y
- CONFIG_AT803X_PHY=m
- CONFIG_MARVELL_PHY=m
-+CONFIG_MARVELL_10G_PHY=m
- CONFIG_MESON_GXL_PHY=m
- CONFIG_MICREL_PHY=y
- CONFIG_REALTEK_PHY=m
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 274d203dac13..9ca9aa8ec46e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -215,6 +215,12 @@
+ 	status = "okay";
+ };
+ 
++&cpm_eth0 {
++	status = "okay";
++	phy-mode = "10gbase-kr";
++	phys = <&cpm_comphy2 0>;
++};
++
+ &cpm_eth1 {
+ 	status = "okay";
+ 	phy = <&phy0>;
 -- 
 2.13.5
