@@ -1,40 +1,42 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Mon, 18 Sep 2017 11:18:02 +0200
-Subject: [PATCH][V2] i2c: i2c-stm32f7: make structure stm32f7_setup static
- const
-In-Reply-To: <20170918081539.26512-1-colin.king@canonical.com>
-References: <20170918081539.26512-1-colin.king@canonical.com>
-Message-ID: <3684ee87-f9ca-85e8-302a-7f681c58fdd5@st.com>
+From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
+Date: Mon, 18 Sep 2017 17:25:28 +0800
+Subject: [PATCH v4 2/3] media: ov7670: Add the get_fmt callback
+In-Reply-To: <20170918073628.nwjdyfdk7hvsetfb@valkosipuli.retiisi.org.uk>
+References: <20170918064514.6841-1-wenyou.yang@microchip.com>
+ <20170918064514.6841-3-wenyou.yang@microchip.com>
+ <20170918073628.nwjdyfdk7hvsetfb@valkosipuli.retiisi.org.uk>
+Message-ID: <2f2a0259-1176-74b7-d9f7-a5cf7392ebdf@Microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2017 10:15 AM, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> The structure stm32f7_setup is local to the source and does not need
-> to be in global scope, make it static const.
-> 
-> Cleans up sparse warning:
-> symbol 'stm32f7_setup' was not declared. Should it be static?
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/i2c/busses/i2c-stm32f7.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-> index 47c67b0ca896..3eae4fc96884 100644
-> --- a/drivers/i2c/busses/i2c-stm32f7.c
-> +++ b/drivers/i2c/busses/i2c-stm32f7.c
-> @@ -265,7 +265,7 @@ static struct stm32f7_i2c_spec i2c_specs[] = {
->  	},
->  };
->  
-> -struct stm32f7_i2c_setup stm32f7_setup = {
-> +static const struct stm32f7_i2c_setup stm32f7_setup = {
->  	.rise_time = STM32F7_I2C_RISE_TIME_DEFAULT,
->  	.fall_time = STM32F7_I2C_FALL_TIME_DEFAULT,
->  	.dnf = STM32F7_I2C_DNF_DEFAULT,
-> 
+Hi Sakari,
 
-Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+
+On 2017/9/18 15:36, Sakari Ailus wrote:
+> Hi Wenyou,
+>
+> On Mon, Sep 18, 2017 at 02:45:13PM +0800, Wenyou Yang wrote:
+>> @@ -998,8 +1002,15 @@ static int ov7670_set_fmt(struct v4l2_subdev *sd,
+>>   		ret = ov7670_try_fmt_internal(sd, &format->format, NULL, NULL);
+>>   		if (ret)
+>>   			return ret;
+>> -		cfg->try_fmt = format->format;
+>> +#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
+>> +		struct v4l2_mbus_framefmt *mbus_fmt;
+> This will emit a compiler warning at least.
+Thank you for your review.
+Will be fixed in next version.
+>
+>> +
+>> +		mbus_fmt = v4l2_subdev_get_try_format(sd, cfg, format->pad);
+>> +		*mbus_fmt = format->format;
+>>   		return 0;
+>> +#else
+>> +		return -ENOTTY;
+>> +#endif
+>>   	}
+>>   
+>>   	ret = ov7670_try_fmt_internal(sd, &format->format, &ovfmt, &wsize);
+
+Best Regards,
+Wenyou Yang
