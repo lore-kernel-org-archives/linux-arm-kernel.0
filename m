@@ -1,164 +1,126 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon, 18 Sep 2017 09:44:41 +0800
-Subject: [PATCH v2 3/3] Asoc: rockchip: Init dapm routes dynamically
-In-Reply-To: <20170918014441.17572-1-jeffy.chen@rock-chips.com>
-References: <20170918014441.17572-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170918014441.17572-3-jeffy.chen@rock-chips.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Mon, 18 Sep 2017 09:50:27 +0800
+Subject: [PATCH 4/6] Topology: Add cluster on die macros and arm64 decoding
+In-Reply-To: <20170914184918.20406-5-jeremy.linton@arm.com>
+References: <20170914184918.20406-1-jeremy.linton@arm.com>
+ <20170914184918.20406-5-jeremy.linton@arm.com>
+Message-ID: <e95a0b2a-9dd0-654a-20fe-cad1cf0eed94@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are using a fixed list of dapm routes.
+Hi Jeremy,
 
-Init dapm routes dynamically when parsing dailinks, since we are
-supporting optional codecs.
+On 2017/9/15 2:49, Jeremy Linton wrote:
+> Many modern machines have cluster on die (COD) non-uniformity
+> as well as the traditional multi-socket architectures. Reusing
+> the multi-socket or NUMA on die concepts for these (as arm64 does)
+> breaks down when presented with actual multi-socket/COD machines.
+> Similar, problems are also visible on some x86 machines so it
+> seems appropriate to start abstracting and making these topologies
+> visible.
+> 
+> To start, a topology_cod_id() macro is added which defaults to returning
+> the same information as topology_physical_package_id(). Moving forward
+> we can start to spit out the differences.
+> 
+> For arm64, an additional package_id is added to the cpu_topology array.
+> Initially this will be equal to the cluster_id as well.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/include/asm/topology.h | 4 +++-
+>  arch/arm64/kernel/topology.c      | 8 ++++++--
+>  include/linux/topology.h          | 3 +++
+>  3 files changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> index 8b57339823e9..bd7517960d39 100644
+> --- a/arch/arm64/include/asm/topology.h
+> +++ b/arch/arm64/include/asm/topology.h
+> @@ -7,13 +7,15 @@ struct cpu_topology {
+>  	int thread_id;
+>  	int core_id;
+>  	int cluster_id;
+> +	int package_id;
+>  	cpumask_t thread_sibling;
+>  	cpumask_t core_sibling;
+>  };
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
----
+'core_sibling' will be updated by 'update_siblings_masks()' to represent cores in a cluster;
+Can we add a cpumask_t field to represent cores in a package? So that 'lstopo' can use this
+cpumask_t to display the right information.
 
-Changes in v2:
-Fix DMic typo.
+Thanks,
+Xiongfeng Wang
 
- sound/soc/rockchip/rk3399_gru_sound.c | 88 ++++++++++++++++++++++++++++-------
- 1 file changed, 72 insertions(+), 16 deletions(-)
-
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index ad19e391c4a6..fab868850d3a 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -50,20 +50,6 @@ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
- 	SND_SOC_DAPM_LINE("HDMI", NULL),
- };
- 
--static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
--	/* Input Lines */
--	{"MIC", NULL, "Headset Mic"},
--	{"DMIC1L", NULL, "Int Mic"},
--	{"DMIC1R", NULL, "Int Mic"},
--	{"DMic", NULL, "Int Mic"},
--
--	/* Output Lines */
--	{"Headphones", NULL, "HPL"},
--	{"Headphones", NULL, "HPR"},
--	{"Speakers", NULL, "Speaker"},
--	{"HDMI", NULL, "TX"},
--};
--
- static const struct snd_kcontrol_new rockchip_controls[] = {
- 	SOC_DAPM_PIN_SWITCH("Headphones"),
- 	SOC_DAPM_PIN_SWITCH("Speakers"),
-@@ -318,8 +304,6 @@ static struct snd_soc_card rockchip_sound_card = {
- 	.owner = THIS_MODULE,
- 	.dapm_widgets = rockchip_dapm_widgets,
- 	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
--	.dapm_routes = rockchip_dapm_routes,
--	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
- 	.controls = rockchip_controls,
- 	.num_controls = ARRAY_SIZE(rockchip_controls),
- };
-@@ -395,6 +379,65 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
- 	},
- };
- 
-+static const struct snd_soc_dapm_route rockchip_sound_cdndp_routes[] = {
-+	/* Output */
-+	{"HDMI", NULL, "TX"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_da7219_routes[] = {
-+	/* Output */
-+	{"Headphones", NULL, "HPL"},
-+	{"Headphones", NULL, "HPR"},
-+
-+	/* Input */
-+	{"MIC", NULL, "Headset Mic"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_dmic_routes[] = {
-+	/* Input */
-+	{"DMic", NULL, "Int Mic"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_max98357a_routes[] = {
-+	/* Output */
-+	{"Speakers", NULL, "Speaker"},
-+};
-+
-+static const struct snd_soc_dapm_route rockchip_sound_rt5514_routes[] = {
-+	/* Input */
-+	{"DMIC1L", NULL, "Int Mic"},
-+	{"DMIC1R", NULL, "Int Mic"},
-+};
-+
-+struct rockchip_sound_route {
-+	const struct snd_soc_dapm_route *routes;
-+	int num_routes;
-+};
-+
-+static const struct rockchip_sound_route rockchip_routes[] = {
-+	[DAILINK_CDNDP] = {
-+		.routes = rockchip_sound_cdndp_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_cdndp_routes),
-+	},
-+	[DAILINK_DA7219] = {
-+		.routes = rockchip_sound_da7219_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_da7219_routes),
-+	},
-+	[DAILINK_DMIC] = {
-+		.routes = rockchip_sound_dmic_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_dmic_routes),
-+	},
-+	[DAILINK_MAX98357A] = {
-+		.routes = rockchip_sound_max98357a_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_max98357a_routes),
-+	},
-+	[DAILINK_RT5514] = {
-+		.routes = rockchip_sound_rt5514_routes,
-+		.num_routes = ARRAY_SIZE(rockchip_sound_rt5514_routes),
-+	},
-+	[DAILINK_RT5514_DSP] = {},
-+};
-+
- static int rockchip_sound_codec_node_match(struct device_node *np_codec)
- {
- 	int i;
-@@ -412,6 +455,7 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 	struct device_node *np_cpu, *np_cpu0, *np_cpu1;
- 	struct device_node *np_codec;
- 	struct snd_soc_dai_link *dai;
-+	struct snd_soc_dapm_route *routes;
- 	int i, index;
- 
- 	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
-@@ -419,9 +463,16 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 	if (!card->dai_link)
- 		return -ENOMEM;
- 
-+	routes = devm_kzalloc(dev, sizeof(rockchip_routes),
-+			      GFP_KERNEL);
-+	if (!routes)
-+		return -ENOMEM;
-+	card->dapm_routes = routes;
-+
- 	np_cpu0 = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
- 	np_cpu1 = of_parse_phandle(dev->of_node, "rockchip,cpu", 1);
- 
-+	card->num_dapm_routes = 0;
- 	card->num_links = 0;
- 	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++) {
- 		np_codec = of_parse_phandle(dev->of_node,
-@@ -449,6 +500,11 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 		dai->codec_of_node = np_codec;
- 		dai->platform_of_node = np_cpu;
- 		dai->cpu_of_node = np_cpu;
-+
-+		memcpy(routes + card->num_dapm_routes,
-+		       rockchip_routes[index].routes,
-+		       rockchip_routes[index].num_routes * sizeof(*routes));
-+		card->num_dapm_routes += rockchip_routes[index].num_routes;
- 	}
- 
- 	return 0;
--- 
-2.11.0
+>  
+>  extern struct cpu_topology cpu_topology[NR_CPUS];
+>  
+> -#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
+> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].package_id)
+> +#define topology_cod_id(cpu)		(cpu_topology[cpu].cluster_id)
+>  #define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+>  #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
+>  #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 8d48b233e6ce..9147e5b6326d 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -67,6 +67,8 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>  			leaf = false;
+>  			cpu = get_cpu_for_node(t);
+>  			if (cpu >= 0) {
+> +				/* maintain DT cluster == package behavior */
+> +				cpu_topology[cpu].package_id = cluster_id;
+>  				cpu_topology[cpu].cluster_id = cluster_id;
+>  				cpu_topology[cpu].core_id = core_id;
+>  				cpu_topology[cpu].thread_id = i;
+> @@ -88,7 +90,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>  			       core);
+>  			return -EINVAL;
+>  		}
+> -
+> +		cpu_topology[cpu].package_id = cluster_id;
+>  		cpu_topology[cpu].cluster_id = cluster_id;
+>  		cpu_topology[cpu].core_id = core_id;
+>  	} else if (leaf) {
+> @@ -228,7 +230,7 @@ static void update_siblings_masks(unsigned int cpuid)
+>  	for_each_possible_cpu(cpu) {
+>  		cpu_topo = &cpu_topology[cpu];
+>  
+> -		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
+> +		if (cpuid_topo->package_id != cpu_topo->package_id)
+>  			continue;
+>  
+>  		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+> @@ -273,6 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
+>  					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
+>  					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+>  	}
+> +	cpuid_topo->package_id = cpuid_topo->cluster_id;
+>  
+>  	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
+>  		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
+> @@ -292,6 +295,7 @@ static void __init reset_cpu_topology(void)
+>  		cpu_topo->thread_id = -1;
+>  		cpu_topo->core_id = 0;
+>  		cpu_topo->cluster_id = -1;
+> +		cpu_topo->package_id = -1;
+>  
+>  		cpumask_clear(&cpu_topo->core_sibling);
+>  		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+> diff --git a/include/linux/topology.h b/include/linux/topology.h
+> index cb0775e1ee4b..4660749a7303 100644
+> --- a/include/linux/topology.h
+> +++ b/include/linux/topology.h
+> @@ -184,6 +184,9 @@ static inline int cpu_to_mem(int cpu)
+>  #ifndef topology_physical_package_id
+>  #define topology_physical_package_id(cpu)	((void)(cpu), -1)
+>  #endif
+> +#ifndef topology_cod_id				/* cluster on die */
+> +#define topology_cod_id(cpu)			topology_physical_package_id(cpu)
+> +#endif
+>  #ifndef topology_core_id
+>  #define topology_core_id(cpu)			((void)(cpu), 0)
+>  #endif
+> 
