@@ -1,73 +1,97 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 18 Sep 2017 16:49:20 +0530
-Subject: [PATCH 0/2] dwc3 on XU3 and XU4
-In-Reply-To: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
-References: <CGME20170918100229eucas1p24733d7108dfbcf16a59476c1efd7d56a@eucas1p2.samsung.com>
- <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
-Message-ID: <CANAwSgRuDMsbFW4UTFcc4zgefLLxA-SC0cPjBBjtT8=h_+-kjA@mail.gmail.com>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Mon, 18 Sep 2017 13:27:14 +0200
+Subject: [PATCH 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <e1e1b4e5-0678-faaf-e97b-b18095342af2@ti.com>
+References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20170918100944eucas1p2735d3d6a6ee562b927fb9dfaeb0d4090@eucas1p2.samsung.com>
+ <1505729371-6509-1-git-send-email-andrzej.p@samsung.com>
+ <87y3pcmgv6.fsf@linux.intel.com>
+ <e1e1b4e5-0678-faaf-e97b-b18095342af2@ti.com>
+Message-ID: <96001441-2a67-ac9c-a606-eac66138d09e@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
+W dniu 18.09.2017 o?13:06, Kishon Vijay Abraham I pisze:
+> Hi,
+> 
+> On Monday 18 September 2017 04:08 PM, Felipe Balbi wrote:
+>>
+>> Hi,
+>>
+>> Andrzej Pietrasiewicz <andrzej.p@samsung.com> writes:
+>>> From: Vivek Gautam <gautam.vivek@samsung.com>
+>>>
+>>> Adding phy calibration sequence for USB 3.0 DRD PHY present on
+>>> Exynos5420/5800 systems.
 
-On 18 September 2017 at 15:32, Andrzej Pietrasiewicz
-<andrzej.p@samsung.com> wrote:
-> Hi all,
->
-> this short series addresses two issues.
->
-> The first issue is devices not enumerating when connected to an Odroid XU4,
-> to its 3.0 root hub. The interplay between refactoring certain parts of
-> dwc3's code and handling the SUSPHY quirk results in the said problem.
-> Please see: https://patchwork.kernel.org/patch/9535235/
-> Actually using the quirk solves it.
->
-> The second issue is devices not enumerating and/or wrongly enumerating
-> as high speed instead of super speed on an Odroid XU3. There was a patch
-> series from Vivek Gautam in circulation, but it got lost somehow.
-> Please see:
->
-> https://lkml.org/lkml/2014/9/2/166
-> https://lkml.org/lkml/2015/2/2/257
->
-> I adapted his patch so that it does not use a hacky solution to force
-> additional initialization in order for calibration to happen.
-> Instead I used the .reset() in phy_ops. I could have used the .set_mode(),
-> but the calibration must happen only after dwc3_host_init() but
-> phy_set_mode() is called either after of before it. With this patch
-> enumeration happens correctly and a super speed device is recognized as such.
->
-> Rebased onto v4.13. It also applies cleanly to Felipe's testing/next.
->
-> Andrzej Pietrasiewicz (1):
->   ARM: dts: exynos: Add dwc3 SUSPHY quirk
->
-> Vivek Gautam (1):
->   phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
->
->  arch/arm/boot/dts/exynos54xx.dtsi        |   2 +
->  drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
->  drivers/usb/dwc3/core.c                  |   8 +-
->  3 files changed, 191 insertions(+), 2 deletions(-)
->
+<snip>
 
-Thanks for rending this patch series.
+>>>   
+>>> +static int exynos5_usbdrd_phy_reset(struct phy *phy)
+>>> +{
+>>> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+>>> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+>>> +
+>>> +	return exynos5420_usbdrd_phy_calibrate(phy_drd);
+>>> +}
+>>> +
+>>>   static const struct phy_ops exynos5_usbdrd_phy_ops = {
+>>>   	.init		= exynos5_usbdrd_phy_init,
+>>>   	.exit		= exynos5_usbdrd_phy_exit,
+>>>   	.power_on	= exynos5_usbdrd_phy_power_on,
+>>>   	.power_off	= exynos5_usbdrd_phy_power_off,
+>>> +	.reset		= exynos5_usbdrd_phy_reset,
+>>>   	.owner		= THIS_MODULE,
+>>>   };
+>>>   
+>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>> index 03474d3..1d5836e 100644
+>>> --- a/drivers/usb/dwc3/core.c
+>>> +++ b/drivers/usb/dwc3/core.c
+>>> @@ -156,9 +156,10 @@ static void __dwc3_set_mode(struct work_struct *work)
+>>>   		} else {
+>>>   			if (dwc->usb2_phy)
+>>>   				otg_set_vbus(dwc->usb2_phy->otg, true);
+>>> -			if (dwc->usb2_generic_phy)
+>>> +			if (dwc->usb2_generic_phy) {
+>>>   				phy_set_mode(dwc->usb2_generic_phy, PHY_MODE_USB_HOST);
+>>> -
+>>> +				phy_reset(dwc->usb2_generic_phy);
+>>
+>> it doesn't look like this is the best place to reset the phy. Also,
+> 
+> right, phy_reset is done during initialization before phy_power_on/phy_init or
+> in error cases.
+> 
+>> ->reset() doesn't seem to match correctly with a calibration. That seems
+>> to be more fitting to a ->power_on() or ->init() implementation.
+> 
+> yeah, the initial patch seems to calibrate in phy_init(). Not sure why it's
+> modified.
 
-I would like to suggestion some more pointer to this issue.
-Both the usb 2.0 phy and usb 3.0 tune and calibrate are missing in the
-current driver.
-Lately I have searched on this topic on github so accidentally landed on.
+The original patch used a hack like below, in xhci_plat_probe():
 
-[0] https://github.com/wanam/Adam-Kernel-GalaxyS6-G920F/blob/master/drivers/usb/phy/phy-samsung-usb3-cal.c
-[1] https://github.com/wanam/Adam-Kernel-GalaxyS6-G920F/blob/master/drivers/usb/phy/phy-samsung-usb2-cal.c
++       /* Initialize and power-on USB 3.0 PHY */
++       xhci->shared_hcd->phy->init_count = 0;
++       ret = phy_init(xhci->shared_hcd->phy);
++       if (ret)
++               goto dealloc_usb3_hcd;
++
++       xhci->shared_hcd->phy->power_count = 0;
++       ret = phy_power_on(xhci->shared_hcd->phy);
++       if (ret) {
++               phy_exit(xhci->shared_hcd->phy);
++               goto dealloc_usb3_hcd;
++       }
++
 
-I have tried to mapped few of the change and was able to partially
-stabilize the driver.
+Manually setting init_count to 0 in order for the subsequent phy_init() to
+happen probably does not look good.
 
-But few of the changes are mixed with other platform soc probably Exynos 5433.
+The calibration is clearly needed. However, I don't have any strong opinions
+on from which place exactly to trigger the calibration process.
+The original patch did not make it upstream, but if that patch is ok,
+it is perfectly fine with me to drop my version and take that one instead.
 
-Would it be possible for you to look into into this new approach to
-fix and stabilize this driver.
-
-Best Regards
--Anand Moon
+Andrzej
