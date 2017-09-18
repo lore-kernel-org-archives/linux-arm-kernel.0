@@ -1,86 +1,71 @@
 From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 18 Sep 2017 14:39:22 +0800
-Subject: [PATCH v2 2/5] media: atmel-isc: Add prepare and unprepare ops
+Date: Mon, 18 Sep 2017 14:39:24 +0800
+Subject: [PATCH v2 4/5] media: atmel-isc: Remove unnecessary member
 In-Reply-To: <20170918063925.6372-1-wenyou.yang@microchip.com>
 References: <20170918063925.6372-1-wenyou.yang@microchip.com>
-Message-ID: <20170918063925.6372-3-wenyou.yang@microchip.com>
+Message-ID: <20170918063925.6372-5-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A software write operation to the ISC_CLKEN or ISC_CLKDIS register
-requires double clock domain synchronization and is not permitted
-when the ISC_SR.SIP is asserted. So add the .prepare and .unprepare
-ops to make sure the ISC_CLKSR.SIP is unasserted before the write
-operation to the ISC_CLKEN or ISC_CLKDIS register.
+Remove the memeber *config from the isc_subdev_entity struct,
+the member is useless afterward.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 ---
 
 Changes in v2: None
 
- drivers/media/platform/atmel/atmel-isc-regs.h |  1 +
- drivers/media/platform/atmel/atmel-isc.c      | 30 +++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ drivers/media/platform/atmel/atmel-isc.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/media/platform/atmel/atmel-isc-regs.h b/drivers/media/platform/atmel/atmel-isc-regs.h
-index 6936ac467609..93e58fcf1d5f 100644
---- a/drivers/media/platform/atmel/atmel-isc-regs.h
-+++ b/drivers/media/platform/atmel/atmel-isc-regs.h
-@@ -42,6 +42,7 @@
- 
- /* ISC Clock Status Register */
- #define ISC_CLKSR               0x00000020
-+#define ISC_CLKSR_SIP		BIT(31)
- 
- #define ISC_CLK(n)		BIT(n)
- 
 diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index 78114193af4c..8b9c1cafa348 100644
+index 3ecd2bf016a8..2d876903da71 100644
 --- a/drivers/media/platform/atmel/atmel-isc.c
 +++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -308,6 +308,34 @@ module_param(sensor_preferred, uint, 0644);
- MODULE_PARM_DESC(sensor_preferred,
- 		 "Sensor is preferred to output the specified format (1-on 0-off), default 1");
+@@ -83,7 +83,6 @@ struct isc_subdev_entity {
+ 	struct v4l2_subdev		*sd;
+ 	struct v4l2_async_subdev	*asd;
+ 	struct v4l2_async_notifier      notifier;
+-	struct v4l2_subdev_pad_config	*config;
  
-+static int isc_wait_clk_stable(struct clk_hw *hw)
-+{
-+	struct isc_clk *isc_clk = to_isc_clk(hw);
-+	struct regmap *regmap = isc_clk->regmap;
-+	unsigned long timeout = jiffies + usecs_to_jiffies(1000);
-+	unsigned int status;
-+
-+	while (time_before(jiffies, timeout)) {
-+		regmap_read(regmap, ISC_CLKSR, &status);
-+		if (!(status & ISC_CLKSR_SIP))
-+			return 0;
-+
-+		usleep_range(10, 250);
-+	}
-+
-+	return -ETIMEDOUT;
-+}
-+
-+static int isc_clk_prepare(struct clk_hw *hw)
-+{
-+	return isc_wait_clk_stable(hw);
-+}
-+
-+static void isc_clk_unprepare(struct clk_hw *hw)
-+{
-+	isc_wait_clk_stable(hw);
-+}
-+
- static int isc_clk_enable(struct clk_hw *hw)
+ 	u32 pfe_cfg0;
+ 
+@@ -983,6 +982,7 @@ static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
  {
- 	struct isc_clk *isc_clk = to_isc_clk(hw);
-@@ -459,6 +487,8 @@ static int isc_clk_set_rate(struct clk_hw *hw,
+ 	struct isc_format *isc_fmt;
+ 	struct v4l2_pix_format *pixfmt = &f->fmt.pix;
++	struct v4l2_subdev_pad_config pad_cfg;
+ 	struct v4l2_subdev_format format = {
+ 		.which = V4L2_SUBDEV_FORMAT_TRY,
+ 	};
+@@ -1013,7 +1013,7 @@ static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
+ 
+ 	v4l2_fill_mbus_format(&format.format, pixfmt, mbus_code);
+ 	ret = v4l2_subdev_call(isc->current_subdev->sd, pad, set_fmt,
+-			       isc->current_subdev->config, &format);
++			       &pad_cfg, &format);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -1478,8 +1478,6 @@ static void isc_async_unbind(struct v4l2_async_notifier *notifier,
+ 					      struct isc_device, v4l2_dev);
+ 	cancel_work_sync(&isc->awb_work);
+ 	video_unregister_device(&isc->video_dev);
+-	if (isc->current_subdev->config)
+-		v4l2_subdev_free_pad_config(isc->current_subdev->config);
+ 	v4l2_ctrl_handler_free(&isc->ctrls.handler);
  }
  
- static const struct clk_ops isc_clk_ops = {
-+	.prepare	= isc_clk_prepare,
-+	.unprepare	= isc_clk_unprepare,
- 	.enable		= isc_clk_enable,
- 	.disable	= isc_clk_disable,
- 	.is_enabled	= isc_clk_is_enabled,
+@@ -1632,10 +1630,6 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+ 	INIT_LIST_HEAD(&isc->dma_queue);
+ 	spin_lock_init(&isc->dma_queue_lock);
+ 
+-	sd_entity->config = v4l2_subdev_alloc_pad_config(sd_entity->sd);
+-	if (!sd_entity->config)
+-		return -ENOMEM;
+-
+ 	ret = isc_formats_init(isc);
+ 	if (ret < 0) {
+ 		v4l2_err(&isc->v4l2_dev,
 -- 
 2.13.0
