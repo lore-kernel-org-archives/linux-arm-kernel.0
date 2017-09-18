@@ -1,73 +1,31 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 18 Sep 2017 11:50:12 +0300
-Subject: [PATCH 5/9] arm64: dts: marvell: mcbin: add comphy references to
- Ethernet ports
-In-Reply-To: <20170918075814.27405-6-antoine.tenart@free-electrons.com>
-References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
- <20170918075814.27405-6-antoine.tenart@free-electrons.com>
-Message-ID: <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Sep 2017 09:52:36 +0100
+Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
+In-Reply-To: <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
+References: <20170913193723.16234-1-robert.jarzmik@free.fr>
+ <20170913193723.16234-3-robert.jarzmik@free.fr>
+ <20170914074146.dnibkvom4yuzejf3@dell>
+ <20170914074300.iobuwn2hrmnf6sen@dell>
+ <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
+Message-ID: <20170918085236.z6gmgrwvsjvvc4cd@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+On Thu, 14 Sep 2017, Mark Brown wrote:
 
-On Mon, Sep 18, 2017 at 09:58:10AM +0200, Antoine Tenart wrote:
-> This patch adds comphy phandles to the Ethernet ports in the mcbin
-> device tree. The comphy is used to configure the serdes PHYs used by
-> these ports.
+> On Thu, Sep 14, 2017 at 08:43:00AM +0100, Lee Jones wrote:
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 3 +++
->  1 file changed, 3 insertions(+)
+> > Change of plan.  It looks like there are deps.
 > 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> index acf5c7d16d79..9a3b4a1fd445 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> @@ -223,6 +223,7 @@
->  &cpm_eth0 {
->  	status = "okay";
->  	phy = <&phy0>;
-> +	phys = <&cpm_comphy4 0>;
->  	phy-mode = "10gbase-kr";
+> > Unapplied.
+> 
+> The core stuff went in during the merge window, you should be able to
+> wait for -rc1 or pick up the asoc-v4.14 tag.
 
-Since the 'phys' generic PHY property is unrelated to the 'phy*' Ethernet PHY 
-properties that surround it, its location might be confusing. I think it 
-should appear below those two other properties like you did below ...
-
->  };
->  
-> @@ -258,6 +259,7 @@
->  &cps_eth0 {
->  	status = "okay";
->  	phy = <&phy8>;
-> +	phys = <&cps_comphy4 0>;
->  	phy-mode = "10gbase-kr";
-
-... not here ...
-
->  };
->  
-> @@ -266,6 +268,7 @@
->  	status = "okay";
->  	phy = <&ge_phy>;
->  	phy-mode = "sgmii";
-> +	phys = <&cps_comphy0 1>;
-
-... but here.
-
-See also upstream commits 9a94b3a4bdfdb40 (dt-binding: phy: don't confuse with 
-Ethernet phy properties) and c43593d81ab59b (dt-bindings: net: don't confuse 
-with generic PHY property).
-
->  };
->  
->  &cps_pinctrl {
-
-baruch
+No, I mean patches; 3, 4, 5 and 7 depend on this file.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
