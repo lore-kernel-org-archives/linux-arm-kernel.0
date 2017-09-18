@@ -1,47 +1,31 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 18 Sep 2017 09:58:08 +0200
-Subject: [PATCH 3/9] arm64: dts: marvell: extend the cp110 syscon register
- area length
+Date: Mon, 18 Sep 2017 09:58:06 +0200
+Subject: [PATCH 1/9] arm64: defconfig: enable the Marvell 10G PHY as a module
 In-Reply-To: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
 References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170918075814.27405-4-antoine.tenart@free-electrons.com>
+Message-ID: <20170918075814.27405-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends on both cp110 the system register area length to
-include some of the comphy registers as well.
+The Marvell 10G PHY is present on mvebu platforms. Enable it as a module
+so that the network works on these platforms.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 2 +-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 8263a8a504a8..faf7d4a497aa 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -143,7 +143,7 @@
- 
- 			cpm_syscon0: system-controller at 440000 {
- 				compatible = "syscon", "simple-mfd";
--				reg = <0x440000 0x1000>;
-+				reg = <0x440000 0x2000>;
- 
- 				cpm_clk: clock {
- 					compatible = "marvell,cp110-clock";
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index b71ee6c83668..02d6e2f1a7bf 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -143,7 +143,7 @@
- 
- 			cps_syscon0: system-controller at 440000 {
- 				compatible = "syscon", "simple-mfd";
--				reg = <0x440000 0x1000>;
-+				reg = <0x440000 0x2000>;
- 
- 				cps_clk: clock {
- 					compatible = "marvell,cp110-clock";
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 34480e9af2e7..4c9d4f6692dc 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -204,6 +204,7 @@ CONFIG_STMMAC_ETH=m
+ CONFIG_MDIO_BUS_MUX_MMIOREG=y
+ CONFIG_AT803X_PHY=m
+ CONFIG_MARVELL_PHY=m
++CONFIG_MARVELL_10G_PHY=m
+ CONFIG_MESON_GXL_PHY=m
+ CONFIG_MICREL_PHY=y
+ CONFIG_REALTEK_PHY=m
 -- 
 2.13.5
