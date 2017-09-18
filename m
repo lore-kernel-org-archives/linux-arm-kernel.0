@@ -1,72 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Sep 2017 10:25:12 +0200
-Subject: [PATCH v4 5/6] ARM: sun8i: h3: add support for the thermal
- sensor in H3
-In-Reply-To: <20170914145251.21784-6-icenowy@aosc.io>
-References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-6-icenowy@aosc.io>
-Message-ID: <20170918082512.ovzwuorvwqjkueqa@flea.lan>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 18 Sep 2017 10:04:20 +0200
+Subject: [PATCH 1/3] phy: mvebu-cp110-comphy: fix mux error check
+Message-ID: <20170918080422.28972-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 10:52:50PM +0800, Icenowy Zheng wrote:
-> As we have gained the support for the thermal sensor in H3, we can now
-> add its device nodes to the device tree.
-> 
-> Add them to the H3 device tree.
-> 
-> The calibration data of the thermal sensor is still not added, as
-> it's currently not used, and the SID node is not added yet.
-> 
-> The H5 thermal sensor has some differences, and will be added furtherly.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v4:
-> - Mention calibration data in commit message.
-> Changes in v3:
-> - Clock name changes.
-> - Splited out thermal zone addition.
-> 
->  arch/arm/boot/dts/sun8i-h3.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index b36f9f423c39..3220da3ad790 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -72,6 +72,23 @@
->  		};
->  	};
->  
-> +	iio-hwmon {
-> +		compatible = "iio-hwmon";
-> +		io-channels = <&ths>;
-> +	};
-> +
-> +	soc {
-> +		ths: thermal-sensor at 1c25000 {
-> +			compatible = "allwinner,sun8i-h3-ths";
-> +			reg = <0x01c25000 0x100>;
-> +			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-> +			clock-names = "bus", "mod";
-> +			resets = <&ccu RST_BUS_THS>;
-> +			#thermal-sensor-cells = <0>;
-> +			#io-channel-cells = <0>;
+The mux value is retrieved from the mvebu_comphy_get_mux() function
+which returns an int. In mvebu_comphy_power_on() this int is stored to a
+u32 and a check is made to ensure it's not negative. Which is wrong.
+This fixes it.
 
-You're missing your interrupt.
+Fixes: d0438bd6aa09 ("phy: add the mvebu cp110 comphy driver")
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Maxime
-
+diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+index 73ebad6634a7..514a1a47e1fd 100644
+--- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
++++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+@@ -468,8 +468,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
+ {
+ 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
+ 	struct mvebu_comphy_priv *priv = lane->priv;
+-	int ret;
+-	u32 mux, val;
++	int ret, mux;
++	u32 val;
+ 
+ 	mux = mvebu_comphy_get_mux(lane->id, lane->port, lane->mode);
+ 	if (mux < 0)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/d728ce25/attachment-0001.sig>
+2.13.5
