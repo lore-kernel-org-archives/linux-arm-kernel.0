@@ -1,169 +1,132 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 18 Sep 2017 16:21:53 +0100
-Subject: [PATCH 1/2] iommu/io-pgtable-arm: Convert to IOMMU API TLB sync
-Message-ID: <a472d061559a6afcc4631e881e9420944471f461.1505747866.git.robin.murphy@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 18 Sep 2017 16:38:32 +0100
+Subject: [PATCH] arm64: dts: foundation-v8: Enable PSCI mode
+Message-ID: <20170918153832.16356-1-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the core API issues its own post-unmap TLB sync call, push that
-operation out from the io-pgtable-arm internals into the users. For now,
-we leave the invalidation implicit in the unmap operation, since none of
-the current users would benefit much from any change to that.
+Currently if the Foundation model is running ARM Trusted Firmware then
+the kernel, which is configured to use spin tables, cannot start secondary
+processors or "power off" the simulation.
 
-CC: Magnus Damm <damm+renesas@opensource.se>
-CC: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Add a couple of labels to the include file, and introduce a new .dts
+file that uses these to override the enable-method.
+
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- drivers/iommu/arm-smmu-v3.c    |  6 ++++++
- drivers/iommu/arm-smmu.c       | 18 +++++++++++++-----
- drivers/iommu/io-pgtable-arm.c |  7 +------
- drivers/iommu/ipmmu-vmsa.c     |  6 ++++++
- 4 files changed, 26 insertions(+), 11 deletions(-)
+ arch/arm64/boot/dts/arm/Makefile                   |  3 +-
+ .../boot/dts/arm/foundation-v8-gicv3-psci.dts      | 51 ++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/foundation-v8.dtsi         |  8 ++--
+ 3 files changed, 57 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e67ba6c40faf..6a866e029173 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1743,6 +1743,11 @@ arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- 	return ops->unmap(ops, iova, size);
- }
- 
-+static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
-+{
-+	__arm_smmu_tlb_sync(to_smmu_domain(domain)->smmu);
-+}
+diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
+index 75cc2aa10101..c9ec88809f3d 100644
+--- a/arch/arm64/boot/dts/arm/Makefile
++++ b/arch/arm64/boot/dts/arm/Makefile
+@@ -1,4 +1,5 @@
+-dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb foundation-v8-gicv3.dtb
++dtb-$(CONFIG_ARCH_VEXPRESS) += \
++	foundation-v8.dtb foundation-v8-gicv3.dtb foundation-v8-gicv3-psci.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb juno-r2.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
+diff --git a/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts b/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts
+new file mode 100644
+index 000000000000..94a249095104
+--- /dev/null
++++ b/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dts
+@@ -0,0 +1,51 @@
++/*
++ * ARM Ltd.
++ *
++ * ARMv8 Foundation model DTS (GICv3 configuration)
++ */
 +
- static phys_addr_t
- arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
- {
-@@ -1963,6 +1968,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.map_sg			= default_iommu_map_sg,
-+	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 3bdb799d3b4b..c4b7efe08ce4 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -250,6 +250,7 @@ enum arm_smmu_domain_stage {
- struct arm_smmu_domain {
- 	struct arm_smmu_device		*smmu;
- 	struct io_pgtable_ops		*pgtbl_ops;
-+	const struct iommu_gather_ops	*tlb_ops;
- 	struct arm_smmu_cfg		cfg;
- 	enum arm_smmu_domain_stage	stage;
- 	struct mutex			init_mutex; /* Protects smmu pointer */
-@@ -735,7 +736,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	enum io_pgtable_fmt fmt;
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
--	const struct iommu_gather_ops *tlb_ops;
- 
- 	mutex_lock(&smmu_domain->init_mutex);
- 	if (smmu_domain->smmu)
-@@ -813,7 +813,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 			ias = min(ias, 32UL);
- 			oas = min(oas, 32UL);
- 		}
--		tlb_ops = &arm_smmu_s1_tlb_ops;
-+		smmu_domain->tlb_ops = &arm_smmu_s1_tlb_ops;
- 		break;
- 	case ARM_SMMU_DOMAIN_NESTED:
- 		/*
-@@ -833,9 +833,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 			oas = min(oas, 40UL);
- 		}
- 		if (smmu->version == ARM_SMMU_V2)
--			tlb_ops = &arm_smmu_s2_tlb_ops_v2;
-+			smmu_domain->tlb_ops = &arm_smmu_s2_tlb_ops_v2;
- 		else
--			tlb_ops = &arm_smmu_s2_tlb_ops_v1;
-+			smmu_domain->tlb_ops = &arm_smmu_s2_tlb_ops_v1;
- 		break;
- 	default:
- 		ret = -EINVAL;
-@@ -863,7 +863,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		.pgsize_bitmap	= smmu->pgsize_bitmap,
- 		.ias		= ias,
- 		.oas		= oas,
--		.tlb		= tlb_ops,
-+		.tlb		= smmu_domain->tlb_ops,
- 		.iommu_dev	= smmu->dev,
- 	};
- 
-@@ -1259,6 +1259,13 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return ops->unmap(ops, iova, size);
- }
- 
-+static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
++#include "foundation-v8.dtsi"
 +
-+	smmu_domain->tlb_ops->tlb_sync(smmu_domain);
-+}
++/ {
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++	};
 +
- static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 					      dma_addr_t iova)
- {
-@@ -1562,6 +1569,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.map_sg			= default_iommu_map_sg,
-+	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index e8018a308868..51e5c43caed1 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -609,7 +609,6 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 			  size_t size)
- {
--	size_t unmapped;
- 	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
- 	arm_lpae_iopte *ptep = data->pgd;
- 	int lvl = ARM_LPAE_START_LVL(data);
-@@ -617,11 +616,7 @@ static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
- 		return 0;
- 
--	unmapped = __arm_lpae_unmap(data, iova, size, lvl, ptep);
--	if (unmapped)
--		io_pgtable_tlb_sync(&data->iop);
--
--	return unmapped;
-+	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
- }
- 
- static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 195d6e93ac71..2c045b8d25f8 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -619,6 +619,11 @@ static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
- 	return domain->iop->unmap(domain->iop, iova, size);
- }
- 
-+static void ipmmu_iotlb_sync(struct iommu_domain *io_domain)
-+{
-+	ipmmu_tlb_flush_all(to_vmsa_domain(io_domain));
-+}
++	gic: interrupt-controller at 2f000000 {
++		compatible = "arm,gic-v3";
++		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		interrupt-controller;
++		reg =	<0x0 0x2f000000 0x0 0x10000>,
++			<0x0 0x2f100000 0x0 0x200000>,
++			<0x0 0x2c000000 0x0 0x2000>,
++			<0x0 0x2c010000 0x0 0x2000>,
++			<0x0 0x2c02f000 0x0 0x2000>;
++		interrupts = <1 9 4>;
 +
- static phys_addr_t ipmmu_iova_to_phys(struct iommu_domain *io_domain,
- 				      dma_addr_t iova)
- {
-@@ -876,6 +881,7 @@ static const struct iommu_ops ipmmu_ops = {
- 	.detach_dev = ipmmu_detach_device,
- 	.map = ipmmu_map,
- 	.unmap = ipmmu_unmap,
-+	.iotlb_sync = ipmmu_iotlb_sync,
- 	.map_sg = default_iommu_map_sg,
- 	.iova_to_phys = ipmmu_iova_to_phys,
- 	.add_device = ipmmu_add_device_dma,
--- 
-2.13.4.dirty
++		its: its at 2f020000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2f020000 0x0 0x20000>;
++		};
++	};
++};
++
++&cpu0 {
++	enable-method = "psci";
++};
++
++&cpu1 {
++	enable-method = "psci";
++};
++
++&cpu2 {
++	enable-method = "psci";
++};
++
++&cpu3 {
++	enable-method = "psci";
++};
+diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dtsi b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+index 8ecdd4331980..8c7f8c4f090a 100644
+--- a/arch/arm64/boot/dts/arm/foundation-v8.dtsi
++++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+@@ -28,7 +28,7 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <0>;
+
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x0>;
+@@ -36,7 +36,7 @@
+ 			cpu-release-addr = <0x0 0x8000fff8>;
+ 			next-level-cache = <&L2_0>;
+ 		};
+-		cpu at 1 {
++		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x1>;
+@@ -44,7 +44,7 @@
+ 			cpu-release-addr = <0x0 0x8000fff8>;
+ 			next-level-cache = <&L2_0>;
+ 		};
+-		cpu at 2 {
++		cpu2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x2>;
+@@ -52,7 +52,7 @@
+ 			cpu-release-addr = <0x0 0x8000fff8>;
+ 			next-level-cache = <&L2_0>;
+ 		};
+-		cpu at 3 {
++		cpu3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x3>;
+--
+2.9.5
