@@ -1,43 +1,65 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Mon, 18 Sep 2017 15:04:34 -0500
-Subject: [[RESEND]PATCHv6 2/2] i2c: altera: Add Altera I2C Controller
- driver
-In-Reply-To: <20170913205038.ndlkaivkdgxa3ee2@ninjato>
-References: <1505164640-26413-1-git-send-email-thor.thayer@linux.intel.com>
- <1505164640-26413-2-git-send-email-thor.thayer@linux.intel.com>
- <20170913205038.ndlkaivkdgxa3ee2@ninjato>
-Message-ID: <3f9fe0a6-0e8d-7038-28e6-eacc6ed2e7ad@linux.intel.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 19 Sep 2017 04:11:49 +0800
+Subject: [xlnx:master 841/1027] debug.c:(.text+0x10): multiple definition of
+ `dwc3_set_simple_data'
+Message-ID: <201709190446.sYkAQmR1%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2017 03:50 PM, Wolfram Sang wrote:
-> On Mon, Sep 11, 2017 at 04:17:20PM -0500, thor.thayer at linux.intel.com wrote:
->> From: Thor Thayer <thor.thayer@linux.intel.com>
->>
->> Add driver support for the Altera I2C Controller. The I2C
->> controller is soft IP for use in FPGAs.
->>
->> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
->> ---
-> 
-> Applied to for-next (will be in v4.14), thanks!
-> 
->> +	if (finish) {
->> +		/* Wait for the Core to finish */
->> +		ret = readl_poll_timeout_atomic(idev->base + ALTR_I2C_STATUS,
-> 
-> I wonder a bit about polling in an interrupt handler (maybe threaded
-> irqs?) but we can fix that later, I think.
-> 
+Hi Anurag,
 
-Yes, based on your previous feedback, I changed to a threaded IRQ as 
-shown below. The altr_i2c_isr_quick wakes up this IRQ handler if the 
-status is non-zero.
+FYI, the error/warning still remains.
 
-+
-+	ret = devm_request_threaded_irq(&pdev->dev, irq, altr_i2c_isr_quick,
-+					altr_i2c_isr, IRQF_ONESHOT,
-+					pdev->name, idev);
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   f9658a41c361182381160edbcea3c1de3b76dc9d
+commit: a4769f84c50a769e655d4bb9c1a8a45586cdc1f4 [841/1027] dwc3: Add support for removing vbus when suspended
+config: x86_64-rhel (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout a4769f84c50a769e655d4bb9c1a8a45586cdc1f4
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Thanks for the review and applying the patch!
+All errors (new ones prefixed by >>):
+
+   drivers/usb/dwc3/debug.o: In function `dwc3_simple_wakeup_capable':
+   debug.c:(.text+0x0): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/debug.o: In function `dwc3_set_simple_data':
+>> debug.c:(.text+0x10): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x530): first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
+   trace.c:(.text+0x1880): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_set_simple_data':
+   trace.c:(.text+0x1890): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x530): first defined here
+   drivers/usb/dwc3/gadget.o: In function `dwc3_simple_wakeup_capable':
+   gadget.c:(.text+0x10b0): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/gadget.o: In function `dwc3_set_simple_data':
+   gadget.c:(.text+0x10c0): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x530): first defined here
+   drivers/usb/dwc3/ep0.o: In function `dwc3_simple_wakeup_capable':
+   ep0.c:(.text+0xa10): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/ep0.o: In function `dwc3_set_simple_data':
+   ep0.c:(.text+0xa20): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x530): first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
+   debugfs.c:(.text+0xd40): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_set_simple_data':
+   debugfs.c:(.text+0xd50): multiple definition of `dwc3_set_simple_data'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x530): first defined here
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38234 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/18943ceb/attachment-0001.gz>
