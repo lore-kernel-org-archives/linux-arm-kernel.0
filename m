@@ -1,48 +1,90 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 18 Sep 2017 09:58:05 +0200
-Subject: [PATCH 0/9] arm64: marvell: 7k/8k: improve network support
-Message-ID: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 18 Sep 2017 15:36:43 +0800
+Subject: [PATCH v4 1/6] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3
+In-Reply-To: <20170918073336.j7finend3g76chsu@flea.lan>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-2-icenowy@aosc.io>
+ <20170918073336.j7finend3g76chsu@flea.lan>
+Message-ID: <310CE549-B8CE-4C0C-95B1-B545E38BDAF5@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
 
-This series improves the network support on Marvell 7k and 8k platforms
-by adding descriptions of the comphy, and by using the comphy in already
-available networking ports. The series also introduces a description of
-the SFP ports on the Marvell Armada 7040-db and 8040-db.
 
-Two defconfig patches also improve the Marvell ARM64 support by enabling
-required options allowing to use the networking ports properly.
+? 2017?9?18? GMT+08:00 ??3:33:36, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Thu, Sep 14, 2017 at 10:52:46PM +0800, Icenowy Zheng wrote:
+>> Allwinner H3 features a thermal sensor like the one in A33, but has
+>its
+>> register re-arranged, the clock divider moved to CCU (originally the
+>> clock divider is in ADC) and added a pair of bus clock and reset.
+>> 
+>> Update the binding document to cover H3.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>> Changes in v4:
+>> - Add nvmem calibration data (not yet used by the driver)
+>> Changes in v3:
+>> - Clock name changes.
+>> - Example node name changes.
+>> - Add interupts (not yet used by the driver).
+>> 
+>>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30
+>++++++++++++++++++++--
+>>  1 file changed, 28 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>> index badff3611a98..6c470d584bf9 100644
+>> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can also
+>act as a thermal sensor
+>>  and sometimes as a touchscreen controller.
+>>  
+>>  Required properties:
+>> -  - compatible: "allwinner,sun8i-a33-ths",
+>> +  - compatible: must contain one of the following compatibles:
+>> +		- "allwinner,sun8i-a33-ths"
+>> +		- "allwinner,sun8i-h3-ths"
+>>    - reg: mmio address range of the chip,
+>>    - #thermal-sensor-cells: shall be 0,
+>>    - #io-channel-cells: shall be 0,
+>>  
+>> -Example:
+>> +Optional properties:
+>> +  - nvmem-cells: A phandle to the calibration data provided by a
+>nvmem device.
+>> +                 If unspecified default values shall be used.
+>> +  - nvmem-cell-names: Should be "calibration-data"
+>
+>I'd prefer to have which sensor it applies to here. It wouldn't change
+>anything for the H3, but it definitely does for example for the A83t
+>that has two sensors, one for each cluster, and one for the GPU, each
+>with calibration data.
+>
+>What about cluster0-calibration?
 
-This series follows recent improvements in the PPv2 driver.
+The calibration data is in fact a 2 word (8 bytes) zone,
+which is reserved for 4 sensors on all SoCs, even on H3.
+It's half word per sensor.
 
-Based on v4.14-rc1, and tested on the Marvell Armada 7040-db, 8040-db
-and 8040-mcbin.
+I prefer to just assume a 2 word cell for every SoC.
 
-Thanks!
-Antoine
-
-Antoine Tenart (8):
-  arm64: defconfig: enable the Marvell 10G PHY as a module
-  arm64: dts: marvell: extend the cp110 syscon register area length
-  arm64: dts: marvell: add comphy nodes on cp110 master and slave
-  arm64: dts: marvell: mcbin: add comphy references to Ethernet ports
-  arm64: dts: marvell: 7040-db: add comphy reference to Ethernet port
-  arm64: dts: marvell: cp110: add PPv2 port interrupts
-  arm64: dts: marvell: 7040-db: enable the SFP port
-  arm64: dts: marvell: 8040-db: enable the SFP ports
-
-Miquel Raynal (1):
-  arm64: defconfig: enable Marvell CP110 comphy
-
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  7 +++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 10 ++++
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  3 ++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 55 +++++++++++++++++++---
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 55 +++++++++++++++++++---
- arch/arm64/configs/defconfig                       |  2 +
- 6 files changed, 118 insertions(+), 14 deletions(-)
-
--- 
-2.13.5
+>
+>> +
+>> +Required properties for the following compatibles:
+>> +		- "allwinner,sun8i-h3-ths"
+>> +  - clocks: the bus clock and the input clock of the ADC,
+>> +  - clock-names: should be "bus" and "mod",
+>> +  - resets: the bus reset of the ADC,
+>> +  - interrupts: the sampling interrupt of the ADC,
+>
+>For resets and interrupts, you should list all of them. If there's
+>only one, then there's no point telling which one it is.
+>
+>
+>Thanks,
+>Maxime
