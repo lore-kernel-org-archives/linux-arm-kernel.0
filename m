@@ -1,43 +1,77 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Mon, 18 Sep 2017 09:40:02 +0000
-Subject: [PATCH v3 0/3] STM32 CRYP crypto driver
-In-Reply-To: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
-References: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
-Message-ID: <7be8c468-2e95-c781-3af3-d411acc80598@st.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 18 Sep 2017 11:44:51 +0200
+Subject: [PATCH 5/9] arm64: dts: marvell: mcbin: add comphy references to
+ Ethernet ports
+In-Reply-To: <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
+References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
+ <20170918075814.27405-6-antoine.tenart@free-electrons.com>
+ <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
+Message-ID: <20170918094451.GB20017@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a gentle ping ... or have I missed out on a reply?
+Hi Baruch,
 
+On Mon, Sep 18, 2017 at 11:50:12AM +0300, Baruch Siach wrote:
+> On Mon, Sep 18, 2017 at 09:58:10AM +0200, Antoine Tenart wrote:
+> > This patch adds comphy phandles to the Ethernet ports in the mcbin
+> > device tree. The comphy is used to configure the serdes PHYs used by
+> > these ports.
+> > 
+> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > ---
+> >  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> > index acf5c7d16d79..9a3b4a1fd445 100644
+> > --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> > +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> > @@ -223,6 +223,7 @@
+> >  &cpm_eth0 {
+> >  	status = "okay";
+> >  	phy = <&phy0>;
+> > +	phys = <&cpm_comphy4 0>;
+> >  	phy-mode = "10gbase-kr";
+> 
+> Since the 'phys' generic PHY property is unrelated to the 'phy*' Ethernet PHY 
+> properties that surround it, its location might be confusing. I think it 
+> should appear below those two other properties like you did below ...
+> 
+> >  };
+> >  
+> > @@ -258,6 +259,7 @@
+> >  &cps_eth0 {
+> >  	status = "okay";
+> >  	phy = <&phy8>;
+> > +	phys = <&cps_comphy4 0>;
+> >  	phy-mode = "10gbase-kr";
+> 
+> ... not here ...
+> 
+> >  };
+> >  
+> > @@ -266,6 +268,7 @@
+> >  	status = "okay";
+> >  	phy = <&ge_phy>;
+> >  	phy-mode = "sgmii";
+> > +	phys = <&cps_comphy0 1>;
+> 
+> ... but here.
 
-On 18/08/17 11:19, Fabien Dessenne wrote:
-> This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
-> This drivers uses the crypto API and provides with HW-enabled AEAD and block
-> cipher algorithms.
-> It makes use of the crypto engine which is upgraded in order to support AEAD
-> requests.
->
-> This driver was successfully tested with tcrypt / testmgr.
->
-> Changes since v3:
-> - update dt-bindings with Rob Herring remarks
->
-> Changes since v2:
-> - update dt-bindings (interrupts description)
-> - rebase on STM32 crypto patches (L. Debieve : update CRC32 + add HASH)
->
-> Fabien Dessenne (3):
->    crypto: engine - permit to enqueue aead_request
->    dt-bindings: Document STM32 CRYP bindings
->    crypto: stm32 - Support for STM32 CRYP crypto module
->
->   .../devicetree/bindings/crypto/st,stm32-cryp.txt   |   19 +
->   crypto/crypto_engine.c                             |  101 +
->   drivers/crypto/stm32/Kconfig                       |    9 +
->   drivers/crypto/stm32/Makefile                      |    3 +-
->   drivers/crypto/stm32/stm32-cryp.c                  | 1962 ++++++++++++++++++++
->   include/crypto/engine.h                            |   16 +
->   6 files changed, 2109 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
->   create mode 100644 drivers/crypto/stm32/stm32-cryp.c
->
+OK, I'll update.
+
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/ba16b8b7/attachment.sig>
