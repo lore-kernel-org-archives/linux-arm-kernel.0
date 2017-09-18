@@ -1,28 +1,61 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Sep 2017 10:24:02 +0200
-Subject: [PATCH v4 4/6] iio: adc: sun4i-gpadc-iio: add support for H3
- thermal sensor
-In-Reply-To: <0b395ea1743a14a62855fc2a2dc74411@aosc.io>
+Date: Mon, 18 Sep 2017 10:25:12 +0200
+Subject: [PATCH v4 5/6] ARM: sun8i: h3: add support for the thermal
+ sensor in H3
+In-Reply-To: <20170914145251.21784-6-icenowy@aosc.io>
 References: <20170914145251.21784-1-icenowy@aosc.io>
- <20170914145251.21784-5-icenowy@aosc.io>
- <445ea236-35e9-8d5a-e580-b2bdcf5f7776@free-electrons.com>
- <0b395ea1743a14a62855fc2a2dc74411@aosc.io>
-Message-ID: <20170918082402.fa5mg2ucqouh3ti5@flea.lan>
+ <20170914145251.21784-6-icenowy@aosc.io>
+Message-ID: <20170918082512.ovzwuorvwqjkueqa@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 16, 2017 at 06:14:08PM +0800, icenowy at aosc.io wrote:
-> > The H3 apparently supports IRQs, why do you not support them for the
-> > temperature? They might be broken as it is on A33 but then it might be a
-> > good idea to write it down in a comment in the driver (and not adding
-> > the unused registers in the header file) or at least in the commit log.
-> > 
-> > 3) Now that you have support for clocks, wouldn't it be a good idea to
-> > disable them during suspend?
+On Thu, Sep 14, 2017 at 10:52:50PM +0800, Icenowy Zheng wrote:
+> As we have gained the support for the thermal sensor in H3, we can now
+> add its device nodes to the device tree.
 > 
-> Interesting... It's meaningful to disable the mod clock during suspend.
+> Add them to the H3 device tree.
+> 
+> The calibration data of the thermal sensor is still not added, as
+> it's currently not used, and the SID node is not added yet.
+> 
+> The H5 thermal sensor has some differences, and will be added furtherly.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v4:
+> - Mention calibration data in commit message.
+> Changes in v3:
+> - Clock name changes.
+> - Splited out thermal zone addition.
+> 
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index b36f9f423c39..3220da3ad790 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -72,6 +72,23 @@
+>  		};
+>  	};
+>  
+> +	iio-hwmon {
+> +		compatible = "iio-hwmon";
+> +		io-channels = <&ths>;
+> +	};
+> +
+> +	soc {
+> +		ths: thermal-sensor at 1c25000 {
+> +			compatible = "allwinner,sun8i-h3-ths";
+> +			reg = <0x01c25000 0x100>;
+> +			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
+> +			clock-names = "bus", "mod";
+> +			resets = <&ccu RST_BUS_THS>;
+> +			#thermal-sensor-cells = <0>;
+> +			#io-channel-cells = <0>;
 
-All clocks, actually. And put the device back into reset.
+You're missing your interrupt.
 
 Maxime
 
@@ -36,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/ad9e3963/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/d728ce25/attachment-0001.sig>
