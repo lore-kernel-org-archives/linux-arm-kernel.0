@@ -1,40 +1,29 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon, 18 Sep 2017 09:56:38 +0100
-Subject: [PATCH] ASoC: zte: spdif: remove duplicate initialization of dma_data
-Message-ID: <20170918085638.27110-1-colin.king@canonical.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 18 Sep 2017 11:02:13 +0200
+Subject: [PATCH v2 0/2] stm32 clocksource driver rework
+Message-ID: <1505725335-27081-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+version 2:
+- fix uninitialized variable
 
-dma_data is being initialized twice, remove the unused first
-initialization and use the latter one instead.  Fixed clang warning:
+These patch implements clocksource and clockevent by using only one hardware block.
+It also limits usage of clocksource to 32 bits timers because 16 bits ones
+aren't enough accurate.
+Series includes minor clean up in structures, function prototypes and driver name.
 
-"warning: Value stored to 'dma_data' during its initialization is
-never read"
+Since 16 bits timers become useless it also removes them from stm32f4 and
+stm32f7 devicetree.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- sound/soc/zte/zx-spdif.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Benjamin Gaignard (2):
+  clocksource: stm32: rework driver to use only one timer
+  arm: dts: stm32: remove useless clocksource nodes
 
-diff --git a/sound/soc/zte/zx-spdif.c b/sound/soc/zte/zx-spdif.c
-index b143f9f682d2..17b6ce35037a 100644
---- a/sound/soc/zte/zx-spdif.c
-+++ b/sound/soc/zte/zx-spdif.c
-@@ -139,11 +139,11 @@ static int zx_spdif_hw_params(struct snd_pcm_substream *substream,
- {
- 	struct zx_spdif_info *zx_spdif = dev_get_drvdata(socdai->dev);
- 	struct zx_spdif_info *spdif = snd_soc_dai_get_drvdata(socdai);
--	struct snd_dmaengine_dai_dma_data *dma_data = &zx_spdif->dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data =
-+		snd_soc_dai_get_dma_data(socdai, substream);
- 	u32 val, ch_num, rate;
- 	int ret;
- 
--	dma_data = snd_soc_dai_get_dma_data(socdai, substream);
- 	dma_data->addr_width = params_width(params) >> 3;
- 
- 	val = readl_relaxed(zx_spdif->reg_base + ZX_CTRL);
+ arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
+ arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
+ drivers/clocksource/timer-stm32.c | 259 +++++++++++++++++++++++---------------
+ 3 files changed, 155 insertions(+), 168 deletions(-)
+
 -- 
-2.14.1
+2.7.4
