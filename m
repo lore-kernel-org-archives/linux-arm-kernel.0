@@ -1,180 +1,46 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 18 Sep 2017 16:39:38 -0400
-Subject: [v5 03/12] soc/fsl/qbman: Use shared-dma-pool for QMan private memory
+Date: Mon, 18 Sep 2017 16:39:37 -0400
+Subject: [v5 02/12] soc/fsl/qbman: Use shared-dma-pool for BMan private memory
  allocations
 In-Reply-To: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
 References: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1505767187-4596-4-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1505767187-4596-3-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the shared-memory-pool mechanism for frame queue descriptor and
-packed frame descriptor record area allocations.
+Use the shared-memory-pool mechanism for free buffer proxy record
+area allocation.
 
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/qman_ccsr.c | 93 ++++++++++++++++++++++++++-------------
- drivers/soc/fsl/qbman/qman_priv.h |  2 -
- drivers/soc/fsl/qbman/qman_test.h |  2 -
- 3 files changed, 63 insertions(+), 34 deletions(-)
+ drivers/soc/fsl/qbman/bman_ccsr.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
-index 835ce94..607355b9 100644
---- a/drivers/soc/fsl/qbman/qman_ccsr.c
-+++ b/drivers/soc/fsl/qbman/qman_ccsr.c
-@@ -401,21 +401,42 @@ static int qm_init_pfdr(struct device *dev, u32 pfdr_start, u32 num)
- }
- 
- /*
-- * Ideally we would use the DMA API to turn rmem->base into a DMA address
-- * (especially if iommu translations ever get involved).  Unfortunately, the
-- * DMA API currently does not allow mapping anything that is not backed with
-- * a struct page.
-+ * QMan needs two global memory areas initialized at boot time:
-+ *  1) FQD: Frame Queue Descriptors used to manage frame queues
-+ *  2) PFDR: Packed Frame Queue Descriptor Records used to store frames
-+ * Both areas are reserved using the device tree reserved memory framework
-+ * and the addresses and sizes are initialized when the QMan device is probed
-  */
- static dma_addr_t fqd_a, pfdr_a;
- static size_t fqd_sz, pfdr_sz;
- 
-+#ifdef CONFIG_PPC
-+/*
-+ * Support for PPC Device Tree backward compatibility when compatible
-+ * string is set to fsl-qman-fqd and fsl-qman-pfdr
-+ */
-+static int zero_priv_mem(phys_addr_t addr, size_t sz)
-+{
-+	/* map as cacheable, non-guarded */
-+	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
-+
-+	if (!tmpp)
-+		return -ENOMEM;
-+
-+	memset_io(tmpp, 0, sz);
-+	flush_dcache_range((unsigned long)tmpp,
-+			   (unsigned long)tmpp + sz);
-+	iounmap(tmpp);
-+
-+	return 0;
-+}
-+
- static int qman_fqd(struct reserved_mem *rmem)
- {
- 	fqd_a = rmem->base;
- 	fqd_sz = rmem->size;
- 
- 	WARN_ON(!(fqd_a && fqd_sz));
--
- 	return 0;
- }
- RESERVEDMEM_OF_DECLARE(qman_fqd, "fsl,qman-fqd", qman_fqd);
-@@ -431,32 +452,13 @@ static int qman_pfdr(struct reserved_mem *rmem)
- }
- RESERVEDMEM_OF_DECLARE(qman_pfdr, "fsl,qman-pfdr", qman_pfdr);
- 
-+#endif
-+
- static unsigned int qm_get_fqid_maxcnt(void)
- {
- 	return fqd_sz / 64;
- }
- 
--/*
-- * Flush this memory range from data cache so that QMAN originated
-- * transactions for this memory region could be marked non-coherent.
-- */
--static int zero_priv_mem(struct device *dev, struct device_node *node,
--			 phys_addr_t addr, size_t sz)
--{
--	/* map as cacheable, non-guarded */
--	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
--
--	if (!tmpp)
--		return -ENOMEM;
--
--	memset_io(tmpp, 0, sz);
--	flush_dcache_range((unsigned long)tmpp,
--			   (unsigned long)tmpp + sz);
--	iounmap(tmpp);
--
--	return 0;
--}
--
- static void log_edata_bits(struct device *dev, u32 bit_count)
- {
- 	u32 i, j, mask = 0xffffffff;
-@@ -727,10 +729,41 @@ static int fsl_qman_probe(struct platform_device *pdev)
- 		qm_channel_caam = QMAN_CHANNEL_CAAM_REV3;
+diff --git a/drivers/soc/fsl/qbman/bman_ccsr.c b/drivers/soc/fsl/qbman/bman_ccsr.c
+index eaa9585..05c4223 100644
+--- a/drivers/soc/fsl/qbman/bman_ccsr.c
++++ b/drivers/soc/fsl/qbman/bman_ccsr.c
+@@ -201,6 +201,21 @@ static int fsl_bman_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
  
--	ret = zero_priv_mem(dev, node, fqd_a, fqd_sz);
--	WARN_ON(ret);
--	if (ret)
--		return -ENODEV;
-+	if (fqd_a) {
-+#ifdef CONFIG_PPC
-+		/*
-+		 * For PPC backward DT compatibility
-+		 * FQD memory MUST be zero'd by software
-+		 */
-+		zero_priv_mem(fqd_a, fqd_sz);
-+#else
-+		WARN(1, "Unexpected architecture using non shared-dma-mem reservations");
-+#endif
-+	} else {
-+		/*
-+		 * Order of memory regions is assumed as FQD followed by PFDR
-+		 * in order to ensure allocations from the correct regions the
-+		 * driver initializes then allocates each piece in order
-+		 */
-+		ret = qbman_init_private_mem(dev, 0, &fqd_a, &fqd_sz);
++	/*
++	 * If FBPR memory wasn't defined using the qbman compatible string
++	 * try using the of_reserved_mem_device method
++	 */
++	if (!fbpr_a) {
++		ret = qbman_init_private_mem(dev, 0, &fbpr_a, &fbpr_sz);
 +		if (ret) {
-+			dev_err(dev, "qbman_init_private_mem() for FQD failed 0x%x\n",
++			dev_err(dev, "qbman_init_private_mem() failed 0x%x\n",
 +				ret);
 +			return -ENODEV;
 +		}
 +	}
-+	dev_dbg(dev, "Allocated FQD 0x%llx 0x%zx\n", fqd_a, fqd_sz);
 +
-+	if (!pfdr_a) {
-+		/* Setup PFDR memory */
-+		ret = qbman_init_private_mem(dev, 1, &pfdr_a, &pfdr_sz);
-+		if (ret) {
-+			dev_err(dev, "qbman_init_private_mem() for PFDR failed 0x%x\n",
-+				ret);
-+			return -ENODEV;
-+		}
-+	}
-+	dev_dbg(dev, "Allocated PFDR 0x%llx 0x%zx\n", pfdr_a, pfdr_sz);
++	dev_dbg(dev, "Allocated FBPR 0x%llx 0x%zx\n", fbpr_a, fbpr_sz);
++
+ 	bm_set_memory(fbpr_a, fbpr_sz);
  
- 	ret = qman_init_ccsr(dev);
- 	if (ret) {
-diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
-index 5fe9faf..b1e2cbf 100644
---- a/drivers/soc/fsl/qbman/qman_priv.h
-+++ b/drivers/soc/fsl/qbman/qman_priv.h
-@@ -28,8 +28,6 @@
-  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
--#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
--
- #include "dpaa_sys.h"
- 
- #include <soc/fsl/qman.h>
-diff --git a/drivers/soc/fsl/qbman/qman_test.h b/drivers/soc/fsl/qbman/qman_test.h
-index d5f8cb2..41bdbc48 100644
---- a/drivers/soc/fsl/qbman/qman_test.h
-+++ b/drivers/soc/fsl/qbman/qman_test.h
-@@ -30,7 +30,5 @@
- 
- #include "qman_priv.h"
- 
--#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
--
- int qman_test_stash(void);
- int qman_test_api(void);
+ 	err_irq = platform_get_irq(pdev, 0);
 -- 
 2.7.4
