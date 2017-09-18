@@ -1,293 +1,89 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Mon, 18 Sep 2017 12:09:31 +0200
-Subject: [PATCH 2/2] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
-References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
- <CGME20170918100944eucas1p2735d3d6a6ee562b927fb9dfaeb0d4090@eucas1p2.samsung.com>
-Message-ID: <1505729371-6509-1-git-send-email-andrzej.p@samsung.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 18 Sep 2017 12:24:38 +0200
+Subject: [PATCH] mtd: oxnas_nand: Fix error handling in oxnas_nand_probe()
+In-Reply-To: <20170918121409.03e4b978@bbrezillon>
+References: <1504908038-26285-1-git-send-email-khoroshilov@ispras.ru>
+ <20170918121409.03e4b978@bbrezillon>
+Message-ID: <87e7ab4e-d3fa-9207-c90c-c2c55b75aaed@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vivek Gautam <gautam.vivek@samsung.com>
+On 09/18/2017 12:14 PM, Boris Brezillon wrote:
+> Hi Alexey,
+> 
+> On Sat,  9 Sep 2017 01:00:38 +0300
+> Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
+> 
+>> oxnas_nand_probe() does not disable clock on error paths.
+>> The patch adds disabling using devm interface.
+>>
+>> Found by Linux Driver Verification project (linuxtesting.org).
+>>
+>> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+>> ---
+>>  drivers/mtd/nand/oxnas_nand.c | 22 +++++++++++++++-------
+>>  1 file changed, 15 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+>> index 1b207aac840c..8abc69a285dd 100644
+>> --- a/drivers/mtd/nand/oxnas_nand.c
+>> +++ b/drivers/mtd/nand/oxnas_nand.c
+>> @@ -103,16 +103,26 @@ static int oxnas_nand_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(oxnas->io_base))
+>>  		return PTR_ERR(oxnas->io_base);
+>>  
+>> -	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+>> -	if (IS_ERR(oxnas->clk))
+>> -		oxnas->clk = NULL;
+>> -
+>>  	/* Only a single chip node is supported */
+>>  	count = of_get_child_count(np);
+>>  	if (count > 1)
+>>  		return -EINVAL;
+>>  
+>> -	clk_prepare_enable(oxnas->clk);
+>> +	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
+>> +	if (IS_ERR(oxnas->clk)) {
+>> +		oxnas->clk = NULL;
+>> +	} else {
+>> +		err = clk_prepare_enable(oxnas->clk);
+>> +		if (err)
+>> +			return err;
+>> +
+>> +		err = devm_add_action_or_reset(&pdev->dev,
+>> +				(void(*)(void *))clk_disable_unprepare,
+>> +				oxnas->clk);
+>> +		if (err)
+>> +			return err;
+>> +	}
+>> +
+> 
+> Looks like something that should be made available at the CCF level
+> either with a devm_clk_get_prepare_enable() or with a
+> devm_clk_prepare_enable() helper. Would you care proposing this change
+> to the CCF ML?
+> 
+> In the meantime can you provide a simpler fix that just adds the
+> missing clk_disable_unprepare() call in the error path?
+> 
+>>  	device_reset_optional(&pdev->dev);
+>>  
+>>  	for_each_child_of_node(np, nand_np) {
+>> @@ -167,8 +177,6 @@ static int oxnas_nand_remove(struct platform_device *pdev)
+>>  	if (oxnas->chips[0])
+>>  		nand_release(nand_to_mtd(oxnas->chips[0]));
+>>  
+>> -	clk_disable_unprepare(oxnas->clk);
+>> -
+>>  	return 0;
+>>  }
+>>  
+> 
 
-Adding phy calibration sequence for USB 3.0 DRD PHY present on
-Exynos5420/5800 systems.
-This calibration facilitates setting certain PHY parameters viz.
-the Loss-of-Signal (LOS) Detector Threshold Level, as well as
-Tx-Vboost-Level for Super-Speed operations.
-Additionally we also set proper time to wait for RxDetect measurement,
-for desired PHY reference clock, so as to solve issue with enumeration
-of few USB 3.0 devices, like Samsung SUM-TSB16S 3.0 USB drive
-on the controller.
+Hi Boris,
 
-We are using CR_port for this purpose to send required data
-to override the LOS values.
+I would also like this to be simpler, but this is the actual way to workaround the lack of advanced devm_ calls from CCF.
 
-On testing with USB 3.0 devices on USB 3.0 port present on
-SMDK5420, and peach-pit boards should see following message:
-usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
+Is it an issue to keep this change ?
 
-and without this patch, should see below shown message:
-usb 1-1: new high-speed USB device number 2 using xhci-hcd
-
-[Also removed unnecessary extra lines in the register macro definitions]
-
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-[adapted to use phy_reset as entry point]
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
----
- drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
- drivers/usb/dwc3/core.c                  |   8 +-
- 2 files changed, 189 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/phy/samsung/phy-exynos5-usbdrd.c b/drivers/phy/samsung/phy-exynos5-usbdrd.c
-index 7c41daa..f7de067 100644
---- a/drivers/phy/samsung/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/samsung/phy-exynos5-usbdrd.c
-@@ -89,7 +89,17 @@
- #define PHYCLKRST_COMMONONN			BIT(0)
- 
- #define EXYNOS5_DRD_PHYREG0			0x14
-+#define PHYREG0_SSC_REF_CLK_SEL			BIT(21)
-+#define PHYREG0_SSC_RANGE			BIT(20)
-+#define PHYREG0_CR_WRITE			BIT(19)
-+#define PHYREG0_CR_READ				BIT(18)
-+#define PHYREG0_CR_DATA_IN(_x)			((_x) << 2)
-+#define PHYREG0_CR_CAP_DATA			BIT(1)
-+#define PHYREG0_CR_CAP_ADDR			BIT(0)
-+
- #define EXYNOS5_DRD_PHYREG1			0x18
-+#define PHYREG1_CR_DATA_OUT(_x)			((_x) << 1)
-+#define PHYREG1_CR_ACK				BIT(0)
- 
- #define EXYNOS5_DRD_PHYPARAM0			0x1c
- 
-@@ -118,6 +128,25 @@
- #define EXYNOS5_DRD_PHYRESUME			0x34
- #define EXYNOS5_DRD_LINKPORT			0x44
- 
-+/* USB 3.0 DRD PHY SS Function Control Reg; accessed by CR_PORT */
-+#define EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN		(0x15)
-+#define LOSLEVEL_OVRD_IN_LOS_BIAS_5420			(0x5 << 13)
-+#define LOSLEVEL_OVRD_IN_LOS_BIAS_DEFAULT		(0x0 << 13)
-+#define LOSLEVEL_OVRD_IN_EN				(0x1 << 10)
-+#define LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT		(0x9 << 0)
-+
-+#define EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN	(0x12)
-+#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420		(0x5 << 13)
-+#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_DEFAULT		(0x4 << 13)
-+
-+#define EXYNOS5_DRD_PHYSS_LANE0_TX_DEBUG		(0x1010)
-+#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M		(0x4 << 4)
-+#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_24M		(0x8 << 4)
-+#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_25M_26M		(0x8 << 4)
-+#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M	(0x20 << 4)
-+#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_62M5		(0x20 << 4)
-+#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_96M_100M		(0x40 << 4)
-+
- #define KHZ	1000
- #define MHZ	(KHZ * KHZ)
- 
-@@ -526,6 +555,151 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 	return 0;
- }
- 
-+static int crport_handshake(struct exynos5_usbdrd_phy *phy_drd,
-+						u32 val, u32 cmd)
-+{
-+	u32 usec = 100;
-+	unsigned int result;
-+
-+	writel(val | cmd, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
-+
-+	do {
-+		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
-+		if (result & PHYREG1_CR_ACK)
-+			break;
-+
-+		udelay(1);
-+	} while (usec-- > 0);
-+
-+	if (!usec) {
-+		dev_err(phy_drd->dev,
-+			"CRPORT handshake timeout1 (0x%08x)\n", val);
-+		return -ETIME;
-+	}
-+
-+	usec = 100;
-+
-+	writel(val, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
-+
-+	do {
-+		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
-+		if (!(result & PHYREG1_CR_ACK))
-+			break;
-+
-+		udelay(1);
-+	} while (usec-- > 0);
-+
-+	if (!usec) {
-+		dev_err(phy_drd->dev,
-+			"CRPORT handshake timeout2 (0x%08x)\n", val);
-+		return -ETIME;
-+	}
-+
-+	return 0;
-+}
-+
-+static int crport_ctrl_write(struct exynos5_usbdrd_phy *phy_drd,
-+						u32 addr, u32 data)
-+{
-+	int ret;
-+
-+	/* Write Address */
-+	writel(PHYREG0_CR_DATA_IN(addr),
-+		phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
-+	ret = crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(addr),
-+				PHYREG0_CR_CAP_ADDR);
-+	if (ret)
-+		return ret;
-+
-+	/* Write Data */
-+	writel(PHYREG0_CR_DATA_IN(data),
-+		phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
-+	ret = crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
-+				PHYREG0_CR_CAP_DATA);
-+	if (ret)
-+		return ret;
-+
-+	ret = crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
-+				PHYREG0_CR_WRITE);
-+
-+	return ret;
-+}
-+
-+/*
-+ * Calibrate few PHY parameters using CR_PORT register to meet
-+ * SuperSpeed requirements on Exynos5420 and Exynos5800 systems,
-+ * which have 28nm USB 3.0 DRD PHY.
-+ */
-+static int exynos5420_usbdrd_phy_calibrate(struct exynos5_usbdrd_phy *phy_drd)
-+{
-+	unsigned int temp;
-+	int ret = 0;
-+
-+	/*
-+	 * Change los_bias to (0x5) for 28nm PHY from a
-+	 * default value (0x0); los_level is set as default
-+	 * (0x9) as also reflected in los_level[30:26] bits
-+	 * of PHYPARAM0 register.
-+	 */
-+	temp = LOSLEVEL_OVRD_IN_LOS_BIAS_5420 |
-+		LOSLEVEL_OVRD_IN_EN |
-+		LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT;
-+	ret = crport_ctrl_write(phy_drd,
-+				EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN,
-+				temp);
-+	if (ret) {
-+		dev_err(phy_drd->dev,
-+		 "Failed setting Loss-of-Signal level for SuperSpeed\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * Set tx_vboost_lvl to (0x5) for 28nm PHY Tuning,
-+	 * to raise Tx signal level from its default value of (0x4)
-+	 */
-+	temp = TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420;
-+	ret = crport_ctrl_write(phy_drd,
-+				EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN,
-+				temp);
-+	if (ret) {
-+		dev_err(phy_drd->dev,
-+		 "Failed setting Tx-Vboost-Level for SuperSpeed\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * Set proper time to wait for RxDetect measurement, for
-+	 * desired reference clock of PHY, by tuning the CR_PORT
-+	 * register LANE0.TX_DEBUG which is internal to PHY.
-+	 * This fixes issue with few USB 3.0 devices, which are
-+	 * not detected (not even generate interrupts on the bus
-+	 * on insertion) without this change.
-+	 * e.g. Samsung SUM-TSB16S 3.0 USB drive.
-+	 */
-+	switch (phy_drd->extrefclk) {
-+	case EXYNOS5_FSEL_50MHZ:
-+		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M;
-+		break;
-+	case EXYNOS5_FSEL_20MHZ:
-+	case EXYNOS5_FSEL_19MHZ2:
-+		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M;
-+		break;
-+	case EXYNOS5_FSEL_24MHZ:
-+	default:
-+		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_24M;
-+		break;
-+	}
-+
-+	ret = crport_ctrl_write(phy_drd,
-+				EXYNOS5_DRD_PHYSS_LANE0_TX_DEBUG,
-+				temp);
-+	if (ret)
-+		dev_err(phy_drd->dev,
-+		 "Failed setting RxDetect measurement time for SuperSpeed\n");
-+
-+	return ret;
-+}
-+
- static struct phy *exynos5_usbdrd_phy_xlate(struct device *dev,
- 					struct of_phandle_args *args)
- {
-@@ -537,11 +711,20 @@ static struct phy *exynos5_usbdrd_phy_xlate(struct device *dev,
- 	return phy_drd->phys[args->args[0]].phy;
- }
- 
-+static int exynos5_usbdrd_phy_reset(struct phy *phy)
-+{
-+	struct phy_usb_instance *inst = phy_get_drvdata(phy);
-+	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
-+
-+	return exynos5420_usbdrd_phy_calibrate(phy_drd);
-+}
-+
- static const struct phy_ops exynos5_usbdrd_phy_ops = {
- 	.init		= exynos5_usbdrd_phy_init,
- 	.exit		= exynos5_usbdrd_phy_exit,
- 	.power_on	= exynos5_usbdrd_phy_power_on,
- 	.power_off	= exynos5_usbdrd_phy_power_off,
-+	.reset		= exynos5_usbdrd_phy_reset,
- 	.owner		= THIS_MODULE,
- };
- 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 03474d3..1d5836e 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -156,9 +156,10 @@ static void __dwc3_set_mode(struct work_struct *work)
- 		} else {
- 			if (dwc->usb2_phy)
- 				otg_set_vbus(dwc->usb2_phy->otg, true);
--			if (dwc->usb2_generic_phy)
-+			if (dwc->usb2_generic_phy) {
- 				phy_set_mode(dwc->usb2_generic_phy, PHY_MODE_USB_HOST);
--
-+				phy_reset(dwc->usb2_generic_phy);
-+			}
- 		}
- 		break;
- 	case DWC3_GCTL_PRTCAP_DEVICE:
-@@ -955,6 +956,9 @@ static int dwc3_core_init_mode(struct dwc3 *dwc)
- 				dev_err(dev, "failed to initialize host\n");
- 			return ret;
- 		}
-+
-+		if (dwc->usb2_generic_phy)
-+			phy_reset(dwc->usb2_generic_phy);
- 		break;
- 	case USB_DR_MODE_OTG:
- 		INIT_WORK(&dwc->drd_work, __dwc3_set_mode);
--- 
-1.9.1
+Neil
