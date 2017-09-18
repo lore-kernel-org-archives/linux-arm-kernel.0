@@ -1,39 +1,29 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 18 Sep 2017 12:05:30 +0200
-Subject: [PATCH 1/3] iio: trigger: stm32-timer: preset shouldn't be buffered
-In-Reply-To: <1505729132-1369-1-git-send-email-fabrice.gasnier@st.com>
-References: <1505729132-1369-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1505729132-1369-2-git-send-email-fabrice.gasnier@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Sep 2017 11:06:32 +0100
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+In-Reply-To: <20170904115450.fv5fyvmwlbo5nxra@yury-thinkpad>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
+ <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+ <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
+ <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+ <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
+ <20170821102124.xcqnzdzhs73gzbcf@yury-thinkpad>
+ <20170904115450.fv5fyvmwlbo5nxra@yury-thinkpad>
+Message-ID: <20170918100632.w62dfexqkuehskg6@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, setting preset value (ARR) will update directly 'Auto reload
-value' only on 1st write access. But then, ARPE is set. This makes
-ARR a shadow register. Preset value should be updated upon each
-write request: ensure ARPE is 0. This fixes successive writes to
-preset attribute.
+On Mon, Sep 04, 2017 at 02:54:50PM +0300, Yury Norov wrote:
+> This is 4.13-based and next-20170901-based ilp32 patches. 
+> https://github.com/norov/linux/tree/ilp32-4.13
 
-Fixes: 4adec7da0536 ("iio: stm32 trigger: Add quadrature encoder device")
+Thanks. I'll mirror it on kernel.org sometime this week after doing some
+tests (I've been mostly away for the past two weeks).
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/trigger/stm32-timer-trigger.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Regarding the generic patches in this series, could you please post them
+to linux-arch (without the whole ILP32 series)? It would be good to get
+them merged for 4.15.
 
-diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-index 9b90534..34cc25b 100644
---- a/drivers/iio/trigger/stm32-timer-trigger.c
-+++ b/drivers/iio/trigger/stm32-timer-trigger.c
-@@ -715,8 +715,9 @@ static ssize_t stm32_count_set_preset(struct iio_dev *indio_dev,
- 	if (ret)
- 		return ret;
- 
-+	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
-+	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
- 	regmap_write(priv->regmap, TIM_ARR, preset);
--	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
- 
- 	return len;
- }
 -- 
-1.9.1
+Catalin
