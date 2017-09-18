@@ -1,47 +1,50 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 18 Sep 2017 20:30:43 +0200
-Subject: [PATCH v2] net: stmmac: dwmac-sun8i: Use reset exclusive
-Message-ID: <20170918183043.8028-1-clabbe.montjoie@gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 19 Sep 2017 02:34:59 +0800
+Subject: [xlnx:master 823/1027] debug.c:(.text+0x0): multiple definition of
+ `dwc3_simple_wakeup_capable'
+Message-ID: <201709190254.sMtxu9iF%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dwmac_sun8i module cannot be rmmod/modprobe due to that
-the reset controller was not released when removed.
+Hi Anurag,
 
-This patch remove ambiguity, by using of_reset_control_get_exclusive and
-add the missing reset_control_put().
+FYI, the error/warning still remains.
 
-Note that we cannot use devm_reset_control_get, since the reset is not
-in the device node.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   f9658a41c361182381160edbcea3c1de3b76dc9d
+commit: 80ac0da9010ebabef6ed1d66b6607b345fd14cb4 [823/1027] dwc3: Add support for clock disabling during suspend
+config: x86_64-rhel (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 80ac0da9010ebabef6ed1d66b6607b345fd14cb4
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+All errors (new ones prefixed by >>):
+
+   drivers/usb/dwc3/debug.o: In function `dwc3_simple_wakeup_capable':
+>> debug.c:(.text+0x0): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/trace.o: In function `dwc3_simple_wakeup_capable':
+   trace.c:(.text+0x1880): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/gadget.o: In function `dwc3_simple_wakeup_capable':
+   gadget.c:(.text+0x10b0): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/ep0.o: In function `dwc3_simple_wakeup_capable':
+   ep0.c:(.text+0xa10): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+   drivers/usb/dwc3/debugfs.o: In function `dwc3_simple_wakeup_capable':
+   debugfs.c:(.text+0xd40): multiple definition of `dwc3_simple_wakeup_capable'
+   drivers/usb/dwc3/core.o:core.c:(.text+0x520): first defined here
+
 ---
-Changes since v1:
-- added a note about devm_reset_control_get in commit message
-
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index 57bb6dd7b401..1736d7cb0d96 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -854,6 +854,7 @@ static int sun8i_dwmac_unpower_internal_phy(struct sunxi_priv_data *gmac)
- 
- 	clk_disable_unprepare(gmac->ephy_clk);
- 	reset_control_assert(gmac->rst_ephy);
-+	reset_control_put(gmac->rst_ephy);
- 	return 0;
- }
- 
-@@ -1010,7 +1011,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 			return -EINVAL;
- 		}
- 
--		gmac->rst_ephy = of_reset_control_get(plat_dat->phy_node, NULL);
-+		gmac->rst_ephy = of_reset_control_get_exclusive(plat_dat->phy_node, NULL);
- 		if (IS_ERR(gmac->rst_ephy)) {
- 			ret = PTR_ERR(gmac->rst_ephy);
- 			if (ret == -EPROBE_DEFER)
--- 
-2.13.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38234 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/cd0a98ce/attachment-0001.gz>
