@@ -1,74 +1,30 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 18 Sep 2017 15:52:17 +0200
-Subject: [PATCH 5/9] arm64: dts: marvell: mcbin: add comphy references to
- Ethernet ports
-In-Reply-To: <20170918130437.GA12118@lunn.ch>
-References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
- <20170918075814.27405-6-antoine.tenart@free-electrons.com>
- <20170918085012.knvnwgouhtjyychn@sapphire.tkos.co.il>
- <20170918130437.GA12118@lunn.ch>
-Message-ID: <20170918135217.GE20017@kwain>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 18 Sep 2017 16:02:14 +0200
+Subject: [PATCH] binder: fix "cast to pointer from integer of different
+ size" warning
+In-Reply-To: <20170904051740.2636-1-jszhang@marvell.com>
+References: <20170904051740.2636-1-jszhang@marvell.com>
+Message-ID: <20170918140214.GA21714@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Mon, Sep 18, 2017 at 03:04:37PM +0200, Andrew Lunn wrote:
-> On Mon, Sep 18, 2017 at 11:50:12AM +0300, Baruch Siach wrote:
-> > On Mon, Sep 18, 2017 at 09:58:10AM +0200, Antoine Tenart wrote:
-> > > This patch adds comphy phandles to the Ethernet ports in the mcbin
-> > > device tree. The comphy is used to configure the serdes PHYs used by
-> > > these ports.
-> > > 
-> > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > > ---
-> > >  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 3 +++
-> > >  1 file changed, 3 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > > index acf5c7d16d79..9a3b4a1fd445 100644
-> > > --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > > +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > > @@ -223,6 +223,7 @@
-> > >  &cpm_eth0 {
-> > >  	status = "okay";
-> > >  	phy = <&phy0>;
-> > > +	phys = <&cpm_comphy4 0>;
-> > >  	phy-mode = "10gbase-kr";
-> > 
-> > Since the 'phys' generic PHY property is unrelated to the 'phy*' Ethernet PHY 
-> > properties that surround it, its location might be confusing. I think it 
-> > should appear below those two other properties like you did below ...
+On Mon, Sep 04, 2017 at 01:17:40PM +0800, Jisheng Zhang wrote:
+> The binder driver now could cause warnings as below on 32bit platforms
+> if ANDROID_BINDER_IPC_32BIT is unselected:
 > 
-> Yes, i agree. It is confusing enough as it is, so we should not make
-> it worse.
+> drivers/android/binder.c:1550:15: warning: cast to pointer from integer
+> of different size [-Wint-to-pointer-cast]
 > 
-> I even wonder if it is worth doing some renaming?
+> This patch fix all of them.
 > 
->   	phy = <&ethernet_phy0>;
->   	phy-mode = "10gbase-kr";
->  	phys = <&cpm_generic_comphy4 0>;
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  drivers/android/binder.c | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
 
-We could also add an extra comment without renaming the comphy node, something
-like:
+Arnd sent in a patch for this issue right after you did, that was
+smaller, so I'll take his version.
 
-	/* Network PHY */
-	phy = <&ethernet_phy0>;
-	phy-mode = "10gbase-kr";
-	/* Generic PHY, providing serdes lanes */
-	phys = <&cpm_comphy4 0>;
+thanks,
 
-Thanks,
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170918/0161fae3/attachment.sig>
+greg k-h
