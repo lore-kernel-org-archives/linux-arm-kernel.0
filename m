@@ -1,31 +1,59 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 19 Sep 2017 09:59:11 +0200
-Subject: [PATCH 0/2] ARM: owl: Add CubieBoard6
-In-Reply-To: <20170911005805.10116-1-afaerber@suse.de>
-References: <20170911005805.10116-1-afaerber@suse.de>
-Message-ID: <36278351-87a7-d6f9-d9b4-af636e4be3d8@suse.de>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Tue, 19 Sep 2017 10:03:47 +0200
+Subject: [PATCH 1/1] iommu/iova: Make rcache flush optional on IOVA
+ allocation failure
+In-Reply-To: <250f41c9-fb37-49b7-c336-68e163f77e16@arm.com>
+References: <1505732214-9052-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+ <1505732214-9052-2-git-send-email-tomasz.nowicki@caviumnetworks.com>
+ <250f41c9-fb37-49b7-c336-68e163f77e16@arm.com>
+Message-ID: <5632227b-3d9b-0f03-db3d-2b2d7ccc8079@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.09.2017 um 02:58 schrieb Andreas F?rber:
-> Andreas F?rber (2):
->   dt-bindings: arm: actions: Add CubieBoard6
->   ARM: dts: owl-s500: Add CubieBoard6
+Hi Robin,
+
+On 18.09.2017 18:02, Robin Murphy wrote:
+> Hi Tomasz,
 > 
->  Documentation/devicetree/bindings/arm/actions.txt |  1 +
->  arch/arm/boot/dts/Makefile                        |  1 +
->  arch/arm/boot/dts/owl-s500-cubieboard6.dts        | 44 +++++++++++++++++++++++
->  3 files changed, 46 insertions(+)
->  create mode 100644 arch/arm/boot/dts/owl-s500-cubieboard6.dts
+> On 18/09/17 11:56, Tomasz Nowicki wrote:
+>> Since IOVA allocation failure is not unusual case we need to flush
+>> CPUs' rcache in hope we will succeed in next round.
+>>
+>> However, it is useful to decide whether we need rcache flush step because
+>> of two reasons:
+>> - Not scalability. On large system with ~100 CPUs iterating and flushing
+>>    rcache for each CPU becomes serious bottleneck so we may want to deffer it.
+>> - free_cpu_cached_iovas() does not care about max PFN we are interested in.
+>>    Thus we may flush our rcaches and still get no new IOVA like in the
+>>    commonly used scenario:
+>>
+>>      if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
+>>          iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
+>>
+>>      if (!iova)
+>>          iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
+>>
+>>     1. First alloc_iova_fast() call is limited to DMA_BIT_MASK(32) to get
+>>        PCI devices a SAC address
+>>     2. alloc_iova() fails due to full 32-bit space
+>>     3. rcaches contain PFNs out of 32-bit space so free_cpu_cached_iovas()
+>>        throws entries away for nothing and alloc_iova() fails again
+>>     4. Next alloc_iova_fast() call cannot take advantage of rcache since we
+>>        have just defeated caches. In this case we pick the slowest option
+>>        to proceed.
+>>
+>> This patch reworks flushed_rcache local flag to be additional function
+>> argument instead and control rcache flush step. Also, it updates all users
+>> to do the flush as the last chance.
+> 
+> Looks like you've run into the same thing Nate found[1] - I came up with
+> almost the exact same patch, only with separate alloc_iova_fast() and
+> alloc_iova_fast_noretry() wrapper functions, but on reflection, just
+> exposing the bool to callers is probably simpler. One nit, can you
+> document it in the kerneldoc comment too? With that:
+> 
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Applied to v4.15/dt:
+Thanks! I will add missing comment.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.15/dt
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Tomasz
