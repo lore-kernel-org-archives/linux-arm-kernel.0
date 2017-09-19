@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 14:47:34 +0100
-Subject: Applied "spi: spi-davinci: Update binding for 66AK2Gx pwr dm
- property" to the spi tree
-In-Reply-To: <20170908204638.13149-2-fcooper@ti.com>
-Message-ID: <E1duIsA-0008VG-Dn@debutante>
+Date: Tue, 19 Sep 2017 14:47:29 +0100
+Subject: Applied "spi: rspi: Add r8a7743/5 to the compatible list" to the spi
+ tree
+In-Reply-To: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <E1duIs5-0008U8-I2@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: spi-davinci: Update binding for 66AK2Gx pwr dm property
+   spi: rspi: Add r8a7743/5 to the compatible list
 
 has been applied to the spi tree at
 
@@ -34,41 +34,38 @@ to this mail.
 Thanks,
 Mark
 
->From 32c30f73687a7ea5fe6add62b7bc3b520115d0d9 Mon Sep 17 00:00:00 2001
-From: Franklin Cooper <fcooper@ti.com>
-Date: Fri, 8 Sep 2017 15:46:36 -0500
-Subject: [PATCH] spi: spi-davinci: Update binding for 66AK2Gx pwr dm property
+>From 10c1705eced11d6ad710fddcdb57aaa9f85a6f98 Mon Sep 17 00:00:00 2001
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Date: Fri, 8 Sep 2017 09:07:15 +0100
+Subject: [PATCH] spi: rspi: Add r8a7743/5 to the compatible list
 
-Add pm-domains property which is required for 66AK2Gx. Also document 66AK2G
-unique clocks property usage.
-
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/spi/spi-davinci.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/spi/spi-rspi.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-index f5916c92fe91..1925277bfc1e 100644
---- a/Documentation/devicetree/bindings/spi/spi-davinci.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-@@ -24,6 +24,16 @@ Required properties:
- 	based on a specific SoC configuration.
- - interrupts: interrupt number mapped to CPU.
- - clocks: spi clk phandle
-+          For 66AK2G this property should be set per binding,
-+          Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-+
-+SoC-specific Required Properties:
-+
-+The following are mandatory properties for Keystone 2 66AK2G SoCs only:
-+
-+- power-domains:	Should contain a phandle to a PM domain provider node
-+			and an args specifier containing the SPI device id
-+			value. This property is as per the binding,
- 
- Optional:
- - cs-gpios: gpio chip selects
+diff --git a/Documentation/devicetree/bindings/spi/spi-rspi.txt b/Documentation/devicetree/bindings/spi/spi-rspi.txt
+index 8f4169f63936..3b02b3a7cfb2 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rspi.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rspi.txt
+@@ -5,11 +5,14 @@ Required properties:
+ 		     "renesas,rspi-<soctype>", "renesas,rspi" as fallback.
+ 		     For Renesas Serial Peripheral Interface on RZ/A1H:
+ 		     "renesas,rspi-<soctype>", "renesas,rspi-rz" as fallback.
+-		     For Quad Serial Peripheral Interface on R-Car Gen2:
++		     For Quad Serial Peripheral Interface on R-Car Gen2 and
++		     RZ/G1 devices:
+ 		     "renesas,qspi-<soctype>", "renesas,qspi" as fallback.
+ 		     Examples with soctypes are:
+ 		        - "renesas,rspi-sh7757" (SH)
+ 			- "renesas,rspi-r7s72100" (RZ/A1H)
++			- "renesas,qspi-r8a7743" (RZ/G1M)
++			- "renesas,qspi-r8a7745" (RZ/G1E)
+ 			- "renesas,qspi-r8a7790" (R-Car H2)
+ 			- "renesas,qspi-r8a7791" (R-Car M2-W)
+ 			- "renesas,qspi-r8a7792" (R-Car V2H)
 -- 
 2.14.1
