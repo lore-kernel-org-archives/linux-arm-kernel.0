@@ -1,73 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 14:47:18 +0100
-Subject: Applied "ASoC: zte: spdif: remove duplicate initialization of
- dma_data" to the asoc tree
-In-Reply-To: <20170918085638.27110-1-colin.king@canonical.com>
-Message-ID: <E1duIru-0008PT-QD@debutante>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 19 Sep 2017 09:53:14 -0500
+Subject: [PATCH v7 1/5] Doc: iommu/arm-smmu-v3: Add workaround for
+ HiSilicon erratum 161010801
+In-Reply-To: <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
+References: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
+ <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170919145314.2irmqpsfneeydupo@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Thu, Sep 14, 2017 at 01:57:52PM +0100, Shameer Kolothum wrote:
+> From: John Garry <john.garry@huawei.com>
+> 
+> The HiSilicon erratum 161010801 describes the limitation of HiSilicon platforms
+> hip06/hip07 to support the SMMU mappings for MSI transactions.
+> 
+> On these platforms, GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
+> 
+> This patch adds a SMMUv3 binding to flag that the SMMU breaks msi
+> translation at ITS.
+> 
+> Also, the arm64 silicon errata is updated with this same erratum.
+> 
+> Signed-off-by: John Garry <john.garry@huawei.com>
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  Documentation/arm64/silicon-errata.txt                  | 1 +
+>  Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 3 +++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index 66e8ce1..02816b1 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -70,6 +70,7 @@ stable kernels.
+>  |                |                 |                 |                             |
+>  | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
+>  | Hisilicon      | Hip0{6,7}       | #161010701      | N/A                         |
+> +| Hisilicon      | Hip0{6,7}       | #161010801      | N/A                         |
+>  |                |                 |                 |                             |
+>  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+>  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> index c9abbf3..1f5f7f9 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> @@ -55,6 +55,9 @@ the PCIe specification.
+>  - hisilicon,broken-prefetch-cmd
+>                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
+>  
+> +- hisilicon,broken-untranslated-msi
+> +                    : Reserve ITS HW region to avoid translating msi.
+> +
 
-   ASoC: zte: spdif: remove duplicate initialization of dma_data
+This should be determined from the compatible string. Continuing to add 
+properties for each errata doesn't scale.
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From b6145837218cb984245aea5ccd9201aeb5eb0501 Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Mon, 18 Sep 2017 09:56:38 +0100
-Subject: [PATCH] ASoC: zte: spdif: remove duplicate initialization of dma_data
-
-dma_data is being initialized twice, remove the unused first
-initialization and use the latter one instead.  Fixed clang warning:
-
-"warning: Value stored to 'dma_data' during its initialization is
-never read"
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/zte/zx-spdif.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/zte/zx-spdif.c b/sound/soc/zte/zx-spdif.c
-index b143f9f682d2..17b6ce35037a 100644
---- a/sound/soc/zte/zx-spdif.c
-+++ b/sound/soc/zte/zx-spdif.c
-@@ -139,11 +139,11 @@ static int zx_spdif_hw_params(struct snd_pcm_substream *substream,
- {
- 	struct zx_spdif_info *zx_spdif = dev_get_drvdata(socdai->dev);
- 	struct zx_spdif_info *spdif = snd_soc_dai_get_drvdata(socdai);
--	struct snd_dmaengine_dai_dma_data *dma_data = &zx_spdif->dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data =
-+		snd_soc_dai_get_dma_data(socdai, substream);
- 	u32 val, ch_num, rate;
- 	int ret;
- 
--	dma_data = snd_soc_dai_get_dma_data(socdai, substream);
- 	dma_data->addr_width = params_width(params) >> 3;
- 
- 	val = readl_relaxed(zx_spdif->reg_base + ZX_CTRL);
--- 
-2.14.1
+>  - cavium,cn9900-broken-page1-regspace
+>                      : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
+>  		      PRIQ_PROD/CONS register access with page 0 offsets.
+> -- 
+> 1.9.1
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
