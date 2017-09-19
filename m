@@ -1,50 +1,38 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Sep 2017 16:59:15 +0100
-Subject: [PATCH] arm64: dts: foundation-v8: Enable PSCI mode
-In-Reply-To: <20170918161248.GB5106@leverpostej>
-References: <20170918153832.16356-1-daniel.thompson@linaro.org>
- <20170918161248.GB5106@leverpostej>
-Message-ID: <f0710af4-d414-1f2a-7d86-dd559a50171f@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Sep 2017 17:04:22 +0100
+Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
+In-Reply-To: <20170919152253.tvj3hheggrx4lgig@dell>
+References: <20170913193723.16234-1-robert.jarzmik@free.fr>
+ <20170913193723.16234-3-robert.jarzmik@free.fr>
+ <20170914074146.dnibkvom4yuzejf3@dell>
+ <20170914074300.iobuwn2hrmnf6sen@dell>
+ <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
+ <20170918085236.z6gmgrwvsjvvc4cd@dell>
+ <20170919121539.mz2mettkefxf3oer@sirena.co.uk>
+ <20170919152253.tvj3hheggrx4lgig@dell>
+Message-ID: <20170919160422.l7lxmfl6yrjnpalb@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/09/17 17:12, Mark Rutland wrote:
-> Hi Daniel,
-> 
-> On Mon, Sep 18, 2017 at 04:38:32PM +0100, Daniel Thompson wrote:
->> Currently if the Foundation model is running ARM Trusted Firmware then
->> the kernel, which is configured to use spin tables, cannot start secondary
->> processors or "power off" the simulation.
->>
->> Add a couple of labels to the include file, and introduce a new .dts
->> file that uses these to override the enable-method.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> 
-> This looks good, but has the unfortunate effect of leaving the
-> (irrelevant) cpu-release-addr property in the PSCI dts files, as that's
-> in the underlying dtsi file.
-> 
-> Could we split spin-table / PSCI parts into separate dtsi files?
-> 
-> e.g. have:
-> 
-> * foundation-v8.dtsi
-> * foundation-v8-gicv{2,3}.dtsi
-> * foundation-v8-{psci,spin-table}.dtsi
-> 
-> ... and then combine those to build the dts files we want.
+On Tue, Sep 19, 2017 at 04:22:53PM +0100, Lee Jones wrote:
 
-Will do.
+> Normally I wait until all patches patches in the set have been
+> reviewed (the ASOC ones still have not), then ask the OP and the
 
-> 
-> FWIW, with that:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+I've been fine with them for ages.
 
-Talking about what we want... if it's all split out I might as well add 
-a gicv2+psci DT as well. Will that still retain your Acked-by or do you 
-want to see it first ;-) ?
+> other affected Maintainers how they want to deal with the patch.
+> Far more often than not, the the solution is just to take the set
+> through the MFD tree.
 
-
-Daniel.
+It really helps if we can get the earlier parts of the series moving
+even if the rest of it's in review still - I know I back off on
+reviewing things if it looks like their dependencies aren't making
+progress.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/27d3823f/attachment.sig>
