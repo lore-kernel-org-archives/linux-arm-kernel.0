@@ -1,85 +1,42 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Tue, 19 Sep 2017 10:10:26 +0200
-Subject: [PATCH 1/1] iommu/iova: Make rcache flush optional on IOVA
- allocation failure
-In-Reply-To: <da87f76b-bcd4-ace8-4dd6-166dfde136e3@codeaurora.org>
-References: <1505732214-9052-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <1505732214-9052-2-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <250f41c9-fb37-49b7-c336-68e163f77e16@arm.com>
- <da87f76b-bcd4-ace8-4dd6-166dfde136e3@codeaurora.org>
-Message-ID: <03297a05-8490-a86d-12ab-a99cf73c09ba@caviumnetworks.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Sep 2017 10:15:50 +0200
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <20170919070422.GI3349@codeaurora.org>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <20170919070422.GI3349@codeaurora.org>
+Message-ID: <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nate,
+On Tue, Sep 19, 2017 at 9:04 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-On 19.09.2017 04:57, Nate Watterson wrote:
-> Hi Tomasz,
-> 
-> On 9/18/2017 12:02 PM, Robin Murphy wrote:
->> Hi Tomasz,
->>
->> On 18/09/17 11:56, Tomasz Nowicki wrote:
->>> Since IOVA allocation failure is not unusual case we need to flush
->>> CPUs' rcache in hope we will succeed in next round.
->>>
->>> However, it is useful to decide whether we need rcache flush step 
->>> because
->>> of two reasons:
->>> - Not scalability. On large system with ~100 CPUs iterating and flushing
->>>    rcache for each CPU becomes serious bottleneck so we may want to 
->>> deffer it.
-> s/deffer/defer
-> 
->>> - free_cpu_cached_iovas() does not care about max PFN we are 
->>> interested in.
->>>    Thus we may flush our rcaches and still get no new IOVA like in the
->>>    commonly used scenario:
->>>
->>>      if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
->>>          iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> 
->>> shift);
->>>
->>>      if (!iova)
->>>          iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
->>>
->>>     1. First alloc_iova_fast() call is limited to DMA_BIT_MASK(32) to 
->>> get
->>>        PCI devices a SAC address
->>>     2. alloc_iova() fails due to full 32-bit space
->>>     3. rcaches contain PFNs out of 32-bit space so 
->>> free_cpu_cached_iovas()
->>>        throws entries away for nothing and alloc_iova() fails again
->>>     4. Next alloc_iova_fast() call cannot take advantage of rcache 
->>> since we
->>>        have just defeated caches. In this case we pick the slowest 
->>> option
->>>        to proceed.
->>>
->>> This patch reworks flushed_rcache local flag to be additional function
->>> argument instead and control rcache flush step. Also, it updates all 
->>> users
->>> to do the flush as the last chance.
->>
->> Looks like you've run into the same thing Nate found[1] - I came up with
->> almost the exact same patch, only with separate alloc_iova_fast() and
->> alloc_iova_fast_noretry() wrapper functions, but on reflection, just
->> exposing the bool to callers is probably simpler. One nit, can you
->> document it in the kerneldoc comment too? With that:
->>
->> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->>
->> Thanks,
->> Robin.
->>
->> [1]:https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg19758.html 
->>
-> This patch completely resolves the issue I reported in [1]!!
+> Perhaps we can add another hook for our purposes here that
+> tells gpiolib that the gpio is not usable and to skip it. The
+> semantics would be clear, it's just about probing availability of
+> this pin as a gpio and doesn't mux any pins.
 
-I somehow missed your observations in [1] :/
-Anyway, it's great it fixes performance for you too.
+Oh we already have that I think, Mika Westerberg and Andy Shevcheno
+implemented that for anyone using CONFIG_GPIOLIB_IRQCHIP, and
+this driver does. Timur please check: irq_need_valid_mask, irq_valid_mask
+usage.
 
-> Tested-by: Nate Watterson <nwatters@codeaurora.org>
+Helpful commits:
+commit 49c03096263871a68c9dea3e86b7d1e163d2fba8
+"pinctrl: baytrail: Do not add all GPIOs to IRQ domain"
 
-Thanks!
-Tomasz
+Then you can see in commits:
+commit 7036502783729c2aaf7a3c24c89087c58721430f
+"pinctrl: cherryview: Add a quirk to make Acer Chromebook keyboard work again"
+commit 2a8209fa68236ad65363dba03db5dbced520268a
+"pinctrl: cherryview: Extend the Chromebook DMI quirk to Intel_Strago systems"
+
+How this valid mask is used to work around specific ACPI
+issues on Intel chips.
+
+I bet a million to one that you have the same problems as them,
+and then we should also deal with it the same way.
+
+Sorry for not seeing the obvious connection earlier.
+
+Yours,
+Linus Walleij
