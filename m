@@ -1,90 +1,66 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 Sep 2017 15:32:54 -0600
-Subject: [PATCH v2] doc: coresight: correct usage for disabling idle states
-In-Reply-To: <1505470561-21982-1-git-send-email-leo.yan@linaro.org>
-References: <1505470561-21982-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CANLsYkx++kM9Ocw+_Ar6d0_n0gTdzXLRyMZ8eiaJyHxbPJdgYQ@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Wed, 20 Sep 2017 07:35:23 +1000
+Subject: [PATCH] ARM: uaccess: Add missing include for set_thread_flag
+In-Reply-To: <CAJcbSZEiHW=yH+ATvLq=am4nbVdhbqAxkH-+jEymhNkN+Pkb=A@mail.gmail.com>
+References: <20170919115042.6800-1-net147@gmail.com>
+ <CAJcbSZEiHW=yH+ATvLq=am4nbVdhbqAxkH-+jEymhNkN+Pkb=A@mail.gmail.com>
+Message-ID: <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2017 at 04:16, Leo Yan <leo.yan@linaro.org> wrote:
-> In the coresight CPU debug document it suggests to use 'echo' command
-> to set latency request to /dev/cpu_dma_latency so can disable all CPU
-> idle states, but in fact this doesn't work.
+Hi Thomas,
+
+The top of the C source file I am compiling has:
+#include <linux/kernel.h>
+#include <asm/uaccess.h>
+
+Tracing through the asm/uaccess.h include I see
+asm/uaccess.h -> asm/domain.h -> asm/thread_info.h
+
+but set_thread_info is defined in linux/thread_info.h not
+asm/thread_info.h (see
+http://elixir.free-electrons.com/linux/v4.14-rc1/ident/set_thread_flag).
+
+Regards,
+Jonathan
+
+On 20 September 2017 at 00:32, Thomas Garnier <thgarnie@google.com> wrote:
+> On Tue, Sep 19, 2017 at 4:50 AM, Jonathan Liu <net147@gmail.com> wrote:
+>> Fixes "implicit declaration of function" compile error for out-of-tree
+>> kernel modules including asm/uaccess.h.
 >
-> This is because when the command 'echo' exits, it releases the device
-> node's file descriptor and the kernel release function removes the QoS
-> constraint; finally when the command 'echo' finished there have no
-> constraint imposed on cpu_dma_latency.
+> I failed to reproduce this issue by creating an out of tree module
+> with a separate file (with only uaccess.h). Are you using a special
+> config?
 >
-> This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-> command 'exec' can avoid the file descriptor to be closed so we can
-> keep the constraint on cpu_dma_latency.
+> Looking at the headers on uaccess.h. You get thread_info through:
 >
-> This patch also adds the info for reference docs for PM QoS and cpuidle
-> sysfs.
+>  asm/domain.h -> asm/thread_info.h
 >
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Reported-by: Kim Phillips <kim.phillips@arm.com>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  Documentation/trace/coresight-cpu-debug.txt | 14 +++++++++-----
->  1 file changed, 9 insertions(+), 5 deletions(-)
+>>
+>> Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
+>> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> ---
+>>  arch/arm/include/asm/uaccess.h | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+>> index 87936dd5d151..13d1877ffb75 100644
+>> --- a/arch/arm/include/asm/uaccess.h
+>> +++ b/arch/arm/include/asm/uaccess.h
+>> @@ -17,6 +17,7 @@
+>>  #include <asm/unified.h>
+>>  #include <asm/compiler.h>
+>>
+>> +#include <linux/thread_info.h>
+>>  #include <asm/extable.h>
+>>
+>>  /*
+>> --
+>> 2.13.2
+>>
 >
-> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-> index b3da1f9..205ff95 100644
-> --- a/Documentation/trace/coresight-cpu-debug.txt
-> +++ b/Documentation/trace/coresight-cpu-debug.txt
-> @@ -149,11 +149,15 @@ If you want to limit idle states at boot time, you can use "nohlt" or
->
->  At the runtime you can disable idle states with below methods:
->
-> -Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
-> -states (if latency = 0uS then disable all idle states):
-> -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
-> -
-> -Disable specific CPU's specific idle state:
-> +By using PM QoS interface '/dev/cpu_dma_latency', we can set latency
-> +constraint to disable all CPUs specific idle states (see
-> +Documentation/power/pm_qos_interface.txt, section 'From user mode');
-> +below is one example to set latency constraint to '00000000', it is
-> +hexadecimal format with microsecond unit:
-> +# exec 3<> /dev/cpu_dma_latency; echo '00000000' >&3
-
-Since doing echo '00000000' >&3 or simply echo 0 >&3 yields the same
-result I would go for the latter.  I also think it is important to
-specify that using an "echo" command without holding the file open
-won't give the desired result.  I would reformat your paragraph as
-follow:
-
->>> Begin >>>
-
-It is possible to disable CPU idle states by way of the PM QoS
-subsystem, more specifically by using the "/dev/cpu_dma_latency"
-interface (see Documentation/power/pm_qos_interface.txt for more
-details).  As specified in the PM QoS documentation the requested
-parameter will stay in effect until the file descriptor is released.
-For example:
-
-# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
-...
-Do some work...
-...
-# exec 3<>-
-
-The same can also be done from an application program.
-
-<<< End <<<
-
-
-> +
-> +Disable specific CPU's specific idle state from cpuidle sysfs (see
-> +Documentation/cpuidle/sysfs.txt):
->  # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
 >
 >
 > --
-> 2.7.4
->
+> Thomas
