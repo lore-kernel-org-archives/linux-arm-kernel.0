@@ -1,43 +1,145 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 19 Sep 2017 09:24:29 +0000
-Subject: linux-4.14-rc1/drivers/clk/clk-stm32h7.c: 2 * possible typo ?
-In-Reply-To: <73cadb19-a75e-4938-265f-890cc5a4d3b4@st.com>
-References: <12ce6ec0-d351-4ffe-a5a0-cdc09f6aee39@st.com>
- <73cadb19-a75e-4938-265f-890cc5a4d3b4@st.com>
-Message-ID: <0abb5cce-f98f-b3c1-4d53-7ae4bd0e44dd@st.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 19 Sep 2017 11:29:12 +0200
+Subject: [PATCH v2 8/9] atmel_flexcom: Support backup mode
+In-Reply-To: <20170915140411.31716-9-romain.izard.pro@gmail.com>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-9-romain.izard.pro@gmail.com>
+Message-ID: <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I missed David ...
+On 15/09/2017 at 16:04, Romain Izard wrote:
+> The controller used by a flexcom module is configured at boot, and left
+> alone after this. As the configuration will be lost after backup mode,
+> restore the state of the flexcom driver on resume.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+
+Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+On sama5d2 Xplained board (i2c0 from flexcom 4).
+and obviously:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Thanks Romain!
+
+Regards,
+
+> ---
+>  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 50 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+> index 064bde9cff5a..ef1235c4a179 100644
+> --- a/drivers/mfd/atmel-flexcom.c
+> +++ b/drivers/mfd/atmel-flexcom.c
+> @@ -39,34 +39,44 @@
+>  #define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
+>  				 FLEX_MR_OPMODE_MASK)
+>  
+> +struct atmel_flexcom {
+> +	void __iomem *base;
+> +	u32 opmode;
+> +	struct clk *clk;
+> +};
+>  
+>  static int atmel_flexcom_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+> -	struct clk *clk;
+>  	struct resource *res;
+> -	void __iomem *base;
+> -	u32 opmode;
+> +	struct atmel_flexcom *afc;
+>  	int err;
+> +	u32 val;
+> +
+> +	afc = devm_kzalloc(&pdev->dev, sizeof(*afc), GFP_KERNEL);
+> +	if (!afc)
+> +		return -ENOMEM;
+>  
+> -	err = of_property_read_u32(np, "atmel,flexcom-mode", &opmode);
+> +	platform_set_drvdata(pdev, afc);
+> +
+> +	err = of_property_read_u32(np, "atmel,flexcom-mode", &afc->opmode);
+>  	if (err)
+>  		return err;
+>  
+> -	if (opmode < ATMEL_FLEXCOM_MODE_USART ||
+> -	    opmode > ATMEL_FLEXCOM_MODE_TWI)
+> +	if (afc->opmode < ATMEL_FLEXCOM_MODE_USART ||
+> +	    afc->opmode > ATMEL_FLEXCOM_MODE_TWI)
+>  		return -EINVAL;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	base = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(base))
+> -		return PTR_ERR(base);
+> +	afc->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(afc->base))
+> +		return PTR_ERR(afc->base);
+>  
+> -	clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(clk))
+> -		return PTR_ERR(clk);
+> +	afc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(afc->clk))
+> +		return PTR_ERR(afc->clk);
+>  
+> -	err = clk_prepare_enable(clk);
+> +	err = clk_prepare_enable(afc->clk);
+>  	if (err)
+>  		return err;
+>  
+> @@ -76,9 +86,10 @@ static int atmel_flexcom_probe(struct platform_device *pdev)
+>  	 * inaccessible and are read as zero. Also the external I/O lines of the
+>  	 * Flexcom are muxed to reach the selected device.
+>  	 */
+> -	writel(FLEX_MR_OPMODE(opmode), base + FLEX_MR);
+> +	val = FLEX_MR_OPMODE(afc->opmode);
+> +	writel(val, afc->base + FLEX_MR);
+>  
+> -	clk_disable_unprepare(clk);
+> +	clk_disable_unprepare(afc->clk);
+>  
+>  	return devm_of_platform_populate(&pdev->dev);
+>  }
+> @@ -89,10 +100,34 @@ static const struct of_device_id atmel_flexcom_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int atmel_flexcom_resume(struct device *dev)
+> +{
+> +	struct atmel_flexcom *afc = dev_get_drvdata(dev);
+> +	int err;
+> +	u32 val;
+> +
+> +	err = clk_prepare_enable(afc->clk);
+> +	if (err)
+> +		return err;
+> +
+> +	val = FLEX_MR_OPMODE(afc->opmode),
+> +	writel(val, afc->base + FLEX_MR);
+> +
+> +	clk_disable_unprepare(afc->clk);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(atmel_flexcom_pm_ops, NULL,
+> +			 atmel_flexcom_resume);
+> +
+>  static struct platform_driver atmel_flexcom_driver = {
+>  	.probe	= atmel_flexcom_probe,
+>  	.driver	= {
+>  		.name		= "atmel_flexcom",
+> +		.pm		= &atmel_flexcom_pm_ops,
+>  		.of_match_table	= atmel_flexcom_of_match,
+>  	},
+>  };
+> 
 
 
-On 09/19/2017 11:22 AM, Gabriel FERNANDEZ wrote:
-> Hi David,
->
-> I confirm it's typo issue. I 'm ready to send a fix for that.
->
-> Many Thank's
->
-> Gabriel
->
->> Hello there,
->>
->> 1.
->>
->> linux-4.14-rc1/drivers/clk/clk-stm32h7.c:387]: (style) Same expression
->> on both sides of '&&'.
->>
->> Source code is
->>
->>    ??? if (gcfg->mux && gcfg->mux) {
->>
->> 2.
->>
->> [linux-4.14-rc1/drivers/clk/clk-stm32h7.c:413]: (style) Same expression
->> on both sides of '&&'.
->>
->> Duplicate.
->>
->> Regards
->>
->> David Binderman
+-- 
+Nicolas Ferre
