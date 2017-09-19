@@ -1,41 +1,32 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Tue, 19 Sep 2017 13:43:50 +0200
-Subject: [PATCH] clk: stm32h7: fix test of clock config
-Message-ID: <1505821430-6779-1-git-send-email-gabriel.fernandez@st.com>
+Date: Tue, 19 Sep 2017 13:44:06 +0200
+Subject: [PATCH] dt-bindings: clk: stm32h7: fix clock-cell size
+Message-ID: <1505821446-6847-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-fix test of composite clock config (bad copy / past)
+The clock-cell size is 1 on stm32h7 plaform.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
 ---
- drivers/clk/clk-stm32h7.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
-index a94c3f5..61c3e40 100644
---- a/drivers/clk/clk-stm32h7.c
-+++ b/drivers/clk/clk-stm32h7.c
-@@ -384,7 +384,7 @@ static void get_cfg_composite_div(const struct composite_clk_gcfg *gcfg,
- 	mux_ops = div_ops = gate_ops = NULL;
- 	mux_hw = div_hw = gate_hw = NULL;
+diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+index a135504..cac24ee 100644
+--- a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
++++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+@@ -32,7 +32,7 @@ Example:
+ 		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
+ 		reg = <0x58024400 0x400>;
+ 		#reset-cells = <1>;
+-		#clock-cells = <2>;
++		#clock-cells = <1>;
+ 		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
  
--	if (gcfg->mux && gcfg->mux) {
-+	if (gcfg->mux && cfg->mux) {
- 		mux = _get_cmux(base + cfg->mux->offset,
- 				cfg->mux->shift,
- 				cfg->mux->width,
-@@ -410,7 +410,7 @@ static void get_cfg_composite_div(const struct composite_clk_gcfg *gcfg,
- 		}
- 	}
- 
--	if (gcfg->gate && gcfg->gate) {
-+	if (gcfg->gate && cfg->gate) {
- 		gate = _get_cgate(base + cfg->gate->offset,
- 				cfg->gate->bit_idx,
- 				gcfg->gate->flags, lock);
+ 		st,syscfg = <&pwrcfg>;
 -- 
 1.9.1
