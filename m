@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 14:46:36 +0100
-Subject: Applied "ASoC: rockchip: Add dapm route for HDMI" to the asoc tree
-In-Reply-To: <20170918014441.17572-1-jeffy.chen@rock-chips.com>
-Message-ID: <E1duIrE-0008H7-7j@debutante>
+Date: Tue, 19 Sep 2017 14:46:20 +0100
+Subject: Applied "ASoC: rockchip: Init dapm routes dynamically" to the asoc
+ tree
+In-Reply-To: <20170918014441.17572-3-jeffy.chen@rock-chips.com>
+Message-ID: <E1duIqy-0008DH-O0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: Add dapm route for HDMI
+   ASoC: rockchip: Init dapm routes dynamically
 
 has been applied to the asoc tree at
 
@@ -33,46 +34,160 @@ to this mail.
 Thanks,
 Mark
 
->From e7251484f3bc3bd9203a2c39555ca7d53e988cf6 Mon Sep 17 00:00:00 2001
+>From d9f9c167edae999fc0fcbc97188ab29278e24958 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
-Date: Mon, 18 Sep 2017 19:17:59 +0800
-Subject: [PATCH] ASoC: rockchip: Add dapm route for HDMI
+Date: Tue, 19 Sep 2017 20:57:58 +0800
+Subject: [PATCH] ASoC: rockchip: Init dapm routes dynamically
 
-Add dapm route for DP codec.
+Currently we are using a fixed list of dapm routes.
+
+Init dapm routes dynamically when parsing dailinks, since we are
+supporting optional codecs.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+Tested-by: Matthias Kaehlcke <mka@chromium.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rk3399_gru_sound.c | 3 +++
- 1 file changed, 3 insertions(+)
+ sound/soc/rockchip/rk3399_gru_sound.c | 88 ++++++++++++++++++++++++++++-------
+ 1 file changed, 72 insertions(+), 16 deletions(-)
 
 diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 1ca269ee0b7e..6463ea86a33a 100644
+index ad19e391c4a6..fab868850d3a 100644
 --- a/sound/soc/rockchip/rk3399_gru_sound.c
 +++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -47,6 +47,7 @@ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
- 	SND_SOC_DAPM_SPK("Speakers", NULL),
- 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
- 	SND_SOC_DAPM_MIC("Int Mic", NULL),
-+	SND_SOC_DAPM_LINE("HDMI", NULL),
+@@ -50,20 +50,6 @@ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
+ 	SND_SOC_DAPM_LINE("HDMI", NULL),
  };
  
- static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
-@@ -60,6 +61,7 @@ static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
- 	{"Headphones", NULL, "HPL"},
- 	{"Headphones", NULL, "HPR"},
- 	{"Speakers", NULL, "Speaker"},
-+	{"HDMI", NULL, "TX"},
- };
- 
+-static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
+-	/* Input Lines */
+-	{"MIC", NULL, "Headset Mic"},
+-	{"DMIC1L", NULL, "Int Mic"},
+-	{"DMIC1R", NULL, "Int Mic"},
+-	{"DMic", NULL, "Int Mic"},
+-
+-	/* Output Lines */
+-	{"Headphones", NULL, "HPL"},
+-	{"Headphones", NULL, "HPR"},
+-	{"Speakers", NULL, "Speaker"},
+-	{"HDMI", NULL, "TX"},
+-};
+-
  static const struct snd_kcontrol_new rockchip_controls[] = {
-@@ -67,6 +69,7 @@ static const struct snd_kcontrol_new rockchip_controls[] = {
+ 	SOC_DAPM_PIN_SWITCH("Headphones"),
  	SOC_DAPM_PIN_SWITCH("Speakers"),
- 	SOC_DAPM_PIN_SWITCH("Headset Mic"),
- 	SOC_DAPM_PIN_SWITCH("Int Mic"),
-+	SOC_DAPM_PIN_SWITCH("HDMI"),
+@@ -318,8 +304,6 @@ static struct snd_soc_card rockchip_sound_card = {
+ 	.owner = THIS_MODULE,
+ 	.dapm_widgets = rockchip_dapm_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
+-	.dapm_routes = rockchip_dapm_routes,
+-	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
+ 	.controls = rockchip_controls,
+ 	.num_controls = ARRAY_SIZE(rockchip_controls),
+ };
+@@ -395,6 +379,65 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
+ 	},
  };
  
- static int rockchip_sound_max98357a_hw_params(struct snd_pcm_substream *substream,
++static const struct snd_soc_dapm_route rockchip_sound_cdndp_routes[] = {
++	/* Output */
++	{"HDMI", NULL, "TX"},
++};
++
++static const struct snd_soc_dapm_route rockchip_sound_da7219_routes[] = {
++	/* Output */
++	{"Headphones", NULL, "HPL"},
++	{"Headphones", NULL, "HPR"},
++
++	/* Input */
++	{"MIC", NULL, "Headset Mic"},
++};
++
++static const struct snd_soc_dapm_route rockchip_sound_dmic_routes[] = {
++	/* Input */
++	{"DMic", NULL, "Int Mic"},
++};
++
++static const struct snd_soc_dapm_route rockchip_sound_max98357a_routes[] = {
++	/* Output */
++	{"Speakers", NULL, "Speaker"},
++};
++
++static const struct snd_soc_dapm_route rockchip_sound_rt5514_routes[] = {
++	/* Input */
++	{"DMIC1L", NULL, "Int Mic"},
++	{"DMIC1R", NULL, "Int Mic"},
++};
++
++struct rockchip_sound_route {
++	const struct snd_soc_dapm_route *routes;
++	int num_routes;
++};
++
++static const struct rockchip_sound_route rockchip_routes[] = {
++	[DAILINK_CDNDP] = {
++		.routes = rockchip_sound_cdndp_routes,
++		.num_routes = ARRAY_SIZE(rockchip_sound_cdndp_routes),
++	},
++	[DAILINK_DA7219] = {
++		.routes = rockchip_sound_da7219_routes,
++		.num_routes = ARRAY_SIZE(rockchip_sound_da7219_routes),
++	},
++	[DAILINK_DMIC] = {
++		.routes = rockchip_sound_dmic_routes,
++		.num_routes = ARRAY_SIZE(rockchip_sound_dmic_routes),
++	},
++	[DAILINK_MAX98357A] = {
++		.routes = rockchip_sound_max98357a_routes,
++		.num_routes = ARRAY_SIZE(rockchip_sound_max98357a_routes),
++	},
++	[DAILINK_RT5514] = {
++		.routes = rockchip_sound_rt5514_routes,
++		.num_routes = ARRAY_SIZE(rockchip_sound_rt5514_routes),
++	},
++	[DAILINK_RT5514_DSP] = {},
++};
++
+ static int rockchip_sound_codec_node_match(struct device_node *np_codec)
+ {
+ 	int i;
+@@ -412,6 +455,7 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 	struct device_node *np_cpu, *np_cpu0, *np_cpu1;
+ 	struct device_node *np_codec;
+ 	struct snd_soc_dai_link *dai;
++	struct snd_soc_dapm_route *routes;
+ 	int i, index;
+ 
+ 	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
+@@ -419,9 +463,16 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 	if (!card->dai_link)
+ 		return -ENOMEM;
+ 
++	routes = devm_kzalloc(dev, sizeof(rockchip_routes),
++			      GFP_KERNEL);
++	if (!routes)
++		return -ENOMEM;
++	card->dapm_routes = routes;
++
+ 	np_cpu0 = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
+ 	np_cpu1 = of_parse_phandle(dev->of_node, "rockchip,cpu", 1);
+ 
++	card->num_dapm_routes = 0;
+ 	card->num_links = 0;
+ 	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++) {
+ 		np_codec = of_parse_phandle(dev->of_node,
+@@ -449,6 +500,11 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 		dai->codec_of_node = np_codec;
+ 		dai->platform_of_node = np_cpu;
+ 		dai->cpu_of_node = np_cpu;
++
++		memcpy(routes + card->num_dapm_routes,
++		       rockchip_routes[index].routes,
++		       rockchip_routes[index].num_routes * sizeof(*routes));
++		card->num_dapm_routes += rockchip_routes[index].num_routes;
+ 	}
+ 
+ 	return 0;
 -- 
 2.14.1
