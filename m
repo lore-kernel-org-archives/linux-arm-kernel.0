@@ -1,36 +1,53 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 19 Sep 2017 20:57:55 +0800
-Subject: [PATCH v3 0/5] This series of patches fix the boot time dapm route
- warnings(without rt5514):
-Message-ID: <20170919125800.336-1-jeffy.chen@rock-chips.com>
+Date: Tue, 19 Sep 2017 20:57:56 +0800
+Subject: [PATCH v3 1/5] ASoC: rockchip: Add dapm route for HDMI
+In-Reply-To: <20170919125800.336-1-jeffy.chen@rock-chips.com>
+References: <20170919125800.336-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170919125800.336-2-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ 2.475501] rk3399-gru-sound sound: ASoC: no sink widget found for DMIC1L
-[ 2.475503] rk3399-gru-sound sound: ASoC: Failed to add route Int Mic -> direct -> DMIC1L
-[ 2.475505] rk3399-gru-sound sound: ASoC: no sink widget found for DMIC1R
-[ 2.475507] rk3399-gru-sound sound: ASoC: Failed to add route Int Mic -> direct -> DMIC1R
+Add dapm route for DP codec.
 
-And support detect rt5514-dsp codec and rt5514 codec by checking bus_type.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
 Changes in v3:
 Rebase onto for-next 20170919
 
 Changes in v2:
 Separate HDMI/DMIC patches.
-Fix DMic typo.
 
-Jeffy Chen (5):
-  ASoC: rockchip: Add dapm route for HDMI
-  ASoC: rockchip: Add dapm route for DMic
-  ASoC: rockchip: Init dapm routes dynamically
-  ASoC: rockchip: Use bus_type to distinguish rt5514 dsp from rt5514
-    codec
-  ASoC: rt5514: Add devicetree binding support for rt5514-spi
+ sound/soc/rockchip/rk3399_gru_sound.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
- Documentation/devicetree/bindings/sound/rt5514.txt |  13 +-
- sound/soc/rockchip/rk3399_gru_sound.c              | 149 +++++++++++++++++----
- 2 files changed, 132 insertions(+), 30 deletions(-)
-
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 0513fe480353..b050510be65f 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -47,6 +47,7 @@ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
+ 	SND_SOC_DAPM_SPK("Speakers", NULL),
+ 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+ 	SND_SOC_DAPM_MIC("Int Mic", NULL),
++	SND_SOC_DAPM_LINE("HDMI", NULL),
+ };
+ 
+ static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
+@@ -59,6 +60,7 @@ static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
+ 	{"Headphones", NULL, "HPL"},
+ 	{"Headphones", NULL, "HPR"},
+ 	{"Speakers", NULL, "Speaker"},
++	{"HDMI", NULL, "TX"},
+ };
+ 
+ static const struct snd_kcontrol_new rockchip_controls[] = {
+@@ -66,6 +68,7 @@ static const struct snd_kcontrol_new rockchip_controls[] = {
+ 	SOC_DAPM_PIN_SWITCH("Speakers"),
+ 	SOC_DAPM_PIN_SWITCH("Headset Mic"),
+ 	SOC_DAPM_PIN_SWITCH("Int Mic"),
++	SOC_DAPM_PIN_SWITCH("HDMI"),
+ };
+ 
+ static int rockchip_sound_max98357a_hw_params(struct snd_pcm_substream *substream,
 -- 
 2.11.0
