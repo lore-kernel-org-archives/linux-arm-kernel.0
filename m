@@ -1,38 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Sep 2017 11:13:25 +0200
-Subject: [PATCH] arm64: dts: draak: Add serial console pins
-In-Reply-To: <20170830064402.GB10398@verge.net.au>
-References: <1503912370-20180-1-git-send-email-geert+renesas@glider.be>
- <20170830064402.GB10398@verge.net.au>
-Message-ID: <CAMuHMdVCUcy48qDvDSDZ9MAgCLiSUd4zgFD2iu5eWkTVinN1Jw@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 19 Sep 2017 10:19:52 +0100
+Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
+In-Reply-To: <CACRpkdb8jDRZxuTUNoosLORqDbF4PP4RSHj3avtUqzvW2RwpmQ@mail.gmail.com>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-2-linus.walleij@linaro.org>
+ <20170918083629.qn4dlrmk7ffipfsz@dell>
+ <CACRpkdb8jDRZxuTUNoosLORqDbF4PP4RSHj3avtUqzvW2RwpmQ@mail.gmail.com>
+Message-ID: <42702eb3-d1dd-5dd0-dbd6-ac163bcc27c2@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 30, 2017 at 8:44 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Aug 28, 2017 at 11:26:10AM +0200, Geert Uytterhoeven wrote:
->> Add pin control for SCIF2.
+On 18/09/17 20:00, Linus Walleij wrote:
+> On Mon, Sep 18, 2017 at 10:36 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> On Sun, 17 Sep 2017, Linus Walleij wrote:
+> 
+>>> Lee: requesting ACK for Wolfram to take this patch.
 >>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> To be applied after v4.14-rc1, when commit 794a6711764658a1 ("pinctrl:
->> sh-pfc: Initial R8A77995 PFC support") has hit mainline.
+>> This ...
 >>
->> Else the serial console will fail, reporting (on earlycon):
+>>> SM501 users: requesting Tested-by on this patch.
 >>
->>     sh-sci e6e88000.serial: could not find pctldev for node /soc/pin-controller at e6060000/scif2, deferring probe
->
-> Thanks, please ping me once that has happened.
-> In the meantime I have marked this patch as deferred.
+>> ... loosely depends on this (until it doesn't).
+> 
+> Yeah I did my best to scout around the commit logs
+> to figure out who's been contributing to the SM501 and
+> using it, I hope someone will step up and test it.
 
-Ping...
+I don't know if anything I have available working has an
+SM501 on it. We did a couple of boards with S3C2440 and
+an SM501 connected via external IO. However these have
+not been supported in years (since Simtec)
 
-Gr{oetje,eeting}s,
+I don't even think I have the PCI SM501 kit, that may have
+ended up either at Simtec or one of the other engineers.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
