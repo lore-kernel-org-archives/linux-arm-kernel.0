@@ -1,52 +1,66 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 19 Sep 2017 22:13:15 +0200
-Subject: [PATCH] mtd: nand: lpc32xx_mlc: Fix an error handling path in
- lpc32xx_nand_probe()
-In-Reply-To: <20170903115831.1326-1-christophe.jaillet@wanadoo.fr>
-References: <20170903115831.1326-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <20170919221315.11d94426@bbrezillon>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 19 Sep 2017 13:22:52 -0700
+Subject: [kernel-hardening] [PATCH v2 0/5] stackprotector: ascii armor the
+ stack canary
+In-Reply-To: <20170919171600.GA31441@openwall.com>
+References: <20170524155751.424-1-riel@redhat.com>
+ <20170919171600.GA31441@openwall.com>
+Message-ID: <CAGXu5jJqhhMjOVHDFnDO9oETEf-qsScR3f_NXJGgQg9wDy1ARQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  3 Sep 2017 13:58:31 +0200
-Christophe JAILLET <christophe.jaillet@wanadoo.fr> wrote:
+On Tue, Sep 19, 2017 at 10:16 AM, Solar Designer <solar@openwall.com> wrote:
+> On Wed, May 24, 2017 at 11:57:46AM -0400, riel at redhat.com wrote:
+>> Zero out the first byte of the stack canary value on 64 bit systems,
+>> in order to mitigate unterminated C string overflows.
+>>
+>> The null byte both prevents C string functions from reading the
+>> canary, and from writing it if the canary value were guessed or
+>> obtained through some other means.
+>>
+>> Reducing the entropy by 8 bits is acceptable on 64-bit systems,
+>> which will still have 56 bits of entropy left, but not on 32
+>> bit systems, so the "ascii armor" canary is only implemented on
+>> 64-bit systems.
+>>
+>> Inspired by the "ascii armor" code in execshield and Daniel Micay's
+>> linux-hardened tree.
+>>
+>> Also see https://github.com/thestinger/linux-hardened/
+>
+> Brad trolls us all lightly with this trivia question:
+>
+> https://twitter.com/grsecurity/status/905246423591084033
+>
+> "For #trivia can you describe one scenario where this change actually
+> helps exploitation using similar C string funcs?"
+>
+> I suppose the expected answer is:
+>
+> The change helps exploitation when the overwriting string ends just
+> before the canary.  Its NUL overwriting the NUL byte in the canary would
+> go undetected.  Before this change, there would be a 255/256 chance of
+> detection.
+>
+> I hope this was considered.  The change might still be a good tradeoff,
+> or it might not, depending on which scenarios are more likely (leak of
+> canary value or the string required in an exploit ending at that exact
+> byte location), and we probably lack such statistics.
+>
+> I am not proposing to revert the change.  I had actually contemplated
+> speaking up when this was discussed, but did not for lack of a better
+> suggestion.  We could put/require a NUL in the middle of the canary, but
+> with the full canary being only 64-bit at most that would also make some
+> attacks easier.
+>
+> So this is JFYI.  No action needed on it, I think.
 
-> If 'clk_prepare_enable()' fails, we must 'put' the corresponding clock.
-> 
-> Fixes: 4d26f012ab59 ("mtd: nand: lpc32xx_mlc: Handle return value of clk_prepare_enable.")
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Agreed. And prior to this:
+https://git.kernel.org/linus/5ea30e4e58040cfd6434c2f33dc3ea76e2c15b05
+the same kernels had 4 NULL bytes in a row. ;) So it's all an improvement, IMO.
 
-Applied.
+-Kees
 
-Thanks,
-
-Boris
-
-> ---
-> Labels in the error handling path could be renamed, but it does not worth
-> the effort, IMHO.
-> ---
->  drivers/mtd/nand/lpc32xx_mlc.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
-> index c3bb358ef01e..5f72a824e67d 100644
-> --- a/drivers/mtd/nand/lpc32xx_mlc.c
-> +++ b/drivers/mtd/nand/lpc32xx_mlc.c
-> @@ -707,7 +707,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
->  	}
->  	res = clk_prepare_enable(host->clk);
->  	if (res)
-> -		goto err_exit1;
-> +		goto err_put_clk;
->  
->  	nand_chip->cmd_ctrl = lpc32xx_nand_cmd_ctrl;
->  	nand_chip->dev_ready = lpc32xx_nand_device_ready;
-> @@ -814,6 +814,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
->  		dma_release_channel(host->dma_chan);
->  err_exit2:
->  	clk_disable_unprepare(host->clk);
-> +err_put_clk:
->  	clk_put(host->clk);
->  err_exit1:
->  	lpc32xx_wp_enable(host);
+-- 
+Kees Cook
+Pixel Security
