@@ -1,43 +1,44 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 19 Sep 2017 21:04:56 +0200
-Subject: [PATCH] pinctrl: bcm2835: fix build warning in
- bcm2835_gpio_irq_handle_bank
-Message-ID: <20170919190456.26522-1-clabbe.montjoie@gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 20 Sep 2017 00:51:05 +0530
+Subject: [PATCH v4 4/6] ARM: dts: imx6dl-icore: Add LVDS support
+In-Reply-To: <CAOMZO5C+DXAQu=2OUAquB2AKn8dOzadoPsdGD05hXAUBdTnYjQ@mail.gmail.com>
+References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
+ <1505121145-9507-4-git-send-email-jteki@openedev.com>
+ <CAOMZO5B0RAjdupLSe=S+tDEA-hpf-Si_4qjkcKC_ECX86PLScQ@mail.gmail.com>
+ <CAMty3ZD3od1LXKai=kwq8hxGsa3EWcjQx5gyBtZvCM5ccC34ZQ@mail.gmail.com>
+ <CAOMZO5C+DXAQu=2OUAquB2AKn8dOzadoPsdGD05hXAUBdTnYjQ@mail.gmail.com>
+Message-ID: <CAMty3ZCQP5vnrU5MSzRFwRS+vS9a_ULt3sNB07BOHv0dCton0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the following build warning:
-drivers/pinctrl/bcm/pinctrl-bcm2835.c:376:15: warning: variable 'type' set but not used [-Wunused-but-set-variable]
+Hi Fabio,
 
-Furthermore, it is unused for a long time, at least since commit 85ae9e512f43 ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
-where a "FIXME no clue why the code looks up the type here" was added.
-A year after, nobody answeered this question, so its time to remove it.
+On Tue, Sep 19, 2017 at 9:22 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Jagan,
+>
+> On Tue, Sep 19, 2017 at 2:06 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+>> Hi Fabio,
+>>
+>>> Please add the support of this panel to drivers/gpu/drm/panel/panel-simple.c.
+>>>
+>>> Then you can refer its compatible in your board dts.
+>>
+>> Yes, I'm trying to add the display timings but I couldn't find any
+>> info how to find front_portch, back_porch and sync. I remember
+>> blanking time = Sync Width + BP + FP so out of which how can we
+>> determine each one respectively. Please let me know if you have any
+>> idea, I?ve attached the data-sheet.
+>
+> Does the existing ampire,am800480r3tmqwa1h binding work for your display?
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 4 ----
- 1 file changed, 4 deletions(-)
+Yes, it is working..but need to understand how these respective
+timings were calculated(because I need to add few more) . I tried this
+supported ampire but couldn't get the data-sheet. Please point me if
+you find any details.
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index 0944310225db..ff782445dfb7 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -373,16 +373,12 @@ static void bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
- 	unsigned long events;
- 	unsigned offset;
- 	unsigned gpio;
--	unsigned int type;
- 
- 	events = bcm2835_gpio_rd(pc, GPEDS0 + bank * 4);
- 	events &= mask;
- 	events &= pc->enabled_irq_map[bank];
- 	for_each_set_bit(offset, &events, 32) {
- 		gpio = (32 * bank) + offset;
--		/* FIXME: no clue why the code looks up the type here */
--		type = pc->irq_type[gpio];
--
- 		generic_handle_irq(irq_linear_revmap(pc->gpio_chip.irqdomain,
- 						     gpio));
- 	}
+thanks!
 -- 
-2.13.5
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
