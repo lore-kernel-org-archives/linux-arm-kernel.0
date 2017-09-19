@@ -1,39 +1,31 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 19 Sep 2017 16:26:00 +0530
-Subject: [RESEND PATCH v2 0/5] K2G: Add QSPI support
-Message-ID: <20170919105605.18533-1-vigneshr@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 19 Sep 2017 13:20:31 +0200
+Subject: [PATCH] arm64: dts: draak: Add serial console pins
+In-Reply-To: <CAMuHMdVCUcy48qDvDSDZ9MAgCLiSUd4zgFD2iu5eWkTVinN1Jw@mail.gmail.com>
+References: <1503912370-20180-1-git-send-email-geert+renesas@glider.be>
+ <20170830064402.GB10398@verge.net.au>
+ <CAMuHMdVCUcy48qDvDSDZ9MAgCLiSUd4zgFD2iu5eWkTVinN1Jw@mail.gmail.com>
+Message-ID: <20170919112028.GD7933@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
-The patches enhance the existing cadence-quadspi driver to support
-loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
+On Tue, Sep 19, 2017 at 11:13:25AM +0200, Geert Uytterhoeven wrote:
+> On Wed, Aug 30, 2017 at 8:44 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Aug 28, 2017 at 11:26:10AM +0200, Geert Uytterhoeven wrote:
+> >> Add pin control for SCIF2.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> To be applied after v4.14-rc1, when commit 794a6711764658a1 ("pinctrl:
+> >> sh-pfc: Initial R8A77995 PFC support") has hit mainline.
+> >>
+> >> Else the serial console will fail, reporting (on earlycon):
+> >>
+> >>     sh-sci e6e88000.serial: could not find pctldev for node /soc/pin-controller at e6060000/scif2, deferring probe
+> >
+> > Thanks, please ping me once that has happened.
+> > In the meantime I have marked this patch as deferred.
+> 
+> Ping...
 
-Change log:
-
-Resend:
-* Rebase to latest linux-next.
-* Collect Acked-bys
-
-v2:
-* Drop DT patches. Will be sent as separate series as requested by
- maintainer.
-* Split binding docs into separate patches.
-* Address comments by Rob Herring.
-
-
-Vignesh R (5):
-  mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC specific compatible
-  mtd: spi-nor: cadence-quadspi: add a delay in write sequence
-  mtd: spi-nor: cadence-quadspi: Add new binding to enable loop-back
-    circuit
-  mtd: spi-nor: cadence-quadspi: Add support to enable loop-back clock
-    circuit
-  mtd: spi-nor: cadence-quadspi: Add runtime PM support
-
- .../devicetree/bindings/mtd/cadence-quadspi.txt    |  7 +++-
- drivers/mtd/spi-nor/cadence-quadspi.c              | 46 ++++++++++++++++++++--
- 2 files changed, 49 insertions(+), 4 deletions(-)
-
--- 
-2.14.1
+Thanks, applied.
