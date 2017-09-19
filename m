@@ -1,74 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 19 Sep 2017 16:39:53 +0200
-Subject: [PATCH] arm64: dt marvell: extend AP806 system controller size
-In-Reply-To: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Fri, 15 Sep 2017 10:50:07 +0300")
-References: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
-Message-ID: <871sn2sqfa.fsf@free-electrons.com>
+From: colin.king@canonical.com (Colin King)
+Date: Tue, 19 Sep 2017 15:42:18 +0100
+Subject: [PATCH] pinctrl: single: make two arrays static const,
+ reduces object code size
+Message-ID: <20170919144218.23607-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
- 
- On ven., sept. 15 2017, Baruch Siach <baruch@tkos.co.il> wrote:
+From: Colin Ian King <colin.king@canonical.com>
 
-> Extend the container size to 0x2000 to include the gpio controller at
-> offset 0x1040.
->
+Don't populate the read-only arrays prop2 and prop4 on the stack, instead
+make them static const.  Makes the object code smaller by over 230 bytes:
 
-Actually it is a fix as I don't see how we can use the gpio if it is not
-in the range. So I amended your patch by adding:
-Fixes: 63dac0f4924b ("arm64: dts: marvell: add gpio support for Armada
-7K/8K")
-Cc: <stable@vger.kernel.org>
+Before:
+   text	   data	    bss	    dec	    hex	filename
+  28235	   5820	    192	  34247	   85c7	drivers/pinctrl/pinctrl-single.o
 
-And I also modified the title to:
-arm64: dt marvell: Fix AP806 system controller size
+After:
+   text	   data	    bss	    dec	    hex	filename
+  27839	   5980	    192	  34011	   84db	drivers/pinctrl/pinctrl-single.o
 
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/pinctrl-single.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> While at it, add start address notation to the gpio node name to match
-> its 'offset' property.
->
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-
-Applied on mvebu/fixes
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 4d360713ed12..30d48ecf46e0 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -254,7 +254,7 @@
->  
->  			ap_syscon: system-controller at 6f4000 {
->  				compatible = "syscon", "simple-mfd";
-> -				reg = <0x6f4000 0x1000>;
-> +				reg = <0x6f4000 0x2000>;
->  
->  				ap_clk: clock {
->  					compatible = "marvell,ap806-clock";
-> @@ -265,7 +265,7 @@
->  					compatible = "marvell,ap806-pinctrl";
->  				};
->  
-> -				ap_gpio: gpio {
-> +				ap_gpio: gpio at 1040 {
->  					compatible = "marvell,armada-8k-gpio";
->  					offset = <0x1040>;
->  					ngpios = <20>;
-> -- 
-> 2.14.1
->
-
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index b8b3d932cd73..e6cd8de793e2 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -873,13 +873,13 @@ static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
+ 	int i = 0, nconfs = 0;
+ 	unsigned long *settings = NULL, *s = NULL;
+ 	struct pcs_conf_vals *conf = NULL;
+-	struct pcs_conf_type prop2[] = {
++	static const struct pcs_conf_type prop2[] = {
+ 		{ "pinctrl-single,drive-strength", PIN_CONFIG_DRIVE_STRENGTH, },
+ 		{ "pinctrl-single,slew-rate", PIN_CONFIG_SLEW_RATE, },
+ 		{ "pinctrl-single,input-schmitt", PIN_CONFIG_INPUT_SCHMITT, },
+ 		{ "pinctrl-single,low-power-mode", PIN_CONFIG_LOW_POWER_MODE, },
+ 	};
+-	struct pcs_conf_type prop4[] = {
++	static const struct pcs_conf_type prop4[] = {
+ 		{ "pinctrl-single,bias-pullup", PIN_CONFIG_BIAS_PULL_UP, },
+ 		{ "pinctrl-single,bias-pulldown", PIN_CONFIG_BIAS_PULL_DOWN, },
+ 		{ "pinctrl-single,input-schmitt-enable",
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.14.1
