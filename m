@@ -1,44 +1,47 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 19 Sep 2017 07:08:05 +0200
-Subject: [PATCH 0/4] arm64: Add initial Actions Semi S700 and CubieBoard7
- support
-In-Reply-To: <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
-References: <20170911022241.11603-1-afaerber@suse.de>
- <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
-Message-ID: <0a3e9a40-cb67-d2b2-7f06-fa0f24a4fb42@suse.de>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 19 Sep 2017 07:31:12 +0200
+Subject: [PATCH v5 05/10] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <20170914191949.GA3796@lunn.ch>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-6-clabbe.montjoie@gmail.com>
+ <20170908072538.rqsp6dobwsqmzrsr@flea.lan>
+ <20170908074325.GB29999@Red>
+ <20170913182004.uniyo5opeilcfk7r@rob-hp-laptop>
+ <20170914185301.GB4021@Red> <20170914191949.GA3796@lunn.ch>
+Message-ID: <20170919053112.GA15105@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-Am 18.09.2017 um 23:50 schrieb Daniel Lezcano:
-> On 11/09/2017 04:22, Andreas F?rber wrote:
->> Cc: devicetree at vger.kernel.org
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->>
->> Andreas F?rber (4):
->>   dt-bindings: arm: actions: Add S700 and CubieBoard7
->>   dt-bindings: timer: Add Actions Semi S700
->>   clocksource: owl: Prepare S700
->>   arm64: dts: actions: Add S700 and CubieBoard7
->>
->>  Documentation/devicetree/bindings/arm/actions.txt  |  15 ++
->>  .../bindings/timer/actions,owl-timer.txt           |   1 +
+On Thu, Sep 14, 2017 at 09:19:49PM +0200, Andrew Lunn wrote:
+> > > Is the MDIO controller "allwinner,sun8i-h3-emac" or "snps,dwmac-mdio"? 
+> > > If the latter, then I think the node is fine, but then the mux should be 
+> > > a child node of it. IOW, the child of an MDIO controller should either 
+> > > be a mux node or slave devices.
 > 
-> Usually sub system maintainers are also Cc'ed with Dt bindings
-> definitions and usage.
+> Hi Rob
+> 
+> Up until now, children of an MDIO bus have been MDIO devices. Those
+> MDIO devices are either Ethernet PHYs, Ethernet Switches, or the
+> oddball devices that Broadcom iProc has, like generic PHYs.
+> 
+> We have never had MDIO-muxes as MDIO children. A Mux is not an MDIO
+> device, and does not have the properties of an MDIO device. It is not
+> addressable on the MDIO bus. The current MUXes are addressed via GPIOs
+> or MMIO.
+> 
+> There other similar cases. i2c-mux-gpio is not a child of an i2c bus,
+> nor i2c-mux-reg or gpio-mux. nxp,pca9548 is however a child of the i2c
+> bus, because it is an i2c device itself...
+> 
+> If the MDIO mux was an MDIO device, i would agree with you. Bit it is
+> not, so lets not make it a child.
+> 
+> 	    Andrew
 
-Your MAINTAINERS entry is lacking an entry for the bindings. Can you
-please fix that in linux-next? Then the next patches should reach you.
+Hello Rob, could you anwser/confirm please.
+I wait on this for sending the next version.
 
-Actually I'm even surprised that it works for the drivers - I would
-expect a trailing "/" for the directory (see line 95ff).
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks
+Regards
+Corentin Labbe
