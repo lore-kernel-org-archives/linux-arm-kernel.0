@@ -1,477 +1,504 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 19 Sep 2017 18:11:16 +0200
-Subject: [PATCH 2/2] ARM64: dts: meson-gxm: Add support for Khadas VIM2
-In-Reply-To: <1505832820-3517-3-git-send-email-narmstrong@baylibre.com>
-References: <1505832820-3517-1-git-send-email-narmstrong@baylibre.com>
- <1505832820-3517-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1505837476.2703.88.camel@baylibre.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Sep 2017 17:11:19 +0100
+Subject: Applied "mfd: wm97xx-core: core support for wm97xx Codec" to the asoc
+ tree
+In-Reply-To: <20170913193723.16234-3-robert.jarzmik@free.fr>
+Message-ID: <E1duL7H-0004lj-43@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-09-19 at 16:53 +0200, Neil Armstrong wrote:
-> The Khadas VIM2 is a Single Board Computer, respin of the origin
-> Khadas VIM board, using an Amlogic S912 SoC and more server oriented.
-> 
-> It provides the same external connectors and header pinout, plus a SPI
-> NOR Flash, a reprogrammable STM8S003 MCU, FPC Connector, Cooling FAN header
-> and Pogo Pads Arrays.
-> 
-> Cc: Gouwa <gouwa@szwesion.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
->  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
->  .../boot/dts/amlogic/meson-gxm-khadas-vim2.dts     | 401
-> +++++++++++++++++++++
->  3 files changed, 403 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt
-> b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index 4e4bc0b..a445997 100644
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -71,6 +71,7 @@ Board compatible values (alphabetically, grouped by SoC):
->  
->    - "amlogic,q200" (Meson gxm s912)
->    - "amlogic,q201" (Meson gxm s912)
-> +  - "khadas,vim2" (Meson gxm s912)
->    - "kingnovel,r-box-pro" (Meson gxm S912)
->    - "nexbox,a1" (Meson gxm s912)
->  
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile
-> b/arch/arm64/boot/dts/amlogic/Makefile
-> index 7a9f48c..70246e3 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -15,6 +15,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-khadas-vim2.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> new file mode 100644
-> index 0000000..692bb93
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> @@ -0,0 +1,401 @@
-> +/*
-> + * Copyright (c) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com
-> >.
-> + * Copyright (c) 2017 BayLibre, SAS
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/thermal/thermal.h>
-> +
-> +#include "meson-gxm.dtsi"
-> +
-> +/ {
-> +	compatible = "khadas,vim2", "amlogic,s912", "amlogic,meson-gxm";
-> +	model = "Khadas VIM2";
-> +
-> +	aliases {
-> +		serial0 = &uart_AO;
-> +		serial1 = &uart_A;
-> +		serial2 = &uart_AO_B;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x80000000>;
-> +	};
-> +
-> +	adc-keys {
-> +		compatible = "adc-keys";
-> +		io-channels = <&saradc 0>;
-> +		io-channel-names = "buttons";
-> +		keyup-threshold-microvolt = <1710000>;
-> +
-> +		button-function {
-> +			label = "Function";
-> +			linux,code = <KEY_FN>;
-> +			press-threshold-microvolt = <10000>;
-> +		};
-> +	};
-> +
-> +	emmc_pwrseq: emmc-pwrseq {
-> +		compatible = "mmc-pwrseq-emmc";
-> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> +	gpio_fan: gpio-fan {
-> +		compatible = "gpio-fan";
-> +		gpios = <&gpio GPIODV_14 GPIO_ACTIVE_HIGH
-> +			 &gpio GPIODV_15 GPIO_ACTIVE_HIGH>;
-> +		/* Dummy RPM values since fan is optional */
-> +		gpio-fan,speed-map = <0 0
-> +				      1 1
-> +				      2 2
-> +				      3 3>;
-> +		cooling-min-level = <0>;
-> +		cooling-max-level = <3>;
-> +		#cooling-cells = <2>;
-> +	};
-> +
-> +	gpio-keys-polled {
-> +		compatible = "gpio-keys-polled";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		poll-interval = <100>;
-> +
-> +		button at 0 {
-> +			label = "power";
-> +			linux,code = <KEY_POWER>;
-> +			gpios = <&gpio_ao GPIOAO_2 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	hdmi-connector {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_connector_in: endpoint {
-> +				remote-endpoint = <&hdmi_tx_tmds_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	pwmleds {
-> +		compatible = "pwm-leds";
-> +
-> +		power {
-> +			label = "vim:red:power";
-> +			pwms = <&pwm_AO_ab 1 7812500 0>;
-> +			max-brightness = <255>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
-> +
-> +	sdio_pwrseq: sdio-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-> +		clocks = <&wifi32k>;
-> +		clock-names = "ext_clock";
-> +	};
-> +
-> +	thermal-zones {
-> +		cpu-thermal {
-> +			polling-delay-passive = <250>; /* milliseconds */
-> +			polling-delay = <1000>; /* milliseconds */
-> +
-> +			thermal-sensors = <&scpi_sensors 0>;
-> +
-> +			trips {
-> +				cpu_alert0: cpu-alert0 {
-> +					temperature = <70000>; /*
-> millicelsius */
-> +					hysteresis = <2000>; /* millicelsius
-> */
-> +					type = "active";
-> +				};
-> +
-> +				cpu_alert1: cpu-alert1 {
-> +					temperature = <80000>; /*
-> millicelsius */
-> +					hysteresis = <2000>; /* millicelsius
-> */
-> +					type = "passive";
-> +				};
-> +			};
-> +
-> +			cooling-maps {
-> +				map0 {
-> +					trip = <&cpu_alert0>;
-> +					cooling-device = <&gpio_fan
-> THERMAL_NO_LIMIT 1>;
-> +				};
-> +
-> +				map1 {
-> +					trip = <&cpu_alert1>;
-> +					cooling-device = <&gpio_fan 2
-> THERMAL_NO_LIMIT>;
-> +				};
-> +
-> +				map2 {
-> +					trip = <&cpu_alert1>;
-> +					cooling-device =
-> +						<&cpu0 THERMAL_NO_LIMIT
-> THERMAL_NO_LIMIT>;
-> +				};
-> +
-> +				map3 {
-> +					trip = <&cpu_alert1>;
-> +					cooling-device =
-> +						<&cpu4 THERMAL_NO_LIMIT
-> THERMAL_NO_LIMIT>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	vcc_3v3: regulator-vcc_3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VCC_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	vddio_ao18: regulator-vddio_ao18 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDDIO_AO18";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
-> +
-> +	vddio_boot: regulator-vddio_boot {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDDIO_BOOT";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
-> +
-> +	vddao_3v3: regulator-vddao_3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDDAO_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	wifi32k: wifi32k {
-> +		compatible = "pwm-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <32768>;
-> +		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
-> +	};
-> +};
-> +
-> +&cec_AO {
-> +	status = "okay";
-> +	pinctrl-0 = <&ao_cec_pins>;
-> +	pinctrl-names = "default";
-> +	hdmi-phandle = <&hdmi_tx>;
-> +};
-> +
-> +&cpu0 {
-> +	cooling-min-level = <0>;
-> +	cooling-max-level = <6>;
-> +	#cooling-cells = <2>;
-> +};
-> +
-> +&cpu4 {
-> +	cooling-min-level = <0>;
-> +	cooling-max-level = <4>;
-> +	#cooling-cells = <2>;
-> +};
-> +
-> +&ethmac {
-> +	pinctrl-0 = <&eth_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	/* Select external PHY by default */
-> +	phy-handle = <&external_phy>;
-> +
-> +	amlogic,tx-delay-ns = <2>;
-> +
-> +	/* External PHY reset is shared with internal PHY Led signals */
-> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-> +	snps,reset-delays-us = <0 10000 1000000>;
-> +	snps,reset-active-low;
-> +
-> +	/* External PHY is in RGMII */
-> +	phy-mode = "rgmii";
-> +
-> +	status = "okay";
-> +};
-> +
-> +&external_mdio {
-> +	external_phy: ethernet-phy at 1 {
-> +		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-
-> ieee802.3-c22";
-> +		reg = <0>;
-> +		max-speed = <1000>;
-This entry is not necessary
+The patch
 
-> +	};
-> +};
-> +
-> +&hdmi_tx {
-> +	status = "okay";
-> +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&hdmi_tx_tmds_port {
-> +	hdmi_tx_tmds_out: endpoint {
-> +		remote-endpoint = <&hdmi_connector_in>;
-> +	};
-> +};
-> +
-> +&i2c_A {
-> +	status = "okay";
-> +	pinctrl-0 = <&i2c_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&i2c_B {
-> +	status = "okay";
-> +	pinctrl-0 = <&i2c_b_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	rtc: rtc at 51 {
-> +		/* has to be enabled manually when a battery is connected: */
-> +		status = "disabled";
-> +		compatible = "haoyu,hym8563";
-> +		reg = <0x51>;
-> +		#clock-cells = <0>;
-> +		clock-frequency = <32768>;
-> +		clock-output-names = "xin32k";
-> +	};
-> +};
-> +
-> +&ir {
-> +	status = "okay";
-> +	pinctrl-0 = <&remote_input_ao_pins>;
-> +	pinctrl-names = "default";
-> +	linux,rc-map-name = "rc-geekbox";
-> +};
-> +
-> +&pwm_AO_ab {
-> +	status = "okay";
-> +	pinctrl-0 = <&pwm_ao_a_3_pins>, <&pwm_ao_b_pins>;
-> +	pinctrl-names = "default";
-> +	clocks = <&clkc CLKID_FCLK_DIV4>;
-> +	clock-names = "clkin0";
-> +};
-> +
-> +&pwm_ef {
-> +	status = "okay";
-> +	pinctrl-0 = <&pwm_e_pins>, <&pwm_f_clk_pins>;
-> +	pinctrl-names = "default";
-> +	clocks = <&clkc CLKID_FCLK_DIV4>;
-> +	clock-names = "clkin0";
-> +};
-> +
-> +&sd_emmc_a {
-> +	status = "okay";
-> +	pinctrl-0 = <&sdio_pins>;
-> +	pinctrl-names = "default";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	bus-width = <4>;
-> +	cap-sd-highspeed;
-> +	max-frequency = <100000000>;
-> +
-> +	non-removable;
-> +	disable-wp;
-> +
-> +	mmc-pwrseq = <&sdio_pwrseq>;
-> +
-> +	vmmc-supply = <&vddao_3v3>;
-> +	vqmmc-supply = <&vddio_boot>;
-> +
-> +	brcmf: wifi at 1 {
-> +		reg = <1>;
-> +		compatible = "brcm,bcm4329-fmac";
-> +	};
-> +};
-> +
-> +/* SD card */
-> +&sd_emmc_b {
-> +	status = "okay";
-> +	pinctrl-0 = <&sdcard_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	bus-width = <4>;
-> +	cap-sd-highspeed;
-> +	max-frequency = <100000000>;
-> +	disable-wp;
-> +
-> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-> +	cd-inverted;
-> +
-> +	vmmc-supply = <&vddao_3v3>;
-> +	vqmmc-supply = <&vddio_boot>;
-> +};
-> +
-> +/* eMMC */
-> +&sd_emmc_c {
-> +	status = "okay";
-> +	pinctrl-0 = <&emmc_pins>, <&emmc_ds_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	bus-width = <8>;
-> +	cap-sd-highspeed;
-This entry is not necessary
+   mfd: wm97xx-core: core support for wm97xx Codec
 
-> +	cap-mmc-highspeed;
-> +	max-frequency = <200000000>;
-> +	non-removable;
-> +	disable-wp;
-> +	mmc-ddr-1_8v;
-> +	mmc-hs200-1_8v;
-> +
-> +	mmc-pwrseq = <&emmc_pwrseq>;
-> +	vmmc-supply = <&vcc_3v3>;
-> +	vqmmc-supply = <&vddio_boot>;
-> +};
-> +
-> +/*
-> + * EMMC_DS pin is shared between SPI NOR CS and eMMC Data Strobe
-> + * Remove emmc_ds_pins from sd_emmc_c pinctrl-0 then spifc can be enabled
-> + */
-> +&spifc {
-> +	status = "disabled";
-> +	pinctrl-0 = <&nor_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	w25q32: spi-flash at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "winbond,w25q16", "jedec,spi-nor";
-> +		reg = <0>;
-> +		spi-max-frequency = <3000000>;
-> +	};
-> +};
-> +
-> +/* This one is connected to the Bluetooth module */
-> +&uart_A {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +/* This is brought out on the Linux_RX (18) and Linux_TX (19) pins: */
-> +&uart_AO {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_ao_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +/* This is brought out on the UART_RX_AO_B (15) and UART_TX_AO_B (16) pins:
-> */
-> +&uart_AO_B {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_ao_b_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&saradc {
-> +	status = "okay";
-> +	vref-supply = <&vddio_ao18>;
-> +};
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From a5c6951c49fbf7509419d877620625ca3cdae9b1 Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Wed, 13 Sep 2017 21:37:17 +0200
+Subject: [PATCH] mfd: wm97xx-core: core support for wm97xx Codec
+
+The WM9705, WM9712 and WM9713 are highly integrated codecs, with an
+audio codec, DAC and ADC, GPIO unit and a touchscreen interface.
+
+Historically the support was spread across drivers/input/touchscreen and
+sound/soc/codecs. The sharing was done through ac97 bus sharing. This
+model will not withstand the new AC97 bus model, where codecs are
+discovered on runtime.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/mfd/Kconfig        |  14 ++
+ drivers/mfd/Makefile       |   1 +
+ drivers/mfd/wm97xx-core.c  | 366 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/wm97xx.h |  25 ++++
+ 4 files changed, 406 insertions(+)
+ create mode 100644 drivers/mfd/wm97xx-core.c
+ create mode 100644 include/linux/mfd/wm97xx.h
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index fc5e4fef89d2..ac5ad6d0837c 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1746,6 +1746,20 @@ config MFD_WM8994
+ 	  core support for the WM8994, in order to use the actual
+ 	  functionaltiy of the device other drivers must be enabled.
+ 
++config MFD_WM97xx
++	tristate "Wolfson Microelectronics WM97xx"
++	select MFD_CORE
++	select REGMAP_AC97
++	select AC97_BUS_COMPAT
++	depends on AC97_BUS_NEW
++	help
++	  The WM9705, WM9712 and WM9713 is a highly integrated hi-fi CODEC
++	  designed for smartphone applications.  As well as audio functionality
++	  it has on board GPIO and a touchscreen functionality which is
++	  supported via the relevant subsystems.  This driver provides core
++	  support for the WM97xx, in order to use the actual functionaltiy of
++	  the device other drivers must be enabled.
++
+ config MFD_STW481X
+ 	tristate "Support for ST Microelectronics STw481x"
+ 	depends on I2C && (ARCH_NOMADIK || COMPILE_TEST)
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index c3d0a1b39bb6..3266977f54b8 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -73,6 +73,7 @@ obj-$(CONFIG_MFD_WM8350)	+= wm8350.o
+ obj-$(CONFIG_MFD_WM8350_I2C)	+= wm8350-i2c.o
+ wm8994-objs			:= wm8994-core.o wm8994-irq.o wm8994-regmap.o
+ obj-$(CONFIG_MFD_WM8994)	+= wm8994.o
++obj-$(CONFIG_MFD_WM97xx)	+= wm97xx-core.o
+ 
+ obj-$(CONFIG_TPS6105X)		+= tps6105x.o
+ obj-$(CONFIG_TPS65010)		+= tps65010.o
+diff --git a/drivers/mfd/wm97xx-core.c b/drivers/mfd/wm97xx-core.c
+new file mode 100644
+index 000000000000..4141ee52a70b
+--- /dev/null
++++ b/drivers/mfd/wm97xx-core.c
+@@ -0,0 +1,366 @@
++/*
++ * Wolfson WM97xx -- Core device
++ *
++ * Copyright (C) 2017 Robert Jarzmik
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Features:
++ *  - an AC97 audio codec
++ *  - a touchscreen driver
++ *  - a GPIO block
++ */
++
++#include <linux/device.h>
++#include <linux/mfd/core.h>
++#include <linux/mfd/wm97xx.h>
++#include <linux/module.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++#include <linux/wm97xx.h>
++#include <sound/ac97/codec.h>
++#include <sound/ac97/compat.h>
++
++#define WM9705_VENDOR_ID 0x574d4c05
++#define WM9712_VENDOR_ID 0x574d4c12
++#define WM9713_VENDOR_ID 0x574d4c13
++#define WM97xx_VENDOR_ID_MASK 0xffffffff
++
++struct wm97xx_priv {
++	struct regmap *regmap;
++	struct snd_ac97 *ac97;
++	struct device *dev;
++	struct wm97xx_platform_data codec_pdata;
++};
++
++static bool wm97xx_readable_reg(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case AC97_RESET ... AC97_PCM_SURR_DAC_RATE:
++	case AC97_PCM_LR_ADC_RATE:
++	case AC97_CENTER_LFE_MASTER:
++	case AC97_SPDIF ... AC97_LINE1_LEVEL:
++	case AC97_GPIO_CFG ... 0x5c:
++	case AC97_CODEC_CLASS_REV ... AC97_PCI_SID:
++	case 0x74 ... AC97_VENDOR_ID2:
++		return true;
++	default:
++		return false;
++	}
++}
++
++static bool wm97xx_writeable_reg(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case AC97_VENDOR_ID1:
++	case AC97_VENDOR_ID2:
++		return false;
++	default:
++		return wm97xx_readable_reg(dev, reg);
++	}
++}
++
++static const struct reg_default wm9705_reg_defaults[] = {
++	{ 0x02, 0x8000 },
++	{ 0x04, 0x8000 },
++	{ 0x06, 0x8000 },
++	{ 0x0a, 0x8000 },
++	{ 0x0c, 0x8008 },
++	{ 0x0e, 0x8008 },
++	{ 0x10, 0x8808 },
++	{ 0x12, 0x8808 },
++	{ 0x14, 0x8808 },
++	{ 0x16, 0x8808 },
++	{ 0x18, 0x8808 },
++	{ 0x1a, 0x0000 },
++	{ 0x1c, 0x8000 },
++	{ 0x20, 0x0000 },
++	{ 0x22, 0x0000 },
++	{ 0x26, 0x000f },
++	{ 0x28, 0x0605 },
++	{ 0x2a, 0x0000 },
++	{ 0x2c, 0xbb80 },
++	{ 0x32, 0xbb80 },
++	{ 0x34, 0x2000 },
++	{ 0x5a, 0x0000 },
++	{ 0x5c, 0x0000 },
++	{ 0x72, 0x0808 },
++	{ 0x74, 0x0000 },
++	{ 0x76, 0x0006 },
++	{ 0x78, 0x0000 },
++	{ 0x7a, 0x0000 },
++};
++
++static const struct regmap_config wm9705_regmap_config = {
++	.reg_bits = 16,
++	.reg_stride = 2,
++	.val_bits = 16,
++	.max_register = 0x7e,
++	.cache_type = REGCACHE_RBTREE,
++
++	.reg_defaults = wm9705_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(wm9705_reg_defaults),
++	.volatile_reg = regmap_ac97_default_volatile,
++	.readable_reg = wm97xx_readable_reg,
++	.writeable_reg = wm97xx_writeable_reg,
++};
++
++static struct mfd_cell wm9705_cells[] = {
++	{ .name = "wm9705-codec", },
++	{ .name = "wm97xx-ts", },
++};
++
++static bool wm9712_volatile_reg(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case AC97_REC_GAIN:
++		return true;
++	default:
++		return regmap_ac97_default_volatile(dev, reg);
++	}
++}
++
++static const struct reg_default wm9712_reg_defaults[] = {
++	{ 0x02, 0x8000 },
++	{ 0x04, 0x8000 },
++	{ 0x06, 0x8000 },
++	{ 0x08, 0x0f0f },
++	{ 0x0a, 0xaaa0 },
++	{ 0x0c, 0xc008 },
++	{ 0x0e, 0x6808 },
++	{ 0x10, 0xe808 },
++	{ 0x12, 0xaaa0 },
++	{ 0x14, 0xad00 },
++	{ 0x16, 0x8000 },
++	{ 0x18, 0xe808 },
++	{ 0x1a, 0x3000 },
++	{ 0x1c, 0x8000 },
++	{ 0x20, 0x0000 },
++	{ 0x22, 0x0000 },
++	{ 0x26, 0x000f },
++	{ 0x28, 0x0605 },
++	{ 0x2a, 0x0410 },
++	{ 0x2c, 0xbb80 },
++	{ 0x2e, 0xbb80 },
++	{ 0x32, 0xbb80 },
++	{ 0x34, 0x2000 },
++	{ 0x4c, 0xf83e },
++	{ 0x4e, 0xffff },
++	{ 0x50, 0x0000 },
++	{ 0x52, 0x0000 },
++	{ 0x56, 0xf83e },
++	{ 0x58, 0x0008 },
++	{ 0x5c, 0x0000 },
++	{ 0x60, 0xb032 },
++	{ 0x62, 0x3e00 },
++	{ 0x64, 0x0000 },
++	{ 0x76, 0x0006 },
++	{ 0x78, 0x0001 },
++	{ 0x7a, 0x0000 },
++};
++
++static const struct regmap_config wm9712_regmap_config = {
++	.reg_bits = 16,
++	.reg_stride = 2,
++	.val_bits = 16,
++	.max_register = 0x7e,
++	.cache_type = REGCACHE_RBTREE,
++
++	.reg_defaults = wm9712_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(wm9712_reg_defaults),
++	.volatile_reg = wm9712_volatile_reg,
++	.readable_reg = wm97xx_readable_reg,
++	.writeable_reg = wm97xx_writeable_reg,
++};
++
++static struct mfd_cell wm9712_cells[] = {
++	{ .name = "wm9712-codec", },
++	{ .name = "wm97xx-ts", },
++};
++
++static const struct reg_default wm9713_reg_defaults[] = {
++	{ 0x02, 0x8080 },	/* Speaker Output Volume */
++	{ 0x04, 0x8080 },	/* Headphone Output Volume */
++	{ 0x06, 0x8080 },	/* Out3/OUT4 Volume */
++	{ 0x08, 0xc880 },	/* Mono Volume */
++	{ 0x0a, 0xe808 },	/* LINEIN Volume */
++	{ 0x0c, 0xe808 },	/* DAC PGA Volume */
++	{ 0x0e, 0x0808 },	/* MIC PGA Volume */
++	{ 0x10, 0x00da },	/* MIC Routing Control */
++	{ 0x12, 0x8000 },	/* Record PGA Volume */
++	{ 0x14, 0xd600 },	/* Record Routing */
++	{ 0x16, 0xaaa0 },	/* PCBEEP Volume */
++	{ 0x18, 0xaaa0 },	/* VxDAC Volume */
++	{ 0x1a, 0xaaa0 },	/* AUXDAC Volume */
++	{ 0x1c, 0x0000 },	/* Output PGA Mux */
++	{ 0x1e, 0x0000 },	/* DAC 3D control */
++	{ 0x20, 0x0f0f },	/* DAC Tone Control*/
++	{ 0x22, 0x0040 },	/* MIC Input Select & Bias */
++	{ 0x24, 0x0000 },	/* Output Volume Mapping & Jack */
++	{ 0x26, 0x7f00 },	/* Powerdown Ctrl/Stat*/
++	{ 0x28, 0x0405 },	/* Extended Audio ID */
++	{ 0x2a, 0x0410 },	/* Extended Audio Start/Ctrl */
++	{ 0x2c, 0xbb80 },	/* Audio DACs Sample Rate */
++	{ 0x2e, 0xbb80 },	/* AUXDAC Sample Rate */
++	{ 0x32, 0xbb80 },	/* Audio ADCs Sample Rate */
++	{ 0x36, 0x4523 },	/* PCM codec control */
++	{ 0x3a, 0x2000 },	/* SPDIF control */
++	{ 0x3c, 0xfdff },	/* Powerdown 1 */
++	{ 0x3e, 0xffff },	/* Powerdown 2 */
++	{ 0x40, 0x0000 },	/* General Purpose */
++	{ 0x42, 0x0000 },	/* Fast Power-Up Control */
++	{ 0x44, 0x0080 },	/* MCLK/PLL Control */
++	{ 0x46, 0x0000 },	/* MCLK/PLL Control */
++
++	{ 0x4c, 0xfffe },	/* GPIO Pin Configuration */
++	{ 0x4e, 0xffff },	/* GPIO Pin Polarity / Type */
++	{ 0x50, 0x0000 },	/* GPIO Pin Sticky */
++	{ 0x52, 0x0000 },	/* GPIO Pin Wake-Up */
++				/* GPIO Pin Status */
++	{ 0x56, 0xfffe },	/* GPIO Pin Sharing */
++	{ 0x58, 0x4000 },	/* GPIO PullUp/PullDown */
++	{ 0x5a, 0x0000 },	/* Additional Functions 1 */
++	{ 0x5c, 0x0000 },	/* Additional Functions 2 */
++	{ 0x60, 0xb032 },	/* ALC Control */
++	{ 0x62, 0x3e00 },	/* ALC / Noise Gate Control */
++	{ 0x64, 0x0000 },	/* AUXDAC input control */
++	{ 0x74, 0x0000 },	/* Digitiser Reg 1 */
++	{ 0x76, 0x0006 },	/* Digitiser Reg 2 */
++	{ 0x78, 0x0001 },	/* Digitiser Reg 3 */
++	{ 0x7a, 0x0000 },	/* Digitiser Read Back */
++};
++
++static const struct regmap_config wm9713_regmap_config = {
++	.reg_bits = 16,
++	.reg_stride = 2,
++	.val_bits = 16,
++	.max_register = 0x7e,
++	.cache_type = REGCACHE_RBTREE,
++
++	.reg_defaults = wm9713_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(wm9713_reg_defaults),
++	.volatile_reg = regmap_ac97_default_volatile,
++	.readable_reg = wm97xx_readable_reg,
++	.writeable_reg = wm97xx_writeable_reg,
++};
++
++static struct mfd_cell wm9713_cells[] = {
++	{ .name = "wm9713-codec", },
++	{ .name = "wm97xx-ts", },
++};
++
++static int wm97xx_ac97_probe(struct ac97_codec_device *adev)
++{
++	struct wm97xx_priv *wm97xx;
++	const struct regmap_config *config;
++	struct wm97xx_platform_data *codec_pdata;
++	struct mfd_cell *cells;
++	int ret = -ENODEV, nb_cells, i;
++	struct wm97xx_pdata *pdata = snd_ac97_codec_get_platdata(adev);
++
++	wm97xx = devm_kzalloc(ac97_codec_dev2dev(adev),
++			      sizeof(*wm97xx), GFP_KERNEL);
++	if (!wm97xx)
++		return -ENOMEM;
++
++	wm97xx->dev = ac97_codec_dev2dev(adev);
++	wm97xx->ac97 = snd_ac97_compat_alloc(adev);
++	if (IS_ERR(wm97xx->ac97))
++		return PTR_ERR(wm97xx->ac97);
++
++
++	ac97_set_drvdata(adev, wm97xx);
++	dev_info(wm97xx->dev, "wm97xx core found, id=0x%x\n",
++		 adev->vendor_id);
++
++	codec_pdata = &wm97xx->codec_pdata;
++	codec_pdata->ac97 = wm97xx->ac97;
++	codec_pdata->batt_pdata = pdata->batt_pdata;
++
++	switch (adev->vendor_id) {
++	case WM9705_VENDOR_ID:
++		config = &wm9705_regmap_config;
++		cells = wm9705_cells;
++		nb_cells = ARRAY_SIZE(wm9705_cells);
++		break;
++	case WM9712_VENDOR_ID:
++		config = &wm9712_regmap_config;
++		cells = wm9712_cells;
++		nb_cells = ARRAY_SIZE(wm9712_cells);
++		break;
++	case WM9713_VENDOR_ID:
++		config = &wm9713_regmap_config;
++		cells = wm9713_cells;
++		nb_cells = ARRAY_SIZE(wm9713_cells);
++		break;
++	default:
++		goto err_free_compat;
++	}
++
++	for (i = 0; i < nb_cells; i++) {
++		cells[i].platform_data = codec_pdata;
++		cells[i].pdata_size = sizeof(*codec_pdata);
++	}
++
++	codec_pdata->regmap = devm_regmap_init_ac97(wm97xx->ac97, config);
++	if (IS_ERR(codec_pdata->regmap)) {
++		ret = PTR_ERR(codec_pdata->regmap);
++		goto err_free_compat;
++	}
++
++	ret = devm_mfd_add_devices(wm97xx->dev, PLATFORM_DEVID_NONE,
++				   cells, nb_cells, NULL, 0, NULL);
++	if (ret)
++		goto err_free_compat;
++
++	return ret;
++
++err_free_compat:
++	snd_ac97_compat_release(wm97xx->ac97);
++	return ret;
++}
++
++static int wm97xx_ac97_remove(struct ac97_codec_device *adev)
++{
++	struct wm97xx_priv *wm97xx = ac97_get_drvdata(adev);
++
++	snd_ac97_compat_release(wm97xx->ac97);
++
++	return 0;
++}
++
++static const struct ac97_id wm97xx_ac97_ids[] = {
++	{ .id = WM9705_VENDOR_ID, .mask = WM97xx_VENDOR_ID_MASK },
++	{ .id = WM9712_VENDOR_ID, .mask = WM97xx_VENDOR_ID_MASK },
++	{ .id = WM9713_VENDOR_ID, .mask = WM97xx_VENDOR_ID_MASK },
++	{ }
++};
++
++static struct ac97_codec_driver wm97xx_ac97_driver = {
++	.driver = {
++		.name = "wm97xx-core",
++	},
++	.probe		= wm97xx_ac97_probe,
++	.remove		= wm97xx_ac97_remove,
++	.id_table	= wm97xx_ac97_ids,
++};
++
++static int __init wm97xx_module_init(void)
++{
++	return snd_ac97_codec_driver_register(&wm97xx_ac97_driver);
++}
++module_init(wm97xx_module_init);
++
++static void __exit wm97xx_module_exit(void)
++{
++	snd_ac97_codec_driver_unregister(&wm97xx_ac97_driver);
++}
++module_exit(wm97xx_module_exit);
++
++MODULE_DESCRIPTION("WM9712, WM9713 core driver");
++MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
++MODULE_LICENSE("GPL");
++
+diff --git a/include/linux/mfd/wm97xx.h b/include/linux/mfd/wm97xx.h
+new file mode 100644
+index 000000000000..45fb54f19d09
+--- /dev/null
++++ b/include/linux/mfd/wm97xx.h
+@@ -0,0 +1,25 @@
++/*
++ * wm97xx client interface
++ *
++ * Copyright (C) 2017 Robert Jarzmik
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __LINUX_MFD_WM97XX_H
++#define __LINUX_MFD_WM97XX_H
++
++struct regmap;
++struct wm97xx_batt_pdata;
++struct snd_ac97;
++
++struct wm97xx_platform_data {
++	struct snd_ac97 *ac97;
++	struct regmap *regmap;
++	struct wm97xx_batt_pdata *batt_pdata;
++};
++
++#endif
+-- 
+2.14.1
