@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Sep 2017 17:09:47 +0200
-Subject: [PATCH 5/8] ARM: dts: r8a7743: Add QSPI support
-In-Reply-To: <1505322341-9480-6-git-send-email-chris.paterson2@renesas.com>
+Date: Tue, 19 Sep 2017 17:10:06 +0200
+Subject: [PATCH 7/8] ARM: dts: r8a7745: Add QSPI support
+In-Reply-To: <1505322341-9480-8-git-send-email-chris.paterson2@renesas.com>
 References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-6-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdXpxnuP2eY-J+Va8xK1C9cAeJfpRhAfMBCin_yVXiuCUw@mail.gmail.com>
+ <1505322341-9480-8-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <CAMuHMdXbOYHh9x5HtCtNRuS3qrE_mkUVwbxgOs6eAD=Ju38DMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
