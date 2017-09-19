@@ -1,56 +1,27 @@
-From: solar@openwall.com (Solar Designer)
-Date: Tue, 19 Sep 2017 19:16:00 +0200
-Subject: [kernel-hardening] [PATCH v2 0/5] stackprotector: ascii armor the
- stack canary
-In-Reply-To: <20170524155751.424-1-riel@redhat.com>
-References: <20170524155751.424-1-riel@redhat.com>
-Message-ID: <20170919171600.GA31441@openwall.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 19 Sep 2017 19:32:50 +0200
+Subject: [PATCH v4 2/4] ARM: dts: exynos: Add clean name of compatible.
+In-Reply-To: <1505302915-15699-3-git-send-email-hoegeun.kwon@samsung.com>
+References: <1505302915-15699-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170913114215epcas2p30e9a4593bdb6cc3142c6e4dc108ff2f0@epcas2p3.samsung.com>
+ <1505302915-15699-3-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <20170919173250.o3yhqpxgopxmtlyj@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 11:57:46AM -0400, riel at redhat.com wrote:
-> Zero out the first byte of the stack canary value on 64 bit systems,
-> in order to mitigate unterminated C string overflows.
+On Wed, Sep 13, 2017 at 08:41:53PM +0900, Hoegeun Kwon wrote:
+> Exynos 5250 and 5420 have different hardware rotation limits. However,
+> currently it uses only one compatible - "exynos5-gsc". Since we have
+> to distinguish between these two, we add different compatible.
 > 
-> The null byte both prevents C string functions from reading the
-> canary, and from writing it if the canary value were guessed or
-> obtained through some other means.
->     
-> Reducing the entropy by 8 bits is acceptable on 64-bit systems,
-> which will still have 56 bits of entropy left, but not on 32
-> bit systems, so the "ascii armor" canary is only implemented on
-> 64-bit systems.
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi | 8 ++++----
+>  arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
+>  2 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> Inspired by the "ascii armor" code in execshield and Daniel Micay's
-> linux-hardened tree.
-> 
-> Also see https://github.com/thestinger/linux-hardened/
 
-Brad trolls us all lightly with this trivia question:
+Thanks, applied with modified subject.
 
-https://twitter.com/grsecurity/status/905246423591084033
-
-"For #trivia can you describe one scenario where this change actually
-helps exploitation using similar C string funcs?"
-
-I suppose the expected answer is:
-
-The change helps exploitation when the overwriting string ends just
-before the canary.  Its NUL overwriting the NUL byte in the canary would
-go undetected.  Before this change, there would be a 255/256 chance of
-detection.
-
-I hope this was considered.  The change might still be a good tradeoff,
-or it might not, depending on which scenarios are more likely (leak of
-canary value or the string required in an exploit ending at that exact
-byte location), and we probably lack such statistics.
-
-I am not proposing to revert the change.  I had actually contemplated
-speaking up when this was discussed, but did not for lack of a better
-suggestion.  We could put/require a NUL in the middle of the canary, but
-with the full canary being only 64-bit at most that would also make some
-attacks easier.
-
-So this is JFYI.  No action needed on it, I think.
-
-Alexander
+Best regards,
+Krzysztof
