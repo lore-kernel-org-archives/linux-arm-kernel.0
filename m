@@ -1,74 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Sep 2017 09:53:14 -0500
-Subject: [PATCH v7 1/5] Doc: iommu/arm-smmu-v3: Add workaround for
- HiSilicon erratum 161010801
-In-Reply-To: <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
-References: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
- <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170919145314.2irmqpsfneeydupo@rob-hp-laptop>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 19 Sep 2017 16:53:38 +0200
+Subject: [PATCH 0/2] ARM64: meson-gxm: Add support for Khadas VIM2
+Message-ID: <1505832820-3517-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 01:57:52PM +0100, Shameer Kolothum wrote:
-> From: John Garry <john.garry@huawei.com>
-> 
-> The HiSilicon erratum 161010801 describes the limitation of HiSilicon platforms
-> hip06/hip07 to support the SMMU mappings for MSI transactions.
-> 
-> On these platforms, GICv3 ITS translator is presented with the deviceID
-> by extending the MSI payload data to 64 bits to include the deviceID.
-> Hence, the PCIe controller on this platforms has to differentiate the MSI
-> payload against other DMA payload and has to modify the MSI payload.
-> This basically makes it difficult for this platforms to have a SMMU
-> translation for MSI.
-> 
-> This patch adds a SMMUv3 binding to flag that the SMMU breaks msi
-> translation at ITS.
-> 
-> Also, the arm64 silicon errata is updated with this same erratum.
-> 
-> Signed-off-by: John Garry <john.garry@huawei.com>
-> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> ---
->  Documentation/arm64/silicon-errata.txt                  | 1 +
->  Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 3 +++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 66e8ce1..02816b1 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -70,6 +70,7 @@ stable kernels.
->  |                |                 |                 |                             |
->  | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
->  | Hisilicon      | Hip0{6,7}       | #161010701      | N/A                         |
-> +| Hisilicon      | Hip0{6,7}       | #161010801      | N/A                         |
->  |                |                 |                 |                             |
->  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
->  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> index c9abbf3..1f5f7f9 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> @@ -55,6 +55,9 @@ the PCIe specification.
->  - hisilicon,broken-prefetch-cmd
->                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
->  
-> +- hisilicon,broken-untranslated-msi
-> +                    : Reserve ITS HW region to avoid translating msi.
-> +
+The Khadas VIM2 is a Single Board Computer, respin of the origin
+Khadas VIM board, using an Amlogic S912 SoC and more server oriented.
+    
+It provides the same external connectors and header pinout, plus a SPI
+NOR Flash, a reprogrammable STM8S003 MCU, FPC Connector, Cooling FAN header
+and Pogo Pads Arrays.
 
-This should be determined from the compatible string. Continuing to add 
-properties for each errata doesn't scale.
+To eventually provide access to the SPI NOR flash, the eMMC DS pin must be
+configured as a different pincrl node to disable it's access from the MMC
+Controller. This first patch splits this emmc pins entry for GXBB and GXL.
 
->  - cavium,cn9900-broken-page1-regspace
->                      : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
->  		      PRIQ_PROD/CONS register access with page 0 offsets.
-> -- 
-> 1.9.1
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Neil Armstrong (2):
+  ARM64: dts: meson-gxl: Take eMMC data strobe out of eMMC pins
+  ARM64: dts: meson-gxm: Add support for Khadas VIM2
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+ .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi |   2 +-
+ .../boot/dts/amlogic/meson-gxbb-nanopi-k2.dts      |   2 +-
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |   2 +-
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |   2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |   2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |   2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  10 +-
+ .../dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts |   2 +-
+ .../dts/amlogic/meson-gxl-s905x-libretech-cc.dts   |   2 +-
+ .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    |   2 +-
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     |   2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  10 +-
+ .../boot/dts/amlogic/meson-gxm-khadas-vim2.dts     | 401 +++++++++++++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |   2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts |   2 +-
+ 17 files changed, 431 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+
+-- 
+1.9.1
