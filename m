@@ -1,52 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 19 Sep 2017 08:12:37 +0200
-Subject: [PATCH 0/4] arm64: Add initial Actions Semi S700 and CubieBoard7
- support
-In-Reply-To: <0a3e9a40-cb67-d2b2-7f06-fa0f24a4fb42@suse.de>
-References: <20170911022241.11603-1-afaerber@suse.de>
- <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
- <0a3e9a40-cb67-d2b2-7f06-fa0f24a4fb42@suse.de>
-Message-ID: <97d03615-2437-3890-eab2-16ee7109cb1f@linaro.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 19 Sep 2017 11:45:49 +0530
+Subject: [RESEND PATCH 1/3] ARM: dts: keystone-k2g: Add ECAP PWM DT nodes
+In-Reply-To: <20170919061551.11981-1-vigneshr@ti.com>
+References: <20170919061551.11981-1-vigneshr@ti.com>
+Message-ID: <20170919061551.11981-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/2017 07:08, Andreas F?rber wrote:
-> Hi Daniel,
-> 
-> Am 18.09.2017 um 23:50 schrieb Daniel Lezcano:
->> On 11/09/2017 04:22, Andreas F?rber wrote:
->>> Cc: devicetree at vger.kernel.org
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>
->>> Andreas F?rber (4):
->>>   dt-bindings: arm: actions: Add S700 and CubieBoard7
->>>   dt-bindings: timer: Add Actions Semi S700
->>>   clocksource: owl: Prepare S700
->>>   arm64: dts: actions: Add S700 and CubieBoard7
->>>
->>>  Documentation/devicetree/bindings/arm/actions.txt  |  15 ++
->>>  .../bindings/timer/actions,owl-timer.txt           |   1 +
->>
->> Usually sub system maintainers are also Cc'ed with Dt bindings
->> definitions and usage.
-> 
-> Your MAINTAINERS entry is lacking an entry for the bindings. Can you
-> please fix that in linux-next? Then the next patches should reach you.
-> 
-> Actually I'm even surprised that it works for the drivers - I would
-> expect a trailing "/" for the directory (see line 95ff).
+Add DT nodes for PWM ECAP IP present on 66AK2G SoC.
 
-Done.
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2g.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-https://git.linaro.org/people/daniel.lezcano/linux.git/commit/?h=clockevents/next&id=acdbb48efecb03bc5a6e8e82447208fdd342eb89
-
-Should hit linux-next soon.
-
-
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index 826b286665e6..dace4672b1e6 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -343,5 +343,25 @@
+ 			clock-names = "fck", "mmchsdb_fck";
+ 			status = "disabled";
+ 		};
++
++		ecap0: pwm at 21d1800 {
++			compatible = "ti,k2g-ecap", "ti,am3352-ecap";
++			#pwm-cells = <3>;
++			reg = <0x021d1800 0x60>;
++			power-domains = <&k2g_pds 0x38>;
++			clocks = <&k2g_clks 0x38 0>;
++			clock-names = "fck";
++			status = "disabled";
++		};
++
++		ecap1: pwm at 21d1c00 {
++			compatible = "ti,k2g-ecap", "ti,am3352-ecap";
++			#pwm-cells = <3>;
++			reg = <0x021d1c00 0x60>;
++			power-domains = <&k2g_pds 0x39>;
++			clocks = <&k2g_clks 0x39 0x0>;
++			clock-names = "fck";
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.14.1
