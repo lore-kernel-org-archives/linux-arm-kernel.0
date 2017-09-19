@@ -1,405 +1,182 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 19 Sep 2017 23:26:53 +0800
-Subject: [PATCH v1 3/4] arm: dts: mt7623: add display related nodes
-In-Reply-To: <0eb19ae1a4717d316cdaec44f6c20bfa8aa24ddc.1505801355.git.ryder.lee@mediatek.com>
-References: <cover.1505801355.git.ryder.lee@mediatek.com>
- <0eb19ae1a4717d316cdaec44f6c20bfa8aa24ddc.1505801355.git.ryder.lee@mediatek.com>
-Message-ID: <1505834813.16414.5.camel@mtksdaap41>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 19 Sep 2017 16:37:52 +0100
+Subject: [PATCH v2 11/11] KVM: arm64: Allow user-space to claim guest
+ SMC-CC ranges for SDEI
+In-Reply-To: <20170917144342.GC99021@lvm>
+References: <20170808164616.25949-1-james.morse@arm.com>
+ <20170808164616.25949-12-james.morse@arm.com> <20170917144342.GC99021@lvm>
+Message-ID: <59C139D0.3040507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ryder:
+Hi Christoffer,
 
-Some comment inline.
+On 17/09/17 15:43, Christoffer Dall wrote:
+> On Tue, Aug 08, 2017 at 05:46:16PM +0100, James Morse wrote:
+>> Instead of supporting SDEI in KVM, and providing a new API to
+>> control and configure the in-kernel support, allow user-space to
+>> request particular SMC-CC ranges from guest HVC calls to be handled
+>> by user-space.
+>>
+>> This requires two KVM capabilities, KVM_CAP_ARM_SDEI_1_0 advertises
+>> that KVM knows how match SDEI SMC-CC calls from a guest. To pass these
+>> calls to user-space requires this cap to be enabled using
+>> KVM_CAP_ENABLE_CAP_VM.
+>>
+>> Calls are passed with exit_reason = KVM_EXIT_HYPERCALL, the kvm_run
+>> structure has copies of the first 6 registers and the guest pstate.
 
-On Tue, 2017-09-19 at 14:27 +0800, Ryder Lee wrote:
-> This patch adds the device nodes for the display function block.
-> Also, we add some missing pin macros in mt7623-pinfunc.h.
+
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index e63a35fafef0..740288d6e894 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -1012,7 +1012,7 @@ documentation when it pops into existence).
+>>  4.37 KVM_ENABLE_CAP
+>>  
+>>  Capability: KVM_CAP_ENABLE_CAP, KVM_CAP_ENABLE_CAP_VM
+>> -Architectures: x86 (only KVM_CAP_ENABLE_CAP_VM),
+>> +Architectures: x86, arm, arm64 (only KVM_CAP_ENABLE_CAP_VM),
+>>  	       mips (only KVM_CAP_ENABLE_CAP), ppc, s390
+>>  Type: vcpu ioctl, vm ioctl (with KVM_CAP_ENABLE_CAP_VM)
+>>  Parameters: struct kvm_enable_cap (in)
+>> @@ -3540,10 +3540,16 @@ pending operations.
+>>  			__u32 pad;
+>>  		} hypercall;
+>>  
+>> -Unused.  This was once used for 'hypercall to userspace'.  To implement
+>> -such functionality, use KVM_EXIT_IO (x86) or KVM_EXIT_MMIO (all except s390).
+>> +This was once used for 'hypercall to userspace'.  To implement such
+>> +functionality, use KVM_EXIT_IO (x86) or KVM_EXIT_MMIO (all except s390).
+
+> I suggest you add 'for x86' to these two sentences, otherwise the
+> following paragraph seems contradicting.
+
+Does the second sentence apply to just x86? 'KVM_EXIT_MMIO (all except s390)'
+
+I've change this to:
+> This was once used for 'hypercall to userspace' on x86. To implement such
+> functionality, use KVM_EXIT_IO (x86) or KVM_EXIT_MMIO (all except s390).
+
+
+>>  Note KVM_EXIT_IO is significantly faster than KVM_EXIT_MMIO.
+>>  
+>> +On arm64 this is used to complete guest hypercalls (HVC) in user space.
+>> +e.g. Configuring SDEI or communicating with an emulated TEE.
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/boot/dts/mt7623.dtsi                 | 210 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  41 ++++-
->  include/dt-bindings/pinctrl/mt7623-pinfunc.h  |  12 ++
->  3 files changed, 261 insertions(+), 2 deletions(-)
+> s/e.g./For example,/
 > 
-> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> index 9ec3767..e11e5e7 100644
-> --- a/arch/arm/boot/dts/mt7623.dtsi
-> +++ b/arch/arm/boot/dts/mt7623.dtsi
-> @@ -20,6 +20,7 @@
->  #include <dt-bindings/power/mt2701-power.h>
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/phy/phy.h>
-> +#include <dt-bindings/memory/mt2701-larb-port.h>
->  #include <dt-bindings/reset/mt2701-resets.h>
->  #include <dt-bindings/thermal/thermal.h>
->  #include "skeleton64.dtsi"
-> @@ -28,6 +29,11 @@
->  	compatible = "mediatek,mt7623";
->  	interrupt-parent = <&sysirq>;
->  
-> +	aliases {
-> +		rdma0 = &rdma0;
-> +		rdma1 = &rdma1;
+>> +The required HVC ranges must first be enabled by KVM_CAP_ENABLE_CAP_VM.
+>> +The 'args' array contains a copy of r0-r5 and 'longmode' contains a copy
+>> +of the CPSR/PSTATE.
 
-For display, are these two aliases enough?
+> I'm not entirely sure what this means by just looking at this text.  Do
+> you mean that some HVC (and SMC?) calls can still be handled by the
+> kernel directly (PSCI), and some can be configured to be handled by the
+> kernel?  Where does it specify how these 'ranges' are defined?
 
-> +	};
-> +
->  	cpu_opp_table: opp_table {
->  		compatible = "operating-points-v2";
->  		opp-shared;
-> @@ -273,6 +279,17 @@
->  			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
->  	};
->  
-> +	smi_common: smi at 1000c000 {
-> +		compatible = "mediatek,mt7623-smi-common",
-> +			     "mediatek,mt2701-smi-common";
-> +		reg = <0 0x1000c000 0 0x1000>;
-> +		clocks = <&infracfg CLK_INFRA_SMI>,
-> +			 <&mmsys CLK_MM_SMI_COMMON>,
-> +			 <&infracfg CLK_INFRA_SMI>;
-> +		clock-names = "apb", "smi", "async";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-> +	};
-> +
->  	pwrap: pwrap at 1000d000 {
->  		compatible = "mediatek,mt7623-pwrap",
->  			     "mediatek,mt2701-pwrap";
-> @@ -286,6 +303,17 @@
->  		clock-names = "spi", "wrap";
->  	};
->  
-> +	mipi_tx0: mipi-dphy at 10010000 {
-> +		compatible = "mediatek,mt7623-mipi-tx",
-> +			     "mediatek,mt2701-mipi-tx";
-> +		reg = <0 0x10010000 0 0x90>;
-> +		clocks = <&clk26m>;
-> +		clock-output-names = "mipi_tx0_pll";
-> +		#clock-cells = <0>;
-> +		#phy-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
->  	cir: cir at 10013000 {
->  		compatible = "mediatek,mt7623-cir";
->  		reg = <0 0x10013000 0 0x1000>;
-> @@ -304,6 +332,17 @@
->  		reg = <0 0x10200100 0 0x1c>;
->  	};
->  
-> +	iommu: mmsys_iommu at 10205000 {
-> +		compatible = "mediatek,mt7623-m4u",
-> +			     "mediatek,mt2701-m4u";
-> +		reg = <0 0x10205000 0 0x1000>;
-> +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&infracfg CLK_INFRA_M4U>;
-> +		clock-names = "bclk";
-> +		mediatek,larbs = <&larb0 &larb1 &larb2>;
-> +		#iommu-cells = <1>;
-> +	};
-> +
->  	efuse: efuse at 10206000 {
->  		compatible = "mediatek,mt7623-efuse",
->  			     "mediatek,mt8173-efuse";
-> @@ -661,6 +700,169 @@
->  		status = "disabled";
->  	};
->  
-> +	mmsys: syscon at 14000000 {
-> +		compatible = "mediatek,mt7623-mmsys",
-> +			     "mediatek,mt2701-mmsys",
-> +			     "syscon";
-> +		reg = <0 0x14000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	display_components: dispsys at 14000000 {
-> +		compatible = "mediatek,mt7623-mmsys",
-> +			     "mediatek,mt2701-mmsys";
-> +		reg = <0 0x14000000 0 0x1000>;
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-> +	};
-> +
-> +	ovl at 14007000 {
-> +		compatible = "mediatek,mt7623-disp-ovl",
-> +			     "mediatek,mt2701-disp-ovl";
-> +		reg = <0 0x14007000 0 0x1000>;
-> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_DISP_OVL>;
-> +		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-> +		mediatek,larb = <&larb0>;
-> +	};
-> +
-> +	rdma0: rdma at 14008000 {
-> +		compatible = "mediatek,mt7623-disp-rdma",
-> +			     "mediatek,mt2701-disp-rdma";
-> +		reg = <0 0x14008000 0 0x1000>;
-> +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-> +		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-> +		mediatek,larb = <&larb0>;
-> +	};
-> +
-> +	wdma at 14009000 {
-> +		compatible = "mediatek,mt7623-disp-wdma",
-> +			     "mediatek,mt2701-disp-wdma";
+I'm looking at this as just ARM's SMC-CC services, (which looks like too narrow
+a view). I had expected the kernel to know which ranges its willing to let
+user-space drive, once they have a KVM_HVC_RANGE_ value userspace can try and
+claim them.
 
-There is neither "mediatek,mt7623-disp-wdma" nor
-"mediatek,mt2701-disp-wdma" in driver, do you really need this device
-node?
+This fits nicely with the kernel emulating PSCI by default, but looks wrong once
+SMC and the immediates creep in too.
 
-> +		reg = <0 0x14009000 0 0x1000>;
-> +		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_DISP_WDMA>;
-> +		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
-> +		mediatek,larb = <&larb0>;
-> +	};
-> +
-> +	bls: bls at 1400a000 {
-> +		compatible = "mediatek,mt7623-disp-pwm",
-> +			     "mediatek,mt2701-disp-pwm";
-> +		reg = <0 0x1400a000 0 0x1000>;
-> +		#pwm-cells = <2>;
-> +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>,
-> +			 <&mmsys CLK_MM_DISP_BLS>;
-> +		clock-names = "main", "mm";
-> +		status = "disabled";
-> +	};
-> +
-> +	color at 1400b000 {
 
-color: color at 1400b000 {
+> What about the immediate field, could userspace not also need to know
+> this?
 
-> +		compatible = "mediatek,mt7623-disp-color",
-> +			     "mediatek,mt2701-disp-color";
-> +		reg = <0 0x1400b000 0 0x1000>;
-> +		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-> +	};
-> +
-> +	dsi: dsi at 1400c000 {
-> +		compatible = "mediatek,mt7623-dsi",
-> +			     "mediatek,mt2701-dsi";
-> +		reg = <0 0x1400c000 0 0x1000>;
-> +		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_DSI_ENGINE>,
-> +			 <&mmsys CLK_MM_DSI_DIG>,
-> +			 <&mipi_tx0>;
-> +		clock-names = "engine", "digital", "hs";
-> +		phys = <&mipi_tx0>;
-> +		phy-names = "dphy";
-> +		status = "disabled";
-> +	};
-> +
-> +	mutex: mutex at 1400e000 {
-> +		compatible = "mediatek,mt7623-disp-mutex",
-> +			     "mediatek,mt2701-disp-mutex";
-> +		reg = <0 0x1400e000 0 0x1000>;
-> +		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-> +	};
-> +
-> +	larb0: larb at 14010000 {
-> +		compatible = "mediatek,mt7623-smi-larb",
-> +			     "mediatek,mt2701-smi-larb";
-> +		reg = <0 0x14010000 0 0x1000>;
-> +		mediatek,smi = <&smi_common>;
-> +		mediatek,larb-id = <0>;
-> +		clocks = <&mmsys CLK_MM_SMI_LARB0>,
-> +			 <&mmsys CLK_MM_SMI_LARB0>;
-> +		clock-names = "apb", "smi";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-> +	};
-> +
-> +	rdma1: rdma at 14012000 {
-> +		compatible = "mediatek,mt7623-disp-rdma",
-> +			     "mediatek,mt2701-disp-rdma";
-> +		reg = <0 0x14012000 0 0x1000>;
-> +		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-> +		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-> +		mediatek,larb = <&larb0>;
-> +	};
-> +
-> +	imgsys: syscon at 15000000 {
-> +		compatible = "mediatek,mt7623-imgsys",
-> +			     "mediatek,mt2701-imgsys",
-> +			     "syscon";
-> +		reg = <0 0x15000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	larb2: larb at 15001000 {
-> +		compatible = "mediatek,mt7623-smi-larb",
-> +			     "mediatek,mt2701-smi-larb";
-> +		reg = <0 0x15001000 0 0x1000>;
-> +		mediatek,smi = <&smi_common>;
-> +		mediatek,larb-id = <2>;
-> +		clocks = <&imgsys CLK_IMG_SMI_COMM>,
-> +			 <&imgsys CLK_IMG_SMI_COMM>;
-> +		clock-names = "apb", "smi";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-> +	};
-> +
-> +	jpegdec: jpegdec at 15004000 {
-> +		compatible = "mediatek,mt7623-jpgdec",
-> +			     "mediatek,mt2701-jpgdec";
-> +		reg = <0 0x15004000 0 0x1000>;
-> +		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
-> +			  <&imgsys CLK_IMG_JPGDEC>;
-> +		clock-names = "jpgdec-smi",
-> +			      "jpgdec";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-> +		mediatek,larb = <&larb2>;
-> +		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
-> +			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
-> +	};
-> +
-> +	vdecsys: syscon at 16000000 {
-> +		compatible = "mediatek,mt7623-vdecsys",
-> +			     "mediatek,mt2701-vdecsys",
-> +			     "syscon";
-> +		reg = <0 0x16000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	larb1: larb at 16010000 {
-> +		compatible = "mediatek,mt7623-smi-larb",
-> +			     "mediatek,mt2701-smi-larb";
-> +		reg = <0 0x16010000 0 0x1000>;
-> +		mediatek,smi = <&smi_common>;
-> +		mediatek,larb-id = <1>;
-> +		clocks = <&vdecsys CLK_VDEC_CKGEN>,
-> +			 <&vdecsys CLK_VDEC_LARB>;
-> +		clock-names = "apb", "smi";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
-> +	};
-> +
->  	hifsys: syscon at 1a000000 {
->  		compatible = "mediatek,mt7623-hifsys",
->  			     "mediatek,mt2701-hifsys",
-> @@ -799,4 +1001,12 @@
->  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
->  		status = "disabled";
->  	};
-> +
-> +	bdpsys: syscon at 1c000000 {
-> +		compatible = "mediatek,mt7623-bdpsys",
-> +			     "mediatek,mt2701-bdpsys",
-> +			     "syscon";
-> +		reg = <0 0x1c000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> index 688a863..267a05a 100644
-> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> @@ -17,6 +17,17 @@
->  		serial2 = &uart2;
->  	};
->  
-> +	backlight_lcd: backlight_lcd {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&bls 0 100000>;
-> +		brightness-levels = <
-> +			  0  16  32  48  64  80  96 112
-> +			128 144 160 176 192 208 224 240
-> +			255
-> +		>;
-> +		default-brightness-level = <9>;
-> +	};
-> +
->  	chosen {
->  		stdout-path = "serial2:115200n8";
->  	};
-> @@ -86,6 +97,12 @@
->  	};
->  };
->  
-> +&bls {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&bls_pins_a>;
-> +};
-> +
->  &cir {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&cir_pins_a>;
-> @@ -210,6 +227,12 @@
->  };
->  
->  &pio {
-> +	bls_pins_a: bls at 0 {
-> +		pins_cmd_dat {
-> +			pinmux = <MT7623_PIN_203_PWM0_FUNC_DISP_PWM>;
-> +		};
-> +	};
-> +
->  	cir_pins_a:cir at 0 {
->  		pins_cir {
->  			pinmux = <MT7623_PIN_46_IR_FUNC_IR>;
-> @@ -273,6 +296,21 @@
->  		};
->  	};
->  
-> +	mipi_dsi_pin: mipi_dsi_pin {
-> +		pins_cmd_dat {
-> +			pinmux = <MT7623_PIN_100_MIPI_TDP0_FUNC_TDP0>,
-> +				 <MT7623_PIN_99_MIPI_TDN0_FUNC_TDN0>,
-> +				 <MT7623_PIN_98_MIPI_TDP1_FUNC_TDP1>,
-> +				 <MT7623_PIN_97_MIPI_TDN1_FUNC_TDN1>,
-> +				 <MT7623_PIN_96_MIPI_TCP_FUNC_TCP>,
-> +				 <MT7623_PIN_95_MIPI_TCN_FUNC_TCN>,
-> +				 <MT7623_PIN_94_MIPI_TDP2_FUNC_TDP2>,
-> +				 <MT7623_PIN_93_MIPI_TDN2_FUNC_TDN2>,
-> +				 <MT7623_PIN_92_MIPI_TDP3_FUNC_TDP3>,
-> +				 <MT7623_PIN_91_MIPI_TDN3_FUNC_TDN3>;
-> +		};
-> +	};
-> +
->  	mmc0_pins_default: mmc0default {
->  		pins_cmd_dat {
->  			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
-> @@ -378,8 +416,7 @@
->  
->  	pwm_pins_a: pwm at 0 {
->  		pins_pwm {
-> -			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
-> -				 <MT7623_PIN_204_PWM1_FUNC_PWM1>,
-> +			pinmux = <MT7623_PIN_204_PWM1_FUNC_PWM1>,
->  				 <MT7623_PIN_205_PWM2_FUNC_PWM2>,
->  				 <MT7623_PIN_206_PWM3_FUNC_PWM3>,
->  				 <MT7623_PIN_207_PWM4_FUNC_PWM4>;
-> diff --git a/include/dt-bindings/pinctrl/mt7623-pinfunc.h b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
-> index 436a87b..72bed67 100644
-> --- a/include/dt-bindings/pinctrl/mt7623-pinfunc.h
-> +++ b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
-> @@ -272,6 +272,18 @@
->  #define MT7623_PIN_84_DSI_TE_FUNC_GPIO84 (MTK_PIN_NO(84) | 0)
->  #define MT7623_PIN_84_DSI_TE_FUNC_DSI_TE (MTK_PIN_NO(84) | 1)
->  
-> +#define MT7623_PIN_91_MIPI_TDN3_FUNC_GPIO91 (MTK_PIN_NO(91) | 0)
-> +#define MT7623_PIN_91_MIPI_TDN3_FUNC_TDN3 (MTK_PIN_NO(91) | 1)
-> +
-> +#define MT7623_PIN_92_MIPI_TDP3_FUNC_GPIO92 (MTK_PIN_NO(92) | 0)
-> +#define MT7623_PIN_92_MIPI_TDP3_FUNC_TDP3 (MTK_PIN_NO(92) | 1)
-> +
-> +#define MT7623_PIN_93_MIPI_TDN2_FUNC_GPIO93 (MTK_PIN_NO(93) | 0)
-> +#define MT7623_PIN_93_MIPI_TDN2_FUNC_TDN2 (MTK_PIN_NO(93) | 1)
-> +
-> +#define MT7623_PIN_94_MIPI_TDP2_FUNC_GPIO94 (MTK_PIN_NO(94) | 0)
-> +#define MT7623_PIN_94_MIPI_TDP2_FUNC_TDP2 (MTK_PIN_NO(94) | 1)
-> +
->  #define MT7623_PIN_95_MIPI_TCN_FUNC_GPIO95 (MTK_PIN_NO(95) | 0)
->  #define MT7623_PIN_95_MIPI_TCN_FUNC_TCN (MTK_PIN_NO(95) | 1)
->  
+Yes, I'd ignored that due to the narrow focus...
 
-Regards,
-CK
+
+>>  		/* KVM_EXIT_TPR_ACCESS */
+>>  		struct {
+>>  			__u64 rip;
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 7733492d9a35..77b8436e745e 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -71,8 +71,14 @@ struct kvm_arch {
+>>  
+>>  	/* Interrupt controller */
+>>  	struct vgic_dist	vgic;
+>> +
+>> +	/* SMC-CC/HVC ranges user space has requested */
+>> +	u32	hvc_passthrough_ranges;
+>>  };
+>>  
+>> +/* SMC-CC/HVC ranges that can be passed to user space */
+>> +#define	KVM_HVC_RANGE_SDEI	1
+
+> Oh, I see you want the kernel to know what constitutes a range for some
+> functionality and set things up that way.
+
+> What are your thoughts on letting userspace configure a range of from/to
+> values in x0 for some value/range of the immediate field?
+
+The only user we have today is PSCI. It we let userspace specify the x0 ranges
+it may try and claim PSCI, or worse only part of the range the kernel uses for
+its PSCI emulation. I'd like to avoid these corners.
+
+The logic was the kernel has PSCI emulation so it already knows about particular
+ranges, hence the grouping so that only whole ranges can be claimed...
+
+.. but this doesn't fit with exposing the immediate values or SMC/HVC, both of
+which have a bigger scope than SMC-CC.
+
+Looking again at Marc's comments on this[0, 1], we could consider an 'all or
+nothing' approach. If user-space wants the SDEI or any other range it has to
+claim the lot, and emulate PSCI itself. This is more work for userspace in the
+short term, but its less work for userspace and the kernel in the long run.
+
+(I assume Qemu already has a PSCI implementation for its TCG mode..)
+
+
+>> +
+>>  #define KVM_NR_MEM_OBJS     40
+>>  
+>>  /*
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 17d8a1677a0b..22eadf2cd82f 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -21,6 +21,7 @@
+>>  
+>>  #include <linux/kvm.h>
+>>  #include <linux/kvm_host.h>
+>> +#include <linux/sdei.h>
+>>  
+>>  #include <asm/esr.h>
+>>  #include <asm/kvm_asm.h>
+>> @@ -34,15 +35,40 @@
+>>  
+>>  typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+>>  
+>> +#define HVC_PASSTHROUGH(kvm, range) (kvm->arch.hvc_passthrough_ranges & range)
+
+> I think this should have parenthesis around (range) ?
+>
+> Are we not going to support this for SMC passthrough?  (for nested virt
+> for example).
+
+Ah, I hadn't thought about that, (and I don't know much about how it works).
+I assume user-space needs to know which of SMC/HVC the guest made, to route to
+the appropriate guest{n}-hypervisor, and these probably need enabling
+independently as SMC isn't guaranteed to be trappable, (how can KVM know if
+HCR_EL2.TSC is secretly ignored?).
+
+
+(/me looks at the condition code ESR_EL2.ISS bits for SMC trapped from aarch32)
+
+... I'm not going to get this done this week, and as it no longer has any ties
+to SDEI I'll drop this patch from the series and post it independently.
+
+
+Thanks,
+
+James
+
+
+[0] https://lkml.org/lkml/2017/3/22/196
+[1] https://patchwork.kernel.org/patch/9886029/
