@@ -1,62 +1,43 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 19 Sep 2017 13:47:50 -0500
-Subject: [PATCH v2 5/6] arm64: Fixup users of topology_physical_package_id
-In-Reply-To: <20170919184751.25110-1-jeremy.linton@arm.com>
-References: <20170919184751.25110-1-jeremy.linton@arm.com>
-Message-ID: <20170919184751.25110-6-jeremy.linton@arm.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 19 Sep 2017 21:04:56 +0200
+Subject: [PATCH] pinctrl: bcm2835: fix build warning in
+ bcm2835_gpio_irq_handle_bank
+Message-ID: <20170919190456.26522-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a few arm64 specific users (cpufreq, psci, etc) which really
-want the cluster rather than the topology_physical_package_id(). Lets
-convert those users to topology_cod_id(). That way when we start
-differentiating the socket/cluster they will continue to behave correctly.
+This patch fix the following build warning:
+drivers/pinctrl/bcm/pinctrl-bcm2835.c:376:15: warning: variable 'type' set but not used [-Wunused-but-set-variable]
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Furthermore, it is unused for a long time, at least since commit 85ae9e512f43 ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
+where a "FIXME no clue why the code looks up the type here" was added.
+A year after, nobody answeered this question, so its time to remove it.
+
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/clk/clk-mb86s7x.c        | 2 +-
- drivers/cpufreq/arm_big_little.c | 2 +-
- drivers/firmware/psci_checker.c  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
-index 2a83a3ff1d09..da4b456f9afc 100644
---- a/drivers/clk/clk-mb86s7x.c
-+++ b/drivers/clk/clk-mb86s7x.c
-@@ -338,7 +338,7 @@ static struct clk_hw *mb86s7x_clclk_register(struct device *cpu_dev)
- 		return ERR_PTR(-ENOMEM);
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index 0944310225db..ff782445dfb7 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -373,16 +373,12 @@ static void bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
+ 	unsigned long events;
+ 	unsigned offset;
+ 	unsigned gpio;
+-	unsigned int type;
  
- 	clc->hw.init = &init;
--	clc->cluster = topology_physical_package_id(cpu_dev->id);
-+	clc->cluster = topology_cod_id(cpu_dev->id);
- 
- 	init.name = dev_name(cpu_dev);
- 	init.ops = &clk_clc_ops;
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index 17504129fd77..6ee69b3820de 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -72,7 +72,7 @@ static struct mutex cluster_lock[MAX_CLUSTERS];
- 
- static inline int raw_cpu_to_cluster(int cpu)
- {
--	return topology_physical_package_id(cpu);
-+	return topology_cod_id(cpu);
- }
- 
- static inline int cpu_to_cluster(int cpu)
-diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
-index 6523ce962865..a9465f5d344a 100644
---- a/drivers/firmware/psci_checker.c
-+++ b/drivers/firmware/psci_checker.c
-@@ -202,7 +202,7 @@ static int hotplug_tests(void)
- 	 */
- 	for (i = 0; i < nb_cluster; ++i) {
- 		int cluster_id =
--			topology_physical_package_id(cpumask_any(clusters[i]));
-+			topology_cod_id(cpumask_any(clusters[i]));
- 		ssize_t len = cpumap_print_to_pagebuf(true, page_buf,
- 						      clusters[i]);
- 		/* Remove trailing newline. */
+ 	events = bcm2835_gpio_rd(pc, GPEDS0 + bank * 4);
+ 	events &= mask;
+ 	events &= pc->enabled_irq_map[bank];
+ 	for_each_set_bit(offset, &events, 32) {
+ 		gpio = (32 * bank) + offset;
+-		/* FIXME: no clue why the code looks up the type here */
+-		type = pc->irq_type[gpio];
+-
+ 		generic_handle_irq(irq_linear_revmap(pc->gpio_chip.irqdomain,
+ 						     gpio));
+ 	}
 -- 
 2.13.5
