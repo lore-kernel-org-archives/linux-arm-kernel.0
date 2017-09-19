@@ -1,44 +1,36 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 18 Sep 2017 19:28:30 -0500
-Subject: [PATCH 0/3] Add and enable DSP device on OMAPL138 LCDK board
-Message-ID: <20170919002833.5677-1-s-anna@ti.com>
+From: wenyou.yang@microchip.com (Wenyou Yang)
+Date: Tue, 19 Sep 2017 08:45:06 +0800
+Subject: [PATCH v5 0/3] media: ov7670: Add entity init and power operation
+Message-ID: <20170919004509.12722-1-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+This patch set is to add the media entity pads initialization,
+the s_power operation and get_fmt callback support.
 
-The following series adds the DT node for the DSP device present on
-on DA850/OMAPL138 SoCs. The node is disabled in the base dts file, and
-enabled in the corresponding LCDK board file alongside the reserved
-CMA pool required by the DSP device. The DT bindings and driver
-adaptation were added to mainline in 4.14-rc1, and this series adds
-the remaining dt portions. Nodes are added as per bindings in
-Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
+Changes in v5:
+ - Fix the build warning on the declaration *mbus_fmt(ISO C90 forbids mixed).
 
-Patches are based on 4.14-rc1. The first 2 patches adds the base DTS
-node and enables the device on OMAPL138 LCDK board. The last patch
-allows the non-DT clock to be bound to the DT DSP device by using
-of_auxdata which renames the device to the same as the non-DT device
-name. This is required by the davinci remoteproc driver to properly
-acquire and enable the clock for this device.
+Changes in v4:
+ - Fix the build error when not enabling Media Controller API option.
+ - Fix the build error when not enabling V4L2 sub-device userspace API option.
 
-Validation done on OMAPL138 LCDK board. Supported features include
-basic load/boot (tested with rpmsg_client_sample) using external
-memory from the CMA pool.
+Changes in v3:
+ - Keep tried format info in the try_fmt member of
+   v4l2_subdev__pad_config struct.
+ - Add the internal_ops callback to set default format.
 
-regards
-Suman
+Changes in v2:
+ - Add the patch to support the get_fmt ops.
+ - Remove the redundant invoking ov7670_init_gpio().
 
-Suman Anna (3):
-  ARM: dts: da850: Add DSP node
-  ARM: dts: da850-lcdk: Add and enable CMA reserved pool for DSP
-  ARM: davinci: da8xx-dt: Add OF_DEV_AUXDATA entry for DSP clock
-    matching
+Wenyou Yang (3):
+  media: ov7670: Add entity pads initialization
+  media: ov7670: Add the get_fmt callback
+  media: ov7670: Add the s_power operation
 
- arch/arm/boot/dts/da850-lcdk.dts | 18 ++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi     | 12 ++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |  1 +
- 3 files changed, 31 insertions(+)
+ drivers/media/i2c/ov7670.c | 130 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 123 insertions(+), 7 deletions(-)
 
 -- 
-2.13.1
+2.13.0
