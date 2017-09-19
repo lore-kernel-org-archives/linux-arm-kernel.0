@@ -1,38 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Sep 2017 17:11:17 -0300
-Subject: [PATCH v4 4/6] ARM: dts: imx6dl-icore: Add LVDS support
-In-Reply-To: <CAMty3ZCQP5vnrU5MSzRFwRS+vS9a_ULt3sNB07BOHv0dCton0w@mail.gmail.com>
-References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
- <1505121145-9507-4-git-send-email-jteki@openedev.com>
- <CAOMZO5B0RAjdupLSe=S+tDEA-hpf-Si_4qjkcKC_ECX86PLScQ@mail.gmail.com>
- <CAMty3ZD3od1LXKai=kwq8hxGsa3EWcjQx5gyBtZvCM5ccC34ZQ@mail.gmail.com>
- <CAOMZO5C+DXAQu=2OUAquB2AKn8dOzadoPsdGD05hXAUBdTnYjQ@mail.gmail.com>
- <CAMty3ZCQP5vnrU5MSzRFwRS+vS9a_ULt3sNB07BOHv0dCton0w@mail.gmail.com>
-Message-ID: <CAOMZO5CwFV454Vt-LMMmjaJPatHXuONKshOPmJQVzR_mKuw1Aw@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 19 Sep 2017 15:06:13 -0500
+Subject: [PATCH] cpufreq: ti-cpufreq: Support additional am43xx platforms
+Message-ID: <20170919200613.31625-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 4:21 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+Rather than letting the ti-cpufreq driver match against 'ti,am4372'
+machine compatible during probe let's match against 'ti,am43' so that we
+can support both 'ti,am4372' and 'ti,am438x' platforms which both match
+to this compatible.
 
-> Yes, it is working..but need to understand how these respective
-> timings were calculated(because I need to add few more) . I tried this
-> supported ampire but couldn't get the data-sheet. Please point me if
-> you find any details.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ drivers/cpufreq/ti-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I don't have information about this panel.
-
-Maybe you could check with the author from commit:
-
-commit 1c550fa193d08920255240743f57731d4d57cd4d
-Author: Philipp Zabel <p.zabel@pengutronix.de>
-Date:   Wed Feb 11 18:50:09 2015 +0100
-
-    drm/panel: Add support for Ampire AM-800480R3TMQW-A1H 800x480 7" panel
-
-    This adds support for the AM-800480R3TMQW-A1H 7" 800x480 panel to the
-    DRM simple panel driver.
-
-    Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-    Signed-off-by: Thierry Reding <treding@nvidia.com>
-
-via dri-devel at lists.freedesktop.org list.
+diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+index b29cd3398463..4bf47de6101f 100644
+--- a/drivers/cpufreq/ti-cpufreq.c
++++ b/drivers/cpufreq/ti-cpufreq.c
+@@ -190,7 +190,7 @@ static int ti_cpufreq_setup_syscon_register(struct ti_cpufreq_data *opp_data)
+ 
+ static const struct of_device_id ti_cpufreq_of_match[] = {
+ 	{ .compatible = "ti,am33xx", .data = &am3x_soc_data, },
+-	{ .compatible = "ti,am4372", .data = &am4x_soc_data, },
++	{ .compatible = "ti,am43", .data = &am4x_soc_data, },
+ 	{ .compatible = "ti,dra7", .data = &dra7_soc_data },
+ 	{},
+ };
+-- 
+2.13.4
