@@ -1,120 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Sep 2017 09:46:21 -0500
-Subject: [PATCH 1/3] dt-bindings: Add document for rockchip RGB output
- interface
-In-Reply-To: <1505360600-196567-1-git-send-email-hjc@rock-chips.com>
-References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
- <1505360600-196567-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Sep 2017 14:47:18 +0100
+Subject: Applied "ASoC: zte: spdif: remove duplicate initialization of
+ dma_data" to the asoc tree
+In-Reply-To: <20170918085638.27110-1-colin.king@canonical.com>
+Message-ID: <E1duIru-0008PT-QD@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 11:43:18AM +0800, Sandy Huang wrote:
-> This path add support rv1108 rgb output interface driver.
-> 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> ---
->  .../bindings/display/rockchip/rockchip-rgb.txt     | 80 ++++++++++++++++++++++
->  1 file changed, 80 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> new file mode 100644
-> index 0000000..4164512
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> @@ -0,0 +1,80 @@
-> +Rockchip RV1108 RGB interface
-> +================================
-> +
-> +Required properties:
-> +- compatible: matching the soc type:
-> +	- "rockchip,rv1108-rgb";
-> +
-> +Optional properties:
-> +- pinctrl-names: must contain a "lcdc" entry.
-> +- pinctrl-0: pin control group to be used for this interface.
-> +
-> +Required nodes:
-> +- rockchip,rgb-mode: should be "p888", "p666", "p565", "s888", "s888-dummy"
+The patch
 
-This should be a standard property. Any device with a parallel interface 
-is going to need something like this.
+   ASoC: zte: spdif: remove duplicate initialization of dma_data
 
-> +	- p888: output r8-g8-b8 at each dclk cycle for per-pixel
-> +	- p666: output r6-g6-b6 at each dclk cycle for per-pixel
-> +	- p565: output r5-g6-b5 at each dclk cycle for per-pixel
-> +	- s888: output r8-g8-b8 in three dclk cycle for per-pixel
-> +	- s888-dmmy: output r8-g8-b8-dummy in four dclk cycle for per-pixel
-> +
-> +The rgb has two video ports described by:
-> +	Documentation/devicetree/bindings/media/video-interfaces.txt
-> +Their connections are modeled using the OF graph bindings specified in
-> +	Documentation/devicetree/bindings/graph.txt.
-> +
-> +- video port 0 for the VOP input, the remote endpoint maybe vopb/vopl/vop
-> +- video port 1 for either a panel or subsequent encoder
-> +
-> +the panel described by:
-> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> +Panel other required properties:
-> +- ports for remote rgb output.
-> +
-> +Example:
-> +
-> +panel: panel {
-> +	compatible = "auo,b101ean01";
-> +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
-> +
-> +	ports {
-> +		panel_in_rgb: endpoint {
-> +			remote-endpoint = <&rgb_out_panel>;
-> +		};
-> +	};
-> +};
-> +
-> +For Rockchip RV1108:
-> +
-> +	rgb: rgb {
-> +		compatible = "rockchip,rv1108-rgb";
-> +		pinctrl-names = "lcdc";
-> +		pinctrl-0 = <&lcdc_ctl>;
-> +		rockchip,rgb-mode = "p888";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			rgb_in: port at 0 {
-> +				reg = <0>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				rgb_in_vop: endpoint at 0 {
-> +					reg = <0>;
+has been applied to the asoc tree at
 
-Don't need reg for a single endpoint.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-> +					remote-endpoint = <&vop_out_rgb>;
-> +				};
-> +			};
-> +
-> +			rgb_out: port at 1 {
-> +				reg = <1>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				rgb_out_panel: endpoint at 0 {
-> +					reg = <0>;
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-ditto.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> +					remote-endpoint = <&panel_in_rgb>;
-> +				};
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.7.4
-> 
-> 
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From b6145837218cb984245aea5ccd9201aeb5eb0501 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Mon, 18 Sep 2017 09:56:38 +0100
+Subject: [PATCH] ASoC: zte: spdif: remove duplicate initialization of dma_data
+
+dma_data is being initialized twice, remove the unused first
+initialization and use the latter one instead.  Fixed clang warning:
+
+"warning: Value stored to 'dma_data' during its initialization is
+never read"
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/zte/zx-spdif.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/zte/zx-spdif.c b/sound/soc/zte/zx-spdif.c
+index b143f9f682d2..17b6ce35037a 100644
+--- a/sound/soc/zte/zx-spdif.c
++++ b/sound/soc/zte/zx-spdif.c
+@@ -139,11 +139,11 @@ static int zx_spdif_hw_params(struct snd_pcm_substream *substream,
+ {
+ 	struct zx_spdif_info *zx_spdif = dev_get_drvdata(socdai->dev);
+ 	struct zx_spdif_info *spdif = snd_soc_dai_get_drvdata(socdai);
+-	struct snd_dmaengine_dai_dma_data *dma_data = &zx_spdif->dma_data;
++	struct snd_dmaengine_dai_dma_data *dma_data =
++		snd_soc_dai_get_dma_data(socdai, substream);
+ 	u32 val, ch_num, rate;
+ 	int ret;
+ 
+-	dma_data = snd_soc_dai_get_dma_data(socdai, substream);
+ 	dma_data->addr_width = params_width(params) >> 3;
+ 
+ 	val = readl_relaxed(zx_spdif->reg_base + ZX_CTRL);
+-- 
+2.14.1
