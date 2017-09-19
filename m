@@ -1,58 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Sep 2017 15:09:20 +0100
-Subject: [PATCH 2/2] tee: optee: allow selection of ti-smc as a calling
- method
-In-Reply-To: <20170918205005.30235-2-afd@ti.com>
-References: <20170918205005.30235-1-afd@ti.com>
- <20170918205005.30235-2-afd@ti.com>
-Message-ID: <20170919140920.GG30715@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 19 Sep 2017 16:12:10 +0200
+Subject: [PATCH v2] arm64: dts: marvell: Fix A37xx UART0 register size
+In-Reply-To: <20170907130453.25497-1-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Thu, 7 Sep 2017 15:04:53 +0200")
+References: <20170907130453.25497-1-miquel.raynal@free-electrons.com>
+Message-ID: <87bmm6srph.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 03:50:05PM -0500, Andrew F. Davis wrote:
-> On TI platforms OP-TEE must be called using a modified SMC call,
-> allow the selection of this though DT.
-> 
-> Signed-off-by: Andrew F. Davis <afd@ti.com>
-> ---
->  Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt | 2 ++
->  drivers/tee/optee/core.c                                           | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt b/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
-> index d38834c67dff..a3275ecdf186 100644
-> --- a/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
-> +++ b/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
-> @@ -20,6 +20,8 @@ the reference implementation maintained by Linaro.
->                     "hvc" : HVC #0, with the register assignments specified
->  		           in drivers/tee/optee/optee_smc.h
->  
-> +                   "ti-smc" : Similar to "smc" with TI specific register
-> +		              adjustments
+Hi Miquel,
+ 
+ On jeu., sept. 07 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-... which are what, exactly? Specified where?
+> From: allen yan <yanwei@marvell.com>
+>
+> Armada-37xx UART0 registers are 0x200 bytes wide. Right next to them are
+> the UART1 registers that should not be declared in this node.
+>
+> Update the example in DT bindings document accordingly.
+>
+> Signed-off-by: allen yan <yanwei@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
-As Rob said, this should really have a new compat string.
+Applied on mvebu/dt64
 
 Thanks,
-Mark.
 
->  
->  
+Gregory
+
+> ---
+>
+> Change since first version: re-added original author 'Signed-off-by'.
+>
+>  Documentation/devicetree/bindings/serial/mvebu-uart.txt | 2 +-
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+> index 6087defd9f93..d37fabe17bd1 100644
+> --- a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+> +++ b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
+> @@ -8,6 +8,6 @@ Required properties:
 >  Example:
-> diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-> index 7952357df9c8..dfa9de590d98 100644
-> --- a/drivers/tee/optee/core.c
-> +++ b/drivers/tee/optee/core.c
-> @@ -441,6 +441,8 @@ static optee_invoke_fn *get_invoke_func(struct device_node *np)
->  		return optee_smccc_hvc;
->  	else if (!strcmp("smc", method))
->  		return optee_smccc_smc;
-> +	else if (!strcmp("ti-smc", method))
-> +		return arm_ti_smccc_smc;
+>  	serial at 12000 {
+>  		compatible = "marvell,armada-3700-uart";
+> -		reg = <0x12000 0x400>;
+> +		reg = <0x12000 0x200>;
+>  		interrupts = <43>;
+>  	};
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index 51763d674050..9e558801266a 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -129,7 +129,7 @@
 >  
->  	pr_warn("invalid \"method\" property: %s\n", method);
->  	return ERR_PTR(-EINVAL);
+>  			uart0: serial at 12000 {
+>  				compatible = "marvell,armada-3700-uart";
+> -				reg = <0x12000 0x400>;
+> +				reg = <0x12000 0x200>;
+>  				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>  				status = "disabled";
+>  			};
 > -- 
-> 2.14.1
-> 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
