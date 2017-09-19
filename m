@@ -1,71 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 19 Sep 2017 11:05:35 -0700
-Subject: [PATCH v4 0/3] Add support for BCM7271 style interrupt controller
-In-Reply-To: <20170919010000.32072-1-opendmb@gmail.com>
-References: <20170919010000.32072-1-opendmb@gmail.com>
-Message-ID: <db82458e-5656-1eb2-b4b8-051cc12e7095@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 19 Sep 2017 19:10:00 +0100
+Subject: [PATCH 1/2] ARM: dts: exynos: Add dwc3 SUSPHY quirk
+In-Reply-To: <20170919174038.2sspjvadt6ggka65@kozik-lap>
+References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20170918100230eucas1p29fae00c53f1106af1961a6e269740b2f@eucas1p2.samsung.com>
+ <1505728934-6200-2-git-send-email-andrzej.p@samsung.com>
+ <20170919174038.2sspjvadt6ggka65@kozik-lap>
+Message-ID: <fcefaaab-b99c-a8cc-9684-98cc3c4d803e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2017 05:59 PM, Doug Berger wrote:
-> This patch set extends the functionality of the irq-brcmstb-l2 interrupt
-> controller driver to cover a hardware variant first introduced in the
-> BCM7271 SoC.  The main difference between this variant and the block
-> found in earlier brcmstb SoCs is that this variant only supports level
-> sensitive interrupts and therefore does not latch the interrupt state
-> based on edges.  Since there is no longer a need to ack interrupts with
-> a register write to clear the latch the register map has been changed.
+On 19/09/17 18:40, Krzysztof Kozlowski wrote:
+> On Mon, Sep 18, 2017 at 12:02:13PM +0200, Andrzej Pietrasiewicz wrote:
+>> Odroid XU4 board does not enumerate SuperSpeed devices.
+>> This patch makes exynos5 series chips use USB SUSPHY quirk,
+>> which solves the problem.
+>>
+>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos54xx.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
 > 
-> Therefore the change to add support for the new hardware block is to
-> abstract the register accesses to accommodate different maps and to
-> identify the block with a new device-tree compatible string.
-> 
-> I also took the opportunity to make some small efficiency enhancements
-> to the driver.  One of these was to make use of the slightly more
-> efficient irq_mask_ack method.  However, I discovered that the defined
-> irq_gc_mask_disable_reg_and_ack() generic irq function was insufficient
-> for my needs.  Previous submissions offered candidate solutions to
-> address my needs within the generic irqchip library, but since those
-> submissions appear to have stalled I am submitting this version that
-> includes the function in the driver to prevent controversy and allow
-> the new functionality to be included. 
+> Makes sense to me... was it tested also on XU3 and XU?
 
-For this entire series:
+Well, it at least doesn't make USB3 on my XU any more or less broken
+than it was before ;) (both ports still report an over-current condition
+even with nothing plugged in - I suspect there's probably still some
+pinctrl/regulator stuff missing)
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-
-Thanks Doug.
+Robin.
 
 > 
-> Changes in v4:
+> Best regards,
+> Krzysztof
 > 
-> - The first three commits were removed from the patch set to remove any
->   dependencies on changing the generic irqchip or irqchip-tango imple-
->   mentations. If there is a will to make those changes in the future
->   they can be applied at that time, but they needn't hold up the accept-
->   ance of this patch set.
->   
-> Changes in v3:
+>>
+>> diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
+>> index 0389e8a..8ca4fef 100644
+>> --- a/arch/arm/boot/dts/exynos54xx.dtsi
+>> +++ b/arch/arm/boot/dts/exynos54xx.dtsi
+>> @@ -134,6 +134,7 @@
+>>  				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>>  				phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
+>>  				phy-names = "usb2-phy", "usb3-phy";
+>> +				snps,dis_u3_susphy_quirk;
+>>  			};
+>>  		};
+>>  
+>> @@ -154,6 +155,7 @@
+>>  				reg = <0x12400000 0x10000>;
+>>  				phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
+>>  				phy-names = "usb2-phy", "usb3-phy";
+>> +				snps,dis_u3_susphy_quirk;
+>>  			};
+>>  		};
+>>  
+>> -- 
+>> 1.9.1
+>>
 > 
-> - I did not submit a v3 patch set, but Marc Gonzalez included a PATCH v3
->   in a response to the v2 patch so I am skipping ahead to v4 to avoid
->   confusion.
->   
-> Changes in v2:
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> - removed unused permutations of irq_mask_ack methods
-> - added Reviewed-by and Acked-by responses from first submission
-> 
-> Doug Berger (3):
->   irqchip: brcmstb-l2: Remove some processing from the handler
->   irqchip: brcmstb-l2: Abstract register accesses
->   irqchip: brcmstb-l2: Add support for the BCM7271 L2 controller
-> 
->  .../bindings/interrupt-controller/brcm,l2-intc.txt |   3 +-
->  drivers/irqchip/irq-brcmstb-l2.c                   | 171 +++++++++++++++------
->  2 files changed, 126 insertions(+), 48 deletions(-)
-> 
-
-
--- 
-Florian
