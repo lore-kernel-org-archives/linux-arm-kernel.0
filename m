@@ -1,67 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Sep 2017 15:19:54 +0100
-Subject: [PATCH 1/2] ARM: smccc-call: Use r12 to route secure monitor
- calls on TI platforms
-In-Reply-To: <20170918205005.30235-1-afd@ti.com>
-References: <20170918205005.30235-1-afd@ti.com>
-Message-ID: <20170919141953.GH30715@leverpostej>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 19 Sep 2017 10:23:43 -0400
+Subject: [RFC] iommu: arm-smmu: stall support
+In-Reply-To: <20170919123038.GF8398@8bytes.org>
+References: <20170914194444.32551-1-robdclark@gmail.com>
+ <20170919123038.GF8398@8bytes.org>
+Message-ID: <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 03:50:04PM -0500, Andrew F. Davis wrote:
-> Our ROM Secure Monitor(SM) uses the value in r12 to determine which
-> service is being requested by an SMC call. This inline with the ARM
-> recommended SMC Calling Convention(SMCCC), which partitions the values
-> in R0 for this task, OP-TEE's SM follows the ARM recommended convention.
+On Tue, Sep 19, 2017 at 8:30 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> Hi Rob,
+>
+> thanks for the RFC patch. I have some comments about the interface to
+> the IOMMU-API below.
+>
+> On Thu, Sep 14, 2017 at 03:44:33PM -0400, Rob Clark wrote:
+>> +/**
+>> + * iommu_domain_resume - Resume translations for a domain after a fault.
+>> + *
+>> + * This can be called at some point after the fault handler is called,
+>> + * allowing the user of the IOMMU to (for example) handle the fault
+>> + * from a task context.  It is illegal to call this if
+>> + * iommu_domain_set_attr(STALL) failed.
+>> + *
+>> + * @domain:    the domain to resume
+>> + * @terminate: if true, the translation that triggered the fault should
+>> + *    be terminated, else it should be retried.
+>> + */
+>> +void iommu_domain_resume(struct iommu_domain *domain, bool terminate)
+>> +{
+>> +     /* invalid to call if iommu_domain_set_attr(STALL) failed: */
+>> +     if (WARN_ON(!domain->ops->domain_resume))
+>> +             return;
+>> +     domain->ops->domain_resume(domain, terminate);
+>> +}
+>> +EXPORT_SYMBOL_GPL(iommu_domain_resume);
+>
+> So this function is being called by the device driver owning the domain,
+> right?
 
-I can't parse this last sentence. What exactly is inline with the SMCCC?
+yes, this was my plan
 
-AFAICT, the SMCCC says r12 is "The Intra-Procedure-call scratch
-register", which is not a paramter, service ID, etc.
+> I don't think that the resume call-back you added needs to be exposed
+> like this. It is better to do the page-fault handling completly in the
+> iommu-code, including calling the resume call-back and just let the
+> device-driver provide a per-domain call-back to let it handle the fault
+> and map in the required pages.
 
-> We need a way to signal that a call is for the OP-TEE SM and not for
-> the ROM SM in a way that is safe for the ROM SM, in case it is still
-> present. We do this by putting a value of 0x200 in r12 when the call
-> is for OP-TEE or any other ARM by modifying the SMCCC caller function.
+I would like to decide in the IRQ whether or not to queue work or not,
+because when we get a gpu fault, we tend to get 1000's of gpu faults
+all at once (and I really only need to handle the first one).  I
+suppose that could also be achieved by having a special return value
+from the fault handler to say "call me again from a wq"..
 
-So IIUC, you have a secure monitor which is not SMCCC compliant, but you
-want to use it at the same time as OP-TEE, which is SMCCC compliant.
+Note that in the drm driver I already have a suitable wq to queue the
+work, so it really doesn't buy me anything to have the iommu driver
+toss things off to a wq for me.  Might be a different situation for
+other drivers (but I guess mostly other drivers are using iommu API
+indirectly via dma-mapping?)
 
-It would be much better to have a new version of that monitor that was
-SMCCC compliant, and have to update the code for that, than to have to
-move OP-TEE away from standards compliance.
+> The interface could look like this:
+>
+>         * New function iommu_domain_enable_stalls(domain) - When
+>           this function returns the domain is in stall-handling mode. A
+>           iommu_domain_disable_stalls() might make sense too, not sure
+>           about that.
 
-> There are four combinations of events:
-> 
-> If the ROM SM is present and we make a legacy style SMC call, as we
-> do in early boot, the call will not have r12 set to 0x200 as these
-> calls go through existing mach-omap2/ SMC handlers, so all is well.
-> 
-> If the ROM SM is present and we make an SMCCC style call, r12 will be
-> set to 0x200 and ROM SM will see this as an invalid service call and
-> safely return to the normal world.
+I don't particularly see a use-case for disabling stalls, fwiw
 
-So you're going to describe OP-TEE as present even when it's not!?
+BR,
+-R
 
-That's simply wrong.
-
-> If OP-TEE is present and we make a legacy style SMC call, r12 will
-> not be set to 0x200, and OP-TEE will emulate the functionality that
-> the call is requesting.
-
-AFAICT this means that OP-TEE completely replaces your existing monitor.
-
-Please fix this properly. Implement SMCCC-compliant versions of those
-calls you wish to retain, and come up with a new binding for those.
-Describe that in the DT for systems which have OP-TEE providing these
-services.
-
-Systems with the old monitor should have that descrbied in their DT, and
-not OP-TEE.
-
-That completely removes the need to come up with a new OP-TEE binding
-extension, and aligns your FW for forward compatibility with future
-services.
-
-Thanks,
-Mark.
+>         * When stalls are enabled for a domain, report_iommu_fault()
+>           queues the fault to a workqueue (so that its handler can
+>           block) and in the workqueue you call ->resume() based on the
+>           return value of the handler.
+>
+> As a side-note, as there has been discussion on this: For now it doesn't
+> make sense to merge this with the SVM page-fault handling efforts, as
+> this path is different enough (SVM will call handle_mm_fault() as the
+> handler, for example).
+>
+>
+> Regards,
+>
+>         Joerg
+>
