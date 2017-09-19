@@ -1,184 +1,152 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Mon, 18 Sep 2017 18:00:00 -0700
-Subject: [PATCH v4 3/3] irqchip: brcmstb-l2: Add support for the BCM7271 L2
- controller
-In-Reply-To: <20170919010000.32072-1-opendmb@gmail.com>
-References: <20170919010000.32072-1-opendmb@gmail.com>
-Message-ID: <20170919010000.32072-4-opendmb@gmail.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Tue, 19 Sep 2017 09:03:47 +0800
+Subject: [PATCH 4/6] Topology: Add cluster on die macros and arm64 decoding
+In-Reply-To: <8e145e4b-e1d2-cb15-2cf9-cace5fed524f@arm.com>
+References: <20170914184918.20406-1-jeremy.linton@arm.com>
+ <20170914184918.20406-5-jeremy.linton@arm.com>
+ <e95a0b2a-9dd0-654a-20fe-cad1cf0eed94@huawei.com>
+ <8e145e4b-e1d2-cb15-2cf9-cace5fed524f@arm.com>
+Message-ID: <1e41b605-371b-ee54-f251-ad58082d236e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initialization of the generic irq chip for the BCM7271 L2
-interrupt controller.  This controller only supports level
-interrupts and uses the "brcm,bcm7271-l2-intc" compatibility
-string.
+Hi Jeremy,
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- .../bindings/interrupt-controller/brcm,l2-intc.txt |  3 +-
- drivers/irqchip/irq-brcmstb-l2.c                   | 86 ++++++++++++++++------
- 2 files changed, 66 insertions(+), 23 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-index 448273a30a11..36df06c5c567 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-@@ -2,7 +2,8 @@ Broadcom Generic Level 2 Interrupt Controller
- 
- Required properties:
- 
--- compatible: should be "brcm,l2-intc"
-+- compatible: should be "brcm,l2-intc" for latched interrupt controllers
-+              should be "brcm,bcm7271-l2-intc" for level interrupt controllers
- - reg: specifies the base physical address and size of the registers
- - interrupt-controller: identifies the node as an interrupt controller
- - #interrupt-cells: specifies the number of cells needed to encode an
-diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-index 8d54cd7a090d..691d20eb0bec 100644
---- a/drivers/irqchip/irq-brcmstb-l2.c
-+++ b/drivers/irqchip/irq-brcmstb-l2.c
-@@ -31,13 +31,34 @@
- #include <linux/irqchip.h>
- #include <linux/irqchip/chained_irq.h>
- 
--/* Register offsets in the L2 interrupt controller */
--#define CPU_STATUS	0x00
--#define CPU_SET		0x04
--#define CPU_CLEAR	0x08
--#define CPU_MASK_STATUS	0x0c
--#define CPU_MASK_SET	0x10
--#define CPU_MASK_CLEAR	0x14
-+struct brcmstb_intc_init_params {
-+	irq_flow_handler_t handler;
-+	int cpu_status;
-+	int cpu_clear;
-+	int cpu_mask_status;
-+	int cpu_mask_set;
-+	int cpu_mask_clear;
-+};
-+
-+/* Register offsets in the L2 latched interrupt controller */
-+static const struct brcmstb_intc_init_params l2_edge_intc_init = {
-+	.handler		= handle_edge_irq,
-+	.cpu_status		= 0x00,
-+	.cpu_clear		= 0x08,
-+	.cpu_mask_status	= 0x0c,
-+	.cpu_mask_set		= 0x10,
-+	.cpu_mask_clear		= 0x14
-+};
-+
-+/* Register offsets in the L2 level interrupt controller */
-+static const struct brcmstb_intc_init_params l2_lvl_intc_init = {
-+	.handler		= handle_level_irq,
-+	.cpu_status		= 0x00,
-+	.cpu_clear		= -1, /* Register not present */
-+	.cpu_mask_status	= 0x04,
-+	.cpu_mask_set		= 0x08,
-+	.cpu_mask_clear		= 0x0C
-+};
- 
- /* L2 intc private data structure */
- struct brcmstb_l2_intc_data {
-@@ -128,7 +149,7 @@ static void brcmstb_l2_intc_resume(struct irq_data *d)
- 	struct brcmstb_l2_intc_data *b = gc->private;
- 
- 	irq_gc_lock(gc);
--	if (ct->chip.irq_ack != irq_gc_noop) {
-+	if (ct->chip.irq_ack) {
- 		/* Clear unmasked non-wakeup interrupts */
- 		irq_reg_writel(gc, ~b->saved_mask & ~gc->wake_active,
- 				ct->regs.ack);
-@@ -141,7 +162,9 @@ static void brcmstb_l2_intc_resume(struct irq_data *d)
- }
- 
- static int __init brcmstb_l2_intc_of_init(struct device_node *np,
--					  struct device_node *parent)
-+					  struct device_node *parent,
-+					  const struct brcmstb_intc_init_params
-+					  *init_params)
- {
- 	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
- 	struct brcmstb_l2_intc_data *data;
-@@ -163,12 +186,12 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 	}
- 
- 	/* Disable all interrupts by default */
--	writel(0xffffffff, base + CPU_MASK_SET);
-+	writel(0xffffffff, base + init_params->cpu_mask_set);
- 
- 	/* Wakeup interrupts may be retained from S5 (cold boot) */
- 	data->can_wake = of_property_read_bool(np, "brcm,irq-can-wake");
--	if (!data->can_wake)
--		writel(0xffffffff, base + CPU_CLEAR);
-+	if (!data->can_wake && (init_params->cpu_clear >= 0))
-+		writel(0xffffffff, base + init_params->cpu_clear);
- 
- 	parent_irq = irq_of_parse_and_map(np, 0);
- 	if (!parent_irq) {
-@@ -193,7 +216,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 
- 	/* Allocate a single Generic IRQ chip for this node */
- 	ret = irq_alloc_domain_generic_chips(data->domain, 32, 1,
--				np->full_name, handle_edge_irq, clr, 0, flags);
-+			np->full_name, init_params->handler, clr, 0, flags);
- 	if (ret) {
- 		pr_err("failed to allocate generic irq chip\n");
- 		goto out_free_domain;
-@@ -206,21 +229,26 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 	data->gc = irq_get_domain_generic_chip(data->domain, 0);
- 	data->gc->reg_base = base;
- 	data->gc->private = data;
--	data->status_offset = CPU_STATUS;
--	data->mask_offset = CPU_MASK_STATUS;
-+	data->status_offset = init_params->cpu_status;
-+	data->mask_offset = init_params->cpu_mask_status;
- 
- 	ct = data->gc->chip_types;
- 
--	ct->chip.irq_ack = irq_gc_ack_set_bit;
--	ct->regs.ack = CPU_CLEAR;
-+	if (init_params->cpu_clear >= 0) {
-+		ct->regs.ack = init_params->cpu_clear;
-+		ct->chip.irq_ack = irq_gc_ack_set_bit;
-+		ct->chip.irq_mask_ack = brcmstb_l2_mask_and_ack;
-+	} else {
-+		/* No Ack - but still slightly more efficient to define this */
-+		ct->chip.irq_mask_ack = irq_gc_mask_disable_reg;
-+	}
- 
- 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
--	ct->chip.irq_mask_ack = brcmstb_l2_mask_and_ack;
--	ct->regs.disable = CPU_MASK_SET;
--	ct->regs.mask = CPU_MASK_STATUS;
-+	ct->regs.disable = init_params->cpu_mask_set;
-+	ct->regs.mask = init_params->cpu_mask_status;
- 
- 	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
--	ct->regs.enable = CPU_MASK_CLEAR;
-+	ct->regs.enable = init_params->cpu_mask_clear;
- 
- 	ct->chip.irq_suspend = brcmstb_l2_intc_suspend;
- 	ct->chip.irq_resume = brcmstb_l2_intc_resume;
-@@ -247,4 +275,18 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 	kfree(data);
- 	return ret;
- }
--IRQCHIP_DECLARE(brcmstb_l2_intc, "brcm,l2-intc", brcmstb_l2_intc_of_init);
-+
-+int __init brcmstb_l2_edge_intc_of_init(struct device_node *np,
-+	struct device_node *parent)
-+{
-+	return brcmstb_l2_intc_of_init(np, parent, &l2_edge_intc_init);
-+}
-+IRQCHIP_DECLARE(brcmstb_l2_intc, "brcm,l2-intc", brcmstb_l2_edge_intc_of_init);
-+
-+int __init brcmstb_l2_lvl_intc_of_init(struct device_node *np,
-+	struct device_node *parent)
-+{
-+	return brcmstb_l2_intc_of_init(np, parent, &l2_lvl_intc_init);
-+}
-+IRQCHIP_DECLARE(bcm7271_l2_intc, "brcm,bcm7271-l2-intc",
-+	brcmstb_l2_lvl_intc_of_init);
--- 
-2.14.1
+On 2017/9/19 2:54, Jeremy Linton wrote:
+> Hi,
+> 
+> 
+> On 09/17/2017 08:50 PM, Xiongfeng Wang wrote:
+>> Hi Jeremy,
+>>
+>> On 2017/9/15 2:49, Jeremy Linton wrote:
+>>> Many modern machines have cluster on die (COD) non-uniformity
+>>> as well as the traditional multi-socket architectures. Reusing
+>>> the multi-socket or NUMA on die concepts for these (as arm64 does)
+>>> breaks down when presented with actual multi-socket/COD machines.
+>>> Similar, problems are also visible on some x86 machines so it
+>>> seems appropriate to start abstracting and making these topologies
+>>> visible.
+>>>
+>>> To start, a topology_cod_id() macro is added which defaults to returning
+>>> the same information as topology_physical_package_id(). Moving forward
+>>> we can start to spit out the differences.
+>>>
+>>> For arm64, an additional package_id is added to the cpu_topology array.
+>>> Initially this will be equal to the cluster_id as well.
+>>>
+>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>> ---
+>>>   arch/arm64/include/asm/topology.h | 4 +++-
+>>>   arch/arm64/kernel/topology.c      | 8 ++++++--
+>>>   include/linux/topology.h          | 3 +++
+>>>   3 files changed, 12 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+>>> index 8b57339823e9..bd7517960d39 100644
+>>> --- a/arch/arm64/include/asm/topology.h
+>>> +++ b/arch/arm64/include/asm/topology.h
+>>> @@ -7,13 +7,15 @@ struct cpu_topology {
+>>>       int thread_id;
+>>>       int core_id;
+>>>       int cluster_id;
+>>> +    int package_id;
+>>>       cpumask_t thread_sibling;
+>>>       cpumask_t core_sibling;
+>>>   };
+>>
+>> 'core_sibling' will be updated by 'update_siblings_masks()' to represent cores in a cluster;
+>> Can we add a cpumask_t field to represent cores in a package? So that 'lstopo' can use this
+>> cpumask_t to display the right information.
+> 
+> So, the change below modifies update_siblings_mask() to utilize the package_id. Per the ABI the ..cpuX/topology/physical_package_id is shared between the core_siblings/core_siblings_list. What physical_package_id means can vary per architecture, but the siblings list needs to be the cores with the same phyiscal_package (AFAIK, feel free to correct my understanding). That rule should be enforced by this patch set.
+> 
+> I suspect if your running these patches, and the lstopo output looks strange its because your on a machine where the thread_id has been assigned the cluster_id in the later patch set.
+> 
+Sorry, I didn't notice your change in 'update_siblings_masks()' before, so 'core_sibling' are represent cores in a package now.
+But we may need another cpumask_t field to represent cores in a cluster, so that the scheduler can use it to build a sched_domain
+only with cores in one cluster.
+> 
+>>
+>> Thanks,
+>> Xiongfeng Wang
+>>
+>>>     extern struct cpu_topology cpu_topology[NR_CPUS];
+>>>   -#define topology_physical_package_id(cpu)    (cpu_topology[cpu].cluster_id)
+>>> +#define topology_physical_package_id(cpu)    (cpu_topology[cpu].package_id)
+>>> +#define topology_cod_id(cpu)        (cpu_topology[cpu].cluster_id)
+>>>   #define topology_core_id(cpu)        (cpu_topology[cpu].core_id)
+>>>   #define topology_core_cpumask(cpu)    (&cpu_topology[cpu].core_sibling)
+>>>   #define topology_sibling_cpumask(cpu)    (&cpu_topology[cpu].thread_sibling)
+>>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>>> index 8d48b233e6ce..9147e5b6326d 100644
+>>> --- a/arch/arm64/kernel/topology.c
+>>> +++ b/arch/arm64/kernel/topology.c
+>>> @@ -67,6 +67,8 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>>>               leaf = false;
+>>>               cpu = get_cpu_for_node(t);
+>>>               if (cpu >= 0) {
+>>> +                /* maintain DT cluster == package behavior */
+>>> +                cpu_topology[cpu].package_id = cluster_id;
+>>>                   cpu_topology[cpu].cluster_id = cluster_id;
+>>>                   cpu_topology[cpu].core_id = core_id;
+>>>                   cpu_topology[cpu].thread_id = i;
+>>> @@ -88,7 +90,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>>>                      core);
+>>>               return -EINVAL;
+>>>           }
+>>> -
+>>> +        cpu_topology[cpu].package_id = cluster_id;
+>>>           cpu_topology[cpu].cluster_id = cluster_id;
+>>>           cpu_topology[cpu].core_id = core_id;
+>>>       } else if (leaf) {
+>>> @@ -228,7 +230,7 @@ static void update_siblings_masks(unsigned int cpuid)
+>>>       for_each_possible_cpu(cpu) {
+>>>           cpu_topo = &cpu_topology[cpu];
+>>>   -        if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
+>>> +        if (cpuid_topo->package_id != cpu_topo->package_id)
+> 
+> (note here that core_siblings now reflect the package_id rather than the cluster_id. This only matters if cluster_id!=package_id).
+> 
+>>>               continue;
+>>>             cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+>>> @@ -273,6 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
+>>>                        MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
+>>>                        MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+>>>       }
+>>> +    cpuid_topo->package_id = cpuid_topo->cluster_id;
+>>>         pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
+>>>            cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
+>>> @@ -292,6 +295,7 @@ static void __init reset_cpu_topology(void)
+>>>           cpu_topo->thread_id = -1;
+>>>           cpu_topo->core_id = 0;
+>>>           cpu_topo->cluster_id = -1;
+>>> +        cpu_topo->package_id = -1;
+>>>             cpumask_clear(&cpu_topo->core_sibling);
+>>>           cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+>>> diff --git a/include/linux/topology.h b/include/linux/topology.h
+>>> index cb0775e1ee4b..4660749a7303 100644
+>>> --- a/include/linux/topology.h
+>>> +++ b/include/linux/topology.h
+>>> @@ -184,6 +184,9 @@ static inline int cpu_to_mem(int cpu)
+>>>   #ifndef topology_physical_package_id
+>>>   #define topology_physical_package_id(cpu)    ((void)(cpu), -1)
+>>>   #endif
+>>> +#ifndef topology_cod_id                /* cluster on die */
+>>> +#define topology_cod_id(cpu)            topology_physical_package_id(cpu)
+>>> +#endif
+>>>   #ifndef topology_core_id
+>>>   #define topology_core_id(cpu)            ((void)(cpu), 0)
+>>>   #endif
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> 
+> .
+> 
