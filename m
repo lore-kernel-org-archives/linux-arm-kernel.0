@@ -1,62 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 17:08:56 +0100
-Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170919152253.tvj3hheggrx4lgig@dell>
-References: <20170913193723.16234-1-robert.jarzmik@free.fr>
- <20170913193723.16234-3-robert.jarzmik@free.fr>
- <20170914074146.dnibkvom4yuzejf3@dell>
- <20170914074300.iobuwn2hrmnf6sen@dell>
- <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
- <20170918085236.z6gmgrwvsjvvc4cd@dell>
- <20170919121539.mz2mettkefxf3oer@sirena.co.uk>
- <20170919152253.tvj3hheggrx4lgig@dell>
-Message-ID: <20170919160856.756pwipflx4jt42y@sirena.co.uk>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Tue, 19 Sep 2017 16:09:33 +0000
+Subject: [PATCH v7 1/5] Doc: iommu/arm-smmu-v3: Add workaround for
+ HiSilicon erratum 161010801
+In-Reply-To: <20170919145314.2irmqpsfneeydupo@rob-hp-laptop>
+References: <20170914125756.14836-1-shameerali.kolothum.thodi@huawei.com>
+ <20170914125756.14836-2-shameerali.kolothum.thodi@huawei.com>
+ <20170919145314.2irmqpsfneeydupo@rob-hp-laptop>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838411AD3@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 04:22:53PM +0100, Lee Jones wrote:
 
-> However, since this is a new driver, you can just take it with my:
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Tuesday, September 19, 2017 3:53 PM
+> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> sudeep.holla at arm.com; will.deacon at arm.com; robin.murphy at arm.com;
+> joro at 8bytes.org; mark.rutland at arm.com; hanjun.guo at linaro.org; Gabriele
+> Paoloni <gabriele.paoloni@huawei.com>; John Garry
+> <john.garry@huawei.com>; iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org; linux-acpi at vger.kernel.org;
+> devicetree at vger.kernel.org; devel at acpica.org; Linuxarm
+> <linuxarm@huawei.com>; Wangzhou (B) <wangzhou1@hisilicon.com>;
+> Guohanjun (Hanjun Guo) <guohanjun@huawei.com>
+> Subject: Re: [PATCH v7 1/5] Doc: iommu/arm-smmu-v3: Add workaround for
+> HiSilicon erratum 161010801
+> 
+> On Thu, Sep 14, 2017 at 01:57:52PM +0100, Shameer Kolothum wrote:
+> > From: John Garry <john.garry@huawei.com>
+> >
+> > The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> platforms
+> > hip06/hip07 to support the SMMU mappings for MSI transactions.
+> >
+> > On these platforms, GICv3 ITS translator is presented with the deviceID
+> > by extending the MSI payload data to 64 bits to include the deviceID.
+> > Hence, the PCIe controller on this platforms has to differentiate the MSI
+> > payload against other DMA payload and has to modify the MSI payload.
+> > This basically makes it difficult for this platforms to have a SMMU
+> > translation for MSI.
+> >
+> > This patch adds a SMMUv3 binding to flag that the SMMU breaks msi
+> > translation at ITS.
+> >
+> > Also, the arm64 silicon errata is updated with this same erratum.
+> >
+> > Signed-off-by: John Garry <john.garry@huawei.com>
+> > Signed-off-by: Shameer Kolothum
+> <shameerali.kolothum.thodi@huawei.com>
+[...]
+> > --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> > @@ -55,6 +55,9 @@ the PCIe specification.
+> >  - hisilicon,broken-prefetch-cmd
+> >                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
+> >
+> > +- hisilicon,broken-untranslated-msi
+> > +                    : Reserve ITS HW region to avoid translating msi.
+> > +
+> 
+> This should be determined from the compatible string. Continuing to add
+> properties for each errata doesn't scale.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+Ok. I think the suggestion here is to follow the arm-smmu.c (SMMUv1/v2) 
+driver way of implementing the errata. As you might have noticed,  the 
+SMMUv3 driver dt errata framework depends on properties  and this will
+change the way errata is implemented in the driver now.
 
-are available in the git repository at:
+Hi Will/Robin,
+Could you please take a look and let us know your thoughts on changing
+the SMMUv3 dt errata implementation to version/model/compatible string
+framework for this quirk.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git tags/wm97xx-mfd
-
-for you to fetch changes up to ae9d1b5fbd7b7ee1c2d2f62a7cee3c0455e06f94:
-
-  Input: wm97xx: add new AC97 bus support (2017-09-19 17:07:28 +0100)
-
-----------------------------------------------------------------
-mfd/Input: Changes for the new wm97xx MFD
-
-The newly added proper driver model support for ac97 means we can now
-have a real MFD for the wm97xx devices rather than the hacks that have
-been used.  Since they're mainly audio devices they're going via ASoC,
-these are the other changes for cross tree merging.
-
-----------------------------------------------------------------
-Robert Jarzmik (3):
-      Input: wm97xx: split out touchscreen registering
-      mfd: wm97xx-core: core support for wm97xx Codec
-      Input: wm97xx: add new AC97 bus support
-
- drivers/input/touchscreen/Kconfig       |   2 +-
- drivers/input/touchscreen/wm97xx-core.c | 252 +++++++++++++++-------
- drivers/mfd/Kconfig                     |  14 ++
- drivers/mfd/Makefile                    |   1 +
- drivers/mfd/wm97xx-core.c               | 366 ++++++++++++++++++++++++++++++++
- include/linux/mfd/wm97xx.h              |  25 +++
- 6 files changed, 577 insertions(+), 83 deletions(-)
- create mode 100644 drivers/mfd/wm97xx-core.c
- create mode 100644 include/linux/mfd/wm97xx.h
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/c134c705/attachment.sig>
+Thanks,
+Shameer
