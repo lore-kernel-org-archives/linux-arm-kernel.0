@@ -1,66 +1,25 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 19 Sep 2017 14:30:38 +0200
-Subject: [RFC] iommu: arm-smmu: stall support
-In-Reply-To: <20170914194444.32551-1-robdclark@gmail.com>
-References: <20170914194444.32551-1-robdclark@gmail.com>
-Message-ID: <20170919123038.GF8398@8bytes.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 19 Sep 2017 07:32:22 -0500
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <20170919070422.GI3349@codeaurora.org>
+ <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+Message-ID: <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 9/19/17 3:15 AM, Linus Walleij wrote:
+> Oh we already have that I think, Mika Westerberg and Andy Shevcheno
+> implemented that for anyone using CONFIG_GPIOLIB_IRQCHIP, and
+> this driver does. Timur please check: irq_need_valid_mask, irq_valid_mask
+> usage.
 
-thanks for the RFC patch. I have some comments about the interface to
-the IOMMU-API below.
-
-On Thu, Sep 14, 2017 at 03:44:33PM -0400, Rob Clark wrote:
-> +/**
-> + * iommu_domain_resume - Resume translations for a domain after a fault.
-> + *
-> + * This can be called at some point after the fault handler is called,
-> + * allowing the user of the IOMMU to (for example) handle the fault
-> + * from a task context.  It is illegal to call this if
-> + * iommu_domain_set_attr(STALL) failed.
-> + *
-> + * @domain:    the domain to resume
-> + * @terminate: if true, the translation that triggered the fault should
-> + *    be terminated, else it should be retried.
-> + */
-> +void iommu_domain_resume(struct iommu_domain *domain, bool terminate)
-> +{
-> +	/* invalid to call if iommu_domain_set_attr(STALL) failed: */
-> +	if (WARN_ON(!domain->ops->domain_resume))
-> +		return;
-> +	domain->ops->domain_resume(domain, terminate);
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_domain_resume);
-
-So this function is being called by the device driver owning the domain,
-right?
-
-I don't think that the resume call-back you added needs to be exposed
-like this. It is better to do the page-fault handling completly in the
-iommu-code, including calling the resume call-back and just let the
-device-driver provide a per-domain call-back to let it handle the fault
-and map in the required pages.
-
-The interface could look like this:
-
-	* New function iommu_domain_enable_stalls(domain) - When
-	  this function returns the domain is in stall-handling mode. A
-	  iommu_domain_disable_stalls() might make sense too, not sure
-	  about that.
-
-	* When stalls are enabled for a domain, report_iommu_fault()
-	  queues the fault to a workqueue (so that its handler can
-	  block) and in the workqueue you call ->resume() based on the
-	  return value of the handler.
-
-As a side-note, as there has been discussion on this: For now it doesn't
-make sense to merge this with the SVM page-fault handling efforts, as
-this path is different enough (SVM will call handle_mm_fault() as the
-handler, for example).
+These patches already use irq_valid_mask!  But that doesn't block 
+complete access to the GPIO.
 
 
-Regards,
-
-	Joerg
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
