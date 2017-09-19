@@ -1,30 +1,52 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 19 Sep 2017 14:27:20 +0800
-Subject: [PATCH v1 0/4] update MT7623 and MT2701 dts
-Message-ID: <cover.1505801355.git.ryder.lee@mediatek.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 19 Sep 2017 14:26:53 +0800
+Subject: [PATCH v2 0/3] arm-smmu: performance optimization
+In-Reply-To: <6b051916-c49f-f9d0-81d8-05f857e4672e@codeaurora.org>
+References: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
+ <6b051916-c49f-f9d0-81d8-05f857e4672e@codeaurora.org>
+Message-ID: <59C0B8AD.4010201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This series corrects some nodes for both MT7623 and MT2701, adds display and
-PCIe support for MT7623.
 
-changes since v1:
-- rebase to v4.14.
-- sort nodes in alphabetical order.
+On 2017/9/19 12:31, Nate Watterson wrote:
+> Hi Leizhen,
+> 
+> On 9/12/2017 9:00 AM, Zhen Lei wrote:
+>> v1 -> v2:
+>> base on (add02cfdc9bc2 "iommu: Introduce Interface for IOMMU TLB Flushing")
+>>
+>> Zhen Lei (3):
+>>    iommu/arm-smmu-v3: put off the execution of TLBI* to reduce lock
+>>      confliction
+>>    iommu/arm-smmu-v3: add support for unmap an iova range with only one
+>>      tlb sync
+> 
+> I tested these (2) patches on QDF2400 hardware and saw performance
+> improvements in line with those I reported when testing the original
+> series. I don't have any hardware close at hand to test the 3rd patch
+> in the series so that will have to come from someone else.
+Thanks a lot.
 
-Ryder Lee (4):
-  arm: dts: mediatek: update audio node for mt2701 and mt7623
-  arm: dts: mt7623: update pio, usb and crypto nodes
-  arm: dts: mt7623: add display related nodes
-  arm: dts: mt7623: add PCIe related nodes
-
- arch/arm/boot/dts/mt2701.dtsi                 |   4 +-
- arch/arm/boot/dts/mt7623.dtsi                 | 374 ++++++++++++++++++++++++--
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  71 ++++-
- include/dt-bindings/pinctrl/mt7623-pinfunc.h  |  12 +
- 4 files changed, 432 insertions(+), 29 deletions(-)
+> 
+> Tested-by: Nate Watterson <nwatters@codeaurora.org>
+> 
+> Thanks,
+> Nate
+> 
+>>    iommu/arm-smmu: add support for unmap a memory range with only one tlb
+>>      sync
+>>
+>>   drivers/iommu/arm-smmu-v3.c        | 52 ++++++++++++++++++++++++++++++++++----
+>>   drivers/iommu/arm-smmu.c           | 10 ++++++++
+>>   drivers/iommu/io-pgtable-arm-v7s.c | 32 +++++++++++++++--------
+>>   drivers/iommu/io-pgtable-arm.c     | 30 ++++++++++++++--------
+>>   drivers/iommu/io-pgtable.h         |  1 +
+>>   5 files changed, 99 insertions(+), 26 deletions(-)
+>>
+> 
 
 -- 
-1.9.1
+Thanks!
+BestRegards
