@@ -1,40 +1,405 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Sep 2017 16:25:04 +0100
-Subject: [PATCH v2 8/9] atmel_flexcom: Support backup mode
-In-Reply-To: <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-9-romain.izard.pro@gmail.com>
- <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
-Message-ID: <20170919152504.nhp5i734u75gb5gq@dell>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 19 Sep 2017 23:26:53 +0800
+Subject: [PATCH v1 3/4] arm: dts: mt7623: add display related nodes
+In-Reply-To: <0eb19ae1a4717d316cdaec44f6c20bfa8aa24ddc.1505801355.git.ryder.lee@mediatek.com>
+References: <cover.1505801355.git.ryder.lee@mediatek.com>
+ <0eb19ae1a4717d316cdaec44f6c20bfa8aa24ddc.1505801355.git.ryder.lee@mediatek.com>
+Message-ID: <1505834813.16414.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Sep 2017, Nicolas Ferre wrote:
+Hi, Ryder:
 
-> On 15/09/2017 at 16:04, Romain Izard wrote:
-> > The controller used by a flexcom module is configured at boot, and left
-> > alone after this. As the configuration will be lost after backup mode,
-> > restore the state of the flexcom driver on resume.
-> > 
-> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> 
-> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> On sama5d2 Xplained board (i2c0 from flexcom 4).
-> and obviously:
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> 
-> Thanks Romain!
-> 
-> Regards,
-> 
-> > ---
-> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
-> >  1 file changed, 50 insertions(+), 15 deletions(-)
+Some comment inline.
 
-This is the first time I've seen this patch.  Why's that?
+On Tue, 2017-09-19 at 14:27 +0800, Ryder Lee wrote:
+> This patch adds the device nodes for the display function block.
+> Also, we add some missing pin macros in mt7623-pinfunc.h.
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/boot/dts/mt7623.dtsi                 | 210 ++++++++++++++++++++++++++
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  41 ++++-
+>  include/dt-bindings/pinctrl/mt7623-pinfunc.h  |  12 ++
+>  3 files changed, 261 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+> index 9ec3767..e11e5e7 100644
+> --- a/arch/arm/boot/dts/mt7623.dtsi
+> +++ b/arch/arm/boot/dts/mt7623.dtsi
+> @@ -20,6 +20,7 @@
+>  #include <dt-bindings/power/mt2701-power.h>
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/phy/phy.h>
+> +#include <dt-bindings/memory/mt2701-larb-port.h>
+>  #include <dt-bindings/reset/mt2701-resets.h>
+>  #include <dt-bindings/thermal/thermal.h>
+>  #include "skeleton64.dtsi"
+> @@ -28,6 +29,11 @@
+>  	compatible = "mediatek,mt7623";
+>  	interrupt-parent = <&sysirq>;
+>  
+> +	aliases {
+> +		rdma0 = &rdma0;
+> +		rdma1 = &rdma1;
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+For display, are these two aliases enough?
+
+> +	};
+> +
+>  	cpu_opp_table: opp_table {
+>  		compatible = "operating-points-v2";
+>  		opp-shared;
+> @@ -273,6 +279,17 @@
+>  			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+>  	};
+>  
+> +	smi_common: smi at 1000c000 {
+> +		compatible = "mediatek,mt7623-smi-common",
+> +			     "mediatek,mt2701-smi-common";
+> +		reg = <0 0x1000c000 0 0x1000>;
+> +		clocks = <&infracfg CLK_INFRA_SMI>,
+> +			 <&mmsys CLK_MM_SMI_COMMON>,
+> +			 <&infracfg CLK_INFRA_SMI>;
+> +		clock-names = "apb", "smi", "async";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> +	};
+> +
+>  	pwrap: pwrap at 1000d000 {
+>  		compatible = "mediatek,mt7623-pwrap",
+>  			     "mediatek,mt2701-pwrap";
+> @@ -286,6 +303,17 @@
+>  		clock-names = "spi", "wrap";
+>  	};
+>  
+> +	mipi_tx0: mipi-dphy at 10010000 {
+> +		compatible = "mediatek,mt7623-mipi-tx",
+> +			     "mediatek,mt2701-mipi-tx";
+> +		reg = <0 0x10010000 0 0x90>;
+> +		clocks = <&clk26m>;
+> +		clock-output-names = "mipi_tx0_pll";
+> +		#clock-cells = <0>;
+> +		#phy-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	cir: cir at 10013000 {
+>  		compatible = "mediatek,mt7623-cir";
+>  		reg = <0 0x10013000 0 0x1000>;
+> @@ -304,6 +332,17 @@
+>  		reg = <0 0x10200100 0 0x1c>;
+>  	};
+>  
+> +	iommu: mmsys_iommu at 10205000 {
+> +		compatible = "mediatek,mt7623-m4u",
+> +			     "mediatek,mt2701-m4u";
+> +		reg = <0 0x10205000 0 0x1000>;
+> +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&infracfg CLK_INFRA_M4U>;
+> +		clock-names = "bclk";
+> +		mediatek,larbs = <&larb0 &larb1 &larb2>;
+> +		#iommu-cells = <1>;
+> +	};
+> +
+>  	efuse: efuse at 10206000 {
+>  		compatible = "mediatek,mt7623-efuse",
+>  			     "mediatek,mt8173-efuse";
+> @@ -661,6 +700,169 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	mmsys: syscon at 14000000 {
+> +		compatible = "mediatek,mt7623-mmsys",
+> +			     "mediatek,mt2701-mmsys",
+> +			     "syscon";
+> +		reg = <0 0x14000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	display_components: dispsys at 14000000 {
+> +		compatible = "mediatek,mt7623-mmsys",
+> +			     "mediatek,mt2701-mmsys";
+> +		reg = <0 0x14000000 0 0x1000>;
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> +	};
+> +
+> +	ovl at 14007000 {
+> +		compatible = "mediatek,mt7623-disp-ovl",
+> +			     "mediatek,mt2701-disp-ovl";
+> +		reg = <0 0x14007000 0 0x1000>;
+> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_OVL>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	rdma0: rdma at 14008000 {
+> +		compatible = "mediatek,mt7623-disp-rdma",
+> +			     "mediatek,mt2701-disp-rdma";
+> +		reg = <0 0x14008000 0 0x1000>;
+> +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_RDMA>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	wdma at 14009000 {
+> +		compatible = "mediatek,mt7623-disp-wdma",
+> +			     "mediatek,mt2701-disp-wdma";
+
+There is neither "mediatek,mt7623-disp-wdma" nor
+"mediatek,mt2701-disp-wdma" in driver, do you really need this device
+node?
+
+> +		reg = <0 0x14009000 0 0x1000>;
+> +		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_WDMA>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	bls: bls at 1400a000 {
+> +		compatible = "mediatek,mt7623-disp-pwm",
+> +			     "mediatek,mt2701-disp-pwm";
+> +		reg = <0 0x1400a000 0 0x1000>;
+> +		#pwm-cells = <2>;
+> +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>,
+> +			 <&mmsys CLK_MM_DISP_BLS>;
+> +		clock-names = "main", "mm";
+> +		status = "disabled";
+> +	};
+> +
+> +	color at 1400b000 {
+
+color: color at 1400b000 {
+
+> +		compatible = "mediatek,mt7623-disp-color",
+> +			     "mediatek,mt2701-disp-color";
+> +		reg = <0 0x1400b000 0 0x1000>;
+> +		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_COLOR>;
+> +	};
+> +
+> +	dsi: dsi at 1400c000 {
+> +		compatible = "mediatek,mt7623-dsi",
+> +			     "mediatek,mt2701-dsi";
+> +		reg = <0 0x1400c000 0 0x1000>;
+> +		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DSI_ENGINE>,
+> +			 <&mmsys CLK_MM_DSI_DIG>,
+> +			 <&mipi_tx0>;
+> +		clock-names = "engine", "digital", "hs";
+> +		phys = <&mipi_tx0>;
+> +		phy-names = "dphy";
+> +		status = "disabled";
+> +	};
+> +
+> +	mutex: mutex at 1400e000 {
+> +		compatible = "mediatek,mt7623-disp-mutex",
+> +			     "mediatek,mt2701-disp-mutex";
+> +		reg = <0 0x1400e000 0 0x1000>;
+> +		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_MUTEX_32K>;
+> +	};
+> +
+> +	larb0: larb at 14010000 {
+> +		compatible = "mediatek,mt7623-smi-larb",
+> +			     "mediatek,mt2701-smi-larb";
+> +		reg = <0 0x14010000 0 0x1000>;
+> +		mediatek,smi = <&smi_common>;
+> +		mediatek,larb-id = <0>;
+> +		clocks = <&mmsys CLK_MM_SMI_LARB0>,
+> +			 <&mmsys CLK_MM_SMI_LARB0>;
+> +		clock-names = "apb", "smi";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> +	};
+> +
+> +	rdma1: rdma at 14012000 {
+> +		compatible = "mediatek,mt7623-disp-rdma",
+> +			     "mediatek,mt2701-disp-rdma";
+> +		reg = <0 0x14012000 0 0x1000>;
+> +		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	imgsys: syscon at 15000000 {
+> +		compatible = "mediatek,mt7623-imgsys",
+> +			     "mediatek,mt2701-imgsys",
+> +			     "syscon";
+> +		reg = <0 0x15000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	larb2: larb at 15001000 {
+> +		compatible = "mediatek,mt7623-smi-larb",
+> +			     "mediatek,mt2701-smi-larb";
+> +		reg = <0 0x15001000 0 0x1000>;
+> +		mediatek,smi = <&smi_common>;
+> +		mediatek,larb-id = <2>;
+> +		clocks = <&imgsys CLK_IMG_SMI_COMM>,
+> +			 <&imgsys CLK_IMG_SMI_COMM>;
+> +		clock-names = "apb", "smi";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+> +	};
+> +
+> +	jpegdec: jpegdec at 15004000 {
+> +		compatible = "mediatek,mt7623-jpgdec",
+> +			     "mediatek,mt2701-jpgdec";
+> +		reg = <0 0x15004000 0 0x1000>;
+> +		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
+> +			  <&imgsys CLK_IMG_JPGDEC>;
+> +		clock-names = "jpgdec-smi",
+> +			      "jpgdec";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+> +		mediatek,larb = <&larb2>;
+> +		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
+> +			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
+> +	};
+> +
+> +	vdecsys: syscon at 16000000 {
+> +		compatible = "mediatek,mt7623-vdecsys",
+> +			     "mediatek,mt2701-vdecsys",
+> +			     "syscon";
+> +		reg = <0 0x16000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	larb1: larb at 16010000 {
+> +		compatible = "mediatek,mt7623-smi-larb",
+> +			     "mediatek,mt2701-smi-larb";
+> +		reg = <0 0x16010000 0 0x1000>;
+> +		mediatek,smi = <&smi_common>;
+> +		mediatek,larb-id = <1>;
+> +		clocks = <&vdecsys CLK_VDEC_CKGEN>,
+> +			 <&vdecsys CLK_VDEC_LARB>;
+> +		clock-names = "apb", "smi";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
+> +	};
+> +
+>  	hifsys: syscon at 1a000000 {
+>  		compatible = "mediatek,mt7623-hifsys",
+>  			     "mediatek,mt2701-hifsys",
+> @@ -799,4 +1001,12 @@
+>  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+>  		status = "disabled";
+>  	};
+> +
+> +	bdpsys: syscon at 1c000000 {
+> +		compatible = "mediatek,mt7623-bdpsys",
+> +			     "mediatek,mt2701-bdpsys",
+> +			     "syscon";
+> +		reg = <0 0x1c000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 688a863..267a05a 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -17,6 +17,17 @@
+>  		serial2 = &uart2;
+>  	};
+>  
+> +	backlight_lcd: backlight_lcd {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&bls 0 100000>;
+> +		brightness-levels = <
+> +			  0  16  32  48  64  80  96 112
+> +			128 144 160 176 192 208 224 240
+> +			255
+> +		>;
+> +		default-brightness-level = <9>;
+> +	};
+> +
+>  	chosen {
+>  		stdout-path = "serial2:115200n8";
+>  	};
+> @@ -86,6 +97,12 @@
+>  	};
+>  };
+>  
+> +&bls {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&bls_pins_a>;
+> +};
+> +
+>  &cir {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&cir_pins_a>;
+> @@ -210,6 +227,12 @@
+>  };
+>  
+>  &pio {
+> +	bls_pins_a: bls at 0 {
+> +		pins_cmd_dat {
+> +			pinmux = <MT7623_PIN_203_PWM0_FUNC_DISP_PWM>;
+> +		};
+> +	};
+> +
+>  	cir_pins_a:cir at 0 {
+>  		pins_cir {
+>  			pinmux = <MT7623_PIN_46_IR_FUNC_IR>;
+> @@ -273,6 +296,21 @@
+>  		};
+>  	};
+>  
+> +	mipi_dsi_pin: mipi_dsi_pin {
+> +		pins_cmd_dat {
+> +			pinmux = <MT7623_PIN_100_MIPI_TDP0_FUNC_TDP0>,
+> +				 <MT7623_PIN_99_MIPI_TDN0_FUNC_TDN0>,
+> +				 <MT7623_PIN_98_MIPI_TDP1_FUNC_TDP1>,
+> +				 <MT7623_PIN_97_MIPI_TDN1_FUNC_TDN1>,
+> +				 <MT7623_PIN_96_MIPI_TCP_FUNC_TCP>,
+> +				 <MT7623_PIN_95_MIPI_TCN_FUNC_TCN>,
+> +				 <MT7623_PIN_94_MIPI_TDP2_FUNC_TDP2>,
+> +				 <MT7623_PIN_93_MIPI_TDN2_FUNC_TDN2>,
+> +				 <MT7623_PIN_92_MIPI_TDP3_FUNC_TDP3>,
+> +				 <MT7623_PIN_91_MIPI_TDN3_FUNC_TDN3>;
+> +		};
+> +	};
+> +
+>  	mmc0_pins_default: mmc0default {
+>  		pins_cmd_dat {
+>  			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
+> @@ -378,8 +416,7 @@
+>  
+>  	pwm_pins_a: pwm at 0 {
+>  		pins_pwm {
+> -			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
+> -				 <MT7623_PIN_204_PWM1_FUNC_PWM1>,
+> +			pinmux = <MT7623_PIN_204_PWM1_FUNC_PWM1>,
+>  				 <MT7623_PIN_205_PWM2_FUNC_PWM2>,
+>  				 <MT7623_PIN_206_PWM3_FUNC_PWM3>,
+>  				 <MT7623_PIN_207_PWM4_FUNC_PWM4>;
+> diff --git a/include/dt-bindings/pinctrl/mt7623-pinfunc.h b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+> index 436a87b..72bed67 100644
+> --- a/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+> +++ b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+> @@ -272,6 +272,18 @@
+>  #define MT7623_PIN_84_DSI_TE_FUNC_GPIO84 (MTK_PIN_NO(84) | 0)
+>  #define MT7623_PIN_84_DSI_TE_FUNC_DSI_TE (MTK_PIN_NO(84) | 1)
+>  
+> +#define MT7623_PIN_91_MIPI_TDN3_FUNC_GPIO91 (MTK_PIN_NO(91) | 0)
+> +#define MT7623_PIN_91_MIPI_TDN3_FUNC_TDN3 (MTK_PIN_NO(91) | 1)
+> +
+> +#define MT7623_PIN_92_MIPI_TDP3_FUNC_GPIO92 (MTK_PIN_NO(92) | 0)
+> +#define MT7623_PIN_92_MIPI_TDP3_FUNC_TDP3 (MTK_PIN_NO(92) | 1)
+> +
+> +#define MT7623_PIN_93_MIPI_TDN2_FUNC_GPIO93 (MTK_PIN_NO(93) | 0)
+> +#define MT7623_PIN_93_MIPI_TDN2_FUNC_TDN2 (MTK_PIN_NO(93) | 1)
+> +
+> +#define MT7623_PIN_94_MIPI_TDP2_FUNC_GPIO94 (MTK_PIN_NO(94) | 0)
+> +#define MT7623_PIN_94_MIPI_TDP2_FUNC_TDP2 (MTK_PIN_NO(94) | 1)
+> +
+>  #define MT7623_PIN_95_MIPI_TCN_FUNC_GPIO95 (MTK_PIN_NO(95) | 0)
+>  #define MT7623_PIN_95_MIPI_TCN_FUNC_TCN (MTK_PIN_NO(95) | 1)
+>  
+
+Regards,
+CK
