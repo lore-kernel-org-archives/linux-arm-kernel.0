@@ -1,88 +1,68 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 19 Sep 2017 10:23:43 -0400
-Subject: [RFC] iommu: arm-smmu: stall support
-In-Reply-To: <20170919123038.GF8398@8bytes.org>
-References: <20170914194444.32551-1-robdclark@gmail.com>
- <20170919123038.GF8398@8bytes.org>
-Message-ID: <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 19 Sep 2017 16:25:58 +0200
+Subject: [PATCH] arm64: dt marvell: extend AP806 system controller size
+In-Reply-To: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
+ (Baruch Siach's message of "Fri, 15 Sep 2017 10:50:07 +0300")
+References: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
+Message-ID: <877ewusr2h.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 8:30 AM, Joerg Roedel <joro@8bytes.org> wrote:
-> Hi Rob,
->
-> thanks for the RFC patch. I have some comments about the interface to
-> the IOMMU-API below.
->
-> On Thu, Sep 14, 2017 at 03:44:33PM -0400, Rob Clark wrote:
->> +/**
->> + * iommu_domain_resume - Resume translations for a domain after a fault.
->> + *
->> + * This can be called at some point after the fault handler is called,
->> + * allowing the user of the IOMMU to (for example) handle the fault
->> + * from a task context.  It is illegal to call this if
->> + * iommu_domain_set_attr(STALL) failed.
->> + *
->> + * @domain:    the domain to resume
->> + * @terminate: if true, the translation that triggered the fault should
->> + *    be terminated, else it should be retried.
->> + */
->> +void iommu_domain_resume(struct iommu_domain *domain, bool terminate)
->> +{
->> +     /* invalid to call if iommu_domain_set_attr(STALL) failed: */
->> +     if (WARN_ON(!domain->ops->domain_resume))
->> +             return;
->> +     domain->ops->domain_resume(domain, terminate);
->> +}
->> +EXPORT_SYMBOL_GPL(iommu_domain_resume);
->
-> So this function is being called by the device driver owning the domain,
-> right?
+Hi Baruch,
+ 
+ On ven., sept. 15 2017, Baruch Siach <baruch@tkos.co.il> wrote:
 
-yes, this was my plan
-
-> I don't think that the resume call-back you added needs to be exposed
-> like this. It is better to do the page-fault handling completly in the
-> iommu-code, including calling the resume call-back and just let the
-> device-driver provide a per-domain call-back to let it handle the fault
-> and map in the required pages.
-
-I would like to decide in the IRQ whether or not to queue work or not,
-because when we get a gpu fault, we tend to get 1000's of gpu faults
-all at once (and I really only need to handle the first one).  I
-suppose that could also be achieved by having a special return value
-from the fault handler to say "call me again from a wq"..
-
-Note that in the drm driver I already have a suitable wq to queue the
-work, so it really doesn't buy me anything to have the iommu driver
-toss things off to a wq for me.  Might be a different situation for
-other drivers (but I guess mostly other drivers are using iommu API
-indirectly via dma-mapping?)
-
-> The interface could look like this:
+> Extend the container size to 0x2000 to include the gpio controller at
+> offset 0x1040.
 >
->         * New function iommu_domain_enable_stalls(domain) - When
->           this function returns the domain is in stall-handling mode. A
->           iommu_domain_disable_stalls() might make sense too, not sure
->           about that.
+> While at it, add start address notation to the gpio node name to match
+> its 'offset' property.
+>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-I don't particularly see a use-case for disabling stalls, fwiw
+I made a quick test on a mcbin and I confirm that the watchdog is here
+and usable.
 
-BR,
--R
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+and 
+Applied on mvebu/dt64
 
->         * When stalls are enabled for a domain, report_iommu_fault()
->           queues the fault to a workqueue (so that its handler can
->           block) and in the workqueue you call ->resume() based on the
->           return value of the handler.
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> As a side-note, as there has been discussion on this: For now it doesn't
-> make sense to merge this with the SVM page-fault handling efforts, as
-> this path is different enough (SVM will call handle_mm_fault() as the
-> handler, for example).
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index 4d360713ed12..30d48ecf46e0 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -254,7 +254,7 @@
+>  
+>  			ap_syscon: system-controller at 6f4000 {
+>  				compatible = "syscon", "simple-mfd";
+> -				reg = <0x6f4000 0x1000>;
+> +				reg = <0x6f4000 0x2000>;
+>  
+>  				ap_clk: clock {
+>  					compatible = "marvell,ap806-clock";
+> @@ -265,7 +265,7 @@
+>  					compatible = "marvell,ap806-pinctrl";
+>  				};
+>  
+> -				ap_gpio: gpio {
+> +				ap_gpio: gpio at 1040 {
+>  					compatible = "marvell,armada-8k-gpio";
+>  					offset = <0x1040>;
+>  					ngpios = <20>;
+> -- 
+> 2.14.1
 >
->
-> Regards,
->
->         Joerg
->
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
