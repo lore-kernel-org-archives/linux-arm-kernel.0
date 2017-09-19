@@ -1,38 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Sep 2017 17:20:29 +0100
-Subject: [PATCH] arm64: dts: foundation-v8: Enable PSCI mode
-In-Reply-To: <f0710af4-d414-1f2a-7d86-dd559a50171f@linaro.org>
-References: <20170918153832.16356-1-daniel.thompson@linaro.org>
- <20170918161248.GB5106@leverpostej>
- <f0710af4-d414-1f2a-7d86-dd559a50171f@linaro.org>
-Message-ID: <20170919162029.GJ30715@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Sep 2017 09:26:37 -0700
+Subject: [PATCH] pinctrl: single: make two arrays static const, reduces
+ object code size
+In-Reply-To: <20170919144218.23607-1-colin.king@canonical.com>
+References: <20170919144218.23607-1-colin.king@canonical.com>
+Message-ID: <20170919162637.GY5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 04:59:15PM +0100, Daniel Thompson wrote:
-> On 18/09/17 17:12, Mark Rutland wrote:
-
-> >Could we split spin-table / PSCI parts into separate dtsi files?
-> >
-> >e.g. have:
-> >
-> >* foundation-v8.dtsi
-> >* foundation-v8-gicv{2,3}.dtsi
-> >* foundation-v8-{psci,spin-table}.dtsi
-> >
-> >... and then combine those to build the dts files we want.
+* Colin King <colin.king@canonical.com> [170919 07:43]:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> Will do.
+> Don't populate the read-only arrays prop2 and prop4 on the stack, instead
+> make them static const.  Makes the object code smaller by over 230 bytes:
 > 
-> >FWIW, with that:
-> >
-> >Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Before:
+>    text	   data	    bss	    dec	    hex	filename
+>   28235	   5820	    192	  34247	   85c7	drivers/pinctrl/pinctrl-single.o
 > 
-> Talking about what we want... if it's all split out I might as well
-> add a gicv2+psci DT as well. Will that still retain your Acked-by or
-> do you want to see it first ;-) ?
+> After:
+>    text	   data	    bss	    dec	    hex	filename
+>   27839	   5980	    192	  34011	   84db	drivers/pinctrl/pinctrl-single.o
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-Sure; that's fine by me. :)
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-Thanks,
-Mark.
+> ---
+>  drivers/pinctrl/pinctrl-single.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index b8b3d932cd73..e6cd8de793e2 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -873,13 +873,13 @@ static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
+>  	int i = 0, nconfs = 0;
+>  	unsigned long *settings = NULL, *s = NULL;
+>  	struct pcs_conf_vals *conf = NULL;
+> -	struct pcs_conf_type prop2[] = {
+> +	static const struct pcs_conf_type prop2[] = {
+>  		{ "pinctrl-single,drive-strength", PIN_CONFIG_DRIVE_STRENGTH, },
+>  		{ "pinctrl-single,slew-rate", PIN_CONFIG_SLEW_RATE, },
+>  		{ "pinctrl-single,input-schmitt", PIN_CONFIG_INPUT_SCHMITT, },
+>  		{ "pinctrl-single,low-power-mode", PIN_CONFIG_LOW_POWER_MODE, },
+>  	};
+> -	struct pcs_conf_type prop4[] = {
+> +	static const struct pcs_conf_type prop4[] = {
+>  		{ "pinctrl-single,bias-pullup", PIN_CONFIG_BIAS_PULL_UP, },
+>  		{ "pinctrl-single,bias-pulldown", PIN_CONFIG_BIAS_PULL_DOWN, },
+>  		{ "pinctrl-single,input-schmitt-enable",
+> -- 
+> 2.14.1
+> 
