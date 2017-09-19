@@ -1,45 +1,44 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Tue, 19 Sep 2017 00:31:03 -0400
-Subject: [PATCH v2 0/3] arm-smmu: performance optimization
-In-Reply-To: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1505221238-9428-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <6b051916-c49f-f9d0-81d8-05f857e4672e@codeaurora.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 19 Sep 2017 07:08:05 +0200
+Subject: [PATCH 0/4] arm64: Add initial Actions Semi S700 and CubieBoard7
+ support
+In-Reply-To: <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
+References: <20170911022241.11603-1-afaerber@suse.de>
+ <6beabaab-d95f-4ac9-96f1-7c1c98bd7811@linaro.org>
+Message-ID: <0a3e9a40-cb67-d2b2-7f06-fa0f24a4fb42@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leizhen,
+Hi Daniel,
 
-On 9/12/2017 9:00 AM, Zhen Lei wrote:
-> v1 -> v2:
-> base on (add02cfdc9bc2 "iommu: Introduce Interface for IOMMU TLB Flushing")
+Am 18.09.2017 um 23:50 schrieb Daniel Lezcano:
+> On 11/09/2017 04:22, Andreas F?rber wrote:
+>> Cc: devicetree at vger.kernel.org
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>
+>> Andreas F?rber (4):
+>>   dt-bindings: arm: actions: Add S700 and CubieBoard7
+>>   dt-bindings: timer: Add Actions Semi S700
+>>   clocksource: owl: Prepare S700
+>>   arm64: dts: actions: Add S700 and CubieBoard7
+>>
+>>  Documentation/devicetree/bindings/arm/actions.txt  |  15 ++
+>>  .../bindings/timer/actions,owl-timer.txt           |   1 +
 > 
-> Zhen Lei (3):
->    iommu/arm-smmu-v3: put off the execution of TLBI* to reduce lock
->      confliction
->    iommu/arm-smmu-v3: add support for unmap an iova range with only one
->      tlb sync
+> Usually sub system maintainers are also Cc'ed with Dt bindings
+> definitions and usage.
 
-I tested these (2) patches on QDF2400 hardware and saw performance
-improvements in line with those I reported when testing the original
-series. I don't have any hardware close at hand to test the 3rd patch
-in the series so that will have to come from someone else.
+Your MAINTAINERS entry is lacking an entry for the bindings. Can you
+please fix that in linux-next? Then the next patches should reach you.
 
-Tested-by: Nate Watterson <nwatters@codeaurora.org>
+Actually I'm even surprised that it works for the drivers - I would
+expect a trailing "/" for the directory (see line 95ff).
 
-Thanks,
-Nate
-
->    iommu/arm-smmu: add support for unmap a memory range with only one tlb
->      sync
-> 
->   drivers/iommu/arm-smmu-v3.c        | 52 ++++++++++++++++++++++++++++++++++----
->   drivers/iommu/arm-smmu.c           | 10 ++++++++
->   drivers/iommu/io-pgtable-arm-v7s.c | 32 +++++++++++++++--------
->   drivers/iommu/io-pgtable-arm.c     | 30 ++++++++++++++--------
->   drivers/iommu/io-pgtable.h         |  1 +
->   5 files changed, 99 insertions(+), 26 deletions(-)
-> 
+Regards,
+Andreas
 
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
