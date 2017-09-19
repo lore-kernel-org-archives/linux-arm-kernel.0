@@ -1,156 +1,187 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 19 Sep 2017 14:27:22 +0800
-Subject: [PATCH v1 2/4] arm: dts: mt7623: update pio, usb and crypto nodes
+Date: Tue, 19 Sep 2017 14:27:24 +0800
+Subject: [PATCH v1 4/4] arm: dts: mt7623: add PCIe related nodes
 In-Reply-To: <cover.1505801355.git.ryder.lee@mediatek.com>
 References: <cover.1505801355.git.ryder.lee@mediatek.com>
-Message-ID: <1964ba22750c5720cdc07ebb77a63d6f80e1579e.1505801355.git.ryder.lee@mediatek.com>
+Message-ID: <073cf0921a55a8982f14a4d36f0c4b874e8135d9.1505801355.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates pio, usb and crypto nodes to make them be consistent
-with the binding documents.
+This patch adds devices nodes and updates pinmux setting for the PICe
+function block. Just note that PCIe port2 PHY is shared with U3 port.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 52 ++++++++++++++++++++++---------------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/mt7623.dtsi                 | 108 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  30 +++++++
+ 2 files changed, 138 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index 381843e..9ec3767 100644
+index e11e5e7..7d78471 100644
 --- a/arch/arm/boot/dts/mt7623.dtsi
 +++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -226,21 +226,6 @@
+@@ -872,6 +872,114 @@
  		#reset-cells = <1>;
  	};
  
--	pio: pinctrl at 10005000 {
--		compatible = "mediatek,mt7623-pinctrl",
--			     "mediatek,mt2701-pinctrl";
--		reg = <0 0x1000b000 0 0x1000>;
--		mediatek,pctl-regmap = <&syscfg_pctl_a>;
--		pins-are-numbered;
--		gpio-controller;
--		#gpio-cells = <2>;
--		interrupt-controller;
--		interrupt-parent = <&gic>;
--		#interrupt-cells = <2>;
--		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
--	};
--
- 	syscfg_pctl_a: syscfg at 10005000 {
- 		compatible = "mediatek,mt7623-pctl-a-syscfg", "syscon";
- 		reg = <0 0x10005000 0 0x1000>;
-@@ -274,6 +259,20 @@
- 		clock-names = "system-clk", "rtc-clk";
- 	};
- 
-+	pio: pinctrl at 1000b000 {
-+		compatible = "mediatek,mt7623-pinctrl";
-+		reg = <0 0x1000b000 0 0x1000>;
-+		mediatek,pctl-regmap = <&syscfg_pctl_a>;
-+		pins-are-numbered;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		interrupt-parent = <&gic>;
-+		#interrupt-cells = <2>;
-+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
++	pcie: pcie-controller at 1a140000 {
++		compatible = "mediatek,mt7623-pcie";
++		device_type = "pci";
++		reg = <0 0x1a140000 0 0x1000>, /* PCIe shared registers */
++		      <0 0x1a142000 0 0x1000>, /* Port0 registers */
++		      <0 0x1a143000 0 0x1000>, /* Port1 registers */
++		      <0 0x1a144000 0 0x1000>; /* Port2 registers */
++		reg-names = "subsys", "port0", "port1", "port2";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0xf800 0 0 0>;
++		interrupt-map = <0x0000 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>,
++				<0x0800 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>,
++				<0x1000 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
++			 <&hifsys CLK_HIFSYS_PCIE0>,
++			 <&hifsys CLK_HIFSYS_PCIE1>,
++			 <&hifsys CLK_HIFSYS_PCIE2>;
++		clock-names = "free_ck", "sys_ck0", "sys_ck1", "sys_ck2";
++		resets = <&hifsys MT2701_HIFSYS_PCIE0_RST>,
++			 <&hifsys MT2701_HIFSYS_PCIE1_RST>,
++			 <&hifsys MT2701_HIFSYS_PCIE2_RST>;
++		reset-names = "pcie-rst0", "pcie-rst1", "pcie-rst2";
++		phys = <&pcie0_port PHY_TYPE_PCIE>,
++		       <&pcie1_port PHY_TYPE_PCIE>,
++		       <&u3port1 PHY_TYPE_PCIE>;
++		phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
++		bus-range = <0x00 0xff>;
++		status = "disabled";
++		ranges = <0x81000000 0 0x1a160000 0 0x1a160000 0 0x00010000
++			  0x83000000 0 0x60000000 0 0x60000000 0 0x10000000>;
++
++		pcie at 0,0 {
++			device_type = "pci";
++			reg = <0x0000 0 0 0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>;
++			ranges;
++			num-lanes = <1>;
++			status = "disabled";
++		};
++
++		pcie at 1,0 {
++			device_type = "pci";
++			reg = <0x0800 0 0 0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
++			ranges;
++			num-lanes = <1>;
++			status = "disabled";
++		};
++
++		pcie at 2,0 {
++			device_type = "pci";
++			reg = <0x1000 0 0 0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
++			ranges;
++			num-lanes = <1>;
++			status = "disabled";
++		};
 +	};
 +
- 	pwrap: pwrap at 1000d000 {
- 		compatible = "mediatek,mt7623-pwrap",
- 			     "mediatek,mt2701-pwrap";
-@@ -680,7 +679,7 @@
- 		interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&hifsys CLK_HIFSYS_USB0PHY>,
- 			 <&topckgen CLK_TOP_ETHIF_SEL>;
--		clock-names = "sys_ck", "free_ck";
-+		clock-names = "sys_ck", "ref_ck";
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
- 		phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
- 		status = "disabled";
-@@ -690,8 +689,6 @@
- 		compatible = "mediatek,mt7623-u3phy",
- 			     "mediatek,mt2701-u3phy";
- 		reg = <0 0x1a1c4000 0 0x0700>;
--		clocks = <&clk26m>;
--		clock-names = "u3phya_ref";
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-@@ -699,12 +696,16 @@
- 
- 		u2port0: usb-phy at 1a1c4800 {
- 			reg = <0 0x1a1c4800 0 0x0100>;
-+			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
-+			clock-names = "ref";
- 			#phy-cells = <1>;
- 			status = "okay";
- 		};
- 
- 		u3port0: usb-phy at 1a1c4900 {
- 			reg = <0 0x1a1c4900 0 0x0700>;
++	pcie0_phy: pcie-phy at 1a149000 {
++		compatible = "mediatek,generic-tphy-v1";
++		reg = <0 0x1a149000 0 0x0700>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
++
++		pcie0_port: pcie-phy at 1a149900 {
++			reg = <0 0x1a149900 0 0x0700>;
 +			clocks = <&clk26m>;
 +			clock-names = "ref";
- 			#phy-cells = <1>;
- 			status = "okay";
- 		};
-@@ -719,7 +720,7 @@
- 		interrupts = <GIC_SPI 197 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&hifsys CLK_HIFSYS_USB1PHY>,
- 			 <&topckgen CLK_TOP_ETHIF_SEL>;
--		clock-names = "sys_ck", "free_ck";
-+		clock-names = "sys_ck", "ref_ck";
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
- 		phys = <&u2port1 PHY_TYPE_USB2>, <&u3port1 PHY_TYPE_USB3>;
- 		status = "disabled";
-@@ -729,8 +730,6 @@
- 		compatible = "mediatek,mt7623-u3phy",
- 			     "mediatek,mt2701-u3phy";
- 		reg = <0 0x1a244000 0 0x0700>;
--		clocks = <&clk26m>;
--		clock-names = "u3phya_ref";
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-@@ -738,12 +737,16 @@
- 
- 		u2port1: usb-phy at 1a244800 {
- 			reg = <0 0x1a244800 0 0x0100>;
-+			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
-+			clock-names = "ref";
- 			#phy-cells = <1>;
- 			status = "okay";
- 		};
- 
- 		u3port1: usb-phy at 1a244900 {
- 			reg = <0 0x1a244900 0 0x0700>;
++			#phy-cells = <1>;
++			status = "okay";
++		};
++	};
++
++	pcie1_phy: pcie-phy at 1a14a000 {
++		compatible = "mediatek,generic-tphy-v1";
++		reg = <0 0x1a14a000 0 0x0700>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
++
++		pcie1_port: pcie-phy at 1a14a900 {
++			reg = <0 0x1a14a900 0 0x0700>;
 +			clocks = <&clk26m>;
 +			clock-names = "ref";
- 			#phy-cells = <1>;
- 			status = "okay";
++			#phy-cells = <1>;
++			status = "okay";
++		};
++	};
++
+ 	usb1: usb at 1a1c0000 {
+ 		compatible = "mediatek,mt7623-xhci",
+ 			     "mediatek,mt8173-xhci";
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 267a05a..134a39a 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -226,6 +226,28 @@
+ 	vqmmc-supply = <&mt6323_vio18_reg>;
+ };
+ 
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcie_default>;
++	status = "okay";
++
++	pcie at 0,0 {
++		status = "okay";
++	};
++
++	pcie at 1,0 {
++		status = "okay";
++	};
++};
++
++&pcie0_phy {
++	status = "okay";
++};
++
++&pcie1_phy {
++	status = "okay";
++};
++
+ &pio {
+ 	bls_pins_a: bls at 0 {
+ 		pins_cmd_dat {
+@@ -414,6 +436,14 @@
  		};
-@@ -784,16 +787,15 @@
  	};
  
- 	crypto: crypto at 1b240000 {
--		compatible = "mediatek,mt7623-crypto";
-+		compatible = "mediatek,eip97-crypto";
- 		reg = <0 0x1b240000 0 0x20000>;
- 		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
--			 <&ethsys CLK_ETHSYS_CRYPTO>;
--		clock-names = "ethif","cryp";
-+		clocks = <&ethsys CLK_ETHSYS_CRYPTO>;
-+		clock-names = "cryp";
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
- 		status = "disabled";
- 	};
++	pcie_default: pcie_pin_default {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_208_AUD_EXT_CK1_FUNC_PCIE0_PERST_N>,
++				 <MT7623_PIN_209_AUD_EXT_CK2_FUNC_PCIE1_PERST_N>;
++			bias-disable;
++		};
++	};
++
+ 	pwm_pins_a: pwm at 0 {
+ 		pins_pwm {
+ 			pinmux = <MT7623_PIN_204_PWM1_FUNC_PWM1>,
 -- 
 1.9.1
