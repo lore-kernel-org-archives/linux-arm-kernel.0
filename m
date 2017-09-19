@@ -1,37 +1,39 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 19 Sep 2017 23:54:54 +0200
-Subject: [PATCH v2 1/3] dt-bindings: Add vendor prefix for ProBox2
-In-Reply-To: <7c7224a9-b0a6-caa4-483a-d9613af48d13@suse.de>
-References: <7c7224a9-b0a6-caa4-483a-d9613af48d13@suse.de>
-Message-ID: <20170919215454.5820-1-afaerber@suse.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 19 Sep 2017 15:02:22 -0700
+Subject: [PATCH v3 0/3] arm64: Add CONFIG_KUSER_HELPERS
+In-Reply-To: <20170911152635.95367-1-salyzyn@android.com>
+References: <20170911152635.95367-1-salyzyn@android.com>
+Message-ID: <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PROBOX2 is a TV box brand by Hong Kong based online reseller W2COMP
-Company Limited.
+On Mon, Sep 11, 2017 at 8:26 AM, Mark Salyzyn <salyzyn@android.com> wrote:
+> Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
+> config option (enabled by default). When disabled, all kuser
+> helpers-related code is removed from the kernel and no mapping is done
+> at the fixed high address (0xffff0000); any attempt to use a kuser
+> helper from a 32-bit process will result in a segfault.
+>
+> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+>
+> v2:
+> - vectors_page and compat_vdso_spec as array of 2
+> - free sigpage if vectors allocation failed
+> - adjust makefile so one line for each of the assembler source modules
+> - split off assembler changes to a new previous patch in series to reduce churn
+> - modify slightly the feature documentation to reduce its reach
+> - modify slightly the feature documentation to rationalize the yes default.
+> - There are more ifdefs as a result of the rebase.
+>
+> v3:
+> - rebase (minor conflicts)
 
-Cc: support at probox2.com
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v1 -> v2:
- * Extend the vendor prefix explanation with info provided by PROBOX2
- * Fix the commit message accordingly
- 
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+This looks great to me. I'd love to see kuser helpers gone. :)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 9d1a48ba2445..6c6002cf6be6 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -264,6 +264,7 @@ plathome	Plat'Home Co., Ltd.
- plda	PLDA
- poslab	Poslab Technology Co., Ltd.
- powervr	PowerVR (deprecated, use img)
-+probox2	PROBOX2 (by W2COMP Co., Ltd.)
- pulsedlight	PulsedLight, Inc
- qca	Qualcomm Atheros, Inc.
- qcom	Qualcomm Technologies, Inc
+Catalin, Will, does this need anything else?
+
+-Kees
+
 -- 
-2.13.5
+Kees Cook
+Pixel Security
