@@ -1,32 +1,52 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 19 Sep 2017 15:06:13 -0500
-Subject: [PATCH] cpufreq: ti-cpufreq: Support additional am43xx platforms
-Message-ID: <20170919200613.31625-1-d-gerlach@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 19 Sep 2017 22:13:15 +0200
+Subject: [PATCH] mtd: nand: lpc32xx_mlc: Fix an error handling path in
+ lpc32xx_nand_probe()
+In-Reply-To: <20170903115831.1326-1-christophe.jaillet@wanadoo.fr>
+References: <20170903115831.1326-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <20170919221315.11d94426@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than letting the ti-cpufreq driver match against 'ti,am4372'
-machine compatible during probe let's match against 'ti,am43' so that we
-can support both 'ti,am4372' and 'ti,am438x' platforms which both match
-to this compatible.
+On Sun,  3 Sep 2017 13:58:31 +0200
+Christophe JAILLET <christophe.jaillet@wanadoo.fr> wrote:
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- drivers/cpufreq/ti-cpufreq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> If 'clk_prepare_enable()' fails, we must 'put' the corresponding clock.
+> 
+> Fixes: 4d26f012ab59 ("mtd: nand: lpc32xx_mlc: Handle return value of clk_prepare_enable.")
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-index b29cd3398463..4bf47de6101f 100644
---- a/drivers/cpufreq/ti-cpufreq.c
-+++ b/drivers/cpufreq/ti-cpufreq.c
-@@ -190,7 +190,7 @@ static int ti_cpufreq_setup_syscon_register(struct ti_cpufreq_data *opp_data)
- 
- static const struct of_device_id ti_cpufreq_of_match[] = {
- 	{ .compatible = "ti,am33xx", .data = &am3x_soc_data, },
--	{ .compatible = "ti,am4372", .data = &am4x_soc_data, },
-+	{ .compatible = "ti,am43", .data = &am4x_soc_data, },
- 	{ .compatible = "ti,dra7", .data = &dra7_soc_data },
- 	{},
- };
--- 
-2.13.4
+Applied.
+
+Thanks,
+
+Boris
+
+> ---
+> Labels in the error handling path could be renamed, but it does not worth
+> the effort, IMHO.
+> ---
+>  drivers/mtd/nand/lpc32xx_mlc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+> index c3bb358ef01e..5f72a824e67d 100644
+> --- a/drivers/mtd/nand/lpc32xx_mlc.c
+> +++ b/drivers/mtd/nand/lpc32xx_mlc.c
+> @@ -707,7 +707,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  	}
+>  	res = clk_prepare_enable(host->clk);
+>  	if (res)
+> -		goto err_exit1;
+> +		goto err_put_clk;
+>  
+>  	nand_chip->cmd_ctrl = lpc32xx_nand_cmd_ctrl;
+>  	nand_chip->dev_ready = lpc32xx_nand_device_ready;
+> @@ -814,6 +814,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  		dma_release_channel(host->dma_chan);
+>  err_exit2:
+>  	clk_disable_unprepare(host->clk);
+> +err_put_clk:
+>  	clk_put(host->clk);
+>  err_exit1:
+>  	lpc32xx_wp_enable(host);
