@@ -1,66 +1,90 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 19 Sep 2017 17:14:26 -0400 (EDT)
-Subject: [PULL REQUEST v2] FDPIC ELF support for ARM
-In-Reply-To: <nycvar.YSQ.7.76.1708292307400.2606@knanqh.ubzr>
-References: <nycvar.YSQ.7.76.1708292307400.2606@knanqh.ubzr>
-Message-ID: <nycvar.YSQ.7.76.1709191712590.4063@knanqh.ubzr>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 Sep 2017 15:32:54 -0600
+Subject: [PATCH v2] doc: coresight: correct usage for disabling idle states
+In-Reply-To: <1505470561-21982-1-git-send-email-leo.yan@linaro.org>
+References: <1505470561-21982-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkx++kM9Ocw+_Ar6d0_n0gTdzXLRyMZ8eiaJyHxbPJdgYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 15 September 2017 at 04:16, Leo Yan <leo.yan@linaro.org> wrote:
+> In the coresight CPU debug document it suggests to use 'echo' command
+> to set latency request to /dev/cpu_dma_latency so can disable all CPU
+> idle states, but in fact this doesn't work.
+>
+> This is because when the command 'echo' exits, it releases the device
+> node's file descriptor and the kernel release function removes the QoS
+> constraint; finally when the command 'echo' finished there have no
+> constraint imposed on cpu_dma_latency.
+>
+> This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
+> command 'exec' can avoid the file descriptor to be closed so we can
+> keep the constraint on cpu_dma_latency.
+>
+> This patch also adds the info for reference docs for PM QoS and cpuidle
+> sysfs.
+>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Reported-by: Kim Phillips <kim.phillips@arm.com>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  Documentation/trace/coresight-cpu-debug.txt | 14 +++++++++-----
+>  1 file changed, 9 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+> index b3da1f9..205ff95 100644
+> --- a/Documentation/trace/coresight-cpu-debug.txt
+> +++ b/Documentation/trace/coresight-cpu-debug.txt
+> @@ -149,11 +149,15 @@ If you want to limit idle states at boot time, you can use "nohlt" or
+>
+>  At the runtime you can disable idle states with below methods:
+>
+> -Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
+> -states (if latency = 0uS then disable all idle states):
+> -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
+> -
+> -Disable specific CPU's specific idle state:
+> +By using PM QoS interface '/dev/cpu_dma_latency', we can set latency
+> +constraint to disable all CPUs specific idle states (see
+> +Documentation/power/pm_qos_interface.txt, section 'From user mode');
+> +below is one example to set latency constraint to '00000000', it is
+> +hexadecimal format with microsecond unit:
+> +# exec 3<> /dev/cpu_dma_latency; echo '00000000' >&3
 
-Same deal as with the other pull request: now based on v4.13 otherwise 
-unchanged.  Please pull.
+Since doing echo '00000000' >&3 or simply echo 0 >&3 yields the same
+result I would go for the latter.  I also think it is important to
+specify that using an "echo" command without holding the file open
+won't give the desired result.  I would reformat your paragraph as
+follow:
 
-Thanks.
+>>> Begin >>>
+
+It is possible to disable CPU idle states by way of the PM QoS
+subsystem, more specifically by using the "/dev/cpu_dma_latency"
+interface (see Documentation/power/pm_qos_interface.txt for more
+details).  As specified in the PM QoS documentation the requested
+parameter will stay in effect until the file descriptor is released.
+For example:
+
+# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
+...
+Do some work...
+...
+# exec 3<>-
+
+The same can also be done from an application program.
+
+<<< End <<<
 
 
-On Tue, 29 Aug 2017, Nicolas Pitre wrote:
-
-> Russell, could you please pull the following:
-> 
->   http://git.linaro.org/people/nicolas.pitre/linux fdpic
-> 
-> This series provides the needed changes to suport the ELF_FDPIC binary
-> format on ARM. Both MMU and non-MMU systems are supported. This format
-> has many advantages over the BFLT format used on MMU-less systems, such
-> as being real ELF that can be parsed by standard tools, can support
-> shared dynamic libs, etc.
-> 
-> This is based on v4.13-rc4 not to conflict with changes to signal.c
-> that happened in v4.13-rc3.
-> 
-> A complete toolchain and prebuilt packages can be obtained here:
-> 
-> https://github.com/mickael-guene/fdpic_manifest
-> 
-> Changes from v1:
-> 
-> - Reworked the signal return code to be compatible with a non-executable
->   stack.
-> - Rebased on v4.13-rc4 to pick up latest signal changes.
-> - Added MMU support.
-> - Fixed crash in the ELF-FDPIC loader when loading an executable with
->   shared libs on a system with an MMU.
-> - Made the regular ELF loader reject FDPIC binaries.
-> - Added ACKs and Reviewed-bys.
-> 
-> diffstat:
-> 
->  arch/arm/include/asm/elf.h         | 16 +++++++--
->  arch/arm/include/asm/mmu.h         |  8 +++++
->  arch/arm/include/asm/processor.h   | 22 +++++++++----
->  arch/arm/include/asm/ucontext.h    |  1 +
->  arch/arm/include/uapi/asm/ptrace.h |  4 +++
->  arch/arm/include/uapi/asm/unistd.h |  1 +
->  arch/arm/kernel/asm-offsets.c      |  4 +++
->  arch/arm/kernel/elf.c              | 24 +++++++++++++-
->  arch/arm/kernel/signal.c           | 53 +++++++++++++++++++++---------
->  arch/arm/kernel/signal.h           | 11 +++++++
->  arch/arm/kernel/sigreturn_codes.S  | 56 +++++++++++++++++++++++++++++---
->  arch/arm/kernel/traps.c            |  3 ++
->  fs/Kconfig.binfmt                  |  4 +--
->  fs/binfmt_elf.c                    | 15 +++++++--
->  fs/binfmt_elf_fdpic.c              | 13 ++++++--
->  15 files changed, 199 insertions(+), 36 deletions(-)
-> 
+> +
+> +Disable specific CPU's specific idle state from cpuidle sysfs (see
+> +Documentation/cpuidle/sysfs.txt):
+>  # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
+>
+>
+> --
+> 2.7.4
+>
