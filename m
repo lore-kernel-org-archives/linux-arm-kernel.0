@@ -1,48 +1,81 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue, 19 Sep 2017 15:42:18 +0100
-Subject: [PATCH] pinctrl: single: make two arrays static const,
- reduces object code size
-Message-ID: <20170919144218.23607-1-colin.king@canonical.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 19 Sep 2017 16:43:18 +0200
+Subject: [PATCH 1/2] bus: mbus: fix window size calculation for 4GB windows
+In-Reply-To: <20170828152517.24506-2-jlu@pengutronix.de> (Jan Luebbe's message
+ of "Mon, 28 Aug 2017 17:25:16 +0200")
+References: <20170828152517.24506-1-jlu@pengutronix.de>
+ <20170828152517.24506-2-jlu@pengutronix.de>
+Message-ID: <87wp4urbp5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hi Jan,
+ 
+ On lun., ao?t 28 2017, Jan Luebbe <jlu@pengutronix.de> wrote:
 
-Don't populate the read-only arrays prop2 and prop4 on the stack, instead
-make them static const.  Makes the object code smaller by over 230 bytes:
+> At least the Armada XP SoC supports 4GB on a single DRAM window. Because
+> the size register values contain the actual size - 1, the MSB is set in
+> that case. For example, the SDRAM window's control register's value is
+> 0xffffffe1 for 4GB (bits 31 to 24 contain the size).
+>
+> The MBUS driver reads back each window's size from registers and
+> calculates the actual size as (control_reg | ~DDR_SIZE_MASK) + 1, which
+> overflows for 32 bit values, resulting in other miscalculations further
+> on (a bad RAM window for the CESA crypto engine calculated by
+> mvebu_mbus_setup_cpu_target_nooverlap() in my case).
+>
+> This patch changes the type in 'struct mbus_dram_window' from u32 to
+> u64, which allows us to keep using the same register calculation code in
+> most MBUS-using drivers (which calculate ->size - 1 again).
+>
 
-Before:
-   text	   data	    bss	    dec	    hex	filename
-  28235	   5820	    192	  34247	   85c7	drivers/pinctrl/pinctrl-single.o
+Your patch looks good, but as it is a fix we should also apply it on
+stable, could you provide the commit to fix?
 
-After:
-   text	   data	    bss	    dec	    hex	filename
-  27839	   5980	    192	  34011	   84db	drivers/pinctrl/pinctrl-single.o
+Thanks,
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/pinctrl/pinctrl-single.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Gregory
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index b8b3d932cd73..e6cd8de793e2 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -873,13 +873,13 @@ static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
- 	int i = 0, nconfs = 0;
- 	unsigned long *settings = NULL, *s = NULL;
- 	struct pcs_conf_vals *conf = NULL;
--	struct pcs_conf_type prop2[] = {
-+	static const struct pcs_conf_type prop2[] = {
- 		{ "pinctrl-single,drive-strength", PIN_CONFIG_DRIVE_STRENGTH, },
- 		{ "pinctrl-single,slew-rate", PIN_CONFIG_SLEW_RATE, },
- 		{ "pinctrl-single,input-schmitt", PIN_CONFIG_INPUT_SCHMITT, },
- 		{ "pinctrl-single,low-power-mode", PIN_CONFIG_LOW_POWER_MODE, },
- 	};
--	struct pcs_conf_type prop4[] = {
-+	static const struct pcs_conf_type prop4[] = {
- 		{ "pinctrl-single,bias-pullup", PIN_CONFIG_BIAS_PULL_UP, },
- 		{ "pinctrl-single,bias-pulldown", PIN_CONFIG_BIAS_PULL_DOWN, },
- 		{ "pinctrl-single,input-schmitt-enable",
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> ---
+>  drivers/bus/mvebu-mbus.c | 2 +-
+>  include/linux/mbus.h     | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index c7f396903184..70db4d5638a6 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -720,7 +720,7 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
+>  			if (mbus->hw_io_coherency)
+>  				w->mbus_attr |= ATTR_HW_COHERENCY;
+>  			w->base = base & DDR_BASE_CS_LOW_MASK;
+> -			w->size = (size | ~DDR_SIZE_MASK) + 1;
+> +			w->size = (u64)(size | ~DDR_SIZE_MASK) + 1;
+>  		}
+>  	}
+>  	mvebu_mbus_dram_info.num_cs = cs;
+> diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+> index 0d3f14fd2621..4773145246ed 100644
+> --- a/include/linux/mbus.h
+> +++ b/include/linux/mbus.h
+> @@ -31,8 +31,8 @@ struct mbus_dram_target_info
+>  	struct mbus_dram_window {
+>  		u8	cs_index;
+>  		u8	mbus_attr;
+> -		u32	base;
+> -		u32	size;
+> +		u64	base;
+> +		u64	size;
+>  	} cs[4];
+>  };
+>  
+> -- 
+> 2.11.0
+>
+
 -- 
-2.14.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
