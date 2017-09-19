@@ -1,64 +1,36 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 19 Sep 2017 12:41:10 +0200
-Subject: [PATCH v10] PCI: tango: Add MSI controller support
-In-Reply-To: <CAL_JsqK7XayjJcCYhicuqGqKN8N6+P=9tDrs_m7K3YiOBHDAHA@mail.gmail.com>
-References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
- <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
- <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
- <86efs3wesi.fsf@arm.com>
- <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
- <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
- <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
- <e381170c-e462-01cd-12db-30773005602b@free.fr> <871so09j6g.fsf@arm.com>
- <acdef092-3fb9-4338-5199-a458ac2439c7@free.fr>
- <4954977e-46fd-8d54-ec76-db2134d3073a@arm.com>
- <26b17bd9-232f-b992-68ac-3b5a7752ba54@free.fr>
- <CAL_JsqK7XayjJcCYhicuqGqKN8N6+P=9tDrs_m7K3YiOBHDAHA@mail.gmail.com>
-Message-ID: <78996e48-885a-f0e8-a4ed-8f3e830255ef@free.fr>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 19 Sep 2017 16:26:01 +0530
+Subject: [RESEND PATCH v2 1/5] mtd: spi-nor: cadence-quadspi: Add TI 66AK2G
+ SoC specific compatible
+In-Reply-To: <20170919105605.18533-1-vigneshr@ti.com>
+References: <20170919105605.18533-1-vigneshr@ti.com>
+Message-ID: <20170919105605.18533-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/09/2017 23:30, Rob Herring wrote:
-> On Aug 28, 2017 at 11:13 AM, Mason wrote:
->> On 25/08/2017 17:25, Robin Murphy wrote:
->>
->>> If your host controller driver needs to discover its windows from DT to
->>> configure *itself*, it needs to parse dma-ranges itself; see pcie-iproc,
->>> pcie-rcar, pcie-xgene, etc. for examples.
->>
->> $ git grep '"dma-ranges"' drivers/pci/host
->> drivers/pci/host/pci-ftpci100.c:        parser->range = of_get_property(node, "dma-ranges", &rlen);
->> drivers/pci/host/pci-rcar-gen2.c:       parser->range = of_get_property(node, "dma-ranges", &rlen);
->> drivers/pci/host/pci-xgene.c:   parser->range = of_get_property(node, "dma-ranges", &rlen);
->> drivers/pci/host/pcie-iproc.c:  parser->range = of_get_property(node, "dma-ranges", &rlen);
->> drivers/pci/host/pcie-rcar.c:   parser->range = of_get_property(node, "dma-ranges", &rlen);
->>
->> These 5 drivers are using the same function: pci_dma_range_parser_init
->>
->> pci-ftpci100.c:         d3c68e0a7e34a (Linus Walleij     2017-03-12
->> pci-rcar-gen2.c:        8d598cabf50d8 (Phil Edworthy     2015-11-03
->> pci-xgene.c:            5f6b6ccdbe1cd (Tanmay Inamdar    2014-10-01
->> pcie-iproc.c:           dd9d4e7498de3 (Ray Jui           2016-10-31
->> pcie-rcar.c:            c25da4778803b (Phil Edworthy     2014-05-12
->>
->> which seems to be a copy of of_pci_range_parser_init
->> with "ranges" changed to "dma-ranges"
->>
->> drivers/of/address.c    29b635c00f3eb (Andrew Murray     2013-05-16
->>
->> Perhaps pci_dma_range_parser_init() can be factorized?
->>
->> Rob, Frank, what do you think of the patch below?
-> 
-> I thought I had commented (maybe that was on IRC), but looks fine.
-> 
-> This series should also fix a build failure on rcar with !OF, so can
-> you send a proper patch?
+Update binding documentation to add a new compatible for TI 66AK2G SoC,
+to handle TI SoC specific quirks in the driver.
 
-You're not misremembering, you did review the formal patch ;-)
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-"[PATCH 0/3] Tango PCIe host bridge MSI support + required API"
-https://patchwork.kernel.org/patch/9927539/
-https://patchwork.kernel.org/patch/9927541/
-
-Regards.
+diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+index f248056da24c..7dbe3bd9ac56 100644
+--- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
++++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+@@ -1,7 +1,9 @@
+ * Cadence Quad SPI controller
+ 
+ Required properties:
+-- compatible : Should be "cdns,qspi-nor".
++- compatible : should be one of the following:
++	Generic default - "cdns,qspi-nor".
++	For TI 66AK2G SoC - "ti,k2g-qspi", "cdns,qspi-nor".
+ - reg : Contains two entries, each of which is a tuple consisting of a
+ 	physical address and length. The first entry is the address and
+ 	length of the controller register set. The second entry is the
+-- 
+2.14.1
