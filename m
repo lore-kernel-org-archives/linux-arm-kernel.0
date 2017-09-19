@@ -1,34 +1,38 @@
-From: razvan.stefanescu@nxp.com (Razvan Stefanescu)
-Date: Tue, 19 Sep 2017 12:01:36 +0300
-Subject: [PATCH 4/6] staging: fsl-dpaa2/ethsw: Add maintainer for Ethernet
- Switch driver
-In-Reply-To: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
-References: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
-Message-ID: <1505811698-7338-5-git-send-email-razvan.stefanescu@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 Sep 2017 11:13:25 +0200
+Subject: [PATCH] arm64: dts: draak: Add serial console pins
+In-Reply-To: <20170830064402.GB10398@verge.net.au>
+References: <1503912370-20180-1-git-send-email-geert+renesas@glider.be>
+ <20170830064402.GB10398@verge.net.au>
+Message-ID: <CAMuHMdVCUcy48qDvDSDZ9MAgCLiSUd4zgFD2iu5eWkTVinN1Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Razvan Stefanescu <razvan.stefanescu@nxp.com>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Wed, Aug 30, 2017 at 8:44 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Aug 28, 2017 at 11:26:10AM +0200, Geert Uytterhoeven wrote:
+>> Add pin control for SCIF2.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> To be applied after v4.14-rc1, when commit 794a6711764658a1 ("pinctrl:
+>> sh-pfc: Initial R8A77995 PFC support") has hit mainline.
+>>
+>> Else the serial console will fail, reporting (on earlycon):
+>>
+>>     sh-sci e6e88000.serial: could not find pctldev for node /soc/pin-controller at e6060000/scif2, deferring probe
+>
+> Thanks, please ping me once that has happened.
+> In the meantime I have marked this patch as deferred.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2281af4..cfd4f74 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4297,6 +4297,12 @@ L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/staging/fsl-dpaa2/ethernet
- 
-+DPAA2 ETHERNET SWITCH DRIVER
-+M:	Razvan Stefanescu <razvan.stefanescu@nxp.com>
-+L:	linux-kernel at vger.kernel.org
-+S:	Maintained
-+F:	drivers/staging/fsl-dpaa2/ethsw
-+
- DPT_I2O SCSI RAID DRIVER
- M:	Adaptec OEM Raid Solutions <aacraid@adaptec.com>
- L:	linux-scsi at vger.kernel.org
--- 
-1.9.1
+Ping...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
