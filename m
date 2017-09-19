@@ -1,51 +1,136 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 19 Sep 2017 11:07:05 +0100
-Subject: [PATCH v2 3/4] iommu/iova: Extend rbtree node caching
-In-Reply-To: <59C0E694.6080508@huawei.com>
-References: <cover.1500636791.git.robin.murphy@arm.com>
- <b5b7e5541e47cba1112ef5bfb036d8ad44df8893.1500636791.git.robin.murphy@arm.com>
- <23972edc-e59e-3a43-59a9-d776e64af4d7@codeaurora.org>
- <e5d4524e-bfe9-acf1-66c1-ea1d9d319855@arm.com> <59C0E694.6080508@huawei.com>
-Message-ID: <d9945e6a-b605-a531-cefb-6ba13bd45f1f@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 19 Sep 2017 12:19:33 +0200
+Subject: [PATCH v2 9/9] tty/serial: atmel: Prevent a warning on suspend
+In-Reply-To: <20170915140411.31716-10-romain.izard.pro@gmail.com>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-10-romain.izard.pro@gmail.com>
+Message-ID: <380a15d6-c180-316f-a56b-011acd02df59@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/17 10:42, Leizhen (ThunderTown) wrote:
-[...]
->>>>     static void
->>>>   __cached_rbnode_delete_update(struct iova_domain *iovad, struct iova
->>>> *free)
->>>>   {
->>>>       struct iova *cached_iova;
->>>> -    struct rb_node *curr;
->>>> +    struct rb_node **curr = NULL;
->>>>   -    if (!iovad->cached32_node)
->>>> -        return;
->>>> -    curr = iovad->cached32_node;
->>>> -    cached_iova = rb_entry(curr, struct iova, node);
+On 15/09/2017 at 16:04, Romain Izard wrote:
+> The atmel serial port driver reported the following warning on suspend:
+> atmel_usart f8020000.serial: ttyS1: Unable to drain transmitter
 > 
-> -----------------------------
->>>> +    if (free->pfn_hi < iovad->dma_32bit_pfn)
->>>> +        curr = &iovad->cached32_node;
->>>> +    if (!curr)
->>>> +        curr = &iovad->cached_node;
->>
->> +	if (!*curr)
->> +		return;
-> Is it necessary for us to try the following adjustment?
-> +	if (free->pfn_hi < iovad->dma_32bit_pfn)
-> +		curr = &iovad->cached32_node;
-> +	else
-> +		curr = &iovad->cached_node;
+> As the ATMEL_US_TXEMPTY status bit in ATMEL_US_CSR is always cleared
+> when the transmitter is disabled, we need to know the transmitter's
+> state to return the real fifo state. And as ATMEL_US_CR is write-only,
+> it is necessary to save the state of the transmitter in a local
+> variable, and update the variable when TXEN and TXDIS is written in
+> ATMEL_US_CR.
+> 
+> After those changes, atmel_tx_empty can return "empty" on suspend, the
+> warning in uart_suspend_port disappears, and suspending is 20ms shorter
+> for each enabled Atmel serial port.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+
+Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+on sama5d2 Xplained.
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+> ---
+>  drivers/tty/serial/atmel_serial.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 7551cab438ff..783af6648be0 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -171,6 +171,7 @@ struct atmel_uart_port {
+>  	bool			has_hw_timer;
+>  	struct timer_list	uart_timer;
+>  
+> +	bool			tx_stopped;
+>  	bool			suspended;
+>  	unsigned int		pending;
+>  	unsigned int		pending_status;
+> @@ -380,6 +381,10 @@ static int atmel_config_rs485(struct uart_port *port,
+>   */
+>  static u_int atmel_tx_empty(struct uart_port *port)
+>  {
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
 > +
-> +	if (!*curr) {
-> +		*curr = rb_next(&free->node);
-> +		return;
-> +	}
+> +	if (atmel_port->tx_stopped)
+> +		return TIOCSER_TEMT;
+>  	return (atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXEMPTY) ?
+>  		TIOCSER_TEMT :
+>  		0;
+> @@ -485,6 +490,7 @@ static void atmel_stop_tx(struct uart_port *port)
+>  	 * is fully transmitted.
+>  	 */
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
+> +	atmel_port->tx_stopped = true;
+>  
+>  	/* Disable interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
+> @@ -492,6 +498,7 @@ static void atmel_stop_tx(struct uart_port *port)
+>  	if ((port->rs485.flags & SER_RS485_ENABLED) &&
+>  	    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
+>  		atmel_start_rx(port);
+> +
+>  }
+>  
+>  /*
+> @@ -521,6 +528,7 @@ static void atmel_start_tx(struct uart_port *port)
+>  
+>  	/* re-enable the transmitter */
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+> +	atmel_port->tx_stopped = false;
+>  }
+>  
+>  /*
+> @@ -1866,6 +1874,7 @@ static int atmel_startup(struct uart_port *port)
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+>  	/* enable xmit & rcvr */
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
+> +	atmel_port->tx_stopped = false;
+>  
+>  	setup_timer(&atmel_port->uart_timer,
+>  			atmel_uart_timer_callback,
+> @@ -2122,6 +2131,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  
+>  	/* disable receiver and transmitter */
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS | ATMEL_US_RXDIS);
+> +	atmel_port->tx_stopped = true;
+>  
+>  	/* mode */
+>  	if (port->rs485.flags & SER_RS485_ENABLED) {
+> @@ -2207,6 +2217,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
+> +	atmel_port->tx_stopped = false;
+>  
+>  	/* restore interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IER, imr);
+> @@ -2450,6 +2461,7 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
+>  
+>  	/* Make sure that tx path is actually able to send characters */
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+> +	atmel_port->tx_stopped = false;
+>  
+>  	uart_console_write(port, s, count, atmel_console_putchar);
+>  
+> @@ -2511,6 +2523,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
+>  {
+>  	int ret;
+>  	struct uart_port *port = &atmel_ports[co->index].uart;
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  	int baud = 115200;
+>  	int bits = 8;
+>  	int parity = 'n';
+> @@ -2528,6 +2541,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
+>  	atmel_uart_writel(port, ATMEL_US_IDR, -1);
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+>  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
+> +	atmel_port->tx_stopped = false;
+>  
+>  	if (options)
+>  		uart_parse_options(options, &baud, &parity, &bits, &flow);
+> 
 
-Yeah, I spotted that this looked a bit wonky after I posted it. It's
-already cleaned up in v3, which I'll be posting shortly after I write up
-some cover letters.
 
-Thanks,
-Robin.
+-- 
+Nicolas Ferre
