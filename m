@@ -1,200 +1,131 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Tue, 19 Sep 2017 09:41:01 +0800
-Subject: [PATCH 6/6] arm64: topology: Enable ACPI/PPTT based CPU topology.
-In-Reply-To: <9a8e13d6-4b5e-cfa2-44c4-4d79aca94800@arm.com>
-References: <20170914184918.20406-1-jeremy.linton@arm.com>
- <20170914184918.20406-7-jeremy.linton@arm.com>
- <93846e2c-df62-fda6-200a-f55bfb9955c4@huawei.com>
- <9a8e13d6-4b5e-cfa2-44c4-4d79aca94800@arm.com>
-Message-ID: <6ffb8142-d9ea-47f1-87e7-a226cda22b01@huawei.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 19 Sep 2017 10:22:16 +0800
+Subject: consult a question about 'inject_abt64()'
+In-Reply-To: <20170918223256.GI4657@cbox>
+References: <a9ec4c60-a1b1-9535-89a2-30db4facaf1f@huawei.com>
+ <D8D110F4-5AC4-4AEF-817B-038F506B8D7D@arm.com>
+ <1f06664f-c60d-5551-70e7-13219210ef97@huawei.com>
+ <20170918223256.GI4657@cbox>
+Message-ID: <ede83091-4b52-906b-717f-360db79c77db@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+Hi, Christoffer
 
-On 2017/9/19 3:02, Jeremy Linton wrote:
-> On 09/17/2017 08:37 PM, Xiongfeng Wang wrote:
->> Hi Jeremy,
->>
->> On 2017/9/15 2:49, Jeremy Linton wrote:
->>> Propagate the topology information from the PPTT tree to the
->>> cpu_topology array. We can get the thread id, core_id and
->>> cluster_id by assuming certain levels of the PPTT tree correspond
->>> to those concepts. The package_id is flagged in the tree and can be
->>> found by passing an arbitrary large level to setup_acpi_cpu_topology()
->>> which terminates its search when it finds an ACPI node flagged
->>> as the physical package. If the tree doesn't contain enough
->>> levels to represent all of thread/core/cod/package then the package
->>> id will be used for the missing levels.
->>>
->>> Since arm64 machines can have 3 distinct topology levels, and the
->>> scheduler only handles sockets/threads well today, we compromise
->>> by collapsing into one of three diffrent configurations. These are
->>> thread/socket, thread/cluster or cluster/socket depending on whether
->>> the machine has threading and multisocket, threading in a single
->>> socket, or doesn't have threading.
->>>
->>> This code is loosely based on a combination of code from:
->>> Xiongfeng Wang <wangxiongfeng2@huawei.com>
->>> John Garry <john.garry@huawei.com>
->>> Jeffrey Hugo <jhugo@codeaurora.org>
->>>
->>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>> ---
->>>   arch/arm64/kernel/topology.c | 68 +++++++++++++++++++++++++++++++++++++++++++-
->>>   include/linux/topology.h     |  2 ++
->>>   2 files changed, 69 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->>> index 9147e5b6326d..8ee5cc5ba9bd 100644
->>> --- a/arch/arm64/kernel/topology.c
->>> +++ b/arch/arm64/kernel/topology.c
->>> @@ -11,6 +11,7 @@
->>>    * for more details.
->>>    */
->>>   +#include <linux/acpi.h>
->>>   #include <linux/arch_topology.h>
->>>   #include <linux/cpu.h>
->>>   #include <linux/cpumask.h>
->>> @@ -22,6 +23,7 @@
->>>   #include <linux/sched.h>
->>>   #include <linux/sched/topology.h>
->>>   #include <linux/slab.h>
->>> +#include <linux/smp.h>
->>>   #include <linux/string.h>
->>>     #include <asm/cpu.h>
->>> @@ -304,6 +306,68 @@ static void __init reset_cpu_topology(void)
->>>       }
->>>   }
->>>   +#ifdef CONFIG_ACPI
->>> +/*
->>> + * Propagate the topology information of the processor_topology_node tree to the
->>> + * cpu_topology array.
->>> + */
->>> +static int __init parse_acpi_topology(void)
->>> +{
->>> +    u64 is_threaded;
->>> +    int is_multisocket;
->>> +    int cpu;
->>> +    int topology_id;
->>> +    /* set a large depth, to hit ACPI_PPTT_PHYSICAL_PACKAGE if one exists */
->>> +    const int max_topo = 0xFF;
->>> +
->>> +    is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
->>> +    is_multisocket = acpi_multisocket_count();
->>> +    if (is_multisocket < 0)
->>> +        return is_multisocket;
->>> +
->>> +    for_each_possible_cpu(cpu) {
->>> +        topology_id = setup_acpi_cpu_topology(cpu, 0);
->>> +        if (topology_id < 0)
->>> +            return topology_id;
->>> +
->>> +        if ((is_threaded) && (is_multisocket > 1)) {
->>> +            /* MT per core, and multiple sockets */
->>> +            cpu_topology[cpu].thread_id = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, 1);
->>> +            cpu_topology[cpu].core_id   = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, 2);
->>> +            cpu_topology[cpu].cluster_id = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, max_topo);
->>> +            cpu_topology[cpu].package_id = topology_id;
->>> +        } else if (is_threaded) {
->>> +            /* mutltiple threads, but only a single socket */
->>> +            cpu_topology[cpu].thread_id  = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, 1);
->>> +            cpu_topology[cpu].core_id    = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, 2);
->>> +            cpu_topology[cpu].cluster_id = topology_id;
->>> +            cpu_topology[cpu].package_id = topology_id;
->>> +        } else {
->>> +            /* no threads, clusters behave like threads */
->>> +            cpu_topology[cpu].thread_id  = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, 1);
->>> +            cpu_topology[cpu].core_id    = topology_id;
->>> +            cpu_topology[cpu].cluster_id = topology_id;
->>> +            topology_id = setup_acpi_cpu_topology(cpu, max_topo);
->>> +            cpu_topology[cpu].package_id = topology_id;
->>
->> I can not understand why should we consider cores in a cluster as threads. The scheduler will
->> be effected a lot by this. And the 'lstopo' may display wrong information.
+On 2017/9/19 6:32, Christoffer Dall wrote:
+> Hi,
 > 
-> My take, is that we shouldn't be discarding the cluster information because its extremely valuable. In many ways it seems that clustered cores have, at a high level, 
-> similar performance characteristics to threads (AKA, cores in a cluster have high performance when sharing data, but for problems with little sharing its more advantageous to 
-> first schedule those threads to differing clusters). Although, how much affect this has vs the MC cache priorities in the scheduler isn't apparent to me.
-The code for sched_domain building for arm64 is as below. 'cpu_smt_mask' use 'thread_sibling' in struct cpu_topology, and 'cpu_coregroup_mask' use 'core_sibling' in struct cpu_topology.
-But the defconfig for ARM64 does not include 'CONFIG_SCHED_SMT'. If we add a *_sibling field in struct cpu_topology to represent cores in one cluster, and change 'cpu_coregroup_mask'
-to use this field, we can build a sched_domain only with cores in a cluster.
-
-static struct sched_domain_topology_level default_topology[] = {
-#ifdef CONFIG_SCHED_SMT
-        { cpu_smt_mask, cpu_smt_flags, SD_INIT_NAME(SMT) },
-#endif
-#ifdef CONFIG_SCHED_MC
-        { cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
-#endif
-        { cpu_cpu_mask, SD_INIT_NAME(DIE) },
-        { NULL, },
-};
+> On Mon, Sep 18, 2017 at 09:49:25PM +0800, gengdongjiu wrote:
+>> To KVM mailing List about below question, thanks.
+>>
+> 
+> [Please send properly formatted and written e-mails to this mailing
+> list instead of just forwarding a conversation withtout futher
+> explanation.  It would have been more helpful if you had suggested a
+> patch or at least explained what you concluded from your conversation
+> with Matt.]
+sorry for the mail format. I will pay attention to that next time.
 
 > 
-> Anyway, lstopo doesn't currently know about anything beyond package/thread, except for the book. The question is, do we want to misuse the book_id to represent sockets and 
-> continue to use cluster_id as the physical_package_id? I don't think that is a better plan than what I've done here.
+> I don't think there's a problem here, because the ESR values are defined
+> as
 > 
-Sorry I didn't know much about the book_id. For my understanding, 'lstopo' use the information from the sysfs. So I search the linux code for 'book_id' and found out that
-'book_id' seems to be used in S390 architecture only.
+> #define ESR_ELx_EC_IABT_LOW?    (0x20)
+> #define ESR_ELx_EC_IABT_CUR?    (0x21)
+> ...
+> #define ESR_ELx_EC_DABT_LOW?    (0x24)
+> #define ESR_ELx_EC_DABT_CUR?    (0x25)
 > 
-> The bottom line, is that after having looked at the scheduler a bit, I suspect that thread=cluster for machines without MT doesn't' really matter much. So, the next version 
-> i'm just going to collapse this into what everyone expects socket=socket and thread=thread for ACPI users (which are more likely to have NUMA and multisocket at this point). The 
-> cluster knowledge is still somewhat visible to the scheduler via the cache topology.
+> and we just or on the differating bit for a data abort:
 > 
+> if (!is_iabt)
+> 	esr |= ESR_ELx_EC_DABT_LOW << ESR_ELx_EC_SHIFT;
 > 
+> So you'll see that ESR_ELx_EC_IABT_LOW and ESR_ELx_EC_IABT_CUR become
+> ESR_ELx_EC_DABT_LOW and ESR_ELx_EC_DABT_CUR, respectively.
+
+Thanks for the explanation.
+
+
 > 
+> Thanks,
+> -Christoffer
 > 
 >>
->> Thanks,
->> Xiongfeng Wang
 >>
->>> +        }
->>> +    }
->>> +    return 0;
->>> +}
->>> +
->>> +#else
->>> +static int __init parse_acpi_topology(void)
->>> +{
->>> +    /*ACPI kernels should be built with PPTT support*/
->>> +    return -EINVAL;
->>> +}
->>> +#endif
->>> +
->>>   void __init init_cpu_topology(void)
->>>   {
->>>       reset_cpu_topology();
->>> @@ -312,6 +376,8 @@ void __init init_cpu_topology(void)
->>>        * Discard anything that was parsed if we hit an error so we
->>>        * don't use partial information.
->>>        */
->>> -    if (of_have_populated_dt() && parse_dt_topology())
->>> +    if ((!acpi_disabled) && parse_acpi_topology())
->>> +        reset_cpu_topology();
->>> +    else if (of_have_populated_dt() && parse_dt_topology())
->>>           reset_cpu_topology();
->>>   }
->>> diff --git a/include/linux/topology.h b/include/linux/topology.h
->>> index 4660749a7303..08bf736be7c1 100644
->>> --- a/include/linux/topology.h
->>> +++ b/include/linux/topology.h
->>> @@ -43,6 +43,8 @@
->>>           if (nr_cpus_node(node))
->>>     int arch_update_cpu_topology(void);
->>> +int setup_acpi_cpu_topology(unsigned int cpu, int level);
->>> +int acpi_multisocket_count(void);
->>>     /* Conform to ACPI 2.0 SLIT distance definitions */
->>>   #define LOCAL_DISTANCE        10
+>> On 2017/9/18 21:17, Matt Evans wrote:
+>>> Hi Gengdongjiu,
+>>>
+>>>
+>>>> On 18 Sep 2017, at 07:39, gengdongjiu <gengdongjiu@huawei.com> wrote:
+>>>>
+>>>> Hi Matt,
+>>>>   sorry to disturb you, I want to consult you a question about the function inject_abt64();
+>>>> For this function, the abort EC can be ESR_ELx_EC_DABT_LOW or ESR_ELx_EC_DABT_CUR according to *vcpu_cpsr(vcpu);
+>>>> why it always ESR_ELx_EC_DABT_LOW?  thanks!
+>>>>
+>>>> As you can see the Iabort, when injecting the Iabort, it will check the cpsr to decide to inject the ESR_ELx_EC_IABT_LOW or ESR_ELx_EC_IABT_CUR.
+>>>> but I do not know why the Dabort will always be ESR_ELx_EC_DABT_LOW when injecting.
+>>>>
+>>>>        /*
+>>>>         * Here, the guest runs in AArch64 mode when in EL1. If we get
+>>>>         * an AArch32 fault, it means we managed to trap an EL0 fault.
+>>>>         */
+>>>>        if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
+>>>>                esr |= (ESR_ELx_EC_IABT_LOW << ESR_ELx_EC_SHIFT);
+>>>>        else
+>>>>                esr |= (ESR_ELx_EC_IABT_CUR << ESR_ELx_EC_SHIFT);
+>>>
+>>> I think you're right.  When I fixed that line I had noticed the lack of left-shift but didn't think about the actual ESR value.
+>>>
+>>> The injected vector is calculated correctly (between current-EL or lower-EL vectors) by get_except_vector() but the EC should also correspond to current-EL or lower-EL.
+>>>
+>>> It is worth following this up on the ARM KVM mailing list!  (To be fair, your question should have been sent there too :) )
+>>>
+>>> Thanks,
+>>>
+>>>
+>>> Matt
+>>>
+>>>
+>>>
+>>>>
+>>>>
+>>>>
+>>>> commit e4fe9e7dc3828bf6a5714eb3c55aef6260d823a2
+>>>> Author: Matt Evans <matt.evans@arm.com>
+>>>> Date:   Mon May 16 13:54:56 2016 +0100
+>>>>
+>>>>    kvm: arm64: Fix EC field in inject_abt64
+>>>>
+>>>>    The EC field of the constructed ESR is conditionally modified by ORing in
+>>>>    ESR_ELx_EC_DABT_LOW for a data abort.  However, ESR_ELx_EC_SHIFT is missing
+>>>>    from this condition.
+>>>>
+>>>>    Signed-off-by: Matt Evans <matt.evans@arm.com>
+>>>>    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>    Cc: <stable@vger.kernel.org>
+>>>>    Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>
+>>>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+>>>> index 4d1ac81870d2..e9e0e6db73f6 100644
+>>>> --- a/arch/arm64/kvm/inject_fault.c
+>>>> +++ b/arch/arm64/kvm/inject_fault.c
+>>>> @@ -162,7 +162,7 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
+>>>>                esr |= (ESR_ELx_EC_IABT_CUR << ESR_ELx_EC_SHIFT);
+>>>>
+>>>>        if (!is_iabt)
+>>>> -               esr |= ESR_ELx_EC_DABT_LOW;
+>>>> +               esr |= ESR_ELx_EC_DABT_LOW << ESR_ELx_EC_SHIFT;
+>>>>
+>>>>        vcpu_sys_reg(vcpu, ESR_EL1) = esr | ESR_ELx_FSC_EXTABT;
+>>>> }
+>>>>
+>>>
+>>> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+>>>
 >>>
 >>
-> 
 > 
 > .
 > 
