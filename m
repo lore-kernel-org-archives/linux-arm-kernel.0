@@ -1,32 +1,30 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Tue, 19 Sep 2017 13:44:06 +0200
-Subject: [PATCH] dt-bindings: clk: stm32h7: fix clock-cell size
-Message-ID: <1505821446-6847-1-git-send-email-gabriel.fernandez@st.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue, 19 Sep 2017 21:50:42 +1000
+Subject: [PATCH] ARM: uaccess: Add missing include for set_thread_flag
+Message-ID: <20170919115042.6800-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Fixes "implicit declaration of function" compile error for out-of-tree
+kernel modules including asm/uaccess.h.
 
-The clock-cell size is 1 on stm32h7 plaform.
-
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
+Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
+Signed-off-by: Jonathan Liu <net147@gmail.com>
 ---
- Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/uaccess.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-index a135504..cac24ee 100644
---- a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-+++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-@@ -32,7 +32,7 @@ Example:
- 		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
- 		reg = <0x58024400 0x400>;
- 		#reset-cells = <1>;
--		#clock-cells = <2>;
-+		#clock-cells = <1>;
- 		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 87936dd5d151..13d1877ffb75 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -17,6 +17,7 @@
+ #include <asm/unified.h>
+ #include <asm/compiler.h>
  
- 		st,syscfg = <&pwrcfg>;
++#include <linux/thread_info.h>
+ #include <asm/extable.h>
+ 
+ /*
 -- 
-1.9.1
+2.13.2
