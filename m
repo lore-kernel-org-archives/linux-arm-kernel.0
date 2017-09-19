@@ -1,27 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 13:35:14 +0100
-Subject: [PATCH 1/3] dt-bindings: spi: spi-davinci: Update binding for
- 66AK2Gx pwr dm property
-In-Reply-To: <20170908204638.13149-2-fcooper@ti.com>
-References: <20170908204638.13149-1-fcooper@ti.com>
- <20170908204638.13149-2-fcooper@ti.com>
-Message-ID: <20170919123514.sqzeglbbypp5edsz@sirena.co.uk>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Tue, 19 Sep 2017 20:37:34 +0800
+Subject: [RESEND PATCH v2 1/3] ASoC: rockchip: Add dapm route for HDMI
+In-Reply-To: <20170919121907.bsikxtaih2ca3z3o@sirena.co.uk>
+References: <20170918111801.12881-1-jeffy.chen@rock-chips.com>
+ <20170919121907.bsikxtaih2ca3z3o@sirena.co.uk>
+Message-ID: <59C10F8E.3000404@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 08, 2017 at 03:46:36PM -0500, Franklin S Cooper Jr wrote:
-> Add pm-domains property which is required for 66AK2Gx. Also document 66AK2G
-> unique clocks property usage.
+Hi Mark,
 
-Please submit patches using subject lines reflecting the style for the
-subsystem.  This makes it easier for people to identify relevant
-patches.  Look at what existing commits in the area you're changing are
-doing and make sure your subject lines visually resemble what they're
-doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/f67405e2/attachment.sig>
+On 09/19/2017 08:19 PM, Mark Brown wrote:
+> On Mon, Sep 18, 2017 at 07:17:59PM +0800, Jeffy Chen wrote:
+>> Add dapm route for DP codec.
+>
+> This is a resend of a patch you posted earlier in the same day?
+>
+sorry, this is a resend of yesterday patches, to correct the wrong the 
+wrong patch tag("Asoc") to "ASoC"
