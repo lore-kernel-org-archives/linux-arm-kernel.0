@@ -1,109 +1,66 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 19 Sep 2017 10:17:33 +0200
-Subject: [PATCH] KVM: arm64: vgic-its: Fix wrong return value check in
- vgic_its_restore_device_tables
-In-Reply-To: <000401d32f8c$828f4270$87adc750$@codeaurora.org>
-References: <1504675565-13641-1-git-send-email-vkilari@codeaurora.org>
- <65a66715-4f22-07d4-879a-1181c8dad889@redhat.com>
- <000401d32f8c$828f4270$87adc750$@codeaurora.org>
-Message-ID: <cecab6c9-7f18-9db1-2b4d-a64cd12cd5c8@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 Sep 2017 10:20:19 +0200
+Subject: [PATCH] nvmem: sunxi-sid: add support for A64/H5's SID controller
+In-Reply-To: <20170918154204.54427-1-icenowy@aosc.io>
+References: <20170918154204.54427-1-icenowy@aosc.io>
+Message-ID: <20170919082019.6bopwauso4mbslqo@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vijaya,
-On 17/09/2017 10:10, vkilari at codeaurora.org wrote:
-> Hi Eric,
+On Mon, Sep 18, 2017 at 11:42:04PM +0800, Icenowy Zheng wrote:
+> Allwinner A64/H5 SoCs come with a SID controller like the one in H3, but
+> without the silicon bug that makes the initial value at 0x200 wrong, so
+> the value at 0x200 can be directly read.
 > 
->  Sorry for delayed reply.
+> Add support for this kind of SID controller.
 > 
->> -----Original Message-----
->> From: Auger Eric [mailto:eric.auger at redhat.com]
->> Sent: Wednesday, September 6, 2017 12:53 PM
->> To: Vijaya Kumar K <vkilari@codeaurora.org>;
->> kvmarm at lists.cs.columbia.edu; marc.zyngier at arm.com; cdall at linaro.org;
->> andre.przywara at arm.com
->> Cc: vvenkat at codeaurora.org; shankerd at codeaurora.org;
->> kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] KVM: arm64: vgic-its: Fix wrong return value check in
->> vgic_its_restore_device_tables
->>
->> Hi Vijaya,
->>
->> On 06/09/2017 07:26, Vijaya Kumar K wrote:
->>> scan_its_table() return 1 on success.
->>
->> As mentioned in the kernel-doc comment of scan_its_table, this latter
->> returns 1 if the last element is not found. Than can happen while scanning
-> an
->> L2 table but shouldn't happen if we scan an L1 table.
->>
->>  * Return: < 0 on error, 0 if last element was identified, 1 otherwise
->>  * (the last element may not be found on second level tables)
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
+>  drivers/nvmem/sunxi_sid.c                                       | 6 ++++++
+>  2 files changed, 7 insertions(+)
 > 
-> OK. I will  fix this comment
-> 
->>
->>
->>  In the function vgic_its_restore_device_tables()
->>> the return value of scan_its_table() is checked against success value
->>> and returns -EINVAL. Hence migration fails for VM with ITS.
->>>
->>> With this patch the failure return value is checked while returning
->>> -EINVAL.
->>>
->>> Signed-off-by: Vijaya Kumar K <vkilari@codeaurora.org>
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c
->>> b/virt/kvm/arm/vgic/vgic-its.c index aa6b68d..63f8ac3 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -2142,7 +2142,7 @@ static int vgic_its_restore_device_tables(struct
->> vgic_its *its)
->>>  				     vgic_its_restore_dte, NULL);
->>>  	}
->>>
->>> -	if (ret > 0)
->>> +	if (ret <= 0)
->>>  		ret = -EINVAL;
->> your modification would return -EINVAL for whatever error encountered
->> during the scan table or if last element is found. I don't think this is
-> what we
->> want.
-> 
-> IIUC, ret 0 indicates last entry of the table. So in this case return value
-> 0 is also success.
-> with the assumption that table might be smaller than size.
-0 indicates you successfully found all the valid data laid out in the
-table and you are done.
-> 
-> So only check for < 0 and return -EINVAL. For all other return values 0 and
->> 0  return 0.
-> as below. Please correct me if I wrong.
-> 
->            If (ret < 0)
->                           ret = -EINVAL;
-why overriding ret value by -EINVAL?
->            else
->                           ret = 0;
-I would rather do:
-        if (ret > 0)
-                ret = 0;
+> diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+> index ef06d061913c..6ea0836939ee 100644
+> --- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+> +++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+> @@ -5,6 +5,7 @@ Required properties:
+>    "allwinner,sun4i-a10-sid"
+>    "allwinner,sun7i-a20-sid"
+>    "allwinner,sun8i-h3-sid"
+> +  "allwinner,sun50i-a64-sid"
+>  
+>  - reg: Should contain registers location and length
+>  
+> diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+> index 0d6648be93b8..3c9fd4fb9207 100644
+> --- a/drivers/nvmem/sunxi_sid.c
+> +++ b/drivers/nvmem/sunxi_sid.c
+> @@ -199,10 +199,16 @@ static const struct sunxi_sid_cfg sun8i_h3_cfg = {
+>  	.need_register_readout = true,
+>  };
+>  
+> +static const struct sunxi_sid_cfg sun50i_a64_cfg = {
+> +	.value_offset = 0x200,
+> +	.size = 0x100,
+> +};
+> +
 
-        return ret;
+How did you get those values?
 
-I think Wanghaibin intends to respin + his fix of same issue on
-vgic_its_restore_itt returned value.
+Also, it's reported that the SID can only be accessed in secure mode,
+did you test it?
 
-see https://www.spinics.net/lists/kvm-arm/msg27248.html
+Maxime
 
-Thanks
-
-Eric
-
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/fed1212f/attachment.sig>
