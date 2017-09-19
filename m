@@ -1,23 +1,24 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Sep 2017 14:27:16 +0200
-Subject: [PATCH 0/6] staging: Introduce DPAA2 Ethernet Switch driver
-In-Reply-To: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
-References: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
-Message-ID: <20170919122716.GC4569@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Sep 2017 13:28:03 +0100
+Subject: [RESEND PATCH v2 3/3] ASoC: rockchip: Init dapm routes dynamically
+In-Reply-To: <20170918111801.12881-3-jeffy.chen@rock-chips.com>
+References: <20170918111801.12881-1-jeffy.chen@rock-chips.com>
+ <20170918111801.12881-3-jeffy.chen@rock-chips.com>
+Message-ID: <20170919122803.kybaln43yho3deih@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 12:01:32PM +0300, Razvan Stefanescu wrote:
-> This patchset introduces the Ethernet Switch Driver for Freescale/NXP SoCs
-> with DPAA2 (DataPath Acceleration Architecture v2). The driver manages
-> switch objects discovered on the fsl-mc bus. A description of the driver
-> can be found in the associated README file.
+On Mon, Sep 18, 2017 at 07:18:01PM +0800, Jeffy Chen wrote:
+> Currently we are using a fixed list of dapm routes.
+> 
+> Init dapm routes dynamically when parsing dailinks, since we are
+> supporting optional codecs.
 
-Hi Razvan
-
-You should probably Cc: netdev with these patches, if you want people
-who have written switch drivers to review you code. You can also drop
-linux-arm-kernel, since there is nothing ARM specific in these
-patches.
-
-	Andrew
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/976db638/attachment.sig>
