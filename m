@@ -1,43 +1,57 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 19 Sep 2017 20:44:47 +0200
-Subject: [PATCH] dmaengine: sun6i: sun4i-gpadc: use of_device_get_match_data
-Message-ID: <20170919184447.4479-1-clabbe.montjoie@gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 19 Sep 2017 13:47:47 -0500
+Subject: [PATCH v2 2/6] ACPI: Enable PPTT support on ARM64
+In-Reply-To: <20170919184751.25110-1-jeremy.linton@arm.com>
+References: <20170919184751.25110-1-jeremy.linton@arm.com>
+Message-ID: <20170919184751.25110-3-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of of_device_get_match_data reduce the code size a bit.
-Furthermore, it prevents an improbable dereference when
-of_match_device() return NULL.
+Now that we have a PPTT parser, in preparation for its use
+on arm64, lets build it.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/dma/sun6i-dma.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig         | 1 +
+ drivers/acpi/Makefile      | 1 +
+ drivers/acpi/arm64/Kconfig | 3 +++
+ 3 files changed, 5 insertions(+)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index bcd496edc70f..584f4e82a9be 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -1064,7 +1064,6 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..68c9d1289735 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -7,6 +7,7 @@ config ARM64
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ACPI_MCFG if ACPI
+ 	select ACPI_SPCR_TABLE if ACPI
++	select ACPI_PPTT if ACPI
+ 	select ARCH_CLOCKSOURCE_DATA
+ 	select ARCH_HAS_DEBUG_VIRTUAL
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 90265ab4437a..c92a0c937551 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -85,6 +85,7 @@ obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+ obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+ obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
+ obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
++obj-$(CONFIG_ACPI_PPTT) 	+= pptt.o
  
- static int sun6i_dma_probe(struct platform_device *pdev)
- {
--	const struct of_device_id *device;
- 	struct sun6i_dma_dev *sdc;
- 	struct resource *res;
- 	int ret, i;
-@@ -1073,10 +1072,9 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	if (!sdc)
- 		return -ENOMEM;
+ # processor has its own "processor." module_param namespace
+ processor-y			:= processor_driver.o
+diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+index 5a6f80fce0d6..74b855a669ea 100644
+--- a/drivers/acpi/arm64/Kconfig
++++ b/drivers/acpi/arm64/Kconfig
+@@ -7,3 +7,6 @@ config ACPI_IORT
  
--	device = of_match_device(sun6i_dma_match, &pdev->dev);
--	if (!device)
-+	sdc->cfg = of_device_get_match_data(&pdev->dev);
-+	if (!sdc->cfg)
- 		return -ENODEV;
--	sdc->cfg = device->data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	sdc->base = devm_ioremap_resource(&pdev->dev, res);
+ config ACPI_GTDT
+ 	bool
++
++config ACPI_PPTT
++	bool
+\ No newline at end of file
 -- 
 2.13.5
