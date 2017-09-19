@@ -1,52 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Sep 2017 16:23:49 +0100
-Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170919152253.tvj3hheggrx4lgig@dell>
-References: <20170913193723.16234-1-robert.jarzmik@free.fr>
- <20170913193723.16234-3-robert.jarzmik@free.fr>
- <20170914074146.dnibkvom4yuzejf3@dell>
- <20170914074300.iobuwn2hrmnf6sen@dell>
- <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
- <20170918085236.z6gmgrwvsjvvc4cd@dell>
- <20170919121539.mz2mettkefxf3oer@sirena.co.uk>
- <20170919152253.tvj3hheggrx4lgig@dell>
-Message-ID: <20170919152349.2dks77acrnv27mto@dell>
+Date: Tue, 19 Sep 2017 16:25:04 +0100
+Subject: [PATCH v2 8/9] atmel_flexcom: Support backup mode
+In-Reply-To: <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-9-romain.izard.pro@gmail.com>
+ <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
+Message-ID: <20170919152504.nhp5i734u75gb5gq@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Sep 2017, Lee Jones wrote:
+On Tue, 19 Sep 2017, Nicolas Ferre wrote:
 
-> On Tue, 19 Sep 2017, Mark Brown wrote:
+> On 15/09/2017 at 16:04, Romain Izard wrote:
+> > The controller used by a flexcom module is configured at boot, and left
+> > alone after this. As the configuration will be lost after backup mode,
+> > restore the state of the flexcom driver on resume.
+> > 
+> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 > 
-> > On Mon, Sep 18, 2017 at 09:52:36AM +0100, Lee Jones wrote:
-> > > On Thu, 14 Sep 2017, Mark Brown wrote:
-> > 
-> > > > On Thu, Sep 14, 2017 at 08:43:00AM +0100, Lee Jones wrote:
-> > 
-> > > > > Change of plan.  It looks like there are deps.
-> > 
-> > > > > Unapplied.
-> > 
-> > > > The core stuff went in during the merge window, you should be able to
-> > > > wait for -rc1 or pick up the asoc-v4.14 tag.
-> > 
-> > > No, I mean patches; 3, 4, 5 and 7 depend on this file.
-> > 
-> > Right, but I'd have expected a pull request more than the patch being
-> > unapplied?
+> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> On sama5d2 Xplained board (i2c0 from flexcom 4).
+> and obviously:
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > 
-> Normally I wait until all patches patches in the set have been
-> reviewed (the ASOC ones still have not), then ask the OP and the
-> other affected Maintainers how they want to deal with the patch.
-> Far more often than not, the the solution is just to take the set
-> through the MFD tree.
+> Thanks Romain!
 > 
-> However, since this is a new driver, you can just take it with my:
+> Regards,
 > 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+> >  1 file changed, 50 insertions(+), 15 deletions(-)
 
-... although that does mean that you'll have to handle one of the
-Input patches too.
+This is the first time I've seen this patch.  Why's that?
 
 -- 
 Lee Jones
