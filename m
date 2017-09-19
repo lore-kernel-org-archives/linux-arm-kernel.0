@@ -1,37 +1,24 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 13:15:39 +0100
-Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170918085236.z6gmgrwvsjvvc4cd@dell>
-References: <20170913193723.16234-1-robert.jarzmik@free.fr>
- <20170913193723.16234-3-robert.jarzmik@free.fr>
- <20170914074146.dnibkvom4yuzejf3@dell>
- <20170914074300.iobuwn2hrmnf6sen@dell>
- <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
- <20170918085236.z6gmgrwvsjvvc4cd@dell>
-Message-ID: <20170919121539.mz2mettkefxf3oer@sirena.co.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 19 Sep 2017 14:17:55 +0200
+Subject: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
+In-Reply-To: <1505811698-7338-6-git-send-email-razvan.stefanescu@nxp.com>
+References: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
+ <1505811698-7338-6-git-send-email-razvan.stefanescu@nxp.com>
+Message-ID: <20170919121755.GB4569@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 09:52:36AM +0100, Lee Jones wrote:
-> On Thu, 14 Sep 2017, Mark Brown wrote:
+On Tue, Sep 19, 2017 at 12:01:37PM +0300, Razvan Stefanescu wrote:
+> +Driver uses the switch device driver model and exposes each switch port as
+> +a network interface, which can be included in a bridge. Traffic switched
+> +between ports is offloaded into the hardware. Exposed network interfaces
+> +are not used for I/O, they are used just for configuration. This
+> +limitation is going to be addressed in the future.
 
-> > On Thu, Sep 14, 2017 at 08:43:00AM +0100, Lee Jones wrote:
+Hi Razvan
 
-> > > Change of plan.  It looks like there are deps.
+Could you briefly describe how Ethernet frames get from the CPU to the
+switch. This is what decided if you should write a plain switchdev
+driver, or a DSA driver.
 
-> > > Unapplied.
-
-> > The core stuff went in during the merge window, you should be able to
-> > wait for -rc1 or pick up the asoc-v4.14 tag.
-
-> No, I mean patches; 3, 4, 5 and 7 depend on this file.
-
-Right, but I'd have expected a pull request more than the patch being
-unapplied?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/93b54561/attachment.sig>
+	Andrew
