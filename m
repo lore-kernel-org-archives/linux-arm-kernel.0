@@ -1,44 +1,75 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 20 Sep 2017 00:51:05 +0530
-Subject: [PATCH v4 4/6] ARM: dts: imx6dl-icore: Add LVDS support
-In-Reply-To: <CAOMZO5C+DXAQu=2OUAquB2AKn8dOzadoPsdGD05hXAUBdTnYjQ@mail.gmail.com>
-References: <1505121145-9507-1-git-send-email-jteki@openedev.com>
- <1505121145-9507-4-git-send-email-jteki@openedev.com>
- <CAOMZO5B0RAjdupLSe=S+tDEA-hpf-Si_4qjkcKC_ECX86PLScQ@mail.gmail.com>
- <CAMty3ZD3od1LXKai=kwq8hxGsa3EWcjQx5gyBtZvCM5ccC34ZQ@mail.gmail.com>
- <CAOMZO5C+DXAQu=2OUAquB2AKn8dOzadoPsdGD05hXAUBdTnYjQ@mail.gmail.com>
-Message-ID: <CAMty3ZCQP5vnrU5MSzRFwRS+vS9a_ULt3sNB07BOHv0dCton0w@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Sep 2017 14:36:35 -0500
+Subject: [PATCH v2 1/5] PCI:xilinx-nwl: Enable Root DMA
+In-Reply-To: <1504873388-29195-2-git-send-email-vjonnal@xilinx.com>
+References: <1504873388-29195-1-git-send-email-vjonnal@xilinx.com>
+ <1504873388-29195-2-git-send-email-vjonnal@xilinx.com>
+Message-ID: <20170919193635.GE22312@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Ravi,
 
-On Tue, Sep 19, 2017 at 9:22 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Jagan,
->
-> On Tue, Sep 19, 2017 at 2:06 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->> Hi Fabio,
->>
->>> Please add the support of this panel to drivers/gpu/drm/panel/panel-simple.c.
->>>
->>> Then you can refer its compatible in your board dts.
->>
->> Yes, I'm trying to add the display timings but I couldn't find any
->> info how to find front_portch, back_porch and sync. I remember
->> blanking time = Sync Width + BP + FP so out of which how can we
->> determine each one respectively. Please let me know if you have any
->> idea, I?ve attached the data-sheet.
->
-> Does the existing ampire,am800480r3tmqwa1h binding work for your display?
+Please make the subject line follow the existing convention, i.e., run
 
-Yes, it is working..but need to understand how these respective
-timings were calculated(because I need to add few more) . I tried this
-supported ampire but couldn't get the data-sheet. Please point me if
-you find any details.
+  $ git log --oneline drivers/pci/host/pcie-xilinx-nwl.c
 
-thanks!
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+and make yours match spacing, capitalization, and style (imperative
+sentence).
+
+Also waiting for ack from Michal.
+
+On Fri, Sep 08, 2017 at 05:53:03PM +0530, Ravi Shankar Jonnalagadda wrote:
+> Enabling Root DMA interrupts
+> 
+> Adding Root DMA translations to bridge for Register Access
+> 
+> Signed-off-by: Ravi Shankar Jonnalagadda <vjonnal@xilinx.com>
+> Signed-off-by: RaviKiran Gummaluri <rgummal@xilinx.com>
+> ---
+>  drivers/pci/host/pcie-xilinx-nwl.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+> index eec641a..5766582 100644
+> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> @@ -39,6 +39,11 @@
+>  #define E_ECAM_CONTROL			0x00000228
+>  #define E_ECAM_BASE_LO			0x00000230
+>  #define E_ECAM_BASE_HI			0x00000234
+> +#define E_DREG_CTRL			0x00000288
+> +#define E_DREG_BASE_LO			0x00000290
+> +
+> +#define DREG_DMA_EN			BIT(0)
+> +#define DREG_DMA_BASE_LO		0xFD0F0000
+>  
+>  /* Ingress - address translations */
+>  #define I_MSII_CAPABILITIES		0x00000300
+> @@ -57,6 +62,10 @@
+>  #define MSGF_MSI_STATUS_HI		0x00000444
+>  #define MSGF_MSI_MASK_LO		0x00000448
+>  #define MSGF_MSI_MASK_HI		0x0000044C
+> +/* Root DMA Interrupt register */
+> +#define MSGF_DMA_MASK			0x00000464
+> +
+> +#define MSGF_INTR_EN			BIT(0)
+>  
+>  /* Msg filter mask bits */
+>  #define CFG_ENABLE_PM_MSG_FWD		BIT(1)
+> @@ -766,6 +775,12 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
+>  	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
+>  			  MSGF_LEG_SR_MASKALL, MSGF_LEG_STATUS);
+>  
+> +	/* Enabling DREG translations */
+> +	nwl_bridge_writel(pcie, DREG_DMA_EN, E_DREG_CTRL);
+> +	nwl_bridge_writel(pcie, DREG_DMA_BASE_LO, E_DREG_BASE_LO);
+> +	/* Enabling Root DMA interrupts */
+> +	nwl_bridge_writel(pcie, MSGF_INTR_EN, MSGF_DMA_MASK);
+> +
+>  	/* Enable all legacy interrupts */
+>  	nwl_bridge_writel(pcie, MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
+>  
+> -- 
+> 2.7.4
+> 
