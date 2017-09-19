@@ -1,72 +1,67 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 19 Sep 2017 16:12:10 +0200
-Subject: [PATCH v2] arm64: dts: marvell: Fix A37xx UART0 register size
-In-Reply-To: <20170907130453.25497-1-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Thu, 7 Sep 2017 15:04:53 +0200")
-References: <20170907130453.25497-1-miquel.raynal@free-electrons.com>
-Message-ID: <87bmm6srph.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Sep 2017 15:19:54 +0100
+Subject: [PATCH 1/2] ARM: smccc-call: Use r12 to route secure monitor
+ calls on TI platforms
+In-Reply-To: <20170918205005.30235-1-afd@ti.com>
+References: <20170918205005.30235-1-afd@ti.com>
+Message-ID: <20170919141953.GH30715@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On jeu., sept. 07 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On Mon, Sep 18, 2017 at 03:50:04PM -0500, Andrew F. Davis wrote:
+> Our ROM Secure Monitor(SM) uses the value in r12 to determine which
+> service is being requested by an SMC call. This inline with the ARM
+> recommended SMC Calling Convention(SMCCC), which partitions the values
+> in R0 for this task, OP-TEE's SM follows the ARM recommended convention.
 
-> From: allen yan <yanwei@marvell.com>
->
-> Armada-37xx UART0 registers are 0x200 bytes wide. Right next to them are
-> the UART1 registers that should not be declared in this node.
->
-> Update the example in DT bindings document accordingly.
->
-> Signed-off-by: allen yan <yanwei@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+I can't parse this last sentence. What exactly is inline with the SMCCC?
 
-Applied on mvebu/dt64
+AFAICT, the SMCCC says r12 is "The Intra-Procedure-call scratch
+register", which is not a paramter, service ID, etc.
+
+> We need a way to signal that a call is for the OP-TEE SM and not for
+> the ROM SM in a way that is safe for the ROM SM, in case it is still
+> present. We do this by putting a value of 0x200 in r12 when the call
+> is for OP-TEE or any other ARM by modifying the SMCCC caller function.
+
+So IIUC, you have a secure monitor which is not SMCCC compliant, but you
+want to use it at the same time as OP-TEE, which is SMCCC compliant.
+
+It would be much better to have a new version of that monitor that was
+SMCCC compliant, and have to update the code for that, than to have to
+move OP-TEE away from standards compliance.
+
+> There are four combinations of events:
+> 
+> If the ROM SM is present and we make a legacy style SMC call, as we
+> do in early boot, the call will not have r12 set to 0x200 as these
+> calls go through existing mach-omap2/ SMC handlers, so all is well.
+> 
+> If the ROM SM is present and we make an SMCCC style call, r12 will be
+> set to 0x200 and ROM SM will see this as an invalid service call and
+> safely return to the normal world.
+
+So you're going to describe OP-TEE as present even when it's not!?
+
+That's simply wrong.
+
+> If OP-TEE is present and we make a legacy style SMC call, r12 will
+> not be set to 0x200, and OP-TEE will emulate the functionality that
+> the call is requesting.
+
+AFAICT this means that OP-TEE completely replaces your existing monitor.
+
+Please fix this properly. Implement SMCCC-compliant versions of those
+calls you wish to retain, and come up with a new binding for those.
+Describe that in the DT for systems which have OP-TEE providing these
+services.
+
+Systems with the old monitor should have that descrbied in their DT, and
+not OP-TEE.
+
+That completely removes the need to come up with a new OP-TEE binding
+extension, and aligns your FW for forward compatibility with future
+services.
 
 Thanks,
-
-Gregory
-
-> ---
->
-> Change since first version: re-added original author 'Signed-off-by'.
->
->  Documentation/devicetree/bindings/serial/mvebu-uart.txt | 2 +-
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/mvebu-uart.txt b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-> index 6087defd9f93..d37fabe17bd1 100644
-> --- a/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/mvebu-uart.txt
-> @@ -8,6 +8,6 @@ Required properties:
->  Example:
->  	serial at 12000 {
->  		compatible = "marvell,armada-3700-uart";
-> -		reg = <0x12000 0x400>;
-> +		reg = <0x12000 0x200>;
->  		interrupts = <43>;
->  	};
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index 51763d674050..9e558801266a 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -129,7 +129,7 @@
->  
->  			uart0: serial at 12000 {
->  				compatible = "marvell,armada-3700-uart";
-> -				reg = <0x12000 0x400>;
-> +				reg = <0x12000 0x200>;
->  				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
->  				status = "disabled";
->  			};
-> -- 
-> 2.11.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Mark.
