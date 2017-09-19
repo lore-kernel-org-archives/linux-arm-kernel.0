@@ -1,50 +1,60 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 19 Sep 2017 19:40:38 +0200
-Subject: [PATCH 1/2] ARM: dts: exynos: Add dwc3 SUSPHY quirk
-In-Reply-To: <1505728934-6200-2-git-send-email-andrzej.p@samsung.com>
-References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
- <CGME20170918100230eucas1p29fae00c53f1106af1961a6e269740b2f@eucas1p2.samsung.com>
- <1505728934-6200-2-git-send-email-andrzej.p@samsung.com>
-Message-ID: <20170919174038.2sspjvadt6ggka65@kozik-lap>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Sep 2017 10:42:14 -0700
+Subject: [PATCH] nokia n900: drop unneeded/undocumented parts of the dts
+In-Reply-To: <20170828131816.GB30115@amd>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170828131816.GB30115@amd>
+Message-ID: <20170919174214.GZ5024@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 12:02:13PM +0200, Andrzej Pietrasiewicz wrote:
-> Odroid XU4 board does not enumerate SuperSpeed devices.
-> This patch makes exynos5 series chips use USB SUSPHY quirk,
-> which solves the problem.
+* Pavel Machek <pavel@ucw.cz> [170828 06:18]:
 > 
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos54xx.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-
-Makes sense to me... was it tested also on XU3 and XU?
-
-Best regards,
-Krzysztof
-
+> Sakari mentioned that some parts of the dts are not needed and do
+> not have proper documentation, yet.
 > 
-> diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
-> index 0389e8a..8ca4fef 100644
-> --- a/arch/arm/boot/dts/exynos54xx.dtsi
-> +++ b/arch/arm/boot/dts/exynos54xx.dtsi
-> @@ -134,6 +134,7 @@
->  				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->  				phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
->  				phy-names = "usb2-phy", "usb3-phy";
-> +				snps,dis_u3_susphy_quirk;
+> As the camera works without them, remove them for now.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+Applying into omap-for-v4.14/fixes to correct what already
+got merged during the merge window.
+
+Regards,
+
+Tony
+
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -144,15 +144,6 @@
+>  		io-channel-names = "temp", "bsi", "vbat";
+>  	};
+>  
+> -	rear_camera: camera at 0 {
+> -		compatible = "linux,camera";
+> -
+> -		module {
+> -			model = "TCM8341MD";
+> -			sensor = <&cam1>;
+> -		};
+> -	};
+> -
+>  	pwm9: dmtimer-pwm {
+>  		compatible = "ti,omap-dmtimer-pwm";
+>  		#pwm-cells = <3>;
+> @@ -189,10 +180,8 @@
+>  				clock-lanes = <1>;
+>  				data-lanes = <0>;
+>  				lane-polarity = <0 0>;
+> -				clock-inv = <0>;
+>  				/* Select strobe = <1> for back camera, <0> for front camera */
+>  				strobe = <1>;
+> -				crc = <0>;
 >  			};
 >  		};
->  
-> @@ -154,6 +155,7 @@
->  				reg = <0x12400000 0x10000>;
->  				phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
->  				phy-names = "usb2-phy", "usb3-phy";
-> +				snps,dis_u3_susphy_quirk;
->  			};
->  		};
->  
+>  	};
+> 
 > -- 
-> 1.9.1
-> 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
