@@ -1,89 +1,48 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 19 Sep 2017 17:01:20 +0200
-Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add Vega S96 board
-In-Reply-To: <1505822748-23431-2-git-send-email-narmstrong@baylibre.com>
-References: <1505822748-23431-1-git-send-email-narmstrong@baylibre.com>
- <1505822748-23431-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1505833280.2703.83.camel@baylibre.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 19 Sep 2017 08:02:19 -0700
+Subject: [PATCH] cpufreq: dt-platdev: Add devices covered by ti-cpufreq to
+ blacklist
+In-Reply-To: <20170919145730.8981-1-d-gerlach@ti.com>
+References: <20170919145730.8981-1-d-gerlach@ti.com>
+Message-ID: <CAKohpo=8BBdoxLEzBHqy=jtcxhfy_7SC4Ez-qjPNoQWz=pN4qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-09-19 at 14:05 +0200, Neil Armstrong wrote:
-> The Tronsmart Vega S96 is a TV box derived from Amlogic q200 reference design.
-> 
-> Cc: support at tronsmart.com
-> Signed-off-by: Oleg <balbes-150@yandex.ru>
-
-Does Oleg have a surname ? :)
-
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On 19 September 2017 at 07:57, Dave Gerlach <d-gerlach@ti.com> wrote:
+> Commit edeec420de24 ("cpufreq: dt-platdev: Automatically create cpufreq
+> device with OPP v2") causes a cpufreq-dt platform device to be
+> automatically created for any platform with an OPP v2 node defined.
+> However, ti-cpufreq registers the cpufreq-dt platdev at the end of probe
+> in order to ensure the ti-cpufreq driver probes first and provides the
+> necessary opp-supported-hw for cpufreq-dt. With this new patch now a
+> dupluicate cpufreq-dt is created, which we do not want. To avoid this,
+> add the platforms handled by ti-cpufreq to the blacklist provided in the
+> aforementioned commit to allow ti-cpufreq to continue creating the
+> cpufreq-dt platdev.
+>
+> This applies to am335x, am437x, dra7xx, and am57xx.
+>
+> Fixes: edeec420de24 ("cpufreq: dt-cpufreq: platdev Automatically create device with OPP v2")
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > ---
->  arch/arm64/boot/dts/amlogic/Makefile               |  1 +
->  arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts | 39
-> ++++++++++++++++++++++
->  2 files changed, 40 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile
-> b/arch/arm64/boot/dts/amlogic/Makefile
-> index 7a9f48c..a6c4a06 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -19,6 +19,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-rbox-pro.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-vega-s96.dtb
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts
-> b/arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts
-> new file mode 100644
-> index 0000000..ba74240
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-vega-s96.dts
-> @@ -0,0 +1,39 @@
-> +/*
-> + * Copyright (c) 2017 BayLibre, SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + * Copyright (c) 2017 Oleg <balbes-150@yandex.ru>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> + */
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index a020da7940d6..c6f554ba9bb3 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -106,6 +106,10 @@ static const struct of_device_id whitelist[] __initconst = {
+>   * platforms using "operating-points-v2" property.
+>   */
+>  static const struct of_device_id blacklist[] __initconst = {
+> +       { .compatible = "ti,am33xx", },
+> +       { .compatible = "ti,am43", },
+> +       { .compatible = "ti,dra7", },
 > +
-> +/dts-v1/;
-> +
-> +#include "meson-gxm.dtsi"
-> +#include "meson-gx-p23x-q20x.dtsi"
-> +
-> +/ {
-> +	compatible = "tronsmart,vega-s96", "amlogic,s912", "amlogic,meson-
-> gxm";
-> +	model = "Tronsmart Vega S96";
-> +
-> +};
-> +
-> +&ethmac {
-> +	pinctrl-0 = <&eth_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	/* Select external PHY by default */
-> +	phy-handle = <&external_phy>;
-> +
-> +	amlogic,tx-delay-ns = <2>;
-> +
-> +	/* External PHY is in RGMII */
-> +	phy-mode = "rgmii";
-> +};
-> +
-> +&external_mdio {
-> +	external_phy: ethernet-phy at 0 {
-> +		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-
-> ieee802.3-c22";
-> +		reg = <0>;
-> +		max-speed = <1000>;
-I don't think this max-speed property is necessary
+>         { }
+>  };
 
-> +	};
-> +};
+Perhaps you should ask Sunil to improve his patch.
+
+https://marc.info/?l=linux-kernel&m=150576233031387&w=2
