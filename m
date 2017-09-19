@@ -1,190 +1,228 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 19 Sep 2017 12:00:29 +0800
-Subject: [PATCH v4 8/9] soc: mediatek: add MT2712 scpsys support
+Date: Tue, 19 Sep 2017 12:00:22 +0800
+Subject: [PATCH v4 1/9] dt-bindings: ARM: Mediatek: Document bindings for
+ MT2712
 In-Reply-To: <1505793630-12590-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1505793630-12590-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1505793630-12590-9-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1505793630-12590-2-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add scpsys driver for MT2712
+This patch adds the binding documentation for apmixedsys, bdpsys,
+imgsys, imgsys, infracfg, mcucfg, mfgcfg, mmsys, pericfg, topckgen,
+vdecsys and vencsys for Mediatek MT2712.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-scpsys.c | 112 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 106 insertions(+), 6 deletions(-)
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
+ .../bindings/arm/mediatek/mediatek,bdpsys.txt      |  1 +
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
+ .../bindings/arm/mediatek/mediatek,jpgdecsys.txt   | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mcucfg.txt      | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mfgcfg.txt      | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     |  1 +
+ 12 files changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 28c6e6a..c8abd06 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -21,6 +21,7 @@
- #include <linux/soc/mediatek/infracfg.h>
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+index cd977db..19fc116 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+@@ -7,6 +7,7 @@ Required Properties:
  
- #include <dt-bindings/power/mt2701-power.h>
-+#include <dt-bindings/power/mt2712-power.h>
- #include <dt-bindings/power/mt6797-power.h>
- #include <dt-bindings/power/mt7622-power.h>
- #include <dt-bindings/power/mt8173-power.h>
-@@ -32,7 +33,7 @@
- #define SPM_DIS_PWR_CON			0x023c
- #define SPM_CONN_PWR_CON		0x0280
- #define SPM_VEN2_PWR_CON		0x0298
--#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173 */
-+#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173, MT2712 */
- #define SPM_BDP_PWR_CON			0x029c	/* MT2701 */
- #define SPM_ETH_PWR_CON			0x02a0
- #define SPM_HIF_PWR_CON			0x02a4
-@@ -40,12 +41,12 @@
- #define SPM_MFG_2D_PWR_CON		0x02c0
- #define SPM_MFG_ASYNC_PWR_CON		0x02c4
- #define SPM_USB_PWR_CON			0x02cc
-+#define SPM_USB2_PWR_CON		0x02d4	/* MT2712 */
- #define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
- #define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
- #define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
- #define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-apmixedsys"
++	- "mediatek,mt2712-apmixedsys", "syscon"
+ 	- "mediatek,mt6797-apmixedsys"
+ 	- "mediatek,mt8135-apmixedsys"
+ 	- "mediatek,mt8173-apmixedsys"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+index 4137196..4010e37 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+@@ -7,6 +7,7 @@ Required Properties:
  
--
- #define SPM_PWR_STATUS			0x060c
- #define SPM_PWR_STATUS_2ND		0x0610
+ - compatible: Should be:
+ 	- "mediatek,mt2701-bdpsys", "syscon"
++	- "mediatek,mt2712-bdpsys", "syscon"
+ - #clock-cells: Must be 1
  
-@@ -64,12 +65,13 @@
- #define PWR_STATUS_ETH			BIT(15)
- #define PWR_STATUS_HIF			BIT(16)
- #define PWR_STATUS_IFR_MSC		BIT(17)
-+#define PWR_STATUS_USB2			BIT(19)	/* MT2712 */
- #define PWR_STATUS_VENC_LT		BIT(20)
- #define PWR_STATUS_VENC			BIT(21)
--#define PWR_STATUS_MFG_2D		BIT(22)
--#define PWR_STATUS_MFG_ASYNC		BIT(23)
--#define PWR_STATUS_AUDIO		BIT(24)
--#define PWR_STATUS_USB			BIT(25)
-+#define PWR_STATUS_MFG_2D		BIT(22)	/* MT8173 */
-+#define PWR_STATUS_MFG_ASYNC		BIT(23)	/* MT8173 */
-+#define PWR_STATUS_AUDIO		BIT(24)	/* MT8173, MT2712 */
-+#define PWR_STATUS_USB			BIT(25)	/* MT8173, MT2712 */
- #define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
- #define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
- #define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
-@@ -618,6 +620,85 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- };
+ The bdpsys controller uses the common clk binding from
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+index 047b11a..868bd51 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+@@ -7,6 +7,7 @@ Required Properties:
  
- /*
-+ * MT2712 power domain support
-+ */
-+static const struct scp_domain_data scp_domain_data_mt2712[] = {
-+	[MT2712_POWER_DOMAIN_MM] = {
-+		.name = "mm",
-+		.sta_mask = PWR_STATUS_DISP,
-+		.ctl_offs = SPM_DIS_PWR_CON,
-+		.sram_pdn_bits = GENMASK(8, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = {CLK_MM},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_VDEC] = {
-+		.name = "vdec",
-+		.sta_mask = PWR_STATUS_VDEC,
-+		.ctl_offs = SPM_VDE_PWR_CON,
-+		.sram_pdn_bits = GENMASK(8, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = {CLK_MM, CLK_VDEC},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_VENC] = {
-+		.name = "venc",
-+		.sta_mask = PWR_STATUS_VENC,
-+		.ctl_offs = SPM_VEN_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_MM, CLK_VENC, CLK_JPGDEC},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_ISP] = {
-+		.name = "isp",
-+		.sta_mask = PWR_STATUS_ISP,
-+		.ctl_offs = SPM_ISP_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(13, 12),
-+		.clk_id = {CLK_MM},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_AUDIO] = {
-+		.name = "audio",
-+		.sta_mask = PWR_STATUS_AUDIO,
-+		.ctl_offs = SPM_AUDIO_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_AUDIO},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_USB] = {
-+		.name = "usb",
-+		.sta_mask = PWR_STATUS_USB,
-+		.ctl_offs = SPM_USB_PWR_CON,
-+		.sram_pdn_bits = GENMASK(10, 8),
-+		.sram_pdn_ack_bits = GENMASK(14, 12),
-+		.clk_id = {CLK_NONE},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_USB2] = {
-+		.name = "usb2",
-+		.sta_mask = PWR_STATUS_USB2,
-+		.ctl_offs = SPM_USB2_PWR_CON,
-+		.sram_pdn_bits = GENMASK(10, 8),
-+		.sram_pdn_ack_bits = GENMASK(14, 12),
-+		.clk_id = {CLK_NONE},
-+		.active_wakeup = true,
-+	},
-+	[MT2712_POWER_DOMAIN_MFG] = {
-+		.name = "mfg",
-+		.sta_mask = PWR_STATUS_MFG,
-+		.ctl_offs = SPM_MFG_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(19, 16),
-+		.clk_id = {CLK_MFG},
-+		.bus_prot_mask = BIT(14) | BIT(21) | BIT(23),
-+		.active_wakeup = true,
-+	},
-+};
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-imgsys", "syscon"
++	- "mediatek,mt2712-imgsys", "syscon"
+ 	- "mediatek,mt6797-imgsys", "syscon"
+ 	- "mediatek,mt8173-imgsys", "syscon"
+ - #clock-cells: Must be 1
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
+index 58d58e2..a3430cd 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ 
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-infracfg", "syscon"
++	- "mediatek,mt2712-infracfg", "syscon"
+ 	- "mediatek,mt6797-infracfg", "syscon"
+ 	- "mediatek,mt8135-infracfg", "syscon"
+ 	- "mediatek,mt8173-infracfg", "syscon"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
+new file mode 100644
+index 0000000..2df799c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
+@@ -0,0 +1,22 @@
++Mediatek jpgdecsys controller
++============================
 +
-+/*
-  * MT6797 power domain support
-  */
- 
-@@ -852,6 +933,22 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 	}
- };
- 
-+static const struct scp_soc_data mt2712_data = {
-+	.domains = scp_domain_data_mt2712,
-+	.num_domains = ARRAY_SIZE(scp_domain_data_mt2712),
-+	.regs = {
-+		.scp_ctrl = {
-+			.pwr_sta_offs = SPM_PWR_STATUS,
-+			.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
-+		},
-+		.bus_prot = {
-+			.set_offs = INFRA_TOPAXI_PROTECTEN_SET,
-+			.clr_offs = INFRA_TOPAXI_PROTECTEN_CLR,
-+			.sta_offs = INFRA_TOPAXI_PROTECTSTA1
-+		},
-+	}
-+};
++The Mediatek jpgdecsys controller provides various clocks to the system.
 +
- static const struct scp_soc_data mt6797_data = {
- 	.domains = scp_domain_data_mt6797,
- 	.num_domains = ARRAY_SIZE(scp_domain_data_mt6797),
-@@ -910,6 +1007,9 @@ static void mtk_register_power_domains(struct platform_device *pdev,
- 		.compatible = "mediatek,mt2701-scpsys",
- 		.data = &mt2701_data,
- 	}, {
-+		.compatible = "mediatek,mt2712-scpsys",
-+		.data = &mt2712_data,
-+	}, {
- 		.compatible = "mediatek,mt6797-scpsys",
- 		.data = &mt6797_data,
- 	}, {
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt2712-jpgdecsys", "syscon"
++- #clock-cells: Must be 1
++
++The jpgdecsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++jpgdecsys: syscon at 19000000 {
++	compatible = "mediatek,mt2712-jpgdecsys", "syscon";
++	reg = <0 0x19000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
+new file mode 100644
+index 0000000..b8fb03f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
+@@ -0,0 +1,22 @@
++Mediatek mcucfg controller
++============================
++
++The Mediatek mcucfg controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be one of:
++	- "mediatek,mt2712-mcucfg", "syscon"
++- #clock-cells: Must be 1
++
++The mcucfg controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++mcucfg: syscon at 10220000 {
++	compatible = "mediatek,mt2712-mcucfg", "syscon";
++	reg = <0 0x10220000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
+new file mode 100644
+index 0000000..859e67b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
+@@ -0,0 +1,22 @@
++Mediatek mfgcfg controller
++============================
++
++The Mediatek mfgcfg controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be one of:
++	- "mediatek,mt2712-mfgcfg", "syscon"
++- #clock-cells: Must be 1
++
++The mfgcfg controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++mfgcfg: syscon at 13000000 {
++	compatible = "mediatek,mt2712-mfgcfg", "syscon";
++	reg = <0 0x13000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+index 70529e0..4eb8bbe 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -7,6 +7,7 @@ Required Properties:
+ 
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-mmsys", "syscon"
++	- "mediatek,mt2712-mmsys", "syscon"
+ 	- "mediatek,mt6797-mmsys", "syscon"
+ 	- "mediatek,mt8173-mmsys", "syscon"
+ - #clock-cells: Must be 1
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
+index e494366..d9f092e 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ 
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-pericfg", "syscon"
++	- "mediatek,mt2712-pericfg", "syscon"
+ 	- "mediatek,mt8135-pericfg", "syscon"
+ 	- "mediatek,mt8173-pericfg", "syscon"
+ - #clock-cells: Must be 1
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
+index ec93ecb..2024fc9 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
+@@ -7,6 +7,7 @@ Required Properties:
+ 
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-topckgen"
++	- "mediatek,mt2712-topckgen", "syscon"
+ 	- "mediatek,mt6797-topckgen"
+ 	- "mediatek,mt8135-topckgen"
+ 	- "mediatek,mt8173-topckgen"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+index d150104..ea40d05 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+@@ -7,6 +7,7 @@ Required Properties:
+ 
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-vdecsys", "syscon"
++	- "mediatek,mt2712-vdecsys", "syscon"
+ 	- "mediatek,mt6797-vdecsys", "syscon"
+ 	- "mediatek,mt8173-vdecsys", "syscon"
+ - #clock-cells: Must be 1
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+index 8a93be6..8515453 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+@@ -6,6 +6,7 @@ The Mediatek vencsys controller provides various clocks to the system.
+ Required Properties:
+ 
+ - compatible: Should be one of:
++	- "mediatek,mt2712-vencsys", "syscon"
+ 	- "mediatek,mt6797-vencsys", "syscon"
+ 	- "mediatek,mt8173-vencsys", "syscon"
+ - #clock-cells: Must be 1
 -- 
 1.9.1
