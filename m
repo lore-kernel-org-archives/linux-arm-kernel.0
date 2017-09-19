@@ -1,96 +1,41 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 19 Sep 2017 12:43:56 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD
-In-Reply-To: <1505365722-45418-1-git-send-email-xieyisheng1@huawei.com>
-References: <1505365722-45418-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <e297bd61-ab6f-21a2-9c5a-372d3c4c40b1@arm.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Tue, 19 Sep 2017 13:43:50 +0200
+Subject: [PATCH] clk: stm32h7: fix test of clock config
+Message-ID: <1505821430-6779-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/17 06:08, Yisheng Xie wrote:
-> According to Spec, it is ILLEGAL to set STE.S1STALLD if STALL_MODEL
-> is not 0b00, which means we should not disable stall mode if stall
-> or terminate mode is not configuable.
-> 
-> As Jean-Philippe's suggestion, this patch introduce a feature bit
-> ARM_SMMU_FEAT_STALL_FORCE, which means smmu only supports stall force.
-> Therefore, we can avoid the ILLEGAL setting of STE.S1STALLD.by checking
-> ARM_SMMU_FEAT_STALL_FORCE.
-> 
-> This patch keeps the ARM_SMMU_FEAT_STALLS as the meaning of stall supported
-> (force or configuable) to easy to expand the future function, i.e. we can
-> only use ARM_SMMU_FEAT_STALLS to check whether we should register fault
-> handle or enable master can_stall, etc to supporte platform SVM.
-> 
-> After apply this patch, the feature bit and S1STALLD setting will be like:
-> STALL_MODEL  FEATURE                                              S1STALLD
-> 0b00         ARM_SMMU_FEAT_STALLS                                 0b1
-> 0b01         !ARM_SMMU_FEAT_STALLS && !ARM_SMMU_FEAT_STALL_FORCE  0b0
-> 0b10         ARM_SMMU_FEAT_STALLS && ARM_SMMU_FEAT_STALL_FORCE    0b0
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Thanks for the patch. Since it's the same problem, could you also fix the
-context descriptor value? The spec says, in 5.5 Fault configuration:
+fix test of composite clock config (bad copy / past)
 
-"A CD (Stage 1 translation enabled) is considered ILLEGAL if one of the
-following applies:
-* SMMU_(S_)IDR0.STALL_MODEL == 0b10 and CD.S == 0."
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
+---
+ drivers/clk/clk-stm32h7.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-So I think we should always set CD.S if the SMMU has STALL_FORCE.
-
-As Will pointed out, more work is needed for STALL_FORCE. We can't enable
-translation at all for devices that don't support stalling (e.g. PCI). We
-should force them into bypass or abort mode depending on the config. Maybe
-we can fix that later, after the devicetree property is added.
-
-> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index e67ba6c..d2a3627 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -603,7 +603,8 @@ struct arm_smmu_device {
->  #define ARM_SMMU_FEAT_TRANS_S1		(1 << 9)
->  #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
->  #define ARM_SMMU_FEAT_STALLS		(1 << 11)
-> -#define ARM_SMMU_FEAT_HYP		(1 << 12)
-> +#define ARM_SMMU_FEAT_STALL_FORCE	(1 << 12)
-> +#define ARM_SMMU_FEAT_HYP		(1 << 13)
-
-We probably should keep the feature bits backward compatible and only add
-new ones at the end. It's not ABI, but it's printed@boot time and I
-sometimes use them when inspecting the kernel output to see what an SMMU
-supports.
-
-Thanks,
-Jean
-
->  	u32				features;
->  
->  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> @@ -1112,7 +1113,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->  #endif
->  			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
->  
-> -		if (smmu->features & ARM_SMMU_FEAT_STALLS)
-> +		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
-> +		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
->  			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
->  
->  		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
-> @@ -2536,9 +2538,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
->  			 coherent ? "true" : "false");
->  
->  	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
-> -	case IDR0_STALL_MODEL_STALL:
-> -		/* Fallthrough */
->  	case IDR0_STALL_MODEL_FORCE:
-> +		smmu->features |= ARM_SMMU_FEAT_STALL_FORCE;
-> +		/* Fallthrough */
-> +	case IDR0_STALL_MODEL_STALL:
->  		smmu->features |= ARM_SMMU_FEAT_STALLS;
->  	}
->  
-> 
+diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+index a94c3f5..61c3e40 100644
+--- a/drivers/clk/clk-stm32h7.c
++++ b/drivers/clk/clk-stm32h7.c
+@@ -384,7 +384,7 @@ static void get_cfg_composite_div(const struct composite_clk_gcfg *gcfg,
+ 	mux_ops = div_ops = gate_ops = NULL;
+ 	mux_hw = div_hw = gate_hw = NULL;
+ 
+-	if (gcfg->mux && gcfg->mux) {
++	if (gcfg->mux && cfg->mux) {
+ 		mux = _get_cmux(base + cfg->mux->offset,
+ 				cfg->mux->shift,
+ 				cfg->mux->width,
+@@ -410,7 +410,7 @@ static void get_cfg_composite_div(const struct composite_clk_gcfg *gcfg,
+ 		}
+ 	}
+ 
+-	if (gcfg->gate && gcfg->gate) {
++	if (gcfg->gate && cfg->gate) {
+ 		gate = _get_cgate(base + cfg->gate->offset,
+ 				cfg->gate->bit_idx,
+ 				gcfg->gate->flags, lock);
+-- 
+1.9.1
