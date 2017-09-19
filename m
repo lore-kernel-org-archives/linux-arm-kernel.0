@@ -1,39 +1,97 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 19 Sep 2017 15:02:22 -0700
-Subject: [PATCH v3 0/3] arm64: Add CONFIG_KUSER_HELPERS
-In-Reply-To: <20170911152635.95367-1-salyzyn@android.com>
-References: <20170911152635.95367-1-salyzyn@android.com>
-Message-ID: <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 20 Sep 2017 06:30:42 +0800
+Subject: [PATCH v2] doc: coresight: correct usage for disabling idle states
+In-Reply-To: <CANLsYkx++kM9Ocw+_Ar6d0_n0gTdzXLRyMZ8eiaJyHxbPJdgYQ@mail.gmail.com>
+References: <1505470561-21982-1-git-send-email-leo.yan@linaro.org>
+ <CANLsYkx++kM9Ocw+_Ar6d0_n0gTdzXLRyMZ8eiaJyHxbPJdgYQ@mail.gmail.com>
+Message-ID: <20170919223042.GC2259@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 11, 2017 at 8:26 AM, Mark Salyzyn <salyzyn@android.com> wrote:
-> Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
-> config option (enabled by default). When disabled, all kuser
-> helpers-related code is removed from the kernel and no mapping is done
-> at the fixed high address (0xffff0000); any attempt to use a kuser
-> helper from a 32-bit process will result in a segfault.
->
-> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
->
-> v2:
-> - vectors_page and compat_vdso_spec as array of 2
-> - free sigpage if vectors allocation failed
-> - adjust makefile so one line for each of the assembler source modules
-> - split off assembler changes to a new previous patch in series to reduce churn
-> - modify slightly the feature documentation to reduce its reach
-> - modify slightly the feature documentation to rationalize the yes default.
-> - There are more ifdefs as a result of the rebase.
->
-> v3:
-> - rebase (minor conflicts)
+On Tue, Sep 19, 2017 at 03:32:54PM -0600, Mathieu Poirier wrote:
+> On 15 September 2017 at 04:16, Leo Yan <leo.yan@linaro.org> wrote:
+> > In the coresight CPU debug document it suggests to use 'echo' command
+> > to set latency request to /dev/cpu_dma_latency so can disable all CPU
+> > idle states, but in fact this doesn't work.
+> >
+> > This is because when the command 'echo' exits, it releases the device
+> > node's file descriptor and the kernel release function removes the QoS
+> > constraint; finally when the command 'echo' finished there have no
+> > constraint imposed on cpu_dma_latency.
+> >
+> > This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
+> > command 'exec' can avoid the file descriptor to be closed so we can
+> > keep the constraint on cpu_dma_latency.
+> >
+> > This patch also adds the info for reference docs for PM QoS and cpuidle
+> > sysfs.
+> >
+> > Cc: Jonathan Corbet <corbet@lwn.net>
+> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Reported-by: Kim Phillips <kim.phillips@arm.com>
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  Documentation/trace/coresight-cpu-debug.txt | 14 +++++++++-----
+> >  1 file changed, 9 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+> > index b3da1f9..205ff95 100644
+> > --- a/Documentation/trace/coresight-cpu-debug.txt
+> > +++ b/Documentation/trace/coresight-cpu-debug.txt
+> > @@ -149,11 +149,15 @@ If you want to limit idle states at boot time, you can use "nohlt" or
+> >
+> >  At the runtime you can disable idle states with below methods:
+> >
+> > -Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
+> > -states (if latency = 0uS then disable all idle states):
+> > -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
+> > -
+> > -Disable specific CPU's specific idle state:
+> > +By using PM QoS interface '/dev/cpu_dma_latency', we can set latency
+> > +constraint to disable all CPUs specific idle states (see
+> > +Documentation/power/pm_qos_interface.txt, section 'From user mode');
+> > +below is one example to set latency constraint to '00000000', it is
+> > +hexadecimal format with microsecond unit:
+> > +# exec 3<> /dev/cpu_dma_latency; echo '00000000' >&3
+> 
+> Since doing echo '00000000' >&3 or simply echo 0 >&3 yields the same
+> result I would go for the latter.  I also think it is important to
+> specify that using an "echo" command without holding the file open
+> won't give the desired result.  I would reformat your paragraph as
+> follow:
+> 
+> >>> Begin >>>
+> 
+> It is possible to disable CPU idle states by way of the PM QoS
+> subsystem, more specifically by using the "/dev/cpu_dma_latency"
+> interface (see Documentation/power/pm_qos_interface.txt for more
+> details).  As specified in the PM QoS documentation the requested
+> parameter will stay in effect until the file descriptor is released.
+> For example:
+> 
+> # exec 3<> /dev/cpu_dma_latency; echo 0 >&3
+> ...
+> Do some work...
+> ...
+> # exec 3<>-
+> 
+> The same can also be done from an application program.
+> 
+> <<< End <<<
 
-This looks great to me. I'd love to see kuser helpers gone. :)
+Very appreciate your rephasing and reviewing. Will spin a new patch
+with it.
 
-Catalin, Will, does this need anything else?
+Thanks,
+Leo Yan
 
--Kees
-
--- 
-Kees Cook
-Pixel Security
+> > +
+> > +Disable specific CPU's specific idle state from cpuidle sysfs (see
+> > +Documentation/cpuidle/sysfs.txt):
+> >  # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
+> >
+> >
+> > --
+> > 2.7.4
+> >
