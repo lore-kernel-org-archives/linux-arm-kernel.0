@@ -1,49 +1,49 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 19 Sep 2017 16:03:06 -0700
-Subject: [PATCH 3/3] drm/rockchip: vop: Add more RGB output interface type
-In-Reply-To: <1505360608-377-1-git-send-email-hjc@rock-chips.com>
-References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
- <1505360608-377-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <20170919230306.rcctwo5qnfjw26az@art_vandelay>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 19 Sep 2017 16:10:07 -0700
+Subject: [PATCH 6/7] cpufreq: make cpufreq_generic_init
+ transition_latency default to CPUFREQ_ETERNAL
+In-Reply-To: <1503504610-12880-7-git-send-email-aisheng.dong@nxp.com>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+ <1503504610-12880-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170919231007.GJ30848@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 11:43:28AM +0800, Sandy Huang wrote:
-> This patch add serial RGB output interface for rockchip vop, the
-> more info about serial RGB output interface described at the
-> following file:
+On 24-08-17, 00:10, Dong Aisheng wrote:
+> If no valid transition_latency specified, let's make it default to
+> CPUFREQ_ETERNAL which is consistent with its definition.
 > 
-> Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+> This can save some of the same checkings like this:
+>         transition_latency = dev_pm_opp_get_max_transition_latency(cpu_dev);
+> -       if (!transition_latency)
+> -               transition_latency = CPUFREQ_ETERNAL;
+>         ret = cpufreq_generic_init(policy, freq_table, transition_latency);
 > 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
-
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 2 ++
+>  drivers/cpufreq/cpufreq.c | 2 ++
 >  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> index 56bbd2e..59a01c3 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> @@ -209,6 +209,8 @@ struct vop_data {
->  #define ROCKCHIP_OUT_MODE_P888	0
->  #define ROCKCHIP_OUT_MODE_P666	1
->  #define ROCKCHIP_OUT_MODE_P565	2
-> +#define ROCKCHIP_OUT_MODE_S888	8
-> +#define ROCKCHIP_OUT_MODE_S888_DUMMY	12
->  /* for use special outface */
->  #define ROCKCHIP_OUT_MODE_AAAA	15
+> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> index 9bf97a3..da07de6 100644
+> --- a/drivers/cpufreq/cpufreq.c
+> +++ b/drivers/cpufreq/cpufreq.c
+> @@ -180,6 +180,8 @@ int cpufreq_generic_init(struct cpufreq_policy *policy,
+>  		return ret;
+>  	}
 >  
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> +	if (!transition_latency)
+> +		transition_latency = CPUFREQ_ETERNAL;
+>  	policy->cpuinfo.transition_latency = transition_latency;
+>  
+>  	/*
+
+Can you update all the existing drivers as well (in the same patch)
+who can benefit from it?
 
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+viresh
