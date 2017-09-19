@@ -1,136 +1,64 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 19 Sep 2017 12:19:33 +0200
-Subject: [PATCH v2 9/9] tty/serial: atmel: Prevent a warning on suspend
-In-Reply-To: <20170915140411.31716-10-romain.izard.pro@gmail.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-10-romain.izard.pro@gmail.com>
-Message-ID: <380a15d6-c180-316f-a56b-011acd02df59@microchip.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 19 Sep 2017 12:41:10 +0200
+Subject: [PATCH v10] PCI: tango: Add MSI controller support
+In-Reply-To: <CAL_JsqK7XayjJcCYhicuqGqKN8N6+P=9tDrs_m7K3YiOBHDAHA@mail.gmail.com>
+References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
+ <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
+ <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
+ <86efs3wesi.fsf@arm.com>
+ <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
+ <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
+ <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
+ <e381170c-e462-01cd-12db-30773005602b@free.fr> <871so09j6g.fsf@arm.com>
+ <acdef092-3fb9-4338-5199-a458ac2439c7@free.fr>
+ <4954977e-46fd-8d54-ec76-db2134d3073a@arm.com>
+ <26b17bd9-232f-b992-68ac-3b5a7752ba54@free.fr>
+ <CAL_JsqK7XayjJcCYhicuqGqKN8N6+P=9tDrs_m7K3YiOBHDAHA@mail.gmail.com>
+Message-ID: <78996e48-885a-f0e8-a4ed-8f3e830255ef@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2017 at 16:04, Romain Izard wrote:
-> The atmel serial port driver reported the following warning on suspend:
-> atmel_usart f8020000.serial: ttyS1: Unable to drain transmitter
+On 18/09/2017 23:30, Rob Herring wrote:
+> On Aug 28, 2017 at 11:13 AM, Mason wrote:
+>> On 25/08/2017 17:25, Robin Murphy wrote:
+>>
+>>> If your host controller driver needs to discover its windows from DT to
+>>> configure *itself*, it needs to parse dma-ranges itself; see pcie-iproc,
+>>> pcie-rcar, pcie-xgene, etc. for examples.
+>>
+>> $ git grep '"dma-ranges"' drivers/pci/host
+>> drivers/pci/host/pci-ftpci100.c:        parser->range = of_get_property(node, "dma-ranges", &rlen);
+>> drivers/pci/host/pci-rcar-gen2.c:       parser->range = of_get_property(node, "dma-ranges", &rlen);
+>> drivers/pci/host/pci-xgene.c:   parser->range = of_get_property(node, "dma-ranges", &rlen);
+>> drivers/pci/host/pcie-iproc.c:  parser->range = of_get_property(node, "dma-ranges", &rlen);
+>> drivers/pci/host/pcie-rcar.c:   parser->range = of_get_property(node, "dma-ranges", &rlen);
+>>
+>> These 5 drivers are using the same function: pci_dma_range_parser_init
+>>
+>> pci-ftpci100.c:         d3c68e0a7e34a (Linus Walleij     2017-03-12
+>> pci-rcar-gen2.c:        8d598cabf50d8 (Phil Edworthy     2015-11-03
+>> pci-xgene.c:            5f6b6ccdbe1cd (Tanmay Inamdar    2014-10-01
+>> pcie-iproc.c:           dd9d4e7498de3 (Ray Jui           2016-10-31
+>> pcie-rcar.c:            c25da4778803b (Phil Edworthy     2014-05-12
+>>
+>> which seems to be a copy of of_pci_range_parser_init
+>> with "ranges" changed to "dma-ranges"
+>>
+>> drivers/of/address.c    29b635c00f3eb (Andrew Murray     2013-05-16
+>>
+>> Perhaps pci_dma_range_parser_init() can be factorized?
+>>
+>> Rob, Frank, what do you think of the patch below?
 > 
-> As the ATMEL_US_TXEMPTY status bit in ATMEL_US_CSR is always cleared
-> when the transmitter is disabled, we need to know the transmitter's
-> state to return the real fifo state. And as ATMEL_US_CR is write-only,
-> it is necessary to save the state of the transmitter in a local
-> variable, and update the variable when TXEN and TXDIS is written in
-> ATMEL_US_CR.
+> I thought I had commented (maybe that was on IRC), but looks fine.
 > 
-> After those changes, atmel_tx_empty can return "empty" on suspend, the
-> warning in uart_suspend_port disappears, and suspending is 20ms shorter
-> for each enabled Atmel serial port.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> This series should also fix a build failure on rcar with !OF, so can
+> you send a proper patch?
 
-Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-on sama5d2 Xplained.
+You're not misremembering, you did review the formal patch ;-)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+"[PATCH 0/3] Tango PCIe host bridge MSI support + required API"
+https://patchwork.kernel.org/patch/9927539/
+https://patchwork.kernel.org/patch/9927541/
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 7551cab438ff..783af6648be0 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -171,6 +171,7 @@ struct atmel_uart_port {
->  	bool			has_hw_timer;
->  	struct timer_list	uart_timer;
->  
-> +	bool			tx_stopped;
->  	bool			suspended;
->  	unsigned int		pending;
->  	unsigned int		pending_status;
-> @@ -380,6 +381,10 @@ static int atmel_config_rs485(struct uart_port *port,
->   */
->  static u_int atmel_tx_empty(struct uart_port *port)
->  {
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> +
-> +	if (atmel_port->tx_stopped)
-> +		return TIOCSER_TEMT;
->  	return (atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXEMPTY) ?
->  		TIOCSER_TEMT :
->  		0;
-> @@ -485,6 +490,7 @@ static void atmel_stop_tx(struct uart_port *port)
->  	 * is fully transmitted.
->  	 */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
-> +	atmel_port->tx_stopped = true;
->  
->  	/* Disable interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
-> @@ -492,6 +498,7 @@ static void atmel_stop_tx(struct uart_port *port)
->  	if ((port->rs485.flags & SER_RS485_ENABLED) &&
->  	    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
->  		atmel_start_rx(port);
-> +
->  }
->  
->  /*
-> @@ -521,6 +528,7 @@ static void atmel_start_tx(struct uart_port *port)
->  
->  	/* re-enable the transmitter */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-> +	atmel_port->tx_stopped = false;
->  }
->  
->  /*
-> @@ -1866,6 +1874,7 @@ static int atmel_startup(struct uart_port *port)
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	/* enable xmit & rcvr */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	setup_timer(&atmel_port->uart_timer,
->  			atmel_uart_timer_callback,
-> @@ -2122,6 +2131,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  
->  	/* disable receiver and transmitter */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS | ATMEL_US_RXDIS);
-> +	atmel_port->tx_stopped = true;
->  
->  	/* mode */
->  	if (port->rs485.flags & SER_RS485_ENABLED) {
-> @@ -2207,6 +2217,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	/* restore interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IER, imr);
-> @@ -2450,6 +2461,7 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
->  
->  	/* Make sure that tx path is actually able to send characters */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	uart_console_write(port, s, count, atmel_console_putchar);
->  
-> @@ -2511,6 +2523,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
->  {
->  	int ret;
->  	struct uart_port *port = &atmel_ports[co->index].uart;
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	int baud = 115200;
->  	int bits = 8;
->  	int parity = 'n';
-> @@ -2528,6 +2541,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
->  	atmel_uart_writel(port, ATMEL_US_IDR, -1);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	if (options)
->  		uart_parse_options(options, &baud, &parity, &bits, &flow);
-> 
-
-
--- 
-Nicolas Ferre
+Regards.
