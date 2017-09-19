@@ -1,38 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Sep 2017 17:04:22 +0100
-Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170919152253.tvj3hheggrx4lgig@dell>
-References: <20170913193723.16234-1-robert.jarzmik@free.fr>
- <20170913193723.16234-3-robert.jarzmik@free.fr>
- <20170914074146.dnibkvom4yuzejf3@dell>
- <20170914074300.iobuwn2hrmnf6sen@dell>
- <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
- <20170918085236.z6gmgrwvsjvvc4cd@dell>
- <20170919121539.mz2mettkefxf3oer@sirena.co.uk>
- <20170919152253.tvj3hheggrx4lgig@dell>
-Message-ID: <20170919160422.l7lxmfl6yrjnpalb@sirena.co.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 19 Sep 2017 19:08:13 +0300
+Subject: [PATCH] arm64: dt marvell: extend AP806 system controller size
+In-Reply-To: <877ewusr2h.fsf@free-electrons.com>
+References: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
+ <877ewusr2h.fsf@free-electrons.com>
+Message-ID: <20170919160813.yz4ez2hsuaejbf4t@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 04:22:53PM +0100, Lee Jones wrote:
+Hi Gregory,
 
-> Normally I wait until all patches patches in the set have been
-> reviewed (the ASOC ones still have not), then ask the OP and the
+On Tue, Sep 19, 2017 at 04:25:58PM +0200, Gregory CLEMENT wrote:
+>  On ven., sept. 15 2017, Baruch Siach <baruch@tkos.co.il> wrote:
+> 
+> > Extend the container size to 0x2000 to include the gpio controller at
+> > offset 0x1040.
+> >
+> > While at it, add start address notation to the gpio node name to match
+> > its 'offset' property.
+> >
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> 
+> I made a quick test on a mcbin and I confirm that the watchdog is here
+> and usable.
+> 
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> and 
+> Applied on mvebu/dt64
 
-I've been fine with them for ages.
+This is meant to be a reply to https://patchwork.kernel.org/patch/9947525/, 
+right?
 
-> other affected Maintainers how they want to deal with the patch.
-> Far more often than not, the the solution is just to take the set
-> through the MFD tree.
+Anyway, I see the right patch[1] at mvebu/dt64.
 
-It really helps if we can get the earlier parts of the series moving
-even if the rest of it's in review still - I know I back off on
-reviewing things if it looks like their dependencies aren't making
-progress.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170919/27d3823f/attachment.sig>
+Thanks,
+baruch
+
+[1] http://git.infradead.org/linux-mvebu.git/commitdiff/e34ffe32f6e7ae9191d14226ff9d8c0c47400a71
+
+> > ---
+> >  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> > index 4d360713ed12..30d48ecf46e0 100644
+> > --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> > +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> > @@ -254,7 +254,7 @@
+> >  
+> >  			ap_syscon: system-controller at 6f4000 {
+> >  				compatible = "syscon", "simple-mfd";
+> > -				reg = <0x6f4000 0x1000>;
+> > +				reg = <0x6f4000 0x2000>;
+> >  
+> >  				ap_clk: clock {
+> >  					compatible = "marvell,ap806-clock";
+> > @@ -265,7 +265,7 @@
+> >  					compatible = "marvell,ap806-pinctrl";
+> >  				};
+> >  
+> > -				ap_gpio: gpio {
+> > +				ap_gpio: gpio at 1040 {
+> >  					compatible = "marvell,armada-8k-gpio";
+> >  					offset = <0x1040>;
+> >  					ngpios = <20>;
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
