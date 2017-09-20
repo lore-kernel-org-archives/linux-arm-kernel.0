@@ -1,69 +1,66 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Sep 2017 15:46:21 -0700
-Subject: [PATCH 10/10] ARM: dts: Use ti-sysc module driver for omap4 musb
+Date: Wed, 20 Sep 2017 15:46:20 -0700
+Subject: [PATCH 09/10] ARM: dts: Configure SmartReflex only to idle the
+ interconnect target module
 In-Reply-To: <20170920224621.16236-1-tony@atomide.com>
 References: <20170920224621.16236-1-tony@atomide.com>
-Message-ID: <20170920224621.16236-11-tony@atomide.com>
+Message-ID: <20170920224621.16236-10-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's make use of the generic ti-sysc module for musb to have
-a child device with working runtime PM.
+The TRM has marked dra7 SmartReflex as reserved and we should not
+touch those registers as pointed out by Nishanth Menon <nm@ti.com>.
+We do still want to idle the related interconnect target modules on
+init though.
 
-Cc: Bin Liu <b-liu@ti.com>
+Let's do this by only configuring the generic interconnect target modules
+and not add the child SmartReflex devices.
+
+Cc: Lokesh Vutla <lokeshvutla@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 38 ++++++++++++++++++++++++++------------
- 1 file changed, 26 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -1135,19 +1135,33 @@
- 			reg-names = "otghs_control";
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1497,6 +1497,32 @@
+ 			};
  		};
  
--		usb_otg_hs: usb_otg_hs at 4a0ab000 {
--			compatible = "ti,omap4-musb";
--			reg = <0x4a0ab000 0x7ff>;
--			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-names = "mc", "dma";
-+		target-module at 4a0ab000 {
-+			compatible = "ti,sysc-type1";
- 			ti,hwmods = "usb_otg_hs";
--			usb-phy = <&usb2_phy>;
--			phys = <&usb2_phy>;
--			phy-names = "usb2-phy";
--			multipoint = <1>;
--			num-eps = <16>;
--			ram-bits = <12>;
--			ctrl-module = <&omap_control_usbotg>;
++		target-module at 4a0dd000 {
++			compatible = "ti,sysc-omap4-sr";
++			ti,hwmods = "smartreflex_core";
++			reg = <0x4a0dd000 0x4>,
++			      <0x4a0dd008 0x4>;
++			reg-names = "rev", "sysc";
 +			#address-cells = <1>;
 +			#size-cells = <1>;
-+			reg = <0x4a0ab000 0x4>,
-+			      <0x4a0ab004 0x4>,
-+			      <0x4a0ab008 0x4>;
-+			reg-names = "rev", "sysc", "syss";
-+			ranges = <0 0x4a0ab000 0x1000>;
-+			clocks = <&l3_init_clkctrl OMAP4_USB_OTG_HS_CLKCTRL 0>;
-+			clock-names = "clkctrl";
++			ranges = <0 0x4a0dd000 0x001000>;
 +
-+			usb_otg_hs: otg at 0 {
-+				compatible = "ti,omap4-musb";
-+				reg = <0x0 0x7ff>;
-+				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names = "mc", "dma";
-+				usb-phy = <&usb2_phy>;
-+				phys = <&usb2_phy>;
-+				phy-names = "usb2-phy";
-+				multipoint = <1>;
-+				num-eps = <16>;
-+				ram-bits = <12>;
-+				ctrl-module = <&omap_control_usbotg>;
-+			};
- 		};
- 
- 		aes1: aes at 4b501000 {
++			/* SmartReflex child device marked reserved in TRM */
++		};
++
++		target-module at 4a0d9000 {
++			compatible = "ti,sysc-omap4-sr";
++			ti,hwmods = "smartreflex_mpu";
++			reg = <0x4a0d9000 0x4>,
++			      <0x4a0d9008 0x4>;
++			reg-names = "rev", "sysc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a0d9000 0x001000>;
++
++			/* SmartReflex child device marked reserved in TRM */
++		};
++
+ 		omap_dwc3_1: omap_dwc3_1 at 48880000 {
+ 			compatible = "ti,dwc3";
+ 			ti,hwmods = "usb_otg_ss1";
 -- 
 2.14.1
