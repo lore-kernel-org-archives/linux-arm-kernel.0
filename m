@@ -1,46 +1,94 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 20 Sep 2017 09:24:02 +0200
-Subject: [PATCH v2] dmaengine: sun6i: use of_device_get_match_data
-Message-ID: <20170920072402.27704-1-clabbe.montjoie@gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 20 Sep 2017 15:49:13 +0800
+Subject: [PATCH V3 1/1] clk: bulk: add of_clk_bulk_get()
+Message-ID: <1505893753-16143-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of of_device_get_match_data reduce the code size a bit.
-Furthermore, it prevents an improbable dereference when
-of_match_device() return NULL.
+'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
+here to handle this for DT users without 'clock-names' specified.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Reported-by: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
 ---
-Changes since v1:
-- fixed commit title
- drivers/dma/sun6i-dma.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+Changes since v2:
+ * of_clk_bulk_get should return -ENOENT;
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index bcd496edc70f..584f4e82a9be 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -1064,7 +1064,6 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+Changes since v1:
+ * using %pOF instead of full_name
+---
+ drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
+ include/linux/clk.h    |  8 ++++++++
+ 2 files changed, 39 insertions(+)
+
+diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+index c834f5a..896aa3b 100644
+--- a/drivers/clk/clk-bulk.c
++++ b/drivers/clk/clk-bulk.c
+@@ -19,6 +19,37 @@
+ #include <linux/clk.h>
+ #include <linux/device.h>
+ #include <linux/export.h>
++#include <linux/of.h>
++
++#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
++				 struct clk_bulk_data *clks)
++{
++	int ret;
++	int i;
++
++	for (i = 0; i < num_clks; i++)
++		clks[i].clk = NULL;
++
++	for (i = 0; i < num_clks; i++) {
++		clks[i].clk = of_clk_get(np, i);
++		if (IS_ERR(clks[i].clk)) {
++			ret = PTR_ERR(clks[i].clk);
++			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
++			       np, i, ret);
++			clks[i].clk = NULL;
++			goto err;
++		}
++	}
++
++	return 0;
++
++err:
++	clk_bulk_put(i, clks);
++
++	return ret;
++}
++#endif
  
- static int sun6i_dma_probe(struct platform_device *pdev)
+ void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
  {
--	const struct of_device_id *device;
- 	struct sun6i_dma_dev *sdc;
- 	struct resource *res;
- 	int ret, i;
-@@ -1073,10 +1072,9 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	if (!sdc)
- 		return -ENOMEM;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 12c96d9..a1f1f05 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+ }
  
--	device = of_match_device(sun6i_dma_match, &pdev->dev);
--	if (!device)
-+	sdc->cfg = of_device_get_match_data(&pdev->dev);
-+	if (!sdc->cfg)
- 		return -ENODEV;
--	sdc->cfg = device->data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	sdc->base = devm_ioremap_resource(&pdev->dev, res);
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
++				 struct clk_bulk_data *clks);
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+ #else
++static int of_clk_bulk_get(struct device_node *np, int num_clks,
++			   struct clk_bulk_data *clks)
++{
++	return -ENOENT;
++}
++
+ static inline struct clk *of_clk_get(struct device_node *np, int index)
+ {
+ 	return ERR_PTR(-ENOENT);
 -- 
-2.13.5
+2.7.4
