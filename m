@@ -1,69 +1,83 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Wed, 20 Sep 2017 16:17:08 -0400
-Subject: [PATCH v9 06/12] mm: zero struct pages during initialization
-In-Reply-To: <20170920201714.19817-1-pasha.tatashin@oracle.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
-Message-ID: <20170920201714.19817-7-pasha.tatashin@oracle.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 20 Sep 2017 13:30:33 -0700
+Subject: [PATCH 1/7] PM / OPP: Add platform specific set_clk function
+In-Reply-To: <20170920070343.GA32187@b29396-OptiPlex-7040>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+ <1503504610-12880-2-git-send-email-aisheng.dong@nxp.com>
+ <20170919225840.GI30848@ubuntu>
+ <20170920070343.GA32187@b29396-OptiPlex-7040>
+Message-ID: <20170920203033.GD3001@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add struct page zeroing as a part of initialization of other fields in
-__init_single_page().
+On 20-09-17, 15:03, Dong Aisheng wrote:
+> I've been thinking of that before.
+> Actually IMX already does some similar thing for MX5 (no for MX6).
+> See: clk_cpu_set_rate() in drivers/clk/imx/clk-cpu.c.
+> 
+> After some diggings, it seems MX7ULP is a bit more complicated than before
+> mainly due to two reasons:
+> 1) It requires to switch to different CPU mode accordingly when setting
+> clocks rate. That means we need handle this in clock driver as well
+> which looks not quite suitable although we could do if really want.
+> 
+> 2) It uses different clocks for different CPU mode (RUN 416M or
+> HSRUN 528M), and those clocks have some dependency.
+> e.g. when setting HSRUN clock, we need change RUN clock parent to make sure
+> the SPLL_PFD is got disabled before changing rate, as both CPU mode using
+> the same parent SPLL_PFD clock. Doing this in clock driver also make things
+> a bit more complicated.
+> 
+> The whole follow would be something like below:
+> static int imx7ulp_set_clk(struct device *dev, struct clk *clk,
+>                            unsigned long old_freq, unsigned long new_freq)
+> {
+>         u32 val;
+> 
+>         /*
+>          * Before changing the ARM core PLL, change the ARM clock soure
+>          * to FIRC first.
+>          */
+>         if (new_freq >= HSRUN_FREQ) {
+>                 clk_set_parent(clks[RUN_SCS_SEL].clk, clks[FIRC].clk);
+> 
+>                 /* switch to HSRUN mode */
+>                 val = readl_relaxed(smc_base + SMC_PMCTRL);
+>                 val |= (0x3 << 8);
+>                 writel_relaxed(val, smc_base + SMC_PMCTRL);
+> 
+>                 /* change the clock rate in HSRUN */
+>                 clk_set_rate(clks[SPLL_PFD0].clk, new_freq);
+>                 clk_set_parent(clks[HSRUN_SCS_SEL].clk, clks[SPLL_SEL].clk);
+>         } else {
+>                 /* change the HSRUN clock to firc */
+>                 clk_set_parent(clks[HSRUN_SCS_SEL].clk, clks[FIRC].clk);
+> 
+>                 /* switch to RUN mode */
+>                 val = readl_relaxed(smc_base + SMC_PMCTRL);
+>                 val &= ~(0x3 << 8);
+>                 writel_relaxed(val, smc_base + SMC_PMCTRL);
+> 
+>                 clk_set_rate(clks[SPLL_PFD0].clk, new_freq);
+>                 clk_set_parent(clks[RUN_SCS_SEL].clk, clks[SPLL_SEL].clk);
+>         }
+> 
+>         return 0;
+> }
 
-This single thread performance collected on: Intel(R) Xeon(R) CPU E7-8895
-v3 @ 2.60GHz with 1T of memory (268400646 pages in 8 nodes):
+Right and we have the same thing in the cpufreq driver now. It will
+stay at some place and we need to find the best one, keeping in mind
+that we may or may not want to solve this problem in a generic way.
 
-                        BASE            FIX
-sparse_init     11.244671836s   0.007199623s
-zone_sizes_init  4.879775891s   8.355182299s
-                  --------------------------
-Total           16.124447727s   8.362381922s
+> That's why i thought if we can make OPP core provide a way to handle such
+> complicated things in platform specific cpufreq driver.
+> 
+> How would you suggest for this issue?
 
-sparse_init is where memory for struct pages is zeroed, and the zeroing
-part is moved later in this patch into __init_single_page(), which is
-called from zone_sizes_init().
+I wouldn't add an API into the OPP framework if I were you. There is
+just too much code to add to the core to handle such platform specific
+stuff, which you are anyway going to keep somewhere as it is. IMHO,
+keeping that in the clock driver is a better thing to do than this.
 
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
-Acked-by: Michal Hocko <mhocko@suse.com>
----
- include/linux/mm.h | 9 +++++++++
- mm/page_alloc.c    | 1 +
- 2 files changed, 10 insertions(+)
-
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index f8c10d336e42..50b74d628243 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -94,6 +94,15 @@ extern int mmap_rnd_compat_bits __read_mostly;
- #define mm_forbids_zeropage(X)	(0)
- #endif
- 
-+/*
-+ * On some architectures it is expensive to call memset() for small sizes.
-+ * Those architectures should provide their own implementation of "struct page"
-+ * zeroing by defining this macro in <asm/pgtable.h>.
-+ */
-+#ifndef mm_zero_struct_page
-+#define mm_zero_struct_page(pp)  ((void)memset((pp), 0, sizeof(struct page)))
-+#endif
-+
- /*
-  * Default maximum number of active map areas, this limits the number of vmas
-  * per mm struct. Users can overwrite this number by sysctl but there is a
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index a8dbd405ed94..4b630ee91430 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -1170,6 +1170,7 @@ static void free_one_page(struct zone *zone,
- static void __meminit __init_single_page(struct page *page, unsigned long pfn,
- 				unsigned long zone, int nid)
- {
-+	mm_zero_struct_page(page);
- 	set_page_links(page, zone, nid, pfn);
- 	init_page_count(page);
- 	page_mapcount_reset(page);
 -- 
-2.14.1
+viresh
