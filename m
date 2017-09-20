@@ -1,30 +1,76 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 20 Sep 2017 08:04:19 -0500
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
- <20170919070422.GI3349@codeaurora.org>
- <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
- <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
-Message-ID: <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 20 Sep 2017 15:04:16 +0200
+Subject: [RESEND PATCH 0/4] EDAC: support reduce bus width on 98dx3236
+In-Reply-To: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Mon, 7 Aug 2017 13:46:37 +1200")
+References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <87a81pplm7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/20/17 6:43 AM, Linus Walleij wrote:
-> Doesn't that mean we need something like irq_valid_mask but rather
-> gpio_valid_mask that just block all usage of certain GPIOs?
+Hi Chris,
+ 
+ On lun., ao?t 07 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-That raises a lot of questions.  In the meantime, my current patches for 
-4.14 work fine.
+> (sorry I messed up sending this earlier, there is one additional patch and I'll
+> actually include the linux-arm and linux-edac mailing lists)
+>
+> This series applies on top of Jan Lubbe's "EDAC drivers for Armada XP L2 and
+> DDR" series[1]. 1/4, 2/4 and 3/4 don't strictly depend on Jan's work so they
+> could go in through the ARM tree if that is preferred.
+>
+> The 98dx3236 and similar switch chips with integrated CPUs have fewer pins
+> available for the SDRAM interface so the definition of "full" and "half" is
+> different to the Armada-XP SoC. In this series I introduce a
+> "marvell,reduced-width" device tree property and use this to identify such a
+> system.
+>
+> I chose to use a new property instead of a new compatible string because the IP
+> block really is the Armada-XP one (at least according to the Marvell FAE I
+> spoke to) and because the scenario of requiring a reduced pin-count when going
+> from an external SoC to an integrated one will be reasonably common as we see
+> more an more of these switches with integrated ARM cores.
 
-Do we replace irq_valid_mask with gpio_valid_mask?  That would break 
-drivers where the GPIO is valid but the interrupt is not.  If we keep 
-both, what happens if gpio_valid_mask is false but irq_valid_mask is 
-true?  And then we would need to audit all gpio drivers to see which 
-ones should be updated for the new infrastructure.
+If I understood well a version 2 is expected. If I missed it, please
+point me on it.
+
+Once the binding will be acked I will be able to apply the dts
+patch. For the first patch unless I am wrong the the series "EDAC
+drivers for Armada XP L2 and DDR" was not applied or even formally
+acked. Also while you will be at sending a new version please add a
+commit log even a simple one.
+
+For the 3rd patch, I also wait the new version of patch 2 with an
+ack.
+
+Thanks,
+
+Gregory
+
+
+>
+>
+> [1] - http://marc.info/?l=linux-edac&m=150167758312924
+>
+> Chris Packham (4):
+>   ARM: dts: enable L2 cache parity and ecc on db-xc3-24g4xg board
+>   dt-bindings: add "reduced-width" property for Armada XP SDRAM
+>     controller
+>   ARM: dts: mvebu: set reduced-width property for SDRAM on 98dx3236
+>   EDAC: add support for reduced-width Armada-XP SDRAM
+>
+>  .../bindings/memory-controllers/mvebu-sdram-controller.txt          | 6 ++++++
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi                           | 1 +
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts                       | 5 +++++
+>  drivers/edac/armada_xp_edac.c                                       | 3 +++
+>  4 files changed, 15 insertions(+)
+>
+> -- 
+> 2.13.0
+>
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
