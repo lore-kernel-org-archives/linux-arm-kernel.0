@@ -1,93 +1,146 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 20 Sep 2017 12:57:20 -0700
-Subject: [PATCH v4 4/5] drivers: pci: add support for relative addressing in
- quirk tables
+Date: Wed, 20 Sep 2017 12:57:21 -0700
+Subject: [PATCH v4 5/5] kernel: tracepoints: add support for relative
+ references
 In-Reply-To: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
 References: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170920195721.7939-5-ard.biesheuvel@linaro.org>
+Message-ID: <20170920195721.7939-6-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the PCI quirk tables to be emitted in a way that avoids absolute
-references to the hook functions. This reduces the size of the entries,
-and, more importantly, makes them invariant under runtime relocation
-(e.g., for KASLR)
+To avoid the need for relocating absolute references to tracepoint
+structures at boot time when running relocatable kernels (which may
+take a disproportionate amount of space), add the option to emit
+these tables as relative references instead.
 
-Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Ingo Molnar <mingo@redhat.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/pci/quirks.c | 13 ++++++++++---
- include/linux/pci.h  | 20 ++++++++++++++++++++
- 2 files changed, 30 insertions(+), 3 deletions(-)
+ include/linux/tracepoint.h | 19 ++++++--
+ kernel/tracepoint.c        | 50 +++++++++++---------
+ 2 files changed, 42 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index a4d33619a7bb..82a66235d60c 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -3548,9 +3548,16 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
- 		     f->vendor == (u16) PCI_ANY_ID) &&
- 		    (f->device == dev->device ||
- 		     f->device == (u16) PCI_ANY_ID)) {
--			calltime = fixup_debug_start(dev, f->hook);
--			f->hook(dev);
--			fixup_debug_report(dev, calltime, f->hook);
-+			void (*hook)(struct pci_dev *dev);
+diff --git a/include/linux/tracepoint.h b/include/linux/tracepoint.h
+index a26ffbe09e71..d02bf1a695e8 100644
+--- a/include/linux/tracepoint.h
++++ b/include/linux/tracepoint.h
+@@ -228,6 +228,19 @@ extern void syscall_unregfunc(void);
+ 		return static_key_false(&__tracepoint_##name.key);	\
+ 	}
+ 
 +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+			hook = (void *)((unsigned long)&f->hook_offset +
-+					f->hook_offset);
++#define __TRACEPOINT_ENTRY(name)					 \
++	asm("	.section \"__tracepoints_ptrs\", \"a\"		     \n" \
++	    "	.balign 4					     \n" \
++	    "	.long " VMLINUX_SYMBOL_STR(__tracepoint_##name) " - .\n" \
++	    "	.previous					     \n")
 +#else
-+			hook = f->hook;
++#define __TRACEPOINT_ENTRY(name)					 \
++	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
++	__attribute__((section("__tracepoints_ptrs"))) =		 \
++		&__tracepoint_##name
 +#endif
-+			calltime = fixup_debug_start(dev, hook);
-+			hook(dev);
-+			fixup_debug_report(dev, calltime, hook);
- 		}
++
+ /*
+  * We have no guarantee that gcc and the linker won't up-align the tracepoint
+  * structures, so we create an array of pointers that will be used for iteration
+@@ -237,11 +250,9 @@ extern void syscall_unregfunc(void);
+ 	static const char __tpstrtab_##name[]				 \
+ 	__attribute__((section("__tracepoints_strings"))) = #name;	 \
+ 	struct tracepoint __tracepoint_##name				 \
+-	__attribute__((section("__tracepoints"))) =			 \
++	__attribute__((section("__tracepoints"), used)) =		 \
+ 		{ __tpstrtab_##name, STATIC_KEY_INIT_FALSE, reg, unreg, NULL };\
+-	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
+-	__attribute__((section("__tracepoints_ptrs"))) =		 \
+-		&__tracepoint_##name;
++	__TRACEPOINT_ENTRY(name);
+ 
+ #define DEFINE_TRACE(name)						\
+ 	DEFINE_TRACE_FN(name, NULL, NULL);
+diff --git a/kernel/tracepoint.c b/kernel/tracepoint.c
+index 685c50ae6300..05649fef106c 100644
+--- a/kernel/tracepoint.c
++++ b/kernel/tracepoint.c
+@@ -327,6 +327,28 @@ int tracepoint_probe_unregister(struct tracepoint *tp, void *probe, void *data)
+ }
+ EXPORT_SYMBOL_GPL(tracepoint_probe_unregister);
+ 
++static void for_each_tracepoint_range(struct tracepoint * const *begin,
++		struct tracepoint * const *end,
++		void (*fct)(struct tracepoint *tp, void *priv),
++		void *priv)
++{
++	if (!begin)
++		return;
++
++	if (IS_ENABLED(CONFIG_HAVE_ARCH_PREL32_RELOCATIONS)) {
++		const int *iter;
++
++		for (iter = (const int *)begin; iter < (const int *)end; iter++)
++			fct((struct tracepoint *)((unsigned long)iter + *iter),
++			    priv);
++	} else {
++		struct tracepoint * const *iter;
++
++		for (iter = begin; iter < end; iter++)
++			fct(*iter, priv);
++	}
++}
++
+ #ifdef CONFIG_MODULES
+ bool trace_module_has_bad_taint(struct module *mod)
+ {
+@@ -391,15 +413,9 @@ EXPORT_SYMBOL_GPL(unregister_tracepoint_module_notifier);
+  * Ensure the tracer unregistered the module's probes before the module
+  * teardown is performed. Prevents leaks of probe and data pointers.
+  */
+-static void tp_module_going_check_quiescent(struct tracepoint * const *begin,
+-		struct tracepoint * const *end)
++static void tp_module_going_check_quiescent(struct tracepoint *tp, void *priv)
+ {
+-	struct tracepoint * const *iter;
+-
+-	if (!begin)
+-		return;
+-	for (iter = begin; iter < end; iter++)
+-		WARN_ON_ONCE((*iter)->funcs);
++	WARN_ON_ONCE(tp->funcs);
  }
  
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index f68c58a93dd0..d7a01d7fc3a7 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1791,7 +1791,11 @@ struct pci_fixup {
- 	u16 device;		/* You can use PCI_ANY_ID here of course */
- 	u32 class;		/* You can use PCI_ANY_ID here too */
- 	unsigned int class_shift;	/* should be 0, 8, 16 */
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+	signed int hook_offset;
-+#else
- 	void (*hook)(struct pci_dev *dev);
-+#endif
- };
+ static int tracepoint_module_coming(struct module *mod)
+@@ -450,8 +466,9 @@ static void tracepoint_module_going(struct module *mod)
+ 			 * Called the going notifier before checking for
+ 			 * quiescence.
+ 			 */
+-			tp_module_going_check_quiescent(mod->tracepoints_ptrs,
+-				mod->tracepoints_ptrs + mod->num_tracepoints);
++			for_each_tracepoint_range(mod->tracepoints_ptrs,
++				mod->tracepoints_ptrs + mod->num_tracepoints,
++				tp_module_going_check_quiescent, NULL);
+ 			break;
+ 		}
+ 	}
+@@ -503,19 +520,6 @@ static __init int init_tracepoints(void)
+ __initcall(init_tracepoints);
+ #endif /* CONFIG_MODULES */
  
- enum pci_fixup_pass {
-@@ -1805,12 +1809,28 @@ enum pci_fixup_pass {
- 	pci_fixup_suspend_late,	/* pci_device_suspend_late() */
- };
- 
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+#define __DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
-+				    class_shift, hook)			\
-+	__ADDRESSABLE(hook)						\
-+	asm(".section "	#sec ", \"a\"				\n"	\
-+	    ".balign	16					\n"	\
-+	    ".short "	#vendor ", " #device "			\n"	\
-+	    ".long "	#class ", " #class_shift "		\n"	\
-+	    ".long "	VMLINUX_SYMBOL_STR(hook) " - .		\n"	\
-+	    ".previous						\n");
-+#define DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
-+				  class_shift, hook)			\
-+	__DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
-+				  class_shift, hook)
-+#else
- /* Anonymous variables would be nice... */
- #define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, class,	\
- 				  class_shift, hook)			\
- 	static const struct pci_fixup __PASTE(__pci_fixup_##name,__LINE__) __used	\
- 	__attribute__((__section__(#section), aligned((sizeof(void *)))))    \
- 		= { vendor, device, class, class_shift, hook };
-+#endif
- 
- #define DECLARE_PCI_FIXUP_CLASS_EARLY(vendor, device, class,		\
- 					 class_shift, hook)		\
+-static void for_each_tracepoint_range(struct tracepoint * const *begin,
+-		struct tracepoint * const *end,
+-		void (*fct)(struct tracepoint *tp, void *priv),
+-		void *priv)
+-{
+-	struct tracepoint * const *iter;
+-
+-	if (!begin)
+-		return;
+-	for (iter = begin; iter < end; iter++)
+-		fct(*iter, priv);
+-}
+-
+ /**
+  * for_each_kernel_tracepoint - iteration on all kernel tracepoints
+  * @fct: callback
 -- 
 2.11.0
