@@ -1,76 +1,103 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Sep 2017 15:04:16 +0200
-Subject: [RESEND PATCH 0/4] EDAC: support reduce bus width on 98dx3236
-In-Reply-To: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Mon, 7 Aug 2017 13:46:37 +1200")
-References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <87a81pplm7.fsf@free-electrons.com>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Wed, 20 Sep 2017 13:05:07 +0000
+Subject: [PATCH 3/8] ARM: dts: iwg22m: Enable SDHI1 controller
+In-Reply-To: <20170915081144.GI3924@verge.net.au>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-4-git-send-email-chris.paterson2@renesas.com>
+ <20170915081144.GI3924@verge.net.au>
+Message-ID: <TY1PR06MB07026CA91F110214FF170FA3B7610@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On lun., ao?t 07 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+Hello Simon,
 
-> (sorry I messed up sending this earlier, there is one additional patch and I'll
-> actually include the linux-arm and linux-edac mailing lists)
->
-> This series applies on top of Jan Lubbe's "EDAC drivers for Armada XP L2 and
-> DDR" series[1]. 1/4, 2/4 and 3/4 don't strictly depend on Jan's work so they
-> could go in through the ARM tree if that is preferred.
->
-> The 98dx3236 and similar switch chips with integrated CPUs have fewer pins
-> available for the SDRAM interface so the definition of "full" and "half" is
-> different to the Armada-XP SoC. In this series I introduce a
-> "marvell,reduced-width" device tree property and use this to identify such a
-> system.
->
-> I chose to use a new property instead of a new compatible string because the IP
-> block really is the Armada-XP one (at least according to the Marvell FAE I
-> spoke to) and because the scenario of requiring a reduced pin-count when going
-> from an external SoC to an integrated one will be reasonably common as we see
-> more an more of these switches with integrated ARM cores.
+> From: devicetree-owner at vger.kernel.org [mailto:devicetree-
+> owner at vger.kernel.org] On Behalf Of Simon Horman
+> Sent: 15 September 2017 09:12
+> To: Chris Paterson <Chris.Paterson2@renesas.com>
+> 
+> On Wed, Sep 13, 2017 at 06:05:36PM +0100, Chris Paterson wrote:
+> > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> >
+> > Enable the SDHI1 controller on iWave RZ/G1E SoM.
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> > ---
+> > This patch is based on renesas-devel-20170913-v4.13.
+> >
+> >
+> >  arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> > b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> > index e306e7c..f7f9cef 100644
+> > --- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+> > @@ -9,6 +9,7 @@
+> >   */
+> >
+> >  #include "r8a7745.dtsi"
+> > +#include <dt-bindings/gpio/gpio.h>
+> >
+> >  / {
+> >  	compatible = "iwave,g22m", "renesas,r8a7745"; @@ -38,6 +39,12
+> @@
+> >  		function = "mmc";
+> >  	};
+> >
+> > +	sdhi1_pins: sd1 {
+> > +		groups = "sdhi1_data4", "sdhi1_ctrl";
+> > +		function = "sdhi1";
+> > +		power-source = <3300>;
+> > +	};
+> > +
+> >  	i2c3_pins: i2c3 {
+> >  		groups = "i2c3_b";
+> >  		function = "i2c3";
+> > @@ -54,6 +61,16 @@
+> >  	status = "okay";
+> >  };
+> >
+> > +&sdhi1 {
+> > +	pinctrl-0 = <&sdhi1_pins>;
+> > +	pinctrl-names = "default";
+> > +
+> > +	vmmc-supply = <&reg_3p3v>;
+> > +	vqmmc-supply = <&reg_3p3v>;
+> > +	cd-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
+> 
+> No wp-gpios property means this is a ?SD slot, right?
 
-If I understood well a version 2 is expected. If I missed it, please
-point me on it.
+Correct
 
-Once the binding will be acked I will be able to apply the dts
-patch. For the first patch unless I am wrong the the series "EDAC
-drivers for Armada XP L2 and DDR" was not applied or even formally
-acked. Also while you will be at sending a new version please add a
-commit log even a simple one.
+> 
+> Do you have any plans to enable sdr-50 and sdr-104?
+> Is it not supported for some reason?
 
-For the 3rd patch, I also wait the new version of patch 2 with an
-ack.
+Nope (unless the hardware changes down the line).
+Both vmmc and vqmmc are fixed to 3V3 on the iWave-E SOM module.
 
-Thanks,
-
-Gregory
+Kind regards, Chris
 
 
->
->
-> [1] - http://marc.info/?l=linux-edac&m=150167758312924
->
-> Chris Packham (4):
->   ARM: dts: enable L2 cache parity and ecc on db-xc3-24g4xg board
->   dt-bindings: add "reduced-width" property for Armada XP SDRAM
->     controller
->   ARM: dts: mvebu: set reduced-width property for SDRAM on 98dx3236
->   EDAC: add support for reduced-width Armada-XP SDRAM
->
->  .../bindings/memory-controllers/mvebu-sdram-controller.txt          | 6 ++++++
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi                           | 1 +
->  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts                       | 5 +++++
->  drivers/edac/armada_xp_edac.c                                       | 3 +++
->  4 files changed, 15 insertions(+)
->
-> -- 
-> 2.13.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
+> I don't mind if its not enabled in this patch but I would like to know if it can be
+> enabled or not and reflect that information in the wiki.
+> 
+> http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds
+> 
+> > +	status = "okay";
+> > +};
+> > +
+> >  &i2c3 {
+> >  	pinctrl-0 = <&i2c3_pins>;
+> >  	pinctrl-names = "default";
+> > --
+> > 1.9.1
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
