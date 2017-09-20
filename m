@@ -1,36 +1,29 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 20 Sep 2017 13:38:21 +0530
-Subject: [PATCH 3/4] irqchip/gic: Handle return value of kasprintf
-In-Reply-To: <1505894901-9403-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1505894901-9403-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1505894901-9403-4-git-send-email-arvind.yadav.cs@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 20 Sep 2017 13:43:02 +0530
+Subject: [GIT PULL] DaVinci fixes for v4.14
+Message-ID: <e28d3e5b-03b6-4def-edb0-d586f3c7627b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kasprintf() can fail here and we must check its return value.
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/irqchip/irq-gic.c | 4 ++++
- 1 file changed, 4 insertions(+)
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 651d726..ec4a7e6 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1209,9 +1209,13 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
- 
- 	if (static_key_true(&supports_deactivate) && gic == &gic_data[0]) {
- 		name = kasprintf(GFP_KERNEL, "GICv2");
-+		if (!name)
-+			return -ENOMEM;
- 		gic_init_chip(gic, NULL, name, true);
- 	} else {
- 		name = kasprintf(GFP_KERNEL, "GIC-%d", (int)(gic-&gic_data[0]));
-+		if (!name)
-+			return -ENOMEM;
- 		gic_init_chip(gic, NULL, name, false);
- 	}
- 
--- 
-1.9.1
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.14
+
+for you to fetch changes up to ce21574ad1922b403198ee664c4dff276f514f1d:
+
+  ARM: dts: da850-evm: add serial and ethernet aliases (2017-09-20 13:33:41 +0530)
+
+----------------------------------------------------------------
+A fix for random ethernet mac address problem
+on DA850 EVM.
+
+----------------------------------------------------------------
+Sekhar Nori (1):
+      ARM: dts: da850-evm: add serial and ethernet aliases
+
+ arch/arm/boot/dts/da850-evm.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
