@@ -1,36 +1,35 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 20 Sep 2017 21:38:25 +0200
-Subject: [RFC PATCH 1/7] drm: bridge: Enable polling hpd event in dw_hdmi
+Date: Wed, 20 Sep 2017 21:38:27 +0200
+Subject: [RFC PATCH 3/7] clk: sunxi: Add CLK_SET_RATE_PARENT flag for H3 HDMI
+ clock
 In-Reply-To: <20170920193831.20268-1-jernej.skrabec@siol.net>
 References: <20170920193831.20268-1-jernej.skrabec@siol.net>
-Message-ID: <20170920193831.20268-2-jernej.skrabec@siol.net>
+Message-ID: <20170920193831.20268-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some custom phys don't support hpd interrupts. Add support for polling
-such events.
+When setting the HDMI clock of H3, the PLL_VIDEO clock needs to be set.
+
+Add CLK_SET_RATE_PARENT flag for H3 HDMI clock.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index bf14214fa464..09cb5a3e4c71 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -1954,7 +1954,11 @@ static int dw_hdmi_bridge_attach(struct drm_bridge *bridge)
- 	struct drm_connector *connector = &hdmi->connector;
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 7a222ff1ad0a..36224ba93f9d 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -474,7 +474,7 @@ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
  
- 	connector->interlace_allowed = 1;
--	connector->polled = DRM_CONNECTOR_POLL_HPD;
-+	if (hdmi->phy.ops->setup_hpd)
-+		connector->polled = DRM_CONNECTOR_POLL_HPD;
-+	else
-+		connector->polled = DRM_CONNECTOR_POLL_CONNECT |
-+				    DRM_CONNECTOR_POLL_DISCONNECT;
+ static const char * const hdmi_parents[] = { "pll-video" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
+-				 0x150, 0, 4, 24, 2, BIT(31), 0);
++				 0x150, 0, 4, 24, 2, BIT(31), CLK_SET_RATE_PARENT);
  
- 	drm_connector_helper_add(connector, &dw_hdmi_connector_helper_funcs);
- 
+ static SUNXI_CCU_GATE(hdmi_ddc_clk,	"hdmi-ddc",	"osc24M",
+ 		      0x154, BIT(31), 0);
 -- 
 2.14.1
