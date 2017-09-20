@@ -1,33 +1,60 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 20 Sep 2017 09:21:22 +0200
-Subject: [PATCH] dmaengine: sun6i: sun4i-gpadc: use
- of_device_get_match_data
-In-Reply-To: <20170920065814.fle73gxbu3oyqsr4@flea.home>
-References: <20170919184447.4479-1-clabbe.montjoie@gmail.com>
- <20170920065814.fle73gxbu3oyqsr4@flea.home>
-Message-ID: <20170920072122.GA19920@Red>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 20 Sep 2017 15:04:50 +0800
+Subject: [PATCH 6/7] cpufreq: make cpufreq_generic_init
+ transition_latency default to CPUFREQ_ETERNAL
+In-Reply-To: <20170919231007.GJ30848@ubuntu>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+ <1503504610-12880-7-git-send-email-aisheng.dong@nxp.com>
+ <20170919231007.GJ30848@ubuntu>
+Message-ID: <20170920070450.GB32187@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 08:58:14AM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> On Tue, Sep 19, 2017 at 06:44:47PM +0000, Corentin Labbe wrote:
-> > The usage of of_device_get_match_data reduce the code size a bit.
-> > Furthermore, it prevents an improbable dereference when
-> > of_match_device() return NULL.
+On Tue, Sep 19, 2017 at 04:10:07PM -0700, Viresh Kumar wrote:
+> On 24-08-17, 00:10, Dong Aisheng wrote:
+> > If no valid transition_latency specified, let's make it default to
+> > CPUFREQ_ETERNAL which is consistent with its definition.
 > > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > This can save some of the same checkings like this:
+> >         transition_latency = dev_pm_opp_get_max_transition_latency(cpu_dev);
+> > -       if (!transition_latency)
+> > -               transition_latency = CPUFREQ_ETERNAL;
+> >         ret = cpufreq_generic_init(policy, freq_table, transition_latency);
+> > 
+> > Cc: Viresh Kumar <vireshk@kernel.org>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/cpufreq/cpufreq.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> > index 9bf97a3..da07de6 100644
+> > --- a/drivers/cpufreq/cpufreq.c
+> > +++ b/drivers/cpufreq/cpufreq.c
+> > @@ -180,6 +180,8 @@ int cpufreq_generic_init(struct cpufreq_policy *policy,
+> >  		return ret;
+> >  	}
+> >  
+> > +	if (!transition_latency)
+> > +		transition_latency = CPUFREQ_ETERNAL;
+> >  	policy->cpuinfo.transition_latency = transition_latency;
+> >  
+> >  	/*
 > 
-> The prefix of your commit title is wrong, this isn't about the GPADC.
-> 
-> Once fixed,
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Maxime
-> 
+> Can you update all the existing drivers as well (in the same patch)
+> who can benefit from it?
 
-A copy/paste error, sorry
-I will resend
-thanks
-Corentin Labbe
+Yes, of course.
+Will do it in the updated version later.
+
+Thanks
+
+Regards
+Dong Aisheng
+
+> 
+> -- 
+> viresh
