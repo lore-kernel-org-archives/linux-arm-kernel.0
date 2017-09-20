@@ -1,233 +1,139 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Sep 2017 14:23:48 +0100
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170920112152.GL20805@n2100.armlinux.org.uk>
-References: <20170920112152.GL20805@n2100.armlinux.org.uk>
-Message-ID: <20170920132347.GN20805@n2100.armlinux.org.uk>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Wed, 20 Sep 2017 21:34:57 +0800
+Subject: [PATCH v3 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <59BC1CEE.8010708@arm.com>
+References: <1504770316-4327-1-git-send-email-xiexiuqi@huawei.com>
+ <1504770316-4327-2-git-send-email-xiexiuqi@huawei.com>
+ <59B2DE26.4060002@arm.com> <52d2868c-79cd-8ff8-8e1d-6078d02d5a0c@huawei.com>
+ <59BC1CEE.8010708@arm.com>
+Message-ID: <2b540452-2fa6-322a-e7ee-63a0653b8548@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 12:21:52PM +0100, Russell King - ARM Linux wrote:
-> Hi,
-> 
-> It's common for systems to be time synchronised using programs such as
-> chrony or ntpd.  In such situations, when we are properly synchronised,
-> the kernel writes the current time to the RTC every 11 seconds.
+Hi James,
 
-That should be 11 minutes.
+I try to explain some of following questions.
+
+On 2017/9/16 2:33, James Morse wrote:
+> Hi Xie XiuQi,
+> 
+> On 11/09/17 15:11, Xie XiuQi wrote:
+>> I first describe the approach of this patchset:
+>>
+>> A memory access error on the execution path usually triggers SEA.
+>> According to the existing process, errors occurred in the kernel,
+>> leading to direct panic, if it occurred the user-space, we should
+>> just kill process.
+>>
+>> But there is a class of error, in fact, is not necessary to kill
+>> process, you can recover and continue to run the process. Such as
+>> the instruction data corrupted, where the memory page might be
+>> read-only, which is has not been modified, the disk might have the
+>> correct data, so you can directly drop the page, ant reload it when
+>> necessary.
+>>
+>> So this patchset is just try to solve such problem: if the error is
+>> consumed in user-space and the error occurs on a clean page, you can
+>> directly drop the memory page without killing process.
+>>
+>> This is implemented in memory_failure, which is generic process.
+> 
+>> The error reported by SEA should be handled before re-enter the process,
+>> or we must kill the process to prevent error propagation.
+>>
+>> memory_failure_queue() is asynchronous, in which, error info was saved
+>> at ghes_proc, but handled in kworker. During this period there is a context
+>> switching, so we can not determine which process would be switch to. So
+>> memory_failure_queue is not suitable for handling the problem.
+> 
+> Thanks for this summary. I see the problem you're trying to solve is when
+> memory_failure() runs, in your scenario its not guaranteed to run before we
+> return to user space.
+> 
+> What is the user-visible symptom of this? SIGBUS, code=0 instead of SIGBUS,
+> code=...MCEERR_A?
+
+If the corrupted page is clean, just dropped it and return to user-space without
+side effects. And if corrupted page is dirty, memory_failure() will send SIGBUS
+with code=BUS_MCEERR_AR.
 
 > 
-> However, assumptions are made about the RTC:
-> 
-> 1. kernel/time/ntp.c assumes that all RTCs want to be told to set the
->    time at around 500ms into the second.
-> 
-> 2. drivers/rtc/systohc.c assumes that if the time being set is >= 500ms,
->    then we want to set the _next_ second.
-> 
-> This leads to RTCs being set with an offset time, where the offset
-> depends on the RTC.  For example, the PCF8523 ends up reliably set
-> around 970ms in the future:
-> 
-> RTC Time: 19-09-2017 14:27:51
-> System Time was:     14:27:50.031
-> 
-> What this means is that when the RTC ticked from 50 to 51 seconds,
-> system time was at 50.031s.  Hence, the RTC in this case is 969ms
-> in the future.
-> 
-> For Armada 388, the situation is different:
-> 
-> RTC Time: 19-09-2017 14:48:17
-> System Time was:     14:48:16.521
-> 
-> Here, the RTC is being set 479ms in the future.
-> 
-> The SNVS RTC in imx6 is different again, although I have no definitive
-> figures yet.
-> 
-> Why does this matter - if you introduce a 1s offset in system time
-> (eg, you reboot a machine running NTP) then it takes at least four hours
-> after the reboot for ntpd to settle down, with the PPM swinging faster
-> and slower than normal as it compensates for the offset.  This means if
-> you are using a Linux system for time measurement purposes, it is
-> useless for those four hours.
-> 
-> Being able to accurately save and restore system time helps to reduce
-> the disruptive effect of a reboot.
-> 
-> Currently, there are no controls in the kernel over this mechanism - if
-> you're running a multi-platform kernel which has support for writing the
-> RTC if ntp-sync'd, then you're stuck with the kernel writing the RTC
-> every 11 seconds.  Not only is this detrimental due to the enforced RTC
+> ..in which case I'm looking at this as a race with the memory_failure() bottom
+> half via schedule_work().
 
-and here too.
+Do you mean there is a race between memory_failure() from do_notify_resume() and
+from schedule_work()? Indeed there a race here, thank you for pointing out that.
 
-> dependent offset, but it also means that if you want to trim your RTC
-> to a synchronised source of time (for which the kernel must not write
-> the RTC, but you do want it to ntp sync), the only way to do it is to
-> either modify the kernel, or disable CONFIG_RTC_SYSTOHC in the multi-
-> platform kernel.
+Actually, memory_failure_queue() is not needed in SEA case if we process it in
+synchronous.
+
+I'll try to solve this issue later.
+
+> 
+> How does x86 avoid this same problem?
 > 
 > 
-> The kernel can do better - elimination of the rounding-up in systohc.c
-> gives a better result for PCF8523:
+>> And memory_failure is not nmi-safe, so it can not be called directly in the
+>> SEA context. So we just handle this error at SEA exit path, and before context
+>> switching.
 > 
-> RTC Time: 19-09-2017 16:30:38
-> System Time was:     16:30:38.034
-> 
-> and the remaining offset can be reduced by adjusting the 500ms offset
-> in ntp.c to 470ms.  This is specific to the offset that PCF8523 wants.
-> We know that MC146818 RTCs found in PCs want a 500ms offset (without
-> the addition of one second that systohc.c does.)  The Armada 388 RTC
-> wants to be set on the exact second.
-> 
-> We need some way to cater for these differing requirements (eg, RTC
-> drivers provide some properties to rtclib and the ntp code to describe
-> how long it takes for a written time to "take"), or we decide (as I
-> think was decided in the past) that the kernel should not be setting
-> the RTC, but userspace should be responsible for performing that
-> function.  Either way, we need to know about these RTC specific
-> properties in order to set their time accurately.
-> 
-> One of the issues here, however, is that RTC datasheets do not give this
-> information - this can only be found out by experimentation and
-> measurement.
-> 
-> Currently I'm using the hacky patch below to be able to (a) disable the
-> regular RTC write during runtime, so I can measure the RTC drift and
-> trim it, and (b) provide a knob to adjust how far past the second the
-> RTC will receive its write.  For a properly trimmed PCF8523 (measured
-> over about 12 hours to have 0.1ppm drift - which is better than its
-> associated crystal is rated for), setting this knob to 470ms results
-> in the following (from two samples this morning):
-> 
-> RTC Time: 20-09-2017 10:41:30
-> System Time was:     10:41:30.000
-> RTC Time: 20-09-2017 11:17:38
-> System Time was:     11:17:38.000
-> 
-> There's probably some noise in the setting of this due to the workqueue,
-> but getting it within 10ms is definitely an improvement over being
-> almost a second out.
-> 
-> So, the question is... how should these differences in rtc requirements
-> be handled?
-> 
->  drivers/rtc/systohc.c |  6 +++---
->  kernel/sysctl.c       | 21 +++++++++++++++++++++
->  kernel/time/ntp.c     |  9 ++++++---
->  3 files changed, 30 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
-> index b4a68ffcd06b..df804597de71 100644
-> --- a/drivers/rtc/systohc.c
-> +++ b/drivers/rtc/systohc.c
-> @@ -26,10 +26,7 @@ int rtc_set_ntp_time(struct timespec64 now)
->  	struct rtc_time tm;
->  	int err = -ENODEV;
->  
-> -	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
-> -		rtc_time64_to_tm(now.tv_sec, &tm);
-> -	else
-> -		rtc_time64_to_tm(now.tv_sec + 1, &tm);
-> +	rtc_time64_to_tm(now.tv_sec, &tm);
->  
->  	rtc = rtc_class_open(CONFIG_RTC_SYSTOHC_DEVICE);
->  	if (rtc) {
-> diff --git a/kernel/sysctl.c b/kernel/sysctl.c
-> index 6648fbbb8157..c2ce802f7ab9 100644
-> --- a/kernel/sysctl.c
-> +++ b/kernel/sysctl.c
-> @@ -98,6 +98,9 @@
->  
->  #if defined(CONFIG_SYSCTL)
->  
-> +extern unsigned int sysctl_ntp_rtc_offset;
-> +extern unsigned int sysctl_ntp_rtc_sync;
-> +
->  /* External variables not in a header file. */
->  extern int suid_dumpable;
->  #ifdef CONFIG_COREDUMP
-> @@ -303,6 +306,24 @@ static int max_extfrag_threshold = 1000;
->  #endif
->  
->  static struct ctl_table kern_table[] = {
-> +#if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
-> +	{
-> +		.procname	= "ntp_rtc_offset",
-> +		.data		= &sysctl_ntp_rtc_offset,
-> +		.maxlen		= sizeof(sysctl_ntp_rtc_offset),
-> +		.mode		= 0644,
-> +		.proc_handler	= proc_douintvec,
-> +	},
-> +	{
-> +		.procname	= "ntp_rtc_sync",
-> +		.data		= &sysctl_ntp_rtc_sync,
-> +		.maxlen		= sizeof(sysctl_ntp_rtc_sync),
-> +		.mode		= 0644,
-> +		.proc_handler	= proc_douintvec_minmax,
-> +		.extra1		= &zero,
-> +		.extra2		= &one,
-> +	},
-> +#endif
->  	{
->  		.procname	= "sched_child_runs_first",
->  		.data		= &sysctl_sched_child_runs_first,
-> diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
-> index edf19cc53140..674c45d30561 100644
-> --- a/kernel/time/ntp.c
-> +++ b/kernel/time/ntp.c
-> @@ -508,6 +508,9 @@ int __weak update_persistent_clock64(struct timespec64 now64)
->  #endif
->  
->  #if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
-> +unsigned long sysctl_ntp_rtc_offset = NSEC_PER_SEC / 2;
-> +unsigned int sysctl_ntp_rtc_sync = true;
-> +
->  static void sync_cmos_clock(struct work_struct *work);
->  
->  static DECLARE_DELAYED_WORK(sync_cmos_work, sync_cmos_clock);
-> @@ -526,7 +529,7 @@ static void sync_cmos_clock(struct work_struct *work)
->  	 * may not expire at the correct time.  Thus, we adjust...
->  	 * We want the clock to be within a couple of ticks from the target.
->  	 */
-> -	if (!ntp_synced()) {
-> +	if (!ntp_synced() || !sysctl_ntp_rtc_sync) {
->  		/*
->  		 * Not synced, exit, do not restart a timer (if one is
->  		 * running, let it run out).
-> @@ -535,7 +538,7 @@ static void sync_cmos_clock(struct work_struct *work)
->  	}
->  
->  	getnstimeofday64(&now);
-> -	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec * 5) {
-> +	if (abs(now.tv_nsec - sysctl_ntp_rtc_offset) <= tick_nsec * 5) {
->  		struct timespec64 adjust = now;
->  
->  		fail = -ENODEV;
-> @@ -551,7 +554,7 @@ static void sync_cmos_clock(struct work_struct *work)
->  #endif
->  	}
->  
-> -	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
-> +	next.tv_nsec = sysctl_ntp_rtc_offset - now.tv_nsec - (TICK_NSEC / 2);
->  	if (next.tv_nsec <= 0)
->  		next.tv_nsec += NSEC_PER_SEC;
->  
+> (I need to look more into which locks memory_failure() is taking)
 > 
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
+>> In FFH mode, physical address can only be obtained by parsing the GHES table.
+>> But we only care about SEA, so the error handling is tied to the type of notification.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I care about all the notification methods. Once the notification has been passed
+> to APEI I want them to behave the same so that we don't have subtle bugs between
+> the 11 different ways we could get a notification. This code is rarely tested
+> enough as it is.
+> 
+>>From the arch code I just want to call out to APEI asking 'is this yours?'. If
+> so I expect APEI to have done all the work, if not we take the v8.0 behaviour.
+> 
+> 
+> Here you need APEI and the arch code to spot 'SEA' and treat it differently,
+> invoking some arm64-specific behaviour for APEI, and some
+> not-really-arch-specific code under /arch/arm64. There is nothing arm64 specific
+> about your arm_process_error(), how come the core APEI code doesn't need to do this?
+> 
+> 
+> I think this is caused by the way memory_failure() schedules its work, and that
+> is where I'd like to try and fix this, so that its the same for all notification
+> methods and all (cough: both) architectures.
+
+I try to see if there is a better way.
+
+> 
+> 
+>> The TIF flag is checked on a generic path, but it will only be set when SEA occurs.
+>> And if we use unlikely optimization, it should have little impact on performance.
+> 
+> Yes, the arch code checks _TIF_WORK_MASK in one go so there is no performance
+> problem for code that hasn't taken the RAS-Error. (and once we've taken a RAS
+> error performance is out the window!)
+> 
+>> And the TIF flag approach was used on x86 platform for years, until commit d4812e169d
+> 
+> ... so x86 doesn't do this ...
+> 
+>> (x86, mce: Get rid of TIF_MCE_NOTIFY and associated mce tricks)[0]. On currently arm64
+>> platform, there is no IST interrupt[1] function, so we could not call memory_failure
+>> directly in SEA context. So the way to use TIF notification, is also a good choice,
+>> after all, the same way on x86 platform is verified.
+> 
+> Thanks, looks like I need to read more of the history of x86's kernel-first
+> handling...
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+> .
+> 
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Xie XiuQi
