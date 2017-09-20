@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 20 Sep 2017 12:43:08 +0530
-Subject: [PATCH 1/2] gpio: brcmstb: Handle return value of devm_kasprintf
+Date: Wed, 20 Sep 2017 12:43:09 +0530
+Subject: [PATCH 2/2] gpio: tb10x: Handle return value of devm_kasprintf
 In-Reply-To: <1505891589-6632-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1505891589-6632-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1505891589-6632-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1505891589-6632-3-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,22 +11,22 @@ devm_kasprintf() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/gpio/gpio-brcmstb.c | 3 +++
+ drivers/gpio/gpio-tb10x.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index dd0308c..1227d6e 100644
---- a/drivers/gpio/gpio-brcmstb.c
-+++ b/drivers/gpio/gpio-brcmstb.c
-@@ -485,6 +485,9 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
- 		gc->of_node = np;
- 		gc->owner = THIS_MODULE;
- 		gc->label = devm_kasprintf(dev, GFP_KERNEL, "%pOF", dev->of_node);
-+		if (!gc->label)
-+			goto fail;
+diff --git a/drivers/gpio/gpio-tb10x.c b/drivers/gpio/gpio-tb10x.c
+index 091ffaa..ac6f2a9 100644
+--- a/drivers/gpio/gpio-tb10x.c
++++ b/drivers/gpio/gpio-tb10x.c
+@@ -193,6 +193,9 @@ static int tb10x_gpio_probe(struct platform_device *pdev)
+ 
+ 	tb10x_gpio->gc.label		=
+ 		devm_kasprintf(&pdev->dev, GFP_KERNEL, "%pOF", pdev->dev.of_node);
++	if (!tb10x_gpio->gc.label)
++		return -ENOMEM;
 +
- 		gc->base = gpio_base;
- 		gc->of_gpio_n_cells = 2;
- 		gc->of_xlate = brcmstb_gpio_of_xlate;
+ 	tb10x_gpio->gc.parent		= &pdev->dev;
+ 	tb10x_gpio->gc.owner		= THIS_MODULE;
+ 	tb10x_gpio->gc.direction_input	= tb10x_gpio_direction_in;
 -- 
 1.9.1
