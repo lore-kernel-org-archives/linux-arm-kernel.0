@@ -1,52 +1,105 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 20 Sep 2017 11:55:12 -0500
-Subject: [PATCH 0/3] Add and enable DSP device on OMAPL138 LCDK board
-In-Reply-To: <8bd08406-3fd8-9742-c1b9-d3ec9712c4ee@ti.com>
-References: <20170919002833.5677-1-s-anna@ti.com>
- <8bd08406-3fd8-9742-c1b9-d3ec9712c4ee@ti.com>
-Message-ID: <be3c9155-efe1-7c14-0b04-bc25cb7e1d40@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 20 Sep 2017 11:16:25 -0600
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170920165141.GP20805@n2100.armlinux.org.uk>
+References: <20170920112152.GL20805@n2100.armlinux.org.uk>
+ <20170920162208.GB536@obsidianresearch.com>
+ <20170920165141.GP20805@n2100.armlinux.org.uk>
+Message-ID: <20170920171625.GB5249@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2017 10:14 AM, Sekhar Nori wrote:
-> Hi Suman,
+On Wed, Sep 20, 2017 at 05:51:41PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 20, 2017 at 10:22:08AM -0600, Jason Gunthorpe wrote:
+> > On Wed, Sep 20, 2017 at 12:21:52PM +0100, Russell King - ARM Linux wrote:
+> > 
+> > > However, assumptions are made about the RTC:
+> > > 
+> > > 1. kernel/time/ntp.c assumes that all RTCs want to be told to set the
+> > >    time at around 500ms into the second.
+> > > 
+> > > 2. drivers/rtc/systohc.c assumes that if the time being set is >= 500ms,
+> > >    then we want to set the _next_ second.
+> > 
+> > I looked at these issues when I did the sys to HC patches and I
+> > concluced the first problem was that the RTC read functions generally
+> > did not return sub second resolution, either in sense of directly
+> > returning ts_nsec, or the sense of delaying the read until a clock
+> > tick over event.
 > 
-> On Tuesday 19 September 2017 05:58 AM, Suman Anna wrote:
->> Hi Sekhar,
->>
->> The following series adds the DT node for the DSP device present on
->> on DA850/OMAPL138 SoCs. The node is disabled in the base dts file, and
->> enabled in the corresponding LCDK board file alongside the reserved
->> CMA pool required by the DSP device. The DT bindings and driver
->> adaptation were added to mainline in 4.14-rc1, and this series adds
->> the remaining dt portions. Nodes are added as per bindings in
->> Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
->>
->> Patches are based on 4.14-rc1. The first 2 patches adds the base DTS
->> node and enables the device on OMAPL138 LCDK board. The last patch
->> allows the non-DT clock to be bound to the DT DSP device by using
->> of_auxdata which renames the device to the same as the non-DT device
->> name. This is required by the davinci remoteproc driver to properly
->> acquire and enable the clock for this device.
->>
->> Validation done on OMAPL138 LCDK board. Supported features include
->> basic load/boot (tested with rpmsg_client_sample) using external
->> memory from the CMA pool.
+> The boot time problem can be resolved by using hwclock to set the
+> system time in userspace - there are distros that do exactly that.
+> For example, debian has a udev rule:
+
+Okay, that part I didn't know, thanks.
+
+> > I think patch wise, this is something I would rather see handled
+> > internally via the drivers and perhaps with input from DT, not via
+> > sysctl knobs.
 > 
-> Applied for v4.15. The patches are on my master branch. They will be in
-> linux-next when I send my pull request to ARM-SoC, which typically will
-> take a couple of weeks more.
+> I sort-of agree as far as the time offset information goes, but there's
+> a complication that we only open the RTC to set the time at the point in
+> time that we want to set it - while the RTC is closed, the RTC driver
+> module could be removed and replaced by a different RTC driver which
+> replaces the existing device.
 
-Thanks Sekhar.
+Yes, the ntp code would have to open the rtc initially and record the
+offset. Each time it goes to write it would have to check the offset
+it got against what the device wants and, if necessary, reschedule
+the update if the ts_nsec is not correct. That should handle
+infrequent dynamic changes..
 
+> So, we _do_ need a knob to turn that kernel timekeeping facility on and
+> off in addition to the "are we NTP sync'd" status.
+
+Sure, that makes sense as a sysctl
+
+> > The HW driver should know how to read and write with sub second
+> > resolution. If it works best with a certain value in the ts_nsec
+> > field, then it should set something inside rtc_chip that causes the
+> > systohc code to try and call it with that tv_nsec.
 > 
-> davinci_all_defconfig seems to be missing the CMA options needed. Could
-> you send a patch enabling them?
+> The problem is deeper than the systohc.c code - the timing of the call
+> made into the systohc.c code is decided by kernel/time/ntp.c, and
+> currently is within a tick of 500ms past the second.
 
-These are tracked as dependencies on the remoteproc Kconfig, so you
-won't be able to enable the driver without turning them on. I left them
-as there were before my DT adaptation, but I can enable the CMA options
-by default going forward.
+Right, I was thinking about the entire systohc process, including the
+part in ntp.c
 
-regards
-Suman
+> Do we have any sub-second aware drivers?  None of my RTCs are, and I
+> don't think it's fair for RTC drivers to sleep when getting a request
+> to set the time.
+
+I would call any RTC that can change the phase of the seconds clock as
+sub-second capable. Currently, I think that only the CMOS driver is
+really a sub-second aware driver, and the rest of the RTC stack has been
+sort of hardcoded around what it does..
+
+My thinking was adding a new sub-second entry point would let us keep
+the existing assumptions above while having a cleaner entry point that
+allows fixing the RTC drivers gradually. Eg you have tested PCF, so it
+could use the subsecond entry and define the proper ts_nsec value/etc.
+
+> The userspace API doesn't do that, and the workqueue involved in
+> setting NTP time is probably run using shared system_power_efficient_wq
+> resources, so blocking there will be detrimental to other works queued
+> on that.
+
+I think the NTP path should be non blocking, and rely on the ntp.c
+code calling into the driver with the desired tv_nsec.
+
+However, it also makes sense to provide a blocking sub-second user
+space API that would have the required sleep to make setting the time
+work properly. This way we can hide the desired tv_nsec implementation
+detail from userspace completely.
+
+eg I assume hwclock also has the built in 0.5s assumption when trying
+to write to the RTC?
+
+The same would be true for read, I think it would be cleaner to have a
+kernel uapi that reads the time with subsecond accuracy than to have
+hwclock implement a spinning loop in userspace. That gives drivers
+more options in how they measure the second tick over. The common code
+would just provide a simple loop like we see in hwclock.
+
+Jason
