@@ -1,133 +1,54 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Wed, 20 Sep 2017 09:51:30 +0800
-Subject: [PATCH 1/3] dt-bindings: Add document for rockchip RGB output
- interface
-In-Reply-To: <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
-References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
- <1505360600-196567-1-git-send-email-hjc@rock-chips.com>
- <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
-Message-ID: <d631ff56-e3e6-688f-d9b6-a7101ce047d5@rock-chips.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 19 Sep 2017 21:49:52 -0500
+Subject: [PATCH v5 05/10] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <20170914191949.GA3796@lunn.ch>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-6-clabbe.montjoie@gmail.com>
+ <20170908072538.rqsp6dobwsqmzrsr@flea.lan>
+ <20170908074325.GB29999@Red> <20170913182004.uniyo5opeilcfk7r@rob-hp-laptop>
+ <20170914185301.GB4021@Red> <20170914191949.GA3796@lunn.ch>
+Message-ID: <CAL_JsqJ2eVA9Zg60Hagqm732ZoOzHWTwVBqOabOhjE5aQ26L+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi rob,
-     thanks for you review.
+On Thu, Sep 14, 2017 at 2:19 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > Is the MDIO controller "allwinner,sun8i-h3-emac" or "snps,dwmac-mdio"?
+>> > If the latter, then I think the node is fine, but then the mux should be
+>> > a child node of it. IOW, the child of an MDIO controller should either
+>> > be a mux node or slave devices.
+>
+> Hi Rob
+>
+> Up until now, children of an MDIO bus have been MDIO devices. Those
+> MDIO devices are either Ethernet PHYs, Ethernet Switches, or the
+> oddball devices that Broadcom iProc has, like generic PHYs.
+>
+> We have never had MDIO-muxes as MDIO children. A Mux is not an MDIO
+> device, and does not have the properties of an MDIO device. It is not
+> addressable on the MDIO bus. The current MUXes are addressed via GPIOs
+> or MMIO.
 
-? 2017/9/19 22:46, Rob Herring ??:
-> On Thu, Sep 14, 2017 at 11:43:18AM +0800, Sandy Huang wrote:
->> This path add support rv1108 rgb output interface driver.
->>
->> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->> ---
->>   .../bindings/display/rockchip/rockchip-rgb.txt     | 80 ++++++++++++++++++++++
->>   1 file changed, 80 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->> new file mode 100644
->> index 0000000..4164512
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->> @@ -0,0 +1,80 @@
->> +Rockchip RV1108 RGB interface
->> +================================
->> +
->> +Required properties:
->> +- compatible: matching the soc type:
->> +	- "rockchip,rv1108-rgb";
->> +
->> +Optional properties:
->> +- pinctrl-names: must contain a "lcdc" entry.
->> +- pinctrl-0: pin control group to be used for this interface.
->> +
->> +Required nodes:
->> +- rockchip,rgb-mode: should be "p888", "p666", "p565", "s888", "s888-dummy"
-> 
-> This should be a standard property. Any device with a parallel interface
-> is going to need something like this.
-> 
-so, i need to move this property to panel? or just rename 
-rockchip,rgb-mode to rgb-mode?
+The DT parent/child relationship defines the bus topology. We describe
+MDIO buses in that way and if a mux is sitting between the controller
+and the devices, then the DT hierarchy should reflect that. Now
+sometimes we have 2 options for what interface has the parent/child
+relationship (e.g. an I2C controlled USB hub chip), but in this case
+we don't.
 
->> +	- p888: output r8-g8-b8 at each dclk cycle for per-pixel
->> +	- p666: output r6-g6-b6 at each dclk cycle for per-pixel
->> +	- p565: output r5-g6-b5 at each dclk cycle for per-pixel
->> +	- s888: output r8-g8-b8 in three dclk cycle for per-pixel
->> +	- s888-dmmy: output r8-g8-b8-dummy in four dclk cycle for per-pixel
->> +
->> +The rgb has two video ports described by:
->> +	Documentation/devicetree/bindings/media/video-interfaces.txt
->> +Their connections are modeled using the OF graph bindings specified in
->> +	Documentation/devicetree/bindings/graph.txt.
->> +
->> +- video port 0 for the VOP input, the remote endpoint maybe vopb/vopl/vop
->> +- video port 1 for either a panel or subsequent encoder
->> +
->> +the panel described by:
->> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
->> +Panel other required properties:
->> +- ports for remote rgb output.
->> +
->> +Example:
->> +
->> +panel: panel {
->> +	compatible = "auo,b101ean01";
->> +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
->> +
->> +	ports {
->> +		panel_in_rgb: endpoint {
->> +			remote-endpoint = <&rgb_out_panel>;
->> +		};
->> +	};
->> +};
->> +
->> +For Rockchip RV1108:
->> +
->> +	rgb: rgb {
->> +		compatible = "rockchip,rv1108-rgb";
->> +		pinctrl-names = "lcdc";
->> +		pinctrl-0 = <&lcdc_ctl>;
->> +		rockchip,rgb-mode = "p888";
->> +
->> +		ports {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			rgb_in: port at 0 {
->> +				reg = <0>;
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +				rgb_in_vop: endpoint at 0 {
->> +					reg = <0>;
-> 
-> Don't need reg for a single endpoint.
-> 
-ok, this will be deleted at next version.
->> +					remote-endpoint = <&vop_out_rgb>;
->> +				};
->> +			};
->> +
->> +			rgb_out: port at 1 {
->> +				reg = <1>;
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +				rgb_out_panel: endpoint at 0 {
->> +					reg = <0>;
-> 
-> ditto.
-> 
-ok, this will be deleted at next version.
->> +					remote-endpoint = <&panel_in_rgb>;
->> +				};
->> +			};
->> +		};
->> +	};
->> -- 
->> 2.7.4
->>
->>
-> 
-> 
-> 
+> There other similar cases. i2c-mux-gpio is not a child of an i2c bus,
+> nor i2c-mux-reg or gpio-mux. nxp,pca9548 is however a child of the i2c
+> bus, because it is an i2c device itself...
+
+Some are i2c controlled mux devices, but some can be GPIO controlled.
+
+>
+> If the MDIO mux was an MDIO device, i would agree with you. Bit it is
+> not, so lets not make it a child.
+>
+>             Andrew
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
