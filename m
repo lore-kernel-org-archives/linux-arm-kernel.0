@@ -1,163 +1,285 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Sep 2017 15:46:16 -0700
-Subject: [PATCH 05/10] ARM: OMAP2+: Parse module IO range from dts for legacy
- "ti, hwmods" support
+Date: Wed, 20 Sep 2017 15:46:19 -0700
+Subject: [PATCH 08/10] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
 In-Reply-To: <20170920224621.16236-1-tony@atomide.com>
 References: <20170920224621.16236-1-tony@atomide.com>
-Message-ID: <20170920224621.16236-6-tony@atomide.com>
+Message-ID: <20170920224621.16236-9-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When removing legacy platform data for IO ranges for the hwmod
-interconnect code, we still need to support the "ti,hwmods"
-property.
+On omap4 we are missing dts nodes for several interconnect target
+modules that we are idling on init. This currently works with the
+legacy platform data still around.
 
-And as we're going to use a generic sysc device driver to handle the
-interconnect target instances, we can parse the information needed
-for legacy "ti,hwmods" IO range from the dts. It's always the first
-range the interconnect target module provides.
+To fix this, let's add the interconnect target modules so we can
+idle the unused interconnect target module on init.
 
-Note that we want to parse the range instead of the first child
-device IO regs as the child device may not always be defined.
+Also note that adding the interconnect target module node does not
+necessarily mean that there is a driver available for the child IP
+block, or that the child IP block is even functional.
 
-The child IP device node may not exist in cases where there is no
-driver binding for the device, or when the child IP block may not
-even be functional for some SoC revisions. But the IO range of the
-interconnect target module is always known.
+In the SGX case, the PowerVR driver is closed source. And McASP on
+omap4 has at least the TX path disabled and is not supported by the
+davinci-mcasp driver. For AESS there is old Android 3.4 kernel
+driver available but it's unlikely that anybody is going to update
+it for the mainline kernel.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Lokesh Vutla <lokeshvutla@ti.com>
+For smarflex, we are still probing with platform data and the
+driver needs more work before we can add the device ip child nodes.
+
+And finally, we're not yet using the interconnet ranges. I will
+be posting separate patches for those later on.
+
+Cc: Beno?t Cousson <bcousson@baylibre.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
 Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Sakari Ailus <sakari.ailus@iki.fi>
 Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c | 80 +++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap_hwmod.h |  5 +++
- 2 files changed, 84 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap4.dtsi | 179 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 167 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2395,6 +2395,75 @@ static int of_dev_hwmod_lookup(struct device_node *np,
- 	return -ENODEV;
- }
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -392,6 +392,21 @@
+ 			#interrupt-cells = <2>;
+ 		};
  
-+/**
-+ * omap_hwmod_parse_module_range - map module IO range from device tree
-+ * @oh: struct omap_hwmod *
-+ * @np: struct device_node *
-+ *
-+ * Parse the device tree range an interconnect target module provides
-+ * for it's child device IP blocks. This way we can support the old
-+ * "ti,hwmods" property with just dts data without a need for platform
-+ * data for IO resources. And we don't need all the child IP device
-+ * nodes available in the dts.
-+ */
-+int omap_hwmod_parse_module_range(struct omap_hwmod *oh,
-+				  struct device_node *np,
-+				  struct resource *res)
-+{
-+	struct property *prop;
-+	const __be32 *ranges;
-+	const char *name;
-+	u32 nr_addr, nr_size;
-+	u64 base, size;
-+	int len, error;
++		target-module at 48076000 {
++			compatible = "ti,sysc-type2";
++			ti,hwmods = "slimbus2";
++			reg = <0x48076000 0x4>,
++			      <0x48076010 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&l4_per_clkctrl OMAP4_SLIMBUS2_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x48076000 0x001000>;
 +
-+	if (!res)
-+		return -EINVAL;
++			/* No child device binding or driver in mainline */
++		};
 +
-+	ranges = of_get_property(np, "ranges", &len);
-+	if (!ranges)
-+		return -ENOENT;
-+
-+	len /= sizeof(*ranges);
-+
-+	if (len < 3)
-+		return -EINVAL;
-+
-+	of_property_for_each_string(np, "compatible", prop, name)
-+		if (!strncmp("ti,sysc-", name, 8))
-+			break;
-+
-+	if (!name)
-+		return -ENOENT;
-+
-+	error = of_property_read_u32(np, "#address-cells", &nr_addr);
-+	if (error)
-+		return -ENOENT;
-+
-+	error = of_property_read_u32(np, "#size-cells", &nr_size);
-+	if (error)
-+		return -ENOENT;
-+
-+	if (nr_addr != 1 || nr_size != 1) {
-+		pr_err("%s: invalid range for %s->%s\n", __func__,
-+		       oh->name, np->name);
-+		return -EINVAL;
-+	}
-+
-+	ranges++;
-+	base = of_translate_address(np, ranges++);
-+	size = be32_to_cpup(ranges);
-+
-+	pr_debug("omap_hwmod: %s %s at 0x%llx size 0x%llx\n",
-+		 oh->name, np->name, base, size);
-+
-+	res->start = base;
-+	res->end = base + size - 1;
-+	res->flags = IORESOURCE_MEM;
-+
-+	return 0;
-+}
-+
- /**
-  * _init_mpu_rt_base - populate the virtual address for a hwmod
-  * @oh: struct omap_hwmod * to locate the virtual address
-@@ -2417,6 +2486,8 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
- {
- 	struct omap_hwmod_addr_space *mem;
- 	void __iomem *va_start = NULL;
-+	struct resource res;
-+	int error;
+ 		elm: elm at 48078000 {
+ 			compatible = "ti,am3352-elm";
+ 			reg = <0x48078000 0x2000>;
+@@ -452,25 +467,61 @@
+ 			clock-frequency = <48000000>;
+ 		};
  
- 	if (!oh)
- 		return -EINVAL;
-@@ -2442,7 +2513,14 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
- 			return -ENXIO;
- 		}
- 
--		va_start = of_iomap(np, index + oh->mpu_rt_idx);
-+		/* Do we have a dts range for the interconnect target module? */
-+		error = omap_hwmod_parse_module_range(oh, np, &res);
-+		if (!error)
-+			va_start = ioremap(res.start, resource_size(&res));
+-		smartreflex_iva: smartreflex at 4a0db000 {
+-			compatible = "ti,omap4-smartreflex-iva";
+-			reg = <0x4a0db000 0x80>;
+-			interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
++		target-module at 4a0db000 {
++			compatible = "ti,sysc-sr";
+ 			ti,hwmods = "smartreflex_iva";
++			reg = <0x4a0db000 0x4>,
++			      <0x4a0db008 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&l4_ao_clkctrl OMAP4_SMARTREFLEX_IVA_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a0db000 0x001000>;
 +
-+		/* No ranges, rely on device reg entry */
-+		if (!va_start)
-+			va_start = of_iomap(np, index + oh->mpu_rt_idx);
- 	} else {
- 		va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
- 	}
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -690,11 +690,16 @@ struct omap_hwmod {
- 	struct omap_hwmod		*parent_hwmod;
- };
++			smartreflex_iva: smartreflex at 0 {
++				compatible = "ti,omap4-smartreflex-iva";
++				reg = <0 0x80>;
++				interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
++			};
+ 		};
  
-+struct device_node;
+-		smartreflex_core: smartreflex at 4a0dd000 {
+-			compatible = "ti,omap4-smartreflex-core";
+-			reg = <0x4a0dd000 0x80>;
+-			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++		target-module at 4a0dd000 {
++			compatible = "ti,sysc-sr";
+ 			ti,hwmods = "smartreflex_core";
++			reg = <0x4a0dd000 0x4>,
++			      <0x4a0dd008 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&l4_ao_clkctrl OMAP4_SMARTREFLEX_CORE_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a0dd000 0x001000>;
 +
- struct omap_hwmod *omap_hwmod_lookup(const char *name);
- int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
- 			void *data);
++			smartreflex_core: smartreflex at 0 {
++				compatible = "ti,omap4-smartreflex-core";
++				reg = <0 0x80>;
++				interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++			};
+ 		};
  
- int __init omap_hwmod_setup_one(const char *name);
-+int omap_hwmod_parse_module_range(struct omap_hwmod *oh,
-+				  struct device_node *np,
-+				  struct resource *res);
+-		smartreflex_mpu: smartreflex at 4a0d9000 {
+-			compatible = "ti,omap4-smartreflex-mpu";
+-			reg = <0x4a0d9000 0x80>;
+-			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++		target-module at 4a0d9000 {
++			compatible = "ti,sysc-sr";
+ 			ti,hwmods = "smartreflex_mpu";
++			reg = <0x4a0d9000 0x4>,
++			      <0x4a0d9008 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&l4_ao_clkctrl OMAP4_SMARTREFLEX_MPU_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a0d9000 0x001000>;
++
++			smartreflex_mpu: smartreflex at 0 {
++				compatible = "ti,omap4-smartreflex-mpu";
++				reg = <0 0x80>;
++				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++			};
+ 		};
  
- int omap_hwmod_enable(struct omap_hwmod *oh);
- int omap_hwmod_idle(struct omap_hwmod *oh);
+ 		hwspinlock: spinlock at 4a0f6000 {
+@@ -676,6 +727,21 @@
+ 			#iommu-cells = <0>;
+ 		};
+ 
++		target-module at 52000000 {
++			compatible = "ti,sysc-type2";
++			ti,hwmods = "iss";
++			reg = <0x52000000 0x4>,
++			      <0x52000010 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&iss_clkctrl OMAP4_ISS_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x52000000 0x1000000>;
++
++			/* No child device binding, driver in staging */
++		};
++
+ 		mmu_ipu: mmu at 55082000 {
+ 			compatible = "ti,omap4-iommu";
+ 			reg = <0x55082000 0x100>;
+@@ -770,6 +836,62 @@
+ 			status = "disabled";
+ 		};
+ 
++		target-module at 40128000 {
++			compatible = "ti,sysc-mcasp";
++			ti,hwmods = "mcasp";
++			reg = <0x40128004 0x4>;
++			reg-names = "sysc";
++			clocks = <&abe_clkctrl OMAP4_MCASP_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
++				 <0x49028000 0x49028000 0x1000>; /* L3 */
++
++			/*
++			 * Child device unsupported by davinci-mcasp. At least
++			 * TX path is disabled for omap4, and only DIT mode
++			 * works with no I2S. See also old Android kernel
++			 * omap-mcasp driver for more information.
++			 */
++		};
++
++		target-module at 4012c000 {
++			compatible = "ti,sysc-type2";
++			ti,hwmods = "slimbus1";
++			reg = <0x4012c000 0x4>,
++			      <0x4012c010 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&abe_clkctrl OMAP4_SLIMBUS1_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x00000000 0x4012c000 0x1000>, /* MPU */
++				 <0x4902c000 0x4902c000 0x1000>; /* L3 */
++
++			/* No child device binding or driver in mainline */
++		};
++
++		target-module at 401f1000 {
++			compatible = "ti,sysc-type2";
++			ti,hwmods = "aess";
++			reg = <0x401f1000 0x4>,
++			      <0x401f1010 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&abe_clkctrl OMAP4_AESS_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x00000000 0x401f1000 0x1000>, /* MPU */
++				 <0x490f1000 0x490f1000 0x1000>; /* L3 */
++
++			/*
++			 * No child device binding or driver in mainline.
++			 * See Android tree and related upstreaming efforts
++			 * for the old driver.
++			 */
++		};
++
+ 		mcbsp4: mcbsp at 48096000 {
+ 			compatible = "ti,omap4-mcbsp";
+ 			reg = <0x48096000 0xff>; /* L4 Interconnect */
+@@ -858,6 +980,21 @@
+ 			};
+ 		};
+ 
++		target-module at 4a10a000 {
++			compatible = "ti,sysc-type2";
++			ti,hwmods = "fdif";
++			reg = <0x4a10a000 0x4>,
++			      <0x4a10a010 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&iss_clkctrl OMAP4_FDIF_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a10a000 0x1000>;
++
++			/* No child device binding or driver in mainline */
++		};
++
+ 		timer1: timer at 4a318000 {
+ 			compatible = "ti,omap3430-timer";
+ 			reg = <0x4a318000 0x80>;
+@@ -1075,6 +1212,24 @@
+ 			status = "disabled";
+ 		};
+ 
++		target-module at 56000000 {
++			compatible = "ti,sysc-type2";
++			ti,hwmods = "gpu";
++			reg = <0x5601fc00 0x4>,
++			      <0x5601fc10 0x4>;
++			reg-names = "rev", "sysc";
++			clocks = <&l3_gfx_clkctrl OMAP4_GPU_CLKCTRL 0>;
++			clock-names = "clkctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x56000000 0x2000000>;
++
++			/*
++			 * Closed source PowerVR driver, no child device
++			 * binding or driver in mainline
++			 */
++		};
++
+ 		dss: dss at 58000000 {
+ 			compatible = "ti,omap4-dss";
+ 			reg = <0x58000000 0x80>;
 -- 
 2.14.1
