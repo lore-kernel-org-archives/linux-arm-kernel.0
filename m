@@ -1,18 +1,21 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 20 Sep 2017 19:49:14 +0800
-Subject: [PATCH v3] ARM: dts: imx7d-pico: Add Wifi support
-In-Reply-To: <1503060218-1975-1-git-send-email-vanessa.maegima@nxp.com>
-References: <1503060218-1975-1-git-send-email-vanessa.maegima@nxp.com>
-Message-ID: <20170920114913.GA1244@dragon>
+Date: Wed, 20 Sep 2017 19:59:02 +0800
+Subject: [PATCH v6 0/2] Add device tree and associated documentation for
+ GE Healthcare PPD
+In-Reply-To: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
+References: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <20170920115901.GB1244@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 09:43:38AM -0300, Vanessa Maegima wrote:
-> imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
+On Fri, Aug 18, 2017 at 04:53:46PM +0100, Martyn Welch wrote:
+> This series adds the device tree for the GE Healthcare PPD and binding
+> documentation for the ge-achc, as used by the PPD device tree.
 > 
-> Add support for the usdhc2 port and to the WL_REG_ON regulator
-> so Wifi can be functional on this board.
+> Fabien Lahoudere (1):
+>   ARM: dts: imx53: Add GE Healthcare PPD
 > 
-> Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+> Martyn Welch (1):
+>   dt-bindings: misc: achc: Add device tree binding for GE ACHC
 
-Applied, thanks.
+Applied both, thanks.
