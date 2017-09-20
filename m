@@ -1,131 +1,59 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 20 Sep 2017 16:35:05 +0200
-Subject: [PATCH v2 9/9] tty/serial: atmel: Prevent a warning on suspend
-In-Reply-To: <20170915140411.31716-10-romain.izard.pro@gmail.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-10-romain.izard.pro@gmail.com>
-Message-ID: <dabb8094-3489-3617-0b09-3aff247b34a2@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 20 Sep 2017 07:45:38 -0700
+Subject: [PATCH 6/7] cpufreq: make cpufreq_generic_init
+ transition_latency default to CPUFREQ_ETERNAL
+In-Reply-To: <20170920070450.GB32187@b29396-OptiPlex-7040>
+References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
+ <1503504610-12880-7-git-send-email-aisheng.dong@nxp.com>
+ <20170919231007.GJ30848@ubuntu>
+ <20170920070450.GB32187@b29396-OptiPlex-7040>
+Message-ID: <20170920144538.GK30848@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2017 16:04, Romain Izard wrote:
-> The atmel serial port driver reported the following warning on suspend:
-> atmel_usart f8020000.serial: ttyS1: Unable to drain transmitter
+On 20-09-17, 15:04, Dong Aisheng wrote:
+> On Tue, Sep 19, 2017 at 04:10:07PM -0700, Viresh Kumar wrote:
+> > On 24-08-17, 00:10, Dong Aisheng wrote:
+> > > If no valid transition_latency specified, let's make it default to
+> > > CPUFREQ_ETERNAL which is consistent with its definition.
+> > > 
+> > > This can save some of the same checkings like this:
+> > >         transition_latency = dev_pm_opp_get_max_transition_latency(cpu_dev);
+> > > -       if (!transition_latency)
+> > > -               transition_latency = CPUFREQ_ETERNAL;
+> > >         ret = cpufreq_generic_init(policy, freq_table, transition_latency);
+> > > 
+> > > Cc: Viresh Kumar <vireshk@kernel.org>
+> > > Cc: Nishanth Menon <nm@ti.com>
+> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > >  drivers/cpufreq/cpufreq.c | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> > > index 9bf97a3..da07de6 100644
+> > > --- a/drivers/cpufreq/cpufreq.c
+> > > +++ b/drivers/cpufreq/cpufreq.c
+> > > @@ -180,6 +180,8 @@ int cpufreq_generic_init(struct cpufreq_policy *policy,
+> > >  		return ret;
+> > >  	}
+> > >  
+> > > +	if (!transition_latency)
+> > > +		transition_latency = CPUFREQ_ETERNAL;
+> > >  	policy->cpuinfo.transition_latency = transition_latency;
+> > >  
+> > >  	/*
+> > 
+> > Can you update all the existing drivers as well (in the same patch)
+> > who can benefit from it?
 > 
-> As the ATMEL_US_TXEMPTY status bit in ATMEL_US_CSR is always cleared
-> when the transmitter is disabled, we need to know the transmitter's
-> state to return the real fifo state. And as ATMEL_US_CR is write-only,
-> it is necessary to save the state of the transmitter in a local
-> variable, and update the variable when TXEN and TXDIS is written in
-> ATMEL_US_CR.
-> 
-> After those changes, atmel_tx_empty can return "empty" on suspend, the
-> warning in uart_suspend_port disappears, and suspending is 20ms shorter
-> for each enabled Atmel serial port.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
->  drivers/tty/serial/atmel_serial.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 7551cab438ff..783af6648be0 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -171,6 +171,7 @@ struct atmel_uart_port {
->  	bool			has_hw_timer;
->  	struct timer_list	uart_timer;
->  
-> +	bool			tx_stopped;
->  	bool			suspended;
->  	unsigned int		pending;
->  	unsigned int		pending_status;
-> @@ -380,6 +381,10 @@ static int atmel_config_rs485(struct uart_port *port,
->   */
->  static u_int atmel_tx_empty(struct uart_port *port)
->  {
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> +
-> +	if (atmel_port->tx_stopped)
-> +		return TIOCSER_TEMT;
->  	return (atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXEMPTY) ?
->  		TIOCSER_TEMT :
->  		0;
-> @@ -485,6 +490,7 @@ static void atmel_stop_tx(struct uart_port *port)
->  	 * is fully transmitted.
->  	 */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
-> +	atmel_port->tx_stopped = true;
->  
->  	/* Disable interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
-> @@ -492,6 +498,7 @@ static void atmel_stop_tx(struct uart_port *port)
->  	if ((port->rs485.flags & SER_RS485_ENABLED) &&
->  	    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
->  		atmel_start_rx(port);
-> +
->  }
-This line feed is not needed.
-Otherwise,
+> Yes, of course.
+> Will do it in the updated version later.
 
-Acked-by: Richard Genoud <richard.genoud@gmail.com>
+Perhaps you can send it separately if you want as your series is
+surely going to take some time to get merged.
 
->  
->  /*
-> @@ -521,6 +528,7 @@ static void atmel_start_tx(struct uart_port *port)
->  
->  	/* re-enable the transmitter */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-> +	atmel_port->tx_stopped = false;
->  }
->  
->  /*
-> @@ -1866,6 +1874,7 @@ static int atmel_startup(struct uart_port *port)
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	/* enable xmit & rcvr */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	setup_timer(&atmel_port->uart_timer,
->  			atmel_uart_timer_callback,
-> @@ -2122,6 +2131,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  
->  	/* disable receiver and transmitter */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS | ATMEL_US_RXDIS);
-> +	atmel_port->tx_stopped = true;
->  
->  	/* mode */
->  	if (port->rs485.flags & SER_RS485_ENABLED) {
-> @@ -2207,6 +2217,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	/* restore interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IER, imr);
-> @@ -2450,6 +2461,7 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
->  
->  	/* Make sure that tx path is actually able to send characters */
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	uart_console_write(port, s, count, atmel_console_putchar);
->  
-> @@ -2511,6 +2523,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
->  {
->  	int ret;
->  	struct uart_port *port = &atmel_ports[co->index].uart;
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	int baud = 115200;
->  	int bits = 8;
->  	int parity = 'n';
-> @@ -2528,6 +2541,7 @@ static int __init atmel_console_setup(struct console *co, char *options)
->  	atmel_uart_writel(port, ATMEL_US_IDR, -1);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> +	atmel_port->tx_stopped = false;
->  
->  	if (options)
->  		uart_parse_options(options, &baud, &parity, &bits, &flow);
-> 
+-- 
+viresh
