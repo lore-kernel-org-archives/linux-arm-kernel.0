@@ -1,30 +1,18 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Sep 2017 13:43:38 +0200
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
- <20170919070422.GI3349@codeaurora.org>
- <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
-Message-ID: <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 20 Sep 2017 19:49:14 +0800
+Subject: [PATCH v3] ARM: dts: imx7d-pico: Add Wifi support
+In-Reply-To: <1503060218-1975-1-git-send-email-vanessa.maegima@nxp.com>
+References: <1503060218-1975-1-git-send-email-vanessa.maegima@nxp.com>
+Message-ID: <20170920114913.GA1244@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 2:32 PM, Timur Tabi <timur@codeaurora.org> wrote:
-> On 9/19/17 3:15 AM, Linus Walleij wrote:
->>
->> Oh we already have that I think, Mika Westerberg and Andy Shevcheno
->> implemented that for anyone using CONFIG_GPIOLIB_IRQCHIP, and
->> this driver does. Timur please check: irq_need_valid_mask, irq_valid_mask
->> usage.
->
-> These patches already use irq_valid_mask!  But that doesn't block complete
-> access to the GPIO.
+On Fri, Aug 18, 2017 at 09:43:38AM -0300, Vanessa Maegima wrote:
+> imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
+> 
+> Add support for the usdhc2 port and to the WL_REG_ON regulator
+> so Wifi can be functional on this board.
+> 
+> Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
 
-Aha sorry for my ignorance :(
-
-Doesn't that mean we need something like irq_valid_mask but rather
-gpio_valid_mask that just block all usage of certain GPIOs?
-
-Yours,
-Linus Walleij
+Applied, thanks.
