@@ -1,59 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 20 Sep 2017 07:45:38 -0700
-Subject: [PATCH 6/7] cpufreq: make cpufreq_generic_init
- transition_latency default to CPUFREQ_ETERNAL
-In-Reply-To: <20170920070450.GB32187@b29396-OptiPlex-7040>
-References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
- <1503504610-12880-7-git-send-email-aisheng.dong@nxp.com>
- <20170919231007.GJ30848@ubuntu>
- <20170920070450.GB32187@b29396-OptiPlex-7040>
-Message-ID: <20170920144538.GK30848@ubuntu>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 20 Sep 2017 16:51:05 +0200
+Subject: [PATCH v3 0/2] stm32 clocksource driver rework
+Message-ID: <1505919067-28041-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-09-17, 15:04, Dong Aisheng wrote:
-> On Tue, Sep 19, 2017 at 04:10:07PM -0700, Viresh Kumar wrote:
-> > On 24-08-17, 00:10, Dong Aisheng wrote:
-> > > If no valid transition_latency specified, let's make it default to
-> > > CPUFREQ_ETERNAL which is consistent with its definition.
-> > > 
-> > > This can save some of the same checkings like this:
-> > >         transition_latency = dev_pm_opp_get_max_transition_latency(cpu_dev);
-> > > -       if (!transition_latency)
-> > > -               transition_latency = CPUFREQ_ETERNAL;
-> > >         ret = cpufreq_generic_init(policy, freq_table, transition_latency);
-> > > 
-> > > Cc: Viresh Kumar <vireshk@kernel.org>
-> > > Cc: Nishanth Menon <nm@ti.com>
-> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > ---
-> > >  drivers/cpufreq/cpufreq.c | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > > 
-> > > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> > > index 9bf97a3..da07de6 100644
-> > > --- a/drivers/cpufreq/cpufreq.c
-> > > +++ b/drivers/cpufreq/cpufreq.c
-> > > @@ -180,6 +180,8 @@ int cpufreq_generic_init(struct cpufreq_policy *policy,
-> > >  		return ret;
-> > >  	}
-> > >  
-> > > +	if (!transition_latency)
-> > > +		transition_latency = CPUFREQ_ETERNAL;
-> > >  	policy->cpuinfo.transition_latency = transition_latency;
-> > >  
-> > >  	/*
-> > 
-> > Can you update all the existing drivers as well (in the same patch)
-> > who can benefit from it?
-> 
-> Yes, of course.
-> Will do it in the updated version later.
+version 3:
+- fix comments done by Daniel
+- use timer_of helper functions
 
-Perhaps you can send it separately if you want as your series is
-surely going to take some time to get merged.
+version 2:
+- fix uninitialized variable
+
+These patch implements clocksource and clockevent by using only one hardware block.
+Getting both clock source and events on the same hardware lead to change quite
+a lot driver code.
+It also limits usage of clocksource to 32 bits timers because 16 bits ones
+aren't enough accurate.
+Thanks to timer_fo helpers this series includes minor clean up in structures,
+function prototypes and driver name.
+
+Since 16 bits timers become useless it also removes them from stm32f4 and
+stm32f7 devicetree.
+
+Benjamin Gaignard (2):
+  clocksource: stm32: rework driver to use only one timer
+  arm: dts: stm32: remove useless clocksource nodes
+
+ arch/arm/boot/dts/stm32f429.dtsi  |  32 ------
+ arch/arm/boot/dts/stm32f746.dtsi  |  32 ------
+ drivers/clocksource/Kconfig       |   1 +
+ drivers/clocksource/timer-stm32.c | 229 ++++++++++++++++++--------------------
+ 4 files changed, 112 insertions(+), 182 deletions(-)
 
 -- 
-viresh
+2.7.4
