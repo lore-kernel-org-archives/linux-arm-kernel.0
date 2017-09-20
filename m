@@ -1,68 +1,85 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 20 Sep 2017 10:17:55 -0500
-Subject: [PATCHv2] arm64: dts: stratix10: add ethernet/sdmmc support to the
- S10 devkit
-Message-ID: <1505920675-9641-1-git-send-email-dinguyen@kernel.org>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Wed, 20 Sep 2017 17:18:02 +0200
+Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
+Message-ID: <20170920151802.7609-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ethernet and sdmmc support on the Stratix10 devkit.
+For the 32-bit ARM architecture, unaligned access support is variable.
+On a chip without a MMU, an unaligned access returns a rotated data word
+and must be avoided.
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
-v2: Create a separate PHY node
----
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+When a MMU is available, it can be trapped. On ARMv6 or ARMv7, it can also
+be handled by the hardware, depending on the type of access instruction.
+Unaligned access of 32 bits or less are corrected, while larger access
+provoke a trap.
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-index 41ea2db..5907586 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -34,6 +34,44 @@
- 	};
- };
+Unfortunately, the compiler is able to merge two 32-bit access that
+would generate a LDR instruction, that works on unaligned access, into a
+single LDM access that will not work. This is not a common situation,
+but it has been observed in the LZ4 decompression code.
+
+To prevent this type of optimization, it is necessary to change the
+explicit accessors for unaligned addresses from those defined in the
+access_ok.h header, to those defined in the packed_struct.h header.
+
+Add an arch-specific header to ARM, to retain other optimizations that
+rely on HAVE_EFFICIENT_UNALIGNED_ACCESS, while making sure that access
+that explicitly rely on the unaligned accessors are correctly handled by
+the compiler.
+
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+
+This is a follow-up to this discussion:
+HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32
+https://lkml.org/lkml/2017/9/4/359
+
+ arch/arm/include/asm/Kbuild      |  1 -
+ arch/arm/include/asm/unaligned.h | 22 ++++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/asm/unaligned.h
+
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 721ab5ecfb9b..0f2c8a2a8131 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -20,7 +20,6 @@ generic-y += simd.h
+ generic-y += sizes.h
+ generic-y += timex.h
+ generic-y += trace_clock.h
+-generic-y += unaligned.h
  
-+&gmac0 {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+	phy-handle = <&phy0>;
+ generated-y += mach-types.h
+ generated-y += unistd-nr.h
+diff --git a/arch/arm/include/asm/unaligned.h b/arch/arm/include/asm/unaligned.h
+new file mode 100644
+index 000000000000..394227f24b77
+--- /dev/null
++++ b/arch/arm/include/asm/unaligned.h
+@@ -0,0 +1,22 @@
++#ifndef __ASM_ARM_UNALIGNED_H
++#define __ASM_ARM_UNALIGNED_H
 +
-+	max-frame-size = <3800>;
++#include <asm/byteorder.h>
 +
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy0: ethernet-phy at 0 {
-+			reg = <4>;
++#if defined(__LITTLE_ENDIAN)
++#include <linux/unaligned/le_struct.h>
++#include <linux/unaligned/be_byteshift.h>
++#include <linux/unaligned/generic.h>
++#define get_unaligned	__get_unaligned_le
++#define put_unaligned	__put_unaligned_le
++#elif defined(__BIG_ENDIAN)
++#include <linux/unaligned/be_struct.h>
+:q
++#include <linux/unaligned/le_byteshift.h>
++#include <linux/unaligned/generic.h>
++#define get_unaligned	__get_unaligned_be
++#define put_unaligned	__put_unaligned_be
++#else
++#error need to define endianness
++#endif
 +
-+			txd0-skew-ps = <0>; /* -420ps */
-+			txd1-skew-ps = <0>; /* -420ps */
-+			txd2-skew-ps = <0>; /* -420ps */
-+			txd3-skew-ps = <0>; /* -420ps */
-+			rxd0-skew-ps = <420>; /* 0ps */
-+			rxd1-skew-ps = <420>; /* 0ps */
-+			rxd2-skew-ps = <420>; /* 0ps */
-+			rxd3-skew-ps = <420>; /* 0ps */
-+			txen-skew-ps = <0>; /* -420ps */
-+			txc-skew-ps = <1860>; /* 960ps */
-+			rxdv-skew-ps = <420>; /* 0ps */
-+			rxc-skew-ps = <1680>; /* 780ps */
-+		};
-+	};
-+};
-+
-+&mmc {
-+	status = "okay";
-+	num-slots = <1>;
-+	cap-sd-highspeed;
-+	broken-cd;
-+	bus-width = <4>;
-+};
-+
- &uart0 {
- 	status = "okay";
- };
++#endif /* __ASM_ARM_UNALIGNED_H */
 -- 
-2.7.4
+2.11.0
