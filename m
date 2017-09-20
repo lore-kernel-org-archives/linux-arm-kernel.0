@@ -1,42 +1,27 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 20 Sep 2017 15:37:21 -0700
-Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
-In-Reply-To: <5DDF9572-B2D1-4316-B307-14749365221E@gmail.com>
-References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
- <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
- <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
- <5DDF9572-B2D1-4316-B307-14749365221E@gmail.com>
-Message-ID: <4068eb4a-3982-742f-2b23-28a4b1484de2@gmail.com>
+From: thomas@m3y3r.de (Thomas Meyer)
+Date: Thu, 21 Sep 2017 00:29:36 +0200
+Subject: [PATCH 7/7] drm/rockchip: Cocci spatch "vma_pages"
+In-Reply-To: <1505946334393-568186305-0-diffsplit-thomas@m3y3r.de>
+References: <1505946334393-568186305-0-diffsplit-thomas@m3y3r.de>
+Message-ID: <1505946334393-988165015-7-diffsplit-thomas@m3y3r.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Use vma_pages function on vma object instead of explicit computation.
+Found by coccinelle spatch "api/vma_pages.cocci"
 
-On 09/15/2017 04:49 PM, Florian Fainelli wrote:
-> On September 4, 2017 11:11:47 PM PDT, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Florian,
->>
->> On Saturday 02 September 2017 07:46 AM, Florian Fainelli wrote:
->>>
->>>
->>> On 08/25/2017 10:51 AM, Al Cooper wrote:
->>>> Add a new USB Phy driver for Broadcom STB SoCs. This driver
->>>> supports Broadcom STB ARM SoCs. This driver in
->>>> combination with the Broadcom STB ohci, ehci and xhci
->>>> drivers will enable USB1.1, USB2.0 and USB3.0 support.
->>>> This Phy driver also supports the Broadcom BDC gadget
->>>> driver.
->>>
->>> Thanks Al! Kishon, feel free to merge everything through your tree
->> there
->>> should not be any conflicts with drivers/soc/bcm/brcmstb/common.c and
->>> include/linux/soc/brcmstb/brcmstb.h.
->>
->> I'll start merging once 4.14 -rc1 is tagged.
-> 
-> OK, does not that mean we will be missing this driver in 4.14? I suppose that's fine. Thanks!
+Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
+---
 
-Gentle ping, v4.14-rc1 is now out, can you let us know if this patch
-series is good with you? Thanks!
--- 
-Florian
+diff -u -p a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -220,7 +220,7 @@ static int rockchip_drm_gem_object_mmap_
+ {
+ 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+ 	unsigned int i, count = obj->size >> PAGE_SHIFT;
+-	unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
++	unsigned long user_count = vma_pages(vma);
+ 	unsigned long uaddr = vma->vm_start;
+ 	unsigned long offset = vma->vm_pgoff;
+ 	unsigned long end = user_count + offset;
