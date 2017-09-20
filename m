@@ -1,94 +1,87 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 20 Sep 2017 15:49:13 +0800
-Subject: [PATCH V3 1/1] clk: bulk: add of_clk_bulk_get()
-Message-ID: <1505893753-16143-1-git-send-email-aisheng.dong@nxp.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 20 Sep 2017 09:51:05 +0200
+Subject: [PATCH] arm64: dt marvell: extend AP806 system controller size
+In-Reply-To: <20170919160813.yz4ez2hsuaejbf4t@tarshish> (Baruch Siach's
+ message of "Tue, 19 Sep 2017 19:08:13 +0300")
+References: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
+ <877ewusr2h.fsf@free-electrons.com>
+ <20170919160813.yz4ez2hsuaejbf4t@tarshish>
+Message-ID: <87shfhreom.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
-here to handle this for DT users without 'clock-names' specified.
-
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Reported-by: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-
----
-Changes since v2:
- * of_clk_bulk_get should return -ENOENT;
-
-Changes since v1:
- * using %pOF instead of full_name
----
- drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
- include/linux/clk.h    |  8 ++++++++
- 2 files changed, 39 insertions(+)
-
-diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-index c834f5a..896aa3b 100644
---- a/drivers/clk/clk-bulk.c
-+++ b/drivers/clk/clk-bulk.c
-@@ -19,6 +19,37 @@
- #include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/export.h>
-+#include <linux/of.h>
-+
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks)
-+{
-+	int ret;
-+	int i;
-+
-+	for (i = 0; i < num_clks; i++)
-+		clks[i].clk = NULL;
-+
-+	for (i = 0; i < num_clks; i++) {
-+		clks[i].clk = of_clk_get(np, i);
-+		if (IS_ERR(clks[i].clk)) {
-+			ret = PTR_ERR(clks[i].clk);
-+			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
-+			       np, i, ret);
-+			clks[i].clk = NULL;
-+			goto err;
-+		}
-+	}
-+
-+	return 0;
-+
-+err:
-+	clk_bulk_put(i, clks);
-+
-+	return ret;
-+}
-+#endif
+Hi Baruch,
  
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 12c96d9..a1f1f05 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
- }
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks);
- struct clk *of_clk_get(struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-+static int of_clk_bulk_get(struct device_node *np, int num_clks,
-+			   struct clk_bulk_data *clks)
-+{
-+	return -ENOENT;
-+}
-+
- static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
+ On mar., sept. 19 2017, Baruch Siach <baruch@tkos.co.il> wrote:
+
+> Hi Gregory,
+>
+> On Tue, Sep 19, 2017 at 04:25:58PM +0200, Gregory CLEMENT wrote:
+>>  On ven., sept. 15 2017, Baruch Siach <baruch@tkos.co.il> wrote:
+>> 
+>> > Extend the container size to 0x2000 to include the gpio controller at
+>> > offset 0x1040.
+>> >
+>> > While at it, add start address notation to the gpio node name to match
+>> > its 'offset' property.
+>> >
+>> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>> 
+>> I made a quick test on a mcbin and I confirm that the watchdog is here
+>> and usable.
+>> 
+>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> and 
+>> Applied on mvebu/dt64
+>
+> This is meant to be a reply to https://patchwork.kernel.org/patch/9947525/, 
+> right?
+
+Yes!
+Sorry for hte confusion.
+
+>
+> Anyway, I see the right patch[1] at mvebu/dt64.
+>
+> Thanks,
+> baruch
+>
+> [1] http://git.infradead.org/linux-mvebu.git/commitdiff/e34ffe32f6e7ae9191d14226ff9d8c0c47400a71
+>
+>> > ---
+>> >  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
+>> >  1 file changed, 2 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+>> > index 4d360713ed12..30d48ecf46e0 100644
+>> > --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+>> > +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+>> > @@ -254,7 +254,7 @@
+>> >  
+>> >  			ap_syscon: system-controller at 6f4000 {
+>> >  				compatible = "syscon", "simple-mfd";
+>> > -				reg = <0x6f4000 0x1000>;
+>> > +				reg = <0x6f4000 0x2000>;
+>> >  
+>> >  				ap_clk: clock {
+>> >  					compatible = "marvell,ap806-clock";
+>> > @@ -265,7 +265,7 @@
+>> >  					compatible = "marvell,ap806-pinctrl";
+>> >  				};
+>> >  
+>> > -				ap_gpio: gpio {
+>> > +				ap_gpio: gpio at 1040 {
+>> >  					compatible = "marvell,armada-8k-gpio";
+>> >  					offset = <0x1040>;
+>> >  					ngpios = <20>;
+>
+> -- 
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
