@@ -1,82 +1,76 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 20 Sep 2017 09:31:31 -0700
-Subject: [PATCH] ARM: uaccess: Add missing include for set_thread_flag
-In-Reply-To: <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
-References: <20170919115042.6800-1-net147@gmail.com>
- <CAJcbSZEiHW=yH+ATvLq=am4nbVdhbqAxkH-+jEymhNkN+Pkb=A@mail.gmail.com>
- <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
-Message-ID: <CAJcbSZF1PuMPTM3uZOVzfaUXj1Q3+6Nj2c6DXU+RDrwT8P13Tw@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 21 Sep 2017 00:32:39 +0800
+Subject: [PATCH 2/5] nvmem: mtk-efuse: use stack for nvmem_config
+ instead of malloc'ing it
+In-Reply-To: <1505134864-11975-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
+ <1505134864-11975-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1505925159.17049.12.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 2:35 PM, Jonathan Liu <net147@gmail.com> wrote:
->
-> Hi Thomas,
->
-> The top of the C source file I am compiling has:
-> #include <linux/kernel.h>
-> #include <asm/uaccess.h>
->
-> Tracing through the asm/uaccess.h include I see
-> asm/uaccess.h -> asm/domain.h -> asm/thread_info.h
->
-> but set_thread_info is defined in linux/thread_info.h not
-> asm/thread_info.h (see
-> http://elixir.free-electrons.com/linux/v4.14-rc1/ident/set_thread_flag).
+Hi, Masahiro
 
-I see, I think I could not reproduce this issue because I already
-reverted the original commit in favor of a different approach on
-linux-next (see commit 2404269bc4e77a67875c8db6667be34c9913c96e).
+For maintainability, I felt it's better if we use the same way to
+register nvmem as that most drivers does under nvmem usually using
+static structure. Otherwise, they should also be changed to use the
+one-time data in stack to avoid extra bytes to keep them.
 
-Let me know if this commit resolve the issue and thanks for reaching out.
-
->
-> Regards,
-> Jonathan
->
-> On 20 September 2017 at 00:32, Thomas Garnier <thgarnie@google.com> wrote:
-> > On Tue, Sep 19, 2017 at 4:50 AM, Jonathan Liu <net147@gmail.com> wrote:
-> >> Fixes "implicit declaration of function" compile error for out-of-tree
-> >> kernel modules including asm/uaccess.h.
-> >
-> > I failed to reproduce this issue by creating an out of tree module
-> > with a separate file (with only uaccess.h). Are you using a special
-> > config?
-> >
-> > Looking at the headers on uaccess.h. You get thread_info through:
-> >
-> >  asm/domain.h -> asm/thread_info.h
-> >
-> >>
-> >> Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
-> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
-> >> ---
-> >>  arch/arm/include/asm/uaccess.h | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-> >> index 87936dd5d151..13d1877ffb75 100644
-> >> --- a/arch/arm/include/asm/uaccess.h
-> >> +++ b/arch/arm/include/asm/uaccess.h
-> >> @@ -17,6 +17,7 @@
-> >>  #include <asm/unified.h>
-> >>  #include <asm/compiler.h>
-> >>
-> >> +#include <linux/thread_info.h>
-> >>  #include <asm/extable.h>
-> >>
-> >>  /*
-> >> --
-> >> 2.13.2
-> >>
-> >
-> >
-> >
-> > --
-> > Thomas
+	Sean
 
 
-
-
--- 
-Thomas
+On Mon, 2017-09-11 at 22:01 +0900, Masahiro Yamada wrote:
+> nvmem_register() copies all the members of nvmem_config to
+> nvmem_device.  So, nvmem_config is one-time use data during
+> probing.  There is no point to keep it until the driver detach.
+> Using stack should be no problem because nvmem_config is pretty
+> small.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  drivers/nvmem/mtk-efuse.c | 24 ++++++++++--------------
+>  1 file changed, 10 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
+> index 32fd572..fa7a0f6 100644
+> --- a/drivers/nvmem/mtk-efuse.c
+> +++ b/drivers/nvmem/mtk-efuse.c
+> @@ -49,7 +49,7 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct resource *res;
+>  	struct nvmem_device *nvmem;
+> -	struct nvmem_config *econfig;
+> +	struct nvmem_config econfig = {};
+>  	void __iomem *base;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -57,19 +57,15 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+>  	if (IS_ERR(base))
+>  		return PTR_ERR(base);
+>  
+> -	econfig = devm_kzalloc(dev, sizeof(*econfig), GFP_KERNEL);
+> -	if (!econfig)
+> -		return -ENOMEM;
+> -
+> -	econfig->stride = 4;
+> -	econfig->word_size = 4;
+> -	econfig->reg_read = mtk_reg_read;
+> -	econfig->reg_write = mtk_reg_write;
+> -	econfig->size = resource_size(res);
+> -	econfig->priv = base;
+> -	econfig->dev = dev;
+> -	econfig->owner = THIS_MODULE;
+> -	nvmem = nvmem_register(econfig);
+> +	econfig.stride = 4;
+> +	econfig.word_size = 4;
+> +	econfig.reg_read = mtk_reg_read;
+> +	econfig.reg_write = mtk_reg_write;
+> +	econfig.size = resource_size(res);
+> +	econfig.priv = base;
+> +	econfig.dev = dev;
+> +	econfig.owner = THIS_MODULE;
+> +	nvmem = nvmem_register(&econfig);
+>  	if (IS_ERR(nvmem))
+>  		return PTR_ERR(nvmem);
+>  
