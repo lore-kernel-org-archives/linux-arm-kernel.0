@@ -1,74 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 20 Sep 2017 13:09:48 +0100
-Subject: [PATCH v2] bootwrapper: SVE: Enable SVE for EL2 and below
-Message-ID: <1505909388-13513-1-git-send-email-Dave.Martin@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Sep 2017 13:19:07 +0100
+Subject: [PATCH] arm64: relax assembly code alignment from 16 byte to 4
+ byte
+In-Reply-To: <CAK7LNAQYDgY-4Bu9-RRLAj8hvKFXx2ctXFf058W4uQLoqpTQeg@mail.gmail.com>
+References: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
+ <20170907164651.3bmhdkbnxvj3pz7g@armageddon.cambridge.arm.com>
+ <CAK7LNAQYDgY-4Bu9-RRLAj8hvKFXx2ctXFf058W4uQLoqpTQeg@mail.gmail.com>
+Message-ID: <20170920121907.x4jxd74tuogkb52a@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, SVE will trap to EL3.  We also want to make sure that
-lower ELs have access to the full SVE vector length before dropping
-down.
+On Wed, Sep 20, 2017 at 07:58:34PM +0900, Masahiro Yamada wrote:
+> 2017-09-08 1:46 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
+> > On Thu, Aug 31, 2017 at 06:56:23PM +0900, Masahiro Yamada wrote:
+> >> Aarch64 instructions must be word aligned.  The current 16 byte
+> >> alignment is more than enough.  Relax it into 4 byte alignment.
+> >>
+> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> >> ---
+> >>
+> >> I do not know why arm64 Linux requires 16 byte alignment.
+> >>
+> >> I dug git-history of arch/arm64/include/asm/linkage.h
+> >> and the only commit I see is:
+> >>
+> >>   commit aeed41a9371ee02257b608eb06a9058507a7d0f4
+> >>   Author: Marc Zyngier <Marc.Zyngier@arm.com>
+> >>   Date:   Fri Oct 19 17:33:27 2012 +0100
+> >>
+> >>       arm64: fix alignment padding in assembly code
+> >>
+> >> It just opt out of the asm-generic variant to remove 0x90.
+> >> So, the amount of alignment might not be not optimized yet.
+> >>
+> >> Please correct me if I am missing something.
+> >
+> > Not sure why we ended up with 4. Possibly because we forgot the power of
+> > 2 difference for arm/arm64.
+> >
+> > Queued for 4.14. Thanks.
+> 
+> I still do not see this patch in linux-next.
 
-This patch programs CPTR_EL3 and ZCR_EL3 appropriately to enable
-SVE for lower exception levels and make sure that they can use the
-full vector length provided by the hardware.
+It won't make it into linux-next now, I'll push it as a fix for -rc2
+(sorry, I've been away at Plumbers and didn't get the chance to send any
+pull request). I'll push the patch out on fixes/core once I investigate
+some unrelated failures.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
----
-
-This is basically the same as v1 [1], but rebased to an up-to-date
-bootwrapper tree.  (I was previously tracking Catalin's tree, which no
-longer exists...)
-
-[1] [PATCH] bootwrapper: SVE: Enable SVE for EL2 and below
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-August/527000.html
-
-
- arch/aarch64/boot.S            | 13 +++++++++++++
- arch/aarch64/include/asm/cpu.h |  5 +++++
- 2 files changed, 18 insertions(+)
-
-diff --git a/arch/aarch64/boot.S b/arch/aarch64/boot.S
-index ceeee76..f7d795a 100644
---- a/arch/aarch64/boot.S
-+++ b/arch/aarch64/boot.S
-@@ -45,6 +45,19 @@ _start:
- 
- 	msr	cptr_el3, xzr			// Disable copro. traps to EL3
- 
-+	mrs	x0, id_aa64pfr0_el1
-+	ubfx	x0, x0, #32, #4			// SVE present?
-+	cbz	x0, 1f				// Skip SVE init if not
-+
-+	mrs	x0, cptr_el3
-+	orr	x0, x0, #CPTR_EL3_EZ		// enable SVE
-+	msr	cptr_el3, x0
-+	isb
-+
-+	mov	x0, #ZCR_EL3_LEN_MASK		// SVE: Enable full vector len
-+	msr	ZCR_EL3, x0			// for EL2.
-+
-+1:
- 	ldr	x0, =CNTFRQ
- 	msr	cntfrq_el0, x0
- 
-diff --git a/arch/aarch64/include/asm/cpu.h b/arch/aarch64/include/asm/cpu.h
-index 66726ef..ccb5397 100644
---- a/arch/aarch64/include/asm/cpu.h
-+++ b/arch/aarch64/include/asm/cpu.h
-@@ -27,6 +27,11 @@
- #define SPSR_EL2H		(9 << 0)	/* EL2 Handler mode */
- #define SPSR_HYP		(0x1a << 0)	/* M[3:0] = hyp, M[4] = AArch32 */
- 
-+#define CPTR_EL3_EZ		(1 << 8)
-+
-+#define ZCR_EL3			s3_6_c1_c2_0
-+#define ZCR_EL3_LEN_MASK	0x1ff
-+
- #define SCTLR_EL1_CP15BEN	(1 << 5)
- #define SCTLR_EL1_RES1		(3 << 28 | 3 << 22 | 1 << 11)
- 
 -- 
-2.1.4
+Catalin
