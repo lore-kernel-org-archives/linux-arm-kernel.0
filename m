@@ -1,68 +1,45 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 20 Sep 2017 10:29:58 +0200
-Subject: [PATCH 2/2] ARM64: dts: meson-gxm: Add support for Khadas VIM2
-In-Reply-To: <CAFBinCD0ev5kY_5BY-fZ=fEZ7ZkKi7PdvO4NGAwzVxLEfOT=Dw@mail.gmail.com>
-References: <1505832820-3517-1-git-send-email-narmstrong@baylibre.com>
- <1505832820-3517-3-git-send-email-narmstrong@baylibre.com>
- <CAFBinCD0ev5kY_5BY-fZ=fEZ7ZkKi7PdvO4NGAwzVxLEfOT=Dw@mail.gmail.com>
-Message-ID: <84171990-f5f2-d7d2-2bf6-d28390daac4a@baylibre.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Wed, 20 Sep 2017 10:30:31 +0200
+Subject: [PATCH v2 8/9] atmel_flexcom: Support backup mode
+In-Reply-To: <20170919152504.nhp5i734u75gb5gq@dell>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-9-romain.izard.pro@gmail.com>
+ <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
+ <20170919152504.nhp5i734u75gb5gq@dell>
+Message-ID: <CAGkQfmM08UqpLoMegRGQwmamN=Z74fem9VWT5yGcSjkYdS5c=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2017 07:55 PM, Martin Blumenstingl wrote:
-> Hi Neil,
-> 
-> On Tue, Sep 19, 2017 at 4:53 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> The Khadas VIM2 is a Single Board Computer, respin of the origin
->> Khadas VIM board, using an Amlogic S912 SoC and more server oriented.
+2017-09-19 17:25 GMT+02:00 Lee Jones <lee.jones@linaro.org>:
+> On Tue, 19 Sep 2017, Nicolas Ferre wrote:
+>
+>> On 15/09/2017 at 16:04, Romain Izard wrote:
+>> > The controller used by a flexcom module is configured at boot, and left
+>> > alone after this. As the configuration will be lost after backup mode,
+>> > restore the state of the flexcom driver on resume.
+>> >
+>> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 >>
->> It provides the same external connectors and header pinout, plus a SPI
->> NOR Flash, a reprogrammable STM8S003 MCU, FPC Connector, Cooling FAN header
->> and Pogo Pads Arrays.
+>> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>> On sama5d2 Xplained board (i2c0 from flexcom 4).
+>> and obviously:
+>> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 >>
->> Cc: Gouwa <gouwa@szwesion.com>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
->>  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
->>  .../boot/dts/amlogic/meson-gxm-khadas-vim2.dts     | 401 +++++++++++++++++++++
->>  3 files changed, 403 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+>> Thanks Romain!
 >>
+>> Regards,
+>>
+>> > ---
+>> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+>> >  1 file changed, 50 insertions(+), 15 deletions(-)
+>
+> This is the first time I've seen this patch.  Why's that?
+>
 
-[...]
+As the patchset covers many subsystems, get_maintainers.pl provided a
+very long list of both developpers and mailing lists (28). I thought it
+was a good idea to shorten it a little. Bad idea. Sorry.
 
->> +&external_mdio {
->> +       external_phy: ethernet-phy at 1 {
->> +               compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
-> could you please remove the compatible property and replace it with a
-> comment as explained in [0]?
-> 
-
-Ok
-
->> +               reg = <0>;
->> +               max-speed = <1000>;
->> +       };
->> +};
->> +
-
-[...]
-
-> 
-> with that and Jerome's comments fixed:
-> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> 
-> 
-> Regards,
-> Martin
-> 
-> 
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-September/004729.html
-> 
-
-Thanks Martin !
-
-I'll send a v2 when eMMC DTS patches goes in 4.14-rc2.
-
-Neil
+Best regards,
+-- 
+Romain Izard
