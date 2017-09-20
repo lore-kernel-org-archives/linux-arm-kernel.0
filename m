@@ -1,41 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Sep 2017 06:39:16 -0300
-Subject: [PATCH 1/2] dts: display5: Device tree description of LWN's
- DISPLAY5 board
-In-Reply-To: <f203efc5-b85c-aa3d-0dc6-929ea348e5f6@denx.de>
-References: <1505746765-965-1-git-send-email-lukma@denx.de>
- <CAOMZO5Du4gH1jwcP4ssRPD17GsEAVERpkNBD7W2z5f+4TAd=nA@mail.gmail.com>
- <f203efc5-b85c-aa3d-0dc6-929ea348e5f6@denx.de>
-Message-ID: <CAOMZO5CHR14LWqkgpSiPnMV_6X+Fq=fe-KmE5CrdiqxRUyT8xg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 20 Sep 2017 10:42:52 +0100
+Subject: [PATCH v2] arm64: dts: foundation-v8: Enable PSCI mode
+In-Reply-To: <20170919183204.12751-1-daniel.thompson@linaro.org>
+References: <20170918153832.16356-1-daniel.thompson@linaro.org>
+ <20170919183204.12751-1-daniel.thompson@linaro.org>
+Message-ID: <da8a0cf5-3c1e-1398-b5c3-ac489ae955fa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
 
-On Wed, Sep 20, 2017 at 6:22 AM, ?ukasz Majewski <lukma@denx.de> wrote:
 
-> Could you be more specific here?
->
-> The 0x80000000 corresponds to IMX_NO_PAD_CTL in pinctrl-imx.c, which
-> prevents from manual GPIO control.
->
-> The 0x80000000 value is the IOMUXC_SW_PAD_CTL_PAD_CSI0_DATA11 (0x020E_0654)
-> config data (16 bits only -> 0x0).
->
-> Writing 0x0 to this register is perfectly fine for my application.
->
->
-> I'm a bit in doubt to what I shall do more?
+On 19/09/17 19:32, Daniel Thompson wrote:
+> Currently if the Foundation model is running ARM Trusted Firmware then
+> the kernel, which is configured to use spin tables, cannot start secondary
+> processors or "power off" the simulation.
+> 
+> After adding a couple of labels to the include file and splitting out the
+> spin-table configuration into a header, we add a couple of new headers
+> together with two new DTs (GICv2+PSCI and GICv3+PSCI).
+> 
+> The new GICv3+PSCI DT has been boot tested, the remaining three (two of
+> which existed prior to this patch) have been "tested" by decompiling the
+> blobs and comparing them against a reference.
+> 
 
-As per the Reference Manual, the POR reset for
-IOMUXC_SW_PAD_CTL_PAD_CSI0_DATA11 is 0x1b0b0.
+How different are these from the ones hosted in [1] ?
 
-0x80000000 tells the kernel to not touch this IOMUX and use whatever
-value comes from the bootloader.
+On argument is that we want to take the DTS out of device tree as
+firmware is responsible for generating them. Alternatively, we may be
+duplicating resulting in discrepancies over time by coping it into kernel.
 
-If your bootloader does not touch this register, then you probably
-read 0x1b0b0 from it.
+Since users of ARM TF must be able to access these, I am not sure if it
+makes sense to merge these. Or we remove it from ARM TF to avoid any
+conflicts/discrepancies.
 
-In this case, please do this instead:
+Thoughts ?
 
-MX6QDL_PAD_CSI0_DAT11__GPIO5_IO29 0x1b0b0
+--
+Regards,
+Sudeep
+
+[1] https://github.com/ARM-software/arm-trusted-firmware/tree/master/fdts
