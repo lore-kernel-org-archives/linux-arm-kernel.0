@@ -1,69 +1,62 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 20 Sep 2017 14:15:52 +0530
-Subject: [PATCH v6 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <CAKTKpr4kmdNbO6MGuoUvxnwH_viha9Ba_KmLs-WxYbJKrW+nyA@mail.gmail.com>
+From: tomasz.nowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Wed, 20 Sep 2017 10:52:01 +0200
+Subject: [PATCH V2 0/1] Optimise IOVA allocations for PCI devices
+Message-ID: <1505897522-9237-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Here is my test setup where I have stareted performance measurements.
 
-any further comments?
+ ------------  PCIe  -------------   TX   -------------  PCIe  -----
+| ThunderX2  |------| Intel XL710 | ---> | Intel XL710 |------| X86 |
+| (128 cpus) |      |   40GbE     |      |    40GbE    |       -----
+ ------------        -------------        -------------
 
+As the reference lets take v4.13 host, SMMUv3 off and 1-thread iperf
+taskset to one CPU. The performance results I got:
 
-On Thu, Aug 24, 2017 at 5:33 PM, Ganapatrao Kulkarni
-<ganapatrao.kulkarni@cavium.com> wrote:
-> Extending json/jevent framework for parsing arm64 event files.
-> Adding jevents for ThunderX2 implementation defined PMU events.
->
-> v6 : Addressed comments [1] [2]
->
-> [1] https://patchwork.kernel.org/patch/9903099/
-> [2] https://patchwork.kernel.org/patch/9853899/
->
-> v5:
->    - Addressed comments from Arnaldo.
->    - Rebased to 4.13-rc5
->
-> v4:
->    - Rebased to 4.13-rc1
->
-> v3:
->    - Addressed comments from Will Deacon and Jayachandran C.
->    - Rebased to 4.12-rc1
->
-> v2:
->    - Updated as per Mark Rutland's suggestions.
->    - Added provision for get_cpuid_str to get cpu id string
->      from associated cpus of pmu core device.
->
-> v1: Initial patchset.
->
-> Ganapatrao Kulkarni (4):
->   perf utils: passing pmu as a parameter to function get_cpuid_str
->   perf tools arm64: Add support for get_cpuid_str function.
->   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
->   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->     core events
->
->  tools/perf/arch/arm64/util/Build                   |  1 +
->  tools/perf/arch/arm64/util/header.c                | 60 +++++++++++++++++++++
->  tools/perf/arch/powerpc/util/header.c              |  2 +-
->  tools/perf/arch/x86/util/header.c                  |  2 +-
->  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->  tools/perf/util/header.h                           |  3 +-
->  tools/perf/util/pmu.c                              | 48 ++++++++++++++---
->  8 files changed, 182 insertions(+), 11 deletions(-)
->  create mode 100644 tools/perf/arch/arm64/util/header.c
->  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->
-> --
-> 2.9.4
->
+SMMU off -> 100%
+SMMU on -> 0,02%
 
-thanks
-Ganapat
+I followed down the DMA mapping path and found out IOVA 32-bit space
+full so that kernel was flushing rcaches for all CPUs in (1).
+For 128 CPUs, this kills the performance. Furthermore, for my case, rcaches
+contained PFNs > 32-bit mostly so the second round of IOVA allocation failed
+as well. As the consequence IOVA had to be allocated outside of 32-bit (2)
+from scratch since all rcaches have been flushed in (1).
+
+    if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
+(1)-->  iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
+
+    if (!iova)
+(2)-->  iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
+
+My fix simply introduces parameter for alloc_iova_fast() to decide whether
+rcache flush has to be done or not. All users follow mentioned scenario
+so they should let flush as the last chance to avoid time costly iteration
+over all CPUs.
+
+This bring my iperf performance back to 100% with SMMU on.
+
+My bad feelings regarding this solution is that machines with relatively
+small numbers of CPUs may get DAC addresses more frequently for PCI
+devices. Please let me know your thoughts.
+
+Changelog:
+
+v1 --> v2
+- add missing documentation
+- fix typo
+
+Tomasz Nowicki (1):
+  iommu/iova: Make rcache flush optional on IOVA allocation failure
+
+ drivers/iommu/amd_iommu.c   |  5 +++--
+ drivers/iommu/dma-iommu.c   |  6 ++++--
+ drivers/iommu/intel-iommu.c |  5 +++--
+ drivers/iommu/iova.c        | 11 ++++++-----
+ include/linux/iova.h        |  5 +++--
+ 5 files changed, 19 insertions(+), 13 deletions(-)
+
+-- 
+2.7.4
