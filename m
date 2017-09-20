@@ -1,51 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 20 Sep 2017 13:19:07 +0100
-Subject: [PATCH] arm64: relax assembly code alignment from 16 byte to 4
- byte
-In-Reply-To: <CAK7LNAQYDgY-4Bu9-RRLAj8hvKFXx2ctXFf058W4uQLoqpTQeg@mail.gmail.com>
-References: <1504173383-8367-1-git-send-email-yamada.masahiro@socionext.com>
- <20170907164651.3bmhdkbnxvj3pz7g@armageddon.cambridge.arm.com>
- <CAK7LNAQYDgY-4Bu9-RRLAj8hvKFXx2ctXFf058W4uQLoqpTQeg@mail.gmail.com>
-Message-ID: <20170920121907.x4jxd74tuogkb52a@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 20 Sep 2017 14:30:46 +0200
+Subject: [PATCH 1/9] arm64: defconfig: enable the Marvell 10G PHY as a
+ module
+In-Reply-To: <20170918075814.27405-2-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Mon, 18 Sep 2017 09:58:06 +0200")
+References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
+ <20170918075814.27405-2-antoine.tenart@free-electrons.com>
+Message-ID: <87377hr1qh.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 07:58:34PM +0900, Masahiro Yamada wrote:
-> 2017-09-08 1:46 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > On Thu, Aug 31, 2017 at 06:56:23PM +0900, Masahiro Yamada wrote:
-> >> Aarch64 instructions must be word aligned.  The current 16 byte
-> >> alignment is more than enough.  Relax it into 4 byte alignment.
-> >>
-> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> >> ---
-> >>
-> >> I do not know why arm64 Linux requires 16 byte alignment.
-> >>
-> >> I dug git-history of arch/arm64/include/asm/linkage.h
-> >> and the only commit I see is:
-> >>
-> >>   commit aeed41a9371ee02257b608eb06a9058507a7d0f4
-> >>   Author: Marc Zyngier <Marc.Zyngier@arm.com>
-> >>   Date:   Fri Oct 19 17:33:27 2012 +0100
-> >>
-> >>       arm64: fix alignment padding in assembly code
-> >>
-> >> It just opt out of the asm-generic variant to remove 0x90.
-> >> So, the amount of alignment might not be not optimized yet.
-> >>
-> >> Please correct me if I am missing something.
-> >
-> > Not sure why we ended up with 4. Possibly because we forgot the power of
-> > 2 difference for arm/arm64.
-> >
-> > Queued for 4.14. Thanks.
-> 
-> I still do not see this patch in linux-next.
+Hi Antoine,
+ 
+ On lun., sept. 18 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-It won't make it into linux-next now, I'll push it as a fix for -rc2
-(sorry, I've been away at Plumbers and didn't get the chance to send any
-pull request). I'll push the patch out on fixes/core once I investigate
-some unrelated failures.
+> The Marvell 10G PHY is present on mvebu platforms. Enable it as a module
+> so that the network works on these platforms.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Applied on mvebu/arm64
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 34480e9af2e7..4c9d4f6692dc 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -204,6 +204,7 @@ CONFIG_STMMAC_ETH=m
+>  CONFIG_MDIO_BUS_MUX_MMIOREG=y
+>  CONFIG_AT803X_PHY=m
+>  CONFIG_MARVELL_PHY=m
+> +CONFIG_MARVELL_10G_PHY=m
+>  CONFIG_MESON_GXL_PHY=m
+>  CONFIG_MICREL_PHY=y
+>  CONFIG_REALTEK_PHY=m
+> -- 
+> 2.13.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
