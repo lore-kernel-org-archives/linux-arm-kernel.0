@@ -1,146 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 20 Sep 2017 12:57:21 -0700
-Subject: [PATCH v4 5/5] kernel: tracepoints: add support for relative
- references
-In-Reply-To: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
-References: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170920195721.7939-6-ard.biesheuvel@linaro.org>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Wed, 20 Sep 2017 22:01:17 +0200
+Subject: [RESEND RFC PATCH 0/7] sun8i H3 HDMI glue driver for DW HDMI
+Message-ID: <20170920200124.20457-1-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid the need for relocating absolute references to tracepoint
-structures at boot time when running relocatable kernels (which may
-take a disproportionate amount of space), add the option to emit
-these tables as relative references instead.
+[added media mailing list due to CEC question]
 
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- include/linux/tracepoint.h | 19 ++++++--
- kernel/tracepoint.c        | 50 +++++++++++---------
- 2 files changed, 42 insertions(+), 27 deletions(-)
+This patch series adds a HDMI glue driver for Allwinner H3 SoC. For now, only
+video and CEC functionality is supported. Audio needs more tweaks.
 
-diff --git a/include/linux/tracepoint.h b/include/linux/tracepoint.h
-index a26ffbe09e71..d02bf1a695e8 100644
---- a/include/linux/tracepoint.h
-+++ b/include/linux/tracepoint.h
-@@ -228,6 +228,19 @@ extern void syscall_unregfunc(void);
- 		return static_key_false(&__tracepoint_##name.key);	\
- 	}
- 
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+#define __TRACEPOINT_ENTRY(name)					 \
-+	asm("	.section \"__tracepoints_ptrs\", \"a\"		     \n" \
-+	    "	.balign 4					     \n" \
-+	    "	.long " VMLINUX_SYMBOL_STR(__tracepoint_##name) " - .\n" \
-+	    "	.previous					     \n")
-+#else
-+#define __TRACEPOINT_ENTRY(name)					 \
-+	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
-+	__attribute__((section("__tracepoints_ptrs"))) =		 \
-+		&__tracepoint_##name
-+#endif
-+
- /*
-  * We have no guarantee that gcc and the linker won't up-align the tracepoint
-  * structures, so we create an array of pointers that will be used for iteration
-@@ -237,11 +250,9 @@ extern void syscall_unregfunc(void);
- 	static const char __tpstrtab_##name[]				 \
- 	__attribute__((section("__tracepoints_strings"))) = #name;	 \
- 	struct tracepoint __tracepoint_##name				 \
--	__attribute__((section("__tracepoints"))) =			 \
-+	__attribute__((section("__tracepoints"), used)) =		 \
- 		{ __tpstrtab_##name, STATIC_KEY_INIT_FALSE, reg, unreg, NULL };\
--	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
--	__attribute__((section("__tracepoints_ptrs"))) =		 \
--		&__tracepoint_##name;
-+	__TRACEPOINT_ENTRY(name);
- 
- #define DEFINE_TRACE(name)						\
- 	DEFINE_TRACE_FN(name, NULL, NULL);
-diff --git a/kernel/tracepoint.c b/kernel/tracepoint.c
-index 685c50ae6300..05649fef106c 100644
---- a/kernel/tracepoint.c
-+++ b/kernel/tracepoint.c
-@@ -327,6 +327,28 @@ int tracepoint_probe_unregister(struct tracepoint *tp, void *probe, void *data)
- }
- EXPORT_SYMBOL_GPL(tracepoint_probe_unregister);
- 
-+static void for_each_tracepoint_range(struct tracepoint * const *begin,
-+		struct tracepoint * const *end,
-+		void (*fct)(struct tracepoint *tp, void *priv),
-+		void *priv)
-+{
-+	if (!begin)
-+		return;
-+
-+	if (IS_ENABLED(CONFIG_HAVE_ARCH_PREL32_RELOCATIONS)) {
-+		const int *iter;
-+
-+		for (iter = (const int *)begin; iter < (const int *)end; iter++)
-+			fct((struct tracepoint *)((unsigned long)iter + *iter),
-+			    priv);
-+	} else {
-+		struct tracepoint * const *iter;
-+
-+		for (iter = begin; iter < end; iter++)
-+			fct(*iter, priv);
-+	}
-+}
-+
- #ifdef CONFIG_MODULES
- bool trace_module_has_bad_taint(struct module *mod)
- {
-@@ -391,15 +413,9 @@ EXPORT_SYMBOL_GPL(unregister_tracepoint_module_notifier);
-  * Ensure the tracer unregistered the module's probes before the module
-  * teardown is performed. Prevents leaks of probe and data pointers.
-  */
--static void tp_module_going_check_quiescent(struct tracepoint * const *begin,
--		struct tracepoint * const *end)
-+static void tp_module_going_check_quiescent(struct tracepoint *tp, void *priv)
- {
--	struct tracepoint * const *iter;
--
--	if (!begin)
--		return;
--	for (iter = begin; iter < end; iter++)
--		WARN_ON_ONCE((*iter)->funcs);
-+	WARN_ON_ONCE(tp->funcs);
- }
- 
- static int tracepoint_module_coming(struct module *mod)
-@@ -450,8 +466,9 @@ static void tracepoint_module_going(struct module *mod)
- 			 * Called the going notifier before checking for
- 			 * quiescence.
- 			 */
--			tp_module_going_check_quiescent(mod->tracepoints_ptrs,
--				mod->tracepoints_ptrs + mod->num_tracepoints);
-+			for_each_tracepoint_range(mod->tracepoints_ptrs,
-+				mod->tracepoints_ptrs + mod->num_tracepoints,
-+				tp_module_going_check_quiescent, NULL);
- 			break;
- 		}
- 	}
-@@ -503,19 +520,6 @@ static __init int init_tracepoints(void)
- __initcall(init_tracepoints);
- #endif /* CONFIG_MODULES */
- 
--static void for_each_tracepoint_range(struct tracepoint * const *begin,
--		struct tracepoint * const *end,
--		void (*fct)(struct tracepoint *tp, void *priv),
--		void *priv)
--{
--	struct tracepoint * const *iter;
--
--	if (!begin)
--		return;
--	for (iter = begin; iter < end; iter++)
--		fct(*iter, priv);
--}
--
- /**
-  * for_each_kernel_tracepoint - iteration on all kernel tracepoints
-  * @fct: callback
+Series is based on the H3 DE2 patch series available on mailing list:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-August/522697.html
+(ignore patches marked with [NOT FOR REVIEW NOW] tag)
+
+Patch 1 adds support for polling plug detection since custom PHY used here
+doesn't support HPD interrupt.
+
+Patch 2 enables overflow workaround for v1.32a. This HDMI controller exhibits
+same issues as HDMI controller used in iMX6 SoCs.
+
+Patch 3 adds CLK_SET_RATE_PARENT to hdmi clock.
+
+Patch 4 adds dt bindings documentation.
+
+Patch 5 adds actual H3 HDMI glue driver.
+
+Patch 6 and 7 add HDMI node to DT and enable it where needed.
+
+Allwinner used DW HDMI controller in a non standard way:
+- register offsets obfuscation layer, which can fortunately be turned off
+- register read lock, which has to be disabled by magic number
+- custom PHY, which have to be initialized before DW HDMI controller
+- non standard clocks
+- no HPD interrupt
+
+Because of that, I have two questions:
+- Since HPD have to be polled, is it enough just to enable poll mode? I'm
+  mainly concerned about invalidating CEC address here.
+- PHY has to be initialized before DW HDMI controller to disable offset
+  obfuscation and read lock among other things. This means that all clocks have
+  to be enabled in glue driver. This poses a problem, since when using
+  component model, dw-hdmi bridge uses drvdata for it's own private data and
+  prevents glue layer to pass a pointer to unbind function, where clocks should
+  be disabled. I noticed same issue in meson DW HDMI glue driver, where clocks
+  are also not disabled when unbind callback is called. I noticed that when H3
+  SoC is shutdown, HDMI output is still enabled and lastest image is shown on
+  monitor until it is unplugged from power supply. Is there any simple solution
+  to this?
+
+Chen-Yu,
+TL Lim was unable to obtain any answer from Allwinner about HDMI clocks. I think
+it is safe to assume that divider in HDMI clock doesn't have any effect.
+
+Branch based on linux-next from 1. September with integrated patches is
+available here:
+https://github.com/jernejsk/linux-1/tree/h3_hdmi_rfc
+
+Some additonal info about H3 HDMI:
+https://linux-sunxi.org/DWC_HDMI_Controller
+
+Thanks to Jens Kuske, who figured out that it is actually DW HDMI controller
+and mapped scrambled register offsets to original ones.
+
+Icenowy Zheng (1):
+  ARM: sun8i: h3: Add DesignWare HDMI controller node
+
+Jernej Skrabec (6):
+  drm: bridge: Enable polling hpd event in dw_hdmi
+  drm: bridge: Enable workaround in dw_hdmi for v1.32a
+  clk: sunxi: Add CLK_SET_RATE_PARENT flag for H3 HDMI clock
+  dt-bindings: Document Allwinner DWC HDMI TX node
+  drm: sun4i: Add a glue for the DesignWare HDMI controller in H3
+  ARM: sun8i: h3: Enable HDMI output on H3 boards
+
+ .../bindings/display/sunxi/sun4i-drm.txt           | 158 ++++++-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  33 ++
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  33 ++
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts           |  33 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  33 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  33 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  33 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  33 ++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |   5 +
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  36 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |  14 +-
+ drivers/gpu/drm/sun4i/Kconfig                      |   9 +
+ drivers/gpu/drm/sun4i/Makefile                     |   1 +
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c              | 500 +++++++++++++++++++++
+ 15 files changed, 950 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+
 -- 
-2.11.0
+2.14.1
