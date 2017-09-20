@@ -1,94 +1,42 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Thu, 21 Sep 2017 08:03:36 +1000
-Subject: [PATCH] ARM: uaccess: Add missing include for set_thread_flag
-In-Reply-To: <CAJcbSZF1PuMPTM3uZOVzfaUXj1Q3+6Nj2c6DXU+RDrwT8P13Tw@mail.gmail.com>
-References: <20170919115042.6800-1-net147@gmail.com>
- <CAJcbSZEiHW=yH+ATvLq=am4nbVdhbqAxkH-+jEymhNkN+Pkb=A@mail.gmail.com>
- <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
- <CAJcbSZF1PuMPTM3uZOVzfaUXj1Q3+6Nj2c6DXU+RDrwT8P13Tw@mail.gmail.com>
-Message-ID: <CANwerB2eXA7Jkne504pik5MF4QFkQe0JURjmS0Ux0isauheqyg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 20 Sep 2017 15:37:21 -0700
+Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
+In-Reply-To: <5DDF9572-B2D1-4316-B307-14749365221E@gmail.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+ <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
+ <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
+ <5DDF9572-B2D1-4316-B307-14749365221E@gmail.com>
+Message-ID: <4068eb4a-3982-742f-2b23-28a4b1484de2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Kishon,
 
-On 21 September 2017 at 02:31, Thomas Garnier <thgarnie@google.com> wrote:
-> On Tue, Sep 19, 2017 at 2:35 PM, Jonathan Liu <net147@gmail.com> wrote:
+On 09/15/2017 04:49 PM, Florian Fainelli wrote:
+> On September 4, 2017 11:11:47 PM PDT, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Florian,
 >>
->> Hi Thomas,
+>> On Saturday 02 September 2017 07:46 AM, Florian Fainelli wrote:
+>>>
+>>>
+>>> On 08/25/2017 10:51 AM, Al Cooper wrote:
+>>>> Add a new USB Phy driver for Broadcom STB SoCs. This driver
+>>>> supports Broadcom STB ARM SoCs. This driver in
+>>>> combination with the Broadcom STB ohci, ehci and xhci
+>>>> drivers will enable USB1.1, USB2.0 and USB3.0 support.
+>>>> This Phy driver also supports the Broadcom BDC gadget
+>>>> driver.
+>>>
+>>> Thanks Al! Kishon, feel free to merge everything through your tree
+>> there
+>>> should not be any conflicts with drivers/soc/bcm/brcmstb/common.c and
+>>> include/linux/soc/brcmstb/brcmstb.h.
 >>
->> The top of the C source file I am compiling has:
->> #include <linux/kernel.h>
->> #include <asm/uaccess.h>
->>
->> Tracing through the asm/uaccess.h include I see
->> asm/uaccess.h -> asm/domain.h -> asm/thread_info.h
->>
->> but set_thread_info is defined in linux/thread_info.h not
->> asm/thread_info.h (see
->> http://elixir.free-electrons.com/linux/v4.14-rc1/ident/set_thread_flag).
->
-> I see, I think I could not reproduce this issue because I already
-> reverted the original commit in favor of a different approach on
-> linux-next (see commit 2404269bc4e77a67875c8db6667be34c9913c96e).
->
-> Let me know if this commit resolve the issue and thanks for reaching out.
->
+>> I'll start merging once 4.14 -rc1 is tagged.
+> 
+> OK, does not that mean we will be missing this driver in 4.14? I suppose that's fine. Thanks!
 
-Cherry-picking commit 2404269bc4e77a67875c8db6667be34c9913c96e on top
-of 4.14-rc1 resolves the issue.
-Thanks.
-
->>
->> Regards,
->> Jonathan
->>
->> On 20 September 2017 at 00:32, Thomas Garnier <thgarnie@google.com> wrote:
->> > On Tue, Sep 19, 2017 at 4:50 AM, Jonathan Liu <net147@gmail.com> wrote:
->> >> Fixes "implicit declaration of function" compile error for out-of-tree
->> >> kernel modules including asm/uaccess.h.
->> >
->> > I failed to reproduce this issue by creating an out of tree module
->> > with a separate file (with only uaccess.h). Are you using a special
->> > config?
->> >
->> > Looking at the headers on uaccess.h. You get thread_info through:
->> >
->> >  asm/domain.h -> asm/thread_info.h
->> >
->> >>
->> >> Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
->> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> >> ---
->> >>  arch/arm/include/asm/uaccess.h | 1 +
->> >>  1 file changed, 1 insertion(+)
->> >>
->> >> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
->> >> index 87936dd5d151..13d1877ffb75 100644
->> >> --- a/arch/arm/include/asm/uaccess.h
->> >> +++ b/arch/arm/include/asm/uaccess.h
->> >> @@ -17,6 +17,7 @@
->> >>  #include <asm/unified.h>
->> >>  #include <asm/compiler.h>
->> >>
->> >> +#include <linux/thread_info.h>
->> >>  #include <asm/extable.h>
->> >>
->> >>  /*
->> >> --
->> >> 2.13.2
->> >>
->> >
->> >
->> >
->> > --
->> > Thomas
->
->
->
->
-> --
-> Thomas
-
-Regards,
-Jonathan
+Gentle ping, v4.14-rc1 is now out, can you let us know if this patch
+series is good with you? Thanks!
+-- 
+Florian
