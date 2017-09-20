@@ -1,67 +1,432 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 20 Sep 2017 12:46:57 +0800
-Subject: [PATCH v3] doc: coresight: correct usage for disabling idle states
-Message-ID: <1505882817-19582-1-git-send-email-leo.yan@linaro.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 20 Sep 2017 07:49:19 +0200
+Subject: [PATCH v2 3/5] dmaengine: zynqmp_ps_pcie: Adding PS PCIe DMA
+ driver
+In-Reply-To: <1504873388-29195-4-git-send-email-vjonnal@xilinx.com>
+References: <1504873388-29195-1-git-send-email-vjonnal@xilinx.com>
+ <1504873388-29195-4-git-send-email-vjonnal@xilinx.com>
+Message-ID: <1e17381d-0e60-e563-4f74-96245fe00aaf@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the coresight CPU debug document it suggests to use 'echo' command
-to set latency request to /dev/cpu_dma_latency so can disable all CPU
-idle states, but in fact this doesn't work.
+On 8.9.2017 14:23, Ravi Shankar Jonnalagadda wrote:
+> Adding support for ZynqmMP PS PCIe EP driver.
+> Adding support for ZynqmMP PS PCIe Root DMA driver.
+> Modifying Kconfig and Makefile to add the support.
+> 
+> Signed-off-by: Ravi Shankar Jonnalagadda <vjonnal@xilinx.com>
+> Signed-off-by: RaviKiran Gummaluri <rgummal@xilinx.com>
+> ---
+>  drivers/dma/Kconfig               |  12 +++
+>  drivers/dma/xilinx/Makefile       |   2 +
+>  drivers/dma/xilinx/ps_pcie.h      |  44 +++++++++
+>  drivers/dma/xilinx/ps_pcie_main.c | 200 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma/ps_pcie_dma.h   |  69 +++++++++++++
+>  5 files changed, 327 insertions(+)
+>  create mode 100644 drivers/dma/xilinx/ps_pcie.h
+>  create mode 100644 drivers/dma/xilinx/ps_pcie_main.c
+>  create mode 100644 include/linux/dma/ps_pcie_dma.h
+> 
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index fa8f9c0..e2fe4e5 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -586,6 +586,18 @@ config XILINX_ZYNQMP_DMA
+>  	help
+>  	  Enable support for Xilinx ZynqMP DMA controller.
+>  
+> +config XILINX_PS_PCIE_DMA
+> +	tristate "Xilinx PS PCIe DMA support"
+> +	depends on (PCI && X86_64 || ARM64)
+> +	select DMA_ENGINE
+> +	help
+> +	  Enable support for the Xilinx PS PCIe DMA engine present
+> +	  in recent Xilinx ZynqMP chipsets.
+> +
+> +	  Say Y here if you have such a chipset.
+> +
+> +	  If unsure, say N.
+> +
+>  config ZX_DMA
+>  	tristate "ZTE ZX DMA support"
+>  	depends on ARCH_ZX || COMPILE_TEST
+> diff --git a/drivers/dma/xilinx/Makefile b/drivers/dma/xilinx/Makefile
+> index 9e91f8f..04f6f99 100644
+> --- a/drivers/dma/xilinx/Makefile
+> +++ b/drivers/dma/xilinx/Makefile
+> @@ -1,2 +1,4 @@
+>  obj-$(CONFIG_XILINX_DMA) += xilinx_dma.o
+>  obj-$(CONFIG_XILINX_ZYNQMP_DMA) += zynqmp_dma.o
+> +ps_pcie_dma-objs := ps_pcie_main.o ps_pcie_platform.o
+> +obj-$(CONFIG_XILINX_PS_PCIE_DMA) += ps_pcie_dma.o
+> diff --git a/drivers/dma/xilinx/ps_pcie.h b/drivers/dma/xilinx/ps_pcie.h
+> new file mode 100644
+> index 0000000..351f051
+> --- /dev/null
+> +++ b/drivers/dma/xilinx/ps_pcie.h
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Xilinx PS PCIe DMA Engine platform header file
+> + *
+> + * Copyright (C) 2010-2017 Xilinx, Inc. All rights reserved.
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation
+> + */
+> +
+> +#ifndef __XILINX_PS_PCIE_H
+> +#define __XILINX_PS_PCIE_H
+> +
+> +#include <linux/delay.h>
+> +#include <linux/dma-direction.h>
 
-This is because when the command 'echo' exits, it releases the device
-node's file descriptor and the kernel release function removes the QoS
-constraint; finally when the command 'echo' finished there have no
-constraint imposed on cpu_dma_latency.
+this is included via dma-mapping.h below.
 
-This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-command 'exec' can avoid the file descriptor to be closed so we can
-keep the constraint on cpu_dma_latency.
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/ioport.h>
+> +#include <linux/irqreturn.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/mempool.h>
+> +#include <linux/of.h>
+> +#include <linux/pci.h>
+> +#include <linux/property.h>
 
-This patch also adds the info for reference docs for PM QoS and cpuidle
-sysfs.
+this is already include via of.h
 
-Cc: Jonathan Corbet <corbet@lwn.net>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Reported-by: Kim Phillips <kim.phillips@arm.com>
-Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- Documentation/trace/coresight-cpu-debug.txt | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+> +#include <linux/platform_device.h>
+> +#include <linux/timer.h>
+> +#include <linux/dma/ps_pcie_dma.h>
 
-diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-index b3da1f9..2b9b51c 100644
---- a/Documentation/trace/coresight-cpu-debug.txt
-+++ b/Documentation/trace/coresight-cpu-debug.txt
-@@ -149,11 +149,23 @@ If you want to limit idle states at boot time, you can use "nohlt" or
- 
- At the runtime you can disable idle states with below methods:
- 
--Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
--states (if latency = 0uS then disable all idle states):
--# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
--
--Disable specific CPU's specific idle state:
-+It is possible to disable CPU idle states by way of the PM QoS
-+subsystem, more specifically by using the "/dev/cpu_dma_latency"
-+interface (see Documentation/power/pm_qos_interface.txt for more
-+details).  As specified in the PM QoS documentation the requested
-+parameter will stay in effect until the file descriptor is released.
-+For example:
-+
-+# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
-+...
-+Do some work...
-+...
-+# exec 3<>-
-+
-+The same can also be done from an application program.
-+
-+Disable specific CPU's specific idle state from cpuidle sysfs (see
-+Documentation/cpuidle/sysfs.txt):
- # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
- 
- 
+Don't we have any script for checking this?
+
+> +
+> +/**
+> + * dma_platform_driver_register - This will be invoked by module init
+> + *
+> + * Return: returns status of platform_driver_register
+> + */
+> +int dma_platform_driver_register(void);
+
+
+put empty line here.
+
+> +/**
+> + * dma_platform_driver_unregister - This will be invoked by module exit
+> + *
+> + * Return: returns void after unregustering platform driver
+> + */
+> +void dma_platform_driver_unregister(void);
+> +
+> +#endif
+> diff --git a/drivers/dma/xilinx/ps_pcie_main.c b/drivers/dma/xilinx/ps_pcie_main.c
+> new file mode 100644
+> index 0000000..4ccd8ef
+> --- /dev/null
+> +++ b/drivers/dma/xilinx/ps_pcie_main.c
+> @@ -0,0 +1,200 @@
+> +/*
+> + * XILINX PS PCIe driver
+> + *
+> + * Copyright (C) 2017 Xilinx, Inc. All rights reserved.
+> + *
+> + * Description
+> + * PS PCIe DMA is memory mapped DMA used to execute PS to PL transfers
+> + * on ZynqMP UltraScale+ Devices.
+> + * This PCIe driver creates a platform device with specific platform
+> + * info enabling creation of DMA device corresponding to the channel
+> + * information provided in the properties
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation
+> + */
+> +
+> +#include "ps_pcie.h"
+> +#include "../dmaengine.h"
+> +
+> +#define DRV_MODULE_NAME		  "ps_pcie_dma"
+> +
+> +static int ps_pcie_dma_probe(struct pci_dev *pdev,
+> +			     const struct pci_device_id *ent);
+> +static void ps_pcie_dma_remove(struct pci_dev *pdev);
+> +
+> +static u32 channel_properties_pcie_axi[] = {
+> +	(u32)(PCIE_AXI_DIRECTION), (u32)(NUMBER_OF_BUFFER_DESCRIPTORS),
+> +	(u32)(DEFAULT_DMA_QUEUES), (u32)(CHANNEL_COAELSE_COUNT),
+> +	(u32)(CHANNEL_POLL_TIMER_FREQUENCY) };
+> +
+> +static u32 channel_properties_axi_pcie[] = {
+> +	(u32)(AXI_PCIE_DIRECTION), (u32)(NUMBER_OF_BUFFER_DESCRIPTORS),
+> +	(u32)(DEFAULT_DMA_QUEUES), (u32)(CHANNEL_COAELSE_COUNT),
+> +	(u32)(CHANNEL_POLL_TIMER_FREQUENCY) };
+> +
+> +static struct property_entry generic_pcie_ep_property[] = {
+> +	PROPERTY_ENTRY_U32("numchannels", (u32)MAX_NUMBER_OF_CHANNELS),
+> +	PROPERTY_ENTRY_U32_ARRAY("ps_pcie_channel0",
+> +				 channel_properties_pcie_axi),
+> +	PROPERTY_ENTRY_U32_ARRAY("ps_pcie_channel1",
+> +				 channel_properties_axi_pcie),
+> +	PROPERTY_ENTRY_U32_ARRAY("ps_pcie_channel2",
+> +				 channel_properties_pcie_axi),
+> +	PROPERTY_ENTRY_U32_ARRAY("ps_pcie_channel3",
+> +				 channel_properties_axi_pcie),
+> +	{ },
+> +};
+> +
+> +static const struct platform_device_info xlnx_std_platform_dev_info = {
+> +	.name           = XLNX_PLATFORM_DRIVER_NAME,
+> +	.properties     = generic_pcie_ep_property,
+> +};
+> +
+> +/**
+> + * ps_pcie_dma_probe - Driver probe function
+> + * @pdev: Pointer to the pci_dev structure
+> + * @ent: pci device id
+> + *
+> + * Return: '0' on success and failure value on error
+> + */
+> +static int ps_pcie_dma_probe(struct pci_dev *pdev,
+> +			     const struct pci_device_id *ent)
+> +{
+> +	int err;
+> +	struct platform_device *platform_dev;
+> +	struct platform_device_info platform_dev_info;
+> +
+> +	dev_info(&pdev->dev, "PS PCIe DMA Driver probe\n");
+> +
+> +	err = pcim_enable_device(pdev);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "Cannot enable PCI device, aborting\n");
+> +		return err;
+> +	}
+> +
+> +	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
+> +	if (err) {
+> +		dev_info(&pdev->dev, "Cannot set 64 bit DMA mask\n");
+> +		err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+> +		if (err) {
+> +			dev_err(&pdev->dev, "DMA mask set error\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
+> +	if (err) {
+> +		dev_info(&pdev->dev, "Cannot set 64 bit consistent DMA mask\n");
+> +		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
+> +		if (err) {
+> +			dev_err(&pdev->dev, "Cannot set consistent DMA mask\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	pci_set_master(pdev);
+> +
+> +	/* For Root DMA platform device will be created through device tree */
+> +	if (pdev->vendor == PCI_VENDOR_ID_XILINX &&
+> +	    pdev->device == ZYNQMP_RC_DMA_DEVID)
+> +		return 0;
+> +
+> +	memcpy(&platform_dev_info, &xlnx_std_platform_dev_info,
+> +	       sizeof(xlnx_std_platform_dev_info));
+> +
+> +	/* Do device specific channel configuration changes to
+> +	 * platform_dev_info.properties if required
+> +	 * More information on channel properties can be found
+> +	 * at Documentation/devicetree/bindings/dma/xilinx/ps-pcie-dma.txt
+> +	 */
+> +
+> +	platform_dev_info.parent = &pdev->dev;
+> +	platform_dev_info.data = &pdev;
+> +	platform_dev_info.size_data = sizeof(struct pci_dev **);
+> +
+> +	platform_dev = platform_device_register_full(&platform_dev_info);
+> +	if (IS_ERR(platform_dev)) {
+> +		dev_err(&pdev->dev,
+> +			"Cannot create platform device, aborting\n");
+> +		return PTR_ERR(platform_dev);
+> +	}
+> +
+> +	pci_set_drvdata(pdev, platform_dev);
+> +
+> +	dev_info(&pdev->dev, "PS PCIe DMA driver successfully probed\n");
+> +
+> +	return 0;
+> +}
+> +
+> +static struct pci_device_id ps_pcie_dma_tbl[] = {
+> +	{ PCI_DEVICE(PCI_VENDOR_ID_XILINX, ZYNQMP_DMA_DEVID) },
+> +	{ PCI_DEVICE(PCI_VENDOR_ID_XILINX, ZYNQMP_RC_DMA_DEVID) },
+> +	{ }
+> +};
+> +
+> +static struct pci_driver ps_pcie_dma_driver = {
+> +	.name     = DRV_MODULE_NAME,
+> +	.id_table = ps_pcie_dma_tbl,
+> +	.probe    = ps_pcie_dma_probe,
+> +	.remove   = ps_pcie_dma_remove,
+> +};
+> +
+> +/**
+> + * ps_pcie_init - Driver init function
+> + *
+> + * Return: 0 on success. Non zero on failure
+> + */
+> +static int __init ps_pcie_init(void)
+> +{
+> +	int ret;
+> +
+> +	pr_info("%s init()\n", DRV_MODULE_NAME);
+> +
+> +	ret = pci_register_driver(&ps_pcie_dma_driver);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = dma_platform_driver_register();
+> +	if (ret)
+> +		pci_unregister_driver(&ps_pcie_dma_driver);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * ps_pcie_dma_remove - Driver remove function
+> + * @pdev: Pointer to the pci_dev structure
+> + *
+> + * Return: void
+> + */
+> +static void ps_pcie_dma_remove(struct pci_dev *pdev)
+> +{
+> +	struct platform_device *platform_dev;
+> +
+> +	platform_dev = (struct platform_device *)pci_get_drvdata(pdev);
+> +
+> +	if (platform_dev)
+> +		platform_device_unregister(platform_dev);
+> +}
+> +
+> +/**
+> + * ps_pcie_exit - Driver exit function
+> + *
+> + * Return: void
+> + */
+> +static void __exit ps_pcie_exit(void)
+> +{
+> +	pr_info("%s exit()\n", DRV_MODULE_NAME);
+> +
+> +	dma_platform_driver_unregister();
+> +	pci_unregister_driver(&ps_pcie_dma_driver);
+> +}
+> +
+> +module_init(ps_pcie_init);
+> +module_exit(ps_pcie_exit);
+> +
+> +MODULE_AUTHOR("Xilinx Inc");
+> +MODULE_DESCRIPTION("Xilinx PS PCIe DMA Driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/dma/ps_pcie_dma.h b/include/linux/dma/ps_pcie_dma.h
+> new file mode 100644
+> index 0000000..d11323a
+> --- /dev/null
+> +++ b/include/linux/dma/ps_pcie_dma.h
+> @@ -0,0 +1,69 @@
+> +/*
+> + * Xilinx PS PCIe DMA Engine support header file
+> + *
+> + * Copyright (C) 2017 Xilinx, Inc. All rights reserved.
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation
+> + */
+> +
+> +#ifndef __DMA_XILINX_PS_PCIE_H
+> +#define __DMA_XILINX_PS_PCIE_H
+> +
+> +#include <linux/dma-mapping.h>
+> +#include <linux/dmaengine.h>
+> +
+> +#define XLNX_PLATFORM_DRIVER_NAME "xlnx-platform-dma-driver"
+> +
+> +#define ZYNQMP_DMA_DEVID	(0xD024)
+> +#define ZYNQMP_RC_DMA_DEVID	(0xD021)
+
+
+Are these hardcoded? If yes, maybe we have better location where these
+should be put.
+
+
+> +
+> +#define MAX_ALLOWED_CHANNELS_IN_HW	4
+> +
+> +#define MAX_NUMBER_OF_CHANNELS	MAX_ALLOWED_CHANNELS_IN_HW
+> +
+> +#define DEFAULT_DMA_QUEUES	4
+> +#define TWO_DMA_QUEUES		2
+> +
+> +#define NUMBER_OF_BUFFER_DESCRIPTORS	1999
+> +#define MAX_DESCRIPTORS			65536
+> +
+> +#define CHANNEL_COAELSE_COUNT		0
+> +
+> +#define CHANNEL_POLL_TIMER_FREQUENCY	1000 /* in milli seconds */
+> +
+> +#define PCIE_AXI_DIRECTION	DMA_TO_DEVICE
+> +#define AXI_PCIE_DIRECTION	DMA_FROM_DEVICE
+> +
+> +/**
+> + * struct BAR_PARAMS - PCIe Bar Parameters
+> + * @BAR_PHYS_ADDR: PCIe BAR Physical address
+> + * @BAR_LENGTH: Length of PCIe BAR
+> + * @BAR_VIRT_ADDR: Virtual Address to access PCIe BAR
+> + */
+> +struct BAR_PARAMS {
+> +	dma_addr_t BAR_PHYS_ADDR; /**< Base physical address of BAR memory */
+> +	unsigned long BAR_LENGTH; /**< Length of BAR memory window */
+> +	void *BAR_VIRT_ADDR;      /**< Virtual Address of mapped BAR memory */
+> +};
+> +
+> +/**
+> + * struct ps_pcie_dma_channel_match - Match structure for dma clients
+> + * @pci_vendorid: PCIe Vendor id of PS PCIe DMA device
+> + * @pci_deviceid: PCIe Device id of PS PCIe DMA device
+> + * @board_number: Unique id to identify individual device in a system
+> + * @channel_number: Unique channel number of the device
+> + * @direction: DMA channel direction
+> + * @bar_params: Pointer to BAR_PARAMS for accessing application specific data
+> + */
+> +struct ps_pcie_dma_channel_match {
+> +	u16 pci_vendorid;
+> +	u16 pci_deviceid;
+> +	u16 board_number;
+> +	u16 channel_number;
+> +	enum dma_data_direction direction;
+> +	struct BAR_PARAMS *bar_params;
+> +};
+> +
+> +#endif
+> 
+
+Thanks,
+Michal
+
+
 -- 
-2.7.4
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170920/42035e91/attachment.sig>
