@@ -1,87 +1,94 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Sep 2017 09:51:05 +0200
-Subject: [PATCH] arm64: dt marvell: extend AP806 system controller size
-In-Reply-To: <20170919160813.yz4ez2hsuaejbf4t@tarshish> (Baruch Siach's
- message of "Tue, 19 Sep 2017 19:08:13 +0300")
-References: <d230651ed28aa4344bab7e13e9964d69673ecace.1505461807.git.baruch@tkos.co.il>
- <877ewusr2h.fsf@free-electrons.com>
- <20170919160813.yz4ez2hsuaejbf4t@tarshish>
-Message-ID: <87shfhreom.fsf@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 20 Sep 2017 09:52:23 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 1/6] dt-bindings: update the
+ Allwinner GPADC device tree binding for H3
+In-Reply-To: <e73ead447af89031749e85207cac1e69@aosc.io>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-2-icenowy@aosc.io>
+ <20170918073336.j7finend3g76chsu@flea.lan>
+ <310CE549-B8CE-4C0C-95B1-B545E38BDAF5@aosc.io>
+ <20170918083045.7bfiialtbm7w6i7j@flea.lan>
+ <e73ead447af89031749e85207cac1e69@aosc.io>
+Message-ID: <20170920075223.jaeswlhcqgu4yhse@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
- 
- On mar., sept. 19 2017, Baruch Siach <baruch@tkos.co.il> wrote:
+On Mon, Sep 18, 2017 at 03:47:25PM +0000, icenowy at aosc.io wrote:
+> ? 2017-09-18 16:30?Maxime Ripard ???
+> > On Mon, Sep 18, 2017 at 03:36:43PM +0800, Icenowy Zheng wrote:
+> > > ? 2017?9?18? GMT+08:00 ??3:33:36, Maxime Ripard
+> > > <maxime.ripard@free-electrons.com> ??:
+> > > >On Thu, Sep 14, 2017 at 10:52:46PM +0800, Icenowy Zheng wrote:
+> > > >> Allwinner H3 features a thermal sensor like the one in A33, but has
+> > > >its
+> > > >> register re-arranged, the clock divider moved to CCU (originally the
+> > > >> clock divider is in ADC) and added a pair of bus clock and reset.
+> > > >>
+> > > >> Update the binding document to cover H3.
+> > > >>
+> > > >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > > >> ---
+> > > >> Changes in v4:
+> > > >> - Add nvmem calibration data (not yet used by the driver)
+> > > >> Changes in v3:
+> > > >> - Clock name changes.
+> > > >> - Example node name changes.
+> > > >> - Add interupts (not yet used by the driver).
+> > > >>
+> > > >>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30
+> > > >++++++++++++++++++++--
+> > > >>  1 file changed, 28 insertions(+), 2 deletions(-)
+> > > >>
+> > > >> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > >b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > >> index badff3611a98..6c470d584bf9 100644
+> > > >> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > >> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > >> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can also
+> > > >act as a thermal sensor
+> > > >>  and sometimes as a touchscreen controller.
+> > > >>
+> > > >>  Required properties:
+> > > >> -  - compatible: "allwinner,sun8i-a33-ths",
+> > > >> +  - compatible: must contain one of the following compatibles:
+> > > >> +		- "allwinner,sun8i-a33-ths"
+> > > >> +		- "allwinner,sun8i-h3-ths"
+> > > >>    - reg: mmio address range of the chip,
+> > > >>    - #thermal-sensor-cells: shall be 0,
+> > > >>    - #io-channel-cells: shall be 0,
+> > > >>
+> > > >> -Example:
+> > > >> +Optional properties:
+> > > >> +  - nvmem-cells: A phandle to the calibration data provided by a
+> > > >nvmem device.
+> > > >> +                 If unspecified default values shall be used.
+> > > >> +  - nvmem-cell-names: Should be "calibration-data"
+> > > >
+> > > >I'd prefer to have which sensor it applies to here. It wouldn't change
+> > > >anything for the H3, but it definitely does for example for the A83t
+> > > >that has two sensors, one for each cluster, and one for the GPU, each
+> > > >with calibration data.
+> > > >
+> > > >What about cluster0-calibration?
+> 
+> I prefer sensor0-calibration to sensor3-calibration now.
+> (Theortically the new generation THS can support up to 4 sensors)
 
-> Hi Gregory,
->
-> On Tue, Sep 19, 2017 at 04:25:58PM +0200, Gregory CLEMENT wrote:
->>  On ven., sept. 15 2017, Baruch Siach <baruch@tkos.co.il> wrote:
->> 
->> > Extend the container size to 0x2000 to include the gpio controller at
->> > offset 0x1040.
->> >
->> > While at it, add start address notation to the gpio node name to match
->> > its 'offset' property.
->> >
->> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->> 
->> I made a quick test on a mcbin and I confirm that the watchdog is here
->> and usable.
->> 
->> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> and 
->> Applied on mvebu/dt64
->
-> This is meant to be a reply to https://patchwork.kernel.org/patch/9947525/, 
-> right?
+The mapping that explains what sensor0 means can change in the
+future. It's better to be explicit here, and just say upfront what
+it's about.
 
-Yes!
-Sorry for hte confusion.
-
->
-> Anyway, I see the right patch[1] at mvebu/dt64.
->
-> Thanks,
-> baruch
->
-> [1] http://git.infradead.org/linux-mvebu.git/commitdiff/e34ffe32f6e7ae9191d14226ff9d8c0c47400a71
->
->> > ---
->> >  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++--
->> >  1 file changed, 2 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->> > index 4d360713ed12..30d48ecf46e0 100644
->> > --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->> > +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->> > @@ -254,7 +254,7 @@
->> >  
->> >  			ap_syscon: system-controller at 6f4000 {
->> >  				compatible = "syscon", "simple-mfd";
->> > -				reg = <0x6f4000 0x1000>;
->> > +				reg = <0x6f4000 0x2000>;
->> >  
->> >  				ap_clk: clock {
->> >  					compatible = "marvell,ap806-clock";
->> > @@ -265,7 +265,7 @@
->> >  					compatible = "marvell,ap806-pinctrl";
->> >  				};
->> >  
->> > -				ap_gpio: gpio {
->> > +				ap_gpio: gpio at 1040 {
->> >  					compatible = "marvell,armada-8k-gpio";
->> >  					offset = <0x1040>;
->> >  					ngpios = <20>;
->
-> -- 
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Maxime
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170920/2bd99e95/attachment.sig>
