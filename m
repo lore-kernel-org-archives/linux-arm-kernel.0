@@ -1,44 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Sep 2017 18:37:16 +0200
-Subject: [PATCH 1/2] bus: mbus: fix window size calculation for 4GB windows
-In-Reply-To: <87wp4urbp5.fsf@free-electrons.com>
-References: <20170828152517.24506-1-jlu@pengutronix.de>
- <20170828152517.24506-2-jlu@pengutronix.de>
- <87wp4urbp5.fsf@free-electrons.com>
-Message-ID: <20170920163716.l6kpf56ig5gfqzbi@pengutronix.de>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Wed, 20 Sep 2017 18:48:34 +0200
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: add HDMI CEC pinctrl
+Message-ID: <8c5150c5-3aff-4068-a548-05eb02b73138@rwthex-s3-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 04:43:18PM +0200, Gregory CLEMENT wrote:
-> Hi Jan,
->  
->  On lun., ao?t 28 2017, Jan Luebbe <jlu@pengutronix.de> wrote:
-> 
-> > At least the Armada XP SoC supports 4GB on a single DRAM window. Because
-> > the size register values contain the actual size - 1, the MSB is set in
-> > that case. For example, the SDRAM window's control register's value is
-> > 0xffffffe1 for 4GB (bits 31 to 24 contain the size).
-> >
-> > The MBUS driver reads back each window's size from registers and
-> > calculates the actual size as (control_reg | ~DDR_SIZE_MASK) + 1, which
-> > overflows for 32 bit values, resulting in other miscalculations further
-> > on (a bad RAM window for the CESA crypto engine calculated by
-> > mvebu_mbus_setup_cpu_target_nooverlap() in my case).
-> >
-> > This patch changes the type in 'struct mbus_dram_window' from u32 to
-> > u64, which allows us to keep using the same register calculation code in
-> > most MBUS-using drivers (which calculate ->size - 1 again).
-> >
-> 
-> Your patch looks good, but as it is a fix we should also apply it on
-> stable, could you provide the commit to fix?
+From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-It was there just from the start: the .c file was introduced in
-v3.10-rc1~64^2~1^2~8^2~2 and already did that 32 bit calculus.
+On the Utilite Pro the CEC line is wired up to the HDMI connector.
+Add the required pinctrl setting.
 
-Best regards
-Uwe
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+---
+ arch/arm/boot/dts/imx6q-utilite-pro.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+index 16d5be1aeb3c..f5d9c34b0d39 100644
+--- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
++++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+@@ -188,6 +188,8 @@
+ /delete-node/&hdmi_mux_1;
+ 
+ &hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hdmicec>;
+ 	ddc-i2c-bus = <&i2c2>;
+ 	status = "okay";
+ };
+@@ -211,6 +213,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_hdmicec: hdmicecgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
++		>;
++	};
++
+ 	pinctrl_hpd: hpdgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_4__GPIO1_IO04 0x1b0b0
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.14.1
