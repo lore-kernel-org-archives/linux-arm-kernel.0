@@ -1,468 +1,239 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Wed, 20 Sep 2017 11:03:39 +0800
-Subject: [PATCH 2/3] drm/rockchip: Add support for Rockchip Soc RGB output
- interface
-In-Reply-To: <20170919230243.eh2algukl7bn7cr3@art_vandelay>
-References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
- <1505360606-317-1-git-send-email-hjc@rock-chips.com>
- <20170919230243.eh2algukl7bn7cr3@art_vandelay>
-Message-ID: <93be3e6d-e0e1-87f2-e742-f08440a12659@rock-chips.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 19 Sep 2017 22:21:06 -0500
+Subject: [PATCH v2] irqchip/gicv3: Add support for Range Selector (RS) feature
+Message-ID: <1505877666-15497-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi sean,
-     Thanks for your review.
+A new feature Range Selector (RS) has been added to GIC specification
+in order to support more than 16 CPUs at affinity level 0. New fields
+are introduced in SGI system registers (ICC_SGI0R_EL1, ICC_SGI1R_EL1
+and ICC_ASGI1R_EL1) to relax an artificial limit of 16 at level 0.
 
-? 2017/9/20 7:02, Sean Paul ??:
-> On Thu, Sep 14, 2017 at 11:43:23AM +0800, Sandy Huang wrote:
->> Like rockchip rv1108 crtc can directly output parallel and serial
->> RGB data to panel or conversion chip, so we add this driver to
->> probe encoder and connector.
->>
->> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->> ---
->>   drivers/gpu/drm/rockchip/Kconfig            |   9 +
->>   drivers/gpu/drm/rockchip/Makefile           |   1 +
->>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   2 +
->>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 +
->>   drivers/gpu/drm/rockchip/rockchip_rgb.c     | 327 ++++++++++++++++++++++++++++
->>   5 files changed, 340 insertions(+)
->>   create mode 100644 drivers/gpu/drm/rockchip/rockchip_rgb.c
->>
->> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
->> index 0c31f0a..ff1c781 100644
->> --- a/drivers/gpu/drm/rockchip/Kconfig
->> +++ b/drivers/gpu/drm/rockchip/Kconfig
->> @@ -8,6 +8,7 @@ config DRM_ROCKCHIP
->>   	select DRM_ANALOGIX_DP if ROCKCHIP_ANALOGIX_DP
->>   	select DRM_DW_HDMI if ROCKCHIP_DW_HDMI
->>   	select DRM_MIPI_DSI if ROCKCHIP_DW_MIPI_DSI
->> +	select DRM_RGB if ROCKCHIP_RGB
->>   	select SND_SOC_HDMI_CODEC if ROCKCHIP_CDN_DP && SND_SOC
->>   	help
->>   	  Choose this option if you have a Rockchip soc chipset.
->> @@ -65,4 +66,12 @@ config ROCKCHIP_LVDS
->>   	  Rockchip rk3288 SoC has LVDS TX Controller can be used, and it
->>   	  support LVDS, rgb, dual LVDS output mode. say Y to enable its
->>   	  driver.
->> +
->> +config ROCKCHIP_RGB
->> +	bool "Rockchip RGB support"
->> +	help
->> +	  Choose this option to enable support for Rockchip RGB output.
->> +	  Like Rockchip rv1108 SoC CRTC can directly output parallel and
-> 
-> The wording here is a little awkward. Perhaps change to:
-> 
-> Some Rockchip CRTCs, like rv1108, can directly output parallel and
-> ...
-> 
-ok, i will update at next version.
+- A new RSS field in ICC_CTLR_EL3, ICC_CTLR_EL1 and ICV_CTLR_EL1:
+  [18] - Range Selector Support (RSS)
+  0b0 = Targeted SGIs with affinity level 0 values of 0-15 are supported.
+  0b1 = Targeted SGIs with affinity level 0 values of 0-255 are supported.
 
->> +	  serial RGB format to panel or connect to a conversion chip.
->> +	  say Y to enable its driver.
->>   endif
->> diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
->> index a881d2c..f32a17f 100644
->> --- a/drivers/gpu/drm/rockchip/Makefile
->> +++ b/drivers/gpu/drm/rockchip/Makefile
->> @@ -13,5 +13,6 @@ rockchipdrm-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
->>   rockchipdrm-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
->>   rockchipdrm-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
->>   rockchipdrm-$(CONFIG_ROCKCHIP_LVDS) += rockchip_lvds.o
->> +rockchipdrm-$(CONFIG_ROCKCHIP_RGB) += rockchip_rgb.o
->>   
->>   obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
->> index 082c251..36e602a 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
->> @@ -449,6 +449,8 @@ static int __init rockchip_drm_init(void)
->>   				CONFIG_ROCKCHIP_LVDS);
->>   	ADD_ROCKCHIP_SUB_DRIVER(rockchip_dp_driver,
->>   				CONFIG_ROCKCHIP_ANALOGIX_DP);
->> +	ADD_ROCKCHIP_SUB_DRIVER(rockchip_rgb_driver,
->> +				CONFIG_ROCKCHIP_RGB);
->>   	ADD_ROCKCHIP_SUB_DRIVER(cdn_dp_driver, CONFIG_ROCKCHIP_CDN_DP);
->>   	ADD_ROCKCHIP_SUB_DRIVER(dw_hdmi_rockchip_pltfm_driver,
->>   				CONFIG_ROCKCHIP_DW_HDMI);
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> index 498dfbc..6b0ec7e 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> @@ -70,5 +70,6 @@ extern struct platform_driver dw_mipi_dsi_driver;
->>   extern struct platform_driver inno_hdmi_driver;
->>   extern struct platform_driver rockchip_dp_driver;
->>   extern struct platform_driver rockchip_lvds_driver;
->> +extern struct platform_driver rockchip_rgb_driver;
->>   extern struct platform_driver vop_platform_driver;
->>   #endif /* _ROCKCHIP_DRM_DRV_H_ */
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_rgb.c b/drivers/gpu/drm/rockchip/rockchip_rgb.c
->> new file mode 100644
->> index 0000000..0f0e6b464
->> --- /dev/null
->> +++ b/drivers/gpu/drm/rockchip/rockchip_rgb.c
->> @@ -0,0 +1,327 @@
->> +/*
->> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
->> + * Author:
->> + *      Sandy Huang <hjc@rock-chips.com>
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <drm/drmP.h>
->> +#include <drm/drm_atomic_helper.h>
->> +#include <drm/drm_crtc_helper.h>
->> +#include <drm/drm_dp_helper.h>
->> +#include <drm/drm_panel.h>
->> +#include <drm/drm_of.h>
->> +
->> +#include <linux/component.h>
->> +#include <linux/of_graph.h>
->> +
->> +#include "rockchip_drm_drv.h"
->> +#include "rockchip_drm_vop.h"
->> +
->> +#define connector_to_rgb(c) container_of(c, struct rockchip_rgb, connector)
->> +#define encoder_to_rgb(c) container_of(c, struct rockchip_rgb, encoder)
->> +
->> +struct rockchip_rgb {
->> +	struct device *dev;
->> +	struct drm_device *drm_dev;
->> +	struct drm_panel *panel;
->> +	struct drm_bridge *bridge;
->> +	struct drm_connector connector;
->> +	struct drm_encoder encoder;
->> +	struct dev_pin_info *pins;
->> +	int output_mode;
->> +};
->> +
->> +static inline int name_to_output_mode(const char *s)
->> +{
->> +	if (strncmp(s, "p888", 4) == 0)
->> +		return ROCKCHIP_OUT_MODE_P888;
->> +	else if (strncmp(s, "p666", 4) == 0)
->> +		return ROCKCHIP_OUT_MODE_P666;
->> +	else if (strncmp(s, "p565", 4) == 0)
->> +		return ROCKCHIP_OUT_MODE_P565;
->> +	else if (strncmp(s, "s888", 4) == 0)
->> +		return ROCKCHIP_OUT_MODE_S888;
->> +	else if (strncmp(s, "s888_dummy", 10) == 0)
->> +		return ROCKCHIP_OUT_MODE_S888_DUMMY;
-> 
-> Instead of hardcoding the string lengths, try:
-> 
->          static const struct {
->                  const char *name;
->                  int format;
->          } formats[] = {
->                  { "p888", ROCKCHIP_OUT_MODE_P888 },
->                  { "p666", ROCKCHIP_OUT_MODE_P666 },
->                  { "p565", ROCKCHIP_OUT_MODE_P565 },
->                  { "s888", ROCKCHIP_OUT_MODE_S888 },
->                  { "s888_dummy", ROCKCHIP_OUT_MODE_S888_DUMMY }
->          };
->          int i;
-> 
->          for (i = 0; i < ARRAY_SIZE(formats); i++)
->                  if (!strncmp(s, formats[i].name, strlen(formats[i].name)))
->                          return formats[i].format;
-> 
-> Yes, strlen isn't as performant, but this code only runs once and it's safer.
-> 
-ok, i will update at next version.
->> +
->> +	return -EINVAL;
->> +}
->> +
->> +static const struct drm_connector_funcs rockchip_rgb_connector_funcs = {
->> +	.fill_modes = drm_helper_probe_single_connector_modes,
->> +	.destroy = drm_connector_cleanup,
->> +	.reset = drm_atomic_helper_connector_reset,
->> +	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
->> +	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
->> +};
->> +
->> +static int rockchip_rgb_connector_get_modes(struct drm_connector *connector)
->> +{
->> +	struct rockchip_rgb *rgb = connector_to_rgb(connector);
->> +	struct drm_panel *panel = rgb->panel;
->> +
->> +	return drm_panel_get_modes(panel);
->> +}
->> +
->> +static const
->> +struct drm_connector_helper_funcs rockchip_rgb_connector_helper_funcs = {
->> +	.get_modes = rockchip_rgb_connector_get_modes,
->> +};
->> +
->> +static void rockchip_rgb_encoder_enable(struct drm_encoder *encoder)
->> +{
->> +	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
->> +
->> +	drm_panel_prepare(rgb->panel);
->> +	/* iomux to LCD data/sync mode */
->> +	if (rgb->pins && !IS_ERR(rgb->pins->default_state))
->> +		pinctrl_select_state(rgb->pins->p, rgb->pins->default_state);
->> +
->> +	drm_panel_enable(rgb->panel);
->> +}
->> +
->> +static void rockchip_rgb_encoder_disable(struct drm_encoder *encoder)
->> +{
->> +	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
->> +
->> +	drm_panel_disable(rgb->panel);
->> +	drm_panel_unprepare(rgb->panel);
->> +}
->> +
->> +static int
->> +rockchip_rgb_encoder_atomic_check(struct drm_encoder *encoder,
->> +				   struct drm_crtc_state *crtc_state,
->> +				   struct drm_connector_state *conn_state)
->> +{
->> +	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
->> +	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
->> +
->> +	s->output_mode = rgb->output_mode;
->> +	s->output_type = DRM_MODE_CONNECTOR_LVDS;
->> +
->> +	return 0;
->> +}
->> +
->> +static const
->> +struct drm_encoder_helper_funcs rockchip_rgb_encoder_helper_funcs = {
->> +	.enable = rockchip_rgb_encoder_enable,
->> +	.disable = rockchip_rgb_encoder_disable,
->> +	.atomic_check = rockchip_rgb_encoder_atomic_check,
->> +};
->> +
->> +static const struct drm_encoder_funcs rockchip_rgb_encoder_funcs = {
->> +	.destroy = drm_encoder_cleanup,
->> +};
->> +
->> +static const struct of_device_id rockchip_rgb_dt_ids[] = {
->> +	{
->> +		.compatible = "rockchip,rv1108-rgb",
->> +	},
->> +	{}
->> +};
->> +MODULE_DEVICE_TABLE(of, rockchip_rgb_dt_ids);
->> +
->> +static int rockchip_rgb_bind(struct device *dev, struct device *master,
->> +			     void *data)
->> +{
->> +	struct rockchip_rgb *rgb = dev_get_drvdata(dev);
->> +	struct drm_device *drm_dev = data;
->> +	struct drm_encoder *encoder;
->> +	struct drm_connector *connector;
->> +	struct device_node *remote = NULL;
->> +	struct device_node  *port, *endpoint;
->> +	u32 endpoint_id;
->> +	const char *name;
->> +	int ret;
->> +
->> +	rgb->drm_dev = drm_dev;
->> +	port = of_graph_get_port_by_id(dev->of_node, 1);
->> +	if (!port) {
->> +		DRM_DEV_ERROR(dev,
->> +			      "can't found port point, please init rgb panel port!\n");
->> +		return -EINVAL;
->> +	}
->> +	for_each_child_of_node(port, endpoint) {
->> +		of_property_read_u32(endpoint, "reg", &endpoint_id);
->> +		ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
->> +						  &rgb->panel, &rgb->bridge);
->> +		if (!ret)
->> +			break;
->> +	}
->> +	if (ret) {
->> +		DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
->> +		ret  = -EPROBE_DEFER;
->> +		goto err_put_port;
->> +	}
->> +	if (rgb->panel)
->> +		remote = rgb->panel->dev->of_node;
->> +	else
->> +		remote = rgb->bridge->of_node;
->> +	if (of_property_read_string(dev->of_node, "rockchip,rgb-mode", &name))
->> +		/* default set it as output mode P888 */
->> +		rgb->output_mode = ROCKCHIP_OUT_MODE_P888;
->> +	else
->> +		rgb->output_mode = name_to_output_mode(name);
->> +	if (rgb->output_mode < 0) {
->> +		DRM_DEV_ERROR(dev, "invalid rockchip,rgb-mode [%s]\n", name);
->> +		ret = rgb->output_mode;
->> +		goto err_put_remote;
->> +	}
->> +
->> +	encoder = &rgb->encoder;
->> +	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
->> +							     dev->of_node);
->> +
->> +	ret = drm_encoder_init(drm_dev, encoder, &rockchip_rgb_encoder_funcs,
->> +			       DRM_MODE_ENCODER_NONE, NULL);
->> +	if (ret < 0) {
->> +		DRM_DEV_ERROR(drm_dev->dev,
->> +			      "failed to initialize encoder: %d\n", ret);
->> +		goto err_put_remote;
->> +	}
->> +
->> +	drm_encoder_helper_add(encoder, &rockchip_rgb_encoder_helper_funcs);
->> +
->> +	if (rgb->panel) {
->> +		connector = &rgb->connector;
->> +		connector->dpms = DRM_MODE_DPMS_OFF;
->> +		ret = drm_connector_init(drm_dev, connector,
->> +					 &rockchip_rgb_connector_funcs,
->> +					 DRM_MODE_CONNECTOR_Unknown);
->> +		if (ret < 0) {
->> +			DRM_DEV_ERROR(drm_dev->dev,
->> +				      "failed to initialize connector: %d\n",
->> +				      ret);
->> +			goto err_free_encoder;
->> +		}
->> +
->> +		drm_connector_helper_add(connector,
->> +					 &rockchip_rgb_connector_helper_funcs);
->> +
->> +		ret = drm_mode_connector_attach_encoder(connector, encoder);
->> +		if (ret < 0) {
->> +			DRM_DEV_ERROR(drm_dev->dev,
->> +				      "failed to attach encoder: %d\n", ret);
->> +			goto err_free_connector;
->> +		}
->> +
->> +		ret = drm_panel_attach(rgb->panel, connector);
->> +		if (ret < 0) {
->> +			DRM_DEV_ERROR(drm_dev->dev,
->> +				      "failed to attach panel: %d\n", ret);
->> +			goto err_free_connector;
->> +		}
->> +	} else {
->> +		rgb->bridge->encoder = encoder;
->> +		ret = drm_bridge_attach(encoder, rgb->bridge, NULL);
->> +		if (ret) {
->> +			DRM_DEV_ERROR(drm_dev->dev,
->> +				      "failed to attach bridge: %d\n", ret);
->> +			goto err_free_encoder;
->> +		}
->> +		encoder->bridge = rgb->bridge;
->> +	}
->> +
->> +	of_node_put(remote);
->> +	of_node_put(port);
->> +
->> +	return 0;
->> +
->> +err_free_connector:
->> +	drm_connector_cleanup(connector);
->> +err_free_encoder:
->> +	drm_encoder_cleanup(encoder);
->> +err_put_remote:
->> +	of_node_put(remote);
->> +err_put_port:
->> +	of_node_put(port);
->> +
->> +	return ret;
->> +}
->> +
->> +static void rockchip_rgb_unbind(struct device *dev, struct device *master,
->> +				void *data)
->> +{
->> +	struct rockchip_rgb *rgb = dev_get_drvdata(dev);
->> +
->> +	rockchip_rgb_encoder_disable(&rgb->encoder);
->> +	if (rgb->panel)
->> +		drm_panel_detach(rgb->panel);
->> +	drm_connector_cleanup(&rgb->connector);
->> +	drm_encoder_cleanup(&rgb->encoder);
->> +}
->> +
->> +static const struct component_ops rockchip_rgb_component_ops = {
->> +	.bind = rockchip_rgb_bind,
->> +	.unbind = rockchip_rgb_unbind,
->> +};
->> +
->> +static int rockchip_rgb_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct rockchip_rgb *rgb;
->> +	const struct of_device_id *match;
->> +	int ret;
->> +
->> +	if (!dev->of_node)
->> +		return -ENODEV;
->> +
->> +	rgb = devm_kzalloc(&pdev->dev, sizeof(*rgb), GFP_KERNEL);
->> +	if (!rgb)
->> +		return -ENOMEM;
->> +
->> +	rgb->dev = dev;
->> +	match = of_match_node(rockchip_rgb_dt_ids, dev->of_node);
->> +	if (!match)
->> +		return -ENODEV;
->> +
->> +	rgb->pins = devm_kzalloc(rgb->dev, sizeof(*rgb->pins), GFP_KERNEL);
->> +	if (!rgb->pins)
->> +		return -ENOMEM;
-> 
-> Can you please log errors for all of these failing conditions?
-> 
-ok, i will add error log for this return, except the devm_kzalloc error.
+- A new RS field in ICC_SGI0R_EL1, ICC_SGI1R_EL1 and ICC_ASGI1R_EL1:
+  [47:44] - RangeSelector (RS) which group of 16 TargetList[n] field
+            TargetList[n] represents aff0 value ((RS*16)+n)
+            When ICC_CTLR_EL3.RSS==0 or ICC_CTLR_EL1.RSS==0, RS is RES0.
 
->> +	rgb->pins->p = devm_pinctrl_get(rgb->dev);
->> +	if (IS_ERR(rgb->pins->p)) {
->> +		DRM_DEV_ERROR(dev, "no pinctrl handle\n");
->> +		devm_kfree(rgb->dev, rgb->pins);
->> +		rgb->pins = NULL;
->> +	} else {
->> +		rgb->pins->default_state =
->> +			pinctrl_lookup_state(rgb->pins->p, "lcdc");
->> +		if (IS_ERR(rgb->pins->default_state)) {
->> +			DRM_DEV_ERROR(dev, "no default pinctrl state\n");
->> +			devm_kfree(rgb->dev, rgb->pins);
->> +			rgb->pins = NULL;
->> +		}
->> +	}
->> +
->> +	dev_set_drvdata(dev, rgb);
->> +	ret = component_add(&pdev->dev, &rockchip_rgb_component_ops);
->> +	if (ret < 0)
->> +		DRM_DEV_ERROR(dev, "failed to add component\n");
->> +
->> +	return ret;
->> +}
->> +
->> +static int rockchip_rgb_remove(struct platform_device *pdev)
->> +{
->> +	component_del(&pdev->dev, &rockchip_rgb_component_ops);
->> +
->> +	return 0;
->> +}
->> +
->> +struct platform_driver rockchip_rgb_driver = {
->> +	.probe = rockchip_rgb_probe,
->> +	.remove = rockchip_rgb_remove,
->> +	.driver = {
->> +		   .name = "rockchip-rgb",
->> +		   .of_match_table = of_match_ptr(rockchip_rgb_dt_ids),
->> +	},
->> +};
->> -- 
->> 2.7.4
->>
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
+- A new RSS field in GICD_TYPER:
+  [26] - Range Selector Support (RSS)
+  0b0 = Targeted SGIs with affinity level 0 values of 0-15 are supported.
+  0b1 = Targeted SGIs with affinity level 0 values of 0-255 are supported.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v1:
+   - Addrssed Marc's review comments on RSS validation checks.
+   - Apply code changes to gic_compute_target_list() to support RSS feature.
+   - Fix the compilation on ARM32.
+
+ arch/arm/include/asm/arch_gicv3.h   |  5 ++++
+ arch/arm64/include/asm/arch_gicv3.h |  5 ++++
+ drivers/irqchip/irq-gic-v3.c        | 60 +++++++++++++++++++++++++++++++------
+ include/linux/irqchip/arm-gic-v3.h  |  4 +++
+ 4 files changed, 65 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 2747590..4a3b3c2 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -196,6 +196,11 @@ static inline void gic_write_ctlr(u32 val)
+ 	isb();
+ }
+ 
++static inline u32 gic_read_ctlr(void)
++{
++	return read_sysreg(ICC_CTLR);
++}
++
+ static inline void gic_write_grpen1(u32 val)
+ {
+ 	write_sysreg(val, ICC_IGRPEN1);
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 8cef47f..aa2c795 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -87,6 +87,11 @@ static inline void gic_write_ctlr(u32 val)
+ 	isb();
+ }
+ 
++static inline u32 gic_read_ctlr(void)
++{
++	return read_sysreg_s(SYS_ICC_CTLR_EL1);
++}
++
+ static inline void gic_write_grpen1(u32 val)
+ {
+ 	write_sysreg_s(val, SYS_ICC_IGRPEN1_EL1);
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 984c3ec..2d56f2b 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -55,6 +55,7 @@ struct gic_chip_data {
+ 	struct irq_domain	*domain;
+ 	u64			redist_stride;
+ 	u32			nr_redist_regions;
++	bool			has_rss;
+ 	unsigned int		irq_nr;
+ 	struct partition_desc	*ppi_descs[16];
+ };
+@@ -63,7 +64,9 @@ struct gic_chip_data {
+ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
+ 
+ static struct gic_kvm_info gic_v3_kvm_info;
++static DEFINE_PER_CPU(bool, has_rss);
+ 
++#define MPIDR_RS(mpidr)			(((mpidr) & 0xF0UL) >> 4)
+ #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
+ #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
+ #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() + SZ_64K)
+@@ -483,6 +486,10 @@ static int gic_populate_rdist(void)
+ 
+ static void gic_cpu_sys_reg_init(void)
+ {
++	int i, cpu = smp_processor_id();
++	u64 mpidr = cpu_logical_map(cpu);
++	bool need_rss = false;
++
+ 	/*
+ 	 * Need to check that the SRE bit has actually been set. If
+ 	 * not, it means that SRE is disabled at EL2. We're going to
+@@ -514,6 +521,40 @@ static void gic_cpu_sys_reg_init(void)
+ 
+ 	/* ... and let's hit the road... */
+ 	gic_write_grpen1(1);
++
++	/* Keep the RSS capability status in per_cpu variable */
++	per_cpu(has_rss, cpu) = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
++
++	/* Check all the CPUs have capable of sending SGIs to other CPUs */
++	for_each_online_cpu(i) {
++		if (cpu == i)
++			continue;
++
++		if (MPIDR_RS(mpidr) && (!per_cpu(has_rss, i))) {
++			pr_crit("CPU%d has no RSS, SGIs aren't reachable to CPU%d",
++				i, cpu);
++			continue;
++		}
++
++		if (MPIDR_RS(cpu_logical_map(i)) && (!per_cpu(has_rss, cpu))) {
++			pr_crit("CPU%d has no RSS, SGIs aren't reachable to CPU%d",
++				cpu, i);
++			continue;
++		}
++
++		if (MPIDR_RS(mpidr) || MPIDR_RS(cpu_logical_map(i)))
++			need_rss = true;
++	}
++
++	/**
++	 * GIC spec says, when ICC_CTLR_EL1.RSS==1 and GICD_TYPER.RSS==0,
++	 * writing ICC_ASGI1R_EL1 register with RS != 0 is a CONSTRAINED
++	 * UNPREDICTABLE choice of :
++	 *   - The write is ignored.
++	 *   - The RS field is treated as 0.
++	 */
++	if (need_rss && (!gic_data.has_rss))
++		pr_crit("RSS support is required but GICD doesn't support it\n");
+ }
+ 
+ static int gic_dist_supports_lpis(void)
+@@ -548,6 +589,9 @@ static void gic_cpu_init(void)
+ 
+ #ifdef CONFIG_SMP
+ 
++#define MPIDR_TO_SGI_RS(mpidr)	(MPIDR_RS(mpidr) << ICC_SGI1R_RS_SHIFT)
++#define MPIDR_TO_SGI_CLUSTER_ID(mpidr)	(mpidr & ~0xFUL)
++
+ static int gic_starting_cpu(unsigned int cpu)
+ {
+ 	gic_cpu_init();
+@@ -562,13 +606,6 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+ 	u16 tlist = 0;
+ 
+ 	while (cpu < nr_cpu_ids) {
+-		/*
+-		 * If we ever get a cluster of more than 16 CPUs, just
+-		 * scream and skip that CPU.
+-		 */
+-		if (WARN_ON((mpidr & 0xff) >= 16))
+-			goto out;
+-
+ 		tlist |= 1 << (mpidr & 0xf);
+ 
+ 		next_cpu = cpumask_next(cpu, mask);
+@@ -578,7 +615,7 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+ 
+ 		mpidr = cpu_logical_map(cpu);
+ 
+-		if (cluster_id != (mpidr & ~0xffUL)) {
++		if (cluster_id != MPIDR_TO_SGI_CLUSTER_ID(mpidr)) {
+ 			cpu--;
+ 			goto out;
+ 		}
+@@ -600,6 +637,7 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
+ 	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
+ 	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
+ 	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
++	       MPIDR_TO_SGI_RS(cluster_id)		|
+ 	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
+ 
+ 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+@@ -620,7 +658,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	smp_wmb();
+ 
+ 	for_each_cpu(cpu, mask) {
+-		unsigned long cluster_id = cpu_logical_map(cpu) & ~0xffUL;
++		u64 cluster_id = MPIDR_TO_SGI_CLUSTER_ID(cpu_logical_map(cpu));
+ 		u16 tlist;
+ 
+ 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
+@@ -959,6 +997,10 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 		goto out_free;
+ 	}
+ 
++	gic_data.has_rss = !!(typer & GICD_TYPER_RSS);
++	pr_info("Distributor has %s Range Selector support\n",
++		gic_data.has_rss ? "" : "no");
++
+ 	set_handle_irq(gic_handle_irq);
+ 
+ 	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 6a1f87f..eb9ff9b 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -68,6 +68,7 @@
+ #define GICD_CTLR_ENABLE_SS_G1		(1U << 1)
+ #define GICD_CTLR_ENABLE_SS_G0		(1U << 0)
+ 
++#define GICD_TYPER_RSS			(1U << 26)
+ #define GICD_TYPER_LPIS			(1U << 17)
+ #define GICD_TYPER_MBIS			(1U << 16)
+ 
+@@ -377,6 +378,7 @@
+ #define ICC_CTLR_EL1_SEIS_MASK		(0x1 << ICC_CTLR_EL1_SEIS_SHIFT)
+ #define ICC_CTLR_EL1_A3V_SHIFT		15
+ #define ICC_CTLR_EL1_A3V_MASK		(0x1 << ICC_CTLR_EL1_A3V_SHIFT)
++#define ICC_CTLR_EL1_RSS		(0x1 << 18)
+ #define ICC_PMR_EL1_SHIFT		0
+ #define ICC_PMR_EL1_MASK		(0xff << ICC_PMR_EL1_SHIFT)
+ #define ICC_BPR0_EL1_SHIFT		0
+@@ -465,6 +467,8 @@
+ #define ICC_SGI1R_AFFINITY_2_SHIFT	32
+ #define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_2_SHIFT)
+ #define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
++#define ICC_SGI1R_RS_SHIFT		44
++#define ICC_SGI1R_RS_MASK		(0xfULL << ICC_SGI1R_RS_SHIFT)
+ #define ICC_SGI1R_AFFINITY_3_SHIFT	48
+ #define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_3_SHIFT)
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
