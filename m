@@ -1,12 +1,11 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Sep 2017 14:30:46 +0200
-Subject: [PATCH 1/9] arm64: defconfig: enable the Marvell 10G PHY as a
- module
-In-Reply-To: <20170918075814.27405-2-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Mon, 18 Sep 2017 09:58:06 +0200")
+Date: Wed, 20 Sep 2017 14:31:15 +0200
+Subject: [PATCH 2/9] arm64: defconfig: enable Marvell CP110 comphy
+In-Reply-To: <20170918075814.27405-3-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Mon, 18 Sep 2017 09:58:07 +0200")
 References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
- <20170918075814.27405-2-antoine.tenart@free-electrons.com>
-Message-ID: <87377hr1qh.fsf@free-electrons.com>
+ <20170918075814.27405-3-antoine.tenart@free-electrons.com>
+Message-ID: <87y3p9pn58.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,9 +13,13 @@ Hi Antoine,
  
  On lun., sept. 18 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-> The Marvell 10G PHY is present on mvebu platforms. Enable it as a module
-> so that the network works on these platforms.
+> From: Miquel Raynal <miquel.raynal@free-electrons.com>
 >
+> The comphy is an hardware block giving access to common PHYs that can be
+> used by various other engines (Network, SATA, ...). This is used on
+> Marvell 7k/8k platforms for now. Enable the corresponding driver.
+>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
 Applied on mvebu/arm64
@@ -30,17 +33,17 @@ Gregory
 >  1 file changed, 1 insertion(+)
 >
 > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 34480e9af2e7..4c9d4f6692dc 100644
+> index 4c9d4f6692dc..8495b88a0966 100644
 > --- a/arch/arm64/configs/defconfig
 > +++ b/arch/arm64/configs/defconfig
-> @@ -204,6 +204,7 @@ CONFIG_STMMAC_ETH=m
->  CONFIG_MDIO_BUS_MUX_MMIOREG=y
->  CONFIG_AT803X_PHY=m
->  CONFIG_MARVELL_PHY=m
-> +CONFIG_MARVELL_10G_PHY=m
->  CONFIG_MESON_GXL_PHY=m
->  CONFIG_MICREL_PHY=y
->  CONFIG_REALTEK_PHY=m
+> @@ -535,6 +535,7 @@ CONFIG_PWM_TEGRA=m
+>  CONFIG_PHY_RCAR_GEN3_USB2=y
+>  CONFIG_PHY_HI6220_USB=y
+>  CONFIG_PHY_SUN4I_USB=y
+> +CONFIG_PHY_MVEBU_CP110_COMPHY=y
+>  CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+>  CONFIG_PHY_ROCKCHIP_EMMC=y
+>  CONFIG_PHY_ROCKCHIP_PCIE=m
 > -- 
 > 2.13.5
 >
