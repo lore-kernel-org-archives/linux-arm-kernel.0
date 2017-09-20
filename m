@@ -1,31 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Sep 2017 13:40:20 +0200
-Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
-In-Reply-To: <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdVFPiXe9trwprNfX=p8-OKbrcgVSrwmveYhXGm=kd2bfQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Sep 2017 13:43:38 +0200
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <20170919070422.GI3349@codeaurora.org>
+ <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+ <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+Message-ID: <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 7:05 PM, Chris Paterson
-<chris.paterson2@renesas.com> wrote:
-> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On Tue, Sep 19, 2017 at 2:32 PM, Timur Tabi <timur@codeaurora.org> wrote:
+> On 9/19/17 3:15 AM, Linus Walleij wrote:
+>>
+>> Oh we already have that I think, Mika Westerberg and Andy Shevcheno
+>> implemented that for anyone using CONFIG_GPIOLIB_IRQCHIP, and
+>> this driver does. Timur please check: irq_need_valid_mask, irq_valid_mask
+>> usage.
 >
-> Enable the SDHI0 controller on iWave RZ/G1E carrier board.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> These patches already use irq_valid_mask!  But that doesn't block complete
+> access to the GPIO.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Aha sorry for my ignorance :(
 
-Gr{oetje,eeting}s,
+Doesn't that mean we need something like irq_valid_mask but rather
+gpio_valid_mask that just block all usage of certain GPIOs?
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
