@@ -1,94 +1,112 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Wed, 20 Sep 2017 15:56:14 +0000
-Subject: [RESEND PATCH 0/4] EDAC: support reduce bus width on 98dx3236
-References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
- <87a81pplm7.fsf@free-electrons.com>
-Message-ID: <65e008eb149b4abd891f676770138fb8@svr-chch-ex1.atlnz.lc>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 21 Sep 2017 00:19:57 +0800
+Subject: [PATCH 3/5] nvmem: mtk-efuse: fix different address space
+ warnings of sparse
+In-Reply-To: <1505134864-11975-4-git-send-email-yamada.masahiro@socionext.com>
+References: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
+ <1505134864-11975-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1505924397.17049.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-Thanks for following up.
-
-On 21/09/17 01:04, Gregory CLEMENT wrote:
-> Hi Chris,
->   
->   On lun., ao?t 07 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+On Mon, 2017-09-11 at 22:01 +0900, Masahiro Yamada wrote:
+> Fix the following sparse warnings:
 > 
->> (sorry I messed up sending this earlier, there is one additional patch and I'll
->> actually include the linux-arm and linux-edac mailing lists)
->>
->> This series applies on top of Jan Lubbe's "EDAC drivers for Armada XP L2 and
->> DDR" series[1]. 1/4, 2/4 and 3/4 don't strictly depend on Jan's work so they
->> could go in through the ARM tree if that is preferred.
->>
->> The 98dx3236 and similar switch chips with integrated CPUs have fewer pins
->> available for the SDRAM interface so the definition of "full" and "half" is
->> different to the Armada-XP SoC. In this series I introduce a
->> "marvell,reduced-width" device tree property and use this to identify such a
->> system.
->>
->> I chose to use a new property instead of a new compatible string because the IP
->> block really is the Armada-XP one (at least according to the Marvell FAE I
->> spoke to) and because the scenario of requiring a reduced pin-count when going
->> from an external SoC to an integrated one will be reasonably common as we see
->> more an more of these switches with integrated ARM cores.
+> drivers/nvmem/mtk-efuse.c:24:30: warning: incorrect type in initializer (different address spaces)
+> drivers/nvmem/mtk-efuse.c:24:30:    expected void [noderef] <asn:2>*base
+> drivers/nvmem/mtk-efuse.c:24:30:    got void *context
+> drivers/nvmem/mtk-efuse.c:37:30: warning: incorrect type in initializer (different address spaces)
+> drivers/nvmem/mtk-efuse.c:37:30:    expected void [noderef] <asn:2>*base
+> drivers/nvmem/mtk-efuse.c:37:30:    got void *context
+> drivers/nvmem/mtk-efuse.c:69:23: warning: incorrect type in assignment (different address spaces)
+> drivers/nvmem/mtk-efuse.c:69:23:    expected void *priv
+> drivers/nvmem/mtk-efuse.c:69:23:    got void [noderef] <asn:2>*[assigned] base
 > 
-> If I understood well a version 2 is expected. If I missed it, please
-> point me on it.
-
-Yes I owe a v2. I was actually waiting to see Jan's series applied 
-before sending my additions which build upon it. I'm traveling right now 
-so it'll probably be at least a week before I'm able to send the next 
-iteration.
-
-> Once the binding will be acked I will be able to apply the dts
-> patch. For the first patch unless I am wrong the the series "EDAC
-> drivers for Armada XP L2 and DDR" was not applied or even formally
-> acked.
-
-Last I saw there was some comments from Boris on v2 of that series that 
-needed addressing. Not sure if Jan has time to look at them. If not I 
-can have a go when I get back.
-
-> Also while you will be at sending a new version please add a
-> commit log even a simple one.
-
-Will do.
-> For the 3rd patch, I also wait the new version of patch 2 with an
-> ack.
-
-Yes that's fine. I'm now doing some work on and Armada-38x platform and 
-I realize that that also has the narrower DDR interface (as does the 375 
-I believe). I was planning on using that as the compatible string since 
-it's much better known than the integrated switch asic + CPU I've been 
-working with.
-
+> The type of nvmem_config->priv is (void *), so sparse complains
+> about assignment of the base address with (void __iomem *) type.
 > 
-> Thanks,
+> Even if we cast it out, sparse still warns:
+> warning: cast removes address space of expression
 > 
-> Gregory
+> Of course, we can shut up the sparse by marking __force, but a more
+> correct way is to put the base address into driver private data.
 > 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+Acked-by: Sean Wang <sean.wang@mediatek.com>
+
+> ---
 > 
->>
->>
->> [1] - http://marc.info/?l=linux-edac&m=150167758312924
->>
->> Chris Packham (4):
->>    ARM: dts: enable L2 cache parity and ecc on db-xc3-24g4xg board
->>    dt-bindings: add "reduced-width" property for Armada XP SDRAM
->>      controller
->>    ARM: dts: mvebu: set reduced-width property for SDRAM on 98dx3236
->>    EDAC: add support for reduced-width Armada-XP SDRAM
->>
->>   .../bindings/memory-controllers/mvebu-sdram-controller.txt          | 6 ++++++
->>   arch/arm/boot/dts/armada-xp-98dx3236.dtsi                           | 1 +
->>   arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts                       | 5 +++++
->>   drivers/edac/armada_xp_edac.c                                       | 3 +++
->>   4 files changed, 15 insertions(+)
->>
->> -- 
->> 2.13.0
->>
+>  drivers/nvmem/mtk-efuse.c | 26 +++++++++++++++++---------
+>  1 file changed, 17 insertions(+), 9 deletions(-)
 > 
+> diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
+> index fa7a0f6..c4058b5 100644
+> --- a/drivers/nvmem/mtk-efuse.c
+> +++ b/drivers/nvmem/mtk-efuse.c
+> @@ -18,15 +18,19 @@
+>  #include <linux/nvmem-provider.h>
+>  #include <linux/platform_device.h>
+>  
+> +struct mtk_efuse_priv {
+> +	void __iomem *base;
+> +};
+> +
+>  static int mtk_reg_read(void *context,
+>  			unsigned int reg, void *_val, size_t bytes)
+>  {
+> -	void __iomem *base = context;
+> +	struct mtk_efuse_priv *priv = context;
+>  	u32 *val = _val;
+>  	int i = 0, words = bytes / 4;
+>  
+>  	while (words--)
+> -		*val++ = readl(base + reg + (i++ * 4));
+> +		*val++ = readl(priv->base + reg + (i++ * 4));
+>  
+>  	return 0;
+>  }
+> @@ -34,12 +38,12 @@ static int mtk_reg_read(void *context,
+>  static int mtk_reg_write(void *context,
+>  			 unsigned int reg, void *_val, size_t bytes)
+>  {
+> -	void __iomem *base = context;
+> +	struct mtk_efuse_priv *priv = context;
+>  	u32 *val = _val;
+>  	int i = 0, words = bytes / 4;
+>  
+>  	while (words--)
+> -		writel(*val++, base + reg + (i++ * 4));
+> +		writel(*val++, priv->base + reg + (i++ * 4));
+>  
+>  	return 0;
+>  }
+> @@ -50,19 +54,23 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	struct nvmem_device *nvmem;
+>  	struct nvmem_config econfig = {};
+> -	void __iomem *base;
+> +	struct mtk_efuse_priv *priv;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	base = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(base))
+> -		return PTR_ERR(base);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+>  
+>  	econfig.stride = 4;
+>  	econfig.word_size = 4;
+>  	econfig.reg_read = mtk_reg_read;
+>  	econfig.reg_write = mtk_reg_write;
+>  	econfig.size = resource_size(res);
+> -	econfig.priv = base;
+> +	econfig.priv = priv;
+>  	econfig.dev = dev;
+>  	econfig.owner = THIS_MODULE;
+>  	nvmem = nvmem_register(&econfig);
