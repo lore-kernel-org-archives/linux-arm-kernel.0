@@ -1,150 +1,40 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Wed, 20 Sep 2017 16:48:32 +0800
-Subject: [PATCH v4 1/1] pwm: mediatek: add MT2712/MT7622 support
-In-Reply-To: <1503367755-6519-2-git-send-email-zhi.mao@mediatek.com>
-References: <1503367755-6519-1-git-send-email-zhi.mao@mediatek.com>
- <1503367755-6519-2-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <1505897312.28692.2.camel@mhfsdcap03>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 Sep 2017 10:15:56 +0100
+Subject: [PATCH v3 0/3] arm64: Add CONFIG_KUSER_HELPERS
+In-Reply-To: <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
+References: <20170911152635.95367-1-salyzyn@android.com>
+ <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
+Message-ID: <20170920091555.GA3782@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-Just a gentle ping on this issue.
-Would you please have a review to this patch?
-
-Regards,
-Zhi
-
-
-On Tue, 2017-08-22 at 10:09 +0800, Zhi Mao wrote:
-> Add support to MT2712 and MT7622.
-> Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
-> add mtk_pwm_reg_offset array for pwm register offset.
+On Tue, Sep 19, 2017 at 03:02:22PM -0700, Kees Cook wrote:
+> On Mon, Sep 11, 2017 at 8:26 AM, Mark Salyzyn <salyzyn@android.com> wrote:
+> > Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
+> > config option (enabled by default). When disabled, all kuser
+> > helpers-related code is removed from the kernel and no mapping is done
+> > at the fixed high address (0xffff0000); any attempt to use a kuser
+> > helper from a 32-bit process will result in a segfault.
+> >
+> > Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+> >
+> > v2:
+> > - vectors_page and compat_vdso_spec as array of 2
+> > - free sigpage if vectors allocation failed
+> > - adjust makefile so one line for each of the assembler source modules
+> > - split off assembler changes to a new previous patch in series to reduce churn
+> > - modify slightly the feature documentation to reduce its reach
+> > - modify slightly the feature documentation to rationalize the yes default.
+> > - There are more ifdefs as a result of the rebase.
+> >
+> > v3:
+> > - rebase (minor conflicts)
 > 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> ---
->  drivers/pwm/pwm-mediatek.c |   51 ++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 42 insertions(+), 9 deletions(-)
+> This looks great to me. I'd love to see kuser helpers gone. :)
 > 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index 1d78ab1..ccd86e7 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/clk.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/pwm.h>
->  #include <linux/slab.h>
-> @@ -40,11 +41,19 @@ enum {
->  	MTK_CLK_PWM3,
->  	MTK_CLK_PWM4,
->  	MTK_CLK_PWM5,
-> +	MTK_CLK_PWM6,
-> +	MTK_CLK_PWM7,
-> +	MTK_CLK_PWM8,
->  	MTK_CLK_MAX,
->  };
->  
-> -static const char * const mtk_pwm_clk_name[] = {
-> -	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-> +static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-> +	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
-> +	"pwm8"
-> +};
-> +
-> +struct mtk_pwm_platform_data {
-> +	unsigned int num_pwms;
->  };
->  
->  /**
-> @@ -57,6 +66,11 @@ struct mtk_pwm_chip {
->  	struct pwm_chip chip;
->  	void __iomem *regs;
->  	struct clk *clks[MTK_CLK_MAX];
-> +	const struct mtk_pwm_platform_data *data;
-> +};
-> +
-> +static const unsigned int mtk_pwm_reg_offset[] = {
-> +	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
->  };
->  
->  static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
-> @@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
->  				unsigned int offset)
->  {
-> -	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-> +	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
->  }
->  
->  static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
->  				  unsigned int num, unsigned int offset,
->  				  u32 value)
->  {
-> -	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-> +	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
->  }
->  
->  static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> @@ -194,15 +208,20 @@ static int mtk_pwm_probe(struct platform_device *pdev)
->  	if (!pc)
->  		return -ENOMEM;
->  
-> +	pc->data = of_device_get_match_data(&pdev->dev);
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(pc->regs))
->  		return PTR_ERR(pc->regs);
->  
-> -	for (i = 0; i < MTK_CLK_MAX; i++) {
-> +	for (i = 0; i < pc->data->num_pwms + 2; i++) {
->  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
-> -		if (IS_ERR(pc->clks[i]))
-> +		if (IS_ERR(pc->clks[i])) {
-> +			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-> +				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
->  			return PTR_ERR(pc->clks[i]);
-> +		}
->  	}
->  
->  	platform_set_drvdata(pdev, pc);
-> @@ -210,7 +229,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
->  	pc->chip.dev = &pdev->dev;
->  	pc->chip.ops = &mtk_pwm_ops;
->  	pc->chip.base = -1;
-> -	pc->chip.npwm = 5;
-> +	pc->chip.npwm = pc->data->num_pwms;
->  
->  	ret = pwmchip_add(&pc->chip);
->  	if (ret < 0) {
-> @@ -228,9 +247,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
->  	return pwmchip_remove(&pc->chip);
->  }
->  
-> +static const struct mtk_pwm_platform_data mt2712_pwm_data = {
-> +	.num_pwms = 8,
-> +};
-> +
-> +static const struct mtk_pwm_platform_data mt7622_pwm_data = {
-> +	.num_pwms = 6,
-> +};
-> +
-> +static const struct mtk_pwm_platform_data mt7623_pwm_data = {
-> +	.num_pwms = 5,
-> +};
-> +
->  static const struct of_device_id mtk_pwm_of_match[] = {
-> -	{ .compatible = "mediatek,mt7623-pwm" },
-> -	{ }
-> +	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
-> +	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
-> +	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
-> +	{ },
->  };
->  MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
->  
+> Catalin, Will, does this need anything else?
+
+I haven't had chance to look at the patches yet (buried in other stuff), but
+I aim to get to it in the next couple of weeks.
+
+Will
