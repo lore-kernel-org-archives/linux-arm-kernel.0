@@ -1,563 +1,120 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 20 Sep 2017 21:38:29 +0200
-Subject: [RFC PATCH 5/7] drm: sun4i: Add a glue for the DesignWare HDMI
- controller in H3
-In-Reply-To: <20170920193831.20268-1-jernej.skrabec@siol.net>
-References: <20170920193831.20268-1-jernej.skrabec@siol.net>
-Message-ID: <20170920193831.20268-6-jernej.skrabec@siol.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 20 Sep 2017 12:57:17 -0700
+Subject: [PATCH v4 1/5] arch: enable relative relocations for arm64, power, x86,
+ s390 and x86
+In-Reply-To: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
+References: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170920195721.7939-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 features DesignWare HDMI Transmitter paired with custom
-PHY.
+Before updating certain subsystems to use place relative 32-bit
+relocations in special sections, to save space  and reduce the
+number of absolute relocations that need to be processed at runtime
+by relocatable kernels, introduce the Kconfig symbol and define it
+for some architectures that should be able to support and benefit
+from it.
 
-Add a glue driver for it.
-
-For now, only video and CEC are supported. Audio will be supported at
-a later time.
-
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/gpu/drm/sun4i/Kconfig         |   9 +
- drivers/gpu/drm/sun4i/Makefile        |   1 +
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 500 ++++++++++++++++++++++++++++++++++
- 3 files changed, 510 insertions(+)
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+ arch/Kconfig                    | 10 ++++++++++
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/vmlinux.lds.S |  2 +-
+ arch/powerpc/Kconfig            |  1 +
+ arch/s390/Kconfig               |  1 +
+ arch/x86/Kconfig                |  1 +
+ 6 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index 06f05302ee75..589502ffe31a 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -40,6 +40,15 @@ config DRM_SUN4I_BACKEND
- 	  do some alpha blending and feed graphics to TCON. If M is
- 	  selected the module will be called sun4i-backend.
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 1aafb4efbb51..0d78e377b208 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -961,4 +961,14 @@ config REFCOUNT_FULL
+ 	  against various use-after-free conditions that can be used in
+ 	  security flaw exploits.
  
-+config DRM_SUN8I_DW_HDMI
-+	tristate "Support for Allwinner version of DesignWare HDMI"
-+	depends on DRM_SUN4I
-+	select DRM_DW_HDMI
++config HAVE_ARCH_PREL32_RELOCATIONS
++	bool
 +	help
-+	  Choose this option if you have an Allwinner SoC with the
-+	  DesignWare HDMI controller with custom HDMI PHY. If M is
-+	  selected the module will be called sun8i_dw_hdmi.
-+
- config DRM_SUN8I_MIXER
- 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
- 	default MACH_SUN8I
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 43c753cafc88..9c56173bf140 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -22,3 +22,4 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
- obj-$(CONFIG_DRM_SUN4I_BACKEND)		+= sun4i-backend.o
- obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
- obj-$(CONFIG_DRM_SUN8I_MIXER)		+= sun8i-mixer.o
-+obj-$(CONFIG_DRM_SUN8I_DW_HDMI)	+= sun8i_dw_hdmi.o
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-new file mode 100644
-index 000000000000..65db3e10e311
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-@@ -0,0 +1,500 @@
-+/*
-+ * Copyright (c) 2017, Jernej Skrabec <jernej.skrabec@siol.net>
-+ *
-+ * Based on hdmi_bsp_sun8iw7.c which is:
-+ * Copyright (c) 2016 Allwinnertech Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/component.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset.h>
-+
-+#include <drm/drm_of.h>
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_edid.h>
-+#include <drm/bridge/dw_hdmi.h>
-+
-+#include "sun4i_crtc.h"
-+#include "sun4i_tcon.h"
-+
-+#define SUN8I_HDMI_PHY_REG_POL		0x0000
-+
-+#define SUN8I_HDMI_PHY_REG_READ_EN	0x0010
-+#define SUN8I_HDMI_PHY_REG_READ_EN_MAGIC	0x54524545
-+
-+#define SUN8I_HDMI_PHY_REG_UNSCRAMBLE	0x0014
-+#define SUN8I_HDMI_PHY_REG_UNSCRAMBLE_MAGIC	0x42494E47
-+
-+#define SUN8I_HDMI_PHY_REG_CTRL		0x0020
-+#define SUN8I_HDMI_PHY_REG_UNK1		0x0024
-+#define SUN8I_HDMI_PHY_REG_UNK2		0x0028
-+#define SUN8I_HDMI_PHY_REG_PLL		0x002c
-+#define SUN8I_HDMI_PHY_REG_CLK		0x0030
-+#define SUN8I_HDMI_PHY_REG_UNK3		0x0034
-+
-+#define SUN8I_HDMI_PHY_REG_STATUS	0x0038
-+#define SUN8I_HDMI_PHY_REG_STATUS_READY		BIT(7)
-+#define SUN8I_HDMI_PHY_REG_STATUS_HPD		BIT(19)
-+
-+#define SUN8I_HDMI_PHY_REG_CEC		0x003c
-+
-+#define to_sun8i_dw_hdmi(x)	container_of(x, struct sun8i_dw_hdmi, x)
-+#define set_bits(p, v)		writel(readl(p) | (v), p)
-+
-+struct sun8i_dw_hdmi {
-+	struct clk *clk_ahb;
-+	struct clk *clk_ddc;
-+	struct clk *clk_sfr;
-+	struct device *dev;
-+	struct drm_encoder encoder;
-+	void __iomem *phy_base;
-+	struct dw_hdmi_plat_data plat_data;
-+	struct reset_control *rst_ddc;
-+	struct reset_control *rst_hdmi;
-+};
-+
-+static u32 sun8i_dw_hdmi_get_divider(int clk_khz)
-+{
-+	/*
-+	 * Due to missing documentation of HDMI PHY, we know correct
-+	 * settings only for following four PHY dividers. Select one
-+	 * based on pixel clock.
-+	 */
-+	if (clk_khz <= 27000)
-+		return 11;
-+	else if (clk_khz <= 74250)
-+		return 4;
-+	else if (clk_khz <= 148500)
-+		return 2;
-+	else
-+		return 1;
-+}
-+
-+static void sun8i_dw_hdmi_encoder_disable(struct drm_encoder *encoder)
-+{
-+	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
-+	struct sun4i_tcon *tcon = crtc->tcon;
-+
-+	DRM_DEBUG_DRIVER("Disabling HDMI Output\n");
-+
-+	sun4i_tcon_channel_disable(tcon, 1);
-+}
-+
-+static void sun8i_dw_hdmi_encoder_enable(struct drm_encoder *encoder)
-+{
-+	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
-+	struct sun4i_tcon *tcon = crtc->tcon;
-+
-+	DRM_DEBUG_DRIVER("Enabling HDMI Output\n");
-+
-+	sun4i_tcon_channel_enable(tcon, 1);
-+}
-+
-+static void sun8i_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-+					   struct drm_display_mode *mode,
-+					   struct drm_display_mode *adj_mode)
-+{
-+	struct sun8i_dw_hdmi *hdmi = to_sun8i_dw_hdmi(encoder);
-+	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
-+	struct sun4i_tcon *tcon = crtc->tcon;
-+	u32 div;
-+
-+	sun4i_tcon1_mode_set(tcon, mode);
-+
-+	div = sun8i_dw_hdmi_get_divider(mode->crtc_clock);
-+	clk_set_rate(hdmi->clk_sfr, mode->crtc_clock * 1000 * div);
-+	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
-+}
-+
-+static const struct drm_encoder_helper_funcs
-+				sun8i_dw_hdmi_encoder_helper_funcs = {
-+	.mode_set = sun8i_dw_hdmi_encoder_mode_set,
-+	.enable   = sun8i_dw_hdmi_encoder_enable,
-+	.disable  = sun8i_dw_hdmi_encoder_disable,
-+};
-+
-+static int sun8i_dw_hdmi_phy_init(struct dw_hdmi *hdmi_data, void *data,
-+				  struct drm_display_mode *mode)
-+{
-+	struct sun8i_dw_hdmi *hdmi = (struct sun8i_dw_hdmi *)data;
-+	u32 div = sun8i_dw_hdmi_get_divider(mode->crtc_clock);
-+	u32 val;
-+
-+	/*
-+	 * Unfortunately, we don't know much about those magic
-+	 * numbers. They are taken from Allwinner BSP driver.
-+	 */
-+
-+	val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+	writel(val & ~0xf000, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+
-+	switch (div) {
-+	case 1:
-+		writel(0x30dc5fc0, hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL);
-+		writel(0x800863C0, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CLK);
-+		usleep_range(10000, 15000);
-+		writel(1, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK3);
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, BIT(25));
-+		msleep(200);
-+		val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS);
-+		val = (val & 0x1f800) >> 11;
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL,
-+			 BIT(31) | BIT(30));
-+		if (val < 0x3d)
-+			set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL,
-+				 val + 2);
-+		else
-+			set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, 0x3f);
-+		msleep(100);
-+		writel(0x01FFFF7F, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+		writel(0x8063b000, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK1);
-+		writel(0x0F8246B5, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK2);
-+		break;
-+	case 2:
-+		writel(0x39dc5040, hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL);
-+		writel(0x80084381, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CLK);
-+		usleep_range(10000, 15000);
-+		writel(1, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK3);
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, BIT(25));
-+		msleep(100);
-+		val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS);
-+		val = (val & 0x1f800) >> 11;
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL,
-+			 BIT(31) | BIT(30));
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, val);
-+		writel(0x01FFFF7F, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+		writel(0x8063a800, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK1);
-+		writel(0x0F81C485, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK2);
-+		break;
-+	case 4:
-+		writel(0x39dc5040, hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL);
-+		writel(0x80084343, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CLK);
-+		usleep_range(10000, 15000);
-+		writel(1, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK3);
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, BIT(25));
-+		msleep(100);
-+		val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS);
-+		val = (val & 0x1f800) >> 11;
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL,
-+			 BIT(31) | BIT(30));
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, val);
-+		writel(0x01FFFF7F, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+		writel(0x8063b000, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK1);
-+		writel(0x0F81C405, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK2);
-+		break;
-+	case 11:
-+		writel(0x39dc5040, hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL);
-+		writel(0x8008430a, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CLK);
-+		usleep_range(10000, 15000);
-+		writel(1, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK3);
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, BIT(25));
-+		msleep(100);
-+		val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS);
-+		val = (val & 0x1f800) >> 11;
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL,
-+			 BIT(31) | BIT(30));
-+		set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, val);
-+		writel(0x01FFFF7F, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+		writel(0x8063b000, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK1);
-+		writel(0x0F81C405, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK2);
-+		break;
-+	}
-+
-+	/* clear polarity bits */
-+	val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_POL);
-+	val &= ~0x300;
-+
-+	/*
-+	 * Set polarity bits if necessary. Condition in original code
-+	 * is a bit weird. This is attempt to make it more reasonable
-+	 * and it works. It could be that bits and conditions are
-+	 * related and should be separated.
-+	 */
-+	if (!(mode->flags & DRM_MODE_FLAG_PHSYNC) ||
-+	    !(mode->flags & DRM_MODE_FLAG_PVSYNC)) {
-+		val |= 0x300;
-+	}
-+
-+	writel(val, hdmi->phy_base + SUN8I_HDMI_PHY_REG_POL);
-+
-+	return 0;
-+}
-+
-+static void sun8i_dw_hdmi_phy_disable(struct dw_hdmi *hdmi_data, void *data)
-+{
-+	struct sun8i_dw_hdmi *hdmi = (struct sun8i_dw_hdmi *)data;
-+
-+	/* Disable output and stop PLL */
-+	writel(7, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+	writel(0, hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL);
-+}
-+
-+static enum drm_connector_status
-+			sun8i_dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi_data,
-+						   void *data)
-+{
-+	struct sun8i_dw_hdmi *hdmi = (struct sun8i_dw_hdmi *)data;
-+	u32 reg_val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS);
-+
-+	return (reg_val & SUN8I_HDMI_PHY_REG_STATUS_HPD) ?
-+		connector_status_connected : connector_status_disconnected;
-+}
-+
-+static const struct dw_hdmi_phy_ops sun8i_dw_hdmi_phy_ops = {
-+	.init = &sun8i_dw_hdmi_phy_init,
-+	.disable = &sun8i_dw_hdmi_phy_disable,
-+	.read_hpd = &sun8i_dw_hdmi_phy_read_hpd,
-+};
-+
-+static void sun8i_dw_hdmi_init(struct sun8i_dw_hdmi *hdmi)
-+{
-+	u32 timeout = 20;
-+	u32 val;
-+
-+	/*
-+	 * HDMI PHY settings are taken as-is from Allwinner BSP code.
-+	 * There is no documentation.
-+	 */
-+	writel(0, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(0));
-+	udelay(5);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(16));
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(1));
-+	usleep_range(10, 20);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(2));
-+	udelay(5);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(3));
-+	usleep_range(40, 100);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(19));
-+	usleep_range(100, 200);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(18));
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, 7 << 4);
-+
-+	/* Note that Allwinner code doesn't fail in case of timeout */
-+	while (!(readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS) &
-+		SUN8I_HDMI_PHY_REG_STATUS_READY)) {
-+		if (!timeout--) {
-+			dev_warn(hdmi->dev, "HDMI PHY init timeout!\n");
-+			break;
-+		}
-+		usleep_range(100, 200);
-+	}
-+
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, 0xf << 8);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL, BIT(7));
-+
-+	writel(0x39dc5040, hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL);
-+	writel(0x80084343, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CLK);
-+	usleep_range(10000, 15000);
-+	writel(1, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK3);
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, BIT(25));
-+	msleep(100);
-+	val = readl(hdmi->phy_base + SUN8I_HDMI_PHY_REG_STATUS);
-+	val = (val & 0x1f800) >> 11;
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, BIT(31) | BIT(30));
-+	set_bits(hdmi->phy_base + SUN8I_HDMI_PHY_REG_PLL, val);
-+	writel(0x01FF0F7F, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CTRL);
-+	writel(0x80639000, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK1);
-+	writel(0x0F81C405, hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNK2);
-+
-+	/* enable read access to HDMI controller */
-+	writel(SUN8I_HDMI_PHY_REG_READ_EN_MAGIC,
-+	       hdmi->phy_base + SUN8I_HDMI_PHY_REG_READ_EN);
-+
-+	/* unscramble register offsets */
-+	writel(SUN8I_HDMI_PHY_REG_UNSCRAMBLE_MAGIC,
-+	       hdmi->phy_base + SUN8I_HDMI_PHY_REG_UNSCRAMBLE);
-+
-+	/* Reset PHY CEC settings. This gives dw hdmi total control over CEC. */
-+	writel(0, hdmi->phy_base + SUN8I_HDMI_PHY_REG_CEC);
-+}
-+
-+static const struct drm_encoder_funcs sun8i_dw_hdmi_encoder_funcs = {
-+	.destroy = drm_encoder_cleanup,
-+};
-+
-+static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
-+			      void *data)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct dw_hdmi_plat_data *plat_data;
-+	struct drm_device *drm = data;
-+	struct drm_encoder *encoder;
-+	struct sun8i_dw_hdmi *hdmi;
-+	struct resource *res;
-+	int ret;
-+
-+	if (!pdev->dev.of_node)
-+		return -ENODEV;
-+
-+	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
-+	if (!hdmi)
-+		return -ENOMEM;
-+
-+	plat_data = &hdmi->plat_data;
-+	hdmi->dev = &pdev->dev;
-+	encoder = &hdmi->encoder;
-+
-+	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
-+	/*
-+	 * If we failed to find the CRTC(s) which this encoder is
-+	 * supposed to be connected to, it's because the CRTC has
-+	 * not been registered yet.  Defer probing, and hope that
-+	 * the required CRTC is added later.
-+	 */
-+	if (encoder->possible_crtcs == 0)
-+		return -EPROBE_DEFER;
-+
-+	/* resource 0 is the memory region for the core controller */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	hdmi->phy_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(hdmi->phy_base))
-+		return PTR_ERR(hdmi->phy_base);
-+
-+	hdmi->clk_ahb = devm_clk_get(dev, "iahb");
-+	if (IS_ERR(hdmi->clk_ahb)) {
-+		dev_err(dev, "Could not get iahb clock\n");
-+		return PTR_ERR(hdmi->clk_ahb);
-+	}
-+
-+	hdmi->clk_sfr = devm_clk_get(dev, "isfr");
-+	if (IS_ERR(hdmi->clk_sfr)) {
-+		dev_err(dev, "Could not get isfr clock\n");
-+		return PTR_ERR(hdmi->clk_sfr);
-+	}
-+
-+	hdmi->clk_ddc = devm_clk_get(dev, "ddc");
-+	if (IS_ERR(hdmi->clk_ddc)) {
-+		dev_err(dev, "Could not get ddc clock\n");
-+		return PTR_ERR(hdmi->clk_ddc);
-+	}
-+
-+	hdmi->rst_hdmi = devm_reset_control_get(dev, "hdmi");
-+	if (IS_ERR(hdmi->rst_hdmi)) {
-+		dev_err(dev, "Could not get hdmi reset control\n");
-+		return PTR_ERR(hdmi->rst_hdmi);
-+	}
-+
-+	hdmi->rst_ddc = devm_reset_control_get(dev, "ddc");
-+	if (IS_ERR(hdmi->rst_ddc)) {
-+		dev_err(dev, "Could not get ddc reset control\n");
-+		return PTR_ERR(hdmi->rst_ddc);
-+	}
-+
-+	ret = clk_prepare_enable(hdmi->clk_ahb);
-+	if (ret) {
-+		dev_err(dev, "Cannot enable ahb clock: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(hdmi->clk_sfr);
-+	if (ret) {
-+		dev_err(dev, "Cannot enable isfr clock: %d\n", ret);
-+		goto err_ahb_clk;
-+	}
-+
-+	ret = clk_prepare_enable(hdmi->clk_ddc);
-+	if (ret) {
-+		dev_err(dev, "Cannot enable ddc clock: %d\n", ret);
-+		goto err_sfr_clk;
-+	}
-+
-+	ret = reset_control_deassert(hdmi->rst_hdmi);
-+	if (ret) {
-+		dev_err(dev, "Could not deassert hdmi reset control\n");
-+		goto err_ddc_clk;
-+	}
-+
-+	ret = reset_control_deassert(hdmi->rst_ddc);
-+	if (ret) {
-+		dev_err(dev, "Could not deassert ddc reset control\n");
-+		goto err_assert_hdmi_reset;
-+	}
-+
-+	drm_encoder_helper_add(encoder, &sun8i_dw_hdmi_encoder_helper_funcs);
-+	drm_encoder_init(drm, encoder, &sun8i_dw_hdmi_encoder_funcs,
-+			 DRM_MODE_ENCODER_TMDS, NULL);
-+
-+	sun8i_dw_hdmi_init(hdmi);
-+
-+	plat_data->phy_ops = &sun8i_dw_hdmi_phy_ops,
-+	plat_data->phy_name = "sun8i_dw_hdmi_phy",
-+	plat_data->phy_data = hdmi;
-+
-+	ret = dw_hdmi_bind(pdev, encoder, plat_data);
-+
-+	/*
-+	 * If dw_hdmi_bind() fails we'll never call dw_hdmi_unbind(),
-+	 * which would have called the encoder cleanup.  Do it manually.
-+	 */
-+	if (ret)
-+		goto cleanup_encoder;
-+
-+	return 0;
-+
-+cleanup_encoder:
-+	drm_encoder_cleanup(encoder);
-+	reset_control_assert(hdmi->rst_ddc);
-+err_assert_hdmi_reset:
-+	reset_control_assert(hdmi->rst_hdmi);
-+err_ddc_clk:
-+	clk_disable_unprepare(hdmi->clk_ddc);
-+err_sfr_clk:
-+	clk_disable_unprepare(hdmi->clk_sfr);
-+err_ahb_clk:
-+	clk_disable_unprepare(hdmi->clk_ahb);
-+
-+	return ret;
-+}
-+
-+static void sun8i_dw_hdmi_unbind(struct device *dev, struct device *master,
-+				 void *data)
-+{
-+	return dw_hdmi_unbind(dev);
-+}
-+
-+static const struct component_ops sun8i_dw_hdmi_ops = {
-+	.bind	= sun8i_dw_hdmi_bind,
-+	.unbind	= sun8i_dw_hdmi_unbind,
-+};
-+
-+static int sun8i_dw_hdmi_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &sun8i_dw_hdmi_ops);
-+}
-+
-+static int sun8i_dw_hdmi_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &sun8i_dw_hdmi_ops);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id sun8i_dw_hdmi_dt_ids[] = {
-+	{ .compatible = "allwinner,sun8i-h3-dw-hdmi" },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, sun8i_dw_hdmi_dt_ids);
-+
-+struct platform_driver sun8i_dw_hdmi_pltfm_driver = {
-+	.probe  = sun8i_dw_hdmi_probe,
-+	.remove = sun8i_dw_hdmi_remove,
-+	.driver = {
-+		.name = "sun8i-dw-hdmi",
-+		.of_match_table = sun8i_dw_hdmi_dt_ids,
-+	},
-+};
-+module_platform_driver(sun8i_dw_hdmi_pltfm_driver);
-+
-+MODULE_AUTHOR("Jernej Skrabec <jernej.skrabec@siol.net>");
-+MODULE_DESCRIPTION("Allwinner H3 DW HDMI bridge");
-+MODULE_LICENSE("GPL");
++	  May be selected by an architecture if it supports place-relative
++	  32-bit relocations, both in the toolchain and in the module loader,
++	  in which case relative references can be used in special sections
++	  for PCI fixup, initcalls etc which are only half the size on 64 bit
++	  architectures, and don't require runtime relocation on relocatable
++	  kernels.
++
+ source "kernel/gcov/Kconfig"
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..30761f350d02 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -72,6 +72,7 @@ config ARM64
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index fe56c268a7d9..30dc991bbd85 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -155,7 +155,7 @@ SECTIONS
+ 		CON_INITCALL
+ 		SECURITY_INITCALL
+ 		INIT_RAM_FS
+-		*(.init.rodata.* .init.bss)	/* from the EFI stub */
++		*(.init.rodata.* .init.bss .init.discard.*)	/* EFI stub */
+ 	}
+ 	.exit.data : {
+ 		ARM_EXIT_KEEP(EXIT_DATA)
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 809c468edab1..86e2987b3a4a 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -174,6 +174,7 @@ config PPC
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if COMPAT
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select ARCH_HAS_STRICT_KERNEL_RWX	if ((PPC_BOOK3S_64 || PPC32) && !RELOCATABLE && !HIBERNATION)
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index 48af970320cb..6c3b16a73024 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -127,6 +127,7 @@ config S390
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select CPU_NO_EFFICIENT_FFS if !HAVE_MARCH_Z9_109_FEATURES
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_SOFT_DIRTY
+ 	select HAVE_ARCH_TRACEHOOK
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 971feac13506..a50f96b08053 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -113,6 +113,7 @@ config X86
+ 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if MMU && COMPAT
+ 	select HAVE_ARCH_COMPAT_MMAP_BASES	if MMU && COMPAT
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
 -- 
-2.14.1
+2.11.0
