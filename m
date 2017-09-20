@@ -1,67 +1,94 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Sep 2017 15:53:01 -0500
-Subject: [PATCH v4 2/5] dt-bindings: input: Add document bindings for
- mtk-pmic-keys
-In-Reply-To: <1505635252-27716-3-git-send-email-chen.zhong@mediatek.com>
-References: <1505635252-27716-1-git-send-email-chen.zhong@mediatek.com>
- <1505635252-27716-3-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <20170920205301.v6gpmhll4pdpuyxv@rob-hp-laptop>
+From: net147@gmail.com (Jonathan Liu)
+Date: Thu, 21 Sep 2017 08:03:36 +1000
+Subject: [PATCH] ARM: uaccess: Add missing include for set_thread_flag
+In-Reply-To: <CAJcbSZF1PuMPTM3uZOVzfaUXj1Q3+6Nj2c6DXU+RDrwT8P13Tw@mail.gmail.com>
+References: <20170919115042.6800-1-net147@gmail.com>
+ <CAJcbSZEiHW=yH+ATvLq=am4nbVdhbqAxkH-+jEymhNkN+Pkb=A@mail.gmail.com>
+ <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
+ <CAJcbSZF1PuMPTM3uZOVzfaUXj1Q3+6Nj2c6DXU+RDrwT8P13Tw@mail.gmail.com>
+Message-ID: <CANwerB2eXA7Jkne504pik5MF4QFkQe0JURjmS0Ux0isauheqyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 17, 2017 at 04:00:49PM +0800, Chen Zhong wrote:
-> This patch adds the device tree binding documentation for the MediaTek
-> pmic keys found on PMIC MT6397/MT6323.
-> 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> ---
->  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   41 ++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> new file mode 100644
-> index 0000000..fd48ff7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> @@ -0,0 +1,41 @@
-> +MediaTek MT6397/MT6323 PMIC Keys Device Driver
-> +
-> +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
-> +and homekey. The key functions are defined as the subnode of the function
-> +node provided by MT6397/MT6323 PMIC that is being defined as one kind
-> +of Muti-Function Device (MFD)
-> +
-> +For MT6397/MT6323 MFD bindings see:
-> +Documentation/devicetree/bindings/mfd/mt6397.txt
-> +
-> +Required properties:
-> +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-> +- linux,keycodes: Specifies the numeric keycode values to
-> +	be used for reporting keys presses. The array can
-> +	contain up to 2 entries.
-> +
-> +Optional Properties:
-> +- mediatek,wakeup-keys: Specifies each key can be used as a wakeup source
-> +	or not. This can be customized depends on board design.
+Hi Thomas,
 
-I think this should be a common property if we're going to put into DT. 
-Something like "wakeup-scancodes" to be clear the values are the raw 
-scancodes. Alternatively, we could list Linux keycodes instead with 
-something like "linux,wakeup-keycodes".
+On 21 September 2017 at 02:31, Thomas Garnier <thgarnie@google.com> wrote:
+> On Tue, Sep 19, 2017 at 2:35 PM, Jonathan Liu <net147@gmail.com> wrote:
+>>
+>> Hi Thomas,
+>>
+>> The top of the C source file I am compiling has:
+>> #include <linux/kernel.h>
+>> #include <asm/uaccess.h>
+>>
+>> Tracing through the asm/uaccess.h include I see
+>> asm/uaccess.h -> asm/domain.h -> asm/thread_info.h
+>>
+>> but set_thread_info is defined in linux/thread_info.h not
+>> asm/thread_info.h (see
+>> http://elixir.free-electrons.com/linux/v4.14-rc1/ident/set_thread_flag).
+>
+> I see, I think I could not reproduce this issue because I already
+> reverted the original commit in favor of a different approach on
+> linux-next (see commit 2404269bc4e77a67875c8db6667be34c9913c96e).
+>
+> Let me know if this commit resolve the issue and thanks for reaching out.
+>
 
-> +- wakeup-source: PMIC keys can be used as wakeup sources.
+Cherry-picking commit 2404269bc4e77a67875c8db6667be34c9913c96e on top
+of 4.14-rc1 resolves the issue.
+Thanks.
 
-Just "See ../power/wakeup-source.txt" for the description.
+>>
+>> Regards,
+>> Jonathan
+>>
+>> On 20 September 2017 at 00:32, Thomas Garnier <thgarnie@google.com> wrote:
+>> > On Tue, Sep 19, 2017 at 4:50 AM, Jonathan Liu <net147@gmail.com> wrote:
+>> >> Fixes "implicit declaration of function" compile error for out-of-tree
+>> >> kernel modules including asm/uaccess.h.
+>> >
+>> > I failed to reproduce this issue by creating an out of tree module
+>> > with a separate file (with only uaccess.h). Are you using a special
+>> > config?
+>> >
+>> > Looking at the headers on uaccess.h. You get thread_info through:
+>> >
+>> >  asm/domain.h -> asm/thread_info.h
+>> >
+>> >>
+>> >> Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
+>> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> >> ---
+>> >>  arch/arm/include/asm/uaccess.h | 1 +
+>> >>  1 file changed, 1 insertion(+)
+>> >>
+>> >> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+>> >> index 87936dd5d151..13d1877ffb75 100644
+>> >> --- a/arch/arm/include/asm/uaccess.h
+>> >> +++ b/arch/arm/include/asm/uaccess.h
+>> >> @@ -17,6 +17,7 @@
+>> >>  #include <asm/unified.h>
+>> >>  #include <asm/compiler.h>
+>> >>
+>> >> +#include <linux/thread_info.h>
+>> >>  #include <asm/extable.h>
+>> >>
+>> >>  /*
+>> >> --
+>> >> 2.13.2
+>> >>
+>> >
+>> >
+>> >
+>> > --
+>> > Thomas
+>
+>
+>
+>
+> --
+> Thomas
 
-> +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
-> +	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
-> +- debounce-interval: Long press key shutdown debouncing interval time
-> +	in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
-
-This property units should be in milliseconds. However, this doesn't 
-sound like debounce filtering time if 5-14 seconds. That sounds like 
-forced power off time (i.e. for a hung device). This also should be 
-common. I imagine we already have some drivers with similar properties.
-
-Rob
+Regards,
+Jonathan
