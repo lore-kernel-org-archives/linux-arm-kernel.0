@@ -1,56 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Sep 2017 13:45:35 -0700
-Subject: [PATCH v3 29/31] arm: Implement thread_struct whitelist for hardened
- usercopy
-In-Reply-To: <1505940337-79069-1-git-send-email-keescook@chromium.org>
-References: <1505940337-79069-1-git-send-email-keescook@chromium.org>
-Message-ID: <1505940337-79069-30-git-send-email-keescook@chromium.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Sep 2017 15:53:04 -0500
+Subject: [PATCH 6/7] dt-bindings: i2c: i2c-gpio: Add support for named
+ gpios
+In-Reply-To: <20170917093906.16325-7-linus.walleij@linaro.org>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-7-linus.walleij@linaro.org>
+Message-ID: <20170920205304.shkguzlqco3m6weu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM does not carry FPU state in the thread structure, so it can declare
-no usercopy whitelist at all.
+On Sun, Sep 17, 2017 at 11:39:05AM +0200, Linus Walleij wrote:
+> From: Geert Uytterhoeven <geert+renesas () glider ! be>
+> 
+> The current i2c-gpio DT bindings use a single unnamed "gpios" property
+> to refer to the SDA and SCL signal lines by index.  This is error-prone
+> for the casual DT writer and reviewer, as one has to look up the order
+> in the DT bindings.
+> 
+> Fix this by amending the DT bindings to use two separate named gpios
+> properties, and deprecate the old unnamed variant.
+> 
+> Take this opportunity to clearly deprecate the "i2c-gpio,sda-open-drain"
+> and "i2c-gpio,scl-open-drain" flags as well. The commit describes
+> in detail what these flags actually mean, and why they should not be
+> used in new device trees.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> [Augmented to what I and Rob would like]
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Create a special section for the deprecated bindings
+> - Also deprecate the open drain bool properties
+> - Update the example to use the new style of bindings
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-gpio.txt | 32 ++++++++++++++++------
+>  1 file changed, 23 insertions(+), 9 deletions(-)
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm/Kconfig                 | 1 +
- arch/arm/include/asm/processor.h | 7 +++++++
- 2 files changed, 8 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7888c9803eb0..4f1ab6c6b8c0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -48,6 +48,7 @@ config ARM
- 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
- 	select HAVE_ARCH_MMAP_RND_BITS if MMU
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
-+	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARM_SMCCC if CPU_V7
- 	select HAVE_EBPF_JIT if !CPU_ENDIAN_BE32
-diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index c3d5fc124a05..d6dc45c92ee5 100644
---- a/arch/arm/include/asm/processor.h
-+++ b/arch/arm/include/asm/processor.h
-@@ -45,6 +45,13 @@ struct thread_struct {
- 	struct debug_info	debug;
- };
- 
-+/* Nothing needs to be usercopy-whitelisted from thread_struct. */
-+static inline void arch_thread_struct_whitelist(unsigned long *offset,
-+						unsigned long *size)
-+{
-+	*offset = *size = 0;
-+}
-+
- #define INIT_THREAD  {	}
- 
- #ifdef CONFIG_MMU
--- 
-2.7.4
+Acked-by: Rob Herring <robh@kernel.org>
