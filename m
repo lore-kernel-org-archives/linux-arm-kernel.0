@@ -1,161 +1,53 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 20 Sep 2017 23:18:11 +0800
-Subject: [RFC PATCH 4/7] power: supply: axp20x-battery: support AXP803
+Date: Wed, 20 Sep 2017 23:18:13 +0800
+Subject: [RFC PATCH 6/7] arm64: allwinner: a64: add power supply nodes in
+ AXP803 DTSI
 In-Reply-To: <20170920151814.22461-1-icenowy@aosc.io>
 References: <20170920151814.22461-1-icenowy@aosc.io>
-Message-ID: <20170920151814.22461-5-icenowy@aosc.io>
+Message-ID: <20170920151814.22461-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP803 PMIC has battery support like other AXP PMICs, but with
-different definition of max target charging voltage and constant
-charging current.
+AXP803 PMIC features AC/USB/Battery power supplies.
 
-Add support for AXP803 battery in axp20x-battery driver.
+As we have now the device tree bindings for them, add device tree
+nodes for them.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/power/supply/axp20x_battery.c | 88 +++++++++++++++++++++++++++++++----
- 1 file changed, 78 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/allwinner/axp803.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
-index 7494f0f0eadb..c9a9fb320c92 100644
---- a/drivers/power/supply/axp20x_battery.c
-+++ b/drivers/power/supply/axp20x_battery.c
-@@ -49,6 +49,8 @@
- #define AXP22X_CHRG_CTRL1_TGT_4_22V	(1 << 5)
- #define AXP22X_CHRG_CTRL1_TGT_4_24V	(3 << 5)
+diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+index ff8af52743ff..3a8615231b7c 100644
+--- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
++++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+@@ -49,6 +49,16 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
-+#define AXP803_CHRG_CTRL1_TGT_4_35V	(3 << 5)
++	ac_power_supply: ac-power-supply {
++		compatible = "x-powers,axp221-ac-power-supply";
++		status = "disabled";
++	};
 +
- #define AXP20X_CHRG_CTRL1_TGT_CURR	GENMASK(3, 0)
- 
- #define AXP20X_V_OFF_MASK		GENMASK(2, 0)
-@@ -123,20 +125,71 @@ static int axp22x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
- 	return 0;
- }
- 
-+static int axp803_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-+					  int *val)
-+{
-+	int ret, reg;
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp803-battery-power-supply";
++		status = "disabled";
++	};
 +
-+	ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
-+	if (ret)
-+		return ret;
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <3000>;
+@@ -147,4 +157,9 @@
+ 			regulator-name = "rtc-ldo";
+ 		};
+ 	};
 +
-+	switch (reg & AXP20X_CHRG_CTRL1_TGT_VOLT) {
-+	case AXP20X_CHRG_CTRL1_TGT_4_1V:
-+		*val = 4100000;
-+		break;
-+	case AXP20X_CHRG_CTRL1_TGT_4_15V:
-+		*val = 4150000;
-+		break;
-+	case AXP20X_CHRG_CTRL1_TGT_4_2V:
-+		*val = 4200000;
-+		break;
-+	case AXP803_CHRG_CTRL1_TGT_4_35V:
-+		*val = 4350000;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static void raw_to_constant_charge_current(struct axp20x_batt_ps *axp, int *val)
- {
--	if (axp->axp_id == AXP209_ID)
-+	switch (axp->axp_id) {
-+	case AXP209_ID:
- 		*val = *val * 100000 + 300000;
--	else
-+		break;
-+	case AXP221_ID:
- 		*val = *val * 150000 + 300000;
-+		break;
-+	case AXP803_ID:
-+		*val = *val * 200000 + 200000;
-+		break;
-+	}
- }
- 
- static void constant_charge_current_to_raw(struct axp20x_batt_ps *axp, int *val)
- {
--	if (axp->axp_id == AXP209_ID)
-+	switch (axp->axp_id) {
-+	case AXP209_ID:
- 		*val = (*val - 300000) / 100000;
--	else
-+		break;
-+	case AXP221_ID:
- 		*val = (*val - 300000) / 150000;
-+		break;
-+	case AXP803_ID:
-+		*val = (*val - 200000) / 200000;
-+		/*
-+		 * The maximum charge current on AXP803 is 2.8A, and the
-+		 * datasheet says "1110-1111 reserved" in this part.
-+		 * So we return an invalid value -1 in this situation,
-+		 * which will be dealed by the caller of this function,
-+		 */
-+		if (*val > 13)
-+			*val = -1;
-+		break;
-+	}
- }
- 
- static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
-@@ -269,9 +322,13 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
- 		if (ret)
- 			return ret;
- 
--		if (axp20x_batt->axp_id == AXP221_ID &&
--		    !(reg & AXP22X_FG_VALID))
--			return -EINVAL;
-+		switch (axp20x_batt->axp_id) {
-+		case AXP221_ID:
-+		case AXP803_ID:
-+			if (!(reg & AXP22X_FG_VALID))
-+				return -EINVAL;
-+			break;
-+		};
- 
- 		/*
- 		 * Fuel Gauge data takes 7 bits but the stored value seems to be
-@@ -281,11 +338,19 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
- 		break;
- 
- 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
--		if (axp20x_batt->axp_id == AXP209_ID)
-+		switch (axp20x_batt->axp_id) {
-+		case AXP209_ID:
- 			return axp20x_battery_get_max_voltage(axp20x_batt,
- 							      &val->intval);
--		return axp22x_battery_get_max_voltage(axp20x_batt,
--						      &val->intval);
-+		case AXP221_ID:
-+			return axp22x_battery_get_max_voltage(axp20x_batt,
-+							      &val->intval);
-+		case AXP803_ID:
-+			return axp803_battery_get_max_voltage(axp20x_batt,
-+							      &val->intval);
-+		default:
-+			return -EINVAL;
-+		}
- 
- 	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
- 		ret = regmap_read(axp20x_batt->regmap, AXP20X_V_OFF, &reg);
-@@ -467,6 +532,9 @@ static const struct of_device_id axp20x_battery_ps_id[] = {
- 	}, {
- 		.compatible = "x-powers,axp221-battery-power-supply",
- 		.data = (void *)AXP221_ID,
-+	}, {
-+		.compatible = "x-powers,axp803-battery-power-supply",
-+		.data = (void *)AXP803_ID,
- 	}, { /* sentinel */ },
++	usb_power_supply: usb_power_supply {
++		compatible = "x-powers,axp803-usb-power-supply";
++		status = "disabled";
++	};
  };
- MODULE_DEVICE_TABLE(of, axp20x_battery_ps_id);
 -- 
 2.13.5
