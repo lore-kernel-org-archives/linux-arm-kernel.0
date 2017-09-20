@@ -1,49 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Sep 2017 15:52:33 -0500
-Subject: [PATCH v2 6/8] arm64: renesas: document Eagle board bindings
-In-Reply-To: <20170915194442.464361390@cogentembedded.com>
-References: <20170915194442.464361390@cogentembedded.com>
-Message-ID: <20170920205233.jjncu7fzi6cmoggq@rob-hp-laptop>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 20 Sep 2017 13:45:34 -0700
+Subject: [PATCH v3 28/31] arm64: Implement thread_struct whitelist for
+ hardened usercopy
+In-Reply-To: <1505940337-79069-1-git-send-email-keescook@chromium.org>
+References: <1505940337-79069-1-git-send-email-keescook@chromium.org>
+Message-ID: <1505940337-79069-29-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 15, 2017 at 10:43:24PM +0300, Sergei Shtylyov wrote:
-> Document the Eagle device tree bindings, listing it as a supported board.
-> 
-> This allows to use checkpatch.pl to validate .dts files referring to the
-> Eagle board.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
-> Changes in version 2:
-> - renamed the patch.
-> 
->  Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
-> ===================================================================
-> --- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
-> +++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
-> @@ -59,6 +59,8 @@ Boards:
->      compatible = "renesas,bockw", "renesas,r8a7778"
->    - Draak (RTP0RC77995SEB0010S)
->      compatible = "renesas,draak", "renesas,r8a77995"
-> +  - Eagle (RTP0RC77970SEB0010S)
-> +    compatible = "renesas,eagle", "renesas,r8a77970";
+This whitelists the FPU register state portion of the thread_struct for
+copying to userspace, instead of the default entire structure.
 
-You're not consistent here with the ';'.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: James Morse <james.morse@arm.com>
+Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: zijun_hu <zijun_hu@htc.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm64/Kconfig                 | 1 +
+ arch/arm64/include/asm/processor.h | 8 ++++++++
+ 2 files changed, 9 insertions(+)
 
-Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
->    - Genmai (RTK772100BC00000BR)
->      compatible = "renesas,genmai", "renesas,r7s72100"
->    - GR-Peach (X28A-M01-E/F)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..e190f9901aef 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -73,6 +73,7 @@ config ARM64
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+ 	select HAVE_ARCH_SECCOMP_FILTER
++	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	select HAVE_ARCH_VMAP_STACK
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 29adab8138c3..759c4d90ac7f 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -90,6 +90,14 @@ struct thread_struct {
+ 	struct debug_info	debug;		/* debugging */
+ };
+ 
++/* Whitelist the fpsimd_state for copying to userspace. */
++static inline void arch_thread_struct_whitelist(unsigned long *offset,
++						unsigned long *size)
++{
++	*offset = offsetof(struct thread_struct, fpsimd_state);
++	*size = sizeof(struct fpsimd_state);
++}
++
+ #ifdef CONFIG_COMPAT
+ #define task_user_tls(t)						\
+ ({									\
+-- 
+2.7.4
