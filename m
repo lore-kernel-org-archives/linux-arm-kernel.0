@@ -1,88 +1,54 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Wed, 20 Sep 2017 16:17:03 -0400
-Subject: [PATCH v9 01/12] x86/mm: setting fields in deferred pages
+Date: Wed, 20 Sep 2017 16:17:13 -0400
+Subject: [PATCH v9 11/12] arm64/kasan: use kasan_map_populate()
 In-Reply-To: <20170920201714.19817-1-pasha.tatashin@oracle.com>
 References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
-Message-ID: <20170920201714.19817-2-pasha.tatashin@oracle.com>
+Message-ID: <20170920201714.19817-12-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
-flags and other fields in "struct page"es are never changed prior to first
-initializing struct pages by going through __init_single_page().
+To optimize the performance of struct page initialization,
+vmemmap_populate() will no longer zero memory.
 
-With deferred struct page feature enabled, however, we set fields in
-register_page_bootmem_info that are subsequently clobbered right after in
-free_all_bootmem:
-
-        mem_init() {
-                register_page_bootmem_info();
-                free_all_bootmem();
-                ...
-        }
-
-When register_page_bootmem_info() is called only non-deferred struct pages
-are initialized. But, this function goes through some reserved pages which
-might be part of the deferred, and thus are not yet initialized.
-
-  mem_init
-   register_page_bootmem_info
-    register_page_bootmem_info_node
-     get_page_bootmem
-      .. setting fields here ..
-      such as: page->freelist = (void *)type;
-
-  free_all_bootmem()
-   free_low_memory_core_early()
-    for_each_reserved_mem_region()
-     reserve_bootmem_region()
-      init_reserved_page() <- Only if this is deferred reserved page
-       __init_single_pfn()
-        __init_single_page()
-            memset(0) <-- Loose the set fields here
-
-We end-up with issue where, currently we do not observe problem as memory
-is explicitly zeroed. But, if flag asserts are changed we can start hitting
-issues.
-
-Also, because in this patch series we will stop zeroing struct page memory
-during allocation, we must make sure that struct pages are properly
-initialized prior to using them.
-
-The deferred-reserved pages are initialized in free_all_bootmem().
-Therefore, the fix is to switch the above calls.
+Therefore, we must use a new interface to allocate and map kasan shadow
+memory, that also zeroes memory for us.
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
- arch/x86/mm/init_64.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm64/mm/kasan_init.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
-index 5ea1c3c2636e..30fe22558720 100644
---- a/arch/x86/mm/init_64.c
-+++ b/arch/x86/mm/init_64.c
-@@ -1182,12 +1182,17 @@ void __init mem_init(void)
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 81f03959a4ab..b6e92cfa3ea3 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -161,11 +161,11 @@ void __init kasan_init(void)
  
- 	/* clear_bss() already clear the empty_zero_page */
+ 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
  
--	register_page_bootmem_info();
--
- 	/* this will put all memory onto the freelists */
- 	free_all_bootmem();
- 	after_bootmem = 1;
+-	vmemmap_populate(kimg_shadow_start, kimg_shadow_end,
+-			 pfn_to_nid(virt_to_pfn(lm_alias(_text))));
++	kasan_map_populate(kimg_shadow_start, kimg_shadow_end,
++			   pfn_to_nid(virt_to_pfn(lm_alias(_text))));
  
-+	/* Must be done after boot memory is put on freelist, because here we
-+	 * might set fields in deferred struct pages that have not yet been
-+	 * initialized, and free_all_bootmem() initializes all the reserved
-+	 * deferred pages for us.
-+	 */
-+	register_page_bootmem_info();
-+
- 	/* Register memory areas for /proc/kcore */
- 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
- 			 PAGE_SIZE, KCORE_OTHER);
+ 	/*
+-	 * vmemmap_populate() has populated the shadow region that covers the
++	 * kasan_map_populate() has populated the shadow region that covers the
+ 	 * kernel image with SWAPPER_BLOCK_SIZE mappings, so we have to round
+ 	 * the start and end addresses to SWAPPER_BLOCK_SIZE as well, to prevent
+ 	 * kasan_populate_zero_shadow() from replacing the page table entries
+@@ -191,9 +191,9 @@ void __init kasan_init(void)
+ 		if (start >= end)
+ 			break;
+ 
+-		vmemmap_populate((unsigned long)kasan_mem_to_shadow(start),
+-				(unsigned long)kasan_mem_to_shadow(end),
+-				pfn_to_nid(virt_to_pfn(start)));
++		kasan_map_populate((unsigned long)kasan_mem_to_shadow(start),
++				   (unsigned long)kasan_mem_to_shadow(end),
++				   pfn_to_nid(virt_to_pfn(start)));
+ 	}
+ 
+ 	/*
 -- 
 2.14.1
