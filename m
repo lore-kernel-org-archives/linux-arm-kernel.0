@@ -1,40 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Sep 2017 10:15:56 +0100
-Subject: [PATCH v3 0/3] arm64: Add CONFIG_KUSER_HELPERS
-In-Reply-To: <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
-References: <20170911152635.95367-1-salyzyn@android.com>
- <CAGXu5jK-i_Eqfm1mZ-Kz5dqsKuCt_-MDymkb735VXCV9aOnvwQ@mail.gmail.com>
-Message-ID: <20170920091555.GA3782@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 20 Sep 2017 11:18:29 +0200
+Subject: [PATCH v2 8/9] atmel_flexcom: Support backup mode
+In-Reply-To: <CAGkQfmM08UqpLoMegRGQwmamN=Z74fem9VWT5yGcSjkYdS5c=Q@mail.gmail.com>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-9-romain.izard.pro@gmail.com>
+ <53aa7783-0ecf-1e68-1bf9-c470ba2f79eb@microchip.com>
+ <20170919152504.nhp5i734u75gb5gq@dell>
+ <CAGkQfmM08UqpLoMegRGQwmamN=Z74fem9VWT5yGcSjkYdS5c=Q@mail.gmail.com>
+Message-ID: <20170920091829.wftbjshog3ixvpmu@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 03:02:22PM -0700, Kees Cook wrote:
-> On Mon, Sep 11, 2017 at 8:26 AM, Mark Salyzyn <salyzyn@android.com> wrote:
-> > Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
-> > config option (enabled by default). When disabled, all kuser
-> > helpers-related code is removed from the kernel and no mapping is done
-> > at the fixed high address (0xffff0000); any attempt to use a kuser
-> > helper from a 32-bit process will result in a segfault.
+On 20/09/2017 at 10:30:31 +0200, Romain Izard wrote:
+> 2017-09-19 17:25 GMT+02:00 Lee Jones <lee.jones@linaro.org>:
+> > On Tue, 19 Sep 2017, Nicolas Ferre wrote:
 > >
-> > Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+> >> On 15/09/2017 at 16:04, Romain Izard wrote:
+> >> > The controller used by a flexcom module is configured at boot, and left
+> >> > alone after this. As the configuration will be lost after backup mode,
+> >> > restore the state of the flexcom driver on resume.
+> >> >
+> >> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> >>
+> >> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> >> On sama5d2 Xplained board (i2c0 from flexcom 4).
+> >> and obviously:
+> >> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> >>
+> >> Thanks Romain!
+> >>
+> >> Regards,
+> >>
+> >> > ---
+> >> >  drivers/mfd/atmel-flexcom.c | 65 ++++++++++++++++++++++++++++++++++-----------
+> >> >  1 file changed, 50 insertions(+), 15 deletions(-)
 > >
-> > v2:
-> > - vectors_page and compat_vdso_spec as array of 2
-> > - free sigpage if vectors allocation failed
-> > - adjust makefile so one line for each of the assembler source modules
-> > - split off assembler changes to a new previous patch in series to reduce churn
-> > - modify slightly the feature documentation to reduce its reach
-> > - modify slightly the feature documentation to rationalize the yes default.
-> > - There are more ifdefs as a result of the rebase.
+> > This is the first time I've seen this patch.  Why's that?
 > >
-> > v3:
-> > - rebase (minor conflicts)
 > 
-> This looks great to me. I'd love to see kuser helpers gone. :)
+> As the patchset covers many subsystems, get_maintainers.pl provided a
+> very long list of both developpers and mailing lists (28). I thought it
+> was a good idea to shorten it a little. Bad idea. Sorry.
 > 
-> Catalin, Will, does this need anything else?
 
-I haven't had chance to look at the patches yet (buried in other stuff), but
-I aim to get to it in the next couple of weeks.
+I think the correct way of handling that would have been to send each
+patch to the proper subsystem as there are no dependency here.
 
-Will
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
