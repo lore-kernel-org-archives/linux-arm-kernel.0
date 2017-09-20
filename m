@@ -1,145 +1,113 @@
 From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Wed, 20 Sep 2017 13:14:05 +0200
-Subject: [PATCH V2 5/8] MIPS: BMIPS: name the refclk clock for uart
+Date: Wed, 20 Sep 2017 13:14:08 +0200
+Subject: [PATCH V2 8/8] MIPS: BCM63XX: split out swpkt_sar/usb clocks
 In-Reply-To: <20170920111408.29711-1-jonas.gorski@gmail.com>
 References: <20170920111408.29711-1-jonas.gorski@gmail.com>
-Message-ID: <20170920111408.29711-6-jonas.gorski@gmail.com>
+Message-ID: <20170920111408.29711-9-jonas.gorski@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the clock name to the uart nodes, to name the input clock
-properly.
+Make the secondary switch clocks their own clocks. This allows proper
+enable reference counting between SAR/XTM and the main switch clocks,
+and controlling them individually from drivers.
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
 ---
- arch/mips/boot/dts/brcm/bcm3368.dtsi  | 2 ++
- arch/mips/boot/dts/brcm/bcm63268.dtsi | 2 ++
- arch/mips/boot/dts/brcm/bcm6328.dtsi  | 2 ++
- arch/mips/boot/dts/brcm/bcm6358.dtsi  | 2 ++
- arch/mips/boot/dts/brcm/bcm6362.dtsi  | 2 ++
- arch/mips/boot/dts/brcm/bcm6368.dtsi  | 2 ++
- 6 files changed, 12 insertions(+)
+ arch/mips/bcm63xx/clk.c | 61 +++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 51 insertions(+), 10 deletions(-)
 
-diff --git a/arch/mips/boot/dts/brcm/bcm3368.dtsi b/arch/mips/boot/dts/brcm/bcm3368.dtsi
-index bee855cb8073..772fb42b7730 100644
---- a/arch/mips/boot/dts/brcm/bcm3368.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm3368.dtsi
-@@ -82,6 +82,7 @@
- 			interrupts = <2>;
+diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
+index 2018425fe97e..164115944a7f 100644
+--- a/arch/mips/bcm63xx/clk.c
++++ b/arch/mips/bcm63xx/clk.c
+@@ -122,21 +122,56 @@ static struct clk clk_ephy = {
+ };
  
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
+ /*
++ * Ethernet switch SAR clock
++ */
++static void swpkt_sar_set(struct clk *clk, int enable)
++{
++	if (BCMCPU_IS_6368())
++		bcm_hwclock_set(CKCTL_6368_SWPKT_SAR_EN, enable);
++	else
++		return;
++}
++
++static struct clk clk_swpkt_sar = {
++	.set	= swpkt_sar_set,
++};
++
++/*
++ * Ethernet switch USB clock
++ */
++static void swpkt_usb_set(struct clk *clk, int enable)
++{
++	if (BCMCPU_IS_6368())
++		bcm_hwclock_set(CKCTL_6368_SWPKT_USB_EN, enable);
++	else
++		return;
++}
++
++static struct clk clk_swpkt_usb = {
++	.set	= swpkt_usb_set,
++};
++
++/*
+  * Ethernet switch clock
+  */
+ static void enetsw_set(struct clk *clk, int enable)
+ {
+-	if (BCMCPU_IS_6328())
++	if (BCMCPU_IS_6328()) {
+ 		bcm_hwclock_set(CKCTL_6328_ROBOSW_EN, enable);
+-	else if (BCMCPU_IS_6362())
++	} else if (BCMCPU_IS_6362()) {
+ 		bcm_hwclock_set(CKCTL_6362_ROBOSW_EN, enable);
+-	else if (BCMCPU_IS_6368())
+-		bcm_hwclock_set(CKCTL_6368_ROBOSW_EN |
+-				CKCTL_6368_SWPKT_USB_EN |
+-				CKCTL_6368_SWPKT_SAR_EN,
+-				enable);
+-	else
++	} else if (BCMCPU_IS_6368()) {
++		if (enable) {
++			clk_enable_unlocked(&clk_swpkt_sar);
++			clk_enable_unlocked(&clk_swpkt_usb);
++		} else {
++			clk_disable_unlocked(&clk_swpkt_usb);
++			clk_disable_unlocked(&clk_swpkt_sar);
++		}
++		bcm_hwclock_set(CKCTL_6368_ROBOSW_EN, enable);
++	} else {
+ 		return;
++	}
  
- 			status = "disabled";
- 		};
-@@ -94,6 +95,7 @@
- 			interrupts = <3>;
+ 	if (enable) {
+ 		/* reset switch core afer clock change */
+@@ -261,8 +296,12 @@ static void xtm_set(struct clk *clk, int enable)
+ 	if (!BCMCPU_IS_6368())
+ 		return;
  
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
+-	bcm_hwclock_set(CKCTL_6368_SAR_EN |
+-			CKCTL_6368_SWPKT_SAR_EN, enable);
++	if (enable)
++		clk_enable_unlocked(&clk_swpkt_sar);
++	else
++		clk_disable_unlocked(&clk_swpkt_sar);
++
++	bcm_hwclock_set(CKCTL_6368_SAR_EN, enable);
  
- 			status = "disabled";
- 		};
-diff --git a/arch/mips/boot/dts/brcm/bcm63268.dtsi b/arch/mips/boot/dts/brcm/bcm63268.dtsi
-index 7e6bf2cc0287..b033a23b5e13 100644
---- a/arch/mips/boot/dts/brcm/bcm63268.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm63268.dtsi
-@@ -83,6 +83,7 @@
- 			interrupts = <5>;
- 
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 
- 			status = "disabled";
- 		};
-@@ -95,6 +96,7 @@
- 			interrupts = <34>;
- 
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 
- 			status = "disabled";
- 		};
-diff --git a/arch/mips/boot/dts/brcm/bcm6328.dtsi b/arch/mips/boot/dts/brcm/bcm6328.dtsi
-index 5633b9d90f55..7c3061ba6d38 100644
---- a/arch/mips/boot/dts/brcm/bcm6328.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm6328.dtsi
-@@ -68,6 +68,7 @@
- 			interrupt-parent = <&periph_intc>;
- 			interrupts = <28>;
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 			status = "disabled";
- 		};
- 
-@@ -77,6 +78,7 @@
- 			interrupt-parent = <&periph_intc>;
- 			interrupts = <39>;
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/mips/boot/dts/brcm/bcm6358.dtsi b/arch/mips/boot/dts/brcm/bcm6358.dtsi
-index f9d8d392162b..ab9d6c268a84 100644
---- a/arch/mips/boot/dts/brcm/bcm6358.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm6358.dtsi
-@@ -92,6 +92,7 @@
- 			interrupts = <2>;
- 
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 
- 			status = "disabled";
- 		};
-@@ -104,6 +105,7 @@
- 			interrupts = <3>;
- 
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 
- 			status = "disabled";
- 		};
-diff --git a/arch/mips/boot/dts/brcm/bcm6362.dtsi b/arch/mips/boot/dts/brcm/bcm6362.dtsi
-index c507da594f2f..ca93c9a6f23f 100644
---- a/arch/mips/boot/dts/brcm/bcm6362.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm6362.dtsi
-@@ -83,6 +83,7 @@
- 			interrupts = <3>;
- 
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 
- 			status = "disabled";
- 		};
-@@ -95,6 +96,7 @@
- 			interrupts = <4>;
- 
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 
- 			status = "disabled";
- 		};
-diff --git a/arch/mips/boot/dts/brcm/bcm6368.dtsi b/arch/mips/boot/dts/brcm/bcm6368.dtsi
-index d0e3a70b32e2..da4ec89710fd 100644
---- a/arch/mips/boot/dts/brcm/bcm6368.dtsi
-+++ b/arch/mips/boot/dts/brcm/bcm6368.dtsi
-@@ -89,6 +89,7 @@
- 			interrupt-parent = <&periph_intc>;
- 			interrupts = <2>;
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 			status = "disabled";
- 		};
- 
-@@ -98,6 +99,7 @@
- 			interrupt-parent = <&periph_intc>;
- 			interrupts = <3>;
- 			clocks = <&periph_clk>;
-+			clock-names = "refclk";
- 			status = "disabled";
- 		};
- 
+ 	if (enable) {
+ 		/* reset sar core afer clock change */
+@@ -451,6 +490,8 @@ static struct clk_lookup bcm6358_clks[] = {
+ 	CLKDEV_INIT(NULL, "usbd", &clk_usbd),
+ 	CLKDEV_INIT(NULL, "spi", &clk_spi),
+ 	CLKDEV_INIT(NULL, "pcm", &clk_pcm),
++	CLKDEV_INIT(NULL, "swpkt_sar", &clk_swpkt_sar),
++	CLKDEV_INIT(NULL, "swpkt_usb", &clk_swpkt_usb),
+ 	CLKDEV_INIT("bcm63xx_enet.0", "enet", &clk_enet0),
+ 	CLKDEV_INIT("bcm63xx_enet.1", "enet", &clk_enet1),
+ };
 -- 
 2.13.2
