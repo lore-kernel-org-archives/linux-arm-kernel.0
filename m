@@ -1,56 +1,59 @@
-From: joerg.krause@embedded.rocks (=?UTF-8?q?J=C3=B6rg=20Krause?=)
-Date: Wed, 20 Sep 2017 11:44:49 +0200
-Subject: [PATCH] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux mode
-Message-ID: <20170920094449.28683-1-joerg.krause@embedded.rocks>
+From: lukma@denx.de (=?UTF-8?Q?=c5=81ukasz_Majewski?=)
+Date: Wed, 20 Sep 2017 11:45:12 +0200
+Subject: [PATCH 1/2] dts: display5: Device tree description of LWN's
+ DISPLAY5 board
+In-Reply-To: <CAOMZO5CHR14LWqkgpSiPnMV_6X+Fq=fe-KmE5CrdiqxRUyT8xg@mail.gmail.com>
+References: <1505746765-965-1-git-send-email-lukma@denx.de>
+ <CAOMZO5Du4gH1jwcP4ssRPD17GsEAVERpkNBD7W2z5f+4TAd=nA@mail.gmail.com>
+ <f203efc5-b85c-aa3d-0dc6-929ea348e5f6@denx.de>
+ <CAOMZO5CHR14LWqkgpSiPnMV_6X+Fq=fe-KmE5CrdiqxRUyT8xg@mail.gmail.com>
+Message-ID: <3537f09b-be9d-0b43-0bec-87d08b43312f@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32 kHz reference clock on the i.MX6UL(L) can be output by
-setting the external signal XTALOSC_REF_CLK_32K in one of the
-following ways [1]:
+Hi Fabio,
 
-|----------------------------------------------------------|
-| Signal              | Pad             | Mode | Direction |
-|----------------------------------------------------------|
-| XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
-|                     | GPIO1_IO03      | ALT3 |           |
-|                     | JTAG_TCK        | ALT6 |           |
-|----------------------------------------------------------|
+> Hi Lukasz,
+> 
+> On Wed, Sep 20, 2017 at 6:22 AM, ?ukasz Majewski <lukma@denx.de> wrote:
+> 
+>> Could you be more specific here?
+>>
+>> The 0x80000000 corresponds to IMX_NO_PAD_CTL in pinctrl-imx.c, which
+>> prevents from manual GPIO control.
+>>
+>> The 0x80000000 value is the IOMUXC_SW_PAD_CTL_PAD_CSI0_DATA11 (0x020E_0654)
+>> config data (16 bits only -> 0x0).
+>>
+>> Writing 0x0 to this register is perfectly fine for my application.
+>>
+>>
+>> I'm a bit in doubt to what I shall do more?
+> 
+> As per the Reference Manual, the POR reset for
+> IOMUXC_SW_PAD_CTL_PAD_CSI0_DATA11 is 0x1b0b0.
+> 
+> 0x80000000 tells the kernel to not touch this IOMUX and use whatever
+> value comes from the bootloader.
+> 
+> If your bootloader does not touch this register, then you probably
+> read 0x1b0b0 from it.
+> 
+> In this case, please do this instead:
+> 
+> MX6QDL_PAD_CSI0_DAT11__GPIO5_IO29 0x1b0b0
+> 
 
-[1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
+Ok. Thanks for explanation :-)
 
-Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
----
- arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
-index 0034eeb84542..e12654018c23 100644
---- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-@@ -63,6 +63,7 @@
- #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
- #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
- #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
-+#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
- #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
- #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
- #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
-@@ -101,6 +102,7 @@
- #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
- #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
- #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
-+#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
- #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
- #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
- #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
-@@ -316,6 +318,7 @@
- #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
- #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
- #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
-+#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
- #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
- #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
- #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
 -- 
-2.14.1
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
