@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Sep 2017 13:10:00 +0200
-Subject: [PATCH 8/8] ARM: drs: iwg22m: Add SPI NOR support
-In-Reply-To: <1505322341-9480-9-git-send-email-chris.paterson2@renesas.com>
+Date: Wed, 20 Sep 2017 13:10:32 +0200
+Subject: [PATCH 6/8] ARM: dts: iwg20m: Add SPI NOR support
+In-Reply-To: <1505322341-9480-7-git-send-email-chris.paterson2@renesas.com>
 References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-9-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdW2_Tz6Mu7bwTXiAuyyeUvJTFrbyMAnxCi+Nj7ig65Ong@mail.gmail.com>
+ <1505322341-9480-7-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <CAMuHMdULzENGQT8kPX0aNqUpW=bOFo6850tnneu8DBqNp24RRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,7 +18,6 @@ On Wed, Sep 13, 2017 at 7:05 PM, Chris Paterson
 > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-With the subject fixed (s/drs/dts/):
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
