@@ -1,64 +1,82 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 20 Sep 2017 09:28:23 -0700
-Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
-In-Reply-To: <20170920154143.GO20805@n2100.armlinux.org.uk>
-References: <20170920151802.7609-1-romain.izard.pro@gmail.com>
- <CAKv+Gu_ZMy-A-Du3ikVe47pcUR7hSBFHY+hQQ8APGGP1iRcigA@mail.gmail.com>
- <20170920154143.GO20805@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu8q1bqe6hHpK98eskF5qmtLu6+Hqw6S7i6qgZy3OjErXQ@mail.gmail.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Wed, 20 Sep 2017 09:31:31 -0700
+Subject: [PATCH] ARM: uaccess: Add missing include for set_thread_flag
+In-Reply-To: <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
+References: <20170919115042.6800-1-net147@gmail.com>
+ <CAJcbSZEiHW=yH+ATvLq=am4nbVdhbqAxkH-+jEymhNkN+Pkb=A@mail.gmail.com>
+ <CANwerB1Pn2YAN9VmbSAzD3Se47ThAQNBRLH71HV_e7VZ34yAPQ@mail.gmail.com>
+Message-ID: <CAJcbSZF1PuMPTM3uZOVzfaUXj1Q3+6Nj2c6DXU+RDrwT8P13Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2017 at 08:41, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Sep 20, 2017 at 08:26:09AM -0700, Ard Biesheuvel wrote:
->> Hi Romain,
->>
->> On 20 September 2017 at 08:18, Romain Izard <romain.izard.pro@gmail.com> wrote:
->> > For the 32-bit ARM architecture, unaligned access support is variable.
->> > On a chip without a MMU, an unaligned access returns a rotated data word
->> > and must be avoided.
->> >
->> > When a MMU is available, it can be trapped. On ARMv6 or ARMv7, it can also
->> > be handled by the hardware, depending on the type of access instruction.
->> > Unaligned access of 32 bits or less are corrected, while larger access
->> > provoke a trap.
->> >
->> > Unfortunately, the compiler is able to merge two 32-bit access that
->> > would generate a LDR instruction, that works on unaligned access, into a
->> > single LDM access that will not work. This is not a common situation,
->> > but it has been observed in the LZ4 decompression code.
->> >
->> > To prevent this type of optimization, it is necessary to change the
->> > explicit accessors for unaligned addresses from those defined in the
->> > access_ok.h header, to those defined in the packed_struct.h header.
->> >
->> > Add an arch-specific header to ARM, to retain other optimizations that
->> > rely on HAVE_EFFICIENT_UNALIGNED_ACCESS, while making sure that access
->> > that explicitly rely on the unaligned accessors are correctly handled by
->> > the compiler.
->> >
->> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
->> > ---
->> >
->>
->> If access_ok.h has been observed to produce different output from the
->> struct versions (using any compiler), I guess we cannot simply change
->> the asm-generic default and expect everybody to be ok with that. So I
->> agree this is the most appropriate course of action.
+On Tue, Sep 19, 2017 at 2:35 PM, Jonathan Liu <net147@gmail.com> wrote:
 >
-> However, what effect does this have on the code generated for the rest
-> of the kernel?
+> Hi Thomas,
 >
+> The top of the C source file I am compiling has:
+> #include <linux/kernel.h>
+> #include <asm/uaccess.h>
+>
+> Tracing through the asm/uaccess.h include I see
+> asm/uaccess.h -> asm/domain.h -> asm/thread_info.h
+>
+> but set_thread_info is defined in linux/thread_info.h not
+> asm/thread_info.h (see
+> http://elixir.free-electrons.com/linux/v4.14-rc1/ident/set_thread_flag).
 
-On v6/v7, we may currently rely on alignment fixups for unaligned
-ldm/stm instructions in the core kernel, and so avoiding those sounds
-like an improvement to me. The 'struct' unaligned accessor type looks
-like the sweet spot for ARM, since it will prevent the compiler from
-using ldm/stm/ldrd/etc on quantities that may be unaligned, but does
-not fall back to byte accesses on CPUs that can perform unaligned
-accesses in hardware when using ldr/str.
+I see, I think I could not reproduce this issue because I already
+reverted the original commit in favor of a different approach on
+linux-next (see commit 2404269bc4e77a67875c8db6667be34c9913c96e).
 
-I guess you may be concerned about performance regressions for
-scenarios where the alignment fixup is only rarely triggered? Do you
-have anything specific in mind?
+Let me know if this commit resolve the issue and thanks for reaching out.
+
+>
+> Regards,
+> Jonathan
+>
+> On 20 September 2017 at 00:32, Thomas Garnier <thgarnie@google.com> wrote:
+> > On Tue, Sep 19, 2017 at 4:50 AM, Jonathan Liu <net147@gmail.com> wrote:
+> >> Fixes "implicit declaration of function" compile error for out-of-tree
+> >> kernel modules including asm/uaccess.h.
+> >
+> > I failed to reproduce this issue by creating an out of tree module
+> > with a separate file (with only uaccess.h). Are you using a special
+> > config?
+> >
+> > Looking at the headers on uaccess.h. You get thread_info through:
+> >
+> >  asm/domain.h -> asm/thread_info.h
+> >
+> >>
+> >> Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
+> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> >> ---
+> >>  arch/arm/include/asm/uaccess.h | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+> >> index 87936dd5d151..13d1877ffb75 100644
+> >> --- a/arch/arm/include/asm/uaccess.h
+> >> +++ b/arch/arm/include/asm/uaccess.h
+> >> @@ -17,6 +17,7 @@
+> >>  #include <asm/unified.h>
+> >>  #include <asm/compiler.h>
+> >>
+> >> +#include <linux/thread_info.h>
+> >>  #include <asm/extable.h>
+> >>
+> >>  /*
+> >> --
+> >> 2.13.2
+> >>
+> >
+> >
+> >
+> > --
+> > Thomas
+
+
+
+
+-- 
+Thomas
