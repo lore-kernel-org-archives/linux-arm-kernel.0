@@ -1,83 +1,49 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 20 Sep 2017 12:17:19 +0100
-Subject: [PATCH v2] arm64: dts: foundation-v8: Enable PSCI mode
-In-Reply-To: <da8a0cf5-3c1e-1398-b5c3-ac489ae955fa@arm.com>
-References: <20170918153832.16356-1-daniel.thompson@linaro.org>
- <20170919183204.12751-1-daniel.thompson@linaro.org>
- <da8a0cf5-3c1e-1398-b5c3-ac489ae955fa@arm.com>
-Message-ID: <9a542b9a-3c37-ed8a-04e6-de41493f4b0d@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Sep 2017 12:34:46 +0100
+Subject: [PATCH v7 2/8] mfd: wm97xx-core: core support for wm97xx Codec
+In-Reply-To: <20170920082443.cqimrbhddum23lof@dell>
+References: <20170913193723.16234-1-robert.jarzmik@free.fr>
+ <20170913193723.16234-3-robert.jarzmik@free.fr>
+ <20170914074146.dnibkvom4yuzejf3@dell>
+ <20170914074300.iobuwn2hrmnf6sen@dell>
+ <20170914160453.gys3imt4eobckcrq@sirena.org.uk>
+ <20170918085236.z6gmgrwvsjvvc4cd@dell>
+ <20170919121539.mz2mettkefxf3oer@sirena.co.uk>
+ <20170919152253.tvj3hheggrx4lgig@dell>
+ <20170919160422.l7lxmfl6yrjnpalb@sirena.co.uk>
+ <20170920082443.cqimrbhddum23lof@dell>
+Message-ID: <20170920113446.ttwv23riutpp7e5i@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/17 10:42, Sudeep Holla wrote:
-> 
-> 
-> On 19/09/17 19:32, Daniel Thompson wrote:
->> Currently if the Foundation model is running ARM Trusted Firmware then
->> the kernel, which is configured to use spin tables, cannot start secondary
->> processors or "power off" the simulation.
->>
->> After adding a couple of labels to the include file and splitting out the
->> spin-table configuration into a header, we add a couple of new headers
->> together with two new DTs (GICv2+PSCI and GICv3+PSCI).
->>
->> The new GICv3+PSCI DT has been boot tested, the remaining three (two of
->> which existed prior to this patch) have been "tested" by decompiling the
->> blobs and comparing them against a reference.
->>
-> 
-> How different are these from the ones hosted in [1] ?
+On Wed, Sep 20, 2017 at 09:24:43AM +0100, Lee Jones wrote:
+> On Tue, 19 Sep 2017, Mark Brown wrote:
 
-They look like they were either independently written or diverged a long 
-time ago. The existing kernel DTs describe hardware absent from the ARM 
-TF ones and vice versa.
+> > It really helps if we can get the earlier parts of the series moving
+> > even if the rest of it's in review still - I know I back off on
+> > reviewing things if it looks like their dependencies aren't making
+> > progress.
 
-With specific reference to PSCI it looks like my patches could perhaps 
-be improved by adding idle-state support.
+> Just for your FYI, I tend to review my parts then wait for the
+> rest of the series to be reviewed, then discuss how the set should be
+> handled.
 
+> Holding back on reviewing your parts is not a good idea.  If everyone
+> did that we'd end up in a circular Maintainer dependency and nothing
+> would ever get reviewed.
 
-> On argument is that we want to take the DTS out of device tree as
-> firmware is responsible for generating them. Alternatively, we may be
-> duplicating resulting in discrepancies over time by coping it into kernel.
-
-The general problem is copying from where?
-
-The kernel DTs are a well maintained centralized repository which is 
-*really* useful. git grep across the kernel DTs is a hugely powerful 
-tool when trying to better understand an ecosystem as sprawling and 
-diverse as ARMs. In fact I've even seen those sort of searchs used as a 
-basis to clean up unused code. Seeing that centralized repository 
-splinter into separate per-vendor silos would be a huge loss for kernel 
-developers.
-
-
-> Since users of ARM TF must be able to access these, I am not sure if it
-> makes sense to merge these. Or we remove it from ARM TF to avoid any
-> conflicts/discrepancies. >
-> Thoughts ?
-
-I kind of agree that maintaining DTs and DT documentation in the kernel 
-is a little odd given that the kernel is not the only player here 
-(FreeBSD, u-boot, etc). However it is sufficiently well maintained that 
-projects are content(ish) to regard the kernel as the canonical source 
-for these things (u-boot, for example, seeks to shadow kernel DTs 
-without modifying them).
-
-However regardless of the above I'd say they should be removed from ARM 
-TF. ARM TF does not use, modify, pass on or in any way consume DT... it 
-has no skin in the game here. Why does it want to own a few of blobs for 
-a small subset of the platforms it supports? I'm afraid that makes no 
-sense to me, to the extent that it didn't even occur to me to *look* in 
-the ARM TF sources to find any DTs for FVP until you pointed them out.
-
-In other words, whilst people could discuss alternative ways to manage 
-DTs[1], I can't see any universe where ARM TF would be a logical place 
-to keep them.
-
-
-Daniel.
-
-
-[1] ... and I'd further suggest that only perhaps people who are
-     prepared to put resources into fixing it should convene such a
-     discussion.
+I get fed up with having to re-review the same patches over and over and
+over again while people work out what's going on with the earlier parts
+of the series, that gets very time consuming and is error prone.  If
+we're getting churn early on in the series that's causing things to
+change then it's better to let that settle down and look properly at the
+results than glaze over looking at each minor change as it comes in and
+miss other things that get tweaked.  Once the dependencies are stable
+then it becomes worthwhile again.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170920/a7bf2923/attachment.sig>
