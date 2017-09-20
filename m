@@ -1,78 +1,67 @@
-From: Alan.Hayward@arm.com (Alan Hayward)
-Date: Wed, 20 Sep 2017 10:59:55 +0000
-Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
-Message-ID: <FC5BA359-D37C-493C-87CD-146B83D3CCB5@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 20 Sep 2017 19:01:57 +0800
+Subject: [xlnx:master 1035/1039] drivers//crypto/zynqmp-sha.c:125:3: error:
+ implicit declaration of function '__flush_cache_user_range'
+Message-ID: <201709201955.5FSnqErn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Resending without disclaimer)
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   ca1d7a18cb61a29a329774f634fcd9daabc1d68d
+commit: 6aa92efb058fe13225b5ee06e2d6ca5f221e505f [1035/1039] crypto: zynqmp-sha: Adopted SHA3 support for ZynqMP Soc
+config: ia64-allyesconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6aa92efb058fe13225b5ee06e2d6ca5f221e505f
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-> On 31 Aug 2017, at 18:00, Dave Martin <Dave.Martin@arm.com> wrote:
+All errors (new ones prefixed by >>):
 
-> 
-> +int sve_set_vector_length(struct task_struct *task,
-> +			  unsigned long vl, unsigned long flags)
-> +{
-> +	WARN_ON(task == current && preemptible());
-> +
-> +	if (flags & ~(unsigned long)(PR_SVE_VL_INHERIT |
-> +				     PR_SVE_SET_VL_ONEXEC))
-> +		return -EINVAL;
-> +
-> +	if (!sve_vl_valid(vl))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Clamp to the maximum vector length that VL-agnostic SVE code can
-> +	 * work with.  A flag may be assigned in the future to allow setting
-> +	 * of larger vector lengths without confusing older software.
-> +	 */
-> +	if (vl > SVE_VL_ARCH_MAX)
-> +		vl = SVE_VL_ARCH_MAX;
-> +
-> +	vl = find_supported_vector_length(vl);
-> +
+   drivers//crypto/zynqmp-sha.c: In function 'zynqmp_sha_update':
+>> drivers//crypto/zynqmp-sha.c:125:3: error: implicit declaration of function '__flush_cache_user_range' [-Werror=implicit-function-declaration]
+      __flush_cache_user_range((unsigned long)kbuf,
+      ^~~~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
+vim +/__flush_cache_user_range +125 drivers//crypto/zynqmp-sha.c
 
-Given, sve_set_vector_length is called when setting the vector length in
-PTRACE_SETREGSET, it looks to me like if you set VL to a value that?s not
-supported by the hardware, then it?s going to round down to the previous value.
-Is that correct? I?m not sure if that?s explained in the docs?
+   107	
+   108	static int zynqmp_sha_update(struct ahash_request *req)
+   109	{
+   110		struct zynqmp_sha_ctx *tctx = crypto_tfm_ctx(req->base.tfm);
+   111		struct zynqmp_sha_dev *dd = tctx->dd;
+   112		char *kbuf;
+   113		size_t dma_size = req->nbytes;
+   114		dma_addr_t dma_addr;
+   115		int ret;
+   116	
+   117		if (!req->nbytes)
+   118			return 0;
+   119	
+   120		kbuf = dma_alloc_coherent(dd->dev, dma_size, &dma_addr, GFP_KERNEL);
+   121		if (!kbuf)
+   122			return -ENOMEM;
+   123	
+   124		scatterwalk_map_and_copy(kbuf, req->src, 0, req->nbytes, 0);
+ > 125		 __flush_cache_user_range((unsigned long)kbuf,
+   126					  (unsigned long)kbuf + dma_size);
+   127		ret = zynqmp_pm_sha_hash(dma_addr, req->nbytes, ZYNQMP_SHA3_UPDATE);
+   128		dma_free_coherent(dd->dev, dma_size, kbuf, dma_addr);
+   129	
+   130		return ret;
+   131	}
+   132	
 
-What happens if you give a vl value lower than the min supported value in the
-hardware?
-
-
-> +/*
-> + * All vector length selection from userspace comes through here.
-> + * We're on a slow path, so some sanity-checks are included.
-> + * If things go wrong there's a bug somewhere, but try to fall back to a
-> + * safe choice.
-> + */
-> +static unsigned int find_supported_vector_length(unsigned int vl)
-> +{
-> +	int bit;
-> +	int max_vl = sve_max_vl;
-> +
-> +	if (WARN_ON(!sve_vl_valid(vl)))
-> +		vl = SVE_VL_MIN;
-> +
-> +	if (WARN_ON(!sve_vl_valid(max_vl)))
-> +		max_vl = SVE_VL_MIN;
-> +
-> +	if (vl > max_vl)
-> +		vl = max_vl;
-> +
-> +	bit = find_next_bit(sve_vq_map, SVE_VQ_MAX,
-> +			    vq_to_bit(sve_vq_from_vl(vl)));
-> +	return sve_vl_from_vq(bit_to_vq(bit));
-> +}
-> +
-
-
-Thanks,
-Alan.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 48211 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170920/190e899e/attachment-0001.gz>
