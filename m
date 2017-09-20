@@ -1,52 +1,30 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 20 Sep 2017 16:56:01 +0200
-Subject: [PATCH v2 0/2] ARM: Actions Semi S500 SMP cleanups
-In-Reply-To: <20170905212000.7009-1-afaerber@suse.de>
-References: <20170905212000.7009-1-afaerber@suse.de>
-Message-ID: <2a13d28a-7115-ee18-a131-081c58115c70@suse.de>
+From: solar@openwall.com (Solar Designer)
+Date: Wed, 20 Sep 2017 17:03:29 +0200
+Subject: [kernel-hardening] [PATCH v2 0/5] stackprotector: ascii armor the
+ stack canary
+In-Reply-To: <1505906284.3490.5.camel@opteya.com>
+References: <20170524155751.424-1-riel@redhat.com>
+ <20170919171600.GA31441@openwall.com> <1505906284.3490.5.camel@opteya.com>
+Message-ID: <20170920150329.GA7017@openwall.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.09.2017 um 23:19 schrieb Andreas F?rber:
-> Hello,
+On Wed, Sep 20, 2017 at 01:18:04PM +0200, Yann Droneaud wrote:
+> Le mardi 19 septembre 2017 ?? 19:16 +0200, Solar Designer a ??crit :
+> >
+> > We could put/require a NUL in the middle of the canary,
+> > but with the full canary being only 64-bit at most that would also
+> > make some attacks easier.
 > 
-> This mini-series further cleans up the SMP code for Actions Semi S500 SoC.
-> 
-> @David, can you please reply with an Acked-by for the second patch? Thanks!
-> 
-> Work branch for testing:
-> https://github.com/afaerber/linux/commits/bg96-next
-> 
-> Have a lot of fun!
-> 
-> Cheers,
-> Andreas
-> 
-> v1 -> v2:
-> * Prepended __pa_symbol cleanup (Florian)
-> 
-> Cc: David Liu <liuwei@actions-semi.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Andreas F?rber (2):
->   ARM: owl: smp: Use __pa_symbol()
->   ARM: owl: smp: Drop owl_secondary_boot()
+> Are you suggesting to randomly select which byte to set to 0 in each
+> canary ?
 
-No further review from David or Florian on v1 or this v2, so applied to
-v4.15/arm now:
+Definitely not.  That's only 8 different possibilities per canary, and
+the weakest one will affect exploitability in each scenario.  So that
+would be a fairly clear change to the worse.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.15/arm
+I suggest that we make no further changes at this time, unless someone
+comes up with an idea that would clearly hurt exploitation more than it
+helps exploitation, overall across different scenarios.
 
-Regards,
-Andreas
-
->  arch/arm/mach-actions/Makefile  |  4 +---
->  arch/arm/mach-actions/headsmp.S | 52 -----------------------------------------
->  arch/arm/mach-actions/platsmp.c |  2 +-
->  3 files changed, 2 insertions(+), 56 deletions(-)
->  delete mode 100644 arch/arm/mach-actions/headsmp.S
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Alexander
