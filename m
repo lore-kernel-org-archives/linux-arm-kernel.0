@@ -1,60 +1,46 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 20 Sep 2017 15:04:50 +0800
-Subject: [PATCH 6/7] cpufreq: make cpufreq_generic_init
- transition_latency default to CPUFREQ_ETERNAL
-In-Reply-To: <20170919231007.GJ30848@ubuntu>
-References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
- <1503504610-12880-7-git-send-email-aisheng.dong@nxp.com>
- <20170919231007.GJ30848@ubuntu>
-Message-ID: <20170920070450.GB32187@b29396-OptiPlex-7040>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 20 Sep 2017 09:24:02 +0200
+Subject: [PATCH v2] dmaengine: sun6i: use of_device_get_match_data
+Message-ID: <20170920072402.27704-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 04:10:07PM -0700, Viresh Kumar wrote:
-> On 24-08-17, 00:10, Dong Aisheng wrote:
-> > If no valid transition_latency specified, let's make it default to
-> > CPUFREQ_ETERNAL which is consistent with its definition.
-> > 
-> > This can save some of the same checkings like this:
-> >         transition_latency = dev_pm_opp_get_max_transition_latency(cpu_dev);
-> > -       if (!transition_latency)
-> > -               transition_latency = CPUFREQ_ETERNAL;
-> >         ret = cpufreq_generic_init(policy, freq_table, transition_latency);
-> > 
-> > Cc: Viresh Kumar <vireshk@kernel.org>
-> > Cc: Nishanth Menon <nm@ti.com>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/cpufreq/cpufreq.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> > index 9bf97a3..da07de6 100644
-> > --- a/drivers/cpufreq/cpufreq.c
-> > +++ b/drivers/cpufreq/cpufreq.c
-> > @@ -180,6 +180,8 @@ int cpufreq_generic_init(struct cpufreq_policy *policy,
-> >  		return ret;
-> >  	}
-> >  
-> > +	if (!transition_latency)
-> > +		transition_latency = CPUFREQ_ETERNAL;
-> >  	policy->cpuinfo.transition_latency = transition_latency;
-> >  
-> >  	/*
-> 
-> Can you update all the existing drivers as well (in the same patch)
-> who can benefit from it?
+The usage of of_device_get_match_data reduce the code size a bit.
+Furthermore, it prevents an improbable dereference when
+of_match_device() return NULL.
 
-Yes, of course.
-Will do it in the updated version later.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+Changes since v1:
+- fixed commit title
+ drivers/dma/sun6i-dma.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Thanks
-
-Regards
-Dong Aisheng
-
-> 
-> -- 
-> viresh
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index bcd496edc70f..584f4e82a9be 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -1064,7 +1064,6 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+ 
+ static int sun6i_dma_probe(struct platform_device *pdev)
+ {
+-	const struct of_device_id *device;
+ 	struct sun6i_dma_dev *sdc;
+ 	struct resource *res;
+ 	int ret, i;
+@@ -1073,10 +1072,9 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	if (!sdc)
+ 		return -ENOMEM;
+ 
+-	device = of_match_device(sun6i_dma_match, &pdev->dev);
+-	if (!device)
++	sdc->cfg = of_device_get_match_data(&pdev->dev);
++	if (!sdc->cfg)
+ 		return -ENODEV;
+-	sdc->cfg = device->data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	sdc->base = devm_ioremap_resource(&pdev->dev, res);
+-- 
+2.13.5
