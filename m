@@ -1,126 +1,87 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Sep 2017 14:47:57 +0200
-Subject: [PATCH 7/9] arm64: dts: marvell: cp110: add PPv2 port interrupts
-In-Reply-To: <20170918075814.27405-8-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Mon, 18 Sep 2017 09:58:12 +0200")
-References: <20170918075814.27405-1-antoine.tenart@free-electrons.com>
- <20170918075814.27405-8-antoine.tenart@free-electrons.com>
-Message-ID: <87lgl9pmde.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Sep 2017 13:47:26 +0100
+Subject: [PATCH v2] bootwrapper: SVE: Enable SVE for EL2 and below
+In-Reply-To: <1505909388-13513-1-git-send-email-Dave.Martin@arm.com>
+References: <1505909388-13513-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170920124726.GA26836@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On lun., sept. 18 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On Wed, Sep 20, 2017 at 01:09:48PM +0100, Dave Martin wrote:
+> By default, SVE will trap to EL3.  We also want to make sure that
+> lower ELs have access to the full SVE vector length before dropping
+> down.
+> 
+> This patch programs CPTR_EL3 and ZCR_EL3 appropriately to enable
+> SVE for lower exception levels and make sure that they can use the
+> full vector length provided by the hardware.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
 
-> Ports interrupts are used by the PPv2 driver when no PHY is connected to
-> a port. This patch adds a description of these interrupts.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Tested-by: Marcin Wojtas <mw@semihalf.com>
+This looks fine, builds with my toolchain collection, and I assume
+you've boot-tested this.
 
-Applied on mvebu/dt64
+I've pushed this out now.
 
 Thanks,
+Mark.
 
-Gregory
 > ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 15 +++++++++------
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 15 +++++++++------
->  2 files changed, 18 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index a26948ff72b4..b1119c541f16 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -74,9 +74,10 @@
->  						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
-> -						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>;
-> +						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
-> +						     <ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
->  					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
-> -							  "tx-cpu3", "rx-shared";
-> +							  "tx-cpu3", "rx-shared", "link";
->  					port-id = <0>;
->  					gop-port-id = <0>;
->  					status = "disabled";
-> @@ -87,9 +88,10 @@
->  						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
-> -						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>;
-> +						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
-> +						     <ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
->  					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
-> -							  "tx-cpu3", "rx-shared";
-> +							  "tx-cpu3", "rx-shared", "link";
->  					port-id = <1>;
->  					gop-port-id = <2>;
->  					status = "disabled";
-> @@ -100,9 +102,10 @@
->  						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
-> -						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>;
-> +						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
-> +						     <ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
->  					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
-> -							  "tx-cpu3", "rx-shared";
-> +							  "tx-cpu3", "rx-shared", "link";
->  					port-id = <2>;
->  					gop-port-id = <3>;
->  					status = "disabled";
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index fe326074edb6..497d233d6c47 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -74,9 +74,10 @@
->  						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
-> -						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>;
-> +						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
-> +						     <ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
->  					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
-> -							  "tx-cpu3", "rx-shared";
-> +							  "tx-cpu3", "rx-shared", "link";
->  					port-id = <0>;
->  					gop-port-id = <0>;
->  					status = "disabled";
-> @@ -87,9 +88,10 @@
->  						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
-> -						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>;
-> +						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
-> +						     <ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
->  					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
-> -							  "tx-cpu3", "rx-shared";
-> +							  "tx-cpu3", "rx-shared", "link";
->  					port-id = <1>;
->  					gop-port-id = <2>;
->  					status = "disabled";
-> @@ -100,9 +102,10 @@
->  						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
->  						     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
-> -						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>;
-> +						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
-> +						     <ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
->  					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
-> -							  "tx-cpu3", "rx-shared";
-> +							  "tx-cpu3", "rx-shared", "link";
->  					port-id = <2>;
->  					gop-port-id = <3>;
->  					status = "disabled";
+> 
+> This is basically the same as v1 [1], but rebased to an up-to-date
+> bootwrapper tree.  (I was previously tracking Catalin's tree, which no
+> longer exists...)
+> 
+> [1] [PATCH] bootwrapper: SVE: Enable SVE for EL2 and below
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-August/527000.html
+> 
+> 
+>  arch/aarch64/boot.S            | 13 +++++++++++++
+>  arch/aarch64/include/asm/cpu.h |  5 +++++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/arch/aarch64/boot.S b/arch/aarch64/boot.S
+> index ceeee76..f7d795a 100644
+> --- a/arch/aarch64/boot.S
+> +++ b/arch/aarch64/boot.S
+> @@ -45,6 +45,19 @@ _start:
+>  
+>  	msr	cptr_el3, xzr			// Disable copro. traps to EL3
+>  
+> +	mrs	x0, id_aa64pfr0_el1
+> +	ubfx	x0, x0, #32, #4			// SVE present?
+> +	cbz	x0, 1f				// Skip SVE init if not
+> +
+> +	mrs	x0, cptr_el3
+> +	orr	x0, x0, #CPTR_EL3_EZ		// enable SVE
+> +	msr	cptr_el3, x0
+> +	isb
+> +
+> +	mov	x0, #ZCR_EL3_LEN_MASK		// SVE: Enable full vector len
+> +	msr	ZCR_EL3, x0			// for EL2.
+> +
+> +1:
+>  	ldr	x0, =CNTFRQ
+>  	msr	cntfrq_el0, x0
+>  
+> diff --git a/arch/aarch64/include/asm/cpu.h b/arch/aarch64/include/asm/cpu.h
+> index 66726ef..ccb5397 100644
+> --- a/arch/aarch64/include/asm/cpu.h
+> +++ b/arch/aarch64/include/asm/cpu.h
+> @@ -27,6 +27,11 @@
+>  #define SPSR_EL2H		(9 << 0)	/* EL2 Handler mode */
+>  #define SPSR_HYP		(0x1a << 0)	/* M[3:0] = hyp, M[4] = AArch32 */
+>  
+> +#define CPTR_EL3_EZ		(1 << 8)
+> +
+> +#define ZCR_EL3			s3_6_c1_c2_0
+> +#define ZCR_EL3_LEN_MASK	0x1ff
+> +
+>  #define SCTLR_EL1_CP15BEN	(1 << 5)
+>  #define SCTLR_EL1_RES1		(3 << 28 | 3 << 22 | 1 << 11)
+>  
 > -- 
-> 2.13.5
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 2.1.4
+> 
