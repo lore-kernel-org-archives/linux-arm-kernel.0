@@ -1,112 +1,63 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 21 Sep 2017 00:19:57 +0800
-Subject: [PATCH 3/5] nvmem: mtk-efuse: fix different address space
- warnings of sparse
-In-Reply-To: <1505134864-11975-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
- <1505134864-11975-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1505924397.17049.1.camel@mtkswgap22>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 20 Sep 2017 10:22:08 -0600
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170920112152.GL20805@n2100.armlinux.org.uk>
+References: <20170920112152.GL20805@n2100.armlinux.org.uk>
+Message-ID: <20170920162208.GB536@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-09-11 at 22:01 +0900, Masahiro Yamada wrote:
-> Fix the following sparse warnings:
-> 
-> drivers/nvmem/mtk-efuse.c:24:30: warning: incorrect type in initializer (different address spaces)
-> drivers/nvmem/mtk-efuse.c:24:30:    expected void [noderef] <asn:2>*base
-> drivers/nvmem/mtk-efuse.c:24:30:    got void *context
-> drivers/nvmem/mtk-efuse.c:37:30: warning: incorrect type in initializer (different address spaces)
-> drivers/nvmem/mtk-efuse.c:37:30:    expected void [noderef] <asn:2>*base
-> drivers/nvmem/mtk-efuse.c:37:30:    got void *context
-> drivers/nvmem/mtk-efuse.c:69:23: warning: incorrect type in assignment (different address spaces)
-> drivers/nvmem/mtk-efuse.c:69:23:    expected void *priv
-> drivers/nvmem/mtk-efuse.c:69:23:    got void [noderef] <asn:2>*[assigned] base
-> 
-> The type of nvmem_config->priv is (void *), so sparse complains
-> about assignment of the base address with (void __iomem *) type.
-> 
-> Even if we cast it out, sparse still warns:
-> warning: cast removes address space of expression
-> 
-> Of course, we can shut up the sparse by marking __force, but a more
-> correct way is to put the base address into driver private data.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Wed, Sep 20, 2017 at 12:21:52PM +0100, Russell King - ARM Linux wrote:
 
-Acked-by: Sean Wang <sean.wang@mediatek.com>
+> However, assumptions are made about the RTC:
+> 
+> 1. kernel/time/ntp.c assumes that all RTCs want to be told to set the
+>    time at around 500ms into the second.
+> 
+> 2. drivers/rtc/systohc.c assumes that if the time being set is >= 500ms,
+>    then we want to set the _next_ second.
 
-> ---
-> 
->  drivers/nvmem/mtk-efuse.c | 26 +++++++++++++++++---------
->  1 file changed, 17 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-> index fa7a0f6..c4058b5 100644
-> --- a/drivers/nvmem/mtk-efuse.c
-> +++ b/drivers/nvmem/mtk-efuse.c
-> @@ -18,15 +18,19 @@
->  #include <linux/nvmem-provider.h>
->  #include <linux/platform_device.h>
->  
-> +struct mtk_efuse_priv {
-> +	void __iomem *base;
-> +};
-> +
->  static int mtk_reg_read(void *context,
->  			unsigned int reg, void *_val, size_t bytes)
->  {
-> -	void __iomem *base = context;
-> +	struct mtk_efuse_priv *priv = context;
->  	u32 *val = _val;
->  	int i = 0, words = bytes / 4;
->  
->  	while (words--)
-> -		*val++ = readl(base + reg + (i++ * 4));
-> +		*val++ = readl(priv->base + reg + (i++ * 4));
->  
->  	return 0;
->  }
-> @@ -34,12 +38,12 @@ static int mtk_reg_read(void *context,
->  static int mtk_reg_write(void *context,
->  			 unsigned int reg, void *_val, size_t bytes)
->  {
-> -	void __iomem *base = context;
-> +	struct mtk_efuse_priv *priv = context;
->  	u32 *val = _val;
->  	int i = 0, words = bytes / 4;
->  
->  	while (words--)
-> -		writel(*val++, base + reg + (i++ * 4));
-> +		writel(*val++, priv->base + reg + (i++ * 4));
->  
->  	return 0;
->  }
-> @@ -50,19 +54,23 @@ static int mtk_efuse_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	struct nvmem_device *nvmem;
->  	struct nvmem_config econfig = {};
-> -	void __iomem *base;
-> +	struct mtk_efuse_priv *priv;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	base = devm_ioremap_resource(dev, res);
-> -	if (IS_ERR(base))
-> -		return PTR_ERR(base);
-> +	priv->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(priv->base))
-> +		return PTR_ERR(priv->base);
->  
->  	econfig.stride = 4;
->  	econfig.word_size = 4;
->  	econfig.reg_read = mtk_reg_read;
->  	econfig.reg_write = mtk_reg_write;
->  	econfig.size = resource_size(res);
-> -	econfig.priv = base;
-> +	econfig.priv = priv;
->  	econfig.dev = dev;
->  	econfig.owner = THIS_MODULE;
->  	nvmem = nvmem_register(&econfig);
+I looked at these issues when I did the sys to HC patches and I
+concluced the first problem was that the RTC read functions generally
+did not return sub second resolution, either in sense of directly
+returning ts_nsec, or the sense of delaying the read until a clock
+tick over event.
+
+Eg if I repeatedly booted my various embedded ARM/PPC systems, and
+recorded the time offset from NTP, I got a fairly random distribution
+of offsets.
+
+Given that we couldn't seem to read back sub second resolution on my
+systems, storing it more accurately did not seem important.
+
+I think we also did some experiments with a few of the RTCs we were
+using and some of them did not adjust the seconds clock phase on
+write, so they seemed incapable of storing sub second data anyhow.
+
+So.. My feeling was that we'd need driver support in each RTC driver
+to enable sub section resolution.
+
+Do you know differently?
+
+Our pragmatic solution in our products was to have the initial time
+sync from NTP step the clock even if the offset is small.
+
+> So, the question is... how should these differences in rtc requirements
+> be handled?
+
+I think patch wise, this is something I would rather see handled
+internally via the drivers and perhaps with input from DT, not via
+sysctl knobs.
+
+The HW driver should know how to read and write with sub second
+resolution. If it works best with a certain value in the ts_nsec
+field, then it should set something inside rtc_chip that causes the
+systohc code to try and call it with that tv_nsec.
+
+It would probably also make sense to add new ntp ops for sub second
+get/set that includes the full timespec. This way the RTC driver can
+provide the right adjustments and we can get rid of the +1 in
+rtc_set_ntp_time and the +0.5 in rtc_hctosys for sub sec aware
+drivers..
+
+Jason
