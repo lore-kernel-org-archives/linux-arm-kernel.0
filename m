@@ -1,69 +1,41 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 20 Sep 2017 17:17:44 +0000
-Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
-In-Reply-To: <20170915080530.GH3924@verge.net.au>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
- <20170915080530.GH3924@verge.net.au>
-Message-ID: <TY1PR06MB0895D8F201C57A65EBE5F5D2C0610@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 20 Sep 2017 13:50:41 -0400
+Subject: [v4,0/3] Workaround for bus/slot reset on Cavium cn8xxx root ports
+In-Reply-To: <20170912094049.GA14111@localhost.localdomain>
+References: <20170908081033.3025-1-jglauber@cavium.com>
+ <20170912094049.GA14111@localhost.localdomain>
+Message-ID: <f90f2900-4008-5195-f16d-54ccdc1edb37@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon, Geert
+On 09/12/2017 05:40 AM, Vadim Lomovtsev wrote:
 
-thank you for your patience on this one. We found out that there is an HW issue on SDHI0 , SDHC_CD# and SDHC_CMD (on the carrier board) are pulled up to 3.3V, therefore we are dropping UHS on this interface, and as result we are dropping this patch. We will send a V2 shortly.
+> Are there any updates on this ?
+> Comments/objections/acks/nacks ?
 
-Thanks,
-Fabrizio
+Any more comments?
 
-> -----Original Message-----
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: 15 September 2017 09:06
-> To: Chris Paterson <Chris.Paterson2@renesas.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
-> Russell King <linux@armlinux.org.uk>; Fabrizio Castro <fabrizio.castro@bp.renesas.com>; devicetree at vger.kernel.org; linux-renesas-
-> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
->
-> On Wed, Sep 13, 2017 at 06:05:37PM +0100, Chris Paterson wrote:
-> > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> >
-> > Enable the SDHI0 controller on iWave RZ/G1E carrier board.
->
-> ...
->
-> > @@ -63,3 +88,15 @@
-> >  micrel,led-mode = <1>;
-> >  };
-> >  };
-> > +
-> > +&sdhi0 {
-> > +pinctrl-0 = <&sdhi0_pins>;
-> > +pinctrl-1 = <&sdhi0_pins_uhs>;
-> > +pinctrl-names = "default", "state_uhs";
-> > +
-> > +vmmc-supply = <&reg_3p3v>;
-> > +vqmmc-supply = <&vccq_sdhi0>;
-> > +cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
->
-> I take that the absence of a wp-gpio means that that this is a ?SD slot.
-> Could you help me by documenting this correctly on
-> http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds ?
->
-> For some reason I thought that SDHI0 wasn't exposed at all, so I guess
-> my reading of the documentation was incorrect.
->
->
-> I think you also want sd-uhs-sdr50 here too.
-> You can test it by removing the sd-uhs-sdr104 property.
->
-> > +sd-uhs-sdr104;
-> > +status = "okay";
-> > +};
-> > --
-> > 1.9.1
-> >
+Jon.
+
+> On Fri, Sep 08, 2017 at 10:10:30AM +0200, Jan Glauber wrote:
+>> Using vfio-pci on a combination of cn8xxx and some PCI devices results in
+>> a kernel panic. This is triggered by issuing a bus or a slot reset
+>> on the PCI device.
+>>
+>> With this series both checks indicate that the reset is not possible
+>> preventing the kernel panic.
+>>
+>> David Daney (2):
+>>   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
+>>   PCI: Avoid bus reset for Cavium cn8xxx root ports
+>>
+>> Jan Glauber (1):
+>>   PCI: Avoid slot reset if bus reset is not possible
+>>
+>>  drivers/pci/pci.c    | 8 ++++++++
+>>  drivers/pci/quirks.c | 8 ++++++++
+>>  2 files changed, 16 insertions(+)
 
 
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+Computer Architect | Sent from my Fedora powered laptop
