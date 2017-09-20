@@ -1,50 +1,84 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 20 Sep 2017 12:09:12 -0600
-Subject: [v4,0/3] Workaround for bus/slot reset on Cavium cn8xxx root ports
-In-Reply-To: <20170912094049.GA14111@localhost.localdomain>
-References: <20170908081033.3025-1-jglauber@cavium.com>
- <20170912094049.GA14111@localhost.localdomain>
-Message-ID: <20170920120912.7544420d@t450s.home>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 20 Sep 2017 20:23:50 +0200
+Subject: [PATCH v5 05/10] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <CAL_JsqJ2eVA9Zg60Hagqm732ZoOzHWTwVBqOabOhjE5aQ26L+g@mail.gmail.com>
+References: <20170908071156.5115-1-clabbe.montjoie@gmail.com>
+ <20170908071156.5115-6-clabbe.montjoie@gmail.com>
+ <20170908072538.rqsp6dobwsqmzrsr@flea.lan>
+ <20170908074325.GB29999@Red>
+ <20170913182004.uniyo5opeilcfk7r@rob-hp-laptop>
+ <20170914185301.GB4021@Red> <20170914191949.GA3796@lunn.ch>
+ <CAL_JsqJ2eVA9Zg60Hagqm732ZoOzHWTwVBqOabOhjE5aQ26L+g@mail.gmail.com>
+Message-ID: <20170920182350.GA21482@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Sep 2017 02:40:49 -0700
-Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com> wrote:
-
-> Hi all,
+On Tue, Sep 19, 2017 at 09:49:52PM -0500, Rob Herring wrote:
+> On Thu, Sep 14, 2017 at 2:19 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> >> > Is the MDIO controller "allwinner,sun8i-h3-emac" or "snps,dwmac-mdio"?
+> >> > If the latter, then I think the node is fine, but then the mux should be
+> >> > a child node of it. IOW, the child of an MDIO controller should either
+> >> > be a mux node or slave devices.
+> >
+> > Hi Rob
+> >
+> > Up until now, children of an MDIO bus have been MDIO devices. Those
+> > MDIO devices are either Ethernet PHYs, Ethernet Switches, or the
+> > oddball devices that Broadcom iProc has, like generic PHYs.
+> >
+> > We have never had MDIO-muxes as MDIO children. A Mux is not an MDIO
+> > device, and does not have the properties of an MDIO device. It is not
+> > addressable on the MDIO bus. The current MUXes are addressed via GPIOs
+> > or MMIO.
 > 
-> Are there any updates on this ?
-> Comments/objections/acks/nacks ?
+> The DT parent/child relationship defines the bus topology. We describe
+> MDIO buses in that way and if a mux is sitting between the controller
+> and the devices, then the DT hierarchy should reflect that. Now
+> sometimes we have 2 options for what interface has the parent/child
+> relationship (e.g. an I2C controlled USB hub chip), but in this case
+> we don't.
 > 
-> WBBR,
-> Vadim
-> 
-> On Fri, Sep 08, 2017 at 10:10:30AM +0200, Jan Glauber wrote:
-> > Using vfio-pci on a combination of cn8xxx and some PCI devices results in
-> > a kernel panic. This is triggered by issuing a bus or a slot reset
-> > on the PCI device.
-> > 
-> > With this series both checks indicate that the reset is not possible
-> > preventing the kernel panic.
-> > 
-> > David Daney (2):
-> >   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
-> >   PCI: Avoid bus reset for Cavium cn8xxx root ports
-> > 
-> > Jan Glauber (1):
-> >   PCI: Avoid slot reset if bus reset is not possible
-> > 
-> >  drivers/pci/pci.c    | 8 ++++++++
-> >  drivers/pci/quirks.c | 8 ++++++++
-> >  2 files changed, 16 insertions(+)  
 
+Putting mdio-mux as a child of it (the mdio node) give me:
+[   18.175338] libphy: stmmac: probed
+[   18.175379] mdio_bus stmmac-0: /soc/ethernet at 1c30000/mdio/mdio-mux has invalid PHY address
+[   18.175408] mdio_bus stmmac-0: scan phy mdio-mux at address 0
+[   18.175450] mdio_bus stmmac-0: scan phy mdio-mux at address 1
+[   18.175482] mdio_bus stmmac-0: scan phy mdio-mux at address 2
+[   18.175513] mdio_bus stmmac-0: scan phy mdio-mux at address 3
+[   18.175544] mdio_bus stmmac-0: scan phy mdio-mux at address 4
+[   18.175575] mdio_bus stmmac-0: scan phy mdio-mux at address 5
+[   18.175607] mdio_bus stmmac-0: scan phy mdio-mux at address 6
+[   18.175638] mdio_bus stmmac-0: scan phy mdio-mux at address 7
+[   18.175669] mdio_bus stmmac-0: scan phy mdio-mux at address 8
+[   18.175700] mdio_bus stmmac-0: scan phy mdio-mux at address 9
+[   18.175731] mdio_bus stmmac-0: scan phy mdio-mux at address 10
+[   18.175762] mdio_bus stmmac-0: scan phy mdio-mux at address 11
+[   18.175795] mdio_bus stmmac-0: scan phy mdio-mux at address 12
+[   18.175827] mdio_bus stmmac-0: scan phy mdio-mux at address 13
+[   18.175858] mdio_bus stmmac-0: scan phy mdio-mux at address 14
+[   18.175889] mdio_bus stmmac-0: scan phy mdio-mux at address 15
+[   18.175919] mdio_bus stmmac-0: scan phy mdio-mux at address 16
+[   18.175951] mdio_bus stmmac-0: scan phy mdio-mux at address 17
+[   18.175982] mdio_bus stmmac-0: scan phy mdio-mux at address 18
+[   18.176014] mdio_bus stmmac-0: scan phy mdio-mux at address 19
+[   18.176045] mdio_bus stmmac-0: scan phy mdio-mux at address 20
+[   18.176076] mdio_bus stmmac-0: scan phy mdio-mux at address 21
+[   18.176107] mdio_bus stmmac-0: scan phy mdio-mux at address 22
+[   18.176139] mdio_bus stmmac-0: scan phy mdio-mux at address 23
+[   18.176170] mdio_bus stmmac-0: scan phy mdio-mux at address 24
+[   18.176202] mdio_bus stmmac-0: scan phy mdio-mux at address 25
+[   18.176233] mdio_bus stmmac-0: scan phy mdio-mux at address 26
+[   18.176271] mdio_bus stmmac-0: scan phy mdio-mux at address 27
+[   18.176320] mdio_bus stmmac-0: scan phy mdio-mux at address 28
+[   18.176371] mdio_bus stmmac-0: scan phy mdio-mux at address 29
+[   18.176420] mdio_bus stmmac-0: scan phy mdio-mux at address 30
+[   18.176452] mdio_bus stmmac-0: scan phy mdio-mux at address 31
 
-Looks ok to me, for series:
+Adding a fake <reg> to mdio-mux remove it, but I found that a bit ugly.
+Or perhaps patching of_mdiobus_register() to not scan node with compatible "mdio-mux".
 
-Reviewed-by: Alex Williamson <alex.williamson@redhat.com>
+What do you think ?
 
-I am curious why we're happy targeting this quirk at a single device ID
-while at the same time trying to expand the ACS quirk to a notable
-fraction of the Cavium PCI device ID address space.  Thanks,
-
-Alex
+Regards
