@@ -1,52 +1,133 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 19 Sep 2017 20:57:54 +0800
-Subject: [PATCH 1/1] ARM: add stacktrace support for non current tasks on SMP
-Message-ID: <1505825874-9528-1-git-send-email-thunder.leizhen@huawei.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Wed, 20 Sep 2017 09:51:30 +0800
+Subject: [PATCH 1/3] dt-bindings: Add document for rockchip RGB output
+ interface
+In-Reply-To: <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
+References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
+ <1505360600-196567-1-git-send-email-hjc@rock-chips.com>
+ <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
+Message-ID: <d631ff56-e3e6-688f-d9b6-a7101ce047d5@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. An invalid frame.xx can not lead kernel to crash, this should be
-guaranteed by function unwind_frame itself. Otherwise, walk the stack
-trace of current is also at risk.
-2. There is no way to prevent the walked task becoming rq->curr during
-walk_stackframe. This means some entries traced maybe inconsistent. But
-it's better than none. Besides, we can dump it again.
+Hi rob,
+     thanks for you review.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm/kernel/stacktrace.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
+? 2017/9/19 22:46, Rob Herring ??:
+> On Thu, Sep 14, 2017 at 11:43:18AM +0800, Sandy Huang wrote:
+>> This path add support rv1108 rgb output interface driver.
+>>
+>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+>> ---
+>>   .../bindings/display/rockchip/rockchip-rgb.txt     | 80 ++++++++++++++++++++++
+>>   1 file changed, 80 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>> new file mode 100644
+>> index 0000000..4164512
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>> @@ -0,0 +1,80 @@
+>> +Rockchip RV1108 RGB interface
+>> +================================
+>> +
+>> +Required properties:
+>> +- compatible: matching the soc type:
+>> +	- "rockchip,rv1108-rgb";
+>> +
+>> +Optional properties:
+>> +- pinctrl-names: must contain a "lcdc" entry.
+>> +- pinctrl-0: pin control group to be used for this interface.
+>> +
+>> +Required nodes:
+>> +- rockchip,rgb-mode: should be "p888", "p666", "p565", "s888", "s888-dummy"
+> 
+> This should be a standard property. Any device with a parallel interface
+> is going to need something like this.
+> 
+so, i need to move this property to panel? or just rename 
+rockchip,rgb-mode to rgb-mode?
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 92b7237..80a0e9d 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -120,13 +120,20 @@ static noinline void __save_stack_trace(struct task_struct *tsk,
- 	if (tsk != current) {
- #ifdef CONFIG_SMP
- 		/*
--		 * What guarantees do we have here that 'tsk' is not
--		 * running on another CPU?  For now, ignore it as we
--		 * can't guarantee we won't explode.
-+		 * There is no way to prevent tsk becoming rq->curr during
-+		 * walk_stackframe. frame.xx should be sanity checked in
-+		 * function unwind_frame.
- 		 */
--		if (trace->nr_entries < trace->max_entries)
--			trace->entries[trace->nr_entries++] = ULONG_MAX;
--		return;
-+		if (!task_curr(tsk)) {
-+			frame.fp = thread_saved_fp(tsk);
-+			frame.sp = thread_saved_sp(tsk);
-+			frame.lr = 0;		/* recovered from the stack */
-+			frame.pc = thread_saved_pc(tsk);
-+		} else {
-+			if (trace->nr_entries < trace->max_entries)
-+				trace->entries[trace->nr_entries++] = ULONG_MAX;
-+			return;
-+		}
- #else
- 		frame.fp = thread_saved_fp(tsk);
- 		frame.sp = thread_saved_sp(tsk);
--- 
-2.5.0
+>> +	- p888: output r8-g8-b8 at each dclk cycle for per-pixel
+>> +	- p666: output r6-g6-b6 at each dclk cycle for per-pixel
+>> +	- p565: output r5-g6-b5 at each dclk cycle for per-pixel
+>> +	- s888: output r8-g8-b8 in three dclk cycle for per-pixel
+>> +	- s888-dmmy: output r8-g8-b8-dummy in four dclk cycle for per-pixel
+>> +
+>> +The rgb has two video ports described by:
+>> +	Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +Their connections are modeled using the OF graph bindings specified in
+>> +	Documentation/devicetree/bindings/graph.txt.
+>> +
+>> +- video port 0 for the VOP input, the remote endpoint maybe vopb/vopl/vop
+>> +- video port 1 for either a panel or subsequent encoder
+>> +
+>> +the panel described by:
+>> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
+>> +Panel other required properties:
+>> +- ports for remote rgb output.
+>> +
+>> +Example:
+>> +
+>> +panel: panel {
+>> +	compatible = "auo,b101ean01";
+>> +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
+>> +
+>> +	ports {
+>> +		panel_in_rgb: endpoint {
+>> +			remote-endpoint = <&rgb_out_panel>;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +For Rockchip RV1108:
+>> +
+>> +	rgb: rgb {
+>> +		compatible = "rockchip,rv1108-rgb";
+>> +		pinctrl-names = "lcdc";
+>> +		pinctrl-0 = <&lcdc_ctl>;
+>> +		rockchip,rgb-mode = "p888";
+>> +
+>> +		ports {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +
+>> +			rgb_in: port at 0 {
+>> +				reg = <0>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				rgb_in_vop: endpoint at 0 {
+>> +					reg = <0>;
+> 
+> Don't need reg for a single endpoint.
+> 
+ok, this will be deleted at next version.
+>> +					remote-endpoint = <&vop_out_rgb>;
+>> +				};
+>> +			};
+>> +
+>> +			rgb_out: port at 1 {
+>> +				reg = <1>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				rgb_out_panel: endpoint at 0 {
+>> +					reg = <0>;
+> 
+> ditto.
+> 
+ok, this will be deleted at next version.
+>> +					remote-endpoint = <&panel_in_rgb>;
+>> +				};
+>> +			};
+>> +		};
+>> +	};
+>> -- 
+>> 2.7.4
+>>
+>>
+> 
+> 
+> 
