@@ -1,134 +1,52 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 20 Sep 2017 16:51:07 +0200
-Subject: [PATCH v3 2/2] arm: dts: stm32: remove useless clocksource nodes
-In-Reply-To: <1505919067-28041-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1505919067-28041-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1505919067-28041-3-git-send-email-benjamin.gaignard@linaro.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 20 Sep 2017 16:56:01 +0200
+Subject: [PATCH v2 0/2] ARM: Actions Semi S500 SMP cleanups
+In-Reply-To: <20170905212000.7009-1-afaerber@suse.de>
+References: <20170905212000.7009-1-afaerber@suse.de>
+Message-ID: <2a13d28a-7115-ee18-a131-081c58115c70@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-16 bits timers aren't accurate enough to be used as
-clocksource, remove them from stm32f4 and stm32f7 devicetree.
+Am 05.09.2017 um 23:19 schrieb Andreas F?rber:
+> Hello,
+> 
+> This mini-series further cleans up the SMP code for Actions Semi S500 SoC.
+> 
+> @David, can you please reply with an Acked-by for the second patch? Thanks!
+> 
+> Work branch for testing:
+> https://github.com/afaerber/linux/commits/bg96-next
+> 
+> Have a lot of fun!
+> 
+> Cheers,
+> Andreas
+> 
+> v1 -> v2:
+> * Prepended __pa_symbol cleanup (Florian)
+> 
+> Cc: David Liu <liuwei@actions-semi.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> 
+> Andreas F?rber (2):
+>   ARM: owl: smp: Use __pa_symbol()
+>   ARM: owl: smp: Drop owl_secondary_boot()
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- arch/arm/boot/dts/stm32f429.dtsi | 32 --------------------------------
- arch/arm/boot/dts/stm32f746.dtsi | 32 --------------------------------
- 2 files changed, 64 deletions(-)
+No further review from David or Florian on v1 or this v2, so applied to
+v4.15/arm now:
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index a8113dc..fd211cb 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -108,14 +108,6 @@
- 			};
- 		};
- 
--		timer3: timer at 40000400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000400 0x400>;
--			interrupts = <29>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM3)>;
--			status = "disabled";
--		};
--
- 		timers3: timers at 40000400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -137,14 +129,6 @@
- 			};
- 		};
- 
--		timer4: timer at 40000800 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000800 0x400>;
--			interrupts = <30>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM4)>;
--			status = "disabled";
--		};
--
- 		timers4: timers at 40000800 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -194,14 +178,6 @@
- 			};
- 		};
- 
--		timer6: timer at 40001000 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001000 0x400>;
--			interrupts = <54>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM6)>;
--			status = "disabled";
--		};
--
- 		timers6: timers at 40001000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -218,14 +194,6 @@
- 			};
- 		};
- 
--		timer7: timer at 40001400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001400 0x400>;
--			interrupts = <55>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM7)>;
--			status = "disabled";
--		};
--
- 		timers7: timers at 40001400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 4506eb9..c4d0273 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -82,22 +82,6 @@
- 			status = "disabled";
- 		};
- 
--		timer3: timer at 40000400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000400 0x400>;
--			interrupts = <29>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM3)>;
--			status = "disabled";
--		};
--
--		timer4: timer at 40000800 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000800 0x400>;
--			interrupts = <30>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM4)>;
--			status = "disabled";
--		};
--
- 		timer5: timer at 40000c00 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40000c00 0x400>;
-@@ -105,22 +89,6 @@
- 			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM5)>;
- 		};
- 
--		timer6: timer at 40001000 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001000 0x400>;
--			interrupts = <54>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM6)>;
--			status = "disabled";
--		};
--
--		timer7: timer at 40001400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001400 0x400>;
--			interrupts = <55>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM7)>;
--			status = "disabled";
--		};
--
- 		rtc: rtc at 40002800 {
- 			compatible = "st,stm32-rtc";
- 			reg = <0x40002800 0x400>;
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.15/arm
+
+Regards,
+Andreas
+
+>  arch/arm/mach-actions/Makefile  |  4 +---
+>  arch/arm/mach-actions/headsmp.S | 52 -----------------------------------------
+>  arch/arm/mach-actions/platsmp.c |  2 +-
+>  3 files changed, 2 insertions(+), 56 deletions(-)
+>  delete mode 100644 arch/arm/mach-actions/headsmp.S
+
 -- 
-2.7.4
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
