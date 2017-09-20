@@ -1,18 +1,24 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 20 Sep 2017 10:07:13 -0400 (EDT)
-Subject: [PATCH v1] usb: host: Implement workaround for Erratum A-007463
-In-Reply-To: <20170920092441.21292-1-yinbo.zhu@nxp.com>
-Message-ID: <Pine.LNX.4.44L0.1709201004040.1563-100000@iolanthe.rowland.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 20 Sep 2017 22:10:45 +0800
+Subject: [PATCHv2 0/3] arm64: dts: ls1012a: add the DTS node for DSPI
+ support
+In-Reply-To: <20170830101238.28378-1-Zhiqiang.Hou@nxp.com>
+References: <20170830101238.28378-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <20170920141044.GC1244@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Subject: line should specify which type of USB host controller the
-patch is for.  The kernel contains lots of different USB host
-controller drivers.  How are we supposed to know that Erratum A-007463
-applies to dwc3 xHCI controllers?
+On Wed, Aug 30, 2017 at 06:12:35PM +0800, Zhiqiang Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> Corrected the subject for 3/5 patch v1.
+> 
+> Yuan Yao (3):
+>   arm64: dts: ls1012a: add the DTS node for DSPI support
+>   Documentation: fsl: dspi: Add fsl,ls1012a-dspi compatible string
+>   Documentation: dt: mtd: add sst25wf040b and en25s64 to the SPI NOR
+>     support list
 
-The Subject: line should say something like:
+I edited bindings doc patch subject a bit, and applied all.
 
-[PATCH v1] USB: host: dwc3: Implement workaround for Erratum A-007643
-
-Alan Stern
+Shawn
