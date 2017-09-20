@@ -1,83 +1,61 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 20 Sep 2017 13:30:33 -0700
-Subject: [PATCH 1/7] PM / OPP: Add platform specific set_clk function
-In-Reply-To: <20170920070343.GA32187@b29396-OptiPlex-7040>
-References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
- <1503504610-12880-2-git-send-email-aisheng.dong@nxp.com>
- <20170919225840.GI30848@ubuntu>
- <20170920070343.GA32187@b29396-OptiPlex-7040>
-Message-ID: <20170920203033.GD3001@ubuntu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Sep 2017 22:35:39 +0200
+Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
+In-Reply-To: <CAKv+Gu_ZMy-A-Du3ikVe47pcUR7hSBFHY+hQQ8APGGP1iRcigA@mail.gmail.com>
+References: <20170920151802.7609-1-romain.izard.pro@gmail.com>
+ <CAKv+Gu_ZMy-A-Du3ikVe47pcUR7hSBFHY+hQQ8APGGP1iRcigA@mail.gmail.com>
+Message-ID: <CAK8P3a17y1zfhOPShjpbt+wf5B=ZyTb1jL1WiBHCz_rU4pNnnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-09-17, 15:03, Dong Aisheng wrote:
-> I've been thinking of that before.
-> Actually IMX already does some similar thing for MX5 (no for MX6).
-> See: clk_cpu_set_rate() in drivers/clk/imx/clk-cpu.c.
-> 
-> After some diggings, it seems MX7ULP is a bit more complicated than before
-> mainly due to two reasons:
-> 1) It requires to switch to different CPU mode accordingly when setting
-> clocks rate. That means we need handle this in clock driver as well
-> which looks not quite suitable although we could do if really want.
-> 
-> 2) It uses different clocks for different CPU mode (RUN 416M or
-> HSRUN 528M), and those clocks have some dependency.
-> e.g. when setting HSRUN clock, we need change RUN clock parent to make sure
-> the SPLL_PFD is got disabled before changing rate, as both CPU mode using
-> the same parent SPLL_PFD clock. Doing this in clock driver also make things
-> a bit more complicated.
-> 
-> The whole follow would be something like below:
-> static int imx7ulp_set_clk(struct device *dev, struct clk *clk,
->                            unsigned long old_freq, unsigned long new_freq)
-> {
->         u32 val;
-> 
->         /*
->          * Before changing the ARM core PLL, change the ARM clock soure
->          * to FIRC first.
->          */
->         if (new_freq >= HSRUN_FREQ) {
->                 clk_set_parent(clks[RUN_SCS_SEL].clk, clks[FIRC].clk);
-> 
->                 /* switch to HSRUN mode */
->                 val = readl_relaxed(smc_base + SMC_PMCTRL);
->                 val |= (0x3 << 8);
->                 writel_relaxed(val, smc_base + SMC_PMCTRL);
-> 
->                 /* change the clock rate in HSRUN */
->                 clk_set_rate(clks[SPLL_PFD0].clk, new_freq);
->                 clk_set_parent(clks[HSRUN_SCS_SEL].clk, clks[SPLL_SEL].clk);
->         } else {
->                 /* change the HSRUN clock to firc */
->                 clk_set_parent(clks[HSRUN_SCS_SEL].clk, clks[FIRC].clk);
-> 
->                 /* switch to RUN mode */
->                 val = readl_relaxed(smc_base + SMC_PMCTRL);
->                 val &= ~(0x3 << 8);
->                 writel_relaxed(val, smc_base + SMC_PMCTRL);
-> 
->                 clk_set_rate(clks[SPLL_PFD0].clk, new_freq);
->                 clk_set_parent(clks[RUN_SCS_SEL].clk, clks[SPLL_SEL].clk);
->         }
-> 
->         return 0;
-> }
+On Wed, Sep 20, 2017 at 5:26 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 20 September 2017 at 08:18, Romain Izard <romain.izard.pro@gmail.com> wrote:
+>> Add an arch-specific header to ARM, to retain other optimizations that
+>> rely on HAVE_EFFICIENT_UNALIGNED_ACCESS, while making sure that access
+>> that explicitly rely on the unaligned accessors are correctly handled by
+>> the compiler.
+>>
+>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+>> ---
+>>
+>
+> If access_ok.h has been observed to produce different output from the
+> struct versions (using any compiler), I guess we cannot simply change
+> the asm-generic default and expect everybody to be ok with that. So I
+> agree this is the most appropriate course of action.
 
-Right and we have the same thing in the cpufreq driver now. It will
-stay at some place and we need to find the best one, keeping in mind
-that we may or may not want to solve this problem in a generic way.
+But is that actually the case? I think patching ARM like this is
+correct, but perhaps we can simply remove the access_ok.h
+version entirely and just use the struct version everywhere.
 
-> That's why i thought if we can make OPP core provide a way to handle such
-> complicated things in platform specific cpufreq driver.
-> 
-> How would you suggest for this issue?
+Unfortunately it's been almost 10 years since the various
+implementations got introduced, so it's hard to find out all
+the concerns that went into it then.
 
-I wouldn't add an API into the OPP framework if I were you. There is
-just too much code to add to the core to handle such platform specific
-stuff, which you are anyway going to keep somewhere as it is. IMHO,
-keeping that in the clock driver is a better thing to do than this.
+Commit 064106a91be5 ("kernel: add common
+infrastructure for unaligned access") lists
 
--- 
-viresh
+    Currently there are five implementations:
+    1) packed_struct.h: C-struct based, from asm-generic/unaligned.h
+    2) le_byteshift.h: Open coded byte-swapping, heavily based on asm-arm
+    3) be_byteshift.h: Open coded byte-swapping, heavily based on asm-arm
+    4) memmove.h: taken from multiple implementations in tree
+    5) access_ok.h: taken from x86 and others, unaligned access is ok.
+
+The only architectectures that use memmove.h are m32r (always has,
+probably not intentionally) and openrisc. That one says that GCC on
+OR32 "optimizes too aggressively" for struct.h, which is a bit scary
+but wouldn't change anything here since they don't use the asm-generic
+file.
+
+The architectures that do use include/asm-generic/unaligned.h and
+also set HAVE_EFFICIENT_UNALIGNED_ACCESS in some configurations
+are arm, arm64, metag, s390 and arc.
+
+This is a rather short list, and three of them (arm64, metag and arc) only
+support very recent compilers, so we can probably just ask the respective
+arch maintainers to ack the patch that changes the asm-generic file
+for everyone.
+
+        Arnd
