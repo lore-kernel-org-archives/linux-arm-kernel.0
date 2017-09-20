@@ -1,99 +1,69 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 20 Sep 2017 18:16:45 +0100
-Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
-In-Reply-To: <20170920151802.7609-1-romain.izard.pro@gmail.com>
-References: <20170920151802.7609-1-romain.izard.pro@gmail.com>
-Message-ID: <8a7a3680-c021-402b-c0f5-f10363051543@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 20 Sep 2017 17:17:44 +0000
+Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
+In-Reply-To: <20170915080530.GH3924@verge.net.au>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
+ <20170915080530.GH3924@verge.net.au>
+Message-ID: <TY1PR06MB0895D8F201C57A65EBE5F5D2C0610@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+Hello Simon, Geert
 
-On 20/09/17 16:18, Romain Izard wrote:
-> For the 32-bit ARM architecture, unaligned access support is variable.
-> On a chip without a MMU, an unaligned access returns a rotated data word
-> and must be avoided.
+thank you for your patience on this one. We found out that there is an HW issue on SDHI0 , SDHC_CD# and SDHC_CMD (on the carrier board) are pulled up to 3.3V, therefore we are dropping UHS on this interface, and as result we are dropping this patch. We will send a V2 shortly.
 
-Nit: that sentence is not really true - there are CPUs without MMUs that
-still support alignment checking (e.g. ARM1156), and more importantly
-the rotation thing is only true for LDR/LDRH - LDM always just ignores
-the bottom two bits of the address, and LDRD doesn't make any guarantee
-at all of what you might get back (and stores are even worse). I think
-it suffices to say that in the absence of alignment checking, the
-results of unaligned accesses are inconsistent and impossible to rely upon.
+Thanks,
+Fabrizio
 
-Robin.
+> -----Original Message-----
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 15 September 2017 09:06
+> To: Chris Paterson <Chris.Paterson2@renesas.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
+> Russell King <linux@armlinux.org.uk>; Fabrizio Castro <fabrizio.castro@bp.renesas.com>; devicetree at vger.kernel.org; linux-renesas-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
+>
+> On Wed, Sep 13, 2017 at 06:05:37PM +0100, Chris Paterson wrote:
+> > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> >
+> > Enable the SDHI0 controller on iWave RZ/G1E carrier board.
+>
+> ...
+>
+> > @@ -63,3 +88,15 @@
+> >  micrel,led-mode = <1>;
+> >  };
+> >  };
+> > +
+> > +&sdhi0 {
+> > +pinctrl-0 = <&sdhi0_pins>;
+> > +pinctrl-1 = <&sdhi0_pins_uhs>;
+> > +pinctrl-names = "default", "state_uhs";
+> > +
+> > +vmmc-supply = <&reg_3p3v>;
+> > +vqmmc-supply = <&vccq_sdhi0>;
+> > +cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+>
+> I take that the absence of a wp-gpio means that that this is a ?SD slot.
+> Could you help me by documenting this correctly on
+> http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds ?
+>
+> For some reason I thought that SDHI0 wasn't exposed at all, so I guess
+> my reading of the documentation was incorrect.
+>
+>
+> I think you also want sd-uhs-sdr50 here too.
+> You can test it by removing the sd-uhs-sdr104 property.
+>
+> > +sd-uhs-sdr104;
+> > +status = "okay";
+> > +};
+> > --
+> > 1.9.1
+> >
 
-> When a MMU is available, it can be trapped. On ARMv6 or ARMv7, it can also
-> be handled by the hardware, depending on the type of access instruction.
-> Unaligned access of 32 bits or less are corrected, while larger access
-> provoke a trap.
-> 
-> Unfortunately, the compiler is able to merge two 32-bit access that
-> would generate a LDR instruction, that works on unaligned access, into a
-> single LDM access that will not work. This is not a common situation,
-> but it has been observed in the LZ4 decompression code.
-> 
-> To prevent this type of optimization, it is necessary to change the
-> explicit accessors for unaligned addresses from those defined in the
-> access_ok.h header, to those defined in the packed_struct.h header.
-> 
-> Add an arch-specific header to ARM, to retain other optimizations that
-> rely on HAVE_EFFICIENT_UNALIGNED_ACCESS, while making sure that access
-> that explicitly rely on the unaligned accessors are correctly handled by
-> the compiler.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
-> 
-> This is a follow-up to this discussion:
-> HAVE_EFFICIENT_UNALIGNED_ACCESS on ARM32
-> https://lkml.org/lkml/2017/9/4/359
-> 
->  arch/arm/include/asm/Kbuild      |  1 -
->  arch/arm/include/asm/unaligned.h | 22 ++++++++++++++++++++++
->  2 files changed, 22 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/include/asm/unaligned.h
-> 
-> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-> index 721ab5ecfb9b..0f2c8a2a8131 100644
-> --- a/arch/arm/include/asm/Kbuild
-> +++ b/arch/arm/include/asm/Kbuild
-> @@ -20,7 +20,6 @@ generic-y += simd.h
->  generic-y += sizes.h
->  generic-y += timex.h
->  generic-y += trace_clock.h
-> -generic-y += unaligned.h
->  
->  generated-y += mach-types.h
->  generated-y += unistd-nr.h
-> diff --git a/arch/arm/include/asm/unaligned.h b/arch/arm/include/asm/unaligned.h
-> new file mode 100644
-> index 000000000000..394227f24b77
-> --- /dev/null
-> +++ b/arch/arm/include/asm/unaligned.h
-> @@ -0,0 +1,22 @@
-> +#ifndef __ASM_ARM_UNALIGNED_H
-> +#define __ASM_ARM_UNALIGNED_H
-> +
-> +#include <asm/byteorder.h>
-> +
-> +#if defined(__LITTLE_ENDIAN)
-> +#include <linux/unaligned/le_struct.h>
-> +#include <linux/unaligned/be_byteshift.h>
-> +#include <linux/unaligned/generic.h>
-> +#define get_unaligned	__get_unaligned_le
-> +#define put_unaligned	__put_unaligned_le
-> +#elif defined(__BIG_ENDIAN)
-> +#include <linux/unaligned/be_struct.h>
-> :q
-> +#include <linux/unaligned/le_byteshift.h>
-> +#include <linux/unaligned/generic.h>
-> +#define get_unaligned	__get_unaligned_be
-> +#define put_unaligned	__put_unaligned_be
-> +#else
-> +#error need to define endianness
-> +#endif
-> +
-> +#endif /* __ASM_ARM_UNALIGNED_H */
-> 
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
