@@ -1,22 +1,49 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Sep 2017 15:52:29 -0500
-Subject: [PATCH v2 3/8] dt-bindings: gpu: mali-utgard: add optional
- power-domain reference
-In-Reply-To: <20170915091812.13368-4-heiko@sntech.de>
-References: <20170915091812.13368-1-heiko@sntech.de>
- <20170915091812.13368-4-heiko@sntech.de>
-Message-ID: <20170920205229.jwnz7uyx2wi6uqd4@rob-hp-laptop>
+Date: Wed, 20 Sep 2017 15:52:33 -0500
+Subject: [PATCH v2 6/8] arm64: renesas: document Eagle board bindings
+In-Reply-To: <20170915194442.464361390@cogentembedded.com>
+References: <20170915194442.464361390@cogentembedded.com>
+Message-ID: <20170920205233.jjncu7fzi6cmoggq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 15, 2017 at 11:18:07AM +0200, Heiko Stuebner wrote:
-> On some socs Mali Utgard gpu have both soc power-domains and external
-> supplying regulators, so add an optional power-domains property for
-> reference.
+On Fri, Sep 15, 2017 at 10:43:24PM +0300, Sergei Shtylyov wrote:
+> Document the Eagle device tree bindings, listing it as a supported board.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This allows to use checkpatch.pl to validate .dts files referring to the
+> Eagle board.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
 > ---
->  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+> Changes in version 2:
+> - renamed the patch.
+> 
+>  Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+> ===================================================================
+> --- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -59,6 +59,8 @@ Boards:
+>      compatible = "renesas,bockw", "renesas,r8a7778"
+>    - Draak (RTP0RC77995SEB0010S)
+>      compatible = "renesas,draak", "renesas,r8a77995"
+> +  - Eagle (RTP0RC77970SEB0010S)
+> +    compatible = "renesas,eagle", "renesas,r8a77970";
+
+You're not consistent here with the ';'.
+
+Otherwise,
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>    - Genmai (RTK772100BC00000BR)
+>      compatible = "renesas,genmai", "renesas,r7s72100"
+>    - GR-Peach (X28A-M01-E/F)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
