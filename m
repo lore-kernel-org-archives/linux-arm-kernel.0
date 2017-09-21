@@ -1,31 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Sep 2017 14:10:28 +0200
-Subject: [PATCH] pinctrl: single: make two arrays static const, reduces
- object code size
-In-Reply-To: <20170919144218.23607-1-colin.king@canonical.com>
-References: <20170919144218.23607-1-colin.king@canonical.com>
-Message-ID: <CACRpkdZOxpEYgxYJ=xTRUQ3jGY0ovZbmvi3nKspO8oCv-5pJ9Q@mail.gmail.com>
+Date: Thu, 21 Sep 2017 14:12:00 +0200
+Subject: [PATCH] pinctrl: bcm2835: fix build warning in
+ bcm2835_gpio_irq_handle_bank
+In-Reply-To: <20170919190456.26522-1-clabbe.montjoie@gmail.com>
+References: <20170919190456.26522-1-clabbe.montjoie@gmail.com>
+Message-ID: <CACRpkdYFL-NwxPSsyTxJqq=Yqi4S=JjjZWc1W80EuqmUcZ0tcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 4:42 PM, Colin King <colin.king@canonical.com> wrote:
+On Tue, Sep 19, 2017 at 9:04 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
 
-> From: Colin Ian King <colin.king@canonical.com>
+> This patch fix the following build warning:
+> drivers/pinctrl/bcm/pinctrl-bcm2835.c:376:15: warning: variable 'type' set but not used [-Wunused-but-set-variable]
 >
-> Don't populate the read-only arrays prop2 and prop4 on the stack, instead
-> make them static const.  Makes the object code smaller by over 230 bytes:
+> Furthermore, it is unused for a long time, at least since commit 85ae9e512f43 ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
+> where a "FIXME no clue why the code looks up the type here" was added.
+> A year after, nobody answeered this question, so its time to remove it.
 >
-> Before:
->    text    data     bss     dec     hex filename
->   28235    5820     192   34247    85c7 drivers/pinctrl/pinctrl-single.o
->
-> After:
->    text    data     bss     dec     hex filename
->   27839    5980     192   34011    84db drivers/pinctrl/pinctrl-single.o
->
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-Patch applied with Tony's ACK.
+Patch applied with Stefan's ACK.
 
 Yours,
 Linus Walleij
