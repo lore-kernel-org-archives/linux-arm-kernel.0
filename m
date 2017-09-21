@@ -1,64 +1,24 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu, 21 Sep 2017 09:36:43 +0200
-Subject: [PATCH] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
-Message-ID: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 21 Sep 2017 15:45:28 +0800
+Subject: [PATCH] tee: ACPI support for optee driver
+In-Reply-To: <1505977937-25034-1-git-send-email-mchitale@apm.com>
+References: <1505977937-25034-1-git-send-email-mchitale@apm.com>
+Message-ID: <59C36E18.1050106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christine Gharzuzi <chrisg@marvell.com>
+On 2017/9/21 15:12, Mayuresh Chitale wrote:
+> This patch modifies the optee driver to add support for parsing
+> the conduit method from an ACPI node.
 
-Add the DT node enabling Armada-8040-DB CPS SPI controller driver.
+Sorry I didn't involve this earlier, but I think this is a wrong
+approach, in ACPI 5.1+ spec, there is a bit in FADT table which
+indicates PSCI using SMC or HVC, please see ACPI 6.2 [1],
+Table 5-37 Fixed ACPI Description Table ARM Boot Architecture Flags.
 
-Add the SPI NAND flash device connected on the bus. Fill the MTD
-partitions layout.
+Can we just use that to get the conduit method for optee driver too?
 
-Signed-off-by: Christine Gharzuzi <chrisg@marvell.com>
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-8040-db.dts | 31 ++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+[1]: http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-index 0d7b2ae46610..f5be6ffe0106 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-@@ -216,6 +216,37 @@
- 	clock-frequency = <100000>;
- };
- 
-+&cps_spi1 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		compatible = "jedec,spi-nor";
-+		reg = <0x0>;
-+		spi-max-frequency = <20000000>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "Boot";
-+				reg = <0x0 0x200000>;
-+			};
-+			partition at 200000 {
-+				label = "Filesystem";
-+				reg = <0x200000 0xd00000>;
-+			};
-+			partition at d00000 {
-+				label = "Boot_2nd";
-+				reg = <0xf00000 0x100000>;
-+			};
-+		};
-+	};
-+};
-+
- /* CON4 on CP1 expansion */
- &cps_sata0 {
- 	status = "okay";
--- 
-2.11.0
+Thanks
+Hanjun
