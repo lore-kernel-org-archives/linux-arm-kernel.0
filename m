@@ -1,34 +1,33 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Thu, 21 Sep 2017 10:44:13 +0530
-Subject: [PATCH v2 1/2] gpio: brcmstb: Handle return value of devm_kasprintf
-Message-ID: <1cfed20c00d642a34d8f93c5e9591412d387fa2a.1505970542.git.arvind.yadav.cs@gmail.com>
+From: thomas@m3y3r.de (Thomas Meyer)
+Date: Thu, 21 Sep 2017 08:24:27 +0200
+Subject: [PATCH 1/3] ARM: mediatek: Cocci spatch "of_table"
+In-Reply-To: <1505974912018-1637125348-0-diffsplit-thomas@m3y3r.de>
+References: <1505974912018-1637125348-0-diffsplit-thomas@m3y3r.de>
+Message-ID: <1505974912018-1713366490-1-diffsplit-thomas@m3y3r.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_kasprintf() can fail here and we must check its return value.
+Make sure (of/i2c/platform)_device_id tables are NULL terminated.
+Found by coccinelle spatch "misc/of_table.cocci"
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
 ---
-changes in v2 :
-		Set return 'err' to -ENOMEM.
 
- drivers/gpio/gpio-brcmstb.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index dd0308c..27e92e5 100644
---- a/drivers/gpio/gpio-brcmstb.c
-+++ b/drivers/gpio/gpio-brcmstb.c
-@@ -485,6 +485,10 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
- 		gc->of_node = np;
- 		gc->owner = THIS_MODULE;
- 		gc->label = devm_kasprintf(dev, GFP_KERNEL, "%pOF", dev->of_node);
-+		if (!gc->label) {
-+			err = -ENOMEM;
-+			goto fail;
-+		}
- 		gc->base = gpio_base;
- 		gc->of_gpio_n_cells = 2;
- 		gc->of_xlate = brcmstb_gpio_of_xlate;
--- 
-1.9.1
+diff -u -p a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
+--- a/arch/arm/mach-mediatek/platsmp.c
++++ b/arch/arm/mach-mediatek/platsmp.c
+@@ -54,12 +54,14 @@ static const struct of_device_id mtk_tz_
+ 	{ .compatible   = "mediatek,mt8135", .data = &mtk_mt8135_tz_boot },
+ 	{ .compatible   = "mediatek,mt8127", .data = &mtk_mt8135_tz_boot },
+ 	{ .compatible   = "mediatek,mt2701", .data = &mtk_mt8135_tz_boot },
++	{},
+ };
+ 
+ static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
+ 	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
+ 	{ .compatible   = "mediatek,mt7623", .data = &mtk_mt7623_boot },
+ 	{ .compatible   = "mediatek,mt7623a", .data = &mtk_mt7623_boot },
++	{},
+ };
+ 
+ static void __iomem *mtk_smp_base;
