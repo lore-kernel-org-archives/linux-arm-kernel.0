@@ -1,211 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Sep 2017 14:40:45 -0500
-Subject: [PATCH 1/3] dt-bindings: Add document for rockchip RGB output
- interface
-In-Reply-To: <6cd1ac0d-bc99-f8f3-15da-799f8623ce65@rock-chips.com>
-References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
- <1505360600-196567-1-git-send-email-hjc@rock-chips.com>
- <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
- <d631ff56-e3e6-688f-d9b6-a7101ce047d5@rock-chips.com>
- <6cd1ac0d-bc99-f8f3-15da-799f8623ce65@rock-chips.com>
-Message-ID: <CAL_JsqK7kR5QuBCCgGkOTfw041_k4qsUsNdm0cft=C3UWTfxoQ@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 21 Sep 2017 13:13:07 -0700
+Subject: [PATCH] drm/rockchip: Fix uninitialized use of ret
+In-Reply-To: <3163442d-356a-4000-f15b-74391b79188f@rock-chips.com>
+References: <20170921001408.1839-1-seanpaul@chromium.org>
+ <3163442d-356a-4000-f15b-74391b79188f@rock-chips.com>
+Message-ID: <CAOw6vb+HAKQ8j9gYYnCLVRVBhhKxJVCsetCiRNWiPeJCOP78=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 9:57 PM, Sandy Huang <hjc@rock-chips.com> wrote:
+On Wed, Sep 20, 2017 at 6:03 PM, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2017?09?21? 08:13, Sean Paul wrote:
+>
+> If there are no children for lvds, ret is used uninitialized. This patch
+> initializes ret and returns an error if the port has no children.
+>
+> Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
+> Cc: Mark Yao <mark.yao@rock-chips.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Sandy Huang <hjc@rock-chips.com>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_lvds.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> index c5fbe533796c..0ce6205d8d80 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> @@ -346,7 +346,7 @@ static int rockchip_lvds_bind(struct device *dev, struct
+> device *master,
+>   struct drm_connector *connector;
+>   struct device_node *remote = NULL;
+>   struct device_node  *port, *endpoint;
+> - int ret;
+> + int ret = 0, child_count = 0;
+>   const char *name;
+>   u32 endpoint_id;
+>
+> @@ -358,13 +358,18 @@ static int rockchip_lvds_bind(struct device *dev,
+> struct device *master,
+>   return -EINVAL;
+>   }
+>   for_each_child_of_node(port, endpoint) {
+> + child_count++;
+>   of_property_read_u32(endpoint, "reg", &endpoint_id);
+>   ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
+>    &lvds->panel, &lvds->bridge);
+>   if (!ret)
+>   break;
+>   }
+> - if (ret) {
+> + if (!child_count) {
+> + DRM_DEV_ERROR(dev, "lvds port does not have any children\n");
+> + ret  = -EINVAL;
 >
 >
-> ? 2017/9/20 9:51, Sandy Huang ??:
->>
->> Hi rob,
->>      thanks for you review.
->>
->> ? 2017/9/19 22:46, Rob Herring ??:
->>>
->>> On Thu, Sep 14, 2017 at 11:43:18AM +0800, Sandy Huang wrote:
->>>>
->>>> This path add support rv1108 rgb output interface driver.
->>>>
->>>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->>>> ---
->>>>   .../bindings/display/rockchip/rockchip-rgb.txt     | 80
->>>> ++++++++++++++++++++++
->>>>   1 file changed, 80 insertions(+)
->>>>   create mode 100644
->>>> Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->>>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->>>> b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->>>> new file mode 100644
->>>> index 0000000..4164512
->>>> --- /dev/null
->>>> +++
->>>> b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->>>> @@ -0,0 +1,80 @@
->>>> +Rockchip RV1108 RGB interface
->>>> +================================
->>>> +
->>>> +Required properties:
->>>> +- compatible: matching the soc type:
->>>> +    - "rockchip,rv1108-rgb";
->>>> +
->>>> +Optional properties:
->>>> +- pinctrl-names: must contain a "lcdc" entry.
->>>> +- pinctrl-0: pin control group to be used for this interface.
->>>> +
->>>> +Required nodes:
->>>> +- rockchip,rgb-mode: should be "p888", "p666", "p565", "s888",
->>>> "s888-dummy"
->>>
->>>
->>> This should be a standard property. Any device with a parallel interface
->>> is going to need something like this.
->>>
->> so, i need to move this property to panel? or just rename
->> rockchip,rgb-mode to rgb-mode?
->>
->>>> +    - p888: output r8-g8-b8 at each dclk cycle for per-pixel
->>>> +    - p666: output r6-g6-b6 at each dclk cycle for per-pixel
->>>> +    - p565: output r5-g6-b5 at each dclk cycle for per-pixel
->>>> +    - s888: output r8-g8-b8 in three dclk cycle for per-pixel
->>>> +    - s888-dmmy: output r8-g8-b8-dummy in four dclk cycle for per-pixel
->>>> +
->>>> +The rgb has two video ports described by:
->>>> +    Documentation/devicetree/bindings/media/video-interfaces.txt
->>>> +Their connections are modeled using the OF graph bindings specified in
->>>> +    Documentation/devicetree/bindings/graph.txt.
->>>> +
->>>> +- video port 0 for the VOP input, the remote endpoint maybe
->>>> vopb/vopl/vop
->>>> +- video port 1 for either a panel or subsequent encoder
->>>> +
->>>> +the panel described by:
->>>> +    Documentation/devicetree/bindings/display/panel/simple-panel.txt
->>>> +Panel other required properties:
->>>> +- ports for remote rgb output.
->>>> +
->>>> +Example:
->>>> +
->>>> +panel: panel {
->>>> +    compatible = "auo,b101ean01";
->>>> +    enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
->>>> +
->>>> +    ports {
->>>> +        panel_in_rgb: endpoint {
->>>> +            remote-endpoint = <&rgb_out_panel>;
->>>> +        };
->>>> +    };
->>>> +};
->>>> +
->>>> +For Rockchip RV1108:
->>>> +
->>>> +    rgb: rgb {
->>>> +        compatible = "rockchip,rv1108-rgb";
->>>> +        pinctrl-names = "lcdc";
->>>> +        pinctrl-0 = <&lcdc_ctl>;
->>>> +        rockchip,rgb-mode = "p888";
->>>> +
->>>> +        ports {
->>>> +            #address-cells = <1>;
->>>> +            #size-cells = <0>;
->>>> +
->>>> +            rgb_in: port at 0 {
->>>> +                reg = <0>;
->>>> +                #address-cells = <1>;
->>>> +                #size-cells = <0>;
->>>> +
->>>> +                rgb_in_vop: endpoint at 0 {
->>>> +                    reg = <0>;
->>>
->>>
->>> Don't need reg for a single endpoint.
->>>
->> ok, this will be deleted at next version.
->>>>
->>>> +                    remote-endpoint = <&vop_out_rgb>;
->>>> +                };
->>>> +            };
->>>> +
->>>> +            rgb_out: port at 1 {
->>>> +                reg = <1>;
->>>> +                #address-cells = <1>;
->>>> +                #size-cells = <0>;
->>>> +
->>>> +                rgb_out_panel: endpoint at 0 {
->>>> +                    reg = <0>;
->>>
->>>
->>> ditto.
->>>
->> ok, this will be deleted at next version.
+> Double space on "ret  =",  except this, looks good for me.
+> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
 >
-> sorry,this can't be deleted, because rgb output remote endpoint maybe panel
-> or convert chip, the dts node maybe like this:
->
-> panel: panel {
->         status = "disabled";
->         ports {
->                 panel_in_rgb: endpoint {
->                         remote-endpoint =  <&rgb_out_panel>;
->                 };
->         };
-> };
->
-> bridge: bridge {
->         status = "okay";
->         ports {
->                 bridge_in_rgb: endpoint {
->                         remote-endpoint =  <&rgb_out_bridge>;
->                 };
->         };
-> };
->
-> rgb_out: port at 1 {
->         reg = <1>;
->         #address-cells = <1>;
->         #size-cells = <0>;
->         rgb_out_panel: endpoint at 0 {
->                  reg = <0>;
->                 remote-endpoint = <&panel_in_rgb>;
->         };
->         rgb_out_bridge: endpoint at 1 {
->                  reg = <1>;
->                 remote-endpoint = <&bridge_in_rgb>;
->         };
->  };
->
-> so rockchip_rgb_bind() @ rockchip_rgb.c use reg id to find the remote
-> actived endpoint.
->
-> for_each_child_of_node(port, endpoint) {
->         of_property_read_u32(endpoint, "reg", &endpoint_id);
 
-Lack of reg property here should imply 0 for endpoint_id.
+Thanks for your review, Mark!
 
->         ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
-> &rgb->panel, &rgb->bridge);
->         if (!ret)
->                 break;
-> }
->
->>>> +                    remote-endpoint = <&panel_in_rgb>;
->>>> +                };
->>>> +            };
->>>> +        };
->>>> +    };
->>>> --
->>>> 2.7.4
->>>>
->>>>
->>>
->>>
->>>
->>
->>
->> _______________________________________________
->> Linux-rockchip mailing list
->> Linux-rockchip at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+I've pushed the patch with whitespace fixes to -misc-next.
+
+Sean
+
+
+> + goto err_put_port;
+> + } else if (ret) {
+>   DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
+>   ret  = -EPROBE_DEFER;
+>   goto err_put_port;
 >
 >
+> --
+> ?ark Yao
