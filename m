@@ -1,54 +1,118 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 21 Sep 2017 13:17:52 -0700
-Subject: [PATCH V5 1/4] soc: brcmstb: Add Product ID and Family ID
- helper functions
-In-Reply-To: <CAGh=XAAzjvSpHK_oaj2OwTswdtCpfKUhg-nL+M_4jM92yMTs=A@mail.gmail.com>
-References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
- <1503683495-11766-2-git-send-email-alcooperx@gmail.com>
- <3aefb1ca-827d-6ebf-03c6-1f0d41e5da5c@gmail.com>
- <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
- <CAGh=XAAzjvSpHK_oaj2OwTswdtCpfKUhg-nL+M_4jM92yMTs=A@mail.gmail.com>
-Message-ID: <1506025072.12311.29.camel@perches.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 21 Sep 2017 16:03:13 -0500
+Subject: [PATCH v4 4/5] drivers: pci: add support for relative addressing
+ in quirk tables
+In-Reply-To: <20170920195721.7939-5-ard.biesheuvel@linaro.org>
+References: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
+ <20170920195721.7939-5-ard.biesheuvel@linaro.org>
+Message-ID: <20170921210312.GK22312@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-09-21 at 15:16 -0400, Al Cooper wrote:
-> Kishon,
-> 
-> I ran checkpatch on all my patches before submitting them and didn't
-> get any warnings. It looks like you may be running checkpatch with the
-> "--subjective" option. Is this a requirement and if so are there any
-> other checkpatch options I should be using?
-> 
-> Thanks
-> Al
-> 
-> On Thu, Sep 21, 2017 at 4:54 AM, 'Kishon Vijay Abraham I' via
-> BCM-KERNEL-FEEDBACK-LIST,PDL
-> <bcm-kernel-feedback-list.pdl@broadcom.com> wrote:
-> > Hi,
-> > 
-> > On Saturday 02 September 2017 07:45 AM, Florian Fainelli wrote:
-> > > On 08/25/2017 10:51 AM, Al Cooper wrote:
-[]
-> > I get the following checkpatch warning
-> > CHECK: Macro argument reuse 'reg' - possible side-effects?
-> > #110: FILE: include/linux/soc/brcmstb/brcmstb.h:4:
-> > +#define BRCM_ID(reg)   ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
-[]
-> > > > diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
-> > > > index 337ce41..23e4dc9 100644
-> > > > --- a/include/linux/soc/brcmstb/brcmstb.h
-> > > > +++ b/include/linux/soc/brcmstb/brcmstb.h
-> > > > @@ -1,10 +1,20 @@
-> > > >  #ifndef __BRCMSTB_SOC_H
-> > > >  #define __BRCMSTB_SOC_H
-> > > > 
-> > > > +#define BRCM_ID(reg)        ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
-> > > > +#define BRCM_REV(reg)       ((u32)reg & 0xff)
+[+cc linux-pci]
 
-These should be (reg) to avoid a possible issue with
-cast precedence or
-maybe a use a statement expression
-macro with a temporary to avoid the
-reuse message.
+You copied LKML on some previous versions, but not this one.  Seems
+like that would be useful.
+
+Please adjust the subject line of this one so it matches the typical
+ones for this file, e.g.,
+
+  PCI: Add support for relative addressing in quirk tables
+
+On Wed, Sep 20, 2017 at 12:57:20PM -0700, Ard Biesheuvel wrote:
+> Allow the PCI quirk tables to be emitted in a way that avoids absolute
+> references to the hook functions. This reduces the size of the entries,
+> and, more importantly, makes them invariant under runtime relocation
+> (e.g., for KASLR)
+> 
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+This really uglifies the code (and initcall_from_entry() in the other
+patch makes my head hurt), but I don't have any cleaner implementation
+ideas, and it does seem like a worthwhile space optimization.
+
+> ---
+>  drivers/pci/quirks.c | 13 ++++++++++---
+>  include/linux/pci.h  | 20 ++++++++++++++++++++
+>  2 files changed, 30 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index a4d33619a7bb..82a66235d60c 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -3548,9 +3548,16 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
+>  		     f->vendor == (u16) PCI_ANY_ID) &&
+>  		    (f->device == dev->device ||
+>  		     f->device == (u16) PCI_ANY_ID)) {
+> -			calltime = fixup_debug_start(dev, f->hook);
+> -			f->hook(dev);
+> -			fixup_debug_report(dev, calltime, f->hook);
+> +			void (*hook)(struct pci_dev *dev);
+> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+> +			hook = (void *)((unsigned long)&f->hook_offset +
+> +					f->hook_offset);
+> +#else
+> +			hook = f->hook;
+> +#endif
+> +			calltime = fixup_debug_start(dev, hook);
+> +			hook(dev);
+> +			fixup_debug_report(dev, calltime, hook);
+>  		}
+>  }
+>  
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index f68c58a93dd0..d7a01d7fc3a7 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1791,7 +1791,11 @@ struct pci_fixup {
+>  	u16 device;		/* You can use PCI_ANY_ID here of course */
+>  	u32 class;		/* You can use PCI_ANY_ID here too */
+>  	unsigned int class_shift;	/* should be 0, 8, 16 */
+> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+> +	signed int hook_offset;
+> +#else
+>  	void (*hook)(struct pci_dev *dev);
+> +#endif
+>  };
+>  
+>  enum pci_fixup_pass {
+> @@ -1805,12 +1809,28 @@ enum pci_fixup_pass {
+>  	pci_fixup_suspend_late,	/* pci_device_suspend_late() */
+>  };
+>  
+> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+> +#define __DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
+> +				    class_shift, hook)			\
+> +	__ADDRESSABLE(hook)						\
+> +	asm(".section "	#sec ", \"a\"				\n"	\
+> +	    ".balign	16					\n"	\
+> +	    ".short "	#vendor ", " #device "			\n"	\
+> +	    ".long "	#class ", " #class_shift "		\n"	\
+> +	    ".long "	VMLINUX_SYMBOL_STR(hook) " - .		\n"	\
+> +	    ".previous						\n");
+> +#define DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
+> +				  class_shift, hook)			\
+> +	__DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
+> +				  class_shift, hook)
+> +#else
+>  /* Anonymous variables would be nice... */
+>  #define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, class,	\
+>  				  class_shift, hook)			\
+>  	static const struct pci_fixup __PASTE(__pci_fixup_##name,__LINE__) __used	\
+>  	__attribute__((__section__(#section), aligned((sizeof(void *)))))    \
+>  		= { vendor, device, class, class_shift, hook };
+> +#endif
+>  
+>  #define DECLARE_PCI_FIXUP_CLASS_EARLY(vendor, device, class,		\
+>  					 class_shift, hook)		\
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
