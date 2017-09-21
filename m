@@ -1,102 +1,120 @@
-From: al.cooper@broadcom.com (Al Cooper)
-Date: Thu, 21 Sep 2017 15:16:34 -0400
-Subject: [PATCH V5 1/4] soc: brcmstb: Add Product ID and Family ID helper
- functions
-In-Reply-To: <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
-References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
- <1503683495-11766-2-git-send-email-alcooperx@gmail.com>
- <3aefb1ca-827d-6ebf-03c6-1f0d41e5da5c@gmail.com>
- <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
-Message-ID: <CAGh=XAAzjvSpHK_oaj2OwTswdtCpfKUhg-nL+M_4jM92yMTs=A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Sep 2017 21:32:11 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 1/6] dt-bindings: update the
+ Allwinner GPADC device tree binding for H3
+In-Reply-To: <27449039-F0D4-4663-B596-C95D4408D471@aosc.io>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-2-icenowy@aosc.io>
+ <20170918073336.j7finend3g76chsu@flea.lan>
+ <310CE549-B8CE-4C0C-95B1-B545E38BDAF5@aosc.io>
+ <20170918083045.7bfiialtbm7w6i7j@flea.lan>
+ <e73ead447af89031749e85207cac1e69@aosc.io>
+ <20170920075223.jaeswlhcqgu4yhse@flea.home>
+ <27449039-F0D4-4663-B596-C95D4408D471@aosc.io>
+Message-ID: <20170921193211.pjsikkez5by46mfh@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon,
+On Wed, Sep 20, 2017 at 08:04:02AM +0000, Icenowy Zheng wrote:
+> ? 2017?9?20? GMT+08:00 ??3:52:23, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Mon, Sep 18, 2017 at 03:47:25PM +0000, icenowy at aosc.io wrote:
+> >> ? 2017-09-18 16:30?Maxime Ripard ???
+> >> > On Mon, Sep 18, 2017 at 03:36:43PM +0800, Icenowy Zheng wrote:
+> >> > > ? 2017?9?18? GMT+08:00 ??3:33:36, Maxime Ripard
+> >> > > <maxime.ripard@free-electrons.com> ??:
+> >> > > >On Thu, Sep 14, 2017 at 10:52:46PM +0800, Icenowy Zheng wrote:
+> >> > > >> Allwinner H3 features a thermal sensor like the one in A33,
+> >but has
+> >> > > >its
+> >> > > >> register re-arranged, the clock divider moved to CCU
+> >(originally the
+> >> > > >> clock divider is in ADC) and added a pair of bus clock and
+> >reset.
+> >> > > >>
+> >> > > >> Update the binding document to cover H3.
+> >> > > >>
+> >> > > >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> > > >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> >> > > >> ---
+> >> > > >> Changes in v4:
+> >> > > >> - Add nvmem calibration data (not yet used by the driver)
+> >> > > >> Changes in v3:
+> >> > > >> - Clock name changes.
+> >> > > >> - Example node name changes.
+> >> > > >> - Add interupts (not yet used by the driver).
+> >> > > >>
+> >> > > >>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 30
+> >> > > >++++++++++++++++++++--
+> >> > > >>  1 file changed, 28 insertions(+), 2 deletions(-)
+> >> > > >>
+> >> > > >> diff --git
+> >a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> >> > > >b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> >> > > >> index badff3611a98..6c470d584bf9 100644
+> >> > > >> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> >> > > >> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> >> > > >> @@ -4,12 +4,26 @@ The Allwinner SoCs all have an ADC that can
+> >also
+> >> > > >act as a thermal sensor
+> >> > > >>  and sometimes as a touchscreen controller.
+> >> > > >>
+> >> > > >>  Required properties:
+> >> > > >> -  - compatible: "allwinner,sun8i-a33-ths",
+> >> > > >> +  - compatible: must contain one of the following
+> >compatibles:
+> >> > > >> +		- "allwinner,sun8i-a33-ths"
+> >> > > >> +		- "allwinner,sun8i-h3-ths"
+> >> > > >>    - reg: mmio address range of the chip,
+> >> > > >>    - #thermal-sensor-cells: shall be 0,
+> >> > > >>    - #io-channel-cells: shall be 0,
+> >> > > >>
+> >> > > >> -Example:
+> >> > > >> +Optional properties:
+> >> > > >> +  - nvmem-cells: A phandle to the calibration data provided
+> >by a
+> >> > > >nvmem device.
+> >> > > >> +                 If unspecified default values shall be used.
+> >> > > >> +  - nvmem-cell-names: Should be "calibration-data"
+> >> > > >
+> >> > > >I'd prefer to have which sensor it applies to here. It wouldn't
+> >change
+> >> > > >anything for the H3, but it definitely does for example for the
+> >A83t
+> >> > > >that has two sensors, one for each cluster, and one for the GPU,
+> >each
+> >> > > >with calibration data.
+> >> > > >
+> >> > > >What about cluster0-calibration?
+> >> 
+> >> I prefer sensor0-calibration to sensor3-calibration now.
+> >> (Theortically the new generation THS can support up to 4 sensors)
+> >
+> >The mapping that explains what sensor0 means can change in the
+> >future. It's better to be explicit here, and just say upfront what
+> >it's about.
+> 
+> I think for some SoC (e.g. A64) there's no clear explain on
+> the functions of the sensors.
 
-I ran checkpatch on all my patches before submitting them and didn't
-get any warnings. It looks like you may be running checkpatch with the
-"--subjective" option. Is this a requirement and if so are there any
-other checkpatch options I should be using?
+It's documented in the user manual ("sensor0 located in the CPU, sensor1 and
+sensor2 located in the GPU"
 
-Thanks
-Al
+> In addition, in the THS controller the sensors has a explicit
+> sequence, and when referencing it in the DT the number is still
+> needed (in thermal zones).
 
-On Thu, Sep 21, 2017 at 4:54 AM, 'Kishon Vijay Abraham I' via
-BCM-KERNEL-FEEDBACK-LIST,PDL
-<bcm-kernel-feedback-list.pdl@broadcom.com> wrote:
-> Hi,
->
-> On Saturday 02 September 2017 07:45 AM, Florian Fainelli wrote:
->>
->>
->> On 08/25/2017 10:51 AM, Al Cooper wrote:
->>> Signed-off-by: Al Cooper <alcooperx@gmail.com>
->>
->> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
->
-> I get the following checkpatch warning
-> CHECK: Macro argument reuse 'reg' - possible side-effects?
-> #110: FILE: include/linux/soc/brcmstb/brcmstb.h:4:
-> +#define BRCM_ID(reg)   ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
->
-> Can you fix it and resend. While at that also add commmit log.
->
-> Thanks
-> Kishon
->
->>
->>> ---
->>>  drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
->>>  include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
->>>  2 files changed, 22 insertions(+)
->>>
->>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
->>> index b6195fd..184dbf5 100644
->>> --- a/drivers/soc/bcm/brcmstb/common.c
->>> +++ b/drivers/soc/bcm/brcmstb/common.c
->>> @@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
->>>      return of_match_node(brcmstb_machine_match, root) != NULL;
->>>  }
->>>
->>> +u32 brcmstb_get_family_id(void)
->>> +{
->>> +    return family_id;
->>> +}
->>> +EXPORT_SYMBOL(brcmstb_get_family_id);
->>> +
->>> +u32 brcmstb_get_product_id(void)
->>> +{
->>> +    return product_id;
->>> +}
->>> +EXPORT_SYMBOL(brcmstb_get_product_id);
->>> +
->>>  static const struct of_device_id sun_top_ctrl_match[] = {
->>>      { .compatible = "brcm,bcm7125-sun-top-ctrl", },
->>>      { .compatible = "brcm,bcm7346-sun-top-ctrl", },
->>> diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
->>> index 337ce41..23e4dc9 100644
->>> --- a/include/linux/soc/brcmstb/brcmstb.h
->>> +++ b/include/linux/soc/brcmstb/brcmstb.h
->>> @@ -1,10 +1,20 @@
->>>  #ifndef __BRCMSTB_SOC_H
->>>  #define __BRCMSTB_SOC_H
->>>
->>> +#define BRCM_ID(reg)        ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
->>> +#define BRCM_REV(reg)       ((u32)reg & 0xff)
->>> +
->>>  /*
->>>   * Bus Interface Unit control register setup, must happen early during boot,
->>>   * before SMP is brought up, called by machine entry point.
->>>   */
->>>  void brcmstb_biuctrl_init(void);
->>>
->>> +/*
->>> + * Helper functions for getting family or product id from the
->>> + * SoC driver.
->>> + */
->>> +u32 brcmstb_get_family_id(void);
->>> +u32 brcmstb_get_product_id(void);
->>> +
->>>  #endif /* __BRCMSTB_SOC_H */
->>>
->>
+Yes, but that's something that can be made easier through defines too.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170921/8fe447b0/attachment.sig>
