@@ -1,155 +1,83 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Sep 2017 13:56:41 +0930
-Subject: [PATCH v2 5/5] clk: aspeed: Add reset controller
-In-Reply-To: <20170921042641.7326-1-joel@jms.id.au>
-References: <20170921042641.7326-1-joel@jms.id.au>
-Message-ID: <20170921042641.7326-6-joel@jms.id.au>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 21 Sep 2017 13:57:51 +0900
+Subject: [PATCH v2 8/8] PM / devfreq: exynos-bus: Register cooling device
+In-Reply-To: <1505954032-3327-9-git-send-email-cw00.choi@samsung.com>
+References: <1505954032-3327-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170921003356epcas1p34bf88ccd1b9630577a83f14f0c291b1d@epcas1p3.samsung.com>
+ <1505954032-3327-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <59C346CF.6010105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some resets that are not associated with gates. These are
-represented by a reset controller.
+Dear all,
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- drivers/clk/clk-aspeed.c                 | 82 +++++++++++++++++++++++++++++++-
- include/dt-bindings/clock/aspeed-clock.h |  9 ++++
- 2 files changed, 90 insertions(+), 1 deletion(-)
+Please ignore this patch. It has some problem.
+I'll fix and resend this patch on v2.
 
-diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index dec9db4ec47b..db97c0f9f99e 100644
---- a/drivers/clk/clk-aspeed.c
-+++ b/drivers/clk/clk-aspeed.c
-@@ -17,6 +17,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset-controller.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-@@ -256,6 +257,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
- 	.is_enabled = aspeed_clk_is_enabled,
- };
- 
-+/**
-+ * struct aspeed_reset - Aspeed reset controller
-+ * @map: regmap to access the containing system controller
-+ * @rcdev: reset controller device
-+ */
-+struct aspeed_reset {
-+	struct regmap			*map;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
-+
-+static const u8 aspeed_resets[] = {
-+	25, /* x-dma */
-+	24, /* mctp */
-+	23, /* adc */
-+	22, /* jtag-master */
-+	18, /* mic */
-+	 9, /* pwm */
-+	 8, /* pci-vga */
-+	 2, /* i2c */
-+	 1, /* ahb */
-+};
-+
-+static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
-+}
-+
-+static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
-+}
-+
-+static int aspeed_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 val, rst = BIT(aspeed_resets[id]);
-+	int ret;
-+
-+	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
-+	if (ret)
-+		return ret;
-+
-+	return !!(val & rst);
-+}
-+
-+static const struct reset_control_ops aspeed_reset_ops = {
-+	.assert = aspeed_reset_assert,
-+	.deassert = aspeed_reset_deassert,
-+	.status = aspeed_reset_status,
-+};
-+
- static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		struct regmap *map, u8 clock_idx, u8 reset_idx,
-@@ -299,10 +362,11 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
- 	const struct clk_div_table *mac_div_table;
- 	const struct clk_div_table *div_table;
- 	struct device *dev = &pdev->dev;
-+	struct aspeed_reset *ar;
- 	struct regmap *map;
- 	struct clk_hw *hw;
- 	u32 val, rate;
--	int i;
-+	int i, ret;
- 
- 	map = syscon_node_to_regmap(dev->of_node);
- 	if (IS_ERR(map)) {
-@@ -310,6 +374,22 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
- 		return PTR_ERR(map);
- 	}
- 
-+	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
-+	if (!ar)
-+		return -ENOMEM;
-+
-+	ar->map = map;
-+	ar->rcdev.owner = THIS_MODULE;
-+	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
-+	ar->rcdev.ops = &aspeed_reset_ops;
-+	ar->rcdev.of_node = dev->of_node;
-+
-+	ret = devm_reset_controller_register(dev, &ar->rcdev);
-+	if (ret) {
-+		dev_err(dev, "could not register reset controller\n");
-+		return ret;
-+	}
-+
- 	/* SoC generations share common layouts but have different divisors */
- 	soc_data = of_device_get_match_data(&pdev->dev);
- 	div_table = soc_data->div_table;
-diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
-index afe06b77562d..a9d552b6bbd2 100644
---- a/include/dt-bindings/clock/aspeed-clock.h
-+++ b/include/dt-bindings/clock/aspeed-clock.h
-@@ -40,4 +40,13 @@
- #define ASPEED_CLK_GATE_SDCLKCLK	(22 + ASPEED_CLK_GATES)
- #define ASPEED_CLK_GATE_LHCCLK		(23 + ASPEED_CLK_GATES)
- 
-+#define ASPEED_RESET_XDMA		0
-+#define ASPEED_RESET_MCTP		1
-+#define ASPEED_RESET_JTAG_MASTER	2
-+#define ASPEED_RESET_MIC		3
-+#define ASPEED_RESET_PWM		4
-+#define ASPEED_RESET_PCIVGA		5
-+#define ASPEED_RESET_I2C		6
-+#define ASPEED_RESET_AHB		7
-+
- #endif
--- 
-2.14.1
+Chanwoo Choi
+Samsung Electronics
+
+On 2017? 09? 21? 09:33, Chanwoo Choi wrote:
+> This patch registers the Exynos Bus-Frequency scaling device
+> as a cooling device of thermal management.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/devfreq/Kconfig      |  1 +
+>  drivers/devfreq/exynos-bus.c | 11 +++++++++++
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+> index 6a172d338f6d..eb8128e08b2c 100644
+> --- a/drivers/devfreq/Kconfig
+> +++ b/drivers/devfreq/Kconfig
+> @@ -81,6 +81,7 @@ config ARM_EXYNOS_BUS_DEVFREQ
+>  	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+>  	select DEVFREQ_GOV_PASSIVE
+>  	select DEVFREQ_EVENT_EXYNOS_PPMU
+> +	select DEVFREQ_THERMAL
+>  	select PM_DEVFREQ_EVENT
+>  	select PM_OPP
+>  	help
+> diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+> index c25658b26598..200ca0d11834 100644
+> --- a/drivers/devfreq/exynos-bus.c
+> +++ b/drivers/devfreq/exynos-bus.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/devfreq.h>
+>  #include <linux/devfreq-event.h>
+> +#include <linux/devfreq_cooling.h>
+>  #include <linux/device.h>
+>  #include <linux/export.h>
+>  #include <linux/module.h>
+> @@ -41,6 +42,8 @@ struct exynos_bus {
+>  	struct clk *clk;
+>  	unsigned int voltage_tolerance;
+>  	unsigned int ratio;
+> +
+> +	struct thermal_cooling_device *cdev;
+>  };
+>  
+>  /*
+> @@ -468,6 +471,14 @@ static int exynos_bus_probe(struct platform_device *pdev)
+>  		goto err;
+>  	}
+>  
+> +	/* Register devfreq cooling device */
+> +	bus->cdev = of_devfreq_cooling_register(np, bus->devfreq);
+> +	if (IS_ERR(bus->cdev) < 0) {
+> +		dev_err(dev, "failed to register cooling device\n");
+> +		ret = PTR_ERR(bus->cdev);
+> +		goto err;
+> +	}
+> +
+>  	goto out;
+>  passive:
+>  	/* Initialize the struct profile and governor data for passive device */
+> 
