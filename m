@@ -1,94 +1,58 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Thu, 21 Sep 2017 17:18:17 +0100
-Subject: [PATCH v3 6/6] serial: imx: Fix imx_shutdown procedure
-In-Reply-To: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
-References: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <1506010697-22114-7-git-send-email-martyn.welch@collabora.co.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 21 Sep 2017 22:40:18 +0530
+Subject: [PATCH 1/5] dmaengine: edma: Implement protection for invalid
+ max_burst
+In-Reply-To: <20170912104424.18495-2-peter.ujfalusi@ti.com>
+References: <20170912104424.18495-1-peter.ujfalusi@ti.com>
+ <20170912104424.18495-2-peter.ujfalusi@ti.com>
+Message-ID: <20170921171018.GE30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nandor Han <nandor.han@ge.com>
+On Tue, Sep 12, 2017 at 01:44:20PM +0300, Peter Ujfalusi wrote:
+> Set the device's max_burst to 32767 (CIDX is 16bit signed value) so clients
+> can take this into consideration when setting up the trasnfer.
 
-In some cases, it looks that interrupts can happen after the dma was
-disabled and port was not yet shutdown. This will result in interrupts
-handled by imx_rxint.
+/s/trasnfer/transfer
 
-This commits updates the shutdown function to ensure that underlying
-components are disabled in the right order. This disables RX and TX
-blocks, then it disabled interrupts. In case DMA is enabled, it disables
-DMA and free corresponding resources. It disables UART port and stop
-clocks.
+> 
+> During slave transfer preparation check if the requested maxburst is valid.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/edma.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 3879f80a4815..6970355abdc9 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -891,6 +891,10 @@ static int edma_slave_config(struct dma_chan *chan,
+>  	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+>  		return -EINVAL;
+>  
+> +	if (cfg->src_maxburst > chan->device->max_burst ||
+> +	    cfg->dst_maxburst > chan->device->max_burst)
+> +		return -EINVAL;
+> +
+>  	memcpy(&echan->cfg, cfg, sizeof(echan->cfg));
+>  
+>  	return 0;
+> @@ -1855,6 +1859,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+>  	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+>  	s_ddev->directions |= (BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV));
+>  	s_ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+> +	s_ddev->max_burst = SZ_32K - 1; /* CIDX: 16bit signed */
+>  
+>  	s_ddev->dev = ecc->dev;
+>  	INIT_LIST_HEAD(&s_ddev->channels);
+> -- 
+> 2.14.1
+> 
+> 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> 
+> 
 
-Signed-off-by: Nandor Han <nandor.han@ge.com>
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
-Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
----
- drivers/tty/serial/imx.c | 34 +++++++++++++++-------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 256b128..393c1c0 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1368,44 +1368,40 @@ static void imx_shutdown(struct uart_port *port)
- 	unsigned long temp;
- 	unsigned long flags;
- 
--	if (sport->dma_is_enabled) {
--		sport->dma_is_rxing = 0;
--		sport->dma_is_txing = 0;
--		dmaengine_terminate_sync(sport->dma_chan_tx);
--		dmaengine_terminate_sync(sport->dma_chan_rx);
--
-+	if (!sport->port.suspended) {
- 		spin_lock_irqsave(&sport->port.lock, flags);
- 		imx_stop_tx(port);
- 		imx_stop_rx(port);
--		imx_disable_dma(sport);
-+
-+		if (sport->dma_is_inited && sport->dma_is_enabled)
-+			imx_disable_dma(sport);
-+
- 		spin_unlock_irqrestore(&sport->port.lock, flags);
- 		imx_uart_dma_exit(sport);
- 	}
- 
--	mctrl_gpio_disable_ms(sport->gpios);
--
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR2);
--	temp &= ~(UCR2_TXEN);
-+	temp &= ~(UCR2_TXEN | UCR2_RXEN);
- 	writel(temp, sport->port.membase + UCR2);
-+	temp = readl(sport->port.membase + UCR4);
-+	temp &= ~UCR4_OREN;
-+	writel(temp, sport->port.membase + UCR4);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
--	/*
--	 * Stop our timer.
--	 */
--	del_timer_sync(&sport->timer);
-+	mctrl_gpio_disable_ms(sport->gpios);
- 
--	/*
--	 * Disable all interrupts, port and break condition.
--	 */
-+	/* Stop our timer. */
-+	del_timer_sync(&sport->timer);
- 
-+	/* Disable port. */
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR1);
--	temp &= ~(UCR1_TXMPTYEN | UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN);
--
-+	temp &= ~UCR1_UARTEN;
- 	writel(temp, sport->port.membase + UCR1);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
-+	/* Disable clocks. */
- 	clk_disable_unprepare(sport->clk_per);
- 	clk_disable_unprepare(sport->clk_ipg);
- }
 -- 
-1.8.3.1
+~Vinod
