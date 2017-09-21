@@ -1,103 +1,264 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 21 Sep 2017 02:17:10 +0000
-Subject: [PATCH 1/7] PM / OPP: Add platform specific set_clk function
-In-Reply-To: <20170920203033.GD3001@ubuntu>
-References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
- <1503504610-12880-2-git-send-email-aisheng.dong@nxp.com>
- <20170919225840.GI30848@ubuntu> <20170920070343.GA32187@b29396-OptiPlex-7040>
- <20170920203033.GD3001@ubuntu>
-Message-ID: <AM3PR04MB3063900BE634FABE8668F3380660@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: hanetzer@startmail.com (Marty E. Plummer)
+Date: Wed, 20 Sep 2017 21:15:16 -0500
+Subject: [RFC RESEND 3/3] arm: dts: add Hi3521A dts
+In-Reply-To: <CAL_JsqLfRN=CjcDbwANE7gwCQS-_s99f6UANPLAooiaWB1mvfA@mail.gmail.com>
+References: <20170917082327.10058-1-hanetzer@startmail.com>
+ <20170917082327.10058-4-hanetzer@startmail.com>
+ <20170920205303.lcycfuai75a7namk@rob-hp-laptop>
+ <20170920230405.tz3vzoys2vn72rgv@proprietary-killer.fossland>
+ <CAL_JsqLfRN=CjcDbwANE7gwCQS-_s99f6UANPLAooiaWB1mvfA@mail.gmail.com>
+Message-ID: <20170921021511.q6cbew5d5ec5cxxd@proprietary-killer.fossland>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Viresh Kumar [mailto:viresh.kumar at linaro.org]
-> Sent: Thursday, September 21, 2017 4:31 AM
-> To: Dong Aisheng
-> Cc: A.s. Dong; linux-pm at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; sboyd at codeaurora.org;
-> vireshk at kernel.org; nm at ti.com; rjw at rjwysocki.net; shawnguo at kernel.org;
-> Anson Huang; Jacky Bai
-> Subject: Re: [PATCH 1/7] PM / OPP: Add platform specific set_clk function
+On Thu, Sep 21, 2017 at 01:08:39AM +0000, Rob Herring wrote:
+> On Wed, Sep 20, 2017 at 6:04 PM, Marty E. Plummer
+> <hanetzer@startmail.com> wrote:
+> > On Wed, Sep 20, 2017 at 08:53:03PM +0000, Rob Herring wrote:
+> >> On Sun, Sep 17, 2017 at 03:23:27AM -0500, Marty E. Plummer wrote:
+> >> > Add hi3521a.dtsi and hi3521a-rs-dm290e.dts for RaySharp CCTV systems,
+> >> > marketed under the name Samsung SDR-B74301N
+> >> >
+> >> > Signed-off-by: Marty E. Plummer <hanetzer@startmail.com>
+> >> > ---
+> >> >  arch/arm/boot/dts/Makefile              |   2 +
+> >> >  arch/arm/boot/dts/hi3521a-rs-dm290e.dts |  52 ++++++
+> >> >  arch/arm/boot/dts/hi3521a.dtsi          | 310 ++++++++++++++++++++++++++++++++
+> >> >  3 files changed, 364 insertions(+)
+> >> >  create mode 100644 arch/arm/boot/dts/hi3521a-rs-dm290e.dts
+> >> >  create mode 100644 arch/arm/boot/dts/hi3521a.dtsi
+> >> >
+> >> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> > index faf46abaa4a2..e7b9b5dde20f 100644
+> >> > --- a/arch/arm/boot/dts/Makefile
+> >> > +++ b/arch/arm/boot/dts/Makefile
+> >> > @@ -189,6 +189,8 @@ dtb-$(CONFIG_ARCH_GEMINI) += \
+> >> >     gemini-sq201.dtb \
+> >> >     gemini-wbd111.dtb \
+> >> >     gemini-wbd222.dtb
+> >> > +dtb-$(CONFIG_ARCH_HI3521A) += \
+> >> > +   hi3521a-rs-dm290e.dtb
+> >> >  dtb-$(CONFIG_ARCH_HI3xxx) += \
+> >> >     hi3620-hi4511.dtb
+> >> >  dtb-$(CONFIG_ARCH_HIGHBANK) += \
+> >> > diff --git a/arch/arm/boot/dts/hi3521a-rs-dm290e.dts b/arch/arm/boot/dts/hi3521a-rs-dm290e.dts
+> >> > new file mode 100644
+> >> > index 000000000000..b32c8392c93f
+> >> > --- /dev/null
+> >> > +++ b/arch/arm/boot/dts/hi3521a-rs-dm290e.dts
+> >> > @@ -0,0 +1,52 @@
+> >> > +/*
+> >> > + * Copyright (C) 2017 Marty Plummer <hanetzer@startmail.com>
+> >> > + *
+> >> > + * This program is free software: you can redistribute it and/or modify
+> >> > + * it under the terms of the GNU General Public License as published by
+> >> > + * the Free Software Foundation, either version 3 of the License, or
+> >> > + * (at your option) any later version.
+> >>
+> >> Should be version 2 or later? Doesn't really matter to me from a DT
+> >> perspective, but it is in the kernel tree.
+> >>
+> >> You can use SPDX tags if you want.
+> >>
+> > Oh, that's a good idea. I hadn't seen any SPDX tags in the tree that I
+> > noticed before. I ended up just using the :Gpl command from neovim.
+> >> > + *
+> >> > + * This program is distributed in the hope that it will be useful,
+> >> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> > + * GNU General Public License for more details.
+> >> > + *
+> >> > + * You should have received a copy of the GNU General Public License
+> >> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >> > + */
+> >> > +
+> >> > +/dts-v1/;
+> >> > +#include "hi3521a.dtsi"
+> >> > +
+> >> > +/ {
+> >> > +   model = "RaySharp RS-DM-290E DVR Board";
+> >> > +   compatible = "hisilicon,hi3521a";
+> >>
+> >> Needs a board compatible too.
+> >>
+> > Something like `compatible = "hisilicon,hi3521a", "raysharp,rs-dm-290e";` ?
 > 
-> On 20-09-17, 15:03, Dong Aisheng wrote:
-> > I've been thinking of that before.
-> > Actually IMX already does some similar thing for MX5 (no for MX6).
-> > See: clk_cpu_set_rate() in drivers/clk/imx/clk-cpu.c.
-> >
-> > After some diggings, it seems MX7ULP is a bit more complicated than
-> > before mainly due to two reasons:
-> > 1) It requires to switch to different CPU mode accordingly when
-> > setting clocks rate. That means we need handle this in clock driver as
-> > well which looks not quite suitable although we could do if really want.
-> >
-> > 2) It uses different clocks for different CPU mode (RUN 416M or HSRUN
-> > 528M), and those clocks have some dependency.
-> > e.g. when setting HSRUN clock, we need change RUN clock parent to make
-> > sure the SPLL_PFD is got disabled before changing rate, as both CPU
-> > mode using the same parent SPLL_PFD clock. Doing this in clock driver
-> > also make things a bit more complicated.
-> >
-> > The whole follow would be something like below:
-> > static int imx7ulp_set_clk(struct device *dev, struct clk *clk,
-> >                            unsigned long old_freq, unsigned long
-> > new_freq) {
-> >         u32 val;
-> >
-> >         /*
-> >          * Before changing the ARM core PLL, change the ARM clock soure
-> >          * to FIRC first.
-> >          */
-> >         if (new_freq >= HSRUN_FREQ) {
-> >                 clk_set_parent(clks[RUN_SCS_SEL].clk, clks[FIRC].clk);
-> >
-> >                 /* switch to HSRUN mode */
-> >                 val = readl_relaxed(smc_base + SMC_PMCTRL);
-> >                 val |= (0x3 << 8);
-> >                 writel_relaxed(val, smc_base + SMC_PMCTRL);
-> >
-> >                 /* change the clock rate in HSRUN */
-> >                 clk_set_rate(clks[SPLL_PFD0].clk, new_freq);
-> >                 clk_set_parent(clks[HSRUN_SCS_SEL].clk,
-> clks[SPLL_SEL].clk);
-> >         } else {
-> >                 /* change the HSRUN clock to firc */
-> >                 clk_set_parent(clks[HSRUN_SCS_SEL].clk,
-> > clks[FIRC].clk);
-> >
-> >                 /* switch to RUN mode */
-> >                 val = readl_relaxed(smc_base + SMC_PMCTRL);
-> >                 val &= ~(0x3 << 8);
-> >                 writel_relaxed(val, smc_base + SMC_PMCTRL);
-> >
-> >                 clk_set_rate(clks[SPLL_PFD0].clk, new_freq);
-> >                 clk_set_parent(clks[RUN_SCS_SEL].clk,
-> clks[SPLL_SEL].clk);
-> >         }
-> >
-> >         return 0;
-> > }
+> Yes, but flip the order. Most specific compatible first.
 > 
-> Right and we have the same thing in the cpufreq driver now. It will stay
-> at some place and we need to find the best one, keeping in mind that we
-> may or may not want to solve this problem in a generic way.
+> >> > +
+> >> > +   aliases {
+> >> > +           serial0 = &uart0;
+> >> > +           serial1 = &uart1;
+> >> > +           serial2 = &uart2;
+> >> > +   };
+> >> > +
+> >> > +   memory {
+> >>
+> >> Needs a unit-address.
+> >>
+> > Could you explain what you mean here? As in, memory at someaddr? What would
+> > I use here?
 > 
-> > That's why i thought if we can make OPP core provide a way to handle
-> > such complicated things in platform specific cpufreq driver.
-> >
-> > How would you suggest for this issue?
+> "memory at 80000000". Building with W=2 will tell you.
 > 
-> I wouldn't add an API into the OPP framework if I were you. There is just
-> too much code to add to the core to handle such platform specific stuff,
-> which you are anyway going to keep somewhere as it is. IMHO, keeping that
-> in the clock driver is a better thing to do than this.
+Ah, nice trick. Suppose that makes sense, as every other thing was the
+same on that sort of thing. Not sure if I've ever seen memory at addr
+before.
+> >> > +           device_type = "memory";
+> >> > +           reg = <0x80000000 0xf00000>;
+> >> > +   };
+> >> > +};
+> >> > +
+> >> > +&hi_sfc {
+> >> > +   status = "okay";
+> >> > +   spi-nor at 0 {
+> >> > +           compatible = "jedec,spi-nor";
+> >>
+> >> I don't remember offhand, but I think this should have a device specific
+> >> compatible too.
+> >>
+> > Instead of "jedec,spi-nor" ? Specific to the SPI chip?
 > 
-
-Okay, I will give a try in CLK driver.
-Thanks for the suggestion.
-
-Regards
-Dong Aisheng
-
-> --
-> viresh
+> No, both with jedec,spi-nor 2nd.
+> 
+Gotcha, will fix it up.
+> >> > +           reg = <0>;
+> >> > +           spi-max-frequency = <104000000>;
+> >> > +   };
+> >> > +};
+> >> > +
+> >> > +&uart0 {
+> >> > +   status = "okay";
+> >> > +};
+> >> > +
+> >> > +&dual_timer0 {
+> >> > +   status = "okay";
+> >> > +};
+> >> > diff --git a/arch/arm/boot/dts/hi3521a.dtsi b/arch/arm/boot/dts/hi3521a.dtsi
+> >> > new file mode 100644
+> >> > index 000000000000..2af746fdec46
+> >> > --- /dev/null
+> >> > +++ b/arch/arm/boot/dts/hi3521a.dtsi
+> >> > @@ -0,0 +1,310 @@
+> >> > +/*
+> >> > + * Copyright (C) 2017 Marty Plummer <hanetzer@startmail.com>
+> >> > + *
+> >> > + * This program is free software: you can redistribute it and/or modify
+> >> > + * it under the terms of the GNU General Public License as published by
+> >> > + * the Free Software Foundation, either version 3 of the License, or
+> >> > + * (at your option) any later version.
+> >> > + *
+> >> > + * This program is distributed in the hope that it will be useful,
+> >> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> > + * GNU General Public License for more details.
+> >> > + *
+> >> > + * You should have received a copy of the GNU General Public License
+> >> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >> > + */
+> >> > +
+> >> > +#include <dt-bindings/clock/hi3521a-clock.h>
+> >> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> >> > +/ {
+> >> > +   #address-cells = <1>;
+> >> > +   #size-cells = <1>;
+> >> > +   chosen { };
+> >> > +
+> >> > +   cpus {
+> >> > +           #address-cells = <1>;
+> >> > +           #size-cells = <0>;
+> >> > +
+> >> > +           cpu0: cpu at 0 {
+> >> > +                   device_type = "cpu";
+> >> > +                   compatible = "arm,cortex-a7";
+> >> > +                   reg = <0>;
+> >> > +           };
+> >> > +   };
+> >> > +
+> >> > +   hi_sfc: spi-nor-controller at 10000000 {
+> >> > +           compatible = "hisilicon,hi3521a-spi-nor", "hisilicon,fmc-spi-nor";
+> >> > +           #address-cells = <1>;
+> >> > +           #size-cells = <0>;
+> >> > +           reg = <0x10000000 0x10000>, <0x14000000 0x1000000>;
+> >> > +           reg-names = "control", "memory";
+> >> > +           clocks = <&crg HI3521A_FMC_CLK>;
+> >> > +           status = "disabled";
+> >> > +   };
+> >> > +
+> >> > +   gic: interrupt-controller at 10300000 {
+> >> > +           compatible = "arm,pl390";
+> >> > +           #interrupt-cells = <3>;
+> >> > +           interrupt-controller;
+> >> > +           reg = <0x10301000 0x1000>, <0x10302000 0x1000>;
+> >> > +   };
+> >> > +
+> >> > +   clk_3m: clk_3m {
+> >> > +           compatible = "fixed-clock";
+> >> > +           #clock-cells = <0>;
+> >> > +           clock-frequency = <3000000>;
+> >> > +   };
+> >> > +
+> >> > +   crg: clock-reset-controller at 12040000 {
+> >> > +           compatible = "hisilicon,hi3521a-crg";
+> >> > +           #clock-cells = <1>;
+> >> > +           #reset-cells = <2>;
+> >> > +           reg = <0x12040000 0x10000>;
+> >> > +   };
+> >>
+> >> These memory mapped peripherals should be under a bus node.
+> >>
+> > Crap, will fix.
+> >> > +
+> >> > +   soc {
+> >> > +           #address-cells = <1>;
+> >> > +           #size-cells = <1>;
+> >> > +           compatible = "simple-bus";
+> >> > +           interrupt-parent = <&gic>;
+> >> > +           ranges;
+> >>
+> >> It is preferred to have a value here and limit the range of the bus
+> >> addresses.
+> >>
+> > Yeah, I think I've seen that before, I don't quite grok how that works.
+> >> > +
+> >> > +           dmac: dma at 10060000 {
+> >>
+> >> dma-controller at ...
+> >>
+> > Will fix.
+> >> > +                   compatible = "arm,pl080", "arm,primecell";
+> >> > +                   reg = <0x10060000 0x1000>;
+> >> > +                   interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+> >> > +                   status = "disabled";
+> >>
+> >> I wouldn't think enabling dma would be a per board decision.
+> >>
+> > I've just noticed that in general dtsi files just lay it all out and are
+> > mostly "disabled", though if you think this should be explicitly enabled
+> > thats fine by me.
+> >> > +           };
+> >> > +
+> >> > +           dual_timer0: timer at 12000000 {
+> >> > +                   compatible = "arm,sp804", "arm,primecell";
+> >> > +                   interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
+> >> > +                                <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+> >> > +                   reg = <0x12000000 0x1000>;
+> >> > +                   clocks = <&clk_3m>;
+> >> > +                   clock-names = "apb_pclk";
+> >>
+> >> IIRC, it is deprecated to have a single clock here. The h/w has 2 clock
+> >> inputs.
+> >>
+> > Are you meaning for the 0x0 index and 0x20 index clocks?
+> 
+> Yes. Maybe it's 3 clocks. Anyway, should all be in the sp804 binding doc.
+> 
+> >> Where's the ARM architected timer?
+> >>
+> > Unsure tbqf, just doing my best to translate a datasheet into code. Do
+> > all ARM soc's have one?
+> 
+> All A7's should I think.
+> 
+Gotcha.
+> Rob
