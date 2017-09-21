@@ -1,18 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 21 Sep 2017 22:53:56 +0530
-Subject: [PATCH v2] dmaengine: sun6i: use of_device_get_match_data
-In-Reply-To: <20170920072402.27704-1-clabbe.montjoie@gmail.com>
-References: <20170920072402.27704-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170921172356.GK30097@localhost>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 21 Sep 2017 19:21:39 +0200
+Subject: [PATCH 00/12] ARM: dts: sunxi: Fix DT build warnings
+Message-ID: <20170921172151.29779-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 09:24:02AM +0200, Corentin Labbe wrote:
-> The usage of of_device_get_match_data reduce the code size a bit.
-> Furthermore, it prevents an improbable dereference when
-> of_match_device() return NULL.
+Hello
 
-Applied, thanks
+The goal of this patch series is to have a clean DT build with W=1.
+
+Regards
+
+Corentin Labbe (12):
+  ARM: dts: sunxi: h3/h5: Fix simple-bus unit address format error
+  ARM: dts: sunxi: h3/h5: Fix i2c2 register address
+  ARM: dts: sunxi: h3/h5: Fix node with unit name and no reg property
+  ARM: dts: nanopi: Fix node with unit name and no reg property
+  ARM: dts: orangepi2: Fix node with unit name and no reg property
+  ARM: dts: sun8i: orangepi-lite: Fix node with unit name and no reg
+    property
+  ARM: dts: sun8i: orangepi one: Fix node with unit name and no reg
+    property
+  ARM: dts: sun8i: orangepipc: Fix node with unit name and no reg
+    property
+  ARM: dts: sun8i: orangepi-plus: Fix node with unit name and no reg
+    property
+  arm64: allwinner: a64: Fix simple-bus unit address format error
+  arm64: allwinner: a64: Fix node with unit name and no reg property
+  ARM: sun8i: a83t: Fix simple-bus unit address format error
+
+ arch/arm/boot/dts/sun8i-a83t.dtsi             |  6 +-
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi        |  8 +--
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts     |  8 +--
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts  |  6 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts   |  6 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts    |  6 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts  |  2 +-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi            | 88 +++++++++++++--------------
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++----
+ 9 files changed, 77 insertions(+), 77 deletions(-)
 
 -- 
-~Vinod
+2.13.5
