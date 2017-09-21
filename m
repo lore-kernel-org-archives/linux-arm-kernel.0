@@ -1,79 +1,102 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Thu, 21 Sep 2017 20:12:57 +0100
-Subject: [PATCH v3 1/6] serial: imx: remove CTSC and CTS handling from
- imx_disable_dma
-In-Reply-To: <20170921182017.t7c75tyy66q7q3ns@pengutronix.de>
-References: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
- <1506010697-22114-2-git-send-email-martyn.welch@collabora.co.uk>
- <20170921182017.t7c75tyy66q7q3ns@pengutronix.de>
-Message-ID: <20170921191257.GJ6739@hermes.home>
+From: al.cooper@broadcom.com (Al Cooper)
+Date: Thu, 21 Sep 2017 15:16:34 -0400
+Subject: [PATCH V5 1/4] soc: brcmstb: Add Product ID and Family ID helper
+ functions
+In-Reply-To: <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+ <1503683495-11766-2-git-send-email-alcooperx@gmail.com>
+ <3aefb1ca-827d-6ebf-03c6-1f0d41e5da5c@gmail.com>
+ <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
+Message-ID: <CAGh=XAAzjvSpHK_oaj2OwTswdtCpfKUhg-nL+M_4jM92yMTs=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 08:20:17PM +0200, Uwe Kleine-K?nig wrote:
-> On Thu, Sep 21, 2017 at 05:18:12PM +0100, Martyn Welch wrote:
-> > From: Nandor Han <nandor.han@ge.com>
-> > 
-> > The CTSC and CTS bits affect operation of the CTS/RTS hardware flow
-> > control signal (depending on whether the device is in DCE or DTE mode) and
-> > are not related to DMA. When in RS-232 mode, the driver is using the
-> > automatic CTSC control based on a rxFIFO fill level unless the state of
-> > the CTS signal is explictly set via an ioctl call.
-> > 
-> > Previous improvements to the imx serial driver have resulted on
-> > imx_disable_dma() only being called on shutdown, by which point the
-> > serial core has already correctly deasserted CTS.
-> > 
-> > Testing shows that without this handling in imx_disable_dma() the CTS
-> > signal state is set correctly when the device is open and TIOCM_RTS is
-> > set/cleared via the TIOCMGET ioctl. The CTS signal is also correctly
-> > deasserted when the device file is closed.
-> 
-> With that block kept CTS set once more to inactive. So the block doesn't
-> hurt and is "only" superflous, right?
-> 
+Kishon,
 
-That's my understanding, yes.
+I ran checkpatch on all my patches before submitting them and didn't
+get any warnings. It looks like you may be running checkpatch with the
+"--subjective" option. Is this a requirement and if so are there any
+other checkpatch options I should be using?
 
-> > When in RS-485 mode, the driver uses the CTS signal very differently and
-> > appears to control it via calls to imx_port_rts_active() and
-> > imx_port_rts_inactive().
-> > 
-> > This configuration of the CTSC and CTS bits are therefore not needed.
-> > 
-> > Signed-off-by: Nandor Han <nandor.han@ge.com>
-> > Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> > Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
-> > ---
-> >  drivers/tty/serial/imx.c | 5 -----
-> >  1 file changed, 5 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> > index fe368a4..d90dae3 100644
-> > --- a/drivers/tty/serial/imx.c
-> > +++ b/drivers/tty/serial/imx.c
-> > @@ -1225,11 +1225,6 @@ static void imx_disable_dma(struct imx_port *sport)
-> >  	temp &= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
-> >  	writel(temp, sport->port.membase + UCR1);
-> >  
-> > -	/* clear UCR2 */
-> > -	temp = readl(sport->port.membase + UCR2);
-> > -	temp &= ~(UCR2_CTSC | UCR2_CTS | UCR2_ATEN);
-> > -	writel(temp, sport->port.membase + UCR2);
-> 
-> The commit log doesn't mention ATEN, I guess that one just doesn't
-> matter any more at this stage? Would be nice to point out though.
-> 
+Thanks
+Al
 
-Hmm, going to need to look at this again...
-
-Patch 5 adds clearing ATEN into imx_stop_rx(), which is sensible given
-that it's the aging timer on the rxFIFO, but I don't think we should be
-removing that from here before it's in imx_stop_rx().
-
-> Best regards
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+On Thu, Sep 21, 2017 at 4:54 AM, 'Kishon Vijay Abraham I' via
+BCM-KERNEL-FEEDBACK-LIST,PDL
+<bcm-kernel-feedback-list.pdl@broadcom.com> wrote:
+> Hi,
+>
+> On Saturday 02 September 2017 07:45 AM, Florian Fainelli wrote:
+>>
+>>
+>> On 08/25/2017 10:51 AM, Al Cooper wrote:
+>>> Signed-off-by: Al Cooper <alcooperx@gmail.com>
+>>
+>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>
+> I get the following checkpatch warning
+> CHECK: Macro argument reuse 'reg' - possible side-effects?
+> #110: FILE: include/linux/soc/brcmstb/brcmstb.h:4:
+> +#define BRCM_ID(reg)   ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+>
+> Can you fix it and resend. While at that also add commmit log.
+>
+> Thanks
+> Kishon
+>
+>>
+>>> ---
+>>>  drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
+>>>  include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
+>>>  2 files changed, 22 insertions(+)
+>>>
+>>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+>>> index b6195fd..184dbf5 100644
+>>> --- a/drivers/soc/bcm/brcmstb/common.c
+>>> +++ b/drivers/soc/bcm/brcmstb/common.c
+>>> @@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
+>>>      return of_match_node(brcmstb_machine_match, root) != NULL;
+>>>  }
+>>>
+>>> +u32 brcmstb_get_family_id(void)
+>>> +{
+>>> +    return family_id;
+>>> +}
+>>> +EXPORT_SYMBOL(brcmstb_get_family_id);
+>>> +
+>>> +u32 brcmstb_get_product_id(void)
+>>> +{
+>>> +    return product_id;
+>>> +}
+>>> +EXPORT_SYMBOL(brcmstb_get_product_id);
+>>> +
+>>>  static const struct of_device_id sun_top_ctrl_match[] = {
+>>>      { .compatible = "brcm,bcm7125-sun-top-ctrl", },
+>>>      { .compatible = "brcm,bcm7346-sun-top-ctrl", },
+>>> diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+>>> index 337ce41..23e4dc9 100644
+>>> --- a/include/linux/soc/brcmstb/brcmstb.h
+>>> +++ b/include/linux/soc/brcmstb/brcmstb.h
+>>> @@ -1,10 +1,20 @@
+>>>  #ifndef __BRCMSTB_SOC_H
+>>>  #define __BRCMSTB_SOC_H
+>>>
+>>> +#define BRCM_ID(reg)        ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+>>> +#define BRCM_REV(reg)       ((u32)reg & 0xff)
+>>> +
+>>>  /*
+>>>   * Bus Interface Unit control register setup, must happen early during boot,
+>>>   * before SMP is brought up, called by machine entry point.
+>>>   */
+>>>  void brcmstb_biuctrl_init(void);
+>>>
+>>> +/*
+>>> + * Helper functions for getting family or product id from the
+>>> + * SoC driver.
+>>> + */
+>>> +u32 brcmstb_get_family_id(void);
+>>> +u32 brcmstb_get_product_id(void);
+>>> +
+>>>  #endif /* __BRCMSTB_SOC_H */
+>>>
+>>
