@@ -1,39 +1,25 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Thu, 21 Sep 2017 02:47:16 +0000
-Subject: [PATCHv2 0/3] arm64: dts: ls1012a: add the DTS node for DSPI
- support
-In-Reply-To: <20170920141044.GC1244@dragon>
-References: <20170830101238.28378-1-Zhiqiang.Hou@nxp.com>
- <20170920141044.GC1244@dragon>
-Message-ID: <AM5PR0402MB2771A60E9CBD1A1CA13C2B2084660@AM5PR0402MB2771.eurprd04.prod.outlook.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Thu, 21 Sep 2017 04:56:56 +0200
+Subject: [PATCH 08/10] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <20170920224621.16236-9-tony@atomide.com>
+References: <20170920224621.16236-1-tony@atomide.com>
+ <20170920224621.16236-9-tony@atomide.com>
+Message-ID: <20170921025656.omeoippus7b4mmig@squirrel.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, Sep 20, 2017 at 03:46:19PM -0700, Tony Lindgren wrote:
+> For AESS there is old Android 3.4 kernel
+> driver available but it's unlikely that anybody is going to update
+> it for the mainline kernel.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2017?9?20? 22:11
-> To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org; dwmw2 at infradead.org; robh+dt at kernel.org;
-> mark.rutland at arm.com; computersforpeace at gmail.com
-> Subject: Re: [PATCHv2 0/3] arm64: dts: ls1012a: add the DTS node for DSPI
-> support
-> 
-> On Wed, Aug 30, 2017 at 06:12:35PM +0800, Zhiqiang Hou wrote:
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >
-> > Corrected the subject for 3/5 patch v1.
-> >
-> > Yuan Yao (3):
-> >   arm64: dts: ls1012a: add the DTS node for DSPI support
-> >   Documentation: fsl: dspi: Add fsl,ls1012a-dspi compatible string
-> >   Documentation: dt: mtd: add sst25wf040b and en25s64 to the SPI NOR
-> >     support list
-> 
-> I edited bindings doc patch subject a bit, and applied all.
+We do actually hope to get the Audio Engine in ABE working eventually on
+omap5 (which would presumably also make it work on omap4). and there are
+more recent kernels that support it: a TI 3.8 kernel and a 3.15 branch
+from Peter Ujfalusi [1].
 
-Thanks a lot!
+[1] https://pyra-handheld.com/pipermail/kernel/2017-September/002060.html
 
-- Zhiqiang
+-- 
+Matthijs van Duin
