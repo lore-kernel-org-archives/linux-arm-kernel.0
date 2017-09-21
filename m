@@ -1,50 +1,51 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 21 Sep 2017 15:09:32 +0530
-Subject: [PATCH V5 0/4] Add Broadcom STB USB phy driver
-In-Reply-To: <4068eb4a-3982-742f-2b23-28a4b1484de2@gmail.com>
-References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
- <f4625f5e-db00-ebcc-4618-6f00247edfab@gmail.com>
- <f7bb89bf-1a09-891c-4ae5-3dc2e4b38d97@ti.com>
- <5DDF9572-B2D1-4316-B307-14749365221E@gmail.com>
- <4068eb4a-3982-742f-2b23-28a4b1484de2@gmail.com>
-Message-ID: <73815a53-b07c-64f2-3648-b50e12e92958@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Sep 2017 11:26:54 +0200
+Subject: [GIT PULL] EP93xx improvements for v4.15
+Message-ID: <CACRpkdYfhRuPLUGaweWzukxRiY0XsJ+DtaWd2OzVLq6daZqeyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi ARM SoC folks,
 
-On Thursday 21 September 2017 04:07 AM, Florian Fainelli wrote:
-> Hi Kishon,
-> 
-> On 09/15/2017 04:49 PM, Florian Fainelli wrote:
->> On September 4, 2017 11:11:47 PM PDT, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Florian,
->>>
->>> On Saturday 02 September 2017 07:46 AM, Florian Fainelli wrote:
->>>>
->>>>
->>>> On 08/25/2017 10:51 AM, Al Cooper wrote:
->>>>> Add a new USB Phy driver for Broadcom STB SoCs. This driver
->>>>> supports Broadcom STB ARM SoCs. This driver in
->>>>> combination with the Broadcom STB ohci, ehci and xhci
->>>>> drivers will enable USB1.1, USB2.0 and USB3.0 support.
->>>>> This Phy driver also supports the Broadcom BDC gadget
->>>>> driver.
->>>>
->>>> Thanks Al! Kishon, feel free to merge everything through your tree
->>> there
->>>> should not be any conflicts with drivers/soc/bcm/brcmstb/common.c and
->>>> include/linux/soc/brcmstb/brcmstb.h.
->>>
->>> I'll start merging once 4.14 -rc1 is tagged.
->>
->> OK, does not that mean we will be missing this driver in 4.14? I suppose that's fine. Thanks!
-> 
-> Gentle ping, v4.14-rc1 is now out, can you let us know if this patch
-> series is good with you? Thanks!
+here is a first pull request for EP93xx improvements from
+Hartley et al.
 
-Thank you for reminding. Actually the patch series has quite a few "CHECK"
-checkpatch warnings. Can that be fixed before merging it?
+These patches have been floating for a while and really need
+to land upstream.
 
-Thanks
-Kishon
+Please pull them in where appropriate for v4.15.
+
+Yours,
+Linus Walleij
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/ep93xx-for-arm-soc-1
+
+for you to fetch changes up to 7aef828dfc41565f7e2f7af99be8134639d3f769:
+
+  ARM: ep93xx: Add lm70 HWMON sensor to TS-72xx boards (2017-09-21
+11:22:04 +0200)
+
+----------------------------------------------------------------
+EP93xx patches that have been floating for a while,
+converting the platform to sparsemem, using SPI-MMC
+and a bit more.
+
+----------------------------------------------------------------
+H Hartley Sweeten (4):
+      ARM: ep93xx: switch to SPARSEMEM
+      ARM: ep93xx: simone: let the mmc_spi driver handle the card detect
+      ARM: ep93xx: tidy up TS-72xx Watchdog resources
+      ARM: ep93xx: Add lm70 HWMON sensor to TS-72xx boards
+
+ arch/arm/Kconfig              |  2 +-
+ arch/arm/mach-ep93xx/simone.c | 54 +++----------------------------------------
+ arch/arm/mach-ep93xx/ts72xx.c | 46 +++++++++++++++++++++++++++---------
+ arch/arm/mach-ep93xx/ts72xx.h |  3 ---
+ 4 files changed, 39 insertions(+), 66 deletions(-)
