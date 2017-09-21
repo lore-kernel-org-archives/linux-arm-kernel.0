@@ -1,72 +1,33 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 21 Sep 2017 14:29:22 +0530
-Subject: [PATCH 4/4] iommu/dma,
- numa: Use NUMA aware memory allocations in __iommu_dma_alloc_pages
-In-Reply-To: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170921085922.11659-5-ganapatrao.kulkarni@cavium.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 21 Sep 2017 17:01:05 +0800
+Subject: [PATCH] soc: mediatek: turn MTK_PMIC_WRAP into visible symbols
+Message-ID: <6c1696cf9f860cc8151a906ecbc799121b5aeeab.1505984256.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change function __iommu_dma_alloc_pages to allocate memory/pages
-for dma from respective device numa node.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+MTK_PMIC_WRAP is the basic and required configuration for those various
+MediaTek PMICs, so turning MTK_PMIC_WRAP into visible symbols easily
+allows users tending to have the enablement for those PMICs.
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/iommu/dma-iommu.c | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+ drivers/soc/mediatek/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 9d1cebe..0626b58 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -428,20 +428,21 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
- 	kvfree(pages);
- }
- 
--static struct page **__iommu_dma_alloc_pages(unsigned int count,
--		unsigned long order_mask, gfp_t gfp)
-+static struct page **__iommu_dma_alloc_pages(struct device *dev,
-+		unsigned int count, unsigned long order_mask, gfp_t gfp)
- {
- 	struct page **pages;
- 	unsigned int i = 0, array_size = count * sizeof(*pages);
-+	int numa_node = dev_to_node(dev);
- 
- 	order_mask &= (2U << MAX_ORDER) - 1;
- 	if (!order_mask)
- 		return NULL;
- 
- 	if (array_size <= PAGE_SIZE)
--		pages = kzalloc(array_size, GFP_KERNEL);
-+		pages = kzalloc_node(array_size, GFP_KERNEL, numa_node);
- 	else
--		pages = vzalloc(array_size);
-+		pages = vzalloc_node(array_size, numa_node);
- 	if (!pages)
- 		return NULL;
- 
-@@ -462,8 +463,9 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
- 			unsigned int order = __fls(order_mask);
- 
- 			order_size = 1U << order;
--			page = alloc_pages((order_mask - order_size) ?
--					   gfp | __GFP_NORETRY : gfp, order);
-+			page = alloc_pages_node(numa_node,
-+					(order_mask - order_size) ?
-+				   gfp | __GFP_NORETRY : gfp, order);
- 			if (!page)
- 				continue;
- 			if (!order)
-@@ -548,7 +550,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
- 		alloc_sizes = min_size;
- 
- 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
--	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
-+	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
-+			gfp);
- 	if (!pages)
- 		return NULL;
- 
+diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+index a2fcd7f..d513629 100644
+--- a/drivers/soc/mediatek/Kconfig
++++ b/drivers/soc/mediatek/Kconfig
+@@ -15,7 +15,7 @@ config MTK_INFRACFG
+ config MTK_PMIC_WRAP
+ 	tristate "MediaTek PMIC Wrapper Support"
+ 	depends on ARCH_MEDIATEK
+-	depends on RESET_CONTROLLER
++	select RESET_CONTROLLER
+ 	select REGMAP
+ 	help
+ 	  Say yes here to add support for MediaTek PMIC Wrapper found
 -- 
-2.9.4
+2.7.4
