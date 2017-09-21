@@ -1,108 +1,142 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 21 Sep 2017 16:26:55 +0800
-Subject: [PATCH v4 5/7] soc: mediatek: pwrap: add MediaTek MT6380 as one slave
- of pwrap
+Date: Thu, 21 Sep 2017 16:26:52 +0800
+Subject: [PATCH v4 2/7] soc: mediatek: pwrap: add pwrap_read32 for reading in
+ 32-bit mode
 In-Reply-To: <cover.1505980364.git.sean.wang@mediatek.com>
 References: <cover.1505980364.git.sean.wang@mediatek.com>
-Message-ID: <c5e8c585437623b7eae1a95e5d3632da339fdd3d.1505980364.git.sean.wang@mediatek.com>
+Message-ID: <2593be0ffa11f77076b2c967f1479f308220c3f7.1505980364.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add MediaTek MT6380 regulator becoming one of PMIC wrapper slave
-and also add extra new regmap_config of 32-bit mode for MT6380
-since old regmap_config of 16-bit mode can't be fit into the need.
+Some regulators such as MediaTek MT6380 has to be read in 32-bit mode.
+So the patch adds pwrap_read32, rename old pwrap_read into pwrap_read16
+and one function pointer is introduced for increasing flexibility allowing
+the determination which mode is used by the pwrap slave detection through
+device tree.
 
 Signed-off-by: Chenglin Xu <chenglin.xu@mediatek.com>
 Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 54 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 53 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 9c6d855..5e3a41b 100644
+index c204838..db55f13 100644
 --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
 +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -501,6 +501,7 @@ struct pmic_wrapper;
+@@ -487,6 +487,7 @@ static int mt8135_regs[] = {
+ 
+ enum pmic_type {
+ 	PMIC_MT6323,
++	PMIC_MT6380,
+ 	PMIC_MT6397,
+ };
+ 
+@@ -496,9 +497,15 @@ enum pwrap_type {
+ 	PWRAP_MT8173,
+ };
+ 
++struct pmic_wrapper;
  struct pwrap_slv_type {
  	const u32 *dew_regs;
  	enum pmic_type type;
-+	const struct regmap_config *regmap;
- 	/* pwrap operations are highly associated with the PMIC types,
- 	 * so the pointers added increases flexibility allowing determination
- 	 * which type is used by the detection through device tree.
-@@ -1109,7 +1110,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static const struct regmap_config pwrap_regmap_config = {
-+static const struct regmap_config pwrap_regmap_config16 = {
- 	.reg_bits = 16,
- 	.val_bits = 16,
- 	.reg_stride = 2,
-@@ -1118,9 +1119,19 @@ static const struct regmap_config pwrap_regmap_config = {
- 	.max_register = 0xffff,
++	/* pwrap operations are highly associated with the PMIC types,
++	 * so the pointers added increases flexibility allowing determination
++	 * which type is used by the detection through device tree.
++	 */
++	int (*pwrap_read)(struct pmic_wrapper *wrp, u32 adr, u32 *rdata);
  };
  
-+static const struct regmap_config pwrap_regmap_config32 = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.reg_read = pwrap_regmap_read,
-+	.reg_write = pwrap_regmap_write,
-+	.max_register = 0xffff,
-+};
+ struct pmic_wrapper {
+@@ -609,7 +616,7 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
+ 	return 0;
+ }
+ 
+-static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
++static int pwrap_read16(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+ {
+ 	int ret;
+ 
+@@ -632,6 +639,39 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+ 	return 0;
+ }
+ 
++static int pwrap_read32(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
++{
++	int ret, msb;
 +
++	*rdata = 0;
++	for (msb = 0; msb < 2; msb++) {
++		ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
++		if (ret) {
++			pwrap_leave_fsm_vldclr(wrp);
++			return ret;
++		}
++
++		pwrap_writel(wrp, ((msb << 30) | (adr << 16)),
++			     PWRAP_WACS2_CMD);
++
++		ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_vldclr);
++		if (ret)
++			return ret;
++
++		*rdata += (PWRAP_GET_WACS_RDATA(pwrap_readl(wrp,
++			   PWRAP_WACS2_RDATA)) << (16 * msb));
++
++		pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
++	}
++
++	return 0;
++}
++
++static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
++{
++	return wrp->slave->pwrap_read(wrp, adr, rdata);
++}
++
+ static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
+ {
+ 	return pwrap_read(context, adr, rdata);
+@@ -752,6 +792,8 @@ static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
+ 		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
+ 		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
+ 		break;
++	default:
++		break;
+ 	}
+ 
+ 	return 0;
+@@ -815,6 +857,8 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+ 		pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_EN],
+ 			    0x1);
+ 		break;
++	default:
++		break;
+ 	}
+ 
+ 	/* wait for cipher data ready at AP */
+@@ -1035,11 +1079,19 @@ static const struct regmap_config pwrap_regmap_config = {
  static const struct pwrap_slv_type pmic_mt6323 = {
  	.dew_regs = mt6323_regs,
  	.type = PMIC_MT6323,
-+	.regmap = &pwrap_regmap_config16,
- 	.pwrap_read = pwrap_read16,
- 	.pwrap_write = pwrap_write16,
++	.pwrap_read = pwrap_read16,
++};
++
++static const struct pwrap_slv_type pmic_mt6380 = {
++	.dew_regs = NULL,
++	.type = PMIC_MT6380,
++	.pwrap_read = pwrap_read32,
  };
-@@ -1128,6 +1139,7 @@ static const struct pwrap_slv_type pmic_mt6323 = {
- static const struct pwrap_slv_type pmic_mt6380 = {
- 	.dew_regs = NULL,
- 	.type = PMIC_MT6380,
-+	.regmap = &pwrap_regmap_config32,
- 	.pwrap_read = pwrap_read32,
- 	.pwrap_write = pwrap_write32,
- };
-@@ -1135,6 +1147,7 @@ static const struct pwrap_slv_type pmic_mt6380 = {
+ 
  static const struct pwrap_slv_type pmic_mt6397 = {
  	.dew_regs = mt6397_regs,
  	.type = PMIC_MT6397,
-+	.regmap = &pwrap_regmap_config16,
- 	.pwrap_read = pwrap_read16,
- 	.pwrap_write = pwrap_write16,
++	.pwrap_read = pwrap_read16,
  };
-@@ -1144,9 +1157,15 @@ static const struct of_device_id of_slave_match_tbl[] = {
- 		.compatible = "mediatek,mt6323",
- 		.data = &pmic_mt6323,
- 	}, {
-+		/* The MT6380 slave device is directly pointed to the regulator
-+		 * device which is different from the cases MT6323 and MT6397
-+		 * where they're one kind of MFDs.
-+		 */
-+		.compatible = "mediatek,mt6380-regulator",
-+		.data = &pmic_mt6380,
-+	}, {
- 		.compatible = "mediatek,mt6397",
- 		.data = &pmic_mt6397,
--	}, {
- 		/* sentinel */
- 	}
- };
-@@ -1325,7 +1344,7 @@ static int pwrap_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_out2;
  
--	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
-+	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, wrp->slave->regmap);
- 	if (IS_ERR(wrp->regmap)) {
- 		ret = PTR_ERR(wrp->regmap);
- 		goto err_out2;
+ static const struct of_device_id of_slave_match_tbl[] = {
 -- 
 2.7.4
