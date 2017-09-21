@@ -1,118 +1,356 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 21 Sep 2017 16:03:13 -0500
-Subject: [PATCH v4 4/5] drivers: pci: add support for relative addressing
- in quirk tables
-In-Reply-To: <20170920195721.7939-5-ard.biesheuvel@linaro.org>
-References: <20170920195721.7939-1-ard.biesheuvel@linaro.org>
- <20170920195721.7939-5-ard.biesheuvel@linaro.org>
-Message-ID: <20170921210312.GK22312@bhelgaas-glaptop.roam.corp.google.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 21 Sep 2017 16:05:10 -0600
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170921093218.GS20805@n2100.armlinux.org.uk>
+References: <20170920112152.GL20805@n2100.armlinux.org.uk>
+ <20170920162208.GB536@obsidianresearch.com>
+ <20170920165141.GP20805@n2100.armlinux.org.uk>
+ <20170920224522.GB20974@obsidianresearch.com>
+ <20170921075907.GR20805@n2100.armlinux.org.uk>
+ <20170921093218.GS20805@n2100.armlinux.org.uk>
+Message-ID: <20170921220510.GA11395@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc linux-pci]
+On Thu, Sep 21, 2017 at 10:32:19AM +0100, Russell King - ARM Linux
+wrote:
 
-You copied LKML on some previous versions, but not this one.  Seems
-like that would be useful.
+I've combined several of your messages together into this reply...
 
-Please adjust the subject line of this one so it matches the typical
-ones for this file, e.g.,
-
-  PCI: Add support for relative addressing in quirk tables
-
-On Wed, Sep 20, 2017 at 12:57:20PM -0700, Ard Biesheuvel wrote:
-> Allow the PCI quirk tables to be emitted in a way that avoids absolute
-> references to the hook functions. This reduces the size of the entries,
-> and, more importantly, makes them invariant under runtime relocation
-> (e.g., for KASLR)
+> static inline bool rtc_tv_nsec_ok(struct rtc_device *rtc,
+> 				  struct timespec64 *now)
+> {
+> 	long diff;
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 	diff = (now->tv_nsec - rtc->time_set_nsec) % NSEC_PER_SEC;
+> 	/* diff must be within [-NSEC_PER_SEC/2..NSEC_PER_SEC/2) */
+> 	if (diff >= NSEC_PER_SEC / 2)
+> 		diff -= NSEC_PER_SEC;
+> 	else if (diff < -NSEC_PER_SEC / 2)
+> 		diff += NSEC_PER_SEC;
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+I like your concept of allowing a negative time_set_nsec, I was
+focused on a positive value and botched the first draft by not casting
+to unsigned for the maths.. It seems much better because it
+incorporates the rounding calculation into the common code instead of
+shifting it to the driver.
 
-This really uglifies the code (and initcall_from_entry() in the other
-patch makes my head hurt), but I don't have any cleaner implementation
-ideas, and it does seem like a worthwhile space optimization.
+I revised this idea a few times and came up with something a bit
+simpler to understand by changing from a time_set_nsec to its inverse
+the set_offset_nsec, that makes the maths simpler and we can avoid
+troublesome signed modulos by using time maths functions instead of
+open coding them.
 
-> ---
->  drivers/pci/quirks.c | 13 ++++++++++---
->  include/linux/pci.h  | 20 ++++++++++++++++++++
->  2 files changed, 30 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index a4d33619a7bb..82a66235d60c 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -3548,9 +3548,16 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
->  		     f->vendor == (u16) PCI_ANY_ID) &&
->  		    (f->device == dev->device ||
->  		     f->device == (u16) PCI_ANY_ID)) {
-> -			calltime = fixup_debug_start(dev, f->hook);
-> -			f->hook(dev);
-> -			fixup_debug_report(dev, calltime, f->hook);
-> +			void (*hook)(struct pci_dev *dev);
-> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-> +			hook = (void *)((unsigned long)&f->hook_offset +
-> +					f->hook_offset);
-> +#else
-> +			hook = f->hook;
-> +#endif
-> +			calltime = fixup_debug_start(dev, hook);
-> +			hook(dev);
-> +			fixup_debug_report(dev, calltime, hook);
->  		}
->  }
->  
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index f68c58a93dd0..d7a01d7fc3a7 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1791,7 +1791,11 @@ struct pci_fixup {
->  	u16 device;		/* You can use PCI_ANY_ID here of course */
->  	u32 class;		/* You can use PCI_ANY_ID here too */
->  	unsigned int class_shift;	/* should be 0, 8, 16 */
-> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-> +	signed int hook_offset;
-> +#else
->  	void (*hook)(struct pci_dev *dev);
-> +#endif
->  };
->  
->  enum pci_fixup_pass {
-> @@ -1805,12 +1809,28 @@ enum pci_fixup_pass {
->  	pci_fixup_suspend_late,	/* pci_device_suspend_late() */
->  };
->  
-> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-> +#define __DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
-> +				    class_shift, hook)			\
-> +	__ADDRESSABLE(hook)						\
-> +	asm(".section "	#sec ", \"a\"				\n"	\
-> +	    ".balign	16					\n"	\
-> +	    ".short "	#vendor ", " #device "			\n"	\
-> +	    ".long "	#class ", " #class_shift "		\n"	\
-> +	    ".long "	VMLINUX_SYMBOL_STR(hook) " - .		\n"	\
-> +	    ".previous						\n");
-> +#define DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
-> +				  class_shift, hook)			\
-> +	__DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
-> +				  class_shift, hook)
-> +#else
->  /* Anonymous variables would be nice... */
->  #define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, class,	\
->  				  class_shift, hook)			\
->  	static const struct pci_fixup __PASTE(__pci_fixup_##name,__LINE__) __used	\
->  	__attribute__((__section__(#section), aligned((sizeof(void *)))))    \
->  		= { vendor, device, class, class_shift, hook };
-> +#endif
->  
->  #define DECLARE_PCI_FIXUP_CLASS_EARLY(vendor, device, class,		\
->  					 class_shift, hook)		\
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+See full revised patch below, this time I did test the
+rtc_tv_nsec_ok() using your test vectors and it seems OK. Still have
+not tested the whole patch...
+
+So with v2 of this patch, the driver would specify positive 1s, and
+then the set will be called when tv_nsec == 0, but the tv_sec will
+be +1.
+
+Similarly the existing case of 0.5s offset will work more like
+before, where it will be called with tv_nsec == .5s and the tv_sec
+will be +1 - before I think this happened reliably 'by accident' due
+to the rounding.
+
+> Most drivers use rtc_device_register() or devm_rtc_device_register()
+> rather than rtc_allocate_device() (which is static.)  This does not
+> give RTC drivers a chance to set rtc->time_set_nsec before the RTC
+> is registered with the kernel.
+
+You are correct about the race, of course. I left it like that
+deliberately, I'm not sure it is worth solving since I felt nothing
+should be setting the RTC within a few CPU instructions of registering
+it.
+
+As you say, adding a pre-registration init op will solve the issue if
+you think it is worth solving.
+
+Jason
+
+>From 566712cb27596836469637b0e50e7fd973368df8 Mon Sep 17 00:00:00 2001
+From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Date: Thu, 21 Sep 2017 15:55:33 -0600
+Subject: [PATCH v2] rtc: Allow rtc drivers to specify the tv_nsec value for ntp
+
+ntp is currently hardwired to try and call the rtc set when wall clock
+tv_nsec is 0.5 seconds. This historical behaviour works well with certain
+PC RTCs, but is not universal to all rtc hardware.
+
+Change how this works by introducing the driver specific concept of
+a required delay between current wall clock time and the target time
+to set (with a 0 tv_nsecs). When this delay is set to 0.5 seconds then
+the behaviour will be the same as today, at wall clock time 0.5 sec the
+RTC set will be called to set 1.0 sec.
+
+Each RTC driver should set the set_offset_nsec according to its needs.
+
+This also polices the incoming set time ts_nsec from NTP, if it is not
+within +-1ms of the required time then the set is deferred. The target
+time to set is 'snapped' to the nearest value.
+
+The calculation of the sleep time for ntp is also revised to use modern
+helper functions, and to more directly and safely compute a relative
+jiffies delay that will result in the correct tv_nsec. If for some reason
+the timer does not meet the requirement then it does a short sleep
+and tries again.
+
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/rtc/class.c   |  6 ++++
+ drivers/rtc/systohc.c | 85 ++++++++++++++++++++++++++++++++++++++++++---------
+ include/linux/rtc.h   | 10 +++++-
+ kernel/time/ntp.c     | 62 ++++++++++++++++++++++++-------------
+ 4 files changed, 125 insertions(+), 38 deletions(-)
+
+diff --git a/drivers/rtc/class.c b/drivers/rtc/class.c
+index 2ed970d61da140..eef4123a573504 100644
+--- a/drivers/rtc/class.c
++++ b/drivers/rtc/class.c
+@@ -161,6 +161,12 @@ static struct rtc_device *rtc_allocate_device(void)
+ 
+ 	device_initialize(&rtc->dev);
+ 
++	/* Drivers can revise this default after allocating the device. It
++	 * should be the value of wallclock tv_nsec that the driver needs in
++	 * order to synchronize the second tick over during set.
++	 */
++	rtc->set_offset_nsec =  NSEC_PER_SEC / 2;
++
+ 	rtc->irq_freq = 1;
+ 	rtc->max_user_freq = 64;
+ 	rtc->dev.class = rtc_class;
+diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
+index b4a68ffcd06bb8..a7d0bbe2577110 100644
+--- a/drivers/rtc/systohc.c
++++ b/drivers/rtc/systohc.c
+@@ -7,9 +7,42 @@
+ #include <linux/rtc.h>
+ #include <linux/time.h>
+ 
++/* Determine if we can call to driver to set the time. Drivers can only be
++ * called to set a second aligned time value, and the field set_offset_nsec
++ * specifies how far away from the second aligned time to call the driver.
++ *
++ * This also compute 'to_set' which is the time we are trying to set, and has
++ * a zero in tv_nsecs, such that:
++ *    to_set - set_delay_nsec == now +/- FUZZ
++ *
++ */
++#define TIME_SET_NSEC_FUZZ (1000 * 1000)
++static inline bool rtc_tv_nsec_ok(struct rtc_device *rtc,
++				  struct timespec64 *to_set,
++				  const struct timespec64 *now)
++{
++	struct timespec64 delay = {.tv_sec = 0,
++				   .tv_nsec = rtc->set_offset_nsec};
++
++	*to_set = timespec64_add(*now, delay);
++
++	if (to_set->tv_nsec < TIME_SET_NSEC_FUZZ) {
++		to_set->tv_nsec = 0;
++		return true;
++	}
++
++	if (to_set->tv_nsec > NSEC_PER_SEC - TIME_SET_NSEC_FUZZ) {
++		to_set->tv_sec++;
++		to_set->tv_nsec = 0;
++		return true;
++	}
++	return false;
++}
++
+ /**
+  * rtc_set_ntp_time - Save NTP synchronized time to the RTC
+  * @now: Current time of day
++ * @target_nsec: pointer for desired now->tv_nsec value
+  *
+  * Replacement for the NTP platform function update_persistent_clock64
+  * that stores time for later retrieval by rtc_hctosys.
+@@ -18,30 +51,52 @@
+  * possible at all, and various other -errno for specific temporary failure
+  * cases.
+  *
++ * -EPROTO is returned if now.tv_nsec is not close enough to *target_nsec.
++ (
+  * If temporary failure is indicated the caller should try again 'soon'
+  */
+-int rtc_set_ntp_time(struct timespec64 now)
++int rtc_set_ntp_time(struct timespec64 now, long *target_nsec)
+ {
+ 	struct rtc_device *rtc;
+ 	struct rtc_time tm;
++	struct timespec64 to_set;
+ 	int err = -ENODEV;
+-
+-	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
+-		rtc_time64_to_tm(now.tv_sec, &tm);
+-	else
+-		rtc_time64_to_tm(now.tv_sec + 1, &tm);
++	bool ok;
+ 
+ 	rtc = rtc_class_open(CONFIG_RTC_SYSTOHC_DEVICE);
+-	if (rtc) {
+-		/* rtc_hctosys exclusively uses UTC, so we call set_time here,
+-		 * not set_mmss. */
+-		if (rtc->ops &&
+-		    (rtc->ops->set_time ||
+-		     rtc->ops->set_mmss64 ||
+-		     rtc->ops->set_mmss))
+-			err = rtc_set_time(rtc, &tm);
+-		rtc_class_close(rtc);
++	if (!rtc)
++		goto out_err;
++
++	if (!rtc->ops || (!rtc->ops->set_time && !rtc->ops->set_mmss64 &&
++			  !rtc->ops->set_mmss))
++		goto out_close;
++
++	/* Compute the value of tv_nsec we require the caller to supply in
++	 * now.tv_nsec.  This is the value such that (now +
++	 * set_offset_nsec).tv_nsec == 0.
++	 */
++	set_normalized_timespec64(&to_set, 0, -rtc->set_offset_nsec);
++	*target_nsec = to_set.tv_nsec;
++
++	/* The ntp code must call this with the correct value in tv_nsec, if
++	 * it does not we update target_nsec and return EPROTO to make the ntp
++	 * code try again later.
++	 */
++	ok = rtc_tv_nsec_ok(rtc, &to_set, &now);
++	if (!ok) {
++		err = -EPROTO;
++		goto out_close;
+ 	}
+ 
++	rtc_time64_to_tm(to_set.tv_sec, &tm);
++
++	/* rtc_hctosys exclusively uses UTC, so we call set_time here, not
++	 * set_mmss.
++	 */
++	err = rtc_set_time(rtc, &tm);
++
++out_close:
++	rtc_class_close(rtc);
++out_err:
+ 	return err;
+ }
+diff --git a/include/linux/rtc.h b/include/linux/rtc.h
+index 0a0f0d14a5fba5..7d526550a700f8 100644
+--- a/include/linux/rtc.h
++++ b/include/linux/rtc.h
+@@ -137,6 +137,14 @@ struct rtc_device {
+ 	/* Some hardware can't support UIE mode */
+ 	int uie_unsupported;
+ 
++	/* Number of nsec it takes to set the RTC clock. This influences when
++	 * the set ops are called. An offset:
++	 *   - of 0.5 s will call RTC set for wall clock time 10.0 s at 9.5 s
++	 *   - of 1.5 s will call RTC set for wall clock time 10.0 s at 8.5 s
++	 *   - of -0.5 s will call RTC set for wall clock time 10.0 s at 10.5 s
++	 */
++	long set_offset_nsec;
++
+ 	bool registered;
+ 
+ 	struct nvmem_config *nvmem_config;
+@@ -174,7 +182,7 @@ extern void devm_rtc_device_unregister(struct device *dev,
+ 
+ extern int rtc_read_time(struct rtc_device *rtc, struct rtc_time *tm);
+ extern int rtc_set_time(struct rtc_device *rtc, struct rtc_time *tm);
+-extern int rtc_set_ntp_time(struct timespec64 now);
++extern int rtc_set_ntp_time(struct timespec64 now, long *target_nsec);
+ int __rtc_read_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm);
+ extern int rtc_read_alarm(struct rtc_device *rtc,
+ 			struct rtc_wkalrm *alrm);
+diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
+index edf19cc5314043..6d2f521dd97748 100644
+--- a/kernel/time/ntp.c
++++ b/kernel/time/ntp.c
+@@ -514,17 +514,19 @@ static DECLARE_DELAYED_WORK(sync_cmos_work, sync_cmos_clock);
+ 
+ static void sync_cmos_clock(struct work_struct *work)
+ {
+-	struct timespec64 now;
+-	struct timespec64 next;
++	struct timespec64 now, next, delta;
+ 	int fail = 1;
++	long target_nsec = NSEC_PER_SEC / 2;
+ 
+ 	/*
+-	 * If we have an externally synchronized Linux clock, then update
+-	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
+-	 * called as close as possible to 500 ms before the new second starts.
+-	 * This code is run on a timer.  If the clock is set, that timer
+-	 * may not expire at the correct time.  Thus, we adjust...
+-	 * We want the clock to be within a couple of ticks from the target.
++	 * If we have an externally synchronized Linux clock, then update CMOS
++	 * clock accordingly every ~11 minutes.  Histiocally Set_rtc_mmss()
++	 * has to be called as close as possible to 500 ms (target_nsec)
++	 * before the new second starts, but new RTC drivers can select a
++	 * different value.  This code is run on a timer.  If the clock is
++	 * set, that timer may not expire at the correct time.  Thus, we
++	 * adjust...  We want the clock to be within a couple of ticks from
++	 * the target.
+ 	 */
+ 	if (!ntp_synced()) {
+ 		/*
+@@ -547,25 +549,41 @@ static void sync_cmos_clock(struct work_struct *work)
+ 
+ #ifdef CONFIG_RTC_SYSTOHC
+ 		if (fail == -ENODEV)
+-			fail = rtc_set_ntp_time(adjust);
++			fail = rtc_set_ntp_time(adjust, &target_nsec);
+ #endif
+ 	}
+ 
+-	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
+-	if (next.tv_nsec <= 0)
+-		next.tv_nsec += NSEC_PER_SEC;
++	do {
++		/*
++		 * Compute the next wall clock time to try and set the
++		 * clock
++		 */
++		next = now;
++		if (!fail || fail == -ENODEV)
++			timespec64_add_ns(&next, 659ULL * NSEC_PER_SEC);
++		else
++			/* Update failed, try again in about 10 seconds */
++			timespec64_add_ns(&next, 10ULL * NSEC_PER_SEC);
+ 
+-	if (!fail || fail == -ENODEV)
+-		next.tv_sec = 659;
+-	else
+-		next.tv_sec = 0;
++		/*
++		 * The next call to sync_cmos_clock needs to have have a wall
++		 * clock tv_nsec value equal to target_nsec.
++		 */
++		if (next.tv_nsec > target_nsec)
++			next.tv_sec++;
++		next.tv_nsec = target_nsec;
+ 
+-	if (next.tv_nsec >= NSEC_PER_SEC) {
+-		next.tv_sec++;
+-		next.tv_nsec -= NSEC_PER_SEC;
+-	}
+-	queue_delayed_work(system_power_efficient_wq,
+-			   &sync_cmos_work, timespec64_to_jiffies(&next));
++		/*
++		 * Convert to a relative delay. If time set took a really long
++		 * time, or the wall clock was changed, this might become
++		 * negative, so try again.
++		 */
++		getnstimeofday64(&now);
++		delta = timespec64_sub(next, now);
++	} while (delta.tv_sec <= 0);
++
++	queue_delayed_work(system_power_efficient_wq, &sync_cmos_work,
++			   timespec64_to_jiffies(&delta));
+ }
+ 
+ void ntp_notify_cmos_timer(void)
+-- 
+2.7.4
