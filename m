@@ -1,88 +1,69 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 22 Sep 2017 01:14:45 +0900
-Subject: [PATCH] pinctrl: samsung: add pinctrl_force_sleep() for "sleep"
- pinctrl state
-In-Reply-To: <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
-References: <CGME20170921123230epcas1p4d3c1de108af7d34053d2c4f40dd42119@epcas1p4.samsung.com>
- <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
-Message-ID: <CA+Ln22GXr4TRDvgSm1HWQbucBjJ8c=dfnTOARXyM4EZU64QQww@mail.gmail.com>
+From: martyn.welch@collabora.co.uk (Martyn Welch)
+Date: Thu, 21 Sep 2017 17:18:14 +0100
+Subject: [PATCH v3 3/6] serial: imx: Simplify DMA disablement
+In-Reply-To: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
+References: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <1506010697-22114-4-git-send-email-martyn.welch@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Youngmin,
+From: Nandor Han <nandor.han@ge.com>
 
-2017-09-21 21:32 GMT+09:00 ??? <youngmin.nam@samsung.com>:
-> This patch adds pinctrl_for_sleep() in samsung_pinctrl_suspend()
-> to support configuration of "sleep" pinctrl state.
->
-> For example, we can configure "sleep" pinctrl state of "gpf1-6"
-> as "INPUT, PULL DOWN" by configuring power down mode register.
->
-> &pinctrl_5 {
->         pinctrl-names = "default","sleep";
->         pinctrl-0 = <&initial5>;
->         pinctrl-1 = <&sleep5>;
->
->         initial5: initial-state {
->                 samsung,pins = gpf1-6;
->                 samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
->         };
->         sleep5: sleep-state {
->                 samsung,pins = gpf1-6;
->                 samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
->                 samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_DOWN>;
+This commits simplify the function imx_disable_dma() by moving
+the code for disabling RX and TX DMAs to dedicated functions.
+This is a preparation for the next commit.
 
-This isn't a very good example, because pin-con-pdn and pin-pud-pdn
-are used to program dedicated sleep state registers in the pin
-controller and they can be programmed at any time. Typically one would
-include them in "default" state.
+Signed-off-by: Nandor Han <nandor.han@ge.com>
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+---
+ drivers/tty/serial/imx.c | 27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-As for pins which don't have dedicated sleep state registers, i.e. the
-alive banks, which retain their value, the DT node of device
-associated with the pins would have "sleep" pinctrl state and its
-driver would activate it on suspend.
-
-The only remaining use case would be pins in alive banks not
-associated with any device, but I can't imagine any practical case
-that would need to change the value on suspend in such case.
-
-Do you have an example of a real use case for this patch?
-
->         };
-> };
->
-> Signed-off-by: Youngmin Nam <youngmin.nam@samsung.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-samsung.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index e04f7fe0a65d..b4d12f8db475 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -1099,6 +1099,11 @@ static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
->  {
->         struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
->         int i;
-> +       int ret;
-> +
-> +       ret = pinctrl_force_sleep(drvdata->pctl_dev);
-> +       if (ret)
-> +               dev_err(dev, "could not set sleep pinstate %d\n", ret);
->
->         for (i = 0; i < drvdata->nr_banks; i++) {
->                 struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
-> @@ -1187,6 +1192,11 @@ static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
->         if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
->                 drvdata->retention_ctrl->disable(drvdata);
->
-> +       /* For changing state without writing register. */
-> +       if (!IS_ERR(drvdata->pctl_dev->p) &&
-> +           !IS_ERR(drvdata->pctl_dev->hog_default))
-> +               drvdata->pctl_dev->p->state = drvdata->pctl_dev->hog_default;
-
-How is this supposed to work? The pins were reconfigured at suspend,
-where are they restored back to the values before suspend?
-
-Best regards,
-Tomasz
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 7835279..2fb3210 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -350,6 +350,24 @@ static void imx_port_rts_auto(struct imx_port *sport, unsigned long *ucr2)
+ 	*ucr2 |= UCR2_CTSC;
+ }
+ 
++static void imx_stop_tx_dma(struct imx_port *sport)
++{
++	unsigned long temp;
++
++	temp = readl(sport->port.membase + UCR1);
++	temp &= ~UCR1_TDMAEN;
++	writel(temp, sport->port.membase + UCR1);
++}
++
++static void imx_stop_rx_dma(struct imx_port *sport)
++{
++	unsigned long temp;
++
++	temp = readl(sport->port.membase + UCR1);
++	temp &= ~(UCR1_RDMAEN | UCR1_ATDMAEN);
++	writel(temp, sport->port.membase + UCR1);
++}
++
+ /*
+  * interrupts disabled on entry
+  */
+@@ -1217,13 +1235,8 @@ static void imx_enable_dma(struct imx_port *sport)
+ 
+ static void imx_disable_dma(struct imx_port *sport)
+ {
+-	unsigned long temp;
+-
+-	/* clear UCR1 */
+-	temp = readl(sport->port.membase + UCR1);
+-	temp &= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
+-	writel(temp, sport->port.membase + UCR1);
+-
++	imx_stop_rx_dma(sport);
++	imx_stop_tx_dma(sport);
+ 	imx_setup_ufcr(sport, TXTL_DEFAULT, RXTL_DEFAULT);
+ 
+ 	sport->dma_is_enabled = 0;
+-- 
+1.8.3.1
