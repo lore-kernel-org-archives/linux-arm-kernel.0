@@ -1,57 +1,74 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 20 Sep 2017 17:13:56 -0700
-Subject: [PATCH] drm/rockchip: Fix uninitialized use of ret
-Message-ID: <20170921001408.1839-1-seanpaul@chromium.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 21 Sep 2017 09:33:52 +0900
+Subject: [PATCH v2 8/8] PM / devfreq: exynos-bus: Register cooling device
+In-Reply-To: <1505954032-3327-1-git-send-email-cw00.choi@samsung.com>
+References: <1505954032-3327-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170921003356epcas1p34bf88ccd1b9630577a83f14f0c291b1d@epcas1p3.samsung.com>
+Message-ID: <1505954032-3327-9-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there are no children for lvds, ret is used uninitialized. This patch
-initializes ret and returns an error if the port has no children.
+This patch registers the Exynos Bus-Frequency scaling device
+as a cooling device of thermal management.
 
-Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
-Cc: Mark Yao <mark.yao@rock-chips.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Sandy Huang <hjc@rock-chips.com>
-Cc: dri-devel at lists.freedesktop.org
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: linux-samsung-soc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Cc: linux-kernel at vger.kernel.org
 ---
- drivers/gpu/drm/rockchip/rockchip_lvds.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/devfreq/Kconfig      |  1 +
+ drivers/devfreq/exynos-bus.c | 11 +++++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-index c5fbe533796c..0ce6205d8d80 100644
---- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-@@ -346,7 +346,7 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
- 	struct drm_connector *connector;
- 	struct device_node *remote = NULL;
- 	struct device_node  *port, *endpoint;
--	int ret;
-+	int ret = 0, child_count = 0;
- 	const char *name;
- 	u32 endpoint_id;
+diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+index 6a172d338f6d..eb8128e08b2c 100644
+--- a/drivers/devfreq/Kconfig
++++ b/drivers/devfreq/Kconfig
+@@ -81,6 +81,7 @@ config ARM_EXYNOS_BUS_DEVFREQ
+ 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+ 	select DEVFREQ_GOV_PASSIVE
+ 	select DEVFREQ_EVENT_EXYNOS_PPMU
++	select DEVFREQ_THERMAL
+ 	select PM_DEVFREQ_EVENT
+ 	select PM_OPP
+ 	help
+diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+index c25658b26598..200ca0d11834 100644
+--- a/drivers/devfreq/exynos-bus.c
++++ b/drivers/devfreq/exynos-bus.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/devfreq.h>
+ #include <linux/devfreq-event.h>
++#include <linux/devfreq_cooling.h>
+ #include <linux/device.h>
+ #include <linux/export.h>
+ #include <linux/module.h>
+@@ -41,6 +42,8 @@ struct exynos_bus {
+ 	struct clk *clk;
+ 	unsigned int voltage_tolerance;
+ 	unsigned int ratio;
++
++	struct thermal_cooling_device *cdev;
+ };
  
-@@ -358,13 +358,18 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
- 		return -EINVAL;
+ /*
+@@ -468,6 +471,14 @@ static int exynos_bus_probe(struct platform_device *pdev)
+ 		goto err;
  	}
- 	for_each_child_of_node(port, endpoint) {
-+		child_count++;
- 		of_property_read_u32(endpoint, "reg", &endpoint_id);
- 		ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
- 						  &lvds->panel, &lvds->bridge);
- 		if (!ret)
- 			break;
- 	}
--	if (ret) {
-+	if (!child_count) {
-+		DRM_DEV_ERROR(dev, "lvds port does not have any children\n");
-+		ret  = -EINVAL;
-+		goto err_put_port;
-+	} else if (ret) {
- 		DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
- 		ret  = -EPROBE_DEFER;
- 		goto err_put_port;
+ 
++	/* Register devfreq cooling device */
++	bus->cdev = of_devfreq_cooling_register(np, bus->devfreq);
++	if (IS_ERR(bus->cdev) < 0) {
++		dev_err(dev, "failed to register cooling device\n");
++		ret = PTR_ERR(bus->cdev);
++		goto err;
++	}
++
+ 	goto out;
+ passive:
+ 	/* Initialize the struct profile and governor data for passive device */
 -- 
-2.14.1.821.g8fa685d3b7-goog
+1.9.1
