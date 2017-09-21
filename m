@@ -1,43 +1,28 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 21 Sep 2017 19:16:04 +0200
-Subject: [PATCH 7/7] ARM64: dts: meson-gxl: adjust libretech-cc gpio-line-names
-Message-ID: <20170921171604.27675-1-jbrunet@baylibre.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 21 Sep 2017 22:51:26 +0530
+Subject: [PATCH v2] dmaengine: edma: Align the memcpy acnt array size
+ with the transfer
+In-Reply-To: <20170918081626.12878-1-peter.ujfalusi@ti.com>
+References: <20170918081626.12878-1-peter.ujfalusi@ti.com>
+Message-ID: <20170921172126.GJ30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TEST_N gpio has been moved so the gpio-line-names of the cc
-must be adjusted accordingly
+On Mon, Sep 18, 2017 at 11:16:26AM +0300, Peter Ujfalusi wrote:
+> Memory to Memory transfers does not have any special alignment needs
+> regarding to acnt array size, but if one of the areas are in memory mapped
+> regions (like PCIe memory), we need to make sure that the acnt array size
+> is aligned with the mem copy parameters.
+> 
+> Before "dmaengine: edma: Optimize memcpy operation" change the memcpy was set
+> up in a different way: acnt == number of bytes in a word based on
+> __ffs((src | dest | len), bcnt and ccnt for looping the necessary number of
+> words to comlete the trasnfer.
+> 
+> Instead of reverting the commit we can fix it to make sure that the ACNT size
+> is aligned to the traswnfer.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Applied, thanks
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-index 69ca14ac10fa..3e9b9c8b72f0 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-@@ -146,7 +146,9 @@
- 			  "7J1 Header Pin12",
- 			  "IR In",
- 			  "9J3 Switch HDMI CEC/7J1 Header Pin11",
--			  "7J1 Header Pin13";
-+			  "7J1 Header Pin13",
-+			  /* GPIO_TEST_N */
-+			  "7J1 Header Pin15";
- };
- 
- &pinctrl_periphs {
-@@ -188,9 +190,7 @@
- 			  "7J1 Header Pin32", "7J1 Header Pin29",
- 			  "7J1 Header Pin31",
- 			  /* Bank GPIOCLK */
--			  "7J1 Header Pin7", "",
--			  /* GPIO_TEST_N */
--			  "7J1 Header Pin15";
-+			  "7J1 Header Pin7", "";
- };
- 
- /* SD card */
 -- 
-2.13.5
+~Vinod
