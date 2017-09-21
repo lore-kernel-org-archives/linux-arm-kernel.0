@@ -1,44 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 21 Sep 2017 12:11:23 +0100
-Subject: [PATCH 2/4] numa, iommu/io-pgtable-arm: Use NUMA aware memory
- allocation for smmu translation tables
-In-Reply-To: <20170921085922.11659-3-ganapatrao.kulkarni@cavium.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <20170921085922.11659-3-ganapatrao.kulkarni@cavium.com>
-Message-ID: <37e3ce0e-717d-156d-fef3-27559aff980e@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 21 Sep 2017 12:19:45 +0100
+Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
+ length
+In-Reply-To: <E82895B2-3F95-4A54-8703-D654221F8CBA@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
+ <FC5BA359-D37C-493C-87CD-146B83D3CCB5@arm.com>
+ <20170920110902.GG24231@e103592.cambridge.arm.com>
+ <E82895B2-3F95-4A54-8703-D654221F8CBA@arm.com>
+Message-ID: <20170921111937.GA17434@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
-> function __arm_lpae_alloc_pages is used to allcoated memory for smmu
-> translation tables. updating function to allocate memory/pages
-> from the proximity domain of SMMU device.
-
-AFAICS, data->pgd_size always works out to a power-of-two number of
-pages, so I'm not sure why we've ever needed alloc_pages_exact() here. I
-think we could simply use alloc_pages_node() and drop patch #1.
-
-Robin.
-
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  drivers/iommu/io-pgtable-arm.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+On Wed, Sep 20, 2017 at 06:08:21PM +0000, Alan Hayward wrote:
 > 
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index e8018a3..f6d01f6 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -215,8 +215,10 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
->  {
->  	struct device *dev = cfg->iommu_dev;
->  	dma_addr_t dma;
-> -	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
-> +	void *pages;
->  
-> +	pages = alloc_pages_exact_nid(dev_to_node(dev), size,
-> +			gfp | __GFP_ZERO);
->  	if (!pages)
->  		return NULL;
->  
+> > On 20 Sep 2017, at 12:09, Dave Martin <dave.martin@foss.arm.com> wrote:
+
+[...]
+
+> >> Given, sve_set_vector_length is called when setting the vector length in
+> >> PTRACE_SETREGSET, it looks to me like if you set VL to a value that?s not
+> >> supported by the hardware, then it?s going to round down to the previous value.
+> >> Is that correct? I?m not sure if that?s explained in the docs?
+> > 
+> > Does this cover it?
+> > 
+> > "On success, the calling thread's vector length is changed to the
+> > largest value supported by the system that is less than or equal to vl."
+> > 
+> > (For ptrace, I just cross-reference the PR_SVE_SET_VL behaviour, above.)
 > 
+> For ptrace is it worth mentioning user should do a GET after a SET to confirm
+> what VL value was actually set?
+
+This seems worth a clarification -- I'd thought this was already
+mentioned, but it isn't.
+
+How about:
+
+  The caller must make a further GETREGSET call if it needs to know what VL is
+  actually set by SETREGSET, unless is it known in advance that the requested
+  VL is supported.
+
+
+[...]
+
+Cheers
+---Dave
