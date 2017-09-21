@@ -1,29 +1,31 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 21 Sep 2017 16:26:39 +0200
-Subject: [PATCH 3/4] iommu/arm-smmu-v3: Use NUMA memory allocations for
- stream tables and comamnd queues
-In-Reply-To: <db28d6ff-77e5-ed59-c1b8-57c917564a68@arm.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <20170921085922.11659-4-ganapatrao.kulkarni@cavium.com>
- <db28d6ff-77e5-ed59-c1b8-57c917564a68@arm.com>
-Message-ID: <20170921142639.GA18211@lst.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Sep 2017 07:27:49 -0700
+Subject: [PATCH 08/10] ARM: dts: Add nodes for missing omap4 interconnect
+ target modules
+In-Reply-To: <20170921025656.omeoippus7b4mmig@squirrel.local>
+References: <20170920224621.16236-1-tony@atomide.com>
+ <20170920224621.16236-9-tony@atomide.com>
+ <20170921025656.omeoippus7b4mmig@squirrel.local>
+Message-ID: <20170921142748.GA4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 12:58:04PM +0100, Robin Murphy wrote:
-> Christoph, Marek; how reasonable do you think it is to expect
-> dma_alloc_coherent() to be inherently NUMA-aware on NUMA-capable
-> systems? SWIOTLB looks fairly straightforward to fix up (for the simple
-> allocation case; I'm not sure it's even worth it for bounce-buffering),
-> but the likes of CMA might be a little trickier...
+* Matthijs van Duin <matthijsvanduin@gmail.com> [170920 19:57]:
+> On Wed, Sep 20, 2017 at 03:46:19PM -0700, Tony Lindgren wrote:
+> > For AESS there is old Android 3.4 kernel
+> > driver available but it's unlikely that anybody is going to update
+> > it for the mainline kernel.
+> 
+> We do actually hope to get the Audio Engine in ABE working eventually on
+> omap5 (which would presumably also make it work on omap4). and there are
+> more recent kernels that support it: a TI 3.8 kernel and a 3.15 branch
+> from Peter Ujfalusi [1].
 
-I think allocating data node local to dev is a good default.  I'm not
-sure if we'd still need a version that takes an explicit node, though.
+OK cool, so I'll drop the "but it's unlikely that anybody is going to update
+it for the mainline kernel" part.
 
-On the one hand devices like NVMe or RDMA nics have queues that are
-assigned to specific cpus and thus have an inherent affinity to given
-nodes.  On the other hand we'd still need to access the PCIe device,
-so for it to make sense we'd need to access the dma memory a lot more
-from the host than from the device, and I'm not sure if we ever have
-devices where that is the case (which would not be optimal to start
-with).
+Regards,
+
+Tony
+
+> [1] https://pyra-handheld.com/pipermail/kernel/2017-September/002060.html
