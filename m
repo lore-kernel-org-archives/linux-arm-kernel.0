@@ -1,25 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 21 Sep 2017 15:55:29 +0200
-Subject: [PATCH v2 1/4] arm64: dts: marvell: mcbin: add comphy references
- to Ethernet ports
-In-Reply-To: <20170921075410.19072-2-antoine.tenart@free-electrons.com>
-References: <20170921075410.19072-1-antoine.tenart@free-electrons.com>
- <20170921075410.19072-2-antoine.tenart@free-electrons.com>
-Message-ID: <20170921135529.GA27589@lunn.ch>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Thu, 21 Sep 2017 09:17:58 -0500
+Subject: [PATCH 1/3] arm64: dts: stratix10: include the reset manager bindings
+Message-ID: <1506003480-22955-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 09:54:07AM +0200, Antoine Tenart wrote:
-> This patch adds comphy phandles to the Ethernet ports in the mcbin
-> device tree. The comphy is used to configure the serdes PHYs used by
-> these ports.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Add the reset manager includes for Stratix10. Need to use the '#include'
+instead of '/include/' to avoid a DTC syntax error.
 
-Hi Antoine
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi      | 1 +
+ arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-This is much easier to understand. Thanks
-
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-    Andrew
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+index 631e09a..f7fbc38 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+@@ -15,6 +15,7 @@
+  */
+ 
+ /dts-v1/;
++#include <dt-bindings/reset/altr,rst-mgr-s10.h>
+ 
+ / {
+ 	compatible = "altr,socfpga-stratix10";
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+index 5907586..46f27ed 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+@@ -14,7 +14,7 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-/include/ "socfpga_stratix10.dtsi"
++#include "socfpga_stratix10.dtsi"
+ 
+ / {
+ 	model = "SoCFPGA Stratix 10 SoCDK";
+-- 
+2.7.4
