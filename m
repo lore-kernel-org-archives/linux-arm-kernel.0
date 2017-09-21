@@ -1,47 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Sep 2017 14:21:19 +0200
-Subject: [PATCH 0/8] pinctrl: meson: clean pin offsets
-In-Reply-To: <20170920133927.17390-1-jbrunet@baylibre.com>
-References: <20170920133927.17390-1-jbrunet@baylibre.com>
-Message-ID: <CACRpkdYmO2PSKU-qkBMW7C35kHf=usfOoEAobQDMMdzd1RFSTw@mail.gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 21 Sep 2017 21:27:47 +0900
+Subject: [PATCH net-next 2/3] net: ethernet: socionext: add AVE ethernet
+ driver
+In-Reply-To: <20170911155555.6719.4A936039@socionext.com>
+References: <df4ec8b2-67cf-5dee-2600-88cffd1bcd11@gmail.com>
+ <20170911155555.6719.4A936039@socionext.com>
+Message-ID: <20170921212746.9119.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 3:39 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+On Mon, 11 Sep 2017 15:55:56 +0900 <hayashi.kunihiko@socionext.com> wrote:
 
-> The initial goal of this series was move to TEST_N pin from the EE
-> controller to AO controller, where it belongs. This meant modify the
-> EE_OFF value.
->
-> This offset is a quirk we brought from the vendor driver when it was
-> initially merged. There no reason to keep this around and we could simply
-> let pinctrl figure the pin base value.
->
-> Removing this offset, while simple, ends up being quite a patch bomb.
-> This is why I split the change over 5 first patches, so the important
-> change, patch #1 remains visible. Of course, to avoid breaking bisect,
-> these first 5 patches should be squashed into one. (If you prefer that I
-> squash it myself, I may have to send you a PR as the patch would exceed
-> VGER 100000 characters limit)
->
-> The last change is this series, while not directly related, also requires
-> to adjust the gpio-line-names property in DT. Having these changes going
-> together would make it easier to coordinate the DTS changes.
->
-> This was changeset has been test on gxbb P200, gxl libretech-cc.  It was
-> also boot tested on meson8 (Thx Martin!)
->
-> Jerome Brunet (8):
->   pinctrl: meson: remove offset from pinctrl
->   pinctrl: meson: remove offset continued - gxbb
->   pinctrl: meson: remove offset continued - gxl
->   pinctrl: meson: remove offset continued - meson8
->   pinctrl: meson: remove offset continued - meson8b
->   pinctrl: meson: get rid of pin_base
->   pinctrl: meson-gx: TEST_N belongs to the AO controller
->   pinctrl: meson-gxbb: add missing GPIOX_22 pin
+> > > +static int ave_set_rxdesc(struct net_device *ndev, int entry)
+> > > +{
+> > > +	struct ave_private *priv = netdev_priv(ndev);
+> > > +	struct sk_buff *skb;
+> > > +	unsigned long align;
+> > > +	dma_addr_t paddr;
+> > > +	void *buffptr;
+> > > +	int ret = 0;
+> > > +
+> > > +	skb = priv->rx.desc[entry].skbs;
+> > > +	if (!skb) {
+> > > +		skb = netdev_alloc_skb_ip_align(ndev,
+> > > +						AVE_MAX_ETHFRAME + NET_SKB_PAD);
+> > > +		if (!skb) {
+> > > +			netdev_err(ndev, "can't allocate skb for Rx\n");
+> > > +			return -ENOMEM;
+> > > +		}
+> > > +	}
+> > > +
+> > > +	/* set disable to cmdsts */
+> > > +	ave_wdesc(ndev, AVE_DESCID_RX, entry, 0, AVE_STS_INTR | AVE_STS_OWN);
+> > > +
+> > > +	/* align skb data for cache size */
+> > > +	align = (unsigned long)skb_tail_pointer(skb) & (NET_SKB_PAD - 1);
+> > > +	align = NET_SKB_PAD - align;
+> > > +	skb_reserve(skb, align);
+> > > +	buffptr = (void *)skb_tail_pointer(skb);
+> > 
+> > Are you positive you need this? Because by default, the networking stack
+> > will align to the maximum between your L1 cache line size and 64 bytes,
+> > which should be a pretty good alignment guarantee.
+> 
+> Now if L1 cache line size is 128,
+> the skb buffer is also aligned to 128, isn't it?
+> So this code doesn't make sense.
 
-Looks good just waiting for review from Carlo && || Kevin.
+Although the above cache-alignment operation isn't necessary,
+we should add the address adjustment because of the restriction of the hardware
+specification.
 
-Yours,
-Linus Walleij
+The netdev_alloc_skb_ip_align() allocates the cache-aligned buffer
+and add 2 byte to skb->data by skb_reserve(skb, NET_IP_ALIGN).
+Then skb->data points to "aligned address + 2 byte".
+
+When we call dma_map_single() with skb->data, it might return the aligned address
+and there might not be 2 byte space.
+
+On the other hand, according to the hardware specification,
+the Rx buffer address set to the descriptor is assumed that:
+ - the Rx address is 4 byte aligned,
+ - the Rx address begins with 2 byte headroom, data will be put from (buffer+2).
+
+Therefore, to make headroom in front of returned address from ave_dma_map(),
+I think that the buffer address should be adjusted like that:
+
+    skb = netdev_alloc_skb_ip_align(ndev, AVE_MAX_ETHFRAME);
+
+    paddr = ave_dma_map(ndev, &priv->rx.desc[entry],
+		skb->data - NET_IP_ALIGN,
+		AVE_MAX_ETHFRAME + NET_IP_ALIGN, DMA_FROM_DEVICE);
+
+    ave_wdesc_addr(ndev, AVE_DESCID_RX, entry, 4, paddr);
+
+I'll apply the code to next patch.
+
+BTW, since the Tx buffer address doesn't have any restrictions, the adjustment
+like this isn't necessary.
+
+
+> > > +
+> > > +	/* enable clock */
+> > > +	priv->clk = devm_clk_get(dev, NULL);
+> > > +	if (IS_ERR(priv->clk))
+> > > +		priv->clk = NULL;
+> > > +	clk_prepare_enable(priv->clk);
+> > 
+> > Same here with the clock, the block is clocked, so it can consume some
+> > amount of power, just do the necessary HW initialization with the clock
+> > enabled, then defer until ndo_open() before turning it back on.
+
+There are a number of the functions that needs clock enabled and "block reset"
+operations, like mdiobus_register(), phy_connect(), and so on.
+
+I tried to move such functions to ndo_open() to defer clock enabled until ndo_open().
+However, the driver didn't work for some reasons of hardware restriction.
+I think it's hard to change this sequence.
+
+---
+Best Regards,
+Kunihiko Hayashi
