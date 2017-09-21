@@ -1,74 +1,110 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Thu, 21 Sep 2017 15:55:25 +0800
-Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
- userspace
-In-Reply-To: <59BA7D72.4090403@arm.com>
-References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
- <1503916701-13516-7-git-send-email-gengdongjiu@huawei.com>
- <59B17438.5070501@arm.com> <2a42d1ea-3456-2873-c9ea-d8a027b59789@huawei.com>
- <59BA7D72.4090403@arm.com>
-Message-ID: <92f2fecc-9833-15e4-30cc-b4dd5ba93cb7@huawei.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Sep 2017 08:59:07 +0100
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170920224522.GB20974@obsidianresearch.com>
+References: <20170920112152.GL20805@n2100.armlinux.org.uk>
+ <20170920162208.GB536@obsidianresearch.com>
+ <20170920165141.GP20805@n2100.armlinux.org.uk>
+ <20170920224522.GB20974@obsidianresearch.com>
+Message-ID: <20170921075907.GR20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James
-
-On 2017/9/14 21:00, James Morse wrote:
-> Hi gengdongjiu,
-
-> user-space can choose whether to use SEA or SEI, it doesn't have to choose the
-> same notification type that firmware used, which in turn doesn't have to be the
-> same as that used by the CPU to notify firmware.
+On Wed, Sep 20, 2017 at 04:45:22PM -0600, Jason Gunthorpe wrote:
+> On Wed, Sep 20, 2017 at 05:51:41PM +0100, Russell King - ARM Linux wrote:
+> > I sort-of agree as far as the time offset information goes, but there's
+> > a complication that we only open the RTC to set the time at the
+> > point in
 > 
-> The choice only matters because these notifications hang on an existing pieces
-> of the Arm-architecture, so the notification can only add to the architecturally
-> defined meaning. (i.e. You can only send an SEA for something that can already
-> be described as a synchronous external abort).
+> Hi Russell,
 > 
-> Once we get to user-space, for memory_failure() notifications, (which so far is
-> all we are talking about here), the only thing that could matter is whether the
-> guest hit a PG_hwpoison page as a stage2 fault. These can be described as
-> Synchronous-External-Abort.
+> What do you think of this untested approach in the below patch?
 > 
-> The Synchronous-External-Abort/SError-Interrupt distinction matters for the CPU
-> because it can't always make an error synchronous. For memory_failure()
-> notifications to a KVM guest we really can do this, and we already have this
-> behaviour for free. An example:
-> 
-> A guest touches some hardware:poisoned memory, for whatever reason the CPU can't
-> put the world back together to make this a synchronous exception, so it reports
-> it to firmware as an SError-interrupt.
-> Linux gets an APEI notification and memory_failure() causes the affected page to
-> be unmapped from the guest's stage2, and SIGBUS_MCEERR_AO sent to user-space.
-> 
-> Qemu/kvmtool can now notify the guest with an IRQ or POLLed notification. AO->
-> action optional, probably asynchronous.
-> 
-> But in our example it wasn't really asynchronous, that was just a property of
-> the original CPU->firmware notification. What happens? The guest vcpu is re-run,
-> it re-runs the same instructions (this was a contained error so KVM's ELR points
-> at/before the instruction that steps in the problem). This time KVM takes a
-> stage2 fault, which the mm code will refuse to fixup because the relevant page
-> was marked as PG_hwpoision by memory_failure(). KVM signals Qemu/kvmtool with
-> SIGBUS_MCEERR_AR. Now Qemu/kvmtool can notify the guest using SEA.
+> Upon more careful inspection I think I found a way to make the
+> rounding in rtc_set_ntp_time compatible with a wide range of rtc
+> devices, so the subsecond capable ops I suggested do not seem
+> necessary.
 
-CC Achin
+Looks like a possibility, but...
 
-I have some personal opinion, if you think it is not right, hope you can point out.
+> +/* True if now.tv_nsec is close enough to time_sec_nsec that we can call the
+> + * drivers's set_time_ns(). Arbitrarily choose 1ms as the allowable error
+> + * margin.
+> + *
+> + * This also rounds tv_sec to the second that covers the tv_nsec tick we are
+> + * targeting.
+> + */
+> +#define TIME_SET_NSEC_FUZZ (1000*1000)
+> +static inline bool rtc_tv_nsec_ok(struct rtc_device *rtc,
+> +				  struct timespec64 *now)
+> +{
+> +	long diff;
+> +
+> +	diff = (now->tv_nsec - rtc->time_set_nsec) % NSEC_PER_SEC;
+> +	if (diff < TIME_SET_NSEC_FUZZ) {
+> +		if (rtc->time_set_nsec + diff >= NSEC_PER_SEC) {
+> +			now->tv_sec -= 1;
+> +			now->tv_nsec = NSEC_PER_SEC-1;
+> +		}
+> +		return true;
+> +	}
+> +
+> +	diff = (rtc->time_set_nsec - now->tv_nsec) % NSEC_PER_SEC;
+> +	if (diff < TIME_SET_NSEC_FUZZ) {
+> +		if (now->tv_nsec + diff >= NSEC_PER_SEC) {
+> +			now->tv_sec += 1;
+> +			now->tv_nsec = 0;
+> +		}
+> +		return true;
+> +	}
 
-Synchronous External Abort and SError Interrupt are hardware exception(hardware concept), which is independent of software notification,
-in armv8 without RAS, the two concepts already exist. In the APEI spec, in order to better describe the two exceptions, so use SEA and SEI notification to stand for them.
+I don't think this is correct - and I think it's overly expensive.
+I threw this into a test program to prove the point, and it confirmed
+my suspicions - the above will always return true.
 
-SEA notification stands for Synchronous External Abort, so may be it is not only a notification, it also stands for a hardware error type.
-SEI notification stands for SError Interrupt, so may be it is not only a notification, it also stands for a hardware error type.
+Here's the test program output:
 
-In the OS, it has different handling flow to the two exception(two notification):
-when the guest OS running, if the hardware generates a Synchronous External Abort, we told the guest OS this error is SError Interrupt instead of Synchronous External Abort.
-guest OS uses SEI notification handling flow to deal with it, I am not sure whether it will have problem, because the true hardware exception is Synchronous External Abort,
-but software treats it as SError interrupt to handle.
+now=0.990000000, offset=         0: diff= 990000000 true 2: 0.990000000
+now=0.999000000, offset=         0: diff= 999000000 true 2: 0.999000000
+now=0.999900000, offset=         0: diff= 999900000 true 2: 0.999900000
+now=1.000000000, offset=         0: diff=         0 true 1: 1.000000000
+now=1.000100000, offset=         0: diff=    100000 true 1: 1.000100000
+now=1.001000000, offset=         0: diff=   1000000 true 2: 1.001000000
+now=1.010000000, offset=         0: diff=  10000000 true 2: 1.010000000
+now=0.990000000, offset= 470000000: diff= 520000000 true 2: 0.990000000
+now=0.999000000, offset= 470000000: diff= 529000000 true 2: 0.999000000
+now=0.999900000, offset= 470000000: diff= 529900000 true 2: 0.999900000
+now=1.000000000, offset= 470000000: diff=-470000000 true 1: 1.000000000
+now=1.000100000, offset= 470000000: diff=-469900000 true 1: 1.000100000
+now=1.001000000, offset= 470000000: diff=-469000000 true 1: 1.001000000
+now=1.010000000, offset= 470000000: diff=-460000000 true 1: 1.010000000
+now=0.990000000, offset=1000000000: diff= -10000000 true 1: 0.990000000
+now=0.999000000, offset=1000000000: diff=  -1000000 true 1: 0.999000000
+now=0.999900000, offset=1000000000: diff=   -100000 true 1: 0.999900000
+now=1.000000000, offset=1000000000: diff=         0 true 1: 0.999999999
+now=1.000100000, offset=1000000000: diff=-999900000 true 1: 1.000100000
+now=1.001000000, offset=1000000000: diff=-999000000 true 1: 1.001000000
+now=1.010000000, offset=1000000000: diff=-990000000 true 1: 1.010000000
+now=0.990000000, offset=1470000000: diff=-480000000 true 1: 0.990000000
+now=0.999000000, offset=1470000000: diff=-471000000 true 1: 0.999000000
+now=0.999900000, offset=1470000000: diff=-470100000 true 1: 0.999900000
+now=1.000000000, offset=1470000000: diff=-470000000 true 1: 0.999999999
+now=1.000100000, offset=1470000000: diff=-469900000 true 1: 0.999999999
+now=1.001000000, offset=1470000000: diff=-469000000 true 1: 0.999999999
+now=1.010000000, offset=1470000000: diff=-460000000 true 1: 0.999999999
 
-In the mainline code, it does not have SEI notification support, the reason I think it is because of the error address record by firmware is not accurate(SError Interrupt is asynchronous exception).
-so if treat a hardware Synchronous External Abort as SError interrupt(SEI). The default OS behavior for SEI is PANIC, that is to say, when hardware triggers a Synchronous External Abort(SEA), if guest
-treat it as SError interrupt(SEI), the OS will be panic. in fact, it can be recoverable instead of Panic.
+which should be self explanatory.  Another point to note is that
+the computation of the time to be set is also incorrect - for
+example, in the case of offset=0, we can see if we're slightly
+early, we set tv_sec=0 rather than tv_sec=1.
 
-I ever added a patch to support the SEI notification, but not sure whether it is can be accepted by open source, until now, not receive response.
+In the offset=1sec case, it also isn't working as we'd expect -
+this case should be providing tv_sec for the preceding second, but
+it doesn't.
+
+I don't yet have a proposal to fix this...
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
