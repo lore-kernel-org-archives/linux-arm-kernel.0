@@ -1,33 +1,27 @@
-From: hejianet@gmail.com (Jia He)
-Date: Thu, 21 Sep 2017 16:35:05 +0800
-Subject: Possible gcc 4.8.5 bug about RELOC_HIDE marcro
-In-Reply-To: <22979.28663.77963.862263@gargle.gargle.HOWL>
-References: <03f619bd-e3b2-49e0-5f2c-e232974eac12@gmail.com>
- <22979.28663.77963.862263@gargle.gargle.HOWL>
-Message-ID: <c9da3aad-f8c2-4396-a15f-e1a1188590dd@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 21 Sep 2017 10:37:41 +0200
+Subject: [PATCH 3/8] ARM: dts: iwg22m: Enable SDHI1 controller
+In-Reply-To: <TY1PR06MB07024A3CACDC8399EE8F6C62B7610@TY1PR06MB0702.apcprd06.prod.outlook.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-4-git-send-email-chris.paterson2@renesas.com>
+ <20170915081144.GI3924@verge.net.au>
+ <TY1PR06MB07024A3CACDC8399EE8F6C62B7610@TY1PR06MB0702.apcprd06.prod.outlook.com>
+Message-ID: <20170921083741.GF15749@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Mikael
+On Wed, Sep 20, 2017 at 01:06:30PM +0000, Chris Paterson wrote:
+> 
+> > From: Chris Paterson
+> > Sent: 20 September 2017 14:05
+> 
+> > 
+> > >
+> > > I don't mind if its not enabled in this patch but I would like to know
+> > > if it can be enabled or not and reflect that information in the wiki.
+> > >
+> > > http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds
+> 
+> Will do.
 
-It is a known gcc bug, please see 
-https://gcc.gnu.org/ml/gcc-patches/2017-03/msg00790.html
-
-
-Cheers,
-
-Jusitn(Jia He)
-
-
-? 9/21/2017 3:53 PM, Mikael Pettersson Wrote:
-> Jia He writes:
->   > I tried to build kernel 4.14-rc1 on a arm64 server in distro centos 7.3.
->   > The gcc version is 4.8.5
->
-> I have no input on the specifics of the issue, but please note that gcc-4.8
-> is no longer supported or maintained by upstream.  Even gcc-4.9 is EOL, and
-> gcc-5 will be EOL:d inn a week or so.  Also I'll note that gcc-4.8 is still
-> fairly early wrt to arm64 support, so bugs may be expected.
->
-> In short, please retry with gcc-6.4 or gcc-7.2.
->
+Thanks.
