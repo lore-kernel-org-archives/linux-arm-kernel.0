@@ -1,27 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Sep 2017 13:38:27 +0200
-Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <1505355021.8308.4.camel@mhfsdcap03>
-References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
- <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
- <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
- <1505355021.8308.4.camel@mhfsdcap03>
-Message-ID: <CACRpkdbfCFL3w6bMzT2D2rukhVkzdHPpsfZO6vYQtv_SHSjgOQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 21 Sep 2017 12:41:11 +0100
+Subject: [PATCH 4/4] iommu/dma, numa: Use NUMA aware memory allocations in
+ __iommu_dma_alloc_pages
+In-Reply-To: <20170921085922.11659-5-ganapatrao.kulkarni@cavium.com>
+References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
+ <20170921085922.11659-5-ganapatrao.kulkarni@cavium.com>
+Message-ID: <9d65676f-e4e8-e0a6-602c-361d83ce83c1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 4:10 AM, Chaotian Jing
-<chaotian.jing@mediatek.com> wrote:
-> On Wed, 2017-09-13 at 09:10 -0500, Rob Herring wrote:
->> On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
+On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
+> Change function __iommu_dma_alloc_pages to allocate memory/pages
+> for dma from respective device numa node.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  drivers/iommu/dma-iommu.c | 17 ++++++++++-------
+>  1 file changed, 10 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 9d1cebe..0626b58 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -428,20 +428,21 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
+>  	kvfree(pages);
+>  }
+>  
+> -static struct page **__iommu_dma_alloc_pages(unsigned int count,
+> -		unsigned long order_mask, gfp_t gfp)
+> +static struct page **__iommu_dma_alloc_pages(struct device *dev,
+> +		unsigned int count, unsigned long order_mask, gfp_t gfp)
+>  {
+>  	struct page **pages;
+>  	unsigned int i = 0, array_size = count * sizeof(*pages);
+> +	int numa_node = dev_to_node(dev);
+>  
+>  	order_mask &= (2U << MAX_ORDER) - 1;
+>  	if (!order_mask)
+>  		return NULL;
+>  
+>  	if (array_size <= PAGE_SIZE)
+> -		pages = kzalloc(array_size, GFP_KERNEL);
+> +		pages = kzalloc_node(array_size, GFP_KERNEL, numa_node);
+>  	else
+> -		pages = vzalloc(array_size);
+> +		pages = vzalloc_node(array_size, numa_node);
 
->> > +- mediatek,latch-ck: Some projects do not support enhance_rx, need set correct latch-ck to avoid data crc
->>
->> What's a project?
-> eg, MT2701
+kvzalloc{,_node}() didn't exist when this code was first written, but it
+does now - since you're touching it you may as well get rid of the whole
+if-else and array_size local.
 
-Replace the word "project" with the word "system" or "SoC" in
-your patch.
+Further nit: some of the indentation below is a bit messed up.
 
-Yours,
-Linus Walleij
+Robin.
+
+>  	if (!pages)
+>  		return NULL;
+>  
+> @@ -462,8 +463,9 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
+>  			unsigned int order = __fls(order_mask);
+>  
+>  			order_size = 1U << order;
+> -			page = alloc_pages((order_mask - order_size) ?
+> -					   gfp | __GFP_NORETRY : gfp, order);
+> +			page = alloc_pages_node(numa_node,
+> +					(order_mask - order_size) ?
+> +				   gfp | __GFP_NORETRY : gfp, order);
+>  			if (!page)
+>  				continue;
+>  			if (!order)
+> @@ -548,7 +550,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+>  		alloc_sizes = min_size;
+>  
+>  	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> -	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
+> +	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
+> +			gfp);
+>  	if (!pages)
+>  		return NULL;
+>  
+> 
