@@ -1,66 +1,146 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 21 Sep 2017 15:30:09 +0200
-Subject: [PATCH v1] i2c:i2c-stm32f7: fix setup structure
-Message-ID: <1506000609-27409-1-git-send-email-pierre-yves.mordret@st.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=C5=99ej?= Jirman)
+Date: Thu, 21 Sep 2017 15:45:00 +0200
+Subject: [linux-sunxi] [PATCH v2 1/3] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+Message-ID: <1506001500.29217.6.camel@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2C drive setup structure is not properly allocated.
-Make it static instead of pointer to store driver data.
+Hello Yong,
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
- drivers/i2c/busses/i2c-stm32f7.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+I noticed one issue in the register macros. See below.
 
-diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index 47c67b0..42ebdb1 100644
---- a/drivers/i2c/busses/i2c-stm32f7.c
-+++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -215,7 +215,7 @@ struct stm32f7_i2c_dev {
- 	unsigned int msg_num;
- 	unsigned int msg_id;
- 	struct stm32f7_i2c_msg f7_msg;
--	struct stm32f7_i2c_setup *setup;
-+	struct stm32f7_i2c_setup setup;
- 	struct stm32f7_i2c_timings timing;
- };
- 
-@@ -537,7 +537,7 @@ static void stm32f7_i2c_hw_config(struct stm32f7_i2c_dev *i2c_dev)
- 	writel_relaxed(timing, i2c_dev->base + STM32F7_I2C_TIMINGR);
- 
- 	/* Enable I2C */
--	if (i2c_dev->setup->analog_filter)
-+	if (i2c_dev->setup.analog_filter)
- 		stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
- 				     STM32F7_I2C_CR1_ANFOFF);
- 	else
-@@ -887,22 +887,19 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	setup = of_device_get_match_data(&pdev->dev);
--	i2c_dev->setup->rise_time = setup->rise_time;
--	i2c_dev->setup->fall_time = setup->fall_time;
--	i2c_dev->setup->dnf = setup->dnf;
--	i2c_dev->setup->analog_filter = setup->analog_filter;
-+	i2c_dev->setup = *setup;
- 
- 	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-rising-time-ns",
- 				       &rise_time);
- 	if (!ret)
--		i2c_dev->setup->rise_time = rise_time;
-+		i2c_dev->setup.rise_time = rise_time;
- 
- 	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-falling-time-ns",
- 				       &fall_time);
- 	if (!ret)
--		i2c_dev->setup->fall_time = fall_time;
-+		i2c_dev->setup.fall_time = fall_time;
- 
--	ret = stm32f7_i2c_setup_timing(i2c_dev, i2c_dev->setup);
-+	ret = stm32f7_i2c_setup_timing(i2c_dev, &i2c_dev->setup);
- 	if (ret)
- 		goto clk_free;
- 
--- 
-2.7.4
+Yong Deng p??e v ?t 27. 07. 2017 v 13:01 +0800:
+> Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> and CSI1 is used for parallel interface. This is not documented in
+> datasheet but by testing and guess.
+> 
+> This patch implement a v4l2 framework driver for it.
+> 
+> Currently, the driver only support the parallel interface. MIPI-CSI2,
+> ISP's support are not included in this patch.
+> 
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+> 
+
+[snip]
+
+> +
+> +#define CSI_CH_INT_EN_REG		0x70
+> +#define CSI_CH_INT_EN_VS_INT_EN			BIT(7)
+> +#define CSI_CH_INT_EN_HB_OF_INT_EN		BIT(6)
+> +#define CSI_CH_INT_EN_MUL_ERR_INT_EN		BIT(5)
+> +#define CSI_CH_INT_EN_FIFO2_OF_INT_EN		BIT(4)
+> +#define CSI_CH_INT_EN_FIFO1_OF_INT_EN		BIT(3)
+> +#define CSI_CH_INT_EN_FIFO0_OF_INT_EN		BIT(2)
+> +#define CSI_CH_INT_EN_FD_INT_EN			BIT(1)
+> +#define CSI_CH_INT_EN_CD_INT_EN			BIT(0)
+> +
+> +#define CSI_CH_INT_STA_REG		0x74
+> +#define CSI_CH_INT_STA_VS_PD			BIT(7)
+> +#define CSI_CH_INT_STA_HB_OF_PD			BIT(6)
+> +#define CSI_CH_INT_STA_MUL_ERR_PD		BIT(5)
+> +#define CSI_CH_INT_STA_FIFO2_OF_PD		BIT(4)
+> +#define CSI_CH_INT_STA_FIFO1_OF_PD		BIT(3)
+> +#define CSI_CH_INT_STA_FIFO0_OF_PD		BIT(2)
+> +#define CSI_CH_INT_STA_FD_PD			BIT(1)
+> +#define CSI_CH_INT_STA_CD_PD			BIT(0)
+> +
+> +#define CSI_CH_FLD1_VSIZE_REG		0x74
+
+This register should be 0x78 according to the V3s manual. Though it's
+not used in your driver yet, so it is not yet causing any issues.
+
+> +#define CSI_CH_HSIZE_REG		0x80
+> +#define CSI_CH_HSIZE_HOR_LEN_MASK		GENMASK(28, 16)
+> +#define CSI_CH_HSIZE_HOR_LEN(len)		((len << 16) & CSI_CH_HSIZE_HOR_LEN_MASK)
+> +#define CSI_CH_HSIZE_HOR_START_MASK		GENMASK(12, 0)
+> +#define CSI_CH_HSIZE_HOR_START(start)		((start << 0) & CSI_CH_HSIZE_HOR_START_MASK)
+> +
+> +#define CSI_CH_VSIZE_REG		0x84
+> +#define CSI_CH_VSIZE_VER_LEN_MASK		GENMASK(28, 16)
+> +#define CSI_CH_VSIZE_VER_LEN(len)		((len << 16) & CSI_CH_VSIZE_VER_LEN_MASK)
+> +#define CSI_CH_VSIZE_VER_START_MASK		GENMASK(12, 0)
+> +#define CSI_CH_VSIZE_VER_START(start)		((start << 0) & CSI_CH_VSIZE_VER_START_MASK)
+> +
+> +#define CSI_CH_BUF_LEN_REG		0x88
+> +#define CSI_CH_BUF_LEN_BUF_LEN_C_MASK		GENMASK(29, 16)
+> +#define CSI_CH_BUF_LEN_BUF_LEN_C(len)		((len << 16) & CSI_CH_BUF_LEN_BUF_LEN_C_MASK)
+> +#define CSI_CH_BUF_LEN_BUF_LEN_Y_MASK		GENMASK(13, 0)
+> +#define CSI_CH_BUF_LEN_BUF_LEN_Y(len)		((len << 0) & CSI_CH_BUF_LEN_BUF_LEN_Y_MASK)
+> +
+> +#define CSI_CH_FLIP_SIZE_REG		0x8c
+> +#define CSI_CH_FLIP_SIZE_VER_LEN_MASK		GENMASK(28, 16)
+> +#define CSI_CH_FLIP_SIZE_VER_LEN(len)		((len << 16) & CSI_CH_FLIP_SIZE_VER_LEN_MASK)
+> +#define CSI_CH_FLIP_SIZE_VALID_LEN_MASK		GENMASK(12, 0)
+> +#define CSI_CH_FLIP_SIZE_VALID_LEN(len)		((len << 0) & CSI_CH_FLIP_SIZE_VALID_LEN_MASK)
+> +
+> +#define CSI_CH_FRM_CLK_CNT_REG		0x90
+> +#define CSI_CH_ACC_ITNL_CLK_CNT_REG	0x94
+> +#define CSI_CH_FIFO_STAT_REG		0x98
+> +#define CSI_CH_PCLK_STAT_REG		0x9c
+> +
+> +/*
+> + * csi input data format
+> + */
+> +enum csi_input_fmt
+> +{
+> +	CSI_INPUT_FORMAT_RAW		= 0,
+> +	CSI_INPUT_FORMAT_YUV422		= 3,
+> +	CSI_INPUT_FORMAT_YUV420		= 4,
+> +};
+> +
+> +/*
+> + * csi output data format
+> + */
+> +enum csi_output_fmt
+> +{
+> +	/* only when input format is RAW */
+> +	CSI_FIELD_RAW_8			= 0,
+> +	CSI_FIELD_RAW_10		= 1,
+> +	CSI_FIELD_RAW_12		= 2,
+> +	CSI_FIELD_RGB565		= 4,
+> +	CSI_FIELD_RGB888		= 5,
+> +	CSI_FIELD_PRGB888		= 6,
+> +	CSI_FRAME_RAW_8			= 8,
+> +	CSI_FRAME_RAW_10		= 9,
+> +	CSI_FRAME_RAW_12		= 10,
+> +	CSI_FRAME_RGB565		= 12,
+> +	CSI_FRAME_RGB888		= 13,
+> +	CSI_FRAME_PRGB888		= 14,
+> +
+> +	/* only when input format is YUV422/YUV420 */
+
+Other limitation is that when input is YUV420 output can only be YUV420
+and not YUV422.
+
+> +	CSI_FIELD_PLANAR_YUV422		= 0,
+> +	CSI_FIELD_PLANAR_YUV420		= 1,
+> +	CSI_FRAME_PLANAR_YUV420		= 2,
+> +	CSI_FRAME_PLANAR_YUV422		= 3,
+> +	CSI_FIELD_UV_CB_YUV422		= 4,
+> +	CSI_FIELD_UV_CB_YUV420		= 5,
+> +	CSI_FRAME_UV_CB_YUV420		= 6,
+> +	CSI_FRAME_UV_CB_YUV422		= 7,
+> +	CSI_FIELD_MB_YUV422		= 8,
+> +	CSI_FIELD_MB_YUV420		= 9,
+> +	CSI_FRAME_MB_YUV420		= 10,
+> +	CSI_FRAME_MB_YUV422		= 11,
+> +	CSI_FIELD_UV_CB_YUV422_10	= 12,
+> +	CSI_FIELD_UV_CB_YUV420_10	= 13,
+> +};
+> +
+
+thank you and regards,
+  Ondrej
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170921/94d26b62/attachment.sig>
