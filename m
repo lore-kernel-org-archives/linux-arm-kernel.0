@@ -1,60 +1,27 @@
-From: hansverk@cisco.com (Hans Verkuil)
-Date: Thu, 21 Sep 2017 11:59:27 +0200
-Subject: [RESEND RFC PATCH 0/7] sun8i H3 HDMI glue driver for DW HDMI
-In-Reply-To: <5172c185-c6b5-49c3-cf0a-c3e073459346@synopsys.com>
-References: <20170920200124.20457-1-jernej.skrabec@siol.net>
- <5172c185-c6b5-49c3-cf0a-c3e073459346@synopsys.com>
-Message-ID: <68fa56f8-9878-12d0-1696-4393abe45db5@cisco.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 21 Sep 2017 12:04:27 +0200
+Subject: [PATCH] ARM: shmobile: remove inconsistent ; from documentation
+In-Reply-To: <1505987099-19944-1-git-send-email-horms+renesas@verge.net.au>
+References: <1505987099-19944-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUx5SrFZZq+f5e-ym-zmr-JJLC-E1GYZGVJpz9-qkYqJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/17 11:39, Jose Abreu wrote:
-> Hi Jernej,
-> 
-> On 20-09-2017 21:01, Jernej Skrabec wrote:
->> [added media mailing list due to CEC question]
->>
->> This patch series adds a HDMI glue driver for Allwinner H3 SoC. For now, only
->> video and CEC functionality is supported. Audio needs more tweaks.
->>
->> Series is based on the H3 DE2 patch series available on mailing list:
->> https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.infradead.org_pipermail_linux-2Darm-2Dkernel_2017-2DAugust_522697.html&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=WHDsc6kcWAl4i96Vm5hJ_19IJiuxx_p_Rzo2g-uHDKw&m=coyfcQKSr2asrHcaCeWFmAP_9nkFkRK8s7Uw5bmVei4&s=JCFaMXK1MmZ3jE745_YcqZhZkaqtc6UapGfSSapcz_s&e= 
->> (ignore patches marked with [NOT FOR REVIEW NOW] tag)
->>
->> Patch 1 adds support for polling plug detection since custom PHY used here
->> doesn't support HPD interrupt.
->>
->> Patch 2 enables overflow workaround for v1.32a. This HDMI controller exhibits
->> same issues as HDMI controller used in iMX6 SoCs.
->>
->> Patch 3 adds CLK_SET_RATE_PARENT to hdmi clock.
->>
->> Patch 4 adds dt bindings documentation.
->>
->> Patch 5 adds actual H3 HDMI glue driver.
->>
->> Patch 6 and 7 add HDMI node to DT and enable it where needed.
->>
->> Allwinner used DW HDMI controller in a non standard way:
->> - register offsets obfuscation layer, which can fortunately be turned off
->> - register read lock, which has to be disabled by magic number
->> - custom PHY, which have to be initialized before DW HDMI controller
->> - non standard clocks
->> - no HPD interrupt
->>
->> Because of that, I have two questions:
->> - Since HPD have to be polled, is it enough just to enable poll mode? I'm
->>   mainly concerned about invalidating CEC address here.
-> 
-> You mean you get no interrupt when HPD status changes? Hans can
-> answer this better but then you will need to invalidate the cec
-> physical address yourself because right now its invalidated in
-> the dw-hdmi irq handler (see dw_hdmi_irq()).
+On Thu, Sep 21, 2017 at 11:44 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Consistently do not suffix compat string documentation with a ';'
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-That's correct. When the HPD goes low you need to call cec_notifier_phys_addr_invalidate()
-to invalidate the physical address. This is not terribly time sensitive, i.e.
-checking this once a second would be quick enough.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Regards,
+Gr{oetje,eeting}s,
 
-	Hans
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
