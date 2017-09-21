@@ -1,82 +1,53 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 21 Sep 2017 12:41:11 +0100
-Subject: [PATCH 4/4] iommu/dma, numa: Use NUMA aware memory allocations in
- __iommu_dma_alloc_pages
-In-Reply-To: <20170921085922.11659-5-ganapatrao.kulkarni@cavium.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <20170921085922.11659-5-ganapatrao.kulkarni@cavium.com>
-Message-ID: <9d65676f-e4e8-e0a6-602c-361d83ce83c1@arm.com>
+From: Alan.Hayward@arm.com (Alan Hayward)
+Date: Thu, 21 Sep 2017 11:57:24 +0000
+Subject: [PATCH v2 14/28] arm64/sve: Backend logic for setting the vector
+ length
+In-Reply-To: <20170921111937.GA17434@e103592.cambridge.arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-15-git-send-email-Dave.Martin@arm.com>
+ <FC5BA359-D37C-493C-87CD-146B83D3CCB5@arm.com>
+ <20170920110902.GG24231@e103592.cambridge.arm.com>
+ <E82895B2-3F95-4A54-8703-D654221F8CBA@arm.com>
+ <20170921111937.GA17434@e103592.cambridge.arm.com>
+Message-ID: <E7AEE685-0814-4308-97D2-4AC095A52ED2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
-> Change function __iommu_dma_alloc_pages to allocate memory/pages
-> for dma from respective device numa node.
+
+> On 21 Sep 2017, at 12:19, Dave Martin <Dave.Martin@arm.com> wrote:
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  drivers/iommu/dma-iommu.c | 17 ++++++++++-------
->  1 file changed, 10 insertions(+), 7 deletions(-)
+> On Wed, Sep 20, 2017 at 06:08:21PM +0000, Alan Hayward wrote:
+>> 
+>>> On 20 Sep 2017, at 12:09, Dave Martin <dave.martin@foss.arm.com> wrote:
 > 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 9d1cebe..0626b58 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -428,20 +428,21 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
->  	kvfree(pages);
->  }
->  
-> -static struct page **__iommu_dma_alloc_pages(unsigned int count,
-> -		unsigned long order_mask, gfp_t gfp)
-> +static struct page **__iommu_dma_alloc_pages(struct device *dev,
-> +		unsigned int count, unsigned long order_mask, gfp_t gfp)
->  {
->  	struct page **pages;
->  	unsigned int i = 0, array_size = count * sizeof(*pages);
-> +	int numa_node = dev_to_node(dev);
->  
->  	order_mask &= (2U << MAX_ORDER) - 1;
->  	if (!order_mask)
->  		return NULL;
->  
->  	if (array_size <= PAGE_SIZE)
-> -		pages = kzalloc(array_size, GFP_KERNEL);
-> +		pages = kzalloc_node(array_size, GFP_KERNEL, numa_node);
->  	else
-> -		pages = vzalloc(array_size);
-> +		pages = vzalloc_node(array_size, numa_node);
-
-kvzalloc{,_node}() didn't exist when this code was first written, but it
-does now - since you're touching it you may as well get rid of the whole
-if-else and array_size local.
-
-Further nit: some of the indentation below is a bit messed up.
-
-Robin.
-
->  	if (!pages)
->  		return NULL;
->  
-> @@ -462,8 +463,9 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
->  			unsigned int order = __fls(order_mask);
->  
->  			order_size = 1U << order;
-> -			page = alloc_pages((order_mask - order_size) ?
-> -					   gfp | __GFP_NORETRY : gfp, order);
-> +			page = alloc_pages_node(numa_node,
-> +					(order_mask - order_size) ?
-> +				   gfp | __GFP_NORETRY : gfp, order);
->  			if (!page)
->  				continue;
->  			if (!order)
-> @@ -548,7 +550,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
->  		alloc_sizes = min_size;
->  
->  	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> -	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
-> +	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
-> +			gfp);
->  	if (!pages)
->  		return NULL;
->  
+> [...]
 > 
+>>>> Given, sve_set_vector_length is called when setting the vector length in
+>>>> PTRACE_SETREGSET, it looks to me like if you set VL to a value that?s not
+>>>> supported by the hardware, then it?s going to round down to the previous value.
+>>>> Is that correct? I?m not sure if that?s explained in the docs?
+>>> 
+>>> Does this cover it?
+>>> 
+>>> "On success, the calling thread's vector length is changed to the
+>>> largest value supported by the system that is less than or equal to vl."
+>>> 
+>>> (For ptrace, I just cross-reference the PR_SVE_SET_VL behaviour, above.)
+>> 
+>> For ptrace is it worth mentioning user should do a GET after a SET to confirm
+>> what VL value was actually set?
+> 
+> This seems worth a clarification -- I'd thought this was already
+> mentioned, but it isn't.
+> 
+> How about:
+> 
+>  The caller must make a further GETREGSET call if it needs to know what VL is
+>  actually set by SETREGSET, unless is it known in advance that the requested
+>  VL is supported.
+> 
+
+Looks good to me.
+
+
+Alan.
