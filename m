@@ -1,24 +1,61 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 21 Sep 2017 15:45:28 +0800
-Subject: [PATCH] tee: ACPI support for optee driver
-In-Reply-To: <1505977937-25034-1-git-send-email-mchitale@apm.com>
-References: <1505977937-25034-1-git-send-email-mchitale@apm.com>
-Message-ID: <59C36E18.1050106@huawei.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 21 Sep 2017 09:52:39 +0200
+Subject: [PATCH] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
+In-Reply-To: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
+References: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
+Message-ID: <20170921075239.GE3568@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/9/21 15:12, Mayuresh Chitale wrote:
-> This patch modifies the optee driver to add support for parsing
-> the conduit method from an ACPI node.
+Hi Miquel,
 
-Sorry I didn't involve this earlier, but I think this is a wrong
-approach, in ACPI 5.1+ spec, there is a bit in FADT table which
-indicates PSCI using SMC or HVC, please see ACPI 6.2 [1],
-Table 5-37 Fixed ACPI Description Table ARM Boot Architecture Flags.
+On Thu, Sep 21, 2017 at 09:36:43AM +0200, Miquel Raynal wrote:
+> From: Christine Gharzuzi <chrisg@marvell.com>
+> +&cps_spi1 {
+> +	status = "okay";
+> +
+> +	spi-flash at 0 {
+> +		#address-cells = <0x1>;
+> +		#size-cells = <0x1>;
+> +		compatible = "jedec,spi-nor";
+> +		reg = <0x0>;
+> +		spi-max-frequency = <20000000>;
+> +
+> +		partitions {
+> +			compatible = "fixed-partitions";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			partition at 0 {
+> +				label = "Boot";
+> +				reg = <0x0 0x200000>;
+> +			};
+> +			partition at 200000 {
+> +				label = "Filesystem";
+> +				reg = <0x200000 0xd00000>;
+> +			};
+> +			partition at d00000 {
 
-Can we just use that to get the conduit method for optee driver too?
+The node should be 'partition at f00000'.
 
-[1]: http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> +				label = "Boot_2nd";
+> +				reg = <0xf00000 0x100000>;
+> +			};
+> +		};
+> +	};
+> +};
 
-Thanks
-Hanjun
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170921/34acc3e4/attachment.sig>
