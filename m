@@ -1,20 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Sep 2017 18:32:34 -0500
-Subject: [PATCH 3/5] PCI: layerscape: Add support for ls1012a
-In-Reply-To: <20170919092658.22482-4-Zhiqiang.Hou@nxp.com>
-References: <20170919092658.22482-1-Zhiqiang.Hou@nxp.com>
- <20170919092658.22482-4-Zhiqiang.Hou@nxp.com>
-Message-ID: <20170921233234.vlmjm3hw3egr7zag@rob-hp-laptop>
+Date: Thu, 21 Sep 2017 18:39:34 -0500
+Subject: [PATCH] dt-bindings: clk: stm32h7: fix clock-cell size
+In-Reply-To: <1505821446-6847-1-git-send-email-gabriel.fernandez@st.com>
+References: <1505821446-6847-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20170921233934.syq5onkdwtikvyso@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 05:26:56PM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Tue, Sep 19, 2017 at 01:44:06PM +0200, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> The clock-cell size is 1 on stm32h7 plaform.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
 > ---
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
->  drivers/pci/dwc/pci-layerscape.c                         | 1 +
->  2 files changed, 2 insertions(+)
+>  Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied, thanks.
+
+Rob
