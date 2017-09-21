@@ -1,37 +1,66 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Sep 2017 13:28:53 +0100
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170920224522.GB20974@obsidianresearch.com>
-References: <20170920112152.GL20805@n2100.armlinux.org.uk>
- <20170920162208.GB536@obsidianresearch.com>
- <20170920165141.GP20805@n2100.armlinux.org.uk>
- <20170920224522.GB20974@obsidianresearch.com>
-Message-ID: <20170921122852.GX20805@n2100.armlinux.org.uk>
+From: youngmin.nam@samsung.com (=?UTF-8?B?64Ko7JiB66+8?=)
+Date: Thu, 21 Sep 2017 21:32:29 +0900
+Subject: [PATCH] pinctrl: samsung: add pinctrl_force_sleep() for "sleep"
+ pinctrl state
+References: <CGME20170921123230epcas1p4d3c1de108af7d34053d2c4f40dd42119@epcas1p4.samsung.com>
+Message-ID: <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 04:45:22PM -0600, Jason Gunthorpe wrote:
-> What do you think of this untested approach in the below patch?
+This patch adds pinctrl_for_sleep() in samsung_pinctrl_suspend()
+to support configuration of "sleep" pinctrl state.
 
-There's another issue.
+For example, we can configure "sleep" pinctrl state of "gpf1-6"
+as "INPUT, PULL DOWN" by configuring power down mode register.
 
-Most drivers use rtc_device_register() or devm_rtc_device_register()
-rather than rtc_allocate_device() (which is static.)  This does not
-give RTC drivers a chance to set rtc->time_set_nsec before the
-RTC is registered with the kernel.
+&pinctrl_5 {
+	pinctrl-names = "default","sleep";
+	pinctrl-0 = <&initial5>;
+	pinctrl-1 = <&sleep5>;
 
-Setting it after the device has been registered is racy.  So, having
-this member in struct rtc_device and assuming that drivers will override
-the value doesn't work.
+	initial5: initial-state {
+		samsung,pins = gpf1-6;
+		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+	};
+	sleep5: sleep-state {
+		samsung,pins = gpf1-6;
+		samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
+		samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_DOWN>;
+	};
+};
 
-It doesn't make sense to put it in rtc_class_ops as it isn't an
-operation, but we could add a callback in there which is used during
-initialisation but before registration which could be used to set this
-member.
+Signed-off-by: Youngmin Nam <youngmin.nam@samsung.com>
+---
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Thoughts?
-
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index e04f7fe0a65d..b4d12f8db475 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1099,6 +1099,11 @@ static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
+ {
+ 	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+ 	int i;
++	int ret;
++
++	ret = pinctrl_force_sleep(drvdata->pctl_dev);
++	if (ret)
++		dev_err(dev, "could not set sleep pinstate %d\n", ret);
+ 
+ 	for (i = 0; i < drvdata->nr_banks; i++) {
+ 		struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
+@@ -1187,6 +1192,11 @@ static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
+ 	if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
+ 		drvdata->retention_ctrl->disable(drvdata);
+ 
++	/* For changing state without writing register. */
++	if (!IS_ERR(drvdata->pctl_dev->p) &&
++	    !IS_ERR(drvdata->pctl_dev->hog_default))
++		drvdata->pctl_dev->p->state = drvdata->pctl_dev->hog_default;
++
+ 	return 0;
+ }
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.13.0
