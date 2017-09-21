@@ -1,36 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 21 Sep 2017 15:40:28 +0100
-Subject: [v5 00/12] soc/fsl/qbman: Enable QBMan on ARM Platforms
-In-Reply-To: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
-References: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <20170921144028.nv2f54w55quyabje@localhost>
+From: atull@kernel.org (Alan Tull)
+Date: Thu, 21 Sep 2017 09:42:46 -0500
+Subject: [PATCH] fpga: make xlnx_pr_decoupler_br_ops const
+In-Reply-To: <CAAtXAHcf1bjyFg9XPZRmJS4Pw7=+P_E4TB-euJBSrj6ZGBSAig@mail.gmail.com>
+References: <1503941531-17977-1-git-send-email-bhumirks@gmail.com>
+ <78e2ed1d-ea20-eb68-b6b4-d993a98984a6@xilinx.com>
+ <CAAtXAHcf1bjyFg9XPZRmJS4Pw7=+P_E4TB-euJBSrj6ZGBSAig@mail.gmail.com>
+Message-ID: <CANk1AXSdx1nJMqyvR1JNPEE5WMDuB0BrXLKw5bw5YcGMtpR_1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 04:39:35PM -0400, Roy Pledge wrote:
-> Madalin Bucur (4):
->   soc/fsl/qbman: Drop set/clear_bits usage
->   soc/fsl/qbman: add QMAN_REV32
->   soc/fsl/qbman: different register offsets on ARM
->   soc/fsl/qbman: Enable FSL_LAYERSCAPE config on ARM
-> 
-> Roy Pledge (5):
->   soc/fsl/qbman: Add common routine for QBMan private allocations
->   soc/fsl/qbman: Use shared-dma-pool for BMan private memory allocations
->   soc/fsl/qbman: Use shared-dma-pool for QMan private memory allocations
->   dt-bindings: soc/fsl: Update reserved memory binding for QBMan
->   soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
-> 
-> Valentin Rothberg (1):
->   soc/fsl/qbman: Fix ARM32 typo
-
-I reviewed the patches specific to the arm qbman buffer mappings, they
-look fine to me. The DT bindings would need acks from the devicetree
-maintainers. The rest of the patches are qbman-specific definitions
-which I haven't checked for correctness (I guess they are fine).
-
-How do you plan to upstream these patches? They would probably go in via
-arm-soc.
-
--- 
-Catalin
+On Tue, Aug 29, 2017 at 11:09 AM, Moritz Fischer
+<moritz.fischer@ettus.com> wrote:
+> On Tue, Aug 29, 2017 at 12:00 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 28.8.2017 19:32, Bhumika Goyal wrote:
+>>> Make this const as it is only passed to a const argument of the function
+>>> fpga_bridge_register.
+>>>
+>>> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+>
+> Acked-by: Moritz Fischer <mdf@kernel.org>
+>>> ---
+>>>  drivers/fpga/xilinx-pr-decoupler.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
+>>> index e359930..0d77430 100644
+>>> --- a/drivers/fpga/xilinx-pr-decoupler.c
+>>> +++ b/drivers/fpga/xilinx-pr-decoupler.c
+>>> @@ -79,7 +79,7 @@ static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
+>>>       return !status;
+>>>  }
+>>>
+>>> -static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+>>> +static const struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+>>>       .enable_set = xlnx_pr_decoupler_enable_set,
+>>>       .enable_show = xlnx_pr_decoupler_enable_show,
+>>>  };
+>
+> Must've been a leftover from when I worked on integrating a simple
+> GPIO based one.
+> I'll have to rebase that and submit it.
+>>>
+>>
+>> Acked-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Alan Tull <atull@kernel.org>
+>>
+>> Thanks,
+>> Michal
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> Thanks,
+> Moritz
