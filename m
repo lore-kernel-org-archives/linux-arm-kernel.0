@@ -1,69 +1,39 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 21 Sep 2017 22:44:51 +0530
-Subject: [PATCH 3/5] dmaengine: Support for querying maximum trasnfer
- length (of an SG element)
-In-Reply-To: <20170912104424.18495-4-peter.ujfalusi@ti.com>
-References: <20170912104424.18495-1-peter.ujfalusi@ti.com>
- <20170912104424.18495-4-peter.ujfalusi@ti.com>
-Message-ID: <20170921171451.GG30097@localhost>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 21 Sep 2017 19:14:43 +0200
+Subject: [PATCH 0/7] ARM: dts: meson: clean pin offsets
+Message-ID: <20170921171450.27407-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 12, 2017 at 01:44:22PM +0300, Peter Ujfalusi wrote:
-> Certain DMA engines have limitation on the maximum size of a transfer they
-> can support. This size limitation is per SG element or for period length in
-> cyclic transfers.
-> In TI's eDMA and sDMA this limitation is not really a length limit, but it
-> is the number of bursts that we can support in one transfer.
-> 
-> With this callback the DMA drivers can provide hints to clients on how they
-> should set up their buffers (sglist, cyclic buffer). Without this the
-> clients must have open coded workarounds in place for each and every DMA
-> engine they might be interfacing with to have correct length for the
-> transfers.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  include/linux/dmaengine.h | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 8319101170fc..739824b94c1b 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -705,6 +705,9 @@ struct dma_filter {
->   * @device_prep_dma_imm_data: DMA's 8 byte immediate data to the dst address
->   * @device_config: Pushes a new configuration to a channel, return 0 or an error
->   *	code
-> + * @device_get_max_len: Get the maximum supported length in bytes of a slave
-> + *	transfer based on the set dma_slave_config. The length limitation
-> + *	applies to each SG element's length.
->   * @device_pause: Pauses any transfer happening on a channel. Returns
->   *	0 or an error code
->   * @device_resume: Resumes any transfer on a channel previously
-> @@ -792,6 +795,8 @@ struct dma_device {
->  
->  	int (*device_config)(struct dma_chan *chan,
->  			     struct dma_slave_config *config);
-> +	u32 (*device_get_max_len)(struct dma_chan *chan,
-> +				  enum dma_transfer_direction dir);
->  	int (*device_pause)(struct dma_chan *chan);
->  	int (*device_resume)(struct dma_chan *chan);
->  	int (*device_terminate_all)(struct dma_chan *chan);
-> @@ -812,6 +817,15 @@ static inline int dmaengine_slave_config(struct dma_chan *chan,
->  	return -ENOSYS;
->  }
->  
-> +static inline u32 dmaengine_slave_get_max_len(struct dma_chan *chan,
-> +					      enum dma_transfer_direction dir)
-> +{
-> +	if (chan->device->device_get_max_len)
-> +		return chan->device->device_get_max_len(chan, dir);
+The series is the device-tree part of the series sent to pinctrl [0]
+The present patchset depends on the pinctrl part.
 
-not another callback :)
+The purpose of this series is to:
+1) remove the hardcoded gpio offset
+2) adjust gpio-ranges with respect to the new pin number of each
+   controller
+3) adjust gpio-line-names accordingly for the boards having this property.
 
-on a serious note, why shouldn't this be one more capability in
-dma_slave_caps. looking at next patch it seems static
+[0]: https://lkml.kernel.org/r/20170918134610.17743-1-jbrunet at baylibre.com
+
+Jerome Brunet (7):
+  ARM: dts: meson8: remove gpio offset
+  ARM64: dts: meson-gx: remove gpio offset
+  ARM64: dts: meson-gx: adjust gpio-ranges for TEST_N
+  ARM64: dts: meson-gxbb: adjust nanopi-k2 gpio-line-names
+  ARM64: dts: meson-gxbb: adjust odroid-c2 gpio-line-names
+  ARM64: dts: meson-gxl: adjust kvim gpio-line-names
+  ARM64: dts: meson-gxl: adjust libretech-cc gpio-line-names
+
+ arch/arm/boot/dts/meson8.dtsi                                |  2 +-
+ arch/arm/boot/dts/meson8b.dtsi                               |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts         | 10 +++++-----
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts          | 10 +++++-----
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                  |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   |  8 ++++----
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts |  8 ++++----
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   |  2 +-
+ 8 files changed, 22 insertions(+), 22 deletions(-)
 
 -- 
-~Vinod
+2.13.5
