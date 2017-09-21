@@ -1,83 +1,78 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 21 Sep 2017 13:57:51 +0900
-Subject: [PATCH v2 8/8] PM / devfreq: exynos-bus: Register cooling device
-In-Reply-To: <1505954032-3327-9-git-send-email-cw00.choi@samsung.com>
-References: <1505954032-3327-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170921003356epcas1p34bf88ccd1b9630577a83f14f0c291b1d@epcas1p3.samsung.com>
- <1505954032-3327-9-git-send-email-cw00.choi@samsung.com>
-Message-ID: <59C346CF.6010105@samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 20 Sep 2017 22:11:02 -0700
+Subject: [PATCHv2] arm64: dts: stratix10: add ethernet/sdmmc support to
+ the S10 devkit
+In-Reply-To: <1505920675-9641-1-git-send-email-dinguyen@kernel.org>
+References: <1505920675-9641-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <9fc4c173-6d98-052f-50cc-aefeeec9c264@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
 
-Please ignore this patch. It has some problem.
-I'll fix and resend this patch on v2.
 
-Chanwoo Choi
-Samsung Electronics
-
-On 2017? 09? 21? 09:33, Chanwoo Choi wrote:
-> This patch registers the Exynos Bus-Frequency scaling device
-> as a cooling device of thermal management.
+On 09/20/2017 08:17 AM, Dinh Nguyen wrote:
+> Enable ethernet and sdmmc support on the Stratix10 devkit.
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 > ---
->  drivers/devfreq/Kconfig      |  1 +
->  drivers/devfreq/exynos-bus.c | 11 +++++++++++
->  2 files changed, 12 insertions(+)
+> v2: Create a separate PHY node
+
+The gmac/phy nodes look fine now, thanks!
+
+> ---
+>  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 > 
-> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-> index 6a172d338f6d..eb8128e08b2c 100644
-> --- a/drivers/devfreq/Kconfig
-> +++ b/drivers/devfreq/Kconfig
-> @@ -81,6 +81,7 @@ config ARM_EXYNOS_BUS_DEVFREQ
->  	select DEVFREQ_GOV_SIMPLE_ONDEMAND
->  	select DEVFREQ_GOV_PASSIVE
->  	select DEVFREQ_EVENT_EXYNOS_PPMU
-> +	select DEVFREQ_THERMAL
->  	select PM_DEVFREQ_EVENT
->  	select PM_OPP
->  	help
-> diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
-> index c25658b26598..200ca0d11834 100644
-> --- a/drivers/devfreq/exynos-bus.c
-> +++ b/drivers/devfreq/exynos-bus.c
-> @@ -15,6 +15,7 @@
->  #include <linux/clk.h>
->  #include <linux/devfreq.h>
->  #include <linux/devfreq-event.h>
-> +#include <linux/devfreq_cooling.h>
->  #include <linux/device.h>
->  #include <linux/export.h>
->  #include <linux/module.h>
-> @@ -41,6 +42,8 @@ struct exynos_bus {
->  	struct clk *clk;
->  	unsigned int voltage_tolerance;
->  	unsigned int ratio;
-> +
-> +	struct thermal_cooling_device *cdev;
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> index 41ea2db..5907586 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> @@ -34,6 +34,44 @@
+>  	};
 >  };
 >  
->  /*
-> @@ -468,6 +471,14 @@ static int exynos_bus_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> +	/* Register devfreq cooling device */
-> +	bus->cdev = of_devfreq_cooling_register(np, bus->devfreq);
-> +	if (IS_ERR(bus->cdev) < 0) {
-> +		dev_err(dev, "failed to register cooling device\n");
-> +		ret = PTR_ERR(bus->cdev);
-> +		goto err;
-> +	}
+> +&gmac0 {
+> +	status = "okay";
+> +	phy-mode = "rgmii";
+> +	phy-handle = <&phy0>;
 > +
->  	goto out;
->  passive:
->  	/* Initialize the struct profile and governor data for passive device */
+> +	max-frame-size = <3800>;
+> +
+> +	mdio0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "snps,dwmac-mdio";
+> +		phy0: ethernet-phy at 0 {
+> +			reg = <4>;
+> +
+> +			txd0-skew-ps = <0>; /* -420ps */
+> +			txd1-skew-ps = <0>; /* -420ps */
+> +			txd2-skew-ps = <0>; /* -420ps */
+> +			txd3-skew-ps = <0>; /* -420ps */
+> +			rxd0-skew-ps = <420>; /* 0ps */
+> +			rxd1-skew-ps = <420>; /* 0ps */
+> +			rxd2-skew-ps = <420>; /* 0ps */
+> +			rxd3-skew-ps = <420>; /* 0ps */
+> +			txen-skew-ps = <0>; /* -420ps */
+> +			txc-skew-ps = <1860>; /* 960ps */
+> +			rxdv-skew-ps = <420>; /* 0ps */
+> +			rxc-skew-ps = <1680>; /* 780ps */
+> +		};
+> +	};
+> +};
+> +
+> +&mmc {
+> +	status = "okay";
+> +	num-slots = <1>;
+> +	cap-sd-highspeed;
+> +	broken-cd;
+> +	bus-width = <4>;
+> +};
+> +
+>  &uart0 {
+>  	status = "okay";
+>  };
 > 
+
+-- 
+Florian
