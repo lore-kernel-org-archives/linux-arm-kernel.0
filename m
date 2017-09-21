@@ -1,48 +1,46 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 21 Sep 2017 19:14:48 +0200
-Subject: [PATCH 5/7] ARM64: dts: meson-gxbb: adjust odroid-c2 gpio-line-names
+Date: Thu, 21 Sep 2017 19:14:46 +0200
+Subject: [PATCH 3/7] ARM64: dts: meson-gx: adjust gpio-ranges for TEST_N
 In-Reply-To: <20170921171450.27407-1-jbrunet@baylibre.com>
 References: <20170921171450.27407-1-jbrunet@baylibre.com>
-Message-ID: <20170921171450.27407-6-jbrunet@baylibre.com>
+Message-ID: <20170921171450.27407-4-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIOX22 is now declared properly and TEST_N has been moved so
-the gpio-line-names of the odroid-c2 must be adjusted accordingly
+TEST_N has moved from the EE controller to the AO controller so
+the gpio-ranges need to adjusted for it
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index d147c853ab05..9fc50bc5f9f4 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -194,7 +194,9 @@
- 			  "USB HUB nRESET", "USB OTG Power En",
- 			  "J7 Header Pin2", "IR In", "J7 Header Pin4",
- 			  "J7 Header Pin6", "J7 Header Pin5", "J7 Header Pin7",
--			  "HDMI CEC", "SYS LED";
-+			  "HDMI CEC", "SYS LED",
-+			  /* GPIO_TEST_N */
-+			  "";
- };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index fb4baed97a01..e5a7bdead275 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -379,7 +379,7 @@
+ 			reg-names = "mux", "pull", "pull-enable", "gpio";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+-			gpio-ranges = <&pinctrl_periphs 0 0 120>;
++			gpio-ranges = <&pinctrl_periphs 0 0 119>;
+ 		};
  
- &pinctrl_periphs {
-@@ -233,11 +235,9 @@
- 			  "J2 Header Pin12", "J2 Header Pin13",
- 			  "J2 Header Pin8", "J2 Header Pin10",
- 			  "", "", "", "", "",
--			  "J2 Header Pin11", "", "J2 Header Pin7",
-+			  "J2 Header Pin11", "", "J2 Header Pin7", "",
- 			  /* Bank GPIOCLK */
--			  "", "", "", "",
--			  /* GPIO_TEST_N */
--			  "";
-+			  "", "", "", "";
- };
+ 		emmc_pins: emmc {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index f3fca26c9658..084cef1842e7 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -268,7 +268,7 @@
+ 			reg-names = "mux", "pull", "pull-enable", "gpio";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+-			gpio-ranges = <&pinctrl_periphs 0 0 101>;
++			gpio-ranges = <&pinctrl_periphs 0 0 100>;
+ 		};
  
- &saradc {
+ 		emmc_pins: emmc {
 -- 
 2.13.5
