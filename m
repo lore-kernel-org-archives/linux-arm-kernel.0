@@ -1,64 +1,99 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Sep 2017 10:46:42 +0100
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170920224522.GB20974@obsidianresearch.com>
-References: <20170920112152.GL20805@n2100.armlinux.org.uk>
- <20170920162208.GB536@obsidianresearch.com>
- <20170920165141.GP20805@n2100.armlinux.org.uk>
- <20170920224522.GB20974@obsidianresearch.com>
-Message-ID: <20170921094641.GT20805@n2100.armlinux.org.uk>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 21 Sep 2017 17:50:24 +0800
+Subject: [PATCH v1 3/4] arm: dts: mt7623: add display related nodes
+In-Reply-To: <1505834813.16414.5.camel@mtksdaap41>
+References: <cover.1505801355.git.ryder.lee@mediatek.com>
+ <0eb19ae1a4717d316cdaec44f6c20bfa8aa24ddc.1505801355.git.ryder.lee@mediatek.com>
+ <1505834813.16414.5.camel@mtksdaap41>
+Message-ID: <1505987424.3084.8.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 04:45:22PM -0600, Jason Gunthorpe wrote:
->  /**
->   * rtc_set_ntp_time - Save NTP synchronized time to the RTC
->   * @now: Current time of day
-> + * @target_nsec: Output value indicating what now->tv_nsec
+On Tue, 2017-09-19 at 23:26 +0800, CK Hu wrote:
+> Hi, Ryder:
+> 
+> Some comment inline.
+> 
+> On Tue, 2017-09-19 at 14:27 +0800, Ryder Lee wrote:
+> > This patch adds the device nodes for the display function block.
+> > Also, we add some missing pin macros in mt7623-pinfunc.h.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > CC: Linus Walleij <linus.walleij@linaro.org>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/mt7623.dtsi                 | 210 ++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  41 ++++-
+> >  include/dt-bindings/pinctrl/mt7623-pinfunc.h  |  12 ++
+> >  3 files changed, 261 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+> > index 9ec3767..e11e5e7 100644
+> > --- a/arch/arm/boot/dts/mt7623.dtsi
+> > +++ b/arch/arm/boot/dts/mt7623.dtsi
+> > @@ -20,6 +20,7 @@
+> >  #include <dt-bindings/power/mt2701-power.h>
+> >  #include <dt-bindings/gpio/gpio.h>
+> >  #include <dt-bindings/phy/phy.h>
+> > +#include <dt-bindings/memory/mt2701-larb-port.h>
+> >  #include <dt-bindings/reset/mt2701-resets.h>
+> >  #include <dt-bindings/thermal/thermal.h>
+> >  #include "skeleton64.dtsi"
+> > @@ -28,6 +29,11 @@
+> >  	compatible = "mediatek,mt7623";
+> >  	interrupt-parent = <&sysirq>;
+> >  
+> > +	aliases {
+> > +		rdma0 = &rdma0;
+> > +		rdma1 = &rdma1;
+> 
+> For display, are these two aliases enough?
 
-I'd suggest:
+Yes, this part is the same as mt2701.
 
- * @target_nsec: pointer for desired now->tv_nsec value
+https://patchwork.kernel.org/patch/9803813/
 
->   *
->   * Replacement for the NTP platform function update_persistent_clock64
->   * that stores time for later retrieval by rtc_hctosys.
-> @@ -20,28 +54,35 @@
->   *
->   * If temporary failure is indicated the caller should try again 'soon'
->   */
-> -int rtc_set_ntp_time(struct timespec64 now)
-> +int rtc_set_ntp_time(struct timespec64 now, long *target_nsec)
->  {
->  	struct rtc_device *rtc;
->  	struct rtc_time tm;
->  	int err = -ENODEV;
->  
-> -	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
-> -		rtc_time64_to_tm(now.tv_sec, &tm);
-> -	else
-> -		rtc_time64_to_tm(now.tv_sec + 1, &tm);
-> -
->  	rtc = rtc_class_open(CONFIG_RTC_SYSTOHC_DEVICE);
-> -	if (rtc) {
-> +	if (!rtc)
-> +		goto out_err;
-> +
-> +	/* The ntp code must call this with the correct value in tv_nsec, if
-> +	 * it does not we update target_nsec and return EPROTO to make the ntp
-> +	 * code try again later.
-> +	 */
-> +	*target_nsec = rtc->time_set_nsec;
+> > +	};
+> > +
 
-Here, we want just the positive nanoseconds part of the desired offset
-(iow, the value we want to see in now.tv_nsec):
+...
+> > +	wdma at 14009000 {
+> > +		compatible = "mediatek,mt7623-disp-wdma",
+> > +			     "mediatek,mt2701-disp-wdma";
+> 
+> There is neither "mediatek,mt7623-disp-wdma" nor
+> "mediatek,mt2701-disp-wdma" in driver, do you really need this device
+> node?
 
-	nsec = rtc->time_set_nsec % NSEC_PER_SEC;
-	if (nsec < 0)
-		nsec += NSEC_PER_SEC;
-	*target_nsec = nsec;
+Okay, I will remove it.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> > +		reg = <0 0x14009000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&mmsys CLK_MM_DISP_WDMA>;
+> > +		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
+> > +		mediatek,larb = <&larb0>;
+> > +	};
+> > +
+> > +	bls: bls at 1400a000 {
+> > +		compatible = "mediatek,mt7623-disp-pwm",
+> > +			     "mediatek,mt2701-disp-pwm";
+> > +		reg = <0 0x1400a000 0 0x1000>;
+> > +		#pwm-cells = <2>;
+> > +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>,
+> > +			 <&mmsys CLK_MM_DISP_BLS>;
+> > +		clock-names = "main", "mm";
+> > +		status = "disabled";
+> > +	};
+> > +
+> > +	color at 1400b000 {
+> 
+> color: color at 1400b000 {
+
+Okay.
+> > +		compatible = "mediatek,mt7623-disp-color",
+> > +			     "mediatek,mt2701-disp-color";
+> > +		reg = <0 0x1400b000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&mmsys CLK_MM_DISP_COLOR>;
+> > +	};
+> > +
