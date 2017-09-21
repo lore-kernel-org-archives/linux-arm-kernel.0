@@ -1,28 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 21 Sep 2017 10:47:45 +0200
-Subject: [PATCH 8/8] ARM: drs: iwg22m: Add SPI NOR support
-In-Reply-To: <CAMuHMdW2_Tz6Mu7bwTXiAuyyeUvJTFrbyMAnxCi+Nj7ig65Ong@mail.gmail.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-9-git-send-email-chris.paterson2@renesas.com>
- <CAMuHMdW2_Tz6Mu7bwTXiAuyyeUvJTFrbyMAnxCi+Nj7ig65Ong@mail.gmail.com>
-Message-ID: <20170921084744.GM15749@verge.net.au>
+From: mchitale@apm.com (Mayuresh Chitale)
+Date: Thu, 21 Sep 2017 13:26:25 +0530
+Subject: [PATCH] tee: ACPI support for optee driver
+In-Reply-To: <59C36E18.1050106@huawei.com>
+References: <1505977937-25034-1-git-send-email-mchitale@apm.com>
+ <59C36E18.1050106@huawei.com>
+Message-ID: <CAL-zptMBRAM1-fWVv0u_YP7bhzagDPGOZPNWw5BJmfMdzhutjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 01:10:00PM +0200, Geert Uytterhoeven wrote:
-> On Wed, Sep 13, 2017 at 7:05 PM, Chris Paterson
-> <chris.paterson2@renesas.com> wrote:
-> > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> >
-> > Add support for the SPI NOR device used to boot up the system
-> > to the System on Module DT.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> 
-> With the subject fixed (s/drs/dts/):
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Thanks, applied as
-
-ARM: dts: iwg22m: Add SPI NOR support
+On Thu, Sep 21, 2017 at 1:15 PM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> On 2017/9/21 15:12, Mayuresh Chitale wrote:
+>> This patch modifies the optee driver to add support for parsing
+>> the conduit method from an ACPI node.
+>
+> Sorry I didn't involve this earlier, but I think this is a wrong
+> approach, in ACPI 5.1+ spec, there is a bit in FADT table which
+> indicates PSCI using SMC or HVC, please see ACPI 6.2 [1],
+> Table 5-37 Fixed ACPI Description Table ARM Boot Architecture Flags.
+>
+> Can we just use that to get the conduit method for optee driver too?
+Thanks for the comment. I will check it out.
+>
+> [1]: http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+>
+> Thanks
+> Hanjun
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
