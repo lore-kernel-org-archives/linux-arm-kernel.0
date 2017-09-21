@@ -1,19 +1,48 @@
-From: mikpelinux@gmail.com (Mikael Pettersson)
-Date: Thu, 21 Sep 2017 09:53:27 +0200
-Subject: Possible gcc 4.8.5 bug about RELOC_HIDE marcro
-In-Reply-To: <03f619bd-e3b2-49e0-5f2c-e232974eac12@gmail.com>
-References: <03f619bd-e3b2-49e0-5f2c-e232974eac12@gmail.com>
-Message-ID: <22979.28663.77963.862263@gargle.gargle.HOWL>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 21 Sep 2017 09:54:10 +0200
+Subject: [PATCH v2 4/4] arm64: dts: marvell: 8040-db: enable the SFP ports
+In-Reply-To: <20170921075410.19072-1-antoine.tenart@free-electrons.com>
+References: <20170921075410.19072-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170921075410.19072-5-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jia He writes:
- > I tried to build kernel 4.14-rc1 on a arm64 server in distro centos 7.3. 
- > The gcc version is 4.8.5
+This patch enables the SFP ports on the Armada 8040 DB as these ports
+are now supported by the PPv2 driver (since the PHY is now optional).
 
-I have no input on the specifics of the issue, but please note that gcc-4.8
-is no longer supported or maintained by upstream.  Even gcc-4.9 is EOL, and
-gcc-5 will be EOL:d inn a week or so.  Also I'll note that gcc-4.8 is still
-fairly early wrt to arm64 support, so bugs may be expected.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Tested-by: Marcin Wojtas <mw@semihalf.com>
+---
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-In short, please retry with gcc-6.4 or gcc-7.2.
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 0d7b2ae46610..26a018329a74 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -200,6 +200,11 @@
+ 	status = "okay";
+ };
+ 
++&cpm_eth0 {
++	status = "okay";
++	phy-mode = "10gbase-kr";
++};
++
+ &cpm_eth2 {
+ 	status = "okay";
+ 	phy = <&phy1>;
+@@ -244,6 +249,11 @@
+ 	status = "okay";
+ };
+ 
++&cps_eth0 {
++	status = "okay";
++	phy-mode = "10gbase-kr";
++};
++
+ &cps_eth1 {
+ 	status = "okay";
+ 	phy = <&phy0>;
+-- 
+2.13.5
