@@ -1,181 +1,155 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Sep 2017 13:56:39 +0930
-Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
+Date: Thu, 21 Sep 2017 13:56:41 +0930
+Subject: [PATCH v2 5/5] clk: aspeed: Add reset controller
 In-Reply-To: <20170921042641.7326-1-joel@jms.id.au>
 References: <20170921042641.7326-1-joel@jms.id.au>
-Message-ID: <20170921042641.7326-4-joel@jms.id.au>
+Message-ID: <20170921042641.7326-6-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This registers a platform driver to set up all of the non-core clocks.
-
-The clocks that have configurable rates are now registered.
+There are some resets that are not associated with gates. These are
+represented by a reset controller.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/clk/clk-aspeed.c | 129 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+ drivers/clk/clk-aspeed.c                 | 82 +++++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/aspeed-clock.h |  9 ++++
+ 2 files changed, 90 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index e614c61b82d2..19531798e040 100644
+index dec9db4ec47b..db97c0f9f99e 100644
 --- a/drivers/clk/clk-aspeed.c
 +++ b/drivers/clk/clk-aspeed.c
-@@ -14,6 +14,8 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
+@@ -17,6 +17,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
  #include <linux/regmap.h>
++#include <linux/reset-controller.h>
  #include <linux/slab.h>
  #include <linux/spinlock.h>
-@@ -115,6 +117,20 @@ static const struct aspeed_gate_data aspeed_gates[] __initconst = {
- 	/* 31: reserved */
+ 
+@@ -256,6 +257,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
+ 	.is_enabled = aspeed_clk_is_enabled,
  };
  
-+static const char * const eclk_parents[] = {"d1pll", "hpll", "mpll"};
-+
-+static const struct clk_div_table ast2500_mac_div_table[] = {
-+	{ 0x0, 4 }, /* Yep, really. Aspeed confirmed this is correct */
-+	{ 0x1, 4 },
-+	{ 0x2, 6 },
-+	{ 0x3, 8 },
-+	{ 0x4, 10 },
-+	{ 0x5, 12 },
-+	{ 0x6, 14 },
-+	{ 0x7, 16 },
-+	{ 0 }
++/**
++ * struct aspeed_reset - Aspeed reset controller
++ * @map: regmap to access the containing system controller
++ * @rcdev: reset controller device
++ */
++struct aspeed_reset {
++	struct regmap			*map;
++	struct reset_controller_dev	rcdev;
 +};
 +
- static const struct clk_div_table ast2400_div_table[] = {
- 	{ 0x0, 2 },
- 	{ 0x1, 4 },
-@@ -139,6 +155,21 @@ static const struct clk_div_table ast2500_div_table[] = {
- 	{ 0 }
- };
- 
-+struct aspeed_clk_soc_data {
-+	const struct clk_div_table *div_table;
-+	const struct clk_div_table *mac_div_table;
++#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
++
++static const u8 aspeed_resets[] = {
++	25, /* x-dma */
++	24, /* mctp */
++	23, /* adc */
++	22, /* jtag-master */
++	18, /* mic */
++	 9, /* pwm */
++	 8, /* pci-vga */
++	 2, /* i2c */
++	 1, /* ahb */
 +};
 +
-+static const struct aspeed_clk_soc_data ast2500_data = {
-+	.div_table = ast2500_div_table,
-+	.mac_div_table = ast2500_mac_div_table,
-+};
-+
-+static const struct aspeed_clk_soc_data ast2400_data = {
-+	.div_table = ast2400_div_table,
-+	.mac_div_table = ast2400_div_table,
-+};
-+
- static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
- {
- 	unsigned int mult, div;
-@@ -160,6 +191,104 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
- 			mult, div);
- }
- 
-+static int __init aspeed_clk_probe(struct platform_device *pdev)
++static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
 +{
-+	const struct aspeed_clk_soc_data *soc_data;
-+	const struct clk_div_table *mac_div_table;
-+	const struct clk_div_table *div_table;
-+	struct device *dev = &pdev->dev;
-+	struct regmap *map;
-+	struct clk_hw *hw;
-+	u32 val, rate;
++	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
++	u32 rst = BIT(aspeed_resets[id]);
 +
-+	map = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(map)) {
-+		dev_err(dev, "no syscon regmap\n");
-+		return PTR_ERR(map);
++	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
++}
++
++static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
++	u32 rst = BIT(aspeed_resets[id]);
++
++	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
++}
++
++static int aspeed_reset_status(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
++	u32 val, rst = BIT(aspeed_resets[id]);
++	int ret;
++
++	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
++	if (ret)
++		return ret;
++
++	return !!(val & rst);
++}
++
++static const struct reset_control_ops aspeed_reset_ops = {
++	.assert = aspeed_reset_assert,
++	.deassert = aspeed_reset_deassert,
++	.status = aspeed_reset_status,
++};
++
+ static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+ 		struct regmap *map, u8 clock_idx, u8 reset_idx,
+@@ -299,10 +362,11 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
+ 	const struct clk_div_table *mac_div_table;
+ 	const struct clk_div_table *div_table;
+ 	struct device *dev = &pdev->dev;
++	struct aspeed_reset *ar;
+ 	struct regmap *map;
+ 	struct clk_hw *hw;
+ 	u32 val, rate;
+-	int i;
++	int i, ret;
+ 
+ 	map = syscon_node_to_regmap(dev->of_node);
+ 	if (IS_ERR(map)) {
+@@ -310,6 +374,22 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
+ 		return PTR_ERR(map);
+ 	}
+ 
++	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
++	if (!ar)
++		return -ENOMEM;
++
++	ar->map = map;
++	ar->rcdev.owner = THIS_MODULE;
++	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
++	ar->rcdev.ops = &aspeed_reset_ops;
++	ar->rcdev.of_node = dev->of_node;
++
++	ret = devm_reset_controller_register(dev, &ar->rcdev);
++	if (ret) {
++		dev_err(dev, "could not register reset controller\n");
++		return ret;
 +	}
 +
-+	/* SoC generations share common layouts but have different divisors */
-+	soc_data = of_device_get_match_data(&pdev->dev);
-+	div_table = soc_data->div_table;
-+	mac_div_table = soc_data->mac_div_table;
+ 	/* SoC generations share common layouts but have different divisors */
+ 	soc_data = of_device_get_match_data(&pdev->dev);
+ 	div_table = soc_data->div_table;
+diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
+index afe06b77562d..a9d552b6bbd2 100644
+--- a/include/dt-bindings/clock/aspeed-clock.h
++++ b/include/dt-bindings/clock/aspeed-clock.h
+@@ -40,4 +40,13 @@
+ #define ASPEED_CLK_GATE_SDCLKCLK	(22 + ASPEED_CLK_GATES)
+ #define ASPEED_CLK_GATE_LHCCLK		(23 + ASPEED_CLK_GATES)
+ 
++#define ASPEED_RESET_XDMA		0
++#define ASPEED_RESET_MCTP		1
++#define ASPEED_RESET_JTAG_MASTER	2
++#define ASPEED_RESET_MIC		3
++#define ASPEED_RESET_PWM		4
++#define ASPEED_RESET_PCIVGA		5
++#define ASPEED_RESET_I2C		6
++#define ASPEED_RESET_AHB		7
 +
-+	/* UART clock div13 setting */
-+	regmap_read(map, ASPEED_MISC_CTRL, &val);
-+	if (val & BIT(12))
-+		rate = 24000000 / 13;
-+	else
-+		rate = 24000000;
-+	/* TODO: Find the parent data for the uart clock */
-+	hw = clk_hw_register_fixed_rate(NULL, "uart", NULL, 0, rate);
-+	aspeed_clk_data->hws[ASPEED_CLK_UART] = hw;
-+
-+	/*
-+	 * Memory controller (M-PLL) PLL. This clock is configured by the
-+	 * bootloader, and is exposed to Linux as a read-only clock rate.
-+	 */
-+	regmap_read(map, ASPEED_MPLL_PARAM, &val);
-+	aspeed_clk_data->hws[ASPEED_CLK_MPLL] =	aspeed_calc_pll("mpll", val);
-+
-+	/* SD/SDIO clock divider (TODO: There's a gate too) */
-+	hw = clk_hw_register_divider_table(NULL, "sdio", "hpll", 0,
-+			scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
-+			div_table,
-+			&aspeed_clk_lock);
-+	aspeed_clk_data->hws[ASPEED_CLK_SDIO] = hw;
-+
-+	/* MAC AHB bus clock divider */
-+	hw = clk_hw_register_divider_table(NULL, "mac", "hpll", 0,
-+			scu_base + ASPEED_CLK_SELECTION, 16, 3, 0,
-+			mac_div_table,
-+			&aspeed_clk_lock);
-+	aspeed_clk_data->hws[ASPEED_CLK_MAC] = hw;
-+
-+	/* LPC Host (LHCLK) clock divider */
-+	hw = clk_hw_register_divider_table(NULL, "lhclk", "hpll", 0,
-+			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
-+			div_table,
-+			&aspeed_clk_lock);
-+	aspeed_clk_data->hws[ASPEED_CLK_LHCLK] = hw;
-+
-+	/* Video Engine (ECLK) mux and clock divider */
-+	hw = clk_hw_register_mux(NULL, "eclk_mux",
-+			eclk_parents, ARRAY_SIZE(eclk_parents), 0,
-+			scu_base + ASPEED_CLK_SELECTION, 2, 2,
-+			0, &aspeed_clk_lock);
-+	aspeed_clk_data->hws[ASPEED_CLK_ECLK_MUX] = hw;
-+	hw = clk_hw_register_divider_table(NULL, "eclk", "eclk_mux", 0,
-+			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
-+			div_table,
-+			&aspeed_clk_lock);
-+	aspeed_clk_data->hws[ASPEED_CLK_ECLK] = hw;
-+
-+	/* P-Bus (BCLK) clock divider */
-+	hw = clk_hw_register_divider_table(NULL, "bclk", "hpll", 0,
-+			scu_base + ASPEED_CLK_SELECTION, 0, 2, 0,
-+			div_table,
-+			&aspeed_clk_lock);
-+	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
-+
-+	return 0;
-+};
-+
-+static const struct of_device_id aspeed_clk_dt_ids[] = {
-+	{ .compatible = "aspeed,ast2400-scu", .data = &ast2400_data },
-+	{ .compatible = "aspeed,ast2500-scu", .data = &ast2500_data },
-+	{ },
-+};
-+
-+static struct platform_driver aspeed_clk_driver = {
-+	.probe  = aspeed_clk_probe,
-+	.driver = {
-+		.name = "aspeed-clk",
-+		.of_match_table = aspeed_clk_dt_ids,
-+		.suppress_bind_attrs = true,
-+	},
-+};
-+builtin_platform_driver(aspeed_clk_driver);
-+
-+
- static void __init aspeed_ast2400_cc(struct regmap *map)
- {
- 	struct clk_hw *hw;
+ #endif
 -- 
 2.14.1
