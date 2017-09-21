@@ -1,276 +1,123 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Sep 2017 10:32:19 +0100
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170921075907.GR20805@n2100.armlinux.org.uk>
-References: <20170920112152.GL20805@n2100.armlinux.org.uk>
- <20170920162208.GB536@obsidianresearch.com>
- <20170920165141.GP20805@n2100.armlinux.org.uk>
- <20170920224522.GB20974@obsidianresearch.com>
- <20170921075907.GR20805@n2100.armlinux.org.uk>
-Message-ID: <20170921093218.GS20805@n2100.armlinux.org.uk>
+From: Jose.Abreu@synopsys.com (Jose Abreu)
+Date: Thu, 21 Sep 2017 10:39:42 +0100
+Subject: [RESEND RFC PATCH 0/7] sun8i H3 HDMI glue driver for DW HDMI
+In-Reply-To: <20170920200124.20457-1-jernej.skrabec@siol.net>
+References: <20170920200124.20457-1-jernej.skrabec@siol.net>
+Message-ID: <5172c185-c6b5-49c3-cf0a-c3e073459346@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 08:59:07AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 20, 2017 at 04:45:22PM -0600, Jason Gunthorpe wrote:
-> > On Wed, Sep 20, 2017 at 05:51:41PM +0100, Russell King - ARM Linux wrote:
-> > > I sort-of agree as far as the time offset information goes, but there's
-> > > a complication that we only open the RTC to set the time at the
-> > > point in
-> > 
-> > Hi Russell,
-> > 
-> > What do you think of this untested approach in the below patch?
-> > 
-> > Upon more careful inspection I think I found a way to make the
-> > rounding in rtc_set_ntp_time compatible with a wide range of rtc
-> > devices, so the subsecond capable ops I suggested do not seem
-> > necessary.
-> 
-> Looks like a possibility, but...
-> 
-> > +/* True if now.tv_nsec is close enough to time_sec_nsec that we can call the
-> > + * drivers's set_time_ns(). Arbitrarily choose 1ms as the allowable error
-> > + * margin.
-> > + *
-> > + * This also rounds tv_sec to the second that covers the tv_nsec tick we are
-> > + * targeting.
-> > + */
-> > +#define TIME_SET_NSEC_FUZZ (1000*1000)
-> > +static inline bool rtc_tv_nsec_ok(struct rtc_device *rtc,
-> > +				  struct timespec64 *now)
-> > +{
-> > +	long diff;
-> > +
-> > +	diff = (now->tv_nsec - rtc->time_set_nsec) % NSEC_PER_SEC;
-> > +	if (diff < TIME_SET_NSEC_FUZZ) {
-> > +		if (rtc->time_set_nsec + diff >= NSEC_PER_SEC) {
-> > +			now->tv_sec -= 1;
-> > +			now->tv_nsec = NSEC_PER_SEC-1;
-> > +		}
-> > +		return true;
-> > +	}
-> > +
-> > +	diff = (rtc->time_set_nsec - now->tv_nsec) % NSEC_PER_SEC;
-> > +	if (diff < TIME_SET_NSEC_FUZZ) {
-> > +		if (now->tv_nsec + diff >= NSEC_PER_SEC) {
-> > +			now->tv_sec += 1;
-> > +			now->tv_nsec = 0;
-> > +		}
-> > +		return true;
-> > +	}
-> 
-> I don't think this is correct - and I think it's overly expensive.
-> I threw this into a test program to prove the point, and it confirmed
-> my suspicions - the above will always return true.
-> 
-> Here's the test program output:
-> 
-> now=0.990000000, offset=         0: diff= 990000000 true 2: 0.990000000
-> now=0.999000000, offset=         0: diff= 999000000 true 2: 0.999000000
-> now=0.999900000, offset=         0: diff= 999900000 true 2: 0.999900000
-> now=1.000000000, offset=         0: diff=         0 true 1: 1.000000000
-> now=1.000100000, offset=         0: diff=    100000 true 1: 1.000100000
-> now=1.001000000, offset=         0: diff=   1000000 true 2: 1.001000000
-> now=1.010000000, offset=         0: diff=  10000000 true 2: 1.010000000
-> now=0.990000000, offset= 470000000: diff= 520000000 true 2: 0.990000000
-> now=0.999000000, offset= 470000000: diff= 529000000 true 2: 0.999000000
-> now=0.999900000, offset= 470000000: diff= 529900000 true 2: 0.999900000
-> now=1.000000000, offset= 470000000: diff=-470000000 true 1: 1.000000000
-> now=1.000100000, offset= 470000000: diff=-469900000 true 1: 1.000100000
-> now=1.001000000, offset= 470000000: diff=-469000000 true 1: 1.001000000
-> now=1.010000000, offset= 470000000: diff=-460000000 true 1: 1.010000000
-> now=0.990000000, offset=1000000000: diff= -10000000 true 1: 0.990000000
-> now=0.999000000, offset=1000000000: diff=  -1000000 true 1: 0.999000000
-> now=0.999900000, offset=1000000000: diff=   -100000 true 1: 0.999900000
-> now=1.000000000, offset=1000000000: diff=         0 true 1: 0.999999999
-> now=1.000100000, offset=1000000000: diff=-999900000 true 1: 1.000100000
-> now=1.001000000, offset=1000000000: diff=-999000000 true 1: 1.001000000
-> now=1.010000000, offset=1000000000: diff=-990000000 true 1: 1.010000000
-> now=0.990000000, offset=1470000000: diff=-480000000 true 1: 0.990000000
-> now=0.999000000, offset=1470000000: diff=-471000000 true 1: 0.999000000
-> now=0.999900000, offset=1470000000: diff=-470100000 true 1: 0.999900000
-> now=1.000000000, offset=1470000000: diff=-470000000 true 1: 0.999999999
-> now=1.000100000, offset=1470000000: diff=-469900000 true 1: 0.999999999
-> now=1.001000000, offset=1470000000: diff=-469000000 true 1: 0.999999999
-> now=1.010000000, offset=1470000000: diff=-460000000 true 1: 0.999999999
-> 
-> which should be self explanatory.  Another point to note is that
-> the computation of the time to be set is also incorrect - for
-> example, in the case of offset=0, we can see if we're slightly
-> early, we set tv_sec=0 rather than tv_sec=1.
-> 
-> In the offset=1sec case, it also isn't working as we'd expect -
-> this case should be providing tv_sec for the preceding second, but
-> it doesn't.
-> 
-> I don't yet have a proposal to fix this...
+Hi Jernej,
 
-How about this:
+On 20-09-2017 21:01, Jernej Skrabec wrote:
+> [added media mailing list due to CEC question]
+>
+> This patch series adds a HDMI glue driver for Allwinner H3 SoC. For now, only
+> video and CEC functionality is supported. Audio needs more tweaks.
+>
+> Series is based on the H3 DE2 patch series available on mailing list:
+> https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.infradead.org_pipermail_linux-2Darm-2Dkernel_2017-2DAugust_522697.html&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=WHDsc6kcWAl4i96Vm5hJ_19IJiuxx_p_Rzo2g-uHDKw&m=coyfcQKSr2asrHcaCeWFmAP_9nkFkRK8s7Uw5bmVei4&s=JCFaMXK1MmZ3jE745_YcqZhZkaqtc6UapGfSSapcz_s&e= 
+> (ignore patches marked with [NOT FOR REVIEW NOW] tag)
+>
+> Patch 1 adds support for polling plug detection since custom PHY used here
+> doesn't support HPD interrupt.
+>
+> Patch 2 enables overflow workaround for v1.32a. This HDMI controller exhibits
+> same issues as HDMI controller used in iMX6 SoCs.
+>
+> Patch 3 adds CLK_SET_RATE_PARENT to hdmi clock.
+>
+> Patch 4 adds dt bindings documentation.
+>
+> Patch 5 adds actual H3 HDMI glue driver.
+>
+> Patch 6 and 7 add HDMI node to DT and enable it where needed.
+>
+> Allwinner used DW HDMI controller in a non standard way:
+> - register offsets obfuscation layer, which can fortunately be turned off
+> - register read lock, which has to be disabled by magic number
+> - custom PHY, which have to be initialized before DW HDMI controller
+> - non standard clocks
+> - no HPD interrupt
+>
+> Because of that, I have two questions:
+> - Since HPD have to be polled, is it enough just to enable poll mode? I'm
+>   mainly concerned about invalidating CEC address here.
 
-static inline bool rtc_tv_nsec_ok(struct rtc_device *rtc,
-				  struct timespec64 *now)
-{
-	long diff;
+You mean you get no interrupt when HPD status changes? Hans can
+answer this better but then you will need to invalidate the cec
+physical address yourself because right now its invalidated in
+the dw-hdmi irq handler (see dw_hdmi_irq()).
 
-	diff = (now->tv_nsec - rtc->time_set_nsec) % NSEC_PER_SEC;
-	/* diff must be within [-NSEC_PER_SEC/2..NSEC_PER_SEC/2) */
-	if (diff >= NSEC_PER_SEC / 2)
-		diff -= NSEC_PER_SEC;
-	else if (diff < -NSEC_PER_SEC / 2)
-		diff += NSEC_PER_SEC;
+> - PHY has to be initialized before DW HDMI controller to disable offset
+>   obfuscation and read lock among other things. This means that all clocks have
+>   to be enabled in glue driver. This poses a problem, since when using
+>   component model, dw-hdmi bridge uses drvdata for it's own private data and
+>   prevents glue layer to pass a pointer to unbind function, where clocks should
+>   be disabled. I noticed same issue in meson DW HDMI glue driver, where clocks
+>   are also not disabled when unbind callback is called. I noticed that when H3
+>   SoC is shutdown, HDMI output is still enabled and lastest image is shown on
+>   monitor until it is unplugged from power supply. Is there any simple solution
+>   to this?
 
-	if (abs(diff) < TIME_SET_NSEC_FUZZ) {
-		/* Correct the time for the rtc->time_set_nsec and difference */
-		diff += rtc->time_set_nsec;
-		if (diff > 0)
-			timespec64_sub_ns(now, diff);
-		else if (diff < 0)
-			timespec64_add_ns(now, -diff);
-		return true;
-	}
-	return false;
-}
+I don't know if you can use an empty platform device created with
+platform_device_alloc(). Perhaps it would be better fix this in
+the dw-hdmi driver. I see two solutions:
 
-This always returns now->tv_nsec = 0, but with now->tv_sec appropriately
-adjusted.  The return value is true if we're within 1msec of the required
-nanoseconds, false otherwise.
+    - Either you return the dw-hdmi private structure in the bind
+callback, store it and pass it in the unbind
+    - Or, you pass your own private data to the dw-hdmi bind, the
+dw-hdmi stores it and you just create a public function in the
+dw-hdmi driver called like dw_hdmi_get_auxdata(struct device
+*dev) which returns your private data.
 
-Here's the results of my test program, which looks a lot better to me:
+I think first option is nice, maybe anyone else can suggest
+something better?
 
-now=0.469000000, offset=-1000000000: diff= 469000000 false
-now=0.469000001, offset=-1000000000: diff= 469000001 false
-now=0.470000000, offset=-1000000000: diff= 470000000 false
-now=0.470999999, offset=-1000000000: diff= 470999999 false
-now=0.471000000, offset=-1000000000: diff= 471000000 false
-now=0.499999999, offset=-1000000000: diff= 499999999 false
-now=0.500000000, offset=-1000000000: diff=-500000000 false
-now=0.990000000, offset=-1000000000: diff= -10000000 false
-now=0.999000000, offset=-1000000000: diff=  -1000000 false
-now=0.999900000, offset=-1000000000: diff=   -100000 true: 2.000000000
-now=1.000000000, offset=-1000000000: diff=         0 true: 2.000000000
-now=1.000100000, offset=-1000000000: diff=    100000 true: 2.000000000
-now=1.001000000, offset=-1000000000: diff=   1000000 false
-now=1.010000000, offset=-1000000000: diff=  10000000 false
-now=1.469000000, offset=-1000000000: diff= 469000000 false
-now=1.469000001, offset=-1000000000: diff= 469000001 false
-now=1.470000000, offset=-1000000000: diff= 470000000 false
-now=1.470999999, offset=-1000000000: diff= 470999999 false
-now=1.471000000, offset=-1000000000: diff= 471000000 false
-now=1.499999999, offset=-1000000000: diff= 499999999 false
-now=1.500000000, offset=-1000000000: diff=-500000000 false
+Best regards,
+Jose Miguel Abreu
 
-now=0.469000000, offset= -530000000: diff=  -1000000 false
-now=0.469000001, offset= -530000000: diff=   -999999 true: 1.000000000
-now=0.470000000, offset= -530000000: diff=         0 true: 1.000000000
-now=0.470999999, offset= -530000000: diff=    999999 true: 1.000000000
-now=0.471000000, offset= -530000000: diff=   1000000 false
-now=0.499999999, offset= -530000000: diff=  29999999 false
-now=0.500000000, offset= -530000000: diff=  30000000 false
-now=0.990000000, offset= -530000000: diff=-480000000 false
-now=0.999000000, offset= -530000000: diff=-471000000 false
-now=0.999900000, offset= -530000000: diff=-470100000 false
-now=1.000000000, offset= -530000000: diff=-470000000 false
-now=1.000100000, offset= -530000000: diff=-469900000 false
-now=1.001000000, offset= -530000000: diff=-469000000 false
-now=1.010000000, offset= -530000000: diff=-460000000 false
-now=1.469000000, offset= -530000000: diff=  -1000000 false
-now=1.469000001, offset= -530000000: diff=   -999999 true: 2.000000000
-now=1.470000000, offset= -530000000: diff=         0 true: 2.000000000
-now=1.470999999, offset= -530000000: diff=    999999 true: 2.000000000
-now=1.471000000, offset= -530000000: diff=   1000000 false
-now=1.499999999, offset= -530000000: diff=  29999999 false
-now=1.500000000, offset= -530000000: diff=  30000000 false
-
-now=0.469000000, offset=          0: diff= 469000000 false
-now=0.469000001, offset=          0: diff= 469000001 false
-now=0.470000000, offset=          0: diff= 470000000 false
-now=0.470999999, offset=          0: diff= 470999999 false
-now=0.471000000, offset=          0: diff= 471000000 false
-now=0.499999999, offset=          0: diff= 499999999 false
-now=0.500000000, offset=          0: diff=-500000000 false
-now=0.990000000, offset=          0: diff= -10000000 false
-now=0.999000000, offset=          0: diff=  -1000000 false
-now=0.999900000, offset=          0: diff=   -100000 true: 1.000000000
-now=1.000000000, offset=          0: diff=         0 true: 1.000000000
-now=1.000100000, offset=          0: diff=    100000 true: 1.000000000
-now=1.001000000, offset=          0: diff=   1000000 false
-now=1.010000000, offset=          0: diff=  10000000 false
-now=1.469000000, offset=          0: diff= 469000000 false
-now=1.469000001, offset=          0: diff= 469000001 false
-now=1.470000000, offset=          0: diff= 470000000 false
-now=1.470999999, offset=          0: diff= 470999999 false
-now=1.471000000, offset=          0: diff= 471000000 false
-now=1.499999999, offset=          0: diff= 499999999 false
-now=1.500000000, offset=          0: diff=-500000000 false
-
-now=0.469000000, offset=  470000000: diff=  -1000000 false
-now=0.469000001, offset=  470000000: diff=   -999999 true: 0.000000000
-now=0.470000000, offset=  470000000: diff=         0 true: 0.000000000
-now=0.470999999, offset=  470000000: diff=    999999 true: 0.000000000
-now=0.471000000, offset=  470000000: diff=   1000000 false
-now=0.499999999, offset=  470000000: diff=  29999999 false
-now=0.500000000, offset=  470000000: diff=  30000000 false
-now=0.990000000, offset=  470000000: diff=-480000000 false
-now=0.999000000, offset=  470000000: diff=-471000000 false
-now=0.999900000, offset=  470000000: diff=-470100000 false
-now=1.000000000, offset=  470000000: diff=-470000000 false
-now=1.000100000, offset=  470000000: diff=-469900000 false
-now=1.001000000, offset=  470000000: diff=-469000000 false
-now=1.010000000, offset=  470000000: diff=-460000000 false
-now=1.469000000, offset=  470000000: diff=  -1000000 false
-now=1.469000001, offset=  470000000: diff=   -999999 true: 1.000000000
-now=1.470000000, offset=  470000000: diff=         0 true: 1.000000000
-now=1.470999999, offset=  470000000: diff=    999999 true: 1.000000000
-now=1.471000000, offset=  470000000: diff=   1000000 false
-now=1.499999999, offset=  470000000: diff=  29999999 false
-now=1.500000000, offset=  470000000: diff=  30000000 false
-
-now=0.469000000, offset= 1000000000: diff= 469000000 false
-now=0.469000001, offset= 1000000000: diff= 469000001 false
-now=0.470000000, offset= 1000000000: diff= 470000000 false
-now=0.470999999, offset= 1000000000: diff= 470999999 false
-now=0.471000000, offset= 1000000000: diff= 471000000 false
-now=0.499999999, offset= 1000000000: diff= 499999999 false
-now=0.500000000, offset= 1000000000: diff=-500000000 false
-now=0.990000000, offset= 1000000000: diff= -10000000 false
-now=0.999000000, offset= 1000000000: diff=  -1000000 false
-now=0.999900000, offset= 1000000000: diff=   -100000 true: 0.000000000
-now=1.000000000, offset= 1000000000: diff=         0 true: 0.000000000
-now=1.000100000, offset= 1000000000: diff=    100000 true: 0.000000000
-now=1.001000000, offset= 1000000000: diff=   1000000 false
-now=1.010000000, offset= 1000000000: diff=  10000000 false
-now=1.469000000, offset= 1000000000: diff= 469000000 false
-now=1.469000001, offset= 1000000000: diff= 469000001 false
-now=1.470000000, offset= 1000000000: diff= 470000000 false
-now=1.470999999, offset= 1000000000: diff= 470999999 false
-now=1.471000000, offset= 1000000000: diff= 471000000 false
-now=1.499999999, offset= 1000000000: diff= 499999999 false
-now=1.500000000, offset= 1000000000: diff=-500000000 false
-
-now=0.469000000, offset= 1470000000: diff=  -1000000 false
-now=0.469000001, offset= 1470000000: diff=   -999999 true: -1.000000000
-now=0.470000000, offset= 1470000000: diff=         0 true: -1.000000000
-now=0.470999999, offset= 1470000000: diff=    999999 true: -1.000000000
-now=0.471000000, offset= 1470000000: diff=   1000000 false
-now=0.499999999, offset= 1470000000: diff=  29999999 false
-now=0.500000000, offset= 1470000000: diff=  30000000 false
-now=0.990000000, offset= 1470000000: diff=-480000000 false
-now=0.999000000, offset= 1470000000: diff=-471000000 false
-now=0.999900000, offset= 1470000000: diff=-470100000 false
-now=1.000000000, offset= 1470000000: diff=-470000000 false
-now=1.000100000, offset= 1470000000: diff=-469900000 false
-now=1.001000000, offset= 1470000000: diff=-469000000 false
-now=1.010000000, offset= 1470000000: diff=-460000000 false
-now=1.469000000, offset= 1470000000: diff=  -1000000 false
-now=1.469000001, offset= 1470000000: diff=   -999999 true: 0.000000000
-now=1.470000000, offset= 1470000000: diff=         0 true: 0.000000000
-now=1.470999999, offset= 1470000000: diff=    999999 true: 0.000000000
-now=1.471000000, offset= 1470000000: diff=   1000000 false
-now=1.499999999, offset= 1470000000: diff=  29999999 false
-now=1.500000000, offset= 1470000000: diff=  30000000 false
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+>
+> Chen-Yu,
+> TL Lim was unable to obtain any answer from Allwinner about HDMI clocks. I think
+> it is safe to assume that divider in HDMI clock doesn't have any effect.
+>
+> Branch based on linux-next from 1. September with integrated patches is
+> available here:
+> https://urldefense.proofpoint.com/v2/url?u=https-3A__github.com_jernejsk_linux-2D1_tree_h3-5Fhdmi-5Frfc&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=WHDsc6kcWAl4i96Vm5hJ_19IJiuxx_p_Rzo2g-uHDKw&m=coyfcQKSr2asrHcaCeWFmAP_9nkFkRK8s7Uw5bmVei4&s=lDAnd3egsc2sxqVM-Ya_Me9ozWXKWvxxvsdV3Jn3vpA&e= 
+>
+> Some additonal info about H3 HDMI:
+> https://urldefense.proofpoint.com/v2/url?u=https-3A__linux-2Dsunxi.org_DWC-5FHDMI-5FController&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=WHDsc6kcWAl4i96Vm5hJ_19IJiuxx_p_Rzo2g-uHDKw&m=coyfcQKSr2asrHcaCeWFmAP_9nkFkRK8s7Uw5bmVei4&s=d9iEgk23RCLJL4oXJ4kkt6NyYK90_vFy0mCD3WauJDk&e= 
+>
+> Thanks to Jens Kuske, who figured out that it is actually DW HDMI controller
+> and mapped scrambled register offsets to original ones.
+>
+> Icenowy Zheng (1):
+>   ARM: sun8i: h3: Add DesignWare HDMI controller node
+>
+> Jernej Skrabec (6):
+>   drm: bridge: Enable polling hpd event in dw_hdmi
+>   drm: bridge: Enable workaround in dw_hdmi for v1.32a
+>   clk: sunxi: Add CLK_SET_RATE_PARENT flag for H3 HDMI clock
+>   dt-bindings: Document Allwinner DWC HDMI TX node
+>   drm: sun4i: Add a glue for the DesignWare HDMI controller in H3
+>   ARM: sun8i: h3: Enable HDMI output on H3 boards
+>
+>  .../bindings/display/sunxi/sun4i-drm.txt           | 158 ++++++-
+>  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  33 ++
+>  arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  33 ++
+>  arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts           |  33 ++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  33 ++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  33 ++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  33 ++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  33 ++
+>  arch/arm/boot/dts/sun8i-h3.dtsi                    |   5 +
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  36 ++
+>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |  14 +-
+>  drivers/gpu/drm/sun4i/Kconfig                      |   9 +
+>  drivers/gpu/drm/sun4i/Makefile                     |   1 +
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c              | 500 +++++++++++++++++++++
+>  15 files changed, 950 insertions(+), 6 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+>
