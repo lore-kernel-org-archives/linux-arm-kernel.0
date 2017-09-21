@@ -1,59 +1,54 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 21 Sep 2017 17:29:20 +0200
-Subject: [PATCH v5 3/4] dt-bindings: stm32-dma: add a property to handle STM32
- DMAMUX
-In-Reply-To: <1506007761-11621-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1506007761-11621-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1506007761-11621-4-git-send-email-pierre-yves.mordret@st.com>
+Date: Thu, 21 Sep 2017 17:29:17 +0200
+Subject: [PATCH v5 0/4] Add STM32 DMAMUX support
+Message-ID: <1506007761-11621-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32 DMA controller has to exposed its number of request line to be
-addressed via STM32 DMAMUX.
+This patchset adds support for the STM32 DMA multiplexer.
+It allows to map any peripheral DMA request to any channel of the product
+DMAs.
+This IP has been introduced with STM32H7 SoC.
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
  Version history:
     v5:
+        * Set selected channel ID within a lock to avoid race condition.
+          Release if any error occurs
     v4:
-        * get rid of st,dmamux property
-        * number of DMA requests is exposed for DMAMUX
+        * Add multi-master ability for STM32 DMAMUX
+        * Get rid of st,dmamux property and custom API between STM32
+          DMAMUX and DMA. Bindings has changed.
+          DMAMUX will read DMA masters from Device Tree from now on.
+          Merely one DMAMUX node is needed now.
+        * Only STM32 DMA are allowed to be connected onto DMAMUX
+        * channelID is computed locally within the driver and crafted in
+          dma_psec to be passed toward DMA master.
+          DMAMUX router sorts out which DMA master will serve the
+          request automatically.
+        * This version forbids the use of DMA in standalone and DMAMUX at
+          the same time : all clients need to be connected either on DMA
+          or DMAMUX ; no mix up
     v3:
-        * None
-    v2:
-        * Typo fix
+        * change compatible to st,stm32h7-dmamux to be mode Soc specific
+        * add verbosity in dma-cells
 ---
----
- Documentation/devicetree/bindings/dma/stm32-dma.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-index 4408af6..77542e1 100644
---- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-@@ -13,6 +13,7 @@ Required properties:
- - #dma-cells : Must be <4>. See DMA client paragraph for more details.
- 
- Optional properties:
-+- dma-requests : Number of DMA requests supported.
- - resets: Reference to a reset controller asserting the DMA controller
- - st,mem2mem: boolean; if defined, it indicates that the controller supports
-   memory-to-memory transfer
-@@ -34,12 +35,13 @@ Example:
- 		#dma-cells = <4>;
- 		st,mem2mem;
- 		resets = <&rcc 150>;
-+		dma-requests = <8>;
- 	};
- 
- * DMA client
- 
- DMA clients connected to the STM32 DMA controller must use the format
--described in the dma.txt file, using a five-cell specifier for each
-+described in the dma.txt file, using a four-cell specifier for each
- channel: a phandle to the DMA controller plus the following four integer cells:
- 
- 1. The channel id
+Pierre-Yves MORDRET (4):
+  dt-bindings: Document the STM32 DMAMUX bindings
+  dmaengine: Add STM32 DMAMUX driver
+  dt-bindings: stm32-dma: add a property to handle STM32 DMAMUX
+  ARM: configs: stm32: Add DMAMUX support in STM32 defconfig
+
+ .../devicetree/bindings/dma/stm32-dma.txt          |   4 +-
+ .../devicetree/bindings/dma/stm32-dmamux.txt       |  84 ++++++
+ arch/arm/configs/stm32_defconfig                   |   1 +
+ drivers/dma/Kconfig                                |   9 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/stm32-dmamux.c                         | 327 +++++++++++++++++++++
+ 6 files changed, 425 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+ create mode 100644 drivers/dma/stm32-dmamux.c
+
 -- 
 2.7.4
