@@ -1,61 +1,88 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 21 Sep 2017 18:12:59 +0200
-Subject: [GIT PULL] Reset controller fixes for v4.14
-Message-ID: <1506010379.10081.15.camel@pengutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 22 Sep 2017 01:14:45 +0900
+Subject: [PATCH] pinctrl: samsung: add pinctrl_force_sleep() for "sleep"
+ pinctrl state
+In-Reply-To: <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
+References: <CGME20170921123230epcas1p4d3c1de108af7d34053d2c4f40dd42119@epcas1p4.samsung.com>
+ <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
+Message-ID: <CA+Ln22GXr4TRDvgSm1HWQbucBjJ8c=dfnTOARXyM4EZU64QQww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc-maintainers,
+Hi Youngmin,
 
-please consider merging this tag for v4.14. It removes the "v1" suffix
-from the newly merged HSDK reset driver, fixes its Kconfig dependencies,
-and adds back the DT binding documentation that I accidentally dropped
-onto the floor when applying the original patch.
+2017-09-21 21:32 GMT+09:00 ??? <youngmin.nam@samsung.com>:
+> This patch adds pinctrl_for_sleep() in samsung_pinctrl_suspend()
+> to support configuration of "sleep" pinctrl state.
+>
+> For example, we can configure "sleep" pinctrl state of "gpf1-6"
+> as "INPUT, PULL DOWN" by configuring power down mode register.
+>
+> &pinctrl_5 {
+>         pinctrl-names = "default","sleep";
+>         pinctrl-0 = <&initial5>;
+>         pinctrl-1 = <&sleep5>;
+>
+>         initial5: initial-state {
+>                 samsung,pins = gpf1-6;
+>                 samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+>         };
+>         sleep5: sleep-state {
+>                 samsung,pins = gpf1-6;
+>                 samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
+>                 samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_DOWN>;
 
-regards
-Philipp
+This isn't a very good example, because pin-con-pdn and pin-pud-pdn
+are used to program dedicated sleep state registers in the pin
+controller and they can be programmed at any time. Typically one would
+include them in "default" state.
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+As for pins which don't have dedicated sleep state registers, i.e. the
+alive banks, which retain their value, the DT node of device
+associated with the pins would have "sleep" pinctrl state and its
+driver would activate it on suspend.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+The only remaining use case would be pins in alive banks not
+associated with any device, but I can't imagine any practical case
+that would need to change the value on suspend in such case.
 
-are available in the git repository at:
+Do you have an example of a real use case for this patch?
 
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.14
+>         };
+> };
+>
+> Signed-off-by: Youngmin Nam <youngmin.nam@samsung.com>
+> ---
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index e04f7fe0a65d..b4d12f8db475 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -1099,6 +1099,11 @@ static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
+>  {
+>         struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+>         int i;
+> +       int ret;
+> +
+> +       ret = pinctrl_force_sleep(drvdata->pctl_dev);
+> +       if (ret)
+> +               dev_err(dev, "could not set sleep pinstate %d\n", ret);
+>
+>         for (i = 0; i < drvdata->nr_banks; i++) {
+>                 struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
+> @@ -1187,6 +1192,11 @@ static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
+>         if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
+>                 drvdata->retention_ctrl->disable(drvdata);
+>
+> +       /* For changing state without writing register. */
+> +       if (!IS_ERR(drvdata->pctl_dev->p) &&
+> +           !IS_ERR(drvdata->pctl_dev->hog_default))
+> +               drvdata->pctl_dev->p->state = drvdata->pctl_dev->hog_default;
 
-for you to fetch changes up to 544e3bf4f0e8278400f19ca7918a3cdf2548b4eb:
+How is this supposed to work? The pins were reconfigured at suspend,
+where are they restored back to the values before suspend?
 
-  reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST (2017-09-21 12:44:01 +0200)
-
-----------------------------------------------------------------
-Reset controller fixes for v4.14
-
-- Remove misleading HSDK v1 suffix, as there is no v2 planned
-- Add missing DT binding documentation for HSDK reset driver
-- Fix HSDK reset driver dependencies
-
-----------------------------------------------------------------
-Eugeniy Paltsev (1):
-      ARC: reset: add missing DT binding documentation for HSDKv1 reset driver
-
-Geert Uytterhoeven (1):
-      reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST
-
-Thomas Meyer (1):
-      ARC: reset: Only build on archs that have IOMEM
-
-Vineet Gupta (1):
-      ARC: reset: remove the misleading v1 suffix all over
-
- .../devicetree/bindings/reset/snps,hsdk-reset.txt  | 28 ++++++++++++++
- MAINTAINERS                                        |  6 +--
- drivers/reset/Kconfig                              |  9 +++--
- drivers/reset/Makefile                             |  2 +-
- drivers/reset/{reset-hsdk-v1.c => reset-hsdk.c}    | 44 +++++++++++-----------
- include/dt-bindings/reset/snps,hsdk-reset.h        | 17 +++++++++
- include/dt-bindings/reset/snps,hsdk-v1-reset.h     | 17 ---------
- 7 files changed, 76 insertions(+), 47 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/snps,hsdk-reset.txt
- rename drivers/reset/{reset-hsdk-v1.c => reset-hsdk.c} (72%)
- create mode 100644 include/dt-bindings/reset/snps,hsdk-reset.h
- delete mode 100644 include/dt-bindings/reset/snps,hsdk-v1-reset.h
+Best regards,
+Tomasz
