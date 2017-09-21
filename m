@@ -1,10 +1,10 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 21 Sep 2017 19:21:48 +0200
-Subject: [PATCH 09/12] ARM: dts: sun8i: orangepi-plus: Fix node with unit name
+Date: Thu, 21 Sep 2017 19:21:47 +0200
+Subject: [PATCH 08/12] ARM: dts: sun8i: orangepipc: Fix node with unit name
  and no reg property
 In-Reply-To: <20170921172151.29779-1-clabbe.montjoie@gmail.com>
 References: <20170921172151.29779-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170921172151.29779-10-clabbe.montjoie@gmail.com>
+Message-ID: <20170921172151.29779-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,35 @@ removing "@0" from such node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index 331ed683ac62..119732505844 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -114,7 +114,7 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index f5f0f15a2088..6d98bcfbe877 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -158,19 +158,19 @@
  };
  
  &pio {
--	usb3_vbus_pin_a: usb3_vbus_pin at 0 {
-+	usb3_vbus_pin_a: usb3_vbus_pin {
- 		pins = "PG11";
+-	leds_opc: led_pins at 0 {
++	leds_opc: led_pins {
+ 		pins = "PA15";
  		function = "gpio_out";
+ 	};
+ };
+ 
+ &r_pio {
+-	leds_r_opc: led_pins at 0 {
++	leds_r_opc: led_pins {
+ 		pins = "PL10";
+ 		function = "gpio_out";
+ 	};
+ 
+-	sw_r_opc: key_pins at 0 {
++	sw_r_opc: key_pins {
+ 		pins = "PL3";
+ 		function = "gpio_in";
  	};
 -- 
 2.13.5
