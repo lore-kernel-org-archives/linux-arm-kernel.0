@@ -1,67 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 21 Sep 2017 18:09:34 +0200
-Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
-In-Reply-To: <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
-References: <20170915194449.538504992@cogentembedded.com>
- <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
- <c0390fc1-7da4-ac60-afee-97126d1fd372@cogentembedded.com>
-Message-ID: <CAMuHMdVCTORpfKN+GTka_6pT1VWjOneV2GBhGo7Y8DsZYSxdvw@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 21 Sep 2017 18:12:59 +0200
+Subject: [GIT PULL] Reset controller fixes for v4.14
+Message-ID: <1506010379.10081.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Dear arm-soc-maintainers,
 
-On Thu, Sep 21, 2017 at 6:03 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 9/21/2017 4:08 PM, Geert Uytterhoeven wrote:
->>> Define the Eagle board  dependent part of the EtherAVB device node.
->>> Enable DHCP  and NFS root for the kernel booting.
->>>
->>> Based  on the original (and large) patch by Vladimir Barinov.
->>>
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->>
->>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->
-> [...]
->>>
->>> @@ -43,3 +44,14 @@
->>>   &scif0 {
->>>          status = "okay";
->>>   };
->>> +
->>> +&avb {
->>> +       renesas,no-ether-link;
->>> +       phy-handle = <&phy0>;
->>> +       status = "okay";
->>> +
->>> +       phy0: ethernet-phy at 0 {
->>> +               rxc-skew-ps = <1500>;
->>> +               reg = <0>;
->>
->>
->> Any specific reason why you don't want to wire up the interrupt?
->>
->>                  interrupt-parent = <&gpio2>;
->
->
->    I thought it's quite obvious -- we don't have GPIOs yet, and GPIOs seem
-> to require PFC.
+please consider merging this tag for v4.14. It removes the "v1" suffix
+from the newly merged HSDK reset driver, fixes its Kconfig dependencies,
+and adds back the DT binding documentation that I accidentally dropped
+onto the floor when applying the original patch.
 
-Of course. And these can be added later.
+regards
+Philipp
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-Gr{oetje,eeting}s,
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-                        Geert
+are available in the git repository at:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.14
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+for you to fetch changes up to 544e3bf4f0e8278400f19ca7918a3cdf2548b4eb:
+
+  reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST (2017-09-21 12:44:01 +0200)
+
+----------------------------------------------------------------
+Reset controller fixes for v4.14
+
+- Remove misleading HSDK v1 suffix, as there is no v2 planned
+- Add missing DT binding documentation for HSDK reset driver
+- Fix HSDK reset driver dependencies
+
+----------------------------------------------------------------
+Eugeniy Paltsev (1):
+      ARC: reset: add missing DT binding documentation for HSDKv1 reset driver
+
+Geert Uytterhoeven (1):
+      reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST
+
+Thomas Meyer (1):
+      ARC: reset: Only build on archs that have IOMEM
+
+Vineet Gupta (1):
+      ARC: reset: remove the misleading v1 suffix all over
+
+ .../devicetree/bindings/reset/snps,hsdk-reset.txt  | 28 ++++++++++++++
+ MAINTAINERS                                        |  6 +--
+ drivers/reset/Kconfig                              |  9 +++--
+ drivers/reset/Makefile                             |  2 +-
+ drivers/reset/{reset-hsdk-v1.c => reset-hsdk.c}    | 44 +++++++++++-----------
+ include/dt-bindings/reset/snps,hsdk-reset.h        | 17 +++++++++
+ include/dt-bindings/reset/snps,hsdk-v1-reset.h     | 17 ---------
+ 7 files changed, 76 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/snps,hsdk-reset.txt
+ rename drivers/reset/{reset-hsdk-v1.c => reset-hsdk.c} (72%)
+ create mode 100644 include/dt-bindings/reset/snps,hsdk-reset.h
+ delete mode 100644 include/dt-bindings/reset/snps,hsdk-v1-reset.h
