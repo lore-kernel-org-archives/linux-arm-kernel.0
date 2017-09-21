@@ -1,69 +1,52 @@
 From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Thu, 21 Sep 2017 17:18:14 +0100
-Subject: [PATCH v3 3/6] serial: imx: Simplify DMA disablement
+Date: Thu, 21 Sep 2017 17:18:13 +0100
+Subject: [PATCH v3 2/6] serial: imx: only set dma_is_rxing when DMA starts
 In-Reply-To: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
 References: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <1506010697-22114-4-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <1506010697-22114-3-git-send-email-martyn.welch@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nandor Han <nandor.han@ge.com>
+From: Romain Perier <romain.perier@collabora.com>
 
-This commits simplify the function imx_disable_dma() by moving
-the code for disabling RX and TX DMAs to dedicated functions.
-This is a preparation for the next commit.
+The variable dma_is_rxing is currently set to 1 in imx_disable_rx_int().
+This is problematic as:
 
-Signed-off-by: Nandor Han <nandor.han@ge.com>
+- whilst imx_disable_rx_int() is currently always called before
+  start_rx_dma() this dependency isn't obvious.
+- start_rx_dma() does error checking and might exit without
+  enabling DMA. Currently this will result in dma_is_rxing suggesting
+  that DMA is being used for recieving.
+
+To avoid these issues, move the setting of dma_is_rxing to
+start_rx_dma() when appropriate.
+
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
 ---
- drivers/tty/serial/imx.c | 27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+ drivers/tty/serial/imx.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 7835279..2fb3210 100644
+index d90dae3..7835279 100644
 --- a/drivers/tty/serial/imx.c
 +++ b/drivers/tty/serial/imx.c
-@@ -350,6 +350,24 @@ static void imx_port_rts_auto(struct imx_port *sport, unsigned long *ucr2)
- 	*ucr2 |= UCR2_CTSC;
- }
- 
-+static void imx_stop_tx_dma(struct imx_port *sport)
-+{
-+	unsigned long temp;
-+
-+	temp = readl(sport->port.membase + UCR1);
-+	temp &= ~UCR1_TDMAEN;
-+	writel(temp, sport->port.membase + UCR1);
-+}
-+
-+static void imx_stop_rx_dma(struct imx_port *sport)
-+{
-+	unsigned long temp;
-+
-+	temp = readl(sport->port.membase + UCR1);
-+	temp &= ~(UCR1_RDMAEN | UCR1_ATDMAEN);
-+	writel(temp, sport->port.membase + UCR1);
-+}
-+
- /*
-  * interrupts disabled on entry
-  */
-@@ -1217,13 +1235,8 @@ static void imx_enable_dma(struct imx_port *sport)
- 
- static void imx_disable_dma(struct imx_port *sport)
+@@ -714,8 +714,6 @@ static void imx_disable_rx_int(struct imx_port *sport)
  {
--	unsigned long temp;
--
--	/* clear UCR1 */
--	temp = readl(sport->port.membase + UCR1);
--	temp &= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
--	writel(temp, sport->port.membase + UCR1);
--
-+	imx_stop_rx_dma(sport);
-+	imx_stop_tx_dma(sport);
- 	imx_setup_ufcr(sport, TXTL_DEFAULT, RXTL_DEFAULT);
+ 	unsigned long temp;
  
- 	sport->dma_is_enabled = 0;
+-	sport->dma_is_rxing = 1;
+-
+ 	/* disable the receiver ready and aging timer interrupts */
+ 	temp = readl(sport->port.membase + UCR1);
+ 	temp &= ~(UCR1_RRDYEN);
+@@ -1074,6 +1072,7 @@ static int start_rx_dma(struct imx_port *sport)
+ 	desc->callback_param = sport;
+ 
+ 	dev_dbg(dev, "RX: prepare for the DMA.\n");
++	sport->dma_is_rxing = 1;
+ 	sport->rx_cookie = dmaengine_submit(desc);
+ 	dma_async_issue_pending(chan);
+ 	return 0;
 -- 
 1.8.3.1
