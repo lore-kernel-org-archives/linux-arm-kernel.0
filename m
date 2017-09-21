@@ -1,184 +1,181 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Sep 2017 13:56:40 +0930
-Subject: [PATCH v2 4/5] clk: aspeed: Register gated clocks
+Date: Thu, 21 Sep 2017 13:56:39 +0930
+Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
 In-Reply-To: <20170921042641.7326-1-joel@jms.id.au>
 References: <20170921042641.7326-1-joel@jms.id.au>
-Message-ID: <20170921042641.7326-5-joel@jms.id.au>
+Message-ID: <20170921042641.7326-4-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The majority of the clocks in the system are gates paired with a reset
-controller that holds the IP in reset.
+This registers a platform driver to set up all of the non-core clocks.
 
-This borrows from clk_hw_register_gate, but registers two 'gates', one
-to control the clock enable register and the other to control the reset
-IP. This allows us to enforce the ordering:
-
- 1. Place IP in reset
- 2. Enable clock
- 3. Delay
- 4. Release reset
-
-There are some gates that do not have an associated reset; these are
-handled by using -1 as the index for the reset.
+The clocks that have configurable rates are now registered.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/clk/clk-aspeed.c | 128 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 128 insertions(+)
+ drivers/clk/clk-aspeed.c | 129 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
 
 diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index 19531798e040..dec9db4ec47b 100644
+index e614c61b82d2..19531798e040 100644
 --- a/drivers/clk/clk-aspeed.c
 +++ b/drivers/clk/clk-aspeed.c
-@@ -191,6 +191,108 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
+@@ -14,6 +14,8 @@
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+@@ -115,6 +117,20 @@ static const struct aspeed_gate_data aspeed_gates[] __initconst = {
+ 	/* 31: reserved */
+ };
+ 
++static const char * const eclk_parents[] = {"d1pll", "hpll", "mpll"};
++
++static const struct clk_div_table ast2500_mac_div_table[] = {
++	{ 0x0, 4 }, /* Yep, really. Aspeed confirmed this is correct */
++	{ 0x1, 4 },
++	{ 0x2, 6 },
++	{ 0x3, 8 },
++	{ 0x4, 10 },
++	{ 0x5, 12 },
++	{ 0x6, 14 },
++	{ 0x7, 16 },
++	{ 0 }
++};
++
+ static const struct clk_div_table ast2400_div_table[] = {
+ 	{ 0x0, 2 },
+ 	{ 0x1, 4 },
+@@ -139,6 +155,21 @@ static const struct clk_div_table ast2500_div_table[] = {
+ 	{ 0 }
+ };
+ 
++struct aspeed_clk_soc_data {
++	const struct clk_div_table *div_table;
++	const struct clk_div_table *mac_div_table;
++};
++
++static const struct aspeed_clk_soc_data ast2500_data = {
++	.div_table = ast2500_div_table,
++	.mac_div_table = ast2500_mac_div_table,
++};
++
++static const struct aspeed_clk_soc_data ast2400_data = {
++	.div_table = ast2400_div_table,
++	.mac_div_table = ast2400_div_table,
++};
++
+ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
+ {
+ 	unsigned int mult, div;
+@@ -160,6 +191,104 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
  			mult, div);
  }
  
-+static int aspeed_clk_enable(struct clk_hw *hw)
++static int __init aspeed_clk_probe(struct platform_device *pdev)
 +{
-+	struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-+	unsigned long flags;
-+	u32 clk = BIT(gate->clock_idx);
-+	u32 rst = BIT(gate->reset_idx);
++	const struct aspeed_clk_soc_data *soc_data;
++	const struct clk_div_table *mac_div_table;
++	const struct clk_div_table *div_table;
++	struct device *dev = &pdev->dev;
++	struct regmap *map;
++	struct clk_hw *hw;
++	u32 val, rate;
 +
-+	spin_lock_irqsave(gate->lock, flags);
-+
-+	if (gate->reset_idx >= 0) {
-+		/* Put IP in reset */
-+		regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, rst);
-+
-+		/* Delay 100us */
-+		udelay(100);
++	map = syscon_node_to_regmap(dev->of_node);
++	if (IS_ERR(map)) {
++		dev_err(dev, "no syscon regmap\n");
++		return PTR_ERR(map);
 +	}
 +
-+	/* Enable clock */
-+	regmap_update_bits(gate->map, ASPEED_CLK_STOP_CTRL, clk, 0);
++	/* SoC generations share common layouts but have different divisors */
++	soc_data = of_device_get_match_data(&pdev->dev);
++	div_table = soc_data->div_table;
++	mac_div_table = soc_data->mac_div_table;
 +
-+	if (gate->reset_idx >= 0) {
-+		/* Delay 10ms */
-+		/* TODO: can we sleep here? */
-+		msleep(10);
++	/* UART clock div13 setting */
++	regmap_read(map, ASPEED_MISC_CTRL, &val);
++	if (val & BIT(12))
++		rate = 24000000 / 13;
++	else
++		rate = 24000000;
++	/* TODO: Find the parent data for the uart clock */
++	hw = clk_hw_register_fixed_rate(NULL, "uart", NULL, 0, rate);
++	aspeed_clk_data->hws[ASPEED_CLK_UART] = hw;
 +
-+		/* Take IP out of reset */
-+		regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, 0);
-+	}
++	/*
++	 * Memory controller (M-PLL) PLL. This clock is configured by the
++	 * bootloader, and is exposed to Linux as a read-only clock rate.
++	 */
++	regmap_read(map, ASPEED_MPLL_PARAM, &val);
++	aspeed_clk_data->hws[ASPEED_CLK_MPLL] =	aspeed_calc_pll("mpll", val);
 +
-+	spin_unlock_irqrestore(gate->lock, flags);
++	/* SD/SDIO clock divider (TODO: There's a gate too) */
++	hw = clk_hw_register_divider_table(NULL, "sdio", "hpll", 0,
++			scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
++			div_table,
++			&aspeed_clk_lock);
++	aspeed_clk_data->hws[ASPEED_CLK_SDIO] = hw;
++
++	/* MAC AHB bus clock divider */
++	hw = clk_hw_register_divider_table(NULL, "mac", "hpll", 0,
++			scu_base + ASPEED_CLK_SELECTION, 16, 3, 0,
++			mac_div_table,
++			&aspeed_clk_lock);
++	aspeed_clk_data->hws[ASPEED_CLK_MAC] = hw;
++
++	/* LPC Host (LHCLK) clock divider */
++	hw = clk_hw_register_divider_table(NULL, "lhclk", "hpll", 0,
++			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
++			div_table,
++			&aspeed_clk_lock);
++	aspeed_clk_data->hws[ASPEED_CLK_LHCLK] = hw;
++
++	/* Video Engine (ECLK) mux and clock divider */
++	hw = clk_hw_register_mux(NULL, "eclk_mux",
++			eclk_parents, ARRAY_SIZE(eclk_parents), 0,
++			scu_base + ASPEED_CLK_SELECTION, 2, 2,
++			0, &aspeed_clk_lock);
++	aspeed_clk_data->hws[ASPEED_CLK_ECLK_MUX] = hw;
++	hw = clk_hw_register_divider_table(NULL, "eclk", "eclk_mux", 0,
++			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
++			div_table,
++			&aspeed_clk_lock);
++	aspeed_clk_data->hws[ASPEED_CLK_ECLK] = hw;
++
++	/* P-Bus (BCLK) clock divider */
++	hw = clk_hw_register_divider_table(NULL, "bclk", "hpll", 0,
++			scu_base + ASPEED_CLK_SELECTION, 0, 2, 0,
++			div_table,
++			&aspeed_clk_lock);
++	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
 +
 +	return 0;
-+}
-+
-+static void aspeed_clk_disable(struct clk_hw *hw)
-+{
-+	struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-+	unsigned long flags;
-+	u32 clk = BIT(gate->clock_idx);
-+
-+	spin_lock_irqsave(gate->lock, flags);
-+
-+	/* Disable clock */
-+	regmap_update_bits(gate->map, ASPEED_CLK_STOP_CTRL, clk, clk);
-+
-+	spin_unlock_irqrestore(gate->lock, flags);
-+}
-+
-+static int aspeed_clk_is_enabled(struct clk_hw *hw)
-+{
-+	struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-+	u32 clk = BIT(gate->clock_idx);
-+	u32 reg;
-+
-+	regmap_read(gate->map, ASPEED_CLK_STOP_CTRL, &reg);
-+
-+	return (reg & clk) ? 0 : 1;
-+}
-+
-+static const struct clk_ops aspeed_clk_gate_ops = {
-+	.enable = aspeed_clk_enable,
-+	.disable = aspeed_clk_disable,
-+	.is_enabled = aspeed_clk_is_enabled,
 +};
 +
-+static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		struct regmap *map, u8 clock_idx, u8 reset_idx,
-+		u8 clk_gate_flags, spinlock_t *lock)
-+{
-+	struct aspeed_clk_gate *gate;
-+	struct clk_init_data init;
-+	struct clk_hw *hw;
-+	int ret;
++static const struct of_device_id aspeed_clk_dt_ids[] = {
++	{ .compatible = "aspeed,ast2400-scu", .data = &ast2400_data },
++	{ .compatible = "aspeed,ast2500-scu", .data = &ast2500_data },
++	{ },
++};
 +
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		return ERR_PTR(-ENOMEM);
++static struct platform_driver aspeed_clk_driver = {
++	.probe  = aspeed_clk_probe,
++	.driver = {
++		.name = "aspeed-clk",
++		.of_match_table = aspeed_clk_dt_ids,
++		.suppress_bind_attrs = true,
++	},
++};
++builtin_platform_driver(aspeed_clk_driver);
 +
-+	init.name = name;
-+	init.ops = &aspeed_clk_gate_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
 +
-+	gate->map = map;
-+	gate->clock_idx = clock_idx;
-+	gate->reset_idx = reset_idx;
-+	gate->flags = clk_gate_flags;
-+	gate->lock = lock;
-+	gate->hw.init = &init;
-+
-+	hw = &gate->hw;
-+	ret = clk_hw_register(dev, hw);
-+	if (ret) {
-+		kfree(gate);
-+		hw = ERR_PTR(ret);
-+	}
-+
-+	return hw;
-+}
-+
- static int __init aspeed_clk_probe(struct platform_device *pdev)
+ static void __init aspeed_ast2400_cc(struct regmap *map)
  {
- 	const struct aspeed_clk_soc_data *soc_data;
-@@ -200,6 +302,7 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
- 	struct regmap *map;
  	struct clk_hw *hw;
- 	u32 val, rate;
-+	int i;
- 
- 	map = syscon_node_to_regmap(dev->of_node);
- 	if (IS_ERR(map)) {
-@@ -269,6 +372,31 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
- 			&aspeed_clk_lock);
- 	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
- 
-+	/* There are a number of clocks that not included in this driver as
-+	 * more information is required:
-+	 *   D2-PLL
-+	 *   D-PLL
-+	 *   YCLK
-+	 *   RGMII
-+	 *   RMII
-+	 *   UART[1..5] clock source mux
-+	 */
-+
-+	for (i = 0; i < ARRAY_SIZE(aspeed_gates); i++) {
-+		const struct aspeed_gate_data *gd;
-+
-+		gd = &aspeed_gates[i];
-+		aspeed_clk_data->hws[ASPEED_CLK_GATES + i] =
-+			aspeed_clk_hw_register_gate(NULL, gd->name,
-+					     gd->parent_name,
-+					     gd->flags,
-+					     map,
-+					     gd->clock_idx,
-+					     gd->reset_idx,
-+					     CLK_GATE_SET_TO_DISABLE,
-+					     &aspeed_clk_lock);
-+	}
-+
- 	return 0;
- };
- 
 -- 
 2.14.1
