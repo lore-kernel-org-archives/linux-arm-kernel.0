@@ -1,61 +1,19 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 21 Sep 2017 09:52:39 +0200
-Subject: [PATCH] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
-In-Reply-To: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
-References: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
-Message-ID: <20170921075239.GE3568@kwain>
+From: mikpelinux@gmail.com (Mikael Pettersson)
+Date: Thu, 21 Sep 2017 09:53:27 +0200
+Subject: Possible gcc 4.8.5 bug about RELOC_HIDE marcro
+In-Reply-To: <03f619bd-e3b2-49e0-5f2c-e232974eac12@gmail.com>
+References: <03f619bd-e3b2-49e0-5f2c-e232974eac12@gmail.com>
+Message-ID: <22979.28663.77963.862263@gargle.gargle.HOWL>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
+Jia He writes:
+ > I tried to build kernel 4.14-rc1 on a arm64 server in distro centos 7.3. 
+ > The gcc version is 4.8.5
 
-On Thu, Sep 21, 2017 at 09:36:43AM +0200, Miquel Raynal wrote:
-> From: Christine Gharzuzi <chrisg@marvell.com>
-> +&cps_spi1 {
-> +	status = "okay";
-> +
-> +	spi-flash at 0 {
-> +		#address-cells = <0x1>;
-> +		#size-cells = <0x1>;
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0x0>;
-> +		spi-max-frequency = <20000000>;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			partition at 0 {
-> +				label = "Boot";
-> +				reg = <0x0 0x200000>;
-> +			};
-> +			partition at 200000 {
-> +				label = "Filesystem";
-> +				reg = <0x200000 0xd00000>;
-> +			};
-> +			partition at d00000 {
+I have no input on the specifics of the issue, but please note that gcc-4.8
+is no longer supported or maintained by upstream.  Even gcc-4.9 is EOL, and
+gcc-5 will be EOL:d inn a week or so.  Also I'll note that gcc-4.8 is still
+fairly early wrt to arm64 support, so bugs may be expected.
 
-The node should be 'partition at f00000'.
-
-> +				label = "Boot_2nd";
-> +				reg = <0xf00000 0x100000>;
-> +			};
-> +		};
-> +	};
-> +};
-
-Thanks,
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170921/34acc3e4/attachment.sig>
+In short, please retry with gcc-6.4 or gcc-7.2.
