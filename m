@@ -1,110 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Sep 2017 08:59:07 +0100
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170920224522.GB20974@obsidianresearch.com>
-References: <20170920112152.GL20805@n2100.armlinux.org.uk>
- <20170920162208.GB536@obsidianresearch.com>
- <20170920165141.GP20805@n2100.armlinux.org.uk>
- <20170920224522.GB20974@obsidianresearch.com>
-Message-ID: <20170921075907.GR20805@n2100.armlinux.org.uk>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 21 Sep 2017 09:59:07 +0200
+Subject: [PATCH v4 0/4] Add STM32 DMAMUX support
+In-Reply-To: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <19fea8c6-5c23-025f-6048-532011055044@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 04:45:22PM -0600, Jason Gunthorpe wrote:
-> On Wed, Sep 20, 2017 at 05:51:41PM +0100, Russell King - ARM Linux wrote:
-> > I sort-of agree as far as the time offset information goes, but there's
-> > a complication that we only open the RTC to set the time at the
-> > point in
+Hello
+
+Gentle ping for driver review since DT Bindings have been acked by Rob Herring.
+
+Thanks
+Py
+
+On 09/07/2017 01:52 PM, Pierre-Yves MORDRET wrote:
+> This patchset adds support for the STM32 DMA multiplexer.
+> It allows to map any peripheral DMA request to any channel of the product
+> DMAs.
+> This IP has been introduced with STM32H7 SoC.
 > 
-> Hi Russell,
+> ---
+>  Version history:
+>     v4:
+>         * Add multi-master ability for STM32 DMAMUX
+>         * Get rid of st,dmamux property and custom API between STM32
+>           DMAMUX and DMA. Bindings has changed.
+>           DMAMUX will read DMA masters from Device Tree from now on.
+>           Merely one DMAMUX node is needed now.
+>         * Only STM32 DMA are allowed to be connected onto DMAMUX
+>         * channelID is computed locally within the driver and crafted in
+>           dma_psec to be passed toward DMA master.
+>           DMAMUX router sorts out which DMA master will serve the
+>           request automatically.
+>         * This version forbids the use of DMA in standalone and DMAMUX at
+>           the same time : all clients need to be connected either on DMA
+>           or DMAMUX ; no mix up
+>     v3:
+>         * change compatible to st,stm32h7-dmamux to be mode Soc specific
+>         * add verbosity in dma-cells
+> ---
 > 
-> What do you think of this untested approach in the below patch?
+> Pierre-Yves MORDRET (4):
+>   dt-bindings: Document the STM32 DMAMUX bindings
+>   dmaengine: Add STM32 DMAMUX driver
+>   dt-bindings: stm32-dma: add a property to handle STM32 DMAMUX
+>   ARM: configs: stm32: Add MDMA support in STM32 defconfig
 > 
-> Upon more careful inspection I think I found a way to make the
-> rounding in rtc_set_ntp_time compatible with a wide range of rtc
-> devices, so the subsecond capable ops I suggested do not seem
-> necessary.
-
-Looks like a possibility, but...
-
-> +/* True if now.tv_nsec is close enough to time_sec_nsec that we can call the
-> + * drivers's set_time_ns(). Arbitrarily choose 1ms as the allowable error
-> + * margin.
-> + *
-> + * This also rounds tv_sec to the second that covers the tv_nsec tick we are
-> + * targeting.
-> + */
-> +#define TIME_SET_NSEC_FUZZ (1000*1000)
-> +static inline bool rtc_tv_nsec_ok(struct rtc_device *rtc,
-> +				  struct timespec64 *now)
-> +{
-> +	long diff;
-> +
-> +	diff = (now->tv_nsec - rtc->time_set_nsec) % NSEC_PER_SEC;
-> +	if (diff < TIME_SET_NSEC_FUZZ) {
-> +		if (rtc->time_set_nsec + diff >= NSEC_PER_SEC) {
-> +			now->tv_sec -= 1;
-> +			now->tv_nsec = NSEC_PER_SEC-1;
-> +		}
-> +		return true;
-> +	}
-> +
-> +	diff = (rtc->time_set_nsec - now->tv_nsec) % NSEC_PER_SEC;
-> +	if (diff < TIME_SET_NSEC_FUZZ) {
-> +		if (now->tv_nsec + diff >= NSEC_PER_SEC) {
-> +			now->tv_sec += 1;
-> +			now->tv_nsec = 0;
-> +		}
-> +		return true;
-> +	}
-
-I don't think this is correct - and I think it's overly expensive.
-I threw this into a test program to prove the point, and it confirmed
-my suspicions - the above will always return true.
-
-Here's the test program output:
-
-now=0.990000000, offset=         0: diff= 990000000 true 2: 0.990000000
-now=0.999000000, offset=         0: diff= 999000000 true 2: 0.999000000
-now=0.999900000, offset=         0: diff= 999900000 true 2: 0.999900000
-now=1.000000000, offset=         0: diff=         0 true 1: 1.000000000
-now=1.000100000, offset=         0: diff=    100000 true 1: 1.000100000
-now=1.001000000, offset=         0: diff=   1000000 true 2: 1.001000000
-now=1.010000000, offset=         0: diff=  10000000 true 2: 1.010000000
-now=0.990000000, offset= 470000000: diff= 520000000 true 2: 0.990000000
-now=0.999000000, offset= 470000000: diff= 529000000 true 2: 0.999000000
-now=0.999900000, offset= 470000000: diff= 529900000 true 2: 0.999900000
-now=1.000000000, offset= 470000000: diff=-470000000 true 1: 1.000000000
-now=1.000100000, offset= 470000000: diff=-469900000 true 1: 1.000100000
-now=1.001000000, offset= 470000000: diff=-469000000 true 1: 1.001000000
-now=1.010000000, offset= 470000000: diff=-460000000 true 1: 1.010000000
-now=0.990000000, offset=1000000000: diff= -10000000 true 1: 0.990000000
-now=0.999000000, offset=1000000000: diff=  -1000000 true 1: 0.999000000
-now=0.999900000, offset=1000000000: diff=   -100000 true 1: 0.999900000
-now=1.000000000, offset=1000000000: diff=         0 true 1: 0.999999999
-now=1.000100000, offset=1000000000: diff=-999900000 true 1: 1.000100000
-now=1.001000000, offset=1000000000: diff=-999000000 true 1: 1.001000000
-now=1.010000000, offset=1000000000: diff=-990000000 true 1: 1.010000000
-now=0.990000000, offset=1470000000: diff=-480000000 true 1: 0.990000000
-now=0.999000000, offset=1470000000: diff=-471000000 true 1: 0.999000000
-now=0.999900000, offset=1470000000: diff=-470100000 true 1: 0.999900000
-now=1.000000000, offset=1470000000: diff=-470000000 true 1: 0.999999999
-now=1.000100000, offset=1470000000: diff=-469900000 true 1: 0.999999999
-now=1.001000000, offset=1470000000: diff=-469000000 true 1: 0.999999999
-now=1.010000000, offset=1470000000: diff=-460000000 true 1: 0.999999999
-
-which should be self explanatory.  Another point to note is that
-the computation of the time to be set is also incorrect - for
-example, in the case of offset=0, we can see if we're slightly
-early, we set tv_sec=0 rather than tv_sec=1.
-
-In the offset=1sec case, it also isn't working as we'd expect -
-this case should be providing tv_sec for the preceding second, but
-it doesn't.
-
-I don't yet have a proposal to fix this...
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+>  .../devicetree/bindings/dma/stm32-dma.txt          |   4 +-
+>  .../devicetree/bindings/dma/stm32-dmamux.txt       |  84 ++++++
+>  arch/arm/configs/stm32_defconfig                   |   1 +
+>  drivers/dma/Kconfig                                |   9 +
+>  drivers/dma/Makefile                               |   1 +
+>  drivers/dma/stm32-dmamux.c                         | 321 +++++++++++++++++++++
+>  6 files changed, 419 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+>  create mode 100644 drivers/dma/stm32-dmamux.c
+> 
