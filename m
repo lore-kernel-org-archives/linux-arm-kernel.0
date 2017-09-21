@@ -1,66 +1,100 @@
-From: youngmin.nam@samsung.com (=?UTF-8?B?64Ko7JiB66+8?=)
-Date: Thu, 21 Sep 2017 21:32:29 +0900
-Subject: [PATCH] pinctrl: samsung: add pinctrl_force_sleep() for "sleep"
- pinctrl state
-References: <CGME20170921123230epcas1p4d3c1de108af7d34053d2c4f40dd42119@epcas1p4.samsung.com>
-Message-ID: <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 21 Sep 2017 20:36:07 +0800
+Subject: [PATCH v2] iommu/arm-smmu-v3: Avoid ILLEGAL setting of STE.S1STALLD
+ and CD.S
+Message-ID: <1505997367-51569-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinctrl_for_sleep() in samsung_pinctrl_suspend()
-to support configuration of "sleep" pinctrl state.
+According to Spec, it is ILLEGAL to set STE.S1STALLD if STALL_MODEL
+is not 0b00, which means we should not disable stall mode if stall
+or terminate mode is not configuable.
 
-For example, we can configure "sleep" pinctrl state of "gpf1-6"
-as "INPUT, PULL DOWN" by configuring power down mode register.
+Meanwhile, it is also ILLEGAL when STALL_MODEL==0b10 && CD.S==0 which
+means if stall mode is force we should always set CD.S.
 
-&pinctrl_5 {
-	pinctrl-names = "default","sleep";
-	pinctrl-0 = <&initial5>;
-	pinctrl-1 = <&sleep5>;
+As Jean-Philippe's suggestion, this patch introduce a feature bit
+ARM_SMMU_FEAT_STALL_FORCE, which means smmu only supports stall force.
+Therefore, we can avoid the ILLEGAL setting of STE.S1STALLD.by checking
+ARM_SMMU_FEAT_STALL_FORCE.
 
-	initial5: initial-state {
-		samsung,pins = gpf1-6;
-		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
-	};
-	sleep5: sleep-state {
-		samsung,pins = gpf1-6;
-		samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
-		samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_DOWN>;
-	};
-};
+This patch keeps the ARM_SMMU_FEAT_STALLS as the meaning of stall supported
+(force or configuable) to easy to expand the future function, i.e. we can
+only use ARM_SMMU_FEAT_STALLS to check whether we should register fault
+handle or enable master can_stall, etc to supporte platform SVM.
 
-Signed-off-by: Youngmin Nam <youngmin.nam@samsung.com>
+The feature bit, STE.S1STALLD and CD.S setting will be like:
+
+STALL_MODEL  FEATURE                                         S1STALLD CD.S
+0b00         ARM_SMMU_FEAT_STALLS                                 0b1 0b0
+0b01         !ARM_SMMU_FEAT_STALLS && !ARM_SMMU_FEAT_STALL_FORCE  0b0 0b0
+0b10         ARM_SMMU_FEAT_STALLS && ARM_SMMU_FEAT_STALL_FORCE    0b0 0b1
+
+after apply this patch.
+
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
 ---
- drivers/pinctrl/samsung/pinctrl-samsung.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+v2:
+ * Keep the feature bits backward compatible and add new one at the end
+ * Avoid ILLEGAL of CD.S - both as Jean's suggestion.
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index e04f7fe0a65d..b4d12f8db475 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -1099,6 +1099,11 @@ static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
- {
- 	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
- 	int i;
-+	int ret;
-+
-+	ret = pinctrl_force_sleep(drvdata->pctl_dev);
-+	if (ret)
-+		dev_err(dev, "could not set sleep pinstate %d\n", ret);
+ drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e67ba6c..22a6b08 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -316,6 +316,7 @@
+ #define ARM64_TCR_TBI0_MASK		0x1UL
  
- 	for (i = 0; i < drvdata->nr_banks; i++) {
- 		struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
-@@ -1187,6 +1192,11 @@ static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
- 	if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
- 		drvdata->retention_ctrl->disable(drvdata);
+ #define CTXDESC_CD_0_AA64		(1UL << 41)
++#define CTXDESC_CD_0_S			(1UL << 44)
+ #define CTXDESC_CD_0_R			(1UL << 45)
+ #define CTXDESC_CD_0_A			(1UL << 46)
+ #define CTXDESC_CD_0_ASET_SHIFT		47
+@@ -604,6 +605,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
+ #define ARM_SMMU_FEAT_STALLS		(1 << 11)
+ #define ARM_SMMU_FEAT_HYP		(1 << 12)
++#define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
+ 	u32				features;
  
-+	/* For changing state without writing register. */
-+	if (!IS_ERR(drvdata->pctl_dev->p) &&
-+	    !IS_ERR(drvdata->pctl_dev->hog_default))
-+		drvdata->pctl_dev->p->state = drvdata->pctl_dev->hog_default;
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+@@ -996,6 +998,11 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
+ 	      CTXDESC_CD_0_R | CTXDESC_CD_0_A | CTXDESC_CD_0_ASET_PRIVATE |
+ 	      CTXDESC_CD_0_AA64 | (u64)cfg->cd.asid << CTXDESC_CD_0_ASID_SHIFT |
+ 	      CTXDESC_CD_0_V;
 +
- 	return 0;
- }
++	/* STALL_MODEL==0b10 && CD.S==0 is ILLEGAL */
++	if (smmu->features & ARM_SMMU_FEAT_STALL_FORCE)
++		val |= CTXDESC_CD_0_S;
++
+ 	cfg->cdptr[0] = cpu_to_le64(val);
+ 
+ 	val = cfg->cd.ttbr & CTXDESC_CD_1_TTB0_MASK << CTXDESC_CD_1_TTB0_SHIFT;
+@@ -1112,7 +1119,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ #endif
+ 			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
+ 
+-		if (smmu->features & ARM_SMMU_FEAT_STALLS)
++		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
++		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+ 
+ 		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+@@ -2536,9 +2544,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ 			 coherent ? "true" : "false");
+ 
+ 	switch (reg & IDR0_STALL_MODEL_MASK << IDR0_STALL_MODEL_SHIFT) {
+-	case IDR0_STALL_MODEL_STALL:
+-		/* Fallthrough */
+ 	case IDR0_STALL_MODEL_FORCE:
++		smmu->features |= ARM_SMMU_FEAT_STALL_FORCE;
++		/* Fallthrough */
++	case IDR0_STALL_MODEL_STALL:
+ 		smmu->features |= ARM_SMMU_FEAT_STALLS;
+ 	}
  
 -- 
-2.13.0
+1.7.12.4
