@@ -1,25 +1,42 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Thu, 21 Sep 2017 04:56:56 +0200
-Subject: [PATCH 08/10] ARM: dts: Add nodes for missing omap4 interconnect
- target modules
-In-Reply-To: <20170920224621.16236-9-tony@atomide.com>
-References: <20170920224621.16236-1-tony@atomide.com>
- <20170920224621.16236-9-tony@atomide.com>
-Message-ID: <20170921025656.omeoippus7b4mmig@squirrel.local>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed, 20 Sep 2017 20:24:52 -0700
+Subject: [PATCH 1/2] gpio: brcmstb: Handle return value of devm_kasprintf
+In-Reply-To: <1505891589-6632-2-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1505891589-6632-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1505891589-6632-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <CADtm3G6ngRfbzhOkpyfKnvSSN4F+P3vgLJ-Pfo2zLKdaHDOCBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 03:46:19PM -0700, Tony Lindgren wrote:
-> For AESS there is old Android 3.4 kernel
-> driver available but it's unlikely that anybody is going to update
-> it for the mainline kernel.
+On Wed, Sep 20, 2017 at 12:13 AM, Arvind Yadav
+<arvind.yadav.cs@gmail.com> wrote:
+> devm_kasprintf() can fail here and we must check its return value.
+>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/gpio/gpio-brcmstb.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+> index dd0308c..1227d6e 100644
+> --- a/drivers/gpio/gpio-brcmstb.c
+> +++ b/drivers/gpio/gpio-brcmstb.c
+> @@ -485,6 +485,9 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>                 gc->of_node = np;
+>                 gc->owner = THIS_MODULE;
+>                 gc->label = devm_kasprintf(dev, GFP_KERNEL, "%pOF", dev->of_node);
+> +               if (!gc->label)
+> +                       goto fail;
 
-We do actually hope to get the Audio Engine in ABE working eventually on
-omap5 (which would presumably also make it work on omap4). and there are
-more recent kernels that support it: a TI 3.8 kernel and a 3.15 branch
-from Peter Ujfalusi [1].
+Please also set err to -ENOMEM.
 
-[1] https://pyra-handheld.com/pipermail/kernel/2017-September/002060.html
+> +
+>                 gc->base = gpio_base;
+>                 gc->of_gpio_n_cells = 2;
+>                 gc->of_xlate = brcmstb_gpio_of_xlate;
+> --
+> 1.9.1
+>
 
--- 
-Matthijs van Duin
+Thanks,
+Gregory
