@@ -1,73 +1,48 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Thu, 21 Sep 2017 18:40:25 +0800
-Subject: [PATCH v5 0/6] Add HiSilicon SoC uncore Performance Monitoring
- Unit driver
-In-Reply-To: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <2a9d317a-3811-9661-8211-fc779b27458c@hisilicon.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 21 Sep 2017 16:23:50 +0530
+Subject: [PATCH RESEND 1/2] phy: phy-mtk-tphy: fix NULL point of chip bank
+In-Reply-To: <5ddda7cc6940941b645564afff5afa496d7dbb68.1505989703.git.chunfeng.yun@mediatek.com>
+References: <5ddda7cc6940941b645564afff5afa496d7dbb68.1505989703.git.chunfeng.yun@mediatek.com>
+Message-ID: <02a5e183-444a-bc75-2a4e-1337c9e7872e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark/Will,
 
-Appreciate any comments from you.
 
-Thanks,
-Shaokun
+On Thursday 21 September 2017 04:01 PM, Chunfeng Yun wrote:
+> Chip bank of version-1 is initialized as NULL, but it's used
+> by pcie_phy_instance_power_on/off(), so assign it a right
+> address.
 
-On 2017/8/22 16:07, Shaokun Zhang wrote:
-> This patchset adds support for HiSilicon SoC uncore PMUs driver. It
-> includes L3C, Hydra Home Agent (HHA) and DDRC.
+merged. How was this not noticed before?
+
+Thanks
+Kishon
 > 
-> Changes in v5:
-> * remove unnecessary name/num_events member in hisi_pmu
-> * refactor hisi_pmu_hwevents structure
-> * remove hisi_pmu_alloc function
-> * revise cpuhotplug for L3C PMUs
-> * add cpuhotplug for HHA/DDRC PMUs
-> * fix the name format of uncore PMUs
-> * remove unnecessary variants
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/phy/mediatek/phy-mtk-tphy.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> Changes in v4:
-> * remove redundant code and comments
-> * reverse the functions order in exit function
-> * remove some GPL information
-> * revise including header file
-> * fix Jonathan's other comments
-> 
-> Changes in v3:
-> * rebase to 4.13-rc1
-> * add dev_err if ioremap fails for PMUs
->  
-> Changes in v2:
-> * fix kbuild test robot error
-> * make hisi_uncore_ops static
-> 
-> Shaokun Zhang (6):
->   Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
->   perf: hisi: Add support for HiSilicon SoC uncore PMU driver
->   perf: hisi: Add support for HiSilicon SoC L3C PMU driver
->   perf: hisi: Add support for HiSilicon SoC HHA PMU driver
->   perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
->   arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
-> 
->  Documentation/perf/hisi-pmu.txt               |  53 +++
->  MAINTAINERS                                   |   7 +
->  drivers/perf/Kconfig                          |   7 +
->  drivers/perf/Makefile                         |   1 +
->  drivers/perf/hisilicon/Makefile               |   1 +
->  drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 467 +++++++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 477 +++++++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 482 ++++++++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_pmu.c      | 440 +++++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_pmu.h      | 107 ++++++
->  include/linux/cpuhotplug.h                    |   3 +
->  11 files changed, 2045 insertions(+)
->  create mode 100644 Documentation/perf/hisi-pmu.txt
->  create mode 100644 drivers/perf/hisilicon/Makefile
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+> diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+> index e3baad7..721a2a1 100644
+> --- a/drivers/phy/mediatek/phy-mtk-tphy.c
+> +++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+> @@ -27,6 +27,7 @@
+>  /* banks shared by multiple phys */
+>  #define SSUSB_SIFSLV_V1_SPLLC		0x000	/* shared by u3 phys */
+>  #define SSUSB_SIFSLV_V1_U2FREQ		0x100	/* shared by u2 phys */
+> +#define SSUSB_SIFSLV_V1_CHIP		0x300	/* shared by u3 phys */
+>  /* u2 phy bank */
+>  #define SSUSB_SIFSLV_V1_U2PHY_COM	0x000
+>  /* u3/pcie/sata phy banks */
+> @@ -762,7 +763,7 @@ static void phy_v1_banks_init(struct mtk_tphy *tphy,
+>  	case PHY_TYPE_USB3:
+>  	case PHY_TYPE_PCIE:
+>  		u3_banks->spllc = tphy->sif_base + SSUSB_SIFSLV_V1_SPLLC;
+> -		u3_banks->chip = NULL;
+> +		u3_banks->chip = tphy->sif_base + SSUSB_SIFSLV_V1_CHIP;
+>  		u3_banks->phyd = instance->port_base + SSUSB_SIFSLV_V1_U3PHYD;
+>  		u3_banks->phya = instance->port_base + SSUSB_SIFSLV_V1_U3PHYA;
+>  		break;
 > 
