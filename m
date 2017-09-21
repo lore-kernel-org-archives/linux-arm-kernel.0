@@ -1,166 +1,60 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 21 Sep 2017 17:53:36 +0800
-Subject: [PATCH v1 3/4] arm: dts: mt7623: add display related nodes
-In-Reply-To: <1505869897.27600.6.camel@mtksdaap41>
-References: <cover.1505801355.git.ryder.lee@mediatek.com>
- <0eb19ae1a4717d316cdaec44f6c20bfa8aa24ddc.1505801355.git.ryder.lee@mediatek.com>
- <1505869897.27600.6.camel@mtksdaap41>
-Message-ID: <1505987616.3084.12.camel@mtkswgap22>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Thu, 21 Sep 2017 11:59:27 +0200
+Subject: [RESEND RFC PATCH 0/7] sun8i H3 HDMI glue driver for DW HDMI
+In-Reply-To: <5172c185-c6b5-49c3-cf0a-c3e073459346@synopsys.com>
+References: <20170920200124.20457-1-jernej.skrabec@siol.net>
+ <5172c185-c6b5-49c3-cf0a-c3e073459346@synopsys.com>
+Message-ID: <68fa56f8-9878-12d0-1696-4393abe45db5@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Wed, 2017-09-20 at 09:11 +0800, CK Hu wrote:
-> Hi, Ryder:
+On 09/21/17 11:39, Jose Abreu wrote:
+> Hi Jernej,
 > 
-> Mode comment inline.
+> On 20-09-2017 21:01, Jernej Skrabec wrote:
+>> [added media mailing list due to CEC question]
+>>
+>> This patch series adds a HDMI glue driver for Allwinner H3 SoC. For now, only
+>> video and CEC functionality is supported. Audio needs more tweaks.
+>>
+>> Series is based on the H3 DE2 patch series available on mailing list:
+>> https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.infradead.org_pipermail_linux-2Darm-2Dkernel_2017-2DAugust_522697.html&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=WHDsc6kcWAl4i96Vm5hJ_19IJiuxx_p_Rzo2g-uHDKw&m=coyfcQKSr2asrHcaCeWFmAP_9nkFkRK8s7Uw5bmVei4&s=JCFaMXK1MmZ3jE745_YcqZhZkaqtc6UapGfSSapcz_s&e= 
+>> (ignore patches marked with [NOT FOR REVIEW NOW] tag)
+>>
+>> Patch 1 adds support for polling plug detection since custom PHY used here
+>> doesn't support HPD interrupt.
+>>
+>> Patch 2 enables overflow workaround for v1.32a. This HDMI controller exhibits
+>> same issues as HDMI controller used in iMX6 SoCs.
+>>
+>> Patch 3 adds CLK_SET_RATE_PARENT to hdmi clock.
+>>
+>> Patch 4 adds dt bindings documentation.
+>>
+>> Patch 5 adds actual H3 HDMI glue driver.
+>>
+>> Patch 6 and 7 add HDMI node to DT and enable it where needed.
+>>
+>> Allwinner used DW HDMI controller in a non standard way:
+>> - register offsets obfuscation layer, which can fortunately be turned off
+>> - register read lock, which has to be disabled by magic number
+>> - custom PHY, which have to be initialized before DW HDMI controller
+>> - non standard clocks
+>> - no HPD interrupt
+>>
+>> Because of that, I have two questions:
+>> - Since HPD have to be polled, is it enough just to enable poll mode? I'm
+>>   mainly concerned about invalidating CEC address here.
 > 
-> On Tue, 2017-09-19 at 14:27 +0800, Ryder Lee wrote:
->  
-> > +	smi_common: smi at 1000c000 {
-> > +		compatible = "mediatek,mt7623-smi-common",
-> > +			     "mediatek,mt2701-smi-common";
-> > +		reg = <0 0x1000c000 0 0x1000>;
-> > +		clocks = <&infracfg CLK_INFRA_SMI>,
-> > +			 <&mmsys CLK_MM_SMI_COMMON>,
-> > +			 <&infracfg CLK_INFRA_SMI>;
-> > +		clock-names = "apb", "smi", "async";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-> > +	};
-> > +
+> You mean you get no interrupt when HPD status changes? Hans can
+> answer this better but then you will need to invalidate the cec
+> physical address yourself because right now its invalidated in
+> the dw-hdmi irq handler (see dw_hdmi_irq()).
 
-> > +	iommu: mmsys_iommu at 10205000 {
-> > +		compatible = "mediatek,mt7623-m4u",
-> > +			     "mediatek,mt2701-m4u";
-> > +		reg = <0 0x10205000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&infracfg CLK_INFRA_M4U>;
-> > +		clock-names = "bclk";
-> > +		mediatek,larbs = <&larb0 &larb1 &larb2>;
-> > +		#iommu-cells = <1>;
-> > +	};
-> > +
-> > +	mmsys: syscon at 14000000 {
-> > +		compatible = "mediatek,mt7623-mmsys",
-> > +			     "mediatek,mt2701-mmsys",
-> > +			     "syscon";
-> > +		reg = <0 0x14000000 0 0x1000>;
-> > +		#clock-cells = <1>;
-> > +	};
-> > +
+That's correct. When the HPD goes low you need to call cec_notifier_phys_addr_invalidate()
+to invalidate the physical address. This is not terribly time sensitive, i.e.
+checking this once a second would be quick enough.
 
-> > +	larb0: larb at 14010000 {
-> > +		compatible = "mediatek,mt7623-smi-larb",
-> > +			     "mediatek,mt2701-smi-larb";
-> > +		reg = <0 0x14010000 0 0x1000>;
-> > +		mediatek,smi = <&smi_common>;
-> > +		mediatek,larb-id = <0>;
-> > +		clocks = <&mmsys CLK_MM_SMI_LARB0>,
-> > +			 <&mmsys CLK_MM_SMI_LARB0>;
-> > +		clock-names = "apb", "smi";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-> > +	};
+Regards,
 
-> > +	imgsys: syscon at 15000000 {
-> > +		compatible = "mediatek,mt7623-imgsys",
-> > +			     "mediatek,mt2701-imgsys",
-> > +			     "syscon";
-> > +		reg = <0 0x15000000 0 0x1000>;
-> > +		#clock-cells = <1>;
-> > +	};
-> > +
-> > +	larb2: larb at 15001000 {
-> > +		compatible = "mediatek,mt7623-smi-larb",
-> > +			     "mediatek,mt2701-smi-larb";
-> > +		reg = <0 0x15001000 0 0x1000>;
-> > +		mediatek,smi = <&smi_common>;
-> > +		mediatek,larb-id = <2>;
-> > +		clocks = <&imgsys CLK_IMG_SMI_COMM>,
-> > +			 <&imgsys CLK_IMG_SMI_COMM>;
-> > +		clock-names = "apb", "smi";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-> > +	};
-> > +
-> > +	jpegdec: jpegdec at 15004000 {
-> > +		compatible = "mediatek,mt7623-jpgdec",
-> > +			     "mediatek,mt2701-jpgdec";
-> > +		reg = <0 0x15004000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
-> > +			  <&imgsys CLK_IMG_JPGDEC>;
-> > +		clock-names = "jpgdec-smi",
-> > +			      "jpgdec";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-> > +		mediatek,larb = <&larb2>;
-> > +		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
-> > +			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
-> > +	};
-> 
-> jpegdec and some other device node is not related to display. I think
-> you should move them to another patch.
-
-Yes, you're right.
-> > +
-> > +	vdecsys: syscon at 16000000 {
-> > +		compatible = "mediatek,mt7623-vdecsys",
-> > +			     "mediatek,mt2701-vdecsys",
-> > +			     "syscon";
-> > +		reg = <0 0x16000000 0 0x1000>;
-> > +		#clock-cells = <1>;
-> > +	};
-> > +
-> > +	larb1: larb at 16010000 {
-> > +		compatible = "mediatek,mt7623-smi-larb",
-> > +			     "mediatek,mt2701-smi-larb";
-> > +		reg = <0 0x16010000 0 0x1000>;
-> > +		mediatek,smi = <&smi_common>;
-> > +		mediatek,larb-id = <1>;
-> > +		clocks = <&vdecsys CLK_VDEC_CKGEN>,
-> > +			 <&vdecsys CLK_VDEC_LARB>;
-> > +		clock-names = "apb", "smi";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
-> > +	};
-> > +
-> >  	hifsys: syscon at 1a000000 {
-> >  		compatible = "mediatek,mt7623-hifsys",
-> >  			     "mediatek,mt2701-hifsys",
-> > @@ -799,4 +1001,12 @@
-> >  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-> >  		status = "disabled";
-> >  	};
-> > +
-> > +	bdpsys: syscon at 1c000000 {
-> > +		compatible = "mediatek,mt7623-bdpsys",
-> > +			     "mediatek,mt2701-bdpsys",
-> > +			     "syscon";
-> > +		reg = <0 0x1c000000 0 0x1000>;
-> > +		#clock-cells = <1>;
-> > +	};
-> >  };
-
-I will move these nodes to different patches.
-
-> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > index 688a863..267a05a 100644
-> > --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > @@ -17,6 +17,17 @@
-> >  		serial2 = &uart2;
-> >  	};
-> >  
-> > +	backlight_lcd: backlight_lcd {
-> > +		compatible = "pwm-backlight";
-> > +		pwms = <&bls 0 100000>;
-> > +		brightness-levels = <
-> > +			  0  16  32  48  64  80  96 112
-> > +			128 144 160 176 192 208 224 240
-> > +			255
-> > +		>;
-> > +		default-brightness-level = <9>;
-> > +	};
-> > +
-> 
-> I think this patch only for mt7623 common dtsi modification. This part
-> is just for bananapi-bpi-r2, so move non-common part to another patch.
-> 
-Okay.
+	Hans
