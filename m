@@ -1,54 +1,38 @@
 From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 21 Sep 2017 14:29:19 +0530
-Subject: [PATCH 1/4] mm: move function alloc_pages_exact_nid out of __meminit
+Date: Thu, 21 Sep 2017 14:29:20 +0530
+Subject: [PATCH 2/4] numa,
+ iommu/io-pgtable-arm: Use NUMA aware memory allocation for smmu
+ translation tables
 In-Reply-To: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
 References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170921085922.11659-2-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170921085922.11659-3-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function can be used on NUMA systems in place of alloc_pages_exact
-Adding code to export and to remove __meminit section tagging.
+function __arm_lpae_alloc_pages is used to allcoated memory for smmu
+translation tables. updating function to allocate memory/pages
+from the proximity domain of SMMU device.
 
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- include/linux/gfp.h | 2 +-
- mm/page_alloc.c     | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/iommu/io-pgtable-arm.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/gfp.h b/include/linux/gfp.h
-index f780718..a4bd234 100644
---- a/include/linux/gfp.h
-+++ b/include/linux/gfp.h
-@@ -528,7 +528,7 @@ extern unsigned long get_zeroed_page(gfp_t gfp_mask);
- 
- void *alloc_pages_exact(size_t size, gfp_t gfp_mask);
- void free_pages_exact(void *virt, size_t size);
--void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask);
-+void *alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask);
- 
- #define __get_free_page(gfp_mask) \
- 		__get_free_pages((gfp_mask), 0)
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index c841af8..7975870 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -4442,7 +4442,7 @@ EXPORT_SYMBOL(alloc_pages_exact);
-  * Like alloc_pages_exact(), but try to allocate on node nid first before falling
-  * back.
-  */
--void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
-+void *alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index e8018a3..f6d01f6 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -215,8 +215,10 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
  {
- 	unsigned int order = get_order(size);
- 	struct page *p = alloc_pages_node(nid, gfp_mask, order);
-@@ -4450,6 +4450,7 @@ void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
- 		return NULL;
- 	return make_alloc_exact((unsigned long)page_address(p), order, size);
- }
-+EXPORT_SYMBOL(alloc_pages_exact_nid);
+ 	struct device *dev = cfg->iommu_dev;
+ 	dma_addr_t dma;
+-	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
++	void *pages;
  
- /**
-  * free_pages_exact - release memory allocated via alloc_pages_exact()
++	pages = alloc_pages_exact_nid(dev_to_node(dev), size,
++			gfp | __GFP_ZERO);
+ 	if (!pages)
+ 		return NULL;
+ 
 -- 
 2.9.4
