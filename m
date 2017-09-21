@@ -1,74 +1,40 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 21 Sep 2017 23:20:11 +0800
-Subject: [RFC PATCH 0/7] AXP803 AC/Battery support
-In-Reply-To: <20170921154621.0000328d@huawei.com>
-References: <20170920151814.22461-1-icenowy@aosc.io>
- <20170921154621.0000328d@huawei.com>
-Message-ID: <CF74A2A9-B9F4-4413-975B-A0F4B24686A3@aosc.io>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Thu, 21 Sep 2017 17:29:21 +0200
+Subject: [PATCH v5 4/4] ARM: configs: stm32: Add DMAMUX support in STM32
+ defconfig
+In-Reply-To: <1506007761-11621-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1506007761-11621-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1506007761-11621-5-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds DMAMUX support in STM32 defconfig file
 
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+ Version history:
+    v5:
+    v4:
+    v3:
+    v2:
+        * None
+---
+---
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-? 2017?9?21? GMT+08:00 ??10:46:21, Jonathan Cameron <Jonathan.Cameron@huawei.com> ??:
->On Wed, 20 Sep 2017 23:18:07 +0800
->Icenowy Zheng <icenowy@aosc.io> wrote:
->
->> The AXP803 PMIC, used by most Allwinner A64 boards, features 3 power
->inputs:
->> AC, USB and Battery.
->> 
->> This patchset adds support for the AC and Battery supplies, which is
->useful
->> for the boards from Pine64 (Pine64, SoPine w/ baseboard model A,
->Pinebook).
->> 
->> The USB supply is not yet supported in this patchset because it's not
->> present on Pine series boards.
->> 
->> In order to enable battery monitoring the ADC for battery is also
->enabled
->> for AXs.
->> 
->> In order to enable battery monitoring the ADC for battery is also
->enabled
->> for AXP803.
->
->I'll go with the obvious question...
->
->Why an RFC rather than a standard patch submission? I'm not immediately
->seeing what is controversial!
-
-Oh I am just not confident about this patchset,
-especially the IIO part.
-
->
->Jonathan
->
->> 
->> Icenowy Zheng (7):
->>   dt-bindings: add compatibles for AXP803 Battery/USB power supplies
->>   iio: adc: axp20x-adc: allow to skip ADC rate setup now
->>   iio: adc: axp20x-adc: add support for AXP803
->>   power: supply: axp20x-battery: support AXP803
->>   mfd: axp20x: add cells for AXP803 ADC/AC Power/Battery
->>   arm64: allwinner: a64: add power supply nodes in AXP803 DTSI
->>   arm64: allwinner: a64: enable AC and Battery for Pine64
->> 
->>  .../bindings/power/supply/axp20x_battery.txt       |   1 +
->>  .../bindings/power/supply/axp20x_usb_power.txt     |   1 +
->>  arch/arm64/boot/dts/allwinner/axp803.dtsi          |  15 +++
->>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |   8 ++
->>  drivers/iio/adc/axp20x_adc.c                       | 114
->++++++++++++++++++++-
->>  drivers/mfd/axp20x.c                               |  11 ++
->>  drivers/power/supply/axp20x_battery.c              |  88
->++++++++++++++--
->>  7 files changed, 226 insertions(+), 12 deletions(-)
->> 
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 90e5c46..988f395 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_STM32=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
++CONFIG_STM32_DMAMUX=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
+-- 
+2.7.4
