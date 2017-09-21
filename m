@@ -1,66 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Sep 2017 15:46:20 -0700
-Subject: [PATCH 09/10] ARM: dts: Configure SmartReflex only to idle the
- interconnect target module
-In-Reply-To: <20170920224621.16236-1-tony@atomide.com>
-References: <20170920224621.16236-1-tony@atomide.com>
-Message-ID: <20170920224621.16236-10-tony@atomide.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 20 Sep 2017 17:13:56 -0700
+Subject: [PATCH] drm/rockchip: Fix uninitialized use of ret
+Message-ID: <20170921001408.1839-1-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TRM has marked dra7 SmartReflex as reserved and we should not
-touch those registers as pointed out by Nishanth Menon <nm@ti.com>.
-We do still want to idle the related interconnect target modules on
-init though.
+If there are no children for lvds, ret is used uninitialized. This patch
+initializes ret and returns an error if the port has no children.
 
-Let's do this by only configuring the generic interconnect target modules
-and not add the child SmartReflex devices.
-
-Cc: Lokesh Vutla <lokeshvutla@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
+Cc: Mark Yao <mark.yao@rock-chips.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Sandy Huang <hjc@rock-chips.com>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
- arch/arm/boot/dts/dra7.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_lvds.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1497,6 +1497,32 @@
- 			};
- 		};
+diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+index c5fbe533796c..0ce6205d8d80 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
++++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+@@ -346,7 +346,7 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
+ 	struct drm_connector *connector;
+ 	struct device_node *remote = NULL;
+ 	struct device_node  *port, *endpoint;
+-	int ret;
++	int ret = 0, child_count = 0;
+ 	const char *name;
+ 	u32 endpoint_id;
  
-+		target-module at 4a0dd000 {
-+			compatible = "ti,sysc-omap4-sr";
-+			ti,hwmods = "smartreflex_core";
-+			reg = <0x4a0dd000 0x4>,
-+			      <0x4a0dd008 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x4a0dd000 0x001000>;
-+
-+			/* SmartReflex child device marked reserved in TRM */
-+		};
-+
-+		target-module at 4a0d9000 {
-+			compatible = "ti,sysc-omap4-sr";
-+			ti,hwmods = "smartreflex_mpu";
-+			reg = <0x4a0d9000 0x4>,
-+			      <0x4a0d9008 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x4a0d9000 0x001000>;
-+
-+			/* SmartReflex child device marked reserved in TRM */
-+		};
-+
- 		omap_dwc3_1: omap_dwc3_1 at 48880000 {
- 			compatible = "ti,dwc3";
- 			ti,hwmods = "usb_otg_ss1";
+@@ -358,13 +358,18 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
+ 		return -EINVAL;
+ 	}
+ 	for_each_child_of_node(port, endpoint) {
++		child_count++;
+ 		of_property_read_u32(endpoint, "reg", &endpoint_id);
+ 		ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
+ 						  &lvds->panel, &lvds->bridge);
+ 		if (!ret)
+ 			break;
+ 	}
+-	if (ret) {
++	if (!child_count) {
++		DRM_DEV_ERROR(dev, "lvds port does not have any children\n");
++		ret  = -EINVAL;
++		goto err_put_port;
++	} else if (ret) {
+ 		DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
+ 		ret  = -EPROBE_DEFER;
+ 		goto err_put_port;
 -- 
-2.14.1
+2.14.1.821.g8fa685d3b7-goog
