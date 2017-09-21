@@ -1,89 +1,44 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 21 Sep 2017 19:32:58 +0800
-Subject: [PATCH] ACPI/IORT: Fix PCI ACS enablement
-In-Reply-To: <20170919170539.6265-1-lorenzo.pieralisi@arm.com>
-References: <20170919170539.6265-1-lorenzo.pieralisi@arm.com>
-Message-ID: <59C3A36A.2060202@hisilicon.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 21 Sep 2017 14:35:32 +0300
+Subject: [PATCH] dmaengine: ti-dma-crossbar: Fix possible race condition with
+ dma_inuse
+Message-ID: <20170921113532.15297-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/9/20 1:05, Lorenzo Pieralisi wrote:
-> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> workarounds") removed kernel code that was allowing to initialize
-> and probe the SMMU devices early (ie earlier than PCI devices through
-> linker script callback entries) in the boot process because it was not
-> needed any longer in that the SMMU devices/drivers now support deferred
-> probing.
-> 
-> Since the SMMUs probe routines are also in charge of requesting global
-> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
-> up early-probing workarounds") also postponed PCI ACS enablement to
-> SMMUs devices probe time, which may be too late given that PCI devices
-> needs to detect if PCI ACS is enabled to init the respective capability
-> through the following call path:
-> 
-> pci_device_add()
->  -> pci_init_capabilities()
->   -> pci_enable_acs()
-> 
-> Add code in the ACPI IORT SMMU platform devices initialization path
-> (that is called before ACPI PCI enumeration) to detect if an SMMU is
-> present in HW and enable PCI ACS if it actually is, restoring the
-> correct PCI ACS enablement sequencing.
-> 
-> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> Signed-workarounds")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> Cc: Alex Williamson <alex.williamson@redhat.com>
-> ---
->  drivers/acpi/arm64/iort.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 9565d57..71a7694 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -1184,6 +1184,7 @@ static void __init iort_init_platform_devices(void)
->  	struct acpi_table_iort *iort;
->  	struct fwnode_handle *fwnode;
->  	int i, ret;
-> +	bool smmu_detected = false;
->  
->  	/*
->  	 * iort_table and iort both point to the start of IORT table, but
-> @@ -1218,11 +1219,21 @@ static void __init iort_init_platform_devices(void)
->  				acpi_free_fwnode_static(fwnode);
->  				return;
->  			}
-> +
-> +			smmu_detected = true;
->  		}
->  
->  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
->  					 iort_node->length);
->  	}
-> +
-> +	/*
-> +	 * If IORT reports an SMMU component make sure PCI ACS is
-> +	 * requested so that PCI devices can enable it in their
-> +	 * capabilities.
-> +	 */
-> +	if (smmu_detected)
-> +		pci_request_acs();
->  }
->  
->  void __init acpi_iort_init(void)
->
+?When looking for unused xbar_out lane we should also protect the set_bit()
+call with the same mutex to protect against concurrent threads picking the
+same ID.
 
-Hi Lorenzo,
+Fixes: ec9bfa1e1a796 ("dmaengine: ti-dma-crossbar: dra7: Use bitops instead of idr")
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: stable at vger.kernel.org
+---
+ drivers/dma/ti-dma-crossbar.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I tested this patch, it works well in my HiSilicon Hip08 based system.
-However, setting ACS flag at the stage of SMMU device init seems not good,
-I mean what if in one system there are only platform devices connected to
-SMMU device.
+diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
+index 10ef9d5d5a66..7df910e7c348 100644
+--- a/drivers/dma/ti-dma-crossbar.c
++++ b/drivers/dma/ti-dma-crossbar.c
+@@ -262,13 +262,14 @@ static void *ti_dra7_xbar_route_allocate(struct of_phandle_args *dma_spec,
+ 	mutex_lock(&xbar->mutex);
+ 	map->xbar_out = find_first_zero_bit(xbar->dma_inuse,
+ 					    xbar->dma_requests);
+-	mutex_unlock(&xbar->mutex);
+ 	if (map->xbar_out == xbar->dma_requests) {
++		mutex_unlock(&xbar->mutex);
+ 		dev_err(&pdev->dev, "Run out of free DMA requests\n");
+ 		kfree(map);
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 	set_bit(map->xbar_out, xbar->dma_inuse);
++	mutex_unlock(&xbar->mutex);
+ 
+ 	map->xbar_in = (u16)dma_spec->args[0];
+ 
+-- 
+2.14.1
 
-Best,
-Zhou
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
