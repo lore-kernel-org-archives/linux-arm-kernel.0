@@ -1,77 +1,99 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 21 Sep 2017 15:18:25 +0200
-Subject: [PATCH v2 7/8] arm64: dts: renesas: initial Eagle board device
- tree
-In-Reply-To: <20170915194445.950496886@cogentembedded.com>
-References: <20170915194445.950496886@cogentembedded.com>
-Message-ID: <CAMuHMdUX+RW9H-p5n_JB-SkW8k5g_i0bg-i9LD59b5MLvFm3YQ@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 21 Sep 2017 21:17:16 +0800
+Subject: [RFC PATCH v2 2/4] ACPI: IORT: lookup iort node via fwnode
+In-Reply-To: <1505999838-52530-1-git-send-email-guohanjun@huawei.com>
+References: <1505999838-52530-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1505999838-52530-3-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 15, 2017 at 9:43 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
-> The board has 1 debug serial port (SCIF0); include support for it,
-> so that the serial console can work.
->
-> Based on the original (and large) patch by Vladimir Barinov
-> <vladimir.barinov@cogentembedded.com>.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Now we have a helper function iort_get_fwnode() which
+lookup fwnode via iort node for SMMU, but sometimes we
+just need something exctly the opposite, which means we
+need to get the iort node via fwnode.
 
-> --- /dev/null
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> @@ -0,0 +1,45 @@
-> +/*
-> + * Device Tree Source for the Eagle board
-> + *
-> + * Copyright (C) 2016-2017 Renesas Electronics Corp.
-> + * Copyright (C) 2017 Cogent Embedded, Inc.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +#include "r8a77970.dtsi"
-> +
-> +/ {
-> +       model = "Renesas Eagle board based on r8a77970";
-> +       compatible = "renesas,eagle", "renesas,r8a77970";
-> +
-> +       aliases {
-> +               serial0 = &scif0;
-> +       };
-> +
-> +       chosen {
-> +               bootargs = "ignore_loglevel";
-> +               stdout-path = "serial0:115200n8";
-> +       };
-> +
-> +       memory at 48000000 {
-> +               device_type = "memory";
-> +               /* first 128MB is reserved for secure area. */
-> +               reg = <0x0 0x48000000 0x0 0x38000000>;
-> +       };
-> +};
-> +
-> +&extal_clk {
-> +       clock-frequency = <16666666>;
+For example, we need to get SMMU's iort node when adding
+support for SMMU MSI, but SMMU is not a named component
+which has a associated device node in DSDT, that means
+we can't match the ACPI full path name to get the iort
+node for SMMU.
 
-Nitpicking: the schematics say 16.6666 MHz
-At 100 ppm accuracy that's the same, though.
+But with SMMU or other devices in IORT probed as platform
+device, it created a fwnode to associate with the iort
+node, so we introduce iort_get_iort_node() to get the
+iort node via fwnode.
 
-Gr{oetje,eeting}s,
+This can be extended to PMCG node usage in IORT too.
 
-                        Geert
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 9565d57..db71d7f 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -126,6 +126,31 @@ static inline void iort_delete_fwnode(struct acpi_iort_node *node)
+ 	spin_unlock(&iort_fwnode_lock);
+ }
+ 
++/**
++ * iort_get_iort_node() - Retrieve iort_node associated with an fwnode
++ *
++ * @fwnode: fwnode associated with device to be looked-up
++ *
++ * Returns: iort_node pointer on success, NULL on failure
++ */
++static inline
++struct acpi_iort_node *iort_get_iort_node(struct fwnode_handle *fwnode)
++{
++	struct iort_fwnode *curr;
++	struct acpi_iort_node *iort_node = NULL;
++
++	spin_lock(&iort_fwnode_lock);
++	list_for_each_entry(curr, &iort_fwnode_list, list) {
++		if (curr->fwnode == fwnode) {
++			iort_node = curr->iort_node;
++			break;
++		}
++	}
++	spin_unlock(&iort_fwnode_lock);
++
++	return iort_node;
++}
++
+ typedef acpi_status (*iort_find_node_callback)
+ 	(struct acpi_iort_node *node, void *context);
+ 
+@@ -424,9 +449,25 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
+ {
+ 	struct pci_bus *pbus;
+ 
+-	if (!dev_is_pci(dev))
++	if (!dev_is_pci(dev)) {
++		struct acpi_iort_node *node;
++		/*
++		 * scan iort_fwnode_list to see if it's an iort platform
++		 * device (such as SMMU, PMCG),its iort node already cached
++		 * and associated with fwnode when iort platform devices
++		 * were initialized.
++		 */
++		node = iort_get_iort_node(dev->fwnode);
++		if (node)
++			return node;
++
++		/*
++		 * if not, then it should be a platform device defined in
++		 * DSDT/SSDT (with Named Component node in IORT)
++		 */
+ 		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+ 				      iort_match_node_callback, dev);
++	}
+ 
+ 	/* Find a PCI root bus */
+ 	pbus = to_pci_dev(dev)->bus;
+-- 
+1.7.12.4
