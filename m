@@ -1,54 +1,88 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Thu, 21 Sep 2017 08:53:00 +0000
-Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
-In-Reply-To: <20170921084219.GK15749@verge.net.au>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
- <CAMuHMdVFPiXe9trwprNfX=p8-OKbrcgVSrwmveYhXGm=kd2bfQ@mail.gmail.com>
- <20170921083839.GH15749@verge.net.au> <20170921084219.GK15749@verge.net.au>
-Message-ID: <TY1PR06MB089549AB7DCF1C03605EF421C0660@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 21 Sep 2017 14:24:42 +0530
+Subject: [PATCH V5 1/4] soc: brcmstb: Add Product ID and Family ID helper
+ functions
+In-Reply-To: <3aefb1ca-827d-6ebf-03c6-1f0d41e5da5c@gmail.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+ <1503683495-11766-2-git-send-email-alcooperx@gmail.com>
+ <3aefb1ca-827d-6ebf-03c6-1f0d41e5da5c@gmail.com>
+Message-ID: <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Hi,
 
-> -----Original Message-----
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: 21 September 2017 09:42
-> To: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Chris Paterson <Chris.Paterson2@renesas.com>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Magnus Damm <magnus.damm@gmail.com>; Russell King <linux@armlinux.org.uk>; Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com>; devicetree at vger.kernel.org; Linux-Renesas <linux-renesas-soc@vger.kernel.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
->
-> On Thu, Sep 21, 2017 at 10:38:40AM +0200, Simon Horman wrote:
-> > On Wed, Sep 20, 2017 at 01:40:20PM +0200, Geert Uytterhoeven wrote:
-> > > On Wed, Sep 13, 2017 at 7:05 PM, Chris Paterson
-> > > <chris.paterson2@renesas.com> wrote:
-> > > > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > > >
-> > > > Enable the SDHI0 controller on iWave RZ/G1E carrier board.
-> > > >
-> > > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> > >
-> > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> > Thanks, applied.
->
-> Sorry, I somehow overlooked Fabrizio's comments.
-> I have dropped this patch for now.
+On Saturday 02 September 2017 07:45 AM, Florian Fainelli wrote:
+> 
+> 
+> On 08/25/2017 10:51 AM, Al Cooper wrote:
+>> Signed-off-by: Al Cooper <alcooperx@gmail.com>
+> 
+> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Thank you for doing this.
-We are working on a new patch now, I'll submit a V2 as soon as it is ready.
-Just to recap (all in one place), we found an HW issue and a SW one preventing SDHI0 from working properly at UHS SDR50 and SDR104, therefore we need a new patch to limit the speed of this interface.
+I get the following checkpatch warning
+CHECK: Macro argument reuse 'reg' - possible side-effects?
+#110: FILE: include/linux/soc/brcmstb/brcmstb.h:4:
++#define BRCM_ID(reg)	((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
 
-Thanks,
-Fabrizio
+Can you fix it and resend. While at that also add commmit log.
 
+Thanks
+Kishon
 
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+> 
+>> ---
+>>  drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
+>>  include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
+>>  2 files changed, 22 insertions(+)
+>>
+>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+>> index b6195fd..184dbf5 100644
+>> --- a/drivers/soc/bcm/brcmstb/common.c
+>> +++ b/drivers/soc/bcm/brcmstb/common.c
+>> @@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
+>>  	return of_match_node(brcmstb_machine_match, root) != NULL;
+>>  }
+>>  
+>> +u32 brcmstb_get_family_id(void)
+>> +{
+>> +	return family_id;
+>> +}
+>> +EXPORT_SYMBOL(brcmstb_get_family_id);
+>> +
+>> +u32 brcmstb_get_product_id(void)
+>> +{
+>> +	return product_id;
+>> +}
+>> +EXPORT_SYMBOL(brcmstb_get_product_id);
+>> +
+>>  static const struct of_device_id sun_top_ctrl_match[] = {
+>>  	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
+>>  	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
+>> diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+>> index 337ce41..23e4dc9 100644
+>> --- a/include/linux/soc/brcmstb/brcmstb.h
+>> +++ b/include/linux/soc/brcmstb/brcmstb.h
+>> @@ -1,10 +1,20 @@
+>>  #ifndef __BRCMSTB_SOC_H
+>>  #define __BRCMSTB_SOC_H
+>>  
+>> +#define BRCM_ID(reg)	((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+>> +#define BRCM_REV(reg)	((u32)reg & 0xff)
+>> +
+>>  /*
+>>   * Bus Interface Unit control register setup, must happen early during boot,
+>>   * before SMP is brought up, called by machine entry point.
+>>   */
+>>  void brcmstb_biuctrl_init(void);
+>>  
+>> +/*
+>> + * Helper functions for getting family or product id from the
+>> + * SoC driver.
+>> + */
+>> +u32 brcmstb_get_family_id(void);
+>> +u32 brcmstb_get_product_id(void);
+>> +
+>>  #endif /* __BRCMSTB_SOC_H */
+>>
+> 
