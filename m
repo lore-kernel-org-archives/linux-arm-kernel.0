@@ -1,27 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 21 Sep 2017 20:13:41 +0530
-Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
-In-Reply-To: <20170920180132.4373-1-s-anna@ti.com>
-References: <20170920180132.4373-1-s-anna@ti.com>
-Message-ID: <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Thu, 21 Sep 2017 15:46:21 +0100
+Subject: [RFC PATCH 0/7] AXP803 AC/Battery support
+In-Reply-To: <20170920151814.22461-1-icenowy@aosc.io>
+References: <20170920151814.22461-1-icenowy@aosc.io>
+Message-ID: <20170921154621.0000328d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
-> Enable the CMA and DMA_CMA Kconfig options by default for
-> Davinci platforms. Davinci remoteproc driver is one of the
-> modules that depends on these options, and this allows the
-> driver to be made visible for selection with menuconfig.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
-> Hi Sekhar,
-> 
-> Here's the patch that enables CMA as per your request. Patch based
-> on your v4.15/defconfig branch.
+On Wed, 20 Sep 2017 23:18:07 +0800
+Icenowy Zheng <icenowy@aosc.io> wrote:
 
-Applied! I guess you will be sending another patch enabling the
-remoteproc driver itself?
+> The AXP803 PMIC, used by most Allwinner A64 boards, features 3 power inputs:
+> AC, USB and Battery.
+> 
+> This patchset adds support for the AC and Battery supplies, which is useful
+> for the boards from Pine64 (Pine64, SoPine w/ baseboard model A, Pinebook).
+> 
+> The USB supply is not yet supported in this patchset because it's not
+> present on Pine series boards.
+> 
+> In order to enable battery monitoring the ADC for battery is also enabled
+> for AXs.
+> 
+> In order to enable battery monitoring the ADC for battery is also enabled
+> for AXP803.
 
-Thanks,
-Sekhar
+I'll go with the obvious question...
+
+Why an RFC rather than a standard patch submission? I'm not immediately
+seeing what is controversial!
+
+Jonathan
+
+> 
+> Icenowy Zheng (7):
+>   dt-bindings: add compatibles for AXP803 Battery/USB power supplies
+>   iio: adc: axp20x-adc: allow to skip ADC rate setup now
+>   iio: adc: axp20x-adc: add support for AXP803
+>   power: supply: axp20x-battery: support AXP803
+>   mfd: axp20x: add cells for AXP803 ADC/AC Power/Battery
+>   arm64: allwinner: a64: add power supply nodes in AXP803 DTSI
+>   arm64: allwinner: a64: enable AC and Battery for Pine64
+> 
+>  .../bindings/power/supply/axp20x_battery.txt       |   1 +
+>  .../bindings/power/supply/axp20x_usb_power.txt     |   1 +
+>  arch/arm64/boot/dts/allwinner/axp803.dtsi          |  15 +++
+>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |   8 ++
+>  drivers/iio/adc/axp20x_adc.c                       | 114 ++++++++++++++++++++-
+>  drivers/mfd/axp20x.c                               |  11 ++
+>  drivers/power/supply/axp20x_battery.c              |  88 ++++++++++++++--
+>  7 files changed, 226 insertions(+), 12 deletions(-)
+> 
