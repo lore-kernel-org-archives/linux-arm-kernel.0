@@ -1,23 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Sep 2017 18:12:40 -0500
-Subject: [PATCH] nvmem: sunxi-sid: add support for A64/H5's SID controller
-In-Reply-To: <20170918154204.54427-1-icenowy@aosc.io>
-References: <20170918154204.54427-1-icenowy@aosc.io>
-Message-ID: <20170921231240.tsoapk6zlwcysiud@rob-hp-laptop>
+Date: Thu, 21 Sep 2017 18:14:52 -0500
+Subject: [v5 04/12] dt-bindings: soc/fsl: Update reserved memory binding
+ for QBMan
+In-Reply-To: <1505767187-4596-5-git-send-email-roy.pledge@nxp.com>
+References: <1505767187-4596-1-git-send-email-roy.pledge@nxp.com>
+ <1505767187-4596-5-git-send-email-roy.pledge@nxp.com>
+Message-ID: <20170921231452.if6soolp6tzawbmx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 11:42:04PM +0800, Icenowy Zheng wrote:
-> Allwinner A64/H5 SoCs come with a SID controller like the one in H3, but
-> without the silicon bug that makes the initial value at 0x200 wrong, so
-> the value at 0x200 can be directly read.
+On Mon, Sep 18, 2017 at 04:39:39PM -0400, Roy Pledge wrote:
+> Updates the QMan and BMan device tree bindings for reserved memory
+> nodes. This makes the reserved memory allocation compatible with
+> the shared-dma-pool usage.
 > 
-> Add support for this kind of SID controller.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 > ---
->  Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
->  drivers/nvmem/sunxi_sid.c                                       | 6 ++++++
->  2 files changed, 7 insertions(+)
+>  Documentation/devicetree/bindings/soc/fsl/bman.txt | 12 +++++-----
+>  Documentation/devicetree/bindings/soc/fsl/qman.txt | 26 ++++++++++++++++------
+>  2 files changed, 26 insertions(+), 12 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
