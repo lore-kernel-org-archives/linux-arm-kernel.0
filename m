@@ -1,44 +1,37 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Thu, 21 Sep 2017 16:13:12 +0800
-Subject: [PATCH 2/3] arm64: dts: mt2712: add pintcrl device node.
-In-Reply-To: <CACRpkdZHyXec+L8ueRHOs=9TLT1Arqe3KeQpRZ6D0K1Ag1c+Zw@mail.gmail.com>
-References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
- <1501489333-23145-3-git-send-email-zhiyong.tao@mediatek.com>
- <2f883a8a-5402-5625-bada-bcfed53c098e@gmail.com>
- <CACRpkdZHyXec+L8ueRHOs=9TLT1Arqe3KeQpRZ6D0K1Ag1c+Zw@mail.gmail.com>
-Message-ID: <1505981592.22452.7.camel@mhfsdcap03>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 21 Sep 2017 16:26:50 +0800
+Subject: [PATCH v4 0/7] Add PMIC support to MediaTek MT7622 SoC
+Message-ID: <cover.1505980364.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-22 at 15:04 +0200, Linus Walleij wrote:
-> On Mon, Aug 14, 2017 at 5:23 PM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> > On 07/31/2017 10:22 AM, Zhiyong Tao wrote:
-> >>
-> >> The commit includes two change:
-> >> 1)add pintcrl device node for mt2712.
-> >> 2)add pinfunc file for mt2712.
-> >>
-> >> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> >> ---
-> >>   arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1014
-> >> +++++++++++++++++++++++++
-> >
-> >
-> > Shouldn't this file be in include/dt-bindings/pinctrl?
-> 
-> Only if it is also #included in the driver.
-> 
-> Yours,
-> Linus Walleij
+From: Sean Wang <sean.wang@mediatek.com>
 
-==>
-Thanks for your comment. 
-We see our some ICs(mt7623) which move the file to
-"include/dt-bindings/pinctrl". other ICs(mt2701) which is put in
-"arch/arm64/boot/dts/mediatek".
-In mt2712, mt2712-pinfunc.h is only include by dts file. It won't be
-included by driver. So which is better? "arch/arm64/boot/dts/mediatek/"
-or "include/dt-bindings/pinctrl".
+Changes since v3
+- rebase into Linux 4.14-rc1
+- removed those patches already applied
 
-Thanks.
+Changes since v2:
+- for patch 1/2, enhance the document as the suggestions from v2.
+- for patch 3, constify the table with struct regulator_ops, also fix that
+regulator doesn't have modesetting facilities it just shouldn't have the ops
+and finally fix copy+paste mistake in warranty disclaimer.
+- for patch 7/8, sort the things added for MT7622/MT6380 alphabetically.
+
+Chenglin Xu (1):
+  soc: mediatek: pwrap: add support for MT7622 SoC
+
+Sean Wang (6):
+  dt-bindings: arm: mediatek: add MT7622 string to the PMIC wrapper doc
+  soc: mediatek: pwrap: add pwrap_read32 for reading in 32-bit mode
+  soc: mediatek: pwrap: add pwrap_write32 for writing in 32-bit mode
+  soc: mediatek: pwrap: update pwrap_init without slave programming
+  soc: mediatek: pwrap: add MediaTek MT6380 as one slave of pwrap
+  soc: mediatek: pwrap: fixup warnings from coding style
+
+ .../devicetree/bindings/soc/mediatek/pwrap.txt     |   1 +
+ drivers/soc/mediatek/mtk-pmic-wrap.c               | 417 ++++++++++++++++++---
+ 2 files changed, 362 insertions(+), 56 deletions(-)
+
+-- 
+2.7.4
