@@ -1,47 +1,48 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 21 Sep 2017 19:14:44 +0200
-Subject: [PATCH 1/7] ARM: dts: meson8: remove gpio offset
+Date: Thu, 21 Sep 2017 19:14:47 +0200
+Subject: [PATCH 4/7] ARM64: dts: meson-gxbb: adjust nanopi-k2 gpio-line-names
 In-Reply-To: <20170921171450.27407-1-jbrunet@baylibre.com>
 References: <20170921171450.27407-1-jbrunet@baylibre.com>
-Message-ID: <20170921171450.27407-2-jbrunet@baylibre.com>
+Message-ID: <20170921171450.27407-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove pin offset on the AO controller. meson pinctrl no longer has
-this quirk
+GPIOX22 is now declared properly and TEST_N has been moved so
+the gpio-line-names of the nanopi-k2 must be adjusted accordingly
 
-Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm/boot/dts/meson8.dtsi  | 2 +-
- arch/arm/boot/dts/meson8b.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index b98d44fde6b6..aff0243ea7d5 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -132,7 +132,7 @@
- 			reg-names = "mux", "pull", "gpio";
- 			gpio-controller;
- 			#gpio-cells = <2>;
--			gpio-ranges = <&pinctrl_aobus 0 120 16>;
-+			gpio-ranges = <&pinctrl_aobus 0 0 16>;
- 		};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+index 9697a7a79464..3c445030ed52 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+@@ -180,7 +180,9 @@
+ 			  "VCCK En", "CON1 Header Pin31",
+ 			  "I2S Header Pin6", "IR In", "I2S Header Pin7",
+ 			  "I2S Header Pin3", "I2S Header Pin4",
+-			  "I2S Header Pin5", "HDMI CEC", "SYS LED";
++			  "I2S Header Pin5", "HDMI CEC", "SYS LED",
++			  /* GPIO_TEST_N */
++			  "";
+ };
  
- 		uart_ao_a_pins: uart_ao_a {
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index bc278da7df0d..09ceec93b4c8 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -104,7 +104,7 @@
- 			reg-names = "mux", "pull", "gpio";
- 			gpio-controller;
- 			#gpio-cells = <2>;
--			gpio-ranges = <&pinctrl_aobus 0 130 16>;
-+			gpio-ranges = <&pinctrl_aobus 0 0 16>;
- 		};
+ &pinctrl_periphs {
+@@ -226,11 +228,9 @@
+ 			  "Bluetooth UART TX", "Bluetooth UART RX",
+ 			  "Bluetooth UART CTS", "Bluetooth UART RTS",
+ 			  "", "", "", "WIFI 32K", "Bluetooth Enable",
+-			  "Bluetooth WAKE HOST",
++			  "Bluetooth WAKE HOST", "",
+ 			  /* Bank GPIOCLK */
+-			  "", "CON1 Header Pin35", "", "",
+-			  /* GPIO_TEST_N */
+-			  "";
++			  "", "CON1 Header Pin35", "", "";
+ };
  
- 		uart_ao_a_pins: uart_ao_a {
+ &pwm_ef {
 -- 
 2.13.5
