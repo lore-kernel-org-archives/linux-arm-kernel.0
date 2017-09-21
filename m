@@ -1,53 +1,47 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Sep 2017 14:17:21 +0200
-Subject: [PATCH 2/3] arm64: dts: mt2712: add pintcrl device node.
-In-Reply-To: <1505981592.22452.7.camel@mhfsdcap03>
-References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
- <1501489333-23145-3-git-send-email-zhiyong.tao@mediatek.com>
- <2f883a8a-5402-5625-bada-bcfed53c098e@gmail.com>
- <CACRpkdZHyXec+L8ueRHOs=9TLT1Arqe3KeQpRZ6D0K1Ag1c+Zw@mail.gmail.com>
- <1505981592.22452.7.camel@mhfsdcap03>
-Message-ID: <CACRpkdaX0n7BZVkXYFEh_XSN3P7huvhE6j5My=p=2Lh45oFZaQ@mail.gmail.com>
+Date: Thu, 21 Sep 2017 14:21:19 +0200
+Subject: [PATCH 0/8] pinctrl: meson: clean pin offsets
+In-Reply-To: <20170920133927.17390-1-jbrunet@baylibre.com>
+References: <20170920133927.17390-1-jbrunet@baylibre.com>
+Message-ID: <CACRpkdYmO2PSKU-qkBMW7C35kHf=usfOoEAobQDMMdzd1RFSTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 10:13 AM, Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
-> On Tue, 2017-08-22 at 15:04 +0200, Linus Walleij wrote:
->> On Mon, Aug 14, 2017 at 5:23 PM, Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
->> > On 07/31/2017 10:22 AM, Zhiyong Tao wrote:
->> >>
->> >> The commit includes two change:
->> >> 1)add pintcrl device node for mt2712.
->> >> 2)add pinfunc file for mt2712.
->> >>
->> >> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
->> >> ---
->> >>   arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1014
->> >> +++++++++++++++++++++++++
->> >
->> >
->> > Shouldn't this file be in include/dt-bindings/pinctrl?
->>
->> Only if it is also #included in the driver.
->>
->> Yours,
->> Linus Walleij
+On Wed, Sep 20, 2017 at 3:39 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+
+> The initial goal of this series was move to TEST_N pin from the EE
+> controller to AO controller, where it belongs. This meant modify the
+> EE_OFF value.
 >
-> ==>
-> Thanks for your comment.
-> We see our some ICs(mt7623) which move the file to
-> "include/dt-bindings/pinctrl". other ICs(mt2701) which is put in
-> "arch/arm64/boot/dts/mediatek".
-> In mt2712, mt2712-pinfunc.h is only include by dts file. It won't be
-> included by driver. So which is better? "arch/arm64/boot/dts/mediatek/"
-> or "include/dt-bindings/pinctrl".
+> This offset is a quirk we brought from the vendor driver when it was
+> initially merged. There no reason to keep this around and we could simply
+> let pinctrl figure the pin base value.
+>
+> Removing this offset, while simple, ends up being quite a patch bomb.
+> This is why I split the change over 5 first patches, so the important
+> change, patch #1 remains visible. Of course, to avoid breaking bisect,
+> these first 5 patches should be squashed into one. (If you prefer that I
+> squash it myself, I may have to send you a PR as the patch would exceed
+> VGER 100000 characters limit)
+>
+> The last change is this series, while not directly related, also requires
+> to adjust the gpio-line-names property in DT. Having these changes going
+> together would make it easier to coordinate the DTS changes.
+>
+> This was changeset has been test on gxbb P200, gxl libretech-cc.  It was
+> also boot tested on meson8 (Thx Martin!)
+>
+> Jerome Brunet (8):
+>   pinctrl: meson: remove offset from pinctrl
+>   pinctrl: meson: remove offset continued - gxbb
+>   pinctrl: meson: remove offset continued - gxl
+>   pinctrl: meson: remove offset continued - meson8
+>   pinctrl: meson: remove offset continued - meson8b
+>   pinctrl: meson: get rid of pin_base
+>   pinctrl: meson-gx: TEST_N belongs to the AO controller
+>   pinctrl: meson-gxbb: add missing GPIOX_22 pin
 
-If it is used in both arm and arm64 it is helpful to have it in
-include/dt-bindings so it can be shared between the two
-archs.
-
-If it is just (ever) for arm64 it can stay inside the arch tree.
+Looks good just waiting for review from Carlo && || Kevin.
 
 Yours,
 Linus Walleij
