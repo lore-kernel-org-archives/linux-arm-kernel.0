@@ -1,61 +1,68 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 21 Sep 2017 14:47:59 +0200
-Subject: [PATCH v4 2/4] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <a88a83ba-9477-36ae-87ba-a35f477a5ca1@ti.com>
-References: <1504785168-26572-1-git-send-email-pierre-yves.mordret@st.com>
- <1504785168-26572-3-git-send-email-pierre-yves.mordret@st.com>
- <a88a83ba-9477-36ae-87ba-a35f477a5ca1@ti.com>
-Message-ID: <ab012ccc-21e4-e487-4ef1-056c36a65cd0@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 21 Sep 2017 15:08:40 +0200
+Subject: [PATCH v2 8/8] arm64: dts: renesas: eagle: add EtherAVB support
+In-Reply-To: <20170915194449.538504992@cogentembedded.com>
+References: <20170915194449.538504992@cogentembedded.com>
+Message-ID: <CAMuHMdXQXFuVzwW7G-U7XWZUEj8qFRjtfDQF1+TgyzO0Xb+eYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sergei,
 
+On Fri, Sep 15, 2017 at 9:43 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the Eagle board  dependent part of the EtherAVB device node.
+> Enable DHCP  and NFS root for the kernel booting.
+>
+> Based  on the original (and large) patch by Vladimir Barinov.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-On 09/21/2017 01:25 PM, Peter Ujfalusi wrote:
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> 
-> 
-> Great that you got it working w/o a custom API!
-> I have one comment, which actually valid for the ti-dma-crossbar driver
-> as well...
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+> @@ -18,10 +18,11 @@
+>
+>         aliases {
+>                 serial0 = &scif0;
+> +               ethernet0 = &avb;
+>         };
+>
+>         chosen {
+> -               bootargs = "ignore_loglevel";
+> +               bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+>                 stdout-path = "serial0:115200n8";
+>         };
+>
+> @@ -43,3 +44,14 @@
+>  &scif0 {
+>         status = "okay";
+>  };
+> +
+> +&avb {
+> +       renesas,no-ether-link;
+> +       phy-handle = <&phy0>;
+> +       status = "okay";
+> +
+> +       phy0: ethernet-phy at 0 {
+> +               rxc-skew-ps = <1500>;
+> +               reg = <0>;
 
-Yes. That cleans up a little bit the sw architecture. But still this custom API
-allowed both DMAMUX and DMA at the same time since using the same channel ID
-allocator.
-Ok this is another story to be addressed out of this thread ;)
+Any specific reason why you don't want to wire up the interrupt?
 
-> 
->> +static void *stm32_dmamux_route_allocate(struct of_phandle_args *dma_spec,
->> +					 struct of_dma *ofdma)
->> +
->> +	spin_lock_irqsave(&dmamux->lock, flags);
->> +	mux->chan_id = find_first_zero_bit(dmamux->dma_inuse,
->> +					   dmamux->dma_requests);
-> 
-> you pick the first available chan_id here under the lock.
-> 
->> +	spin_unlock_irqrestore(&dmamux->lock, flags);
->> +	if (mux->chan_id == dmamux->dma_requests) {
->> ...
->> +	/* Set dma request */
->> +	spin_lock_irqsave(&dmamux->lock, flags);
->> +	if (!IS_ERR(dmamux->clk)) {
->> ...
->> +	spin_unlock_irqrestore(&dmamux->lock, flags);
->> +
->> +	set_bit(mux->chan_id, dmamux->dma_inuse);
-> 
-> But nothing stops other parallel threads to pick the same chan_id since
-> you have released the lock (released, got the lock to protect the set
-> dma request and released it again). imho the find_first_zero_bit() and
-> the set_bit() should be done within the same lock to avoid race conditions.
-> 
-> - P?ter
-> 
+                interrupt-parent = <&gpio2>;
+                interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 
-Yep good catch : That's correct. Even if probability to happen is rather low, it
-may happen.
-Will solve that.
+> +       };
+> +};
 
-Py
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
