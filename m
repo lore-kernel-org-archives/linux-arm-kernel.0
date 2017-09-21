@@ -1,59 +1,58 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 21 Sep 2017 10:01:17 +0200
-Subject: [PATCH v4 0/4] Add STM32 MDMA driver
-In-Reply-To: <1503671466-32029-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1503671466-32029-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <07712135-3840-d1da-c087-ca95300f96da@st.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Thu, 21 Sep 2017 10:06:59 +0200
+Subject: [v4,0/3] Workaround for bus/slot reset on Cavium cn8xxx root ports
+In-Reply-To: <20170920120912.7544420d@t450s.home>
+References: <20170908081033.3025-1-jglauber@cavium.com>
+ <20170912094049.GA14111@localhost.localdomain>
+ <20170920120912.7544420d@t450s.home>
+Message-ID: <20170921080659.GA12818@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Gentle ping for driver review submitted on August 25th.
-
-Thanks
-Regards
-
-On 08/25/2017 04:31 PM, Pierre-Yves MORDRET wrote:
-> This patchset adds support for the STM32 MDMA controller.
-> The Master Direct memory access (MDMA) provides high-speed data transfer
-> between memory and memory or between peripherals and memory.
-> Contrary to STM32 DMA, the STM32 MDMA controller supports hardware LLI and
-> uses a larger integrated FIFO (128 vs 16 bytes)
-> ---
->   Version history:
->      v4:
->          * Add safe getter/setter macros
->          * forbid DMA preparation in cyclic mode yet
->          * Optimize burst and memory width for memcpy
->          * replace of_property_xx by device_property_xx
->      v3:
->          * Update header template
->          * Unsigned expression compared with zero
->          * Rework stm32_mdma_get_max_width
->          * moved to src/dst case where they are used in set_xfer
->          * Change of_property_* with device_property_*
->          * Add dev_warn whether default value is used
->          * Indentation
->          * Add MODULE_*
->      v2:
->          * change compatible into st,stm32h7-mdma to be more SoC specific
->          * Add MDMA support in DT for H7
->          * Add MDMA support in STM32 defconfig
-> ---
-> Pierre-Yves MORDRET (4):
->   dt-bindings: Document the STM32 MDMA bindings
->   dmaengine: Add STM32 MDMA driver
->   ARM: dts: stm32: Add MDMA support for STM32H743 SoC
->   ARM: configs: stm32: Add MDMA support in STM32 defconfig
+On Wed, Sep 20, 2017 at 12:09:12PM -0600, Alex Williamson wrote:
+> On Tue, 12 Sep 2017 02:40:49 -0700
+> Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com> wrote:
 > 
->  .../devicetree/bindings/dma/stm32-mdma.txt         |   94 ++
->  arch/arm/boot/dts/stm32h743.dtsi                   |   10 +
->  arch/arm/configs/stm32_defconfig                   |    1 +
->  drivers/dma/Kconfig                                |   12 +
->  drivers/dma/Makefile                               |    1 +
->  drivers/dma/stm32-mdma.c                           | 1618 ++++++++++++++++++++
->  6 files changed, 1736 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
->  create mode 100644 drivers/dma/stm32-mdma.c
+> > Hi all,
+> > 
+> > Are there any updates on this ?
+> > Comments/objections/acks/nacks ?
+> > 
+> > WBBR,
+> > Vadim
+> > 
+> > On Fri, Sep 08, 2017 at 10:10:30AM +0200, Jan Glauber wrote:
+> > > Using vfio-pci on a combination of cn8xxx and some PCI devices results in
+> > > a kernel panic. This is triggered by issuing a bus or a slot reset
+> > > on the PCI device.
+> > > 
+> > > With this series both checks indicate that the reset is not possible
+> > > preventing the kernel panic.
+> > > 
+> > > David Daney (2):
+> > >   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
+> > >   PCI: Avoid bus reset for Cavium cn8xxx root ports
+> > > 
+> > > Jan Glauber (1):
+> > >   PCI: Avoid slot reset if bus reset is not possible
+> > > 
+> > >  drivers/pci/pci.c    | 8 ++++++++
+> > >  drivers/pci/quirks.c | 8 ++++++++
+> > >  2 files changed, 16 insertions(+)  
 > 
+> 
+> Looks ok to me, for series:
+> 
+> Reviewed-by: Alex Williamson <alex.williamson@redhat.com>
+
+Thanks for the review. And also for being patient with my iterations.
+
+> I am curious why we're happy targeting this quirk at a single device ID
+> while at the same time trying to expand the ACS quirk to a notable
+> fraction of the Cavium PCI device ID address space.  Thanks,
+
+David, please correct me if I'm wrong but I think this problem only
+exists on cn88xx (device id 0xa100) but not on cn81xx/cn83xx (0xa200,
+0xa300). I've seen the bridge causing the problem only on cn88xx.
+
+--Jan
