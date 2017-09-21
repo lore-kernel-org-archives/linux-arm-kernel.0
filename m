@@ -1,81 +1,54 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 21 Sep 2017 13:13:07 -0700
-Subject: [PATCH] drm/rockchip: Fix uninitialized use of ret
-In-Reply-To: <3163442d-356a-4000-f15b-74391b79188f@rock-chips.com>
-References: <20170921001408.1839-1-seanpaul@chromium.org>
- <3163442d-356a-4000-f15b-74391b79188f@rock-chips.com>
-Message-ID: <CAOw6vb+HAKQ8j9gYYnCLVRVBhhKxJVCsetCiRNWiPeJCOP78=w@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 21 Sep 2017 13:17:52 -0700
+Subject: [PATCH V5 1/4] soc: brcmstb: Add Product ID and Family ID
+ helper functions
+In-Reply-To: <CAGh=XAAzjvSpHK_oaj2OwTswdtCpfKUhg-nL+M_4jM92yMTs=A@mail.gmail.com>
+References: <1503683495-11766-1-git-send-email-alcooperx@gmail.com>
+ <1503683495-11766-2-git-send-email-alcooperx@gmail.com>
+ <3aefb1ca-827d-6ebf-03c6-1f0d41e5da5c@gmail.com>
+ <0deddef3-fc3e-67be-12e8-9fbd84f24314@ti.com>
+ <CAGh=XAAzjvSpHK_oaj2OwTswdtCpfKUhg-nL+M_4jM92yMTs=A@mail.gmail.com>
+Message-ID: <1506025072.12311.29.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 6:03 PM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2017?09?21? 08:13, Sean Paul wrote:
->
-> If there are no children for lvds, ret is used uninitialized. This patch
-> initializes ret and returns an error if the port has no children.
->
-> Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
-> Cc: Mark Yao <mark.yao@rock-chips.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Sandy Huang <hjc@rock-chips.com>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_lvds.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> index c5fbe533796c..0ce6205d8d80 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> @@ -346,7 +346,7 @@ static int rockchip_lvds_bind(struct device *dev, struct
-> device *master,
->   struct drm_connector *connector;
->   struct device_node *remote = NULL;
->   struct device_node  *port, *endpoint;
-> - int ret;
-> + int ret = 0, child_count = 0;
->   const char *name;
->   u32 endpoint_id;
->
-> @@ -358,13 +358,18 @@ static int rockchip_lvds_bind(struct device *dev,
-> struct device *master,
->   return -EINVAL;
->   }
->   for_each_child_of_node(port, endpoint) {
-> + child_count++;
->   of_property_read_u32(endpoint, "reg", &endpoint_id);
->   ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
->    &lvds->panel, &lvds->bridge);
->   if (!ret)
->   break;
->   }
-> - if (ret) {
-> + if (!child_count) {
-> + DRM_DEV_ERROR(dev, "lvds port does not have any children\n");
-> + ret  = -EINVAL;
->
->
-> Double space on "ret  =",  except this, looks good for me.
-> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
->
+On Thu, 2017-09-21 at 15:16 -0400, Al Cooper wrote:
+> Kishon,
+> 
+> I ran checkpatch on all my patches before submitting them and didn't
+> get any warnings. It looks like you may be running checkpatch with the
+> "--subjective" option. Is this a requirement and if so are there any
+> other checkpatch options I should be using?
+> 
+> Thanks
+> Al
+> 
+> On Thu, Sep 21, 2017 at 4:54 AM, 'Kishon Vijay Abraham I' via
+> BCM-KERNEL-FEEDBACK-LIST,PDL
+> <bcm-kernel-feedback-list.pdl@broadcom.com> wrote:
+> > Hi,
+> > 
+> > On Saturday 02 September 2017 07:45 AM, Florian Fainelli wrote:
+> > > On 08/25/2017 10:51 AM, Al Cooper wrote:
+[]
+> > I get the following checkpatch warning
+> > CHECK: Macro argument reuse 'reg' - possible side-effects?
+> > #110: FILE: include/linux/soc/brcmstb/brcmstb.h:4:
+> > +#define BRCM_ID(reg)   ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+[]
+> > > > diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+> > > > index 337ce41..23e4dc9 100644
+> > > > --- a/include/linux/soc/brcmstb/brcmstb.h
+> > > > +++ b/include/linux/soc/brcmstb/brcmstb.h
+> > > > @@ -1,10 +1,20 @@
+> > > >  #ifndef __BRCMSTB_SOC_H
+> > > >  #define __BRCMSTB_SOC_H
+> > > > 
+> > > > +#define BRCM_ID(reg)        ((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+> > > > +#define BRCM_REV(reg)       ((u32)reg & 0xff)
 
-Thanks for your review, Mark!
-
-I've pushed the patch with whitespace fixes to -misc-next.
-
-Sean
-
-
-> + goto err_put_port;
-> + } else if (ret) {
->   DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
->   ret  = -EPROBE_DEFER;
->   goto err_put_port;
->
->
-> --
-> ?ark Yao
+These should be (reg) to avoid a possible issue with
+cast precedence or
+maybe a use a statement expression
+macro with a temporary to avoid the
+reuse message.
