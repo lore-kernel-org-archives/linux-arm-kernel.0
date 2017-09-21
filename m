@@ -1,33 +1,65 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 Sep 2017 20:15:03 +0200
-Subject: [PATCH v3 2/6] serial: imx: only set dma_is_rxing when DMA starts
-In-Reply-To: <1506010697-22114-3-git-send-email-martyn.welch@collabora.co.uk>
+Date: Thu, 21 Sep 2017 20:20:17 +0200
+Subject: [PATCH v3 1/6] serial: imx: remove CTSC and CTS handling from
+ imx_disable_dma
+In-Reply-To: <1506010697-22114-2-git-send-email-martyn.welch@collabora.co.uk>
 References: <1506010697-22114-1-git-send-email-martyn.welch@collabora.co.uk>
- <1506010697-22114-3-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <20170921181503.2d4w7fklptt4cktv@pengutronix.de>
+ <1506010697-22114-2-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <20170921182017.t7c75tyy66q7q3ns@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 05:18:13PM +0100, Martyn Welch wrote:
-> From: Romain Perier <romain.perier@collabora.com>
+On Thu, Sep 21, 2017 at 05:18:12PM +0100, Martyn Welch wrote:
+> From: Nandor Han <nandor.han@ge.com>
 > 
-> The variable dma_is_rxing is currently set to 1 in imx_disable_rx_int().
-> This is problematic as:
+> The CTSC and CTS bits affect operation of the CTS/RTS hardware flow
+> control signal (depending on whether the device is in DCE or DTE mode) and
+> are not related to DMA. When in RS-232 mode, the driver is using the
+> automatic CTSC control based on a rxFIFO fill level unless the state of
+> the CTS signal is explictly set via an ioctl call.
 > 
-> - whilst imx_disable_rx_int() is currently always called before
->   start_rx_dma() this dependency isn't obvious.
-> - start_rx_dma() does error checking and might exit without
->   enabling DMA. Currently this will result in dma_is_rxing suggesting
->   that DMA is being used for recieving.
+> Previous improvements to the imx serial driver have resulted on
+> imx_disable_dma() only being called on shutdown, by which point the
+> serial core has already correctly deasserted CTS.
 > 
-> To avoid these issues, move the setting of dma_is_rxing to
-> start_rx_dma() when appropriate.
+> Testing shows that without this handling in imx_disable_dma() the CTS
+> signal state is set correctly when the device is open and TIOCM_RTS is
+> set/cleared via the TIOCMGET ioctl. The CTS signal is also correctly
+> deasserted when the device file is closed.
+
+With that block kept CTS set once more to inactive. So the block doesn't
+hurt and is "only" superflous, right?
+
+> When in RS-485 mode, the driver uses the CTS signal very differently and
+> appears to control it via calls to imx_port_rts_active() and
+> imx_port_rts_inactive().
 > 
+> This configuration of the CTSC and CTS bits are therefore not needed.
+> 
+> Signed-off-by: Nandor Han <nandor.han@ge.com>
 > Signed-off-by: Romain Perier <romain.perier@collabora.com>
 > Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
-Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/tty/serial/imx.c | 5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index fe368a4..d90dae3 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1225,11 +1225,6 @@ static void imx_disable_dma(struct imx_port *sport)
+>  	temp &= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
+>  	writel(temp, sport->port.membase + UCR1);
+>  
+> -	/* clear UCR2 */
+> -	temp = readl(sport->port.membase + UCR2);
+> -	temp &= ~(UCR2_CTSC | UCR2_CTS | UCR2_ATEN);
+> -	writel(temp, sport->port.membase + UCR2);
 
-Thanks
+The commit log doesn't mention ATEN, I guess that one just doesn't
+matter any more at this stage? Would be nice to point out though.
+
+Best regards
 Uwe
 
 -- 
