@@ -1,36 +1,73 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 21 Sep 2017 16:06:49 +0530
-Subject: [PATCH v2 0/4] phy: rockchip-typec: Set "flip" properly; some
- cleanups; fix swing
-In-Reply-To: <20170919195630.18747-1-dianders@chromium.org>
-References: <20170919195630.18747-1-dianders@chromium.org>
-Message-ID: <9d892f99-d48d-b034-8f50-2719ef07d0b1@ti.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Thu, 21 Sep 2017 18:40:25 +0800
+Subject: [PATCH v5 0/6] Add HiSilicon SoC uncore Performance Monitoring
+ Unit driver
+In-Reply-To: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <2a9d317a-3811-9661-8211-fc779b27458c@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Douglas,
+Hi Mark/Will,
 
-On Wednesday 20 September 2017 01:26 AM, Douglas Anderson wrote:
-> When connecting to certain DP monitors it was observed that only one
-> of the two orientations of the type C to DP cable would work.
-> Debugging showed that the problem was that we needed to set the type C
-> "flip" state earlier.  Once we did this, problems went away.
+Appreciate any comments from you.
+
+Thanks,
+Shaokun
+
+On 2017/8/22 16:07, Shaokun Zhang wrote:
+> This patchset adds support for HiSilicon SoC uncore PMUs driver. It
+> includes L3C, Hydra Home Agent (HHA) and DDRC.
 > 
-> While trying to dig into this problem and some others, I found that
-> the proper documentation for the Type C PHY was available to me.  This
-> allowed me to cleanup the magic numbers in the funtion that I was
-> touching and also fix a few minor issues that (luckily) haven't caused
-> any problems yet.
+> Changes in v5:
+> * remove unnecessary name/num_events member in hisi_pmu
+> * refactor hisi_pmu_hwevents structure
+> * remove hisi_pmu_alloc function
+> * revise cpuhotplug for L3C PMUs
+> * add cpuhotplug for HHA/DDRC PMUs
+> * fix the name format of uncore PMUs
+> * remove unnecessary variants
 > 
-> I also found that aux channel communications were flaky on some
-> adapters until I adjusted the voltage swing.
-
->From the commit log, looks like only the 1st and 4th patch are fixes. Only
-those can go in -rc cycle. But I can't apply the 4th patch without the 2nd and
-3rd patch.
-
-Can you resend the series such that 2nd and 3rd patch apply on top of 1st and
-4th patch?
-
-Thanks
-Kishon
+> Changes in v4:
+> * remove redundant code and comments
+> * reverse the functions order in exit function
+> * remove some GPL information
+> * revise including header file
+> * fix Jonathan's other comments
+> 
+> Changes in v3:
+> * rebase to 4.13-rc1
+> * add dev_err if ioremap fails for PMUs
+>  
+> Changes in v2:
+> * fix kbuild test robot error
+> * make hisi_uncore_ops static
+> 
+> Shaokun Zhang (6):
+>   Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
+>   perf: hisi: Add support for HiSilicon SoC uncore PMU driver
+>   perf: hisi: Add support for HiSilicon SoC L3C PMU driver
+>   perf: hisi: Add support for HiSilicon SoC HHA PMU driver
+>   perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
+>   arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
+> 
+>  Documentation/perf/hisi-pmu.txt               |  53 +++
+>  MAINTAINERS                                   |   7 +
+>  drivers/perf/Kconfig                          |   7 +
+>  drivers/perf/Makefile                         |   1 +
+>  drivers/perf/hisilicon/Makefile               |   1 +
+>  drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 467 +++++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 477 +++++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 482 ++++++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_pmu.c      | 440 +++++++++++++++++++++++
+>  drivers/perf/hisilicon/hisi_uncore_pmu.h      | 107 ++++++
+>  include/linux/cpuhotplug.h                    |   3 +
+>  11 files changed, 2045 insertions(+)
+>  create mode 100644 Documentation/perf/hisi-pmu.txt
+>  create mode 100644 drivers/perf/hisilicon/Makefile
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+> 
