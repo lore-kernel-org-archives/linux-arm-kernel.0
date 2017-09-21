@@ -1,55 +1,64 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 21 Sep 2017 11:44:59 +0200
-Subject: [PATCH] ARM: shmobile: remove inconsistent ; from documentation
-Message-ID: <1505987099-19944-1-git-send-email-horms+renesas@verge.net.au>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Sep 2017 10:46:42 +0100
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170920224522.GB20974@obsidianresearch.com>
+References: <20170920112152.GL20805@n2100.armlinux.org.uk>
+ <20170920162208.GB536@obsidianresearch.com>
+ <20170920165141.GP20805@n2100.armlinux.org.uk>
+ <20170920224522.GB20974@obsidianresearch.com>
+Message-ID: <20170921094641.GT20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consistently do not suffix compat string documentation with a ';'
+On Wed, Sep 20, 2017 at 04:45:22PM -0600, Jason Gunthorpe wrote:
+>  /**
+>   * rtc_set_ntp_time - Save NTP synchronized time to the RTC
+>   * @now: Current time of day
+> + * @target_nsec: Output value indicating what now->tv_nsec
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- Documentation/devicetree/bindings/arm/shmobile.txt | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I'd suggest:
 
-Based on renesas-devel-20170921-v4.14-rc1
+ * @target_nsec: pointer for desired now->tv_nsec value
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 4fa984ada912..020d758fc0c5 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -69,7 +69,7 @@ Boards:
-     compatible = "renesas,gose", "renesas,r8a7793"
-   - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
-     H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
--    compatible = "renesas,h3ulcb", "renesas,r8a7795";
-+    compatible = "renesas,h3ulcb", "renesas,r8a7795"
-   - Henninger
-     compatible = "renesas,henninger", "renesas,r8a7791"
-   - iWave Systems RZ/G1E SODIMM SOM Development Platform (iW-RainboW-G22D)
-@@ -91,7 +91,7 @@ Boards:
-   - Lager (RTP0RC7790SEB00010S)
-     compatible = "renesas,lager", "renesas,r8a7790"
-   - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
--    compatible = "renesas,m3ulcb", "renesas,r8a7796";
-+    compatible = "renesas,m3ulcb", "renesas,r8a7796"
-   - Marzen (R0P7779A00010S)
-     compatible = "renesas,marzen", "renesas,r8a7779"
-   - Porter (M2-LCDP)
-@@ -99,11 +99,11 @@ Boards:
-   - RSKRZA1 (YR0K77210C000BE)
-     compatible = "renesas,rskrza1", "renesas,r7s72100"
-   - Salvator-X (RTP0RC7795SIPB0010S)
--    compatible = "renesas,salvator-x", "renesas,r8a7795";
-+    compatible = "renesas,salvator-x", "renesas,r8a7795"
-   - Salvator-X (RTP0RC7796SIPB0011S)
--    compatible = "renesas,salvator-x", "renesas,r8a7796";
-+    compatible = "renesas,salvator-x", "renesas,r8a7796"
-   - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
--    compatible = "renesas,salvator-xs", "renesas,r8a7795";
-+    compatible = "renesas,salvator-xs", "renesas,r8a7795"
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
-   - SK-RZG1E (YR8A77450S000BE)
+>   *
+>   * Replacement for the NTP platform function update_persistent_clock64
+>   * that stores time for later retrieval by rtc_hctosys.
+> @@ -20,28 +54,35 @@
+>   *
+>   * If temporary failure is indicated the caller should try again 'soon'
+>   */
+> -int rtc_set_ntp_time(struct timespec64 now)
+> +int rtc_set_ntp_time(struct timespec64 now, long *target_nsec)
+>  {
+>  	struct rtc_device *rtc;
+>  	struct rtc_time tm;
+>  	int err = -ENODEV;
+>  
+> -	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
+> -		rtc_time64_to_tm(now.tv_sec, &tm);
+> -	else
+> -		rtc_time64_to_tm(now.tv_sec + 1, &tm);
+> -
+>  	rtc = rtc_class_open(CONFIG_RTC_SYSTOHC_DEVICE);
+> -	if (rtc) {
+> +	if (!rtc)
+> +		goto out_err;
+> +
+> +	/* The ntp code must call this with the correct value in tv_nsec, if
+> +	 * it does not we update target_nsec and return EPROTO to make the ntp
+> +	 * code try again later.
+> +	 */
+> +	*target_nsec = rtc->time_set_nsec;
+
+Here, we want just the positive nanoseconds part of the desired offset
+(iow, the value we want to see in now.tv_nsec):
+
+	nsec = rtc->time_set_nsec % NSEC_PER_SEC;
+	if (nsec < 0)
+		nsec += NSEC_PER_SEC;
+	*target_nsec = nsec;
+
 -- 
-2.1.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
