@@ -1,39 +1,36 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 21 Sep 2017 18:31:48 +0800
-Subject: [PATCH RESEND 1/2] phy: phy-mtk-tphy: fix NULL point of chip bank
-Message-ID: <5ddda7cc6940941b645564afff5afa496d7dbb68.1505989703.git.chunfeng.yun@mediatek.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 21 Sep 2017 16:06:49 +0530
+Subject: [PATCH v2 0/4] phy: rockchip-typec: Set "flip" properly; some
+ cleanups; fix swing
+In-Reply-To: <20170919195630.18747-1-dianders@chromium.org>
+References: <20170919195630.18747-1-dianders@chromium.org>
+Message-ID: <9d892f99-d48d-b034-8f50-2719ef07d0b1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chip bank of version-1 is initialized as NULL, but it's used
-by pcie_phy_instance_power_on/off(), so assign it a right
-address.
+Hi Douglas,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/mediatek/phy-mtk-tphy.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On Wednesday 20 September 2017 01:26 AM, Douglas Anderson wrote:
+> When connecting to certain DP monitors it was observed that only one
+> of the two orientations of the type C to DP cable would work.
+> Debugging showed that the problem was that we needed to set the type C
+> "flip" state earlier.  Once we did this, problems went away.
+> 
+> While trying to dig into this problem and some others, I found that
+> the proper documentation for the Type C PHY was available to me.  This
+> allowed me to cleanup the magic numbers in the funtion that I was
+> touching and also fix a few minor issues that (luckily) haven't caused
+> any problems yet.
+> 
+> I also found that aux channel communications were flaky on some
+> adapters until I adjusted the voltage swing.
 
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index e3baad7..721a2a1 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -27,6 +27,7 @@
- /* banks shared by multiple phys */
- #define SSUSB_SIFSLV_V1_SPLLC		0x000	/* shared by u3 phys */
- #define SSUSB_SIFSLV_V1_U2FREQ		0x100	/* shared by u2 phys */
-+#define SSUSB_SIFSLV_V1_CHIP		0x300	/* shared by u3 phys */
- /* u2 phy bank */
- #define SSUSB_SIFSLV_V1_U2PHY_COM	0x000
- /* u3/pcie/sata phy banks */
-@@ -762,7 +763,7 @@ static void phy_v1_banks_init(struct mtk_tphy *tphy,
- 	case PHY_TYPE_USB3:
- 	case PHY_TYPE_PCIE:
- 		u3_banks->spllc = tphy->sif_base + SSUSB_SIFSLV_V1_SPLLC;
--		u3_banks->chip = NULL;
-+		u3_banks->chip = tphy->sif_base + SSUSB_SIFSLV_V1_CHIP;
- 		u3_banks->phyd = instance->port_base + SSUSB_SIFSLV_V1_U3PHYD;
- 		u3_banks->phya = instance->port_base + SSUSB_SIFSLV_V1_U3PHYA;
- 		break;
--- 
-1.7.9.5
+>From the commit log, looks like only the 1st and 4th patch are fixes. Only
+those can go in -rc cycle. But I can't apply the 4th patch without the 2nd and
+3rd patch.
+
+Can you resend the series such that 2nd and 3rd patch apply on top of 1st and
+4th patch?
+
+Thanks
+Kishon
