@@ -1,46 +1,47 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 21 Sep 2017 19:14:45 +0200
-Subject: [PATCH 2/7] ARM64: dts: meson-gx: remove gpio offset
+Date: Thu, 21 Sep 2017 19:14:44 +0200
+Subject: [PATCH 1/7] ARM: dts: meson8: remove gpio offset
 In-Reply-To: <20170921171450.27407-1-jbrunet@baylibre.com>
 References: <20170921171450.27407-1-jbrunet@baylibre.com>
-Message-ID: <20170921171450.27407-3-jbrunet@baylibre.com>
+Message-ID: <20170921171450.27407-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove pin offset on the EE controller. Meson pinctrl no longer has
+Remove pin offset on the AO controller. meson pinctrl no longer has
 this quirk
 
+Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 2 +-
+ arch/arm/boot/dts/meson8.dtsi  | 2 +-
+ arch/arm/boot/dts/meson8b.dtsi | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 52f1687e7a09..fb4baed97a01 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -379,7 +379,7 @@
- 			reg-names = "mux", "pull", "pull-enable", "gpio";
+diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+index b98d44fde6b6..aff0243ea7d5 100644
+--- a/arch/arm/boot/dts/meson8.dtsi
++++ b/arch/arm/boot/dts/meson8.dtsi
+@@ -132,7 +132,7 @@
+ 			reg-names = "mux", "pull", "gpio";
  			gpio-controller;
  			#gpio-cells = <2>;
--			gpio-ranges = <&pinctrl_periphs 0 14 120>;
-+			gpio-ranges = <&pinctrl_periphs 0 0 120>;
+-			gpio-ranges = <&pinctrl_aobus 0 120 16>;
++			gpio-ranges = <&pinctrl_aobus 0 0 16>;
  		};
  
- 		emmc_pins: emmc {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index d6876e64979e..f3fca26c9658 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -268,7 +268,7 @@
- 			reg-names = "mux", "pull", "pull-enable", "gpio";
+ 		uart_ao_a_pins: uart_ao_a {
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index bc278da7df0d..09ceec93b4c8 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -104,7 +104,7 @@
+ 			reg-names = "mux", "pull", "gpio";
  			gpio-controller;
  			#gpio-cells = <2>;
--			gpio-ranges = <&pinctrl_periphs 0 10 101>;
-+			gpio-ranges = <&pinctrl_periphs 0 0 101>;
+-			gpio-ranges = <&pinctrl_aobus 0 130 16>;
++			gpio-ranges = <&pinctrl_aobus 0 0 16>;
  		};
  
- 		emmc_pins: emmc {
+ 		uart_ao_a_pins: uart_ao_a {
 -- 
 2.13.5
