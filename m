@@ -1,108 +1,169 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Sep 2017 11:25:20 +0100
-Subject: [PATCH v2 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <1502959160-30900-2-git-send-email-julien.thierry@arm.com>
-References: <1502959160-30900-1-git-send-email-julien.thierry@arm.com>
- <1502959160-30900-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <20170922102520.GA23365@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Fri, 22 Sep 2017 12:31:12 +0200
+Subject: [PATCH v2 3/9] clk: at91: pmc: Support backup for programmable
+ clocks
+In-Reply-To: <20170915140411.31716-4-romain.izard.pro@gmail.com>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-4-romain.izard.pro@gmail.com>
+Message-ID: <d6359e89-7c78-fdec-fbab-eb885017ec58@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 09:39:19AM +0100, Julien Thierry wrote:
-> The arch timer configuration for a CPU might get reset after suspending said
-> CPU.
+On 15/09/2017 at 16:04, Romain Izard wrote:
+> From: Romain Izard <romain.izard@mobile-devices.fr>
 > 
-> In order to reliably use the event stream in the kernel (e.g. for delays),
-> we keep track of the state where we can safely concider the event stream as
-> properly configured.
+> When an AT91 programmable clock is declared in the device tree, register
+> it into the Power Management Controller driver. On entering suspend mode,
+> the driver saves and restores the Programmable Clock registers to support
+> the backup mode for these clocks.
 > 
-> Signed-off: Julien Thierry <julien.thierry@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+
+Romain,
+
+Some nitpicking and one comment. But on the overall patch, here is my:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+See below:
+
 > ---
->  arch/arm/include/asm/arch_timer.h    |  1 +
->  arch/arm64/include/asm/arch_timer.h  |  1 +
->  drivers/clocksource/arm_arch_timer.c | 32 ++++++++++++++++++++++++++++++--
->  include/clocksource/arm_arch_timer.h |  6 ++++++
->  4 files changed, 38 insertions(+), 2 deletions(-)
+> Changes in v2:
+> * register PCKs on clock startup
 > 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index d4ebf56..0b6e104 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->  static inline void arch_timer_set_cntkctl(u32 cntkctl)
+>  drivers/clk/at91/clk-programmable.c |  2 ++
+>  drivers/clk/at91/pmc.c              | 27 +++++++++++++++++++++++++++
+>  drivers/clk/at91/pmc.h              |  2 ++
+>  3 files changed, 31 insertions(+)
+> 
+> diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+> index 85a449cf61e3..0e6aab1252fc 100644
+> --- a/drivers/clk/at91/clk-programmable.c
+> +++ b/drivers/clk/at91/clk-programmable.c
+> @@ -204,6 +204,8 @@ at91_clk_register_programmable(struct regmap *regmap,
+>  	if (ret) {
+>  		kfree(prog);
+>  		hw = ERR_PTR(ret);
+
+Nit: "else" not needed.
+
+> +	} else {
+> +		pmc_register_pck(id);
+>  	}
+>  
+>  	return hw;
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 07dc2861ad3f..3910b7537152 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -22,6 +22,7 @@
+>  #include "pmc.h"
+>  
+>  #define PMC_MAX_IDS 128
+> +#define PMC_MAX_PCKS 8
+>  
+>  int of_at91_get_clk_range(struct device_node *np, const char *propname,
+>  			  struct clk_range *range)
+> @@ -50,6 +51,7 @@ EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
+>  static struct regmap *pmcreg;
+>  
+>  static u8 registered_ids[PMC_MAX_IDS];
+> +static u8 registered_pcks[PMC_MAX_PCKS];
+>  
+>  static struct
 >  {
->  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-> +	isb();
->  }
-> 
->  #endif
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 74d08e4..26b3376 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->  static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> @@ -66,8 +68,10 @@ static struct
+>  	u32 pcr[PMC_MAX_IDS];
+>  	u32 audio_pll0;
+>  	u32 audio_pll1;
+> +	u32 pckr[PMC_MAX_PCKS];
+>  } pmc_cache;
+>  
+> +/* Clock ID 0 is invalid */
+
+(read: so we can use the 0 value as an indicator that this place in the
+table hasn't been filled, so unused)
+
+>  void pmc_register_id(u8 id)
 >  {
->  	write_sysreg(cntkctl, cntkctl_el1);
-> +	isb();
+>  	int i;
+> @@ -82,6 +86,21 @@ void pmc_register_id(u8 id)
+>  	}
 >  }
-> 
->  static inline u64 arch_counter_get_cntpct(void)
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index aae87c4..866bbf8 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -77,6 +77,7 @@ struct arch_timer {
->  static bool arch_counter_suspend_stop;
->  static bool vdso_default = true;
-> 
-> +static DEFINE_PER_CPU(bool, evtstrm_available) = false;
->  static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
-> 
->  static int __init early_evtstrm_cfg(char *buf)
-> @@ -736,6 +737,7 @@ static void arch_timer_evtstrm_enable(int divider)
->  #ifdef CONFIG_COMPAT
->  	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->  #endif
-> +	__this_cpu_write(evtstrm_available, true);
->  }
-> 
->  static void arch_timer_configure_evtstream(void)
-> @@ -860,6 +862,26 @@ u32 arch_timer_get_rate(void)
->  	return arch_timer_rate;
->  }
-> 
-> +bool arch_timer_evtstrm_available(void)
+>  
+> +/* Programmable Clock 0 is valid */
+
+I understand the rationale behind these ^^ two comments, but I would
+like that it's more explicit. Saying that you will store the pck id as
+(id + 1) and that you would have to invert this operation while using
+the stored id.
+Maybe add a comment about this transformation to the struct definition
+as well...
+
+
+> +void pmc_register_pck(u8 pck)
 > +{
-> +	/*
-> +	 * This function might get called outside of a preempt disable context.
-> +	 * This is not an issue because the result of this function will stay
-> +	 * valid for the CPU the caller task will be running on, even if
-> +	 * preempted. The possible case are as follow:
-> +	 *   - evtstrm_available == false -> either event stream is disabled
-> +	 *     system-wide or event stream is momentarily disabled on this CPU
-> +	 *     meaning we won't be scheduling in/out tasks on this CPU until it
-> +	 *     is reconfigured. Current task is made aware it cannot rely on
-> +	 *     event stream.
-> +	 *   - evtstrm_available == true -> task was running on a CPU with event
-> +	 *     stream enabled, if it gets preempted, it will be resumed on a CPU
-> +	 *     where event stream is configured properly. The task can use the
-> +	 *     event stream.
-> +	 */
-> +	return this_cpu_read(evtstrm_available);
+> +	int i;
+> +
+> +	for (i = 0; i < PMC_MAX_PCKS; i++) {
+> +		if (registered_pcks[i] == 0) {
+> +			registered_pcks[i] = pck + 1;
+> +			break;
+> +		}
+> +		if (registered_pcks[i] == (pck + 1))
+> +			break;
+> +	}
+> +}
+> +
+>  static int pmc_suspend(void)
+>  {
+>  	int i;
+> @@ -103,6 +122,10 @@ static int pmc_suspend(void)
+>  		regmap_read(pmcreg, AT91_PMC_PCR,
+>  			    &pmc_cache.pcr[registered_ids[i]]);
+>  	}
+> +	for (i = 0; registered_pcks[i]; i++) {
+> +		u8 num = registered_pcks[i] - 1;
 
-I think this means that a per-cpu variable isn't necessarily what we need
-here. It would be clearer to me if we maintained a cpumask instead, with an
-enable bit for each CPU. If the thing is disabled system-wide, then it's all
-zeroes, otherwise CPUs zero their entry for the cases where the stream is
-momentarily disabled during PM transitions.
+Nit: declaration are better made at the beginning of the function. This
+lead to a checkpatch warning:
+"WARNING: Missing a blank line after declarations"
 
-The alternative would be to move the arch-timer save/restore into sleep.S
-and then just check that the current CPU is online.
+> +		regmap_read(pmcreg, AT91_PMC_PCKR(num), &pmc_cache.pckr[num]);
+> +	}
+>  
+>  	return 0;
+>  }
+> @@ -143,6 +166,10 @@ static void pmc_resume(void)
+>  			     pmc_cache.pcr[registered_ids[i]] |
+>  			     AT91_PMC_PCR_CMD);
+>  	}
+> +	for (i = 0; registered_pcks[i]; i++) {
+> +		u8 num = registered_pcks[i] - 1;
 
-Will
+Ditto
+
+> +		regmap_write(pmcreg, AT91_PMC_PCKR(num), pmc_cache.pckr[num]);
+> +	}
+>  
+>  	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
+>  		mask |= AT91_PMC_LOCKU;
+> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+> index 858e8ef7e8db..d22b1fa9ecdc 100644
+> --- a/drivers/clk/at91/pmc.h
+> +++ b/drivers/clk/at91/pmc.h
+> @@ -31,8 +31,10 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+>  
+>  #ifdef CONFIG_PM
+>  void pmc_register_id(u8 id);
+> +void pmc_register_pck(u8 pck);
+>  #else
+>  static inline void pmc_register_id(u8 id) {}
+> +static inline void pmc_register_pck(u8 pck) {}
+>  #endif
+>  
+>  #endif /* __PMC_H_ */
+> 
+
+
+-- 
+Nicolas Ferre
