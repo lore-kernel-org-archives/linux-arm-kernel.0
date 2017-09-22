@@ -1,43 +1,48 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 22 Sep 2017 20:40:44 +0200
-Subject: [PATCH v2 11/12] arm64: allwinner: a64: Fix node with unit name and
- no reg property
+Date: Fri, 22 Sep 2017 20:40:40 +0200
+Subject: [PATCH v2 07/12] ARM: dts: sun8i: orangepi one: Fix node with unit
+ name and no reg property
 In-Reply-To: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
 References: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170922184045.6498-12-clabbe.montjoie@gmail.com>
+Message-ID: <20170922184045.6498-8-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch fix the warning "xxx has a unit name, but no reg property" by
-removing "@0" from such node
+removing "@0" from such node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 662e8b7981b5..b02a8476b0c8 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -347,7 +347,7 @@
- 				function = "spi1";
- 			};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 6880268e8b87..82e5d28cd698 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -124,19 +124,19 @@
+ };
  
--			uart0_pins_a: uart0 at 0 {
-+			uart0_pins_a: uart0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
- 			};
-@@ -571,7 +571,7 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+ &pio {
+-	leds_opc: led_pins at 0 {
++	leds_opc: led_pins {
+ 		pins = "PA15";
+ 		function = "gpio_out";
+ 	};
+ };
  
--			r_rsb_pins: rsb at 0 {
-+			r_rsb_pins: rsb {
- 				pins = "PL0", "PL1";
- 				function = "s_rsb";
- 			};
+ &r_pio {
+-	leds_r_opc: led_pins at 0 {
++	leds_r_opc: led_pins {
+ 		pins = "PL10";
+ 		function = "gpio_out";
+ 	};
+ 
+-	sw_r_opc: key_pins at 0 {
++	sw_r_opc: key_pins {
+ 		pins = "PL3";
+ 		function = "gpio_in";
+ 	};
 -- 
 2.13.5
