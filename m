@@ -1,57 +1,41 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 22 Sep 2017 11:43:30 -0500
-Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
-In-Reply-To: <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
-References: <20170920180132.4373-1-s-anna@ti.com>
- <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
- <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
- <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
- <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
-Message-ID: <ba1bb5c3-a524-8ee1-6730-e61047dec440@lechnology.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 22 Sep 2017 09:45:11 -0700
+Subject: [PATCH v2 0/4] phy: rockchip-typec: Set "flip" properly; some
+ cleanups; fix swing
+In-Reply-To: <9d892f99-d48d-b034-8f50-2719ef07d0b1@ti.com>
+References: <20170919195630.18747-1-dianders@chromium.org>
+ <9d892f99-d48d-b034-8f50-2719ef07d0b1@ti.com>
+Message-ID: <CAD=FV=W3fHjMjBHqmAT=S47QHzNemXKPtOE9NJ8QhW=otvdXAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2017 11:24 AM, Suman Anna wrote:
-> Hi Sekhar,
-> 
->>
->> On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
->>> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
->>>> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
->>>>> Enable the CMA and DMA_CMA Kconfig options by default for
->>>>> Davinci platforms. Davinci remoteproc driver is one of the
->>>>> modules that depends on these options, and this allows the
->>>>> driver to be made visible for selection with menuconfig.
->>>>>
->>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>> ---
->>>>> Hi Sekhar,
->>>>>
->>>>> Here's the patch that enables CMA as per your request. Patch based
->>>>> on your v4.15/defconfig branch.
->>>>
->>>> Applied! I guess you will be sending another patch enabling the
->>>> remoteproc driver itself?
->>>
->>> Thanks. Well, one always needs a firmware image in their filesystem
->>> without which enabling the driver is meaningless (it would fail). So was
->>> not planning to enable it by default.
->>
->> But the errors will show up only on DA850 LCDK where we have enabled the
->> DSP by default in DT because its an important usecase there. I think it
->> is important for users to see those errors.
->> (besides the usual benefits of having the module enabled to catch build
->> and runtime issues easily).
-> 
-> Yeah, DSP node is enabled only for DA850 LCDK among the DT-supported
-> boards, but I believe there are boards still using legacy boot, and it
-> shows up on those platforms as well. FYI, we do not have any rpmsg
-> drivers other than the kernel sample to make real usage of a booted
-> remoteproc. Anycase, if you still prefer this to be added, I don't mind.
-> 
-> regards
-> Suman
-> 
+Kishon,
 
-I am interested in using remoteproc on LEGO MINDSTORMS EV3 to implement 
-I2C and UART in the PRU.
+On Thu, Sep 21, 2017 at 3:36 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi Douglas,
+>
+> On Wednesday 20 September 2017 01:26 AM, Douglas Anderson wrote:
+>> When connecting to certain DP monitors it was observed that only one
+>> of the two orientations of the type C to DP cable would work.
+>> Debugging showed that the problem was that we needed to set the type C
+>> "flip" state earlier.  Once we did this, problems went away.
+>>
+>> While trying to dig into this problem and some others, I found that
+>> the proper documentation for the Type C PHY was available to me.  This
+>> allowed me to cleanup the magic numbers in the funtion that I was
+>> touching and also fix a few minor issues that (luckily) haven't caused
+>> any problems yet.
+>>
+>> I also found that aux channel communications were flaky on some
+>> adapters until I adjusted the voltage swing.
+>
+> From the commit log, looks like only the 1st and 4th patch are fixes. Only
+> those can go in -rc cycle. But I can't apply the 4th patch without the 2nd and
+> 3rd patch.
+>
+> Can you resend the series such that 2nd and 3rd patch apply on top of 1st and
+> 4th patch?
+
+Good point.  Done.  You should have just received v3 of the series.  :)
+
+-Doug
