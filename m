@@ -1,37 +1,29 @@
 From: hjc@rock-chips.com (Sandy Huang)
-Date: Fri, 22 Sep 2017 11:00:42 +0800
-Subject: [PATCH v2 3/3] drm/rockchip: vop: Add more RGB output interface type
-In-Reply-To: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
-References: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <1506049242-117801-1-git-send-email-hjc@rock-chips.com>
+Date: Fri, 22 Sep 2017 11:00:21 +0800
+Subject: [PATCH v2 0/3] Add support rockchip RGB output interface
+Message-ID: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add serial RGB output interface for rockchip vop, the
-more info about serial RGB output interface described at the
-following file:
+This patches add support rockchip RGB output, Some Rockchip CRTCs, like rv1108,
+can directly output parallel and serial RGB data to panel or to conversion chip.
+So we add this driver to probe encoder and connector to support this case.
 
-Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+Sandy Huang (3):
+  dt-bindings: Add document for rockchip RGB output interface
+  drm/rockchip: Add support for Rockchip Soc RGB output interface
+  drm/rockchip: vop: Add more RGB output interface type
 
-Signed-off-by: Sandy Huang <hjc@rock-chips.com>
----
-No changes in v2:
+ .../bindings/display/rockchip/rockchip-rgb.txt     |  78 +++++
+ drivers/gpu/drm/rockchip/Kconfig                   |   9 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |   2 +
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |   1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
+ drivers/gpu/drm/rockchip/rockchip_rgb.c            | 343 +++++++++++++++++++++
+ 7 files changed, 436 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+ create mode 100644 drivers/gpu/drm/rockchip/rockchip_rgb.c
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 56bbd2e..59a01c3 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -209,6 +209,8 @@ struct vop_data {
- #define ROCKCHIP_OUT_MODE_P888	0
- #define ROCKCHIP_OUT_MODE_P666	1
- #define ROCKCHIP_OUT_MODE_P565	2
-+#define ROCKCHIP_OUT_MODE_S888	8
-+#define ROCKCHIP_OUT_MODE_S888_DUMMY	12
- /* for use special outface */
- #define ROCKCHIP_OUT_MODE_AAAA	15
- 
 -- 
 2.7.4
