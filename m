@@ -1,26 +1,36 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Fri, 22 Sep 2017 14:27:06 +0530
-Subject: [PATCH 0/4] iirqchip: Handle return value of kasprintf
-In-Reply-To: <86vakbnofy.fsf@arm.com>
-References: <1505894901-9403-1-git-send-email-arvind.yadav.cs@gmail.com>
- <86vakbnofy.fsf@arm.com>
-Message-ID: <cd0d74fa-3842-949a-55d9-d5591c6bd615@gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 22 Sep 2017 11:02:05 +0200
+Subject: [RFC] iommu: arm-smmu: stall support
+In-Reply-To: <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
+References: <20170914194444.32551-1-robdclark@gmail.com>
+ <20170919123038.GF8398@8bytes.org>
+ <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
+Message-ID: <20170922090204.GJ8398@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Sep 19, 2017 at 10:23:43AM -0400, Rob Clark wrote:
+> I would like to decide in the IRQ whether or not to queue work or not,
+> because when we get a gpu fault, we tend to get 1000's of gpu faults
+> all at once (and I really only need to handle the first one).  I
+> suppose that could also be achieved by having a special return value
+> from the fault handler to say "call me again from a wq"..
+> 
+> Note that in the drm driver I already have a suitable wq to queue the
+> work, so it really doesn't buy me anything to have the iommu driver
+> toss things off to a wq for me.  Might be a different situation for
+> other drivers (but I guess mostly other drivers are using iommu API
+> indirectly via dma-mapping?)
 
-On Friday 22 September 2017 01:40 PM, Marc Zyngier wrote:
-> On Wed, Sep 20 2017 at  1:38:18 pm BST, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
->> kasprintf() can fail here and we must check its return value.
-> Or not. The use of these strings is purely cosmetic (they are only used
-> to display various debug information), and printk is perfectly able to
-> handle a NULL string.
->
-> Refusing to probe an essential piece of HW because a debug feature
-> failed seems at best counter-productive.
-Yes, Your are right. Sorry for noise. :)
-> Thanks,
->
-> 	M.
-~arvind
+Okay, so since you are the only user for now, we don't need a
+work-queue. But I still want the ->resume call-back to be hidden in the
+iommu code and not be exposed to users.
+
+We already have per-domain fault-handlers, so the best solution for now
+is to call ->resume from report_iommu_fault() when the fault-handler
+returns a special value.
+
+
+Regards,
+
+	Joerg
