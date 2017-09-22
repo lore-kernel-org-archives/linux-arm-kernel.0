@@ -1,175 +1,78 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Fri, 22 Sep 2017 09:44:03 -0700
-Subject: [PATCH v3 1/4] phy: rockchip-typec: Set the AUX channel flip state
- earlier
+Date: Fri, 22 Sep 2017 09:44:06 -0700
+Subject: [PATCH v3 4/4] phy: rockchip-typec: Do the calibration more correctly
 In-Reply-To: <20170922164406.27606-1-dianders@chromium.org>
 References: <20170922164406.27606-1-dianders@chromium.org>
-Message-ID: <20170922164406.27606-2-dianders@chromium.org>
+Message-ID: <20170922164406.27606-5-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some DP monitors we found that setting the wrong flip state on the
-AUX channel could cause the monitor to stop asserting HotPlug Detect
-(HPD).  Setting the right flip state caused these monitors to start
-asserting HotPlug Detect again.
+Calculate the calibration code as per the docs.  The docs talk about
+reading and averaging the pullup and pulldown calibration codes.  They
+also talk about adding in some adjustment codes.  Let's do what the
+docs say.
 
-Here's what we believe was happening:
-* We'd plug in the monitor and we'd see HPD assert
-* We'd quickly see HPD deassert
-* The kernel would try to init the type C PHY but would init it in USB
-  mode (because there was a peripheral there but no HPD)
-* Because the kernel never set the flip mode properly we'd never see
-  the HPD come back.
+In practice this doesn't seem to matter a whole lot.  On a device I
+tested the pullup and pulldown codes were nearly the same (0x23 and
+0x24) and the adjustment codes were 0.
 
-With this change, we'll still see HPD disappear (we don't think
-there's anything we can do about that), but then it will come back.
-
-Overall we can say that it's sane to set the AUX channel flip state
-even when HPD is not asserted.
-
-NOTE: to make this change possible, I needed to do a bit of cleanup to
-the tcphy_dp_aux_calibration() function so that it doesn't ever
-clobber the FLIP state.  This made it very obvious that a line of code
-documented as "setting bit 12" also did a bunch of other magic,
-undocumented stuff.  For now I'll just break out the bits and add a
-comment that this is black magic and we'll try to document
-tcphy_dp_aux_calibration() better in a future CL.
-
-ALSO NOTE: the old function used to write a bunch of hardcoded
-values in _some_ cases instead of doing a read-modify-write.  One
-could possibly assert that these could have had (beneficial) side
-effects and thus with this new code (which always does
-read-modify-write) we could have a bug.  We shouldn't need to worry,
-though, since in the old code tcphy_dp_aux_calibration() was always
-called following the de-assertion of "reset" the the type C PHY.
-...so the type C PHY was always in default state.  TX_ANA_CTRL_REG_1
-is documented to be 0x0 after reset.  This was also confirmed by
-printk.
-
-Suggested-by: Shawn Nematbakhsh <shawnn@chromium.org>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
 
 Changes in v3: None
-Changes in v2: None
+Changes in v2:
+- Removed extra blank line.
 
- drivers/phy/rockchip/phy-rockchip-typec.c | 62 +++++++++++++++++++++----------
- 1 file changed, 42 insertions(+), 20 deletions(-)
+ drivers/phy/rockchip/phy-rockchip-typec.c | 27 ++++++++++++++++++---------
+ 1 file changed, 18 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-index 4d2c57f21d76..342a77733207 100644
+index 95f8f23676b4..a96635447d48 100644
 --- a/drivers/phy/rockchip/phy-rockchip-typec.c
 +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-@@ -443,14 +443,34 @@ static inline int property_enable(struct rockchip_typec_phy *tcphy,
- 	return regmap_write(tcphy->grf_regs, reg->offset, val | mask);
- }
- 
-+static void tcphy_dp_aux_set_flip(struct rockchip_typec_phy *tcphy)
-+{
-+	u16 tx_ana_ctrl_reg_1;
-+
-+	/*
-+	 * Select the polarity of the xcvr:
-+	 * 1, Reverses the polarity (If TYPEC, Pulls ups aux_p and pull
-+	 * down aux_m)
-+	 * 0, Normal polarity (if TYPEC, pulls up aux_m and pulls down
-+	 * aux_p)
-+	 */
-+	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
-+	if (!tcphy->flip)
-+		tx_ana_ctrl_reg_1 |= BIT(12);
-+	else
-+		tx_ana_ctrl_reg_1 &= ~BIT(12);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+}
-+
- static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- {
-+	u16 tx_ana_ctrl_reg_1;
- 	u16 rdata, rdata2, val;
- 
- 	/* disable txda_cal_latch_en for rewrite the calibration values */
--	rdata = readl(tcphy->base + TX_ANA_CTRL_REG_1);
--	val = rdata & 0xdfff;
--	writel(val, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 &= ~BIT(13);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
+@@ -560,24 +560,33 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
+ 	u16 val;
+ 	u16 tx_ana_ctrl_reg_1;
+ 	u16 tx_ana_ctrl_reg_2;
+-	s32 pu_calib_code;
+-
+-	/* disable txda_cal_latch_en for rewrite the calibration values */
+-	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
+-	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
+-	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
++	s32 pu_calib_code, pd_calib_code;
++	s32 pu_adj, pd_adj;
++	u16 calib;
  
  	/*
- 	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[6:0] and
-@@ -472,9 +492,8 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	 * Activate this signal for 1 clock cycle to sample new calibration
- 	 * values.
+-	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[5:0] and
+-	 * write it to TX_DIG_CTRL_REG_2[5:0].
++	 * Calculate calibration code as per docs: use an average of the
++	 * pull down and pull up.  Then add in adjustments.
  	 */
--	rdata = readl(tcphy->base + TX_ANA_CTRL_REG_1);
--	val = rdata | 0x2000;
--	writel(val, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(13);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
- 	usleep_range(150, 200);
- 
- 	/* set TX Voltage Level and TX Deemphasis to 0 */
-@@ -482,8 +501,10 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	/* re-enable decap */
- 	writel(0x100, tcphy->base + TX_ANA_CTRL_REG_2);
- 	writel(0x300, tcphy->base + TX_ANA_CTRL_REG_2);
--	writel(0x2008, tcphy->base + TX_ANA_CTRL_REG_1);
--	writel(0x2018, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(3);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(4);
+ 	val = readl(tcphy->base + CMN_TXPUCAL_CTRL);
+ 	pu_calib_code = CMN_CALIB_CODE_POS(val);
++	val = readl(tcphy->base + CMN_TXPDCAL_CTRL);
++	pd_calib_code = CMN_CALIB_CODE_POS(val);
++	val = readl(tcphy->base + CMN_TXPU_ADJ_CTRL);
++	pu_adj = CMN_CALIB_CODE(val);
++	val = readl(tcphy->base + CMN_TXPD_ADJ_CTRL);
++	pd_adj = CMN_CALIB_CODE(val);
++	calib = (pu_calib_code + pd_calib_code) / 2 + pu_adj + pd_adj;
++
++	/* disable txda_cal_latch_en for rewrite the calibration values */
++	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
++	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
 +	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
  
- 	writel(0, tcphy->base + TX_ANA_CTRL_REG_5);
- 
-@@ -494,8 +515,10 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	writel(0x1001, tcphy->base + TX_ANA_CTRL_REG_4);
- 
- 	/* re-enables Bandgap reference for LDO */
--	writel(0x2098, tcphy->base + TX_ANA_CTRL_REG_1);
--	writel(0x2198, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(7);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |= BIT(8);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
- 
- 	/*
- 	 * re-enables the transmitter pre-driver, driver data selection MUX,
-@@ -505,17 +528,15 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	writel(0x303, tcphy->base + TX_ANA_CTRL_REG_2);
- 
- 	/*
--	 * BIT 12: Controls auxda_polarity, which selects the polarity of the
--	 * xcvr:
--	 * 1, Reverses the polarity (If TYPEC, Pulls ups aux_p and pull
--	 * down aux_m)
--	 * 0, Normal polarity (if TYPE_C, pulls up aux_m and pulls down
--	 * aux_p)
-+	 * Do some magic undocumented stuff, some of which appears to
-+	 * undo the "re-enables Bandgap reference for LDO" above.
- 	 */
--	val = 0xa078;
--	if (!tcphy->flip)
--		val |= BIT(12);
--	writel(val, tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 |=  BIT(15);
-+	tx_ana_ctrl_reg_1 &= ~BIT(8);
-+	tx_ana_ctrl_reg_1 &= ~BIT(7);
-+	tx_ana_ctrl_reg_1 |=  BIT(6);
-+	tx_ana_ctrl_reg_1 |=  BIT(5);
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
- 
- 	writel(0, tcphy->base + TX_ANA_CTRL_REG_3);
- 	writel(0, tcphy->base + TX_ANA_CTRL_REG_4);
-@@ -555,6 +576,7 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
- 	reset_control_deassert(tcphy->tcphy_rst);
- 
- 	property_enable(tcphy, &cfg->typec_conn_dir, tcphy->flip);
-+	tcphy_dp_aux_set_flip(tcphy);
- 
- 	tcphy_cfg_24m(tcphy);
+ 	/* write the calibration, then delay 10 ms as sample in docs */
+ 	val = readl(tcphy->base + TX_DIG_CTRL_REG_2);
+ 	val &= ~(TX_RESCAL_CODE_MASK << TX_RESCAL_CODE_OFFSET);
+-	val |= pu_calib_code << TX_RESCAL_CODE_OFFSET;
++	val |= calib << TX_RESCAL_CODE_OFFSET;
+ 	writel(val, tcphy->base + TX_DIG_CTRL_REG_2);
+ 	usleep_range(10000, 10050);
  
 -- 
 2.14.1.821.g8fa685d3b7-goog
