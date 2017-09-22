@@ -1,34 +1,56 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 22 Sep 2017 20:40:42 +0200
-Subject: [PATCH v2 09/12] ARM: dts: sun8i: orangepi-plus: Fix node with unit
- name and no reg property
-In-Reply-To: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
-References: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170922184045.6498-10-clabbe.montjoie@gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 22 Sep 2017 19:26:13 +0100
+Subject: [PATCH v3 12/13] arm64: acpi: Remove __init from acpi_psci_use_hvc()
+ for use by SDEI
+In-Reply-To: <20170922182614.27885-1-james.morse@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+Message-ID: <20170922182614.27885-13-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the warning "xxx has a unit name, but no reg property" by
-removing "@0" from such node.
+SDEI inherits the 'use hvc' bit that is also used by PSCI. PSCI does all
+its initialisation early, SDEI does its late.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Remove the __init annotation from acpi_psci_use_hvc().
+
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The function name is unchanged as this bit is named 'PSCI_USE_HVC'
+in table 5-37 of ACPIv6.2.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index 331ed683ac62..119732505844 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -114,7 +114,7 @@
- };
+ arch/arm64/kernel/acpi.c | 2 +-
+ include/linux/psci.h     | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index b3162715ed78..252396a96c78 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -117,7 +117,7 @@ bool __init acpi_psci_present(void)
+ }
  
- &pio {
--	usb3_vbus_pin_a: usb3_vbus_pin at 0 {
-+	usb3_vbus_pin_a: usb3_vbus_pin {
- 		pins = "PG11";
- 		function = "gpio_out";
- 	};
+ /* Whether HVC must be used instead of SMC as the PSCI conduit */
+-bool __init acpi_psci_use_hvc(void)
++bool acpi_psci_use_hvc(void)
+ {
+ 	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
+ }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index bdea1cb5e1db..e25a99992a82 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -46,10 +46,11 @@ static inline int psci_dt_init(void) { return 0; }
+ #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
+ int __init psci_acpi_init(void);
+ bool __init acpi_psci_present(void);
+-bool __init acpi_psci_use_hvc(void);
++bool acpi_psci_use_hvc(void);
+ #else
+ static inline int psci_acpi_init(void) { return 0; }
+ static inline bool acpi_psci_present(void) { return false; }
++static inline bool acpi_psci_use_hvc(void) {return false; }
+ #endif
+ 
+ #endif /* __LINUX_PSCI_H */
 -- 
-2.13.5
+2.13.3
