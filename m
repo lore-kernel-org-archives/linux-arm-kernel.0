@@ -1,95 +1,51 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 22 Sep 2017 21:14:51 +0530
-Subject: [PATCH 4/4] iommu/dma,
- numa: Use NUMA aware memory allocations in __iommu_dma_alloc_pages
-In-Reply-To: <9d65676f-e4e8-e0a6-602c-361d83ce83c1@arm.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <20170921085922.11659-5-ganapatrao.kulkarni@cavium.com>
- <9d65676f-e4e8-e0a6-602c-361d83ce83c1@arm.com>
-Message-ID: <CAKTKpr6O9OpT+WgWStYda3EZcbwbs5dzp10SnEfDEt8Z-ZaAhA@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 22 Sep 2017 11:24:16 -0500
+Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
+In-Reply-To: <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
+References: <20170920180132.4373-1-s-anna@ti.com>
+ <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
+ <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
+ <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
+Message-ID: <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Sekhar,
 
+> 
+> On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
+>> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
+>>> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
+>>>> Enable the CMA and DMA_CMA Kconfig options by default for
+>>>> Davinci platforms. Davinci remoteproc driver is one of the
+>>>> modules that depends on these options, and this allows the
+>>>> driver to be made visible for selection with menuconfig.
+>>>>
+>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>> ---
+>>>> Hi Sekhar,
+>>>>
+>>>> Here's the patch that enables CMA as per your request. Patch based
+>>>> on your v4.15/defconfig branch.
+>>>
+>>> Applied! I guess you will be sending another patch enabling the
+>>> remoteproc driver itself?
+>>
+>> Thanks. Well, one always needs a firmware image in their filesystem
+>> without which enabling the driver is meaningless (it would fail). So was
+>> not planning to enable it by default.
+> 
+> But the errors will show up only on DA850 LCDK where we have enabled the
+> DSP by default in DT because its an important usecase there. I think it
+> is important for users to see those errors.
+> (besides the usual benefits of having the module enabled to catch build
+> and runtime issues easily).
 
-On Thu, Sep 21, 2017 at 5:11 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
->> Change function __iommu_dma_alloc_pages to allocate memory/pages
->> for dma from respective device numa node.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  drivers/iommu/dma-iommu.c | 17 ++++++++++-------
->>  1 file changed, 10 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 9d1cebe..0626b58 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -428,20 +428,21 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
->>       kvfree(pages);
->>  }
->>
->> -static struct page **__iommu_dma_alloc_pages(unsigned int count,
->> -             unsigned long order_mask, gfp_t gfp)
->> +static struct page **__iommu_dma_alloc_pages(struct device *dev,
->> +             unsigned int count, unsigned long order_mask, gfp_t gfp)
->>  {
->>       struct page **pages;
->>       unsigned int i = 0, array_size = count * sizeof(*pages);
->> +     int numa_node = dev_to_node(dev);
->>
->>       order_mask &= (2U << MAX_ORDER) - 1;
->>       if (!order_mask)
->>               return NULL;
->>
->>       if (array_size <= PAGE_SIZE)
->> -             pages = kzalloc(array_size, GFP_KERNEL);
->> +             pages = kzalloc_node(array_size, GFP_KERNEL, numa_node);
->>       else
->> -             pages = vzalloc(array_size);
->> +             pages = vzalloc_node(array_size, numa_node);
->
-> kvzalloc{,_node}() didn't exist when this code was first written, but it
-> does now - since you're touching it you may as well get rid of the whole
-> if-else and array_size local.
+Yeah, DSP node is enabled only for DA850 LCDK among the DT-supported
+boards, but I believe there are boards still using legacy boot, and it
+shows up on those platforms as well. FYI, we do not have any rpmsg
+drivers other than the kernel sample to make real usage of a booted
+remoteproc. Anycase, if you still prefer this to be added, I don't mind.
 
-thanks, i will update in next version.
->
-> Further nit: some of the indentation below is a bit messed up.
-
-ok, will fix it.
->
-> Robin.
->
->>       if (!pages)
->>               return NULL;
->>
->> @@ -462,8 +463,9 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
->>                       unsigned int order = __fls(order_mask);
->>
->>                       order_size = 1U << order;
->> -                     page = alloc_pages((order_mask - order_size) ?
->> -                                        gfp | __GFP_NORETRY : gfp, order);
->> +                     page = alloc_pages_node(numa_node,
->> +                                     (order_mask - order_size) ?
->> +                                gfp | __GFP_NORETRY : gfp, order);
->>                       if (!page)
->>                               continue;
->>                       if (!order)
->> @@ -548,7 +550,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
->>               alloc_sizes = min_size;
->>
->>       count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->> -     pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
->> +     pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
->> +                     gfp);
->>       if (!pages)
->>               return NULL;
->>
->>
->
-
-thanks
-Ganapat
+regards
+Suman
