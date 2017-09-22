@@ -1,136 +1,69 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 22 Sep 2017 14:42:37 +0200
-Subject: [PATCH v2 7/9] pwm: atmel-tcb: Support backup mode
-In-Reply-To: <20170915140411.31716-8-romain.izard.pro@gmail.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-8-romain.izard.pro@gmail.com>
-Message-ID: <fa66d212-dbfb-08d4-1b2b-aaaa9f9d62de@microchip.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Fri, 22 Sep 2017 14:47:49 +0200
+Subject: [PATCH] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
+In-Reply-To: <20170921075239.GE3568@kwain>
+References: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
+ <20170921075239.GE3568@kwain>
+Message-ID: <20170922144749.6b2aaa76@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2017 at 16:04, Romain Izard wrote:
-> Save and restore registers for the PWM on suspend and resume, which
-> makes hibernation and backup modes possible.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Hello Antoine,
 
-Seems good to me:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+On Thu, 21 Sep 2017 09:52:39 +0200
+Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-> ---
->  drivers/pwm/pwm-atmel-tcb.c | 63 +++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 61 insertions(+), 2 deletions(-)
+> Hi Miquel,
 > 
-> diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-> index 75db585a2a94..acd3ce8ecf3f 100644
-> --- a/drivers/pwm/pwm-atmel-tcb.c
-> +++ b/drivers/pwm/pwm-atmel-tcb.c
-> @@ -37,11 +37,20 @@ struct atmel_tcb_pwm_device {
->  	unsigned period;		/* PWM period expressed in clk cycles */
->  };
->  
-> +struct atmel_tcb_channel {
-> +	u32 enabled;
-> +	u32 cmr;
-> +	u32 ra;
-> +	u32 rb;
-> +	u32 rc;
-> +};
-> +
->  struct atmel_tcb_pwm_chip {
->  	struct pwm_chip chip;
->  	spinlock_t lock;
->  	struct atmel_tc *tc;
->  	struct atmel_tcb_pwm_device *pwms[NPWM];
-> +	struct atmel_tcb_channel bkup[NPWM / 2];
->  };
->  
->  static inline struct atmel_tcb_pwm_chip *to_tcb_chip(struct pwm_chip *chip)
-> @@ -175,12 +184,15 @@ static void atmel_tcb_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	 * Use software trigger to apply the new setting.
->  	 * If both PWM devices in this group are disabled we stop the clock.
->  	 */
-> -	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC)))
-> +	if (!(cmr & (ATMEL_TC_ACPC | ATMEL_TC_BCPC))) {
->  		__raw_writel(ATMEL_TC_SWTRG | ATMEL_TC_CLKDIS,
->  			     regs + ATMEL_TC_REG(group, CCR));
-> -	else
-> +		tcbpwmc->bkup[group].enabled = 1;
-> +	} else {
->  		__raw_writel(ATMEL_TC_SWTRG, regs +
->  			     ATMEL_TC_REG(group, CCR));
-> +		tcbpwmc->bkup[group].enabled = 0;
-> +	}
->  
->  	spin_unlock(&tcbpwmc->lock);
->  }
-> @@ -263,6 +275,7 @@ static int atmel_tcb_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	/* Use software trigger to apply the new setting */
->  	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
->  		     regs + ATMEL_TC_REG(group, CCR));
-> +	tcbpwmc->bkup[group].enabled = 1;
->  	spin_unlock(&tcbpwmc->lock);
->  	return 0;
->  }
-> @@ -445,10 +458,56 @@ static const struct of_device_id atmel_tcb_pwm_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, atmel_tcb_pwm_dt_ids);
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int atmel_tcb_pwm_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-> +	void __iomem *base = tcbpwm->tc->regs;
-> +	int i;
-> +
-> +	for (i = 0; i < (NPWM / 2); i++) {
-> +		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
-> +
-> +		chan->cmr = readl(base + ATMEL_TC_REG(i, CMR));
-> +		chan->ra = readl(base + ATMEL_TC_REG(i, RA));
-> +		chan->rb = readl(base + ATMEL_TC_REG(i, RB));
-> +		chan->rc = readl(base + ATMEL_TC_REG(i, RC));
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int atmel_tcb_pwm_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-> +	void __iomem *base = tcbpwm->tc->regs;
-> +	int i;
-> +
-> +	for (i = 0; i < (NPWM / 2); i++) {
-> +		struct atmel_tcb_channel *chan = &tcbpwm->bkup[i];
-> +
-> +		writel(chan->cmr, base + ATMEL_TC_REG(i, CMR));
-> +		writel(chan->ra, base + ATMEL_TC_REG(i, RA));
-> +		writel(chan->rb, base + ATMEL_TC_REG(i, RB));
-> +		writel(chan->rc, base + ATMEL_TC_REG(i, RC));
-> +		if (chan->enabled) {
-> +			writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
-> +				base + ATMEL_TC_REG(i, CCR));
-> +		}
-> +	}
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(atmel_tcb_pwm_pm_ops, atmel_tcb_pwm_suspend,
-> +			 atmel_tcb_pwm_resume);
-> +
->  static struct platform_driver atmel_tcb_pwm_driver = {
->  	.driver = {
->  		.name = "atmel-tcb-pwm",
->  		.of_match_table = atmel_tcb_pwm_dt_ids,
-> +		.pm = &atmel_tcb_pwm_pm_ops,
->  	},
->  	.probe = atmel_tcb_pwm_probe,
->  	.remove = atmel_tcb_pwm_remove,
+> On Thu, Sep 21, 2017 at 09:36:43AM +0200, Miquel Raynal wrote:
+> > From: Christine Gharzuzi <chrisg@marvell.com>
+> > +&cps_spi1 {
+> > +	status = "okay";
+> > +
+> > +	spi-flash at 0 {
+> > +		#address-cells = <0x1>;
+> > +		#size-cells = <0x1>;
+> > +		compatible = "jedec,spi-nor";
+> > +		reg = <0x0>;
+> > +		spi-max-frequency = <20000000>;
+> > +
+> > +		partitions {
+> > +			compatible = "fixed-partitions";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +
+> > +			partition at 0 {
+> > +				label = "Boot";
+> > +				reg = <0x0 0x200000>;
+> > +			};
+> > +			partition at 200000 {
+> > +				label = "Filesystem";
+> > +				reg = <0x200000 0xd00000>;
+> > +			};
+> > +			partition at d00000 {  
 > 
+> The node should be 'partition at f00000'.
+
+Absolutely, thanks for poiting it!
+
+Regards,
+Miqu?l
+
+> 
+> > +				label = "Boot_2nd";
+> > +				reg = <0xf00000 0x100000>;
+> > +			};
+> > +		};
+> > +	};
+> > +};  
+> 
+> Thanks,
+> Antoine
+> 
+
 
 
 -- 
-Nicolas Ferre
+Miquel Raynal, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
