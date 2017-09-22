@@ -1,49 +1,51 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 22 Sep 2017 11:02:53 +0100
-Subject: [RFC] iommu: arm-smmu: stall support
-In-Reply-To: <20170922090204.GJ8398@8bytes.org>
-References: <20170914194444.32551-1-robdclark@gmail.com>
- <20170919123038.GF8398@8bytes.org>
- <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
- <20170922090204.GJ8398@8bytes.org>
-Message-ID: <32e3ab2c-a996-c805-2a0d-a2e85deb3a50@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 22 Sep 2017 12:08:44 +0200
+Subject: [PATCH v2 0/2] mtd: nand: introduce NAND_ROW_ADDR_3 flag and
+ improve Denali driver
+In-Reply-To: <1505268351-31941-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1505268351-31941-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170922120844.6cc692e6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/17 10:02, Joerg Roedel wrote:
-> On Tue, Sep 19, 2017 at 10:23:43AM -0400, Rob Clark wrote:
->> I would like to decide in the IRQ whether or not to queue work or not,
->> because when we get a gpu fault, we tend to get 1000's of gpu faults
->> all at once (and I really only need to handle the first one).  I
->> suppose that could also be achieved by having a special return value
->> from the fault handler to say "call me again from a wq"..
->>
->> Note that in the drm driver I already have a suitable wq to queue the
->> work, so it really doesn't buy me anything to have the iommu driver
->> toss things off to a wq for me.  Might be a different situation for
->> other drivers (but I guess mostly other drivers are using iommu API
->> indirectly via dma-mapping?)
+On Wed, 13 Sep 2017 11:05:49 +0900
+Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+
+> Currently, Denali NAND driver always expects 3 row address cycle
+> devices because the driver init code hard-code the register setting.
+> I will fix it in 2/2.
 > 
-> Okay, so since you are the only user for now, we don't need a
-> work-queue. But I still want the ->resume call-back to be hidden in the
-> iommu code and not be exposed to users.
+> Many drivers check chip->chipsize if the third row address cycle
+> is needed or not.  This is not nice because 32MB, 128MB are
+> magic numbers.  nand_scan_ident can decide it and provide a
+> driver-friendly flag.
 > 
-> We already have per-domain fault-handlers, so the best solution for now
-> is to call ->resume from report_iommu_fault() when the fault-handler
-> returns a special value.
+> 1/2 is touching verious drivers.
+> I hope Acked-by from driver maintainers if this change looks good.
+> 
 
-The problem is that report_iommu_fault is called from IRQ context by the
-SMMU driver, so the device driver callback cannot sleep.
-
-So if the device driver needs to be able to sleep between fault report and
-resume, as I understand Rob needs for writing debugfs, we can either:
-
-* call report_iommu_fault from higher up, in a thread or workqueue.
-* split the fault reporting as this patch proposes. The exact same
-  mechanism is needed for the vSVM work by Intel: in order to inject fault
-  into the guest, they would like to have an atomic notifier registered by
-  VFIO for passing down the Page Request, and a new function in the IOMMU
-  API to resume/complete the fault.
+Applied.
 
 Thanks,
-Jean
+
+Boris
+
+> 
+> Changes in v2:
+>  - Fix build error
+> 
+> Masahiro Yamada (2):
+>   mtd: nand: introduce NAND_ROW_ADDR_3 flag
+>   mtd: nand: denali: support two row address cycle devices
+> 
+>  drivers/mtd/nand/atmel/nand-controller.c | 3 +--
+>  drivers/mtd/nand/au1550nd.c              | 3 +--
+>  drivers/mtd/nand/denali.c                | 4 ++--
+>  drivers/mtd/nand/diskonchip.c            | 3 +--
+>  drivers/mtd/nand/hisi504_nand.c          | 3 +--
+>  drivers/mtd/nand/mxc_nand.c              | 3 +--
+>  drivers/mtd/nand/nand_base.c             | 9 +++++----
+>  drivers/mtd/nand/nuc900_nand.c           | 2 +-
+>  include/linux/mtd/rawnand.h              | 3 +++
+>  9 files changed, 16 insertions(+), 17 deletions(-)
+> 
