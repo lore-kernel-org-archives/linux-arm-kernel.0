@@ -1,162 +1,93 @@
-From: alcooperx@gmail.com (Al Cooper)
-Date: Fri, 22 Sep 2017 15:34:02 -0400
-Subject: [PATCH V6 4/4] phy: usb: phy-brcm-usb: Add ability to force DRD mode
- to host or device
-In-Reply-To: <1506108842-39072-1-git-send-email-alcooperx@gmail.com>
-References: <1506108842-39072-1-git-send-email-alcooperx@gmail.com>
-Message-ID: <1506108842-39072-5-git-send-email-alcooperx@gmail.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri, 22 Sep 2017 14:37:26 -0500
+Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
+Message-ID: <1506109046-11527-1-git-send-email-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Cooper <al.cooper@broadcom.com>
+Hi arm-soc maintainers,
 
-When the usb phy device mode is set to "drd", the USB port will
-switch between device and host modes depending on what's plugged
-into the port. Customers have asked for the ability to force
-host or device mode from software. This commit adds sysfs
-entries to the phy device that allow this. The sysfs for the phy
-device can be found at:
-/sys/bus/platform/drivers/brcmstb-usb-phy/*.usb-phy
+This pull request includes updates to the QMAN/BMAN drivers to make
+them work on the arm/arm64 architectures in addition to the power
+architecture and a few minor update/bug-fix to the soc/fsl drivers.
 
-The following sysfs entries were added:
-- "dr_mode" (RO) - The current phy "dr_mode" setting.
-  It will be set to one of the following values:
-  - "host" - host mode
-  - "peripheral " - device mode
-  - "drd" - switch between device and host mode based on
-    installed device
-  - "typec-pd" - device/host mode is controller by the USB
-    Type-C PD protocol.
+We got the Reviewed-by from Catalin on the ARM architecture side.
 
-If "dr_mode" is "drd"
-- "drd_select" (RW) -
-  It will be set to one of the following values:
-  - "host" - force host mode
-  - "device" - force device mode
-  - "auto" - allow normal auto selection of host/device based on
-    inserted USB device
+DPAA (Data Path Acceleration Architecture) is a set of hardware
+components used on some FSL/NXP QorIQ Networking SoCs, it provides the
+infrastructure to support simplified sharing of networking interfaces
+and accelerators by multiple CPU cores, and the accelerators
+themselves.  The QMan(Queue Manager) and BMan(Buffer Manager) are
+infrastructural components within the DPAA framework.  They are used to
+manage queues and buffers for various I/O interfaces, hardware
+accelerators.  
 
-Signed-off-by: Al Cooper <alcooperx@gmail.com>
----
- drivers/phy/broadcom/phy-brcm-usb.c | 85 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+More information can be found via link: 
+http://www.nxp.com/products/microcontrollers-and-processors/power-architecture-processors/qoriq-platforms/data-path-acceleration:QORIQ_DPAA
 
-diff --git a/drivers/phy/broadcom/phy-brcm-usb.c b/drivers/phy/broadcom/phy-brcm-usb.c
-index 8ffd0f1..195b981 100644
---- a/drivers/phy/broadcom/phy-brcm-usb.c
-+++ b/drivers/phy/broadcom/phy-brcm-usb.c
-@@ -27,6 +27,8 @@
- 
- #include "phy-brcm-usb-init.h"
- 
-+static DEFINE_MUTEX(sysfs_lock);
-+
- enum brcm_usb_phy_id {
- 	BRCM_USB_PHY_2_0 = 0,
- 	BRCM_USB_PHY_3_0,
-@@ -45,6 +47,12 @@ struct value_to_name_map {
- 	{ USB_CTLR_MODE_TYPEC_PD, "typec-pd" }
- };
- 
-+static struct value_to_name_map brcm_dual_mode_to_name[] = {
-+	{ 0, "host" },
-+	{ 1, "device" },
-+	{ 2, "auto" },
-+};
-+
- struct brcm_usb_phy {
- 	struct phy *phy;
- 	unsigned int id;
-@@ -161,6 +169,73 @@ static int name_to_value(struct value_to_name_map *table, int count,
- 	return -EINVAL;
- }
- 
-+static const char *value_to_name(struct value_to_name_map *table, int count,
-+				 int value)
-+{
-+	if (value >= count)
-+		return "unknown";
-+	return table[value].name;
-+}
-+
-+static ssize_t dr_mode_show(struct device *dev,
-+			    struct device_attribute *attr,
-+			    char *buf)
-+{
-+	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
-+
-+	return sprintf(buf, "%s\n",
-+		value_to_name(&brcm_dr_mode_to_name[0],
-+			      ARRAY_SIZE(brcm_dr_mode_to_name),
-+			      priv->ini.mode));
-+}
-+static DEVICE_ATTR_RO(dr_mode);
-+
-+static ssize_t dual_select_store(struct device *dev,
-+				 struct device_attribute *attr,
-+				 const char *buf, size_t len)
-+{
-+	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
-+	int value;
-+	int res;
-+
-+	mutex_lock(&sysfs_lock);
-+	res = name_to_value(&brcm_dual_mode_to_name[0],
-+			    ARRAY_SIZE(brcm_dual_mode_to_name), buf, &value);
-+	if (!res) {
-+		brcm_usb_init_set_dual_select(&priv->ini, value);
-+		res = len;
-+	}
-+	mutex_unlock(&sysfs_lock);
-+	return res;
-+}
-+
-+static ssize_t dual_select_show(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
-+	int value;
-+
-+	mutex_lock(&sysfs_lock);
-+	value = brcm_usb_init_get_dual_select(&priv->ini);
-+	mutex_unlock(&sysfs_lock);
-+	return sprintf(buf, "%s\n",
-+		value_to_name(&brcm_dual_mode_to_name[0],
-+			      ARRAY_SIZE(brcm_dual_mode_to_name),
-+			      value));
-+}
-+static DEVICE_ATTR_RW(dual_select);
-+
-+static struct attribute *brcm_usb_phy_attrs[] = {
-+	&dev_attr_dr_mode.attr,
-+	&dev_attr_dual_select.attr,
-+	NULL
-+};
-+
-+static const struct attribute_group brcm_usb_phy_group = {
-+	.attrs = brcm_usb_phy_attrs,
-+};
-+
- static int brcm_usb_phy_dvr_init(struct device *dev,
- 				 struct brcm_usb_phy_data *priv,
- 				 struct device_node *dn)
-@@ -277,6 +352,16 @@ static int brcm_usb_phy_probe(struct platform_device *pdev)
- 	/* make sure invert settings are correct */
- 	brcm_usb_init_ipp(&priv->ini);
- 
-+	/*
-+	 * Create sysfs entries for mode.
-+	 * Remove "dual_select" attribute if not in dual mode
-+	 */
-+	if (priv->ini.mode != USB_CTLR_MODE_DRD)
-+		brcm_usb_phy_attrs[1] = NULL;
-+	err = sysfs_create_group(&dev->kobj, &brcm_usb_phy_group);
-+	if (err)
-+		dev_warn(dev, "Error creating sysfs attributes\n");
-+
- 	/* start with everything off */
- 	if (priv->has_xhci)
- 		brcm_usb_uninit_xhci(&priv->ini);
--- 
-1.9.0.138.g2de3478
+Regards,
+Leo
+
+
+The following changes since commit 0a8abd97dcda50e5d2c893a51733416534e95706:
+
+  Merge tag 'for-linus-4.14b-rc2-tag' of git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip (2017-09-22 06:40:47 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-4.14
+
+for you to fetch changes up to e868adf21c0a25634d5dfa5b1e6dbf839306d8fa:
+
+  soc/fsl/qbman: Enable FSL_LAYERSCAPE config on ARM (2017-09-22 13:33:07 -0500)
+
+----------------------------------------------------------------
+FSL/NXP ARM SoC drivers updates for 4.14
+
+This adds the DPAA QBMan support for ARM SoCs and a few minor fixes/updates.
+
+----------------------------------------------------------------
+Claudiu Manoil (2):
+      soc/fsl/qbman: Drop L1_CACHE_BYTES compile time check
+      soc/fsl/qbman: Add missing headers on ARM
+
+Karim Eshapa (1):
+      soc/fsl/qman: Sleep instead of stuck hacking jiffies
+
+Madalin Bucur (4):
+      soc/fsl/qbman: Drop set/clear_bits usage
+      soc/fsl/qbman: add QMAN_REV32
+      soc/fsl/qbman: different register offsets on ARM
+      soc/fsl/qbman: Enable FSL_LAYERSCAPE config on ARM
+
+Roy Pledge (5):
+      soc/fsl/qbman: Add common routine for QBMan private allocations
+      soc/fsl/qbman: Use shared-dma-pool for BMan private memory allocations
+      soc/fsl/qbman: Use shared-dma-pool for QMan private memory allocations
+      dt-bindings: soc/fsl: Update reserved memory binding for QBMan
+      soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
+
+Valentin Rothberg (1):
+      soc/fsl/qbman: Fix ARM32 typo
+
+ashish kumar (1):
+      soc/fsl/guts: Add compatible string for LS1088
+
+ Documentation/devicetree/bindings/soc/fsl/bman.txt | 12 +--
+ Documentation/devicetree/bindings/soc/fsl/qman.txt | 26 ++++--
+ drivers/soc/fsl/guts.c                             |  1 +
+ drivers/soc/fsl/qbman/Kconfig                      |  2 +-
+ drivers/soc/fsl/qbman/Makefile                     |  2 +-
+ drivers/soc/fsl/qbman/bman.c                       | 42 ++++++++--
+ drivers/soc/fsl/qbman/bman_ccsr.c                  | 15 ++++
+ drivers/soc/fsl/qbman/bman_portal.c                | 23 +++---
+ drivers/soc/fsl/qbman/bman_priv.h                  |  8 +-
+ drivers/soc/fsl/qbman/dpaa_sys.c                   | 78 ++++++++++++++++++
+ drivers/soc/fsl/qbman/dpaa_sys.h                   | 25 ++++--
+ drivers/soc/fsl/qbman/qman.c                       | 83 +++++++++++++------
+ drivers/soc/fsl/qbman/qman_ccsr.c                  | 95 +++++++++++++++-------
+ drivers/soc/fsl/qbman/qman_portal.c                | 23 +++---
+ drivers/soc/fsl/qbman/qman_priv.h                  | 11 +--
+ drivers/soc/fsl/qbman/qman_test.h                  |  2 -
+ 16 files changed, 320 insertions(+), 128 deletions(-)
+ create mode 100644 drivers/soc/fsl/qbman/dpaa_sys.c
