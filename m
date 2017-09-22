@@ -1,32 +1,100 @@
 From: kevin.wangtao@hisilicon.com (Tao Wang)
-Date: Fri, 22 Sep 2017 17:42:03 +0800
-Subject: [PATCH 0/9] add support for Hi3660 tsensor
-Message-ID: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
+Date: Fri, 22 Sep 2017 17:42:04 +0800
+Subject: [PATCH 1/9] thermal/drivers/hisi: move clk operation to related
+ function
+In-Reply-To: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
+References: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <1506073332-92438-2-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wangtao <kevin.wangtao@linaro.org>
 
-This patchset reorganize hisi thermal driver and make it both
-support Hi6220 and Hi3660.
-This patchset is based on Daniel thermal patch V2.
-https://lkml.org/lkml/2017/9/4/432
+The sensor's clock is enabled and disabled outside of the probe and
+disable function. Moving the corresponding action in the
+hisi_thermal_setup() and hisi_thermal_disable_sensor(), factors out
+some lines of code and makes the code more symmetric.
 
-Kevin Wangtao (9):
-  thermal/drivers/hisi: move clk operation to related function
-  thermal/drivers/hisi: use round up step value
-  thermal/drivers/hisi: put platform code together
-  thermal/drivers/hisi: add platform prefix to function name
-  thermal/drivers/hisi: perpare to add support for other hisi platform
-  thermal/drivers/hisi: add support for multi temp threshold
-  dt-bindings: Document the hi3660 thermal sensor binding
-  thermal/drivers/hisi: add support for hi3660 SoC
-  arm64: dts: register Hi3660's thermal sensor
+Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
+---
+ drivers/thermal/hisi_thermal.c | 29 +++++++++--------------------
+ 1 file changed, 9 insertions(+), 20 deletions(-)
 
- .../bindings/thermal/hisilicon-thermal.txt         |   9 +
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   8 +
- drivers/thermal/hisi_thermal.c                     | 494 ++++++++++++++-------
- 3 files changed, 351 insertions(+), 160 deletions(-)
-
+diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
+index 39f4627..c43e3df 100644
+--- a/drivers/thermal/hisi_thermal.c
++++ b/drivers/thermal/hisi_thermal.c
+@@ -203,6 +203,8 @@ static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
+ 	hisi_thermal_enable(data->regs, 0);
+ 	hisi_thermal_alarm_enable(data->regs, 0);
+ 	hisi_thermal_reset_enable(data->regs, 0);
++
++	clk_disable_unprepare(data->clk);
+ }
+ 
+ static int hisi_thermal_get_temp(void *__data, int *temp)
+@@ -297,9 +299,13 @@ static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
+ 
+ static int hisi_thermal_setup(struct hisi_thermal_data *data)
+ {
+-	struct hisi_thermal_sensor *sensor;
++	struct hisi_thermal_sensor *sensor = &data->sensor;
++	int ret;
+ 
+-	sensor = &data->sensor;
++	/* enable clock for tsensor */
++	ret = clk_prepare_enable(data->clk);
++	if (ret)
++		return ret;
+ 
+ 	/* disable module firstly */
+ 	hisi_thermal_reset_enable(data->regs, 0);
+@@ -363,13 +369,6 @@ static int hisi_thermal_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	/* enable clock for thermal */
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+-		return ret;
+-	}
+-
+ 	ret = hisi_thermal_register_sensor(pdev, data,
+ 					   &data->sensor,
+ 					   HISI_DEFAULT_SENSOR);
+@@ -405,7 +404,6 @@ static int hisi_thermal_remove(struct platform_device *pdev)
+ 
+ 	hisi_thermal_toggle_sensor(sensor, false);
+ 	hisi_thermal_disable_sensor(data);
+-	clk_disable_unprepare(data->clk);
+ 
+ 	return 0;
+ }
+@@ -417,23 +415,14 @@ static int hisi_thermal_suspend(struct device *dev)
+ 
+ 	hisi_thermal_disable_sensor(data);
+ 
+-	clk_disable_unprepare(data->clk);
+-
+ 	return 0;
+ }
+ 
+ static int hisi_thermal_resume(struct device *dev)
+ {
+ 	struct hisi_thermal_data *data = dev_get_drvdata(dev);
+-	int ret;
+ 
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret)
+-		return ret;
+-
+-	hisi_thermal_setup(data);
+-
+-	return 0;
++	return hisi_thermal_setup(data);
+ }
+ #endif
+ 
 -- 
 2.8.1
