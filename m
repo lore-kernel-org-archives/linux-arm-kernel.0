@@ -1,33 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 22 Sep 2017 10:37:03 +0100
-Subject: [PATCH] tee: ACPI support for optee driver
-In-Reply-To: <59C36E18.1050106@huawei.com>
-References: <1505977937-25034-1-git-send-email-mchitale@apm.com>
- <59C36E18.1050106@huawei.com>
-Message-ID: <20170922093703.GD1523@red-moon>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 22 Sep 2017 12:39:38 +0300
+Subject: [PATCH 3/5] dmaengine: Support for querying maximum trasnfer
+ length (of an SG element)
+In-Reply-To: <20170921171451.GG30097@localhost>
+References: <20170912104424.18495-1-peter.ujfalusi@ti.com>
+ <20170912104424.18495-4-peter.ujfalusi@ti.com>
+ <20170921171451.GG30097@localhost>
+Message-ID: <02509904-4ae8-c6f8-3514-5f77d665c9a6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 03:45:28PM +0800, Hanjun Guo wrote:
-> On 2017/9/21 15:12, Mayuresh Chitale wrote:
-> > This patch modifies the optee driver to add support for parsing
-> > the conduit method from an ACPI node.
+?
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
+On 2017-09-21 20:14, Vinod Koul wrote:
+> On Tue, Sep 12, 2017 at 01:44:22PM +0300, Peter Ujfalusi wrote:
+>> Certain DMA engines have limitation on the maximum size of a transfer they
+>> can support. This size limitation is per SG element or for period length in
+>> cyclic transfers.
+>> In TI's eDMA and sDMA this limitation is not really a length limit, but it
+>> is the number of bursts that we can support in one transfer.
+>>
+>> With this callback the DMA drivers can provide hints to clients on how they
+>> should set up their buffers (sglist, cyclic buffer). Without this the
+>> clients must have open coded workarounds in place for each and every DMA
+>> engine they might be interfacing with to have correct length for the
+>> transfers.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  include/linux/dmaengine.h | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index 8319101170fc..739824b94c1b 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -705,6 +705,9 @@ struct dma_filter {
+>>   * @device_prep_dma_imm_data: DMA's 8 byte immediate data to the dst address
+>>   * @device_config: Pushes a new configuration to a channel, return 0 or an error
+>>   *	code
+>> + * @device_get_max_len: Get the maximum supported length in bytes of a slave
+>> + *	transfer based on the set dma_slave_config. The length limitation
+>> + *	applies to each SG element's length.
+>>   * @device_pause: Pauses any transfer happening on a channel. Returns
+>>   *	0 or an error code
+>>   * @device_resume: Resumes any transfer on a channel previously
+>> @@ -792,6 +795,8 @@ struct dma_device {
+>>  
+>>  	int (*device_config)(struct dma_chan *chan,
+>>  			     struct dma_slave_config *config);
+>> +	u32 (*device_get_max_len)(struct dma_chan *chan,
+>> +				  enum dma_transfer_direction dir);
+>>  	int (*device_pause)(struct dma_chan *chan);
+>>  	int (*device_resume)(struct dma_chan *chan);
+>>  	int (*device_terminate_all)(struct dma_chan *chan);
+>> @@ -812,6 +817,15 @@ static inline int dmaengine_slave_config(struct dma_chan *chan,
+>>  	return -ENOSYS;
+>>  }
+>>  
+>> +static inline u32 dmaengine_slave_get_max_len(struct dma_chan *chan,
+>> +					      enum dma_transfer_direction dir)
+>> +{
+>> +	if (chan->device->device_get_max_len)
+>> +		return chan->device->device_get_max_len(chan, dir);
 > 
-> Sorry I didn't involve this earlier, but I think this is a wrong
-> approach, in ACPI 5.1+ spec, there is a bit in FADT table which
-> indicates PSCI using SMC or HVC, please see ACPI 6.2 [1],
-> Table 5-37 Fixed ACPI Description Table ARM Boot Architecture Flags.
+> not another callback :)
 > 
-> Can we just use that to get the conduit method for optee driver too?
-> 
-> [1]: http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> on a serious note, why shouldn't this be one more capability in
+> dma_slave_caps. looking at next patch it seems static
 
-It is just not a matter of conduit method but also to define how OPTEE
-should be detected. It is up to Linaro (who owns OP-TEE) to put forward
-a binding at ACPI (ARM) spec level.
+It is not really static, the size in bytes depends on the dev_width and
+the maxburst:
+dev_width * burst * (SZ_64K - 1);
 
-We do not define ACPI bindings on a kernel mailing list.
+The number of (dev_width * burst) is static, yes. Other DMA engines
+might have similar interpretation, but returning the maximum length in
+bytes sounded more generic for other engines to be able to adopt.
 
-NAK on this patch.
+Initially I had maxburst_cnt in struct dma_device for maximum burst
+count within one SG, but it felt clumsy and not too intuitive either.
 
-Lorenzo
+- P?ter
