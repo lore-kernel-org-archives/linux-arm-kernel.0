@@ -1,75 +1,85 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Sep 2017 15:08:34 +0200
-Subject: [PATCH RESEND v2] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
-Message-ID: <20170922130834.7096-1-miquel.raynal@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Sep 2017 15:09:51 +0200
+Subject: [PATCH] pinctrl: samsung: add pinctrl_force_sleep() for "sleep"
+ pinctrl state
+In-Reply-To: <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
+References: <CGME20170921123230epcas1p4d3c1de108af7d34053d2c4f40dd42119@epcas1p4.samsung.com>
+ <006801d332d5$b0ca09d0$125e1d70$@samsung.com>
+Message-ID: <CACRpkdZSCyEWWptfSHr+EOW-RVh4sgVT5yNkiVqZs=nXwHxZGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christine Gharzuzi <chrisg@marvell.com>
+On Thu, Sep 21, 2017 at 2:32 PM, ??? <youngmin.nam@samsung.com> wrote:
 
-Add the DT node enabling Armada-8040-DB CPS SPI controller driver.
+I'm copying the whole patch so that everyone added to To: can see it.
 
-Add the SPI NAND flash device connected on the bus. Fill the MTD
-partitions layout.
+> This patch adds pinctrl_for_sleep() in samsung_pinctrl_suspend()
+> to support configuration of "sleep" pinctrl state.
+>
+> For example, we can configure "sleep" pinctrl state of "gpf1-6"
+> as "INPUT, PULL DOWN" by configuring power down mode register.
+>
+> &pinctrl_5 {
+>         pinctrl-names = "default","sleep";
+>         pinctrl-0 = <&initial5>;
+>         pinctrl-1 = <&sleep5>;
+>
+>         initial5: initial-state {
+>                 samsung,pins = gpf1-6;
+>                 samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+>         };
+>         sleep5: sleep-state {
+>                 samsung,pins = gpf1-6;
+>                 samsung,pin-con-pdn = <EXYNOS_PIN_PDN_INPUT>;
+>                 samsung,pin-pud-pdn = <EXYNOS_PIN_PULL_DOWN>;
+>         };
+> };
+>
+> Signed-off-by: Youngmin Nam <youngmin.nam@samsung.com>
+> ---
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index e04f7fe0a65d..b4d12f8db475 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -1099,6 +1099,11 @@ static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
+>  {
+>         struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+>         int i;
+> +       int ret;
+> +
+> +       ret = pinctrl_force_sleep(drvdata->pctl_dev);
+> +       if (ret)
+> +               dev_err(dev, "could not set sleep pinstate %d\n", ret);
+>
+>         for (i = 0; i < drvdata->nr_banks; i++) {
+>                 struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
+> @@ -1187,6 +1192,11 @@ static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
+>         if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
+>                 drvdata->retention_ctrl->disable(drvdata);
+>
+> +       /* For changing state without writing register. */
+> +       if (!IS_ERR(drvdata->pctl_dev->p) &&
+> +           !IS_ERR(drvdata->pctl_dev->hog_default))
+> +               drvdata->pctl_dev->p->state = drvdata->pctl_dev->hog_default;
+> +
+>         return 0;
+>  }
 
-Signed-off-by: Christine Gharzuzi <chrisg@marvell.com>
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
+Oddly this business of forcing the hardware into different "sleep" states
+is coming up from the left and right at the moment.
 
-Hello,
+Please check a bit at:
+commit 6606bc9dee63 ("pinctrl: Add sleep related state to indicate
+sleep related configs")
+and how the Spreadtrum driver handles this.
 
-Made a mistake resending the v1 prefixed by v2.
-This is the real v2.
+That is for the case where the hardware autonomously defines
+a sleep state that need to be programmed from somewhere.
 
-It fixes the third partition address from 0xd00000 to 0xf00000.
+This seems to be what this hardware needs to use?
 
-Thanks,
-Miqu?l
-
- arch/arm64/boot/dts/marvell/armada-8040-db.dts | 31 ++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-index 0d7b2ae46610..85c72f835184 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-@@ -216,6 +216,37 @@
- 	clock-frequency = <100000>;
- };
- 
-+&cps_spi1 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		compatible = "jedec,spi-nor";
-+		reg = <0x0>;
-+		spi-max-frequency = <20000000>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "Boot";
-+				reg = <0x0 0x200000>;
-+			};
-+			partition at 200000 {
-+				label = "Filesystem";
-+				reg = <0x200000 0xd00000>;
-+			};
-+			partition at f00000 {
-+				label = "Boot_2nd";
-+				reg = <0xf00000 0x100000>;
-+			};
-+		};
-+	};
-+};
-+
- /* CON4 on CP1 expansion */
- &cps_sata0 {
- 	status = "okay";
--- 
-2.11.0
+Yours,
+Linus Walleij
