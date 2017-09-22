@@ -1,38 +1,54 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 22 Sep 2017 22:52:19 +0800
-Subject: [PATCH v2 1/3] dt-bindings: add compatible string for Allwinner
- V3s SoC
-In-Reply-To: <20170822052322.15338-1-icenowy@aosc.io>
-References: <20170822052322.15338-1-icenowy@aosc.io>
-Message-ID: <01d17ee85f0e59b927a9f24d1c541d33@aosc.io>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 22 Sep 2017 21:03:24 +0530
+Subject: [PATCH 2/4] numa, iommu/io-pgtable-arm: Use NUMA aware memory
+ allocation for smmu translation tables
+In-Reply-To: <37e3ce0e-717d-156d-fef3-27559aff980e@arm.com>
+References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
+ <20170921085922.11659-3-ganapatrao.kulkarni@cavium.com>
+ <37e3ce0e-717d-156d-fef3-27559aff980e@arm.com>
+Message-ID: <CAKTKpr65XoLCDh1RxEq-nSpZcsSuPnHiZrp6McQBx3xrAhhxYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-22 13:23?Icenowy Zheng ???
-> The compatible string for Allwinner V3s SoC used to be missing.
-> 
-> Add it to the binding document.
-> 
-> Fixes: b074fede01c0 ("arm: sunxi: add support for V3s SoC")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+On Thu, Sep 21, 2017 at 4:41 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
+>> function __arm_lpae_alloc_pages is used to allcoated memory for smmu
+>> translation tables. updating function to allocate memory/pages
+>> from the proximity domain of SMMU device.
+>
+> AFAICS, data->pgd_size always works out to a power-of-two number of
+> pages, so I'm not sure why we've ever needed alloc_pages_exact() here. I
+> think we could simply use alloc_pages_node() and drop patch #1.
 
-Maxime,
-Ping. Have you checked this patchset?
+thanks Robin, i think we can replace with alloc_pages_node.
+i will change as suggested in next version.
 
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt
-> b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index d2c46449b4eb..f35c6ada5a65 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -14,6 +14,7 @@ using one of the following compatible strings:
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h2-plus
->    allwinner,sun8i-h3
-> +  allwinner,sun8i-v3s
->    allwinner,sun9i-a80
->    allwinner,sun50i-a64
->    nextthing,gr8
+>
+> Robin.
+>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  drivers/iommu/io-pgtable-arm.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+>> index e8018a3..f6d01f6 100644
+>> --- a/drivers/iommu/io-pgtable-arm.c
+>> +++ b/drivers/iommu/io-pgtable-arm.c
+>> @@ -215,8 +215,10 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
+>>  {
+>>       struct device *dev = cfg->iommu_dev;
+>>       dma_addr_t dma;
+>> -     void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+>> +     void *pages;
+>>
+>> +     pages = alloc_pages_exact_nid(dev_to_node(dev), size,
+>> +                     gfp | __GFP_ZERO);
+>>       if (!pages)
+>>               return NULL;
+>>
+>>
+>
+
+thanks
+Ganapat
