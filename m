@@ -1,100 +1,155 @@
-From: kevin.wangtao@hisilicon.com (Tao Wang)
-Date: Fri, 22 Sep 2017 17:42:04 +0800
-Subject: [PATCH 1/9] thermal/drivers/hisi: move clk operation to related
- function
-In-Reply-To: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
-References: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
-Message-ID: <1506073332-92438-2-git-send-email-kevin.wangtao@hisilicon.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Sep 2017 10:57:13 +0100
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170921232040.GA15130@obsidianresearch.com>
+References: <20170920112152.GL20805@n2100.armlinux.org.uk>
+ <20170920162208.GB536@obsidianresearch.com>
+ <20170920165141.GP20805@n2100.armlinux.org.uk>
+ <20170920224522.GB20974@obsidianresearch.com>
+ <20170921075907.GR20805@n2100.armlinux.org.uk>
+ <20170921093218.GS20805@n2100.armlinux.org.uk>
+ <20170921220510.GA11395@obsidianresearch.com>
+ <20170921224541.GC20805@n2100.armlinux.org.uk>
+ <20170921232040.GA15130@obsidianresearch.com>
+Message-ID: <20170922095713.GD20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Wangtao <kevin.wangtao@linaro.org>
+On Thu, Sep 21, 2017 at 05:20:40PM -0600, Jason Gunthorpe wrote:
+> On Thu, Sep 21, 2017 at 11:45:41PM +0100, Russell King - ARM Linux wrote:
+> > > I've combined several of your messages together into this reply...
+> > 
+> > Sorry about that, I'm currently ill and sleep deprived, so it's been
+> > a struggle to pick up on everything together.
+> 
+> No worries, your replys were easy to follow, thanks
 
-The sensor's clock is enabled and disabled outside of the probe and
-disable function. Moving the corresponding action in the
-hisi_thermal_setup() and hisi_thermal_disable_sensor(), factors out
-some lines of code and makes the code more symmetric.
+Feeling better today, thankfully.
 
-Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
----
- drivers/thermal/hisi_thermal.c | 29 +++++++++--------------------
- 1 file changed, 9 insertions(+), 20 deletions(-)
+> > > So with v2 of this patch, the driver would specify positive 1s, and
+> > > then the set will be called when tv_nsec == 0, but the tv_sec will
+> > > be +1.
+> > > 
+> > > Similarly the existing case of 0.5s offset will work more like
+> > > before, where it will be called with tv_nsec == .5s and the tv_sec
+> > > will be +1 - before I think this happened reliably 'by accident' due
+> > > to the rounding.
+> > 
+> > It seems to mean (from reading the code) that I'd need to specify
+> > -470ms for the PCF8523, if I'm understand what you're saying and
+> > the code correctly.
+> 
+> Okay.. but I guessed a negative number is probably not what most RTCs would
+> want, eg a positive number would compensate for delays executing an
+> I2C command, assuming the RTC zeros its divider when it sets the time.
 
-diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
-index 39f4627..c43e3df 100644
---- a/drivers/thermal/hisi_thermal.c
-+++ b/drivers/thermal/hisi_thermal.c
-@@ -203,6 +203,8 @@ static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
- 	hisi_thermal_enable(data->regs, 0);
- 	hisi_thermal_alarm_enable(data->regs, 0);
- 	hisi_thermal_reset_enable(data->regs, 0);
-+
-+	clk_disable_unprepare(data->clk);
- }
- 
- static int hisi_thermal_get_temp(void *__data, int *temp)
-@@ -297,9 +299,13 @@ static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
- 
- static int hisi_thermal_setup(struct hisi_thermal_data *data)
- {
--	struct hisi_thermal_sensor *sensor;
-+	struct hisi_thermal_sensor *sensor = &data->sensor;
-+	int ret;
- 
--	sensor = &data->sensor;
-+	/* enable clock for tsensor */
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret)
-+		return ret;
- 
- 	/* disable module firstly */
- 	hisi_thermal_reset_enable(data->regs, 0);
-@@ -363,13 +369,6 @@ static int hisi_thermal_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	/* enable clock for thermal */
--	ret = clk_prepare_enable(data->clk);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
--		return ret;
--	}
--
- 	ret = hisi_thermal_register_sensor(pdev, data,
- 					   &data->sensor,
- 					   HISI_DEFAULT_SENSOR);
-@@ -405,7 +404,6 @@ static int hisi_thermal_remove(struct platform_device *pdev)
- 
- 	hisi_thermal_toggle_sensor(sensor, false);
- 	hisi_thermal_disable_sensor(data);
--	clk_disable_unprepare(data->clk);
- 
- 	return 0;
- }
-@@ -417,23 +415,14 @@ static int hisi_thermal_suspend(struct device *dev)
- 
- 	hisi_thermal_disable_sensor(data);
- 
--	clk_disable_unprepare(data->clk);
--
- 	return 0;
- }
- 
- static int hisi_thermal_resume(struct device *dev)
- {
- 	struct hisi_thermal_data *data = dev_get_drvdata(dev);
--	int ret;
- 
--	ret = clk_prepare_enable(data->clk);
--	if (ret)
--		return ret;
--
--	hisi_thermal_setup(data);
--
--	return 0;
-+	return hisi_thermal_setup(data);
- }
- #endif
- 
+Okay, I thought I'd investigate a few other systems:
+
+With the mainline code, which sets the RTC to tv_sec + 1 when tv_nsec
+>= 500ms or tv_sec when tv_nsec < 500ms, at about tv_nsec = 500ms:
+
+Dove - drifting about 4-5ms per minute:
+RTC Time: 22-09-2017 09:06:38
+System Time was:     09:06:37.464
+RTC Time: 22-09-2017 09:07:38
+System Time was:     09:07:37.508
+RTC Time: 22-09-2017 09:08:39
+System Time was:     09:08:38.504
+...
+RTC Time: 22-09-2017 09:17:48
+System Time was:     09:17:47.464
+RTC Time: 22-09-2017 09:18:48
+System Time was:     09:18:47.500
+
+I suspect this wants the time to be set at or around tv_nsec = 0.
+
+
+Armada 388 - drifting@about 2-3ms per minute:
+RTC Time: 22-09-2017 08:22:25
+System Time was:     08:22:25.498
+...
+RTC Time: 22-09-2017 08:30:42
+System Time was:     08:30:42.516
+RTC Time: 22-09-2017 08:31:43
+System Time was:     08:31:43.518
+RTC Time: 22-09-2017 08:32:45
+System Time was:     08:32:44.520
+RTC Time: 22-09-2017 08:33:46
+System Time was:     08:33:45.522
+...
+RTC Time: 22-09-2017 08:41:54
+System Time was:     08:41:53.540
+RTC Time: 22-09-2017 08:42:55
+System Time was:     08:42:54.542
+RTC Time: 22-09-2017 08:43:56
+System Time was:     08:43:55.520
+RTC Time: 22-09-2017 08:44:57
+System Time was:     08:44:56.522
+
+This looks the same as the Dove case - although there's some flucuation
+in the second offset, probably caused by the 500ms threshold in
+rtc_set_ntp_time().
+
+> > Also... don't we want to move the call to rtc_set_ntp_time() from out
+> > of the "if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec * 5) {"
+> > check, otherwise how could it be called except at about .5s?
+> 
+> Yes, definitely. If we do not call through to rtc_set_ntp_time then it
+> does not update target_nsec, and we go back to the 0.5 offset not the
+> offset you want, which will certainly cause random rtc_tv_nsec_ok
+> failures.
+> 
+> My bad to not notice that.. But I'm not sure what the revision should
+> be.. I think this is using tick_nsec similarly to TIME_SET_NSEC_FUZZ,
+> but I'm not sure where tick_nsec comes from or if we should push it
+> down in to TIME_SET_NSEC_FUZZ, or something else.
+
+I think tick_nsec is the length of one tick in nanoseconds, adjusted
+by NTP (see ntp_update_frequency() where it's calculated.)
+
+It's probably easiest to think about it in terms of the old timekeeping
+model, where we had a periodic tick whose period was fixed and defined
+the point at which time incremented.  tick_nsec would be the amount of
+time for one period.
+
+I think that's still relevant in a modern kernel, especially when it's
+using a clock event in periodic mode, as that's when we get the regular
+interrupts which guarantee a scheduling point (other scheduling points
+are available!) and hence when the workqueue can be run.
+
+The only places it's used is by the NTP code, and also by a few
+architectures to that still have gettimeoffset() functionality (pre-
+clocksource) as it can be used to derive the scaling factor to convert
+timer count ticks to wall time.
+
+I also don't see an obvious rearrangement of the code to fix this -
+the problem is we need to call update_persistent_clock64() to know
+whether we should call rtc_set_ntp_time(), but we can only call
+update_persistent_clock64() on tv_nsec=500ms.
+
+It looks like the users of update_persistent_clock*() are:
+arch/mips/kernel/time.c
+arch/powerpc/kernel/time.c
+arch/sh/kernel/time.c
+arch/x86/kernel/rtc.c
+
+I thought SH was introduced after rtclib was born?
+
+All of these have some kind of architecture specific multiplexing of
+the update_persistent_clock() call - switch statements depending on
+rtc type, function pointers set according to the rtc type, etc.  They
+all look like legacy code that no one wants to update to rtclib.
+
+Maybe the solution here is to split two forms of ntp RTC synchronisation
+so:
+- If you enable CONFIG_GENERIC_CMOS_UPDATE, then you get the
+  update_persistent_clock*() methods called.
+- If you enable CONFIG_RTC_SYSTOHC, rtc_set_ntp_time() gets called.
+- If you enable both, then both get called at their appropriate times.
+
+This would certainly simplify sync_cmos_clock().
+
 -- 
-2.8.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
