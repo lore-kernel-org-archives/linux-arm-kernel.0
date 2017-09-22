@@ -1,56 +1,73 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 22 Sep 2017 19:26:13 +0100
-Subject: [PATCH v3 12/13] arm64: acpi: Remove __init from acpi_psci_use_hvc()
- for use by SDEI
-In-Reply-To: <20170922182614.27885-1-james.morse@arm.com>
-References: <20170922182614.27885-1-james.morse@arm.com>
-Message-ID: <20170922182614.27885-13-james.morse@arm.com>
+From: alcooperx@gmail.com (Al Cooper)
+Date: Fri, 22 Sep 2017 15:33:59 -0400
+Subject: [PATCH V6 1/4] soc: brcmstb: Add Product ID and Family ID helper
+ functions
+In-Reply-To: <1506108842-39072-1-git-send-email-alcooperx@gmail.com>
+References: <1506108842-39072-1-git-send-email-alcooperx@gmail.com>
+Message-ID: <1506108842-39072-2-git-send-email-alcooperx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDEI inherits the 'use hvc' bit that is also used by PSCI. PSCI does all
-its initialisation early, SDEI does its late.
-
-Remove the __init annotation from acpi_psci_use_hvc().
-
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Al Cooper <alcooperx@gmail.com>
 ---
-The function name is unchanged as this bit is named 'PSCI_USE_HVC'
-in table 5-37 of ACPIv6.2.
+ drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
+ include/linux/soc/brcmstb/brcmstb.h | 17 +++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
- arch/arm64/kernel/acpi.c | 2 +-
- include/linux/psci.h     | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index b3162715ed78..252396a96c78 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -117,7 +117,7 @@ bool __init acpi_psci_present(void)
+diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+index 22e98a9..a71730d 100644
+--- a/drivers/soc/bcm/brcmstb/common.c
++++ b/drivers/soc/bcm/brcmstb/common.c
+@@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
+ 	return of_match_node(brcmstb_machine_match, root) != NULL;
  }
  
- /* Whether HVC must be used instead of SMC as the PSCI conduit */
--bool __init acpi_psci_use_hvc(void)
-+bool acpi_psci_use_hvc(void)
- {
- 	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
- }
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index bdea1cb5e1db..e25a99992a82 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -46,10 +46,11 @@ static inline int psci_dt_init(void) { return 0; }
- #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
- int __init psci_acpi_init(void);
- bool __init acpi_psci_present(void);
--bool __init acpi_psci_use_hvc(void);
-+bool acpi_psci_use_hvc(void);
- #else
- static inline int psci_acpi_init(void) { return 0; }
- static inline bool acpi_psci_present(void) { return false; }
-+static inline bool acpi_psci_use_hvc(void) {return false; }
- #endif
++u32 brcmstb_get_family_id(void)
++{
++	return family_id;
++}
++EXPORT_SYMBOL(brcmstb_get_family_id);
++
++u32 brcmstb_get_product_id(void)
++{
++	return product_id;
++}
++EXPORT_SYMBOL(brcmstb_get_product_id);
++
+ static const struct of_device_id sun_top_ctrl_match[] = {
+ 	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
+ 	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
+diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+index 337ce41..8baafd6 100644
+--- a/include/linux/soc/brcmstb/brcmstb.h
++++ b/include/linux/soc/brcmstb/brcmstb.h
+@@ -1,10 +1,27 @@
+ #ifndef __BRCMSTB_SOC_H
+ #define __BRCMSTB_SOC_H
  
- #endif /* __LINUX_PSCI_H */
++static inline u32 BRCM_ID(u32 reg)
++{
++	return reg >> 28 ? reg >> 16 : reg >> 8;
++}
++
++static inline u32 BRCM_REV(u32 reg)
++{
++	return reg & 0xff;
++}
++
+ /*
+  * Bus Interface Unit control register setup, must happen early during boot,
+  * before SMP is brought up, called by machine entry point.
+  */
+ void brcmstb_biuctrl_init(void);
+ 
++/*
++ * Helper functions for getting family or product id from the
++ * SoC driver.
++ */
++u32 brcmstb_get_family_id(void);
++u32 brcmstb_get_product_id(void);
++
+ #endif /* __BRCMSTB_SOC_H */
 -- 
-2.13.3
+1.9.0.138.g2de3478
