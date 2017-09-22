@@ -1,72 +1,175 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Fri, 22 Sep 2017 13:20:59 -0400
-Subject: [PATCH][for 4.14] xhci: allow TRACE to work with EVENT ring dequeue
-Message-ID: <1506100859-14521-1-git-send-email-awallis@codeaurora.org>
+From: jliang@xilinx.com (Jiaying Liang)
+Date: Fri, 22 Sep 2017 17:37:07 +0000
+Subject: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
+ Mailbox
+In-Reply-To: <20170922111005.GA11613@e107155-lin>
+References: <1506034724-14639-1-git-send-email-jliang@xilinx.com>
+ <BY1PR0201MB0885E6563EBAFE83DF8822A4B0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
+ <20170922111005.GA11613@e107155-lin>
+Message-ID: <BY1PR0201MB088507AE303DC61E172DDF5BB0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-inc_deq() currently bails earlier for EVENT rings than the common return
-point of the function, due to the fact that EVENT rings do not have
-link TRBs. The unfortunate side effect of this is that the very useful
-trace_xhci_inc_deq() function is not called/usable for EVENT ring
-debug.
+HI Sudeep,
 
-This patch provides a refactor by removing the multiple return exit
-points into a single return which additionally allows for all rings to
-use the trace function.
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Friday, September 22, 2017 4:10 AM
+> To: Jiaying Liang <jliang@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; jassisinghbrar at gmail.com; Cyril Chemparathy
+> <cyrilc@xilinx.com>; Michal Simek <michals@xilinx.com>;
+> robh+dt at kernel.org; mark.rutland at arm.com; Soren Brinkmann
+> <sorenb@xilinx.com>; Sudeep Holla <sudeep.holla@arm.com>
+> Subject: Re: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
+> Mailbox
+> 
+> On Fri, Sep 22, 2017 at 06:05:18AM +0000, Jiaying Liang wrote:
+> >
+> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
+> > ZynqMP SoC used for the communication between various processor
+> systems.
+> >
+> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
+> > ---
+> >  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 88
+> ++++++++++++++++++++++
+> >  1 file changed, 88 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> > mailbox.txt
+> > b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> > mailbox.txt
+> > new file mode 100644
+> > index 0000000..5d915d1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> mailbox.
+> > +++ txt
+> > @@ -0,0 +1,88 @@
+> > +Xilinx IPI Mailbox Driver
+> > +========================================
+> > +
+> > +The Xilinx IPI(Inter Processor Interrupt) mailbox driver is a mailbox
+> > +controller that manages the messaging between two IPI agents. Each
+> > +IPI mailbox has request and response buffers between the two IPI agents.
+> > +
+> > ++-------------------------------------+
+> > +|                                     | Xilinx ZynqMP IPI Mailbox
+> > +| Controller|
+> > +|                                     |
+> > +|                       +-------------+
+> > +|                       |     SMC     |
+> > +|                       |             |
+> > ++--------+--------------+------+------+
+> > +         |                     |
+> > +         |          +-----------------+
+> > +         |                     |   ATF (ARM trusted firmware)
+> 
+> I suppose it should work with any EL3 firmware, ATF reference can be
+> removed IMO.
+> 
+> > +         |                     |
+> > ++-------------------------------------+
+> > +         |                     |   Hardware
+> > +         |                     |
+> > + +--------------------------------------+
+> > +                               |        |
+> > + +----------------------+ +-----------+ |
+> > + | | Buffers between    | | IPI Agent | |
+> > + | | two IPI agents     | | Registers | |
+> > + | +--------------------+ +-----------+ |
+> > + |                                      |
+> > + |   Xilinx ZynqMP IPI                  |
+> > + +--------------------------------------+
+> > +
+> > +
+> > +Message Manager Device Node:
+> > +===========================
+> > +Required properties:
+> > +--------------------
+> > +- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
+> > +- ipi-smc-fid-base	Base offset of SMC function IDs for IPI mailbox SMC.
+> > +			It contains the IPI IDs of the two IPI agents.
+> 
+> Why is "SMC" associated with this hardware block ? Is it secure device ?
+> Can Linux access it ? If so, why do you need SMC ?
+[Wendy] one IPI agent uses its own IPI agent registers to notify (write to register to raise interrupt)
+Other IPI agents. The IPI agent registers are shared between secure and non-secure.
+And thus, I think about to access the IPI agent registers in ATF. And thus
+Use SMC for registers access.
 
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
- drivers/usb/host/xhci-ring.c | 33 ++++++++++++++++-----------------
- 1 file changed, 16 insertions(+), 17 deletions(-)
+> 
+> > +- reg:			IPI request and response buffers address
+> range. It
+> > +			can be the IPI buffers from the hardware or it can
+> > +			be carved out shared memory.
+> 
+> It sounds like buffer used for communication and not part of this IP.
+> Shouldn't this be part of mailbox client binding rather than controller
+> binding.
+[Wendy] the IPI hardware has IPI buffers (32bytes request buffer and 32bytes response buffer per)
+But we also want user to be able to use other shared memory.
+The reason I am considering to make it part of the mailbox is, we can have logical
+Channels on top of the physical channels.
+Each mailbox controller controls the physical connection(IPI agent registers and buffers), each
+Mailbox client requests for a logical channel.
 
-diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
-index a944365..10afd50 100644
---- a/drivers/usb/host/xhci-ring.c
-+++ b/drivers/usb/host/xhci-ring.c
-@@ -171,25 +171,24 @@ static void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring)
- 	if (ring->type == TYPE_EVENT) {
- 		if (!last_trb_on_seg(ring->deq_seg, ring->dequeue)) {
- 			ring->dequeue++;
--			return;
-+		} else {
-+			if (last_trb_on_ring(ring, ring->deq_seg,
-+				ring->dequeue))
-+				ring->cycle_state ^= 1;
-+			ring->deq_seg = ring->deq_seg->next;
-+			ring->dequeue = ring->deq_seg->trbs;
-+		}
-+	} else {
-+		/* All other rings have link trbs */
-+		if (!trb_is_link(ring->dequeue)) {
-+			ring->dequeue++;
-+			ring->num_trbs_free++;
-+		}
-+		while (trb_is_link(ring->dequeue)) {
-+			ring->deq_seg = ring->deq_seg->next;
-+			ring->dequeue = ring->deq_seg->trbs;
- 		}
--		if (last_trb_on_ring(ring, ring->deq_seg, ring->dequeue))
--			ring->cycle_state ^= 1;
--		ring->deq_seg = ring->deq_seg->next;
--		ring->dequeue = ring->deq_seg->trbs;
--		return;
--	}
--
--	/* All other rings have link trbs */
--	if (!trb_is_link(ring->dequeue)) {
--		ring->dequeue++;
--		ring->num_trbs_free++;
--	}
--	while (trb_is_link(ring->dequeue)) {
--		ring->deq_seg = ring->deq_seg->next;
--		ring->dequeue = ring->deq_seg->trbs;
- 	}
--
- 	trace_xhci_inc_deq(ring);
- 
- 	return;
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
+> > +- reg-names:		Reg resource name of the IPI request and response
+> > +			buffers.
+> > +- #mbox-cells:		Shall be 1. Contains the logical channel IDs of
+> the
+> > +			channels on the IPI mailbox.
+> > +- interrupt-parent:	Phandle for the interrupt controller.
+> > +- interrupts:		Interrupt mapping.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +- method:		The method of accessing the IPI agent registers.
+> > +			Permitted values are: "smc" and "hvc". Default is
+> > +			"smc".
+> > +Example:
+> > +------------
+> > +	/* APU IPI mailbox driver */
+> > +	ipis {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		ipi_mailbox_apu_rpu0: ipi_mailbox at 0 {
+> > +			compatible = "xlnx,zynqmp-ipi-mailbox";
+> > +			reg = <0 0xff990400 40>;
+> > +			reg-names = "apu-rpu0";
+> > +			ipi-smc-fid-base = <0x1010>;
+> > +			method = "smc";
+> > +			#mbox-cells = <1>;
+> > +			interrupt-parent = <&gic>;
+> > +			interrupts = <0 35 4>;
+> > +		};
+> > +		ipi_mailbox_apu_rpu1: ipi_mailbox at 1 {
+> > +			compatible = "xlnx,zynqmp-ipi-mailbox";
+> > +			reg = <0 0xff990440 40>;
+> > +			reg-names = "apu-rpu1";
+> > +			ipi-smc-fid-base = <0x1020>;
+> > +			method = "smc";
+> > +			#mbox-cells = <1>;
+> > +			interrupt-parent = <&gic>;
+> > +			interrupts = <0 35 4>;
+> > +		};
+> 
+> Why do you need the above 2 ? They don't look like 2 controller blocks.
+> You just need to represent single mailbox controller.
+[Wendy] I just wanted to have single mailbox controller to control one
+Physical connection and allows logical channels on top of it. Is there any framework
+to support logical channels on top of mailbox? Or we need to write the mailbox client
+driver to support logical channels on top of one mailbox client?
+
+Thanks,
+Wendy
+
+> 
+> --
+> Regards,
+> Sudeep
