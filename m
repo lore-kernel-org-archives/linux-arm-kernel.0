@@ -1,52 +1,34 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 22 Sep 2017 20:40:45 +0200
-Subject: [PATCH v2 12/12] ARM: dts: sun8i: a83t: Fix simple-bus unit address
- format error
+Date: Fri, 22 Sep 2017 20:40:42 +0200
+Subject: [PATCH v2 09/12] ARM: dts: sun8i: orangepi-plus: Fix node with unit
+ name and no reg property
 In-Reply-To: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
 References: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170922184045.6498-13-clabbe.montjoie@gmail.com>
+Message-ID: <20170922184045.6498-10-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch remove leading 0 of unit address and so remove
-lots of warning when building DT with W=1.
+This patch fix the warning "xxx has a unit name, but no reg property" by
+removing "@0" from such node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 7f99ef37f61f..dd6a393725c6 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -248,7 +248,7 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index 331ed683ac62..119732505844 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -114,7 +114,7 @@
+ };
  
--		usb_otg: usb at 01c19000 {
-+		usb_otg: usb at 1c19000 {
- 			compatible = "allwinner,sun8i-a83t-musb",
- 				     "allwinner,sun8i-a33-musb";
- 			reg = <0x01c19000 0x0400>;
-@@ -436,7 +436,7 @@
- 			status = "disabled";
- 		};
- 
--		uart0: serial at 01c28000 {
-+		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-@@ -447,7 +447,7 @@
- 			status = "disabled";
- 		};
- 
--		uart1: serial at 01c28400 {
-+		uart1: serial at 1c28400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28400 0x400>;
- 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ &pio {
+-	usb3_vbus_pin_a: usb3_vbus_pin at 0 {
++	usb3_vbus_pin_a: usb3_vbus_pin {
+ 		pins = "PG11";
+ 		function = "gpio_out";
+ 	};
 -- 
 2.13.5
