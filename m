@@ -1,66 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 22 Sep 2017 15:04:00 +0100
-Subject: [PATCH] iommu/arm-smmu: Remove ACPICA workarounds
-Message-ID: <63cc66c4c23a6066c06498079295035df7e68160.1506088916.git.robin.murphy@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Sep 2017 15:12:40 +0100
+Subject: [PATCH] drivers/perf: arm_pmu_acpi: Release memory obtained by
+ kasprintf
+In-Reply-To: <20170922105405.GD23365@arm.com>
+References: <f3b19a8ba9ca69fe84b0d980b6337a33a1da907d.1505884534.git.arvind.yadav.cs@gmail.com>
+ <20170922105405.GD23365@arm.com>
+Message-ID: <20170922141240.n7spqo6rxzfzb42d@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the kernel headers have synced with the relevant upstream
-ACPICA updates, it's time to clean up the temporary local definitions.
+On Fri, Sep 22, 2017 at 11:54:06AM +0100, Will Deacon wrote:
+> On Wed, Sep 20, 2017 at 12:26:38PM +0530, Arvind Yadav wrote:
+> > Free memory region, if arm_pmu_acpi_probe is not successful.
+> > 
+> > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> > ---
+> >  drivers/perf/arm_pmu_acpi.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> > index 0a9b787..3303dd8 100644
+> > --- a/drivers/perf/arm_pmu_acpi.c
+> > +++ b/drivers/perf/arm_pmu_acpi.c
+> > @@ -235,6 +235,7 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
+> >  		ret = armpmu_register(pmu);
+> >  		if (ret) {
+> >  			pr_warn("Failed to register PMU for CPU%d\n", cpu);
+> > +			kfree(pmu->name);
+> >  			return ret;
+> >  		}
+> >  	}
+> 
+> It's a bit weird that we bail out of the loop on the first failing CPU, but
+> you've not changed that behaviour so your patch looks fine in isolation:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Catalin: can you pick this up as a fix, please?
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 11 +----------
- drivers/iommu/arm-smmu.c    |  8 --------
- 2 files changed, 1 insertion(+), 18 deletions(-)
+Applied. Thanks.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e67ba6c40faf..47f52b1ab838 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -413,15 +413,6 @@
- #define MSI_IOVA_BASE			0x8000000
- #define MSI_IOVA_LENGTH			0x100000
- 
--/* Until ACPICA headers cover IORT rev. C */
--#ifndef ACPI_IORT_SMMU_HISILICON_HI161X
--#define ACPI_IORT_SMMU_HISILICON_HI161X		0x1
--#endif
--
--#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
--#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
--#endif
--
- static bool disable_bypass;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
-@@ -2665,7 +2656,7 @@ static void acpi_smmu_get_options(u32 model, struct arm_smmu_device *smmu)
- 	case ACPI_IORT_SMMU_V3_CAVIUM_CN99XX:
- 		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
- 		break;
--	case ACPI_IORT_SMMU_HISILICON_HI161X:
-+	case ACPI_IORT_SMMU_V3_HISILICON_HI161X:
- 		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
- 		break;
- 	}
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 3bdb799d3b4b..bce312a99f52 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -119,14 +119,6 @@ enum arm_smmu_implementation {
- 	CAVIUM_SMMUV2,
- };
- 
--/* Until ACPICA headers cover IORT rev. C */
--#ifndef ACPI_IORT_SMMU_CORELINK_MMU401
--#define ACPI_IORT_SMMU_CORELINK_MMU401	0x4
--#endif
--#ifndef ACPI_IORT_SMMU_CAVIUM_THUNDERX
--#define ACPI_IORT_SMMU_CAVIUM_THUNDERX	0x5
--#endif
--
- struct arm_smmu_s2cr {
- 	struct iommu_group		*group;
- 	int				count;
 -- 
-2.13.4.dirty
+Catalin
