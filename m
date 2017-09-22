@@ -1,99 +1,62 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 22 Sep 2017 13:33:39 +0000
-Subject: [PATCH v2] ARM: dts: iwg22d: Enable SDHI0 controller
-In-Reply-To: <1506085262-13639-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <TY1PR06MB0702E99A48352C055705E3A9B7670@TY1PR06MB0702.apcprd06.prod.outlook.com>
- <1506085262-13639-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <TY1PR06MB08955E235768A72D33FE2AD3C0670@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 22 Sep 2017 08:37:07 -0500
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <20170919070422.GI3349@codeaurora.org>
+ <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+ <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+ <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+ <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+ <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
+ <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
+ <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+Message-ID: <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+On 09/22/2017 08:29 AM, Linus Walleij wrote:
+> 
+> What is your response to Stephen's comment:
+> 
+>> [Stephen Boyd]
+>> Perhaps we can add another hook for our purposes here that
+>> tells gpiolib that the gpio is not usable and to skip it. The
+>> semantics would be clear, it's just about probing availability of
+>> this pin as a gpio and doesn't mux any pins.
 
-just to clarify the changes between v1 and v2, we can't use SDR50 and SDR104 (due to an HW issue) therefore the pinctrl for UHS has been removed and we dropped property "sd-uhs-sdr104". High Speed has been tested, therefore if you are happy with the patch I guess you can update the following page accordingly:
-http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds&type=revision&diff=451426&oldid=451421
+> I think this kind of related to my response (after I realized it
+> was not just about IRQs):
 
-Although (due to a bug) sdhi0 may not hold a reference to "vccq_sdhi0", the gpio regulator will initialize "SDHI0 VccQ" at 3.3V.
-I have sent another patch (mmc: tmio: check mmc_regulator_get_supply return value) to start a discussion about a possible fix for the bug.
+We already have 95% of this.  We can already specify individual pin 
+ranges, and the vast majority of the code recognizes the ranges.  There 
+is only one small loophole, and that's in gpiochip_add_data().  The 
+for-loop iterates over all GPIOs:
 
-Let me know if you need more information.
+	for (i = 0; i < chip->ngpio; i++) {
+		struct gpio_desc *desc = &gdev->descs[i];
 
-Thanks,
-Fabrizio
+		desc->gdev = gdev;
+		/*
+		 * REVISIT: most hardware initializes GPIOs as inputs
+		 * (often with pullups enabled) so power usage is
+		 * minimized. Linux code should set the gpio direction
+		 * first thing; but until it does, and in case
+		 * chip->get_direction is not set, we may expose the
+		 * wrong direction in sysfs.
+		 */
 
-> -----Original Message-----
-> From: linux-renesas-soc-owner at vger.kernel.org [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Fabrizio Castro
-> Sent: 22 September 2017 14:01
-> To: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
-> Russell King <linux@armlinux.org.uk>; Chris Paterson <Chris.Paterson2@renesas.com>; Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com>; Biju Das <biju.das@bp.renesas.com>; devicetree at vger.kernel.org; linux-renesas-
-> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chris Paterson <Chris.Paterson2@renesas.com>
-> Subject: [PATCH v2] ARM: dts: iwg22d: Enable SDHI0 controller
->
-> Enable the SDHI0 controller on iWave RZ/G1E carrier board.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> ---
->  arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-> index aac84c6..8772c56 100644
-> --- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-> +++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-> @@ -24,6 +24,19 @@
->  bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
->  stdout-path = "serial0:115200n8";
->  };
-> +
-> +vccq_sdhi0: regulator-vccq-sdhi0 {
-> +compatible = "regulator-gpio";
-> +
-> +regulator-name = "SDHI0 VccQ";
-> +regulator-min-microvolt = <1800000>;
-> +regulator-max-microvolt = <3300000>;
-> +
-> +gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
-> +gpios-states = <1>;
-> +states = <3300000 1
-> +  1800000 0>;
-> +};
->  };
->
->  &pfc {
-> @@ -36,6 +49,12 @@
->  groups = "avb_mdio", "avb_gmii";
->  function = "avb";
->  };
-> +
-> +sdhi0_pins: sd0 {
-> +groups = "sdhi0_data4", "sdhi0_ctrl";
-> +function = "sdhi0";
-> +power-source = <3300>;
-> +};
->  };
->
->  &scif4 {
-> @@ -63,3 +82,13 @@
->  micrel,led-mode = <1>;
->  };
->  };
-> +
-> +&sdhi0 {
-> +pinctrl-0 = <&sdhi0_pins>;
-> +pinctrl-names = "default";
-> +
-> +vmmc-supply = <&reg_3p3v>;
-> +vqmmc-supply = <&vccq_sdhi0>;
-> +cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
-> +status = "okay";
-> +};
-> --
-> 2.7.4
+I believe the real problem is that this for-loop should be moved from 
+gpiochip_add_data() into some other function that is called *after* the 
+pin ranges are defined.  We can put it in gpiochip_add_pin_range(), maybe.
 
+My patch covers the loophole by adding a check inside get_direction(). 
+If we fix gpiochip_add_data(), I can remove that patch.
 
+However, I think that change is risky and will require a lot of testing 
+and review.
 
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
