@@ -1,131 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 22 Sep 2017 23:30:27 +0200
-Subject: [PATCH v2 07/10] dmaengine: sun6i: Retrieve channel count/max
- request from devicetree
-In-Reply-To: <6028407.VKu5LCmQv0@sbruens-linux>
-References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
- <2791817.czGZyN6WKS@sbruens-linux>
- <20170919142508.woslovwjtecgygpo@flea.lan>
- <6028407.VKu5LCmQv0@sbruens-linux>
-Message-ID: <20170922213027.xpnaut3an5or6edl@flea.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 22 Sep 2017 14:36:01 -0700
+Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
+In-Reply-To: <CAK8P3a17y1zfhOPShjpbt+wf5B=ZyTb1jL1WiBHCz_rU4pNnnQ@mail.gmail.com>
+References: <20170920151802.7609-1-romain.izard.pro@gmail.com>
+ <CAKv+Gu_ZMy-A-Du3ikVe47pcUR7hSBFHY+hQQ8APGGP1iRcigA@mail.gmail.com>
+ <CAK8P3a17y1zfhOPShjpbt+wf5B=ZyTb1jL1WiBHCz_rU4pNnnQ@mail.gmail.com>
+Message-ID: <CAKv+Gu-KAou7y-xTc7aaKU6WFstchKitSPJsKD_dXJ=_BbWb8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 19, 2017 at 04:17:59PM +0000, Br?ns, Stefan wrote:
-> On Dienstag, 19. September 2017 16:25:08 CEST Maxime Ripard wrote:
-> > On Mon, Sep 18, 2017 at 02:09:43PM +0000, Br?ns, Stefan wrote:
-> > > On Montag, 18. September 2017 10:18:24 CEST you wrote:
-> > > > Hi,
-> > > > 
-> > > > On Sun, Sep 17, 2017 at 05:19:53AM +0200, Stefan Br?ns wrote:
-> > > > > +	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
-> > > > > +	if (ret && !sdc->num_pchans) {
-> > > > > +		dev_err(&pdev->dev, "Can't get dma-channels.\n");
-> > > > > +		return ret;
-> > > > > +	}
-> > > > > +
-> > > > > +	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
-> > > > > +		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
-> > > > > +		return -EINVAL;
-> > > > > +	}
-> > > > > +
-> > > > > +	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
-> > > > > +	if (ret && !sdc->max_request) {
-> > > > > +		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
-> > > > > +			 DMA_CHAN_MAX_DRQ);
-> > > > > +		sdc->max_request = DMA_CHAN_MAX_DRQ;
-> > > > > +	}
-> > > > > +
-> > > > > +	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
-> > > > > +		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
-> > > > > +		return -EINVAL;
-> > > > > +	}
-> > > > 
-> > > > I'm not really convinced about these two checks. They don't catch all
-> > > > errors (the range between the actual number of channels / DRQ and the
-> > > > maximum allowed per the registers), they might increase in the future
-> > > > too, and if we want to make that check actually working, we would have
-> > > > to duplicate the number of requests and channels into the driver.
-> > > 
-> > > 1. If these values increase, we have a new register layout and and
-> > > need a new compatible anyway.
-> > 
-> > And you want to store a new maximum attached to the compatible? Isn't
-> > that exactly the situation you're trying to get away from?
-> 
-> Yes, and no. H3, H5, A64 and R40 have the exact same register layout, but 
-> different number of channels and ports. They could share a compatible (if DMA 
-> channels were generalized), and we already have several register offsets/
-> widths (implicitly via the callbacks) attached to the compatible (so these 
-> don't need generalization via DT).
-> 
-> Now, we could also move everything that is currently attached to the 
-> compatible, i.e. clock gate register offset, burst widths/lengths etc. into 
-> the devicetree binding, but that would just be too much.
-> 
-> The idea is to find a middle ground here, using common patterns in the 
-> existing SoCs. The register layout has hardly changed, while the number of DMA 
-> channels and ports changes all the time. Moving the number of DMA channels and 
-> ports to the DT is trivial, and a pattern also found in other DMA controller 
-> drivers.
+On 20 September 2017 at 13:35, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Sep 20, 2017 at 5:26 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 20 September 2017 at 08:18, Romain Izard <romain.izard.pro@gmail.com> wrote:
+>>> Add an arch-specific header to ARM, to retain other optimizations that
+>>> rely on HAVE_EFFICIENT_UNALIGNED_ACCESS, while making sure that access
+>>> that explicitly rely on the unaligned accessors are correctly handled by
+>>> the compiler.
+>>>
+>>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+>>> ---
+>>>
+>>
+>> If access_ok.h has been observed to produce different output from the
+>> struct versions (using any compiler), I guess we cannot simply change
+>> the asm-generic default and expect everybody to be ok with that. So I
+>> agree this is the most appropriate course of action.
+>
+> But is that actually the case? I think patching ARM like this is
+> correct, but perhaps we can simply remove the access_ok.h
+> version entirely and just use the struct version everywhere.
+>
+> Unfortunately it's been almost 10 years since the various
+> implementations got introduced, so it's hard to find out all
+> the concerns that went into it then.
+>
+> Commit 064106a91be5 ("kernel: add common
+> infrastructure for unaligned access") lists
+>
+>     Currently there are five implementations:
+>     1) packed_struct.h: C-struct based, from asm-generic/unaligned.h
+>     2) le_byteshift.h: Open coded byte-swapping, heavily based on asm-arm
+>     3) be_byteshift.h: Open coded byte-swapping, heavily based on asm-arm
+>     4) memmove.h: taken from multiple implementations in tree
+>     5) access_ok.h: taken from x86 and others, unaligned access is ok.
+>
+> The only architectectures that use memmove.h are m32r (always has,
+> probably not intentionally) and openrisc. That one says that GCC on
+> OR32 "optimizes too aggressively" for struct.h, which is a bit scary
+> but wouldn't change anything here since they don't use the asm-generic
+> file.
+>
+> The architectures that do use include/asm-generic/unaligned.h and
+> also set HAVE_EFFICIENT_UNALIGNED_ACCESS in some configurations
+> are arm, arm64, metag, s390 and arc.
+>
+> This is a rather short list, and three of them (arm64, metag and arc) only
+> support very recent compilers, so we can probably just ask the respective
+> arch maintainers to ack the patch that changes the asm-generic file
+> for everyone.
+>
 
-I'm sorry, but the code is inconsistent here. You basically have two
-variables from one SoC to the other, the number of channels and
-requests.
+If we can limit the fallout like that, I agree that we should simply
+make the struct flavor the default. It elegantly informs the compiler
+about the size of the access and the potential misalignment, so it
+should allow compilers for any architecture to select the most
+appropriate instruction.
 
-In one case (channels), it mandates that the property is provided in
-the device tree, and doesn't default to anything.
-
-In the other case (requests), the property is optional and it will
-provide a default. All that in 20 lines.
-
-I guess we already reached that middle ground by providing them
-through the DT, we just have to make sure we remain consistent.
-
-> *If* the number of dma channels and ports is ever increased,
-> exceeding the current maximum, this would amount to major changes in
-> the driver and maybe even warrant a completely new driver.
-> 
-> > > 2. As long as the the limits are adhered to, no other registers/register
-> > > fields are overwritten. As the channel number and port are used to
-> > > calculate memory offsets bounds checking is IMHO a good idea.
-> > 
-> > And this is true for many other resources, starting with the one
-> > defined in reg. We don't error check every register range, clock
-> > index, reset line, interrupt, DMA channel, the memory size, etc. yet
-> > you could make the same argument.
-> > 
-> > The DT has to be right, and we have to trust it. Otherwise we can just
-> > throw it away.
-> 
-> So your argument here basically is - don't do any checks on DT provided 
-> values, these are always correct. So, following this argument, not only the 
-> range check, but also the of_property_read return values should be ignored, as 
-> the DT is correct, thus of_property_read will never return an error.
-
-No, my argument is don't do a check if you can catch only half of the
-errors, and with no hope of fixing it.
-
-The functions you mentionned have a 100% error catch rate. This is the
-difference.
-
-> That clearly does not match the implementation of drivers throughout the 
-> various subsystems for DT properties, which is in general - do all the checks 
-> that can be done, trust everything you can not verify.
-
-And my point is that we're falling into the latter here. You cannot
-verify it properly.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170922/d0334768/attachment.sig>
+But doesn't that mean that any code that currently relies on
+HAVE_EFFICIENT_UNALIGNED_ACCESS should be using get_unaligned instead?
+I haven't reviewed the actual use cases (other than the ones I added
+myself to the crypto subsystem), but it seems to me that it is
+generally unsafe to do any unaligned accesses directly on ARM, given
+that the compiler may merge adjacent LDRs into LDMs or LDRDs (and
+likewise for stores)
