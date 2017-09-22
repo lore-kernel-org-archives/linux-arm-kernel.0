@@ -1,175 +1,24 @@
-From: jliang@xilinx.com (Jiaying Liang)
-Date: Fri, 22 Sep 2017 17:37:07 +0000
-Subject: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
- Mailbox
-In-Reply-To: <20170922111005.GA11613@e107155-lin>
-References: <1506034724-14639-1-git-send-email-jliang@xilinx.com>
- <BY1PR0201MB0885E6563EBAFE83DF8822A4B0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
- <20170922111005.GA11613@e107155-lin>
-Message-ID: <BY1PR0201MB088507AE303DC61E172DDF5BB0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Sep 2017 10:51:10 -0700
+Subject: [PATCH 0/8] Add hwmod data for IPU & DSP processors/MMUs
+In-Reply-To: <d4715d1e-8113-050b-9a0f-77f4a4486081@ti.com>
+References: <20170821234818.4755-1-s-anna@ti.com>
+ <d4715d1e-8113-050b-9a0f-77f4a4486081@ti.com>
+Message-ID: <20170922175110.GC4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Sudeep,
+* Suman Anna <s-anna@ti.com> [170922 10:19]:
+> Ping on this series. Tero's clkctrl series changes are orthogonal to
+> these changes.
 
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: Friday, September 22, 2017 4:10 AM
-> To: Jiaying Liang <jliang@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; jassisinghbrar at gmail.com; Cyril Chemparathy
-> <cyrilc@xilinx.com>; Michal Simek <michals@xilinx.com>;
-> robh+dt at kernel.org; mark.rutland at arm.com; Soren Brinkmann
-> <sorenb@xilinx.com>; Sudeep Holla <sudeep.holla@arm.com>
-> Subject: Re: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
-> Mailbox
-> 
-> On Fri, Sep 22, 2017 at 06:05:18AM +0000, Jiaying Liang wrote:
-> >
-> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
-> > ZynqMP SoC used for the communication between various processor
-> systems.
-> >
-> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
-> > ---
-> >  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 88
-> ++++++++++++++++++++++
-> >  1 file changed, 88 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> > mailbox.txt
-> > b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> > mailbox.txt
-> > new file mode 100644
-> > index 0000000..5d915d1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> mailbox.
-> > +++ txt
-> > @@ -0,0 +1,88 @@
-> > +Xilinx IPI Mailbox Driver
-> > +========================================
-> > +
-> > +The Xilinx IPI(Inter Processor Interrupt) mailbox driver is a mailbox
-> > +controller that manages the messaging between two IPI agents. Each
-> > +IPI mailbox has request and response buffers between the two IPI agents.
-> > +
-> > ++-------------------------------------+
-> > +|                                     | Xilinx ZynqMP IPI Mailbox
-> > +| Controller|
-> > +|                                     |
-> > +|                       +-------------+
-> > +|                       |     SMC     |
-> > +|                       |             |
-> > ++--------+--------------+------+------+
-> > +         |                     |
-> > +         |          +-----------------+
-> > +         |                     |   ATF (ARM trusted firmware)
-> 
-> I suppose it should work with any EL3 firmware, ATF reference can be
-> removed IMO.
-> 
-> > +         |                     |
-> > ++-------------------------------------+
-> > +         |                     |   Hardware
-> > +         |                     |
-> > + +--------------------------------------+
-> > +                               |        |
-> > + +----------------------+ +-----------+ |
-> > + | | Buffers between    | | IPI Agent | |
-> > + | | two IPI agents     | | Registers | |
-> > + | +--------------------+ +-----------+ |
-> > + |                                      |
-> > + |   Xilinx ZynqMP IPI                  |
-> > + +--------------------------------------+
-> > +
-> > +
-> > +Message Manager Device Node:
-> > +===========================
-> > +Required properties:
-> > +--------------------
-> > +- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
-> > +- ipi-smc-fid-base	Base offset of SMC function IDs for IPI mailbox SMC.
-> > +			It contains the IPI IDs of the two IPI agents.
-> 
-> Why is "SMC" associated with this hardware block ? Is it secure device ?
-> Can Linux access it ? If so, why do you need SMC ?
-[Wendy] one IPI agent uses its own IPI agent registers to notify (write to register to raise interrupt)
-Other IPI agents. The IPI agent registers are shared between secure and non-secure.
-And thus, I think about to access the IPI agent registers in ATF. And thus
-Use SMC for registers access.
+With patch 5/8 you said earlier "It will still be a shared set
+between the MMU and remoteproc drivers, but let me look into
+how these get integrated." So was there any conclusion there?
 
-> 
-> > +- reg:			IPI request and response buffers address
-> range. It
-> > +			can be the IPI buffers from the hardware or it can
-> > +			be carved out shared memory.
-> 
-> It sounds like buffer used for communication and not part of this IP.
-> Shouldn't this be part of mailbox client binding rather than controller
-> binding.
-[Wendy] the IPI hardware has IPI buffers (32bytes request buffer and 32bytes response buffer per)
-But we also want user to be able to use other shared memory.
-The reason I am considering to make it part of the mailbox is, we can have logical
-Channels on top of the physical channels.
-Each mailbox controller controls the physical connection(IPI agent registers and buffers), each
-Mailbox client requests for a logical channel.
+Also, what's the deal with these omap4 changes that I commented
+on in 5/8?
 
-> 
-> > +- reg-names:		Reg resource name of the IPI request and response
-> > +			buffers.
-> > +- #mbox-cells:		Shall be 1. Contains the logical channel IDs of
-> the
-> > +			channels on the IPI mailbox.
-> > +- interrupt-parent:	Phandle for the interrupt controller.
-> > +- interrupts:		Interrupt mapping.
-> > +
-> > +Required properties:
-> > +--------------------
-> > +- method:		The method of accessing the IPI agent registers.
-> > +			Permitted values are: "smc" and "hvc". Default is
-> > +			"smc".
-> > +Example:
-> > +------------
-> > +	/* APU IPI mailbox driver */
-> > +	ipis {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		ipi_mailbox_apu_rpu0: ipi_mailbox at 0 {
-> > +			compatible = "xlnx,zynqmp-ipi-mailbox";
-> > +			reg = <0 0xff990400 40>;
-> > +			reg-names = "apu-rpu0";
-> > +			ipi-smc-fid-base = <0x1010>;
-> > +			method = "smc";
-> > +			#mbox-cells = <1>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupts = <0 35 4>;
-> > +		};
-> > +		ipi_mailbox_apu_rpu1: ipi_mailbox at 1 {
-> > +			compatible = "xlnx,zynqmp-ipi-mailbox";
-> > +			reg = <0 0xff990440 40>;
-> > +			reg-names = "apu-rpu1";
-> > +			ipi-smc-fid-base = <0x1020>;
-> > +			method = "smc";
-> > +			#mbox-cells = <1>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupts = <0 35 4>;
-> > +		};
-> 
-> Why do you need the above 2 ? They don't look like 2 controller blocks.
-> You just need to represent single mailbox controller.
-[Wendy] I just wanted to have single mailbox controller to control one
-Physical connection and allows logical channels on top of it. Is there any framework
-to support logical channels on top of mailbox? Or we need to write the mailbox client
-driver to support logical channels on top of one mailbox client?
+Regards,
 
-Thanks,
-Wendy
-
-> 
-> --
-> Regards,
-> Sudeep
+Tony
