@@ -1,117 +1,58 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Fri, 22 Sep 2017 09:15:21 +0800
-Subject: [PATCH v2 1/6] ACPI/PPTT: Add Processor Properties Topology Table
- parsing
-In-Reply-To: <03912538-f7bf-f235-c87f-3ba275502db0@arm.com>
-References: <20170919184751.25110-1-jeremy.linton@arm.com>
- <20170919184751.25110-2-jeremy.linton@arm.com>
- <4c9cfa18-507b-01c4-7464-ff2b149fbb68@huawei.com>
- <03912538-f7bf-f235-c87f-3ba275502db0@arm.com>
-Message-ID: <f1752bf4-b62e-e41a-bd58-783c15bba868@huawei.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Fri, 22 Sep 2017 09:31:34 +0800
+Subject: [PATCH 2/3] arm64: dts: mt2712: add pintcrl device node.
+In-Reply-To: <CACRpkdaX0n7BZVkXYFEh_XSN3P7huvhE6j5My=p=2Lh45oFZaQ@mail.gmail.com>
+References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1501489333-23145-3-git-send-email-zhiyong.tao@mediatek.com>
+ <2f883a8a-5402-5625-bada-bcfed53c098e@gmail.com>
+ <CACRpkdZHyXec+L8ueRHOs=9TLT1Arqe3KeQpRZ6D0K1Ag1c+Zw@mail.gmail.com>
+ <1505981592.22452.7.camel@mhfsdcap03>
+ <CACRpkdaX0n7BZVkXYFEh_XSN3P7huvhE6j5My=p=2Lh45oFZaQ@mail.gmail.com>
+Message-ID: <1506043894.22452.19.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+On Thu, 2017-09-21 at 14:17 +0200, Linus Walleij wrote:
+> On Thu, Sep 21, 2017 at 10:13 AM, Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+> > On Tue, 2017-08-22 at 15:04 +0200, Linus Walleij wrote:
+> >> On Mon, Aug 14, 2017 at 5:23 PM, Matthias Brugger
+> >> <matthias.bgg@gmail.com> wrote:
+> >> > On 07/31/2017 10:22 AM, Zhiyong Tao wrote:
+> >> >>
+> >> >> The commit includes two change:
+> >> >> 1)add pintcrl device node for mt2712.
+> >> >> 2)add pinfunc file for mt2712.
+> >> >>
+> >> >> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> >> >> ---
+> >> >>   arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1014
+> >> >> +++++++++++++++++++++++++
+> >> >
+> >> >
+> >> > Shouldn't this file be in include/dt-bindings/pinctrl?
+> >>
+> >> Only if it is also #included in the driver.
+> >>
+> >> Yours,
+> >> Linus Walleij
+> >
+> > ==>
+> > Thanks for your comment.
+> > We see our some ICs(mt7623) which move the file to
+> > "include/dt-bindings/pinctrl". other ICs(mt2701) which is put in
+> > "arch/arm64/boot/dts/mediatek".
+> > In mt2712, mt2712-pinfunc.h is only include by dts file. It won't be
+> > included by driver. So which is better? "arch/arm64/boot/dts/mediatek/"
+> > or "include/dt-bindings/pinctrl".
+> 
+> If it is used in both arm and arm64 it is helpful to have it in
+> include/dt-bindings so it can be shared between the two
+> archs.
+> 
+> If it is just (ever) for arm64 it can stay inside the arch tree.
+> 
+> Yours,
+> Linus Walleij
 
-On 2017/9/22 2:48, Jeremy Linton wrote:
-> Hi,
-> 
-> On 09/20/2017 02:15 AM, Xiongfeng Wang wrote:
->> Hi Jeremy,
->>
->> On 2017/9/20 2:47, Jeremy Linton wrote:
->>> ACPI 6.2 adds a new table, which describes how processing units
->>> are related to each other in tree like fashion. Caches are
->>> also sprinkled throughout the tree and describe the properties
->>> of the caches in relation to other caches and processing units.
->>>
->>> Add the code to parse the cache hierarchy and report the total
->>> number of levels of cache for a given core using
->>> acpi_find_last_cache_level() as well as fill out the individual
->>> cores cache information with cache_setup_acpi() once the
->>> cpu_cacheinfo structure has been populated by the arch specific
->>> code.
->>>
->>> Further, report peers in the topology using setup_acpi_cpu_topology()
->>> to report a unique ID for each processing unit at a given level
->>> in the tree. These unique id's can then be used to match related
->>> processing units which exist as threads, COD (clusters
->>> on die), within a given package, etc.
->>>
->>> +
->>> +static int topology_setup_acpi_cpu(struct acpi_table_header *table,
->>> +                    unsigned int cpu, int level)
->>> +{
->>> +    struct acpi_pptt_processor *cpu_node;
->>> +    u32 acpi_cpu_id = acpi_cpu_get_madt_gicc(cpu)->uid;
->>> +
->>> +    cpu_node = acpi_find_processor_node(table, acpi_cpu_id);
->>> +    if (cpu_node) {
->>> +        cpu_node = acpi_find_processor_package_id(table, cpu_node, level);
->>> +        return (int)((u8 *)cpu_node - (u8 *)table);
->>> +    }
->>> +    pr_err_once("PPTT table found, but unable to locate core for %d\n",
->>> +            cpu);
->>> +    return -ENOENT;
->>
->> Can we return -1 when PPTT doesn't exist? So that we can still get topo info from MPIDR.
->> 'store_cpu_topology()' determine whether cpu topology has been populated by checking
->> whether cluster_id is -1. If cluster_id is not -1, it won't read cpu topo info from MPIDR.
->> Or maybe we can change 'store_cpu_topology()' as well. If cluster_id is less than zero,
->> we read cpu topo info from MPIDR.
-> 
-> ? I will retest this, but any negative return from setup_acpi_topology() for the initial node (subsequent requests should minimally duplicate the cpu node rather than failing) request, should result in a call to reset_cpu_topology(), and the information being sourced from the MPIDR in store_cpu_topology(). There are various ways the tree could be "damaged" but if all the system cpus have matching valid acpi_id/cpu nodes, then that reflects a valid topology and there really isn't enough information to decide if its damaged. The one case where this isn't accurate is missing socket identifiers, but the code actually handles this as well as the lack of missing cluster/thread ids (which don't exist in the standard).
-> 
-Yes, you are right. I didn't notice the function reset_cpu_topology() before. Thanks for your explanation.
->>
->>> +}
->>> +
->>> +/*
->>> + * simply assign a ACPI cache entry to each known CPU cache entry
->>> + * determining which entries are shared is done later.
->>> + */
->>> +int cache_setup_acpi(unsigned int cpu)
->>> +{
->>> +    struct acpi_table_header *table;
->>> +    acpi_status status;
->>> +
->>> +    pr_debug("Cache Setup ACPI cpu %d\n", cpu);
->>> +
->>> +    status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
->>> +    if (ACPI_FAILURE(status)) {
->>> +        pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
->>> +        return -ENOENT;
->>> +    }
->>> +
->>> +    cache_setup_acpi_cpu(table, cpu);
->>> +    acpi_put_table(table);
->>> +
->>> +    return status;
->>> +}
->>> +
->>> +/*
->>> + * Determine a topology unique ID for each thread/core/cluster/socket/etc.
->>> + * This ID can then be used to group peers.
->>> + */
->>> +int setup_acpi_cpu_topology(unsigned int cpu, int level)
->>> +{
->>> +    struct acpi_table_header *table;
->>> +    acpi_status status;
->>> +    int retval;
->>
->> Can we add a static int array to record already assigned id for each level?
->> So that we can count the id starting from zero. And also the id can be successive.
-> 
-> I don't like the idea of a node<->generated_id array/map in this module, although I've considered a number of ways to create more normalized values. Particularly, the one area that might be useful is utilizing the acpi id for the cores, which is problematic in the MT case. One of my other alternative ideas was to plug a unique node id into a reserved field in the table as the node is traversed. That idea is a little evil, and really should be part of the ACPI standard so the firmware is providing the ID's rather than dependent on the traversal order of the tree.
-> 
-> If it turns out that these ID's need to be zero based, or some other limitation I would prefer just renumbering them in update_siblings_mask() or parse_acpi_topology(). I hacked together a patch to renumber the package_id yesterday, but i'm pretty sure I've seen (non arm) machines with odd package/core ids in the past, and I don't really see anything in the ABI the dictating this. Let me clean it up a bit and I can post it as an additional patch on top of the PPTT patches.
-> 
-Yes, I agree. Renumbering the IDs in parse_acpi_topology() is better.
-
-> So, is this an actual use case/problem, or its just an "appearance" type of thing?
-> 
-It is not an actual use problem, just an "appearance".
-
-
-Thanks,
-Xiongfeng Wang
+==> Thanks for your comment. mt2712-pinfunc.h is only used in arm64. so
+it can stay inside the arch tree.
