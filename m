@@ -1,51 +1,134 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 22 Sep 2017 11:24:16 -0500
-Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
-In-Reply-To: <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
-References: <20170920180132.4373-1-s-anna@ti.com>
- <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
- <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
- <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
-Message-ID: <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Sep 2017 17:28:36 +0100
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170922122419.GH20805@n2100.armlinux.org.uk>
+References: <20170920162208.GB536@obsidianresearch.com>
+ <20170920165141.GP20805@n2100.armlinux.org.uk>
+ <20170920224522.GB20974@obsidianresearch.com>
+ <20170921075907.GR20805@n2100.armlinux.org.uk>
+ <20170921093218.GS20805@n2100.armlinux.org.uk>
+ <20170921220510.GA11395@obsidianresearch.com>
+ <20170921224541.GC20805@n2100.armlinux.org.uk>
+ <20170921232040.GA15130@obsidianresearch.com>
+ <20170922095713.GD20805@n2100.armlinux.org.uk>
+ <20170922122419.GH20805@n2100.armlinux.org.uk>
+Message-ID: <20170922162836.GI20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
+On Fri, Sep 22, 2017 at 01:24:20PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 22, 2017 at 10:57:13AM +0100, Russell King - ARM Linux wrote:
+> > Maybe the solution here is to split two forms of ntp RTC synchronisation
+> > so:
+> > - If you enable CONFIG_GENERIC_CMOS_UPDATE, then you get the
+> >   update_persistent_clock*() methods called.
+> > - If you enable CONFIG_RTC_SYSTOHC, rtc_set_ntp_time() gets called.
+> > - If you enable both, then both get called at their appropriate times.
+> > 
+> > This would certainly simplify sync_cmos_clock().
 > 
-> On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
->> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
->>> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
->>>> Enable the CMA and DMA_CMA Kconfig options by default for
->>>> Davinci platforms. Davinci remoteproc driver is one of the
->>>> modules that depends on these options, and this allows the
->>>> driver to be made visible for selection with menuconfig.
->>>>
->>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>> ---
->>>> Hi Sekhar,
->>>>
->>>> Here's the patch that enables CMA as per your request. Patch based
->>>> on your v4.15/defconfig branch.
->>>
->>> Applied! I guess you will be sending another patch enabling the
->>> remoteproc driver itself?
->>
->> Thanks. Well, one always needs a firmware image in their filesystem
->> without which enabling the driver is meaningless (it would fail). So was
->> not planning to enable it by default.
+> I've just tried that out, and it doesn't work very well (not wrapping
+> the kernel messages):
 > 
-> But the errors will show up only on DA850 LCDK where we have enabled the
-> DSP by default in DT because its an important usecase there. I think it
-> is important for users to see those errors.
-> (besides the usual benefits of having the module enabled to catch build
-> and runtime issues easily).
+> [   18.827144] sync_rtc_clock: adjust=1506081346.710933001 target=470000000 next=1506081357.470000000 now=1506081346.710953334 delta=10.759046666 jiffies=2690
+> [   29.662077] sync_rtc_clock: adjust=1506081357.546474534 target=470000000 next=1506081368.470000000 now=1506081357.546487201 delta=10.923512799 jiffies=2731
+> [   40.671669] sync_rtc_clock: adjust=1506081368.556684059 target=470000000 next=1506081379.470000000 now=1506081368.556696727 delta=10.913303273 jiffies=2729
+> [   51.675016] sync_rtc_clock: adjust=1506081379.560649235 target=470000000 next=1506081390.470000000 now=1506081379.560662236 delta=10.909337764 jiffies=2728
+> [   62.682385] sync_rtc_clock: adjust=1506081390.568637970 target=470000000 next=1506081401.470000000 now=1506081390.568648637 delta=10.901351363 jiffies=2726
+> [   73.689831] sync_rtc_clock: adjust=1506081401.576696708 target=470000000 next=1506081412.470000000 now=1506081401.576708376 delta=10.893291624 jiffies=2724
+> [   84.697233] sync_rtc_clock: adjust=1506081412.584695110 target=470000000 next=1506081423.470000000 now=1506081412.584723778 delta=10.885276222 jiffies=2722
+> [   95.704624] sync_rtc_clock: adjust=1506081423.592724847 target=470000000 next=1506081434.470000000 now=1506081423.592736847 delta=10.877263153 jiffies=2720
+> [  106.711941] sync_rtc_clock: adjust=1506081434.600651911 target=470000000 next=1506081445.470000000 now=1506081434.600665579 delta=10.869334421 jiffies=2718
+> [  117.719334] sync_rtc_clock: adjust=1506081445.608659647 target=470000000 next=1506081456.470000000 now=1506081445.608673981 delta=10.861326019 jiffies=2716
+> [  128.726723] sync_rtc_clock: adjust=1506081456.616661715 target=470000000 next=1506081467.470000000 now=1506081456.616676049 delta=10.853323951 jiffies=2714
+> [  139.734103] sync_rtc_clock: adjust=1506081467.624659450 target=470000000 next=1506081478.470000000 now=1506081467.624672451 delta=10.845327549 jiffies=2712
+> [  150.741489] sync_rtc_clock: adjust=1506081478.632661185 target=470000000 next=1506081489.470000000 now=1506081478.632673519 delta=10.837326481 jiffies=2710
+> [  161.748870] sync_rtc_clock: adjust=1506081489.640655587 target=470000000 next=1506081500.470000000 now=1506081489.640668254 delta=10.829331746 jiffies=2708
+> [  172.756352] sync_rtc_clock: adjust=1506081500.648758661 target=470000000 next=1506081511.470000000 now=1506081500.648772995 delta=10.821227005 jiffies=2706
+> [  183.763642] sync_rtc_clock: adjust=1506081511.656658057 target=470000000 next=1506081522.470000000 now=1506081511.656671391 delta=10.813328609 jiffies=2704
+> [  194.771043] sync_rtc_clock: adjust=1506081522.664678127 target=470000000 next=1506081533.470000000 now=1506081522.664689794 delta=10.805310206 jiffies=2702
+> [  205.778402] sync_rtc_clock: adjust=1506081533.672649194 target=470000000 next=1506081544.470000000 now=1506081533.672662528 delta=10.797337472 jiffies=2700
+> [  216.785780] sync_rtc_clock: adjust=1506081544.680643928 target=470000000 next=1506081555.470000000 now=1506081544.680656929 delta=10.789343071 jiffies=2698
+> [  227.792447] sync_rtc_clock: adjust=1506081555.688650369 target=470000000 next=1506081566.470000000 now=1506081555.688664037 delta=10.781335963 jiffies=2696
+> [  238.798968] sync_rtc_clock: adjust=1506081566.696674887 target=470000000 next=1506081577.470000000 now=1506081566.696687889 delta=10.773312111 jiffies=2694
+> [  249.805483] sync_rtc_clock: adjust=1506081577.704652923 target=470000000 next=1506081588.470000000 now=1506081577.704666259 delta=10.765333741 jiffies=2692
+> [  260.812078] sync_rtc_clock: adjust=1506081588.712679979 target=470000000 next=1506081599.470000000 now=1506081588.712693647 delta=10.757306353 jiffies=2690
+> [  271.818656] sync_rtc_clock: adjust=1506081599.720654429 target=470000000 next=1506081610.470000000 now=1506081599.720668431 delta=10.749331569 jiffies=2688
+> [  282.825311] sync_rtc_clock: adjust=1506081610.728677710 target=470000000 next=1506081621.470000000 now=1506081610.728690045 delta=10.741309955 jiffies=2686
+> [  293.575979] sync_rtc_clock: adjust=1506081621.480653995 target=470000000 next=1506081632.470000000 now=1506081621.480666996 delta=10.989333004 jiffies=2748
+> [  304.582667] sync_rtc_clock: adjust=1506081632.488651088 target=470000000 next=1506081643.470000000 now=1506081632.488663756 delta=10.981336244 jiffies=2746
+> [  315.589372] sync_rtc_clock: adjust=1506081643.496641761 target=470000000 next=1506081654.470000000 now=1506081643.496653429 delta=10.973346571 jiffies=2744
+> 
+> As previous mentioned, this has HZ=250, so one jiffy is about 4ms.  What
+> this shows is that we're failing every single time to hit the desired
+> window - the closest we got in the 5 minutes of uptime to 470ms was
+> 480653995ns.
+> 
+> The comments in linux/workqueue.h refer to a gmane link -
+> http://thread.gmane.org/gmane.linux.kernel/1480396 but this seems to be
+> dead - "Archived At Nothing found - bye".  Looks like using gmane URLs
+> in kernel code is not a good idea, they don't seem to be persistent!
+> 
+> It's interesting to watch what's happening there - despite reducing the
+> number of jiffies each time, we still seem to be woken later and later
+> each time, with an approximate increase of 8ms or two jiffies each time.
+> Eg:
+> 
+> [  293.575979] sync_rtc_clock: adjust=1506081621.480653995 target=470000000
+>  next=1506081632.470000000 now=1506081621.480666996 delta=10.989333004
+>  jiffies=2748
+> [  304.582667] sync_rtc_clock: adjust=1506081632.488651088 target=470000000
+>  next=1506081643.470000000 now=1506081632.488663756 delta=10.981336244
+>  jiffies=2746
+> [  315.589372] sync_rtc_clock: adjust=1506081643.496641761 target=470000000
+>  next=1506081654.470000000 now=1506081643.496653429 delta=10.973346571
+>  jiffies=2744
+> 
+> If we do the math, then:
+> 
+>  2748 jiffies is 10.992s, which is 10.989333004 rounded up to a jiffy.
+>  10.992 + 1506081621.480666996 gives 1506081632.472666996, but we're
+>  next called at 1506081632.488651088, which is almost 4 jiffies later
+>  than requested.
+> 
+>  2746 jiffies is 10.984s, which is 10.981336244 rounded up to a jiffy.
+>  10.984 + 1506081632.488663756 gives 1506081643.472663756, but we're
+>  next called at 1506081643.496641761, which is almost 6 jiffies later
+>  than requested.
+> 
+> I'm not sure where those extra jiffies are coming from... but maybe
+> using the power efficient wq is not the best for accuracy?
+> 
+> Also notice that the target time seems to always be about 2.6ms late.
+> based on the requested jiffies, which in itself would mean we miss
+> the 1ms window in the systohc.c code.
 
-Yeah, DSP node is enabled only for DA850 LCDK among the DT-supported
-boards, but I believe there are boards still using legacy boot, and it
-shows up on those platforms as well. FYI, we do not have any rpmsg
-drivers other than the kernel sample to make real usage of a booted
-remoteproc. Anycase, if you still prefer this to be added, I don't mind.
+Okay, the problem seems to be the new timer wheel code - see
+https://lwn.net/Articles/646950/
 
-regards
-Suman
+This means that timers set way in the future (like more than a few
+milliseconds) can be delayed - they no longer expire "on the specified
+jiffies".  Something to bear in mind for the future, as this affects
+everything that uses normal timers.
+
+I think the reason this doesn't show up for the original code is
+because of your change from a 0-1s retry to a 10s retry - the further
+the expiry into the future, the more delayed the timers can get.
+
+I guess we could go back to the 0-1s retry and keep using the delayed
+work queues, but I wonder if normal timers will get even less accurate
+in the future (if tglx does more work there.)
+
+The suggestion from Arjan van de Ven is to use hrtimers for this - but
+we still need the workqueue (as we may sleep) so we need a hrtimer-
+delayed workqueue.  On the face of it, that seems a contradiction in
+terms to use a hrtimer with a workqueue.
+
+I do have an implementation for the hrtimer suggestion, which I'll try
+to sort out during the remainder of the day, once I've ironed out a
+few remaining quirks.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
