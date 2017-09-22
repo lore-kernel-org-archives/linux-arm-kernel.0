@@ -1,115 +1,133 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 22 Sep 2017 11:58:27 +0100
-Subject: [PATCH v2 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <20170922102520.GA23365@arm.com>
-References: <1502959160-30900-1-git-send-email-julien.thierry@arm.com>
- <1502959160-30900-2-git-send-email-julien.thierry@arm.com>
- <20170922102520.GA23365@arm.com>
-Message-ID: <dd4432da-5695-4436-729a-cd9dfdf6450b@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 22 Sep 2017 12:10:05 +0100
+Subject: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
+ Mailbox
+In-Reply-To: <BY1PR0201MB0885E6563EBAFE83DF8822A4B0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
+References: <1506034724-14639-1-git-send-email-jliang@xilinx.com>
+ <BY1PR0201MB0885E6563EBAFE83DF8822A4B0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
+Message-ID: <20170922111005.GA11613@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/09/17 11:25, Will Deacon wrote:
-> On Thu, Aug 17, 2017 at 09:39:19AM +0100, Julien Thierry wrote:
->> The arch timer configuration for a CPU might get reset after suspending said
->> CPU.
->>
->> In order to reliably use the event stream in the kernel (e.g. for delays),
->> we keep track of the state where we can safely concider the event stream as
->> properly configured.
->>
->> Signed-off: Julien Thierry <julien.thierry@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/arch_timer.h    |  1 +
->>   arch/arm64/include/asm/arch_timer.h  |  1 +
->>   drivers/clocksource/arm_arch_timer.c | 32 ++++++++++++++++++++++++++++++--
->>   include/clocksource/arm_arch_timer.h |  6 ++++++
->>   4 files changed, 38 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
->> index d4ebf56..0b6e104 100644
->> --- a/arch/arm/include/asm/arch_timer.h
->> +++ b/arch/arm/include/asm/arch_timer.h
->> @@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>   {
->>   	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->> +	isb();
->>   }
->>
->>   #endif
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index 74d08e4..26b3376 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
->>   static inline void arch_timer_set_cntkctl(u32 cntkctl)
->>   {
->>   	write_sysreg(cntkctl, cntkctl_el1);
->> +	isb();
->>   }
->>
->>   static inline u64 arch_counter_get_cntpct(void)
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index aae87c4..866bbf8 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -77,6 +77,7 @@ struct arch_timer {
->>   static bool arch_counter_suspend_stop;
->>   static bool vdso_default = true;
->>
->> +static DEFINE_PER_CPU(bool, evtstrm_available) = false;
->>   static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
->>
->>   static int __init early_evtstrm_cfg(char *buf)
->> @@ -736,6 +737,7 @@ static void arch_timer_evtstrm_enable(int divider)
->>   #ifdef CONFIG_COMPAT
->>   	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->>   #endif
->> +	__this_cpu_write(evtstrm_available, true);
->>   }
->>
->>   static void arch_timer_configure_evtstream(void)
->> @@ -860,6 +862,26 @@ u32 arch_timer_get_rate(void)
->>   	return arch_timer_rate;
->>   }
->>
->> +bool arch_timer_evtstrm_available(void)
->> +{
->> +	/*
->> +	 * This function might get called outside of a preempt disable context.
->> +	 * This is not an issue because the result of this function will stay
->> +	 * valid for the CPU the caller task will be running on, even if
->> +	 * preempted. The possible case are as follow:
->> +	 *   - evtstrm_available == false -> either event stream is disabled
->> +	 *     system-wide or event stream is momentarily disabled on this CPU
->> +	 *     meaning we won't be scheduling in/out tasks on this CPU until it
->> +	 *     is reconfigured. Current task is made aware it cannot rely on
->> +	 *     event stream.
->> +	 *   - evtstrm_available == true -> task was running on a CPU with event
->> +	 *     stream enabled, if it gets preempted, it will be resumed on a CPU
->> +	 *     where event stream is configured properly. The task can use the
->> +	 *     event stream.
->> +	 */
->> +	return this_cpu_read(evtstrm_available);
+On Fri, Sep 22, 2017 at 06:05:18AM +0000, Jiaying Liang wrote:
 > 
-> I think this means that a per-cpu variable isn't necessarily what we need
-> here. It would be clearer to me if we maintained a cpumask instead, with an
-> enable bit for each CPU. If the thing is disabled system-wide, then it's all
-> zeroes, otherwise CPUs zero their entry for the cases where the stream is
-> momentarily disabled during PM transitions.
+> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in ZynqMP
+> SoC used for the communication between various processor systems.
 > 
+> Signed-off-by: Wendy Liang <jliang@xilinx.com>
+> ---
+>  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 88 ++++++++++++++++++++++
+>  1 file changed, 88 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> mailbox.txt b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> mailbox.txt
+> new file mode 100644
+> index 0000000..5d915d1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.
+> +++ txt
+> @@ -0,0 +1,88 @@
+> +Xilinx IPI Mailbox Driver
+> +========================================
+> +
+> +The Xilinx IPI(Inter Processor Interrupt) mailbox driver is a mailbox
+> +controller that manages the messaging between two IPI agents. Each IPI
+> +mailbox has request and response buffers between the two IPI agents.
+> +
+> ++-------------------------------------+
+> +|                                     | Xilinx ZynqMP IPI Mailbox
+> +| Controller|
+> +|                                     |
+> +|                       +-------------+
+> +|                       |     SMC     |
+> +|                       |             |
+> ++--------+--------------+------+------+
+> +         |                     |
+> +         |          +-----------------+
+> +         |                     |   ATF (ARM trusted firmware)
 
-Yes, that sounds better. I'll do that.
+I suppose it should work with any EL3 firmware, ATF reference can be
+removed IMO.
 
-Thanks for the suggestion.
+> +         |                     |
+> ++-------------------------------------+
+> +         |                     |   Hardware
+> +         |                     |
+> + +--------------------------------------+
+> +                               |        |
+> + +----------------------+ +-----------+ |
+> + | | Buffers between    | | IPI Agent | |
+> + | | two IPI agents     | | Registers | |
+> + | +--------------------+ +-----------+ |
+> + |                                      |
+> + |   Xilinx ZynqMP IPI                  |
+> + +--------------------------------------+
+> +
+> +
+> +Message Manager Device Node:
+> +===========================
+> +Required properties:
+> +--------------------
+> +- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
+> +- ipi-smc-fid-base	Base offset of SMC function IDs for IPI mailbox SMC.
+> +			It contains the IPI IDs of the two IPI agents.
 
--- 
-Julien Thierry
+Why is "SMC" associated with this hardware block ? Is it secure device ?
+Can Linux access it ? If so, why do you need SMC ?
+
+> +- reg:			IPI request and response buffers address range. It
+> +			can be the IPI buffers from the hardware or it can
+> +			be carved out shared memory.
+
+It sounds like buffer used for communication and not part of this IP.
+Shouldn't this be part of mailbox client binding rather than controller
+binding.
+
+> +- reg-names:		Reg resource name of the IPI request and response
+> +			buffers.
+> +- #mbox-cells:		Shall be 1. Contains the logical channel IDs of the
+> +			channels on the IPI mailbox.
+> +- interrupt-parent:	Phandle for the interrupt controller.
+> +- interrupts:		Interrupt mapping.
+> +
+> +Required properties:
+> +--------------------
+> +- method:		The method of accessing the IPI agent registers.
+> +			Permitted values are: "smc" and "hvc". Default is
+> +			"smc".
+> +Example:
+> +------------
+> +	/* APU IPI mailbox driver */
+> +	ipis {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		ipi_mailbox_apu_rpu0: ipi_mailbox at 0 {
+> +			compatible = "xlnx,zynqmp-ipi-mailbox";
+> +			reg = <0 0xff990400 40>;
+> +			reg-names = "apu-rpu0";
+> +			ipi-smc-fid-base = <0x1010>;
+> +			method = "smc";
+> +			#mbox-cells = <1>;
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <0 35 4>;
+> +		};
+> +		ipi_mailbox_apu_rpu1: ipi_mailbox at 1 {
+> +			compatible = "xlnx,zynqmp-ipi-mailbox";
+> +			reg = <0 0xff990440 40>;
+> +			reg-names = "apu-rpu1";
+> +			ipi-smc-fid-base = <0x1020>;
+> +			method = "smc";
+> +			#mbox-cells = <1>;
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <0 35 4>;
+> +		};
+
+Why do you need the above 2 ? They don't look like 2 controller blocks.
+You just need to represent single mailbox controller.
+
+--
+Regards,
+Sudeep
