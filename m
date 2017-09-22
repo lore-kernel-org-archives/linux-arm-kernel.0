@@ -1,104 +1,114 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 22 Sep 2017 11:45:11 +0200
-Subject: [PATCH v3 0/3] mmc: Add OMAP SDHCI driver
-In-Reply-To: <20170906114556.32532-1-kishon@ti.com>
-References: <20170906114556.32532-1-kishon@ti.com>
-Message-ID: <CAPDyKFqWMy857LqpO2rPCb4TBQSU4oyFWbo8NunM_89OGsusvQ@mail.gmail.com>
+From: kevin.wangtao@hisilicon.com (Tao Wang)
+Date: Fri, 22 Sep 2017 17:42:06 +0800
+Subject: [PATCH 3/9] thermal/drivers/hisi: put platform code together
+In-Reply-To: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
+References: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <1506073332-92438-4-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2017 at 13:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> This is the first step in deprecating omap_hsmmc driver completely
-> and moving to sdhci-omap driver which uses the sdhci library.
->
-> This patch that adds a new SDHCI quirk "MMC_RSP_136" has already been
-> merged and hence removed it in this revision.
->
-> Apart from the quirk, sdhci-omap has it's own callbacks
-> to set_clock (clock divider programming is different from generic sdhci)
-> , set_power, set_bus_width, set_bus_mode and platform_send_init_74_clocks.
-> These callback functions are implemented based on omap_hsmmc driver.
-> Since sdhci-omap driver requires pbias regulator fixes to be present, I've
-> sent them as part of this series.
->
-> The sdhci-omap driver supports only the high speed mode and UHS/HS200
-> mode will be added in a later series.
->
-> It has been tested only in boards having DRA7 SoCs like dra7-evm, dra72-evm,
-> am571x-idk, am572x-idk, am57xx-evm. (Tested only eMMC and SD.
-> SDIO support will be added later). The plan is to fully convert DRA7
-> SoC to use SDHCI driver and then convert other legacy platforms to use
-> SDHCI.
->
-> For sdhci-omap to be functional, the following tag should be merged (There
-> are no compilation dependencies).
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator
-> tags/regulator-pbias-variants
+From: Kevin Wangtao <kevin.wangtao@linaro.org>
 
-Tag pulled.
+reorganize code for follow-up patch, there is no functional change here.
 
->
-> However the above regulator tag will impact omap_hsmmc driver. so [1]
-> should be merged before everything else is merged.
->
-> [1] -> https://lkml.org/lkml/2017/8/31/300
+Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
+---
+ drivers/thermal/hisi_thermal.c | 76 +++++++++++++++++++++---------------------
+ 1 file changed, 38 insertions(+), 38 deletions(-)
 
-Applied.
-
->
-> The patch to add config and dts changes to use sdhci-omap will be sent
-> separately.
->
-> Next Steps:
-> *) Add UHS support to sdhci-omap
-> *) Add SDIO support
-> *) Add support for older TI platforms
->
-> Changes from v3:
-> *) removed omap_hsmmc and pbias-regulator patches from the series
-> *) Fixed dt-binding documentation (remove '0x' in node name)
-> *) stop clock if MMC core sends '0' in frequency
->
-> Changes from v2:
-> *) Rebased on git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
-> *) Included a couple of patches from Ravikumar to fix pbias-regulator driver
->    to support max-voltage of 3.3V. This is required for sdhci-omap driver.
-> *) Create sdhci-omap as a new driver with MMC generic bindings and hence doesn't
->    have bindings like ti,dual-volt added for omap-hsmmc. (Instead of
->    ti,dual-volt, sdhci-omap driver uses the supported regulator voltage to
->    set controller IO voltage capabilities).
->    When omap-hsmmc driver is deprecated, support for these properties will
->    be added to sdhci-omap.
-> *) Fixed minor comments from Adrian).
->
-> Changes from v1:
-> *) Remove the quirks and instead use sdhci_omap specific callbacks for
->    set_power, set_busmode etc.
-> *) Add a patch from Adrian to tidy reading 136-bit responses
->
-> I've also pushed the entire series along with dependent dt patches @
-> https://github.com/kishon/linux-wip.git sdhci_v3 (in case someone
-> wants to test)
->
-> Kishon Vijay Abraham I (3):
->   dt-bindings: sdhci-omap: Add bindings for the sdhci-omap controller
->   mmc: sdhci-omap: Add OMAP SDHCI driver
->   MAINTAINERS: Add TI OMAP SDHCI Maintainer
->
->  .../devicetree/bindings/mmc/sdhci-omap.txt         |  16 +
->  MAINTAINERS                                        |   6 +
->  drivers/mmc/host/Kconfig                           |  12 +
->  drivers/mmc/host/Makefile                          |   1 +
->  drivers/mmc/host/sdhci-omap.c                      | 607 +++++++++++++++++++++
->  5 files changed, 642 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->  create mode 100644 drivers/mmc/host/sdhci-omap.c
->
-> --
-> 2.11.0
->
-
-Thanks, everything applied/pulled for next! Great work!
-
-Kind regards
-Uffe
+diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
+index c8b651d..96904b4 100644
+--- a/drivers/thermal/hisi_thermal.c
++++ b/drivers/thermal/hisi_thermal.c
+@@ -201,6 +201,44 @@ static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
+ 	clk_disable_unprepare(data->clk);
+ }
+ 
++
++static int hisi_thermal_setup(struct hisi_thermal_data *data)
++{
++	struct hisi_thermal_sensor *sensor = &data->sensor;
++	int ret;
++
++	/* enable clock for tsensor */
++	ret = clk_prepare_enable(data->clk);
++	if (ret)
++		return ret;
++
++	/* disable module firstly */
++	hisi_thermal_reset_enable(data->regs, 0);
++	hisi_thermal_enable(data->regs, 0);
++
++	/* select sensor id */
++	hisi_thermal_sensor_select(data->regs, sensor->id);
++
++	/* setting the hdak time */
++	hisi_thermal_hdak_set(data->regs, 0);
++
++	/* setting lag value between current temp and the threshold */
++	hisi_thermal_set_lag(data->regs, HISI_TEMP_LAG);
++
++	/* enable for interrupt */
++	hisi_thermal_alarm_set(data->regs, sensor->thres_temp);
++
++	hisi_thermal_reset_set(data->regs, HISI_TEMP_RESET);
++
++	/* enable module */
++	hisi_thermal_reset_enable(data->regs, 1);
++	hisi_thermal_enable(data->regs, 1);
++
++	hisi_thermal_alarm_clear(data->regs, 0);
++	hisi_thermal_alarm_enable(data->regs, 1);
++
++	return 0;
++}
+ static int hisi_thermal_get_temp(void *__data, int *temp)
+ {
+ 	struct hisi_thermal_data *data = __data;
+@@ -291,44 +329,6 @@ static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
+ 		on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
+ }
+ 
+-static int hisi_thermal_setup(struct hisi_thermal_data *data)
+-{
+-	struct hisi_thermal_sensor *sensor = &data->sensor;
+-	int ret;
+-
+-	/* enable clock for tsensor */
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret)
+-		return ret;
+-
+-	/* disable module firstly */
+-	hisi_thermal_reset_enable(data->regs, 0);
+-	hisi_thermal_enable(data->regs, 0);
+-
+-	/* select sensor id */
+-	hisi_thermal_sensor_select(data->regs, sensor->id);
+-
+-	/* setting the hdak time */
+-	hisi_thermal_hdak_set(data->regs, 0);
+-
+-	/* setting lag value between current temp and the threshold */
+-	hisi_thermal_set_lag(data->regs, HISI_TEMP_LAG);
+-
+-	/* enable for interrupt */
+-	hisi_thermal_alarm_set(data->regs, sensor->thres_temp);
+-
+-	hisi_thermal_reset_set(data->regs, HISI_TEMP_RESET);
+-
+-	/* enable module */
+-	hisi_thermal_reset_enable(data->regs, 1);
+-	hisi_thermal_enable(data->regs, 1);
+-
+-	hisi_thermal_alarm_clear(data->regs, 0);
+-	hisi_thermal_alarm_enable(data->regs, 1);
+-
+-	return 0;
+-}
+-
+ static int hisi_thermal_probe(struct platform_device *pdev)
+ {
+ 	struct hisi_thermal_data *data;
+-- 
+2.8.1
