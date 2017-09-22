@@ -1,78 +1,57 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Fri, 22 Sep 2017 09:44:06 -0700
-Subject: [PATCH v3 4/4] phy: rockchip-typec: Do the calibration more correctly
-In-Reply-To: <20170922164406.27606-1-dianders@chromium.org>
-References: <20170922164406.27606-1-dianders@chromium.org>
-Message-ID: <20170922164406.27606-5-dianders@chromium.org>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 22 Sep 2017 11:43:30 -0500
+Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
+In-Reply-To: <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
+References: <20170920180132.4373-1-s-anna@ti.com>
+ <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
+ <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
+ <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
+ <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
+Message-ID: <ba1bb5c3-a524-8ee1-6730-e61047dec440@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calculate the calibration code as per the docs.  The docs talk about
-reading and averaging the pullup and pulldown calibration codes.  They
-also talk about adding in some adjustment codes.  Let's do what the
-docs say.
+On 09/22/2017 11:24 AM, Suman Anna wrote:
+> Hi Sekhar,
+> 
+>>
+>> On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
+>>> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
+>>>> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
+>>>>> Enable the CMA and DMA_CMA Kconfig options by default for
+>>>>> Davinci platforms. Davinci remoteproc driver is one of the
+>>>>> modules that depends on these options, and this allows the
+>>>>> driver to be made visible for selection with menuconfig.
+>>>>>
+>>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>>> ---
+>>>>> Hi Sekhar,
+>>>>>
+>>>>> Here's the patch that enables CMA as per your request. Patch based
+>>>>> on your v4.15/defconfig branch.
+>>>>
+>>>> Applied! I guess you will be sending another patch enabling the
+>>>> remoteproc driver itself?
+>>>
+>>> Thanks. Well, one always needs a firmware image in their filesystem
+>>> without which enabling the driver is meaningless (it would fail). So was
+>>> not planning to enable it by default.
+>>
+>> But the errors will show up only on DA850 LCDK where we have enabled the
+>> DSP by default in DT because its an important usecase there. I think it
+>> is important for users to see those errors.
+>> (besides the usual benefits of having the module enabled to catch build
+>> and runtime issues easily).
+> 
+> Yeah, DSP node is enabled only for DA850 LCDK among the DT-supported
+> boards, but I believe there are boards still using legacy boot, and it
+> shows up on those platforms as well. FYI, we do not have any rpmsg
+> drivers other than the kernel sample to make real usage of a booted
+> remoteproc. Anycase, if you still prefer this to be added, I don't mind.
+> 
+> regards
+> Suman
+> 
 
-In practice this doesn't seem to matter a whole lot.  On a device I
-tested the pullup and pulldown codes were nearly the same (0x23 and
-0x24) and the adjustment codes were 0.
-
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-
-Changes in v3: None
-Changes in v2:
-- Removed extra blank line.
-
- drivers/phy/rockchip/phy-rockchip-typec.c | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-index 95f8f23676b4..a96635447d48 100644
---- a/drivers/phy/rockchip/phy-rockchip-typec.c
-+++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-@@ -560,24 +560,33 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
- 	u16 val;
- 	u16 tx_ana_ctrl_reg_1;
- 	u16 tx_ana_ctrl_reg_2;
--	s32 pu_calib_code;
--
--	/* disable txda_cal_latch_en for rewrite the calibration values */
--	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
--	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
--	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
-+	s32 pu_calib_code, pd_calib_code;
-+	s32 pu_adj, pd_adj;
-+	u16 calib;
- 
- 	/*
--	 * read a resistor calibration code from CMN_TXPUCAL_CTRL[5:0] and
--	 * write it to TX_DIG_CTRL_REG_2[5:0].
-+	 * Calculate calibration code as per docs: use an average of the
-+	 * pull down and pull up.  Then add in adjustments.
- 	 */
- 	val = readl(tcphy->base + CMN_TXPUCAL_CTRL);
- 	pu_calib_code = CMN_CALIB_CODE_POS(val);
-+	val = readl(tcphy->base + CMN_TXPDCAL_CTRL);
-+	pd_calib_code = CMN_CALIB_CODE_POS(val);
-+	val = readl(tcphy->base + CMN_TXPU_ADJ_CTRL);
-+	pu_adj = CMN_CALIB_CODE(val);
-+	val = readl(tcphy->base + CMN_TXPD_ADJ_CTRL);
-+	pd_adj = CMN_CALIB_CODE(val);
-+	calib = (pu_calib_code + pd_calib_code) / 2 + pu_adj + pd_adj;
-+
-+	/* disable txda_cal_latch_en for rewrite the calibration values */
-+	tx_ana_ctrl_reg_1 = readl(tcphy->base + TX_ANA_CTRL_REG_1);
-+	tx_ana_ctrl_reg_1 &= ~TXDA_CAL_LATCH_EN;
-+	writel(tx_ana_ctrl_reg_1, tcphy->base + TX_ANA_CTRL_REG_1);
- 
- 	/* write the calibration, then delay 10 ms as sample in docs */
- 	val = readl(tcphy->base + TX_DIG_CTRL_REG_2);
- 	val &= ~(TX_RESCAL_CODE_MASK << TX_RESCAL_CODE_OFFSET);
--	val |= pu_calib_code << TX_RESCAL_CODE_OFFSET;
-+	val |= calib << TX_RESCAL_CODE_OFFSET;
- 	writel(val, tcphy->base + TX_DIG_CTRL_REG_2);
- 	usleep_range(10000, 10050);
- 
--- 
-2.14.1.821.g8fa685d3b7-goog
+I am interested in using remoteproc on LEGO MINDSTORMS EV3 to implement 
+I2C and UART in the PRU.
