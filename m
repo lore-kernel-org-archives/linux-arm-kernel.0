@@ -1,62 +1,66 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 22 Sep 2017 08:37:07 -0500
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
- <20170919070422.GI3349@codeaurora.org>
- <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
- <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
- <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
- <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
- <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
- <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
-Message-ID: <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Sep 2017 15:04:00 +0100
+Subject: [PATCH] iommu/arm-smmu: Remove ACPICA workarounds
+Message-ID: <63cc66c4c23a6066c06498079295035df7e68160.1506088916.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2017 08:29 AM, Linus Walleij wrote:
-> 
-> What is your response to Stephen's comment:
-> 
->> [Stephen Boyd]
->> Perhaps we can add another hook for our purposes here that
->> tells gpiolib that the gpio is not usable and to skip it. The
->> semantics would be clear, it's just about probing availability of
->> this pin as a gpio and doesn't mux any pins.
+Now that the kernel headers have synced with the relevant upstream
+ACPICA updates, it's time to clean up the temporary local definitions.
 
-> I think this kind of related to my response (after I realized it
-> was not just about IRQs):
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 11 +----------
+ drivers/iommu/arm-smmu.c    |  8 --------
+ 2 files changed, 1 insertion(+), 18 deletions(-)
 
-We already have 95% of this.  We can already specify individual pin 
-ranges, and the vast majority of the code recognizes the ranges.  There 
-is only one small loophole, and that's in gpiochip_add_data().  The 
-for-loop iterates over all GPIOs:
-
-	for (i = 0; i < chip->ngpio; i++) {
-		struct gpio_desc *desc = &gdev->descs[i];
-
-		desc->gdev = gdev;
-		/*
-		 * REVISIT: most hardware initializes GPIOs as inputs
-		 * (often with pullups enabled) so power usage is
-		 * minimized. Linux code should set the gpio direction
-		 * first thing; but until it does, and in case
-		 * chip->get_direction is not set, we may expose the
-		 * wrong direction in sysfs.
-		 */
-
-I believe the real problem is that this for-loop should be moved from 
-gpiochip_add_data() into some other function that is called *after* the 
-pin ranges are defined.  We can put it in gpiochip_add_pin_range(), maybe.
-
-My patch covers the loophole by adding a check inside get_direction(). 
-If we fix gpiochip_add_data(), I can remove that patch.
-
-However, I think that change is risky and will require a lot of testing 
-and review.
-
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e67ba6c40faf..47f52b1ab838 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -413,15 +413,6 @@
+ #define MSI_IOVA_BASE			0x8000000
+ #define MSI_IOVA_LENGTH			0x100000
+ 
+-/* Until ACPICA headers cover IORT rev. C */
+-#ifndef ACPI_IORT_SMMU_HISILICON_HI161X
+-#define ACPI_IORT_SMMU_HISILICON_HI161X		0x1
+-#endif
+-
+-#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+-#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
+-#endif
+-
+ static bool disable_bypass;
+ module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+ MODULE_PARM_DESC(disable_bypass,
+@@ -2665,7 +2656,7 @@ static void acpi_smmu_get_options(u32 model, struct arm_smmu_device *smmu)
+ 	case ACPI_IORT_SMMU_V3_CAVIUM_CN99XX:
+ 		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
+ 		break;
+-	case ACPI_IORT_SMMU_HISILICON_HI161X:
++	case ACPI_IORT_SMMU_V3_HISILICON_HI161X:
+ 		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
+ 		break;
+ 	}
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 3bdb799d3b4b..bce312a99f52 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -119,14 +119,6 @@ enum arm_smmu_implementation {
+ 	CAVIUM_SMMUV2,
+ };
+ 
+-/* Until ACPICA headers cover IORT rev. C */
+-#ifndef ACPI_IORT_SMMU_CORELINK_MMU401
+-#define ACPI_IORT_SMMU_CORELINK_MMU401	0x4
+-#endif
+-#ifndef ACPI_IORT_SMMU_CAVIUM_THUNDERX
+-#define ACPI_IORT_SMMU_CAVIUM_THUNDERX	0x5
+-#endif
+-
+ struct arm_smmu_s2cr {
+ 	struct iommu_group		*group;
+ 	int				count;
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.13.4.dirty
