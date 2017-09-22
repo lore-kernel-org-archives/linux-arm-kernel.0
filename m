@@ -1,64 +1,131 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Sep 2017 14:19:19 -0700
-Subject: [PATCH 0/8] Add hwmod data for IPU & DSP processors/MMUs
-In-Reply-To: <de9b14a1-250e-c73d-d999-468a50e6b1a3@ti.com>
-References: <20170821234818.4755-1-s-anna@ti.com>
- <d4715d1e-8113-050b-9a0f-77f4a4486081@ti.com>
- <20170922175110.GC4394@atomide.com>
- <de9b14a1-250e-c73d-d999-468a50e6b1a3@ti.com>
-Message-ID: <20170922211919.GD4394@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 22 Sep 2017 23:30:27 +0200
+Subject: [PATCH v2 07/10] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <6028407.VKu5LCmQv0@sbruens-linux>
+References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
+ <2791817.czGZyN6WKS@sbruens-linux>
+ <20170919142508.woslovwjtecgygpo@flea.lan>
+ <6028407.VKu5LCmQv0@sbruens-linux>
+Message-ID: <20170922213027.xpnaut3an5or6edl@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [170922 14:08]:
-> On 09/22/2017 12:51 PM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [170922 10:19]:
-> >> Ping on this series. Tero's clkctrl series changes are orthogonal to
-> >> these changes.
+On Tue, Sep 19, 2017 at 04:17:59PM +0000, Br?ns, Stefan wrote:
+> On Dienstag, 19. September 2017 16:25:08 CEST Maxime Ripard wrote:
+> > On Mon, Sep 18, 2017 at 02:09:43PM +0000, Br?ns, Stefan wrote:
+> > > On Montag, 18. September 2017 10:18:24 CEST you wrote:
+> > > > Hi,
+> > > > 
+> > > > On Sun, Sep 17, 2017 at 05:19:53AM +0200, Stefan Br?ns wrote:
+> > > > > +	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
+> > > > > +	if (ret && !sdc->num_pchans) {
+> > > > > +		dev_err(&pdev->dev, "Can't get dma-channels.\n");
+> > > > > +		return ret;
+> > > > > +	}
+> > > > > +
+> > > > > +	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
+> > > > > +		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
+> > > > > +		return -EINVAL;
+> > > > > +	}
+> > > > > +
+> > > > > +	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
+> > > > > +	if (ret && !sdc->max_request) {
+> > > > > +		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
+> > > > > +			 DMA_CHAN_MAX_DRQ);
+> > > > > +		sdc->max_request = DMA_CHAN_MAX_DRQ;
+> > > > > +	}
+> > > > > +
+> > > > > +	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
+> > > > > +		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
+> > > > > +		return -EINVAL;
+> > > > > +	}
+> > > > 
+> > > > I'm not really convinced about these two checks. They don't catch all
+> > > > errors (the range between the actual number of channels / DRQ and the
+> > > > maximum allowed per the registers), they might increase in the future
+> > > > too, and if we want to make that check actually working, we would have
+> > > > to duplicate the number of requests and channels into the driver.
+> > > 
+> > > 1. If these values increase, we have a new register layout and and
+> > > need a new compatible anyway.
 > > 
-> > With patch 5/8 you said earlier "It will still be a shared set
-> > between the MMU and remoteproc drivers, but let me look into
-> > how these get integrated." So was there any conclusion there?
-> > 
-> > Also, what's the deal with these omap4 changes that I commented
-> > on in 5/8?
+> > And you want to store a new maximum attached to the compatible? Isn't
+> > that exactly the situation you're trying to get away from?
 > 
-> Tony,
-> So, looking at code, removing modulemode on hwmod does change the
-> semantics as that will not plug in the clkctrl clk (_omap4_xlate_clkctrl
-> will return 0) into the hwmod and will fall back. So, this should make
-> it compatible to the existing code before adding the clkctrl dt nodes,
-> and Patch 5 will be good to avoid the crash when disabling the processor
-> nodes. That said, now that the modulemode is controlled by the
-> ti-clkctrl code, I would expect to get the refcounting for free due to
-> clk_enable() semantics if the same clkctrl clk is plugged under two
-> nodes (MMU and processor) and I may not need to remove the modulemode.
-> One of the main reasons for removing the modulemode is the lack of
-> refcounting on modulemode in the original code.
+> Yes, and no. H3, H5, A64 and R40 have the exact same register layout, but 
+> different number of channels and ports. They could share a compatible (if DMA 
+> channels were generalized), and we already have several register offsets/
+> widths (implicitly via the callbacks) attached to the compatible (so these 
+> don't need generalization via DT).
+> 
+> Now, we could also move everything that is currently attached to the 
+> compatible, i.e. clock gate register offset, burst widths/lengths etc. into 
+> the devicetree binding, but that would just be too much.
+> 
+> The idea is to find a middle ground here, using common patterns in the 
+> existing SoCs. The register layout has hardly changed, while the number of DMA 
+> channels and ports changes all the time. Moving the number of DMA channels and 
+> ports to the DT is trivial, and a pattern also found in other DMA controller 
+> drivers.
 
-OK. Sounds like you can get the refcounting for free just by modifying
-the dts as done for example for musb on omap4 in "[PATCH 10/10] ARM:
-dts: Use ti-sysc module driver for omap4 musb" in that series. You
-will need also the rest of the patches from that series naturally :)
+I'm sorry, but the code is inconsistent here. You basically have two
+variables from one SoC to the other, the number of channels and
+requests.
 
-That is as long as MMU and processor are both child devices in the
-same interconnect target module.
+In one case (channels), it mandates that the property is provided in
+the device tree, and doesn't default to anything.
 
-> In anycase, I need to retest this with all of required patches from Tero
-> (current mainline does not yet have the clkctrl dt nodes).
+In the other case (requests), the property is optional and it will
+provide a default. All that in 20 lines.
 
-OK
+I guess we already reached that middle ground by providing them
+through the DT, we just have to make sure we remain consistent.
 
-> Tero,
-> Do you have these patches rebased onto 4.14-rc1 (preferable if it is
-> rebased onto Tony's omap-for-v4.15/soc branch. I tried cherry-picking
-> from your github test branch (based on 4.13-rc3), but am running into
-> some L3Noc errors once I add the clkctrl dts node patch on Panda4 using NFS.
+> *If* the number of dma channels and ports is ever increased,
+> exceeding the current maximum, this would amount to major changes in
+> the driver and maybe even warrant a completely new driver.
+> 
+> > > 2. As long as the the limits are adhered to, no other registers/register
+> > > fields are overwritten. As the channel number and port are used to
+> > > calculate memory offsets bounds checking is IMHO a good idea.
+> > 
+> > And this is true for many other resources, starting with the one
+> > defined in reg. We don't error check every register range, clock
+> > index, reset line, interrupt, DMA channel, the memory size, etc. yet
+> > you could make the same argument.
+> > 
+> > The DT has to be right, and we have to trust it. Otherwise we can just
+> > throw it away.
+> 
+> So your argument here basically is - don't do any checks on DT provided 
+> values, these are always correct. So, following this argument, not only the 
+> range check, but also the of_property_read return values should be ignored, as 
+> the DT is correct, thus of_property_read will never return an error.
 
-Yeah I noticed that and emailed Tero about it. It seems to trigger
-with built-in musb and DEBUG_KERNEL disabled, not sure what triggers
-it. Only happens after the clkctrl nodes are added.
+No, my argument is don't do a check if you can catch only half of the
+errors, and with no hope of fixing it.
 
-Regards,
+The functions you mentionned have a 100% error catch rate. This is the
+difference.
 
-Tony
+> That clearly does not match the implementation of drivers throughout the 
+> various subsystems for DT properties, which is in general - do all the checks 
+> that can be done, trust everything you can not verify.
+
+And my point is that we're falling into the latter here. You cannot
+verify it properly.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170922/d0334768/attachment.sig>
