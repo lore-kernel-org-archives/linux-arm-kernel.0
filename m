@@ -1,169 +1,114 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 22 Sep 2017 12:31:12 +0200
-Subject: [PATCH v2 3/9] clk: at91: pmc: Support backup for programmable
- clocks
-In-Reply-To: <20170915140411.31716-4-romain.izard.pro@gmail.com>
-References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
- <20170915140411.31716-4-romain.izard.pro@gmail.com>
-Message-ID: <d6359e89-7c78-fdec-fbab-eb885017ec58@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 22 Sep 2017 11:41:02 +0100
+Subject: [PATCH v2 2/2] arm64: use WFE for long delays
+In-Reply-To: <1502959160-30900-3-git-send-email-julien.thierry@arm.com>
+References: <1502959160-30900-1-git-send-email-julien.thierry@arm.com>
+ <1502959160-30900-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <20170922104102.GB23365@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2017 at 16:04, Romain Izard wrote:
-> From: Romain Izard <romain.izard@mobile-devices.fr>
+On Thu, Aug 17, 2017 at 09:39:20AM +0100, Julien Thierry wrote:
+> The current delay implementation uses the yield instruction, which is a hint
+> that it is beneficial to schedule another thread. As this is a hint, it may be
+> implemented as a NOP, causing all delays to be busy loops. This is the case for
+> many existing CPUs.
 > 
-> When an AT91 programmable clock is declared in the device tree, register
-> it into the Power Management Controller driver. On entering suspend mode,
-> the driver saves and restores the Programmable Clock registers to support
-> the backup mode for these clocks.
+> Taking advantage of the generic timer sending periodic events to all cores, we
+> can use WFE during delays to reduce power consumption. This is beneficial only
+> for delays longer than the period of the timer event stream.
 > 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-
-Romain,
-
-Some nitpicking and one comment. But on the overall patch, here is my:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-See below:
-
+> If timer event stream is not enabled, delays will behave as yield/busy loops.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 > ---
-> Changes in v2:
-> * register PCKs on clock startup
+>  arch/arm64/lib/delay.c      | 25 ++++++++++++++++++++-----
+>  include/asm-generic/delay.h |  9 +++++++--
+>  2 files changed, 27 insertions(+), 7 deletions(-)
 > 
->  drivers/clk/at91/clk-programmable.c |  2 ++
->  drivers/clk/at91/pmc.c              | 27 +++++++++++++++++++++++++++
->  drivers/clk/at91/pmc.h              |  2 ++
->  3 files changed, 31 insertions(+)
+> diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
+> index dad4ec9..ada7005 100644
+> --- a/arch/arm64/lib/delay.c
+> +++ b/arch/arm64/lib/delay.c
+> @@ -24,10 +24,28 @@
+>  #include <linux/module.h>
+>  #include <linux/timex.h>
 > 
-> diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-> index 85a449cf61e3..0e6aab1252fc 100644
-> --- a/drivers/clk/at91/clk-programmable.c
-> +++ b/drivers/clk/at91/clk-programmable.c
-> @@ -204,6 +204,8 @@ at91_clk_register_programmable(struct regmap *regmap,
->  	if (ret) {
->  		kfree(prog);
->  		hw = ERR_PTR(ret);
-
-Nit: "else" not needed.
-
-> +	} else {
-> +		pmc_register_pck(id);
->  	}
->  
->  	return hw;
-> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-> index 07dc2861ad3f..3910b7537152 100644
-> --- a/drivers/clk/at91/pmc.c
-> +++ b/drivers/clk/at91/pmc.c
-> @@ -22,6 +22,7 @@
->  #include "pmc.h"
->  
->  #define PMC_MAX_IDS 128
-> +#define PMC_MAX_PCKS 8
->  
->  int of_at91_get_clk_range(struct device_node *np, const char *propname,
->  			  struct clk_range *range)
-> @@ -50,6 +51,7 @@ EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
->  static struct regmap *pmcreg;
->  
->  static u8 registered_ids[PMC_MAX_IDS];
-> +static u8 registered_pcks[PMC_MAX_PCKS];
->  
->  static struct
->  {
-> @@ -66,8 +68,10 @@ static struct
->  	u32 pcr[PMC_MAX_IDS];
->  	u32 audio_pll0;
->  	u32 audio_pll1;
-> +	u32 pckr[PMC_MAX_PCKS];
->  } pmc_cache;
->  
-> +/* Clock ID 0 is invalid */
-
-(read: so we can use the 0 value as an indicator that this place in the
-table hasn't been filled, so unused)
-
->  void pmc_register_id(u8 id)
->  {
->  	int i;
-> @@ -82,6 +86,21 @@ void pmc_register_id(u8 id)
->  	}
->  }
->  
-> +/* Programmable Clock 0 is valid */
-
-I understand the rationale behind these ^^ two comments, but I would
-like that it's more explicit. Saying that you will store the pck id as
-(id + 1) and that you would have to invert this operation while using
-the stored id.
-Maybe add a comment about this transformation to the struct definition
-as well...
-
-
-> +void pmc_register_pck(u8 pck)
-> +{
-> +	int i;
+> +#include <clocksource/arm_arch_timer.h>
 > +
-> +	for (i = 0; i < PMC_MAX_PCKS; i++) {
-> +		if (registered_pcks[i] == 0) {
-> +			registered_pcks[i] = pck + 1;
-> +			break;
-> +		}
-> +		if (registered_pcks[i] == (pck + 1))
-> +			break;
-> +	}
+> +#define USECS_TO_CYCLES(TIME_USECS)			\
+> +	(xloops_to_cycles(usecs_to_xloops(TIME_USECS)))
+> +
+> +static inline unsigned long xloops_to_cycles(unsigned long xloops)
+> +{
+> +	return (xloops * loops_per_jiffy * HZ) >> 32;
 > +}
 > +
->  static int pmc_suspend(void)
+>  void __delay(unsigned long cycles)
 >  {
->  	int i;
-> @@ -103,6 +122,10 @@ static int pmc_suspend(void)
->  		regmap_read(pmcreg, AT91_PMC_PCR,
->  			    &pmc_cache.pcr[registered_ids[i]]);
->  	}
-> +	for (i = 0; registered_pcks[i]; i++) {
-> +		u8 num = registered_pcks[i] - 1;
-
-Nit: declaration are better made at the beginning of the function. This
-lead to a checkpatch warning:
-"WARNING: Missing a blank line after declarations"
-
-> +		regmap_read(pmcreg, AT91_PMC_PCKR(num), &pmc_cache.pckr[num]);
-> +	}
->  
->  	return 0;
->  }
-> @@ -143,6 +166,10 @@ static void pmc_resume(void)
->  			     pmc_cache.pcr[registered_ids[i]] |
->  			     AT91_PMC_PCR_CMD);
->  	}
-> +	for (i = 0; registered_pcks[i]; i++) {
-> +		u8 num = registered_pcks[i] - 1;
-
-Ditto
-
-> +		regmap_write(pmcreg, AT91_PMC_PCKR(num), pmc_cache.pckr[num]);
-> +	}
->  
->  	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
->  		mask |= AT91_PMC_LOCKU;
-> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-> index 858e8ef7e8db..d22b1fa9ecdc 100644
-> --- a/drivers/clk/at91/pmc.h
-> +++ b/drivers/clk/at91/pmc.h
-> @@ -31,8 +31,10 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
->  
->  #ifdef CONFIG_PM
->  void pmc_register_id(u8 id);
-> +void pmc_register_pck(u8 pck);
->  #else
->  static inline void pmc_register_id(u8 id) {}
-> +static inline void pmc_register_pck(u8 pck) {}
->  #endif
->  
->  #endif /* __PMC_H_ */
+>  	cycles_t start = get_cycles();
 > 
+> +	if (arch_timer_evtstrm_available()) {
+> +		const cycles_t timer_evt_period =
+> +			USECS_TO_CYCLES(1000000 / ARCH_TIMER_EVT_STREAM_FREQ);
 
+Given that ARCH_TIMER_EVT_STREAM_FREQ is defined as:
 
--- 
-Nicolas Ferre
+	#define ARCH_TIMER_EVT_STREAM_FREQ      10000   /* 100us */
+
+perhaps it would actually be better to define all of this in terms of
+a 100us period.
+
+> +
+> +		while (get_cycles() - start + timer_evt_period < cycles)
+
+Please add some brackets here for clarify.
+
+> +			wfe();
+> +	}
+> +
+>  	while ((get_cycles() - start) < cycles)
+>  		cpu_relax();
+>  }
+> @@ -35,16 +53,13 @@ void __delay(unsigned long cycles)
+> 
+>  inline void __const_udelay(unsigned long xloops)
+>  {
+> -	unsigned long loops;
+> -
+> -	loops = xloops * loops_per_jiffy * HZ;
+> -	__delay(loops >> 32);
+> +	__delay(xloops_to_cycles(xloops));
+>  }
+>  EXPORT_SYMBOL(__const_udelay);
+> 
+>  void __udelay(unsigned long usecs)
+>  {
+> -	__const_udelay(usecs * 0x10C7UL); /* 2**32 / 1000000 (rounded up) */
+> +	__const_udelay(usecs_to_xloops(usecs));
+>  }
+>  EXPORT_SYMBOL(__udelay);
+> 
+> diff --git a/include/asm-generic/delay.h b/include/asm-generic/delay.h
+> index 0f79054..1538e58 100644
+> --- a/include/asm-generic/delay.h
+> +++ b/include/asm-generic/delay.h
+> @@ -10,19 +10,24 @@
+>  extern void __const_udelay(unsigned long xloops);
+>  extern void __delay(unsigned long loops);
+> 
+> +/* 0x10c7 is 2**32 / 1000000 (rounded up) */
+> +static inline unsigned long usecs_to_xloops(unsigned long usecs)
+> +{
+> +	return usecs * 0x10C7UL;
+> +}
+
+I'm not sure it's worth factoring this out tbh. It's not got lots of use,
+and you haven't done one for nsecs so I'd be inclined to leave the generic
+code as-is.
+
+Will
