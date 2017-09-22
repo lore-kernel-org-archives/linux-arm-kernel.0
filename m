@@ -1,76 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Sep 2017 14:36:01 -0700
-Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
-In-Reply-To: <CAK8P3a17y1zfhOPShjpbt+wf5B=ZyTb1jL1WiBHCz_rU4pNnnQ@mail.gmail.com>
-References: <20170920151802.7609-1-romain.izard.pro@gmail.com>
- <CAKv+Gu_ZMy-A-Du3ikVe47pcUR7hSBFHY+hQQ8APGGP1iRcigA@mail.gmail.com>
- <CAK8P3a17y1zfhOPShjpbt+wf5B=ZyTb1jL1WiBHCz_rU4pNnnQ@mail.gmail.com>
-Message-ID: <CAKv+Gu-KAou7y-xTc7aaKU6WFstchKitSPJsKD_dXJ=_BbWb8w@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 23 Sep 2017 00:36:25 +0300
+Subject: [PATCH] arm64: defconfig: enable R8A77970 SoC
+Message-ID: <20170922213634.084486879@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2017 at 13:35, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, Sep 20, 2017 at 5:26 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 20 September 2017 at 08:18, Romain Izard <romain.izard.pro@gmail.com> wrote:
->>> Add an arch-specific header to ARM, to retain other optimizations that
->>> rely on HAVE_EFFICIENT_UNALIGNED_ACCESS, while making sure that access
->>> that explicitly rely on the unaligned accessors are correctly handled by
->>> the compiler.
->>>
->>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
->>> ---
->>>
->>
->> If access_ok.h has been observed to produce different output from the
->> struct versions (using any compiler), I guess we cannot simply change
->> the asm-generic default and expect everybody to be ok with that. So I
->> agree this is the most appropriate course of action.
->
-> But is that actually the case? I think patching ARM like this is
-> correct, but perhaps we can simply remove the access_ok.h
-> version entirely and just use the struct version everywhere.
->
-> Unfortunately it's been almost 10 years since the various
-> implementations got introduced, so it's hard to find out all
-> the concerns that went into it then.
->
-> Commit 064106a91be5 ("kernel: add common
-> infrastructure for unaligned access") lists
->
->     Currently there are five implementations:
->     1) packed_struct.h: C-struct based, from asm-generic/unaligned.h
->     2) le_byteshift.h: Open coded byte-swapping, heavily based on asm-arm
->     3) be_byteshift.h: Open coded byte-swapping, heavily based on asm-arm
->     4) memmove.h: taken from multiple implementations in tree
->     5) access_ok.h: taken from x86 and others, unaligned access is ok.
->
-> The only architectectures that use memmove.h are m32r (always has,
-> probably not intentionally) and openrisc. That one says that GCC on
-> OR32 "optimizes too aggressively" for struct.h, which is a bit scary
-> but wouldn't change anything here since they don't use the asm-generic
-> file.
->
-> The architectures that do use include/asm-generic/unaligned.h and
-> also set HAVE_EFFICIENT_UNALIGNED_ACCESS in some configurations
-> are arm, arm64, metag, s390 and arc.
->
-> This is a rather short list, and three of them (arm64, metag and arc) only
-> support very recent compilers, so we can probably just ask the respective
-> arch maintainers to ack the patch that changes the asm-generic file
-> for everyone.
->
+Enable the Renesas R-Car V3M (R8A77970) SoC in the ARM64 defconfig.
 
-If we can limit the fallout like that, I agree that we should simply
-make the struct flavor the default. It elegantly informs the compiler
-about the size of the access and the potential misalignment, so it
-should allow compilers for any architecture to select the most
-appropriate instruction.
+Suggested-by: Simon Horman <horms@verge.net.au>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-But doesn't that mean that any code that currently relies on
-HAVE_EFFICIENT_UNALIGNED_ACCESS should be using get_unaligned instead?
-I haven't reviewed the actual use cases (other than the ones I added
-myself to the crypto subsystem), but it seems to me that it is
-generally unsafe to do any unaligned accesses directly on ARM, given
-that the compiler may merge adjacent LDRs into LDMs or LDRDs (and
-likewise for stores)
+---
+The patch is against the ARM64 repo's 'for-next/core' branch plus the patch
+enabling R8A77995 SoC (https://patchwork.kernel.org/patch/9905747/).
+
+ arch/arm64/configs/defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+Index: linux/arch/arm64/configs/defconfig
+===================================================================
+--- linux.orig/arch/arm64/configs/defconfig
++++ linux/arch/arm64/configs/defconfig
+@@ -50,6 +50,7 @@ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_RENESAS=y
+ CONFIG_ARCH_R8A7795=y
+ CONFIG_ARCH_R8A7796=y
++CONFIG_ARCH_R8A77970=y
+ CONFIG_ARCH_R8A77995=y
+ CONFIG_ARCH_STRATIX10=y
+ CONFIG_ARCH_TEGRA=y
