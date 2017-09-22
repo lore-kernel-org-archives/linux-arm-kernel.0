@@ -1,7 +1,7 @@
 From: allen.lkml@gmail.com (Allen Pais)
-Date: Fri, 22 Sep 2017 17:09:02 +0530
-Subject: [PATCH] arm: mach-iop32x: use setup_timer() helper.
-Message-ID: <1506080342-5914-1-git-send-email-allen.lkml@gmail.com>
+Date: Fri, 22 Sep 2017 17:10:57 +0530
+Subject: [PATCH] arm: mach-footbridge: use setup_timer() helper.
+Message-ID: <1506080457-6019-1-git-send-email-allen.lkml@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,22 +10,28 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Allen Pais <allen.lkml@gmail.com>
 ---
- arch/arm/mach-iop32x/n2100.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-footbridge/dc21285.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
-index c1cd80e..4a64a11 100644
---- a/arch/arm/mach-iop32x/n2100.c
-+++ b/arch/arm/mach-iop32x/n2100.c
-@@ -336,8 +336,7 @@ static int __init n2100_request_gpios(void)
- 			pr_err("could not set power GPIO as input\n");
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index 96a3d73..f8d011b 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -323,13 +323,8 @@ void __init dc21285_preinit(void)
+ 		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
  	}
- 	/* Set up power button poll timer */
--	init_timer(&power_button_poll_timer);
--	power_button_poll_timer.function = power_button_poll;
-+	setup_timer(&power_button_poll_timer, power_button_poll, 0UL);
- 	power_button_poll_timer.expires = jiffies + (HZ / 10);
- 	add_timer(&power_button_poll_timer);
- 	return 0;
+ 
+-	init_timer(&serr_timer);
+-	init_timer(&perr_timer);
+-
+-	serr_timer.data = IRQ_PCI_SERR;
+-	serr_timer.function = dc21285_enable_error;
+-	perr_timer.data = IRQ_PCI_PERR;
+-	perr_timer.function = dc21285_enable_error;
++	setup_timer(&serr_timer, dc21285_enable_error, IRQ_PCI_SERR);
++	setup_timer(&perr_timer, dc21285_enable_error, IRQ_PCI_PERR);
+ 
+ 	/*
+ 	 * We don't care if these fail.
 -- 
 2.7.4
