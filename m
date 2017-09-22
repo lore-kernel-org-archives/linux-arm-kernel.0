@@ -1,58 +1,220 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Fri, 22 Sep 2017 09:31:34 +0800
-Subject: [PATCH 2/3] arm64: dts: mt2712: add pintcrl device node.
-In-Reply-To: <CACRpkdaX0n7BZVkXYFEh_XSN3P7huvhE6j5My=p=2Lh45oFZaQ@mail.gmail.com>
-References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
- <1501489333-23145-3-git-send-email-zhiyong.tao@mediatek.com>
- <2f883a8a-5402-5625-bada-bcfed53c098e@gmail.com>
- <CACRpkdZHyXec+L8ueRHOs=9TLT1Arqe3KeQpRZ6D0K1Ag1c+Zw@mail.gmail.com>
- <1505981592.22452.7.camel@mhfsdcap03>
- <CACRpkdaX0n7BZVkXYFEh_XSN3P7huvhE6j5My=p=2Lh45oFZaQ@mail.gmail.com>
-Message-ID: <1506043894.22452.19.camel@mhfsdcap03>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Fri, 22 Sep 2017 10:59:58 +0800
+Subject: [PATCH 1/3] dt-bindings: Add document for rockchip RGB output
+ interface
+In-Reply-To: <CAL_JsqK7kR5QuBCCgGkOTfw041_k4qsUsNdm0cft=C3UWTfxoQ@mail.gmail.com>
+References: <1505360594-196508-1-git-send-email-hjc@rock-chips.com>
+ <1505360600-196567-1-git-send-email-hjc@rock-chips.com>
+ <20170919144621.eledmglqgn7nf7zp@rob-hp-laptop>
+ <d631ff56-e3e6-688f-d9b6-a7101ce047d5@rock-chips.com>
+ <6cd1ac0d-bc99-f8f3-15da-799f8623ce65@rock-chips.com>
+ <CAL_JsqK7kR5QuBCCgGkOTfw041_k4qsUsNdm0cft=C3UWTfxoQ@mail.gmail.com>
+Message-ID: <e70e572d-5b44-43dd-3b66-0cd6e71cbedc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-09-21 at 14:17 +0200, Linus Walleij wrote:
-> On Thu, Sep 21, 2017 at 10:13 AM, Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
-> > On Tue, 2017-08-22 at 15:04 +0200, Linus Walleij wrote:
-> >> On Mon, Aug 14, 2017 at 5:23 PM, Matthias Brugger
-> >> <matthias.bgg@gmail.com> wrote:
-> >> > On 07/31/2017 10:22 AM, Zhiyong Tao wrote:
-> >> >>
-> >> >> The commit includes two change:
-> >> >> 1)add pintcrl device node for mt2712.
-> >> >> 2)add pinfunc file for mt2712.
-> >> >>
-> >> >> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> >> >> ---
-> >> >>   arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1014
-> >> >> +++++++++++++++++++++++++
-> >> >
-> >> >
-> >> > Shouldn't this file be in include/dt-bindings/pinctrl?
-> >>
-> >> Only if it is also #included in the driver.
-> >>
-> >> Yours,
-> >> Linus Walleij
-> >
-> > ==>
-> > Thanks for your comment.
-> > We see our some ICs(mt7623) which move the file to
-> > "include/dt-bindings/pinctrl". other ICs(mt2701) which is put in
-> > "arch/arm64/boot/dts/mediatek".
-> > In mt2712, mt2712-pinfunc.h is only include by dts file. It won't be
-> > included by driver. So which is better? "arch/arm64/boot/dts/mediatek/"
-> > or "include/dt-bindings/pinctrl".
-> 
-> If it is used in both arm and arm64 it is helpful to have it in
-> include/dt-bindings so it can be shared between the two
-> archs.
-> 
-> If it is just (ever) for arm64 it can stay inside the arch tree.
-> 
-> Yours,
-> Linus Walleij
+Hi rob,
 
-==> Thanks for your comment. mt2712-pinfunc.h is only used in arm64. so
-it can stay inside the arch tree.
+? 2017/9/22 3:40, Rob Herring ??:
+> On Tue, Sep 19, 2017 at 9:57 PM, Sandy Huang <hjc@rock-chips.com> wrote:
+>>
+>>
+>> ? 2017/9/20 9:51, Sandy Huang ??:
+>>>
+>>> Hi rob,
+>>>       thanks for you review.
+>>>
+>>> ? 2017/9/19 22:46, Rob Herring ??:
+>>>>
+>>>> On Thu, Sep 14, 2017 at 11:43:18AM +0800, Sandy Huang wrote:
+>>>>>
+>>>>> This path add support rv1108 rgb output interface driver.
+>>>>>
+>>>>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+>>>>> ---
+>>>>>    .../bindings/display/rockchip/rockchip-rgb.txt     | 80
+>>>>> ++++++++++++++++++++++
+>>>>>    1 file changed, 80 insertions(+)
+>>>>>    create mode 100644
+>>>>> Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>>>>>
+>>>>> diff --git
+>>>>> a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>>>>> b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..4164512
+>>>>> --- /dev/null
+>>>>> +++
+>>>>> b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>>>>> @@ -0,0 +1,80 @@
+>>>>> +Rockchip RV1108 RGB interface
+>>>>> +================================
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible: matching the soc type:
+>>>>> +    - "rockchip,rv1108-rgb";
+>>>>> +
+>>>>> +Optional properties:
+>>>>> +- pinctrl-names: must contain a "lcdc" entry.
+>>>>> +- pinctrl-0: pin control group to be used for this interface.
+>>>>> +
+>>>>> +Required nodes:
+>>>>> +- rockchip,rgb-mode: should be "p888", "p666", "p565", "s888",
+>>>>> "s888-dummy"
+>>>>
+>>>>
+>>>> This should be a standard property. Any device with a parallel interface
+>>>> is going to need something like this.
+>>>>
+>>> so, i need to move this property to panel? or just rename
+>>> rockchip,rgb-mode to rgb-mode?
+>>>
+>>>>> +    - p888: output r8-g8-b8 at each dclk cycle for per-pixel
+>>>>> +    - p666: output r6-g6-b6 at each dclk cycle for per-pixel
+>>>>> +    - p565: output r5-g6-b5 at each dclk cycle for per-pixel
+>>>>> +    - s888: output r8-g8-b8 in three dclk cycle for per-pixel
+>>>>> +    - s888-dmmy: output r8-g8-b8-dummy in four dclk cycle for per-pixel
+>>>>> +
+>>>>> +The rgb has two video ports described by:
+>>>>> +    Documentation/devicetree/bindings/media/video-interfaces.txt
+>>>>> +Their connections are modeled using the OF graph bindings specified in
+>>>>> +    Documentation/devicetree/bindings/graph.txt.
+>>>>> +
+>>>>> +- video port 0 for the VOP input, the remote endpoint maybe
+>>>>> vopb/vopl/vop
+>>>>> +- video port 1 for either a panel or subsequent encoder
+>>>>> +
+>>>>> +the panel described by:
+>>>>> +    Documentation/devicetree/bindings/display/panel/simple-panel.txt
+>>>>> +Panel other required properties:
+>>>>> +- ports for remote rgb output.
+>>>>> +
+>>>>> +Example:
+>>>>> +
+>>>>> +panel: panel {
+>>>>> +    compatible = "auo,b101ean01";
+>>>>> +    enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
+>>>>> +
+>>>>> +    ports {
+>>>>> +        panel_in_rgb: endpoint {
+>>>>> +            remote-endpoint = <&rgb_out_panel>;
+>>>>> +        };
+>>>>> +    };
+>>>>> +};
+>>>>> +
+>>>>> +For Rockchip RV1108:
+>>>>> +
+>>>>> +    rgb: rgb {
+>>>>> +        compatible = "rockchip,rv1108-rgb";
+>>>>> +        pinctrl-names = "lcdc";
+>>>>> +        pinctrl-0 = <&lcdc_ctl>;
+>>>>> +        rockchip,rgb-mode = "p888";
+>>>>> +
+>>>>> +        ports {
+>>>>> +            #address-cells = <1>;
+>>>>> +            #size-cells = <0>;
+>>>>> +
+>>>>> +            rgb_in: port at 0 {
+>>>>> +                reg = <0>;
+>>>>> +                #address-cells = <1>;
+>>>>> +                #size-cells = <0>;
+>>>>> +
+>>>>> +                rgb_in_vop: endpoint at 0 {
+>>>>> +                    reg = <0>;
+>>>>
+>>>>
+>>>> Don't need reg for a single endpoint.
+>>>>
+>>> ok, this will be deleted at next version.
+>>>>>
+>>>>> +                    remote-endpoint = <&vop_out_rgb>;
+>>>>> +                };
+>>>>> +            };
+>>>>> +
+>>>>> +            rgb_out: port at 1 {
+>>>>> +                reg = <1>;
+>>>>> +                #address-cells = <1>;
+>>>>> +                #size-cells = <0>;
+>>>>> +
+>>>>> +                rgb_out_panel: endpoint at 0 {
+>>>>> +                    reg = <0>;
+>>>>
+>>>>
+>>>> ditto.
+>>>>
+>>> ok, this will be deleted at next version.
+>>
+>> sorry,this can't be deleted, because rgb output remote endpoint maybe panel
+>> or convert chip, the dts node maybe like this:
+>>
+>> panel: panel {
+>>          status = "disabled";
+>>          ports {
+>>                  panel_in_rgb: endpoint {
+>>                          remote-endpoint =  <&rgb_out_panel>;
+>>                  };
+>>          };
+>> };
+>>
+>> bridge: bridge {
+>>          status = "okay";
+>>          ports {
+>>                  bridge_in_rgb: endpoint {
+>>                          remote-endpoint =  <&rgb_out_bridge>;
+>>                  };
+>>          };
+>> };
+>>
+>> rgb_out: port at 1 {
+>>          reg = <1>;
+>>          #address-cells = <1>;
+>>          #size-cells = <0>;
+>>          rgb_out_panel: endpoint at 0 {
+>>                   reg = <0>;
+>>                  remote-endpoint = <&panel_in_rgb>;
+>>          };
+>>          rgb_out_bridge: endpoint at 1 {
+>>                   reg = <1>;
+>>                  remote-endpoint = <&bridge_in_rgb>;
+>>          };
+>>   };
+>>
+>> so rockchip_rgb_bind() @ rockchip_rgb.c use reg id to find the remote
+>> actived endpoint.
+>>
+>> for_each_child_of_node(port, endpoint) {
+>>          of_property_read_u32(endpoint, "reg", &endpoint_id);
+> 
+> Lack of reg property here should imply 0 for endpoint_id.
+> 
+ok, i will delete this reg id and set the endpoint_id default value to 0 
+when lack of reg property at next version, thanks.
+>>          ret = drm_of_find_panel_or_bridge(dev->of_node, 1, endpoint_id,
+>> &rgb->panel, &rgb->bridge);
+>>          if (!ret)
+>>                  break;
+>> }
+>>
+>>>>> +                    remote-endpoint = <&panel_in_rgb>;
+>>>>> +                };
+>>>>> +            };
+>>>>> +        };
+>>>>> +    };
+>>>>> --
+>>>>> 2.7.4
+>>>>>
+>>>>>
+>>>>
+>>>>
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> Linux-rockchip mailing list
+>>> Linux-rockchip at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>>
+>>
+> 
+> 
+> 
