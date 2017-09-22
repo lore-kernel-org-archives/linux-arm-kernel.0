@@ -1,44 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Sep 2017 15:12:40 +0100
-Subject: [PATCH] drivers/perf: arm_pmu_acpi: Release memory obtained by
- kasprintf
-In-Reply-To: <20170922105405.GD23365@arm.com>
-References: <f3b19a8ba9ca69fe84b0d980b6337a33a1da907d.1505884534.git.arvind.yadav.cs@gmail.com>
- <20170922105405.GD23365@arm.com>
-Message-ID: <20170922141240.n7spqo6rxzfzb42d@armageddon.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Sep 2017 16:21:32 +0200
+Subject: [PATCH v2] ARM: dts: iwg22d: Enable SDHI0 controller
+In-Reply-To: <1506085262-13639-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <TY1PR06MB0702E99A48352C055705E3A9B7670@TY1PR06MB0702.apcprd06.prod.outlook.com>
+ <1506085262-13639-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdVx0yaL8CnqKBiCPN1e4upEuw9JZ2yEs8SP5dALRFaemA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 11:54:06AM +0100, Will Deacon wrote:
-> On Wed, Sep 20, 2017 at 12:26:38PM +0530, Arvind Yadav wrote:
-> > Free memory region, if arm_pmu_acpi_probe is not successful.
-> > 
-> > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> > ---
-> >  drivers/perf/arm_pmu_acpi.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-> > index 0a9b787..3303dd8 100644
-> > --- a/drivers/perf/arm_pmu_acpi.c
-> > +++ b/drivers/perf/arm_pmu_acpi.c
-> > @@ -235,6 +235,7 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
-> >  		ret = armpmu_register(pmu);
-> >  		if (ret) {
-> >  			pr_warn("Failed to register PMU for CPU%d\n", cpu);
-> > +			kfree(pmu->name);
-> >  			return ret;
-> >  		}
-> >  	}
-> 
-> It's a bit weird that we bail out of the loop on the first failing CPU, but
-> you've not changed that behaviour so your patch looks fine in isolation:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Catalin: can you pick this up as a fix, please?
+On Fri, Sep 22, 2017 at 3:01 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> Enable the SDHI0 controller on iWave RZ/G1E carrier board.
+>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-Applied. Thanks.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
--- 
-Catalin
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
