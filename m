@@ -1,50 +1,62 @@
-From: ji.zhang@mediatek.com (Ji Zhang)
-Date: Fri, 22 Sep 2017 11:15:19 +0800
-Subject: [PATCH] arm: fix text section corruption
-Message-ID: <1506050119-2670-1-git-send-email-ji.zhang@mediatek.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 22 Sep 2017 11:59:47 +0800
+Subject: [PATCH 2/5] nvmem: mtk-efuse: use stack for nvmem_config
+ instead of malloc'ing it
+In-Reply-To: <CAK7LNARoZnVduzkWqyTYq4iMEAi0A88cpGWrD0Zc=wt=Xa+1QA@mail.gmail.com>
+References: <1505134864-11975-1-git-send-email-yamada.masahiro@socionext.com>
+ <1505134864-11975-3-git-send-email-yamada.masahiro@socionext.com>
+ <1505925159.17049.12.camel@mtkswgap22>
+ <CAK7LNARoZnVduzkWqyTYq4iMEAi0A88cpGWrD0Zc=wt=Xa+1QA@mail.gmail.com>
+Message-ID: <1506052787.21515.10.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_CPU_SW_DOMAIN_PAN is enabled, there are 9 registers being
-pushed into stack in save_regs, but in fixup it still consider there are
-8 registers in stack, which is the case of CONFIG_CPU_SW_DOMAIN_PAN
-disabled.
-When fixup being executed, -EFAULT will be written to the text section.
+Hi, Masahiro
 
-In fixup:
-mov	r4, #-EFAULT
-/*
- * When CONFIG_CPU_SW_DOMAIN_PAN enabled, r5 will load the value stored by
- * lr in save_regs, which is the address of instruction in text section.
- */
-ldr	r5, [sp,#8*4]	@err_ptr
-/*
- * This will write -EFAULT(0xfffffff2) to r5, which points to text section
- * now, and when function returns, it will use 0xfffffff2 as an
- * instruction, then undefined instruction occurs.
- */
-str	r4, [r5]
+On Thu, 2017-09-21 at 11:09 +0900, Masahiro Yamada wrote:
+> Hi Sean,
+> 
+> 
+> 2017-09-21 1:32 GMT+09:00 Sean Wang <sean.wang@mediatek.com>:
+> > Hi, Masahiro
+> >
+> > For maintainability, I felt it's better if we use the same way to
+> > register nvmem as that most drivers does under nvmem usually using
+> > static structure. Otherwise, they should also be changed to use the
+> > one-time data in stack to avoid extra bytes to keep them.
+> >
+> >         Sean
+> 
+> 
+> Srinivas and I discussed the best practice for allocating nvmem_config.
+> https://lkml.org/lkml/2017/9/11/4
+> 
+> From the discussion, static structure is possible only when
+> the system has one instance of the device.
+> 
 
-Signed-off-by: Ji Zhang <ji.zhang@mediatek.com>
----
- arch/arm/lib/csumpartialcopyuser.S | 4 ++++
- 1 file changed, 4 insertions(+)
+thank you for your detailed explanation
 
-diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
-index 1712f13..b83fdc0 100644
---- a/arch/arm/lib/csumpartialcopyuser.S
-+++ b/arch/arm/lib/csumpartialcopyuser.S
-@@ -85,7 +85,11 @@
- 		.pushsection .text.fixup,"ax"
- 		.align	4
- 9001:		mov	r4, #-EFAULT
-+#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-+		ldr	r5, [sp, #9*4]		@ *err_ptr
-+#else
- 		ldr	r5, [sp, #8*4]		@ *err_ptr
-+#endif
- 		str	r4, [r5]
- 		ldmia	sp, {r1, r2}		@ retrieve dst, len
- 		add	r2, r2, r1
--- 
-1.9.1
+> If you know this is the case for mediatek,
+> yes, you can turn it into static,
+> but it is not always possible.
+> For example, Socionext SoCs have
+> two banks of efuse devices.
+> 
+
+there should be only one instance of nvmem for mediatek soc, currently
+
+
+> So, if we want to align the coding style for consistency,
+> nvmem in stack is safe and efficient, I think.
+> 
+> 
+> Moving one-time data into stack slightly
+> reduces the kernel image size.
+> 
+> 
+
+agreed on those statements, indeed bigger struct uart_8250_port is still
+used on stack for configuring in a lot 8250 driver, so 
+
+Acked-by: Sean Wang <sean.wang@mediatek.com>
