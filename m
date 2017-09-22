@@ -1,114 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Sep 2017 11:41:02 +0100
-Subject: [PATCH v2 2/2] arm64: use WFE for long delays
-In-Reply-To: <1502959160-30900-3-git-send-email-julien.thierry@arm.com>
-References: <1502959160-30900-1-git-send-email-julien.thierry@arm.com>
- <1502959160-30900-3-git-send-email-julien.thierry@arm.com>
-Message-ID: <20170922104102.GB23365@arm.com>
+Date: Fri, 22 Sep 2017 11:54:06 +0100
+Subject: [PATCH] drivers/perf: arm_pmu_acpi: Release memory obtained by
+ kasprintf
+In-Reply-To: <f3b19a8ba9ca69fe84b0d980b6337a33a1da907d.1505884534.git.arvind.yadav.cs@gmail.com>
+References: <f3b19a8ba9ca69fe84b0d980b6337a33a1da907d.1505884534.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170922105405.GD23365@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 09:39:20AM +0100, Julien Thierry wrote:
-> The current delay implementation uses the yield instruction, which is a hint
-> that it is beneficial to schedule another thread. As this is a hint, it may be
-> implemented as a NOP, causing all delays to be busy loops. This is the case for
-> many existing CPUs.
+On Wed, Sep 20, 2017 at 12:26:38PM +0530, Arvind Yadav wrote:
+> Free memory region, if arm_pmu_acpi_probe is not successful.
 > 
-> Taking advantage of the generic timer sending periodic events to all cores, we
-> can use WFE during delays to reduce power consumption. This is beneficial only
-> for delays longer than the period of the timer event stream.
-> 
-> If timer event stream is not enabled, delays will behave as yield/busy loops.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
->  arch/arm64/lib/delay.c      | 25 ++++++++++++++++++++-----
->  include/asm-generic/delay.h |  9 +++++++--
->  2 files changed, 27 insertions(+), 7 deletions(-)
+>  drivers/perf/arm_pmu_acpi.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
-> index dad4ec9..ada7005 100644
-> --- a/arch/arm64/lib/delay.c
-> +++ b/arch/arm64/lib/delay.c
-> @@ -24,10 +24,28 @@
->  #include <linux/module.h>
->  #include <linux/timex.h>
-> 
-> +#include <clocksource/arm_arch_timer.h>
-> +
-> +#define USECS_TO_CYCLES(TIME_USECS)			\
-> +	(xloops_to_cycles(usecs_to_xloops(TIME_USECS)))
-> +
-> +static inline unsigned long xloops_to_cycles(unsigned long xloops)
-> +{
-> +	return (xloops * loops_per_jiffy * HZ) >> 32;
-> +}
-> +
->  void __delay(unsigned long cycles)
->  {
->  	cycles_t start = get_cycles();
-> 
-> +	if (arch_timer_evtstrm_available()) {
-> +		const cycles_t timer_evt_period =
-> +			USECS_TO_CYCLES(1000000 / ARCH_TIMER_EVT_STREAM_FREQ);
+> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> index 0a9b787..3303dd8 100644
+> --- a/drivers/perf/arm_pmu_acpi.c
+> +++ b/drivers/perf/arm_pmu_acpi.c
+> @@ -235,6 +235,7 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
+>  		ret = armpmu_register(pmu);
+>  		if (ret) {
+>  			pr_warn("Failed to register PMU for CPU%d\n", cpu);
+> +			kfree(pmu->name);
+>  			return ret;
+>  		}
+>  	}
 
-Given that ARCH_TIMER_EVT_STREAM_FREQ is defined as:
+It's a bit weird that we bail out of the loop on the first failing CPU, but
+you've not changed that behaviour so your patch looks fine in isolation:
 
-	#define ARCH_TIMER_EVT_STREAM_FREQ      10000   /* 100us */
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-perhaps it would actually be better to define all of this in terms of
-a 100us period.
-
-> +
-> +		while (get_cycles() - start + timer_evt_period < cycles)
-
-Please add some brackets here for clarify.
-
-> +			wfe();
-> +	}
-> +
->  	while ((get_cycles() - start) < cycles)
->  		cpu_relax();
->  }
-> @@ -35,16 +53,13 @@ void __delay(unsigned long cycles)
-> 
->  inline void __const_udelay(unsigned long xloops)
->  {
-> -	unsigned long loops;
-> -
-> -	loops = xloops * loops_per_jiffy * HZ;
-> -	__delay(loops >> 32);
-> +	__delay(xloops_to_cycles(xloops));
->  }
->  EXPORT_SYMBOL(__const_udelay);
-> 
->  void __udelay(unsigned long usecs)
->  {
-> -	__const_udelay(usecs * 0x10C7UL); /* 2**32 / 1000000 (rounded up) */
-> +	__const_udelay(usecs_to_xloops(usecs));
->  }
->  EXPORT_SYMBOL(__udelay);
-> 
-> diff --git a/include/asm-generic/delay.h b/include/asm-generic/delay.h
-> index 0f79054..1538e58 100644
-> --- a/include/asm-generic/delay.h
-> +++ b/include/asm-generic/delay.h
-> @@ -10,19 +10,24 @@
->  extern void __const_udelay(unsigned long xloops);
->  extern void __delay(unsigned long loops);
-> 
-> +/* 0x10c7 is 2**32 / 1000000 (rounded up) */
-> +static inline unsigned long usecs_to_xloops(unsigned long usecs)
-> +{
-> +	return usecs * 0x10C7UL;
-> +}
-
-I'm not sure it's worth factoring this out tbh. It's not got lots of use,
-and you haven't done one for nsecs so I'd be inclined to leave the generic
-code as-is.
+Catalin: can you pick this up as a fix, please?
 
 Will
