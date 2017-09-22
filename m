@@ -1,54 +1,40 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 22 Sep 2017 09:31:28 +0200
-Subject: [RESEND PATCH v5 0/4] Add STM32 DMAMUX support
-Message-ID: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Fri, 22 Sep 2017 09:31:32 +0200
+Subject: [RESEND PATCH v5 4/4] ARM: configs: stm32: Add DMAMUX support in
+ STM32 defconfig
+In-Reply-To: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the STM32 DMA multiplexer.
-It allows to map any peripheral DMA request to any channel of the product
-DMAs.
-This IP has been introduced with STM32H7 SoC.
+This patch adds DMAMUX support in STM32 defconfig file
 
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
  Version history:
     v5:
-        * Set selected channel ID within a lock to avoid race condition.
-          Release if any error occurs
     v4:
-        * Add multi-master ability for STM32 DMAMUX
-        * Get rid of st,dmamux property and custom API between STM32
-          DMAMUX and DMA. Bindings has changed.
-          DMAMUX will read DMA masters from Device Tree from now on.
-          Merely one DMAMUX node is needed now.
-        * Only STM32 DMA are allowed to be connected onto DMAMUX
-        * channelID is computed locally within the driver and crafted in
-          dma_psec to be passed toward DMA master.
-          DMAMUX router sorts out which DMA master will serve the
-          request automatically.
-        * This version forbids the use of DMA in standalone and DMAMUX at
-          the same time : all clients need to be connected either on DMA
-          or DMAMUX ; no mix up
     v3:
-        * change compatible to st,stm32h7-dmamux to be mode Soc specific
-        * add verbosity in dma-cells
+    v2:
+        * None
 ---
+---
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Pierre-Yves MORDRET (4):
-  dt-bindings: Document the STM32 DMAMUX bindings
-  dmaengine: Add STM32 DMAMUX driver
-  dt-bindings: stm32-dma: add a property to handle STM32 DMAMUX
-  ARM: configs: stm32: Add DMAMUX support in STM32 defconfig
-
- .../devicetree/bindings/dma/stm32-dma.txt          |   4 +-
- .../devicetree/bindings/dma/stm32-dmamux.txt       |  84 ++++++
- arch/arm/configs/stm32_defconfig                   |   1 +
- drivers/dma/Kconfig                                |   9 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/stm32-dmamux.c                         | 327 +++++++++++++++++++++
- 6 files changed, 425 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
- create mode 100644 drivers/dma/stm32-dmamux.c
-
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 90e5c46..988f395 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_STM32=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
++CONFIG_STM32_DMAMUX=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
 -- 
 2.7.4
