@@ -1,62 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Sep 2017 14:44:51 -0700
-Subject: [RFC 00/11] KVM, EFI, arm64: EFI Runtime Services Sandboxing
-In-Reply-To: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
-Message-ID: <CAKv+Gu-d89kPavCNJmHe3q0t-WUzyZpUn=B30b=Z5a=mqzSGkQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Sep 2017 23:49:56 +0200
+Subject: [PATCH] ARM: unaligned.h: Use an arch-specific version
+In-Reply-To: <CAKv+Gu-KAou7y-xTc7aaKU6WFstchKitSPJsKD_dXJ=_BbWb8w@mail.gmail.com>
+References: <20170920151802.7609-1-romain.izard.pro@gmail.com>
+ <CAKv+Gu_ZMy-A-Du3ikVe47pcUR7hSBFHY+hQQ8APGGP1iRcigA@mail.gmail.com>
+ <CAK8P3a17y1zfhOPShjpbt+wf5B=ZyTb1jL1WiBHCz_rU4pNnnQ@mail.gmail.com>
+ <CAKv+Gu-KAou7y-xTc7aaKU6WFstchKitSPJsKD_dXJ=_BbWb8w@mail.gmail.com>
+Message-ID: <CAK8P3a3MDSDCZq_+Meub6ty8-ZasSOJ09Qjc3h4OArFcB24ScA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2017 at 01:31, Florent Revest <florent.revest@arm.com> wrote:
-> Hi,
->
-> This series implements a mechanism to sandbox EFI Runtime Services on arm64.
-> It can be enabled with CONFIG_EFI_SANDBOX. At boot it spawns an internal KVM
-> virtual machine that is ran everytime an EFI Runtime Service is called. This
-> limits the possible security and stability impact of EFI runtime on the kernel.
->
-> The patch set is split as follow:
->  - Patches 1 and 2: Give more control over HVC handling to KVM
->  - Patches 3 to 6: Introduce the concept of KVM "internal VMs"
->  - Patches 7 to 9: Reorder KVM and EFI initialization on ARM
->  - Patch 10: Introduces the EFI sandboxing VM and wrappers
->  - Patch 11: Workarounds some EFI Runtime Services relying on EL3
->
-> The sandboxing has been tested to work reliably (rtc and efivars) on a
-> SoftIron OverDrive 1000 box and on a ARMv8.3 model with VHE enabled. Normal
-> userspace KVM instance have also been tested to still work correctly.
->
-> Those patches apply cleanly on the Linus' v4.13-rc6 tag and have no other
-> dependencies.
->
-> Florent Revest (11):
->   arm64: Add an SMCCC function IDs header
->   KVM: arm64: Return an Unknown ID on unhandled HVC
->   KVM: Allow VM lifecycle management without userspace
->   KVM, arm, arm64: Offer PAs to IPAs idmapping to internal VMs
->   KVM: Expose VM/VCPU creation functions
->   KVM, arm64: Expose a VCPU initialization function
->   KVM: Allow initialization before the module target
->   KVM, arm, arm64: Initialize KVM's core earlier
->   EFI, arm, arm64: Enable EFI Runtime Services later
->   efi, arm64: Sandbox Runtime Services in a VM
->   KVM, arm64: Don't trap internal VMs SMC calls
->
+On Fri, Sep 22, 2017 at 11:36 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 20 September 2017 at 13:35, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Hello Florent,
+>> The architectures that do use include/asm-generic/unaligned.h and
+>> also set HAVE_EFFICIENT_UNALIGNED_ACCESS in some configurations
+>> are arm, arm64, metag, s390 and arc.
+>>
+>> This is a rather short list, and three of them (arm64, metag and arc) only
+>> support very recent compilers, so we can probably just ask the respective
+>> arch maintainers to ack the patch that changes the asm-generic file
+>> for everyone.
+>>
+>
+> If we can limit the fallout like that, I agree that we should simply
+> make the struct flavor the default. It elegantly informs the compiler
+> about the size of the access and the potential misalignment, so it
+> should allow compilers for any architecture to select the most
+> appropriate instruction.
+>
+> But doesn't that mean that any code that currently relies on
+> HAVE_EFFICIENT_UNALIGNED_ACCESS should be using get_unaligned instead?
+> I haven't reviewed the actual use cases (other than the ones I added
+> myself to the crypto subsystem), but it seems to me that it is
+> generally unsafe to do any unaligned accesses directly on ARM, given
+> that the compiler may merge adjacent LDRs into LDMs or LDRDs (and
+> likewise for stores)
 
-This is really nice work. Thanks for contributing it.
+It's not clear that all that code should be using get_unaligned(),
+but I agree that any code relying on
+HAVE_EFFICIENT_UNALIGNED_ACCESS is potentially inefficient
+on ARM when it causes a trap.
 
->From the EFI side, there are some minor concerns on my part regarding
-the calling convention, and the fact that we can no longer invoke
-runtime services from a kernel running at EL1, but those all seem
-fixable. I will respond to the patches in question in greater detail
-at a later time.
+I think it would be a useful goal to avoid running into the ARM alignment
+trap handler entirely for kernel code, but that sounds like a lot of work.
 
-In the mean time, Christoffer has raised a number for valid concerns,
-and those need to be addressed first before it makes sense to talk
-about EFI specifics. I hope you will find more time to invest in this:
-I would really love to have this feature upstream.
+If we want to do that, we'd need at least these steps:
 
-Regards,
-Ard.
+- review each reference to HAVE_EFFICIENT_UNALIGNED_ACCESS
+  and modify it so that gcc will never use the trapping instructions
+- add a WARN_ON_ONCE() in the trap handler
+- fix any drivers we run into that should be using get_unaligned() but
+  blindly rely on the trap handler instead.
+
+        Arnd
