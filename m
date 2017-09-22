@@ -1,159 +1,28 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 22 Sep 2017 13:53:34 +0100
-Subject: [RFC PATCH v2 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two
- steps mappings
-In-Reply-To: <1505999838-52530-4-git-send-email-guohanjun@huawei.com>
-References: <1505999838-52530-1-git-send-email-guohanjun@huawei.com>
- <1505999838-52530-4-git-send-email-guohanjun@huawei.com>
-Message-ID: <20170922125334.GC3475@red-moon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 22 Sep 2017 15:00:22 +0200
+Subject: [PATCH v2] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
+In-Reply-To: <20170922125012.6715-1-miquel.raynal@free-electrons.com>
+References: <20170922125012.6715-1-miquel.raynal@free-electrons.com>
+Message-ID: <20170922130022.GA31634@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 09:17:17PM +0800, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
+On Fri, Sep 22, 2017 at 02:50:12PM +0200, Miquel Raynal wrote:
+> From: Christine Gharzuzi <chrisg@marvell.com>
 > 
-> IORT revision C introduced SMMUv3 MSI support which adding a
-> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
-> device ID mapping for the output ID (dev ID for ITS) and the
-> link to which ITS.
+> Add the DT node enabling Armada-8040-DB CPS SPI controller driver.
 > 
-> So if a platform supports SMMUv3 MSI for control interrupt,
-> there will be a additional single map entry under SMMU, this
-> will not introduce any difference for devices just use one
-> step map to get its output ID and parent (ITS or SMMU), such
-> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
-> do the special handling for two steps map case such as
-> PCI/NC--->SMMUv3--->ITS.
+> Add the SPI NAND flash device connected on the bus. Fill the MTD
+> partitions layout.
 > 
-> Take a PCI hostbridge for example,
-> 
-> |----------------------|
-> |  Root Complex Node   |
-> |----------------------|
-> |    map entry[x]      |
-> |----------------------|
-> |       id value       |
-> | output_reference     |
-> |---|------------------|
->     |
->     |   |----------------------|
->     |-->|        SMMUv3        |
->         |----------------------|
->         |     SMMU dev ID      |
->         |     mapping index 0  |
->         |----------------------|
->         |      map entry[0]    |
->         |----------------------|
->         |       id value       |
->         | output_reference-----------> ITS 1 (SMMU MSI domain)
->         |----------------------|
->         |      map entry[1]    |
->         |----------------------|
->         |       id value       |
->         | output_reference-----------> ITS 2 (PCI MSI domain)
->         |----------------------|
-> 
-> When the SMMU dev ID mapping index is 0, there is entry[0]
-> to map to a ITS, we need to skip that map entry for PCI
-> or NC (named component), or we may get the wrong ITS parent.
-
-We do skip it because it is a single mapping that it is currently
-not allowed for SMMUv3 components, right ?
-
-Ok, we barf with a printk log message if we encounter such mapping
-but the mapping won't resolve to the SMMUv3 MSI in the current
-kernel.
-
-Anyway, I think patch 3 and patch 4 should be partially squashed,
-more about that in patch 4 comments.
-
-Lorenzo
-
-> For now we have two APIs for ID mapping, iort_node_map_id()
-> and iort_node_map_platform_id(), and iort_node_map_id() is
-> used for optional two steps mapping, so we just need to
-> skip the map entry in iort_node_map_id() for non-SMMUv3
-> devices.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Christine Gharzuzi <chrisg@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 > ---
->  drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 42 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index db71d7f..269959e 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -366,6 +366,34 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->  	return NULL;
->  }
->  
-> +static int iort_get_smmu_v3_id_mapping_index(struct acpi_iort_node *node,
-> +					     u32 *index)
-> +{
-> +	struct acpi_iort_smmu_v3 *smmu;
-> +
-> +	/*
-> +	 * SMMUv3 dev ID mapping index was introdueced in revision 1
-> +	 * table, not avaible in revision 0
-> +	 */
-> +	if (node->revision < 1)
-> +		return -EINVAL;
-> +
-> +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> +	/* if any of the gsi for control interrupts is not 0, ignore the MSI */
-> +	if (smmu->event_gsiv || smmu->pri_gsiv || smmu->gerr_gsiv
-> +	    || smmu->sync_gsiv)
-> +		return -EINVAL;
-> +
-> +	if (smmu->id_mapping_index >= node->mapping_count) {
-> +		pr_err(FW_BUG "[node %p type %d] ID mapping index overflows valid mappings\n",
-> +		       node, node->type);
-> +		return -EINVAL;
-> +	}
-> +
-> +	*index = smmu->id_mapping_index;
-> +	return 0;
-> +}
-> +
->  static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->  					       u32 id_in, u32 *id_out,
->  					       u8 type_mask)
-> @@ -375,7 +403,9 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->  	/* Parse the ID mapping tree to find specified node type */
->  	while (node) {
->  		struct acpi_iort_id_mapping *map;
-> -		int i;
-> +		int i, ret = -EINVAL;
-> +		/* big enough for an invalid id index in practical */
-> +		u32 index = U32_MAX;
->  
->  		if (IORT_TYPE_MASK(node->type) & type_mask) {
->  			if (id_out)
-> @@ -396,8 +426,19 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->  			goto fail_map;
->  		}
->  
-> +		/*
-> +		 *  we need to get SMMUv3 dev ID mapping index and skip its
-> +		 *  associated ID map for single mapping cases.
-> +		 */
-> +		if (node->type == ACPI_IORT_NODE_SMMU_V3)
-> +			ret = iort_get_smmu_v3_id_mapping_index(node, &index);
-> +
->  		/* Do the ID translation */
->  		for (i = 0; i < node->mapping_count; i++, map++) {
-> +			/* if it's a SMMUv3 device id mapping index, skip it */
-> +			if (!ret && i == index)
-> +				continue;
-> +
->  			if (!iort_id_map(map, node->type, id, &id))
->  				break;
->  		}
-> -- 
-> 1.7.12.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Hi Miquel
+
+Please put under the --- what you changed between v1 and v2. It helps
+make the reviewing easier.
+
+     Thanks
+	Andrew
