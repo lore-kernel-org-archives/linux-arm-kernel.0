@@ -1,36 +1,60 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 22 Sep 2017 10:03:59 +0300
-Subject: [PATCH] dmaengine: ti-dma-crossbar: Fix possible race condition
- with dma_inuse
-In-Reply-To: <20170921173013.GL30097@localhost>
-References: <20170921113532.15297-1-peter.ujfalusi@ti.com>
- <20170921173013.GL30097@localhost>
-Message-ID: <9ed74f0c-9363-efbf-3fdf-47ebd1fd4eea@ti.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 22 Sep 2017 09:31:31 +0200
+Subject: [RESEND PATCH v5 3/4] dt-bindings: stm32-dma: add a property to
+ handle STM32 DMAMUX
+In-Reply-To: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1506065492-31478-4-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?Vinod,
+STM32 DMA controller has to exposed its number of request line to be
+addressed via STM32 DMAMUX.
 
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Version history:
+    v5:
+    v4:
+        * get rid of st,dmamux property
+        * number of DMA requests is exposed for DMAMUX
+    v3:
+        * None
+    v2:
+        * Typo fix
+---
+---
+ Documentation/devicetree/bindings/dma/stm32-dma.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-
-On 2017-09-21 20:30, Vinod Koul wrote:
-> On Thu, Sep 21, 2017 at 02:35:32PM +0300, Peter Ujfalusi wrote:
->> When looking for unused xbar_out lane we should also protect the set_bit()
->> call with the same mutex to protect against concurrent threads picking the
->> same ID.
-> 
-> Applied, thanks
-> 
-> Just a note, somehow the patches from you only are getting mangled for me.
-> Curiously, the ones in patchworks are fine and I used to apply that, not sure
-> what mail servers at our work places are doing!!
-
-I'm afraid it is our mail servers where the mangling is happening :(
-We are trying to resolve this since early August when it first started
-to happen (and only for the guys in Finland).
-We are as frustrated as one can be, believe me.
-
-PS: And the mangler will add a footer on top of this mail
-
-- P?ter
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+index 4408af6..77542e1 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+@@ -13,6 +13,7 @@ Required properties:
+ - #dma-cells : Must be <4>. See DMA client paragraph for more details.
+ 
+ Optional properties:
++- dma-requests : Number of DMA requests supported.
+ - resets: Reference to a reset controller asserting the DMA controller
+ - st,mem2mem: boolean; if defined, it indicates that the controller supports
+   memory-to-memory transfer
+@@ -34,12 +35,13 @@ Example:
+ 		#dma-cells = <4>;
+ 		st,mem2mem;
+ 		resets = <&rcc 150>;
++		dma-requests = <8>;
+ 	};
+ 
+ * DMA client
+ 
+ DMA clients connected to the STM32 DMA controller must use the format
+-described in the dma.txt file, using a five-cell specifier for each
++described in the dma.txt file, using a four-cell specifier for each
+ channel: a phandle to the DMA controller plus the following four integer cells:
+ 
+ 1. The channel id
+-- 
+2.7.4
