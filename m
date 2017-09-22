@@ -1,69 +1,64 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Fri, 22 Sep 2017 14:47:49 +0200
-Subject: [PATCH] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
-In-Reply-To: <20170921075239.GE3568@kwain>
-References: <20170921073643.5677-1-miquel.raynal@free-electrons.com>
- <20170921075239.GE3568@kwain>
-Message-ID: <20170922144749.6b2aaa76@xps13>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Fri, 22 Sep 2017 14:50:12 +0200
+Subject: [PATCH v2] arm64: dts: marvell: Enable Armada-8040-DB CPS SPI1
+Message-ID: <20170922125012.6715-1-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Antoine,
+From: Christine Gharzuzi <chrisg@marvell.com>
 
-On Thu, 21 Sep 2017 09:52:39 +0200
-Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+Add the DT node enabling Armada-8040-DB CPS SPI controller driver.
 
-> Hi Miquel,
-> 
-> On Thu, Sep 21, 2017 at 09:36:43AM +0200, Miquel Raynal wrote:
-> > From: Christine Gharzuzi <chrisg@marvell.com>
-> > +&cps_spi1 {
-> > +	status = "okay";
-> > +
-> > +	spi-flash at 0 {
-> > +		#address-cells = <0x1>;
-> > +		#size-cells = <0x1>;
-> > +		compatible = "jedec,spi-nor";
-> > +		reg = <0x0>;
-> > +		spi-max-frequency = <20000000>;
-> > +
-> > +		partitions {
-> > +			compatible = "fixed-partitions";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +
-> > +			partition at 0 {
-> > +				label = "Boot";
-> > +				reg = <0x0 0x200000>;
-> > +			};
-> > +			partition at 200000 {
-> > +				label = "Filesystem";
-> > +				reg = <0x200000 0xd00000>;
-> > +			};
-> > +			partition at d00000 {  
-> 
-> The node should be 'partition at f00000'.
+Add the SPI NAND flash device connected on the bus. Fill the MTD
+partitions layout.
 
-Absolutely, thanks for poiting it!
+Signed-off-by: Christine Gharzuzi <chrisg@marvell.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts | 31 ++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Regards,
-Miqu?l
-
-> 
-> > +				label = "Boot_2nd";
-> > +				reg = <0xf00000 0x100000>;
-> > +			};
-> > +		};
-> > +	};
-> > +};  
-> 
-> Thanks,
-> Antoine
-> 
-
-
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 0d7b2ae46610..f5be6ffe0106 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -216,6 +216,37 @@
+ 	clock-frequency = <100000>;
+ };
+ 
++&cps_spi1 {
++	status = "okay";
++
++	spi-flash at 0 {
++		#address-cells = <0x1>;
++		#size-cells = <0x1>;
++		compatible = "jedec,spi-nor";
++		reg = <0x0>;
++		spi-max-frequency = <20000000>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "Boot";
++				reg = <0x0 0x200000>;
++			};
++			partition at 200000 {
++				label = "Filesystem";
++				reg = <0x200000 0xd00000>;
++			};
++			partition at d00000 {
++				label = "Boot_2nd";
++				reg = <0xf00000 0x100000>;
++			};
++		};
++	};
++};
++
+ /* CON4 on CP1 expansion */
+ &cps_sata0 {
+ 	status = "okay";
 -- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
