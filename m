@@ -1,51 +1,20 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 22 Sep 2017 12:08:44 +0200
-Subject: [PATCH v2 0/2] mtd: nand: introduce NAND_ROW_ADDR_3 flag and
- improve Denali driver
-In-Reply-To: <1505268351-31941-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1505268351-31941-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170922120844.6cc692e6@bbrezillon>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 22 Sep 2017 18:13:23 +0800
+Subject: [PATCH 1/1] crypto: stm32/hash - Remove uninitialized symbol
+In-Reply-To: <1503064441-19964-1-git-send-email-lionel.debieve@st.com>
+References: <1503064441-19964-1-git-send-email-lionel.debieve@st.com>
+Message-ID: <20170922101323.GE16270@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Sep 2017 11:05:49 +0900
-Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On Fri, Aug 18, 2017 at 03:54:01PM +0200, Lionel Debieve wrote:
+> Remove err symbol as this is not used in the thread context
+> and the variable is not initialized.
+> 
+> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
 
-> Currently, Denali NAND driver always expects 3 row address cycle
-> devices because the driver init code hard-code the register setting.
-> I will fix it in 2/2.
-> 
-> Many drivers check chip->chipsize if the third row address cycle
-> is needed or not.  This is not nice because 32MB, 128MB are
-> magic numbers.  nand_scan_ident can decide it and provide a
-> driver-friendly flag.
-> 
-> 1/2 is touching verious drivers.
-> I hope Acked-by from driver maintainers if this change looks good.
-> 
-
-Applied.
-
-Thanks,
-
-Boris
-
-> 
-> Changes in v2:
->  - Fix build error
-> 
-> Masahiro Yamada (2):
->   mtd: nand: introduce NAND_ROW_ADDR_3 flag
->   mtd: nand: denali: support two row address cycle devices
-> 
->  drivers/mtd/nand/atmel/nand-controller.c | 3 +--
->  drivers/mtd/nand/au1550nd.c              | 3 +--
->  drivers/mtd/nand/denali.c                | 4 ++--
->  drivers/mtd/nand/diskonchip.c            | 3 +--
->  drivers/mtd/nand/hisi504_nand.c          | 3 +--
->  drivers/mtd/nand/mxc_nand.c              | 3 +--
->  drivers/mtd/nand/nand_base.c             | 9 +++++----
->  drivers/mtd/nand/nuc900_nand.c           | 2 +-
->  include/linux/mtd/rawnand.h              | 3 +++
->  9 files changed, 16 insertions(+), 17 deletions(-)
-> 
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
