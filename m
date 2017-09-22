@@ -1,47 +1,54 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 22 Sep 2017 20:40:33 +0200
-Subject: [PATCH v2 00/12] ARM: dts: sunxi: Fix DT build warnings
-Message-ID: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
+Date: Fri, 22 Sep 2017 20:40:38 +0200
+Subject: [PATCH v2 05/12] ARM: dts: orangepi2: Fix node with unit name and no
+ reg property
+In-Reply-To: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
+References: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170922184045.6498-6-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+This patch fix the warning "xxx has a unit name, but no reg property" by
+removing "@0" from such node.
 
-The goal of this patch series is to have a clean DT build with W=1.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Regards
-
-Changes since v1:
-- moved i2c2 unit address change from patch #2 in patch #1
-
-Corentin Labbe (12):
-  ARM: dts: sunxi: h3/h5: Fix simple-bus unit address format error
-  ARM: dts: sunxi: h3/h5: Fix i2c2 register address
-  ARM: dts: sunxi: h3/h5: Fix node with unit name and no reg property
-  ARM: dts: nanopi: Fix node with unit name and no reg property
-  ARM: dts: orangepi2: Fix node with unit name and no reg property
-  ARM: dts: sun8i: orangepi-lite: Fix node with unit name and no reg
-    property
-  ARM: dts: sun8i: orangepi one: Fix node with unit name and no reg
-    property
-  ARM: dts: sun8i: orangepipc: Fix node with unit name and no reg
-    property
-  ARM: dts: sun8i: orangepi-plus: Fix node with unit name and no reg
-    property
-  arm64: allwinner: a64: Fix simple-bus unit address format error
-  arm64: allwinner: a64: Fix node with unit name and no reg property
-  ARM: dts: sun8i: a83t: Fix simple-bus unit address format error
-
- arch/arm/boot/dts/sun8i-a83t.dtsi             |  6 +-
- arch/arm/boot/dts/sun8i-h3-nanopi.dtsi        |  8 +--
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts     |  8 +--
- arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts  |  6 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts   |  6 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts    |  6 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts  |  2 +-
- arch/arm/boot/dts/sunxi-h3-h5.dtsi            | 88 +++++++++++++--------------
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++----
- 9 files changed, 77 insertions(+), 77 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+index 17cdeae19c6f..b20be95b49d5 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+@@ -160,24 +160,24 @@
+ };
+ 
+ &pio {
+-	leds_opc: led_pins at 0 {
++	leds_opc: led_pins {
+ 		pins = "PA15";
+ 		function = "gpio_out";
+ 	};
+ };
+ 
+ &r_pio {
+-	leds_r_opc: led_pins at 0 {
++	leds_r_opc: led_pins {
+ 		pins = "PL10";
+ 		function = "gpio_out";
+ 	};
+ 
+-	sw_r_opc: key_pins at 0 {
++	sw_r_opc: key_pins {
+ 		pins = "PL3", "PL4";
+ 		function = "gpio_in";
+ 	};
+ 
+-	wifi_pwrseq_pin_orangepi: wifi_pwrseq_pin at 0 {
++	wifi_pwrseq_pin_orangepi: wifi_pwrseq_pin {
+ 		pins = "PL7";
+ 		function = "gpio_out";
+ 	};
 -- 
 2.13.5
