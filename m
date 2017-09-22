@@ -1,144 +1,84 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 22 Sep 2017 19:26:01 +0100
-Subject: [PATCH v3 00/13] arm64/firmware: Software Delegated Exception
- Interface
-Message-ID: <20170922182614.27885-1-james.morse@arm.com>
+Date: Fri, 22 Sep 2017 19:26:03 +0100
+Subject: [PATCH v3 02/13] KVM: arm/arm64: Convert kvm_host_cpu_state to a
+ static per-cpu allocation
+In-Reply-To: <20170922182614.27885-1-james.morse@arm.com>
+References: <20170922182614.27885-1-james.morse@arm.com>
+Message-ID: <20170922182614.27885-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+kvm_host_cpu_state is a per-cpu allocation made from kvm_arch_init()
+used to store the host EL1 registers when KVM switches to a guest.
 
-The Software Delegated Exception Interface (SDEI) is an ARM specification
-for registering callbacks from the platform firmware into the OS.
-This is intended to be used to implement firmware-first RAS notifications,
-but also supports vendor-defined events and binding IRQs as events.
+Make it easier for ASM to generate pointers into this per-cpu memory
+by making it a static allocation.
 
-The document is here:
-http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/arm.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
-I anticpate once reviewed this series will go via the arm-soc tree, as the
-bulk of the code is under /drivers/firmware/.
-
-The major change in v3 is due to VMAP stacks. We can't trust sp when we take
-an event, so need our own SDEI stack. Events can nest, so we need two. Private
-events can be delivered per-cpu, so we need two per-cpu SDEI stacks.
-
-The APCICA support for the SDEI table is now in mainline, so this series has
-grown the detection code for non-DT systems. The APEI/GHES wire-up is still
-being held back as APEI's ghes_proc() isn't (yet) safe for multiple sources
-of NMI.
-
-Exposing the HVC range through KVM to user-space is gone, this will be
-re-incarnated as something that better fits KVMs architecture emulation,
-as opposed to assuming all-the-world's-SMC-CC.
-
-
-This series (juggles some registers with KVM+VHE, then) adds a DT binding to
-trigger probing of the interface and support for the SDEI API.
-
-SDEI runs between adjacent exception levels, so events will always be delivered
-to EL2 if firmware is at EL3. For VHE hosts we run the SDEI event handler
-behind KVM's back with all exceptions masked. Once the handler has done its
-work we return to the appropriate vbar+irq entry. This allows KVM to
-world-switch and deliver any signals sent by the handler to Qemu/kvmtool. We
-do the same thing if we interrupt host EL0. If we interrupted code with
-interrupts masked, we use a different API call to return to the interrupted
-context.
-
-What about non-VHE KVM? If you don't have VHE support and boot at EL2, the
-kernel drops to EL1. This driver will print an error message then give up. This
-is because events would still be delivered to EL2 hitting either KVM, or the
-hyp-stub. Supporting this is complicated, but because the main use-case is
-RAS, and ARM v8.2's RAS extensions imply v8.1's Virtual Host Extensions, we
-can assume all platforms with SDEI will support VHE too. (I have some ideas
-on how to support non-VHE).
-
-Running the event handler behind VHE-KVM's back has some side effects: The
-event handler will blindly use any registers that are shared between the host
-and guest. The two that I think matter are TPIDR_EL1, and the debug state. The
-guest may have set MDSCR_EL1 so debug exceptions must remain masked. The
-guest's TPIDR_EL1 will be used by the event handler if it accesses per-cpu
-variables. This needs fixing. The first part of this series juggles KVMs use
-of TPIDR_EL2 so that we share it with the host on VHE systems. An equivalent
-change for 32bit is (still) on my todo list. (the alternative to this is to
-have a parody world switch in the SDEI event handler, but this would mean
-special casing interrupted guests, and be an ABI link to KVM.)
-
-Is this another begins-with-S RAS mechanism for arm64? Yes.
-Why? Any notification delivered as an exception will overwrite the exception
-registers. This is fatal for the running thread if it happens during entry.S's
-kernel_enter or kernel_exit. Instead of adding masking and routing controls,
-events are delivered to a registered address at a fixed exception level and
-don't change the exception registers when delivered.
-
-This series can be retrieved from:
-git://linux-arm.org/linux-jm.git -b sdei/v3/base
-
-Questions and contradictions welcome!
-
-Thanks,
-
-James
-
-[Changes since previous versions are noted on each patch]
-
-
-James Morse (13):
-  KVM: arm64: Store vcpu on the stack during __guest_enter()
-  KVM: arm/arm64: Convert kvm_host_cpu_state to a static per-cpu
-    allocation
-  KVM: arm64: Change hyp_panic()s dependency on tpidr_el2
-  arm64: alternatives: use tpidr_el2 on VHE hosts
-  KVM: arm64: Stop save/restoring host tpidr_el1 on VHE
-  Docs: dt: add devicetree binding for describing arm64 SDEI firmware
-  firmware: arm_sdei: Add driver for Software Delegated Exceptions
-  arm64: Add vmap_stack header file
-  arm64: kernel: Add arch-specific SDEI entry code and CPU masking
-  firmware: arm_sdei: Add support for CPU and system power states
-  firmware: arm_sdei: add support for CPU private events
-  arm64: acpi: Remove __init from acpi_psci_use_hvc() for use by SDEI
-  firmware: arm_sdei: Discover SDEI support via ACPI
-
- .../devicetree/bindings/arm/firmware/sdei.txt      |   42 +
- arch/arm64/Kconfig                                 |    2 +-
- arch/arm64/include/asm/assembler.h                 |    8 +
- arch/arm64/include/asm/kvm_host.h                  |    2 +
- arch/arm64/include/asm/percpu.h                    |   11 +-
- arch/arm64/include/asm/processor.h                 |    1 +
- arch/arm64/include/asm/sdei.h                      |   63 ++
- arch/arm64/include/asm/stacktrace.h                |    3 +
- arch/arm64/include/asm/vmap_stack.h                |   41 +
- arch/arm64/kernel/Makefile                         |    1 +
- arch/arm64/kernel/acpi.c                           |    2 +-
- arch/arm64/kernel/asm-offsets.c                    |    5 +
- arch/arm64/kernel/cpufeature.c                     |   23 +
- arch/arm64/kernel/irq.c                            |   13 +-
- arch/arm64/kernel/sdei-entry.S                     |  122 +++
- arch/arm64/kernel/sdei.c                           |  235 +++++
- arch/arm64/kernel/smp.c                            |   11 +-
- arch/arm64/kvm/hyp-init.S                          |    4 +
- arch/arm64/kvm/hyp/entry.S                         |   10 +-
- arch/arm64/kvm/hyp/hyp-entry.S                     |   18 +-
- arch/arm64/kvm/hyp/switch.c                        |   25 +-
- arch/arm64/kvm/hyp/sysreg-sr.c                     |   16 +-
- arch/arm64/mm/proc.S                               |    8 +
- drivers/firmware/Kconfig                           |    8 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/arm_sdei.c                        | 1096 ++++++++++++++++++++
- include/linux/cpuhotplug.h                         |    1 +
- include/linux/psci.h                               |    3 +-
- include/linux/sdei.h                               |  105 ++
- include/uapi/linux/sdei.h                          |   91 ++
- virt/kvm/arm/arm.c                                 |   18 +-
- 31 files changed, 1931 insertions(+), 58 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/firmware/sdei.txt
- create mode 100644 arch/arm64/include/asm/sdei.h
- create mode 100644 arch/arm64/include/asm/vmap_stack.h
- create mode 100644 arch/arm64/kernel/sdei-entry.S
- create mode 100644 arch/arm64/kernel/sdei.c
- create mode 100644 drivers/firmware/arm_sdei.c
- create mode 100644 include/linux/sdei.h
- create mode 100644 include/uapi/linux/sdei.h
-
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..3786dd7e277d 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -51,8 +51,8 @@
+ __asm__(".arch_extension	virt");
+ #endif
+ 
++DEFINE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
+ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+-static kvm_cpu_context_t __percpu *kvm_host_cpu_state;
+ 
+ /* Per-CPU variable containing the currently running vcpu. */
+ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+@@ -351,7 +351,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 	}
+ 
+ 	vcpu->cpu = cpu;
+-	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
++	vcpu->arch.host_cpu_context = this_cpu_ptr(&kvm_host_cpu_state);
+ 
+ 	kvm_arm_set_running_vcpu(vcpu);
+ 
+@@ -1255,19 +1255,8 @@ static inline void hyp_cpu_pm_exit(void)
+ }
+ #endif
+ 
+-static void teardown_common_resources(void)
+-{
+-	free_percpu(kvm_host_cpu_state);
+-}
+-
+ static int init_common_resources(void)
+ {
+-	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
+-	if (!kvm_host_cpu_state) {
+-		kvm_err("Cannot allocate host CPU state\n");
+-		return -ENOMEM;
+-	}
+-
+ 	/* set size of VMID supported by CPU */
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+ 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+@@ -1412,7 +1401,7 @@ static int init_hyp_mode(void)
+ 	for_each_possible_cpu(cpu) {
+ 		kvm_cpu_context_t *cpu_ctxt;
+ 
+-		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
++		cpu_ctxt = per_cpu_ptr(&kvm_host_cpu_state, cpu);
+ 		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1, PAGE_HYP);
+ 
+ 		if (err) {
+@@ -1490,7 +1479,6 @@ int kvm_arch_init(void *opaque)
+ out_hyp:
+ 	teardown_hyp_mode();
+ out_err:
+-	teardown_common_resources();
+ 	return err;
+ }
+ 
 -- 
 2.13.3
