@@ -1,93 +1,104 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 22 Sep 2017 10:45:46 +0100
-Subject: [PATCH] ACPI/IORT: Fix PCI ACS enablement
-In-Reply-To: <59C3A36A.2060202@hisilicon.com>
-References: <20170919170539.6265-1-lorenzo.pieralisi@arm.com>
- <59C3A36A.2060202@hisilicon.com>
-Message-ID: <20170922094546.GE1523@red-moon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 22 Sep 2017 11:45:11 +0200
+Subject: [PATCH v3 0/3] mmc: Add OMAP SDHCI driver
+In-Reply-To: <20170906114556.32532-1-kishon@ti.com>
+References: <20170906114556.32532-1-kishon@ti.com>
+Message-ID: <CAPDyKFqWMy857LqpO2rPCb4TBQSU4oyFWbo8NunM_89OGsusvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 07:32:58PM +0800, Zhou Wang wrote:
-> On 2017/9/20 1:05, Lorenzo Pieralisi wrote:
-> > commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> > workarounds") removed kernel code that was allowing to initialize
-> > and probe the SMMU devices early (ie earlier than PCI devices through
-> > linker script callback entries) in the boot process because it was not
-> > needed any longer in that the SMMU devices/drivers now support deferred
-> > probing.
-> > 
-> > Since the SMMUs probe routines are also in charge of requesting global
-> > PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
-> > up early-probing workarounds") also postponed PCI ACS enablement to
-> > SMMUs devices probe time, which may be too late given that PCI devices
-> > needs to detect if PCI ACS is enabled to init the respective capability
-> > through the following call path:
-> > 
-> > pci_device_add()
-> >  -> pci_init_capabilities()
-> >   -> pci_enable_acs()
-> > 
-> > Add code in the ACPI IORT SMMU platform devices initialization path
-> > (that is called before ACPI PCI enumeration) to detect if an SMMU is
-> > present in HW and enable PCI ACS if it actually is, restoring the
-> > correct PCI ACS enablement sequencing.
-> > 
-> > Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> > Signed-workarounds")
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Robin Murphy <robin.murphy@arm.com>
-> > Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> > Cc: Alex Williamson <alex.williamson@redhat.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index 9565d57..71a7694 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -1184,6 +1184,7 @@ static void __init iort_init_platform_devices(void)
-> >  	struct acpi_table_iort *iort;
-> >  	struct fwnode_handle *fwnode;
-> >  	int i, ret;
-> > +	bool smmu_detected = false;
-> >  
-> >  	/*
-> >  	 * iort_table and iort both point to the start of IORT table, but
-> > @@ -1218,11 +1219,21 @@ static void __init iort_init_platform_devices(void)
-> >  				acpi_free_fwnode_static(fwnode);
-> >  				return;
-> >  			}
-> > +
-> > +			smmu_detected = true;
-> >  		}
-> >  
-> >  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-> >  					 iort_node->length);
-> >  	}
-> > +
-> > +	/*
-> > +	 * If IORT reports an SMMU component make sure PCI ACS is
-> > +	 * requested so that PCI devices can enable it in their
-> > +	 * capabilities.
-> > +	 */
-> > +	if (smmu_detected)
-> > +		pci_request_acs();
-> >  }
-> >  
-> >  void __init acpi_iort_init(void)
-> >
-> 
-> Hi Lorenzo,
-> 
-> I tested this patch, it works well in my HiSilicon Hip08 based system.
-> However, setting ACS flag at the stage of SMMU device init seems not good,
-> I mean what if in one system there are only platform devices connected to
-> SMMU device.
+On 6 September 2017 at 13:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> This is the first step in deprecating omap_hsmmc driver completely
+> and moving to sdhci-omap driver which uses the sdhci library.
+>
+> This patch that adds a new SDHCI quirk "MMC_RSP_136" has already been
+> merged and hence removed it in this revision.
+>
+> Apart from the quirk, sdhci-omap has it's own callbacks
+> to set_clock (clock divider programming is different from generic sdhci)
+> , set_power, set_bus_width, set_bus_mode and platform_send_init_74_clocks.
+> These callback functions are implemented based on omap_hsmmc driver.
+> Since sdhci-omap driver requires pbias regulator fixes to be present, I've
+> sent them as part of this series.
+>
+> The sdhci-omap driver supports only the high speed mode and UHS/HS200
+> mode will be added in a later series.
+>
+> It has been tested only in boards having DRA7 SoCs like dra7-evm, dra72-evm,
+> am571x-idk, am572x-idk, am57xx-evm. (Tested only eMMC and SD.
+> SDIO support will be added later). The plan is to fully convert DRA7
+> SoC to use SDHCI driver and then convert other legacy platforms to use
+> SDHCI.
+>
+> For sdhci-omap to be functional, the following tag should be merged (There
+> are no compilation dependencies).
+> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator
+> tags/regulator-pbias-variants
 
-That's a fair point if you explain to me how current pci_request_acs()
-usage copes with your remark above.
+Tag pulled.
 
-Lorenzo
+>
+> However the above regulator tag will impact omap_hsmmc driver. so [1]
+> should be merged before everything else is merged.
+>
+> [1] -> https://lkml.org/lkml/2017/8/31/300
+
+Applied.
+
+>
+> The patch to add config and dts changes to use sdhci-omap will be sent
+> separately.
+>
+> Next Steps:
+> *) Add UHS support to sdhci-omap
+> *) Add SDIO support
+> *) Add support for older TI platforms
+>
+> Changes from v3:
+> *) removed omap_hsmmc and pbias-regulator patches from the series
+> *) Fixed dt-binding documentation (remove '0x' in node name)
+> *) stop clock if MMC core sends '0' in frequency
+>
+> Changes from v2:
+> *) Rebased on git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
+> *) Included a couple of patches from Ravikumar to fix pbias-regulator driver
+>    to support max-voltage of 3.3V. This is required for sdhci-omap driver.
+> *) Create sdhci-omap as a new driver with MMC generic bindings and hence doesn't
+>    have bindings like ti,dual-volt added for omap-hsmmc. (Instead of
+>    ti,dual-volt, sdhci-omap driver uses the supported regulator voltage to
+>    set controller IO voltage capabilities).
+>    When omap-hsmmc driver is deprecated, support for these properties will
+>    be added to sdhci-omap.
+> *) Fixed minor comments from Adrian).
+>
+> Changes from v1:
+> *) Remove the quirks and instead use sdhci_omap specific callbacks for
+>    set_power, set_busmode etc.
+> *) Add a patch from Adrian to tidy reading 136-bit responses
+>
+> I've also pushed the entire series along with dependent dt patches @
+> https://github.com/kishon/linux-wip.git sdhci_v3 (in case someone
+> wants to test)
+>
+> Kishon Vijay Abraham I (3):
+>   dt-bindings: sdhci-omap: Add bindings for the sdhci-omap controller
+>   mmc: sdhci-omap: Add OMAP SDHCI driver
+>   MAINTAINERS: Add TI OMAP SDHCI Maintainer
+>
+>  .../devicetree/bindings/mmc/sdhci-omap.txt         |  16 +
+>  MAINTAINERS                                        |   6 +
+>  drivers/mmc/host/Kconfig                           |  12 +
+>  drivers/mmc/host/Makefile                          |   1 +
+>  drivers/mmc/host/sdhci-omap.c                      | 607 +++++++++++++++++++++
+>  5 files changed, 642 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+>  create mode 100644 drivers/mmc/host/sdhci-omap.c
+>
+> --
+> 2.11.0
+>
+
+Thanks, everything applied/pulled for next! Great work!
+
+Kind regards
+Uffe
