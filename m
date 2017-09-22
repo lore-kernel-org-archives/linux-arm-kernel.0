@@ -1,37 +1,24 @@
-From: allen.lkml@gmail.com (Allen Pais)
-Date: Fri, 22 Sep 2017 17:10:57 +0530
-Subject: [PATCH] arm: mach-footbridge: use setup_timer() helper.
-Message-ID: <1506080457-6019-1-git-send-email-allen.lkml@gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Fri, 22 Sep 2017 19:59:08 +0800
+Subject: [PATCH v2] mmc: dt-bindings: Add reg/source_cg/latch-ck for
+ Mediatek MMC bindings
+In-Reply-To: <CACRpkdaco5XnWK-gAdGLWFZtjqnM16iT424ist5Zmd3RyAXAEQ@mail.gmail.com>
+References: <1505958774-14410-1-git-send-email-chaotian.jing@mediatek.com>
+ <CACRpkdaco5XnWK-gAdGLWFZtjqnM16iT424ist5Zmd3RyAXAEQ@mail.gmail.com>
+Message-ID: <1506081548.28930.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-   Use setup_timer function instead of initializing timer with the
-   function and data fields.
+On Fri, 2017-09-22 at 13:25 +0200, Linus Walleij wrote:
+> On Thu, Sep 21, 2017 at 3:52 AM, Chaotian Jing
+> <chaotian.jing@mediatek.com> wrote:
+> 
+> > +- mediatek,latch-ck: Some projects do not support enhance_rx, need set correct latch-ck to avoid data crc
+> > +                    error caused by stop clock(fifo full)
+> 
+> I think I wrote elsewhere: replace "projects" with "systems" or "SoCs".
 
-Signed-off-by: Allen Pais <allen.lkml@gmail.com>
----
- arch/arm/mach-footbridge/dc21285.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index 96a3d73..f8d011b 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -323,13 +323,8 @@ void __init dc21285_preinit(void)
- 		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
- 	}
- 
--	init_timer(&serr_timer);
--	init_timer(&perr_timer);
--
--	serr_timer.data = IRQ_PCI_SERR;
--	serr_timer.function = dc21285_enable_error;
--	perr_timer.data = IRQ_PCI_PERR;
--	perr_timer.function = dc21285_enable_error;
-+	setup_timer(&serr_timer, dc21285_enable_error, IRQ_PCI_SERR);
-+	setup_timer(&perr_timer, dc21285_enable_error, IRQ_PCI_PERR);
- 
- 	/*
- 	 * We don't care if these fail.
--- 
-2.7.4
+Sorry about that, will change to SoCs at v3.
+> 
+> Yours,
+> Linus Walleij
