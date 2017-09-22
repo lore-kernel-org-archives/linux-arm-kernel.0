@@ -1,40 +1,42 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Fri, 22 Sep 2017 10:18:54 +0200
-Subject: [PATCH 1/2] ARM: dts: exynos: Add dwc3 SUSPHY quirk
-In-Reply-To: <fcefaaab-b99c-a8cc-9684-98cc3c4d803e@arm.com>
-References: <1505728934-6200-1-git-send-email-andrzej.p@samsung.com>
- <CGME20170918100230eucas1p29fae00c53f1106af1961a6e269740b2f@eucas1p2.samsung.com>
- <1505728934-6200-2-git-send-email-andrzej.p@samsung.com>
- <20170919174038.2sspjvadt6ggka65@kozik-lap>
- <fcefaaab-b99c-a8cc-9684-98cc3c4d803e@arm.com>
-Message-ID: <894725fe-595b-45dc-e567-41caf48a012b@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 22 Sep 2017 14:13:01 +0530
+Subject: [PATCH] dmaengine: ti-dma-crossbar: Fix possible race condition
+ with dma_inuse
+In-Reply-To: <9ed74f0c-9363-efbf-3fdf-47ebd1fd4eea@ti.com>
+References: <20170921113532.15297-1-peter.ujfalusi@ti.com>
+ <20170921173013.GL30097@localhost>
+ <9ed74f0c-9363-efbf-3fdf-47ebd1fd4eea@ti.com>
+Message-ID: <20170922084300.GP30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 22, 2017 at 10:03:59AM +0300, Peter Ujfalusi wrote:
+> Vinod,
+> 
+> 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> 
+> On 2017-09-21 20:30, Vinod Koul wrote:
+> > On Thu, Sep 21, 2017 at 02:35:32PM +0300, Peter Ujfalusi wrote:
+> >> When looking for unused xbar_out lane we should also protect the set_bit()
+> >> call with the same mutex to protect against concurrent threads picking the
+> >> same ID.
+> > 
+> > Applied, thanks
+> > 
+> > Just a note, somehow the patches from you only are getting mangled for me.
+> > Curiously, the ones in patchworks are fine and I used to apply that, not sure
+> > what mail servers at our work places are doing!!
+> 
+> I'm afraid it is our mail servers where the mangling is happening :(
+> We are trying to resolve this since early August when it first started
+> to happen (and only for the guys in Finland).
+> We are as frustrated as one can be, believe me.
+> 
+> PS: And the mangler will add a footer on top of this mail
 
-W dniu 19.09.2017 o?20:10, Robin Murphy pisze:
-> On 19/09/17 18:40, Krzysztof Kozlowski wrote:
->> On Mon, Sep 18, 2017 at 12:02:13PM +0200, Andrzej Pietrasiewicz wrote:
->>> Odroid XU4 board does not enumerate SuperSpeed devices.
->>> This patch makes exynos5 series chips use USB SUSPHY quirk,
->>> which solves the problem.
->>>
->>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
->>> ---
->>>   arch/arm/boot/dts/exynos54xx.dtsi | 2 ++
->>>   1 file changed, 2 insertions(+)
->>
->> Makes sense to me... was it tested also on XU3 and XU?
-> 
-> Well, it at least doesn't make USB3 on my XU any more or less broken
-> than it was before ;) (both ports still report an over-current condition
-> even with nothing plugged in - I suspect there's probably still some
-> pinctrl/regulator stuff missing)
-> 
-> Robin.
-> 
-Similar with XU3: nothing is any more or less broken with this patch
-compared to the situation without the patch.
+ah okay, consider sending using some other server then, or just put up a
+linux box in the corner like we do (@linux.intel.com)
 
-Andrzej
+-- 
+~Vinod
