@@ -1,57 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Sep 2017 17:44:08 +0100
-Subject: [GIT PULL] arm64 fixes for 4.14-rc2
-Message-ID: <20170922164406.hizswjk7yh4injvr@armageddon.cambridge.arm.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Fri, 22 Sep 2017 09:44:02 -0700
+Subject: [PATCH v3 0/4] phy: rockchip-typec: Set "flip" properly; some cleanups;
+ fix swing
+Message-ID: <20170922164406.27606-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+When connecting to certain DP monitors it was observed that only one
+of the two orientations of the type C to DP cable would work.
+Debugging showed that the problem was that we needed to set the type C
+"flip" state earlier.  Once we did this, problems went away.
 
-Please pull the arm64 fixes below. Thanks.
+While trying to dig into this problem and some others, I found that
+the proper documentation for the Type C PHY was available to me.  This
+allowed me to cleanup the magic numbers in the funtion that I was
+touching and also fix a few minor issues that (luckily) haven't caused
+any problems yet.
 
+I also found that aux channel communications were flaky on some
+adapters until I adjusted the voltage swing.
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+For this series I've added Chris Zhong's Reviewed-by tags to some of
+the patches since he gave a +1 to nearly identical patches on the
+Chrome OS gerrit and I didn't think he'd mind me carrying his tag.  If
+folks would rather I didn't do that, please yell.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+Changes in v3:
+- Voltage swing patch now patch 2.
 
-are available in the git repository at:
+Changes in v2:
+- Voltage swing patch new for v2.
+- Removed extra blank line.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+Douglas Anderson (4):
+  phy: rockchip-typec: Set the AUX channel flip state earlier
+  phy: rockchip-typec: Don't set the aux voltage swing to 400 mV
+  phy: rockchip-typec: Avoid magic numbers + add delays in aux calib
+  phy: rockchip-typec: Do the calibration more correctly
 
-for you to fetch changes up to a88dc7ba15cd4f4ef5102b5185f8fa7ff86e54e1:
-
-  drivers/perf: arm_pmu_acpi: Release memory obtained by kasprintf (2017-09-22 15:11:46 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- #ifdef CONFIG_EFI around __efi_fpsimd_begin/end
-
-- Assembly code alignment reduced to 4 bytes from 16
-
-- Ensure the kernel is compiled for LP64 (there are some arm64 compilers
-  around defaulting to ILP32)
-
-- Fix arm_pmu_acpi memory leak on the error path
-
-----------------------------------------------------------------
-Andrew Pinski (1):
-      arm64: ensure the kernel is compiled for LP64
-
-Arvind Yadav (1):
-      drivers/perf: arm_pmu_acpi: Release memory obtained by kasprintf
-
-Dave Martin (1):
-      arm64: efi: Don't include EFI fpsimd save/restore code in non-EFI kernels
-
-Masahiro Yamada (1):
-      arm64: relax assembly code alignment from 16 byte to 4 byte
-
- arch/arm64/Makefile              | 5 +++++
- arch/arm64/include/asm/linkage.h | 4 ++--
- arch/arm64/kernel/fpsimd.c       | 4 ++++
- drivers/perf/arm_pmu_acpi.c      | 1 +
- 4 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/phy/rockchip/phy-rockchip-typec.c | 246 ++++++++++++++++++++++++------
+ 1 file changed, 201 insertions(+), 45 deletions(-)
 
 -- 
-Catalin
+2.14.1.821.g8fa685d3b7-goog
