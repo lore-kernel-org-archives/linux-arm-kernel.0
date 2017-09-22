@@ -1,168 +1,83 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 22 Sep 2017 19:26:05 +0100
-Subject: [PATCH v3 04/13] arm64: alternatives: use tpidr_el2 on VHE hosts
+Date: Fri, 22 Sep 2017 19:26:07 +0100
+Subject: [PATCH v3 06/13] Docs: dt: add devicetree binding for describing
+ arm64 SDEI firmware
 In-Reply-To: <20170922182614.27885-1-james.morse@arm.com>
 References: <20170922182614.27885-1-james.morse@arm.com>
-Message-ID: <20170922182614.27885-5-james.morse@arm.com>
+Message-ID: <20170922182614.27885-7-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that KVM uses tpidr_el2 in the same way as Linux's cpu_offset in
-tpidr_el1, merge the two. This saves KVM from save/restoring tpidr_el1
-on VHE hosts, and allows future code to blindly access per-cpu variables
-without triggering world-switch.
+The Software Delegated Exception Interface (SDEI) is an ARM standard
+for registering callbacks from the platform firmware into the OS.
+This is typically used to implement RAS notifications, or from an
+IRQ that has been promoted to a firmware-assisted NMI.
+
+Add a new devicetree binding to describe the SDE firmware interface.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
+Changes since v2:
+ * Added Rob's Ack
+ * Fixed 'childe node' typo
+
 Changes since v1:
- * cpu_copy_el2regs()'s 'have I been patched' test now always sets a register,
-   just in case the compiler optimises out part of the logic.
+* Added bound IRQ description for binding,
+* Reference SMC-CC, not 'AAPCS like'
+* Move sdei node under firmware node (and the file path)
 
- arch/arm64/include/asm/assembler.h |  8 ++++++++
- arch/arm64/include/asm/percpu.h    | 11 +++++++++--
- arch/arm64/include/asm/processor.h |  1 +
- arch/arm64/kernel/cpufeature.c     | 23 +++++++++++++++++++++++
- arch/arm64/mm/proc.S               |  8 ++++++++
- 5 files changed, 49 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/firmware/sdei.txt      | 42 ++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/sdei.txt
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index d58a6253c6ab..1ba12f59dec0 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -242,7 +242,11 @@ lr	.req	x30		// link register
- #else
- 	adr_l	\dst, \sym
- #endif
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	\tmp, tpidr_el1
-+alternative_else
-+	mrs	\tmp, tpidr_el2
-+alternative_endif
- 	add	\dst, \dst, \tmp
- 	.endm
- 
-@@ -253,7 +257,11 @@ lr	.req	x30		// link register
- 	 */
- 	.macro ldr_this_cpu dst, sym, tmp
- 	adr_l	\dst, \sym
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	\tmp, tpidr_el1
-+alternative_else
-+	mrs	\tmp, tpidr_el2
-+alternative_endif
- 	ldr	\dst, [\dst, \tmp]
- 	.endm
- 
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 3bd498e4de4c..43393208229e 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -16,11 +16,15 @@
- #ifndef __ASM_PERCPU_H
- #define __ASM_PERCPU_H
- 
-+#include <asm/alternative.h>
- #include <asm/stack_pointer.h>
- 
- static inline void set_my_cpu_offset(unsigned long off)
- {
--	asm volatile("msr tpidr_el1, %0" :: "r" (off) : "memory");
-+	asm volatile(ALTERNATIVE("msr tpidr_el1, %0",
-+				 "msr tpidr_el2, %0",
-+				 ARM64_HAS_VIRT_HOST_EXTN)
-+			:: "r" (off) : "memory");
- }
- 
- static inline unsigned long __my_cpu_offset(void)
-@@ -31,7 +35,10 @@ static inline unsigned long __my_cpu_offset(void)
- 	 * We want to allow caching the value, so avoid using volatile and
- 	 * instead use a fake stack read to hazard against barrier().
- 	 */
--	asm("mrs %0, tpidr_el1" : "=r" (off) :
-+	asm(ALTERNATIVE("mrs %0, tpidr_el1",
-+			"mrs %0, tpidr_el2",
-+			ARM64_HAS_VIRT_HOST_EXTN)
-+		: "=r" (off) :
- 		"Q" (*(const unsigned long *)current_stack_pointer));
- 
- 	return off;
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 29adab8138c3..8f2d0f7d193b 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -193,5 +193,6 @@ static inline void spin_lock_prefetch(const void *ptr)
- 
- int cpu_enable_pan(void *__unused);
- int cpu_enable_cache_maint_trap(void *__unused);
-+int cpu_copy_el2regs(void *__unused);
- 
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index cd52d365d1f0..8e4c7da2b126 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -865,6 +865,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.capability = ARM64_HAS_VIRT_HOST_EXTN,
- 		.def_scope = SCOPE_SYSTEM,
- 		.matches = runs_at_el2,
-+		.enable = cpu_copy_el2regs,
- 	},
- 	{
- 		.desc = "32-bit EL0 Support",
-@@ -1308,3 +1309,25 @@ static int __init enable_mrs_emulation(void)
- }
- 
- late_initcall(enable_mrs_emulation);
+diff --git a/Documentation/devicetree/bindings/arm/firmware/sdei.txt b/Documentation/devicetree/bindings/arm/firmware/sdei.txt
+new file mode 100644
+index 000000000000..ee3f0ff49889
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/firmware/sdei.txt
+@@ -0,0 +1,42 @@
++* Software Delegated Exception Interface (SDEI)
 +
-+int cpu_copy_el2regs(void *__unused)
-+{
-+	int do_copyregs = 0;
++Firmware implementing the SDEI functions described in ARM document number
++ARM DEN 0054A ("Software Delegated Exception Interface") can be used by
++Linux to receive notification of events such as those generated by
++firmware-first error handling, or from an IRQ that has been promoted to
++a firmware-assisted NMI.
 +
-+	/*
-+	 * Copy register values that aren't redirected by hardware.
-+	 *
-+	 * Before code patching, we only set tpidr_el1, all CPUs need to copy
-+	 * this value to tpidr_el2 before we patch the code. Once we've done
-+	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
-+	 * do anything here.
-+	 */
-+	asm volatile(ALTERNATIVE("mov %0, #1", "mov %0, #0",
-+				 ARM64_HAS_VIRT_HOST_EXTN)
-+		    : "=r" (do_copyregs) : : );
++The interface provides a number of API functions for registering callbacks
++and enabling/disabling events. Functions are invoked by trapping to the
++privilege level of the SDEI firmware (specified as part of the binding
++below) and passing arguments in a manner specified by the "SMC Calling
++Convention (ARM DEN 0028B):
 +
-+	if (do_copyregs)
-+		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
++	 r0		=> 32-bit Function ID / return value
++	{r1 - r3}	=> Parameters
 +
-+	return 0;
-+}
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 877d42fb0df6..109d43a15aaf 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -70,7 +70,11 @@ ENTRY(cpu_do_suspend)
- 	mrs	x8, mdscr_el1
- 	mrs	x9, oslsr_el1
- 	mrs	x10, sctlr_el1
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	x11, tpidr_el1
-+alternative_else
-+	mrs	x11, tpidr_el2
-+alternative_endif
- 	mrs	x12, sp_el0
- 	stp	x2, x3, [x0]
- 	stp	x4, xzr, [x0, #16]
-@@ -116,7 +120,11 @@ ENTRY(cpu_do_resume)
- 	msr	mdscr_el1, x10
- 
- 	msr	sctlr_el1, x12
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	msr	tpidr_el1, x13
-+alternative_else
-+	msr	tpidr_el2, x13
-+alternative_endif
- 	msr	sp_el0, x14
- 	/*
- 	 * Restore oslsr_el1 by writing oslar_el1
++Note that the immediate field of the trapping instruction must be set
++to #0.
++
++The SDEI_EVENT_REGISTER function registers a callback in the kernel
++text to handle the specified event number.
++
++The sdei node should be a child node of '/firmware' and have required
++properties:
++
++ - compatible    : should contain:
++	* "arm,sdei-1.0" : For implementations complying to SDEI version 1.x.
++
++ - method        : The method of calling the SDEI firmware. Permitted
++                   values are:
++	* "smc" : SMC #0, with the register assignments specified in this
++	          binding.
++	* "hvc" : HVC #0, with the register assignments specified in this
++	          binding.
++Example:
++	firmware {
++		sdei {
++			compatible	= "arm,sdei-1.0";
++			method		= "smc";
++		};
++	};
 -- 
 2.13.3
