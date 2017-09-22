@@ -1,26 +1,44 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 22 Sep 2017 17:09:21 +0800
-Subject: [PATCH v3 1/3] crypto: engine - permit to enqueue aead_request
-In-Reply-To: <1503047946-27799-2-git-send-email-fabien.dessenne@st.com>
-References: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
- <1503047946-27799-2-git-send-email-fabien.dessenne@st.com>
-Message-ID: <20170922090921.GA15677@gondor.apana.org.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 22 Sep 2017 14:42:23 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
+In-Reply-To: <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
+References: <20170920180132.4373-1-s-anna@ti.com>
+ <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
+ <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
+Message-ID: <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 11:19:04AM +0200, Fabien Dessenne wrote:
-> The current crypto engine allows ablkcipher_request and ahash_request to
-> be enqueued. Extend this to aead_request.
+Hi Suman,
+
+On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
+> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
+>> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
+>>> Enable the CMA and DMA_CMA Kconfig options by default for
+>>> Davinci platforms. Davinci remoteproc driver is one of the
+>>> modules that depends on these options, and this allows the
+>>> driver to be made visible for selection with menuconfig.
+>>>
+>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>> ---
+>>> Hi Sekhar,
+>>>
+>>> Here's the patch that enables CMA as per your request. Patch based
+>>> on your v4.15/defconfig branch.
+>>
+>> Applied! I guess you will be sending another patch enabling the
+>> remoteproc driver itself?
 > 
-> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+> Thanks. Well, one always needs a firmware image in their filesystem
+> without which enabling the driver is meaningless (it would fail). So was
+> not planning to enable it by default.
 
-I'd like to see the crypto_engine interface cleaned up a little
-before we expand it further.  Please refer to
+But the errors will show up only on DA850 LCDK where we have enabled the
+DSP by default in DT because its an important usecase there. I think it
+is important for users to see those errors.
 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
+(besides the usual benefits of having the module enabled to catch build
+and runtime issues easily).
 
 Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Sekhar
