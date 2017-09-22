@@ -1,425 +1,92 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 22 Sep 2017 19:26:12 +0100
-Subject: [PATCH v3 11/13] firmware: arm_sdei: add support for CPU private
- events
+Date: Fri, 22 Sep 2017 19:26:14 +0100
+Subject: [PATCH v3 13/13] firmware: arm_sdei: Discover SDEI support via ACPI
 In-Reply-To: <20170922182614.27885-1-james.morse@arm.com>
 References: <20170922182614.27885-1-james.morse@arm.com>
-Message-ID: <20170922182614.27885-12-james.morse@arm.com>
+Message-ID: <20170922182614.27885-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Private SDE events are per-cpu, and need to be registered and enabled
-on each CPU.
+SDEI defines a new ACPI table to indicate the presence of the interface.
+The conduit is discovered in the same way as PSCI.
 
-Hide this detail from the caller by adapting our {,un}register and
-{en,dis}able calls to send an IPI to each CPU if the event is private.
+For ACPI we need to create the platform device ourselves as SDEI doesn't
+have an entry in the DSDT.
 
-CPU private events are unregistered when the CPU is powered-off, and
-re-registered when the CPU is brought back online. This saves bringing
-secondary cores back online to call private_reset() on shutdown, kexec
-and resume from hibernate.
+The SDEI platform device should be created after ACPI has been initialised
+so that we can parse the table, but before GHES devices are created, which
+may register SDE events if they use SDEI as their notification type.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/firmware/arm_sdei.c | 242 +++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 228 insertions(+), 14 deletions(-)
+ drivers/firmware/arm_sdei.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 40 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 5656830efff4..3bee2719d6f4 100644
+index 3bee2719d6f4..50b6b1d0fe72 100644
 --- a/drivers/firmware/arm_sdei.c
 +++ b/drivers/firmware/arm_sdei.c
-@@ -20,9 +20,11 @@
+@@ -912,6 +912,14 @@ static int sdei_get_conduit(struct platform_device *pdev)
+ 		}
  
- #include <linux/acpi.h>
- #include <linux/arm-smccc.h>
-+#include <linux/atomic.h>
- #include <linux/bitops.h>
- #include <linux/compiler.h>
- #include <linux/cpuhotplug.h>
-+#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/hardirq.h>
-@@ -65,12 +67,49 @@ struct sdei_event {
- 	u8			priority;
- 
- 	/* This pointer is handed to firmware as the event argument. */
--	struct sdei_registered_event *registered;
-+	union {
-+		/* Shared events */
-+		struct sdei_registered_event *registered;
-+
-+		/* CPU private events */
-+		struct sdei_registered_event __percpu *private_registered;
-+	};
- };
- 
- static LIST_HEAD(sdei_events);
- static DEFINE_SPINLOCK(sdei_events_lock);
- 
-+/* When frozen, cpu-hotplug notifiers shouldn't unregister/re-register events */
-+static bool frozen;
-+
-+/* Private events are registered/enabled via IPI passing one of these */
-+struct sdei_crosscall_args {
-+	struct sdei_event *event;
-+	atomic_t errors;
-+	int first_error;
-+};
-+
-+#define CROSSCALL_INIT(arg, event)	(arg.event = event, \
-+					 arg.first_error = 0, \
-+					 atomic_set(&arg.errors, 0))
-+
-+static inline int sdei_do_cross_call(void *fn, struct sdei_event * event)
-+{
-+	struct sdei_crosscall_args arg;
-+
-+	CROSSCALL_INIT(arg, event);
-+	on_each_cpu(fn, &arg, true);
-+
-+	return arg.first_error;
-+}
-+
-+static inline void
-+sdei_cross_call_return(struct sdei_crosscall_args *arg, int err)
-+{
-+	if (err && (atomic_inc_return(&arg->errors) == 1))
-+		arg->first_error = err;
-+}
-+
- static int sdei_to_linux_errno(unsigned long sdei_err)
- {
- 	switch (sdei_err) {
-@@ -214,6 +253,26 @@ static struct sdei_event *sdei_event_create(u32 event_num,
- 		reg->callback = cb;
- 		reg->callback_arg = cb_arg;
- 		event->registered = reg;
-+	} else {
-+		int cpu;
-+		struct sdei_registered_event __percpu *regs;
-+
-+		regs = alloc_percpu(struct sdei_registered_event);
-+		if (!regs) {
-+			kfree(event);
-+			return ERR_PTR(-ENOMEM);
+ 		pr_warn("invalid \"method\" property: %s\n", method);
++	} else if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled) {
++		if (acpi_psci_use_hvc()) {
++			sdei_firmware_call = &sdei_smccc_hvc;
++			return CONDUIT_HVC;
++		} else {
++			sdei_firmware_call = &sdei_smccc_smc;
++			return CONDUIT_SMC;
 +		}
-+
-+		for_each_possible_cpu(cpu) {
-+			reg = per_cpu_ptr(regs, cpu);
-+
-+			reg->event_num = event->event_num;
-+			reg->priority = event->priority;
-+			reg->callback = cb;
-+			reg->callback_arg = cb_arg;
-+		}
-+
-+		event->private_registered = regs;
  	}
  
- 	if (sdei_event_find(event_num)) {
-@@ -235,6 +294,8 @@ static void sdei_event_destroy(struct sdei_event *event)
- 
- 	if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		kfree(event->registered);
-+	else
-+		free_percpu(event->private_registered);
- 
- 	kfree(event);
- }
-@@ -265,11 +326,6 @@ static void _ipi_mask_cpu(void *ignored)
- 	sdei_mask_local_cpu();
+ 	return CONDUIT_INVALID;
+@@ -1025,14 +1033,45 @@ static bool __init sdei_present_dt(void)
+ 	return true;
  }
  
--static int sdei_cpuhp_down(unsigned int ignored)
--{
--	return sdei_mask_local_cpu();
--}
--
- int sdei_unmask_local_cpu(void)
- {
- 	int err;
-@@ -291,11 +347,6 @@ static void _ipi_unmask_cpu(void *ignored)
- 	sdei_unmask_local_cpu();
- }
- 
--static int sdei_cpuhp_up(unsigned int ignored)
--{
--	return sdei_unmask_local_cpu();
--}
--
- static void _ipi_private_reset(void *ignored)
- {
- 	int err;
-@@ -346,6 +397,16 @@ static int sdei_api_event_enable(u32 event_num)
- 			      0, NULL);
- }
- 
-+static void _ipi_event_enable(void *data)
++static bool __init sdei_present_acpi(void)
 +{
-+	int err;
-+	struct sdei_crosscall_args *arg = data;
++	acpi_status status;
++	struct platform_device *pdev;
++	struct acpi_table_header *sdei_table_header;
 +
-+	err = sdei_api_event_enable(arg->event->event_num);
++	if (acpi_disabled)
++		return false;
 +
-+	sdei_cross_call_return(arg, err);
-+}
++	status = acpi_get_table(ACPI_SIG_SDEI, 0, &sdei_table_header);
++	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
++		const char *msg = acpi_format_exception(status);
 +
- int sdei_event_enable(u32 event_num)
- {
- 	int err = -EINVAL;
-@@ -357,6 +418,8 @@ int sdei_event_enable(u32 event_num)
- 		err = -ENOENT;
- 	else if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		err = sdei_api_event_enable(event->event_num);
-+	else
-+		err = sdei_do_cross_call(_ipi_event_enable, event);
- 	spin_unlock(&sdei_events_lock);
- 
- 	return err;
-@@ -369,6 +432,16 @@ static int sdei_api_event_disable(u32 event_num)
- 			      0, 0, NULL);
- }
- 
-+static void _ipi_event_disable(void *data)
-+{
-+	int err;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	err = sdei_api_event_disable(arg->event->event_num);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- int sdei_event_disable(u32 event_num)
- {
- 	int err = -EINVAL;
-@@ -380,6 +453,9 @@ int sdei_event_disable(u32 event_num)
- 		err = -ENOENT;
- 	else if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		err = sdei_api_event_disable(event->event_num);
-+	else
-+		err = sdei_do_cross_call(_ipi_event_disable, event);
-+
- 	spin_unlock(&sdei_events_lock);
- 
- 	return err;
-@@ -392,6 +468,27 @@ static int sdei_api_event_unregister(u32 event_num)
- 			      0, 0, 0, NULL);
- }
- 
-+static void _local_event_unregister(void *data)
-+{
-+	int err;
-+	u64 result;
-+	struct sdei_registered_event *reg;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	WARN_ON_ONCE(preemptible());
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
-+	err = sdei_api_event_status(reg->event_num, &result);
-+	if (!err) {
-+		reg->was_enabled = !!(result & BIT(SDEI_EVENT_STATUS_ENABLED));
-+
-+		err = sdei_api_event_unregister(arg->event->event_num);
++		pr_info("Failed to get ACPI:SDEI table, %s\n", msg);
 +	}
++	if (ACPI_FAILURE(status))
++		return false;
 +
-+	sdei_cross_call_return(arg, err);
++	pdev = platform_device_register_simple(sdei_driver.driver.name, 0, NULL,
++					       0);
++	if (IS_ERR(pdev))
++		return false;
++
++	return true;
 +}
 +
- static int _sdei_event_unregister(struct sdei_event *event)
+ static int __init sdei_init(void)
  {
- 	int err;
-@@ -412,7 +509,7 @@ static int _sdei_event_unregister(struct sdei_event *event)
- 		return sdei_api_event_unregister(event->event_num);
- 	}
+-	if (sdei_present_dt())
++	if (sdei_present_dt() || sdei_present_acpi())
+ 		platform_driver_register(&sdei_driver);
  
--	return -EINVAL;
-+	return sdei_do_cross_call(_local_event_unregister, event);
+ 	return 0;
  }
  
- int sdei_event_unregister(u32 event_num)
-@@ -471,15 +568,41 @@ static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
- 			      flags, affinity, NULL);
- }
++/*
++ * On an ACPI system SDEI needs to be ready before HEST:GHES tries to register
++ * its events. ACPI is initialised from a subsys_initcall(), GHES is initialised
++ * by device_initcall(). We want to be called in the middle.
++ */
+ subsys_initcall_sync(sdei_init);
  
-+static void _local_event_register(void *data)
-+{
-+	int err;
-+	struct sdei_registered_event *reg;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	WARN_ON(preemptible());
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
-+	err = sdei_api_event_register(arg->event->event_num, sdei_entry_point,
-+				      reg, 0, 0);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- static int _sdei_event_register(struct sdei_event *event)
- {
-+	int err;
-+
- 	if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		return sdei_api_event_register(event->event_num,
- 					       sdei_entry_point,
- 					       event->registered,
- 					       SDEI_EVENT_REGISTER_RM_ANY, 0);
- 
--	return -EINVAL;
-+	get_online_cpus();
-+
-+	err = sdei_do_cross_call(_local_event_register, event);
-+	if (err)
-+		sdei_do_cross_call(_local_event_unregister, event);
-+
-+	put_online_cpus();
-+
-+	return err;
- }
- 
- int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
-@@ -519,6 +642,22 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
- }
- EXPORT_SYMBOL(sdei_event_register);
- 
-+static void _local_event_reenable(void *data)
-+{
-+	int err = 0;
-+	struct sdei_registered_event *reg;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	WARN_ON_ONCE(preemptible());
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
-+	if (reg->was_enabled)
-+		err = sdei_api_event_enable(arg->event->event_num);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- static int sdei_reregister_event(struct sdei_event *event)
- {
- 	int err;
-@@ -535,6 +674,8 @@ static int sdei_reregister_event(struct sdei_event *event)
- 	if (event->type == SDEI_EVENT_TYPE_SHARED) {
- 		if (event->registered->was_enabled)
- 			err = sdei_api_event_enable(event->event_num);
-+	} else {
-+		err = sdei_do_cross_call(_local_event_reenable, event);
- 	}
- 
- 	if (err)
-@@ -559,6 +700,68 @@ static int sdei_reregister_events(void)
- 	return err;
- }
- 
-+static int sdei_cpuhp_down(unsigned int cpu)
-+{
-+	struct sdei_event *event;
-+	struct sdei_crosscall_args arg;
-+
-+	if (frozen) {
-+		/* All events unregistered  */
-+		return sdei_mask_local_cpu();
-+	}
-+
-+	/* un-register private events */
-+	spin_lock(&sdei_events_lock);
-+	list_for_each_entry(event, &sdei_events, list) {
-+		if (event->type == SDEI_EVENT_TYPE_SHARED)
-+			continue;
-+
-+		CROSSCALL_INIT(arg, event);
-+		/* call the cross-call function locally... */
-+		_local_event_unregister(&arg);
-+		if (arg.first_error)
-+			pr_err("Failed to unregister event %u: %d\n",
-+			       event->event_num, arg.first_error);
-+	}
-+	spin_unlock(&sdei_events_lock);
-+
-+	return sdei_mask_local_cpu();
-+}
-+
-+static int sdei_cpuhp_up(unsigned int cpu)
-+{
-+	struct sdei_event *event;
-+	struct sdei_crosscall_args arg;
-+
-+	if (frozen) {
-+		/* Events will be re-registered when we thaw. */
-+		return sdei_unmask_local_cpu();
-+	}
-+
-+	/* re-register/enable private events */
-+	spin_lock(&sdei_events_lock);
-+	list_for_each_entry(event, &sdei_events, list) {
-+		if (event->type == SDEI_EVENT_TYPE_SHARED)
-+			continue;
-+
-+		CROSSCALL_INIT(arg, event);
-+		/* call the cross-call function locally... */
-+		_local_event_register(&arg);
-+		if (arg.first_error)
-+			pr_err("Failed to re-register event %u: %d\n",
-+			       event->event_num, arg.first_error);
-+
-+		CROSSCALL_INIT(arg, event);
-+		_local_event_reenable(&arg);
-+		if (arg.first_error)
-+			pr_err("Failed to re-enable event %u: %d\n",
-+			       event->event_num, arg.first_error);
-+	}
-+	spin_unlock(&sdei_events_lock);
-+
-+	return sdei_unmask_local_cpu();
-+}
-+
- /* When entering idle, mask/unmask events for this cpu */
- static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
- 			    void *data)
-@@ -611,6 +814,7 @@ static int sdei_device_freeze(struct device *dev)
- {
- 	int err;
- 
-+	frozen = true;
- 	err = sdei_event_unregister_all();
- 	if (err)
- 		return err;
-@@ -620,9 +824,13 @@ static int sdei_device_freeze(struct device *dev)
- 
- static int sdei_device_thaw(struct device *dev)
- {
-+	int err;
-+
- 	sdei_device_resume(dev);
- 
--	return sdei_reregister_events();
-+	err = sdei_reregister_events();
-+	frozen = false;
-+	return err;
- }
- 
- static int sdei_device_restore(struct device *dev)
-@@ -654,6 +862,12 @@ static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
- 
- 	sdei_platform_reset();
- 
-+	/*
-+	 * There is now no point trying to unregister private events if we go on
-+	 * to take CPUs offline.
-+	 */
-+	frozen = true;
-+
- 	return NOTIFY_OK;
- }
- 
+ int sdei_event_handler(struct pt_regs *regs,
 -- 
 2.13.3
