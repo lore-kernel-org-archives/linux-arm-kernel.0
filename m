@@ -1,86 +1,48 @@
-From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Fri, 22 Sep 2017 15:25:22 +0800
-Subject: [PATCH 2/2] pci/layerscape: change the default error response behavior
-In-Reply-To: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
-References: <20170922072522.36306-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20170922072522.36306-3-Zhiqiang.Hou@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 22 Sep 2017 09:49:45 +0200
+Subject: [PATCH 02/12] ARM: dts: sunxi: h3/h5: Fix i2c2 register address
+In-Reply-To: <20170921172151.29779-3-clabbe.montjoie@gmail.com>
+References: <20170921172151.29779-1-clabbe.montjoie@gmail.com>
+ <20170921172151.29779-3-clabbe.montjoie@gmail.com>
+Message-ID: <20170922074945.jzibcgromgbhggxy@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Minghuan Lian <Minghuan.Lian@nxp.com>
+On Thu, Sep 21, 2017 at 05:21:41PM +0000, Corentin Labbe wrote:
+> The unit address and register address does not match.
+> This patch fix the register address with the good one.
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> index 59ddac9f65a7..37464d4d07f6 100644
+> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> @@ -630,9 +630,9 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> -		i2c2: i2c at 01c2b400 {
+> +		i2c2: i2c at 1c2b400 {
 
-By default, when the PCIe controller experiences an erroneous
-completion from an external completer for its outbound non-posted
-request, it always sends an OKAY response to the device's internal
-AXI slave system interface. However, such default system error
-response behavior cannot be used for other types of outbound
-non-posted requests. For example, the outbound memory read
-transaction requires an actual ERROR response, like UR completion
-or completion timeout. The patch is to fix it by forwarding
-the error response of the non-posted request.
+This one should be merged into the previous patch.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
- drivers/pci/dwc/pci-layerscape.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+The serie looks good otherwise, onec it's fixed, you can add my
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-index 3b01e309a55e..a647090c140e 100644
---- a/drivers/pci/dwc/pci-layerscape.c
-+++ b/drivers/pci/dwc/pci-layerscape.c
-@@ -33,6 +33,8 @@
- 
- /* PEX Internal Configuration Registers */
- #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
-+#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response Register */
-+#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted request */
- 
- #define PCIE_IATU_NUM		6
- 
-@@ -54,6 +56,19 @@ struct ls_pcie {
- 
- #define to_ls_pcie(x)	dev_get_drvdata((x)->dev)
- 
-+static int err_response_flag = 1;
-+
-+static int __init ls_pcie_param(char *p)
-+{
-+	if (p && strncmp(p, "no-err-response", 15) == 0)
-+		err_response_flag = 0;
-+	else
-+		err_response_flag = 1;
-+
-+	return 0;
-+}
-+early_param("ls_pcie", ls_pcie_param);
-+
- static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
- {
- 	struct dw_pcie *pci = pcie->pci;
-@@ -124,6 +139,14 @@ static int ls_pcie_link_up(struct dw_pcie *pci)
- 	return 1;
- }
- 
-+/* Forward error response of outbound non-posted requests */
-+static void ls_pcie_fix_error_response(struct ls_pcie *pcie)
-+{
-+	struct dw_pcie *pci = pcie->pci;
-+
-+	iowrite32(PCIE_ABSERR_SETTING, pci->dbi_base + PCIE_ABSERR);
-+}
-+
- static int ls_pcie_host_init(struct pcie_port *pp)
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
-@@ -135,6 +158,8 @@ static int ls_pcie_host_init(struct pcie_port *pp)
- 	 * dw_pcie_setup_rc() will reconfigure the outbound windows.
- 	 */
- 	ls_pcie_disable_outbound_atus(pcie);
-+	if (err_response_flag)
-+		ls_pcie_fix_error_response(pcie);
- 
- 	dw_pcie_dbi_ro_wr_en(pci);
- 	ls_pcie_clear_multifunction(pcie);
+Maxime
+
 -- 
-2.14.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170922/62b866d5/attachment.sig>
