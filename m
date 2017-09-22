@@ -1,44 +1,24 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 22 Sep 2017 14:42:23 +0530
-Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
-In-Reply-To: <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
-References: <20170920180132.4373-1-s-anna@ti.com>
- <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
- <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
-Message-ID: <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 22 Sep 2017 11:23:27 +0200
+Subject: [PATCH v2 0/8] ARM: dts: rockchip: add Utgard Mali nodes for some
+ socs
+In-Reply-To: <20170915091812.13368-1-heiko@sntech.de>
+References: <20170915091812.13368-1-heiko@sntech.de>
+Message-ID: <3670729.UWqOD6MBPG@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
-
-On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
-> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
->> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
->>> Enable the CMA and DMA_CMA Kconfig options by default for
->>> Davinci platforms. Davinci remoteproc driver is one of the
->>> modules that depends on these options, and this allows the
->>> driver to be made visible for selection with menuconfig.
->>>
->>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>> ---
->>> Hi Sekhar,
->>>
->>> Here's the patch that enables CMA as per your request. Patch based
->>> on your v4.15/defconfig branch.
->>
->> Applied! I guess you will be sending another patch enabling the
->> remoteproc driver itself?
+Am Freitag, 15. September 2017, 11:18:04 CEST schrieb Heiko Stuebner:
+> This adds a mali-supply similar to the Midgard binding, the
+> compatibles for 3 Rockchip socs and the nodes for these.
 > 
-> Thanks. Well, one always needs a firmware image in their filesystem
-> without which enabling the driver is meaningless (it would fail). So was
-> not planning to enable it by default.
+> The rk3036 and rk3188 gpus were tested, on the boards that
+> get their gpus enabled, using the current Lima resurrection
+> project and were able to probe the gpus sucessfully and draw
+> a nice red-triangle in an off-screen application.
+> 
+> The only special thing Rockchip Malis do, is that all MMUs have
+> a shared interrupt and all PPs also have a shared interrupt, but
+> that works out well with the current binding.
 
-But the errors will show up only on DA850 LCDK where we have enabled the
-DSP by default in DT because its an important usecase there. I think it
-is important for users to see those errors.
-
-(besides the usual benefits of having the module enabled to catch build
-and runtime issues easily).
-
-Thanks,
-Sekhar
+applied all 8 for 4.15 with Rob's Acks for the binding changes.
