@@ -1,131 +1,64 @@
-From: jliang@xilinx.com (Jiaying Liang)
-Date: Fri, 22 Sep 2017 06:05:18 +0000
-Subject: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
- Mailbox
-In-Reply-To: <1506034724-14639-1-git-send-email-jliang@xilinx.com>
-References: <1506034724-14639-1-git-send-email-jliang@xilinx.com>
-Message-ID: <BY1PR0201MB0885E6563EBAFE83DF8822A4B0670@BY1PR0201MB0885.namprd02.prod.outlook.com>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Fri, 22 Sep 2017 06:52:48 +0000
+Subject: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
+In-Reply-To: <20170921090332.GS15749@verge.net.au>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-5-git-send-email-chris.paterson2@renesas.com>
+ <CAMuHMdVFPiXe9trwprNfX=p8-OKbrcgVSrwmveYhXGm=kd2bfQ@mail.gmail.com>
+ <20170921083839.GH15749@verge.net.au> <20170921084219.GK15749@verge.net.au>
+ <TY1PR06MB089549AB7DCF1C03605EF421C0660@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <20170921090332.GS15749@verge.net.au>
+Message-ID: <TY1PR06MB0702E99A48352C055705E3A9B7670@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wendy Liang [mailto:wendy.liang at xilinx.com]
-> Sent: Thursday, September 21, 2017 3:59 PM
-> To: linux-kernel at vger.kernel.org
-> Cc: jassisinghbrar at gmail.com; Cyril Chemparathy <cyrilc@xilinx.com>;
-> Michal Simek <michals@xilinx.com>; Jiaying Liang <jliang@xilinx.com>
-> Subject: [RFC LINUX PATCH] Dcoumentation: dt: mailbox: Add Xilinx IPI
-> Mailbox
-> 
-> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in ZynqMP
-> SoC used for the communication between various processor systems.
-> 
-> Signed-off-by: Wendy Liang <jliang@xilinx.com>
-> ---
->  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 88
-> ++++++++++++++++++++++
->  1 file changed, 88 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> mailbox.txt b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> mailbox.txt
-> new file mode 100644
-> index 0000000..5d915d1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.
-> +++ txt
-> @@ -0,0 +1,88 @@
-> +Xilinx IPI Mailbox Driver
-> +========================================
-> +
-> +The Xilinx IPI(Inter Processor Interrupt) mailbox driver is a mailbox
-> +controller that manages the messaging between two IPI agents. Each IPI
-> +mailbox has request and response buffers between the two IPI agents.
-> +
-> ++-------------------------------------+
-> +|                                     | Xilinx ZynqMP IPI Mailbox
-> +| Controller|
-> +|                                     |
-> +|                       +-------------+
-> +|                       |     SMC     |
-> +|                       |             |
-> ++--------+--------------+------+------+
-> +         |                     |
-> +         |          +-----------------+
-> +         |                     |   ATF (ARM trusted firmware)
-> +         |                     |
-> ++-------------------------------------+
-> +         |                     |   Hardware
-> +         |                     |
-> + +--------------------------------------+
-> +                               |        |
-> + +----------------------+ +-----------+ |
-> + | | Buffers between    | | IPI Agent | |
-> + | | two IPI agents     | | Registers | |
-> + | +--------------------+ +-----------+ |
-> + |                                      |
-> + |   Xilinx ZynqMP IPI                  |
-> + +--------------------------------------+
-> +
-> +
-> +Message Manager Device Node:
-> +===========================
-> +Required properties:
-> +--------------------
-> +- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
-> +- ipi-smc-fid-base	Base offset of SMC function IDs for IPI mailbox SMC.
-> +			It contains the IPI IDs of the two IPI agents.
-> +- reg:			IPI request and response buffers address range. It
-> +			can be the IPI buffers from the hardware or it can
-> +			be carved out shared memory.
-> +- reg-names:		Reg resource name of the IPI request and response
-> +			buffers.
-> +- #mbox-cells:		Shall be 1. Contains the logical channel IDs of the
-> +			channels on the IPI mailbox.
-> +- interrupt-parent:	Phandle for the interrupt controller.
-> +- interrupts:		Interrupt mapping.
-> +
-> +Required properties:
-> +--------------------
-> +- method:		The method of accessing the IPI agent registers.
-> +			Permitted values are: "smc" and "hvc". Default is
-> +			"smc".
-> +Example:
-> +------------
-> +	/* APU IPI mailbox driver */
-> +	ipis {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		ipi_mailbox_apu_rpu0: ipi_mailbox at 0 {
-> +			compatible = "xlnx,zynqmp-ipi-mailbox";
-> +			reg = <0 0xff990400 40>;
-> +			reg-names = "apu-rpu0";
-> +			ipi-smc-fid-base = <0x1010>;
-> +			method = "smc";
-> +			#mbox-cells = <1>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0 35 4>;
-> +		};
-> +		ipi_mailbox_apu_rpu1: ipi_mailbox at 1 {
-> +			compatible = "xlnx,zynqmp-ipi-mailbox";
-> +			reg = <0 0xff990440 40>;
-> +			reg-names = "apu-rpu1";
-> +			ipi-smc-fid-base = <0x1020>;
-> +			method = "smc";
-> +			#mbox-cells = <1>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0 35 4>;
-> +		};
-> +	};
-> +	device0: device0 {
-> +		...
-> +		mbox-names = "rpu0", "rpu1",
-> +		mboxes = <&ipi_mailbox_apu_rpu0 0>,
-> +			 < &ipi_mailbox_apu_rpu1 0>;
-> +	};
-> --
-> 2.7.4
 
-cc: device tree and linux arm kernel mailing lists.
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 21 September 2017 10:04
+> 
+> On Thu, Sep 21, 2017 at 08:53:00AM +0000, Fabrizio Castro wrote:
+> > Hello Simon,
+> >
+> > > -----Original Message-----
+> > > From: Simon Horman [mailto:horms at verge.net.au]
+> > > Sent: 21 September 2017 09:42
+> > > To: Geert Uytterhoeven <geert@linux-m68k.org>
+> > > Cc: Chris Paterson <Chris.Paterson2@renesas.com>; Rob Herring
+> > > <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> Magnus
+> > > Damm <magnus.damm@gmail.com>; Russell King
+> <linux@armlinux.org.uk>;
+> > > Fabrizio Castro <fabrizio.castro@bp.renesas.com>;
+> > > devicetree at vger.kernel.org; Linux-Renesas
+> > > <linux-renesas-soc@vger.kernel.org>; linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: Re: [PATCH 4/8] ARM: dts: iwg22d: Enable SDHI0 controller
+> > >
+> > > On Thu, Sep 21, 2017 at 10:38:40AM +0200, Simon Horman wrote:
+> > > > On Wed, Sep 20, 2017 at 01:40:20PM +0200, Geert Uytterhoeven wrote:
+> > > > > On Wed, Sep 13, 2017 at 7:05 PM, Chris Paterson
+> > > > > <chris.paterson2@renesas.com> wrote:
+> > > > > > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > > > > >
+> > > > > > Enable the SDHI0 controller on iWave RZ/G1E carrier board.
+> > > > > >
+> > > > > > Signed-off-by: Fabrizio Castro
+> > > > > > <fabrizio.castro@bp.renesas.com>
+> > > > > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> > > > >
+> > > > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > >
+> > > > Thanks, applied.
+> > >
+> > > Sorry, I somehow overlooked Fabrizio's comments.
+> > > I have dropped this patch for now.
+> >
+> > Thank you for doing this.
+> > We are working on a new patch now, I'll submit a V2 as soon as it is ready.
+> > Just to recap (all in one place), we found an HW issue and a SW one
+> preventing SDHI0 from working properly at UHS SDR50 and SDR104,
+> therefore we need a new patch to limit the speed of this interface.
+> 
+> Thanks for catching this, UHS can be quite troublesome in my experience.
+
+So we've seen!
