@@ -1,69 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 22 Sep 2017 14:04:49 +0200
-Subject: [PATCH v2 0/4] arm64: marvell: 7k/8k: improve network support
-In-Reply-To: <20170921075410.19072-1-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Thu, 21 Sep 2017 09:54:06 +0200")
-References: <20170921075410.19072-1-antoine.tenart@free-electrons.com>
-Message-ID: <87k20rkkgu.fsf@free-electrons.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Fri, 22 Sep 2017 14:05:32 +0200
+Subject: [PATCH v2 1/9] clk: at91: pmc: Wait for clocks when resuming
+In-Reply-To: <20170915140411.31716-2-romain.izard.pro@gmail.com>
+References: <20170915140411.31716-1-romain.izard.pro@gmail.com>
+ <20170915140411.31716-2-romain.izard.pro@gmail.com>
+Message-ID: <20170922120532.jddabnd57yt3iowe@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On jeu., sept. 21 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On Fri, Sep 15, 2017 at 04:04:03PM +0200, Romain Izard wrote:
+> Wait for the syncronization of all clocks when resuming, not only the
+> UPLL clock. Do not use regmap_read_poll_timeout, as it will call BUG()
+> when interrupts are masked, which is the case in here.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-> Hi all,
->
-> This series improves the network support on Marvell 7k and 8k platforms
-> by adding descriptions of the comphy, and by using the comphy in already
-> available networking ports. The series also introduces a description of
-> the SFP ports on the Marvell Armada 7040-db and 8040-db.
->
-> Two defconfig patches also improve the Marvell ARM64 support by enabling
-> required options allowing to use the networking ports properly.
->
-> This series follows recent improvements in the PPv2 driver.
->
-> Based on v4.14-rc1, and tested on the Marvell Armada 7040-db, 8040-db
-> and 8040-mcbin.
->
-> Thanks!
-> Antoine
->
-> Since v1:
->   - Added comments in nodes using both a network PHY and a generic PHY.
->   - 4 patches were applied on mvebu trees.
->
-> Antoine Tenart (4):
->   arm64: dts: marvell: mcbin: add comphy references to Ethernet ports
->   arm64: dts: marvell: 7040-db: add comphy reference to Ethernet port
->   arm64: dts: marvell: 7040-db: enable the SFP port
->   arm64: dts: marvell: 8040-db: enable the SFP ports
->
-
-All applied on mvebu/dt64 and first with Testdd-by from Andrew.
-
-Thanks,
-
-Gregory
+I faced the same issue because of the use of regmap_read_poll_timeout
+when timekeeping is not ready.
 
 
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts    | 11 +++++++++++
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts    | 10 ++++++++++
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |  9 +++++++++
->  3 files changed, 30 insertions(+)
->
+Ludovic
+
+> ---
+>  drivers/clk/at91/pmc.c | 24 ++++++++++++++++--------
+>  1 file changed, 16 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 775af473fe11..5c2b26de303e 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -107,10 +107,20 @@ static int pmc_suspend(void)
+>  	return 0;
+>  }
+>  
+> +static bool pmc_ready(unsigned int mask)
+> +{
+> +	unsigned int status;
+> +
+> +	regmap_read(pmcreg, AT91_PMC_SR, &status);
+> +
+> +	return ((status & mask) == mask) ? 1 : 0;
+> +}
+> +
+>  static void pmc_resume(void)
+>  {
+> -	int i, ret = 0;
+> +	int i;
+>  	u32 tmp;
+> +	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
+>  
+>  	regmap_read(pmcreg, AT91_PMC_MCKR, &tmp);
+>  	if (pmc_cache.mckr != tmp)
+> @@ -134,13 +144,11 @@ static void pmc_resume(void)
+>  			     AT91_PMC_PCR_CMD);
+>  	}
+>  
+> -	if (pmc_cache.uckr & AT91_PMC_UPLLEN) {
+> -		ret = regmap_read_poll_timeout(pmcreg, AT91_PMC_SR, tmp,
+> -					       !(tmp & AT91_PMC_LOCKU),
+> -					       10, 5000);
+> -		if (ret)
+> -			pr_crit("USB PLL didn't lock when resuming\n");
+> -	}
+> +	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
+> +		mask |= AT91_PMC_LOCKU;
+> +
+> +	while (!pmc_ready(mask))
+> +		cpu_relax();
+>  }
+>  
+>  static struct syscore_ops pmc_syscore_ops = {
 > -- 
-> 2.13.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 2.11.0
+> 
