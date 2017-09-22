@@ -1,128 +1,108 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 22 Sep 2017 19:26:06 +0100
-Subject: [PATCH v3 05/13] KVM: arm64: Stop save/restoring host tpidr_el1 on VHE
+Date: Fri, 22 Sep 2017 19:26:09 +0100
+Subject: [PATCH v3 08/13] arm64: Add vmap_stack header file
 In-Reply-To: <20170922182614.27885-1-james.morse@arm.com>
 References: <20170922182614.27885-1-james.morse@arm.com>
-Message-ID: <20170922182614.27885-6-james.morse@arm.com>
+Message-ID: <20170922182614.27885-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that a VHE host uses tpidr_el2 for the cpu offset we no longer
-need KVM to save/restore tpidr_el1. Move this from the 'common' code
-into the non-vhe code. While we're at it, on VHE we don't need to
-save the ELR or SPSR as kernel_entry in entry.S will have pushed these
-onto the kernel stack, and will restore them from there. Move these
-to the non-vhe code as we need them to get back to the host.
+Today the arm64 arch code allocates an extra IRQ stack per-cpu. If we
+also have SDEI and VMAP stacks we need two extra per-cpu VMAP stacks.
 
-Finally remove the always-copy-tpidr we hid in the stage2 setup
-code, cpufeature's enable callback will do this for VHE, we only
-need KVM to do it for non-vhe. Add the copy into kvm-init instead.
+Move the VMAP stack allocation out to a helper in a new header file.
+This avoids missing THREADINFO_GFP, or getting the all-important alignment
+wrong.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
 ---
-Changes since v1:
- * Switched KVM<->arm64 in the subject.
+This patch is new for v3. Having a bare prototype if VMAP stacks aren't
+enabled allows us to avoid ifdeffery but still forbid building code using
+the symbol.
 
- arch/arm64/kvm/hyp-init.S      |  4 ++++
- arch/arm64/kvm/hyp/s2-setup.c  |  3 ---
- arch/arm64/kvm/hyp/sysreg-sr.c | 16 ++++++++--------
- 3 files changed, 12 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/vmap_stack.h | 41 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/irq.c             | 13 ++----------
+ 2 files changed, 43 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/vmap_stack.h
 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f9615582377..fbf259893f6a 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -122,6 +122,10 @@ CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
- 	kern_hyp_va	x2
- 	msr	vbar_el2, x2
- 
-+	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
-+	mrs	x1, tpidr_el1
-+	msr	tpidr_el2, x1
+diff --git a/arch/arm64/include/asm/vmap_stack.h b/arch/arm64/include/asm/vmap_stack.h
+new file mode 100644
+index 000000000000..f41d043cac31
+--- /dev/null
++++ b/arch/arm64/include/asm/vmap_stack.h
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_VMAP_STACK_H
++#define __ASM_VMAP_STACK_H
 +
- 	/* Hello, World! */
- 	eret
- ENDPROC(__kvm_hyp_init)
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index 7fb88274eba1..a81f5e10fc8c 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -84,8 +84,5 @@ u32 __hyp_text __init_stage2_translation(void)
++#include <linux/vmalloc.h>
++#include <asm/memory.h>
++#include <asm/pgtable.h>
++#include <asm/thread_info.h>
++
++#ifdef CONFIG_VMAP_STACK
++/*
++ * To ensure that VMAP'd stack overflow detection works correctly, all VMAP'd
++ * stacks need to have the same alignment.
++ */
++static inline unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node)
++{
++	return __vmalloc_node_range(stack_size, THREAD_ALIGN,
++				    VMALLOC_START, VMALLOC_END,
++				    THREADINFO_GFP, PAGE_KERNEL, 0, node,
++				    __builtin_return_address(0));
++}
++
++#else
++unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node); // link error
++
++#endif /* CONFIG_VMAP_STACK */
++#endif /* __ASM_VMAP_STACK_H */
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 713561e5bcab..60e5fc661f74 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -29,6 +29,7 @@
+ #include <linux/irqchip.h>
+ #include <linux/seq_file.h>
+ #include <linux/vmalloc.h>
++#include <asm/vmap_stack.h>
  
- 	write_sysreg(val, vtcr_el2);
+ unsigned long irq_err_count;
  
--	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
--	write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+@@ -58,17 +59,7 @@ static void init_irq_stacks(void)
+ 	unsigned long *p;
+ 
+ 	for_each_possible_cpu(cpu) {
+-		/*
+-		* To ensure that VMAP'd stack overflow detection works
+-		* correctly, the IRQ stacks need to have the same
+-		* alignment as other stacks.
+-		*/
+-		p = __vmalloc_node_range(IRQ_STACK_SIZE, THREAD_ALIGN,
+-					 VMALLOC_START, VMALLOC_END,
+-					 THREADINFO_GFP, PAGE_KERNEL,
+-					 0, cpu_to_node(cpu),
+-					 __builtin_return_address(0));
 -
- 	return parange;
++		p = arch_alloc_vmap_stack(IRQ_STACK_SIZE, cpu_to_node(cpu));
+ 		per_cpu(irq_stack_ptr, cpu) = p;
+ 	}
  }
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 934137647837..c54cc2afb92b 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -27,8 +27,8 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
- /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-- * VHE: Host must save tpidr*_el[01], actlr_el1, mdscr_el1, sp0, pc,
-- * pstate, and guest must save everything.
-+ * VHE: Host must save tpidr*_el0, actlr_el1, mdscr_el1, sp_el0,
-+ * and guest must save everything.
-  */
- 
- static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-@@ -36,11 +36,8 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
- 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
- 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
--	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
- 	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
--	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
--	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
- }
- 
- static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-@@ -62,10 +59,13 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
- 	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
- 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
-+	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
- 
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
-+	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
-+	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
- }
- 
- static hyp_alternate_select(__sysreg_call_save_host_state,
-@@ -89,11 +89,8 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
- 	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
- 	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
- 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
--	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
- 	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
- 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
--	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
--	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
- }
- 
- static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-@@ -115,10 +112,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
- 	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
- 	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
-+	write_sysreg(ctxt->sys_regs[TPIDR_EL1],		tpidr_el1);
- 
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
-+	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
-+	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
- }
- 
- static hyp_alternate_select(__sysreg_call_restore_host_state,
 -- 
 2.13.3
