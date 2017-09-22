@@ -1,134 +1,206 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Sep 2017 17:28:36 +0100
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170922122419.GH20805@n2100.armlinux.org.uk>
-References: <20170920162208.GB536@obsidianresearch.com>
- <20170920165141.GP20805@n2100.armlinux.org.uk>
- <20170920224522.GB20974@obsidianresearch.com>
- <20170921075907.GR20805@n2100.armlinux.org.uk>
- <20170921093218.GS20805@n2100.armlinux.org.uk>
- <20170921220510.GA11395@obsidianresearch.com>
- <20170921224541.GC20805@n2100.armlinux.org.uk>
- <20170921232040.GA15130@obsidianresearch.com>
- <20170922095713.GD20805@n2100.armlinux.org.uk>
- <20170922122419.GH20805@n2100.armlinux.org.uk>
-Message-ID: <20170922162836.GI20805@n2100.armlinux.org.uk>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 22 Sep 2017 17:39:21 +0100
+Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
+ userspace
+In-Reply-To: <5af0cb96-be13-4cc4-13bb-1f608cdc171c@huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-7-git-send-email-gengdongjiu@huawei.com>
+ <59B17438.5070501@arm.com> <2a42d1ea-3456-2873-c9ea-d8a027b59789@huawei.com>
+ <59BA7D72.4090403@arm.com> <5af0cb96-be13-4cc4-13bb-1f608cdc171c@huawei.com>
+Message-ID: <59C53CB9.5000003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 01:24:20PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 22, 2017 at 10:57:13AM +0100, Russell King - ARM Linux wrote:
-> > Maybe the solution here is to split two forms of ntp RTC synchronisation
-> > so:
-> > - If you enable CONFIG_GENERIC_CMOS_UPDATE, then you get the
-> >   update_persistent_clock*() methods called.
-> > - If you enable CONFIG_RTC_SYSTOHC, rtc_set_ntp_time() gets called.
-> > - If you enable both, then both get called at their appropriate times.
-> > 
-> > This would certainly simplify sync_cmos_clock().
-> 
-> I've just tried that out, and it doesn't work very well (not wrapping
-> the kernel messages):
-> 
-> [   18.827144] sync_rtc_clock: adjust=1506081346.710933001 target=470000000 next=1506081357.470000000 now=1506081346.710953334 delta=10.759046666 jiffies=2690
-> [   29.662077] sync_rtc_clock: adjust=1506081357.546474534 target=470000000 next=1506081368.470000000 now=1506081357.546487201 delta=10.923512799 jiffies=2731
-> [   40.671669] sync_rtc_clock: adjust=1506081368.556684059 target=470000000 next=1506081379.470000000 now=1506081368.556696727 delta=10.913303273 jiffies=2729
-> [   51.675016] sync_rtc_clock: adjust=1506081379.560649235 target=470000000 next=1506081390.470000000 now=1506081379.560662236 delta=10.909337764 jiffies=2728
-> [   62.682385] sync_rtc_clock: adjust=1506081390.568637970 target=470000000 next=1506081401.470000000 now=1506081390.568648637 delta=10.901351363 jiffies=2726
-> [   73.689831] sync_rtc_clock: adjust=1506081401.576696708 target=470000000 next=1506081412.470000000 now=1506081401.576708376 delta=10.893291624 jiffies=2724
-> [   84.697233] sync_rtc_clock: adjust=1506081412.584695110 target=470000000 next=1506081423.470000000 now=1506081412.584723778 delta=10.885276222 jiffies=2722
-> [   95.704624] sync_rtc_clock: adjust=1506081423.592724847 target=470000000 next=1506081434.470000000 now=1506081423.592736847 delta=10.877263153 jiffies=2720
-> [  106.711941] sync_rtc_clock: adjust=1506081434.600651911 target=470000000 next=1506081445.470000000 now=1506081434.600665579 delta=10.869334421 jiffies=2718
-> [  117.719334] sync_rtc_clock: adjust=1506081445.608659647 target=470000000 next=1506081456.470000000 now=1506081445.608673981 delta=10.861326019 jiffies=2716
-> [  128.726723] sync_rtc_clock: adjust=1506081456.616661715 target=470000000 next=1506081467.470000000 now=1506081456.616676049 delta=10.853323951 jiffies=2714
-> [  139.734103] sync_rtc_clock: adjust=1506081467.624659450 target=470000000 next=1506081478.470000000 now=1506081467.624672451 delta=10.845327549 jiffies=2712
-> [  150.741489] sync_rtc_clock: adjust=1506081478.632661185 target=470000000 next=1506081489.470000000 now=1506081478.632673519 delta=10.837326481 jiffies=2710
-> [  161.748870] sync_rtc_clock: adjust=1506081489.640655587 target=470000000 next=1506081500.470000000 now=1506081489.640668254 delta=10.829331746 jiffies=2708
-> [  172.756352] sync_rtc_clock: adjust=1506081500.648758661 target=470000000 next=1506081511.470000000 now=1506081500.648772995 delta=10.821227005 jiffies=2706
-> [  183.763642] sync_rtc_clock: adjust=1506081511.656658057 target=470000000 next=1506081522.470000000 now=1506081511.656671391 delta=10.813328609 jiffies=2704
-> [  194.771043] sync_rtc_clock: adjust=1506081522.664678127 target=470000000 next=1506081533.470000000 now=1506081522.664689794 delta=10.805310206 jiffies=2702
-> [  205.778402] sync_rtc_clock: adjust=1506081533.672649194 target=470000000 next=1506081544.470000000 now=1506081533.672662528 delta=10.797337472 jiffies=2700
-> [  216.785780] sync_rtc_clock: adjust=1506081544.680643928 target=470000000 next=1506081555.470000000 now=1506081544.680656929 delta=10.789343071 jiffies=2698
-> [  227.792447] sync_rtc_clock: adjust=1506081555.688650369 target=470000000 next=1506081566.470000000 now=1506081555.688664037 delta=10.781335963 jiffies=2696
-> [  238.798968] sync_rtc_clock: adjust=1506081566.696674887 target=470000000 next=1506081577.470000000 now=1506081566.696687889 delta=10.773312111 jiffies=2694
-> [  249.805483] sync_rtc_clock: adjust=1506081577.704652923 target=470000000 next=1506081588.470000000 now=1506081577.704666259 delta=10.765333741 jiffies=2692
-> [  260.812078] sync_rtc_clock: adjust=1506081588.712679979 target=470000000 next=1506081599.470000000 now=1506081588.712693647 delta=10.757306353 jiffies=2690
-> [  271.818656] sync_rtc_clock: adjust=1506081599.720654429 target=470000000 next=1506081610.470000000 now=1506081599.720668431 delta=10.749331569 jiffies=2688
-> [  282.825311] sync_rtc_clock: adjust=1506081610.728677710 target=470000000 next=1506081621.470000000 now=1506081610.728690045 delta=10.741309955 jiffies=2686
-> [  293.575979] sync_rtc_clock: adjust=1506081621.480653995 target=470000000 next=1506081632.470000000 now=1506081621.480666996 delta=10.989333004 jiffies=2748
-> [  304.582667] sync_rtc_clock: adjust=1506081632.488651088 target=470000000 next=1506081643.470000000 now=1506081632.488663756 delta=10.981336244 jiffies=2746
-> [  315.589372] sync_rtc_clock: adjust=1506081643.496641761 target=470000000 next=1506081654.470000000 now=1506081643.496653429 delta=10.973346571 jiffies=2744
-> 
-> As previous mentioned, this has HZ=250, so one jiffy is about 4ms.  What
-> this shows is that we're failing every single time to hit the desired
-> window - the closest we got in the 5 minutes of uptime to 470ms was
-> 480653995ns.
-> 
-> The comments in linux/workqueue.h refer to a gmane link -
-> http://thread.gmane.org/gmane.linux.kernel/1480396 but this seems to be
-> dead - "Archived At Nothing found - bye".  Looks like using gmane URLs
-> in kernel code is not a good idea, they don't seem to be persistent!
-> 
-> It's interesting to watch what's happening there - despite reducing the
-> number of jiffies each time, we still seem to be woken later and later
-> each time, with an approximate increase of 8ms or two jiffies each time.
-> Eg:
-> 
-> [  293.575979] sync_rtc_clock: adjust=1506081621.480653995 target=470000000
->  next=1506081632.470000000 now=1506081621.480666996 delta=10.989333004
->  jiffies=2748
-> [  304.582667] sync_rtc_clock: adjust=1506081632.488651088 target=470000000
->  next=1506081643.470000000 now=1506081632.488663756 delta=10.981336244
->  jiffies=2746
-> [  315.589372] sync_rtc_clock: adjust=1506081643.496641761 target=470000000
->  next=1506081654.470000000 now=1506081643.496653429 delta=10.973346571
->  jiffies=2744
-> 
-> If we do the math, then:
-> 
->  2748 jiffies is 10.992s, which is 10.989333004 rounded up to a jiffy.
->  10.992 + 1506081621.480666996 gives 1506081632.472666996, but we're
->  next called at 1506081632.488651088, which is almost 4 jiffies later
->  than requested.
-> 
->  2746 jiffies is 10.984s, which is 10.981336244 rounded up to a jiffy.
->  10.984 + 1506081632.488663756 gives 1506081643.472663756, but we're
->  next called at 1506081643.496641761, which is almost 6 jiffies later
->  than requested.
-> 
-> I'm not sure where those extra jiffies are coming from... but maybe
-> using the power efficient wq is not the best for accuracy?
-> 
-> Also notice that the target time seems to always be about 2.6ms late.
-> based on the requested jiffies, which in itself would mean we miss
-> the 1ms window in the systohc.c code.
+Hi gengdongjiu,
 
-Okay, the problem seems to be the new timer wheel code - see
-https://lwn.net/Articles/646950/
+On 18/09/17 14:36, gengdongjiu wrote:
+> On 2017/9/14 21:00, James Morse wrote:
+>> On 13/09/17 08:32, gengdongjiu wrote:
+>>> On 2017/9/8 0:30, James Morse wrote:
+>>>> On 28/08/17 11:38, Dongjiu Geng wrote:
+>>>> For BUS_MCEERR_A* from memory_failure() we can't know if they are caused by
+>>>> an access or not.
+>>
+>> Actually it looks like we can: I thought 'BUS_MCEERR_AR' could be triggered via
+>> some CPER flags, but its not. The only code that flags MF_ACTION_REQUIRED is
+>> x86's kernel-first handling, which nicely matches this 'direct access' problem.
+>> BUS_MCEERR_AR also come from KVM stage2 faults (and the x86 equivalent). Powerpc
+>> also triggers these directly, both from what look to be synchronous paths, so I
+>> think its fair to equate BUS_MCEERR_AR to a synchronous access and BUS_MCEERR_AO
+>> to something_else.
+> 
+> James, thanks for your explanation.
+> can I understand that your meaning that "BUS_MCEERR_AR" stands for synchronous access and BUS_MCEERR_AO stands for asynchronous access?
 
-This means that timers set way in the future (like more than a few
-milliseconds) can be delayed - they no longer expire "on the specified
-jiffies".  Something to bear in mind for the future, as this affects
-everything that uses normal timers.
+Not 'stands for', as the AR is Action-Required and AO Action-Optional. My point
+was I can't find a case where Action-Required is used for an error that isn't
+synchronous.
 
-I think the reason this doesn't show up for the original code is
-because of your change from a 0-1s retry to a 10s retry - the further
-the expiry into the future, the more delayed the timers can get.
+We should run this past the people who maintain the existing BUS_MCEERR_AR
+users, in case its just a severity to them.
 
-I guess we could go back to the 0-1s retry and keep using the delayed
-work queues, but I wonder if normal timers will get even less accurate
-in the future (if tglx does more work there.)
 
-The suggestion from Arjan van de Ven is to use hrtimers for this - but
-we still need the workqueue (as we may sleep) so we need a hrtimer-
-delayed workqueue.  On the face of it, that seems a contradiction in
-terms to use a hrtimer with a workqueue.
+> Then for "BUS_MCEERR_AO", how to distinguish it is asynchronous data access(SError) and PCIE AER error?
 
-I do have an implementation for the hrtimer suggestion, which I'll try
-to sort out during the remainder of the day, once I've ironed out a
-few remaining quirks.
+How would userspace get one of these memory errors for a PCIe error?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+
+> In the user space, we can check the si_code, if it is "BUS_MCEERR_AR", we use SEA notification type for the guest;
+> if it is "BUS_MCEERR_AO", we use SEI notification type for the guest.
+> Because there are only two values for si_code("BUS_MCEERR_AR" and BUS_MCEERR_AO), in which case we can use the GSIV(IRQ) notification type?
+
+This is for Qemu/kvmtool to decide, it depends on what sort of machine they are
+emulating.
+
+For example, the physical machine's memory-controller may notify the CPU about
+memory errors by triggering SError trapped to EL3, or with a dedicated FIQ, also
+routed to EL3. By the time this gets to the host kernel the distinction doesn't
+matter. The host has handled the error.
+
+For a guest, your memory-controller is effectively the host kernel. It will give
+you an BUS_MCEERR_AO signal for any guest memory that is affected, and a
+BUS_MCEERR_AR if the guest directly accesses a page of affected memory.
+
+What Qemu/kvmtool do with this is up to them. If they're emulating a machine
+with no RAS features, printing an error and exit.
+
+Otherwise BUS_MCEERR_AR could be notified as one of the flavours of IRQ, unless
+the affected vcpu has interrupts masked, in which case an SEA notification gives
+you some NMI-like behaviour.
+
+For BUS_MCEERR_AO you could use SEI, IRQ or polled notification. My choice would
+be IRQ, as you can't know if the guest supports SEI and it would be a shame to
+kill it with an SError if the affected memory was free. SEA for synchronous
+errors is still a good choice even if the guest doesn't support it as that
+memory is still gone so its still a valid guest:Synchronous-external-abort.
+
+
+[...]
+
+>>> 1. Let us firstly discuss the SEA and SEI, there are different workflow for the two different Errors.
+
+>> user-space can choose whether to use SEA or SEI, it doesn't have to choose the
+>> same notification type that firmware used, which in turn doesn't have to be the
+>> same as that used by the CPU to notify firmware.
+>>
+>> The choice only matters because these notifications hang on an existing pieces
+>> of the Arm-architecture, so the notification can only add to the architecturally
+>> defined meaning. (i.e. You can only send an SEA for something that can already
+>> be described as a synchronous external abort).
+>>
+>> Once we get to user-space, for memory_failure() notifications, (which so far is
+>> all we are talking about here), the only thing that could matter is whether the
+>> guest hit a PG_hwpoison page as a stage2 fault. These can be described as
+>> Synchronous-External-Abort.
+>>
+>> The Synchronous-External-Abort/SError-Interrupt distinction matters for the CPU
+>> because it can't always make an error synchronous. For memory_failure()
+>> notifications to a KVM guest we really can do this, and we already have this
+>> behaviour for free. An example:
+>>
+>> A guest touches some hardware:poisoned memory, for whatever reason the CPU can't
+>> put the world back together to make this a synchronous exception, so it reports
+>> it to firmware as an SError-interrupt.
+> 
+>> Linux gets an APEI notification and memory_failure() causes the affected page to
+>> be unmapped from the guest's stage2, and SIGBUS_MCEERR_AO sent to user-space.
+>>
+>> Qemu/kvmtool can now notify the guest with an IRQ or POLLed notification. AO->
+>> action optional, probably asynchronous.
+
+> If so, in this case, Qemu/kvmtool only got a little information(receive a SIGBUS), for this SIGBUS,
+> it only include the SIGBUS_MCEERR_AO, error address. not include other information,
+> only according the SIGBUS_MCEERR_AO and error address, user space does not know whether to use IRQ or POLLed notification.
+
+The kernel can't tell it which to use: user space has to decide. This has to be
+a property of the machine you are emulating, not the machine you happen to be
+running on.
+
+What happens if the notification came using a future notification type that user
+space doesn't know about.
+What if user space does know about this type, but the guest doesn't.
+What if you migrate to a machine that uses a new notification type that you
+didn't advertise to the guest via the HEST at boot time.
+
+These dependencies have to break somewhere, and the right place is between the
+host kernel and host user-space. This way whatever Qemu/kvmtool do will work in
+the above 'what-ifs'.
+
+
+> for example, SIGBUS_MCEERR_AO means asynchronous access, user space can use SEI, IRQ or POLLed notification.
+> so user space will be confused to use which method.
+
+There isn't a wrong choice here. I suggest always-use-IRQ. Its faster than
+POLLed, but won't kill a guest that doesn't support NOTIFY_SEI.
+
+
+> I think if we use such solution, user space only judging SIGBUS_MCEERR_A* is not enough.
+> how we provide other extra information to let it choose the proper notification?
+
+Forget the original notification. This physical machine's hardware configuration
+and how its memory controller is wired up to report errors should not be
+relevant to Qemu/kvmtool.
+
+You need to decide how your emulated platform reports errors, you may want to
+make it a configuration option which defaults to something safe.
+
+[...]
+
+> In my platform, there is another issue.
+> for the stage2 fault, we get the IPA from the HPFAR_EL2 register,
+> but for  huawei's CPU, if it is data Error(DFSC[5:0] is 0b010000),
+
+'Synchronous External Abort, not on a translation table walk'
+
+> not translation error(DFSC[5:0] is 0b0101xx),
+
+(the set of external abort, parity or ECC errors that we get from the
+page-table-walker)
+
+> the HPFAR_EL2 is NULL, so the IPA is not recorded, in our current KVM code, we get the IPA from the HPFAR_EL2, so
+> we can not get the right IPA value, because its value is zero.I do not know whether you have same issue.
+
+This is something the ARM-ARM allows, so we have to live with it in software.
+
+For external aborts the ESR has a 'FnV' bit 10 that for your first DSFSC
+'Synchronous External Abort, not on a translation table walk' indicates there is
+no FAR, (or presumably HPFAR). I assume you have this bit set in the ESR.
+
+This shouldn't be a problem, for firmware-first we should take the address from
+the CPER records as this also gives us a range. For kernel-first we'd take
+whatever is in the v8.2 RAS ERR records. Its only if this wasn't a RAS error
+that we're likely to print out this address as we kill-the-task/panic.
+
+
+> Although hpfar_el2 does not record IPA, but host firmware can still record the PA
+
+I agree, it can get the PA from the v8.2 RAS ERR registers and hand it to the OS
+using CPER.
+
+
+> If call memory_failure(), memory_failure can translate the PA to host VA, then deliver
+> host VA to Qemu.
+
+Yes, this is how it works for any user-space process as two processes sharing
+the same page may map it in different locations.
+
+
+> Qemu can translate the host VA to IPA. so we rely on memory_failure() to get
+> the IPA.
+
+Yes. I don't see why this is a problem: The kernel isn't going to pass RAS
+events into the guest, so it never needs to know the IPA.
+
+Instead we notify user-space about ranges of memory affected by
+memory_failure(), KVM's user-space isn't a special case here.
+
+As you point out, if Qemu wants to notify the guest it can calculate the IPA and
+either use CPER for firmware-first, or in the future, update some representation
+of the v8.2 ERR records once we can virtualise kernel-first.
+
+(I'm not sure I understand your point here, but I don't think we disagree,)
+
+
+Thanks,
+
+James
