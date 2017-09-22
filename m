@@ -1,16 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 22 Sep 2017 13:26:52 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: disable over-current detection
- on USB H1
-In-Reply-To: <20170831153951.7674-1-l.stach@pengutronix.de>
-References: <20170831153951.7674-1-l.stach@pengutronix.de>
-Message-ID: <20170922052650.GB26358@dragon>
+Date: Fri, 22 Sep 2017 13:32:10 +0800
+Subject: [PATCH v2] ARM: dts: imx6sx: add vining-2000 board support
+In-Reply-To: <1504431311.1939.11.camel@googlemail.com>
+References: <1504195599.1918.17.camel@googlemail.com>
+ <CAOMZO5BSvyJCSGVF_7EOqia=ufX77JTkQwDCeey8kEaqDB_PBA@mail.gmail.com>
+ <1504431311.1939.11.camel@googlemail.com>
+Message-ID: <20170922053208.GC26358@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 05:39:50PM +0200, Lucas Stach wrote:
-> Just like the OTG port, USB H1 has no over-current detection wired up.
+On Sun, Sep 03, 2017 at 11:35:11AM +0200, Christoph Fritz wrote:
+> Add initial imx6sx-softing-vining-2000 board support.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
 
-Applied both, thanks.
+Applied, thanks.
