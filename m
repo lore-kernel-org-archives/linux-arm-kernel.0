@@ -1,114 +1,93 @@
 From: kevin.wangtao@hisilicon.com (Tao Wang)
-Date: Fri, 22 Sep 2017 17:42:06 +0800
-Subject: [PATCH 3/9] thermal/drivers/hisi: put platform code together
+Date: Fri, 22 Sep 2017 17:42:05 +0800
+Subject: [PATCH 2/9] thermal/drivers/hisi: use round up step value
 In-Reply-To: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
 References: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
-Message-ID: <1506073332-92438-4-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <1506073332-92438-3-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wangtao <kevin.wangtao@linaro.org>
 
-reorganize code for follow-up patch, there is no functional change here.
+Use round up divide to ensure the programmed value of threshold and
+lag not less than we set, and in order to keep the accuracy while
+using round up divide, the step value should also be a round up value.
+Then there is no need to use hisi_thermal_round_temp.
 
 Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
 ---
- drivers/thermal/hisi_thermal.c | 76 +++++++++++++++++++++---------------------
- 1 file changed, 38 insertions(+), 38 deletions(-)
+ drivers/thermal/hisi_thermal.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
-index c8b651d..96904b4 100644
+index c43e3df..c8b651d 100644
 --- a/drivers/thermal/hisi_thermal.c
 +++ b/drivers/thermal/hisi_thermal.c
-@@ -201,6 +201,44 @@ static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
- 	clk_disable_unprepare(data->clk);
- }
+@@ -40,7 +40,7 @@
  
-+
-+static int hisi_thermal_setup(struct hisi_thermal_data *data)
-+{
-+	struct hisi_thermal_sensor *sensor = &data->sensor;
-+	int ret;
-+
-+	/* enable clock for tsensor */
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret)
-+		return ret;
-+
-+	/* disable module firstly */
-+	hisi_thermal_reset_enable(data->regs, 0);
-+	hisi_thermal_enable(data->regs, 0);
-+
-+	/* select sensor id */
-+	hisi_thermal_sensor_select(data->regs, sensor->id);
-+
-+	/* setting the hdak time */
-+	hisi_thermal_hdak_set(data->regs, 0);
-+
-+	/* setting lag value between current temp and the threshold */
-+	hisi_thermal_set_lag(data->regs, HISI_TEMP_LAG);
-+
-+	/* enable for interrupt */
-+	hisi_thermal_alarm_set(data->regs, sensor->thres_temp);
-+
-+	hisi_thermal_reset_set(data->regs, HISI_TEMP_RESET);
-+
-+	/* enable module */
-+	hisi_thermal_reset_enable(data->regs, 1);
-+	hisi_thermal_enable(data->regs, 1);
-+
-+	hisi_thermal_alarm_clear(data->regs, 0);
-+	hisi_thermal_alarm_enable(data->regs, 1);
-+
-+	return 0;
-+}
- static int hisi_thermal_get_temp(void *__data, int *temp)
+ #define HISI_TEMP_BASE			(-60000)
+ #define HISI_TEMP_RESET			(100000)
+-#define HISI_TEMP_STEP			(784)
++#define HISI_TEMP_STEP			(785)
+ #define HISI_TEMP_LAG			(3500)
+ 
+ #define HISI_MAX_SENSORS		4
+@@ -63,19 +63,19 @@ struct hisi_thermal_data {
+ /*
+  * The temperature computation on the tsensor is as follow:
+  *	Unit: millidegree Celsius
+- *	Step: 255/200 (0.7843)
++ *	Step: 200/255 (0.7843)
+  *	Temperature base: -60??C
+  *
+- * The register is programmed in temperature steps, every step is 784
++ * The register is programmed in temperature steps, every step is 785
+  * millidegree and begins at -60 000 m??C
+  *
+  * The temperature from the steps:
+  *
+- *	Temp = TempBase + (steps x 784)
++ *	Temp = TempBase + (steps x 785)
+  *
+  * and the steps from the temperature:
+  *
+- *	steps = (Temp - TempBase) / 784
++ *	steps = (Temp - TempBase) / 785
+  *
+  */
+ static inline int hisi_thermal_step_to_temp(int step)
+@@ -85,13 +85,7 @@ static inline int hisi_thermal_step_to_temp(int step)
+ 
+ static inline int hisi_thermal_temp_to_step(int temp)
  {
- 	struct hisi_thermal_data *data = __data;
-@@ -291,44 +329,6 @@ static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
- 		on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
- }
- 
--static int hisi_thermal_setup(struct hisi_thermal_data *data)
--{
--	struct hisi_thermal_sensor *sensor = &data->sensor;
--	int ret;
--
--	/* enable clock for tsensor */
--	ret = clk_prepare_enable(data->clk);
--	if (ret)
--		return ret;
--
--	/* disable module firstly */
--	hisi_thermal_reset_enable(data->regs, 0);
--	hisi_thermal_enable(data->regs, 0);
--
--	/* select sensor id */
--	hisi_thermal_sensor_select(data->regs, sensor->id);
--
--	/* setting the hdak time */
--	hisi_thermal_hdak_set(data->regs, 0);
--
--	/* setting lag value between current temp and the threshold */
--	hisi_thermal_set_lag(data->regs, HISI_TEMP_LAG);
--
--	/* enable for interrupt */
--	hisi_thermal_alarm_set(data->regs, sensor->thres_temp);
--
--	hisi_thermal_reset_set(data->regs, HISI_TEMP_RESET);
--
--	/* enable module */
--	hisi_thermal_reset_enable(data->regs, 1);
--	hisi_thermal_enable(data->regs, 1);
--
--	hisi_thermal_alarm_clear(data->regs, 0);
--	hisi_thermal_alarm_enable(data->regs, 1);
--
--	return 0;
+-	return (temp - HISI_TEMP_BASE) / HISI_TEMP_STEP;
 -}
 -
- static int hisi_thermal_probe(struct platform_device *pdev)
+-static inline int hisi_thermal_round_temp(int temp)
+-{
+-	return hisi_thermal_step_to_temp(
+-		hisi_thermal_temp_to_step(temp));
++	return DIV_ROUND_UP(temp - HISI_TEMP_BASE, HISI_TEMP_STEP);
+ }
+ 
+ /*
+@@ -127,7 +121,7 @@ static inline int hisi_thermal_round_temp(int temp)
+  */
+ static inline void hisi_thermal_set_lag(void __iomem *addr, int value)
  {
- 	struct hisi_thermal_data *data;
+-	writel((value / HISI_TEMP_STEP) & 0x1F, addr + TEMP0_LAG);
++	writel(DIV_ROUND_UP(value, HISI_TEMP_STEP) & 0x1F, addr + TEMP0_LAG);
+ }
+ 
+ static inline void hisi_thermal_alarm_clear(void __iomem *addr, int value)
+@@ -274,7 +268,7 @@ static int hisi_thermal_register_sensor(struct platform_device *pdev,
+ 
+ 	for (i = 0; i < of_thermal_get_ntrips(sensor->tzd); i++) {
+ 		if (trip[i].type == THERMAL_TRIP_PASSIVE) {
+-			sensor->thres_temp = hisi_thermal_round_temp(trip[i].temperature);
++			sensor->thres_temp = trip[i].temperature;
+ 			break;
+ 		}
+ 	}
 -- 
 2.8.1
