@@ -1,54 +1,117 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 22 Sep 2017 09:14:13 +0800
-Subject: [PATCH RESEND 1/2] phy: phy-mtk-tphy: fix NULL point of chip bank
-In-Reply-To: <02a5e183-444a-bc75-2a4e-1337c9e7872e@ti.com>
-References: <5ddda7cc6940941b645564afff5afa496d7dbb68.1505989703.git.chunfeng.yun@mediatek.com>
- <02a5e183-444a-bc75-2a4e-1337c9e7872e@ti.com>
-Message-ID: <1506042853.17567.23.camel@mhfsdcap03>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Fri, 22 Sep 2017 09:15:21 +0800
+Subject: [PATCH v2 1/6] ACPI/PPTT: Add Processor Properties Topology Table
+ parsing
+In-Reply-To: <03912538-f7bf-f235-c87f-3ba275502db0@arm.com>
+References: <20170919184751.25110-1-jeremy.linton@arm.com>
+ <20170919184751.25110-2-jeremy.linton@arm.com>
+ <4c9cfa18-507b-01c4-7464-ff2b149fbb68@huawei.com>
+ <03912538-f7bf-f235-c87f-3ba275502db0@arm.com>
+Message-ID: <f1752bf4-b62e-e41a-bd58-783c15bba868@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-09-21 at 16:23 +0530, Kishon Vijay Abraham I wrote:
-> 
-> On Thursday 21 September 2017 04:01 PM, Chunfeng Yun wrote:
-> > Chip bank of version-1 is initialized as NULL, but it's used
-> > by pcie_phy_instance_power_on/off(), so assign it a right
-> > address.
-> 
-> merged. How was this not noticed before?
+Hi Jeremy,
 
-The PCIe function was tested on mt2712 with tphy-v2, and didn't notice
-this issue until tested it on mt7622 with tphy-v1.
-
-Ashamed of myself for making such a rookie mistake.
+On 2017/9/22 2:48, Jeremy Linton wrote:
+> Hi,
 > 
-> Thanks
-> Kishon
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/phy/mediatek/phy-mtk-tphy.c |    3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-> > index e3baad7..721a2a1 100644
-> > --- a/drivers/phy/mediatek/phy-mtk-tphy.c
-> > +++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-> > @@ -27,6 +27,7 @@
-> >  /* banks shared by multiple phys */
-> >  #define SSUSB_SIFSLV_V1_SPLLC		0x000	/* shared by u3 phys */
-> >  #define SSUSB_SIFSLV_V1_U2FREQ		0x100	/* shared by u2 phys */
-> > +#define SSUSB_SIFSLV_V1_CHIP		0x300	/* shared by u3 phys */
-> >  /* u2 phy bank */
-> >  #define SSUSB_SIFSLV_V1_U2PHY_COM	0x000
-> >  /* u3/pcie/sata phy banks */
-> > @@ -762,7 +763,7 @@ static void phy_v1_banks_init(struct mtk_tphy *tphy,
-> >  	case PHY_TYPE_USB3:
-> >  	case PHY_TYPE_PCIE:
-> >  		u3_banks->spllc = tphy->sif_base + SSUSB_SIFSLV_V1_SPLLC;
-> > -		u3_banks->chip = NULL;
-> > +		u3_banks->chip = tphy->sif_base + SSUSB_SIFSLV_V1_CHIP;
-> >  		u3_banks->phyd = instance->port_base + SSUSB_SIFSLV_V1_U3PHYD;
-> >  		u3_banks->phya = instance->port_base + SSUSB_SIFSLV_V1_U3PHYA;
-> >  		break;
-> > 
+> On 09/20/2017 02:15 AM, Xiongfeng Wang wrote:
+>> Hi Jeremy,
+>>
+>> On 2017/9/20 2:47, Jeremy Linton wrote:
+>>> ACPI 6.2 adds a new table, which describes how processing units
+>>> are related to each other in tree like fashion. Caches are
+>>> also sprinkled throughout the tree and describe the properties
+>>> of the caches in relation to other caches and processing units.
+>>>
+>>> Add the code to parse the cache hierarchy and report the total
+>>> number of levels of cache for a given core using
+>>> acpi_find_last_cache_level() as well as fill out the individual
+>>> cores cache information with cache_setup_acpi() once the
+>>> cpu_cacheinfo structure has been populated by the arch specific
+>>> code.
+>>>
+>>> Further, report peers in the topology using setup_acpi_cpu_topology()
+>>> to report a unique ID for each processing unit at a given level
+>>> in the tree. These unique id's can then be used to match related
+>>> processing units which exist as threads, COD (clusters
+>>> on die), within a given package, etc.
+>>>
+>>> +
+>>> +static int topology_setup_acpi_cpu(struct acpi_table_header *table,
+>>> +                    unsigned int cpu, int level)
+>>> +{
+>>> +    struct acpi_pptt_processor *cpu_node;
+>>> +    u32 acpi_cpu_id = acpi_cpu_get_madt_gicc(cpu)->uid;
+>>> +
+>>> +    cpu_node = acpi_find_processor_node(table, acpi_cpu_id);
+>>> +    if (cpu_node) {
+>>> +        cpu_node = acpi_find_processor_package_id(table, cpu_node, level);
+>>> +        return (int)((u8 *)cpu_node - (u8 *)table);
+>>> +    }
+>>> +    pr_err_once("PPTT table found, but unable to locate core for %d\n",
+>>> +            cpu);
+>>> +    return -ENOENT;
+>>
+>> Can we return -1 when PPTT doesn't exist? So that we can still get topo info from MPIDR.
+>> 'store_cpu_topology()' determine whether cpu topology has been populated by checking
+>> whether cluster_id is -1. If cluster_id is not -1, it won't read cpu topo info from MPIDR.
+>> Or maybe we can change 'store_cpu_topology()' as well. If cluster_id is less than zero,
+>> we read cpu topo info from MPIDR.
+> 
+> ? I will retest this, but any negative return from setup_acpi_topology() for the initial node (subsequent requests should minimally duplicate the cpu node rather than failing) request, should result in a call to reset_cpu_topology(), and the information being sourced from the MPIDR in store_cpu_topology(). There are various ways the tree could be "damaged" but if all the system cpus have matching valid acpi_id/cpu nodes, then that reflects a valid topology and there really isn't enough information to decide if its damaged. The one case where this isn't accurate is missing socket identifiers, but the code actually handles this as well as the lack of missing cluster/thread ids (which don't exist in the standard).
+> 
+Yes, you are right. I didn't notice the function reset_cpu_topology() before. Thanks for your explanation.
+>>
+>>> +}
+>>> +
+>>> +/*
+>>> + * simply assign a ACPI cache entry to each known CPU cache entry
+>>> + * determining which entries are shared is done later.
+>>> + */
+>>> +int cache_setup_acpi(unsigned int cpu)
+>>> +{
+>>> +    struct acpi_table_header *table;
+>>> +    acpi_status status;
+>>> +
+>>> +    pr_debug("Cache Setup ACPI cpu %d\n", cpu);
+>>> +
+>>> +    status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
+>>> +    if (ACPI_FAILURE(status)) {
+>>> +        pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
+>>> +        return -ENOENT;
+>>> +    }
+>>> +
+>>> +    cache_setup_acpi_cpu(table, cpu);
+>>> +    acpi_put_table(table);
+>>> +
+>>> +    return status;
+>>> +}
+>>> +
+>>> +/*
+>>> + * Determine a topology unique ID for each thread/core/cluster/socket/etc.
+>>> + * This ID can then be used to group peers.
+>>> + */
+>>> +int setup_acpi_cpu_topology(unsigned int cpu, int level)
+>>> +{
+>>> +    struct acpi_table_header *table;
+>>> +    acpi_status status;
+>>> +    int retval;
+>>
+>> Can we add a static int array to record already assigned id for each level?
+>> So that we can count the id starting from zero. And also the id can be successive.
+> 
+> I don't like the idea of a node<->generated_id array/map in this module, although I've considered a number of ways to create more normalized values. Particularly, the one area that might be useful is utilizing the acpi id for the cores, which is problematic in the MT case. One of my other alternative ideas was to plug a unique node id into a reserved field in the table as the node is traversed. That idea is a little evil, and really should be part of the ACPI standard so the firmware is providing the ID's rather than dependent on the traversal order of the tree.
+> 
+> If it turns out that these ID's need to be zero based, or some other limitation I would prefer just renumbering them in update_siblings_mask() or parse_acpi_topology(). I hacked together a patch to renumber the package_id yesterday, but i'm pretty sure I've seen (non arm) machines with odd package/core ids in the past, and I don't really see anything in the ABI the dictating this. Let me clean it up a bit and I can post it as an additional patch on top of the PPTT patches.
+> 
+Yes, I agree. Renumbering the IDs in parse_acpi_topology() is better.
+
+> So, is this an actual use case/problem, or its just an "appearance" type of thing?
+> 
+It is not an actual use problem, just an "appearance".
+
+
+Thanks,
+Xiongfeng Wang
