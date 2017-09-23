@@ -1,55 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 23 Sep 2017 10:29:28 +0800
-Subject: [PATCH v2 11/12] arm64: allwinner: a64: Fix node with unit name
- and no reg property
-In-Reply-To: <20170922184045.6498-12-clabbe.montjoie@gmail.com>
-References: <20170922184045.6498-1-clabbe.montjoie@gmail.com>
- <20170922184045.6498-12-clabbe.montjoie@gmail.com>
-Message-ID: <CAGb2v67Gam27uNeNd1Ma-x=SgMNMN5OY1_juXLd63dXah+cNDA@mail.gmail.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Sat, 23 Sep 2017 14:38:15 +0800
+Subject: [PATCH v4 2/5] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <20170920205301.v6gpmhll4pdpuyxv@rob-hp-laptop>
+References: <1505635252-27716-1-git-send-email-chen.zhong@mediatek.com>
+ <1505635252-27716-3-git-send-email-chen.zhong@mediatek.com>
+ <20170920205301.v6gpmhll4pdpuyxv@rob-hp-laptop>
+Message-ID: <1506148695.19409.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 23, 2017 at 2:40 AM, Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
-> This patch fix the warning "xxx has a unit name, but no reg property" by
-> removing "@0" from such node
->
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 662e8b7981b5..b02a8476b0c8 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -347,7 +347,7 @@
->                                 function = "spi1";
->                         };
->
-> -                       uart0_pins_a: uart0 at 0 {
-> +                       uart0_pins_a: uart0 {
+On Wed, 2017-09-20 at 15:53 -0500, Rob Herring wrote:
+> On Sun, Sep 17, 2017 at 04:00:49PM +0800, Chen Zhong wrote:
+> > This patch adds the device tree binding documentation for the MediaTek
+> > pmic keys found on PMIC MT6397/MT6323.
+> > 
+> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   41 ++++++++++++++++++++
+> >  1 file changed, 41 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > new file mode 100644
+> > index 0000000..fd48ff7
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > @@ -0,0 +1,41 @@
+> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
+> > +
+> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
+> > +and homekey. The key functions are defined as the subnode of the function
+> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
+> > +of Muti-Function Device (MFD)
+> > +
+> > +For MT6397/MT6323 MFD bindings see:
+> > +Documentation/devicetree/bindings/mfd/mt6397.txt
+> > +
+> > +Required properties:
+> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
+> > +- linux,keycodes: Specifies the numeric keycode values to
+> > +	be used for reporting keys presses. The array can
+> > +	contain up to 2 entries.
+> > +
+> > +Optional Properties:
+> > +- mediatek,wakeup-keys: Specifies each key can be used as a wakeup source
+> > +	or not. This can be customized depends on board design.
+> 
+> I think this should be a common property if we're going to put into DT. 
+> Something like "wakeup-scancodes" to be clear the values are the raw 
+> scancodes. Alternatively, we could list Linux keycodes instead with 
+> something like "linux,wakeup-keycodes".
+> 
+> > +- wakeup-source: PMIC keys can be used as wakeup sources.
+> 
+> Just "See ../power/wakeup-source.txt" for the description.
+> 
+> > +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
+> > +	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
+> > +- debounce-interval: Long press key shutdown debouncing interval time
+> > +	in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
+> 
+> This property units should be in milliseconds. However, this doesn't 
+> sound like debounce filtering time if 5-14 seconds. That sounds like 
+> forced power off time (i.e. for a hung device). This also should be 
+> common. I imagine we already have some drivers with similar properties.
 
-Same here. This should be uart0_pb_pins.
+Hi Rob,
 
->                                 pins = "PB8", "PB9";
->                                 function = "uart0";
->                         };
-> @@ -571,7 +571,7 @@
->                         interrupt-controller;
->                         #interrupt-cells = <3>;
->
-> -                       r_rsb_pins: rsb at 0 {
-> +                       r_rsb_pins: rsb {
+I searched in kernel documents and found a similar usage in
+"ti,palmas-pwrbutton.txt"
+"- ti,palmas-long-press-seconds: Duration in seconds which the power
+  button should be kept pressed for Palmas to power off automatically."
 
-And this rsb_pins.
+Could I just wrote it like this?
+mediatek,long-press-seconds = <0>;
 
-ChenYu
+And for the wakeup source part, how about Dmitry's suggestion? 
+The whole device node would be:
 
->                                 pins = "PL0", "PL1";
->                                 function = "s_rsb";
->                         };
-> --
-> 2.13.5
->
+mt6397keys: mt6397keys {
+	compatible = "mediatek,mt6397-keys";
+	mediatek,long-press-mode = <1>;
+	mediatek,long-press-seconds = <0>;
+	
+	power at 0 {
+		linux,code = <116>;
+		wakeup-source;
+	};
+
+	home at 0 {
+		linux,code = <114>;
+	};
+};
+
+Thank you.
+
+> 
+> Rob
