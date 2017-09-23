@@ -1,90 +1,132 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sat, 23 Sep 2017 02:41:57 +0200
-Subject: [PATCH v3 10/20] KVM: arm/arm64: Move timer/vgic flush/sync under
- disabled irq
+Date: Sat, 23 Sep 2017 02:42:02 +0200
+Subject: [PATCH v3 15/20] KVM: arm/arm64: Support EL1 phys timer register
+ access in set/get reg
 In-Reply-To: <20170923004207.22356-1-cdall@linaro.org>
 References: <20170923004207.22356-1-cdall@linaro.org>
-Message-ID: <20170923004207.22356-11-cdall@linaro.org>
+Message-ID: <20170923004207.22356-16-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to play tricks with the timer to be more lazy in saving
-and restoring state, we need to move the timer sync and flush functions
-under a disabled irq section and since we have to flush the vgic state
-after the timer and PMU state, we do the whole flush/sync sequence with
-disabled irqs.
+Add suport for the physical timer registers in kvm_arm_timer_set_reg and
+kvm_arm_timer_get_reg so that these functions can be reused to interact
+with the rest of the system.
 
-The only downside is a slightly longer delay before being able to
-process hardware interrupts and run softirqs.
+Note that this paves part of the way for the physical timer state
+save/restore, but we still need to add those registers to
+KVM_GET_REG_LIST before we support migrating the physical timer state.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/arm.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h   |  6 ++++++
+ arch/arm64/include/uapi/asm/kvm.h |  6 ++++++
+ virt/kvm/arm/arch_timer.c         | 33 +++++++++++++++++++++++++++++++--
+ 3 files changed, 43 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4..27db222 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -654,11 +654,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 5db2d4c..665c454 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -151,6 +151,12 @@ struct kvm_arch_memory_slot {
+ 	(__ARM_CP15_REG(op1, 0, crm, 0) | KVM_REG_SIZE_U64)
+ #define ARM_CP15_REG64(...) __ARM_CP15_REG64(__VA_ARGS__)
  
- 		kvm_pmu_flush_hwstate(vcpu);
- 
-+		local_irq_disable();
++/* PL1 Physical Timer Registers */
++#define KVM_REG_ARM_PTIMER_CTL		ARM_CP15_REG32(0, 14, 2, 1)
++#define KVM_REG_ARM_PTIMER_CNT		ARM_CP15_REG64(0, 14)
++#define KVM_REG_ARM_PTIMER_CVAL		ARM_CP15_REG64(2, 14)
 +
- 		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
++/* Virtual Timer Registers */
+ #define KVM_REG_ARM_TIMER_CTL		ARM_CP15_REG32(0, 14, 3, 1)
+ #define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14)
+ #define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 9f3ca24..07be6e2 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -195,6 +195,12 @@ struct kvm_arch_memory_slot {
  
--		local_irq_disable();
--
- 		/*
- 		 * If we have a singal pending, or need to notify a userspace
- 		 * irqchip about timer or PMU level changes, then we exit (and
-@@ -683,10 +683,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
- 		    kvm_request_pending(vcpu)) {
- 			vcpu->mode = OUTSIDE_GUEST_MODE;
--			local_irq_enable();
- 			kvm_pmu_sync_hwstate(vcpu);
- 			kvm_timer_sync_hwstate(vcpu);
- 			kvm_vgic_sync_hwstate(vcpu);
-+			local_irq_enable();
- 			preempt_enable();
- 			continue;
- 		}
-@@ -710,6 +710,16 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		kvm_arm_clear_debug(vcpu);
+ #define ARM64_SYS_REG(...) (__ARM64_SYS_REG(__VA_ARGS__) | KVM_REG_SIZE_U64)
  
- 		/*
-+		 * We must sync the PMU and timer state before the vgic state so
-+		 * that the vgic can properly sample the updated state of the
-+		 * interrupt line.
-+		 */
-+		kvm_pmu_sync_hwstate(vcpu);
-+		kvm_timer_sync_hwstate(vcpu);
++/* EL1 Physical Timer Registers */
++#define KVM_REG_ARM_PTIMER_CTL		ARM64_SYS_REG(3, 3, 14, 2, 1)
++#define KVM_REG_ARM_PTIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 2, 2)
++#define KVM_REG_ARM_PTIMER_CNT		ARM64_SYS_REG(3, 3, 14, 0, 1)
 +
-+		kvm_vgic_sync_hwstate(vcpu);
++/* EL0 Virtual Timer Registers */
+ #define KVM_REG_ARM_TIMER_CTL		ARM64_SYS_REG(3, 3, 14, 3, 1)
+ #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
+ #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 70110ea..d5b632d 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -626,10 +626,11 @@ static void kvm_timer_init_interrupt(void *info)
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ {
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	switch (regid) {
+ 	case KVM_REG_ARM_TIMER_CTL:
+-		vtimer->cnt_ctl = value;
++		vtimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
+ 		break;
+ 	case KVM_REG_ARM_TIMER_CNT:
+ 		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
+@@ -637,6 +638,13 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ 	case KVM_REG_ARM_TIMER_CVAL:
+ 		vtimer->cnt_cval = value;
+ 		break;
++	case KVM_REG_ARM_PTIMER_CTL:
++		ptimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
++		break;
++	case KVM_REG_ARM_PTIMER_CVAL:
++		ptimer->cnt_cval = value;
++		break;
 +
-+		/*
- 		 * We may have taken a host interrupt in HYP mode (ie
- 		 * while executing the guest). This interrupt is still
- 		 * pending, as we haven't serviced it yet!
-@@ -732,16 +742,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		guest_exit();
- 		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+ 	default:
+ 		return -1;
+ 	}
+@@ -645,17 +653,38 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ 	return 0;
+ }
  
--		/*
--		 * We must sync the PMU and timer state before the vgic state so
--		 * that the vgic can properly sample the updated state of the
--		 * interrupt line.
--		 */
--		kvm_pmu_sync_hwstate(vcpu);
--		kvm_timer_sync_hwstate(vcpu);
--
--		kvm_vgic_sync_hwstate(vcpu);
--
- 		preempt_enable();
++static u64 read_timer_ctl(struct arch_timer_context *timer)
++{
++	/*
++	 * Set ISTATUS bit if it's expired.
++	 * Note that according to ARMv8 ARM Issue A.k, ISTATUS bit is
++	 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
++	 * regardless of ENABLE bit for our implementation convenience.
++	 */
++	if (!kvm_timer_compute_delta(timer))
++		return timer->cnt_ctl | ARCH_TIMER_CTRL_IT_STAT;
++	else
++		return timer->cnt_ctl;
++}
++
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+ {
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
  
- 		ret = handle_exit(vcpu, run, ret);
+ 	switch (regid) {
+ 	case KVM_REG_ARM_TIMER_CTL:
+-		return vtimer->cnt_ctl;
++		return read_timer_ctl(vtimer);
+ 	case KVM_REG_ARM_TIMER_CNT:
+ 		return kvm_phys_timer_read() - vtimer->cntvoff;
+ 	case KVM_REG_ARM_TIMER_CVAL:
+ 		return vtimer->cnt_cval;
++	case KVM_REG_ARM_PTIMER_CTL:
++		return read_timer_ctl(ptimer);
++	case KVM_REG_ARM_PTIMER_CVAL:
++		return ptimer->cnt_cval;
++	case KVM_REG_ARM_PTIMER_CNT:
++		return kvm_phys_timer_read();
+ 	}
+ 	return (u64)-1;
+ }
 -- 
 2.9.0
