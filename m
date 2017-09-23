@@ -1,64 +1,42 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sat, 23 Sep 2017 02:41:49 +0200
-Subject: [PATCH v3 02/20] arm64: Use physical counter for in-kernel reads
+Date: Sat, 23 Sep 2017 02:41:53 +0200
+Subject: [PATCH v3 06/20] KVM: arm/arm64: Check that system supports split
+ eoi/deactivate
 In-Reply-To: <20170923004207.22356-1-cdall@linaro.org>
 References: <20170923004207.22356-1-cdall@linaro.org>
-Message-ID: <20170923004207.22356-3-cdall@linaro.org>
+Message-ID: <20170923004207.22356-7-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the physical counter allows KVM to retain the offset between the
-virtual and physical counter as long as it is actively running a VCPU.
+Some systems without proper firmware and/or hardware description data
+don't support the split EOI and deactivate operation.
 
-As soon as a VCPU is released, another thread is scheduled or we start
-running userspace applications, we reset the offset to 0, so that
-userspace accessing the virtual timer can still read the cirtual counter
-and get the same view of time as the kernel.
+On such systems, we cannot leave the physical interrupt active after the
+timer handler on the host has run, so we cannot support KVM with an
+in-kernel GIC with the timer changes we are about to introduce.
 
-This opens up potential improvements for KVM performance.
+This patch makes sure that trying to initialize the KVM GIC code will
+fail on such systems.
 
-VHE kernels or kernels continuing to use the virtual timer are
-unaffected.
-
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/include/asm/arch_timer.h  | 9 ++++-----
- drivers/clocksource/arm_arch_timer.c | 3 +--
- 2 files changed, 5 insertions(+), 7 deletions(-)
+ drivers/irqchip/irq-gic.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index a652ce0..1859a1c 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -148,11 +148,10 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index f641e8e..ab12bf4 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1420,7 +1420,8 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+ 	if (ret)
+ 		return;
  
- static inline u64 arch_counter_get_cntpct(void)
- {
--	/*
--	 * AArch64 kernel and user space mandate the use of CNTVCT.
--	 */
--	BUG();
--	return 0;
-+	u64 cval;
-+	isb();
-+	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-+	return cval;
+-	gic_set_kvm_info(&gic_v2_kvm_info);
++	if (static_key_true(&supports_deactivate))
++		gic_set_kvm_info(&gic_v2_kvm_info);
  }
  
- static inline u64 arch_counter_get_cntvct(void)
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index fd4b7f6..9b3322a 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -890,8 +890,7 @@ static void __init arch_counter_register(unsigned type)
- 
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_TIMER_TYPE_CP15) {
--		if (IS_ENABLED(CONFIG_ARM64) ||
--		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
-+		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
- 			arch_timer_read_counter = arch_counter_get_cntvct;
- 		else
- 			arch_timer_read_counter = arch_counter_get_cntpct;
+ int __init
 -- 
 2.9.0
