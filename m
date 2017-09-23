@@ -1,47 +1,72 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 23 Sep 2017 21:08:38 +0200
-Subject: [PATCH] omap_ssi_core: fix kilo to be "k" not "K"
-Message-ID: <20170923190838.GA16966@amd>
+From: stefan.bruens@rwth-aachen.de (Stefan Bruens)
+Date: Sun, 24 Sep 2017 01:34:58 +0200
+Subject: [PATCH v2 06/10] arm64: allwinner: a64: Add devicetree binding
+ for DMA controller
+In-Reply-To: <20170920205300.io3ghr54kzk763kt@rob-hp-laptop>
+References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
+ <20170917031956.28010-7-stefan.bruens@rwth-aachen.de>
+ <20170920205300.io3ghr54kzk763kt@rob-hp-laptop>
+Message-ID: <1673036.ZUJy1pffid@pebbles.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mittwoch, 20. September 2017 22:53:00 CEST Rob Herring wrote:
+> On Sun, Sep 17, 2017 at 05:19:52AM +0200, Stefan Br?ns wrote:
+> > The A64 is register compatible with the H3, but has a different number
+> > of dma channels and request ports.
+> > 
+> > Attach additional properties to the node to allow future reuse of the
+> > compatible for controllers with different number of channels/requests.
+> > 
+> > If dma-requests is not specified, the register layout defined maximum
+> > of 32 is used.
+> > 
+> > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> > ---
+> > 
+> >  .../devicetree/bindings/dma/sun6i-dma.txt          | 26
+> >  ++++++++++++++++++++++ 1 file changed, 26 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> > b/Documentation/devicetree/bindings/dma/sun6i-dma.txt index
+> > 98fbe1a5c6dd..6ebc79f95202 100644
+> > --- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> > +++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> > 
+> > @@ -27,6 +27,32 @@ Example:
+> >  		#dma-cells = <1>;
+> >  	
+> >  	};
+> > 
+> > +-------------------------------------------------------------------------
+> > ----- +For A64 DMA controller:
+> > +
+> > +Required properties:
+> > +- compatible:	"allwinner,sun50i-a64-dma"
+> > +- dma-channels: Number of DMA channels supported by the controller.
+> > +		Refer to Documentation/devicetree/bindings/dma/dma.txt
+> > +- all properties above, i.e. reg, interrupts, clocks, resets and
+> > #dma-cells +
+> > +Optional properties:
+> > +- dma-requests: Number of DMA request signals supported by the
+> > controller.
+> > +		Refer to Documentation/devicetree/bindings/dma/dma.txt
+> > +
+> > +Example:
+> > +	dma: dma-controller at 01c02000 {
+> 
+> Drop the leading 0. Building dtbs with W=2 will tell you this.
+> 
+> With that,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Kilo should be "k" not "K", fix it it comments and messages.
+The leading 0 was copied from the A31 example just a few lines above. Should I 
+also correct that one, or should that go in a separate patch?
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Kind regards,
 
-index 88e48b3..41a09f5 100644
---- a/drivers/hsi/controllers/omap_ssi_core.c
-+++ b/drivers/hsi/controllers/omap_ssi_core.c
-@@ -334,7 +334,7 @@ static int ssi_clk_event(struct notifier_block *nb, unsigned long event,
- 	case POST_RATE_CHANGE:
- 		dev_dbg(&ssi->device, "post rate change (%lu -> %lu)\n",
- 			clk_data->old_rate, clk_data->new_rate);
--		omap_ssi->fck_rate = DIV_ROUND_CLOSEST(clk_data->new_rate, 1000); /* KHz */
-+		omap_ssi->fck_rate = DIV_ROUND_CLOSEST(clk_data->new_rate, 1000); /* kHz */
- 
- 		for (i = 0; i < ssi->num_ports; i++) {
- 			omap_port = omap_ssi->port[i];
-@@ -467,9 +467,9 @@ static int ssi_hw_init(struct hsi_controller *ssi)
- 	}
- 	/* Resetting GDD */
- 	writel_relaxed(SSI_SWRESET, omap_ssi->gdd + SSI_GDD_GRST_REG);
--	/* Get FCK rate in KHz */
-+	/* Get FCK rate in kHz */
- 	omap_ssi->fck_rate = DIV_ROUND_CLOSEST(ssi_get_clk_rate(ssi), 1000);
--	dev_dbg(&ssi->device, "SSI fck rate %lu KHz\n", omap_ssi->fck_rate);
-+	dev_dbg(&ssi->device, "SSI fck rate %lu kHz\n", omap_ssi->fck_rate);
- 
- 	writel_relaxed(SSI_CLK_AUTOGATING_ON, omap_ssi->sys + SSI_GDD_GCR_REG);
- 	omap_ssi->gdd_gcr = SSI_CLK_AUTOGATING_ON;
-
+Stefan
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170923/e4aa463f/attachment.sig>
+Stefan Br?ns  /  Bergstra?e 21  /  52062 Aachen
+home: +49 241 53809034     mobile: +49 151 50412019
