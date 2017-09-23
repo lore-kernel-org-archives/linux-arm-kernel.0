@@ -1,232 +1,45 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 23 Sep 2017 16:14:02 +0200
-Subject: [PATCH 2/3] soc: amlogic: Add Meson6/Meson8/Meson8b/Meson8m2 SoC
- Information driver
-In-Reply-To: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
-References: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170923141403.20882-3-martin.blumenstingl@googlemail.com>
+Date: Sat, 23 Sep 2017 16:14:00 +0200
+Subject: [PATCH 0/3] soc: amlogic: Add Meson6/8/8b SoC Information driver
+Message-ID: <20170923141403.20882-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic SoCs have an information register which contains the SoC type
-and revision information.
-This patchs adds support for decoding those registers and exposing the
-resulting information via the SoC bus infrastructure.
+The 32-bit Amlogic SoC have some registers which contain some information
+the SoC's major and version, as well as a "major version".
+This patchset adds support for this register decoding and exposing with the
+SoC bus infrastructure, with dt-bindings and DT node.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/soc/amlogic/Kconfig            |  10 ++
- drivers/soc/amlogic/Makefile           |   1 +
- drivers/soc/amlogic/meson-mx-socinfo.c | 175 +++++++++++++++++++++++++++++++++
- 3 files changed, 186 insertions(+)
+This is inspired by Neil's Meson GX socinfo driver, see [0]
+
+All information was taken from Amlogic's 3.10 GPL kernel sources because
+the public S805 datasheet from Hardkernel does not contain any relevant
+information for these register blocks.
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-June/004187.html
+
+Martin Blumenstingl (3):
+  dt-bindings: Amlogic: add documentation for the SoC info register
+    areas
+  soc: amlogic: Add Meson6/Meson8/Meson8b/Meson8m2 SoC Information
+    driver
+  ARM: dts: meson: add SoC information nodes
+
+ .../devicetree/bindings/arm/amlogic/analog-top.txt |  20 +++
+ .../devicetree/bindings/arm/amlogic/assist.txt     |  17 ++
+ .../devicetree/bindings/arm/amlogic/bootrom.txt    |  17 ++
+ arch/arm/boot/dts/meson.dtsi                       |  10 ++
+ arch/arm/boot/dts/meson8.dtsi                      |   5 +
+ arch/arm/boot/dts/meson8b.dtsi                     |   5 +
+ drivers/soc/amlogic/Kconfig                        |  10 ++
+ drivers/soc/amlogic/Makefile                       |   1 +
+ drivers/soc/amlogic/meson-mx-socinfo.c             | 175 +++++++++++++++++++++
+ 9 files changed, 260 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/analog-top.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/assist.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/bootrom.txt
  create mode 100644 drivers/soc/amlogic/meson-mx-socinfo.c
 
-diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
-index 22acf064531f..ef0b8f6c53e0 100644
---- a/drivers/soc/amlogic/Kconfig
-+++ b/drivers/soc/amlogic/Kconfig
-@@ -9,4 +9,14 @@ config MESON_GX_SOCINFO
- 	  Say yes to support decoding of Amlogic Meson GX SoC family
- 	  information about the type, package and version.
- 
-+config MESON_MX_SOCINFO
-+	bool "Amlogic Meson MX SoC Information driver"
-+	depends on ARCH_MESON || COMPILE_TEST
-+	default ARCH_MESON
-+	select SOC_BUS
-+	help
-+	  Say yes to support decoding of Amlogic Meson6, Meson8,
-+	  Meson8b and Meson8m2 SoC family information about the type
-+	  and version.
-+
- endmenu
-diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
-index 3e85fc462c21..1f5df50ebd73 100644
---- a/drivers/soc/amlogic/Makefile
-+++ b/drivers/soc/amlogic/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
-+obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
-diff --git a/drivers/soc/amlogic/meson-mx-socinfo.c b/drivers/soc/amlogic/meson-mx-socinfo.c
-new file mode 100644
-index 000000000000..7bfff5ff22a2
---- /dev/null
-+++ b/drivers/soc/amlogic/meson-mx-socinfo.c
-@@ -0,0 +1,175 @@
-+/*
-+ * Copyright (c) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-+ *
-+ * SPDX-License-Identifier: GPL-2.0+
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+#include <linux/bitfield.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+
-+#define MESON_SOCINFO_MAJOR_VER_MESON6		0x16
-+#define MESON_SOCINFO_MAJOR_VER_MESON8		0x19
-+#define MESON_SOCINFO_MAJOR_VER_MESON8B		0x1b
-+
-+#define MESON_MX_ASSIST_HW_REV			0x14c
-+
-+#define MESON_MX_ANALOG_TOP_METAL_REVISION	0x0
-+
-+#define MESON_MX_BOOTROM_MISC_VER		0x4
-+
-+static const char *meson_mx_socinfo_revision(unsigned int major_ver,
-+					     unsigned int misc_ver,
-+					     unsigned int metal_rev)
-+{
-+	unsigned int minor_ver;
-+
-+	switch (major_ver) {
-+	case MESON_SOCINFO_MAJOR_VER_MESON6:
-+		minor_ver = 0xa;
-+		break;
-+
-+	case MESON_SOCINFO_MAJOR_VER_MESON8:
-+		if (metal_rev == 0x11111112)
-+			major_ver = 0x1d;
-+
-+		if (metal_rev == 0x11111111 || metal_rev == 0x11111112)
-+			minor_ver = 0xa;
-+		else if (metal_rev == 0x11111113)
-+			minor_ver = 0xb;
-+		else if (metal_rev == 0x11111133)
-+			minor_ver = 0xc;
-+		else
-+			minor_ver = 0xd;
-+
-+		break;
-+
-+	case MESON_SOCINFO_MAJOR_VER_MESON8B:
-+		if (metal_rev == 0x11111111)
-+			minor_ver = 0xa;
-+		else
-+			minor_ver = 0xb;
-+
-+		break;
-+
-+	default:
-+		minor_ver = 0x0;
-+		break;
-+	}
-+
-+	return kasprintf(GFP_KERNEL, "Rev%X (%x - 0:%X)", minor_ver, major_ver,
-+			 misc_ver);
-+}
-+
-+static const char *meson_mx_socinfo_soc_id(unsigned int major_ver,
-+					   unsigned int metal_rev)
-+{
-+	const char *soc_id;
-+
-+	switch (major_ver) {
-+	case MESON_SOCINFO_MAJOR_VER_MESON6:
-+		soc_id = "Meson6 (AML8726-MX)";
-+		break;
-+
-+	case MESON_SOCINFO_MAJOR_VER_MESON8:
-+		if (metal_rev == 0x11111112)
-+			soc_id = "Meson8m2 (S812)";
-+		else
-+			soc_id = "Meson8 (S802)";
-+
-+		break;
-+
-+	case MESON_SOCINFO_MAJOR_VER_MESON8B:
-+		soc_id = "Meson8b (S805)";
-+		break;
-+
-+	default:
-+		soc_id = "Unknown";
-+		break;
-+	}
-+
-+	return kstrdup_const(soc_id, GFP_KERNEL);
-+}
-+
-+static const struct of_device_id meson_mx_socinfo_analog_top_ids[] = {
-+	{ .compatible = "amlogic,meson8-analog-top", },
-+	{ .compatible = "amlogic,meson8b-analog-top", },
-+	{ /* sentinel */ }
-+};
-+
-+int __init meson_mx_socinfo_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device_node *np;
-+	struct regmap *assist_regmap, *bootrom_regmap, *analog_top_regmap;
-+	unsigned int major_ver, misc_ver, metal_rev = 0;
-+	int ret;
-+
-+	assist_regmap =
-+		syscon_regmap_lookup_by_compatible("amlogic,meson-mx-assist");
-+	if (IS_ERR(assist_regmap))
-+		return PTR_ERR(assist_regmap);
-+
-+	bootrom_regmap =
-+		syscon_regmap_lookup_by_compatible("amlogic,meson-mx-bootrom");
-+	if (IS_ERR(bootrom_regmap))
-+		return PTR_ERR(bootrom_regmap);
-+
-+	np = of_find_matching_node(NULL, meson_mx_socinfo_analog_top_ids);
-+	if (np) {
-+		analog_top_regmap = syscon_node_to_regmap(np);
-+		if (IS_ERR(analog_top_regmap))
-+			return PTR_ERR(analog_top_regmap);
-+
-+		ret = regmap_read(analog_top_regmap,
-+				  MESON_MX_ANALOG_TOP_METAL_REVISION,
-+				  &metal_rev);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	ret = regmap_read(assist_regmap, MESON_MX_ASSIST_HW_REV, &major_ver);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = regmap_read(bootrom_regmap, MESON_MX_BOOTROM_MISC_VER,
-+			  &misc_ver);
-+	if (ret < 0)
-+		return ret;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENODEV;
-+
-+	soc_dev_attr->family = "Amlogic Meson";
-+
-+	np = of_find_node_by_path("/");
-+	of_property_read_string(np, "model", &soc_dev_attr->machine);
-+	of_node_put(np);
-+
-+	soc_dev_attr->revision = meson_mx_socinfo_revision(major_ver, misc_ver,
-+							   metal_rev);
-+	soc_dev_attr->soc_id = meson_mx_socinfo_soc_id(major_ver, metal_rev);
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree_const(soc_dev_attr->revision);
-+		kfree_const(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr);
-+		return PTR_ERR(soc_dev);
-+	}
-+
-+	dev_info(soc_device_to_device(soc_dev), "Amlogic %s %s detected\n",
-+		 soc_dev_attr->soc_id, soc_dev_attr->revision);
-+
-+	return 0;
-+}
-+device_initcall(meson_mx_socinfo_init);
 -- 
 2.14.1
