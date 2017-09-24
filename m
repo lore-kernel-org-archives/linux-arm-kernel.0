@@ -1,13 +1,13 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 24 Sep 2017 20:01:19 +0200
+From: rppt@linux.vnet.ibm.com (Mike Rapoport)
+Date: Sun, 24 Sep 2017 21:33:56 +0300
 Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
 In-Reply-To: <20170924173912.9199-1-linus.walleij@linaro.org>
 References: <20170924173912.9199-1-linus.walleij@linaro.org>
-Message-ID: <25a16804-3300-2ec5-fe90-ca59323f9dd3@gmail.com>
+Message-ID: <20170924183355.GA27375@rapoport-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2017 07:39 PM, Linus Walleij wrote:
+On Sun, Sep 24, 2017 at 07:39:12PM +0200, Linus Walleij wrote:
 > There is exactly one board in the kernel that defines platform data
 > for the GPIO NAND driver.
 > 
@@ -28,9 +28,6 @@ On 09/24/2017 07:39 PM, Linus Walleij wrote:
 > Cc: Gerhard Sittig <gsi@denx.de>
 > Cc: Jamie Iles <jamie.iles@oracle.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-
 > ---
 > ARM SoC folks: Please ACK this so it can be merged through the MTD
 > subsystem.
@@ -39,6 +36,11 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > 
 > I don't have this PXA board, and all device tree users seem to be
 > out-of-tree so I rely on third parties to test this.
+
+Mine is long time dead and I'm doubt even somebody in CompuLab has one
+working ;-)
+Let's see, maybe somebody there will respond anyway.
+
 > ---
 >  arch/arm/mach-pxa/cm-x255.c   |  19 ++++---
 >  drivers/mtd/nand/gpio.c       | 112 +++++++++++++++++++++---------------------
@@ -57,10 +59,10 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +#include <linux/gpio/machine.h>
 >  #include <linux/spi/spi.h>
 >  #include <linux/spi/pxa2xx_spi.h>
->  
+> 
 > @@ -176,6 +176,17 @@ static inline void cmx255_init_nor(void) {}
 >  #endif
->  
+> 
 >  #if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
 > +
 > +static struct gpiod_lookup_table cmx255_nand_gpiod_table = {
@@ -78,7 +80,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 >  		.start = PXA_CS1_PHYS,
 > @@ -198,11 +209,6 @@ static struct mtd_partition cmx255_nand_parts[] = {
 >  };
->  
+> 
 >  static struct gpio_nand_platdata cmx255_nand_platdata = {
 > -	.gpio_nce = GPIO_NAND_CS,
 > -	.gpio_cle = GPIO_NAND_CLE,
@@ -89,7 +91,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 >  	.num_parts = ARRAY_SIZE(cmx255_nand_parts),
 >  	.chip_delay = 25,
 > @@ -220,6 +226,7 @@ static struct platform_device cmx255_nand = {
->  
+> 
 >  static void __init cmx255_init_nand(void)
 >  {
 > +	gpiod_add_lookup_table(&cmx255_nand_gpiod_table);
@@ -114,7 +116,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 >  #include <linux/of.h>
 >  #include <linux/of_address.h>
 > -#include <linux/of_gpio.h>
->  
+> 
 >  struct gpiomtd {
 >  	void __iomem		*io_sync;
 >  	struct nand_chip	nand_chip;
@@ -125,11 +127,11 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +	struct gpio_desc *rdy;
 > +	struct gpio_desc *nwp; /* Optional write protection */
 >  };
->  
+> 
 >  static inline struct gpiomtd *gpio_nand_getpriv(struct mtd_info *mtd)
 > @@ -78,11 +82,10 @@ static void gpio_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 >  	gpio_nand_dosync(gpiomtd);
->  
+> 
 >  	if (ctrl & NAND_CTRL_CHANGE) {
 > -		if (gpio_is_valid(gpiomtd->plat.gpio_nce))
 > -			gpio_set_value(gpiomtd->plat.gpio_nce,
@@ -146,16 +148,16 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > @@ -96,7 +99,7 @@ static int gpio_nand_devready(struct mtd_info *mtd)
 >  {
 >  	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
->  
+> 
 > -	return gpio_get_value(gpiomtd->plat.gpio_rdy);
 > +	return gpiod_get_value(gpiomtd->rdy);
 >  }
->  
+> 
 >  #ifdef CONFIG_OF
 > @@ -123,12 +126,6 @@ static int gpio_nand_get_config_of(const struct device *dev,
 >  		}
 >  	}
->  
+> 
 > -	plat->gpio_rdy = of_get_gpio(dev->of_node, 0);
 > -	plat->gpio_nce = of_get_gpio(dev->of_node, 1);
 > -	plat->gpio_ale = of_get_gpio(dev->of_node, 2);
@@ -164,11 +166,11 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > -
 >  	if (!of_property_read_u32(dev->of_node, "chip-delay", &val))
 >  		plat->chip_delay = val;
->  
+> 
 > @@ -201,10 +198,11 @@ static int gpio_nand_remove(struct platform_device *pdev)
->  
+> 
 >  	nand_release(nand_to_mtd(&gpiomtd->nand_chip));
->  
+> 
 > -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
 > -		gpio_set_value(gpiomtd->plat.gpio_nwp, 0);
 > -	if (gpio_is_valid(gpiomtd->plat.gpio_nce))
@@ -178,7 +180,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +		gpiod_set_value(gpiomtd->nwp, 0);
 > +	if (gpiomtd->nce && !IS_ERR(gpiomtd->nce))
 > +		gpiod_set_value(gpiomtd->nce, 0);
->  
+> 
 >  	return 0;
 >  }
 > @@ -215,66 +213,66 @@ static int gpio_nand_probe(struct platform_device *pdev)
@@ -187,24 +189,24 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 >  	struct resource *res;
 > +	struct device *dev = &pdev->dev;
 >  	int ret = 0;
->  
+> 
 > -	if (!pdev->dev.of_node && !dev_get_platdata(&pdev->dev))
 > +	if (!dev->of_node && !dev_get_platdata(dev))
 >  		return -EINVAL;
->  
+> 
 > -	gpiomtd = devm_kzalloc(&pdev->dev, sizeof(*gpiomtd), GFP_KERNEL);
 > +	gpiomtd = devm_kzalloc(dev, sizeof(*gpiomtd), GFP_KERNEL);
 >  	if (!gpiomtd)
 >  		return -ENOMEM;
->  
+> 
 >  	chip = &gpiomtd->nand_chip;
->  
+> 
 >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 > -	chip->IO_ADDR_R = devm_ioremap_resource(&pdev->dev, res);
 > +	chip->IO_ADDR_R = devm_ioremap_resource(dev, res);
 >  	if (IS_ERR(chip->IO_ADDR_R))
 >  		return PTR_ERR(chip->IO_ADDR_R);
->  
+> 
 >  	res = gpio_nand_get_io_sync(pdev);
 >  	if (res) {
 > -		gpiomtd->io_sync = devm_ioremap_resource(&pdev->dev, res);
@@ -212,12 +214,12 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 >  		if (IS_ERR(gpiomtd->io_sync))
 >  			return PTR_ERR(gpiomtd->io_sync);
 >  	}
->  
+> 
 > -	ret = gpio_nand_get_config(&pdev->dev, &gpiomtd->plat);
 > +	ret = gpio_nand_get_config(dev, &gpiomtd->plat);
 >  	if (ret)
 >  		return ret;
->  
+> 
 > -	if (gpio_is_valid(gpiomtd->plat.gpio_nce)) {
 > -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_nce,
 > -					"NAND NCE");
@@ -235,7 +237,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +		ret = PTR_ERR(gpiomtd->nwp);
 > +		goto out_ce;
 >  	}
->  
+> 
 > -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp)) {
 > -		ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_nwp,
 > -					"NAND NWP");
@@ -246,7 +248,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +		ret = PTR_ERR(gpiomtd->nwp);
 > +		goto out_ce;
 >  	}
->  
+> 
 > -	ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_ale, "NAND ALE");
 > -	if (ret)
 > -		return ret;
@@ -256,7 +258,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +		ret = PTR_ERR(gpiomtd->cle);
 > +		goto out_ce;
 > +	}
->  
+> 
 > -	ret = devm_gpio_request(&pdev->dev, gpiomtd->plat.gpio_cle, "NAND CLE");
 > -	if (ret)
 > -		return ret;
@@ -277,29 +279,29 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +	/* Using RDY pin */
 > +	if (gpiomtd->rdy)
 > +		chip->dev_ready = gpio_nand_devready;
->  
+> 
 >  	nand_set_flash_node(chip, pdev->dev.of_node);
 >  	chip->IO_ADDR_W		= chip->IO_ADDR_R;
 > @@ -285,12 +283,13 @@ static int gpio_nand_probe(struct platform_device *pdev)
 >  	chip->cmd_ctrl		= gpio_nand_cmd_ctrl;
->  
+> 
 >  	mtd			= nand_to_mtd(chip);
 > -	mtd->dev.parent		= &pdev->dev;
 > +	mtd->dev.parent		= dev;
->  
+> 
 >  	platform_set_drvdata(pdev, gpiomtd);
->  
+> 
 > -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
 > -		gpio_direction_output(gpiomtd->plat.gpio_nwp, 1);
 > +	/* Disable write protection, if wired up */
 > +	if (gpiomtd->nwp && !IS_ERR(gpiomtd->nwp))
 > +		gpiod_direction_output(gpiomtd->nwp, 1);
->  
+> 
 >  	ret = nand_scan(mtd, 1);
 >  	if (ret)
 > @@ -305,8 +304,11 @@ static int gpio_nand_probe(struct platform_device *pdev)
 >  		return 0;
->  
+> 
 >  err_wp:
 > -	if (gpio_is_valid(gpiomtd->plat.gpio_nwp))
 > -		gpio_set_value(gpiomtd->plat.gpio_nwp, 0);
@@ -308,7 +310,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +out_ce:
 > +	if (gpiomtd->nce && !IS_ERR(gpiomtd->nce))
 > +		gpiod_set_value(gpiomtd->nce, 0);
->  
+> 
 >  	return ret;
 >  }
 > diff --git a/include/linux/mtd/nand-gpio.h b/include/linux/mtd/nand-gpio.h
@@ -317,7 +319,7 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 > +++ b/include/linux/mtd/nand-gpio.h
 > @@ -4,11 +4,6 @@
 >  #include <linux/mtd/rawnand.h>
->  
+> 
 >  struct gpio_nand_platdata {
 > -	int	gpio_nce;
 > -	int	gpio_nwp;
@@ -327,9 +329,10 @@ Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 >  	void	(*adjust_parts)(struct gpio_nand_platdata *, size_t);
 >  	struct mtd_partition *parts;
 >  	unsigned int num_parts;
+> -- 
+> 2.13.5
 > 
 
-
 -- 
-Best regards,
-Marek Vasut
+Sincerely yours,
+Mike.
