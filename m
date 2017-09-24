@@ -1,53 +1,118 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 23 Sep 2017 20:16:58 -0400
-Subject: [PATCH 5/5] PCI: add device wait after slot and bus reset
+Date: Sat, 23 Sep 2017 20:16:56 -0400
+Subject: [PATCH 3/5] PCI: make pci_flr_wait() generic and rename to
+ pci_dev_wait()
 In-Reply-To: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
 References: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1506212218-29103-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <1506212218-29103-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rev 3.1 Sec 2.3.1 Request Handling Rules indicates that a device can issue
-CRS following secondary bus reset. Handle device presence gracefully.
+Rev 3.1 Sec 2.3.1 Request Handling Rules:
+Valid reset conditions after which a device is permitted to return CRS
+are:
+* Cold, Warm, and Hot Resets,
+* FLR
+* A reset initiated in response to a D3hot to D0 uninitialized
+
+Try to reuse FLR implementation towards other reset types.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/pci/pci.c | 45 ++++++++++++++++++++++++++++-----------------
+ 1 file changed, 28 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 074adf9..7131aab 100644
+index 27ec45d..fd4a3b6 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -4056,7 +4056,7 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
- 
- 	pci_reset_bridge_secondary_bus(dev->bus->self);
- 
--	return 0;
-+	return pci_dev_wait(dev, "bus reset", 1000, 60000);
+@@ -3820,20 +3820,14 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
  }
+ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
  
- static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
-@@ -4077,6 +4077,7 @@ static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
- static int pci_dev_reset_slot_function(struct pci_dev *dev, int probe)
+-static int pci_flr_wait(struct pci_dev *dev)
++static int pci_dev_wait(struct pci_dev *dev, char *reset_type,
++			int initial_wait, int timeout)
  {
- 	struct pci_dev *pdev;
-+	int rc;
+-	int delay = 1, timeout = 60000;
++	int delay = 1;
+ 	u32 id;
  
- 	if (dev->subordinate || !dev->slot ||
- 	    dev->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET)
-@@ -4086,7 +4087,11 @@ static int pci_dev_reset_slot_function(struct pci_dev *dev, int probe)
- 		if (pdev != dev && pdev->slot == dev->slot)
+ 	/*
+-	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
+-	 * 100ms, but may silently discard requests while the FLR is in
+-	 * progress.  Wait 100ms before trying to access the device.
+-	 */
+-	msleep(100);
+-
+-	/*
+-	 * After 100ms, the device should not silently discard config
++	 * After reset, the device should not silently discard config
+ 	 * requests, but it may still indicate that it needs more time by
+ 	 * responding to them with CRS completions.  The Root Port will
+ 	 * generally synthesize ~0 data to complete the read (except when
+@@ -3847,14 +3841,14 @@ static int pci_flr_wait(struct pci_dev *dev)
+ 	pci_read_config_dword(dev, PCI_COMMAND, &id);
+ 	while (id == ~0) {
+ 		if (delay > timeout) {
+-			dev_warn(&dev->dev, "not ready %dms after FLR; giving up\n",
+-				 100 + delay - 1);
++			dev_warn(&dev->dev, "not ready %dms after %s; giving up\n",
++				 initial_wait + delay - 1, reset_type);
  			return -ENOTTY;
+ 		}
  
--	return pci_reset_hotplug_slot(dev->slot->hotplug, probe);
-+	rc = pci_reset_hotplug_slot(dev->slot->hotplug, probe);
-+	if (!rc && !probe)
-+		rc = pci_dev_wait(dev, "slot reset", 1000, 60000);
+ 		if (delay > 1000)
+-			dev_info(&dev->dev, "not ready %dms after FLR; waiting\n",
+-				 100 + delay - 1);
++			dev_info(&dev->dev, "not ready %dms after %s; waiting\n",
++				 initial_wait + delay - 1, reset_type);
+ 
+ 		msleep(delay);
+ 		delay *= 2;
+@@ -3862,7 +3856,8 @@ static int pci_flr_wait(struct pci_dev *dev)
+ 	}
+ 
+ 	if (delay > 1000)
+-		dev_info(&dev->dev, "ready %dms after FLR\n", 100 + delay - 1);
++		dev_info(&dev->dev, "ready %dms after %s\n",
++			 initial_wait + delay - 1, reset_type);
+ 
+ 	return 0;
+ }
+@@ -3899,7 +3894,15 @@ int pcie_flr(struct pci_dev *dev)
+ 		dev_err(&dev->dev, "timed out waiting for pending transaction; performing function level reset anyway\n");
+ 
+ 	pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_BCR_FLR);
+-	return pci_flr_wait(dev);
 +
-+	return rc;
++	/*
++	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
++	 * 100ms, but may silently discard requests while the FLR is in
++	 * progress.  Wait 100ms before trying to access the device.
++	 */
++	msleep(100);
++
++	return pci_dev_wait(dev, "FLR", 100, 60000);
+ }
+ EXPORT_SYMBOL_GPL(pcie_flr);
+ 
+@@ -3932,7 +3935,15 @@ static int pci_af_flr(struct pci_dev *dev, int probe)
+ 		dev_err(&dev->dev, "timed out waiting for pending transaction; performing AF function level reset anyway\n");
+ 
+ 	pci_write_config_byte(dev, pos + PCI_AF_CTRL, PCI_AF_CTRL_FLR);
+-	return pci_flr_wait(dev);
++
++	/*
++	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
++	 * 100ms, but may silently discard requests while the FLR is in
++	 * progress.  Wait 100ms before trying to access the device.
++	 */
++	msleep(100);
++
++	return pci_dev_wait(dev, "AF_FLR", 100, 60000);
  }
  
- static void pci_dev_lock(struct pci_dev *dev)
+ /**
 -- 
 1.9.1
