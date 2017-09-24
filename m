@@ -1,39 +1,59 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sat, 23 Sep 2017 19:30:56 -0600
-Subject: On NTP, RTCs and accurately setting their time
-In-Reply-To: <20170923182324.GK20805@n2100.armlinux.org.uk>
-References: <20170921075907.GR20805@n2100.armlinux.org.uk>
- <20170921093218.GS20805@n2100.armlinux.org.uk>
- <20170921220510.GA11395@obsidianresearch.com>
- <20170921224541.GC20805@n2100.armlinux.org.uk>
- <20170921232040.GA15130@obsidianresearch.com>
- <20170922095713.GD20805@n2100.armlinux.org.uk>
- <20170922164850.GA13235@obsidianresearch.com>
- <20170922172022.GJ20805@n2100.armlinux.org.uk>
- <20170922182424.GA21945@obsidianresearch.com>
- <20170923182324.GK20805@n2100.armlinux.org.uk>
-Message-ID: <20170924013056.GA811@obsidianresearch.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 24 Sep 2017 10:06:43 +0800
+Subject: [PATCH V3 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <1505893753-16143-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <201709240941.1xKB0Rqm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 23, 2017 at 07:23:24PM +0100, Russell King - ARM Linux wrote:
+Hi Dong,
 
-> So we're getting it almost right - except for the sloppyness of the
-> workqueue being run (which is mostly dependent on the sloppiness of
-> the timer.)
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.14-rc1 next-20170922]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Looks really good. I made a note of your fix, but I probably will not
-be able to pick this up again until Friday.
+url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-bulk-add-of_clk_bulk_get/20170921-203645
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: sh-apsh4a3a_defconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-I think what is left to do:
-- Test on x86 with CMOS, using rtclib and update_persistent_clock. I
-  may be able to put together a system for this, but I don't have
-  anything ready to go right now that is not kvm based. :\
-- Add patches in a series to set set_offset_nsec for RTCs we have
-  learned about.
-- HR timer stuff, I'm inclined to put that in a dedicated patch in
-  a series?
+All errors (new ones prefixed by >>):
 
-Anything else? Thanks for your patience with my untested patches :\
+   In file included from arch/sh/kernel/setup.c:28:0:
+>> include/linux/clk.h:689:12: error: 'of_clk_bulk_get' defined but not used [-Werror=unused-function]
+    static int of_clk_bulk_get(struct device_node *np, int num_clks,
+               ^~~~~~~~~~~~~~~
+   cc1: all warnings being treated as errors
 
-Jason
+vim +/of_clk_bulk_get +689 include/linux/clk.h
+
+   681	
+   682	#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+   683	int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+   684					 struct clk_bulk_data *clks);
+   685	struct clk *of_clk_get(struct device_node *np, int index);
+   686	struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+   687	struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+   688	#else
+ > 689	static int of_clk_bulk_get(struct device_node *np, int num_clks,
+   690				   struct clk_bulk_data *clks)
+   691	{
+   692		return -ENOENT;
+   693	}
+   694	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 11750 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170924/ff3fa8bb/attachment.gz>
