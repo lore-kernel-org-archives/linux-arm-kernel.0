@@ -1,85 +1,45 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 24 Sep 2017 15:36:47 +0100
-Subject: [RFC PATCH 0/7] AXP803 AC/Battery support
-In-Reply-To: <CF74A2A9-B9F4-4413-975B-A0F4B24686A3@aosc.io>
-References: <20170920151814.22461-1-icenowy@aosc.io>
- <20170921154621.0000328d@huawei.com>
- <CF74A2A9-B9F4-4413-975B-A0F4B24686A3@aosc.io>
-Message-ID: <20170924153647.1d82e83c@archlinux>
+Date: Sun, 24 Sep 2017 16:45:12 +0100
+Subject: [PATCH 1/3] dt-bindings: adc: mt2712: add binding document
+In-Reply-To: <1505957212-13402-2-git-send-email-zhiyong.tao@mediatek.com>
+References: <1505957212-13402-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1505957212-13402-2-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <20170924164512.5e06cb8f@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Sep 2017 23:20:11 +0800
-Icenowy Zheng <icenowy@aosc.io> wrote:
+On Thu, 21 Sep 2017 09:26:50 +0800
+Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
 
-> ? 2017?9?21? GMT+08:00 ??10:46:21, Jonathan Cameron <Jonathan.Cameron@huawei.com> ??:
-> >On Wed, 20 Sep 2017 23:18:07 +0800
-> >Icenowy Zheng <icenowy@aosc.io> wrote:
-> >  
-> >> The AXP803 PMIC, used by most Allwinner A64 boards, features 3 power  
-> >inputs:  
-> >> AC, USB and Battery.
-> >> 
-> >> This patchset adds support for the AC and Battery supplies, which is  
-> >useful  
-> >> for the boards from Pine64 (Pine64, SoPine w/ baseboard model A,  
-> >Pinebook).  
-> >> 
-> >> The USB supply is not yet supported in this patchset because it's not
-> >> present on Pine series boards.
-> >> 
-> >> In order to enable battery monitoring the ADC for battery is also  
-> >enabled  
-> >> for AXs.
-> >> 
-> >> In order to enable battery monitoring the ADC for battery is also  
-> >enabled  
-> >> for AXP803.  
-> >
-> >I'll go with the obvious question...
-> >
-> >Why an RFC rather than a standard patch submission? I'm not immediately
-> >seeing what is controversial!  
+> The commit adds mt2712 compatible node in binding document.
 > 
-> Oh I am just not confident about this patchset,
-> especially the IIO part.
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
 
-It all looks fine to me.  I would imagine that, once everyone is
-happy, this will go through the mfd tree, but Lee may have other ideas!
+Given just how trivial this is, I'm not going to waste Rob or Marks
+time by waiting for them to look at it.  I did tweak the patch
+title to '... binding documentation' to reflect the fact this
+isn't a new file which 'binding document' sort of implied.
+
+Applied to the togreg branch of iio.git and pushed out as
+testing for the autobuilders to play with it.
+
+Thanks,
 
 Jonathan
+
+> ---
+>  .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> >
-> >Jonathan
-> >  
-> >> 
-> >> Icenowy Zheng (7):
-> >>   dt-bindings: add compatibles for AXP803 Battery/USB power supplies
-> >>   iio: adc: axp20x-adc: allow to skip ADC rate setup now
-> >>   iio: adc: axp20x-adc: add support for AXP803
-> >>   power: supply: axp20x-battery: support AXP803
-> >>   mfd: axp20x: add cells for AXP803 ADC/AC Power/Battery
-> >>   arm64: allwinner: a64: add power supply nodes in AXP803 DTSI
-> >>   arm64: allwinner: a64: enable AC and Battery for Pine64
-> >> 
-> >>  .../bindings/power/supply/axp20x_battery.txt       |   1 +
-> >>  .../bindings/power/supply/axp20x_usb_power.txt     |   1 +
-> >>  arch/arm64/boot/dts/allwinner/axp803.dtsi          |  15 +++
-> >>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |   8 ++
-> >>  drivers/iio/adc/axp20x_adc.c                       | 114  
-> >++++++++++++++++++++-  
-> >>  drivers/mfd/axp20x.c                               |  11 ++
-> >>  drivers/power/supply/axp20x_battery.c              |  88  
-> >++++++++++++++--  
-> >>  7 files changed, 226 insertions(+), 12 deletions(-)
-> >>   
-> >
-> >
-> >_______________________________________________
-> >linux-arm-kernel mailing list
-> >linux-arm-kernel at lists.infradead.org
-> >http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> index 64dc484..0df9bef 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> @@ -12,6 +12,7 @@ for the Thermal Controller which holds a phandle to the AUXADC.
+>  Required properties:
+>    - compatible: Should be one of:
+>      - "mediatek,mt2701-auxadc": For MT2701 family of SoCs
+> +    - "mediatek,mt2712-auxadc": For MT2712 family of SoCs
+>      - "mediatek,mt7622-auxadc": For MT7622 family of SoCs
+>      - "mediatek,mt8173-auxadc": For MT8173 family of SoCs
+>    - reg: Address range of the AUXADC unit.
