@@ -1,26 +1,39 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 23 Sep 2017 20:20:27 -0400
-Subject: [PATCH 5/5] PCI: add device wait after slot and bus reset
-In-Reply-To: <1506212218-29103-5-git-send-email-okaya@codeaurora.org>
-References: <1506212218-29103-1-git-send-email-okaya@codeaurora.org>
- <1506212218-29103-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <a74c385e-f82d-1ec3-bda8-26209749bbe7@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sat, 23 Sep 2017 19:30:56 -0600
+Subject: On NTP, RTCs and accurately setting their time
+In-Reply-To: <20170923182324.GK20805@n2100.armlinux.org.uk>
+References: <20170921075907.GR20805@n2100.armlinux.org.uk>
+ <20170921093218.GS20805@n2100.armlinux.org.uk>
+ <20170921220510.GA11395@obsidianresearch.com>
+ <20170921224541.GC20805@n2100.armlinux.org.uk>
+ <20170921232040.GA15130@obsidianresearch.com>
+ <20170922095713.GD20805@n2100.armlinux.org.uk>
+ <20170922164850.GA13235@obsidianresearch.com>
+ <20170922172022.GJ20805@n2100.armlinux.org.uk>
+ <20170922182424.GA21945@obsidianresearch.com>
+ <20170923182324.GK20805@n2100.armlinux.org.uk>
+Message-ID: <20170924013056.GA811@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/23/2017 8:16 PM, Sinan Kaya wrote:
-> @@ -4056,7 +4056,7 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
->  
->  	pci_reset_bridge_secondary_bus(dev->bus->self);
->  
-> -	return 0;
-> +	return pci_dev_wait(dev, "bus reset", 1000, 60000);
->  }
+On Sat, Sep 23, 2017 at 07:23:24PM +0100, Russell King - ARM Linux wrote:
 
-This doesn't solve the warm reset message getting broadcasted. I wanted to get
-feedback on the direction first with this version.
+> So we're getting it almost right - except for the sloppyness of the
+> workqueue being run (which is mostly dependent on the sloppiness of
+> the timer.)
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Looks really good. I made a note of your fix, but I probably will not
+be able to pick this up again until Friday.
+
+I think what is left to do:
+- Test on x86 with CMOS, using rtclib and update_persistent_clock. I
+  may be able to put together a system for this, but I don't have
+  anything ready to go right now that is not kvm based. :\
+- Add patches in a series to set set_offset_nsec for RTCs we have
+  learned about.
+- HR timer stuff, I'm inclined to put that in a dedicated patch in
+  a series?
+
+Anything else? Thanks for your patience with my untested patches :\
+
+Jason
