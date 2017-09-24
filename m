@@ -1,55 +1,50 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Sun, 24 Sep 2017 16:29:24 +0530
-Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM support
-In-Reply-To: <20170924105924.23923-1-vigneshr@ti.com>
-References: <20170924105924.23923-1-vigneshr@ti.com>
-Message-ID: <20170924105924.23923-6-vigneshr@ti.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 24 Sep 2017 13:09:05 +0100
+Subject: [PATCH 1/3] iio: trigger: stm32-timer: preset shouldn't be
+ buffered
+In-Reply-To: <1505729132-1369-2-git-send-email-fabrice.gasnier@st.com>
+References: <1505729132-1369-1-git-send-email-fabrice.gasnier@st.com>
+ <1505729132-1369-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170924130905.64e1bc39@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm_runtime* calls to cadence-quadspi driver. This is required to
-switch on QSPI power domain on TI 66AK2G SoC during probe.
+On Mon, 18 Sep 2017 12:05:30 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/mtd/spi-nor/cadence-quadspi.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> Currently, setting preset value (ARR) will update directly 'Auto reload
+> value' only on 1st write access. But then, ARPE is set. This makes
+> ARR a shadow register. Preset value should be updated upon each
+> write request: ensure ARPE is 0. This fixes successive writes to
+> preset attribute.
+> 
+> Fixes: 4adec7da0536 ("iio: stm32 trigger: Add quadrature encoder device")
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index d9629e8f4798..2c8e6226d267 100644
---- a/drivers/mtd/spi-nor/cadence-quadspi.c
-+++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -31,6 +31,7 @@
- #include <linux/of_device.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/sched.h>
- #include <linux/spi/spi.h>
- #include <linux/timer.h>
-@@ -1224,6 +1225,13 @@ static int cqspi_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
- 
-+	pm_runtime_enable(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0) {
-+		pm_runtime_put_noidle(&pdev->dev);
-+		return ret;
-+	}
-+
- 	ret = clk_prepare_enable(cqspi->clk);
- 	if (ret) {
- 		dev_err(dev, "Cannot enable QSPI clock.\n");
-@@ -1275,6 +1283,9 @@ static int cqspi_remove(struct platform_device *pdev)
- 
- 	clk_disable_unprepare(cqspi->clk);
- 
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
- 	return 0;
- }
- 
--- 
-2.14.1
+Applied to the fixes-togreg-post-rc1 branch of iio.git and marked
+for stable.
+
+Thanks,
+
+Jonathan
+
+> ---
+>  drivers/iio/trigger/stm32-timer-trigger.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
+> index 9b90534..34cc25b 100644
+> --- a/drivers/iio/trigger/stm32-timer-trigger.c
+> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
+> @@ -715,8 +715,9 @@ static ssize_t stm32_count_set_preset(struct iio_dev *indio_dev,
+>  	if (ret)
+>  		return ret;
+>  
+> +	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
+> +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
+>  	regmap_write(priv->regmap, TIM_ARR, preset);
+> -	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
+>  
+>  	return len;
+>  }
