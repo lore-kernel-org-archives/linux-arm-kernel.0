@@ -1,45 +1,49 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 24 Sep 2017 13:10:27 +0100
-Subject: [PATCH 2/3] iio: trigger: stm32-timer: fix a corner case to
- write preset
-In-Reply-To: <1505729132-1369-3-git-send-email-fabrice.gasnier@st.com>
-References: <1505729132-1369-1-git-send-email-fabrice.gasnier@st.com>
- <1505729132-1369-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170924131027.2d6c5d90@archlinux>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Sun, 24 Sep 2017 17:41:24 +0530
+Subject: [PATCH] net: bcm63xx_enet: Use setup_timer and mod_timer
+Message-ID: <1506255084-10943-1-git-send-email-himanshujha199640@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Sep 2017 12:05:31 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+Use setup_timer and mod_timer API instead of structure assignments.
 
-> Balance timer start routine that sets ARPE: clear it in stop routine.
-> This fixes a corner case, when timer is used successively as trigger
-> (with sampling_frequency start/stop routines), then as a counter
-> (with preset).
-> 
-> Fixes: 93fbe91b5521 ("iio: Add STM32 timer trigger driver")
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+This is done using Coccinelle and semantic patch used
+for this as follows:
 
-Applied to the fixes-togreg-post-rc1 branch of iio.git and
-marked for stable.
+@@
+expression x,y,z,a,b;
+@@
 
-Thanks,
+-init_timer (&x);
++setup_timer (&x, y, z);
++mod_timer (&a, b);
+-x.function = y;
+-x.data = z;
+-x.expires = b;
+-add_timer(&a);
 
-Jonathan
-> ---
->  drivers/iio/trigger/stm32-timer-trigger.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-> index 34cc25b..eb212f8c 100644
-> --- a/drivers/iio/trigger/stm32-timer-trigger.c
-> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
-> @@ -174,6 +174,7 @@ static void stm32_timer_stop(struct stm32_timer_trigger *priv)
->  		clk_disable(priv->clk);
->  
->  	/* Stop timer */
-> +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
->  	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
->  	regmap_write(priv->regmap, TIM_PSC, 0);
->  	regmap_write(priv->regmap, TIM_ARR, 0);
+Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+---
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index f8bbbbf..c6221f0 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -2331,11 +2331,8 @@ static int bcm_enetsw_open(struct net_device *dev)
+ 	}
+ 
+ 	/* start phy polling timer */
+-	init_timer(&priv->swphy_poll);
+-	priv->swphy_poll.function = swphy_poll_timer;
+-	priv->swphy_poll.data = (unsigned long)priv;
+-	priv->swphy_poll.expires = jiffies;
+-	add_timer(&priv->swphy_poll);
++	setup_timer(&priv->swphy_poll, swphy_poll_timer, (unsigned long)priv);
++	mod_timer(&priv->swphy_poll, jiffies);
+ 	return 0;
+ 
+ out:
+-- 
+2.7.4
