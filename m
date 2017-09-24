@@ -1,53 +1,54 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 24 Sep 2017 15:51:55 +0200
-Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
- support
-In-Reply-To: <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
-References: <20170924105924.23923-1-vigneshr@ti.com>
- <20170924105924.23923-6-vigneshr@ti.com>
- <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
- <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
- <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
- <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
-Message-ID: <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 24 Sep 2017 15:23:04 +0100
+Subject: [PATCH v4 6/6] ARM: sun8i: h3: add partial CPU thermal zone
+In-Reply-To: <20170918082703.riqntqilakzhirc5@flea.lan>
+References: <20170914145251.21784-1-icenowy@aosc.io>
+ <20170914145251.21784-7-icenowy@aosc.io>
+ <b41a80ec-23d5-a614-f6cc-d09c5a459e03@free-electrons.com>
+ <20170916151734.10968b7a@archlinux>
+ <20170918082703.riqntqilakzhirc5@flea.lan>
+Message-ID: <20170924152304.02551715@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2017 03:27 PM, Vignesh R wrote:
-> 
-> 
-> On 9/24/2017 6:42 PM, Marek Vasut wrote:
->> On 09/24/2017 03:08 PM, Vignesh R wrote:
->>>
->>>
->>> On 9/24/2017 5:31 PM, Marek Vasut wrote:
->>>> On 09/24/2017 12:59 PM, Vignesh R wrote:
->>>>> Add pm_runtime* calls to cadence-quadspi driver. This is required to
->>>>> switch on QSPI power domain on TI 66AK2G SoC during probe.
->>>>>
->>>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>>>
->>>> Are you planning to add some more fine-grained PM control later?
->>>
->>> Yes, I will need to add fine-grained PM control at some point. But, for
->>> now SoC does not really support low power mode or runtime power saving
->>> option.
->>> The fact that driver still uses clk_prepare_*() calls to enable/disable
->>> clocks instead of pm_*() calls makes it a bit tricky though.
->>>
->>> Just figured out I forgot to add cleanup code in error handling path of
->>> probe(). Will fix that and send a v4.
->>
->> OK, fine. Cleanups are welcome. The SoCFPGA doesn't do much runtime PM
->> either, so it's fine for now.
->>
-> 
-> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
-> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
-> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
+On Mon, 18 Sep 2017 10:27:03 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Not of the top of my head, sorry. +CC Matthew, he should know.
+> Hi Jonathan,
+> 
+> On Sat, Sep 16, 2017 at 03:17:34PM -0700, Jonathan Cameron wrote:
+> > On Sat, 16 Sep 2017 12:05:49 +0200
+> > Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+> >   
+> > > Hi Icenowy,
+> > > 
+> > > On 14/09/2017 16:52, Icenowy Zheng wrote:  
+> > > > Because of the restriction of the OF thermal framework, the thermal
+> > > > sensor will fail to probe if the thermal zone doesn't exist.
+> > > >     
+> > > 
+> > > Oh no, that's not good.
+> > > 
+> > > We discussed about it on IRC and I even proposed a patch for it, telling
+> > > you I would post it on the mailing list soon after. Of course, I forgot
+> > > and you definitely should have yelled at me for not doing it :)
+> > > 
+> > > I won't be able to test the patch soon. I can send it to you so that you
+> > > can test it and integrate it in your patch series so it won't block you.
+> > > Otherwise, we'll have to wait for a week or two for me to test it.
+> > > 
+> > > Thanks and sorry for forgetting to post the patch you need,
+> > > Quentin  
+> > 
+> > Other this outstanding issue I'm happy with the series, so hopefully
+> > with Quentin's patch added we should be good to merge this one.  
+> 
+> We will at least need a v5.
+> 
+> Maxime
+> 
+Sure - I can see other issues are coming out of the woodwork!
 
--- 
-Best regards,
-Marek Vasut
+Thanks,
+
+Jonathan
