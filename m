@@ -1,214 +1,120 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 24 Sep 2017 13:22:52 +0100
-Subject: [PATCH 3/3] iio: trigger: stm32-timer: enable clock when in
- master mode
-In-Reply-To: <1505729132-1369-4-git-send-email-fabrice.gasnier@st.com>
-References: <1505729132-1369-1-git-send-email-fabrice.gasnier@st.com>
- <1505729132-1369-4-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170924132252.211d67d0@archlinux>
+From: vigneshr@ti.com (Vignesh R)
+Date: Sun, 24 Sep 2017 18:03:51 +0530
+Subject: [PATCH v3 2/5] mtd: spi-nor: cadence-quadspi: add a delay in
+ write sequence
+In-Reply-To: <94313cae-4805-0b13-a469-72aa7556b685@gmail.com>
+References: <20170924105924.23923-1-vigneshr@ti.com>
+ <20170924105924.23923-3-vigneshr@ti.com>
+ <94313cae-4805-0b13-a469-72aa7556b685@gmail.com>
+Message-ID: <8990b971-91d5-747f-905b-5e24743e090d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Sep 2017 12:05:32 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> Clock should be enabled as soon as using master mode, even before
-> enabling timer. Or, this may provoke bad behavior on the other end
-> (slave timer). Then, introduce 'clk_enabled' flag, instead of relying
-> on CR1 EN bit, to keep track of clock being enabled.
-> Propagate this anywhere else in the driver.
+
+On 9/24/2017 5:29 PM, Marek Vasut wrote:
+> On 09/24/2017 12:59 PM, Vignesh R wrote:
+>> As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
+>> Controller programming sequence, a delay equal to couple of QSPI master
+>> clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
+>> writing data to the flash. Introduce a quirk flag CQSPI_NEEDS_WR_DELAY
+>> to handle this and set this flag for TI 66AK2G SoC.
+>>
+>> [1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > 
-> Also add 'remove' routine to stop timer and disable clock in case it
-> has been left enabled.
+> Is this TI specific or is this controller property ? I wouldn't be
+> surprised of the later ...
 
-This last bit leaves us open to some nasty race conditions I think.
-I'm not sure of a clean way to avoid them, but turning this off
-before we remove the userspace interfaces doesn't strike me as a good
-idea!
-
-More detail inline.
-
-Jonathan
+I am not sure, there is no generic public documentation by cadence for
+this IP. TI TRM clearly states this delay is required and I have
+verified it practically that this delay is indeed needed.
+But current user of this IP, socfpga does not seem to mention anything
+about it. So, I guess its TI specific quirk.
 
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  drivers/iio/trigger/stm32-timer-trigger.c | 60 +++++++++++++++++++++----------
->  1 file changed, 42 insertions(+), 18 deletions(-)
+>> ---
+>>
+>> v3:
+>> Fix build warnings reported by kbuild test bot.
+>>
+>>  drivers/mtd/spi-nor/cadence-quadspi.c | 27 ++++++++++++++++++++++++++-
+>>  1 file changed, 26 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+>> index 53c7d8e0327a..5cd5d6f7303f 100644
+>> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+>> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+>> @@ -38,6 +38,9 @@
+>>  #define CQSPI_NAME			"cadence-qspi"
+>>  #define CQSPI_MAX_CHIPSELECT		16
+>>  
+>> +/* Quirks */
+>> +#define CQSPI_NEEDS_WR_DELAY		BIT(0)
+>> +
+>>  struct cqspi_st;
+>>  
+>>  struct cqspi_flash_pdata {
+>> @@ -76,6 +79,7 @@ struct cqspi_st {
+>>  	u32			fifo_depth;
+>>  	u32			fifo_width;
+>>  	u32			trigger_address;
+>> +	u32			wr_delay;
+>>  	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
+>>  };
+>>  
+>> @@ -608,6 +612,15 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+>>  	reinit_completion(&cqspi->transfer_complete);
+>>  	writel(CQSPI_REG_INDIRECTWR_START_MASK,
+>>  	       reg_base + CQSPI_REG_INDIRECTWR);
+>> +	/*
+>> +	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
+>> +	 * Controller programming sequence, couple of cycles of
+>> +	 * QSPI_REF_CLK delay is required for the above bit to
+>> +	 * be internally synchronized by the QSPI module. Provide 5
+>> +	 * cycles of delay.
+>> +	 */
+>> +	if (cqspi->wr_delay)
+>> +		ndelay(cqspi->wr_delay);
+>>  
+>>  	while (remaining > 0) {
+>>  		write_bytes = remaining > page_size ? page_size : remaining;
+>> @@ -1156,6 +1169,7 @@ static int cqspi_probe(struct platform_device *pdev)
+>>  	struct cqspi_st *cqspi;
+>>  	struct resource *res;
+>>  	struct resource *res_ahb;
+>> +	unsigned long data;
+>>  	int ret;
+>>  	int irq;
+>>  
+>> @@ -1213,6 +1227,10 @@ static int cqspi_probe(struct platform_device *pdev)
+>>  	}
+>>  
+>>  	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+>> +	data  = (unsigned long)of_device_get_match_data(dev);
+>> +	if (data & CQSPI_NEEDS_WR_DELAY)
+>> +		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
+>> +						   cqspi->master_ref_clk_hz);
+>>  
+>>  	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
+>>  			       pdev->name, cqspi);
+>> @@ -1284,7 +1302,14 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
+>>  #endif
+>>  
+>>  static const struct of_device_id cqspi_dt_ids[] = {
+>> -	{.compatible = "cdns,qspi-nor",},
+>> +	{
+>> +		.compatible = "cdns,qspi-nor",
+>> +		.data = (void *)0,
+>> +	},
+>> +	{
+>> +		.compatible = "ti,k2g-qspi",
+>> +		.data = (void *)CQSPI_NEEDS_WR_DELAY,
+>> +	},
+>>  	{ /* end of table */ }
+>>  };
+>>  
+>>
 > 
-> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-> index eb212f8c..5a6509c 100644
-> --- a/drivers/iio/trigger/stm32-timer-trigger.c
-> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
-> @@ -79,6 +79,7 @@ struct stm32_timer_trigger {
->  	struct device *dev;
->  	struct regmap *regmap;
->  	struct clk *clk;
-> +	bool clk_enabled;
->  	u32 max_arr;
->  	const void *triggers;
->  	const void *valids;
-> @@ -106,7 +107,7 @@ static int stm32_timer_start(struct stm32_timer_trigger *priv,
->  {
->  	unsigned long long prd, div;
->  	int prescaler = 0;
-> -	u32 ccer, cr1;
-> +	u32 ccer;
->  
->  	/* Period and prescaler values depends of clock rate */
->  	div = (unsigned long long)clk_get_rate(priv->clk);
-> @@ -136,9 +137,10 @@ static int stm32_timer_start(struct stm32_timer_trigger *priv,
->  	if (ccer & TIM_CCER_CCXE)
->  		return -EBUSY;
->  
-> -	regmap_read(priv->regmap, TIM_CR1, &cr1);
-> -	if (!(cr1 & TIM_CR1_CEN))
-> +	if (!priv->clk_enabled) {
-> +		priv->clk_enabled = true;
->  		clk_enable(priv->clk);
-> +	}
->  
->  	regmap_write(priv->regmap, TIM_PSC, prescaler);
->  	regmap_write(priv->regmap, TIM_ARR, prd - 1);
-> @@ -163,16 +165,12 @@ static int stm32_timer_start(struct stm32_timer_trigger *priv,
->  
->  static void stm32_timer_stop(struct stm32_timer_trigger *priv)
->  {
-> -	u32 ccer, cr1;
-> +	u32 ccer;
->  
->  	regmap_read(priv->regmap, TIM_CCER, &ccer);
->  	if (ccer & TIM_CCER_CCXE)
->  		return;
->  
-> -	regmap_read(priv->regmap, TIM_CR1, &cr1);
-> -	if (cr1 & TIM_CR1_CEN)
-> -		clk_disable(priv->clk);
-> -
->  	/* Stop timer */
->  	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
->  	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
-> @@ -181,6 +179,11 @@ static void stm32_timer_stop(struct stm32_timer_trigger *priv)
->  
->  	/* Make sure that registers are updated */
->  	regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
-> +
-> +	if (priv->clk_enabled) {
-> +		priv->clk_enabled = false;
-> +		clk_disable(priv->clk);
-> +	}
->  }
->  
->  static ssize_t stm32_tt_store_frequency(struct device *dev,
-> @@ -295,6 +298,11 @@ static ssize_t stm32_tt_store_master_mode(struct device *dev,
->  	for (i = 0; i <= master_mode_max; i++) {
->  		if (!strncmp(master_mode_table[i], buf,
->  			     strlen(master_mode_table[i]))) {
-> +			if (!priv->clk_enabled) {
-> +				/* Clock should be enabled first */
-> +				priv->clk_enabled = true;
-> +				clk_enable(priv->clk);
-> +			}
->  			regmap_update_bits(priv->regmap, TIM_CR2, mask,
->  					   i << shift);
->  			/* Make sure that registers are updated */
-> @@ -438,7 +446,6 @@ static int stm32_counter_write_raw(struct iio_dev *indio_dev,
->  				   int val, int val2, long mask)
->  {
->  	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
-> -	u32 dat;
->  
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
-> @@ -450,17 +457,19 @@ static int stm32_counter_write_raw(struct iio_dev *indio_dev,
->  
->  	case IIO_CHAN_INFO_ENABLE:
->  		if (val) {
-> -			regmap_read(priv->regmap, TIM_CR1, &dat);
-> -			if (!(dat & TIM_CR1_CEN))
-> +			if (!priv->clk_enabled) {
-> +				priv->clk_enabled = true;
->  				clk_enable(priv->clk);
-> +			}
->  			regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
->  					   TIM_CR1_CEN);
->  		} else {
-> -			regmap_read(priv->regmap, TIM_CR1, &dat);
->  			regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
->  					   0);
-> -			if (dat & TIM_CR1_CEN)
-> +			if (priv->clk_enabled) {
-> +				priv->clk_enabled = false;
->  				clk_disable(priv->clk);
-> +			}
->  		}
->  		return 0;
->  	}
-> @@ -558,7 +567,6 @@ static int stm32_set_enable_mode(struct iio_dev *indio_dev,
->  {
->  	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
->  	int sms = stm32_enable_mode2sms(mode);
-> -	u32 val;
->  
->  	if (sms < 0)
->  		return sms;
-> @@ -566,10 +574,9 @@ static int stm32_set_enable_mode(struct iio_dev *indio_dev,
->  	 * Triggered mode sets CEN bit automatically by hardware. So, first
->  	 * enable counter clock, so it can use it. Keeps it in sync with CEN.
->  	 */
-> -	if (sms == 6) {
-> -		regmap_read(priv->regmap, TIM_CR1, &val);
-> -		if (!(val & TIM_CR1_CEN))
-> -			clk_enable(priv->clk);
-> +	if (sms == 6 && !priv->clk_enabled) {
-> +		clk_enable(priv->clk);
-> +		priv->clk_enabled = true;
->  	}
->  
->  	regmap_update_bits(priv->regmap, TIM_SMCR, TIM_SMCR_SMS, sms);
-> @@ -848,6 +855,22 @@ static int stm32_timer_trigger_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int stm32_timer_trigger_remove(struct platform_device *pdev)
-> +{
-> +	struct stm32_timer_trigger *priv = platform_get_drvdata(pdev);
-> +	u32 val;
-> +
-> +	/* Check if nobody else use the timer, then disable it */
-> +	regmap_read(priv->regmap, TIM_CCER, &val);
-> +	if (!(val & TIM_CCER_CCXE))
-> +		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
-> +
-> +	if (priv->clk_enabled)
-> +		clk_disable(priv->clk);
-> +
-> +	return 0;
-> +}
-
-This looks racy to me.  Given we did everything previously with devm
-calls, which will run after this time, we are turning the timer off
-before the userspace interfaces are removed.  If you need to do
-this you probably also need to unwind the use of devm for anything
-that needs this clock.
-
-It's not immediately obvious how to clean up these timers cleanly
-though as they seem to only be enabled on userspace configuration.
-
-Any attempt to prevent removal of the driver until a manual unwind
-is done by userspace would be risk prone, but that might be one
-approach.  It's not as though anyone can force a removal of
-one of these by pulling the cable out or anything.
-
-> +
->  static const struct stm32_timer_trigger_cfg stm32_timer_trg_cfg = {
->  	.valids_table = valids_table,
->  	.num_valids_table = ARRAY_SIZE(valids_table),
-> @@ -872,6 +895,7 @@ static int stm32_timer_trigger_probe(struct platform_device *pdev)
->  
->  static struct platform_driver stm32_timer_trigger_driver = {
->  	.probe = stm32_timer_trigger_probe,
-> +	.remove = stm32_timer_trigger_remove,
->  	.driver = {
->  		.name = "stm32-timer-trigger",
->  		.of_match_table = stm32_trig_of_match,
+> 
