@@ -1,39 +1,130 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 24 Sep 2017 15:12:37 +0200
-Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
- support
-In-Reply-To: <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
+Date: Sun, 24 Sep 2017 15:13:56 +0200
+Subject: [PATCH v3 2/5] mtd: spi-nor: cadence-quadspi: add a delay in
+ write sequence
+In-Reply-To: <8990b971-91d5-747f-905b-5e24743e090d@ti.com>
 References: <20170924105924.23923-1-vigneshr@ti.com>
- <20170924105924.23923-6-vigneshr@ti.com>
- <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
- <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
-Message-ID: <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
+ <20170924105924.23923-3-vigneshr@ti.com>
+ <94313cae-4805-0b13-a469-72aa7556b685@gmail.com>
+ <8990b971-91d5-747f-905b-5e24743e090d@ti.com>
+Message-ID: <d35d0891-71b9-12df-9689-dc77f56453ab@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2017 03:08 PM, Vignesh R wrote:
+On 09/24/2017 02:33 PM, Vignesh R wrote:
 > 
 > 
-> On 9/24/2017 5:31 PM, Marek Vasut wrote:
+> On 9/24/2017 5:29 PM, Marek Vasut wrote:
 >> On 09/24/2017 12:59 PM, Vignesh R wrote:
->>> Add pm_runtime* calls to cadence-quadspi driver. This is required to
->>> switch on QSPI power domain on TI 66AK2G SoC during probe.
+>>> As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
+>>> Controller programming sequence, a delay equal to couple of QSPI master
+>>> clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
+>>> writing data to the flash. Introduce a quirk flag CQSPI_NEEDS_WR_DELAY
+>>> to handle this and set this flag for TI 66AK2G SoC.
+>>>
+>>> [1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
 >>>
 >>> Signed-off-by: Vignesh R <vigneshr@ti.com>
 >>
->> Are you planning to add some more fine-grained PM control later?
+>> Is this TI specific or is this controller property ? I wouldn't be
+>> surprised of the later ...
 > 
-> Yes, I will need to add fine-grained PM control at some point. But, for
-> now SoC does not really support low power mode or runtime power saving
-> option.
-> The fact that driver still uses clk_prepare_*() calls to enable/disable
-> clocks instead of pm_*() calls makes it a bit tricky though.
-> 
-> Just figured out I forgot to add cleanup code in error handling path of
-> probe(). Will fix that and send a v4.
+> I am not sure, there is no generic public documentation by cadence for
+> this IP. TI TRM clearly states this delay is required and I have
+> verified it practically that this delay is indeed needed.
+> But current user of this IP, socfpga does not seem to mention anything
+> about it. So, I guess its TI specific quirk.
 
-OK, fine. Cleanups are welcome. The SoCFPGA doesn't do much runtime PM
-either, so it's fine for now.
+OK, let's go with that then. I didn't observe any stability issues with
+SoCFPGA, but I didn't run the flash at 100s of MHz either. At what kind
+of frequencies does the quirk become relevant ?
+
+>>
+>>> ---
+>>>
+>>> v3:
+>>> Fix build warnings reported by kbuild test bot.
+>>>
+>>>  drivers/mtd/spi-nor/cadence-quadspi.c | 27 ++++++++++++++++++++++++++-
+>>>  1 file changed, 26 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+>>> index 53c7d8e0327a..5cd5d6f7303f 100644
+>>> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+>>> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+>>> @@ -38,6 +38,9 @@
+>>>  #define CQSPI_NAME			"cadence-qspi"
+>>>  #define CQSPI_MAX_CHIPSELECT		16
+>>>  
+>>> +/* Quirks */
+>>> +#define CQSPI_NEEDS_WR_DELAY		BIT(0)
+>>> +
+>>>  struct cqspi_st;
+>>>  
+>>>  struct cqspi_flash_pdata {
+>>> @@ -76,6 +79,7 @@ struct cqspi_st {
+>>>  	u32			fifo_depth;
+>>>  	u32			fifo_width;
+>>>  	u32			trigger_address;
+>>> +	u32			wr_delay;
+>>>  	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
+>>>  };
+>>>  
+>>> @@ -608,6 +612,15 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+>>>  	reinit_completion(&cqspi->transfer_complete);
+>>>  	writel(CQSPI_REG_INDIRECTWR_START_MASK,
+>>>  	       reg_base + CQSPI_REG_INDIRECTWR);
+>>> +	/*
+>>> +	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
+>>> +	 * Controller programming sequence, couple of cycles of
+>>> +	 * QSPI_REF_CLK delay is required for the above bit to
+>>> +	 * be internally synchronized by the QSPI module. Provide 5
+>>> +	 * cycles of delay.
+>>> +	 */
+>>> +	if (cqspi->wr_delay)
+>>> +		ndelay(cqspi->wr_delay);
+>>>  
+>>>  	while (remaining > 0) {
+>>>  		write_bytes = remaining > page_size ? page_size : remaining;
+>>> @@ -1156,6 +1169,7 @@ static int cqspi_probe(struct platform_device *pdev)
+>>>  	struct cqspi_st *cqspi;
+>>>  	struct resource *res;
+>>>  	struct resource *res_ahb;
+>>> +	unsigned long data;
+>>>  	int ret;
+>>>  	int irq;
+>>>  
+>>> @@ -1213,6 +1227,10 @@ static int cqspi_probe(struct platform_device *pdev)
+>>>  	}
+>>>  
+>>>  	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+>>> +	data  = (unsigned long)of_device_get_match_data(dev);
+>>> +	if (data & CQSPI_NEEDS_WR_DELAY)
+>>> +		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
+>>> +						   cqspi->master_ref_clk_hz);
+>>>  
+>>>  	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
+>>>  			       pdev->name, cqspi);
+>>> @@ -1284,7 +1302,14 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
+>>>  #endif
+>>>  
+>>>  static const struct of_device_id cqspi_dt_ids[] = {
+>>> -	{.compatible = "cdns,qspi-nor",},
+>>> +	{
+>>> +		.compatible = "cdns,qspi-nor",
+>>> +		.data = (void *)0,
+>>> +	},
+>>> +	{
+>>> +		.compatible = "ti,k2g-qspi",
+>>> +		.data = (void *)CQSPI_NEEDS_WR_DELAY,
+>>> +	},
+>>>  	{ /* end of table */ }
+>>>  };
+>>>  
+>>>
+>>
+>>
+
 
 -- 
 Best regards,
