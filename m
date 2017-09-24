@@ -1,50 +1,45 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 24 Sep 2017 13:09:05 +0100
-Subject: [PATCH 1/3] iio: trigger: stm32-timer: preset shouldn't be
- buffered
-In-Reply-To: <1505729132-1369-2-git-send-email-fabrice.gasnier@st.com>
+Date: Sun, 24 Sep 2017 13:10:27 +0100
+Subject: [PATCH 2/3] iio: trigger: stm32-timer: fix a corner case to
+ write preset
+In-Reply-To: <1505729132-1369-3-git-send-email-fabrice.gasnier@st.com>
 References: <1505729132-1369-1-git-send-email-fabrice.gasnier@st.com>
- <1505729132-1369-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170924130905.64e1bc39@archlinux>
+ <1505729132-1369-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170924131027.2d6c5d90@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Sep 2017 12:05:30 +0200
+On Mon, 18 Sep 2017 12:05:31 +0200
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> Currently, setting preset value (ARR) will update directly 'Auto reload
-> value' only on 1st write access. But then, ARPE is set. This makes
-> ARR a shadow register. Preset value should be updated upon each
-> write request: ensure ARPE is 0. This fixes successive writes to
-> preset attribute.
+> Balance timer start routine that sets ARPE: clear it in stop routine.
+> This fixes a corner case, when timer is used successively as trigger
+> (with sampling_frequency start/stop routines), then as a counter
+> (with preset).
 > 
-> Fixes: 4adec7da0536 ("iio: stm32 trigger: Add quadrature encoder device")
+> Fixes: 93fbe91b5521 ("iio: Add STM32 timer trigger driver")
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-Applied to the fixes-togreg-post-rc1 branch of iio.git and marked
-for stable.
+Applied to the fixes-togreg-post-rc1 branch of iio.git and
+marked for stable.
 
 Thanks,
 
 Jonathan
-
 > ---
->  drivers/iio/trigger/stm32-timer-trigger.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  drivers/iio/trigger/stm32-timer-trigger.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 > diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-> index 9b90534..34cc25b 100644
+> index 34cc25b..eb212f8c 100644
 > --- a/drivers/iio/trigger/stm32-timer-trigger.c
 > +++ b/drivers/iio/trigger/stm32-timer-trigger.c
-> @@ -715,8 +715,9 @@ static ssize_t stm32_count_set_preset(struct iio_dev *indio_dev,
->  	if (ret)
->  		return ret;
+> @@ -174,6 +174,7 @@ static void stm32_timer_stop(struct stm32_timer_trigger *priv)
+>  		clk_disable(priv->clk);
 >  
-> +	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
+>  	/* Stop timer */
 > +	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
->  	regmap_write(priv->regmap, TIM_ARR, preset);
-> -	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
->  
->  	return len;
->  }
+>  	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
+>  	regmap_write(priv->regmap, TIM_PSC, 0);
+>  	regmap_write(priv->regmap, TIM_ARR, 0);
