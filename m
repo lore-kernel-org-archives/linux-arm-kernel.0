@@ -1,102 +1,55 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Sun, 24 Sep 2017 16:29:21 +0530
-Subject: [PATCH v3 2/5] mtd: spi-nor: cadence-quadspi: add a delay in write
- sequence
+Date: Sun, 24 Sep 2017 16:29:24 +0530
+Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM support
 In-Reply-To: <20170924105924.23923-1-vigneshr@ti.com>
 References: <20170924105924.23923-1-vigneshr@ti.com>
-Message-ID: <20170924105924.23923-3-vigneshr@ti.com>
+Message-ID: <20170924105924.23923-6-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
-Controller programming sequence, a delay equal to couple of QSPI master
-clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
-writing data to the flash. Introduce a quirk flag CQSPI_NEEDS_WR_DELAY
-to handle this and set this flag for TI 66AK2G SoC.
-
-[1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
+Add pm_runtime* calls to cadence-quadspi driver. This is required to
+switch on QSPI power domain on TI 66AK2G SoC during probe.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
-
-v3:
-Fix build warnings reported by kbuild test bot.
-
- drivers/mtd/spi-nor/cadence-quadspi.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ drivers/mtd/spi-nor/cadence-quadspi.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index 53c7d8e0327a..5cd5d6f7303f 100644
+index d9629e8f4798..2c8e6226d267 100644
 --- a/drivers/mtd/spi-nor/cadence-quadspi.c
 +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -38,6 +38,9 @@
- #define CQSPI_NAME			"cadence-qspi"
- #define CQSPI_MAX_CHIPSELECT		16
- 
-+/* Quirks */
-+#define CQSPI_NEEDS_WR_DELAY		BIT(0)
-+
- struct cqspi_st;
- 
- struct cqspi_flash_pdata {
-@@ -76,6 +79,7 @@ struct cqspi_st {
- 	u32			fifo_depth;
- 	u32			fifo_width;
- 	u32			trigger_address;
-+	u32			wr_delay;
- 	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
- };
- 
-@@ -608,6 +612,15 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
- 	reinit_completion(&cqspi->transfer_complete);
- 	writel(CQSPI_REG_INDIRECTWR_START_MASK,
- 	       reg_base + CQSPI_REG_INDIRECTWR);
-+	/*
-+	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
-+	 * Controller programming sequence, couple of cycles of
-+	 * QSPI_REF_CLK delay is required for the above bit to
-+	 * be internally synchronized by the QSPI module. Provide 5
-+	 * cycles of delay.
-+	 */
-+	if (cqspi->wr_delay)
-+		ndelay(cqspi->wr_delay);
- 
- 	while (remaining > 0) {
- 		write_bytes = remaining > page_size ? page_size : remaining;
-@@ -1156,6 +1169,7 @@ static int cqspi_probe(struct platform_device *pdev)
- 	struct cqspi_st *cqspi;
- 	struct resource *res;
- 	struct resource *res_ahb;
-+	unsigned long data;
- 	int ret;
- 	int irq;
- 
-@@ -1213,6 +1227,10 @@ static int cqspi_probe(struct platform_device *pdev)
+@@ -31,6 +31,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/sched.h>
+ #include <linux/spi/spi.h>
+ #include <linux/timer.h>
+@@ -1224,6 +1225,13 @@ static int cqspi_probe(struct platform_device *pdev)
+ 		return -ENXIO;
  	}
  
- 	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
-+	data  = (unsigned long)of_device_get_match_data(dev);
-+	if (data & CQSPI_NEEDS_WR_DELAY)
-+		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
-+						   cqspi->master_ref_clk_hz);
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(&pdev->dev);
++		return ret;
++	}
++
+ 	ret = clk_prepare_enable(cqspi->clk);
+ 	if (ret) {
+ 		dev_err(dev, "Cannot enable QSPI clock.\n");
+@@ -1275,6 +1283,9 @@ static int cqspi_remove(struct platform_device *pdev)
  
- 	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
- 			       pdev->name, cqspi);
-@@ -1284,7 +1302,14 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
- #endif
+ 	clk_disable_unprepare(cqspi->clk);
  
- static const struct of_device_id cqspi_dt_ids[] = {
--	{.compatible = "cdns,qspi-nor",},
-+	{
-+		.compatible = "cdns,qspi-nor",
-+		.data = (void *)0,
-+	},
-+	{
-+		.compatible = "ti,k2g-qspi",
-+		.data = (void *)CQSPI_NEEDS_WR_DELAY,
-+	},
- 	{ /* end of table */ }
- };
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++
+ 	return 0;
+ }
  
 -- 
 2.14.1
