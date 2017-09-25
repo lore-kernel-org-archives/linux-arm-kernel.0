@@ -1,178 +1,120 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Sep 2017 09:54:44 +0200
-Subject: [PATCH 3/3] ARM: shmobile: rcar-gen2: Make sure CNTVOFF is
- initialized on CA7/15
-In-Reply-To: <cover.1506325834.git.horms+renesas@verge.net.au>
-References: <cover.1506325834.git.horms+renesas@verge.net.au>
-Message-ID: <3fd45a136ff61bb54deab70fb2d534a85e40481f.1506325834.git.horms+renesas@verge.net.au>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 25 Sep 2017 16:03:13 +0800
+Subject: [PATCH v3 03/10] kexec_file: factor out arch_kexec_kernel_*()
+ from x86, powerpc
+In-Reply-To: <20170922075807.GM17186@linaro.org>
+References: <20170915105932.25338-1-takahiro.akashi@linaro.org>
+ <20170915105932.25338-4-takahiro.akashi@linaro.org>
+ <20170921073516.GA6643@dhcp-128-65.nay.redhat.com>
+ <20170922075807.GM17186@linaro.org>
+Message-ID: <20170925080313.GA5970@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+HI AKASHI,
+On 09/22/17 at 04:58pm, AKASHI Takahiro wrote:
+> Hi Dave,
+> 
+[snip]
 
-On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
-Ideally it should be initialized by the boot loader, but it isn't.
+> > >  /*
+> > >   * Apply purgatory relocations.
+> > >   *
+> > > diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+> > > index dd056fab9e35..4a2b24d94e04 100644
+> > > --- a/include/linux/kexec.h
+> > > +++ b/include/linux/kexec.h
+> > > @@ -134,6 +134,26 @@ struct kexec_file_ops {
+> > >  #endif
+> > >  };
+> > >  
+> > > +int kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > +			     unsigned long buf_len);
+> > > +void *kexec_kernel_image_load(struct kimage *image);
+> > > +int kexec_kernel_post_load_cleanup(struct kimage *image);
+> > > +int kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> > > +			    unsigned long buf_len);
+> > > +
+> > > +#ifndef arch_kexec_kernel_image_probe
+> > > +#define arch_kexec_kernel_image_probe kexec_kernel_image_probe
+> > > +#endif
+> > > +#ifndef arch_kexec_kernel_image_load
+> > > +#define arch_kexec_kernel_image_load kexec_kernel_image_load
+> > > +#endif
+> > > +#ifndef arch_kimage_file_post_load_cleanup
+> > > +#define arch_kimage_file_post_load_cleanup kexec_kernel_post_load_cleanup
+> > > +#endif
+> > > +#ifndef arch_kexec_kernel_verify_sig
+> > > +#define arch_kexec_kernel_verify_sig kexec_kernel_verify_sig
+> > > +#endif
+> > > +
+> > >  /**
+> > >   * struct kexec_buf - parameters for finding a place for a buffer in memory
+> > >   * @image:	kexec image in which memory to search.
+> > > @@ -276,12 +296,6 @@ int crash_shrink_memory(unsigned long new_size);
+> > >  size_t crash_get_memory_size(void);
+> > >  void crash_free_reserved_phys_range(unsigned long begin, unsigned long end);
+> > >  
+> > > -int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > -					 unsigned long buf_len);
+> > > -void * __weak arch_kexec_kernel_image_load(struct kimage *image);
+> > > -int __weak arch_kimage_file_post_load_cleanup(struct kimage *image);
+> > > -int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> > > -					unsigned long buf_len);
+> > 
+> > I thought we can keep using the __weak function in common code and drop
+> > the arch functions, no need the #ifndef arch_kexec_kernel_image_probe
+> > and the function renaming stuff.  But I did not notice the powerpc
+> > _probe function checks KEXEC_ON_CRASH, that should be checked earlier
+> > and we can fail out early if not supported, but I have no idea
+> > how to do it gracefully for now.
+> > 
+> > Also for x86 _load function it cleanups image->arch.elf_headers, it can
+> > not be dropped simply.
+> 
+> Yeah, arm64 post_load_cleanup function also has some extra stuff.
+> See my patch #7/8.
 
-For the boot CPU, CNTVOFF is initialized by Linux since commit
-9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7 arch_timer
-initialization for r8a7794").
-For secondary CPU cores, no such initialization is done.
+But the x86 cleanup was dropped silently, can you add it in x86
+post_load_cleanup as well?
 
-Hence when enabling SMP on r8a7794, the kernel log is spammed with:
+> 
+> > Consider the above two issues, maybe you can keep the powerpc
+> > version of _probe() and x86 version of _load(), and still copy the common code
+> > to kexec_file.c weak functions.
+> 
+> It was exactly what I made before submitting v3, but I changed
+> my mind a bit. My intension is to prevent the code being duplicated
+> even though it has only a few lines of code.
+> 
+> I agree that '#ifndef arch_kexec_kernel_image_probe' in kexec.h would be
+> quite ugly, but similar usages can be spotted in the kernel source.
+> 
+> That said if you don't like it at all, I defer to you.
 
-    WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
-	     Please report this, consider using a different clocksource, if possible.
-	     Your kernel is probably still fine.
+I understand your concern, maybe still use a weak function for 
+arch_kexec_kernel_image_*, and they call the kexec_kernel_image_* in
+kexec_file.c common code.
 
-As Marc Zyngier pointed out that Cortex-A15 and Cortex-A7 are similar with
-respect to CNTVOFF, we have been very lucky this just worked on R-Car
-Gen2 SoCs with Cortex-A15 cores.
+Like in general code:
 
-To fix this:
-  - Move the existing inline asm code to initialize CNTVOFF to an
-    assembler source file (adding comments and replacing hardcoded
-    constants by definitions in the process), so it can be reused,
-  - Perform the initialization of CNTVOFF on the boot CPU (Cortex-A15 or
-    Cortex-A7) on all R-Car Gen2 and RZ/G1 parts,
-  - Wrap the standard secondary_startup() routine inside a routine which
-    initializes CNTVOFF.
+int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+                                         unsigned long buf_len)
+{
+	return kexec_kernel_image_probe(image, buf, buf_len);
+}
 
-Based on patches by Hisashi Nakamura in the BSP.
+In architechture code it can add other code and call
+kexec_kernel_image_*
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Makefile          |  1 +
- arch/arm/mach-shmobile/common.h          |  2 ++
- arch/arm/mach-shmobile/headsmp-apmu.S    | 37 ++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/platsmp-apmu.c    |  2 +-
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++---------------
- 5 files changed, 43 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
+It looks a bit better than the #ifdef way. 
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 64611a1b4276..32176a00c664 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -22,6 +22,7 @@ cpu-y				:= platsmp.o headsmp.o
- # Shared SoC family objects
- obj-$(CONFIG_ARCH_RCAR_GEN2)	+= setup-rcar-gen2.o platsmp-apmu.o $(cpu-y)
- CFLAGS_setup-rcar-gen2.o	+= -march=armv7-a
-+obj-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
- obj-$(CONFIG_ARCH_R8A7790)	+= regulator-quirk-rcar-gen2.o
- obj-$(CONFIG_ARCH_R8A7791)	+= regulator-quirk-rcar-gen2.o
- obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 1a8f7b3ab449..ea6e9e2be3f7 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -1,6 +1,7 @@
- #ifndef __ARCH_MACH_COMMON_H
- #define __ARCH_MACH_COMMON_H
- 
-+extern void shmobile_init_cntvoff(void);
- extern void shmobile_init_delay(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
-@@ -11,6 +12,7 @@ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
- 			      unsigned long arg);
- extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
- extern bool shmobile_smp_init_fallback_ops(void);
-+extern void shmobile_boot_apmu(void);
- extern void shmobile_boot_scu(void);
- extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
- 					  unsigned int max_cpus);
-diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-new file mode 100644
-index 000000000000..db4743d2bf91
---- /dev/null
-+++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-@@ -0,0 +1,37 @@
-+/*
-+ * SMP support for APMU based systems with Cortex A7/A15
-+ *
-+ * Copyright (C) 2014  Renesas Electronics Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+ENTRY(shmobile_init_cntvoff)
-+	/*
-+	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-+	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-+	 * then it should be handled by the secure code
-+	 */
-+	cps	#MON_MODE
-+	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
-+	orr	r0, r1, #1
-+	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-+	instr_sync
-+	mov	r0, #0
-+	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-+	instr_sync
-+	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-+	instr_sync
-+	cps	#SVC_MODE
-+	ret	lr
-+ENDPROC(shmobile_init_cntvoff)
-+
-+ENTRY(shmobile_boot_apmu)
-+	bl	shmobile_init_cntvoff
-+	b	secondary_startup
-+ENDPROC(shmobile_boot_apmu)
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 3ca2c13346f0..4422b615a6ee 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -204,7 +204,7 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
- int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	/* For this particular CPU register boot vector */
--	shmobile_smp_hook(cpu, __pa_symbol(secondary_startup), 0);
-+	shmobile_smp_hook(cpu, __pa_symbol(shmobile_boot_apmu), 0);
- 
- 	return apmu_wrap(cpu, apmu_power_on);
- }
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 7ab1690fab82..5561dbed7a33 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -70,28 +70,12 @@ void __init rcar_gen2_timer_init(void)
- 	void __iomem *base;
- 	u32 freq;
- 
-+	shmobile_init_cntvoff();
-+
- 	if (of_machine_is_compatible("renesas,r8a7745") ||
- 	    of_machine_is_compatible("renesas,r8a7792") ||
- 	    of_machine_is_compatible("renesas,r8a7794")) {
- 		freq = 260000000 / 8;	/* ZS / 8 */
--		/* CNTVOFF has to be initialized either from non-secure
--		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
--		 * If TrustZone is enabled then it should be handled by the
--		 * secure code.
--		 */
--		asm volatile(
--		"	cps	0x16\n"
--		"	mrc	p15, 0, r1, c1, c1, 0\n"
--		"	orr	r0, r1, #1\n"
--		"	mcr	p15, 0, r0, c1, c1, 0\n"
--		"	isb\n"
--		"	mov	r0, #0\n"
--		"	mcrr	p15, 4, r0, r0, c14\n"
--		"	isb\n"
--		"	mcr	p15, 0, r1, c1, c1, 0\n"
--		"	isb\n"
--		"	cps	0x13\n"
--			: : : "r0", "r1");
- 	} else {
- 		/* At Linux boot time the r8a7790 arch timer comes up
- 		 * with the counter disabled. Moreover, it may also report
--- 
-2.1.4
+[snip]
+
+> 
+> Thanks,
+> -Takahiro AKASHI
+> 
+
+Thanks
+Dave
