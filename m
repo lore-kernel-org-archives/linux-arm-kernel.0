@@ -1,75 +1,32 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 25 Sep 2017 09:16:43 -0700
-Subject: [PATCH v3 1/2] watchdog: dw_wdt: add stop watchdog operation
-In-Reply-To: <20170925052531.1692-1-o.rempel@pengutronix.de>
-References: <20170925052531.1692-1-o.rempel@pengutronix.de>
-Message-ID: <20170925161643.GA32601@roeck-us.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 Sep 2017 17:28:39 +0100
+Subject: [PATCH 2/9] ASoC: cygnus: Update bindings for audio clock changes
+In-Reply-To: <492cb202-f4cb-4f5d-5d32-3dee4f1226b5@broadcom.com>
+References: <1502748417-26417-1-git-send-email-lori.hikichi@broadcom.com>
+ <1502748417-26417-3-git-send-email-lori.hikichi@broadcom.com>
+ <20170815171424.whcy4mftex6sgzgj@sirena.org.uk>
+ <d7e7144b-26c7-b96a-663d-03744bb60c36@broadcom.com>
+ <20170816105954.ve434zeeqinweo5a@sirena.org.uk>
+ <8c2fc92d-5ea8-8163-a588-0a4cba55e0f8@broadcom.com>
+ <20170822160703.nusf7sv6k4gj3pti@sirena.org.uk>
+ <492cb202-f4cb-4f5d-5d32-3dee4f1226b5@broadcom.com>
+Message-ID: <20170925162839.wvnxm5kbzsqpwwj6@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 07:25:30AM +0200, Oleksij Rempel wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> The only way of stopping the watchdog is by resetting it.
-> Add the watchdog op for stopping the device and reset if
-> a reset line is provided.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: linux-watchdog at vger.kernel.org
-> ---
-> 
-> changes v3:
->  - don't return error if rst is not present and set WDOG_HW_RUNNING bit
->    to notify watchdog core.
-> 
-> changes v2:
->  - test if dw_wdt->rst is NULL instead of IS_ERR
-> 
->  drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> index 36be987ff9ef..6cc56b18ee52 100644
-> --- a/drivers/watchdog/dw_wdt.c
-> +++ b/drivers/watchdog/dw_wdt.c
-> @@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
->  	return 0;
->  }
->  
-> +static int dw_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
-> +
-> +	if (!dw_wdt->rst) {
-> +		set_bit(WDOG_HW_RUNNING, &wdd->status);
+On Wed, Sep 06, 2017 at 06:45:22PM -0700, Lori Hikichi wrote:
 
-Setting WDOG_HW_RUNNING should be dropped from dw_wdt_start().
+> This will likely impact a couple of the other patches in the series, but
+> most should be applicable. What would be the best way to have some of the
+> other patches in this series reviewed?  Should I just drop this series and
+> resubmit new individual patches for review.
 
-Guenter
-
-> +		return 0;
-> +	}
-> +
-> +	reset_control_assert(dw_wdt->rst);
-> +	reset_control_deassert(dw_wdt->rst);
-> +
-> +	return 0;
-> +}
-> +
->  static int dw_wdt_restart(struct watchdog_device *wdd,
->  			  unsigned long action, void *data)
->  {
-> @@ -173,6 +188,7 @@ static const struct watchdog_info dw_wdt_ident = {
->  static const struct watchdog_ops dw_wdt_ops = {
->  	.owner		= THIS_MODULE,
->  	.start		= dw_wdt_start,
-> +	.stop		= dw_wdt_stop,
->  	.ping		= dw_wdt_ping,
->  	.set_timeout	= dw_wdt_set_timeout,
->  	.get_timeleft	= dw_wdt_get_timeleft,
-> -- 
-> 2.11.0
-> 
+Resubmit the ones that can be applied as is please, that'll avoid me
+making a mistake about which ones have the dependency.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170925/04624d06/attachment-0001.sig>
