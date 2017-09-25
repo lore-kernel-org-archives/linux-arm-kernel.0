@@ -1,88 +1,133 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 25 Sep 2017 19:11:51 +0100
-Subject: [PATCH] ARM: decompressor:add additional table to compressed kernel
-Message-ID: <E1dwXrD-0002DU-C6@rmk-PC.armlinux.org.uk>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 25 Sep 2017 11:15:30 -0700
+Subject: [PATCH v3 03/10] kexec_file: factor out arch_kexec_kernel_*()
+ from x86, powerpc
+In-Reply-To: <20170925080313.GA5970@dhcp-128-65.nay.redhat.com>
+References: <20170915105932.25338-1-takahiro.akashi@linaro.org>
+ <20170915105932.25338-4-takahiro.akashi@linaro.org>
+ <20170921073516.GA6643@dhcp-128-65.nay.redhat.com>
+ <20170922075807.GM17186@linaro.org>
+ <20170925080313.GA5970@dhcp-128-65.nay.redhat.com>
+Message-ID: <20170925181524.75sknpadahf5wcqa@dragonfly>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an additional extendable table to the compressed kernel so that we
-can provide further information to boot loaders regarding the properties
-of the image contained within.
+On Mon, Sep 25, 2017 at 04:03:13PM +0800, Dave Young wrote:
+> HI AKASHI,
+> On 09/22/17 at 04:58pm, AKASHI Takahiro wrote:
+> > Hi Dave,
+> > 
+> [snip]
+> 
+> > > >  /*
+> > > >   * Apply purgatory relocations.
+> > > >   *
+> > > > diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+> > > > index dd056fab9e35..4a2b24d94e04 100644
+> > > > --- a/include/linux/kexec.h
+> > > > +++ b/include/linux/kexec.h
+> > > > @@ -134,6 +134,26 @@ struct kexec_file_ops {
+> > > >  #endif
+> > > >  };
+> > > >  
+> > > > +int kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > > +			     unsigned long buf_len);
+> > > > +void *kexec_kernel_image_load(struct kimage *image);
+> > > > +int kexec_kernel_post_load_cleanup(struct kimage *image);
+> > > > +int kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> > > > +			    unsigned long buf_len);
+> > > > +
+> > > > +#ifndef arch_kexec_kernel_image_probe
+> > > > +#define arch_kexec_kernel_image_probe kexec_kernel_image_probe
+> > > > +#endif
+> > > > +#ifndef arch_kexec_kernel_image_load
+> > > > +#define arch_kexec_kernel_image_load kexec_kernel_image_load
+> > > > +#endif
+> > > > +#ifndef arch_kimage_file_post_load_cleanup
+> > > > +#define arch_kimage_file_post_load_cleanup kexec_kernel_post_load_cleanup
+> > > > +#endif
+> > > > +#ifndef arch_kexec_kernel_verify_sig
+> > > > +#define arch_kexec_kernel_verify_sig kexec_kernel_verify_sig
+> > > > +#endif
+> > > > +
+> > > >  /**
+> > > >   * struct kexec_buf - parameters for finding a place for a buffer in memory
+> > > >   * @image:	kexec image in which memory to search.
+> > > > @@ -276,12 +296,6 @@ int crash_shrink_memory(unsigned long new_size);
+> > > >  size_t crash_get_memory_size(void);
+> > > >  void crash_free_reserved_phys_range(unsigned long begin, unsigned long end);
+> > > >  
+> > > > -int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > > -					 unsigned long buf_len);
+> > > > -void * __weak arch_kexec_kernel_image_load(struct kimage *image);
+> > > > -int __weak arch_kimage_file_post_load_cleanup(struct kimage *image);
+> > > > -int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> > > > -					unsigned long buf_len);
+> > > 
+> > > I thought we can keep using the __weak function in common code and drop
+> > > the arch functions, no need the #ifndef arch_kexec_kernel_image_probe
+> > > and the function renaming stuff.  But I did not notice the powerpc
+> > > _probe function checks KEXEC_ON_CRASH, that should be checked earlier
+> > > and we can fail out early if not supported, but I have no idea
+> > > how to do it gracefully for now.
+> > > 
+> > > Also for x86 _load function it cleanups image->arch.elf_headers, it can
+> > > not be dropped simply.
+> > 
+> > Yeah, arm64 post_load_cleanup function also has some extra stuff.
+> > See my patch #7/8.
+> 
+> But the x86 cleanup was dropped silently, can you add it in x86
+> post_load_cleanup as well?
 
-When the kernel is configured to produce an EFI binary, one of the EFI
-tables starts at a fixed offset of 0x3c into the image.  Luckily, there
-are two words available after our zImage header to be able to place
-additional information.  Since the data here is indeterminant, we need
-to mark the presence of new information with a magic number, and we use
-the second word to point (via an offset) to a new table.
+Sure, I will do.
 
-The new table uses a tagged-list approach, just like the old ATAG system
-(allowing some re-use of those structures) to add information for boot
-loaders.  This allows additional information to be added without needing
-major revisions of the interface.  Users who do not understand the
-information will not recognise the tag, and will skip over it.
+> > 
+> > > Consider the above two issues, maybe you can keep the powerpc
+> > > version of _probe() and x86 version of _load(), and still copy the common code
+> > > to kexec_file.c weak functions.
+> > 
+> > It was exactly what I made before submitting v3, but I changed
+> > my mind a bit. My intension is to prevent the code being duplicated
+> > even though it has only a few lines of code.
+> > 
+> > I agree that '#ifndef arch_kexec_kernel_image_probe' in kexec.h would be
+> > quite ugly, but similar usages can be spotted in the kernel source.
+> > 
+> > That said if you don't like it at all, I defer to you.
+> 
+> I understand your concern, maybe still use a weak function for 
+> arch_kexec_kernel_image_*, and they call the kexec_kernel_image_* in
+> kexec_file.c common code.
+> 
+> Like in general code:
+> 
+> int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+>                                          unsigned long buf_len)
+> {
+> 	return kexec_kernel_image_probe(image, buf, buf_len);
 
-Our only entry in this table give sthe size of the decompressed kernel
-(which is stored, unaligned, at the end of the compressed data) and the
-decompressed kernel's BSS size.  Both of these are necessary for kexec
-to be able to properly locate the initrd and dtb within memory for both
-the normal case and the panic case.  In the panic case, we want to
-locate the images as closely together as possible.
+as you suggested,
+        "return _kexec_kernel_image_probe(...);
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/compressed/head.S        |  2 ++
- arch/arm/boot/compressed/vmlinux.lds.S | 11 +++++++++++
- 2 files changed, 13 insertions(+)
+would be fine.
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 6e3a9e21436e..cce05a866945 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -139,6 +139,8 @@
- 		.word	_magic_start	@ absolute load/run zImage address
- 		.word	_magic_end	@ zImage end address
- 		.word	0x04030201	@ endianness flag
-+		.word	0x45454545	@ another magic number to indicate
-+		.word	_magic_table	@ additional data table
- 
- 		__EFI_HEADER
- 1:
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-index 81c493156ce8..76b0330f65c4 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.S
-+++ b/arch/arm/boot/compressed/vmlinux.lds.S
-@@ -44,6 +44,15 @@ SECTIONS
-     *(.glue_7t)
-     *(.glue_7)
-   }
-+  .table : ALIGN(4) {
-+    _table_start = .;
-+    LONG(ZIMAGE_MAGIC(2))
-+    LONG(ZIMAGE_MAGIC(0x5a534c4b))
-+    LONG(ZIMAGE_MAGIC(__piggy_size_addr - _start))
-+    LONG(ZIMAGE_MAGIC(_kernel_bss_size))
-+    LONG(0)
-+    _table_end = .;
-+  }
-   .rodata : {
-     *(.rodata)
-     *(.rodata.*)
-@@ -57,6 +66,7 @@ SECTIONS
-   }
-   .piggydata : {
-     *(.piggydata)
-+    __piggy_size_addr = . - 4;
-   }
- 
-   . = ALIGN(4);
-@@ -75,6 +85,7 @@ SECTIONS
-   _magic_sig = ZIMAGE_MAGIC(0x016f2818);
-   _magic_start = ZIMAGE_MAGIC(_start);
-   _magic_end = ZIMAGE_MAGIC(_edata);
-+  _magic_table = ZIMAGE_MAGIC(_table_start - _start);
- 
-   . = BSS_START;
-   __bss_start = .;
--- 
-2.7.4
+-Takahiro AKASHI
+
+
+> }
+> 
+> In architechture code it can add other code and call
+> kexec_kernel_image_*
+> 
+> It looks a bit better than the #ifdef way. 
+> 
+> [snip]
+> 
+> > 
+> > Thanks,
+> > -Takahiro AKASHI
+> > 
+> 
+> Thanks
+> Dave
