@@ -1,108 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 25 Sep 2017 11:39:48 -0500
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <20170901072744.2409-1-dja@axtens.net>
-References: <20170901072744.2409-1-dja@axtens.net>
-Message-ID: <20170925163948.GD15970@bhelgaas-glaptop.roam.corp.google.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Mon, 25 Sep 2017 13:03:58 -0400
+Subject: [PATCH v3][for 4.14] xhci: allow TRACE to work with EVENT ring
+ dequeue
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD007F5A1@AcuExch.aculab.com>
+References: <1506342365-11268-1-git-send-email-awallis@codeaurora.org>
+ <063D6719AE5E284EB5DD2968C1650D6DD007F5A1@AcuExch.aculab.com>
+Message-ID: <11eaa02a-228a-09de-5d89-4fce32236253@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 05:27:41PM +1000, Daniel Axtens wrote:
-> This patch set:
+On 9/25/2017 12:09 PM, David Laight wrote:
+> From: Adam Wallis
+>> Sent: 25 September 2017 13:26
+>> inc_deq() currently bails earlier for EVENT rings than the common return
+>> point of the function, due to the fact that EVENT rings do not have
+>> link TRBs. The unfortunate side effect of this is that the very useful
+>> trace_xhci_inc_deq() function is not called/usable for EVENT ring
+>> debug.
 > 
->  - splits the default display handling out from VGA arbiter, into its
->    own file and behind its own Kconfig option (and gives the functions
->    better names).
+> Is it actually worth using different functions for the different
+> ring types?
+
+David, that is what this patch attempts to add/fix. Instead of adding another
+TRACE function for event rings, it hooks the existing trace functionality
+already used in inc_deq()
+
+> From what I remember there are conditionals in a lot of the functions
+> but they are fixed for most of the call sites.
+
+That's basically all this patch is...fixing a conditional. Thanks for the
+feedback, let me know if I misunderstood your comments!
+
 > 
->  - adds extra detection of default devices. To be nominated, the vga
->    arbiter and platform hooks must not have nominated a default. A
->    card will then only be nominated if it has a driver attached and
->    has IO or memory decoding enabled.
+> 	David
 > 
->  - adds relevant documentation.
 > 
-> The practical impact of this is improved X autoconfiguration on some
-> arm64 systems.
-
-I think I gave you bad advice about trying to separate the "default
-device" idea from the VGA arbiter.
-
-It is true that the "VGA arbiter" per se is related to routing the
-legacy VGA resources, and the arbiter currently only selects a default
-device if it finds a device to which those resources are routed.
-
-We have some cases where we want to select a default device that may
-not support the legacy VGA resources, or where they might not be
-routed to the device:
-
-  - systems where we match the EFI framebuffer address with a BAR, and
-    select that device as default,
-
-  - powerpc systems where there may be no host bridge window that maps
-    to the legacy VGA resources,
-
-  - your ARM64 systems where the default device may be behind a bridge
-    that doesn't support legacy VGA routing (PCI_BRIDGE_CTL_VGA)
-
-But I think trying to split the "default device" part out from the VGA
-arbiter ends up being overkill and making things more complicated
-instead of simpler.
-
-Would something like the following work for you as well as the powerpc
-case?  On powerpc, we already use vga_set_default_device() to select a
-device that doesn't use legacy VGA resources, so maybe we can just do
-the same on ARM64?
-
-I suppose there might be wrinkles in how the arbiter deals with
-multiple graphics devices on those systems, since I don't think it
-identifies these devices that don't use the legacy resources, but it
-seems like we live with whatever those on are powerpc and probably can
-on ARM64 as well.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 
-diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-index 02831a396419..0ac7aa346c69 100644
---- a/arch/powerpc/kernel/pci-common.c
-+++ b/arch/powerpc/kernel/pci-common.c
-@@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
- }
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
--
--static void fixup_vga(struct pci_dev *pdev)
--{
--	u16 cmd;
--
--	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
--	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
--		vga_set_default_device(pdev);
--
--}
--DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
--			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
-diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-index 76875f6299b8..9df4802c5f04 100644
---- a/drivers/gpu/vga/vgaarb.c
-+++ b/drivers/gpu/vga/vgaarb.c
-@@ -1468,6 +1468,21 @@ static int __init vga_arb_device_init(void)
- 			vgaarb_info(dev, "no bridge control possible\n");
- 	}
- 
-+	if (!vga_default_device()) {
-+		list_for_each_entry(vgadev, &vga_list, list) {
-+			struct device *dev = &vgadev->pdev->dev;
-+			u16 cmd;
-+
-+			pdev = vgadev->pdev;
-+			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-+			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
-+				vgaarb_info(dev, "setting as boot device\n");
-+				vga_set_default_device(pdev);
-+				break;
-+			}
-+		}
-+	}
-+
- 	pr_info("loaded\n");
- 	return rc;
- }
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
