@@ -1,45 +1,34 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Sep 2017 11:48:49 -0700
-Subject: [PATCH] [v2] soc: bcm: brcmstb: fix ARM build errors
-In-Reply-To: <95917630-de47-cb0c-f7bf-5742927e11f1@gmail.com>
-References: <20170911201324.3423067-1-arnd@arndb.de>
- <95917630-de47-cb0c-f7bf-5742927e11f1@gmail.com>
-Message-ID: <e8010d8d-6703-348a-aca1-4a981be7e0e8@gmail.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Tue, 26 Sep 2017 00:19:07 +0530
+Subject: [PATCH] ARM: dts: rk3288-vyasa: Enable mali GPU node
+Message-ID: <1506365347-18655-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2017 10:56 AM, Florian Fainelli wrote:
-> On 09/11/2017 01:13 PM, Arnd Bergmann wrote:
->> When building the new PM driver on older ARM architectures, we can
->> run into one of two build errors:
->>
->> drivers/soc/bcm/brcmstb/pm/pm-arm.c: In function 'brcmstb_do_pmsm_power_down':
->> drivers/soc/bcm/brcmstb/pm/pm-arm.c:334:2: error: implicit declaration of function 'wfi' [-Werror=implicit-function-declaration]
->>
->> drivers/soc/bcm/brcmstb/pm/pm-arm.o: In function `brcmstb_pm_s3_finish':
->> pm-arm.c:(.text+0x860): undefined reference to `cpu_resume'
->>
->> The first one requires at least ARMv6K, the second one requires the CPU
->> suspend/resume logic which is not available on some of the older CPUs,
->> and needs to be selected explicitly.
->>
->> This adds the extra Kconfig statements to enforce this, limiting
->> compilation on ARM to the STB platform that is guaranteed to be
->> ARMv7. We could enable compile-testing for other ARMv7 platforms,
->> but there seems to be little value as an allmodconfig kernel
->> already includes it.
-> 
-> Thanks, can you pick that change directly and/or fold it in:
-> 
-> 6274ca43eba1b2ebcac96f3c9b41fbc4945c0af0 ("soc: bcm: brcmstb: Add
-> support for S2/S3/S5 suspend states (ARM)")?
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-Picked this up in drivers/next, and squashed this change into the
-original commit, this is what it looks like now:
+Enable mali GPU node for rk3288 vyasa board.
 
-https://github.com/Broadcom/stblinux/commit/6274ca43eba1b2ebcac96f3c9b41fbc4945c0af0
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/rk3288-vyasa.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks Arnd!
+diff --git a/arch/arm/boot/dts/rk3288-vyasa.dts b/arch/arm/boot/dts/rk3288-vyasa.dts
+index 156193b..932311c 100644
+--- a/arch/arm/boot/dts/rk3288-vyasa.dts
++++ b/arch/arm/boot/dts/rk3288-vyasa.dts
+@@ -82,6 +82,11 @@
+ 	cpu0-supply = <&vdd_cpu>;
+ };
+ 
++&gpu {
++	mali-supply = <&vdd_gpu>;
++	status = "okay";
++};
++
+ &hdmi {
+ 	ddc-i2c-bus = <&i2c2>;
+ 	status = "okay";
 -- 
--- 
-Florian
+2.7.4
