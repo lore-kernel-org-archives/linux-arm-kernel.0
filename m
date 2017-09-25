@@ -1,86 +1,70 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Tue, 26 Sep 2017 09:35:40 +1000
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <20170925163948.GD15970@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170901072744.2409-1-dja@axtens.net>
- <20170925163948.GD15970@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <87zi9ixsfn.fsf@linkitivity.dja.id.au>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 26 Sep 2017 01:49:46 +0200
+Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
+ support
+In-Reply-To: <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
+References: <20170924105924.23923-1-vigneshr@ti.com>
+ <20170924105924.23923-6-vigneshr@ti.com>
+ <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
+ <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
+ <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
+ <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
+ <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
+ <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
+Message-ID: <fdfe29bf-ff46-7542-8e36-e8e45e1ca85f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 09/26/2017 12:41 AM, matthew.gerlach at linux.intel.com wrote:
+> 
+> 
+> On Sun, 24 Sep 2017, Marek Vasut wrote:
+> 
+>> On 09/24/2017 03:27 PM, Vignesh R wrote:
+>>>
+>>>
+>>> On 9/24/2017 6:42 PM, Marek Vasut wrote:
+>>>> On 09/24/2017 03:08 PM, Vignesh R wrote:
+>>>>>
+>>>>>
+>>>>> On 9/24/2017 5:31 PM, Marek Vasut wrote:
+>>>>>> On 09/24/2017 12:59 PM, Vignesh R wrote:
+>>>>>>> Add pm_runtime* calls to cadence-quadspi driver. This is required to
+>>>>>>> switch on QSPI power domain on TI 66AK2G SoC during probe.
+>>>>>>>
+>>>>>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>>>>>
+>>>>>> Are you planning to add some more fine-grained PM control later?
+>>>>>
+>>>>> Yes, I will need to add fine-grained PM control at some point. But,
+>>>>> for
+>>>>> now SoC does not really support low power mode or runtime power saving
+>>>>> option.
+>>>>> The fact that driver still uses clk_prepare_*() calls to
+>>>>> enable/disable
+>>>>> clocks instead of pm_*() calls makes it a bit tricky though.
+>>>>>
+>>>>> Just figured out I forgot to add cleanup code in error handling
+>>>>> path of
+>>>>> probe(). Will fix that and send a v4.
+>>>>
+>>>> OK, fine. Cleanups are welcome. The SoCFPGA doesn't do much runtime PM
+>>>> either, so it's fine for now.
+>>>>
+>>>
+>>> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
+>>> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
+>>> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
+>>
+>> Not of the top of my head, sorry. +CC Matthew, he should know.
+> 
+> I am not an expert at the clock framework nor the power management, but I
+> did ask around a bit.? No one I asked was planning to change the clk_*()
+> calls to pm_*() call, but the feedback was that it would be a good idea.
 
-> But I think trying to split the "default device" part out from the VGA
-> arbiter ends up being overkill and making things more complicated
-> instead of simpler.
-Fair enough.
+The question is, if we do the replacement, will it break on socfpga ?
+A quick test might be useful.
 
-> Would something like the following work for you as well as the powerpc
-> case?  On powerpc, we already use vga_set_default_device() to select a
-> device that doesn't use legacy VGA resources, so maybe we can just do
-> the same on ARM64?
-
-It looks good. I'll try to get some time on the test system to test it
-and I'll pester my friends at IBM to give it a go as well.
-
-> I suppose there might be wrinkles in how the arbiter deals with
-> multiple graphics devices on those systems, since I don't think it
-> identifies these devices that don't use the legacy resources, but it
-> seems like we live with whatever those on are powerpc and probably can
-> on ARM64 as well.
-
-I would say so, yes.
-
-Thanks for sticking with this!
-
-Regards,
-Daniel
-
->
->
-> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-> index 02831a396419..0ac7aa346c69 100644
-> --- a/arch/powerpc/kernel/pci-common.c
-> +++ b/arch/powerpc/kernel/pci-common.c
-> @@ -1740,15 +1740,3 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
->  }
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
-> -
-> -static void fixup_vga(struct pci_dev *pdev)
-> -{
-> -	u16 cmd;
-> -
-> -	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
-> -		vga_set_default_device(pdev);
-> -
-> -}
-> -DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
-> -			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
-> diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> index 76875f6299b8..9df4802c5f04 100644
-> --- a/drivers/gpu/vga/vgaarb.c
-> +++ b/drivers/gpu/vga/vgaarb.c
-> @@ -1468,6 +1468,21 @@ static int __init vga_arb_device_init(void)
->  			vgaarb_info(dev, "no bridge control possible\n");
->  	}
->  
-> +	if (!vga_default_device()) {
-> +		list_for_each_entry(vgadev, &vga_list, list) {
-> +			struct device *dev = &vgadev->pdev->dev;
-> +			u16 cmd;
-> +
-> +			pdev = vgadev->pdev;
-> +			pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> +			if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
-> +				vgaarb_info(dev, "setting as boot device\n");
-> +				vga_set_default_device(pdev);
-> +				break;
-> +			}
-> +		}
-> +	}
-> +
->  	pr_info("loaded\n");
->  	return rc;
->  }
+-- 
+Best regards,
+Marek Vasut
