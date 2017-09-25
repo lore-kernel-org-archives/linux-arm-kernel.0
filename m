@@ -1,24 +1,75 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 25 Sep 2017 16:09:56 +0000
-Subject: [PATCH v3][for 4.14] xhci: allow TRACE to work with EVENT ring
- dequeue
-In-Reply-To: <1506342365-11268-1-git-send-email-awallis@codeaurora.org>
-References: <1506342365-11268-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD007F5A1@AcuExch.aculab.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 25 Sep 2017 09:16:43 -0700
+Subject: [PATCH v3 1/2] watchdog: dw_wdt: add stop watchdog operation
+In-Reply-To: <20170925052531.1692-1-o.rempel@pengutronix.de>
+References: <20170925052531.1692-1-o.rempel@pengutronix.de>
+Message-ID: <20170925161643.GA32601@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Adam Wallis
-> Sent: 25 September 2017 13:26
-> inc_deq() currently bails earlier for EVENT rings than the common return
-> point of the function, due to the fact that EVENT rings do not have
-> link TRBs. The unfortunate side effect of this is that the very useful
-> trace_xhci_inc_deq() function is not called/usable for EVENT ring
-> debug.
+On Mon, Sep 25, 2017 at 07:25:30AM +0200, Oleksij Rempel wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
+> The only way of stopping the watchdog is by resetting it.
+> Add the watchdog op for stopping the device and reset if
+> a reset line is provided.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: linux-watchdog at vger.kernel.org
+> ---
+> 
+> changes v3:
+>  - don't return error if rst is not present and set WDOG_HW_RUNNING bit
+>    to notify watchdog core.
+> 
+> changes v2:
+>  - test if dw_wdt->rst is NULL instead of IS_ERR
+> 
+>  drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> index 36be987ff9ef..6cc56b18ee52 100644
+> --- a/drivers/watchdog/dw_wdt.c
+> +++ b/drivers/watchdog/dw_wdt.c
+> @@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
+>  	return 0;
+>  }
+>  
+> +static int dw_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
+> +
+> +	if (!dw_wdt->rst) {
+> +		set_bit(WDOG_HW_RUNNING, &wdd->status);
 
-Is it actually worth using different functions for the different
-ring types?
->From what I remember there are conditionals in a lot of the functions
-but they are fixed for most of the call sites.
+Setting WDOG_HW_RUNNING should be dropped from dw_wdt_start().
 
-	David
+Guenter
+
+> +		return 0;
+> +	}
+> +
+> +	reset_control_assert(dw_wdt->rst);
+> +	reset_control_deassert(dw_wdt->rst);
+> +
+> +	return 0;
+> +}
+> +
+>  static int dw_wdt_restart(struct watchdog_device *wdd,
+>  			  unsigned long action, void *data)
+>  {
+> @@ -173,6 +188,7 @@ static const struct watchdog_info dw_wdt_ident = {
+>  static const struct watchdog_ops dw_wdt_ops = {
+>  	.owner		= THIS_MODULE,
+>  	.start		= dw_wdt_start,
+> +	.stop		= dw_wdt_stop,
+>  	.ping		= dw_wdt_ping,
+>  	.set_timeout	= dw_wdt_set_timeout,
+>  	.get_timeleft	= dw_wdt_get_timeleft,
+> -- 
+> 2.11.0
+> 
