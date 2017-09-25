@@ -1,166 +1,271 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 25 Sep 2017 22:24:41 +0930
-Subject: [PATCH v2 5/5] clk: aspeed: Add reset controller
-In-Reply-To: <20170921042641.7326-6-joel@jms.id.au>
-References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-6-joel@jms.id.au>
-Message-ID: <1506344081.30138.32.camel@aj.id.au>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 25 Sep 2017 14:54:30 +0200
+Subject: [PATCH v3 8/8] ARM: NOMMU: Support MPU in XIP configuration
+In-Reply-To: <1506330344-31556-9-git-send-email-vladimir.murzin@arm.com>
+References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
+ <1506330344-31556-9-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <492d2707-a83b-56a9-71c9-aed1b59b459e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-09-21 at 13:56 +0930, Joel Stanley wrote:
-> There are some resets that are not associated with gates. These are
-> represented by a reset controller.
->?
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+Hi Vlad,
+
+On 09/25/2017 11:05 AM, Vladimir Murzin wrote:
+> Currently, there is assumption in early MPU setup code that kernel
+> image is located in RAM, which is obviously not true for XIP. To run
+> code from ROM we need to make sure that it is covered by MPU. However,
+> due to we allocate regions (semi-)dynamically we can run into issue of
+> trimming region we are running from in case ROM spawns several MPU
+> regions. To help deal with that we enforce minimum alignments for start
+> end end of XIP address space as 1MB and 128Kb correspondingly.
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+
+
+Thanks for the XIP fix.
+
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
+regards
+Alex
+
+
 > ---
-> ?drivers/clk/clk-aspeed.c?????????????????| 82 +++++++++++++++++++++++++++++++-
-> ?include/dt-bindings/clock/aspeed-clock.h |??9 ++++
-> ?2 files changed, 90 insertions(+), 1 deletion(-)
->?
-> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index dec9db4ec47b..db97c0f9f99e 100644
-> --- a/drivers/clk/clk-aspeed.c
-> +++ b/drivers/clk/clk-aspeed.c
-> @@ -17,6 +17,7 @@
-> ?#include <linux/of_device.h>
-> ?#include <linux/platform_device.h>
-> ?#include <linux/regmap.h>
-> +#include <linux/reset-controller.h>
-> ?#include <linux/slab.h>
-> ?#include <linux/spinlock.h>
-> ?
-> @@ -256,6 +257,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
-> ?	.is_enabled = aspeed_clk_is_enabled,
-> ?};
-> ?
-> +/**
-> + * struct aspeed_reset - Aspeed reset controller
-> + * @map: regmap to access the containing system controller
-> + * @rcdev: reset controller device
+>   arch/arm/Kconfig-nommu            |  2 +-
+>   arch/arm/include/asm/mpu.h        |  3 ++-
+>   arch/arm/kernel/head-nommu.S      | 20 ++++++++++++++++
+>   arch/arm/kernel/vmlinux-xip.lds.S | 23 ++++++++++++++++++
+>   arch/arm/mm/pmsa-v7.c             | 49 +++++++++++++++++++++++++++++++++++----
+>   5 files changed, 90 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
+> index 930e000..0fad7d9 100644
+> --- a/arch/arm/Kconfig-nommu
+> +++ b/arch/arm/Kconfig-nommu
+> @@ -52,7 +52,7 @@ config REMAP_VECTORS_TO_RAM
+>   
+>   config ARM_MPU
+>          bool 'Use the ARM v7 PMSA Compliant MPU'
+> -       depends on !XIP_KERNEL && (CPU_V7 || CPU_V7M)
+> +       depends on CPU_V7 || CPU_V7M
+>          default y if CPU_V7
+>          help
+>            Some ARM systems without an MMU have instead a Memory Protection
+> diff --git a/arch/arm/include/asm/mpu.h b/arch/arm/include/asm/mpu.h
+> index 5db37a6..56ec026 100644
+> --- a/arch/arm/include/asm/mpu.h
+> +++ b/arch/arm/include/asm/mpu.h
+> @@ -41,6 +41,7 @@
+>   #endif
+>   
+>   /* Access permission bits of ACR (only define those that we use)*/
+> +#define MPU_AP_PL1RO_PL0NA	(0x5 << 8)
+>   #define MPU_AP_PL1RW_PL0RW	(0x3 << 8)
+>   #define MPU_AP_PL1RW_PL0R0	(0x2 << 8)
+>   #define MPU_AP_PL1RW_PL0NA	(0x1 << 8)
+> @@ -49,7 +50,7 @@
+>   #define MPU_PROBE_REGION	0
+>   #define MPU_BG_REGION		1
+>   #define MPU_RAM_REGION		2
+> -#define MPU_VECTORS_REGION	3
+> +#define MPU_ROM_REGION		3
+>   
+>   /* Maximum number of regions Linux is interested in */
+>   #define MPU_MAX_REGIONS		16
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index 8a0718f..2ce4455 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -279,6 +279,26 @@ M_CLASS(ldr    r0, [r12, #MPU_TYPE])
+>   	setup_region r0, r5, r6, MPU_INSTR_SIDE r12	@ 0x0, BG region, enabled
+>   2:	isb
+>   
+> +#ifdef CONFIG_XIP_KERNEL
+> +	set_region_nr r0, #MPU_ROM_REGION, r12
+> +	isb
+> +
+> +	ldr	r5,=(MPU_AP_PL1RO_PL0NA | MPU_RGN_NORMAL)
+> +
+> +	ldr	r0, =CONFIG_XIP_PHYS_ADDR		@ ROM start
+> +	ldr     r6, =(_exiprom)				@ ROM end
+> +	sub	r6, r6, r0				@ Minimum size of region to map
+> +	clz	r6, r6					@ Region size must be 2^N...
+> +	rsb	r6, r6, #31				@ ...so round up region size
+> +	lsl	r6, r6, #MPU_RSR_SZ			@ Put size in right field
+> +	orr	r6, r6, #(1 << MPU_RSR_EN)		@ Set region enabled bit
+> +
+> +	setup_region r0, r5, r6, MPU_DATA_SIDE, r12	@ XIP_PHYS_ADDR, shared, enabled
+> +	beq	3f					@ Memory-map not unified
+> +	setup_region r0, r5, r6, MPU_INSTR_SIDE, r12	@ XIP_PHYS_ADDR, shared, enabled
+> +3:	isb
+> +#endif
+> +
+>   	/* Enable the MPU */
+>   AR_CLASS(mrc	p15, 0, r0, c1, c0, 0)		@ Read SCTLR
+>   AR_CLASS(bic	r0, r0, #CR_BR)			@ Disable the 'default mem-map'
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 8265b11..c6f7056 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+> @@ -6,6 +6,8 @@
+>   /* No __ro_after_init data in the .rodata section - which will always be ro */
+>   #define RO_AFTER_INIT_DATA
+>   
+> +#include <linux/sizes.h>
+> +
+>   #include <asm-generic/vmlinux.lds.h>
+>   #include <asm/cache.h>
+>   #include <asm/thread_info.h>
+> @@ -205,6 +207,9 @@ SECTIONS
+>   	PERCPU_SECTION(L1_CACHE_BYTES)
+>   #endif
+>   
+> +#ifdef CONFIG_ARM_MPU
+> +	. = ALIGN(SZ_128K);
+> +#endif
+>   	_exiprom = .;			/* End of XIP ROM area */
+>   	__data_loc = ALIGN(4);		/* location in binary */
+>   	. = PAGE_OFFSET + TEXT_OFFSET;
+> @@ -322,3 +327,21 @@ ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
+>    */
+>   ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & PAGE_MASK) <= PAGE_SIZE,
+>   	"HYP init code too big or misaligned")
+> +
+> +#ifdef CONFIG_ARM_MPU
+> +/*
+> + * Due to PMSAv7 restriction on base address and size we have to
+> + * enforce minimal alignment restrictions. It was seen that weaker
+> + * alignment restriction on _xiprom will likely force XIP address
+> + * space spawns multiple MPU regions thus it is likely we run in
+> + * situation when we are reprogramming MPU region we run on with
+> + * something which doesn't cover reprogramming code itself, so as soon
+> + * as we update MPU settings we'd immediately try to execute straight
+> + * from background region which is XN.
+> + * It seem that alignment in 1M should suit most users.
+> + * _exiprom is aligned as 1/8 of 1M so can be covered by subregion
+> + * disable
 > + */
-> +struct aspeed_reset {
-> +	struct regmap			*map;
-> +	struct reset_controller_dev	rcdev;
-> +};
+> +ASSERT(!(_xiprom & (SZ_1M - 1)), "XIP start address may cause MPU programming issues")
+> +ASSERT(!(_exiprom & (SZ_128K - 1)), "XIP end address may cause MPU programming issues")
+> +#endif
+> diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
+> index c1f1fc7..27434d7 100644
+> --- a/arch/arm/mm/pmsa-v7.c
+> +++ b/arch/arm/mm/pmsa-v7.c
+> @@ -7,9 +7,11 @@
+>   #include <linux/bitops.h>
+>   #include <linux/memblock.h>
+>   
+> +#include <asm/cacheflush.h>
+>   #include <asm/cp15.h>
+>   #include <asm/cputype.h>
+>   #include <asm/mpu.h>
+> +#include <asm/sections.h>
+>   
+>   #include "mm.h"
+>   
+> @@ -20,6 +22,9 @@ struct region {
+>   };
+>   
+>   static struct region __initdata mem[MPU_MAX_REGIONS];
+> +#ifdef CONFIG_XIP_KERNEL
+> +static struct region __initdata xip[MPU_MAX_REGIONS];
+> +#endif
+>   
+>   static unsigned int __initdata mpu_min_region_order;
+>   static unsigned int __initdata mpu_max_regions;
+> @@ -229,7 +234,6 @@ static int __init allocate_region(phys_addr_t base, phys_addr_t size,
+>   /* MPU initialisation functions */
+>   void __init adjust_lowmem_bounds_mpu(void)
+>   {
+> -	phys_addr_t phys_offset = PHYS_OFFSET;
+>   	phys_addr_t  specified_mem_size, total_mem_size = 0;
+>   	struct memblock_region *reg;
+>   	bool first = true;
+> @@ -256,8 +260,19 @@ void __init adjust_lowmem_bounds_mpu(void)
+>   	/* ... and one for vectors */
+>   	mem_max_regions--;
+>   #endif
 > +
-> +#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
+> +#ifdef CONFIG_XIP_KERNEL
+> +	/* plus some regions to cover XIP ROM */
+> +	num = allocate_region(CONFIG_XIP_PHYS_ADDR, __pa(_exiprom) - CONFIG_XIP_PHYS_ADDR,
+> +			      mem_max_regions, xip);
 > +
-> +static const u8 aspeed_resets[] = {
-> +	25, /* x-dma */
-> +	24, /* mctp */
-> +	23, /* adc */
-> +	22, /* jtag-master */
-> +	18, /* mic */
-> +	?9, /* pwm */
-> +	?8, /* pci-vga */
-> +	?2, /* i2c */
-> +	?1, /* ahb */
-
-Bit of a nit, but given you define macros for the indices, maybe use designated
-initialisers and drop the comments.
-
-> +};
+> +	mem_max_regions -= num;
+> +#endif
 > +
-> +static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
-> +				?unsigned long id)
-> +{
-> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-> +	u32 rst = BIT(aspeed_resets[id]);
+>   	for_each_memblock(memory, reg) {
+>   		if (first) {
+> +			phys_addr_t phys_offset = PHYS_OFFSET;
 > +
-> +	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
-> +}
+>   			/*
+>   			 * Initially only use memory continuous from
+>   			 * PHYS_OFFSET */
+> @@ -355,7 +370,7 @@ static int __init __mpu_min_region_order(void)
+>   
+>   static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
+>   				   unsigned int size_order, unsigned int properties,
+> -				   unsigned int subregions)
+> +				   unsigned int subregions, bool need_flush)
+>   {
+>   	u32 size_data;
+>   
+> @@ -374,6 +389,9 @@ static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
+>   	size_data = ((size_order - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN;
+>   	size_data |= subregions << MPU_RSR_SD;
+>   
+> +	if (need_flush)
+> +		flush_cache_all();
 > +
-> +static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
-> +			???????unsigned long id)
-> +{
-> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-> +	u32 rst = BIT(aspeed_resets[id]);
+>   	dsb(); /* Ensure all previous data accesses occur with old mappings */
+>   	rgnr_write(number);
+>   	isb();
+> @@ -416,7 +434,28 @@ void __init mpu_setup(void)
+>   	/* Background */
+>   	err |= mpu_setup_region(region++, 0, 32,
+>   				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA,
+> -				0);
+> +				0, false);
 > +
-> +	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
-> +}
+> +#ifdef CONFIG_XIP_KERNEL
+> +	/* ROM */
+> +	for (i = 0; i < ARRAY_SIZE(xip); i++) {
+> +		/*
+> +                 * In case we overwrite RAM region we set earlier in
+> +                 * head-nommu.S (which is cachable) all subsequent
+> +                 * data access till we setup RAM bellow would be done
+> +                 * with BG region (which is uncachable), thus we need
+> +                 * to clean and invalidate cache.
+> +		 */
+> +		bool need_flush = region == MPU_RAM_REGION;
 > +
-> +static int aspeed_reset_status(struct reset_controller_dev *rcdev,
-> +			???????unsigned long id)
-> +{
-> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-> +	u32 val, rst = BIT(aspeed_resets[id]);
-> +	int ret;
+> +		if (!xip[i].size)
+> +			continue;
 > +
-> +	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return !!(val & rst);
-> +}
-> +
-> +static const struct reset_control_ops aspeed_reset_ops = {
-> +	.assert = aspeed_reset_assert,
-> +	.deassert = aspeed_reset_deassert,
-> +	.status = aspeed_reset_status,
-> +};
-> +
-> ?static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
-> ?		const char *name, const char *parent_name, unsigned long flags,
-> ?		struct regmap *map, u8 clock_idx, u8 reset_idx,
-> @@ -299,10 +362,11 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
-> ?	const struct clk_div_table *mac_div_table;
-> ?	const struct clk_div_table *div_table;
-> ?	struct device *dev = &pdev->dev;
-> +	struct aspeed_reset *ar;
-> ?	struct regmap *map;
-> ?	struct clk_hw *hw;
-> ?	u32 val, rate;
-> -	int i;
-> +	int i, ret;
-> ?
-> ?	map = syscon_node_to_regmap(dev->of_node);
-> ?	if (IS_ERR(map)) {
-> @@ -310,6 +374,22 @@ static int __init aspeed_clk_probe(struct platform_device *pdev)
-> ?		return PTR_ERR(map);
-> ?	}
-> ?
-> +	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
-> +	if (!ar)
-> +		return -ENOMEM;
-> +
-> +	ar->map = map;
-> +	ar->rcdev.owner = THIS_MODULE;
-> +	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
-> +	ar->rcdev.ops = &aspeed_reset_ops;
-> +	ar->rcdev.of_node = dev->of_node;
-> +
-> +	ret = devm_reset_controller_register(dev, &ar->rcdev);
-> +	if (ret) {
-> +		dev_err(dev, "could not register reset controller\n");
-> +		return ret;
+> +		err |= mpu_setup_region(region++, xip[i].base, ilog2(xip[i].size),
+> +					MPU_AP_PL1RO_PL0NA | MPU_RGN_NORMAL,
+> +					xip[i].subreg, need_flush);
 > +	}
-> +
-> ?	/* SoC generations share common layouts but have different divisors */
-> ?	soc_data = of_device_get_match_data(&pdev->dev);
-> ?	div_table = soc_data->div_table;
-> diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
-> index afe06b77562d..a9d552b6bbd2 100644
-> --- a/include/dt-bindings/clock/aspeed-clock.h
-> +++ b/include/dt-bindings/clock/aspeed-clock.h
-> @@ -40,4 +40,13 @@
-> ?#define ASPEED_CLK_GATE_SDCLKCLK	(22 + ASPEED_CLK_GATES)
-> ?#define ASPEED_CLK_GATE_LHCCLK		(23 + ASPEED_CLK_GATES)
-> ?
-> +#define ASPEED_RESET_XDMA		0
-> +#define ASPEED_RESET_MCTP		1
-> +#define ASPEED_RESET_JTAG_MASTER	2
-> +#define ASPEED_RESET_MIC		3
-> +#define ASPEED_RESET_PWM		4
-> +#define ASPEED_RESET_PCIVGA		5
-> +#define ASPEED_RESET_I2C		6
-> +#define ASPEED_RESET_AHB		7
-> +
-> ?#endif
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170925/645f6bb8/attachment.sig>
+> +#endif
+>   
+>   	/* RAM */
+>   	for (i = 0; i < ARRAY_SIZE(mem); i++) {
+> @@ -425,14 +464,14 @@ void __init mpu_setup(void)
+>   
+>   		err |= mpu_setup_region(region++, mem[i].base, ilog2(mem[i].size),
+>   					MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL,
+> -					mem[i].subreg);
+> +					mem[i].subreg, false);
+>   	}
+>   
+>   	/* Vectors */
+>   #ifndef CONFIG_CPU_V7M
+>   	err |= mpu_setup_region(region++, vectors_base, ilog2(2 * PAGE_SIZE),
+>   				MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL,
+> -				0);
+> +				0, false);
+>   #endif
+>   	if (err) {
+>   		panic("MPU region initialization failure! %d", err);
+> 
