@@ -1,87 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Sep 2017 10:44:14 -0700
-Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
- target module binding
-In-Reply-To: <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
-References: <20170920224621.16236-1-tony@atomide.com>
- <20170920224621.16236-2-tony@atomide.com>
- <20170925063545.nn3gr5drea6o2g6m@squirrel.local>
- <20170925142520.GE4394@atomide.com>
- <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
-Message-ID: <20170925174413.GH4394@atomide.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 25 Sep 2017 19:11:41 +0100
+Subject: [PATCH] ARM: better diagnostics with missing/corrupt dtb
+Message-ID: <E1dwXr3-0002DE-1d@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [170925 10:22]:
-> On Mon, Sep 25, 2017 at 07:25:20AM -0700, Tony Lindgren wrote:
-> > * Matthijs van Duin <matthijsvanduin@gmail.com> [170924 23:36]:
-> > > Is the meaning of these documented anywhere?  I'm assuming one of them
-> > > corresponds to the standard omap2/3 sysconfig/sysstatus
-> >
-> > Yes that's the type1 sysc.
-> >
-> > > and one to the standard omap4/5 sysconfig
-> >
-> > Yeah and that's what we call sysc type 2 in the kernel.
-> 
-> Might it then not make more sense to call those something like
-> ti,omap2-sysc and ti,omap4-sysc respectively?
+With a kernel containing both DT and atag support, the diagnostics
+output when the dtb is missing or corrupt assume that we're trying
+to boot using atags and the machine ID, and only print the machine
+ID.  This is not useful for diagnosing a missing or corrupt dtb.
 
-OK that's a good idea.
+Move the message into arch/arm/kernel/setup.c, and print the address
+of the dtb/atag list, and the first 16 bytes of memory of the dtb or
+atag list.
 
-> > The sysc type3 is what we have on am335x/ti81xx, see:
-> >
-> > $ git grep -B10 -A1 "&omap_hwmod_sysc_type3" arch/arm/mach-omap2
-> 
-> Ah... three "foreign" modules with an idlemode carelessly thrown into a
-> register without care for existing layouts.  I think these are more just
-> exceptional cases which happen to agree by coincidence since they all
-> just added idlemode in the simplest way possible, but I can understand
-> how it came to be viewed as a standard type.
+This allows us to see whether the dtb was corrupted in some way,
+causing the fallback to the machine ID / atag list.
 
-So we shall then name this fine centauroid sysc ti,81xx-sysc?
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/kernel/atags_parse.c |  7 ++-----
+ arch/arm/kernel/setup.c       | 10 ++++++++++
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-> > > ISS (omap4/5, dm814x) is also fun since it has top-level sysconfig, but
-> > > most of the child modules (e.g. isp5 and simcop) also have their own
-> > > sysconfig, and some child modules of simcop again have sysconfig.
-> >
-> > Interesting. Sounds like there's yet another interconnect instance
-> > lurking there similar to L4 ABE?
-> 
-> ISS has a 32-bit configuration interconnect and a 64/128-bit data
-> interconnect:
->       .......................................
->      :              ISS                      :
->      :                                       :
-> L3 --:--> configuration interconnect <-------:-- Cortex-M3/M4 subsystem
->      :      ||||||||||        |   |          :
->      :      vvvvvvvvvv        |   |          :
->      :      submodules        |   '---.      :
->      :       ||||||||         |       |      :
->      :       vvvvvvvv         v       v      :
->      : data interconnect --> BTE --> CBUFF --:--> L3
->      '.......................................'
-> 
-> It also has a local prcm controller to manage all this, and an irq
-> combiner.  See the section "ISS Power Management" (8.1.2.4 in the public
-> omap5 TRM, SWPU249AF) for a better diagram of all this.  The various
-> versions of ISS differ somewhat in the submodules but all share the same
-> overall structure.
-
-OK thanks for the pointer.
-
-> One of the ISS submodules, SIMCOP, is itself again a fairly complicated
-> subsystem with two local interconnects, of which you can find a block
-> diagram in the "ISS Still Image Coprocessor" chapter (8.4).
-
-OK
-
-> Having a local interconnect is itself not a particularly rare thing (you
-> can find one in ABE, DSS, CPSW, PRUSS, PWMSS, etc), but ISS does have
-> unusual complexity with its multiple interconnects and nested subsystems.
-
-OK
-
-Regards,
-
-Tony
+diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
+index 98fbfd235ac8..c10a3e8ee998 100644
+--- a/arch/arm/kernel/atags_parse.c
++++ b/arch/arm/kernel/atags_parse.c
+@@ -196,11 +196,8 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
+ 			break;
+ 		}
+ 
+-	if (!mdesc) {
+-		early_print("\nError: unrecognized/unsupported machine ID"
+-			    " (r1 = 0x%08x).\n\n", machine_nr);
+-		dump_machine_table(); /* does not return */
+-	}
++	if (!mdesc)
++		return NULL;
+ 
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 8e9a3e40d949..fc40a2b40595 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1069,6 +1069,16 @@ void __init setup_arch(char **cmdline_p)
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+ 	if (!mdesc)
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
++	if (!mdesc) {
++		early_print("\nError: invalid dtb and unrecognized/unsupported machine ID\n");
++		early_print("  r1=0x%08x, r2=0x%08x\n", __machine_arch_type,
++			    __atags_pointer);
++		if (__atags_pointer)
++			early_print("  r2[]=%*ph\n", 16,
++				    phys_to_virt(__atags_pointer));
++		dump_machine_table();
++	}
++
+ 	machine_desc = mdesc;
+ 	machine_name = mdesc->name;
+ 	dump_stack_set_arch_desc("%s", mdesc->name);
+-- 
+2.7.4
