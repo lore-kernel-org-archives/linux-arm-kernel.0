@@ -1,127 +1,94 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 25 Sep 2017 18:26:17 +0100
-Subject: [PATCH] iio: stm32: fix adc/trigger link error
-In-Reply-To: <20170925111604.00000c02@huawei.com>
-References: <20170906125722.2522781-1-arnd@arndb.de>
- <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
- <20170910170040.7eb1f768@archlinux>
- <6b5ff28a-859d-973c-2da5-60a8bf50c378@st.com>
- <20170925111604.00000c02@huawei.com>
-Message-ID: <20170925182617.18bf5ce8@archlinux>
+From: samuel@sholland.org (Samuel Holland)
+Date: Mon, 25 Sep 2017 12:38:47 -0500
+Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: a64: add CPU opp table
+In-Reply-To: <20170923001531.14285-3-icenowy@aosc.io>
+References: <20170923001531.14285-1-icenowy@aosc.io>
+ <20170923001531.14285-3-icenowy@aosc.io>
+Message-ID: <4e9af757-0881-cd79-2693-6b979db78ddb@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Sep 2017 11:16:04 +0100
-Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+Hello,
 
-> On Mon, 25 Sep 2017 11:54:06 +0200
-> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On 09/22/17 19:15, Icenowy Zheng wrote:
+> Add the operating table for the CPU (ARM cores) on Allwinner A64 SoC.
 > 
-> > On 09/10/2017 06:00 PM, Jonathan Cameron wrote:  
-> > > On Wed, 6 Sep 2017 18:16:33 +0200
-> > > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> > >     
-> > >> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:    
-> > >>> The ADC driver can trigger on either the timer or the lptim
-> > >>> trigger, but it only uses a Kconfig 'select' statement
-> > >>> to ensure that the first of the two is present. When the lptim
-> > >>> trigger is enabled as a loadable module, and the adc driver
-> > >>> is built-in, we now get a link error:
-> > >>>
-> > >>> drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
-> > >>> stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
-> > >>>
-> > >>> We could use a second 'select' statement and always have both
-> > >>> trigger drivers enabled when the adc driver is, but it seems that
-> > >>> the lptimer trigger was intentionally left optional, so it seems
-> > >>> better to keep it that way.      
-> > >> Hi Arnd,
-> > >>
-> > >> This is correct, not all stm32 have this hardware.    
-> > >>>
-> > >>> This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
-> > >>> which avoids the link error, but instead leads to the lptimer trigger
-> > >>> not being used in the broken configuration. I've added a runtime
-> > >>> warning for this case to help users figure out what they did wrong
-> > >>> if this should ever be done by accident.
-> > >>>
-> > >>> Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
-> > >>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>      
-> > >> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>    
-> > > 
-> > > This may take me a few weeks to pick up.  I don't want to
-> > > pull the mfd immutable branch in just to have this fix, so this will
-> > > get sorted after rc1 is out.
-> > > 
-> > > As ever, poke me if it looks like I've forgotten about it.    
-> > 
-> > Hi Jonathan,
-> > 
-> > Di you apply this one?  
+> OPPs higher to 816MHz is temporarily dropped, to prevent overheat on
+> boards with AXP803 support and undervoltage on boards without AXP803
+> support.
 > 
-> I think I still need to rebase my branch. Greg took my fixes pull this morning
-> so I can fast forward that branch next time I'm on the right PC and then pick
-> this up.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>   arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
 > 
-> Thanks for the reminder.
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 20aba7b186aa..0532da4939eb 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -52,6 +52,23 @@
+>   	#address-cells = <1>;
+>   	#size-cells = <1>;
+>   
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp-648000000 {
+> +			opp-hz = /bits/ 64 <648000000>;
+> +			opp-microvolt = <1040000>;
+> +			clock-latency-ns = <244144>; /* 8 32k periods */
+> +		};
+> +
+> +		opp-816000000 {
+> +			opp-hz = /bits/ 64 <816000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <244144>; /* 8 32k periods */
+> +		};
+> +	};
+> +
+>   	cpus {
+>   		#address-cells = <1>;
+>   		#size-cells = <0>;
+> @@ -61,6 +78,10 @@
+>   			device_type = "cpu";
+>   			reg = <0>;
+>   			enable-method = "psci";
+> +			clocks = <&ccu CLK_CPUX>;
+CLK_CPUX is not currently exposed in the dt-bindings header, so this
+doesn't compile.
 
-Applied to the fixes-togreg branch of iio.git.
+> +			clock-names = "cpu";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+> +			#cooling-cells = <2>;
+>   		};
+>   
+>   		cpu1: cpu at 1 {
+> @@ -68,6 +89,7 @@
+>   			device_type = "cpu";
+>   			reg = <1>;
+>   			enable-method = "psci";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>   		};
+>   
+>   		cpu2: cpu at 2 {
+> @@ -75,6 +97,7 @@
+>   			device_type = "cpu";
+>   			reg = <2>;
+>   			enable-method = "psci";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>   		};
+>   
+>   		cpu3: cpu at 3 {
+> @@ -82,6 +105,7 @@
+>   			device_type = "cpu";
+>   			reg = <3>;
+>   			enable-method = "psci";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>   		};
+>   	};
+>   
+> 
 
 Thanks,
-
-Jonathan
-> 
-> Jonathan
-> 
-> > 
-> > Thanks,
-> > Best Regards,
-> > Fabrice  
-> > > Sorry for the delay!
-> > > 
-> > > Jonathan
-> > >     
-> > >>
-> > >> Many thanks for the fix,
-> > >> Best Regards,
-> > >> Fabrice    
-> > >>> ---
-> > >>>  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
-> > >>>  1 file changed, 4 insertions(+), 1 deletion(-)
-> > >>>
-> > >>> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
-> > >>> index 34d59bfdce2d..464458d20b16 100644
-> > >>> --- a/include/linux/iio/timer/stm32-lptim-trigger.h
-> > >>> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
-> > >>> @@ -16,11 +16,14 @@
-> > >>>  #define LPTIM2_OUT	"lptim2_out"
-> > >>>  #define LPTIM3_OUT	"lptim3_out"
-> > >>>  
-> > >>> -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> > >>> +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> > >>>  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
-> > >>>  #else
-> > >>>  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
-> > >>>  {
-> > >>> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> > >>> +	pr_warn_once("stm32 lptim_trigger not linked in\n");
-> > >>> +#endif
-> > >>>  	return false;
-> > >>>  }
-> > >>>  #endif
-> > >>>       
-> > >> --
-> > >> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> > >> the body of a message to majordomo at vger.kernel.org
-> > >> More majordomo info at  http://vger.kernel.org/majordomo-info.html    
-> > >     
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Samuel
