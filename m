@@ -1,26 +1,28 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Mon, 25 Sep 2017 09:03:45 +0200
-Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
- target module binding
-In-Reply-To: <20170920224621.16236-2-tony@atomide.com>
-References: <20170920224621.16236-1-tony@atomide.com>
- <20170920224621.16236-2-tony@atomide.com>
-Message-ID: <20170925070345.2uraikhswru77rm4@squirrel.local>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 25 Sep 2017 09:18:00 +0200
+Subject: [PATCH v2] ARM: dts: iwg22d: Enable SDHI0 controller
+In-Reply-To: <TY1PR06MB08955E235768A72D33FE2AD3C0670@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <TY1PR06MB0702E99A48352C055705E3A9B7670@TY1PR06MB0702.apcprd06.prod.outlook.com>
+ <1506085262-13639-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <TY1PR06MB08955E235768A72D33FE2AD3C0670@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <20170925071800.GF1019@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 03:46:12PM -0700, Tony Lindgren wrote:
-> TI sysc interconnect target module hardware is independent of the
-> interconnect. It is used at least with TI L3 interconnect (Arteris NoC)
-> and TI L4 interconnect (Sonics s3220).
+On Fri, Sep 22, 2017 at 01:33:39PM +0000, Fabrizio Castro wrote:
+> Hello Simon,
+> 
+> just to clarify the changes between v1 and v2, we can't use SDR50 and SDR104 (due to an HW issue) therefore the pinctrl for UHS has been removed and we dropped property "sd-uhs-sdr104". High Speed has been tested, therefore if you are happy with the patch I guess you can update the following page accordingly:
+> http://elinux.org/index.php?title=Renesas-MMC-Enabled-Speeds&type=revision&diff=451426&oldid=451421
+> 
+> Although (due to a bug) sdhi0 may not hold a reference to "vccq_sdhi0", the gpio regulator will initialize "SDHI0 VccQ" at 3.3V.
+> I have sent another patch (mmc: tmio: check mmc_regulator_get_supply return value) to start a discussion about a possible fix for the bug.
+> 
+> Let me know if you need more information.
 
-This is because the interface between interconnect and module is
-standardized (Open Core Protocol), so it doesn't really matter which
-interconnect technology is used.
+Thanks again for following up on this.
 
-Also, afaik sysc mostly just concerns the interaction between module and
-PRCM.  The only role the interconnect plays here is that it participates
-in the OCP Disconnect Protocol to allow the module to safely disconnect
-itself when it or the interconnect enters idle state.
+I have applied the patch with Geert's tag.
 
-Matthijs
+I have also updated the Wiki at the URL above,
+feel free to make any further updates there as appropriate.
