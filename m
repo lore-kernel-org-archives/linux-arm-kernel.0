@@ -1,47 +1,58 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Sep 2017 10:10:15 +0100
-Subject: [RFC PATCH 0/3] arm64: Support Common Not Private translations
-In-Reply-To: <1502707134-10853-1-git-send-email-vladimir.murzin@arm.com>
-References: <1502707134-10853-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <4042ad51-f6b1-1014-8af7-5b0cbacbaede@arm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 25 Sep 2017 11:14:42 +0200
+Subject: [RFC PATCH 1/7] dt-bindings: add compatibles for AXP803
+ Battery/USB power supplies
+In-Reply-To: <20170920151814.22461-2-icenowy@aosc.io>
+References: <20170920151814.22461-1-icenowy@aosc.io>
+ <20170920151814.22461-2-icenowy@aosc.io>
+Message-ID: <8cf69d3d-0004-b5dc-16e0-ce1a4f8c313b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/17 11:38, Vladimir Murzin wrote:
-> Common Not Private (CNP) translations is a feature of ARMv8.2
-> extension which allows translation table entries to be shared between
-> different PEs in the same inner shareable domain, so the hardware can
-> use this fact to optimise the caching of such entries in the TLB.
-> 
-> This patch set is an attempt to bring CNP support into Linux. It was
-> tested on a v8.2 Fast Model with exploring traces and checking that
-> TTBRx_ELy and VTTBR_EL2 have CnP bit set where appropriate.
+Hi Icenowy,
 
-Any comments before I start rebasing it?
+On 20/09/2017 17:18, Icenowy Zheng wrote:
+> The AXP803 PMIC has different Battery and USB power supplies than the
+> AXP series PMICs already supported by the kernel, but the AC power
+> supply is the same as AXP22x (as it can only detect the present/online
+> state of the AC power supply on both AXP22x and AXP803).
+> 
+> Add compatible strings for the AXP803 Battery/USB power supplies. For AC
+> power supply the one on AXP803 is compatible with the one on AXP22x.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  Documentation/devicetree/bindings/power/supply/axp20x_battery.txt   | 1 +
+>  Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+> index c24886676a60..091e5471a8c6 100644
+> --- a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+> @@ -4,6 +4,7 @@ Required Properties:
+>   - compatible, one of:
+>  			"x-powers,axp209-battery-power-supply"
+>  			"x-powers,axp221-battery-power-supply"
+> +			"x-powers,axp803-battery-power-supply"
+>  
+>  This node is a subnode of the axp20x/axp22x PMIC.
+>  
+> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt
+> index ba8d35f66cbe..f30e3bf8d23f 100644
+> --- a/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt
+> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt
+> @@ -4,6 +4,7 @@ Required Properties:
+>  -compatible: One of: "x-powers,axp202-usb-power-supply"
+>                       "x-powers,axp221-usb-power-supply"
+>                       "x-powers,axp223-usb-power-supply"
+> +                     "x-powers,axp803-usb-power-supply"
 
-Cheers
-Vladimir
+No. You are adding support for AC and battery power supply in this
+patchset, not for USB.
 
-> 
-> Thanks!
-> 
-> Vladimir Murzin (3):
->   arm64: mm: Support Common Not Private translations
->   arm64: KVM: Support Common Not Private translations
->   arm64: Introduce command line parameter to disable CNP
-> 
->  Documentation/admin-guide/kernel-parameters.txt |  4 +++
->  arch/arm64/Kconfig                              | 12 ++++++++
->  arch/arm64/include/asm/asm-uaccess.h            |  2 ++
->  arch/arm64/include/asm/cpucaps.h                |  3 +-
->  arch/arm64/include/asm/cpufeature.h             |  6 ++++
->  arch/arm64/include/asm/memory.h                 |  1 +
->  arch/arm64/include/asm/mmu_context.h            | 14 +++++++++
->  arch/arm64/include/asm/uaccess.h                | 10 +++++--
->  arch/arm64/kernel/cpufeature.c                  | 40 +++++++++++++++++++++++++
->  arch/arm64/kernel/hibernate.c                   |  2 +-
->  arch/arm64/kvm/hyp-init.S                       |  4 +++
->  arch/arm64/kvm/hyp/switch.c                     |  6 +++-
->  arch/arm64/mm/proc.S                            |  5 ++++
->  13 files changed, 104 insertions(+), 5 deletions(-)
-> 
+Quentin
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
