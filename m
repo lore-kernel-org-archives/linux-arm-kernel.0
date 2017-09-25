@@ -1,66 +1,71 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 25 Sep 2017 19:11:41 +0100
-Subject: [PATCH] ARM: better diagnostics with missing/corrupt dtb
-Message-ID: <E1dwXr3-0002DE-1d@rmk-PC.armlinux.org.uk>
+Date: Mon, 25 Sep 2017 19:11:46 +0100
+Subject: [PATCH] ARM: decompressor: fix BSS size calculation
+Message-ID: <E1dwXr8-0002DN-84@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a kernel containing both DT and atag support, the diagnostics
-output when the dtb is missing or corrupt assume that we're trying
-to boot using atags and the machine ID, and only print the machine
-ID.  This is not useful for diagnosing a missing or corrupt dtb.
+Assuming size(1) gives the size of the BSS is a mistake - it reports
+the size of the .bss section in the ELF image, which may not be the
+same as the region we mark with the __bss_start..__bss_stop symbols.
 
-Move the message into arch/arm/kernel/setup.c, and print the address
-of the dtb/atag list, and the first 16 bytes of memory of the dtb or
-atag list.
+We use the size of the BSS in the decompressor to know whether the
+kernel will overwrite the appended dtb, by adding the BSS size to the
+size of the Image (stored at the end of the compressed data) and adding
+the desired address of the decompressed image.
 
-This allows us to see whether the dtb was corrupted in some way,
-causing the fallback to the machine ID / atag list.
+If the BSS size is smaller than it really is, the decompressor can
+incorrectly assume that the BSS clearance will not overwrite the DTB.
+
+Here is an illustration:
+
+$ arm-linux-size vmlinux
+   text    data      bss      dec     hex filename
+8136972 3098076 10240348 21475396 147b044 vmlinux
+$ arm-linux-nm vmlinux | grep __bss_
+c0ac0e34 B __bss_start
+c1484f9c B __bss_stop
+$ stat -c %s arch/arm/boot/Image
+11243060
+
+In the above case, we are 12 bytes short.  This is caused by the BSS
+section being aligned by one of its input sections:
+
+Idx Name          Size      VMA       LMA       File off  Algn
+ 23 __bug_table   00005d3c  c0abb0f8  c0abb0f8  00acb0f8  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 24 .bss          009c415c  c0ac0e40  c0ac0e40  00ad0e34  2**6
+                  ALLOC
+
+Note that there's an additional 12 bytes difference between the file
+offset and LMA compared with the bug table - this occurs because one
+of the input sections for the .bss section requires a 64 byte
+alignment.
+
+Fix this by using 'nm' and awk to access the __bss_start and __bss_stop
+symbols, using their difference for the size of the BSS.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/kernel/atags_parse.c |  7 ++-----
- arch/arm/kernel/setup.c       | 10 ++++++++++
- 2 files changed, 12 insertions(+), 5 deletions(-)
+ arch/arm/boot/compressed/Makefile | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
-index 98fbfd235ac8..c10a3e8ee998 100644
---- a/arch/arm/kernel/atags_parse.c
-+++ b/arch/arm/kernel/atags_parse.c
-@@ -196,11 +196,8 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
- 			break;
- 		}
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index d50430c40045..d26e250a56b0 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -116,8 +116,10 @@ ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
  
--	if (!mdesc) {
--		early_print("\nError: unrecognized/unsupported machine ID"
--			    " (r1 = 0x%08x).\n\n", machine_nr);
--		dump_machine_table(); /* does not return */
--	}
-+	if (!mdesc)
-+		return NULL;
- 
- 	if (__atags_pointer)
- 		tags = phys_to_virt(__atags_pointer);
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 8e9a3e40d949..fc40a2b40595 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1069,6 +1069,16 @@ void __init setup_arch(char **cmdline_p)
- 	mdesc = setup_machine_fdt(__atags_pointer);
- 	if (!mdesc)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
-+	if (!mdesc) {
-+		early_print("\nError: invalid dtb and unrecognized/unsupported machine ID\n");
-+		early_print("  r1=0x%08x, r2=0x%08x\n", __machine_arch_type,
-+			    __atags_pointer);
-+		if (__atags_pointer)
-+			early_print("  r2[]=%*ph\n", 16,
-+				    phys_to_virt(__atags_pointer));
-+		dump_machine_table();
-+	}
-+
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
- 	dump_stack_set_arch_desc("%s", mdesc->name);
+ # Supply kernel BSS size to the decompressor via a linker symbol.
+-KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
+-		awk 'END{print $$3}')
++KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
++		awk '/B __bss_start$$/ {bss_start=strtonum("0x"$$1)}; \
++		     /B __bss_stop$$/ {bss_stop=strtonum("0x"$$1)}; \
++		     END {print bss_stop-bss_start}')
+ LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
+ # Supply ZRELADDR to the decompressor via a linker symbol.
+ ifneq ($(CONFIG_AUTO_ZRELADDR),y)
 -- 
 2.7.4
