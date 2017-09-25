@@ -1,94 +1,87 @@
-From: samuel@sholland.org (Samuel Holland)
-Date: Mon, 25 Sep 2017 12:38:47 -0500
-Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: a64: add CPU opp table
-In-Reply-To: <20170923001531.14285-3-icenowy@aosc.io>
-References: <20170923001531.14285-1-icenowy@aosc.io>
- <20170923001531.14285-3-icenowy@aosc.io>
-Message-ID: <4e9af757-0881-cd79-2693-6b979db78ddb@sholland.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Sep 2017 10:44:14 -0700
+Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
+ target module binding
+In-Reply-To: <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
+References: <20170920224621.16236-1-tony@atomide.com>
+ <20170920224621.16236-2-tony@atomide.com>
+ <20170925063545.nn3gr5drea6o2g6m@squirrel.local>
+ <20170925142520.GE4394@atomide.com>
+ <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
+Message-ID: <20170925174413.GH4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* Matthijs van Duin <matthijsvanduin@gmail.com> [170925 10:22]:
+> On Mon, Sep 25, 2017 at 07:25:20AM -0700, Tony Lindgren wrote:
+> > * Matthijs van Duin <matthijsvanduin@gmail.com> [170924 23:36]:
+> > > Is the meaning of these documented anywhere?  I'm assuming one of them
+> > > corresponds to the standard omap2/3 sysconfig/sysstatus
+> >
+> > Yes that's the type1 sysc.
+> >
+> > > and one to the standard omap4/5 sysconfig
+> >
+> > Yeah and that's what we call sysc type 2 in the kernel.
+> 
+> Might it then not make more sense to call those something like
+> ti,omap2-sysc and ti,omap4-sysc respectively?
 
-On 09/22/17 19:15, Icenowy Zheng wrote:
-> Add the operating table for the CPU (ARM cores) on Allwinner A64 SoC.
-> 
-> OPPs higher to 816MHz is temporarily dropped, to prevent overheat on
-> boards with AXP803 support and undervoltage on boards without AXP803
-> support.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->   arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++++++++++++++++++++++
->   1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 20aba7b186aa..0532da4939eb 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -52,6 +52,23 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> +	cpu0_opp_table: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +
-> +		opp-648000000 {
-> +			opp-hz = /bits/ 64 <648000000>;
-> +			opp-microvolt = <1040000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +
-> +		opp-816000000 {
-> +			opp-hz = /bits/ 64 <816000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +	};
-> +
->   	cpus {
->   		#address-cells = <1>;
->   		#size-cells = <0>;
-> @@ -61,6 +78,10 @@
->   			device_type = "cpu";
->   			reg = <0>;
->   			enable-method = "psci";
-> +			clocks = <&ccu CLK_CPUX>;
-CLK_CPUX is not currently exposed in the dt-bindings header, so this
-doesn't compile.
+OK that's a good idea.
 
-> +			clock-names = "cpu";
-> +			operating-points-v2 = <&cpu0_opp_table>;
-> +			#cooling-cells = <2>;
->   		};
->   
->   		cpu1: cpu at 1 {
-> @@ -68,6 +89,7 @@
->   			device_type = "cpu";
->   			reg = <1>;
->   			enable-method = "psci";
-> +			operating-points-v2 = <&cpu0_opp_table>;
->   		};
->   
->   		cpu2: cpu at 2 {
-> @@ -75,6 +97,7 @@
->   			device_type = "cpu";
->   			reg = <2>;
->   			enable-method = "psci";
-> +			operating-points-v2 = <&cpu0_opp_table>;
->   		};
->   
->   		cpu3: cpu at 3 {
-> @@ -82,6 +105,7 @@
->   			device_type = "cpu";
->   			reg = <3>;
->   			enable-method = "psci";
-> +			operating-points-v2 = <&cpu0_opp_table>;
->   		};
->   	};
->   
+> > The sysc type3 is what we have on am335x/ti81xx, see:
+> >
+> > $ git grep -B10 -A1 "&omap_hwmod_sysc_type3" arch/arm/mach-omap2
 > 
+> Ah... three "foreign" modules with an idlemode carelessly thrown into a
+> register without care for existing layouts.  I think these are more just
+> exceptional cases which happen to agree by coincidence since they all
+> just added idlemode in the simplest way possible, but I can understand
+> how it came to be viewed as a standard type.
 
-Thanks,
-Samuel
+So we shall then name this fine centauroid sysc ti,81xx-sysc?
+
+> > > ISS (omap4/5, dm814x) is also fun since it has top-level sysconfig, but
+> > > most of the child modules (e.g. isp5 and simcop) also have their own
+> > > sysconfig, and some child modules of simcop again have sysconfig.
+> >
+> > Interesting. Sounds like there's yet another interconnect instance
+> > lurking there similar to L4 ABE?
+> 
+> ISS has a 32-bit configuration interconnect and a 64/128-bit data
+> interconnect:
+>       .......................................
+>      :              ISS                      :
+>      :                                       :
+> L3 --:--> configuration interconnect <-------:-- Cortex-M3/M4 subsystem
+>      :      ||||||||||        |   |          :
+>      :      vvvvvvvvvv        |   |          :
+>      :      submodules        |   '---.      :
+>      :       ||||||||         |       |      :
+>      :       vvvvvvvv         v       v      :
+>      : data interconnect --> BTE --> CBUFF --:--> L3
+>      '.......................................'
+> 
+> It also has a local prcm controller to manage all this, and an irq
+> combiner.  See the section "ISS Power Management" (8.1.2.4 in the public
+> omap5 TRM, SWPU249AF) for a better diagram of all this.  The various
+> versions of ISS differ somewhat in the submodules but all share the same
+> overall structure.
+
+OK thanks for the pointer.
+
+> One of the ISS submodules, SIMCOP, is itself again a fairly complicated
+> subsystem with two local interconnects, of which you can find a block
+> diagram in the "ISS Still Image Coprocessor" chapter (8.4).
+
+OK
+
+> Having a local interconnect is itself not a particularly rare thing (you
+> can find one in ABE, DSS, CPSW, PRUSS, PWMSS, etc), but ISS does have
+> unusual complexity with its multiple interconnects and nested subsystems.
+
+OK
+
+Regards,
+
+Tony
