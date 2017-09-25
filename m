@@ -1,66 +1,178 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Sep 2017 09:54:42 +0200
-Subject: [PATCH 1/3] ARM: debug-ll: Add support for r8a7745
+Date: Mon, 25 Sep 2017 09:54:44 +0200
+Subject: [PATCH 3/3] ARM: shmobile: rcar-gen2: Make sure CNTVOFF is
+ initialized on CA7/15
 In-Reply-To: <cover.1506325834.git.horms+renesas@verge.net.au>
 References: <cover.1506325834.git.horms+renesas@verge.net.au>
-Message-ID: <8e5f2d651f5b8ebf4b462aac02f51fe6075f88c0.1506325834.git.horms+renesas@verge.net.au>
+Message-ID: <3fd45a136ff61bb54deab70fb2d534a85e40481f.1506325834.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
-SCIF4 for the debug console.
+On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
+Ideally it should be initialized by the boot loader, but it isn't.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+For the boot CPU, CNTVOFF is initialized by Linux since commit
+9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7 arch_timer
+initialization for r8a7794").
+For secondary CPU cores, no such initialization is done.
+
+Hence when enabling SMP on r8a7794, the kernel log is spammed with:
+
+    WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
+	     Please report this, consider using a different clocksource, if possible.
+	     Your kernel is probably still fine.
+
+As Marc Zyngier pointed out that Cortex-A15 and Cortex-A7 are similar with
+respect to CNTVOFF, we have been very lucky this just worked on R-Car
+Gen2 SoCs with Cortex-A15 cores.
+
+To fix this:
+  - Move the existing inline asm code to initialize CNTVOFF to an
+    assembler source file (adding comments and replacing hardcoded
+    constants by definitions in the process), so it can be reused,
+  - Perform the initialization of CNTVOFF on the boot CPU (Cortex-A15 or
+    Cortex-A7) on all R-Car Gen2 and RZ/G1 parts,
+  - Wrap the standard secondary_startup() routine inside a routine which
+    initializes CNTVOFF.
+
+Based on patches by Hisashi Nakamura in the BSP.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-shmobile/Makefile          |  1 +
+ arch/arm/mach-shmobile/common.h          |  2 ++
+ arch/arm/mach-shmobile/headsmp-apmu.S    | 37 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/platsmp-apmu.c    |  2 +-
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++---------------
+ 5 files changed, 43 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6dcea8e8e941..31bf312be7d5 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -911,6 +911,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  via SCIF2 on Renesas R-Car E2 (R8A7794).
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 64611a1b4276..32176a00c664 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -22,6 +22,7 @@ cpu-y				:= platsmp.o headsmp.o
+ # Shared SoC family objects
+ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= setup-rcar-gen2.o platsmp-apmu.o $(cpu-y)
+ CFLAGS_setup-rcar-gen2.o	+= -march=armv7-a
++obj-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= regulator-quirk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= regulator-quirk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 1a8f7b3ab449..ea6e9e2be3f7 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -1,6 +1,7 @@
+ #ifndef __ARCH_MACH_COMMON_H
+ #define __ARCH_MACH_COMMON_H
  
-+	config DEBUG_RCAR_GEN2_SCIF4
-+		bool "Kernel low-level debugging messages via SCIF4 on R8A7745"
-+		depends on ARCH_R8A7745
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  via SCIF4 on Renesas RZ/G1E (R8A7745).
++extern void shmobile_init_cntvoff(void);
+ extern void shmobile_init_delay(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+@@ -11,6 +12,7 @@ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
+ extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
+ extern bool shmobile_smp_init_fallback_ops(void);
++extern void shmobile_boot_apmu(void);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
+ 					  unsigned int max_cpus);
+diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+new file mode 100644
+index 000000000000..db4743d2bf91
+--- /dev/null
++++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+@@ -0,0 +1,37 @@
++/*
++ * SMP support for APMU based systems with Cortex A7/A15
++ *
++ * Copyright (C) 2014  Renesas Electronics Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- 	config DEBUG_RMOBILE_SCIFA0
- 		bool "Kernel low-level debugging messages via SCIFA0 on R8A73A4"
- 		depends on ARCH_R8A73A4
-@@ -1451,6 +1458,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF2
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF0
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF2
-+	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF4
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
-@@ -1570,6 +1578,7 @@ config DEBUG_UART_PHYS
- 	default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
- 	default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
- 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
-+	default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
- 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
-@@ -1604,6 +1613,7 @@ config DEBUG_UART_PHYS
- 		DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
- 		DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
- 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
-+		DEBUG_RCAR_GEN2_SCIF4 || \
- 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
- 		DEBUG_S3C64XX_UART || \
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++ENTRY(shmobile_init_cntvoff)
++	/*
++	 * CNTVOFF has to be initialized either from non-secure Hypervisor
++	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
++	 * then it should be handled by the secure code
++	 */
++	cps	#MON_MODE
++	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
++	orr	r0, r1, #1
++	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
++	instr_sync
++	mov	r0, #0
++	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
++	instr_sync
++	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
++	instr_sync
++	cps	#SVC_MODE
++	ret	lr
++ENDPROC(shmobile_init_cntvoff)
++
++ENTRY(shmobile_boot_apmu)
++	bl	shmobile_init_cntvoff
++	b	secondary_startup
++ENDPROC(shmobile_boot_apmu)
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 3ca2c13346f0..4422b615a6ee 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -204,7 +204,7 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	/* For this particular CPU register boot vector */
+-	shmobile_smp_hook(cpu, __pa_symbol(secondary_startup), 0);
++	shmobile_smp_hook(cpu, __pa_symbol(shmobile_boot_apmu), 0);
+ 
+ 	return apmu_wrap(cpu, apmu_power_on);
+ }
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 7ab1690fab82..5561dbed7a33 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -70,28 +70,12 @@ void __init rcar_gen2_timer_init(void)
+ 	void __iomem *base;
+ 	u32 freq;
+ 
++	shmobile_init_cntvoff();
++
+ 	if (of_machine_is_compatible("renesas,r8a7745") ||
+ 	    of_machine_is_compatible("renesas,r8a7792") ||
+ 	    of_machine_is_compatible("renesas,r8a7794")) {
+ 		freq = 260000000 / 8;	/* ZS / 8 */
+-		/* CNTVOFF has to be initialized either from non-secure
+-		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
+-		 * If TrustZone is enabled then it should be handled by the
+-		 * secure code.
+-		 */
+-		asm volatile(
+-		"	cps	0x16\n"
+-		"	mrc	p15, 0, r1, c1, c1, 0\n"
+-		"	orr	r0, r1, #1\n"
+-		"	mcr	p15, 0, r0, c1, c1, 0\n"
+-		"	isb\n"
+-		"	mov	r0, #0\n"
+-		"	mcrr	p15, 4, r0, r0, c14\n"
+-		"	isb\n"
+-		"	mcr	p15, 0, r1, c1, c1, 0\n"
+-		"	isb\n"
+-		"	cps	0x13\n"
+-			: : : "r0", "r1");
+ 	} else {
+ 		/* At Linux boot time the r8a7790 arch timer comes up
+ 		 * with the counter disabled. Moreover, it may also report
 -- 
 2.1.4
