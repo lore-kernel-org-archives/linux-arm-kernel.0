@@ -1,97 +1,67 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 Sep 2017 18:04:08 +0200
-Subject: [PATCH RESEND v2] arm64: dts: marvell: Enable Armada-8040-DB CPS
- SPI1
-In-Reply-To: <20170922130834.7096-1-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Fri, 22 Sep 2017 15:08:34 +0200")
-References: <20170922130834.7096-1-miquel.raynal@free-electrons.com>
-Message-ID: <87vak6ix3b.fsf@free-electrons.com>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Mon, 25 Sep 2017 09:11:36 -0700
+Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
+ Project Sulfur SDRs
+In-Reply-To: <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
+References: <20170911232223.91894-1-mdf@kernel.org>
+ <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
+Message-ID: <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On ven., sept. 22 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+Hi Michal,
 
-> From: Christine Gharzuzi <chrisg@marvell.com>
->
-> Add the DT node enabling Armada-8040-DB CPS SPI controller driver.
->
-> Add the SPI NAND flash device connected on the bus. Fill the MTD
-> partitions layout.
->
-> Signed-off-by: Christine Gharzuzi <chrisg@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
+> Hi Moritz
+> 
+> sorry for delay.
 
-Applied on mvebu/dt64
+No problem.
+
+> 
+> On 12.9.2017 01:22, Moritz Fischer wrote:
+> > Add support for the National Instruments Project Sulfur SDR
+> > motherboards Rev 2,3 and 4.
+> > 
+> > Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> > ---
+> >  arch/arm/boot/dts/Makefile                |   3 +
+> >  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
+> >  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
+> >  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
+> >  5 files changed, 364 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
+> >  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
+> >  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
+> >  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
+> 
+> Is this publicly available board?
+
+Will be in Q1 2018 was announced at GRCon'17 ([1]).
+Some of the Rev3s are currently deployed in Norway as part of a radar
+system.
+
+> I am not quite sure we should apply these dts files. There are a lot of
+> boards with zynq and there must be any strong argument for applying this
+> to the tree. For arm32 with even flat tree structure.
+
+What's the issue with merging them, except for having 3 more files? 
+
+> Arnd: Do you have any policy about it?
+> 
+> Thanks,
+> Michal
 
 Thanks,
 
-Gregory
+Moritz
 
-> ---
->
-> Hello,
->
-> Made a mistake resending the v1 prefixed by v2.
-> This is the real v2.
->
-> It fixes the third partition address from 0xd00000 to 0xf00000.
->
-> Thanks,
-> Miqu?l
->
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 31 ++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> index 0d7b2ae46610..85c72f835184 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> @@ -216,6 +216,37 @@
->  	clock-frequency = <100000>;
->  };
->  
-> +&cps_spi1 {
-> +	status = "okay";
-> +
-> +	spi-flash at 0 {
-> +		#address-cells = <0x1>;
-> +		#size-cells = <0x1>;
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0x0>;
-> +		spi-max-frequency = <20000000>;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			partition at 0 {
-> +				label = "Boot";
-> +				reg = <0x0 0x200000>;
-> +			};
-> +			partition at 200000 {
-> +				label = "Filesystem";
-> +				reg = <0x200000 0xd00000>;
-> +			};
-> +			partition at f00000 {
-> +				label = "Boot_2nd";
-> +				reg = <0xf00000 0x100000>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
->  /* CON4 on CP1 expansion */
->  &cps_sata0 {
->  	status = "okay";
-> -- 
-> 2.11.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[1] https://drive.google.com/file/d/0B-CV_07uSBIuODc5bmV2QXhnODA/view
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170925/0827281e/attachment.sig>
