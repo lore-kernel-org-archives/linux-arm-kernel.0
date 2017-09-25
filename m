@@ -1,99 +1,80 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Mon, 25 Sep 2017 02:02:41 +0200
-Subject: [PATCH v3 07/10] dmaengine: sun6i: Retrieve channel count/max request
- from devicetree
+Date: Mon, 25 Sep 2017 02:02:40 +0200
+Subject: [PATCH v3 06/10] arm64: allwinner: a64: Add devicetree binding for
+ DMA controller
 In-Reply-To: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
 References: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <b8b9dff1-cec7-437b-8712-450f0f42f96f@rwthex-w2-a.rwth-ad.de>
+Message-ID: <a8bc9cc4-ad2a-4206-9f50-f5918601adbe@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid introduction of a new compatible for each small SoC/DMA controller
-variation, move the definition of the channel count to the devicetree.
+The A64 is register compatible with the H3, but has a different number
+of dma channels and request ports.
 
-The number of vchans is no longer explicit, but limited by the highest
-port/DMA request number. The result is a slight overallocation for SoCs
-with a sparse port mapping.
+Attach additional properties to the node to allow future reuse of the
+compatible for controllers with different number of channels/requests.
+
+If dma-requests is not specified, the register layout defined maximum
+of 32 is used.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+Acked-by: Rob Herring <robh@kernel.org>
 
 ---
 
-Changes in v3: None
-Changes in v2:
-- Set default number of dma-request if not provided in config or devicetree
+Changes in v3:
+- Drop leading 0 from unit name in DT example
 
- drivers/dma/sun6i-dma.c | 37 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+Changes in v2: None
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index b08b89fa4679..34d70af442ff 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -42,6 +42,9 @@
+ .../devicetree/bindings/dma/sun6i-dma.txt          | 28 +++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+index 98fbe1a5c6dd..b2df4f0f1488 100644
+--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
++++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+@@ -18,7 +18,7 @@ Required properties:
+ - #dma-cells :	Should be 1, a single cell holding a line request number
  
- #define DMA_STAT		0x30
+ Example:
+-	dma: dma-controller at 01c02000 {
++	dma: dma-controller at 1c02000 {
+ 		compatible = "allwinner,sun6i-a31-dma";
+ 		reg = <0x01c02000 0x1000>;
+ 		interrupts = <0 50 4>;
+@@ -27,6 +27,32 @@ Example:
+ 		#dma-cells = <1>;
+ 	};
  
-+/* Offset between DMA_IRQ_EN and DMA_IRQ_STAT limits number of channels */
-+#define DMA_MAX_CHANNELS	(DMA_IRQ_CHAN_NR * 0x10 / 4)
++------------------------------------------------------------------------------
++For A64 DMA controller:
 +
- /*
-  * sun8i specific registers
-  */
-@@ -65,7 +68,8 @@
- #define DMA_CHAN_LLI_ADDR	0x08
++Required properties:
++- compatible:	"allwinner,sun50i-a64-dma"
++- dma-channels: Number of DMA channels supported by the controller.
++		Refer to Documentation/devicetree/bindings/dma/dma.txt
++- all properties above, i.e. reg, interrupts, clocks, resets and #dma-cells
++
++Optional properties:
++- dma-requests: Number of DMA request signals supported by the controller.
++		Refer to Documentation/devicetree/bindings/dma/dma.txt
++
++Example:
++	dma: dma-controller at 1c02000 {
++		compatible = "allwinner,sun50i-a64-dma";
++		reg = <0x01c02000 0x1000>;
++		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ccu CLK_BUS_DMA>;
++		dma-channels = <8>;
++		dma-requests = <27>;
++		resets = <&ccu RST_BUS_DMA>;
++		#dma-cells = <1>;
++	};
++------------------------------------------------------------------------------
++
+ Clients:
  
- #define DMA_CHAN_CUR_CFG	0x0c
--#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
-+#define DMA_CHAN_MAX_DRQ		0x1f
-+#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & DMA_CHAN_MAX_DRQ)
- #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
- #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
- #define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
-@@ -1152,6 +1156,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
- static int sun6i_dma_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *device;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct sun6i_dma_dev *sdc;
- 	struct resource *res;
- 	int ret, i;
-@@ -1227,6 +1232,36 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->num_vchans = sdc->cfg->nr_max_vchans;
- 	sdc->max_request = sdc->cfg->nr_max_requests;
- 
-+	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
-+	if (ret && !sdc->num_pchans) {
-+		dev_err(&pdev->dev, "Can't get dma-channels.\n");
-+		return ret;
-+	}
-+
-+	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
-+		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
-+	if (ret && !sdc->max_request) {
-+		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
-+			 DMA_CHAN_MAX_DRQ);
-+		sdc->max_request = DMA_CHAN_MAX_DRQ;
-+	}
-+
-+	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
-+		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * If the number of vchans is not specified, derive it from the
-+	 * highest port number, at most one channel per port and direction.
-+	 */
-+	if (!sdc->num_vchans)
-+		sdc->num_vchans = 2 * (sdc->max_request + 1);
-+
- 	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
- 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
- 	if (!sdc->pchans)
+ DMA clients connected to the A31 DMA controller must use the format
 -- 
 2.14.1
