@@ -1,70 +1,86 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 26 Sep 2017 01:49:46 +0200
-Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
- support
-In-Reply-To: <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
-References: <20170924105924.23923-1-vigneshr@ti.com>
- <20170924105924.23923-6-vigneshr@ti.com>
- <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
- <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
- <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
- <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
- <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
- <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
-Message-ID: <fdfe29bf-ff46-7542-8e36-e8e45e1ca85f@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 25 Sep 2017 18:54:05 -0500
+Subject: [PATCH 1/3] PCI: designware: only register MSI controller when
+ MSI irq line is valid
+In-Reply-To: <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170828142307.30061-1-l.stach@pengutronix.de>
+ <20170828142307.30061-2-l.stach@pengutronix.de>
+ <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170925235405.GJ15970@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2017 12:41 AM, matthew.gerlach at linux.intel.com wrote:
+On Thu, Aug 31, 2017 at 11:58:17AM -0500, Bjorn Helgaas wrote:
+> [+cc Kishon, Thomas, Niklas, Jesper, Zhou, Gabriele, Xiaowei, Binghui,
+> Stanimir, Pratyush, Kukjin, Krzysztof, Richard, Murali, Minghuan, Mingkai,
+> Roy]
 > 
+> Sorry about the unwieldy cc list.  It seems like this affects every
+> DesignWare-based driver.
 > 
-> On Sun, 24 Sep 2017, Marek Vasut wrote:
+> On Mon, Aug 28, 2017 at 04:23:05PM +0200, Lucas Stach wrote:
+> > The MSI part of the controller isn't essential, so the host controller can
+> > be registered without the MSI controller being present. This allows the
+> > host to work in PCIe legancy interrupt only mode, if the IRQ line for the
 > 
->> On 09/24/2017 03:27 PM, Vignesh R wrote:
->>>
->>>
->>> On 9/24/2017 6:42 PM, Marek Vasut wrote:
->>>> On 09/24/2017 03:08 PM, Vignesh R wrote:
->>>>>
->>>>>
->>>>> On 9/24/2017 5:31 PM, Marek Vasut wrote:
->>>>>> On 09/24/2017 12:59 PM, Vignesh R wrote:
->>>>>>> Add pm_runtime* calls to cadence-quadspi driver. This is required to
->>>>>>> switch on QSPI power domain on TI 66AK2G SoC during probe.
->>>>>>>
->>>>>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>>>>>
->>>>>> Are you planning to add some more fine-grained PM control later?
->>>>>
->>>>> Yes, I will need to add fine-grained PM control at some point. But,
->>>>> for
->>>>> now SoC does not really support low power mode or runtime power saving
->>>>> option.
->>>>> The fact that driver still uses clk_prepare_*() calls to
->>>>> enable/disable
->>>>> clocks instead of pm_*() calls makes it a bit tricky though.
->>>>>
->>>>> Just figured out I forgot to add cleanup code in error handling
->>>>> path of
->>>>> probe(). Will fix that and send a v4.
->>>>
->>>> OK, fine. Cleanups are welcome. The SoCFPGA doesn't do much runtime PM
->>>> either, so it's fine for now.
->>>>
->>>
->>> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
->>> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
->>> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
->>
->> Not of the top of my head, sorry. +CC Matthew, he should know.
+> s/legancy/legacy/
 > 
-> I am not an expert at the clock framework nor the power management, but I
-> did ask around a bit.? No one I asked was planning to change the clk_*()
-> calls to pm_*() call, but the feedback was that it would be a good idea.
+> > MSI controller is missing.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  drivers/pci/dwc/pcie-designware-host.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
+> > index d29c020da082..8494089f088d 100644
+> > --- a/drivers/pci/dwc/pcie-designware-host.c
+> > +++ b/drivers/pci/dwc/pcie-designware-host.c
+> > @@ -381,7 +381,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  	if (ret)
+> >  		pci->num_viewport = 2;
+> >  
+> > -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> > +	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
+> >  		if (!pp->ops->msi_host_init) {
+> >  			pp->irq_domain = irq_domain_add_linear(dev->of_node,
+> >  						MAX_MSI_IRQS, &msi_domain_ops,
+> > @@ -412,7 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  	bridge->ops = &dw_pcie_ops;
+> >  	bridge->map_irq = of_irq_parse_and_map_pci;
+> >  	bridge->swizzle_irq = pci_common_swizzle;
+> > -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> > +	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
+> >  		bridge->msi = &dw_pcie_msi_chip;
+> >  		dw_pcie_msi_chip.dev = dev;
+> >  	}
+> 
+> Here are the callers of dw_pcie_host_init():
+> 
+>   armada8k_add_pcie_port
+>   artpec6_add_pcie_port       # sets pp->msi_irq
+>   dra7xx_add_pcie_port
+>   dw_plat_add_pcie_port       # sets pp->msi_irq
+>   exynos_add_pcie_port        # sets pp->msi_irq
+>   hisi_add_pcie_port
+>   imx6_add_pcie_port          # sets pp->msi_irq
+>   kirin_add_pcie_port
+>   ks_dw_pcie_host_init        # sets pp->ops->msi_host_init
+>   ls_add_pcie_port            # sets pp->ops->msi_host_init
+>   qcom_pcie_probe             # sets pp->msi_irq
+>   spear13xx_add_pcie_port
+> 
+> For the drivers that set pp->msi_irq (artpec6, dw_plat, exynos, imx6,
+> qcom), it seems like you'd want a similar follow-up change for all of
+> them to make the MSI IRQ optional, but you only changed imx6.  What
+> about the others?
+> 
+> For the drivers that don't set pp->msi_irq and don't set
+> pp->ops->msi_host_init (armada8k, dra7xx, hisi, kirin, spear13xx),
+> this patch means they no longer set up pp->irq_domain.  Do you intend
+> that?
 
-The question is, if we do the replacement, will it break on socfpga ?
-A quick test might be useful.
+Ping, I'm looking for a v2 that addresses this.  No hurry, just
+making sure you're not waiting on me.
 
--- 
-Best regards,
-Marek Vasut
+Bjorn
