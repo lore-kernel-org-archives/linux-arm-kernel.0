@@ -1,94 +1,64 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 25 Sep 2017 11:54:06 +0200
-Subject: [PATCH] iio: stm32: fix adc/trigger link error
-In-Reply-To: <20170910170040.7eb1f768@archlinux>
-References: <20170906125722.2522781-1-arnd@arndb.de>
- <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
- <20170910170040.7eb1f768@archlinux>
-Message-ID: <6b5ff28a-859d-973c-2da5-60a8bf50c378@st.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Mon, 25 Sep 2017 12:59:23 +0300
+Subject: [PATCH v2][for 4.14] xhci: allow TRACE to work with EVENT ring
+ dequeue
+In-Reply-To: <1506110113-21707-1-git-send-email-awallis@codeaurora.org>
+References: <1506110113-21707-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <59C8D37B.6080505@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2017 06:00 PM, Jonathan Cameron wrote:
-> On Wed, 6 Sep 2017 18:16:33 +0200
-> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> 
->> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:
->>> The ADC driver can trigger on either the timer or the lptim
->>> trigger, but it only uses a Kconfig 'select' statement
->>> to ensure that the first of the two is present. When the lptim
->>> trigger is enabled as a loadable module, and the adc driver
->>> is built-in, we now get a link error:
->>>
->>> drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
->>> stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
->>>
->>> We could use a second 'select' statement and always have both
->>> trigger drivers enabled when the adc driver is, but it seems that
->>> the lptimer trigger was intentionally left optional, so it seems
->>> better to keep it that way.  
->> Hi Arnd,
->>
->> This is correct, not all stm32 have this hardware.
->>>
->>> This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
->>> which avoids the link error, but instead leads to the lptimer trigger
->>> not being used in the broken configuration. I've added a runtime
->>> warning for this case to help users figure out what they did wrong
->>> if this should ever be done by accident.
->>>
->>> Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>  
->> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> 
-> This may take me a few weeks to pick up.  I don't want to
-> pull the mfd immutable branch in just to have this fix, so this will
-> get sorted after rc1 is out.
-> 
-> As ever, poke me if it looks like I've forgotten about it.
+On 22.09.2017 22:55, Adam Wallis wrote:
+> inc_deq() currently bails earlier for EVENT rings than the common return
+> point of the function, due to the fact that EVENT rings do not have
+> link TRBs. The unfortunate side effect of this is that the very useful
+> trace_xhci_inc_deq() function is not called/usable for EVENT ring
+> debug.
 
-Hi Jonathan,
+True, makes sense to trace the event ring deq ptr as well.
 
-Di you apply this one?
+>
+> This patch provides a refactor by removing the multiple return exit
+> points into a single return which additionally allows for all rings to
+> use the trace function.
+>
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+> Changes in v2: undo accidental line removal at end of patch
+>
+>   drivers/usb/host/xhci-ring.c | 32 ++++++++++++++++----------------
+>   1 file changed, 16 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+> index a944365..3960ba9 100644
+> --- a/drivers/usb/host/xhci-ring.c
+> +++ b/drivers/usb/host/xhci-ring.c
+> @@ -171,23 +171,23 @@ static void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring)
+>   	if (ring->type == TYPE_EVENT) {
+>   		if (!last_trb_on_seg(ring->deq_seg, ring->dequeue)) {
+>   			ring->dequeue++;
+> -			return;
+> +		} else {
+> +			if (last_trb_on_ring(ring, ring->deq_seg,
+> +				ring->dequeue))
+> +				ring->cycle_state ^= 1;
+> +			ring->deq_seg = ring->deq_seg->next;
+> +			ring->dequeue = ring->deq_seg->trbs;
+> +		}
+> +	} else {
+> +		/* All other rings have link trbs */
+> +		if (!trb_is_link(ring->dequeue)) {
+> +			ring->dequeue++;
+> +			ring->num_trbs_free++;
+> +		}
+> +		while (trb_is_link(ring->dequeue)) {
+> +			ring->deq_seg = ring->deq_seg->next;
+> +			ring->dequeue = ring->deq_seg->trbs;
 
-Thanks,
-Best Regards,
-Fabrice
-> Sorry for the delay!
-> 
-> Jonathan
-> 
->>
->> Many thanks for the fix,
->> Best Regards,
->> Fabrice
->>> ---
->>>  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
->>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
->>> index 34d59bfdce2d..464458d20b16 100644
->>> --- a/include/linux/iio/timer/stm32-lptim-trigger.h
->>> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
->>> @@ -16,11 +16,14 @@
->>>  #define LPTIM2_OUT	"lptim2_out"
->>>  #define LPTIM3_OUT	"lptim3_out"
->>>  
->>> -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
->>> +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
->>>  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
->>>  #else
->>>  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
->>>  {
->>> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
->>> +	pr_warn_once("stm32 lptim_trigger not linked in\n");
->>> +#endif
->>>  	return false;
->>>  }
->>>  #endif
->>>   
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+The added level of indentation makes it a little bit messier.
+How about just using goto out; instead of return?
+
+out:
+	trace_xhci_inc_deq(ring);
+
+-Mathias
