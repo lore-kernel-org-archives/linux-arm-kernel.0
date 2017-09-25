@@ -1,66 +1,21 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 25 Sep 2017 09:20:02 +0200
-Subject: [RFC PATCH 2/7] iio: adc: axp20x-adc: allow to skip ADC rate
- setup now
-In-Reply-To: <20170920151814.22461-3-icenowy@aosc.io>
-References: <20170920151814.22461-1-icenowy@aosc.io>
- <20170920151814.22461-3-icenowy@aosc.io>
-Message-ID: <300803eb-4526-52c4-e74b-92625602a6da@free-electrons.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 25 Sep 2017 09:21:03 +0200
+Subject: [PATCH] arm64: defconfig: enable R8A77970 SoC
+In-Reply-To: <CAMuHMdVwh+G37vWh2qyPbyRjkkv0CfjDR7aATfXP5R7ABvVVdQ@mail.gmail.com>
+References: <20170922213634.084486879@cogentembedded.com>
+ <CAMuHMdVwh+G37vWh2qyPbyRjkkv0CfjDR7aATfXP5R7ABvVVdQ@mail.gmail.com>
+Message-ID: <20170925072102.GG1019@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
-
-On 20/09/2017 17:18, Icenowy Zheng wrote:
-> The ADC rate setup on AXP803 is more complex than AXP20x/22x.
+On Sat, Sep 23, 2017 at 01:05:25PM +0200, Geert Uytterhoeven wrote:
+> On Fri, Sep 22, 2017 at 11:36 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > Enable the Renesas R-Car V3M (R8A77970) SoC in the ARM64 defconfig.
+> >
+> > Suggested-by: Simon Horman <horms@verge.net.au>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Can you elaborate?
-
-I can see two rate settings in register 0x85.
-
-Bits 7-6 => TS/GPIO ADC speed setting (25, 50, 100, 200 Hz) ((ilog2(x) /
-25) << 6, same as AXP20X).
-Bits 5-4 => Vol/Cur ADC speed setting (100, 200, 400, 800 Hz) ((ilog2(x)
-/ 100) << 4, same as AXP22X except the bit shift).
-
-Just set both to 100 or 200 by default (common rate). If someone wants
-to add a more specific rate setting, he could do it in the future.
-
-Setting a default is safer as we don't know if anything before the
-kernel does anything to this register.
-
-Thanks,
-Quentin
-
-> As it's not a necessary setup, allow it to be skipped, to allow simpler
-> AXP803 support now.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/iio/adc/axp20x_adc.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-> index 11e177180ea0..93dd6b80059e 100644
-> --- a/drivers/iio/adc/axp20x_adc.c
-> +++ b/drivers/iio/adc/axp20x_adc.c
-> @@ -556,8 +556,10 @@ static int axp20x_probe(struct platform_device *pdev)
->  				   AXP20X_ADC_EN2_MASK, AXP20X_ADC_EN2_MASK);
->  
->  	/* Configure ADCs rate */
-> -	regmap_update_bits(info->regmap, AXP20X_ADC_RATE, AXP20X_ADC_RATE_MASK,
-> -			   info->data->adc_rate(100));
-> +	if (info->data->adc_rate)
-> +		regmap_update_bits(info->regmap, AXP20X_ADC_RATE,
-> +				   AXP20X_ADC_RATE_MASK,
-> +				   info->data->adc_rate(100));
->  
->  	ret = iio_map_array_register(indio_dev, info->data->maps);
->  	if (ret < 0) {
-> 
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks, applied.
