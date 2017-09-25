@@ -1,49 +1,56 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Mon, 25 Sep 2017 07:25:00 +0000
-Subject: [PATCH v2] ARM: dts: iwg22d: Enable SDHI0 controller
-In-Reply-To: <20170925071800.GF1019@verge.net.au>
-References: <TY1PR06MB0702E99A48352C055705E3A9B7670@TY1PR06MB0702.apcprd06.prod.outlook.com>
- <1506085262-13639-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <TY1PR06MB08955E235768A72D33FE2AD3C0670@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <20170925071800.GF1019@verge.net.au>
-Message-ID: <TY1PR06MB07025B6A19C90C354EA23775B77A0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Sep 2017 09:44:48 +0200
+Subject: [PATCH 2/2] of: configure DMA for host1x devices
+In-Reply-To: <20170924090454.28116-2-mperttunen@nvidia.com>
+References: <20170924090454.28116-1-mperttunen@nvidia.com>
+ <20170924090454.28116-2-mperttunen@nvidia.com>
+Message-ID: <20170925074448.GB12494@ulmo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
-
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: 25 September 2017 08:18
+On Sun, Sep 24, 2017 at 12:04:54PM +0300, Mikko Perttunen wrote:
+> Devices in the host1x bus rely on the old behavior of of_dma_configure
+> to set up DMA ops. Add a check for them into of_dma_configure.
 > 
-> On Fri, Sep 22, 2017 at 01:33:39PM +0000, Fabrizio Castro wrote:
-> > Hello Simon,
-> >
-> > just to clarify the changes between v1 and v2, we can't use SDR50 and
-> SDR104 (due to an HW issue) therefore the pinctrl for UHS has been
-> removed and we dropped property "sd-uhs-sdr104". High Speed has been
-> tested, therefore if you are happy with the patch I guess you can update the
-> following page accordingly:
-> > http://elinux.org/index.php?title=Renesas-MMC-Enabled-
-> Speeds&type=revi
-> > sion&diff=451426&oldid=451421
-> >
-> > Although (due to a bug) sdhi0 may not hold a reference to "vccq_sdhi0",
-> the gpio regulator will initialize "SDHI0 VccQ" at 3.3V.
-> > I have sent another patch (mmc: tmio: check mmc_regulator_get_supply
-> return value) to start a discussion about a possible fix for the bug.
-> >
-> > Let me know if you need more information.
+> We must do the check using a string comparison instead of using
+> pointers since the host1x bus can be compiled into a module.
 > 
-> Thanks again for following up on this.
+> Fixes: 723288836628 ("of: restrict DMA configuration")
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  drivers/of/device.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> I have applied the patch with Geert's tag.
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 64b710265d39..12368418cd33 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -104,6 +104,9 @@ int of_dma_configure(struct device *dev, struct device_node *np)
+>  		if (!dev_is_pci(dev) &&
+>  #ifdef CONFIG_ARM_AMBA
+>  		    dev->bus != &amba_bustype &&
+> +#endif
+> +#if IS_ENABLED(CONFIG_TEGRA_HOST1X)
+> +		    !(dev->bus && !strcmp("host1x", dev->bus->name)) &&
+>  #endif
+>  		    dev->bus != &platform_bus_type)
+>  			return ret == -ENODEV ? 0 : ret;
 
-Thanks
+Maybe a slightly better solution would be to add a dev_is_host1x()
+function that returns dev->bus == &host1x_bus_type if TEGRA_HOST1X is
+enabled and returns false otherwise. That way we can have a "proper"
+check for the bus type and avoid the #if in this file.
 
-> 
-> I have also updated the Wiki at the URL above, feel free to make any further
-> updates there as appropriate.
+It's slightly more complicated because of the dependencies between the
+DT and Tegra DRM trees, but I'm sure we can get Rob to either give his
+Acked-by on the drivers/of/device.c change or carry the Tegra DRM patch
+in the DT tree.
 
-Thanks, looks okay to me.
-
-Kind regards, Chris
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170925/9c58ca02/attachment.sig>
