@@ -1,258 +1,296 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Sep 2017 10:05:44 +0100
-Subject: [PATCH v3 8/8] ARM: NOMMU: Support MPU in XIP configuration
+Date: Mon, 25 Sep 2017 10:05:42 +0100
+Subject: [PATCH v3 6/8] ARM: V7M: Add support for MPU to M-class
 In-Reply-To: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
 References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1506330344-31556-9-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1506330344-31556-7-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, there is assumption in early MPU setup code that kernel
-image is located in RAM, which is obviously not true for XIP. To run
-code from ROM we need to make sure that it is covered by MPU. However,
-due to we allocate regions (semi-)dynamically we can run into issue of
-trimming region we are running from in case ROM spawns several MPU
-regions. To help deal with that we enforce minimum alignments for start
-end end of XIP address space as 1MB and 128Kb correspondingly.
+This patch makes it possible to use MPU with v7M cores.
 
+Tested-by: Szemz? Andr?s <sza@esh.hu>
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig-nommu            |  2 +-
- arch/arm/include/asm/mpu.h        |  3 ++-
- arch/arm/kernel/head-nommu.S      | 20 ++++++++++++++++
- arch/arm/kernel/vmlinux-xip.lds.S | 23 ++++++++++++++++++
- arch/arm/mm/pmsa-v7.c             | 49 +++++++++++++++++++++++++++++++++++----
- 5 files changed, 90 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig-nommu         |  4 +--
+ arch/arm/include/asm/cputype.h | 10 ++++++++
+ arch/arm/include/asm/v7m.h     | 10 ++++++++
+ arch/arm/kernel/head-nommu.S   | 56 ++++++++++++++++++++++++++++++------------
+ arch/arm/mm/pmsa-v7.c          | 53 +++++++++++++++++++++++++++++++++++++--
+ 5 files changed, 113 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
-index 930e000..0fad7d9 100644
+index 6d18395..930e000 100644
 --- a/arch/arm/Kconfig-nommu
 +++ b/arch/arm/Kconfig-nommu
-@@ -52,7 +52,7 @@ config REMAP_VECTORS_TO_RAM
+@@ -52,8 +52,8 @@ config REMAP_VECTORS_TO_RAM
  
  config ARM_MPU
         bool 'Use the ARM v7 PMSA Compliant MPU'
--       depends on !XIP_KERNEL && (CPU_V7 || CPU_V7M)
-+       depends on CPU_V7 || CPU_V7M
-        default y if CPU_V7
+-       depends on !XIP_KERNEL && CPU_V7
+-       default y
++       depends on !XIP_KERNEL && (CPU_V7 || CPU_V7M)
++       default y if CPU_V7
         help
           Some ARM systems without an MMU have instead a Memory Protection
-diff --git a/arch/arm/include/asm/mpu.h b/arch/arm/include/asm/mpu.h
-index 5db37a6..56ec026 100644
---- a/arch/arm/include/asm/mpu.h
-+++ b/arch/arm/include/asm/mpu.h
-@@ -41,6 +41,7 @@
- #endif
+          Unit (MPU) that defines the type and permissions for regions of
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index b62eaeb..abaac5e 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -173,6 +173,11 @@ static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
+ 	return read_cpuid(CPUID_CACHETYPE);
+ }
  
- /* Access permission bits of ACR (only define those that we use)*/
-+#define MPU_AP_PL1RO_PL0NA	(0x5 << 8)
- #define MPU_AP_PL1RW_PL0RW	(0x3 << 8)
- #define MPU_AP_PL1RW_PL0R0	(0x2 << 8)
- #define MPU_AP_PL1RW_PL0NA	(0x1 << 8)
-@@ -49,7 +50,7 @@
- #define MPU_PROBE_REGION	0
- #define MPU_BG_REGION		1
- #define MPU_RAM_REGION		2
--#define MPU_VECTORS_REGION	3
-+#define MPU_ROM_REGION		3
++static inline unsigned int __attribute_const__ read_cpuid_mputype(void)
++{
++	return read_cpuid(CPUID_MPUIR);
++}
++
+ #elif defined(CONFIG_CPU_V7M)
  
- /* Maximum number of regions Linux is interested in */
- #define MPU_MAX_REGIONS		16
+ static inline unsigned int __attribute_const__ read_cpuid_id(void)
+@@ -185,6 +190,11 @@ static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
+ 	return readl(BASEADDR_V7M_SCB + V7M_SCB_CTR);
+ }
+ 
++static inline unsigned int __attribute_const__ read_cpuid_mputype(void)
++{
++	return readl(BASEADDR_V7M_SCB + MPU_TYPE);
++}
++
+ #else /* ifdef CONFIG_CPU_CP15 / elif defined(CONFIG_CPU_V7M) */
+ 
+ static inline unsigned int __attribute_const__ read_cpuid_id(void)
+diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
+index 1fd775c..5de776c 100644
+--- a/arch/arm/include/asm/v7m.h
++++ b/arch/arm/include/asm/v7m.h
+@@ -57,6 +57,16 @@
+ #define	V7M_SCB_CCSIDR		0x80	/* Cache size ID register */
+ #define	V7M_SCB_CSSELR		0x84	/* Cache size selection register */
+ 
++/* Memory-mapped MPU registers for M-class */
++#define MPU_TYPE		0x90
++#define MPU_CTRL		0x94
++#define MPU_CTRL_ENABLE		1
++#define MPU_CTRL_PRIVDEFENA	(1 << 2)
++
++#define MPU_RNR			0x98
++#define MPU_RBAR		0x9c
++#define MPU_RASR		0xa0
++
+ /* Cache opeartions */
+ #define	V7M_SCB_ICIALLU		0x250	/* I-cache invalidate all to PoU */
+ #define	V7M_SCB_ICIMVAU		0x258	/* I-cache invalidate by MVA to PoU */
 diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 8a0718f..2ce4455 100644
+index f242ae5..8a0718f 100644
 --- a/arch/arm/kernel/head-nommu.S
 +++ b/arch/arm/kernel/head-nommu.S
-@@ -279,6 +279,26 @@ M_CLASS(ldr    r0, [r12, #MPU_TYPE])
- 	setup_region r0, r5, r6, MPU_INSTR_SIDE r12	@ 0x0, BG region, enabled
+@@ -197,19 +197,33 @@ ENDPROC(__after_proc_init)
+ #ifdef CONFIG_ARM_MPU
+ 
+ 
++#ifndef CONFIG_CPU_V7M
+ /* Set which MPU region should be programmed */
+-.macro set_region_nr tmp, rgnr
++.macro set_region_nr tmp, rgnr, unused
+ 	mov	\tmp, \rgnr			@ Use static region numbers
+ 	mcr	p15, 0, \tmp, c6, c2, 0		@ Write RGNR
+ .endm
+ 
+ /* Setup a single MPU region, either D or I side (D-side for unified) */
+-.macro setup_region bar, acr, sr, side = MPU_DATA_SIDE
++.macro setup_region bar, acr, sr, side = MPU_DATA_SIDE, unused
+ 	mcr	p15, 0, \bar, c6, c1, (0 + \side)	@ I/DRBAR
+ 	mcr	p15, 0, \acr, c6, c1, (4 + \side)	@ I/DRACR
+ 	mcr	p15, 0, \sr, c6, c1, (2 + \side)		@ I/DRSR
+ .endm
++#else
++.macro set_region_nr tmp, rgnr, base
++	mov	\tmp, \rgnr
++	str     \tmp, [\base, #MPU_RNR]
++.endm
++
++.macro setup_region bar, acr, sr, unused, base
++	lsl     \acr, \acr, #16
++	orr     \acr, \acr, \sr
++	str     \bar, [\base, #MPU_RBAR]
++	str     \acr, [\base, #MPU_RASR]
++.endm
+ 
++#endif
+ /*
+  * Setup the MPU and initial MPU Regions. We create the following regions:
+  * Region 0: Use this for probing the MPU details, so leave disabled.
+@@ -223,48 +237,58 @@ ENDPROC(__after_proc_init)
+ ENTRY(__setup_mpu)
+ 
+ 	/* Probe for v7 PMSA compliance */
+-	mrc	p15, 0, r0, c0, c1, 4		@ Read ID_MMFR0
++M_CLASS(movw	r12, #:lower16:BASEADDR_V7M_SCB)
++M_CLASS(movt	r12, #:upper16:BASEADDR_V7M_SCB)
++
++AR_CLASS(mrc	p15, 0, r0, c0, c1, 4)		@ Read ID_MMFR0
++M_CLASS(ldr	r0, [r12, 0x50])
+ 	and	r0, r0, #(MMFR0_PMSA)		@ PMSA field
+ 	teq	r0, #(MMFR0_PMSAv7)		@ PMSA v7
+ 	bxne	lr
+ 
+ 	/* Determine whether the D/I-side memory map is unified. We set the
+ 	 * flags here and continue to use them for the rest of this function */
+-	mrc	p15, 0, r0, c0, c0, 4		@ MPUIR
++AR_CLASS(mrc	p15, 0, r0, c0, c0, 4)		@ MPUIR
++M_CLASS(ldr    r0, [r12, #MPU_TYPE])
+ 	ands	r5, r0, #MPUIR_DREGION_SZMASK	@ 0 size d region => No MPU
+ 	bxeq	lr
+ 	tst	r0, #MPUIR_nU			@ MPUIR_nU = 0 for unified
+ 
+ 	/* Setup second region first to free up r6 */
+-	set_region_nr r0, #MPU_RAM_REGION
++	set_region_nr r0, #MPU_RAM_REGION, r12
+ 	isb
+ 	/* Full access from PL0, PL1, shared for CONFIG_SMP, cacheable */
+ 	ldr	r0, =PLAT_PHYS_OFFSET		@ RAM starts at PHYS_OFFSET
+ 	ldr	r5,=(MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL)
+ 
+-	setup_region r0, r5, r6, MPU_DATA_SIDE	@ PHYS_OFFSET, shared, enabled
+-	beq	1f				@ Memory-map not unified
+-	setup_region r0, r5, r6, MPU_INSTR_SIDE @ PHYS_OFFSET, shared, enabled
++	setup_region r0, r5, r6, MPU_DATA_SIDE, r12	@ PHYS_OFFSET, shared, enabled
++	beq	1f					@ Memory-map not unified
++	setup_region r0, r5, r6, MPU_INSTR_SIDE, r12	@ PHYS_OFFSET, shared, enabled
+ 1:	isb
+ 
+ 	/* First/background region */
+-	set_region_nr r0, #MPU_BG_REGION
++	set_region_nr r0, #MPU_BG_REGION, r12
+ 	isb
+ 	/* Execute Never,  strongly ordered, inaccessible to PL0, rw PL1  */
+ 	mov	r0, #0				@ BG region starts at 0x0
+ 	ldr	r5,=(MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA)
+ 	mov	r6, #MPU_RSR_ALL_MEM		@ 4GB region, enabled
+ 
+-	setup_region r0, r5, r6, MPU_DATA_SIDE	@ 0x0, BG region, enabled
+-	beq	2f				@ Memory-map not unified
+-	setup_region r0, r5, r6, MPU_INSTR_SIDE @ 0x0, BG region, enabled
++	setup_region r0, r5, r6, MPU_DATA_SIDE, r12	@ 0x0, BG region, enabled
++	beq	2f					@ Memory-map not unified
++	setup_region r0, r5, r6, MPU_INSTR_SIDE r12	@ 0x0, BG region, enabled
  2:	isb
  
-+#ifdef CONFIG_XIP_KERNEL
-+	set_region_nr r0, #MPU_ROM_REGION, r12
-+	isb
-+
-+	ldr	r5,=(MPU_AP_PL1RO_PL0NA | MPU_RGN_NORMAL)
-+
-+	ldr	r0, =CONFIG_XIP_PHYS_ADDR		@ ROM start
-+	ldr     r6, =(_exiprom)				@ ROM end
-+	sub	r6, r6, r0				@ Minimum size of region to map
-+	clz	r6, r6					@ Region size must be 2^N...
-+	rsb	r6, r6, #31				@ ...so round up region size
-+	lsl	r6, r6, #MPU_RSR_SZ			@ Put size in right field
-+	orr	r6, r6, #(1 << MPU_RSR_EN)		@ Set region enabled bit
-+
-+	setup_region r0, r5, r6, MPU_DATA_SIDE, r12	@ XIP_PHYS_ADDR, shared, enabled
-+	beq	3f					@ Memory-map not unified
-+	setup_region r0, r5, r6, MPU_INSTR_SIDE, r12	@ XIP_PHYS_ADDR, shared, enabled
-+3:	isb
-+#endif
-+
  	/* Enable the MPU */
- AR_CLASS(mrc	p15, 0, r0, c1, c0, 0)		@ Read SCTLR
- AR_CLASS(bic	r0, r0, #CR_BR)			@ Disable the 'default mem-map'
-diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index 8265b11..c6f7056 100644
---- a/arch/arm/kernel/vmlinux-xip.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -6,6 +6,8 @@
- /* No __ro_after_init data in the .rodata section - which will always be ro */
- #define RO_AFTER_INIT_DATA
- 
-+#include <linux/sizes.h>
+-	mrc	p15, 0, r0, c1, c0, 0		@ Read SCTLR
+-	bic	r0, r0, #CR_BR			@ Disable the 'default mem-map'
+-	orr	r0, r0, #CR_M			@ Set SCTRL.M (MPU on)
+-	mcr	p15, 0, r0, c1, c0, 0		@ Enable MPU
++AR_CLASS(mrc	p15, 0, r0, c1, c0, 0)		@ Read SCTLR
++AR_CLASS(bic	r0, r0, #CR_BR)			@ Disable the 'default mem-map'
++AR_CLASS(orr	r0, r0, #CR_M)			@ Set SCTRL.M (MPU on)
++AR_CLASS(mcr	p15, 0, r0, c1, c0, 0)		@ Enable MPU
 +
- #include <asm-generic/vmlinux.lds.h>
- #include <asm/cache.h>
- #include <asm/thread_info.h>
-@@ -205,6 +207,9 @@ SECTIONS
- 	PERCPU_SECTION(L1_CACHE_BYTES)
- #endif
++M_CLASS(ldr	r0, [r12, #MPU_CTRL])
++M_CLASS(bic	r0, #MPU_CTRL_PRIVDEFENA)
++M_CLASS(orr	r0, #MPU_CTRL_ENABLE)
++M_CLASS(str	r0, [r12, #MPU_CTRL])
+ 	isb
  
-+#ifdef CONFIG_ARM_MPU
-+	. = ALIGN(SZ_128K);
-+#endif
- 	_exiprom = .;			/* End of XIP ROM area */
- 	__data_loc = ALIGN(4);		/* location in binary */
- 	. = PAGE_OFFSET + TEXT_OFFSET;
-@@ -322,3 +327,21 @@ ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
-  */
- ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & PAGE_MASK) <= PAGE_SIZE,
- 	"HYP init code too big or misaligned")
-+
-+#ifdef CONFIG_ARM_MPU
-+/*
-+ * Due to PMSAv7 restriction on base address and size we have to
-+ * enforce minimal alignment restrictions. It was seen that weaker
-+ * alignment restriction on _xiprom will likely force XIP address
-+ * space spawns multiple MPU regions thus it is likely we run in
-+ * situation when we are reprogramming MPU region we run on with
-+ * something which doesn't cover reprogramming code itself, so as soon
-+ * as we update MPU settings we'd immediately try to execute straight
-+ * from background region which is XN.
-+ * It seem that alignment in 1M should suit most users.
-+ * _exiprom is aligned as 1/8 of 1M so can be covered by subregion
-+ * disable
-+ */
-+ASSERT(!(_xiprom & (SZ_1M - 1)), "XIP start address may cause MPU programming issues")
-+ASSERT(!(_exiprom & (SZ_128K - 1)), "XIP end address may cause MPU programming issues")
-+#endif
+ 	ret	lr
 diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
-index c1f1fc7..27434d7 100644
+index 029d204..72f1a9f 100644
 --- a/arch/arm/mm/pmsa-v7.c
 +++ b/arch/arm/mm/pmsa-v7.c
-@@ -7,9 +7,11 @@
- #include <linux/bitops.h>
- #include <linux/memblock.h>
- 
-+#include <asm/cacheflush.h>
- #include <asm/cp15.h>
- #include <asm/cputype.h>
- #include <asm/mpu.h>
-+#include <asm/sections.h>
- 
- #include "mm.h"
- 
-@@ -20,6 +22,9 @@ struct region {
- };
- 
- static struct region __initdata mem[MPU_MAX_REGIONS];
-+#ifdef CONFIG_XIP_KERNEL
-+static struct region __initdata xip[MPU_MAX_REGIONS];
-+#endif
- 
+@@ -15,6 +15,8 @@
  static unsigned int __initdata mpu_min_region_order;
  static unsigned int __initdata mpu_max_regions;
-@@ -229,7 +234,6 @@ static int __init allocate_region(phys_addr_t base, phys_addr_t size,
- /* MPU initialisation functions */
- void __init adjust_lowmem_bounds_mpu(void)
- {
--	phys_addr_t phys_offset = PHYS_OFFSET;
- 	phys_addr_t  specified_mem_size, total_mem_size = 0;
- 	struct memblock_region *reg;
- 	bool first = true;
-@@ -256,8 +260,19 @@ void __init adjust_lowmem_bounds_mpu(void)
- 	/* ... and one for vectors */
- 	mem_max_regions--;
- #endif
+ 
++#ifndef CONFIG_CPU_V7M
 +
-+#ifdef CONFIG_XIP_KERNEL
-+	/* plus some regions to cover XIP ROM */
-+	num = allocate_region(CONFIG_XIP_PHYS_ADDR, __pa(_exiprom) - CONFIG_XIP_PHYS_ADDR,
-+			      mem_max_regions, xip);
+ #define DRBAR	__ACCESS_CP15(c6, 0, c1, 0)
+ #define IRBAR	__ACCESS_CP15(c6, 0, c1, 1)
+ #define DRSR	__ACCESS_CP15(c6, 0, c1, 2)
+@@ -78,6 +80,51 @@ static inline u32 irbar_read(void)
+ 	return read_sysreg(IRBAR);
+ }
+ 
++#else
 +
-+	mem_max_regions -= num;
++static inline void rgnr_write(u32 v)
++{
++	writel_relaxed(v, BASEADDR_V7M_SCB + MPU_RNR);
++}
++
++/* Data-side / unified region attributes */
++
++/* Region access control register */
++static inline void dracr_write(u32 v)
++{
++	u32 rsr = readl_relaxed(BASEADDR_V7M_SCB + MPU_RASR) & GENMASK(15, 0);
++
++	writel_relaxed((v << 16) | rsr, BASEADDR_V7M_SCB + MPU_RASR);
++}
++
++/* Region size register */
++static inline void drsr_write(u32 v)
++{
++	u32 racr = readl_relaxed(BASEADDR_V7M_SCB + MPU_RASR) & GENMASK(31, 16);
++
++	writel_relaxed(v | racr, BASEADDR_V7M_SCB + MPU_RASR);
++}
++
++/* Region base address register */
++static inline void drbar_write(u32 v)
++{
++	writel_relaxed(v, BASEADDR_V7M_SCB + MPU_RBAR);
++}
++
++static inline u32 drbar_read(void)
++{
++	return readl_relaxed(BASEADDR_V7M_SCB + MPU_RBAR);
++}
++
++/* ARMv7-M only supports a unified MPU, so I-side operations are nop */
++
++static inline void iracr_write(u32 v) {}
++static inline void irsr_write(u32 v) {}
++static inline void irbar_write(u32 v) {}
++static inline unsigned long irbar_read(void) {return 0;}
++
 +#endif
 +
- 	for_each_memblock(memory, reg) {
- 		if (first) {
-+			phys_addr_t phys_offset = PHYS_OFFSET;
-+
- 			/*
- 			 * Initially only use memory continuous from
- 			 * PHYS_OFFSET */
-@@ -355,7 +370,7 @@ static int __init __mpu_min_region_order(void)
- 
- static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
- 				   unsigned int size_order, unsigned int properties,
--				   unsigned int subregions)
-+				   unsigned int subregions, bool need_flush)
+ static int __init mpu_present(void)
  {
- 	u32 size_data;
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR0) & MMFR0_PMSA) == MMFR0_PMSAv7);
+@@ -166,7 +213,7 @@ static int __init __mpu_max_regions(void)
+ 	 */
+ 	u32 dregions, iregions, mpuir;
  
-@@ -374,6 +389,9 @@ static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
- 	size_data = ((size_order - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN;
- 	size_data |= subregions << MPU_RSR_SD;
+-	mpuir = read_cpuid(CPUID_MPUIR);
++	mpuir = read_cpuid_mputype();
  
-+	if (need_flush)
-+		flush_cache_all();
-+
- 	dsb(); /* Ensure all previous data accesses occur with old mappings */
- 	rgnr_write(number);
- 	isb();
-@@ -416,7 +434,28 @@ void __init mpu_setup(void)
- 	/* Background */
- 	err |= mpu_setup_region(region++, 0, 32,
- 				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA,
--				0);
-+				0, false);
-+
-+#ifdef CONFIG_XIP_KERNEL
-+	/* ROM */
-+	for (i = 0; i < ARRAY_SIZE(xip); i++) {
-+		/*
-+                 * In case we overwrite RAM region we set earlier in
-+                 * head-nommu.S (which is cachable) all subsequent
-+                 * data access till we setup RAM bellow would be done
-+                 * with BG region (which is uncachable), thus we need
-+                 * to clean and invalidate cache.
-+		 */
-+		bool need_flush = region == MPU_RAM_REGION;
-+
-+		if (!xip[i].size)
-+			continue;
-+
-+		err |= mpu_setup_region(region++, xip[i].base, ilog2(xip[i].size),
-+					MPU_AP_PL1RO_PL0NA | MPU_RGN_NORMAL,
-+					xip[i].subreg, need_flush);
-+	}
-+#endif
+ 	dregions = iregions = (mpuir & MPUIR_DREGION_SZMASK) >> MPUIR_DREGION;
  
- 	/* RAM */
- 	for (i = 0; i < ARRAY_SIZE(mem); i++) {
-@@ -425,14 +464,14 @@ void __init mpu_setup(void)
+@@ -181,7 +228,7 @@ static int __init __mpu_max_regions(void)
+ static int __init mpu_iside_independent(void)
+ {
+ 	/* MPUIR.nU specifies whether there is *not* a unified memory map */
+-	return read_cpuid(CPUID_MPUIR) & MPUIR_nU;
++	return read_cpuid_mputype() & MPUIR_nU;
+ }
  
- 		err |= mpu_setup_region(region++, mem[i].base, ilog2(mem[i].size),
- 					MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL,
--					mem[i].subreg);
-+					mem[i].subreg, false);
- 	}
+ static int __init __mpu_min_region_order(void)
+@@ -284,9 +331,11 @@ void __init mpu_setup(void)
+ 				MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL);
  
  	/* Vectors */
- #ifndef CONFIG_CPU_V7M
- 	err |= mpu_setup_region(region++, vectors_base, ilog2(2 * PAGE_SIZE),
- 				MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL,
--				0);
-+				0, false);
- #endif
++#ifndef CONFIG_CPU_V7M
+ 	err |= mpu_setup_region(region++, vectors_base,
+ 				ilog2(2 * PAGE_SIZE),
+ 				MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL);
++#endif
  	if (err) {
  		panic("MPU region initialization failure! %d", err);
+ 	} else {
 -- 
 1.9.1
