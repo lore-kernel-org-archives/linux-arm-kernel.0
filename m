@@ -1,129 +1,51 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Mon, 25 Sep 2017 02:02:39 +0200
-Subject: [PATCH v3 05/10] dmaengine: sun6i: Move number of
- pchans/vchans/request to device struct
+Date: Mon, 25 Sep 2017 02:02:43 +0200
+Subject: [PATCH v3 09/10] arm64: allwinner: a64: Add device node for DMA
+ controller
 In-Reply-To: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
 References: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <7c806ea2-1c3d-4c5b-bcd1-3c6f9b1737f9@rwthex-w2-a.rwth-ad.de>
+Message-ID: <801a02c2-b31f-4f1d-a3e9-8ded8ab6f1aa@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Preparatory patch: If the same compatible is used for different SoCs which
-have a common register layout, but different number of channels, the
-channel count can no longer be stored in the config. Store it in the
-device structure instead.
+The A64 SoC has a DMA controller that supports 8 DMA channels
+to and from various peripherals. The last used DRQ port is 27.
+
+Add a device node for it.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
 ---
 
-Changes in v3: None
+Changes in v3:
+- Drop leading 0 from dma controller unit name
+
 Changes in v2: None
 
- drivers/dma/sun6i-dma.c | 26 ++++++++++++++++----------
- 1 file changed, 16 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index c7ad3b4e836c..b08b89fa4679 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -185,6 +185,9 @@ struct sun6i_dma_dev {
- 	struct sun6i_pchan	*pchans;
- 	struct sun6i_vchan	*vchans;
- 	const struct sun6i_dma_config *cfg;
-+	u32			num_pchans;
-+	u32			num_vchans;
-+	u32			max_request;
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index e9a9d7fb01c8..cbffefce0e71 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -136,6 +136,17 @@
+ 			reg = <0x01c00000 0x1000>;
+ 		};
  
- static struct device *chan2dev(struct dma_chan *chan)
-@@ -431,7 +434,6 @@ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
- static void sun6i_dma_tasklet(unsigned long data)
- {
- 	struct sun6i_dma_dev *sdev = (struct sun6i_dma_dev *)data;
--	const struct sun6i_dma_config *cfg = sdev->cfg;
- 	struct sun6i_vchan *vchan;
- 	struct sun6i_pchan *pchan;
- 	unsigned int pchan_alloc = 0;
-@@ -459,7 +461,7 @@ static void sun6i_dma_tasklet(unsigned long data)
- 	}
- 
- 	spin_lock_irq(&sdev->lock);
--	for (pchan_idx = 0; pchan_idx < cfg->nr_max_channels; pchan_idx++) {
-+	for (pchan_idx = 0; pchan_idx < sdev->num_pchans; pchan_idx++) {
- 		pchan = &sdev->pchans[pchan_idx];
- 
- 		if (pchan->vchan || list_empty(&sdev->pending))
-@@ -480,7 +482,7 @@ static void sun6i_dma_tasklet(unsigned long data)
- 	}
- 	spin_unlock_irq(&sdev->lock);
- 
--	for (pchan_idx = 0; pchan_idx < cfg->nr_max_channels; pchan_idx++) {
-+	for (pchan_idx = 0; pchan_idx < sdev->num_pchans; pchan_idx++) {
- 		if (!(pchan_alloc & BIT(pchan_idx)))
- 			continue;
- 
-@@ -502,7 +504,7 @@ static irqreturn_t sun6i_dma_interrupt(int irq, void *dev_id)
- 	int i, j, ret = IRQ_NONE;
- 	u32 status;
- 
--	for (i = 0; i < sdev->cfg->nr_max_channels / DMA_IRQ_CHAN_NR; i++) {
-+	for (i = 0; i < sdev->num_pchans / DMA_IRQ_CHAN_NR; i++) {
- 		status = readl(sdev->base + DMA_IRQ_STAT(i));
- 		if (!status)
- 			continue;
-@@ -982,7 +984,7 @@ static struct dma_chan *sun6i_dma_of_xlate(struct of_phandle_args *dma_spec,
- 	struct dma_chan *chan;
- 	u8 port = dma_spec->args[0];
- 
--	if (port > sdev->cfg->nr_max_requests)
-+	if (port > sdev->max_request)
- 		return NULL;
- 
- 	chan = dma_get_any_slave_channel(&sdev->slave);
-@@ -1015,7 +1017,7 @@ static inline void sun6i_dma_free(struct sun6i_dma_dev *sdev)
- {
- 	int i;
- 
--	for (i = 0; i < sdev->cfg->nr_max_vchans; i++) {
-+	for (i = 0; i < sdev->num_vchans; i++) {
- 		struct sun6i_vchan *vchan = &sdev->vchans[i];
- 
- 		list_del(&vchan->vc.chan.device_node);
-@@ -1221,26 +1223,30 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
- 
--	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->cfg->nr_max_channels,
-+	sdc->num_pchans = sdc->cfg->nr_max_channels;
-+	sdc->num_vchans = sdc->cfg->nr_max_vchans;
-+	sdc->max_request = sdc->cfg->nr_max_requests;
++		dma: dma-controller at 1c02000 {
++			compatible = "allwinner,sun50i-a64-dma";
++			reg = <0x01c02000 0x1000>;
++			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_DMA>;
++			dma-channels = <8>;
++			dma-requests = <27>;
++			resets = <&ccu RST_BUS_DMA>;
++			#dma-cells = <1>;
++		};
 +
-+	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
- 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
- 	if (!sdc->pchans)
- 		return -ENOMEM;
- 
--	sdc->vchans = devm_kcalloc(&pdev->dev, sdc->cfg->nr_max_vchans,
-+	sdc->vchans = devm_kcalloc(&pdev->dev, sdc->num_vchans,
- 				   sizeof(struct sun6i_vchan), GFP_KERNEL);
- 	if (!sdc->vchans)
- 		return -ENOMEM;
- 
- 	tasklet_init(&sdc->task, sun6i_dma_tasklet, (unsigned long)sdc);
- 
--	for (i = 0; i < sdc->cfg->nr_max_channels; i++) {
-+	for (i = 0; i < sdc->num_pchans; i++) {
- 		struct sun6i_pchan *pchan = &sdc->pchans[i];
- 
- 		pchan->idx = i;
- 		pchan->base = sdc->base + 0x100 + i * 0x40;
- 	}
- 
--	for (i = 0; i < sdc->cfg->nr_max_vchans; i++) {
-+	for (i = 0; i < sdc->num_vchans; i++) {
- 		struct sun6i_vchan *vchan = &sdc->vchans[i];
- 
- 		INIT_LIST_HEAD(&vchan->node);
+ 		mmc0: mmc at 1c0f000 {
+ 			compatible = "allwinner,sun50i-a64-mmc";
+ 			reg = <0x01c0f000 0x1000>;
 -- 
 2.14.1
