@@ -1,64 +1,57 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 25 Sep 2017 17:08:06 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20170921172811.GB4394@atomide.com>
-References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
- <20170905233241.GA19231@js1304-P5Q-DELUXE>
- <20170906133057.GH5024@atomide.com>
- <20170907073038.GA2111@js1304-P5Q-DELUXE>
- <20170907161650.GP5024@atomide.com>
- <20170913075516.GA25036@js1304-P5Q-DELUXE>
- <20170913163126.GS5024@atomide.com>
- <20170915065608.GA8567@js1304-P5Q-DELUXE>
- <20170921172811.GB4394@atomide.com>
-Message-ID: <20170925080806.GA9837@js1304-P5Q-DELUXE>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 25 Sep 2017 10:06:22 +0200
+Subject: [RESEND PATCH v5 10/16] ARM: dts: zynq: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <CABxcv==nFELQ8JJrxty=oNwwonJ3=xWqaH3a-RYssPmy8x2Z5w@mail.gmail.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-11-javier@dowhile0.org>
+ <b22a7db6-7daf-b5c1-3978-cdc699723e30@xilinx.com>
+ <CABxcv=n4pCJLPb_C6eYVJ3CLBVH7T0amiJj7mYbshpv4u8xkXA@mail.gmail.com>
+ <67a9d32a-0a20-f101-4660-0d5aa5ad8a8a@xilinx.com>
+ <CABxcv==nFELQ8JJrxty=oNwwonJ3=xWqaH3a-RYssPmy8x2Z5w@mail.gmail.com>
+Message-ID: <e6006c90-99a2-c8f5-cff2-5c729ada8cd1@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 10:28:11AM -0700, Tony Lindgren wrote:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170914 23:55]:
-> > On Wed, Sep 13, 2017 at 09:31:27AM -0700, Tony Lindgren wrote:
-> > > Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
-> > > you need to remove it from arch/arm/mach-omap2/Kconfig that
-> > > selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
-> > 
-> > Okay. Problem would be related to address traslation. I'd like to
-> > check address traslation more. Could you apply following patch and
-> > test it? And, please send me the dmesg log and your kernel config.
-> > Please test this with CONFIG_DEBUG_VIRTUAL = n and CONFIG_CMA_DEBUG=y and
-> > CONFIG_HIGHMEM=y and with kernel bootparam 'ignore_loglevel'.
-> > 
-> > It would be really appreciate if you send me two logs for before/after
-> > commit 9caf25f996e8.
+Hi,
+
+On 21.9.2017 11:41, Javier Martinez Canillas wrote:
+> Hello Michal,
 > 
-> Sorry for the delays, I finally got around testing this for you.
-
-No problem! I really appreciate your help!
-
-> Compile with your patch failed for modules with __virt_to_phys_debug
-> being undefined so I added EXPORT_SYMBOL there. I also enabled DEBUG_LL
-> and EARLYPRINTK to get output.
+> On Thu, Aug 24, 2017 at 3:44 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 > 
-> Below is dmesg output for 9caf25f996e8 + your patch. I'll send you
-> the full logs separately.
+> [snip]
+> 
+>>
+>> Ok. Applied to
+>> https://github.com/Xilinx/linux-xlnx/commits/zynq/dt
+>>
+>> Will wait if something else pop up.
+>>
+> 
+> I see the patch applied to that repository but I don't see it in
+> neither mainline nor linux-next.
 
-Hmm...there is only one caller for the CMA memory, that is, atomic_pool_init().
-Could you test one more time with 9caf25f996e8 + following patch?  I'd like to
-know the actual user for the CMA memory.
+xilinx tree was merging to linux-next but there were conflicts with arm
+soc tree that's why it was removed.
 
-Thanks.
+> 
+>> Arnd: If you want to take this directly, feel free to do it.
+>>
+>> Thanks,
+>> Michal
 
--------------------------->8------------------------
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 519c294..c68f34a 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -587,6 +587,8 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
-                ptr = (void *)val;
-        }
- 
-+       dump_stack();
-+
-        return ptr;
- }
- 
+It is in queue for v4.15.
+
+FYI: There are still 3 more in doc.
+
+Documentation/devicetree/bindings/i2c/i2c-mux-pca954x.txt:50:
+               compatible = "at,24c08";
+Documentation/devicetree/bindings/i2c/nxp,pca9541.txt:25:
+               compatible = "at,24c08";
+Documentation/devicetree/bindings/trivial-devices.txt:34:at,24c08
+       i2c serial eeprom  (24cxx)
+
+
+Thanks,
+Michal
