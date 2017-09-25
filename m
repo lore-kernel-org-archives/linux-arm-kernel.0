@@ -1,90 +1,30 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 25 Sep 2017 10:58:46 +0200
-Subject: [RFC PATCH 4/7] power: supply: axp20x-battery: support AXP803
-In-Reply-To: <20170920151814.22461-5-icenowy@aosc.io>
-References: <20170920151814.22461-1-icenowy@aosc.io>
- <20170920151814.22461-5-icenowy@aosc.io>
-Message-ID: <9b72b982-85b2-22e0-076a-15c066619006@free-electrons.com>
+From: jamie.iles@oracle.com (Jamie Iles)
+Date: Mon, 25 Sep 2017 09:58:31 +0100
+Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
+In-Reply-To: <20170924173912.9199-1-linus.walleij@linaro.org>
+References: <20170924173912.9199-1-linus.walleij@linaro.org>
+Message-ID: <20170925085831.mamuitnvljrek3bo@cedar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
-
-On 20/09/2017 17:18, Icenowy Zheng wrote:
-> The AXP803 PMIC has battery support like other AXP PMICs, but with
-> different definition of max target charging voltage and constant
-> charging current.
+On Sun, Sep 24, 2017 at 07:39:12PM +0200, Linus Walleij wrote:
+> There is exactly one board in the kernel that defines platform data
+> for the GPIO NAND driver.
 > 
-> Add support for AXP803 battery in axp20x-battery driver.
+> Use the feature to provide a lookup table for the GPIOs in the board
+> file so we can convert the driver as a whole to just use GPIO
+> descriptors.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/power/supply/axp20x_battery.c | 88 +++++++++++++++++++++++++++++++----
->  1 file changed, 78 insertions(+), 10 deletions(-)
+> After this we can cut the use of <linux/of_gpio.h> and use the GPIO
+> descriptor management from <linux/gpio/consumer.h> alone to grab and use
+> the GPIOs used in the driver.
 > 
-> diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
-> index 7494f0f0eadb..c9a9fb320c92 100644
-> --- a/drivers/power/supply/axp20x_battery.c
-> +++ b/drivers/power/supply/axp20x_battery.c
-> @@ -49,6 +49,8 @@
-[...]
->  static void constant_charge_current_to_raw(struct axp20x_batt_ps *axp, int *val)
->  {
-> -	if (axp->axp_id == AXP209_ID)
-> +	switch (axp->axp_id) {
-> +	case AXP209_ID:
->  		*val = (*val - 300000) / 100000;
-> -	else
-> +		break;
-> +	case AXP221_ID:
->  		*val = (*val - 300000) / 150000;
-> +		break;
-> +	case AXP803_ID:
-> +		*val = (*val - 200000) / 200000;
-> +		/*
-> +		 * The maximum charge current on AXP803 is 2.8A, and the
-> +		 * datasheet says "1110-1111 reserved" in this part.
-> +		 * So we return an invalid value -1 in this situation,
-> +		 * which will be dealed by the caller of this function,
-> +		 */
+> I also created a local struct device *dev in the probe() function
+> because I was getting annoyed with all the &pdev->dev dereferencing.
+> 
+> Cc: arm at kernel.org
+> Cc: Mike Rapoport <rppt@linux.vnet.ibm.com>
+> Cc: Frans Klaver <fransklaver@gmail.com>
+> Cc: Gerhard Sittig <gsi@denx.de>
 
-Good, we could do that for the two others compatible as well. They are
-not explicitly marked as reserved but it stops at 1100 for AXP223/AXP221
-for example.
-
-> +		if (*val > 13)
-> +			*val = -1;
-> +		break;
-> +	}
->  }
->  
->  static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
-> @@ -269,9 +322,13 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
->  		if (ret)
->  			return ret;
->  
-> -		if (axp20x_batt->axp_id == AXP221_ID &&
-> -		    !(reg & AXP22X_FG_VALID))
-> -			return -EINVAL;
-> +		switch (axp20x_batt->axp_id) {
-> +		case AXP221_ID:
-> +		case AXP803_ID:
-> +			if (!(reg & AXP22X_FG_VALID))
-> +				return -EINVAL;
-> +			break;
-> +		};
-
-Looks weird to me.
-
-if (axp20x_batt->axp_id != AXP209_ID && !(reg & AXP22X_FG_VALID))
-
-would be a better match?
-[...]
-
-Thanks,
-Quentin
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Acked-by: Jamie Iles <jamie.iles@oracle.com>
