@@ -1,132 +1,116 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Mon, 25 Sep 2017 16:53:51 +0200
-Subject: [PATCH 2/3] mtd: nand: pxa3xx: enable NAND controller if the SoC
- needs it
+Date: Mon, 25 Sep 2017 16:53:52 +0200
+Subject: [PATCH 3/3] arm64: dts: marvell: add NAND support on the 7040-DB board
 In-Reply-To: <20170925145352.13145-1-miquel.raynal@free-electrons.com>
 References: <20170925145352.13145-1-miquel.raynal@free-electrons.com>
-Message-ID: <20170925145352.13145-3-miquel.raynal@free-electrons.com>
+Message-ID: <20170925145352.13145-4-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell recent SoCs like A7k/A8k do not boot with NAND flash
-controller activated by default. Enabling the controller is a matter of
-writing in a system controller register that may also be used for other
-NAND related choices.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This change is needed to stay bootloader independent.
+The NAND controller used in A7K/A8K is present on the CP110 master part.
+It is compatible with the pxa3xx_nand driver but requires the use of the
+marvell,armada-8k-nand compatible string due to the need to first enable
+the NAND controller.
 
+Add properties to the NAND node to fit the bindings constraints of the
+pxa3xx_nand driver and enable the NAND controller.
+
+Add the 'marvell,system-controller' property to the cp110 master NAND
+node with a reference to the syscon node. This is new compared to other
+boards using the pxa3xx_nand driver and it is needed to be bootloader
+independent and enable the NAND controller from the NAND controller
+driver itself by writing in these syscon registers.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+[miquel.raynal at free-electrons.com: add NAND ready/busy MPP subnode,
+change compatible string to fit the needs of the A7k/A8k SoCs and add
+the system controller property]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 41 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 37 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 24 ++++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 14 +++++++++++++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  3 ++-
+ 3 files changed, 40 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 85cff68643e0..90b9a9ccbe60 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -30,6 +30,8 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/platform_data/mtd-nand-pxa3xx.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- 
- #define	CHIP_DELAY_TIMEOUT	msecs_to_jiffies(200)
- #define NAND_STOP_DELAY		msecs_to_jiffies(40)
-@@ -45,6 +47,10 @@
-  */
- #define INIT_BUFFER_SIZE	2048
- 
-+/* System control register and bit to enable NAND on some SoCs */
-+#define GENCONF_SOC_DEVICE_MUX	0x208
-+#define GENCONF_SOC_DEVICE_MUX_NFC_EN BIT(0)
-+
- /* registers and bit definitions */
- #define NDCR		(0x00) /* Control register */
- #define NDTR0CS0	(0x04) /* Timing Parameter 0 for CS0 */
-@@ -174,6 +180,7 @@ enum {
- enum pxa3xx_nand_variant {
- 	PXA3XX_NAND_VARIANT_PXA,
- 	PXA3XX_NAND_VARIANT_ARMADA370,
-+	PXA3XX_NAND_VARIANT_ARMADA_8K,
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 9c3bdf87e543..b98cf265bae5 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -144,6 +144,30 @@
+ 	};
  };
  
- struct pxa3xx_nand_host {
-@@ -425,6 +432,10 @@ static const struct of_device_id pxa3xx_nand_dt_ids[] = {
- 		.compatible = "marvell,armada370-nand",
- 		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA370,
- 	},
-+	{
-+		.compatible = "marvell,armada-8k-nand",
-+		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA_8K,
-+	},
- 	{}
++&cpm_nand {
++	status = "okay";
++	num-cs = <1>;
++	pinctrl-0 = <&nand_pins>, <&nand_rb>;
++	pinctrl-names = "default";
++	nand-ecc-strength = <4>;
++	nand-ecc-step-size = <512>;
++	marvell,nand-enable-arbiter;
++	nand-on-flash-bbt;
++
++	partition at 0 {
++		label = "U-Boot";
++		reg = <0 0x200000>;
++	};
++	partition at 200000 {
++		label = "Linux";
++		reg = <0x200000 0xe00000>;
++	};
++	partition at 1000000 {
++		label = "Filesystem";
++		reg = <0x1000000 0x3f000000>;
++	};
++};
++
+ &cpm_spi1 {
+ 	status = "okay";
+ 
+diff --git a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+index 860b6ae9dcc5..0e1a1e5be399 100644
+--- a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+@@ -64,5 +64,19 @@
+ &cpm_syscon0 {
+ 	cpm_pinctrl: pinctrl {
+ 		compatible = "marvell,armada-7k-pinctrl";
++
++		nand_pins: nand-pins {
++			marvell,pins =
++			"mpp15", "mpp16", "mpp17", "mpp18",
++			"mpp19", "mpp20", "mpp21", "mpp22",
++			"mpp23", "mpp24", "mpp25", "mpp26",
++			"mpp27";
++			marvell,function = "dev";
++		};
++
++		nand_rb: nand-rb {
++			marvell,pins = "mpp13";
++			marvell,function = "nf";
++		};
+ 	};
  };
- MODULE_DEVICE_TABLE(of, pxa3xx_nand_dt_ids);
-@@ -825,7 +836,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- 		info->retcode = ERR_UNCORERR;
- 	if (status & NDSR_CORERR) {
- 		info->retcode = ERR_CORERR;
--		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370 &&
-+		if ((info->variant == PXA3XX_NAND_VARIANT_ARMADA370 ||
-+		     info->variant == PXA3XX_NAND_VARIANT_ARMADA_8K) &&
- 		    info->ecc_bch)
- 			info->ecc_err_cnt = NDSR_ERR_CNT(status);
- 		else
-@@ -888,7 +900,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- 		nand_writel(info, NDCB0, info->ndcb2);
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 8263a8a504a8..d41b41b613ec 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -274,12 +274,13 @@
+ 				 * this controller is only usable on the CPM
+ 				 * for A7K and on the CPS for A8K.
+ 				 */
+-				compatible = "marvell,armada370-nand";
++				compatible = "marvell,armada-8k-nand";
+ 				reg = <0x720000 0x54>;
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&cpm_clk 1 2>;
++				marvell,system-controller = <&cpm_syscon0>;
+ 				status = "disabled";
+ 			};
  
- 		/* NDCB3 register is available in NFCv2 (Armada 370/XP SoC) */
--		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
-+		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370 ||
-+		    info->variant == PXA3XX_NAND_VARIANT_ARMADA_8K)
- 			nand_writel(info, NDCB0, info->ndcb3);
- 	}
- 
-@@ -1671,7 +1684,8 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 		chip->options |= NAND_BUSWIDTH_16;
- 
- 	/* Device detection must be done with ECC disabled */
--	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
-+	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370 ||
-+	    info->variant == PXA3XX_NAND_VARIANT_ARMADA_8K)
- 		nand_writel(info, NDECCCTRL, 0x0);
- 
- 	if (pdata->flash_bbt)
-@@ -1709,7 +1723,8 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	 * (aka splitted) command handling,
- 	 */
- 	if (mtd->writesize > PAGE_CHUNK_SIZE) {
--		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370) {
-+		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370 ||
-+		    info->variant == PXA3XX_NAND_VARIANT_ARMADA_8K) {
- 			chip->cmdfunc = nand_cmdfunc_extended;
- 		} else {
- 			dev_err(&info->pdev->dev,
-@@ -1928,6 +1943,24 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
- 	if (!of_id)
- 		return 0;
- 
-+	/*
-+	 * Some SoCs like A7k/A8k need to enable manually the NAND
-+	 * controller to avoid being bootloader dependent. This is done
-+	 * through the use of a single bit in the System Functions registers.
-+	 */
-+	if (pxa3xx_nand_get_variant(pdev) == PXA3XX_NAND_VARIANT_ARMADA_8K) {
-+		struct regmap *sysctrl_base = syscon_regmap_lookup_by_phandle(
-+			pdev->dev.of_node, "marvell,system-controller");
-+		u32 reg;
-+
-+		if (IS_ERR(sysctrl_base))
-+			return PTR_ERR(sysctrl_base);
-+
-+		regmap_read(sysctrl_base, GENCONF_SOC_DEVICE_MUX, &reg);
-+		reg |= GENCONF_SOC_DEVICE_MUX_NFC_EN;
-+		regmap_write(sysctrl_base, GENCONF_SOC_DEVICE_MUX, reg);
-+	}
-+
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata)
- 		return -ENOMEM;
 -- 
 2.11.0
