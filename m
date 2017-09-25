@@ -1,44 +1,37 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Tue, 26 Sep 2017 00:22:10 +0530
-Subject: [PATCH v5 1/5] ARM: dts: imx6qdl-icore: Add Sound card support
-In-Reply-To: <1505734113-9708-1-git-send-email-jteki@openedev.com>
-References: <1505734113-9708-1-git-send-email-jteki@openedev.com>
-Message-ID: <CAD6G_RTfuegBSN9w-pOYbUq=N9z0u6e24iOMLUUpbycWxH+BeQ@mail.gmail.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Mon, 25 Sep 2017 15:55:57 -0300
+Subject: [PATCH 2/4] ARM: imx: 3ds-debugboard: Include "3ds_debugboard.h"
+ header file
+In-Reply-To: <1506365759-28768-1-git-send-email-marco.franchi@nxp.com>
+References: <1506365759-28768-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <1506365759-28768-2-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The following build warning is seen with W=1:
 
-On Mon, Sep 18, 2017 at 4:58 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
->
-> Linux Sound card now uses generic simple-audio-card, so add
-> the same along with related audmux and codec(via u2c3) for
-> i.CoreM6 QDL module boards.
->
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v5:
-> - Add adumux
-> - Update simple-audio-card,widgets
-> - Add ssi1 fsl,mode
-> - Add #sound-dai-cells in codec
-> Changes for v4:
-> - Moved sgtl5000 node into dtsi instead of multiple copies of
->   same in dts files
-> Changes for v3:
-> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
-> Changes for v2:
-> - Use proper [label:] node-name[@unit-address] for codec
+warning: no previous prototype for ?mxc_expio_init? 
+[-Wmissing-prototypes] int __init mxc_expio_init(u32 base, u32 intr_gpio)
 
-Series has tested, request for comments?
+Fix this warning by including "3ds_debugboard.h".
 
-thanks!
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+ arch/arm/mach-imx/3ds_debugboard.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/3ds_debugboard.c b/arch/arm/mach-imx/3ds_debugboard.c
+index cda330c..0015abe 100644
+--- a/arch/arm/mach-imx/3ds_debugboard.c
++++ b/arch/arm/mach-imx/3ds_debugboard.c
+@@ -20,7 +20,7 @@
+ #include <linux/smsc911x.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
+-
++#include "3ds_debugboard.h"
+ #include "hardware.h"
+ 
+ /* LAN9217 ethernet base address */
 -- 
-Jagan Teki
-Free Software Engineer | www.openedev.com
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+2.7.4
