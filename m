@@ -1,171 +1,76 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Mon, 25 Sep 2017 02:02:37 +0200
-Subject: [PATCH v3 03/10] dmaengine: sun6i: Restructure code to allow
- extension for new SoCs
-In-Reply-To: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
-References: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <98e511f9-8f66-42eb-962f-b33520d0be89@rwthex-w2-a.rwth-ad.de>
+Date: Mon, 25 Sep 2017 02:02:34 +0200
+Subject: [PATCH v3 00/10] Commit 3a03ea763a67 ("dmaengine: sun6i: Add support
+ for Allwinner A83T
+Message-ID: <439d95d6-1ce0-45e9-a4e4-42bc1f97838b@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code mixes three distinct operations when transforming
-the slave config to register settings:
+(sun8i) variant") and commit f008db8c00c1 ("dmaengine: sun6i: Add support for
+Allwinner H3 (sun8i) variant") added support for the A83T resp. H3, but missed
+some differences between the original A31 and A83T/H3.
 
-  1. special handling of DMA_SLAVE_BUSWIDTH_UNDEFINED, maxburst == 0
-  2. range checking
-  3. conversion of raw to register values
+The first patch adds a callback to the controller config to set the clock
+autogating register of different SoC generations, i.e. A31, A23+A83T, H3+later,
+and uses it to for the correct clock autogating setting.
 
-As the range checks depend on the specific SoC, move these out of the
-conversion to distinct operations.
+The second patch adds a callback for the burst length setting in the channel
+config register, which has different field offsets and new burst widths/lengths,
+which differs between H3 and earlier generations
 
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The third patch restructures some code required for the fourth patch and adds the
+burst lengths to the controller config.
 
----
+The fourth patch adds the burst widths to the config and adds the handling of the
+H3 specific burst widths.
 
-Changes in v3: None
+Patch 5 restructures the code to decouple some controller details (e.g. channel
+count) from the compatible string/the config.
+
+Patches 6, 7 and 8 introduce and use the "dma-chans" property for the A64. Although
+register compatible to the H3, the channel count differs and thus it requires a
+new compatible. To avoid introduction of new compatibles for each minor variation,
+anything but the register model is moved to devicetree properties. There
+is at least one SoC (R40) which can then reuse the A64 compatible, the same
+would have worked for A83T+V3s.
+
+Patches 9 and 10 add the DMA controller node to the devicetree and add the DMA
+controller reference to the SPI nodes.
+
+This patch series could be called v2, but the patches were split and significantly
+restructured, thus listing changes individually is not to meaningful.
+
+Changes in v3:
+- Check for callback instead of using a no-op callback
+- Drop leading 0 from unit name in DT example
+- Omit default values from sun50i_a64_dma_cfg definition
+- Drop leading 0 from dma controller unit name
+
 Changes in v2:
+- Use callback for autogating instead of variable for different SoC generations
+- Use controller specific callback for burst length setting
 - Store burst lengths in config instead of device structure
+- Store burst widths in config
+- Set default number of dma-request if not provided in config or devicetree
 
- drivers/dma/sun6i-dma.c | 66 ++++++++++++++++++++++++++++---------------------
- 1 file changed, 38 insertions(+), 28 deletions(-)
+Stefan Br?ns (10):
+  dmaengine: sun6i: Correct setting of clock autogating register for
+    A83T/H3
+  dmaengine: sun6i: Correct burst length field offsets for H3
+  dmaengine: sun6i: Restructure code to allow extension for new SoCs
+  dmaengine: sun6i: Enable additional burst lengths/widths on H3
+  dmaengine: sun6i: Move number of pchans/vchans/request to device
+    struct
+  arm64: allwinner: a64: Add devicetree binding for DMA controller
+  dmaengine: sun6i: Retrieve channel count/max request from devicetree
+  dmaengine: sun6i: Add support for Allwinner A64 and compatibles
+  arm64: allwinner: a64: Add device node for DMA controller
+  arm64: allwinner: a64: add dma controller references to spi nodes
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 269d4ea194e8..5d0c009bad02 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -118,6 +118,8 @@ struct sun6i_dma_config {
- 	 */
- 	void (*clock_autogate_enable)();
- 	void (*set_burst_length)(u32 *p_cfg, s8 src_burst, s8 dst_burst);
-+	u32 src_burst_lengths;
-+	u32 dst_burst_lengths;
- };
- 
- /*
-@@ -266,10 +268,6 @@ static inline s8 convert_burst(u32 maxburst)
- 
- static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
- {
--	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
--	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
--		return -EINVAL;
--
- 	return addr_width >> 1;
- }
- 
-@@ -538,41 +536,43 @@ static int set_config(struct sun6i_dma_dev *sdev,
- 			enum dma_transfer_direction direction,
- 			u32 *p_cfg)
- {
-+	enum dma_slave_buswidth src_addr_width, dst_addr_width;
-+	u32 src_maxburst, dst_maxburst;
- 	s8 src_width, dst_width, src_burst, dst_burst;
- 
-+	src_addr_width = sconfig->src_addr_width;
-+	dst_addr_width = sconfig->dst_addr_width;
-+	src_maxburst = sconfig->src_maxburst;
-+	dst_maxburst = sconfig->dst_maxburst;
-+
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
--		src_burst = convert_burst(sconfig->src_maxburst ?
--					sconfig->src_maxburst : 8);
--		src_width = convert_buswidth(sconfig->src_addr_width !=
--						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
--				sconfig->src_addr_width :
--				DMA_SLAVE_BUSWIDTH_4_BYTES);
--		dst_burst = convert_burst(sconfig->dst_maxburst);
--		dst_width = convert_buswidth(sconfig->dst_addr_width);
-+		if (src_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
-+			src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		src_maxburst = src_maxburst ? src_maxburst : 8;
- 		break;
- 	case DMA_DEV_TO_MEM:
--		src_burst = convert_burst(sconfig->src_maxburst);
--		src_width = convert_buswidth(sconfig->src_addr_width);
--		dst_burst = convert_burst(sconfig->dst_maxburst ?
--					sconfig->dst_maxburst : 8);
--		dst_width = convert_buswidth(sconfig->dst_addr_width !=
--						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
--				sconfig->dst_addr_width :
--				DMA_SLAVE_BUSWIDTH_4_BYTES);
-+		if (dst_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
-+			dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		dst_maxburst = dst_maxburst ? dst_maxburst : 8;
- 		break;
- 	default:
- 		return -EINVAL;
- 	}
- 
--	if (src_burst < 0)
--		return src_burst;
--	if (src_width < 0)
--		return src_width;
--	if (dst_burst < 0)
--		return dst_burst;
--	if (dst_width < 0)
--		return dst_width;
-+	if (!(BIT(src_addr_width) & sdev->slave.src_addr_widths))
-+		return -EINVAL;
-+	if (!(BIT(dst_addr_width) & sdev->slave.dst_addr_widths))
-+		return -EINVAL;
-+	if (!(BIT(src_maxburst) & sdev->cfg->src_burst_lengths))
-+		return -EINVAL;
-+	if (!(BIT(dst_maxburst) & sdev->cfg->dst_burst_lengths))
-+		return -EINVAL;
-+
-+	src_width = convert_buswidth(src_addr_width);
-+	dst_width = convert_buswidth(dst_addr_width);
-+	dst_burst = convert_burst(dst_maxburst);
-+	src_burst = convert_burst(src_maxburst);
- 
- 	*p_cfg = DMA_CHAN_CFG_SRC_WIDTH(src_width) |
- 		DMA_CHAN_CFG_DST_WIDTH(dst_width);
-@@ -1038,6 +1038,8 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
- 	.nr_max_requests = 30,
- 	.nr_max_vchans   = 53,
- 	.set_burst_length = sun6i_set_burst_length_a31;
-+	.src_burst_lengths = BIT(1) | BIT(8);
-+	.dst_burst_lengths = BIT(1) | BIT(8);
- };
- 
- /*
-@@ -1051,6 +1053,8 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
- 	.nr_max_vchans   = 37,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
- 	.set_burst_length = sun6i_set_burst_length_a31;
-+	.src_burst_lengths = BIT(1) | BIT(8);
-+	.dst_burst_lengths = BIT(1) | BIT(8);
- };
- 
- static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
-@@ -1059,6 +1063,8 @@ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
- 	.nr_max_vchans   = 39,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
- 	.set_burst_length = sun6i_set_burst_length_a31;
-+	.src_burst_lengths = BIT(1) | BIT(8);
-+	.dst_burst_lengths = BIT(1) | BIT(8);
- };
- 
- /*
-@@ -1072,6 +1078,8 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_h3;
- 	.set_burst_length = sun6i_set_burst_length_h3;
-+	.src_burst_lengths = BIT(1) | BIT(8);
-+	.dst_burst_lengths = BIT(1) | BIT(8);
- };
- 
- /*
-@@ -1085,6 +1093,8 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
- 	.nr_max_vchans   = 24,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
- 	.set_burst_length = sun6i_set_burst_length_a31;
-+	.src_burst_lengths = BIT(1) | BIT(8);
-+	.dst_burst_lengths = BIT(1) | BIT(8);
- };
- 
- static const struct of_device_id sun6i_dma_match[] = {
+ .../devicetree/bindings/dma/sun6i-dma.txt          |  28 ++-
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  15 ++
+ drivers/dma/sun6i-dma.c                            | 258 ++++++++++++++++-----
+ 3 files changed, 242 insertions(+), 59 deletions(-)
+
 -- 
 2.14.1
