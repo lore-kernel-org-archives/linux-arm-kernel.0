@@ -1,116 +1,72 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Mon, 25 Sep 2017 16:53:52 +0200
-Subject: [PATCH 3/3] arm64: dts: marvell: add NAND support on the 7040-DB board
-In-Reply-To: <20170925145352.13145-1-miquel.raynal@free-electrons.com>
-References: <20170925145352.13145-1-miquel.raynal@free-electrons.com>
-Message-ID: <20170925145352.13145-4-miquel.raynal@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Sep 2017 07:54:37 -0700
+Subject: n900 in next-20170901
+In-Reply-To: <20170925080806.GA9837@js1304-P5Q-DELUXE>
+References: <20170905201314.GE5024@atomide.com>
+ <20170905233241.GA19231@js1304-P5Q-DELUXE>
+ <20170906133057.GH5024@atomide.com>
+ <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+ <20170913075516.GA25036@js1304-P5Q-DELUXE>
+ <20170913163126.GS5024@atomide.com>
+ <20170915065608.GA8567@js1304-P5Q-DELUXE>
+ <20170921172811.GB4394@atomide.com>
+ <20170925080806.GA9837@js1304-P5Q-DELUXE>
+Message-ID: <20170925145437.GG4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+* Joonsoo Kim <iamjoonsoo.kim@lge.com> [170925 01:06]:
+> On Thu, Sep 21, 2017 at 10:28:11AM -0700, Tony Lindgren wrote:
+> > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170914 23:55]:
+> > > On Wed, Sep 13, 2017 at 09:31:27AM -0700, Tony Lindgren wrote:
+> > > > Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
+> > > > you need to remove it from arch/arm/mach-omap2/Kconfig that
+> > > > selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
+> > > 
+> > > Okay. Problem would be related to address traslation. I'd like to
+> > > check address traslation more. Could you apply following patch and
+> > > test it? And, please send me the dmesg log and your kernel config.
+> > > Please test this with CONFIG_DEBUG_VIRTUAL = n and CONFIG_CMA_DEBUG=y and
+> > > CONFIG_HIGHMEM=y and with kernel bootparam 'ignore_loglevel'.
+> > > 
+> > > It would be really appreciate if you send me two logs for before/after
+> > > commit 9caf25f996e8.
+> > 
+> > Sorry for the delays, I finally got around testing this for you.
+> 
+> No problem! I really appreciate your help!
+> 
+> > Compile with your patch failed for modules with __virt_to_phys_debug
+> > being undefined so I added EXPORT_SYMBOL there. I also enabled DEBUG_LL
+> > and EARLYPRINTK to get output.
+> > 
+> > Below is dmesg output for 9caf25f996e8 + your patch. I'll send you
+> > the full logs separately.
+> 
+> Hmm...there is only one caller for the CMA memory, that is, atomic_pool_init().
+> Could you test one more time with 9caf25f996e8 + following patch?  I'd like to
+> know the actual user for the CMA memory.
 
-The NAND controller used in A7K/A8K is present on the CP110 master part.
-It is compatible with the pxa3xx_nand driver but requires the use of the
-marvell,armada-8k-nand compatible string due to the need to first enable
-the NAND controller.
+Hmm not getting any stack with that patch after manually applying
+it because of tabs to spaces mangling.
 
-Add properties to the NAND node to fit the bindings constraints of the
-pxa3xx_nand driver and enable the NAND controller.
+Regards,
 
-Add the 'marvell,system-controller' property to the cp110 master NAND
-node with a reference to the syscon node. This is new compared to other
-boards using the pxa3xx_nand driver and it is needed to be bootloader
-independent and enable the NAND controller from the NAND controller
-driver itself by writing in these syscon registers.
+Tony
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-[miquel.raynal at free-electrons.com: add NAND ready/busy MPP subnode,
-change compatible string to fit the needs of the A7k/A8k SoCs and add
-the system controller property]
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 24 ++++++++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 14 +++++++++++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      |  3 ++-
- 3 files changed, 40 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 9c3bdf87e543..b98cf265bae5 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -144,6 +144,30 @@
- 	};
- };
- 
-+&cpm_nand {
-+	status = "okay";
-+	num-cs = <1>;
-+	pinctrl-0 = <&nand_pins>, <&nand_rb>;
-+	pinctrl-names = "default";
-+	nand-ecc-strength = <4>;
-+	nand-ecc-step-size = <512>;
-+	marvell,nand-enable-arbiter;
-+	nand-on-flash-bbt;
-+
-+	partition at 0 {
-+		label = "U-Boot";
-+		reg = <0 0x200000>;
-+	};
-+	partition at 200000 {
-+		label = "Linux";
-+		reg = <0x200000 0xe00000>;
-+	};
-+	partition at 1000000 {
-+		label = "Filesystem";
-+		reg = <0x1000000 0x3f000000>;
-+	};
-+};
-+
- &cpm_spi1 {
- 	status = "okay";
- 
-diff --git a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
-index 860b6ae9dcc5..0e1a1e5be399 100644
---- a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
-@@ -64,5 +64,19 @@
- &cpm_syscon0 {
- 	cpm_pinctrl: pinctrl {
- 		compatible = "marvell,armada-7k-pinctrl";
-+
-+		nand_pins: nand-pins {
-+			marvell,pins =
-+			"mpp15", "mpp16", "mpp17", "mpp18",
-+			"mpp19", "mpp20", "mpp21", "mpp22",
-+			"mpp23", "mpp24", "mpp25", "mpp26",
-+			"mpp27";
-+			marvell,function = "dev";
-+		};
-+
-+		nand_rb: nand-rb {
-+			marvell,pins = "mpp13";
-+			marvell,function = "nf";
-+		};
- 	};
- };
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 8263a8a504a8..d41b41b613ec 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -274,12 +274,13 @@
- 				 * this controller is only usable on the CPM
- 				 * for A7K and on the CPS for A8K.
- 				 */
--				compatible = "marvell,armada370-nand";
-+				compatible = "marvell,armada-8k-nand";
- 				reg = <0x720000 0x54>;
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&cpm_clk 1 2>;
-+				marvell,system-controller = <&cpm_syscon0>;
- 				status = "disabled";
- 			};
- 
--- 
-2.11.0
+> -------------------------->8------------------------
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 519c294..c68f34a 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -587,6 +587,8 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
+>                 ptr = (void *)val;
+>         }
+>  
+> +       dump_stack();
+> +
+>         return ptr;
+>  }
+>  
