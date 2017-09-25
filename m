@@ -1,112 +1,54 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 25 Sep 2017 11:16:04 +0100
-Subject: [PATCH] iio: stm32: fix adc/trigger link error
-In-Reply-To: <6b5ff28a-859d-973c-2da5-60a8bf50c378@st.com>
-References: <20170906125722.2522781-1-arnd@arndb.de>
- <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
- <20170910170040.7eb1f768@archlinux>
- <6b5ff28a-859d-973c-2da5-60a8bf50c378@st.com>
-Message-ID: <20170925111604.00000c02@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Sep 2017 12:27:44 +0200
+Subject: [PATCH 0/3] Simple DVFS support for Allwinner A64 SoC
+In-Reply-To: <27EF78BD-6285-4D8D-AA65-8294D797E2FB@aosc.io>
+References: <20170923001531.14285-1-icenowy@aosc.io>
+ <20170925101027.lghnnll4h6inreqm@flea.home>
+ <27EF78BD-6285-4D8D-AA65-8294D797E2FB@aosc.io>
+Message-ID: <20170925102744.qixfwlheeimemhcf@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Sep 2017 11:54:06 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-
-> On 09/10/2017 06:00 PM, Jonathan Cameron wrote:
-> > On Wed, 6 Sep 2017 18:16:33 +0200
-> > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> >   
-> >> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:  
-> >>> The ADC driver can trigger on either the timer or the lptim
-> >>> trigger, but it only uses a Kconfig 'select' statement
-> >>> to ensure that the first of the two is present. When the lptim
-> >>> trigger is enabled as a loadable module, and the adc driver
-> >>> is built-in, we now get a link error:
-> >>>
-> >>> drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
-> >>> stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
-> >>>
-> >>> We could use a second 'select' statement and always have both
-> >>> trigger drivers enabled when the adc driver is, but it seems that
-> >>> the lptimer trigger was intentionally left optional, so it seems
-> >>> better to keep it that way.    
-> >> Hi Arnd,
-> >>
-> >> This is correct, not all stm32 have this hardware.  
-> >>>
-> >>> This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
-> >>> which avoids the link error, but instead leads to the lptimer trigger
-> >>> not being used in the broken configuration. I've added a runtime
-> >>> warning for this case to help users figure out what they did wrong
-> >>> if this should ever be done by accident.
-> >>>
-> >>> Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
-> >>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>    
-> >> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
-> > 
-> > This may take me a few weeks to pick up.  I don't want to
-> > pull the mfd immutable branch in just to have this fix, so this will
-> > get sorted after rc1 is out.
-> > 
-> > As ever, poke me if it looks like I've forgotten about it.  
+On Mon, Sep 25, 2017 at 10:12:09AM +0000, Icenowy Zheng wrote:
+> ? 2017?9?25? GMT+08:00 ??6:10:27, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >Hi,
+> >
+> >On Sat, Sep 23, 2017 at 12:15:28AM +0000, Icenowy Zheng wrote:
+> >> This patchset imports simple DVFS support for Allwinner A64 SoC.
+> >> 
+> >> As the thermal sensor driver is not yet implemented and some boards
+> >> have still no AXP PMIC support, now only two OPPs are present --
+> >> 648MHz at 1.04V and 816MHz at 1.1V to prevent overheat or undervoltage.
+> >> 
+> >> PATCH 1 is a fix to the CCU driver of A64, and the remaining patches
+> >> set up the device tree bits of the DVFS on Pine64.
+> >
+> >How has this been tested?
+> >
+> >What tasks did you run, with what governor, etc...
 > 
-> Hi Jonathan,
-> 
-> Di you apply this one?
+> I only tested manual frequency switching between 648MHz and
+> 816MHz, and tested the PLL stuck issue by change the OPPs to
+> some random value.
 
-I think I still need to rebase my branch. Greg took my fixes pull this morning
-so I can fast forward that branch next time I'm on the right PC and then pick
-this up.
+Ideally, we should test that it's actually reliable. Poorly chosen
+OPPs might lead to corrupt data that you might not get before a while.
 
-Thanks for the reminder.
+Please test using:
+https://linux-sunxi.org/Hardware_Reliability_Tests#Reliability_of_cpufreq_voltage.2Ffrequency_settings
 
-Jonathan
+And post the report.
 
-> 
-> Thanks,
-> Best Regards,
-> Fabrice
-> > Sorry for the delay!
-> > 
-> > Jonathan
-> >   
-> >>
-> >> Many thanks for the fix,
-> >> Best Regards,
-> >> Fabrice  
-> >>> ---
-> >>>  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
-> >>>  1 file changed, 4 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
-> >>> index 34d59bfdce2d..464458d20b16 100644
-> >>> --- a/include/linux/iio/timer/stm32-lptim-trigger.h
-> >>> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
-> >>> @@ -16,11 +16,14 @@
-> >>>  #define LPTIM2_OUT	"lptim2_out"
-> >>>  #define LPTIM3_OUT	"lptim3_out"
-> >>>  
-> >>> -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >>> +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >>>  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
-> >>>  #else
-> >>>  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
-> >>>  {
-> >>> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >>> +	pr_warn_once("stm32 lptim_trigger not linked in\n");
-> >>> +#endif
-> >>>  	return false;
-> >>>  }
-> >>>  #endif
-> >>>     
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html  
-> >   
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170925/978f2d38/attachment.sig>
