@@ -1,86 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Sep 2017 12:01:12 -0700
-Subject: [GIT PULL 2/2] Broadcom drivers changes for 4.15 (part 1)
-In-Reply-To: <20170925190112.3915-1-f.fainelli@gmail.com>
-References: <20170925190112.3915-1-f.fainelli@gmail.com>
-Message-ID: <20170925190112.3915-2-f.fainelli@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 25 Sep 2017 22:04:26 +0300
+Subject: ARM64: kernel panics in DABT in sys_msync path
+In-Reply-To: <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
+References: <20170924213622.75e7r3k56tgxlezh@yury-thinkpad>
+ <20170925105335.GA24042@arm.com>
+ <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
+Message-ID: <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+On Mon, Sep 25, 2017 at 05:02:40PM +0300, Yury Norov wrote:
+>  Hi Will,
+>  
+> > > The bug is reproducible for ilp32 and lp64 binaries. For kernel 4.12
+> > > and for all kernels if '-smp 1' is passed to qemu, everything works
+> > > fine. If no ideas, I think I'm able bisect it.
+> > 
+> > I tried to reproduce this on hardware, but failed to do so. Our nightly
+> > tests are also coming back fine for rwtest03. I just built Qemu v2.10.0
+> > and that also passes the test with -smp 4 for me, so I'm a bit stuck.
+> 
+> I also see the test passed sometimes. I run it in endless cycle and
+> leave for a while. 5-10 iterations are usually enough.
+> 
+> > Could you share:
+> > 
+> >   * Your kernel .config
+> >   * Your QEMU command line
+> >   * Details of your userspace
+> 
+> Qemu configure command:
+> ./configure --target-list=aarch64-softmmu --enable-fdt --enable-vhost-net --enable-kvm
+> 
+> And run command:
+> /home/yury/work/qemu-2.10.0/aarch64-softmmu/qemu-system-aarch64 \
+> 	-machine virtualization=true -machine gic-version=3 \
+> 	-machine virt -cpu cortex-a57 -nographic -smp 4  -m 1024 \
+> 	-global virtio-blk-device.scsi=off -device virtio-scsi-device,id=scsi \
+> 	-drive file=img/ubuntu-core-14.04.1-core-arm64.img,id=coreimg,cache=unsafe,if=none -device scsi-hd,drive=coreimg \
+> 	-kernel /home/yury/work/linux/arch/arm64/boot/Image \
+> 	--append "console=ttyAMA0 root=/dev/sda" \
+> 	-initrd initrd.img-3.13.0-62-generic \
+> 	$NETWORK \
+> 	-redir tcp:2222::22 \
+> 	-s \
+> 	$@
+> 
+> My userspace is Ubuntu 14. I build lp64 tests with default Ubuntu
+> toolchain, and ilp32 tests with Linaro cross-toolchain. 
+> 
+> The config is attached, and the branch is vanilla 4.13 kernel, or this
+> one:
+> https://github.com/norov/linux/tree/ilp32-4.13
+> 
+> Later today I will share the whole qemu environment I use.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+https://drive.google.com/file/d/0B07VUB3kjLD8Mm5XN21qTTBfbnc/view
 
-are available in the git repository at:
-
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.15/drivers
-
-for you to fetch changes up to 0e9b11413262ef3d64273e15f7631d9836c53c1a:
-
-  soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-09-25 11:47:14 -0700)
-
-----------------------------------------------------------------
-This pull requests contains Broadcom SoCs drivers updates for 4.15, please pull
-the following:
-
-- Markus adds support for the Broadcom STB DDR PHY frontend which supports
-  dynamic firmware loading and offers the ability to respond with DRAM refresh
-  rates. He also adds a proper documentation binding document for that
-  peripheral
-
-- Brian adds support for S2/S3/S5 system suspend/resume modes on ARM-based SoCs
-  which is not new but had been lingering for a long time.
-
-- Justin adds S2/S3 system suspend/resume modes on MIPS-based SoCs which is a
-  bit new newer and builds on top of the ARM-based support.
-
-- Florian adds Device Tree binding documents for both ARM and MIPS based systems
-  describing the necessary nodes for S2/S3/S5 on these SoCs.
-
-(This pull request somehow missed the 4.14 merge window and is now being sent again
-for 4.15 along with build fixes from Arnd).
-
-----------------------------------------------------------------
-Brian Norris (1):
-      soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
-
-Florian Fainelli (2):
-      dt-bindings: ARM: brcmstb: Update Broadcom STB Power Management binding
-      dt-bindings: Document MIPS Broadcom STB power management nodes
-
-Justin Chen (1):
-      soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
-
-Markus Mayer (2):
-      dt-bindings: Add bindings for Broadcom STB DRAM Sensors
-      memory: brcmstb: Add driver for DPFE
-
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
- .../bindings/memory-controllers/brcm,dpfe-cpu.txt  |  27 +
- .../devicetree/bindings/mips/brcm/soc.txt          | 153 ++++
- MAINTAINERS                                        |   8 +
- drivers/memory/Makefile                            |   1 +
- drivers/memory/brcmstb_dpfe.c                      | 701 ++++++++++++++++++
- drivers/soc/bcm/Kconfig                            |   2 +
- drivers/soc/bcm/brcmstb/Kconfig                    |  10 +
- drivers/soc/bcm/brcmstb/Makefile                   |   1 +
- drivers/soc/bcm/brcmstb/pm/Makefile                |   3 +
- drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
- drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 822 +++++++++++++++++++++
- drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
- drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
- drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
- drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
- drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
- 17 files changed, 2818 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/brcm,dpfe-cpu.txt
- create mode 100644 drivers/memory/brcmstb_dpfe.c
- create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
- create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
- create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
+> Yury
