@@ -1,34 +1,39 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Sep 2017 10:05:40 +0100
-Subject: [PATCH v3 4/8] ARM: NOMMU: Disallow MPU for XIP
+Date: Mon, 25 Sep 2017 10:05:41 +0100
+Subject: [PATCH v3 5/8] ARM: Kconfig: Kill CONFIG_VECTORS_BASE
 In-Reply-To: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
 References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1506330344-31556-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1506330344-31556-6-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that MPU never worked with XIP, so we just disallow such
-combination.
+The last user of CONFIG_VECTORS_BASE has gone, so kill it.
 
-Tested-by: Szemz? Andr?s <sza@esh.hu>
-Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Reported-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig-nommu | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Kconfig | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
-index b757634..6d18395 100644
---- a/arch/arm/Kconfig-nommu
-+++ b/arch/arm/Kconfig-nommu
-@@ -52,7 +52,7 @@ config REMAP_VECTORS_TO_RAM
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7888c98..550b5ab 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -239,15 +239,6 @@ config NEED_RET_TO_USER
+ config ARCH_MTD_XIP
+ 	bool
  
- config ARM_MPU
-        bool 'Use the ARM v7 PMSA Compliant MPU'
--       depends on CPU_V7
-+       depends on !XIP_KERNEL && CPU_V7
-        default y
-        help
-          Some ARM systems without an MMU have instead a Memory Protection
+-config VECTORS_BASE
+-	hex
+-	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+-	default DRAM_BASE if REMAP_VECTORS_TO_RAM
+-	default 0x00000000
+-	help
+-	  The base address of exception vectors.  This must be two pages
+-	  in size.
+-
+ config ARM_PATCH_PHYS_VIRT
+ 	bool "Patch physical to virtual translations at runtime" if EMBEDDED
+ 	default y
 -- 
 1.9.1
