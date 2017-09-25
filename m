@@ -1,46 +1,32 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 25 Sep 2017 15:29:21 +0100
-Subject: Tegra baseline test results for v4.14-rc2
-Message-ID: <dbdcc12f-b1fa-4160-1b96-32270a528eed@nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Sep 2017 07:37:34 -0700
+Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
+ target module binding
+In-Reply-To: <20170925070345.2uraikhswru77rm4@squirrel.local>
+References: <20170920224621.16236-1-tony@atomide.com>
+ <20170920224621.16236-2-tony@atomide.com>
+ <20170925070345.2uraikhswru77rm4@squirrel.local>
+Message-ID: <20170925143733.GF4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra baseline test results for v4.14-rc2
+* Matthijs van Duin <matthijsvanduin@gmail.com> [170925 00:04]:
+> On Wed, Sep 20, 2017 at 03:46:12PM -0700, Tony Lindgren wrote:
+> > TI sysc interconnect target module hardware is independent of the
+> > interconnect. It is used at least with TI L3 interconnect (Arteris NoC)
+> > and TI L4 interconnect (Sonics s3220).
+> 
+> This is because the interface between interconnect and module is
+> standardized (Open Core Protocol), so it doesn't really matter which
+> interconnect technology is used.
+> 
+> Also, afaik sysc mostly just concerns the interaction between module and
+> PRCM.  The only role the interconnect plays here is that it participates
+> in the OCP Disconnect Protocol to allow the module to safely disconnect
+> itself when it or the interconnect enters idle state.
 
+OK thanks for clarifying it, I'll add a note regarding OCP there.
 
-Here are some basic Tegra test results for Linux v4.14-rc2.
-Logs and other details at:
+Regards,
 
-    https://nvtb.github.io//linux/test_v4.14-rc2/20170924170104/
-
-
-Test summary
-------------
-
-Build: zImage:
-    FAIL: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-
-vmlinux object size
-(delta in bytes from test_v4.14-rc1 (2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e)):
-   text     data      bss    total  kernel
-  +3781    +1948        0    +5729  defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.14-rc1 (2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-     -64k      64k        .      64k      qemu-vexpress64            defconfig           __internal
-     -64k      64k        .      64k      tegra132-norrin            defconfig      tegra132-norrin
-     -64k      64k        .      64k  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-     -64k      64k        .      64k       tegra210-smaug            defconfig       tegra210-smaug
-
---
-nvpublic
+Tony
