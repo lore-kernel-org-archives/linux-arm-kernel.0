@@ -1,32 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Sep 2017 07:37:34 -0700
-Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
- target module binding
-In-Reply-To: <20170925070345.2uraikhswru77rm4@squirrel.local>
-References: <20170920224621.16236-1-tony@atomide.com>
- <20170920224621.16236-2-tony@atomide.com>
- <20170925070345.2uraikhswru77rm4@squirrel.local>
-Message-ID: <20170925143733.GF4394@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 25 Sep 2017 16:41:31 +0200
+Subject: [PATCH 0/7] PCI: aardvark: improve compatibility with PCI devices
+In-Reply-To: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+References: <20170908095348.16578-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170925164131.166bcfac@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [170925 00:04]:
-> On Wed, Sep 20, 2017 at 03:46:12PM -0700, Tony Lindgren wrote:
-> > TI sysc interconnect target module hardware is independent of the
-> > interconnect. It is used at least with TI L3 interconnect (Arteris NoC)
-> > and TI L4 interconnect (Sonics s3220).
+Hello Bjorn,
+
+On Fri,  8 Sep 2017 11:53:41 +0200, Thomas Petazzoni wrote:
+
+> This patch series brings a number of fixes to the pci-aardvark driver
+> that allows a much larger number of PCIe devices to be used.
 > 
-> This is because the interface between interconnect and module is
-> standardized (Open Core Protocol), so it doesn't really matter which
-> interconnect technology is used.
+> It fixes kernel bug
+> https://bugzilla.kernel.org/show_bug.cgi?id=196339, and has been
+> tested with an IGB NIC and a Marvell SATA PCIe card, which were not
+> working previously.
 > 
-> Also, afaik sysc mostly just concerns the interaction between module and
-> PRCM.  The only role the interconnect plays here is that it participates
-> in the OCP Disconnect Protocol to allow the module to safely disconnect
-> itself when it or the interconnect enters idle state.
+> They should be taken for the 4.14 cycle, as they are all bug fixes.
 
-OK thanks for clarifying it, I'll add a note regarding OCP there.
+Do you have some feedback about this series? It fixes some important
+problems (reported by users), so it would be nice to have it in 4.14.
 
-Regards,
+Thanks a lot!
 
-Tony
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
