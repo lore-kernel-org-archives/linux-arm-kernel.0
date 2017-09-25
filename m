@@ -1,68 +1,99 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Mon, 25 Sep 2017 02:02:42 +0200
-Subject: [PATCH v3 08/10] dmaengine: sun6i: Add support for Allwinner A64 and
- compatibles
+Date: Mon, 25 Sep 2017 02:02:41 +0200
+Subject: [PATCH v3 07/10] dmaengine: sun6i: Retrieve channel count/max request
+ from devicetree
 In-Reply-To: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
 References: <20170925000244.11679-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <6c3aee4d-3a08-4d41-9e31-f1fb817a691f@rwthex-w2-a.rwth-ad.de>
+Message-ID: <b8b9dff1-cec7-437b-8712-450f0f42f96f@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 SoC has the same dma engine as the H3 (sun8i), with a
-reduced amount of physical channels. To allow future reuse of the
-compatible, leave the channel count etc. in the config data blank
-and retrieve it from the devicetree.
+To avoid introduction of a new compatible for each small SoC/DMA controller
+variation, move the definition of the channel count to the devicetree.
+
+The number of vchans is no longer explicit, but limited by the highest
+port/DMA request number. The result is a slight overallocation for SoCs
+with a sparse port mapping.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 ---
 
-Changes in v3:
-- Omit default values from sun50i_a64_dma_cfg definition
+Changes in v3: None
+Changes in v2:
+- Set default number of dma-request if not provided in config or devicetree
 
-Changes in v2: None
-
- drivers/dma/sun6i-dma.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/dma/sun6i-dma.c | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 34d70af442ff..b4e759f4aa75 100644
+index b08b89fa4679..34d70af442ff 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -1122,6 +1122,25 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
- };
+@@ -42,6 +42,9 @@
  
-+/*
-+ * The A64 binding uses the number of dma channels from the
-+ * device tree node.
-+ */
-+static struct sun6i_dma_config sun50i_a64_dma_cfg = {
-+	.clock_autogate_enable = sun6i_enable_clock_autogate_h3;
-+	.set_burst_length = sun6i_set_burst_length_h3;
-+	.src_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16);
-+	.dst_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16);
-+	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-+	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-+};
+ #define DMA_STAT		0x30
+ 
++/* Offset between DMA_IRQ_EN and DMA_IRQ_STAT limits number of channels */
++#define DMA_MAX_CHANNELS	(DMA_IRQ_CHAN_NR * 0x10 / 4)
 +
  /*
-  * The V3s have only 8 physical channels, a maximum DRQ port id of 23,
-  * and a total of 24 usable source and destination endpoints.
-@@ -1149,6 +1168,7 @@ static const struct of_device_id sun6i_dma_match[] = {
- 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
-+	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+  * sun8i specific registers
+  */
+@@ -65,7 +68,8 @@
+ #define DMA_CHAN_LLI_ADDR	0x08
+ 
+ #define DMA_CHAN_CUR_CFG	0x0c
+-#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
++#define DMA_CHAN_MAX_DRQ		0x1f
++#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & DMA_CHAN_MAX_DRQ)
+ #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
+ #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
+ #define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
+@@ -1152,6 +1156,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+ static int sun6i_dma_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *device;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct sun6i_dma_dev *sdc;
+ 	struct resource *res;
+ 	int ret, i;
+@@ -1227,6 +1232,36 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->num_vchans = sdc->cfg->nr_max_vchans;
+ 	sdc->max_request = sdc->cfg->nr_max_requests;
+ 
++	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
++	if (ret && !sdc->num_pchans) {
++		dev_err(&pdev->dev, "Can't get dma-channels.\n");
++		return ret;
++	}
++
++	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
++		dev_err(&pdev->dev, "Number of dma-channels out of range.\n");
++		return -EINVAL;
++	}
++
++	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
++	if (ret && !sdc->max_request) {
++		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
++			 DMA_CHAN_MAX_DRQ);
++		sdc->max_request = DMA_CHAN_MAX_DRQ;
++	}
++
++	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
++		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
++		return -EINVAL;
++	}
++
++	/*
++	 * If the number of vchans is not specified, derive it from the
++	 * highest port number, at most one channel per port and direction.
++	 */
++	if (!sdc->num_vchans)
++		sdc->num_vchans = 2 * (sdc->max_request + 1);
++
+ 	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
+ 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
+ 	if (!sdc->pchans)
 -- 
 2.14.1
