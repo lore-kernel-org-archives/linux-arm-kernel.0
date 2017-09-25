@@ -1,84 +1,67 @@
-From: rruigrok@codeaurora.org (Ruigrok, Richard)
-Date: Mon, 25 Sep 2017 14:52:26 -0600
-Subject: ARM64: kernel panics in DABT in sys_msync path
-In-Reply-To: <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
-References: <20170924213622.75e7r3k56tgxlezh@yury-thinkpad>
- <20170925105335.GA24042@arm.com>
- <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
- <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
-Message-ID: <67f93803-0e94-d922-ab85-9b3a5f887bd8@codeaurora.org>
+From: matthew.gerlach@linux.intel.com (matthew.gerlach at linux.intel.com)
+Date: Mon, 25 Sep 2017 15:41:40 -0700 (PDT)
+Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
+ support
+In-Reply-To: <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
+References: <20170924105924.23923-1-vigneshr@ti.com>
+ <20170924105924.23923-6-vigneshr@ti.com>
+ <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
+ <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
+ <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
+ <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
+ <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
+Message-ID: <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 9/25/2017 1:04 PM, Yury Norov wrote:
-> On Mon, Sep 25, 2017 at 05:02:40PM +0300, Yury Norov wrote:
->>  Hi Will,
->>  
->>>> The bug is reproducible for ilp32 and lp64 binaries. For kernel 4.12
->>>> and for all kernels if '-smp 1' is passed to qemu, everything works
->>>> fine. If no ideas, I think I'm able bisect it.
->>> I tried to reproduce this on hardware, but failed to do so. Our nightly
->>> tests are also coming back fine for rwtest03. I just built Qemu v2.10.0
->>> and that also passes the test with -smp 4 for me, so I'm a bit stuck.
-Hi Will,
+On Sun, 24 Sep 2017, Marek Vasut wrote:
 
-I also found this issue with kernels from 4.11 through 4.13, reproduced on Hardware.? In my tests, I found that it reproduces only with 4K page and Transparent Huge Pages. With 64K page I was not able to reproduce. RH also reported it here: https://bugzilla.redhat.com/show_bug.cgi?id=1491504 and Linaro reported on the 4.12 based RPK kernel.
-
-https://bugs.linaro.org/show_bug.cgi?id=3191
-
-https://bugs.linaro.org/show_bug.cgi?id=3068.
-
-I was able to bisect down to a specific commit:? f27176cfc363 mm: convert page_mkclean_one() to use page_vma_mapped_walk()
-
-Ran with LTP 20170516 release, rwtest:?? ./runltp -p -f fs -s rwtest
-To validate bisecting (good points), I ran 30 iterations.? Usually it reproduces in 5-10 iterations.
-
-LMK if you have any suggestions for instrumentation, when running with ftrace I could not repro. I can run tests on 4.13 or on 4.11 at the above bisect point.
-I have not tried any 4.14-rc yet.
->> I also see the test passed sometimes. I run it in endless cycle and
->> leave for a while. 5-10 iterations are usually enough.
+> On 09/24/2017 03:27 PM, Vignesh R wrote:
 >>
->>> Could you share:
+>>
+>> On 9/24/2017 6:42 PM, Marek Vasut wrote:
+>>> On 09/24/2017 03:08 PM, Vignesh R wrote:
+>>>>
+>>>>
+>>>> On 9/24/2017 5:31 PM, Marek Vasut wrote:
+>>>>> On 09/24/2017 12:59 PM, Vignesh R wrote:
+>>>>>> Add pm_runtime* calls to cadence-quadspi driver. This is required to
+>>>>>> switch on QSPI power domain on TI 66AK2G SoC during probe.
+>>>>>>
+>>>>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>>>>
+>>>>> Are you planning to add some more fine-grained PM control later?
+>>>>
+>>>> Yes, I will need to add fine-grained PM control at some point. But, for
+>>>> now SoC does not really support low power mode or runtime power saving
+>>>> option.
+>>>> The fact that driver still uses clk_prepare_*() calls to enable/disable
+>>>> clocks instead of pm_*() calls makes it a bit tricky though.
+>>>>
+>>>> Just figured out I forgot to add cleanup code in error handling path of
+>>>> probe(). Will fix that and send a v4.
 >>>
->>>   * Your kernel .config
->>>   * Your QEMU command line
->>>   * Details of your userspace
->> Qemu configure command:
->> ./configure --target-list=aarch64-softmmu --enable-fdt --enable-vhost-net --enable-kvm
+>>> OK, fine. Cleanups are welcome. The SoCFPGA doesn't do much runtime PM
+>>> either, so it's fine for now.
+>>>
 >>
->> And run command:
->> /home/yury/work/qemu-2.10.0/aarch64-softmmu/qemu-system-aarch64 \
->> 	-machine virtualization=true -machine gic-version=3 \
->> 	-machine virt -cpu cortex-a57 -nographic -smp 4  -m 1024 \
->> 	-global virtio-blk-device.scsi=off -device virtio-scsi-device,id=scsi \
->> 	-drive file=img/ubuntu-core-14.04.1-core-arm64.img,id=coreimg,cache=unsafe,if=none -device scsi-hd,drive=coreimg \
->> 	-kernel /home/yury/work/linux/arch/arm64/boot/Image \
->> 	--append "console=ttyAMA0 root=/dev/sda" \
->> 	-initrd initrd.img-3.13.0-62-generic \
->> 	$NETWORK \
->> 	-redir tcp:2222::22 \
->> 	-s \
->> 	$@
->>
->> My userspace is Ubuntu 14. I build lp64 tests with default Ubuntu
->> toolchain, and ilp32 tests with Linaro cross-toolchain. 
->>
->> The config is attached, and the branch is vanilla 4.13 kernel, or this
->> one:
->> https://github.com/norov/linux/tree/ilp32-4.13
->>
->> Later today I will share the whole qemu environment I use.
-> https://drive.google.com/file/d/0B07VUB3kjLD8Mm5XN21qTTBfbnc/view
+>> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
+>> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
+>> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
 >
->> Yury
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Not of the top of my head, sorry. +CC Matthew, he should know.
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+I am not an expert at the clock framework nor the power management, but I
+did ask around a bit.  No one I asked was planning to change the clk_*()
+calls to pm_*() call, but the feedback was that it would be a good idea.
+
+Matthew Gerlach
+
+
+>
+> -- 
+> Best regards,
+> Marek Vasut
+>
