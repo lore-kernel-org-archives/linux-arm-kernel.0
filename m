@@ -1,86 +1,97 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 25 Sep 2017 18:54:05 -0500
-Subject: [PATCH 1/3] PCI: designware: only register MSI controller when
- MSI irq line is valid
-In-Reply-To: <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170828142307.30061-1-l.stach@pengutronix.de>
- <20170828142307.30061-2-l.stach@pengutronix.de>
- <20170831165817.GD18250@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170925235405.GJ15970@bhelgaas-glaptop.roam.corp.google.com>
+Date: Mon, 25 Sep 2017 18:56:58 -0500
+Subject: [PATCH 2/2] PCI: mvebu: Check DRAM window size
+In-Reply-To: <20170828152517.24506-3-jlu@pengutronix.de>
+References: <20170828152517.24506-1-jlu@pengutronix.de>
+ <20170828152517.24506-3-jlu@pengutronix.de>
+Message-ID: <20170925235658.GK15970@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 31, 2017 at 11:58:17AM -0500, Bjorn Helgaas wrote:
-> [+cc Kishon, Thomas, Niklas, Jesper, Zhou, Gabriele, Xiaowei, Binghui,
-> Stanimir, Pratyush, Kukjin, Krzysztof, Richard, Murali, Minghuan, Mingkai,
-> Roy]
+On Mon, Aug 28, 2017 at 05:25:17PM +0200, Jan Luebbe wrote:
+> The sum of the DRAM windows may exceed 4GB (at least on Armada XP).
+> Return an error in that case.
 > 
-> Sorry about the unwieldy cc list.  It seems like this affects every
-> DesignWare-based driver.
-> 
-> On Mon, Aug 28, 2017 at 04:23:05PM +0200, Lucas Stach wrote:
-> > The MSI part of the controller isn't essential, so the host controller can
-> > be registered without the MSI controller being present. This allows the
-> > host to work in PCIe legancy interrupt only mode, if the IRQ line for the
-> 
-> s/legancy/legacy/
-> 
-> > MSI controller is missing.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  drivers/pci/dwc/pcie-designware-host.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-> > index d29c020da082..8494089f088d 100644
-> > --- a/drivers/pci/dwc/pcie-designware-host.c
-> > +++ b/drivers/pci/dwc/pcie-designware-host.c
-> > @@ -381,7 +381,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  	if (ret)
-> >  		pci->num_viewport = 2;
-> >  
-> > -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> > +	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
-> >  		if (!pp->ops->msi_host_init) {
-> >  			pp->irq_domain = irq_domain_add_linear(dev->of_node,
-> >  						MAX_MSI_IRQS, &msi_domain_ops,
-> > @@ -412,7 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  	bridge->ops = &dw_pcie_ops;
-> >  	bridge->map_irq = of_irq_parse_and_map_pci;
-> >  	bridge->swizzle_irq = pci_common_swizzle;
-> > -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> > +	if (IS_ENABLED(CONFIG_PCI_MSI) && pp->msi_irq > 0) {
-> >  		bridge->msi = &dw_pcie_msi_chip;
-> >  		dw_pcie_msi_chip.dev = dev;
-> >  	}
-> 
-> Here are the callers of dw_pcie_host_init():
-> 
->   armada8k_add_pcie_port
->   artpec6_add_pcie_port       # sets pp->msi_irq
->   dra7xx_add_pcie_port
->   dw_plat_add_pcie_port       # sets pp->msi_irq
->   exynos_add_pcie_port        # sets pp->msi_irq
->   hisi_add_pcie_port
->   imx6_add_pcie_port          # sets pp->msi_irq
->   kirin_add_pcie_port
->   ks_dw_pcie_host_init        # sets pp->ops->msi_host_init
->   ls_add_pcie_port            # sets pp->ops->msi_host_init
->   qcom_pcie_probe             # sets pp->msi_irq
->   spear13xx_add_pcie_port
-> 
-> For the drivers that set pp->msi_irq (artpec6, dw_plat, exynos, imx6,
-> qcom), it seems like you'd want a similar follow-up change for all of
-> them to make the MSI IRQ optional, but you only changed imx6.  What
-> about the others?
-> 
-> For the drivers that don't set pp->msi_irq and don't set
-> pp->ops->msi_host_init (armada8k, dra7xx, hisi, kirin, spear13xx),
-> this patch means they no longer set up pp->irq_domain.  Do you intend
-> that?
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 
-Ping, I'm looking for a v2 that addresses this.  No hurry, just
-making sure you're not waiting on me.
+Looking for an ack from Thomas or Jason before applying this...
 
-Bjorn
+> ---
+>  drivers/pci/host/pci-mvebu.c | 27 ++++++++++++++++++++++-----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index f353a6eb2f01..5d74af81d104 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -206,10 +206,10 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
+>   * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
+>   * WIN[0-3] -> DRAM bank[0-3]
+>   */
+> -static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+> +static int mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+>  {
+>  	const struct mbus_dram_target_info *dram;
+> -	u32 size;
+> +	u64 size;
+>  	int i;
+>  
+>  	dram = mv_mbus_dram_info();
+> @@ -252,19 +252,32 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+>  	if ((size & (size - 1)) != 0)
+>  		size = 1 << fls(size);
+>  
+> +	if (size > 0x100000000) {
+> +		dev_err(&port->pcie->pdev->dev,
+> +			"Could not configure DRAM window (too large): 0x%llx\n",
+> +			size);
+> +
+> +		return -EINVAL;
+> +	}
+> +
+>  	/* Setup BAR[1] to all DRAM banks. */
+>  	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
+>  	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
+>  	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
+>  		     PCIE_BAR_CTRL_OFF(1));
+> +
+> +	return 0;
+>  }
+>  
+> -static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+> +static int mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+>  {
+>  	u32 cmd, mask;
+> +	int ret;
+>  
+>  	/* Point PCIe unit MBUS decode windows to DRAM space. */
+> -	mvebu_pcie_setup_wins(port);
+> +	ret = mvebu_pcie_setup_wins(port);
+> +	if (ret)
+> +		return ret;
+>  
+>  	/* Master + slave enable. */
+>  	cmd = mvebu_readl(port, PCIE_CMD_OFF);
+> @@ -277,6 +290,8 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+>  	mask = mvebu_readl(port, PCIE_MASK_OFF);
+>  	mask |= PCIE_MASK_ENABLE_INTS;
+>  	mvebu_writel(port, mask, PCIE_MASK_OFF);
+> +
+> +	return 0;
+>  }
+>  
+>  static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
+> @@ -882,7 +897,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+>  
+>  		if (!port->base)
+>  			continue;
+> -		mvebu_pcie_setup_hw(port);
+> +		err = mvebu_pcie_setup_hw(port);
+> +		if (err)
+> +			return 0;
+>  	}
+>  
+>  	return 1;
+> -- 
+> 2.11.0
+> 
