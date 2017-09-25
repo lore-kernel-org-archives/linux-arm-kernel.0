@@ -1,56 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Sep 2017 09:53:49 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.15
-Message-ID: <cover.1506325468.git.horms+renesas@verge.net.au>
+Date: Mon, 25 Sep 2017 09:53:56 +0200
+Subject: [PATCH 1/3] soc: renesas: rcar-rst: add R8A77970 support
+In-Reply-To: <cover.1506325468.git.horms+renesas@verge.net.au>
+References: <cover.1506325468.git.horms+renesas@verge.net.au>
+Message-ID: <17760376ae31e06f66b3c3b8981f5978d4c53150.1506325468.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these Renesas ARM based SoC drivers updates for v4.15.
+Add support for R-Car V3M (R8A77970) to the R-Car RST driver -- this driver
+is  needed  for the clock driver to work.
 
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
+ drivers/soc/renesas/Kconfig                             | 3 ++-
+ drivers/soc/renesas/rcar-rst.c                          | 1 +
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.15
-
-for you to fetch changes up to bab9b2a74fe9da96e895e0919f625679a0a8c964:
-
-  soc: renesas: rcar-sysc: add R8A77970 support (2017-09-18 09:46:50 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Drivers Updates for v4.15
-
-Add basic support for R-Car V3M (R8A77970) SoC.
-
-Sergei Shtylyov says:
-
-* Add support for R-Car V3M (R8A77970) SoC power areas to the R-Car SYSC
-  driver
-
-* Add support for identifying the R-Car V3M (R8A77970) SoC
-
-* Add support for R-Car V3M (R8A77970) to the R-Car RST driver -- this
-  driver is  needed  for the clock driver to work
-
-----------------------------------------------------------------
-Sergei Shtylyov (3):
-      soc: renesas: rcar-rst: add R8A77970 support
-      soc: renesas: identify R-Car V3M
-      soc: renesas: rcar-sysc: add R8A77970 support
-
- .../bindings/power/renesas,rcar-sysc.txt           |  1 +
- .../devicetree/bindings/reset/renesas,rst.txt      |  1 +
- drivers/soc/renesas/Kconfig                        |  8 ++++-
- drivers/soc/renesas/Makefile                       |  1 +
- drivers/soc/renesas/r8a77970-sysc.c                | 39 ++++++++++++++++++++++
- drivers/soc/renesas/rcar-rst.c                     |  1 +
- drivers/soc/renesas/rcar-sysc.c                    |  3 ++
- drivers/soc/renesas/rcar-sysc.h                    |  1 +
- drivers/soc/renesas/renesas-soc.c                  |  8 +++++
- 9 files changed, 62 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/renesas/r8a77970-sysc.c
+diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+index e5a03ffe04fb..a8014f3ab8ba 100644
+--- a/Documentation/devicetree/bindings/reset/renesas,rst.txt
++++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+@@ -26,6 +26,7 @@ Required properties:
+ 		  - "renesas,r8a7794-rst" (R-Car E2)
+ 		  - "renesas,r8a7795-rst" (R-Car H3)
+ 		  - "renesas,r8a7796-rst" (R-Car M3-W)
++		  - "renesas,r8a77970-rst" (R-Car V3M)
+ 		  - "renesas,r8a77995-rst" (R-Car D3)
+   - reg: Address start and address range for the device.
+ 
+diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
+index 567414cb42ba..f0d562a7c4d3 100644
+--- a/drivers/soc/renesas/Kconfig
++++ b/drivers/soc/renesas/Kconfig
+@@ -3,7 +3,8 @@ config SOC_RENESAS
+ 	default y if ARCH_RENESAS
+ 	select SOC_BUS
+ 	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || \
+-			   ARCH_R8A7795 || ARCH_R8A7796 || ARCH_R8A77995
++			   ARCH_R8A7795 || ARCH_R8A7796 || ARCH_R8A77970 || \
++			   ARCH_R8A77995
+ 	select SYSC_R8A7743 if ARCH_R8A7743
+ 	select SYSC_R8A7745 if ARCH_R8A7745
+ 	select SYSC_R8A7779 if ARCH_R8A7779
+diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+index baa47014e96b..3316b028f231 100644
+--- a/drivers/soc/renesas/rcar-rst.c
++++ b/drivers/soc/renesas/rcar-rst.c
+@@ -41,6 +41,7 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
+ 	/* R-Car Gen3 is handled like R-Car Gen2 */
+ 	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen2 },
+ 	{ /* sentinel */ }
+ };
+-- 
+2.1.4
