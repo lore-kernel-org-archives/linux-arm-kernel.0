@@ -1,124 +1,72 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 24 Sep 2017 23:11:24 -0500
-Subject: [PATCH v4 2/5] dt-bindings: input: Add document bindings for
- mtk-pmic-keys
-In-Reply-To: <1506149223.19409.11.camel@mhfsdcap03>
-References: <1505635252-27716-1-git-send-email-chen.zhong@mediatek.com>
- <1505635252-27716-3-git-send-email-chen.zhong@mediatek.com>
- <20170920205301.v6gpmhll4pdpuyxv@rob-hp-laptop>
- <1506148695.19409.10.camel@mhfsdcap03>
- <1506149223.19409.11.camel@mhfsdcap03>
-Message-ID: <CAL_JsqJZtn7YLn6o9mQMPD+kuseKLbfKe+JiY=1BosqnVqi5Kw@mail.gmail.com>
+Date: Sun, 24 Sep 2017 23:12:26 -0500
+Subject: [PATCH v2 06/10] arm64: allwinner: a64: Add devicetree binding
+ for DMA controller
+In-Reply-To: <1673036.ZUJy1pffid@pebbles.site>
+References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
+ <20170917031956.28010-7-stefan.bruens@rwth-aachen.de>
+ <20170920205300.io3ghr54kzk763kt@rob-hp-laptop>
+ <1673036.ZUJy1pffid@pebbles.site>
+Message-ID: <CAL_JsqKSAP36OTgDXJr=YdfMwPSx+8O_ZfPUS9NTvLQRpvc_MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 23, 2017 at 1:47 AM, Chen Zhong <chen.zhong@mediatek.com> wrote:
-> Sorry for the typo.
+On Sat, Sep 23, 2017 at 6:34 PM, Stefan Bruens
+<stefan.bruens@rwth-aachen.de> wrote:
+> On Mittwoch, 20. September 2017 22:53:00 CEST Rob Herring wrote:
+>> On Sun, Sep 17, 2017 at 05:19:52AM +0200, Stefan Br?ns wrote:
+>> > The A64 is register compatible with the H3, but has a different number
+>> > of dma channels and request ports.
+>> >
+>> > Attach additional properties to the node to allow future reuse of the
+>> > compatible for controllers with different number of channels/requests.
+>> >
+>> > If dma-requests is not specified, the register layout defined maximum
+>> > of 32 is used.
+>> >
+>> > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+>> > ---
+>> >
+>> >  .../devicetree/bindings/dma/sun6i-dma.txt          | 26
+>> >  ++++++++++++++++++++++ 1 file changed, 26 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+>> > b/Documentation/devicetree/bindings/dma/sun6i-dma.txt index
+>> > 98fbe1a5c6dd..6ebc79f95202 100644
+>> > --- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+>> > +++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+>> >
+>> > @@ -27,6 +27,32 @@ Example:
+>> >             #dma-cells = <1>;
+>> >
+>> >     };
+>> >
+>> > +-------------------------------------------------------------------------
+>> > ----- +For A64 DMA controller:
+>> > +
+>> > +Required properties:
+>> > +- compatible:      "allwinner,sun50i-a64-dma"
+>> > +- dma-channels: Number of DMA channels supported by the controller.
+>> > +           Refer to Documentation/devicetree/bindings/dma/dma.txt
+>> > +- all properties above, i.e. reg, interrupts, clocks, resets and
+>> > #dma-cells +
+>> > +Optional properties:
+>> > +- dma-requests: Number of DMA request signals supported by the
+>> > controller.
+>> > +           Refer to Documentation/devicetree/bindings/dma/dma.txt
+>> > +
+>> > +Example:
+>> > +   dma: dma-controller at 01c02000 {
+>>
+>> Drop the leading 0. Building dtbs with W=2 will tell you this.
+>>
+>> With that,
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
 >
-> On Sat, 2017-09-23 at 14:38 +0800, Chen Zhong wrote:
->> On Wed, 2017-09-20 at 15:53 -0500, Rob Herring wrote:
->> > On Sun, Sep 17, 2017 at 04:00:49PM +0800, Chen Zhong wrote:
->> > > This patch adds the device tree binding documentation for the MediaTek
->> > > pmic keys found on PMIC MT6397/MT6323.
->> > >
->> > > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
->> > > ---
->> > >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   41 ++++++++++++++++++++
->> > >  1 file changed, 41 insertions(+)
->> > >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
->> > >
->> > > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
->> > > new file mode 100644
->> > > index 0000000..fd48ff7
->> > > --- /dev/null
->> > > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
->> > > @@ -0,0 +1,41 @@
->> > > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
->> > > +
->> > > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
->> > > +and homekey. The key functions are defined as the subnode of the function
->> > > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
->> > > +of Muti-Function Device (MFD)
->> > > +
->> > > +For MT6397/MT6323 MFD bindings see:
->> > > +Documentation/devicetree/bindings/mfd/mt6397.txt
->> > > +
->> > > +Required properties:
->> > > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
->> > > +- linux,keycodes: Specifies the numeric keycode values to
->> > > + be used for reporting keys presses. The array can
->> > > + contain up to 2 entries.
->> > > +
->> > > +Optional Properties:
->> > > +- mediatek,wakeup-keys: Specifies each key can be used as a wakeup source
->> > > + or not. This can be customized depends on board design.
->> >
->> > I think this should be a common property if we're going to put into DT.
->> > Something like "wakeup-scancodes" to be clear the values are the raw
->> > scancodes. Alternatively, we could list Linux keycodes instead with
->> > something like "linux,wakeup-keycodes".
->> >
->> > > +- wakeup-source: PMIC keys can be used as wakeup sources.
->> >
->> > Just "See ../power/wakeup-source.txt" for the description.
->> >
->> > > +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
->> > > + pwrkey only, 2 for pwrkey/homekey together, others for disabled.
->> > > +- debounce-interval: Long press key shutdown debouncing interval time
->> > > + in seconds. 0/1/2/3 for 8/11/14/5 seconds. If not specified defaults to 0.
->> >
->> > This property units should be in milliseconds. However, this doesn't
->> > sound like debounce filtering time if 5-14 seconds. That sounds like
->> > forced power off time (i.e. for a hung device). This also should be
->> > common. I imagine we already have some drivers with similar properties.
->>
->> Hi Rob,
->>
->> I searched in kernel documents and found a similar usage in
->> "ti,palmas-pwrbutton.txt"
->> "- ti,palmas-long-press-seconds: Duration in seconds which the power
->>   button should be kept pressed for Palmas to power off automatically."
->>
->> Could I just wrote it like this?
->> mediatek,long-press-seconds = <0>;
+> The leading 0 was copied from the A31 example just a few lines above. Should I
+> also correct that one, or should that go in a separate patch?
 
-That doesn't really tell what the long press does. How about
-"power-off-time-sec"? Surprisingly we don't have a common keyboard
-binding doc, so please start one and document it there. Then just
-refer to it.
+A separate patch.
 
->>
->> And for the wakeup source part, how about Dmitry's suggestion?
-
-It's fine for me.
-
->> The whole device node would be:
->>
->> mt6397keys: mt6397keys {
->>       compatible = "mediatek,mt6397-keys";
->>       mediatek,long-press-mode = <1>;
->>       mediatek,long-press-seconds = <0>;
->>
->>       power at 0 {
->>               linux,code = <116>;
-
-linux,keycodes
-
-Also, you either need a reg property with "0" or drop the unit address.
-
->>               wakeup-source;
->>       };
->>
->>       home at 0 {
-> should be home at 1 {
->>               linux,code = <114>;
->>       };
->> };
->>
->> Thank you.
->>
->> >
->> > Rob
->>
->
->
+Rob
