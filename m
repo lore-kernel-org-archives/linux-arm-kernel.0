@@ -1,73 +1,127 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Mon, 25 Sep 2017 19:21:20 +0200
-Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
- target module binding
-In-Reply-To: <20170925142520.GE4394@atomide.com>
-References: <20170920224621.16236-1-tony@atomide.com>
- <20170920224621.16236-2-tony@atomide.com>
- <20170925063545.nn3gr5drea6o2g6m@squirrel.local>
- <20170925142520.GE4394@atomide.com>
-Message-ID: <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 25 Sep 2017 18:26:17 +0100
+Subject: [PATCH] iio: stm32: fix adc/trigger link error
+In-Reply-To: <20170925111604.00000c02@huawei.com>
+References: <20170906125722.2522781-1-arnd@arndb.de>
+ <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
+ <20170910170040.7eb1f768@archlinux>
+ <6b5ff28a-859d-973c-2da5-60a8bf50c378@st.com>
+ <20170925111604.00000c02@huawei.com>
+Message-ID: <20170925182617.18bf5ce8@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 07:25:20AM -0700, Tony Lindgren wrote:
-> * Matthijs van Duin <matthijsvanduin@gmail.com> [170924 23:36]:
-> > Is the meaning of these documented anywhere?  I'm assuming one of them
-> > corresponds to the standard omap2/3 sysconfig/sysstatus
->
-> Yes that's the type1 sysc.
->
-> > and one to the standard omap4/5 sysconfig
->
-> Yeah and that's what we call sysc type 2 in the kernel.
+On Mon, 25 Sep 2017 11:16:04 +0100
+Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
 
-Might it then not make more sense to call those something like
-ti,omap2-sysc and ti,omap4-sysc respectively?
+> On Mon, 25 Sep 2017 11:54:06 +0200
+> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> 
+> > On 09/10/2017 06:00 PM, Jonathan Cameron wrote:  
+> > > On Wed, 6 Sep 2017 18:16:33 +0200
+> > > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> > >     
+> > >> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:    
+> > >>> The ADC driver can trigger on either the timer or the lptim
+> > >>> trigger, but it only uses a Kconfig 'select' statement
+> > >>> to ensure that the first of the two is present. When the lptim
+> > >>> trigger is enabled as a loadable module, and the adc driver
+> > >>> is built-in, we now get a link error:
+> > >>>
+> > >>> drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
+> > >>> stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
+> > >>>
+> > >>> We could use a second 'select' statement and always have both
+> > >>> trigger drivers enabled when the adc driver is, but it seems that
+> > >>> the lptimer trigger was intentionally left optional, so it seems
+> > >>> better to keep it that way.      
+> > >> Hi Arnd,
+> > >>
+> > >> This is correct, not all stm32 have this hardware.    
+> > >>>
+> > >>> This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
+> > >>> which avoids the link error, but instead leads to the lptimer trigger
+> > >>> not being used in the broken configuration. I've added a runtime
+> > >>> warning for this case to help users figure out what they did wrong
+> > >>> if this should ever be done by accident.
+> > >>>
+> > >>> Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
+> > >>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>      
+> > >> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>    
+> > > 
+> > > This may take me a few weeks to pick up.  I don't want to
+> > > pull the mfd immutable branch in just to have this fix, so this will
+> > > get sorted after rc1 is out.
+> > > 
+> > > As ever, poke me if it looks like I've forgotten about it.    
+> > 
+> > Hi Jonathan,
+> > 
+> > Di you apply this one?  
+> 
+> I think I still need to rebase my branch. Greg took my fixes pull this morning
+> so I can fast forward that branch next time I'm on the right PC and then pick
+> this up.
+> 
+> Thanks for the reminder.
 
-> The sysc type3 is what we have on am335x/ti81xx, see:
->
-> $ git grep -B10 -A1 "&omap_hwmod_sysc_type3" arch/arm/mach-omap2
+Applied to the fixes-togreg branch of iio.git.
 
-Ah... three "foreign" modules with an idlemode carelessly thrown into a
-register without care for existing layouts.  I think these are more just
-exceptional cases which happen to agree by coincidence since they all
-just added idlemode in the simplest way possible, but I can understand
-how it came to be viewed as a standard type.
+Thanks,
 
-> > ISS (omap4/5, dm814x) is also fun since it has top-level sysconfig, but
-> > most of the child modules (e.g. isp5 and simcop) also have their own
-> > sysconfig, and some child modules of simcop again have sysconfig.
->
-> Interesting. Sounds like there's yet another interconnect instance
-> lurking there similar to L4 ABE?
-
-ISS has a 32-bit configuration interconnect and a 64/128-bit data
-interconnect:
-      .......................................
-     :              ISS                      :
-     :                                       :
-L3 --:--> configuration interconnect <-------:-- Cortex-M3/M4 subsystem
-     :      ||||||||||        |   |          :
-     :      vvvvvvvvvv        |   |          :
-     :      submodules        |   '---.      :
-     :       ||||||||         |       |      :
-     :       vvvvvvvv         v       v      :
-     : data interconnect --> BTE --> CBUFF --:--> L3
-     '.......................................'
-
-It also has a local prcm controller to manage all this, and an irq
-combiner.  See the section "ISS Power Management" (8.1.2.4 in the public
-omap5 TRM, SWPU249AF) for a better diagram of all this.  The various
-versions of ISS differ somewhat in the submodules but all share the same
-overall structure.
-
-One of the ISS submodules, SIMCOP, is itself again a fairly complicated
-subsystem with two local interconnects, of which you can find a block
-diagram in the "ISS Still Image Coprocessor" chapter (8.4).
-
-Having a local interconnect is itself not a particularly rare thing (you
-can find one in ABE, DSS, CPSW, PRUSS, PWMSS, etc), but ISS does have
-unusual complexity with its multiple interconnects and nested subsystems.
-
-Matthijs
+Jonathan
+> 
+> Jonathan
+> 
+> > 
+> > Thanks,
+> > Best Regards,
+> > Fabrice  
+> > > Sorry for the delay!
+> > > 
+> > > Jonathan
+> > >     
+> > >>
+> > >> Many thanks for the fix,
+> > >> Best Regards,
+> > >> Fabrice    
+> > >>> ---
+> > >>>  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
+> > >>>  1 file changed, 4 insertions(+), 1 deletion(-)
+> > >>>
+> > >>> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
+> > >>> index 34d59bfdce2d..464458d20b16 100644
+> > >>> --- a/include/linux/iio/timer/stm32-lptim-trigger.h
+> > >>> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
+> > >>> @@ -16,11 +16,14 @@
+> > >>>  #define LPTIM2_OUT	"lptim2_out"
+> > >>>  #define LPTIM3_OUT	"lptim3_out"
+> > >>>  
+> > >>> -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> > >>> +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> > >>>  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
+> > >>>  #else
+> > >>>  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
+> > >>>  {
+> > >>> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+> > >>> +	pr_warn_once("stm32 lptim_trigger not linked in\n");
+> > >>> +#endif
+> > >>>  	return false;
+> > >>>  }
+> > >>>  #endif
+> > >>>       
+> > >> --
+> > >> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> > >> the body of a message to majordomo at vger.kernel.org
+> > >> More majordomo info at  http://vger.kernel.org/majordomo-info.html    
+> > >     
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
