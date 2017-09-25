@@ -1,55 +1,73 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 25 Sep 2017 19:17:12 +0200
-Subject: [GIT PULL] Rockchip dts64 Fixes for 4.14
-Message-ID: <6990785.aOlALvEuSf@phil>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Mon, 25 Sep 2017 19:21:20 +0200
+Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
+ target module binding
+In-Reply-To: <20170925142520.GE4394@atomide.com>
+References: <20170920224621.16236-1-tony@atomide.com>
+ <20170920224621.16236-2-tony@atomide.com>
+ <20170925063545.nn3gr5drea6o2g6m@squirrel.local>
+ <20170925142520.GE4394@atomide.com>
+Message-ID: <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On Mon, Sep 25, 2017 at 07:25:20AM -0700, Tony Lindgren wrote:
+> * Matthijs van Duin <matthijsvanduin@gmail.com> [170924 23:36]:
+> > Is the meaning of these documented anywhere?  I'm assuming one of them
+> > corresponds to the standard omap2/3 sysconfig/sysstatus
+>
+> Yes that's the type1 sysc.
+>
+> > and one to the standard omap4/5 sysconfig
+>
+> Yeah and that's what we call sysc type 2 in the kernel.
 
-please find below two fixes for 64bit Rockchip devicetrees.
+Might it then not make more sense to call those something like
+ti,omap2-sysc and ti,omap4-sysc respectively?
 
-As the tag explains the main change is the revert of the rk3368 opp
-addition, as this cannot safely run on current rk3368 boards and thus
-shouldn't make a kernel release.
+> The sysc type3 is what we have on am335x/ti81xx, see:
+>
+> $ git grep -B10 -A1 "&omap_hwmod_sysc_type3" arch/arm/mach-omap2
 
+Ah... three "foreign" modules with an idlemode carelessly thrown into a
+register without care for existing layouts.  I think these are more just
+exceptional cases which happen to agree by coincidence since they all
+just added idlemode in the simplest way possible, but I can understand
+how it came to be viewed as a standard type.
 
-Please pull, thanks
-Heiko
+> > ISS (omap4/5, dm814x) is also fun since it has top-level sysconfig, but
+> > most of the child modules (e.g. isp5 and simcop) also have their own
+> > sysconfig, and some child modules of simcop again have sysconfig.
+>
+> Interesting. Sounds like there's yet another interconnect instance
+> lurking there similar to L4 ABE?
 
+ISS has a 32-bit configuration interconnect and a 64/128-bit data
+interconnect:
+      .......................................
+     :              ISS                      :
+     :                                       :
+L3 --:--> configuration interconnect <-------:-- Cortex-M3/M4 subsystem
+     :      ||||||||||        |   |          :
+     :      vvvvvvvvvv        |   |          :
+     :      submodules        |   '---.      :
+     :       ||||||||         |       |      :
+     :       vvvvvvvv         v       v      :
+     : data interconnect --> BTE --> CBUFF --:--> L3
+     '.......................................'
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+It also has a local prcm controller to manage all this, and an irq
+combiner.  See the section "ISS Power Management" (8.1.2.4 in the public
+omap5 TRM, SWPU249AF) for a better diagram of all this.  The various
+versions of ISS differ somewhat in the submodules but all share the same
+overall structure.
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+One of the ISS submodules, SIMCOP, is itself again a fairly complicated
+subsystem with two local interconnects, of which you can find a block
+diagram in the "ISS Still Image Coprocessor" chapter (8.4).
 
-are available in the git repository at:
+Having a local interconnect is itself not a particularly rare thing (you
+can find one in ABE, DSS, CPSW, PRUSS, PWMSS, etc), but ISS does have
+unusual complexity with its multiple interconnects and nested subsystems.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts64fixes-1
-
-for you to fetch changes up to bb4e6ff01ac356f82327d980e45fee8a65491328:
-
-  arm64: dts: rockchip: Correct MIPI DPHY PLL clock on rk3399 (2017-09-19 19:25:10 +0200)
-
-----------------------------------------------------------------
-Adding the operating points on rk3368 like they were did not end up well
-for the boards as all of them are missing their cpu supplies, the opps
-actually need to follow the <target min max> format as the regulator is
-shared between both clusters and the one rk3368 board I have, somehow also
-doesn't like the higher opps at all - all of which I only realized after
-I brought my rk3368 board online again, after its bootloader broke.
-
-And a fix for the mipi dsi controller on rk3399, which was referencing
-a clock to high up in the clock-tree so that an intermediate gate could
-be disabled inadvertently.
-rk3368-board I have in my farm did not like the h
-
-----------------------------------------------------------------
-Heiko Stuebner (1):
-      Revert "arm64: dts: rockchip: Add basic cpu frequencies for RK3368"
-
-Nickey Yang (1):
-      arm64: dts: rockchip: Correct MIPI DPHY PLL clock on rk3399
-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 72 +-------------------------------
- arch/arm64/boot/dts/rockchip/rk3399.dtsi |  2 +-
- 2 files changed, 3 insertions(+), 71 deletions(-)
+Matthijs
