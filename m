@@ -1,402 +1,348 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 25 Sep 2017 10:05:39 +0100
-Subject: [PATCH v3 3/8] ARM: NOMMU: Rework MPU to be mostly done in C
+Date: Mon, 25 Sep 2017 10:05:43 +0100
+Subject: [PATCH v3 7/8] ARM: NOMMU: Use more MPU regions to cover memory
 In-Reply-To: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
 References: <1506330344-31556-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1506330344-31556-4-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1506330344-31556-8-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, there are several issues with how MPU is setup:
+PMSAv7 defines curious alignment requirements to the regions:
+- size must be power of 2, and
+- region start must be aligned to the region size
 
- 1. We won't boot if MPU is missing
- 2. We won't boot if use XIP
- 3. Further extension of MPU setup requires asm skills
+Because of that we currently adjust lowmem bounds plus we assign
+only one MPU region to cover memory all these lead to significant amount of
+memory could be wasted. As an example, consider 64Mb of memory at
+0x70000000 - it fits alignment requirements nicely; now, imagine that
+2Mb of memory is reserved for coherent DMA allocation, so now Linux is
+expected to see 62Mb of memory... and here annoying thing happens -
+memory gets truncated to 32Mb (we've lost 30Mb!), i.e. MPU layout
+looks like:
 
-The 1st point can be relaxed, so we can continue with boot CPU even if
-MPU is missed and fail boot for secondaries only. To address the 2nd
-point we could create region covering CONFIG_XIP_PHYS_ADDR - _end and
-that might work for the first stage of MPU enable, but due to MPU's
-alignment requirement we could cover too much, IOW we need more
-flexibility in how we're partitioning memory regions... and it'd be
-hardly possible to archive because of the 3rd point.
+0: base 0x70000000, size 0x2000000
 
-This patch is trying to address 1st and 3rd issues and paves the path
-for 2nd and further improvements.
+This patch tries to allocate as much as possible MPU slots to minimise
+amount of truncated memory. Moreover, with this patch MPU subregions
+starting to get used. MPU subregions allow us reduce the number of MPU
+slots used. For example given above, MPU layout looks like:
 
-The most visible change introduced with this patch is that we start
-using mpu_rgn_info array (as it was supposed?), so change in MPU setup
-done by boot CPU is recorded there and feed to secondaries. It
-allows us to keep minimal region setup for boot CPU and do the rest in
-C. Since we start programming MPU regions in C evaluation of MPU
-constrains (number of regions supported and minimal region order) can
-be done once, which in turn open possibility to free-up "probe"
-region early.
+0: base 0x70000000, size 0x2000000
+1: base 0x72000000, size 0x1000000
+2: base 0x73000000, size 0x1000000, disable subreg 7 (0x73e00000 - 0x73ffffff)
+
+Where without subregions we'd get:
+
+0: base 0x70000000, size 0x2000000
+1: base 0x72000000, size 0x1000000
+2: base 0x73000000, size 0x800000
+3: base 0x73800000, size 0x400000
+4: base 0x73c00000, size 0x200000
+
+To achieve better layout we fist try to cover specified memory as is
+(maybe with help of subregions) and if we failed, we truncate memory
+to fit alignment requirements (so it occupies one MPU slot) and
+perform one more attempt with the reminder, and so on till we either
+cover all memory or run out of MPU slots.
 
 Tested-by: Szemz? Andr?s <sza@esh.hu>
 Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/mpu.h    |  2 +-
- arch/arm/include/asm/smp.h    |  2 +-
- arch/arm/kernel/asm-offsets.c | 11 ++++++
- arch/arm/kernel/head-nommu.S  | 80 +++++++++++++++++++++++++++++++++----------
- arch/arm/kernel/smp.c         |  2 +-
- arch/arm/mm/pmsa-v7.c         | 70 +++++++++++++++++++++++++++----------
- 6 files changed, 127 insertions(+), 40 deletions(-)
+ arch/arm/include/asm/mpu.h |   5 ++
+ arch/arm/mm/pmsa-v7.c      | 190 ++++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 149 insertions(+), 46 deletions(-)
 
 diff --git a/arch/arm/include/asm/mpu.h b/arch/arm/include/asm/mpu.h
-index edec5cf..403462e 100644
+index 403462e..5db37a6 100644
 --- a/arch/arm/include/asm/mpu.h
 +++ b/arch/arm/include/asm/mpu.h
-@@ -62,7 +62,7 @@ struct mpu_rgn {
- };
+@@ -15,6 +15,11 @@
+ /* MPU D/I Size Register fields */
+ #define MPU_RSR_SZ		1
+ #define MPU_RSR_EN		0
++#define MPU_RSR_SD		8
++
++/* Number of subregions (SD) */
++#define MPU_NR_SUBREGS		8
++#define MPU_MIN_SUBREG_SIZE	256
  
- struct mpu_rgn_info {
--	u32 mpuir;
-+	unsigned int used;
- 	struct mpu_rgn rgns[MPU_MAX_REGIONS];
- };
- extern struct mpu_rgn_info mpu_rgn_info;
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 3d6dc8b..709a559 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -60,7 +60,7 @@
-  */
- struct secondary_data {
- 	union {
--		unsigned long mpu_rgn_szr;
-+		struct mpu_rgn_info *mpu_rgn_info;
- 		u64 pgdir;
- 	};
- 	unsigned long swapper_pg_dir;
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 6080082..0098d3c4 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -23,6 +23,7 @@
- #include <asm/mach/arch.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
-+#include <asm/mpu.h>
- #include <asm/procinfo.h>
- #include <asm/suspend.h>
- #include <asm/vdso_datapage.h>
-@@ -183,5 +184,15 @@ int main(void)
- #ifdef CONFIG_VDSO
-   DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
- #endif
-+  BLANK();
-+#ifdef CONFIG_ARM_MPU
-+  DEFINE(MPU_RNG_INFO_RNGS,	offsetof(struct mpu_rgn_info, rgns));
-+  DEFINE(MPU_RNG_INFO_USED,	offsetof(struct mpu_rgn_info, used));
-+
-+  DEFINE(MPU_RNG_SIZE,		sizeof(struct mpu_rgn));
-+  DEFINE(MPU_RGN_DRBAR,		offsetof(struct mpu_rgn, drbar));
-+  DEFINE(MPU_RGN_DRSR,		offsetof(struct mpu_rgn, drsr));
-+  DEFINE(MPU_RGN_DRACR,		offsetof(struct mpu_rgn, dracr));
-+#endif
-   return 0; 
- }
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 4b9e8da..f242ae5 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -13,6 +13,7 @@
-  */
- #include <linux/linkage.h>
- #include <linux/init.h>
-+#include <linux/errno.h>
- 
- #include <asm/assembler.h>
- #include <asm/ptrace.h>
-@@ -131,8 +132,8 @@ ENTRY(secondary_startup)
- 
- #ifdef CONFIG_ARM_MPU
- 	/* Use MPU region info supplied by __cpu_up */
--	ldr	r6, [r7]			@ get secondary_data.mpu_szr
--	bl      __setup_mpu			@ Initialize the MPU
-+	ldr	r6, [r7]			@ get secondary_data.mpu_rgn_info
-+	bl      __secondary_setup_mpu		@ Initialize the MPU
- #endif
- 
- 	badr	lr, 1f				@ return (PIC) address
-@@ -225,13 +226,13 @@ ENTRY(__setup_mpu)
- 	mrc	p15, 0, r0, c0, c1, 4		@ Read ID_MMFR0
- 	and	r0, r0, #(MMFR0_PMSA)		@ PMSA field
- 	teq	r0, #(MMFR0_PMSAv7)		@ PMSA v7
--	bne	__error_p			@ Fail: ARM_MPU on NOT v7 PMSA
-+	bxne	lr
- 
- 	/* Determine whether the D/I-side memory map is unified. We set the
- 	 * flags here and continue to use them for the rest of this function */
- 	mrc	p15, 0, r0, c0, c0, 4		@ MPUIR
- 	ands	r5, r0, #MPUIR_DREGION_SZMASK	@ 0 size d region => No MPU
--	beq	__error_p			@ Fail: ARM_MPU and no MPU
-+	bxeq	lr
- 	tst	r0, #MPUIR_nU			@ MPUIR_nU = 0 for unified
- 
- 	/* Setup second region first to free up r6 */
-@@ -259,27 +260,70 @@ ENTRY(__setup_mpu)
- 	setup_region r0, r5, r6, MPU_INSTR_SIDE @ 0x0, BG region, enabled
- 2:	isb
- 
--	/* Vectors region */
--	set_region_nr r0, #MPU_VECTORS_REGION
-+	/* Enable the MPU */
-+	mrc	p15, 0, r0, c1, c0, 0		@ Read SCTLR
-+	bic	r0, r0, #CR_BR			@ Disable the 'default mem-map'
-+	orr	r0, r0, #CR_M			@ Set SCTRL.M (MPU on)
-+	mcr	p15, 0, r0, c1, c0, 0		@ Enable MPU
-+	isb
-+
-+	ret	lr
-+ENDPROC(__setup_mpu)
-+
-+#ifdef CONFIG_SMP
-+/*
-+ * r6: pointer at mpu_rgn_info
-+ */
-+
-+ENTRY(__secondary_setup_mpu)
-+	/* Probe for v7 PMSA compliance */
-+	mrc	p15, 0, r0, c0, c1, 4		@ Read ID_MMFR0
-+	and	r0, r0, #(MMFR0_PMSA)		@ PMSA field
-+	teq	r0, #(MMFR0_PMSAv7)		@ PMSA v7
-+	bne	__error_p
-+
-+	/* Determine whether the D/I-side memory map is unified. We set the
-+	 * flags here and continue to use them for the rest of this function */
-+	mrc	p15, 0, r0, c0, c0, 4		@ MPUIR
-+	ands	r5, r0, #MPUIR_DREGION_SZMASK	@ 0 size d region => No MPU
-+	beq	__error_p
-+
-+	ldr	r4, [r6, #MPU_RNG_INFO_USED]
-+	mov	r5, #MPU_RNG_SIZE
-+	add	r3, r6, #MPU_RNG_INFO_RNGS
-+	mla	r3, r4, r5, r3
-+
-+1:
-+	tst	r0, #MPUIR_nU			@ MPUIR_nU = 0 for unified
-+	sub	r3, r3, #MPU_RNG_SIZE
-+	sub	r4, r4, #1
-+
-+	set_region_nr r0, r4
- 	isb
--	/* Shared, inaccessible to PL0, rw PL1 */
--	mov	r0, #CONFIG_VECTORS_BASE	@ Cover from VECTORS_BASE
--	ldr	r5,=(MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL)
--	/* Writing N to bits 5:1 (RSR_SZ) --> region size 2^N+1 */
--	mov	r6, #(((2 * PAGE_SHIFT - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN)
- 
--	setup_region r0, r5, r6, MPU_DATA_SIDE	@ VECTORS_BASE, PL0 NA, enabled
--	beq	3f				@ Memory-map not unified
--	setup_region r0, r5, r6, MPU_INSTR_SIDE	@ VECTORS_BASE, PL0 NA, enabled
--3:	isb
-+	ldr	r0, [r3, #MPU_RGN_DRBAR]
-+	ldr	r6, [r3, #MPU_RGN_DRSR]
-+	ldr	r5, [r3, #MPU_RGN_DRACR]
-+
-+	setup_region r0, r5, r6, MPU_DATA_SIDE
-+	beq	2f
-+	setup_region r0, r5, r6, MPU_INSTR_SIDE
-+2:	isb
-+
-+	mrc	p15, 0, r0, c0, c0, 4		@ Reevaluate the MPUIR
-+	cmp	r4, #0
-+	bgt	1b
- 
- 	/* Enable the MPU */
- 	mrc	p15, 0, r0, c1, c0, 0		@ Read SCTLR
--	bic     r0, r0, #CR_BR			@ Disable the 'default mem-map'
-+	bic	r0, r0, #CR_BR			@ Disable the 'default mem-map'
- 	orr	r0, r0, #CR_M			@ Set SCTRL.M (MPU on)
- 	mcr	p15, 0, r0, c1, c0, 0		@ Enable MPU
- 	isb
-+
- 	ret	lr
--ENDPROC(__setup_mpu)
--#endif
-+ENDPROC(__secondary_setup_mpu)
-+
-+#endif /* CONFIG_SMP */
-+#endif /* CONFIG_ARM_MPU */
- #include "head-common.S"
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index c9a0a52..b4fbf00 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -114,7 +114,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
- #ifdef CONFIG_ARM_MPU
--	secondary_data.mpu_rgn_szr = mpu_rgn_info.rgns[MPU_RAM_REGION].drsr;
-+	secondary_data.mpu_rgn_info = &mpu_rgn_info;
- #endif
- 
- #ifdef CONFIG_MMU
+ /* The D/I RSR value for an enabled region spanning the whole of memory */
+ #define MPU_RSR_ALL_MEM		63
 diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
-index 5b55f8f..029d204 100644
+index 72f1a9f..c1f1fc7 100644
 --- a/arch/arm/mm/pmsa-v7.c
 +++ b/arch/arm/mm/pmsa-v7.c
-@@ -12,6 +12,9 @@
+@@ -4,6 +4,7 @@
+  * ARM uCLinux supporting functions.
+  */
+ 
++#include <linux/bitops.h>
+ #include <linux/memblock.h>
+ 
+ #include <asm/cp15.h>
+@@ -12,9 +13,20 @@
  
  #include "mm.h"
  
-+static unsigned int __initdata mpu_min_region_order;
-+static unsigned int __initdata mpu_max_regions;
++struct region {
++	phys_addr_t base;
++	phys_addr_t size;
++	unsigned long subreg;
++};
 +
++static struct region __initdata mem[MPU_MAX_REGIONS];
++
+ static unsigned int __initdata mpu_min_region_order;
+ static unsigned int __initdata mpu_max_regions;
+ 
++static int __init __mpu_min_region_order(void);
++static int __init __mpu_max_regions(void);
++
+ #ifndef CONFIG_CPU_V7M
+ 
  #define DRBAR	__ACCESS_CP15(c6, 0, c1, 0)
- #define IRBAR	__ACCESS_CP15(c6, 0, c1, 1)
- #define DRSR	__ACCESS_CP15(c6, 0, c1, 2)
-@@ -75,6 +78,11 @@ static inline u32 irbar_read(void)
- 	return read_sysreg(IRBAR);
+@@ -130,19 +142,120 @@ static int __init mpu_present(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR0) & MMFR0_PMSA) == MMFR0_PMSAv7);
  }
  
-+static int __init mpu_present(void)
++static bool __init try_split_region(phys_addr_t base, phys_addr_t size, struct region *region)
 +{
-+	return ((read_cpuid_ext(CPUID_EXT_MMFR0) & MMFR0_PMSA) == MMFR0_PMSAv7);
++	unsigned long  subreg, bslots, sslots;
++	phys_addr_t abase = base & ~(size - 1);
++	phys_addr_t asize = base + size - abase;
++	phys_addr_t p2size = 1 << __fls(asize);
++	phys_addr_t bdiff, sdiff;
++
++	if (p2size != asize)
++		p2size *= 2;
++
++	bdiff = base - abase;
++	sdiff = p2size - asize;
++	subreg = p2size / MPU_NR_SUBREGS;
++
++	if ((bdiff % subreg) || (sdiff % subreg))
++		return false;
++
++	bslots = bdiff / subreg;
++	sslots = sdiff / subreg;
++
++	if (bslots || sslots) {
++		int i;
++
++		if (subreg < MPU_MIN_SUBREG_SIZE)
++			return false;
++
++		if (bslots + sslots > MPU_NR_SUBREGS)
++			return false;
++
++		for (i = 0; i < bslots; i++)
++			_set_bit(i, &region->subreg);
++
++		for (i = 1; i <= sslots; i++)
++			_set_bit(MPU_NR_SUBREGS - i, &region->subreg);
++	}
++
++	region->base = abase;
++	region->size = p2size;
++
++	return true;
++}
++
++static int __init allocate_region(phys_addr_t base, phys_addr_t size,
++				  unsigned int limit, struct region *regions)
++{
++	int count = 0;
++	phys_addr_t diff = size;
++	int attempts = MPU_MAX_REGIONS;
++
++	while (diff) {
++		/* Try cover region as is (maybe with help of subregions) */
++		if (try_split_region(base, size, &regions[count])) {
++			count++;
++			base += size;
++			diff -= size;
++			size = diff;
++		} else {
++			/*
++			 * Maximum aligned region might overflow phys_addr_t
++			 * if "base" is 0. Hence we keep everything below 4G
++			 * until we take the smaller of the aligned region
++			 * size ("asize") and rounded region size ("p2size"),
++			 * one of which is guaranteed to be smaller than the
++			 * maximum physical address.
++			 */
++			phys_addr_t asize = (base - 1) ^ base;
++			phys_addr_t p2size = (1 <<  __fls(diff)) - 1;
++
++			size = asize < p2size ? asize + 1 : p2size + 1;
++		}
++
++		if (count > limit)
++			break;
++
++		if (!attempts)
++			break;
++
++		attempts--;
++	}
++
++	return count;
 +}
 +
  /* MPU initialisation functions */
  void __init adjust_lowmem_bounds_mpu(void)
  {
-@@ -85,6 +93,9 @@ void __init adjust_lowmem_bounds_mpu(void)
+ 	phys_addr_t phys_offset = PHYS_OFFSET;
+-	phys_addr_t aligned_region_size, specified_mem_size, rounded_mem_size;
++	phys_addr_t  specified_mem_size, total_mem_size = 0;
+ 	struct memblock_region *reg;
+ 	bool first = true;
  	phys_addr_t mem_start;
  	phys_addr_t mem_end;
++	unsigned int mem_max_regions;
++	int num, i;
  
-+	if (!mpu_present())
-+		return;
-+
- 	for_each_memblock(memory, reg) {
- 		if (first) {
- 			/*
-@@ -146,12 +157,7 @@ void __init adjust_lowmem_bounds_mpu(void)
- 
- }
- 
--static int mpu_present(void)
--{
--	return ((read_cpuid_ext(CPUID_EXT_MMFR0) & MMFR0_PMSA) == MMFR0_PMSAv7);
--}
--
--static int mpu_max_regions(void)
-+static int __init __mpu_max_regions(void)
- {
- 	/*
- 	 * We don't support a different number of I/D side regions so if we
-@@ -159,6 +165,7 @@ static int mpu_max_regions(void)
- 	 * whichever side has a smaller number of supported regions.
- 	 */
- 	u32 dregions, iregions, mpuir;
-+
- 	mpuir = read_cpuid(CPUID_MPUIR);
- 
- 	dregions = iregions = (mpuir & MPUIR_DREGION_SZMASK) >> MPUIR_DREGION;
-@@ -171,15 +178,16 @@ static int mpu_max_regions(void)
- 	return min(dregions, iregions);
- }
- 
--static int mpu_iside_independent(void)
-+static int __init mpu_iside_independent(void)
- {
- 	/* MPUIR.nU specifies whether there is *not* a unified memory map */
- 	return read_cpuid(CPUID_MPUIR) & MPUIR_nU;
- }
- 
--static int mpu_min_region_order(void)
-+static int __init __mpu_min_region_order(void)
- {
- 	u32 drbar_result, irbar_result;
-+
- 	/* We've kept a region free for this probing */
- 	rgnr_write(MPU_PROBE_REGION);
- 	isb();
-@@ -198,22 +206,24 @@ static int mpu_min_region_order(void)
- 	}
- 	isb(); /* Ensure that MPU region operations have completed */
- 	/* Return whichever result is larger */
-+
- 	return __ffs(max(drbar_result, irbar_result));
- }
- 
--static int mpu_setup_region(unsigned int number, phys_addr_t start,
-+static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
- 			unsigned int size_order, unsigned int properties)
- {
- 	u32 size_data;
- 
- 	/* We kept a region free for probing resolution of MPU regions*/
--	if (number > mpu_max_regions() || number == MPU_PROBE_REGION)
-+	if (number > mpu_max_regions
-+	    || number >= MPU_MAX_REGIONS)
- 		return -ENOENT;
- 
- 	if (size_order > 32)
- 		return -ENOMEM;
- 
--	if (size_order < mpu_min_region_order())
-+	if (size_order < mpu_min_region_order)
- 		return -ENOMEM;
- 
- 	/* Writing N to bits 5:1 (RSR_SZ)  specifies region size 2^N+1 */
-@@ -240,6 +250,9 @@ static int mpu_setup_region(unsigned int number, phys_addr_t start,
- 	mpu_rgn_info.rgns[number].dracr = properties;
- 	mpu_rgn_info.rgns[number].drbar = start;
- 	mpu_rgn_info.rgns[number].drsr = size_data;
-+
-+	mpu_rgn_info.used++;
-+
- 	return 0;
- }
- 
-@@ -248,19 +261,38 @@ static int mpu_setup_region(unsigned int number, phys_addr_t start,
- */
- void __init mpu_setup(void)
- {
--	int region_err;
-+	int region = 0, err = 0;
-+
  	if (!mpu_present())
  		return;
  
--	region_err = mpu_setup_region(MPU_RAM_REGION, PHYS_OFFSET,
--					ilog2(memblock.memory.regions[0].size),
--					MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL);
--	if (region_err) {
--		panic("MPU region initialization failure! %d", region_err);
 +	/* Free-up MPU_PROBE_REGION */
 +	mpu_min_region_order = __mpu_min_region_order();
 +
 +	/* How many regions are supported */
 +	mpu_max_regions = __mpu_max_regions();
 +
-+	/* Now setup MPU (order is important) */
++	mem_max_regions = min((unsigned int)MPU_MAX_REGIONS, mpu_max_regions);
 +
-+	/* Background */
-+	err |= mpu_setup_region(region++, 0, 32,
-+				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA);
++	/* We need to keep one slot for background region */
++	mem_max_regions--;
 +
-+	/* RAM */
-+	err |= mpu_setup_region(region++, PHYS_OFFSET,
-+				ilog2(memblock.memory.regions[0].size),
-+				MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL);
-+
-+	/* Vectors */
-+	err |= mpu_setup_region(region++, vectors_base,
-+				ilog2(2 * PAGE_SIZE),
-+				MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL);
-+	if (err) {
-+		panic("MPU region initialization failure! %d", err);
- 	} else {
- 		pr_info("Using ARMv7 PMSA Compliant MPU. "
--			 "Region independence: %s, Max regions: %d\n",
-+			 "Region independence: %s, Used %d of %d regions\n",
- 			mpu_iside_independent() ? "Yes" : "No",
--			mpu_max_regions());
-+			mpu_rgn_info.used, mpu_max_regions);
++#ifndef CONFIG_CPU_V7M
++	/* ... and one for vectors */
++	mem_max_regions--;
++#endif
+ 	for_each_memblock(memory, reg) {
+ 		if (first) {
+ 			/*
+@@ -168,40 +281,23 @@ void __init adjust_lowmem_bounds_mpu(void)
+ 		}
  	}
+ 
+-	/*
+-	 * MPU has curious alignment requirements: Size must be power of 2, and
+-	 * region start must be aligned to the region size
+-	 */
+-	if (phys_offset != 0)
+-		pr_info("PHYS_OFFSET != 0 => MPU Region size constrained by alignment requirements\n");
+-
+-	/*
+-	 * Maximum aligned region might overflow phys_addr_t if phys_offset is
+-	 * 0. Hence we keep everything below 4G until we take the smaller of
+-	 * the aligned_region_size and rounded_mem_size, one of which is
+-	 * guaranteed to be smaller than the maximum physical address.
+-	 */
+-	aligned_region_size = (phys_offset - 1) ^ (phys_offset);
+-	/* Find the max power-of-two sized region that fits inside our bank */
+-	rounded_mem_size = (1 <<  __fls(specified_mem_size)) - 1;
++	num = allocate_region(mem_start, specified_mem_size, mem_max_regions, mem);
+ 
+-	/* The actual region size is the smaller of the two */
+-	aligned_region_size = aligned_region_size < rounded_mem_size
+-				? aligned_region_size + 1
+-				: rounded_mem_size + 1;
++	for (i = 0; i < num; i++) {
++		unsigned long  subreg = mem[i].size / MPU_NR_SUBREGS;
+ 
+-	if (aligned_region_size != specified_mem_size) {
+-		pr_warn("Truncating memory from %pa to %pa (MPU region constraints)",
+-				&specified_mem_size, &aligned_region_size);
+-		memblock_remove(mem_start + aligned_region_size,
+-				specified_mem_size - aligned_region_size);
++		total_mem_size += mem[i].size - subreg * hweight_long(mem[i].subreg);
+ 
+-		mem_end = mem_start + aligned_region_size;
++		pr_debug("MPU: base %pa size %pa disable subregions: %*pbl\n",
++			 &mem[i].base, &mem[i].size, MPU_NR_SUBREGS, &mem[i].subreg);
+ 	}
+ 
+-	pr_debug("MPU Region from %pa size %pa (end %pa))\n",
+-		&phys_offset, &aligned_region_size, &mem_end);
+-
++	if (total_mem_size != specified_mem_size) {
++		pr_warn("Truncating memory from %pa to %pa (MPU region constraints)",
++				&specified_mem_size, &total_mem_size);
++		memblock_remove(mem_start + total_mem_size,
++				specified_mem_size - total_mem_size);
++	}
  }
+ 
+ static int __init __mpu_max_regions(void)
+@@ -258,7 +354,8 @@ static int __init __mpu_min_region_order(void)
+ }
+ 
+ static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
+-			unsigned int size_order, unsigned int properties)
++				   unsigned int size_order, unsigned int properties,
++				   unsigned int subregions)
+ {
+ 	u32 size_data;
+ 
+@@ -275,6 +372,7 @@ static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
+ 
+ 	/* Writing N to bits 5:1 (RSR_SZ)  specifies region size 2^N+1 */
+ 	size_data = ((size_order - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN;
++	size_data |= subregions << MPU_RSR_SD;
+ 
+ 	dsb(); /* Ensure all previous data accesses occur with old mappings */
+ 	rgnr_write(number);
+@@ -308,33 +406,33 @@ static int __init mpu_setup_region(unsigned int number, phys_addr_t start,
+ */
+ void __init mpu_setup(void)
+ {
+-	int region = 0, err = 0;
++	int i, region = 0, err = 0;
+ 
+ 	if (!mpu_present())
+ 		return;
+ 
+-	/* Free-up MPU_PROBE_REGION */
+-	mpu_min_region_order = __mpu_min_region_order();
+-
+-	/* How many regions are supported */
+-	mpu_max_regions = __mpu_max_regions();
+-
+-	/* Now setup MPU (order is important) */
++	/* Setup MPU (order is important) */
+ 
+ 	/* Background */
+ 	err |= mpu_setup_region(region++, 0, 32,
+-				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA);
++				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA,
++				0);
+ 
+ 	/* RAM */
+-	err |= mpu_setup_region(region++, PHYS_OFFSET,
+-				ilog2(memblock.memory.regions[0].size),
+-				MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL);
++	for (i = 0; i < ARRAY_SIZE(mem); i++) {
++		if (!mem[i].size)
++			continue;
++
++		err |= mpu_setup_region(region++, mem[i].base, ilog2(mem[i].size),
++					MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL,
++					mem[i].subreg);
++	}
+ 
+ 	/* Vectors */
+ #ifndef CONFIG_CPU_V7M
+-	err |= mpu_setup_region(region++, vectors_base,
+-				ilog2(2 * PAGE_SIZE),
+-				MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL);
++	err |= mpu_setup_region(region++, vectors_base, ilog2(2 * PAGE_SIZE),
++				MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL,
++				0);
+ #endif
+ 	if (err) {
+ 		panic("MPU region initialization failure! %d", err);
 -- 
 1.9.1
