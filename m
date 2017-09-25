@@ -1,38 +1,64 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 25 Sep 2017 10:05:11 +0200
-Subject: bq27xxx: what is going on with MSLEEP() macro
-Message-ID: <20170925080510.GA31768@amd>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 25 Sep 2017 17:08:06 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20170921172811.GB4394@atomide.com>
+References: <20170903203737.GA12475@amd> <20170905201314.GE5024@atomide.com>
+ <20170905233241.GA19231@js1304-P5Q-DELUXE>
+ <20170906133057.GH5024@atomide.com>
+ <20170907073038.GA2111@js1304-P5Q-DELUXE>
+ <20170907161650.GP5024@atomide.com>
+ <20170913075516.GA25036@js1304-P5Q-DELUXE>
+ <20170913163126.GS5024@atomide.com>
+ <20170915065608.GA8567@js1304-P5Q-DELUXE>
+ <20170921172811.GB4394@atomide.com>
+Message-ID: <20170925080806.GA9837@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Sep 21, 2017 at 10:28:11AM -0700, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [170914 23:55]:
+> > On Wed, Sep 13, 2017 at 09:31:27AM -0700, Tony Lindgren wrote:
+> > > Yes I disabled CONFIG_HIGHMEM and n900 boots. To disable it,
+> > > you need to remove it from arch/arm/mach-omap2/Kconfig that
+> > > selects it if ARCH_OMAP2PLUS_TYPICAL is selected.
+> > 
+> > Okay. Problem would be related to address traslation. I'd like to
+> > check address traslation more. Could you apply following patch and
+> > test it? And, please send me the dmesg log and your kernel config.
+> > Please test this with CONFIG_DEBUG_VIRTUAL = n and CONFIG_CMA_DEBUG=y and
+> > CONFIG_HIGHMEM=y and with kernel bootparam 'ignore_loglevel'.
+> > 
+> > It would be really appreciate if you send me two logs for before/after
+> > commit 9caf25f996e8.
+> 
+> Sorry for the delays, I finally got around testing this for you.
 
-0670c9b35 drivers/power/supply/bq27xxx_battery.c #define BQ27XXX_MSLEEP(i) usleep_range((i)*1000, (i)*1000+500)
+No problem! I really appreciate your help!
 
-Liam, is this really neccessary? Defining MSLEEP to be USLEEP_RANGE is
-quite sneaky and confusing. Plus I don't believe we should be
-usleep-ing for 25msec. Can we just replace it with regular msleep?
+> Compile with your patch failed for modules with __virt_to_phys_debug
+> being undefined so I added EXPORT_SYMBOL there. I also enabled DEBUG_LL
+> and EARLYPRINTK to get output.
+> 
+> Below is dmesg output for 9caf25f996e8 + your patch. I'll send you
+> the full logs separately.
 
-0670c9b35 drivers/power/supply/bq27xxx_battery.c         /* DO NOT read BQ27XXX_DM_CKSUM
-here to verify it! That may cause NVM
+Hmm...there is only one caller for the CMA memory, that is, atomic_pool_init().
+Could you test one more time with 9caf25f996e8 + following patch?  I'd like to
+know the actual user for the CMA memory.
 
-Normal kernel style for multi-line comments is
+Thanks.
 
-/*
- * foo
- */
-
-Can you fix those?
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170925/bb21be4f/attachment.sig>
+-------------------------->8------------------------
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 519c294..c68f34a 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -587,6 +587,8 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
+                ptr = (void *)val;
+        }
+ 
++       dump_stack();
++
+        return ptr;
+ }
+ 
