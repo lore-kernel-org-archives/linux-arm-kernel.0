@@ -1,254 +1,111 @@
-From: kdinh@apm.com (Khuong Dinh)
-Date: Tue, 26 Sep 2017 11:49:21 -0600
-Subject: [PATCH v4 pci 2/2] PCI/MSI: Enforce MSI driver loaded before PCIe in
- ACPI boot
-In-Reply-To: <1506448161-30961-1-git-send-email-kdinh@apm.com>
-References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
-Message-ID: <1506448161-30961-3-git-send-email-kdinh@apm.com>
+From: philip@balister.org (Philip Balister)
+Date: Tue, 26 Sep 2017 13:58:38 -0400
+Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
+ Project Sulfur SDRs
+In-Reply-To: <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
+References: <20170911232223.91894-1-mdf@kernel.org>
+ <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
+ <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
+ <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
+ <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
+Message-ID: <dfb517fe-8584-2a1a-22e5-946980cc9644@balister.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enforces MSI driver loaded before PCIe controller driver
-in ACPI boot mode.
+On 09/26/2017 01:50 PM, Moritz Fischer wrote:
+> Michal,
+> 
+> On Tue, Sep 26, 2017 at 02:54:48PM +0200, Michal Simek wrote:
+>> Hi,
+>>
+>> On 25.9.2017 18:11, Moritz Fischer wrote:
+>>> Hi Michal,
+>>>
+>>> On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
+>>>> Hi Moritz
+>>>>
+>>>> sorry for delay.
+>>>
+>>> No problem.
+>>>
+>>>>
+>>>> On 12.9.2017 01:22, Moritz Fischer wrote:
+>>>>> Add support for the National Instruments Project Sulfur SDR
+>>>>> motherboards Rev 2,3 and 4.
+>>>>>
+>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>>>> ---
+>>>>>  arch/arm/boot/dts/Makefile                |   3 +
+>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
+>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
+>>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
+>>>>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
+>>>>>  5 files changed, 364 insertions(+)
+>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
+>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
+>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
+>>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
+>>>>
+>>>> Is this publicly available board?
+>>>
+>>> Will be in Q1 2018 was announced at GRCon'17 ([1]).
+>>> Some of the Rev3s are currently deployed in Norway as part of a radar
+>>> system.
+>>>
+>>>> I am not quite sure we should apply these dts files. There are a lot of
+>>>> boards with zynq and there must be any strong argument for applying this
+>>>> to the tree. For arm32 with even flat tree structure.
+>>>
+>>> What's the issue with merging them, except for having 3 more files? 
+>>
+>> For me this is not a problem because on Linux side it is not increasing
+>> build time.
+>> I want to see the value for community. All xilinx platforms are
+>> evaluation generic purpose boards which are showing how to connect stuff
+>> together.
+>> On the other hand this is real product.
+> 
+> Uh.
+> 
+>> I would let arm-soc maintainer to decide if this is fine or not. I
+>> definitely don't want to end up in situation that we will have dts for
+>> real products which are not bringing any value for others.
+> 
+> Sure, it's the maintainers call.
+> 
+> I do intend to have my customers run mainline on it eventually, currently
+> I'm a handful of patches away from making that happen. So yes, running
+> mainline is a usecase that matters to me.
+> 
+> It is one thing to keep bitching about vendor kernels as a community
+> continuously, but then if someone goes through the effort and actually
+> tries to run mainline, you give them crap like that above.
+> 
+> Our products usually come with full schematics [1], firmware, fpga code and all
+> available, I don't know what makes them less useful to the community as a
+> platform to experiment and develop on than Xilinx eval boards.
+> 
+> There's several people that I know of both hobbyists and companies that
+> build systems around these platforms, so I don't know ...
 
-Signed-off-by: Khuong Dinh <kdinh@apm.com>
----
- drivers/acpi/Makefile            |    2 +-
- drivers/acpi/acpi_msi.c          |   86 ++++++++++++++++++++++++++++++++++++++
- drivers/acpi/acpi_platform.c     |    3 +-
- drivers/acpi/internal.h          |    1 +
- drivers/acpi/scan.c              |    1 +
- drivers/pci/host/pci-xgene-msi.c |   22 +++++++++-
- include/linux/acpi_msi.h         |   37 ++++++++++++++++
- 7 files changed, 148 insertions(+), 4 deletions(-)
- create mode 100644 drivers/acpi/acpi_msi.c
- create mode 100644 include/linux/acpi_msi.h
+I expect this product to be delivered with full source and a mainline
+kernel, so lets make it easy for Moritz to do the right thing here. This
+makes long term support of this product much easier.
 
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 90265ab..b33247e 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -40,7 +40,7 @@ acpi-y				+= ec.o
- acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
- acpi-y				+= pci_root.o pci_link.o pci_irq.o
- obj-$(CONFIG_ACPI_MCFG)		+= pci_mcfg.o
--acpi-y				+= acpi_lpss.o acpi_apd.o
-+acpi-y				+= acpi_lpss.o acpi_apd.o acpi_msi.o
- acpi-y				+= acpi_platform.o
- acpi-y				+= acpi_pnp.o
- acpi-$(CONFIG_ARM_AMBA)	+= acpi_amba.o
-diff --git a/drivers/acpi/acpi_msi.c b/drivers/acpi/acpi_msi.c
-new file mode 100644
-index 0000000..a254e84
---- /dev/null
-+++ b/drivers/acpi/acpi_msi.c
-@@ -0,0 +1,86 @@
-+/*
-+ * Enforce MSI driver loaded before PCIe controller driver
-+ *
-+ * Copyright (c) 2017, MACOM Technology Solutions Corporation
-+ * Author: Khuong Dinh <kdinh@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/acpi.h>
-+#include "internal.h"
-+#include <linux/acpi_msi.h>
-+
-+struct msi_driver_item {
-+	struct list_head msi_drv_list;
-+	struct platform_driver *addr;
-+	unsigned char id[ACPI_ID_LEN];
-+};
-+
-+static LIST_HEAD(msi_drv_list);
-+
-+static acpi_status acpi_create_msi_device(acpi_handle handle, u32 Level,
-+					void *context, void **retval)
-+{
-+	acpi_status status = AE_OK;
-+	int result;
-+
-+	acpi_scan_lock_acquire();
-+	result = acpi_bus_scan(handle);
-+	acpi_scan_lock_release();
-+	if (result) {
-+		status = AE_ERROR;
-+		goto out;
-+	}
-+	result = platform_driver_register((struct platform_driver *) context);
-+	if (result) {
-+		status = AE_ERROR;
-+		goto out;
-+	}
-+out:
-+	return status;
-+}
-+
-+void __init acpi_msi_init(void)
-+{
-+	struct msi_driver_item *current_msi;
-+	struct list_head *pos;
-+
-+	list_for_each(pos, &msi_drv_list) {
-+		current_msi = list_entry(pos, struct msi_driver_item,
-+					msi_drv_list);
-+		if (!current_msi)
-+			return;
-+
-+		acpi_get_devices(current_msi->id,
-+			acpi_create_msi_device,
-+			(void *) current_msi->addr,
-+			NULL);
-+	}
-+}
-+
-+void acpi_msi_drv_subscribe(struct acpi_device_id msi_acpi_ids,
-+					struct platform_driver *msi)
-+{
-+	struct msi_driver_item *new_msi;
-+
-+	if (!msi)
-+		return;
-+
-+	new_msi = kmalloc(sizeof(*new_msi), GFP_KERNEL);
-+	if (!new_msi)
-+		return;
-+
-+	list_add(&(new_msi->msi_drv_list), &msi_drv_list);
-+	new_msi->addr = msi;
-+	strncpy(new_msi->id, msi_acpi_ids.id, sizeof(new_msi->id));
-+	new_msi->id[sizeof(new_msi->id) - 1] = '\0';
-+}
-diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-index 88cd949..a546076 100644
---- a/drivers/acpi/acpi_platform.c
-+++ b/drivers/acpi/acpi_platform.c
-@@ -44,7 +44,8 @@ static void acpi_platform_fill_resource(struct acpi_device *adev,
- 	 * If the device has parent we need to take its resources into
- 	 * account as well because this device might consume part of those.
- 	 */
--	parent = acpi_get_first_physical_node(adev->parent);
-+	parent = adev->parent ?
-+			acpi_get_first_physical_node(adev->parent) : NULL;
- 	if (parent && dev_is_pci(parent))
- 		dest->parent = pci_find_resource(to_pci_dev(parent), dest);
- }
-diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-index 4361c44..ec81801 100644
---- a/drivers/acpi/internal.h
-+++ b/drivers/acpi/internal.h
-@@ -80,6 +80,7 @@ int acpi_scan_add_handler_with_hotplug(struct acpi_scan_handler *handler,
- void acpi_lpss_init(void);
- 
- void acpi_apd_init(void);
-+void acpi_msi_init(void);
- 
- acpi_status acpi_hotplug_schedule(struct acpi_device *adev, u32 src);
- bool acpi_queue_hotplug_work(struct work_struct *work);
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 602f8ff..f1d7b96 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -2110,6 +2110,7 @@ int __init acpi_scan_init(void)
- 	acpi_status status;
- 	struct acpi_table_stao *stao_ptr;
- 
-+	acpi_msi_init();
- 	acpi_pci_root_init();
- 	acpi_pci_link_init();
- 	acpi_processor_init();
-diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-index d657248..327e663 100644
---- a/drivers/pci/host/pci-xgene-msi.c
-+++ b/drivers/pci/host/pci-xgene-msi.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/of_pci.h>
- #include <linux/acpi.h>
-+#include <linux/acpi_msi.h>
- 
- #define MSI_IR0			0x000000
- #define MSI_INT0		0x800000
-@@ -577,8 +578,25 @@ static int xgene_msi_probe(struct platform_device *pdev)
- 	.remove = xgene_msi_remove,
- };
- 
--static int __init xgene_pcie_msi_init(void)
-+static int __init xgene_pcie_msi_subscribe(void)
- {
-+	int i;
-+
-+	for (i = 0; i < sizeof(xgene_msi_acpi_ids)
-+			/ sizeof(xgene_msi_acpi_ids[0]) - 1; i++)
-+		acpi_msi_drv_subscribe(xgene_msi_acpi_ids[i],
-+						&xgene_msi_driver);
-+	return 0;
-+}
-+
-+static int __init xgene_pcie_msi_register(void)
-+{
-+	if (driver_find(xgene_msi_driver.driver.name, &platform_bus_type))
-+		return -EBUSY;
-+
- 	return platform_driver_register(&xgene_msi_driver);
- }
--subsys_initcall(xgene_pcie_msi_init);
-+
-+pure_initcall(xgene_pcie_msi_subscribe);
-+
-+module_init(xgene_pcie_msi_register);
-diff --git a/include/linux/acpi_msi.h b/include/linux/acpi_msi.h
-new file mode 100644
-index 0000000..f132416
---- /dev/null
-+++ b/include/linux/acpi_msi.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Enforce MSI driver loaded before PCIe controller driver library
-+ *
-+ * Copyright (c) 2017, MACOM Technology Solutions Corporation
-+ * Author: Khuong Dinh <kdinh@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __ACPI_MSI_H__
-+#define __ACPI_MSI_H__
-+
-+#include <linux/platform_device.h>
-+
-+/**
-+ * acpi_msi_drv_subscribe - Allow MSI drivers to subscribe its driver
-+ * information (acpi device id and platform driver address) such that
-+ * the ACPI driver layer probes its first before the controller
-+ * enumerated. This enforce that the MSI driver is always probed
-+ * before the PCIe controller driver.
-+ *
-+ * @msi_acpi_ids: The MSI ACPI devive.
-+ * @msi: The MSI platform driver.
-+ *
-+ */
-+void acpi_msi_drv_subscribe(struct acpi_device_id msi_acpi_ids,
-+					struct platform_driver *msi);
-+
-+#endif				/* __ACPI_MSI_H__ */
--- 
-1.7.1
+Acked-by: Philip Balister <philip@opensdr.com>
+
+Philip
+
+> 
+> - Moritz
+> 
+> [1] http://files.ettus.com/schematics/
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 516 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/a7b5fe99/attachment-0001.sig>
