@@ -1,60 +1,135 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 26 Sep 2017 15:20:27 +0530
-Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
-In-Reply-To: <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
-References: <20170920180132.4373-1-s-anna@ti.com>
- <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
- <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
- <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
- <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
-Message-ID: <cf0b63e6-613a-221c-ff40-ef3e333e5423@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Sep 2017 11:56:03 +0200
+Subject: [PATCH v2 03/13] drm/sun4i: tcon: Add support for demuxing TCON
+ output on A31
+In-Reply-To: <20170926065919.24446-4-wens@csie.org>
+References: <20170926065919.24446-1-wens@csie.org>
+ <20170926065919.24446-4-wens@csie.org>
+Message-ID: <20170926095603.c67y4rytydya7kjd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 September 2017 09:54 PM, Suman Anna wrote:
-> Hi Sekhar,
+Hi,
+
+On Tue, Sep 26, 2017 at 06:59:09AM +0000, Chen-Yu Tsai wrote:
+> On systems with 2 TCONs such as the A31, it is possible to demux the
+> output of the TCONs to one encoder.
 > 
->>
->> On Thursday 21 September 2017 08:41 PM, Suman Anna wrote:
->>> On 09/21/2017 09:43 AM, Sekhar Nori wrote:
->>>> On Wednesday 20 September 2017 11:31 PM, Suman Anna wrote:
->>>>> Enable the CMA and DMA_CMA Kconfig options by default for
->>>>> Davinci platforms. Davinci remoteproc driver is one of the
->>>>> modules that depends on these options, and this allows the
->>>>> driver to be made visible for selection with menuconfig.
->>>>>
->>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>> ---
->>>>> Hi Sekhar,
->>>>>
->>>>> Here's the patch that enables CMA as per your request. Patch based
->>>>> on your v4.15/defconfig branch.
->>>>
->>>> Applied! I guess you will be sending another patch enabling the
->>>> remoteproc driver itself?
->>>
->>> Thanks. Well, one always needs a firmware image in their filesystem
->>> without which enabling the driver is meaningless (it would fail). So was
->>> not planning to enable it by default.
->>
->> But the errors will show up only on DA850 LCDK where we have enabled the
->> DSP by default in DT because its an important usecase there. I think it
->> is important for users to see those errors.
->> (besides the usual benefits of having the module enabled to catch build
->> and runtime issues easily).
+> Add support for this for the A31.
 > 
-> Yeah, DSP node is enabled only for DA850 LCDK among the DT-supported
-> boards, but I believe there are boards still using legacy boot, and it
-> shows up on those platforms as well. FYI, we do not have any rpmsg
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 61 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index e853dfe51389..770b843a6fa9 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -14,9 +14,12 @@
+>  #include <drm/drm_atomic_helper.h>
+>  #include <drm/drm_crtc.h>
+>  #include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_encoder.h>
+>  #include <drm/drm_modes.h>
+>  #include <drm/drm_of.h>
+>  
+> +#include <uapi/drm/drm_mode.h>
+> +
+>  #include <linux/component.h>
+>  #include <linux/ioport.h>
+>  #include <linux/of_address.h>
+> @@ -109,11 +112,69 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+>  }
+>  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
+>  
+> +static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
+> +{
+> +	struct sun4i_drv *drv = drm->dev_private;
+> +	struct sun4i_tcon *tcon;
+> +
+> +	list_for_each_entry(tcon, &drv->tcon_list, list)
+> +		if (tcon->id == 0)
+> +			return tcon;
+> +
+> +	dev_warn(drm->dev,
+> +		 "TCON0 not found, display output muxing may not work\n");
+> +
+> +	return tcon;
+> +}
+> +
+> +static int _sun6i_tcon_set_mux(struct drm_encoder *encoder)
+> +{
+> +	struct sun4i_tcon *tcon = sun4i_get_first_tcon(encoder->dev);
+> +	int tcon_id = drm_crtc_to_sun4i_crtc(encoder->crtc)->tcon->id;
+> +	u32 shift;
+> +
+> +	DRM_DEBUG_DRIVER("Muxing encoder %s to CRTC %s (TCON %d)\n",
+> +			 encoder->name, encoder->crtc->name, tcon_id);
+> +
+> +	/* Only 2 TCONs */
+> +	if (tcon_id >= 2)
+> +		return -EINVAL;
+> +
+> +	switch (encoder->encoder_type) {
+> +	case DRM_MODE_ENCODER_TMDS:
+> +		/* HDMI */
+> +		shift = 8;
+> +		break;
+> +	case DRM_MODE_ENCODER_DSI:
+> +		/* No MIPI DSI on A31s */
+> +		if (of_device_is_compatible(tcon->dev->of_node,
+> +					    "allwinner,sun6i-a31s-tcon"))
 
-Thats right. Even there, my thinking is if a board is registering a
-platform device, its because it wants to use it. And so the driver
-should be enabled.
+I'm not sure that test is needed.
 
-> drivers other than the kernel sample to make real usage of a booted
-> remoteproc. Anycase, if you still prefer this to be added, I don't mind.
+We won't end up in that case if we don't have a connected DSI block,
+which isn't going to be the case on the A31. And I guess we can tackle
+DSI later (when I'll send my patches...).
 
-I think its better to enable the driver too. Please submit a patch. Thanks!
+> +			return -EINVAL;
+> +		shift = 0;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	regmap_update_bits(tcon->regs, SUN4I_TCON_MUX_CTRL_REG,
+> +			   0x3 << shift, tcon_id << shift);
+> +
+> +	return 0;
+> +}
+> +
+>  void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+>  			struct drm_encoder *encoder)
+>  {
+> +	/* Get the device node of the display engine */
+> +	struct device_node *node = encoder->dev->dev->of_node;
+>  	u32 val;
+>  
+> +	if (of_device_is_compatible(node, "allwinner,sun6i-a31-display-engine") ||
+> +	    of_device_is_compatible(node, "allwinner,sun6i-a31s-display-engine")) {
+> +		_sun6i_tcon_set_mux(encoder);
+> +		return;
+> +	}
+> +
 
-Regards,
-Sekhar
+I'd really like to avoid mix and matching the structure defined
+behaviour and those of_device_is_compatible calls spread out
+everywhere.
+
+You can either add a flag or a function pointer.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/690f1229/attachment.sig>
