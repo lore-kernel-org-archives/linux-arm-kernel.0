@@ -1,33 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 26 Sep 2017 15:40:52 +0200
-Subject: [PATCH 3/3] powerpc/5200: dts: digsy_mtc.dts: fix rv3029
- compatible
-In-Reply-To: <20170915091326.4b93bde1@crub>
-References: <20170915020004.24272-1-alexandre.belloni@free-electrons.com>
- <20170915020004.24272-3-alexandre.belloni@free-electrons.com>
- <20170915091326.4b93bde1@crub>
-Message-ID: <20170926134052.pjntycy5tbxggmvl@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Sep 2017 15:45:27 +0200
+Subject: [PATCH v2 03/10] pinctrl: axp209: use drv_data of
+ pinctrl_pin_desc to store pin reg
+In-Reply-To: <0ae64e95-ee49-fb4c-e79b-e8c25c86580c@free-electrons.com>
+References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <7993a30fbc2e50a2d228fa0c8fad643c4034b101.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <20170926130108.uibnri32b73elfy6@flea>
+ <0ae64e95-ee49-fb4c-e79b-e8c25c86580c@free-electrons.com>
+Message-ID: <20170926134527.kmhpxn4ysfmvdulf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 15/09/2017 at 09:13:26 +0200, Anatolij Gustschin wrote:
-> On Fri, 15 Sep 2017 04:00:04 +0200
-> Alexandre Belloni alexandre.belloni at free-electrons.com wrote:
+On Tue, Sep 26, 2017 at 01:17:05PM +0000, Quentin Schulz wrote:
+> Hi Maxime,
 > 
-> >The proper compatible for rv3029 is microcrystal,rv3029.
-> >
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> On 26/09/2017 15:01, Maxime Ripard wrote:
+> > On Tue, Sep 26, 2017 at 12:17:13PM +0000, Quentin Schulz wrote:
+> >> Instead of using a function to retrieve each pin's correct control
+> >> register, use drv_data within pinctrl_pin_desc to store the ctrl reg.
+> >>
+> >> Remove axp20x_gpio_get_reg and replace every occurrence by a get from
+> >> drv_data.
+> > 
+> > Why do you need to do that? This should be explained.
+> > 
 > 
-> Acked-by: Anatolij Gustschin <agust@denx.de>
+> Agreed that it misses an explanation.
+> 
+> Today, to get a register addr of one of the GPIOs in the PMIC, we
+> basically get the GPIO number and returns the register via this info.
+> 
+> There are 3 GPIOs in AXP209, 2 in AXP813. I didn't want to have a switch
+> case for the GPIO number and then an if/else inside one of the case to
+> check if the device is AXP209 or AXP813 in which case we return -EINVAL
+> instead of the GPIO2 reg. With support for new PMIC, we would have a
+> bunch of if conditions and complexify the process for something really
+> simple.
 
-If that is fine for you, I would prefer that goes through your tree as
-I'm not usually taking DT patches through the RTC tree. there is no
-dependency as the i2c subsystem will already match the new compatible
-with the i2c device_id.
+I'm not sure how that relates to your code actually. The only thing
+that patch is doing is to move the register offset from a function to
+the structure associated to the pin.
+
+However, even in the AXP813 case, you're using exactly the same
+values, so that's not really needed.
+
+Now, you also mentionned the pin number. While this patch doesn't
+really address it, it's also no really needed. The number of pins is
+already known and registered in the GPIO framework. If the framework
+doesn't already do it (which would be surprising), you can just check
+that the pin number passed is not going to be higher than the one you
+registered.
+
+> IMHO, this also allows easier integration of future PMICs which might
+> have different regs for the GPIOs.
+
+Let's worry about future PMICs in the future.
+
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/5424c9fc/attachment.sig>
