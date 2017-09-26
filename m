@@ -1,43 +1,34 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 26 Sep 2017 09:22:31 +0200
-Subject: [PATCH v3 11/14] arm64: allwinner: a64: Fix node with unit name and
- no reg property
+Date: Tue, 26 Sep 2017 09:22:29 +0200
+Subject: [PATCH v3 09/14] ARM: dts: sun8i: orangepi-plus: Fix node with unit
+ name and no reg property
 In-Reply-To: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
 References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170926072234.27481-12-clabbe.montjoie@gmail.com>
+Message-ID: <20170926072234.27481-10-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch fix the warning "xxx has a unit name, but no reg property" by
-removing "@0" from such node
+removing "@0" from such node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 662e8b7981b5..b02a8476b0c8 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -347,7 +347,7 @@
- 				function = "spi1";
- 			};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index 331ed683ac62..119732505844 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -114,7 +114,7 @@
+ };
  
--			uart0_pins_a: uart0 at 0 {
-+			uart0_pins_a: uart0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
- 			};
-@@ -571,7 +571,7 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
- 
--			r_rsb_pins: rsb at 0 {
-+			r_rsb_pins: rsb {
- 				pins = "PL0", "PL1";
- 				function = "s_rsb";
- 			};
+ &pio {
+-	usb3_vbus_pin_a: usb3_vbus_pin at 0 {
++	usb3_vbus_pin_a: usb3_vbus_pin {
+ 		pins = "PG11";
+ 		function = "gpio_out";
+ 	};
 -- 
 2.13.5
