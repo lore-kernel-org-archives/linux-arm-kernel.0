@@ -1,32 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 26 Sep 2017 11:33:40 -0700 (PDT)
-Subject: [PATCH] net: bcm63xx_enet: Use setup_timer and mod_timer
-In-Reply-To: <1506255084-10943-1-git-send-email-himanshujha199640@gmail.com>
-References: <1506255084-10943-1-git-send-email-himanshujha199640@gmail.com>
-Message-ID: <20170926.113340.239908321617902101.davem@davemloft.net>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 26 Sep 2017 21:45:42 +0300
+Subject: [PATCH] arm64: fix documentation on kernel pages mappings to HYP
+ VA
+In-Reply-To: <20170913180830.8608-1-ynorov@caviumnetworks.com>
+References: <20170913180830.8608-1-ynorov@caviumnetworks.com>
+Message-ID: <20170926184542.t56zpdx2s5et77gy@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Himanshu Jha <himanshujha199640@gmail.com>
-Date: Sun, 24 Sep 2017 17:41:24 +0530
+Ping?
 
-> Use setup_timer and mod_timer API instead of structure assignments.
+On Wed, Sep 13, 2017 at 09:08:30PM +0300, Yury Norov wrote:
+> The Documentation/arm64/memory.txt says:
+> When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+> offset from the kernel VA (top 24bits of the kernel VA set to zero):
 > 
-> This is done using Coccinelle and semantic patch used
-> for this as follows:
+> In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
+> which has more options, and none of them assumes clearing of top 24bits
+> of the kernel VA.
 > 
-> @@
-> expression x,y,z,a,b;
-> @@
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>  Documentation/arm64/memory.txt | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
 > 
-> -init_timer (&x);
-> +setup_timer (&x, y, z);
-> +mod_timer (&a, b);
-> -x.function = y;
-> -x.data = z;
-> -x.expires = b;
-> -add_timer(&a);
-> 
-> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
-
-Applied to net-next, thanks.
+> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+> index d7273a5f6456..c39895d7e3a2 100644
+> --- a/Documentation/arm64/memory.txt
+> +++ b/Documentation/arm64/memory.txt
+> @@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
+>   +-------------------------------------------------> [63] TTBR0/1
+>  
+>  
+> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
+> -
+> -Start			End			Size		Use
+> ------------------------------------------------------------------------
+> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
+> +When using KVM without Virtualization Host Extensions, the hypervisor maps
+> +kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
+> +or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
+> +ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
+> +VA set to zero if CPU has Reduced HYP mapping offset capability. See
+> +kern_hyp_va macro.
+> +
+> +When using KVM with Virtualization Host Extensions, no additional mappings
+> +created as host kernel already operates in EL2.
+> -- 
+> 2.11.0
