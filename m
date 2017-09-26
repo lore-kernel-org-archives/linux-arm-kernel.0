@@ -1,97 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Sep 2017 15:27:09 +0200
-Subject: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features
-In-Reply-To: <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
-References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
- <6b89df1bf07dac2ab295fca5fdf0e55179c47ed6.1506428208.git-series.quentin.schulz@free-electrons.com>
- <20170926130009.r5isgrjvkwmm44nn@flea>
- <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
-Message-ID: <20170926132709.od3myumh5xtungvs@flea>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 26 Sep 2017 15:35:25 +0200
+Subject: [PATCH 1/4] mm: move function alloc_pages_exact_nid out of
+ __meminit
+In-Reply-To: <20170921085922.11659-2-ganapatrao.kulkarni@cavium.com>
+References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
+ <20170921085922.11659-2-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170926133525.2h55vfa25gjiu5ts@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 01:08:21PM +0000, Quentin Schulz wrote:
-> Hi Maxime,
+On Thu 21-09-17 14:29:19, Ganapatrao Kulkarni wrote:
+> This function can be used on NUMA systems in place of alloc_pages_exact
+> Adding code to export and to remove __meminit section tagging.
+
+It is usually better to fold such a change into a patch which adds a new
+user. Other than that I do not have any objections.
+
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+
+Acked-by: Michal Hocko <mhocko@suse.com>
+
+> ---
+>  include/linux/gfp.h | 2 +-
+>  mm/page_alloc.c     | 3 ++-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 > 
-> On 26/09/2017 15:00, Maxime Ripard wrote:
-> > On Tue, Sep 26, 2017 at 12:17:12PM +0000, Quentin Schulz wrote:
-> >> +static const struct axp20x_desc_pin axp209_pins[] = {
-> >> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
-> >> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
-> >> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
-> >> +		   AXP20X_FUNCTION(0x3, "ldo"),
-> >> +		   AXP20X_FUNCTION(0x4, "adc")),
-> >> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1"),
-> >> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
-> >> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
-> >> +		   AXP20X_FUNCTION(0x3, "ldo"),
-> >> +		   AXP20X_FUNCTION(0x4, "adc")),
-> >> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2"),
-> >> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
-> >> +		   AXP20X_FUNCTION(0x2, "gpio_in")),
-> >> +};
-> > 
-> > If all the functions are the same, and at the same offset, can't we
-> > just hardcode it, instead of having (and duplicate) all the logic
-> > below?
-> > 
+> diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+> index f780718..a4bd234 100644
+> --- a/include/linux/gfp.h
+> +++ b/include/linux/gfp.h
+> @@ -528,7 +528,7 @@ extern unsigned long get_zeroed_page(gfp_t gfp_mask);
+>  
+>  void *alloc_pages_exact(size_t size, gfp_t gfp_mask);
+>  void free_pages_exact(void *virt, size_t size);
+> -void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask);
+> +void *alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask);
+>  
+>  #define __get_free_page(gfp_mask) \
+>  		__get_free_pages((gfp_mask), 0)
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index c841af8..7975870 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -4442,7 +4442,7 @@ EXPORT_SYMBOL(alloc_pages_exact);
+>   * Like alloc_pages_exact(), but try to allocate on node nid first before falling
+>   * back.
+>   */
+> -void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
+> +void *alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
+>  {
+>  	unsigned int order = get_order(size);
+>  	struct page *p = alloc_pages_node(nid, gfp_mask, order);
+> @@ -4450,6 +4450,7 @@ void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
+>  		return NULL;
+>  	return make_alloc_exact((unsigned long)page_address(p), order, size);
+>  }
+> +EXPORT_SYMBOL(alloc_pages_exact_nid);
+>  
+>  /**
+>   * free_pages_exact - release memory allocated via alloc_pages_exact()
+> -- 
+> 2.9.4
 > 
-> AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
-> 		AXP20X_GPIO_OUT,
-> 		AXP20X_GPIO_IN,
-> 		AXP20X_LDO,
-> 		AXP20X_ADC))
-> 
-> That's what you mean?
-
-What I mean is:
-
-static int axp20x_get_func(char *func)
-{
-	if (!strcmp(func, "gpio_out"))
-		return 0;
-
-	if (!strcmp(func, "gpio_in"))
-		return 2;
- 
-	if (!strcmp(func, "ldo"))
- 		return 3;
- 
-	if (!strcmp(func, "adc"))
- 		return 4;
-
-	return -EINVAL;
-}
-
-> >> +	pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*pctrl_desc), GFP_KERNEL);
-> >> +	if (!pctrl_desc)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	pctrl_desc->name = dev_name(&pdev->dev);
-> >> +	pctrl_desc->owner = THIS_MODULE;
-> >> +	pctrl_desc->pins = pins;
-> >> +	pctrl_desc->npins = gpio->desc->npins;
-> >> +	pctrl_desc->pctlops = &axp20x_pctrl_ops;
-> >> +	pctrl_desc->pmxops = &axp20x_pmx_ops;
-> > 
-> > The strict flag needs to be set too in order to avoid concurrent uses
-> > of GPIO and other functions.
-> > 
-> 
-> Strict is a property of pinmux_ops struct (pmxops) and it is set.
-
-Ah, right, my bad.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/90d8aa86/attachment.sig>
+Michal Hocko
+SUSE Labs
