@@ -1,37 +1,49 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 26 Sep 2017 11:28:39 -0500
-Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
-In-Reply-To: <b9cbe510-112e-410c-33e1-4e4749b5fcfa@ti.com>
-References: <20170920180132.4373-1-s-anna@ti.com>
- <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
- <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
- <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
- <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
- <ba1bb5c3-a524-8ee1-6730-e61047dec440@lechnology.com>
- <b9cbe510-112e-410c-33e1-4e4749b5fcfa@ti.com>
-Message-ID: <0b2d3921-b58b-6dbd-a8c1-d0b9b6678370@lechnology.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 26 Sep 2017 22:16:03 +0530
+Subject: [RESEND PATCH v5 4/4] ARM: configs: stm32: Add DMAMUX support in
+ STM32 defconfig
+In-Reply-To: <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
+References: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
+ <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20170926164603.GP30097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2017 04:56 AM, Sekhar Nori wrote:
-> Hi David,
+On Fri, Sep 22, 2017 at 09:31:32AM +0200, Pierre-Yves MORDRET wrote:
+> This patch adds DMAMUX support in STM32 defconfig file
+
+Need ACK from ARM folks on this.
+
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>  Version history:
+>     v5:
+>     v4:
+>     v3:
+>     v2:
+>         * None
+> ---
+> ---
+>  arch/arm/configs/stm32_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+> index 90e5c46..988f395 100644
+> --- a/arch/arm/configs/stm32_defconfig
+> +++ b/arch/arm/configs/stm32_defconfig
+> @@ -67,6 +67,7 @@ CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_STM32=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_STM32_DMA=y
+> +CONFIG_STM32_DMAMUX=y
+>  CONFIG_IIO=y
+>  CONFIG_STM32_ADC_CORE=y
+>  CONFIG_STM32_ADC=y
+> -- 
+> 2.7.4
 > 
 
->>
->> I am interested in using remoteproc on LEGO MINDSTORMS EV3 to implement
->> I2C and UART in the PRU.
-> 
-> Do note that the remoteproc driver being discussed here is the DSP
-> remoteproc driver. TI releases have a remoteproc driver that talks to
-> PRUSS[1], but that has not been used to talk to PRUSS on OMAP-L138. And
-> AFAIK, there is no one working towards that in TI as well.
-> 
-> Thanks,
-> Sekhar
-> 
-> [1]
-> http://git.ti.com/cgit/cgit.cgi/ti-linux-kernel/ti-linux-kernel.git/tree/drivers/remoteproc/pru_rproc.c?h=ti-linux-4.9.y
-> 
-
-Darn. I've used pru_rproc on the BeagleBone. One more thing for the EV3 
-list ;-).
+-- 
+~Vinod
