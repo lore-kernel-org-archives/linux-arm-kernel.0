@@ -1,142 +1,69 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 26 Sep 2017 09:53:52 +0200
-Subject: [PATCH v3 13/14] arm64: allwinner: a64: fix pin name
-In-Reply-To: <CAGb2v67R1k_RxK4n+eGNyzqD44efSwTKZ028=5AiiBbVqBeEjQ@mail.gmail.com>
-References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
- <20170926072234.27481-14-clabbe.montjoie@gmail.com>
- <CAGb2v67R1k_RxK4n+eGNyzqD44efSwTKZ028=5AiiBbVqBeEjQ@mail.gmail.com>
-Message-ID: <20170926075352.GA20634@Red>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 26 Sep 2017 10:00:16 +0200
+Subject: [RESEND PATCH v5 10/16] ARM: dts: zynq: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <e6006c90-99a2-c8f5-cff2-5c729ada8cd1@xilinx.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-11-javier@dowhile0.org>
+ <b22a7db6-7daf-b5c1-3978-cdc699723e30@xilinx.com>
+ <CABxcv=n4pCJLPb_C6eYVJ3CLBVH7T0amiJj7mYbshpv4u8xkXA@mail.gmail.com>
+ <67a9d32a-0a20-f101-4660-0d5aa5ad8a8a@xilinx.com>
+ <CABxcv==nFELQ8JJrxty=oNwwonJ3=xWqaH3a-RYssPmy8x2Z5w@mail.gmail.com>
+ <e6006c90-99a2-c8f5-cff2-5c729ada8cd1@xilinx.com>
+Message-ID: <CABxcv=kUB4YL+TTJJ-yt41QOW-boFQeNN5V1p2XR1U2AC601NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 03:46:13PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Sep 26, 2017 at 3:22 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > All pinmux nodes should have the suffix "_pins" or "_pin".
-> >
-> > In the case where there are multiple choices, the node name should convey
-> > what or which pingroup the choice is.
-> >
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts     | 2 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts       | 2 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts        | 2 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts     | 2 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts           | 2 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 2 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi                 | 6 +++---
-> >  7 files changed, 9 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-> > index 45bdbfb96126..36a56e3ab92f 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-> > @@ -248,7 +248,7 @@
-> >
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_pins_a>;
-> > +       pinctrl-0 = <&uart0_pb_pins>;
-> >         status = "okay";
-> >  };
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> > index 2beef9e6cb88..15019edb7dd6 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> > @@ -198,7 +198,7 @@
-> >
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_pins_a>;
-> > +       pinctrl-0 = <&uart0_pb_pins>;
-> >         status = "okay";
-> >  };
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-> > index 338e786155b1..ec62c86cc236 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-> > @@ -194,6 +194,6 @@
-> >
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_pins_a>;
-> > +       pinctrl-0 = <&uart0_pb_pins>;
-> >         status = "okay";
-> >  };
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> > index 5f8ff4017d45..1c8b9d2721f0 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> > @@ -85,7 +85,7 @@
-> >
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_pins_a>;
-> > +       pinctrl-0 = <&uart0_pb_pins>;
-> >         status = "okay";
-> >  };
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> > index 806442d3e846..69743ff171d0 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> > @@ -232,7 +232,7 @@
-> >  /* On Exp and Euler connectors */
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_pins_a>;
-> > +       pinctrl-0 = <&uart0_pb_pins>;
-> >         status = "okay";
-> >  };
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> > index 0eb2acedf8c3..e41eb71eb438 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> > @@ -135,7 +135,7 @@
-> >
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_pins_a>;
-> > +       pinctrl-0 = <&uart0_pb_pins>;
-> >         status = "okay";
-> >  };
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > index b02a8476b0c8..2d2937b7dc68 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > @@ -347,7 +347,7 @@
-> >                                 function = "spi1";
-> >                         };
-> >
-> > -                       uart0_pins_a: uart0 {
-> > +                       uart0_pb_pins: uart0 {
-> 
-> You are again confusing node names with node labels.
-> And it doesn't match what your commit message says.
-> 
-> The node name is what never changes even when the device
-> tree is compiled into a binary blob. The label gets compiled
-> out, and any references to it are converted to an integer
-> index, much like how a goto label in C gets compiled.
-> 
-> Of the two, the node name is what I asked to be changed.
-> Please take a look at arch/arm/boot/dts/sun8i-a83t.dtsi
-> for a proper example of what I am asking for. Note that
-> node names should use hyphens, not underscores, while
-> labels should use underscores. For the pinmux nodes
-> the name and label would likely be the same except for
-> this exception. So your uart0 label changes are good.
-> Please keep them.
-> 
+On Mon, Sep 25, 2017 at 10:06 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> Hi,
+>
+> On 21.9.2017 11:41, Javier Martinez Canillas wrote:
+>> Hello Michal,
+>>
+>> On Thu, Aug 24, 2017 at 3:44 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>
+>> [snip]
+>>
+>>>
+>>> Ok. Applied to
+>>> https://github.com/Xilinx/linux-xlnx/commits/zynq/dt
+>>>
+>>> Will wait if something else pop up.
+>>>
+>>
+>> I see the patch applied to that repository but I don't see it in
+>> neither mainline nor linux-next.
+>
+> xilinx tree was merging to linux-next but there were conflicts with arm
+> soc tree that's why it was removed.
+>
+>>
+>>> Arnd: If you want to take this directly, feel free to do it.
+>>>
+>>> Thanks,
+>>> Michal
+>
+> It is in queue for v4.15.
+>
 
-Sorry, I misunderstood your query.
+Got it, thanks a lot for the info.
 
-I will fix that.
+> FYI: There are still 3 more in doc.
+>
+> Documentation/devicetree/bindings/i2c/i2c-mux-pca954x.txt:50:
+>                compatible = " ";
+> Documentation/devicetree/bindings/i2c/nxp,pca9541.txt:25:
+>                compatible = "at,24c08";
+> Documentation/devicetree/bindings/trivial-devices.txt:34:at,24c08
+>        i2c serial eeprom  (24cxx)
+>
 
-Regards
-Corentin Labbe
+Indeed, thanks for pointing out. I'll take a look to these as well.
+
+>
+> Thanks,
+> Michal
+>
+
+Best regards,
+Javier
