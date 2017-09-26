@@ -1,49 +1,97 @@
-From: fschnizlein@suse.com (Felix Schnizlein)
-Date: Tue, 26 Sep 2017 15:21:34 +0200
-Subject: Unreviewed arm64 ABI change in linux-next via driver-core tree
-In-Reply-To: <20170926131525.GE15480@leverpostej>
-References: <20170926124536.GA11192@arm.com>
- <20170926131525.GE15480@leverpostej>
-Message-ID: <20170926132134.6ekk44ezeehovppe@angmar>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Sep 2017 15:27:09 +0200
+Subject: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features
+In-Reply-To: <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
+References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <6b89df1bf07dac2ab295fca5fdf0e55179c47ed6.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <20170926130009.r5isgrjvkwmm44nn@flea>
+ <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
+Message-ID: <20170926132709.od3myumh5xtungvs@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.09.17, Mark Rutland wrote:
-> Hi,
+On Tue, Sep 26, 2017 at 01:08:21PM +0000, Quentin Schulz wrote:
+> Hi Maxime,
 > 
-> On Tue, Sep 26, 2017 at 01:45:37PM +0100, Will Deacon wrote:
-> > Hi Greg,
+> On 26/09/2017 15:00, Maxime Ripard wrote:
+> > On Tue, Sep 26, 2017 at 12:17:12PM +0000, Quentin Schulz wrote:
+> >> +static const struct axp20x_desc_pin axp209_pins[] = {
+> >> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
+> >> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+> >> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
+> >> +		   AXP20X_FUNCTION(0x3, "ldo"),
+> >> +		   AXP20X_FUNCTION(0x4, "adc")),
+> >> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1"),
+> >> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+> >> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
+> >> +		   AXP20X_FUNCTION(0x3, "ldo"),
+> >> +		   AXP20X_FUNCTION(0x4, "adc")),
+> >> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2"),
+> >> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+> >> +		   AXP20X_FUNCTION(0x2, "gpio_in")),
+> >> +};
 > > 
-> > We stumbled over a change in linux-next that has ABI implications for arm64
-> > and, as far as we can tell, has not been reviewed:
+> > If all the functions are the same, and at the same offset, can't we
+> > just hardcode it, instead of having (and duplicate) all the logic
+> > below?
 > > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm64/kernel?id=fb7ff3f8721b87bf078868c9a252fa0cf71a47c2
-> > 
-> > ("fb7ff3f8721b cpuinfo: implement sysfs nodes for arm64")
 > 
-> > Please can you drop this from your tree until we've had a chance to review
-> > it properly? If Felix can repost it as above, then we can get the discussion
-> > started because, aside from this email, we have concerns about exactly what
-> > is being exposed to userspace here.
+> AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
+> 		AXP20X_GPIO_OUT,
+> 		AXP20X_GPIO_IN,
+> 		AXP20X_LDO,
+> 		AXP20X_ADC))
 > 
-> Seconded.
-> 
-> Experience with the existing /proc/cpuinfo shows that this needs *very*
-> careful review.
-> 
-> I've worked on arm64's /proc/cpuinfo, and I'd appreciate being Cc'd on
-> future postings of this series. I'd also recommend that future postings
-> are also Cc'd to linux-arch (and maybe linux-api) so that the interface
-> is reviewed by a larger set of relevant parties.
+> That's what you mean?
 
-I will do that!
+What I mean is:
+
+static int axp20x_get_func(char *func)
+{
+	if (!strcmp(func, "gpio_out"))
+		return 0;
+
+	if (!strcmp(func, "gpio_in"))
+		return 2;
+ 
+	if (!strcmp(func, "ldo"))
+ 		return 3;
+ 
+	if (!strcmp(func, "adc"))
+ 		return 4;
+
+	return -EINVAL;
+}
+
+> >> +	pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*pctrl_desc), GFP_KERNEL);
+> >> +	if (!pctrl_desc)
+> >> +		return -ENOMEM;
+> >> +
+> >> +	pctrl_desc->name = dev_name(&pdev->dev);
+> >> +	pctrl_desc->owner = THIS_MODULE;
+> >> +	pctrl_desc->pins = pins;
+> >> +	pctrl_desc->npins = gpio->desc->npins;
+> >> +	pctrl_desc->pctlops = &axp20x_pctrl_ops;
+> >> +	pctrl_desc->pmxops = &axp20x_pmx_ops;
+> > 
+> > The strict flag needs to be set too in order to avoid concurrent uses
+> > of GPIO and other functions.
+> > 
 > 
-> Thanks,
-> Mark.
+> Strict is a property of pinmux_ops struct (pmxops) and it is set.
+
+Ah, right, my bad.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 488 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/eaad4b39/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/90d8aa86/attachment.sig>
