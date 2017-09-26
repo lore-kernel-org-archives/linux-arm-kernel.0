@@ -1,63 +1,78 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Sep 2017 14:59:16 +0800
-Subject: [PATCH v2 10/13] drm/sun4i: hdmi: Add A31 specific DDC register
- definitions
+Date: Tue, 26 Sep 2017 14:59:11 +0800
+Subject: [PATCH v2 05/13] drm/sun4i: hdmi: create a regmap for later use
 In-Reply-To: <20170926065919.24446-1-wens@csie.org>
 References: <20170926065919.24446-1-wens@csie.org>
-Message-ID: <20170926065919.24446-11-wens@csie.org>
+Message-ID: <20170926065919.24446-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DDC block for the HDMI controller is different on the A31.
+The HDMI driver is written with readl/writel I/O to the registers.
+However, to support the A31 variant, which has a different layout
+for the DDC registers, it was recommended to use regfields to have
+a cleaner implementation. To use regfields, we need to create an
+underlying regmap.
 
-This patch adds the register definitions.
+This patch only adds the regmap. It does not convert the existing
+driver accesses to use regmap.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi.h | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  1 +
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-index b1124a8f9f05..da4ea9efc6fa 100644
+index 1457750988da..b95512ec8eb6 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-@@ -153,6 +153,37 @@
+@@ -163,6 +163,7 @@ struct sun4i_hdmi {
+ 	struct device		*dev;
  
- #define SUN4I_HDMI_DDC_FIFO_SIZE	16
+ 	void __iomem		*base;
++	struct regmap		*regmap;
  
-+/* A31 specific */
-+#define SUN6I_HDMI_DDC_CTRL_REG		0x500
-+#define SUN6I_HDMI_DDC_CTRL_RESET		BIT(31)
-+#define SUN6I_HDMI_DDC_CTRL_START_CMD		BIT(27)
-+#define SUN6I_HDMI_DDC_CTRL_SDA_ENABLE		BIT(6)
-+#define SUN6I_HDMI_DDC_CTRL_SCL_ENABLE		BIT(4)
-+#define SUN6I_HDMI_DDC_CTRL_ENABLE		BIT(0)
+ 	/* Parent clocks */
+ 	struct clk		*bus_clk;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index 3cf1a6932fac..5ab811cda00e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -22,6 +22,7 @@
+ #include <linux/iopoll.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
++#include <linux/regmap.h>
+ 
+ #include "sun4i_backend.h"
+ #include "sun4i_crtc.h"
+@@ -267,6 +268,13 @@ static const struct cec_pin_ops sun4i_hdmi_cec_pin_ops = {
+ };
+ #endif
+ 
++static const struct regmap_config sun4i_hdmi_regmap_config = {
++	.reg_bits	= 32,
++	.val_bits	= 32,
++	.reg_stride	= 4,
++	.max_register	= 0x580,
++};
 +
-+#define SUN6I_HDMI_DDC_CMD_REG		0x508
-+#define SUN6I_HDMI_DDC_CMD_BYTE_COUNT(count)	((count) << 16)
-+/* command types in lower 3 bits are the same as sun4i */
+ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 			   void *data)
+ {
+@@ -321,6 +329,13 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 		goto err_disable_mod_clk;
+ 	}
+ 
++	hdmi->regmap = devm_regmap_init_mmio(dev, hdmi->base,
++					     &sun4i_hdmi_regmap_config);
++	if (IS_ERR(hdmi->regmap)) {
++		dev_err(dev, "Couldn't create HDMI encoder regmap\n");
++		return PTR_ERR(hdmi->regmap);
++	}
 +
-+#define SUN6I_HDMI_DDC_ADDR_REG		0x50c
-+#define SUN6I_HDMI_DDC_ADDR_SEGMENT(seg)	(((seg) & 0xff) << 24)
-+#define SUN6I_HDMI_DDC_ADDR_EDDC(addr)		(((addr) & 0xff) << 16)
-+#define SUN6I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
-+#define SUN6I_HDMI_DDC_ADDR_SLAVE(addr)		(((addr) & 0xff) << 1)
-+
-+#define SUN6I_HDMI_DDC_INT_STATUS_REG	0x514
-+#define SUN6I_HDMI_DDC_INT_STATUS_TIMEOUT	BIT(8)
-+/* lower 8 bits are the same as sun4i */
-+
-+#define SUN6I_HDMI_DDC_FIFO_CTRL_REG	0x518
-+#define SUN6I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(15)
-+/* lower 9 bits are the same as sun4i */
-+
-+#define SUN6I_HDMI_DDC_CLK_REG		0x520
-+/* DDC CLK bit fields are the same, but the formula is not */
-+
-+#define SUN6I_HDMI_DDC_FIFO_DATA_REG	0x580
-+
- enum sun4i_hdmi_pkt_type {
- 	SUN4I_HDMI_PKT_AVI = 2,
- 	SUN4I_HDMI_PKT_END = 15,
+ 	ret = sun4i_tmds_create(hdmi);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't create the TMDS clock\n");
 -- 
 2.14.1
