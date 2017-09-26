@@ -1,52 +1,87 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Sep 2017 17:09:21 -0700
-Subject: [PATCH 00/10] ARM: bcm: Add support for Broadcom Hurricane 2 SoC
-Message-ID: <20170926000931.670-1-f.fainelli@gmail.com>
+Date: Mon, 25 Sep 2017 17:09:24 -0700
+Subject: [PATCH 03/10] ARM: bcm: Add support for Broadcom Hurricane 2 SoC
+In-Reply-To: <20170926000931.670-1-f.fainelli@gmail.com>
+References: <20170926000931.670-1-f.fainelli@gmail.com>
+Message-ID: <20170926000931.670-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add a Kconfig entry point and basic machine board code for the Broadcom
+Hurricane 2 SoCs used in 1G/10G switching products.
 
-This patch series adds basic (boot to prompt with essential peripherals
-working) support for Broadcom's Hurricane 2 SoC which is found in switching
-applications.
-
-This is also an iProc-family chip with a number of variations, including
-some in the clock controller that I have not been able to identify yet.
-
-Florian Fainelli (10):
-  MAINTAINERS: Update Broadcom iProc regexp with Hurricane 2
-  dt-bindings: Add documentation for Broadcom Hurricane 2 SoCs
-  ARM: bcm: Add support for Broadcom Hurricane 2 SoC
-  dt-bindings: Document Broadcom Hurricane 2 clocks
-  clk: bcm: Add Broadcom Hurricane 2 clock support
-  ARM: dts: Add Broadcom Hurricane 2 DTS include file
-  ARM: debug: Add Hurricane 2 UART2 debug addresses
-  dt-bindings: Add Ubiquiti Networks vendor prefix
-  ARM: dts: Hurricane 2: Add basic support for Ubiquiti UniFi Switch 8
-  ARM: multi_v7_defconfig: Enable CONFIG_ARCH_BCM_HR2
-
- .../devicetree/bindings/arm/bcm/brcm,hr2.txt       |  14 +
- .../bindings/clock/brcm,iproc-clocks.txt           |  14 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   1 +
- arch/arm/Kconfig.debug                             |  10 +-
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/bcm-hr2.dtsi                     | 368 +++++++++++++++++++++
- arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts  |  85 +++++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/mach-bcm/Kconfig                          |   9 +
- arch/arm/mach-bcm/Makefile                         |   3 +
- arch/arm/mach-bcm/bcm_hr2.c                        |  25 ++
- drivers/clk/bcm/Kconfig                            |   9 +
- drivers/clk/bcm/Makefile                           |   1 +
- drivers/clk/bcm/clk-hr2.c                          |  27 ++
- 15 files changed, 569 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
- create mode 100644 arch/arm/boot/dts/bcm-hr2.dtsi
- create mode 100644 arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/mach-bcm/Kconfig   |  9 +++++++++
+ arch/arm/mach-bcm/Makefile  |  3 +++
+ arch/arm/mach-bcm/bcm_hr2.c | 25 +++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
  create mode 100644 arch/arm/mach-bcm/bcm_hr2.c
- create mode 100644 drivers/clk/bcm/clk-hr2.c
 
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 73be3d578851..76807581f9f3 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -36,6 +36,15 @@ config ARCH_BCM_CYGNUS
+ 	  BCM11300, BCM11320, BCM11350, BCM11360,
+ 	  BCM58300, BCM58302, BCM58303, BCM58305.
+ 
++config ARCH_BCM_HR2
++	bool "Broadcom Hurricane 2 SoC support"
++	depends on ARCH_MULTI_V7
++	select ARCH_BCM_IPROC
++	help
++	  Enable support for the Hurricane 2 family,
++	  which includes the following variants:
++	  BCM53342, BCM53343, BCM53344, BCM53346.
++
+ config ARCH_BCM_NSP
+ 	bool "Broadcom Northstar Plus SoC Support"
+ 	depends on ARCH_MULTI_V7
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 980f5850097c..ec93c849a100 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -13,6 +13,9 @@
+ # Cygnus
+ obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
+ 
++# Hurricane 2
++obj-$(CONFIG_ARCH_BCM_HR2)	+= bcm_hr2.o
++
+ # Northstar Plus
+ obj-$(CONFIG_ARCH_BCM_NSP)	+= bcm_nsp.o
+ 
+diff --git a/arch/arm/mach-bcm/bcm_hr2.c b/arch/arm/mach-bcm/bcm_hr2.c
+new file mode 100644
+index 000000000000..c104f28995d7
+--- /dev/null
++++ b/arch/arm/mach-bcm/bcm_hr2.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2017 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/mach/arch.h>
++
++static const char * const bcm_hr2_dt_compat[] __initconst = {
++	"brcm,hr2",
++	NULL,
++};
++
++DT_MACHINE_START(BCM_HR2_DT, "Broadcom Hurricane 2 SoC")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++	.dt_compat = bcm_hr2_dt_compat,
++MACHINE_END
 -- 
 2.14.1
