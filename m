@@ -1,89 +1,33 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Sep 2017 15:37:37 +0200
-Subject: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features
-In-Reply-To: <20170926132709.od3myumh5xtungvs@flea>
-References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
- <6b89df1bf07dac2ab295fca5fdf0e55179c47ed6.1506428208.git-series.quentin.schulz@free-electrons.com>
- <20170926130009.r5isgrjvkwmm44nn@flea>
- <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
- <20170926132709.od3myumh5xtungvs@flea>
-Message-ID: <0bc7efe6-8d0e-ddae-617b-36e4357f76ce@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 26 Sep 2017 15:40:52 +0200
+Subject: [PATCH 3/3] powerpc/5200: dts: digsy_mtc.dts: fix rv3029
+ compatible
+In-Reply-To: <20170915091326.4b93bde1@crub>
+References: <20170915020004.24272-1-alexandre.belloni@free-electrons.com>
+ <20170915020004.24272-3-alexandre.belloni@free-electrons.com>
+ <20170915091326.4b93bde1@crub>
+Message-ID: <20170926134052.pjntycy5tbxggmvl@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/2017 15:27, Maxime Ripard wrote:
-> On Tue, Sep 26, 2017 at 01:08:21PM +0000, Quentin Schulz wrote:
->> Hi Maxime,
->>
->> On 26/09/2017 15:00, Maxime Ripard wrote:
->>> On Tue, Sep 26, 2017 at 12:17:12PM +0000, Quentin Schulz wrote:
->>>> +static const struct axp20x_desc_pin axp209_pins[] = {
->>>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
->>>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
->>>> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
->>>> +		   AXP20X_FUNCTION(0x3, "ldo"),
->>>> +		   AXP20X_FUNCTION(0x4, "adc")),
->>>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1"),
->>>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
->>>> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
->>>> +		   AXP20X_FUNCTION(0x3, "ldo"),
->>>> +		   AXP20X_FUNCTION(0x4, "adc")),
->>>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2"),
->>>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
->>>> +		   AXP20X_FUNCTION(0x2, "gpio_in")),
->>>> +};
->>>
->>> If all the functions are the same, and at the same offset, can't we
->>> just hardcode it, instead of having (and duplicate) all the logic
->>> below?
->>>
->>
->> AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
->> 		AXP20X_GPIO_OUT,
->> 		AXP20X_GPIO_IN,
->> 		AXP20X_LDO,
->> 		AXP20X_ADC))
->>
->> That's what you mean?
-> 
-> What I mean is:
-> 
-> static int axp20x_get_func(char *func)
-> {
-> 	if (!strcmp(func, "gpio_out"))
-> 		return 0;
-> 
-> 	if (!strcmp(func, "gpio_in"))
-> 		return 2;
->  
-> 	if (!strcmp(func, "ldo"))
->  		return 3;
->  
-> 	if (!strcmp(func, "adc"))
->  		return 4;
-> 
-> 	return -EINVAL;
-> }
-> 
+Hi,
 
-GPIO2 on AXP209 does not support ldo nor adc.
-GPIO1 on AXP813 does not support adc.
+On 15/09/2017 at 09:13:26 +0200, Anatolij Gustschin wrote:
+> On Fri, 15 Sep 2017 04:00:04 +0200
+> Alexandre Belloni alexandre.belloni at free-electrons.com wrote:
+> 
+> >The proper compatible for rv3029 is microcrystal,rv3029.
+> >
+> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Acked-by: Anatolij Gustschin <agust@denx.de>
 
-I find it more complex to handle those two cases in a function than by
-hardcoding it in structures like above.
+If that is fine for you, I would prefer that goes through your tree as
+I'm not usually taking DT patches through the RTC tree. there is no
+dependency as the i2c subsystem will already match the new compatible
+with the i2c device_id.
 
-Moreover, nothing tells us that it would be the same offset for other PMICs.
-
-Quentin
 -- 
-Quentin Schulz, Free Electrons
+Alexandre Belloni, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/ff97d032/attachment.sig>
