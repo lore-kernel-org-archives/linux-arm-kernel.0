@@ -1,32 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Sep 2017 17:16:07 +0100
-Subject: [PATCH] arm64: Make sure SPsel is always set
-In-Reply-To: <1506437836-18736-1-git-send-email-will.deacon@arm.com>
-References: <1506437836-18736-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20170926161606.xtzcixvjobtdfayt@armageddon.cambridge.arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 26 Sep 2017 11:28:39 -0500
+Subject: [PATCH] ARM: davinci_all_defconfig: enable CMA options
+In-Reply-To: <b9cbe510-112e-410c-33e1-4e4749b5fcfa@ti.com>
+References: <20170920180132.4373-1-s-anna@ti.com>
+ <758ebb8d-cdf5-4cdc-253b-b1eb8e2f7c61@ti.com>
+ <52fd708b-8497-8d5d-262b-f78ecf068d87@ti.com>
+ <e6232a0b-c2c2-2d20-758e-8b38e65091d7@ti.com>
+ <158a7e84-dd66-e861-544d-172b2d3723ec@ti.com>
+ <ba1bb5c3-a524-8ee1-6730-e61047dec440@lechnology.com>
+ <b9cbe510-112e-410c-33e1-4e4749b5fcfa@ti.com>
+Message-ID: <0b2d3921-b58b-6dbd-a8c1-d0b9b6678370@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 03:57:16PM +0100, Will Deacon wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On 09/26/2017 04:56 AM, Sekhar Nori wrote:
+> Hi David,
 > 
-> When the kernel is entered at EL2 on an ARMv8.0 system, we construct
-> the EL1 pstate and make sure this uses the the EL1 stack pointer
-> (we perform an exception return to EL1h).
-> 
-> But if the kernel is either entered at EL1 or stays at EL2 (because
-> we're on a VHE-capable system), we fail to set SPsel, and use whatever
-> stack selection the higher exception level has choosen for us.
-> 
-> Let's not take any chance, and make sure that SPsel is set to one
-> before we decide the mode we're going to run in.
-> 
-> Cc: <stable@vger.kernel.org>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Queued for 4.14-rc3. Thanks.
+>>
+>> I am interested in using remoteproc on LEGO MINDSTORMS EV3 to implement
+>> I2C and UART in the PRU.
+> 
+> Do note that the remoteproc driver being discussed here is the DSP
+> remoteproc driver. TI releases have a remoteproc driver that talks to
+> PRUSS[1], but that has not been used to talk to PRUSS on OMAP-L138. And
+> AFAIK, there is no one working towards that in TI as well.
+> 
+> Thanks,
+> Sekhar
+> 
+> [1]
+> http://git.ti.com/cgit/cgit.cgi/ti-linux-kernel/ti-linux-kernel.git/tree/drivers/remoteproc/pru_rproc.c?h=ti-linux-4.9.y
+> 
 
--- 
-Catalin
+Darn. I've used pru_rproc on the BeagleBone. One more thing for the EV3 
+list ;-).
