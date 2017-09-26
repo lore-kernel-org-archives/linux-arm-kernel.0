@@ -1,46 +1,42 @@
 From: jdelvare@suse.de (Jean Delvare)
-Date: Tue, 26 Sep 2017 07:55:58 +0200
-Subject: [PATCH] soc: mediatek: place Kconfig for all SoC driver under menu
-In-Reply-To: <b7aeda2773ebd2f030ddd782b31a594a05fdef2c.1505982942.git.sean.wang@mediatek.com>
-References: <b7aeda2773ebd2f030ddd782b31a594a05fdef2c.1505982942.git.sean.wang@mediatek.com>
-Message-ID: <20170926075558.7e4c99c3@endymion>
+Date: Tue, 26 Sep 2017 08:00:22 +0200
+Subject: [PATCH] soc: mediatek: turn MTK_PMIC_WRAP into visible symbols
+In-Reply-To: <6c1696cf9f860cc8151a906ecbc799121b5aeeab.1505984256.git.sean.wang@mediatek.com>
+References: <6c1696cf9f860cc8151a906ecbc799121b5aeeab.1505984256.git.sean.wang@mediatek.com>
+Message-ID: <20170926080022.215f7b7b@endymion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Sep 2017 16:46:35 +0800, sean.wang at mediatek.com wrote:
+On Thu, 21 Sep 2017 17:01:05 +0800, sean.wang at mediatek.com wrote:
 > From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Add cleanup for placing all Kconfig for all MediaTek SoC drivers under
-> the independent menu as other SoCs vendor usually did.
-> 
+> MTK_PMIC_WRAP is the basic and required configuration for those various
+> MediaTek PMICs, so turning MTK_PMIC_WRAP into visible symbols easily
+> allows users tending to have the enablement for those PMICs.
+
+I can't really make sense of the sentence above, sorry, and can't see
+how it matches the change below anyway. MTK_PMIC_WRAP is already a
+visible symbol before this change. The change is probably good in
+itself, but please try to come up with a better description.
+
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
->  drivers/soc/mediatek/Kconfig | 4 ++++
->  1 file changed, 4 insertions(+)
+>  drivers/soc/mediatek/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index 609bb34..a2fcd7f 100644
+> index a2fcd7f..d513629 100644
 > --- a/drivers/soc/mediatek/Kconfig
 > +++ b/drivers/soc/mediatek/Kconfig
-> @@ -1,6 +1,8 @@
->  #
->  # MediaTek SoC drivers
->  #
-> +menu "MediaTek SoC drivers"
-
-Could it depend on ARCH_MEDIATEK || COMPILE_TEST? So that it isn't
-presented if it is going to be empty.
-
-> +
->  config MTK_INFRACFG
->  	bool "MediaTek INFRACFG Support"
->  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> @@ -30,3 +32,5 @@ config MTK_SCPSYS
+> @@ -15,7 +15,7 @@ config MTK_INFRACFG
+>  config MTK_PMIC_WRAP
+>  	tristate "MediaTek PMIC Wrapper Support"
+>  	depends on ARCH_MEDIATEK
+> -	depends on RESET_CONTROLLER
+> +	select RESET_CONTROLLER
+>  	select REGMAP
 >  	help
->  	  Say yes here to add support for the MediaTek SCPSYS power domain
->  	  driver.
-> +
-> +endmenu
+>  	  Say yes here to add support for MediaTek PMIC Wrapper found
 
 
 -- 
