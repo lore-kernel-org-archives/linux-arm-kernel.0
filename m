@@ -1,91 +1,101 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Sep 2017 21:13:57 -0700
-Subject: [PATCH v4 2/4] thermal: add brcmstb AVS TMON driver
-In-Reply-To: <744357E9AAD1214791ACBA4B0B9092636BE1FB55@SHSMSX101.ccr.corp.intel.com>
-References: <20170809220257.4234-1-code@mmayer.net>
- <20170809220257.4234-3-code@mmayer.net> <1502777298.2591.1.camel@intel.com>
- <95da51df3cadbb05f721f2e5b8d59f8d@milecki.pl>
- <1502779721.2591.4.camel@intel.com>
- <4ec0715e-fcd7-3aec-3589-96426575c373@gmail.com>
- <744357E9AAD1214791ACBA4B0B9092636BE1FB55@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <1e23383c-7c63-04fc-0f07-21b0e418e3de@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 26 Sep 2017 06:50:47 +0200
+Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
+In-Reply-To: <87d16oeeti.fsf@linkitivity.dja.id.au>
+References: <20170901072744.2409-1-dja@axtens.net>
+ <87d16oeeti.fsf@linkitivity.dja.id.au>
+Message-ID: <CAKMK7uFq=WEYoeBBvBgSeFq9PCsqzbGiq6KiC10b1KabcayDQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2017 08:02 PM, Zhang, Rui wrote:
-> Hi, Florian,
-> 
-> This patch set was dropped in the last minute because of this discussion
-> https://patchwork.kernel.org/patch/9936325/
-> as I don?t want to rebase the patch before sending the pull request.
+On Mon, Sep 18, 2017 at 7:49 AM, Daniel Axtens <dja@axtens.net> wrote:
+> Hi all,
+>
+> The merge window is well over by now - is there anything else I can do
+> to get this series to a mergeable state? I'm not particularly across the
+> rules for drm-misc, so please let me know if there are things I need to
+> be doing.
 
-Ah, you wanted to squash that patch into the initial submission?
+drm-misc is always open for feature merging, but the patch series
+lacks full r-b by someone with clue on this stuff (i.e. probably not
+me). Pls find someone who can do the in-depth review. Just an Ack
+feels a bit thin.
+-Daniel
 
-> 
-> I don?t think we can make it for 4.14.
-> Eduardo will be back and pick the soc patches for 4.15.
-
-I assume you would want to get that particular patch squashed into a
-clean submission targeting 4.15 now, right?
-
-Thanks
-
-> 
-> Thanks,
-> rui
-> 
-> 
-> 
-> -----Original Message-----
-> From: Florian Fainelli [mailto:f.fainelli at gmail.com] 
-> Sent: Monday, September 25, 2017 5:11 AM
-> To: Zhang, Rui <rui.zhang@intel.com>; Rafa? Mi?ecki <rafal@milecki.pl>
-> Cc: Markus Mayer <code@mmayer.net>; Eduardo Valentin <edubezval@gmail.com>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Doug Berger <opendmb@gmail.com>; Brian Norris <computersforpeace@gmail.com>; Gregory Fong <gregory.0xf0@gmail.com>; Russell King <linux@armlinux.org.uk>; Catalin Marinas <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>; Arnd Bergmann <arnd@arndb.de>; Olof Johansson <olof@lixom.net>; Broadcom Kernel List <bcm-kernel-feedback-list@broadcom.com>; Power Management List <linux-pm@vger.kernel.org>; Device Tree List <devicetree@vger.kernel.org>; ARM Kernel List <linux-arm-kernel@lists.infradead.org>; Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; Markus Mayer <mmayer@broadcom.com>
-> Subject: Re: [PATCH v4 2/4] thermal: add brcmstb AVS TMON driver
-> Importance: High
-> 
-> Le 08/14/17 ? 23:48, Zhang Rui a ?crit?:
->> On Tue, 2017-08-15 at 08:42 +0200, Rafa? Mi?ecki wrote:
->>> On 2017-08-15 08:08, Zhang Rui wrote:
->>>>
->>>>>
->>>>> diff --git a/drivers/thermal/broadcom/Kconfig
->>>>> b/drivers/thermal/broadcom/Kconfig
->>>>> index 42c098e..c106a15 100644
->>>>> --- a/drivers/thermal/broadcom/Kconfig
->>>>> +++ b/drivers/thermal/broadcom/Kconfig
->>>>> @@ -6,6 +6,13 @@ config BCM2835_THERMAL
->>>>> ?	help
->>>>> ?	??Support for thermal sensors on Broadcom bcm2835 SoCs.
->>>>> ?
->>>>> +config BRCMSTB_THERMAL
->>>>> +	tristate "Broadcom STB AVS TMON thermal driver"
->>>>> +	depends on ARCH_BRCMSTB || COMPILE_TEST
->>>>> +	help
->>>>> +	??Enable this driver if you have a Broadcom STB SoC and
->>>>> would like
->>>>> +	??thermal framework support.
->>>>> +
->>>> I don't understand why I got the following checkpatch warning
->>>>
->>>> WARNING: please write a paragraph that describes the config symbol 
->>>> fully
->>>> #73: FILE: drivers/thermal/broadcom/Kconfig:9:
->>>> +config BRCMSTB_THERMAL
->>>>
->>>> I didn't see this for other Kconfig changes.
->>> It's because your help message is only 2 lines long (instead of 3).
->>>
->>> Some (many?) maintainers aren't pedantic about that, a common sense 
->>> should be applied ;)
+>
+> Regards,
+> Daniel
+>
+> Daniel Axtens <dja@axtens.net> writes:
+>
+>> This patch set:
 >>
->> thanks for explaining.
->> Patch 1 and 2 queued for next merge window.
-> 
-> Humm, I don't see this driver in your latest 4.14 pull request to Linus, so what happened here exactly? Can we expect this driver to be submitted for 4.14 or we just happened to have missed this window now?
-> --
-> Florian
-> 
+>>  - splits the default display handling out from VGA arbiter, into its
+>>    own file and behind its own Kconfig option (and gives the functions
+>>    better names).
+>>
+>>  - adds extra detection of default devices. To be nominated, the vga
+>>    arbiter and platform hooks must not have nominated a default. A
+>>    card will then only be nominated if it has a driver attached and
+>>    has IO or memory decoding enabled.
+>>
+>>  - adds relevant documentation.
+>>
+>> The practical impact of this is improved X autoconfiguration on some
+>> arm64 systems.
+>>
+>> Changes in v3:
+>>
+>>  - Add documentation - thanks Daniel Vetter for pointing it out.
+>>
+>>  - Clarify explanations. Thanks to everyone for continuing to bear
+>>    with my incomplete understanding of PCI and provide some clarity.
+>>
+>>  - Split refactoring and adding functionality.
+>>
+>> Changes in v2: https://www.spinics.net/lists/linux-pci/msg64007.html
+>>
+>> Drop all the powerpc patches. [explanation snipped]
+>>
+>> v1: https://www.spinics.net/lists/linux-pci/msg63581.html
+>>
+>> Regards,
+>> Daniel
+>>
+>> Daniel Axtens (3):
+>>   drm: split default display handler out of VGA arbiter
+>>   drm: add fallback default device detection
+>>   drm: documentation for default display device
+>>
+>>  Documentation/gpu/default_display.rst |  93 +++++++++++++++++++
+>>  Documentation/gpu/index.rst           |   1 +
+>>  arch/ia64/pci/fixup.c                 |   6 +-
+>>  arch/powerpc/kernel/pci-common.c      |   6 +-
+>>  arch/x86/pci/fixup.c                  |   6 +-
+>>  arch/x86/video/fbdev.c                |   4 +-
+>>  drivers/gpu/vga/Kconfig               |  12 +++
+>>  drivers/gpu/vga/Makefile              |   1 +
+>>  drivers/gpu/vga/default_display.c     | 163 ++++++++++++++++++++++++++++++++++
+>>  drivers/gpu/vga/vga_switcheroo.c      |   8 +-
+>>  drivers/gpu/vga/vgaarb.c              |  61 +++----------
+>>  drivers/pci/pci-sysfs.c               |   4 +-
+>>  include/linux/default_display.h       |  44 +++++++++
+>>  include/linux/vgaarb.h                |  15 ----
+>>  14 files changed, 344 insertions(+), 80 deletions(-)
+>>  create mode 100644 Documentation/gpu/default_display.rst
+>>  create mode 100644 drivers/gpu/vga/default_display.c
+>>  create mode 100644 include/linux/default_display.h
+>>
+>> --
+>> 2.11.0
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+
 
 -- 
-Florian
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
