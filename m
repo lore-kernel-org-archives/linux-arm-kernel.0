@@ -1,98 +1,126 @@
-From: mdf@kernel.org (Moritz Fischer)
-Date: Tue, 26 Sep 2017 10:50:18 -0700
-Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
- Project Sulfur SDRs
-In-Reply-To: <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
-References: <20170911232223.91894-1-mdf@kernel.org>
- <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
- <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
- <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
-Message-ID: <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Tue, 26 Sep 2017 11:49:20 -0600
+Subject: [PATCH v4 pci 1/2] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
+ boot for X-Gene v1
+In-Reply-To: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+References: <1506448161-30961-1-git-send-email-kdinh@apm.com>
+Message-ID: <1506448161-30961-2-git-send-email-kdinh@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal,
+This patch makes pci-xgene-msi driver ACPI-aware and provides
+MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
 
-On Tue, Sep 26, 2017 at 02:54:48PM +0200, Michal Simek wrote:
-> Hi,
-> 
-> On 25.9.2017 18:11, Moritz Fischer wrote:
-> > Hi Michal,
-> > 
-> > On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
-> >> Hi Moritz
-> >>
-> >> sorry for delay.
-> > 
-> > No problem.
-> > 
-> >>
-> >> On 12.9.2017 01:22, Moritz Fischer wrote:
-> >>> Add support for the National Instruments Project Sulfur SDR
-> >>> motherboards Rev 2,3 and 4.
-> >>>
-> >>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> >>> ---
-> >>>  arch/arm/boot/dts/Makefile                |   3 +
-> >>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
-> >>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
-> >>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
-> >>>  5 files changed, 364 insertions(+)
-> >>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
-> >>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
-> >>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
-> >>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
-> >>
-> >> Is this publicly available board?
-> > 
-> > Will be in Q1 2018 was announced at GRCon'17 ([1]).
-> > Some of the Rev3s are currently deployed in Norway as part of a radar
-> > system.
-> > 
-> >> I am not quite sure we should apply these dts files. There are a lot of
-> >> boards with zynq and there must be any strong argument for applying this
-> >> to the tree. For arm32 with even flat tree structure.
-> > 
-> > What's the issue with merging them, except for having 3 more files? 
-> 
-> For me this is not a problem because on Linux side it is not increasing
-> build time.
-> I want to see the value for community. All xilinx platforms are
-> evaluation generic purpose boards which are showing how to connect stuff
-> together.
-> On the other hand this is real product.
+Signed-off-by: Khuong Dinh <kdinh@apm.com>
+        [Take over from Duc Dang]
+---
+ drivers/pci/host/pci-xgene-msi.c |   38 +++++++++++++++++++++++++++++++++++---
+ 1 files changed, 35 insertions(+), 3 deletions(-)
 
-Uh.
-
-> I would let arm-soc maintainer to decide if this is fine or not. I
-> definitely don't want to end up in situation that we will have dts for
-> real products which are not bringing any value for others.
-
-Sure, it's the maintainers call.
-
-I do intend to have my customers run mainline on it eventually, currently
-I'm a handful of patches away from making that happen. So yes, running
-mainline is a usecase that matters to me.
-
-It is one thing to keep bitching about vendor kernels as a community
-continuously, but then if someone goes through the effort and actually
-tries to run mainline, you give them crap like that above.
-
-Our products usually come with full schematics [1], firmware, fpga code and all
-available, I don't know what makes them less useful to the community as a
-platform to experiment and develop on than Xilinx eval boards.
-
-There's several people that I know of both hobbyists and companies that
-build systems around these platforms, so I don't know ...
-
-- Moritz
-
-[1] http://files.ettus.com/schematics/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/9b76af0d/attachment.sig>
+diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+index 1f42a20..d657248 100644
+--- a/drivers/pci/host/pci-xgene-msi.c
++++ b/drivers/pci/host/pci-xgene-msi.c
+@@ -4,6 +4,7 @@
+  * Copyright (c) 2014, Applied Micro Circuits Corporation
+  * Author: Tanmay Inamdar <tinamdar@apm.com>
+  *	   Duc Dang <dhdang@apm.com>
++ *	   Khuong Dinh <kdinh@apm.com>
+  *
+  * This program is free software; you can redistribute  it and/or modify it
+  * under  the terms of  the GNU General  Public License as published by the
+@@ -24,6 +25,7 @@
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_pci.h>
++#include <linux/acpi.h>
+ 
+ #define MSI_IR0			0x000000
+ #define MSI_INT0		0x800000
+@@ -39,7 +41,7 @@ struct xgene_msi_group {
+ };
+ 
+ struct xgene_msi {
+-	struct device_node	*node;
++	struct fwnode_handle	*fwnode;
+ 	struct irq_domain	*inner_domain;
+ 	struct irq_domain	*msi_domain;
+ 	u64			msi_addr;
+@@ -249,6 +251,13 @@ static void xgene_irq_domain_free(struct irq_domain *domain,
+ 	.free   = xgene_irq_domain_free,
+ };
+ 
++#ifdef CONFIG_ACPI
++static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
++{
++	return xgene_msi_ctrl.fwnode;
++}
++#endif
++
+ static int xgene_allocate_domains(struct xgene_msi *msi)
+ {
+ 	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+@@ -256,7 +265,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+ 	if (!msi->inner_domain)
+ 		return -ENOMEM;
+ 
+-	msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
++	msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+ 						    &xgene_msi_domain_info,
+ 						    msi->inner_domain);
+ 
+@@ -265,6 +274,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+ 		return -ENOMEM;
+ 	}
+ 
++#ifdef CONFIG_ACPI
++	pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
++#endif
+ 	return 0;
+ }
+ 
+@@ -449,6 +461,14 @@ static int xgene_msi_hwirq_free(unsigned int cpu)
+ 	{},
+ };
+ 
++#ifdef CONFIG_ACPI
++static const struct acpi_device_id xgene_msi_acpi_ids[] = {
++	{"APMC0D0E", 0},
++	{ },
++};
++MODULE_DEVICE_TABLE(acpi, xgene_msi_acpi_ids);
++#endif
++
+ static int xgene_msi_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -469,7 +489,18 @@ static int xgene_msi_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 	xgene_msi->msi_addr = res->start;
+-	xgene_msi->node = pdev->dev.of_node;
++
++	xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
++	if (!xgene_msi->fwnode) {
++		xgene_msi->fwnode =
++			irq_domain_alloc_fwnode((void *)xgene_msi->msi_addr);
++		if (!xgene_msi->fwnode) {
++			dev_err(&pdev->dev, "Failed to create fwnode\n");
++			rc = ENOMEM;
++			goto error;
++		}
++	}
++
+ 	xgene_msi->num_cpus = num_possible_cpus();
+ 
+ 	rc = xgene_msi_init_allocator(xgene_msi);
+@@ -540,6 +571,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+ 	.driver = {
+ 		.name = "xgene-msi",
+ 		.of_match_table = xgene_msi_match_table,
++		.acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+ 	},
+ 	.probe = xgene_msi_probe,
+ 	.remove = xgene_msi_remove,
+-- 
+1.7.1
