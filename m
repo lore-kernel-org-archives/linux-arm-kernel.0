@@ -1,97 +1,52 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 25 Sep 2017 18:56:58 -0500
-Subject: [PATCH 2/2] PCI: mvebu: Check DRAM window size
-In-Reply-To: <20170828152517.24506-3-jlu@pengutronix.de>
-References: <20170828152517.24506-1-jlu@pengutronix.de>
- <20170828152517.24506-3-jlu@pengutronix.de>
-Message-ID: <20170925235658.GK15970@bhelgaas-glaptop.roam.corp.google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 25 Sep 2017 17:09:21 -0700
+Subject: [PATCH 00/10] ARM: bcm: Add support for Broadcom Hurricane 2 SoC
+Message-ID: <20170926000931.670-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 28, 2017 at 05:25:17PM +0200, Jan Luebbe wrote:
-> The sum of the DRAM windows may exceed 4GB (at least on Armada XP).
-> Return an error in that case.
-> 
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Hi all,
 
-Looking for an ack from Thomas or Jason before applying this...
+This patch series adds basic (boot to prompt with essential peripherals
+working) support for Broadcom's Hurricane 2 SoC which is found in switching
+applications.
 
-> ---
->  drivers/pci/host/pci-mvebu.c | 27 ++++++++++++++++++++++-----
->  1 file changed, 22 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index f353a6eb2f01..5d74af81d104 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -206,10 +206,10 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
->   * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
->   * WIN[0-3] -> DRAM bank[0-3]
->   */
-> -static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> +static int mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
->  {
->  	const struct mbus_dram_target_info *dram;
-> -	u32 size;
-> +	u64 size;
->  	int i;
->  
->  	dram = mv_mbus_dram_info();
-> @@ -252,19 +252,32 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
->  	if ((size & (size - 1)) != 0)
->  		size = 1 << fls(size);
->  
-> +	if (size > 0x100000000) {
-> +		dev_err(&port->pcie->pdev->dev,
-> +			"Could not configure DRAM window (too large): 0x%llx\n",
-> +			size);
-> +
-> +		return -EINVAL;
-> +	}
-> +
->  	/* Setup BAR[1] to all DRAM banks. */
->  	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
->  	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
->  	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
->  		     PCIE_BAR_CTRL_OFF(1));
-> +
-> +	return 0;
->  }
->  
-> -static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> +static int mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
->  {
->  	u32 cmd, mask;
-> +	int ret;
->  
->  	/* Point PCIe unit MBUS decode windows to DRAM space. */
-> -	mvebu_pcie_setup_wins(port);
-> +	ret = mvebu_pcie_setup_wins(port);
-> +	if (ret)
-> +		return ret;
->  
->  	/* Master + slave enable. */
->  	cmd = mvebu_readl(port, PCIE_CMD_OFF);
-> @@ -277,6 +290,8 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
->  	mask = mvebu_readl(port, PCIE_MASK_OFF);
->  	mask |= PCIE_MASK_ENABLE_INTS;
->  	mvebu_writel(port, mask, PCIE_MASK_OFF);
-> +
-> +	return 0;
->  }
->  
->  static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
-> @@ -882,7 +897,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
->  
->  		if (!port->base)
->  			continue;
-> -		mvebu_pcie_setup_hw(port);
-> +		err = mvebu_pcie_setup_hw(port);
-> +		if (err)
-> +			return 0;
->  	}
->  
->  	return 1;
-> -- 
-> 2.11.0
-> 
+This is also an iProc-family chip with a number of variations, including
+some in the clock controller that I have not been able to identify yet.
+
+Florian Fainelli (10):
+  MAINTAINERS: Update Broadcom iProc regexp with Hurricane 2
+  dt-bindings: Add documentation for Broadcom Hurricane 2 SoCs
+  ARM: bcm: Add support for Broadcom Hurricane 2 SoC
+  dt-bindings: Document Broadcom Hurricane 2 clocks
+  clk: bcm: Add Broadcom Hurricane 2 clock support
+  ARM: dts: Add Broadcom Hurricane 2 DTS include file
+  ARM: debug: Add Hurricane 2 UART2 debug addresses
+  dt-bindings: Add Ubiquiti Networks vendor prefix
+  ARM: dts: Hurricane 2: Add basic support for Ubiquiti UniFi Switch 8
+  ARM: multi_v7_defconfig: Enable CONFIG_ARCH_BCM_HR2
+
+ .../devicetree/bindings/arm/bcm/brcm,hr2.txt       |  14 +
+ .../bindings/clock/brcm,iproc-clocks.txt           |  14 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   1 +
+ arch/arm/Kconfig.debug                             |  10 +-
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/bcm-hr2.dtsi                     | 368 +++++++++++++++++++++
+ arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts  |  85 +++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/mach-bcm/Kconfig                          |   9 +
+ arch/arm/mach-bcm/Makefile                         |   3 +
+ arch/arm/mach-bcm/bcm_hr2.c                        |  25 ++
+ drivers/clk/bcm/Kconfig                            |   9 +
+ drivers/clk/bcm/Makefile                           |   1 +
+ drivers/clk/bcm/clk-hr2.c                          |  27 ++
+ 15 files changed, 569 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
+ create mode 100644 arch/arm/boot/dts/bcm-hr2.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts
+ create mode 100644 arch/arm/mach-bcm/bcm_hr2.c
+ create mode 100644 drivers/clk/bcm/clk-hr2.c
+
+-- 
+2.14.1
