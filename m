@@ -1,42 +1,68 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 26 Sep 2017 10:02:52 +0800
-Subject: [PATCH v2 01/10] arm: dts: mt2701: add pwm backlight device node
+Date: Tue, 26 Sep 2017 10:02:57 +0800
+Subject: [PATCH v2 06/10] arm: dts: mt7623: add subsystem clock controller
+ nodes
 In-Reply-To: <cover.1506390597.git.ryder.lee@mediatek.com>
 References: <cover.1506390597.git.ryder.lee@mediatek.com>
-Message-ID: <144f5d526d15cbf3ada220765c609eb2b59c240a.1506390597.git.ryder.lee@mediatek.com>
+Message-ID: <ea2ed1f558c5f77f533894a90cae3ca5af3df523.1506390597.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Weiqing Kong <weiqing.kong@mediatek.com>
+This patch adds missing susbsystem clock controllers nodes for MT7623.
+(e.g., mmsys, imgsys, vdecsys and bdpsys)
 
-This patch adds the device node for MT2701 pwm backlight.
-
-Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/mt7623.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index afe12e5..3c85879 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -530,6 +530,15 @@
- 		#clock-cells = <1>;
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 9ec3767..ca672bd 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -661,6 +661,30 @@
+ 		status = "disabled";
  	};
  
-+	bls: pwm at 1400a000 {
-+		compatible = "mediatek,mt2701-disp-pwm";
-+		reg = <0 0x1400a000 0 0x1000>;
-+		#pwm-cells = <2>;
-+		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
-+		clock-names = "main", "mm";
-+		status = "disabled";
++	mmsys: syscon at 14000000 {
++		compatible = "mediatek,mt7623-mmsys",
++			     "mediatek,mt2701-mmsys",
++			     "syscon";
++		reg = <0 0x14000000 0 0x1000>;
++		#clock-cells = <1>;
 +	};
 +
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
++	imgsys: syscon at 15000000 {
++		compatible = "mediatek,mt7623-imgsys",
++			     "mediatek,mt2701-imgsys",
++			     "syscon";
++		reg = <0 0x15000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	vdecsys: syscon at 16000000 {
++		compatible = "mediatek,mt7623-vdecsys",
++			     "mediatek,mt2701-vdecsys",
++			     "syscon";
++		reg = <0 0x16000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
+ 	hifsys: syscon at 1a000000 {
+ 		compatible = "mediatek,mt7623-hifsys",
+ 			     "mediatek,mt2701-hifsys",
+@@ -799,4 +823,12 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+ 		status = "disabled";
+ 	};
++
++	bdpsys: syscon at 1c000000 {
++		compatible = "mediatek,mt7623-bdpsys",
++			     "mediatek,mt2701-bdpsys",
++			     "syscon";
++		reg = <0 0x1c000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
+ };
 -- 
 1.9.1
