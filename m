@@ -1,63 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Sep 2017 12:04:24 +0200
-Subject: [PATCH v9 0/5] Add runtime PM support for clocks (on Exynos SoC
- example)
-In-Reply-To: <150483237153.48525.1363518996437790191@resonance>
-References: <CGME20170821080538eucas1p1e273ef22920493ee406ef546bcc230e5@eucas1p1.samsung.com>
- <1503302703-13801-1-git-send-email-m.szyprowski@samsung.com>
- <150483237153.48525.1363518996437790191@resonance>
-Message-ID: <be61a74a-55bd-53cf-20c6-49d3f91d944a@samsung.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 26 Sep 2017 18:17:05 +0800
+Subject: [PATCH v2 05/10] arm: dts: mt7623: update pio, usb and crypto
+ nodes
+In-Reply-To: <93734b87262a8305b67e989777dfa1297d66cee4.1506390597.git.ryder.lee@mediatek.com>
+References: <cover.1506390597.git.ryder.lee@mediatek.com>
+ <93734b87262a8305b67e989777dfa1297d66cee4.1506390597.git.ryder.lee@mediatek.com>
+Message-ID: <1506421025.5626.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On Tue, 2017-09-26 at 10:02 +0800, Ryder Lee wrote:
+> This patch updates pio, usb and crypto nodes to make them be consistent
+> with the binding documents.
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt7623.dtsi | 52 ++++++++++++++++++++++---------------------
+>  1 file changed, 27 insertions(+), 25 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+> index 381843e..9ec3767 100644
+> --- a/arch/arm/boot/dts/mt7623.dtsi
+> +++ b/arch/arm/boot/dts/mt7623.dtsi
+> @@ -226,21 +226,6 @@
+>  		#reset-cells = <1>;
+>  	};
+>  
+> -	pio: pinctrl at 10005000 {
+> -		compatible = "mediatek,mt7623-pinctrl",
+> -			     "mediatek,mt2701-pinctrl";
+> -		reg = <0 0x1000b000 0 0x1000>;
+> -		mediatek,pctl-regmap = <&syscfg_pctl_a>;
+> -		pins-are-numbered;
+> -		gpio-controller;
+> -		#gpio-cells = <2>;
+> -		interrupt-controller;
+> -		interrupt-parent = <&gic>;
+> -		#interrupt-cells = <2>;
+> -		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+> -			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+> -	};
+> -
+>  	syscfg_pctl_a: syscfg at 10005000 {
+>  		compatible = "mediatek,mt7623-pctl-a-syscfg", "syscon";
+>  		reg = <0 0x10005000 0 0x1000>;
 
-On 2017-09-08 02:59, Michael Turquette wrote:
-> Hi Marek,
->
-> Quoting Marek Szyprowski (2017-08-21 01:04:58)
->> Dear All,
->>
->> This patchset adds runtime PM support to common clock framework. This is an
->> attempt to implement support for clock controllers, which belongs to a power
->> domain. This approach works surprisingly well on Exynos 5433 SoC, what allowed
->> us to solve various freeze/crash issues related to power management.
->>
->> The main idea behind this patchset is to keep clock's controller power domain
->> enabled every time when at least one of its clock is enabled or access to its
->> registers is being made. Clock controller driver (clock provider) can
->> supply a struct device pointer, which is the used by clock core for tracking and
->> managing clock's controller runtime pm state. Each clk_prepare() operation will
->> first call pm_runtime_get_sync() on the supplied device, while clk_unprepare()
->> will do pm_runtime_put() at the end.
->>
->> This runtime PM feature has been tested with Exynos4412 (not included in this
->> patchset) and Exynos5433 clocks drivers. Both have some clocks, which belongs to
->> respective power domains and need special handling during power on/off
->> procedures. Till now it wasn't handled at all, what caused various problems.
->>
->> Patches for clocks drivers change the way the clock provider is initialized.
->> Instead of CLK_OF_DECLARE based initialization, a complete platform device driver
->> infrastructure is being used. This is needed to let driver to use runtime PM
->> feature and integrate with generic power domains. The side-effect of this change
->> is a delay in clock provider registeration during system boot, so early
->> initialized drivers might get EPROBEDEFER error when requesting their clocks.
->> This was an issue for IOMMU drivers, but IOMMU deferred probe support has been
->> finally merged to v4.13-rc1 and now it is handled correctly.
->>
->> Patches are based and tested on v4.13-rc5, but applies fine also on v4.13-rc1.
-> Patches look good to me. It's too late for the v4.14 PR, but I'll merge
-> this to clk-next after -rc1 drops.
 
-Gentle ping.
+Hi Ryder,
 
-v4.14-rc2 has been released yesterday. Is there a chance to get this 
-patchset merged
-to clk-next soon? It definitely needs some time for testing in 
-linux-next and now it
-is the best time for that...
+pio node is special, it have 2 registers space.
+The address 10005000 is for PIO, it was accesed through syscfg_pctl_a
+regmap. The other one, 0x1000b000, is for EINT.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+So,I think using address @10005000 is correct.
+
+Joe.C
