@@ -1,63 +1,59 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 26 Sep 2017 07:12:41 +0200
-Subject: [PATCH 7/7] drm/rockchip: Cocci spatch "vma_pages"
-In-Reply-To: <d2298979-3094-744c-3d28-76a0ba4a1137@rock-chips.com>
-References: <1505946334393-568186305-0-diffsplit-thomas@m3y3r.de>
- <1505946334393-988165015-7-diffsplit-thomas@m3y3r.de>
- <d2298979-3094-744c-3d28-76a0ba4a1137@rock-chips.com>
-Message-ID: <20170926051241.rwzpxlk4sfju7ctv@phenom.ffwll.local>
+From: ore@pengutronix.de (Oleksij Rempel)
+Date: Tue, 26 Sep 2017 07:17:32 +0200
+Subject: [PATCH v3 1/2] watchdog: dw_wdt: add stop watchdog operation
+In-Reply-To: <20170925161643.GA32601@roeck-us.net>
+References: <20170925052531.1692-1-o.rempel@pengutronix.de>
+ <20170925161643.GA32601@roeck-us.net>
+Message-ID: <2203f151-99c8-6c58-8766-70813fafe64d@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 09:02:22AM +0800, Mark yao wrote:
-> On 2017?09?21? 06:29, Thomas Meyer wrote:
-> > Use vma_pages function on vma object instead of explicit computation.
-> > Found by coccinelle spatch "api/vma_pages.cocci"
-> > 
-> > Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
-> > ---
-> Looks good for me:
-> Acked-by: Mark Yao <mark.yao@rock-chips.com>
+Hi,
 
-Once more a maintainer who acks a patch and doesn't push it. This is
-really confusing, who exactly do you expect to handle this patch for you?
+On 25.09.2017 18:16, Guenter Roeck wrote:
+> On Mon, Sep 25, 2017 at 07:25:30AM +0200, Oleksij Rempel wrote:
+>> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>
+>> The only way of stopping the watchdog is by resetting it.
+>> Add the watchdog op for stopping the device and reset if
+>> a reset line is provided.
+>>
+>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> Cc: Wim Van Sebroeck <wim@iguana.be>
+>> Cc: Guenter Roeck <linux@roeck-us.net>
+>> Cc: linux-watchdog at vger.kernel.org
+>> ---
+>>
+>> changes v3:
+>>   - don't return error if rst is not present and set WDOG_HW_RUNNING bit
+>>     to notify watchdog core.
+>>
+>> changes v2:
+>>   - test if dw_wdt->rst is NULL instead of IS_ERR
+>>
+>>   drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+>> index 36be987ff9ef..6cc56b18ee52 100644
+>> --- a/drivers/watchdog/dw_wdt.c
+>> +++ b/drivers/watchdog/dw_wdt.c
+>> @@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
+>>   	return 0;
+>>   }
+>>   
+>> +static int dw_wdt_stop(struct watchdog_device *wdd)
+>> +{
+>> +	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
+>> +
+>> +	if (!dw_wdt->rst) {
+>> +		set_bit(WDOG_HW_RUNNING, &wdd->status);
+> 
+> Setting WDOG_HW_RUNNING should be dropped from dw_wdt_start().
 
-Please push to drm-misc-next (also for future patches), thanks.
--Daniel
+you mean, this patch is OK, and i need to provide one more which is 
+removing WDOG_HW_RUNNING from dw_wdt_start(). Correct?
 
-> 
-> > 
-> > diff -u -p a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > @@ -220,7 +220,7 @@ static int rockchip_drm_gem_object_mmap_
-> >   {
-> >   	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-> >   	unsigned int i, count = obj->size >> PAGE_SHIFT;
-> > -	unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-> > +	unsigned long user_count = vma_pages(vma);
-> >   	unsigned long uaddr = vma->vm_start;
-> >   	unsigned long offset = vma->vm_pgoff;
-> >   	unsigned long end = user_count + offset;
-> > 
-> > _______________________________________________
-> > Linux-rockchip mailing list
-> > Linux-rockchip at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> > 
-> > 
-> > 
-> 
-> -- 
-> ?ark Yao
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Regards,
+Oleksij
