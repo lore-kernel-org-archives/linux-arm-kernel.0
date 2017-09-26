@@ -1,41 +1,75 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Sep 2017 21:01:24 +0800
-Subject: [PATCH v3 00/14] ARM: dts: sunxi: Fix DT build warnings
-In-Reply-To: <20170926085855.7yn6zdx3sfuwwxyj@flea>
-References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
- <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
- <20170926085855.7yn6zdx3sfuwwxyj@flea>
-Message-ID: <CAGb2v67=VyHd3n1PgT-2_2efUNijOM8TkwDO9oAQvUd8wYH-qg@mail.gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 26 Sep 2017 15:08:21 +0200
+Subject: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features
+In-Reply-To: <20170926130009.r5isgrjvkwmm44nn@flea>
+References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <6b89df1bf07dac2ab295fca5fdf0e55179c47ed6.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <20170926130009.r5isgrjvkwmm44nn@flea>
+Message-ID: <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 4:58 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Sep 26, 2017 at 07:48:17AM +0000, Chen-Yu Tsai wrote:
->> On Tue, Sep 26, 2017 at 3:22 PM, Corentin Labbe
->> <clabbe.montjoie@gmail.com> wrote:
->> > Hello
->> >
->> > The goal of this patch series is to have a clean DT build with W=1.
->> >
->> > Regards
->> >
->> > Changes since v1:
->> > - moved i2c2 unit address change from patch #2 in patch #1
->> >
->> > Changes since v2
->> > - added two patch for fixing pin names
->>
->> The first twelve patches are good. Maxime, I think we can go ahead and
->> merge them, instead of having them resent again in v3?
->
-> Yep, that works for me. Can you push them?
+Hi Maxime,
 
-Patches 1 and 12 didn't apply cleanly. I fixed them.
+On 26/09/2017 15:00, Maxime Ripard wrote:
+> On Tue, Sep 26, 2017 at 12:17:12PM +0000, Quentin Schulz wrote:
+>> +static const struct axp20x_desc_pin axp209_pins[] = {
+>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
+>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+>> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
+>> +		   AXP20X_FUNCTION(0x3, "ldo"),
+>> +		   AXP20X_FUNCTION(0x4, "adc")),
+>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1"),
+>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+>> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
+>> +		   AXP20X_FUNCTION(0x3, "ldo"),
+>> +		   AXP20X_FUNCTION(0x4, "adc")),
+>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2"),
+>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+>> +		   AXP20X_FUNCTION(0x2, "gpio_in")),
+>> +};
+> 
+> If all the functions are the same, and at the same offset, can't we
+> just hardcode it, instead of having (and duplicate) all the logic
+> below?
+> 
 
-Patches 4~9 do the same type of cleanup for various h3 board dts files.
-Maybe we should just squash them together. Arnd seems to prefer squashing
-identical changes to different boards together.
+AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
+		AXP20X_GPIO_OUT,
+		AXP20X_GPIO_IN,
+		AXP20X_LDO,
+		AXP20X_ADC))
 
+That's what you mean?
 
-ChenYu
+>> +	pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*pctrl_desc), GFP_KERNEL);
+>> +	if (!pctrl_desc)
+>> +		return -ENOMEM;
+>> +
+>> +	pctrl_desc->name = dev_name(&pdev->dev);
+>> +	pctrl_desc->owner = THIS_MODULE;
+>> +	pctrl_desc->pins = pins;
+>> +	pctrl_desc->npins = gpio->desc->npins;
+>> +	pctrl_desc->pctlops = &axp20x_pctrl_ops;
+>> +	pctrl_desc->pmxops = &axp20x_pmx_ops;
+> 
+> The strict flag needs to be set too in order to avoid concurrent uses
+> of GPIO and other functions.
+> 
+
+Strict is a property of pinmux_ops struct (pmxops) and it is set.
+
+Thanks,
+Quentin
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/e49a811a/attachment-0001.sig>
