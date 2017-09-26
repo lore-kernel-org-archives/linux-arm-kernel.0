@@ -1,61 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 26 Sep 2017 00:06:45 -0700
-Subject: [PATCH v3 1/2] watchdog: dw_wdt: add stop watchdog operation
-In-Reply-To: <2203f151-99c8-6c58-8766-70813fafe64d@pengutronix.de>
-References: <20170925052531.1692-1-o.rempel@pengutronix.de>
- <20170925161643.GA32601@roeck-us.net>
- <2203f151-99c8-6c58-8766-70813fafe64d@pengutronix.de>
-Message-ID: <1bd8aa83-97bc-550b-3a2b-46ae857e21c1@roeck-us.net>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 26 Sep 2017 09:22:22 +0200
+Subject: [PATCH v3 02/14] ARM: dts: sunxi: h3/h5: Fix i2c2 register address
+In-Reply-To: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
+References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170926072234.27481-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2017 10:17 PM, Oleksij Rempel wrote:
-> Hi,
-> 
-> On 25.09.2017 18:16, Guenter Roeck wrote:
->> On Mon, Sep 25, 2017 at 07:25:30AM +0200, Oleksij Rempel wrote:
->>> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>
->>> The only way of stopping the watchdog is by resetting it.
->>> Add the watchdog op for stopping the device and reset if
->>> a reset line is provided.
->>>
->>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
->>> Cc: Wim Van Sebroeck <wim@iguana.be>
->>> Cc: Guenter Roeck <linux@roeck-us.net>
->>> Cc: linux-watchdog at vger.kernel.org
->>> ---
->>>
->>> changes v3:
->>> ? - don't return error if rst is not present and set WDOG_HW_RUNNING bit
->>> ??? to notify watchdog core.
->>>
->>> changes v2:
->>> ? - test if dw_wdt->rst is NULL instead of IS_ERR
->>>
->>> ? drivers/watchdog/dw_wdt.c | 16 ++++++++++++++++
->>> ? 1 file changed, 16 insertions(+)
->>>
->>> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
->>> index 36be987ff9ef..6cc56b18ee52 100644
->>> --- a/drivers/watchdog/dw_wdt.c
->>> +++ b/drivers/watchdog/dw_wdt.c
->>> @@ -135,6 +135,21 @@ static int dw_wdt_start(struct watchdog_device *wdd)
->>> ????? return 0;
->>> ? }
->>> +static int dw_wdt_stop(struct watchdog_device *wdd)
->>> +{
->>> +??? struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
->>> +
->>> +??? if (!dw_wdt->rst) {
->>> +??????? set_bit(WDOG_HW_RUNNING, &wdd->status);
->>
->> Setting WDOG_HW_RUNNING should be dropped from dw_wdt_start().
-> 
-> you mean, this patch is OK, and i need to provide one more which is removing WDOG_HW_RUNNING from dw_wdt_start(). Correct?
-> 
+The unit address and register address does not match.
+This patch fix the register address with the good one.
 
-No. You are providing a stop function, thus the start function should not set the flag.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Guenter
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index b37ed3461229..289f2cd06dfe 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -632,7 +632,7 @@
+ 
+ 		i2c2: i2c at 1c2b400 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+-			reg = <0x01c2b000 0x400>;
++			reg = <0x01c2b400 0x400>;
+ 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_I2C2>;
+ 			resets = <&ccu RST_BUS_I2C2>;
+-- 
+2.13.5
