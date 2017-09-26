@@ -1,52 +1,50 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 26 Sep 2017 23:20:19 +0200
-Subject: Unreviewed arm64 ABI change in linux-next via driver-core tree
-In-Reply-To: <20170926131525.GE15480@leverpostej>
-References: <20170926124536.GA11192@arm.com>
- <20170926131525.GE15480@leverpostej>
-Message-ID: <20170926212019.GB28696@kroah.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Tue, 26 Sep 2017 14:27:57 -0700
+Subject: [PATCH v5 0/2] thermal: add brcmstb AVS TMON driver
+Message-ID: <20170926212800.4879-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 02:15:26PM +0100, Mark Rutland wrote:
-> Hi,
-> 
-> On Tue, Sep 26, 2017 at 01:45:37PM +0100, Will Deacon wrote:
-> > Hi Greg,
-> > 
-> > We stumbled over a change in linux-next that has ABI implications for arm64
-> > and, as far as we can tell, has not been reviewed:
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm64/kernel?id=fb7ff3f8721b87bf078868c9a252fa0cf71a47c2
-> > 
-> > ("fb7ff3f8721b cpuinfo: implement sysfs nodes for arm64")
-> 
-> > Please can you drop this from your tree until we've had a chance to review
-> > it properly? If Felix can repost it as above, then we can get the discussion
-> > started because, aside from this email, we have concerns about exactly what
-> > is being exposed to userspace here.
-> 
-> Seconded.
+From: Markus Mayer <mmayer@broadcom.com>
 
-Now dropped.
+This series adds the brcmstb AVS TMON driver.
 
-> Experience with the existing /proc/cpuinfo shows that this needs *very*
-> careful review.
+The driver was originally written by Brian Norris.
 
-Hah, yes, but with a sysfs interface, one would "hope" that you can get
-it right this time around :)
+Changes since v4:
+- disable trip points properly when needed; there was code left-over
+  from an older iteration of this driver that used long ints, which
+  resulted in code that was incorrect now that we are using ints
+- rebased on v4.14-rc1
+- patches 3 & 4 (turning on CONFIG_BRCMSTB_THERMAL for arm/arm64) are no
+  longer part of the series, because they were already picked up for 4.14
 
-> I've worked on arm64's /proc/cpuinfo, and I'd appreciate being Cc'd on
-> future postings of this series. I'd also recommend that future postings
-> are also Cc'd to linux-arch (and maybe linux-api) so that the interface
-> is reviewed by a larger set of relevant parties.
+Changes since v3:
+- Rebased on v4.13-rc3 to resolve conflicts in the MAINTAINERS file
 
-For some reason, this set of patches never made it to lkml or the lists
-multiple times.  Both you all, and the x86 developers have objected to
-these changes, so they are gone for now.
+Changes since v2:
+- replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4 only]
+- all other patches are unchanged from v2
 
-Felix, please resend the series and cc: the needed people.
+Changes since v1:
+- Fixed wording in binding document
+- Fixed lincensing to consistently mention GPL v2
+- Use thermal_zone_get_slope() and thermal_zone_get_offset()
+- Some minor clean-ups
 
-thanks,
+Brian Norris (2):
+  Documentation: devicetree: add binding for Broadcom STB AVS TMON
+  thermal: add brcmstb AVS TMON driver
 
-greg k-h
+ .../devicetree/bindings/thermal/brcm,avs-tmon.txt  |  20 ++
+ MAINTAINERS                                        |   8 +
+ drivers/thermal/Kconfig                            |   2 +-
+ drivers/thermal/broadcom/Kconfig                   |   7 +
+ drivers/thermal/broadcom/Makefile                  |   1 +
+ drivers/thermal/broadcom/brcmstb_thermal.c         | 387 +++++++++++++++++++++
+ 6 files changed, 424 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+ create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+
+-- 
+2.7.4
