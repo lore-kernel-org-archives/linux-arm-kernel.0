@@ -1,43 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Sep 2017 12:02:40 +0200
-Subject: [PATCH v2 11/13] drm/sun4i: hdmi: Add support for A31's HDMI
- controller
-In-Reply-To: <20170926065919.24446-12-wens@csie.org>
-References: <20170926065919.24446-1-wens@csie.org>
- <20170926065919.24446-12-wens@csie.org>
-Message-ID: <20170926100240.es6fbqux3kfihd33@flea>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 26 Sep 2017 12:04:24 +0200
+Subject: [PATCH v9 0/5] Add runtime PM support for clocks (on Exynos SoC
+ example)
+In-Reply-To: <150483237153.48525.1363518996437790191@resonance>
+References: <CGME20170821080538eucas1p1e273ef22920493ee406ef546bcc230e5@eucas1p1.samsung.com>
+ <1503302703-13801-1-git-send-email-m.szyprowski@samsung.com>
+ <150483237153.48525.1363518996437790191@resonance>
+Message-ID: <be61a74a-55bd-53cf-20c6-49d3f91d944a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 06:59:17AM +0000, Chen-Yu Tsai wrote:
-> The HDMI controller found in the A31 SoCs is slightly different
-> from the one already supported, which is found in the A10s:
-> 
->   - Need different initial values for the PLL related registers
-> 
->   - Different behavior of the DDC and TMDS clocks
-> 
->   - Different register layout for the DDC portion
-> 
->   - Separate DDC parent clock
-> 
-> This patch adds support for it.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi Michael,
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 2017-09-08 02:59, Michael Turquette wrote:
+> Hi Marek,
+>
+> Quoting Marek Szyprowski (2017-08-21 01:04:58)
+>> Dear All,
+>>
+>> This patchset adds runtime PM support to common clock framework. This is an
+>> attempt to implement support for clock controllers, which belongs to a power
+>> domain. This approach works surprisingly well on Exynos 5433 SoC, what allowed
+>> us to solve various freeze/crash issues related to power management.
+>>
+>> The main idea behind this patchset is to keep clock's controller power domain
+>> enabled every time when at least one of its clock is enabled or access to its
+>> registers is being made. Clock controller driver (clock provider) can
+>> supply a struct device pointer, which is the used by clock core for tracking and
+>> managing clock's controller runtime pm state. Each clk_prepare() operation will
+>> first call pm_runtime_get_sync() on the supplied device, while clk_unprepare()
+>> will do pm_runtime_put() at the end.
+>>
+>> This runtime PM feature has been tested with Exynos4412 (not included in this
+>> patchset) and Exynos5433 clocks drivers. Both have some clocks, which belongs to
+>> respective power domains and need special handling during power on/off
+>> procedures. Till now it wasn't handled at all, what caused various problems.
+>>
+>> Patches for clocks drivers change the way the clock provider is initialized.
+>> Instead of CLK_OF_DECLARE based initialization, a complete platform device driver
+>> infrastructure is being used. This is needed to let driver to use runtime PM
+>> feature and integrate with generic power domains. The side-effect of this change
+>> is a delay in clock provider registeration during system boot, so early
+>> initialized drivers might get EPROBEDEFER error when requesting their clocks.
+>> This was an issue for IOMMU drivers, but IOMMU deferred probe support has been
+>> finally merged to v4.13-rc1 and now it is handled correctly.
+>>
+>> Patches are based and tested on v4.13-rc5, but applies fine also on v4.13-rc1.
+> Patches look good to me. It's too late for the v4.14 PR, but I'll merge
+> this to clk-next after -rc1 drops.
 
-Thanks!
-Maxime
+Gentle ping.
 
+v4.14-rc2 has been released yesterday. Is there a chance to get this 
+patchset merged
+to clk-next soon? It definitely needs some time for testing in 
+linux-next and now it
+is the best time for that...
+
+Best regards
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/5be92fee/attachment.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
