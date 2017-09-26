@@ -1,123 +1,64 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Sep 2017 14:17:13 +0200
-Subject: [PATCH v2 03/10] pinctrl: axp209: use drv_data of pinctrl_pin_desc to
- store pin reg
-In-Reply-To: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
-References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <7993a30fbc2e50a2d228fa0c8fad643c4034b101.1506428208.git-series.quentin.schulz@free-electrons.com>
+Date: Tue, 26 Sep 2017 14:17:10 +0200
+Subject: [PATCH v2 00/10] add pinmuxing support for pins in AXP209 and AXP813
+ PMICs
+Message-ID: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using a function to retrieve each pin's correct control
-register, use drv_data within pinctrl_pin_desc to store the ctrl reg.
+The AXP209 and AXP813 PMICs have several pins (respectively 3 and 2) that can
+be used either as GPIOs or for other purposes (ADC or LDO here).
 
-Remove axp20x_gpio_get_reg and replace every occurrence by a get from
-drv_data.
+We already have a GPIO driver for the GPIO use of those pins on the AXP209.
+Let's "upgrade" this driver to support all the functions these pins can have.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- drivers/pinctrl/pinctrl-axp209.c | 42 +++++++--------------------------
- 1 file changed, 9 insertions(+), 33 deletions(-)
+Then we add support to this driver for the AXP813 which is slighlty different
+(basically a different offset in a register and one less pin).
 
-diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
-index b35e8dd..4bbcba2 100644
---- a/drivers/pinctrl/pinctrl-axp209.c
-+++ b/drivers/pinctrl/pinctrl-axp209.c
-@@ -32,10 +32,11 @@
- #define AXP20X_GPIO_FUNCTION_OUT_HIGH	1
- #define AXP20X_GPIO_FUNCTION_INPUT	2
- 
--#define AXP20X_PINCTRL_PIN(_pin_num, _pin)			\
-+#define AXP20X_PINCTRL_PIN(_pin_num, _pin, _regs)		\
- 	{							\
- 		.number = _pin_num,				\
- 		.name = _pin,					\
-+		.drv_data = _regs,				\
- 	}
- 
- #define AXP20X_PIN(_pin, ...)					\
-@@ -91,17 +92,17 @@ struct axp20x_gpio {
- };
- 
- static const struct axp20x_desc_pin axp209_pins[] = {
--	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
-+	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0", (void *)AXP20X_GPIO0_CTRL),
- 		   AXP20X_FUNCTION(0x0, "gpio_out"),
- 		   AXP20X_FUNCTION(0x2, "gpio_in"),
- 		   AXP20X_FUNCTION(0x3, "ldo"),
- 		   AXP20X_FUNCTION(0x4, "adc")),
--	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1"),
-+	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1", (void *)AXP20X_GPIO1_CTRL),
- 		   AXP20X_FUNCTION(0x0, "gpio_out"),
- 		   AXP20X_FUNCTION(0x2, "gpio_in"),
- 		   AXP20X_FUNCTION(0x3, "ldo"),
- 		   AXP20X_FUNCTION(0x4, "adc")),
--	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2"),
-+	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2", (void *)AXP20X_GPIO2_CTRL),
- 		   AXP20X_FUNCTION(0x0, "gpio_out"),
- 		   AXP20X_FUNCTION(0x2, "gpio_in")),
- };
-@@ -111,20 +112,6 @@ static const struct axp20x_pinctrl_desc axp20x_pinctrl_data = {
- 	.npins	= ARRAY_SIZE(axp209_pins),
- };
- 
--static int axp20x_gpio_get_reg(unsigned offset)
--{
--	switch (offset) {
--	case 0:
--		return AXP20X_GPIO0_CTRL;
--	case 1:
--		return AXP20X_GPIO1_CTRL;
--	case 2:
--		return AXP20X_GPIO2_CTRL;
--	}
--
--	return -EINVAL;
--}
--
- static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
- {
- 	return pinctrl_gpio_direction_input(chip->base + offset);
-@@ -146,12 +133,9 @@ static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
- static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
- {
- 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
-+	int reg = (int)gpio->desc->pins[offset].pin.drv_data;
- 	unsigned int val;
--	int reg, ret;
--
--	reg = axp20x_gpio_get_reg(offset);
--	if (reg < 0)
--		return reg;
-+	int ret;
- 
- 	ret = regmap_read(gpio->regmap, reg, &val);
- 	if (ret)
-@@ -184,11 +168,7 @@ static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
- 			    int value)
- {
- 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
--	int reg;
--
--	reg = axp20x_gpio_get_reg(offset);
--	if (reg < 0)
--		return;
-+	int reg = (int)gpio->desc->pins[offset].pin.drv_data;
- 
- 	regmap_update_bits(gpio->regmap, reg,
- 			   AXP20X_GPIO_FUNCTIONS,
-@@ -200,11 +180,7 @@ static int axp20x_pmx_set(struct pinctrl_dev *pctldev, unsigned int offset,
- 			  u8 config)
- {
- 	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
--	int reg;
--
--	reg = axp20x_gpio_get_reg(offset);
--	if (reg < 0)
--		return reg;
-+	int reg = (int)gpio->desc->pins[offset].pin.drv_data;
- 
- 	return regmap_update_bits(gpio->regmap, reg, AXP20X_GPIO_FUNCTIONS,
- 				  config);
+This is a v2 to a first version that was sent in November 2016.
+
+v2:
+  - add support for AXP813 pins,
+  - split into more patches so it is easier to follow the modifications,
+  - reorder of some patches,
+  - register all pins within the same range instead of a range per pin,
+
+Thanks,
+Quentin
+
+Maxime Ripard (1):
+  ARM: dts: add dtsi for AXP813 PMIC
+
+Quentin Schulz (9):
+  pinctrl: move gpio-axp209 to pinctrl
+  pinctrl: axp209: add pinctrl features
+  pinctrl: axp209: use drv_data of pinctrl_pin_desc to store pin reg
+  pinctrl: axp209: rename everything from gpio to pctl
+  pinctrl: axp209: add programmable gpio_status_offset
+  pinctrl: axp209: add support for AXP813 GPIOs
+  mfd: axp20x: add pinctrl cell for AXP813
+  ARM: dts: sun8i: a711: include axp813 dtsi
+  ARM: dts: sun8i: bananapi-m3: include axp813 dtsi
+
+ Documentation/devicetree/bindings/gpio/gpio-axp209.txt       |  30 +-
+ Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt |  67 +-
+ arch/arm/boot/dts/axp813.dtsi                                |  58 +-
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts                 |   4 +-
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts                    |   2 +-
+ drivers/gpio/Kconfig                                         |   6 +-
+ drivers/gpio/Makefile                                        |   1 +-
+ drivers/gpio/gpio-axp209.c                                   | 188 +--
+ drivers/mfd/axp20x.c                                         |   3 +-
+ drivers/pinctrl/Kconfig                                      |   6 +-
+ drivers/pinctrl/Makefile                                     |   1 +-
+ drivers/pinctrl/pinctrl-axp209.c                             | 610 +++++++-
+ 12 files changed, 750 insertions(+), 226 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-axp209.txt
+ create mode 100644 arch/arm/boot/dts/axp813.dtsi
+ delete mode 100644 drivers/gpio/gpio-axp209.c
+ create mode 100644 drivers/pinctrl/pinctrl-axp209.c
+
+base-commit: 73527316e3fdde8a210b8ab66c1bf48538cf6b09
 -- 
 git-series 0.9.1
