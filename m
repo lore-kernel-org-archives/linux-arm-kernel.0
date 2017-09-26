@@ -1,97 +1,44 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 26 Sep 2017 16:44:01 +0800
-Subject: [PATCH V4 1/1] clk: bulk: add of_clk_bulk_get()
-Message-ID: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Sep 2017 10:58:55 +0200
+Subject: [PATCH v3 00/14] ARM: dts: sunxi: Fix DT build warnings
+In-Reply-To: <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
+References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
+ <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
+Message-ID: <20170926085855.7yn6zdx3sfuwwxyj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
-here to handle this for DT users without 'clock-names' specified.
+On Tue, Sep 26, 2017 at 07:48:17AM +0000, Chen-Yu Tsai wrote:
+> On Tue, Sep 26, 2017 at 3:22 PM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > Hello
+> >
+> > The goal of this patch series is to have a clean DT build with W=1.
+> >
+> > Regards
+> >
+> > Changes since v1:
+> > - moved i2c2 unit address change from patch #2 in patch #1
+> >
+> > Changes since v2
+> > - added two patch for fixing pin names
+> 
+> The first twelve patches are good. Maxime, I think we can go ahead and
+> merge them, instead of having them resent again in v3?
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Reported-by: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Yep, that works for me. Can you push them?
 
----
-Changes since v3:
- * fix build warning on the SH platform
+Thanks!
+Maxime
 
-Changes since v2:
- * of_clk_bulk_get should return -ENOENT;
-
-Changes since v1:
- * using %pOF instead of full_name
----
- drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
- include/linux/clk.h    |  8 ++++++++
- 2 files changed, 39 insertions(+)
-
-diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-index c834f5a..896aa3b 100644
---- a/drivers/clk/clk-bulk.c
-+++ b/drivers/clk/clk-bulk.c
-@@ -19,6 +19,37 @@
- #include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/export.h>
-+#include <linux/of.h>
-+
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks)
-+{
-+	int ret;
-+	int i;
-+
-+	for (i = 0; i < num_clks; i++)
-+		clks[i].clk = NULL;
-+
-+	for (i = 0; i < num_clks; i++) {
-+		clks[i].clk = of_clk_get(np, i);
-+		if (IS_ERR(clks[i].clk)) {
-+			ret = PTR_ERR(clks[i].clk);
-+			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
-+			       np, i, ret);
-+			clks[i].clk = NULL;
-+			goto err;
-+		}
-+	}
-+
-+	return 0;
-+
-+err:
-+	clk_bulk_put(i, clks);
-+
-+	return ret;
-+}
-+#endif
- 
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 12c96d9..073cb3b 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
- }
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-+				 struct clk_bulk_data *clks);
- struct clk *of_clk_get(struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-+static inline int of_clk_bulk_get(struct device_node *np, int num_clks,
-+			   struct clk_bulk_data *clks)
-+{
-+	return -ENOENT;
-+}
-+
- static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/0b8f750b/attachment.sig>
