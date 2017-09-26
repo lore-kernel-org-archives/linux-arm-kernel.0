@@ -1,91 +1,67 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Sep 2017 14:52:18 +0200
-Subject: [PATCH 1/2] iio: adc: sun4i-gpadc-iio: register in the thermal after
- registering in pm
-Message-ID: <f7b1b9c493c563a2f5b5f5f44596d45d3d719d26.1506430136.git-series.quentin.schulz@free-electrons.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 26 Sep 2017 14:54:48 +0200
+Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
+ Project Sulfur SDRs
+In-Reply-To: <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
+References: <20170911232223.91894-1-mdf@kernel.org>
+ <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
+ <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
+Message-ID: <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver has a get_temp function used by the thermal framework that
-uses pm functions.
+Hi,
 
-However, the driver isn't registered in pm before it is registered in
-thermal framework, resulting in the pm_resume not being called and thus
-the IP not enabled.
+On 25.9.2017 18:11, Moritz Fischer wrote:
+> Hi Michal,
+> 
+> On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
+>> Hi Moritz
+>>
+>> sorry for delay.
+> 
+> No problem.
+> 
+>>
+>> On 12.9.2017 01:22, Moritz Fischer wrote:
+>>> Add support for the National Instruments Project Sulfur SDR
+>>> motherboards Rev 2,3 and 4.
+>>>
+>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile                |   3 +
+>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
+>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
+>>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
+>>>  5 files changed, 364 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
+>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
+>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
+>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
+>>
+>> Is this publicly available board?
+> 
+> Will be in Q1 2018 was announced at GRCon'17 ([1]).
+> Some of the Rev3s are currently deployed in Norway as part of a radar
+> system.
+> 
+>> I am not quite sure we should apply these dts files. There are a lot of
+>> boards with zynq and there must be any strong argument for applying this
+>> to the tree. For arm32 with even flat tree structure.
+> 
+> What's the issue with merging them, except for having 3 more files? 
 
-When the IP is disabled, the raw temp value is always 0. With the
-devices currently supported, it isn't a problem since with their
-respective formula, they return a really cold SoC temperature which
-isn't a problem for the thermal framework. But for future SoC that have
-a different formula, it could return a critically hot temperature,
-forcing the thermal framework to shutdown the board.
+For me this is not a problem because on Linux side it is not increasing
+build time.
+I want to see the value for community. All xilinx platforms are
+evaluation generic purpose boards which are showing how to connect stuff
+together.
+On the other hand this is real product.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- drivers/iio/adc/sun4i-gpadc-iio.c | 34 ++++++++++++++------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
+I would let arm-soc maintainer to decide if this is fine or not. I
+definitely don't want to end up in situation that we will have dts for
+real products which are not bringing any value for others.
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 137f577..392d47f 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -529,17 +529,10 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
- 		return ret;
- 	}
- 
--	if (!IS_ENABLED(CONFIG_THERMAL_OF))
--		return 0;
-+	if (IS_ENABLED(CONFIG_THERMAL_OF))
-+		info->sensor_device = &pdev->dev;
- 
--	info->sensor_device = &pdev->dev;
--	info->tzd = thermal_zone_of_sensor_register(info->sensor_device, 0,
--						    info, &sun4i_ts_tz_ops);
--	if (IS_ERR(info->tzd))
--		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
--			PTR_ERR(info->tzd));
--
--	return PTR_ERR_OR_ZERO(info->tzd);
-+	return 0;
- }
- 
- static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
-@@ -586,15 +579,6 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
- 		 * return the temperature.
- 		 */
- 		info->sensor_device = pdev->dev.parent;
--		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
--							    0, info,
--							    &sun4i_ts_tz_ops);
--		if (IS_ERR(info->tzd)) {
--			dev_err(&pdev->dev,
--				"could not register thermal sensor: %ld\n",
--				PTR_ERR(info->tzd));
--			return PTR_ERR(info->tzd);
--		}
- 	} else {
- 		indio_dev->num_channels =
- 			ARRAY_SIZE(sun4i_gpadc_channels_no_temp);
-@@ -664,6 +648,18 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	pm_runtime_set_suspended(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 
-+	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
-+		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
-+							    0, info,
-+							    &sun4i_ts_tz_ops);
-+		if (IS_ERR(info->tzd)) {
-+			dev_err(&pdev->dev,
-+				"could not register thermal sensor: %ld\n",
-+				PTR_ERR(info->tzd));
-+			return PTR_ERR(info->tzd);
-+		}
-+	}
-+
- 	ret = devm_iio_device_register(&pdev->dev, indio_dev);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "could not register the device\n");
-
-base-commit: 1f183459b5144384e2669a3f757d36bacab108cf
--- 
-git-series 0.9.1
+Thanks,
+Michal
