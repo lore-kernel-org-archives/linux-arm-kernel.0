@@ -1,27 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Sep 2017 09:11:00 -0700
-Subject: next-20170926 build: 2 failures 1 warnings (next-20170926)
-In-Reply-To: <E1dwn6w-0002eY-VE@optimist>
-References: <E1dwn6w-0002eY-VE@optimist>
-Message-ID: <20170926161100.nzyb33o6l6lad2da@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Sep 2017 17:16:07 +0100
+Subject: [PATCH] arm64: Make sure SPsel is always set
+In-Reply-To: <1506437836-18736-1-git-send-email-will.deacon@arm.com>
+References: <1506437836-18736-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20170926161606.xtzcixvjobtdfayt@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 11:29:06AM +0100, Build bot for Mark Brown wrote:
-
-Today's -next fails to build an arm and arm64 allmodconfig with:
-
-> 	arm64-allmodconfig
-> ERROR: "clk_bulk_prepare" [drivers/mmc/host/sdhci-msm.ko] undefined!
+On Tue, Sep 26, 2017 at 03:57:16PM +0100, Will Deacon wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> 	arm-allmodconfig
-> ERROR: "clk_bulk_prepare" [drivers/mmc/host/sdhci-msm.ko] undefined!
+> When the kernel is entered at EL2 on an ARMv8.0 system, we construct
+> the EL1 pstate and make sure this uses the the EL1 stack pointer
+> (we perform an exception return to EL1h).
+> 
+> But if the kernel is either entered at EL1 or stays at EL2 (because
+> we're on a VHE-capable system), we fail to set SPsel, and use whatever
+> stack selection the higher exception level has choosen for us.
+> 
+> Let's not take any chance, and make sure that SPsel is set to one
+> before we decide the mode we're going to run in.
+> 
+> Cc: <stable@vger.kernel.org>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-caused by d8034e3379a83 (mmc: sdhci-msm: Utilize bulk clock API).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/cf8ce56b/attachment.sig>
+Queued for 4.14-rc3. Thanks.
+
+-- 
+Catalin
