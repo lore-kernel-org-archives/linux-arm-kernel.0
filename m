@@ -1,66 +1,132 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Sep 2017 14:59:07 +0800
-Subject: [PATCH v2 01/13] clk: sunxi-ng: sun6i: Export video PLLs
-In-Reply-To: <20170926065919.24446-1-wens@csie.org>
-References: <20170926065919.24446-1-wens@csie.org>
-Message-ID: <20170926065919.24446-2-wens@csie.org>
+Date: Tue, 26 Sep 2017 14:59:06 +0800
+Subject: [PATCH v2 00/13] drm/sun4i: hdmi: Support HDMI controller on A31
+Message-ID: <20170926065919.24446-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2x outputs of the 2 video PLL clocks are directly used by the
-HDMI controller block.
+Hi everyone,
 
-Export them so they can be referenced in the device tree.
+This is v2 of my A31 HDMI support series. As it's been some time
+since the first version and I've rebased my series a couple times
+to merge newer changes done by others, the changelog might not be
+complete.
 
-Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi-ng/ccu-sun6i-a31.h      | 8 ++++++--
- include/dt-bindings/clock/sun6i-a31-ccu.h | 4 ++++
- 2 files changed, 10 insertions(+), 2 deletions(-)
+Changes since v1:
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.h b/drivers/clk/sunxi-ng/ccu-sun6i-a31.h
-index 4e434011e9e7..27e6ad4133ab 100644
---- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.h
-@@ -27,7 +27,9 @@
- #define CLK_PLL_AUDIO_4X	4
- #define CLK_PLL_AUDIO_8X	5
- #define CLK_PLL_VIDEO0		6
--#define CLK_PLL_VIDEO0_2X	7
-+
-+/* The PLL_VIDEO0_2X clock is exported */
-+
- #define CLK_PLL_VE		8
- #define CLK_PLL_DDR		9
- 
-@@ -35,7 +37,9 @@
- 
- #define CLK_PLL_PERIPH_2X	11
- #define CLK_PLL_VIDEO1		12
--#define CLK_PLL_VIDEO1_2X	13
-+
-+/* The PLL_VIDEO1_2X clock is exported */
-+
- #define CLK_PLL_GPU		14
- #define CLK_PLL_MIPI		15
- #define CLK_PLL9		16
-diff --git a/include/dt-bindings/clock/sun6i-a31-ccu.h b/include/dt-bindings/clock/sun6i-a31-ccu.h
-index 4482530fb6f5..c5d13340184a 100644
---- a/include/dt-bindings/clock/sun6i-a31-ccu.h
-+++ b/include/dt-bindings/clock/sun6i-a31-ccu.h
-@@ -43,8 +43,12 @@
- #ifndef _DT_BINDINGS_CLK_SUN6I_A31_H_
- #define _DT_BINDINGS_CLK_SUN6I_A31_H_
- 
-+#define CLK_PLL_VIDEO0_2X	7
-+
- #define CLK_PLL_PERIPH		10
- 
-+#define CLK_PLL_VIDEO1_2X	13
-+
- #define CLK_CPU			18
- 
- #define CLK_AHB1_MIPIDSI	23
+    - Core changes to sun4i-drm to support two display pipelines
+      have been merged into drm-misc and thus dropped from this
+      version
+
+    - Reworked DDC variant support onto new exposed I2C interface bits.
+
+    - Reworked DDC variant support to use regmap_fields.
+
+    - Patches to add variant support to various (TMDS, DDC, HDMI
+      controller) sub-blocks have been merged into one patch.
+
+This series adds support for the HDMI controller found on Allwinner
+A31/A31s SoCs. It builds upon Maxime's work that added support for
+the HDMI controller on the Allwinner A10s SoC.
+
+The HDMI controllers in the older generation Allwinner SoCs is very
+similar. The A10/A10s/A20 all have the same hardware block, with the
+A10 having slightly different initial configuration values. The A31's
+variant splits out the DDC parent clock, has different formulas for
+the DDC and TMDS clocks, and a different register layout for the DDC
+block. Also, it does not expose the CEC pins outside of the SoC, which
+is unfortunate.
+
+Patch 1 exports the 2x outputs of the two video PLLs. These feed the
+TMDS clock directly.
+
+Patch 2 renames the A31 CCU's DDC clock, so that it doesn't conflict
+with the DDC clock in the HDMI block.
+
+Patch 3 adds support for the TCON demuxing feature on the A31. This is
+needed if the user wants to output through HDMI from the second display
+pipeline.
+
+Patch 4 adds proper error path cleanup to the HDMI driver.
+
+Patch 5 adds a regmap for the HDMI driver, to be used in a subsequent
+patch.
+
+Patch 6 allows the HDMI TMDS clock to use the second PLL as its parent,
+in case the first PLL is driving an incompatible dot clock.
+
+Patch 7 adds the A31 HDMI controller variant to the device tree binding.
+
+Patch 8 adds an iopoll-like polling macro for regmap_field. This is used
+in the next patch within the DDC part to poll for reset and I/O
+completion.
+
+Patch 9 adds support for different variants of the HDMI controller
+hardware, with the differences mentioned in the beginning of this
+letter.
+
+Patch 10 adds defines for the A31 specific DDC register offsets.
+
+Patch 11 adds support for the A31's HDMI controller variant.
+
+Patch 12 adds a device node for the HDMI controller on the A31.
+
+Patch 13 enable HDMI video output on three boards that I have.
+
+
+I also had simultaneous output on both display pipelines on the SinA31s,
+one with an LCD panel and the other using HDMI. After boot, both screens
+showed a proper console. The HDMI screen had higher resolution, so the
+console was limited to the upper left corner.
+
+Note that this series does not deal with conflicting pixel clocks.
+
+Assuming everyone is happy with the patches, I propose the following:
+
+    1. We sunxi maintainers will take the clk and dts patches through
+       our tree with minimal but proper cross references.
+
+    2. Mark can either take the regmap patch on an immutable branch,
+       which we then merge into drm-misc before applying the drm/sun4i
+       patches, or give his Ack for us to merge that patch through
+       drm-misc.
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (13):
+  clk: sunxi-ng: sun6i: Export video PLLs
+  clk: sunxi-ng: sun6i: Rename HDMI DDC clock to avoid name collision
+  drm/sun4i: tcon: Add support for demuxing TCON output on A31
+  drm/sun4i: hdmi: Disable clks in bind function error path and unbind
+    function
+  drm/sun4i: hdmi: create a regmap for later use
+  drm/sun4i: hdmi: Allow using second PLL as TMDS clk parent
+  dt-bindings: display: sun4i: Add binding for A31 HDMI controller
+  regmap: add iopoll-like polling macro for regmap_field
+  drm/sun4i: hdmi: Add support for controller hardware variants
+  drm/sun4i: hdmi: Add A31 specific DDC register definitions
+  drm/sun4i: hdmi: Add support for A31's HDMI controller
+  ARM: dts: sun6i: Add device node for HDMI controller
+  ARM: dts: sun6i: Enable HDMI support on some A31/A31s devices
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |   3 +
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts        |  21 ++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  55 +++++
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts           |  25 +++
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts           |  25 +++
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c               |   3 +-
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.h               |   8 +-
+ drivers/gpu/drm/sun4i/sun4i_hdmi.h                 | 107 ++++++++++
+ drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c         |  38 +++-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c             | 204 +++++++++++++++---
+ drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c             | 227 +++++++++++++++------
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c        |  68 +++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  61 ++++++
+ include/dt-bindings/clock/sun6i-a31-ccu.h          |   4 +
+ include/linux/regmap.h                             |  39 ++++
+ 15 files changed, 760 insertions(+), 128 deletions(-)
+
 -- 
 2.14.1
