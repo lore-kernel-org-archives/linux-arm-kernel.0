@@ -1,44 +1,81 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Tue, 26 Sep 2017 08:00:22 +0200
-Subject: [PATCH] soc: mediatek: turn MTK_PMIC_WRAP into visible symbols
-In-Reply-To: <6c1696cf9f860cc8151a906ecbc799121b5aeeab.1505984256.git.sean.wang@mediatek.com>
-References: <6c1696cf9f860cc8151a906ecbc799121b5aeeab.1505984256.git.sean.wang@mediatek.com>
-Message-ID: <20170926080022.215f7b7b@endymion>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 26 Sep 2017 08:11:22 +0200
+Subject: [PATCH v4 1/2] watchdog: dw_wdt: add stop watchdog operation
+Message-ID: <20170926061123.29614-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Sep 2017 17:01:05 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> MTK_PMIC_WRAP is the basic and required configuration for those various
-> MediaTek PMICs, so turning MTK_PMIC_WRAP into visible symbols easily
-> allows users tending to have the enablement for those PMICs.
+The only way of stopping the watchdog is by resetting it.
+Add the watchdog op for stopping the device and reset if
+a reset line is provided.
 
-I can't really make sense of the sentence above, sorry, and can't see
-how it matches the change below anyway. MTK_PMIC_WRAP is already a
-visible symbol before this change. The change is probably good in
-itself, but please try to come up with a better description.
+At same time WDOG_HW_RUNNING should be remove from dw_wdt_start.
+As commented by Guenter Roeck:
+dw_wdt sets WDOG_HW_RUNNING in its open function. Result is
+that the kref_get() in watchdog_open() won't be executed. But then
+kref_put() in close will be called since the watchdog now does stop.
+This causes the imbalance.
 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  drivers/soc/mediatek/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index a2fcd7f..d513629 100644
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -15,7 +15,7 @@ config MTK_INFRACFG
->  config MTK_PMIC_WRAP
->  	tristate "MediaTek PMIC Wrapper Support"
->  	depends on ARCH_MEDIATEK
-> -	depends on RESET_CONTROLLER
-> +	select RESET_CONTROLLER
->  	select REGMAP
->  	help
->  	  Say yes here to add support for MediaTek PMIC Wrapper found
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: linux-watchdog at vger.kernel.org
+---
 
+changes v4:
+ - remove WDOG_HW_RUNNING from dw_wdt_start.
 
+changes v3:
+ - don't return error if rst is not present and set WDOG_HW_RUNNING bit
+   to notify watchdog core.
+
+changes v2:
+ - test if dw_wdt->rst is NULL instead of IS_ERR
+
+ drivers/watchdog/dw_wdt.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+index 36be987ff9ef..c2f4ff516230 100644
+--- a/drivers/watchdog/dw_wdt.c
++++ b/drivers/watchdog/dw_wdt.c
+@@ -127,14 +127,27 @@ static int dw_wdt_start(struct watchdog_device *wdd)
+ 
+ 	dw_wdt_set_timeout(wdd, wdd->timeout);
+ 
+-	set_bit(WDOG_HW_RUNNING, &wdd->status);
+-
+ 	writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+ 	       dw_wdt->regs + WDOG_CONTROL_REG_OFFSET);
+ 
+ 	return 0;
+ }
+ 
++static int dw_wdt_stop(struct watchdog_device *wdd)
++{
++	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
++
++	if (!dw_wdt->rst) {
++		set_bit(WDOG_HW_RUNNING, &wdd->status);
++		return 0;
++	}
++
++	reset_control_assert(dw_wdt->rst);
++	reset_control_deassert(dw_wdt->rst);
++
++	return 0;
++}
++
+ static int dw_wdt_restart(struct watchdog_device *wdd,
+ 			  unsigned long action, void *data)
+ {
+@@ -173,6 +186,7 @@ static const struct watchdog_info dw_wdt_ident = {
+ static const struct watchdog_ops dw_wdt_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.start		= dw_wdt_start,
++	.stop		= dw_wdt_stop,
+ 	.ping		= dw_wdt_ping,
+ 	.set_timeout	= dw_wdt_set_timeout,
+ 	.get_timeleft	= dw_wdt_get_timeleft,
 -- 
-Jean Delvare
-SUSE L3 Support
+2.11.0
