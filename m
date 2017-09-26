@@ -1,49 +1,31 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Sep 2017 14:17:15 +0200
-Subject: [PATCH v2 05/10] pinctrl: axp209: add programmable gpio_status_offset
+Date: Tue, 26 Sep 2017 14:17:19 +0200
+Subject: [PATCH v2 09/10] ARM: dts: sun8i: a711: include axp813 dtsi
 In-Reply-To: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
 References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <e9385e366da18057aaa1e1d5d751839cde4343fa.1506428208.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <b8e3c3cd48a8cf389d3129c7f7ab49c2efb8b688.1506428208.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare for patches that will add support for a new PMIC that has a
-different GPIO input status register, add a gpio_status_offset within
-axp20x_pctl structure and use it.
+This board has an AXP813 PMIC so let's include its dtsi.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/pinctrl/pinctrl-axp209.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
-index 4be1aca..11f871e 100644
---- a/drivers/pinctrl/pinctrl-axp209.c
-+++ b/drivers/pinctrl/pinctrl-axp209.c
-@@ -89,6 +89,7 @@ struct axp20x_pctl {
- 	unsigned int				ngroups;
- 	struct axp20x_pinctrl_function		*functions;
- 	unsigned int				nfunctions;
-+	unsigned int				gpio_status_offset;
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 723641f..d9f8ed3 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -179,6 +179,8 @@
+ 
  };
  
- static const struct axp20x_desc_pin axp209_pins[] = {
-@@ -127,7 +128,7 @@ static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	if (ret)
- 		return ret;
- 
--	return !!(val & BIT(offset + 4));
-+	return !!(val & BIT(offset + pctl->gpio_status_offset));
- }
- 
- static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
-@@ -509,6 +510,7 @@ static int axp20x_pctl_probe(struct platform_device *pdev)
- 	pctl->regmap = axp20x->regmap;
- 
- 	pctl->desc = &axp20x_pinctrl_data;
-+	pctl->gpio_status_offset = 4;
- 	pctl->dev = &pdev->dev;
- 
- 	platform_set_drvdata(pdev, pctl);
++#include "axp813.dtsi"
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 git-series 0.9.1
