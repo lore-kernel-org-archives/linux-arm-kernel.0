@@ -1,125 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Sep 2017 05:08:30 +0800
-Subject: [PATCH v3 02/10] dmaengine: sun6i: Correct burst length field
- offsets for H3
-In-Reply-To: <8ffbdd23-6bf0-4da0-8ce0-4b0e8dc1281d@rwthex-w2-a.rwth-ad.de>
-Message-ID: <201709270534.SbrcoyL1%fengguang.wu@intel.com>
+From: revestflo@gmail.com (Florent Revest)
+Date: Tue, 26 Sep 2017 23:14:45 +0200
+Subject: [RFC 04/11] KVM, arm, arm64: Offer PAs to IPAs idmapping to
+ internal VMs
+In-Reply-To: <20170831092305.GA13572@cbox>
+References: <1503649901-5834-1-git-send-email-florent.revest@arm.com>
+ <1503649901-5834-5-git-send-email-florent.revest@arm.com>
+ <20170831092305.GA13572@cbox>
+Message-ID: <1506460485.5507.57.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Thu, 2017-08-31 at 11:23 +0200, Christoffer Dall wrote:
+> > diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> > index 2ea21da..1d2d3df 100644
+> > --- a/virt/kvm/arm/mmu.c
+> > +++ b/virt/kvm/arm/mmu.c
+> > @@ -772,6 +772,11 @@ static void stage2_unmap_memslot(struct kvm
+> > *kvm,
+> > ????????phys_addr_t size = PAGE_SIZE * memslot->npages;
+> > ????????hva_t reg_end = hva + size;
+> > 
+> > +???????if (unlikely(!kvm->mm)) {
+> I think you should consider using a predicate so that it's clear that
+> this is for in-kernel VMs and not just some random situation where mm
+> can be NULL.
 
-[auto build test WARNING on next-20170926]
-[also build test WARNING on v4.14-rc2]
-[cannot apply to linus/master robh/for-next v4.14-rc2 v4.14-rc1 v4.13]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Internal VMs should be the only usage when kvm->mm would be NULL.
+However if you'd prefer it otherwise, I'll make sure this condition
+will be made clearer.
 
-url:    https://github.com/0day-ci/linux/commits/Stefan-Br-ns/dmaengine-sun6i-Correct-setting-of-clock-autogating-register-for-A83T-H3/20170927-021533
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+> So it's unclear to me why we don't need any special casing in
+> kvm_handle_guest_abort, related to MMIO exits etc.??You probably
+> assume that we will never do emulation, but that should be described
+> and addressed somewhere before I can critically review this patch.
 
-All warnings (new ones prefixed by >>):
+This is indeed what I was assuming. This RFC does not allow MMIO with
+internal VMs. I can not think of a usage when this would be useful. I'd
+make sure this would be documented in an eventual later RFC.
 
-   drivers/dma/sun6i-dma.c:119:2: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-     void (*clock_autogate_enable)();
-     ^
-   drivers/dma/sun6i-dma.c: In function 'sun6i_dma_prep_dma_memcpy':
->> drivers/dma/sun6i-dma.c:627:2: warning: passing argument 1 of 'sdev->cfg->set_burst_length' makes pointer from integer without a cast
-     sdev->cfg->set_burst_length(v_lli->cfg, burst, burst);
-     ^
-   drivers/dma/sun6i-dma.c:627:2: note: expected 'u32 *' but argument is of type 'u32'
-   drivers/dma/sun6i-dma.c: At top level:
-   drivers/dma/sun6i-dma.c:1040:48: error: expected '}' before ';' token
-     .set_burst_length = sun6i_set_burst_length_a31;
-                                                   ^
-   drivers/dma/sun6i-dma.c:1052:58: error: expected '}' before ';' token
-     .clock_autogate_enable = sun6i_enable_clock_autogate_a23;
-                                                             ^
-   drivers/dma/sun6i-dma.c:1060:58: error: expected '}' before ';' token
-     .clock_autogate_enable = sun6i_enable_clock_autogate_a23;
-                                                             ^
-   drivers/dma/sun6i-dma.c:1073:57: error: expected '}' before ';' token
-     .clock_autogate_enable = sun6i_enable_clock_autogate_h3;
-                                                            ^
-   drivers/dma/sun6i-dma.c:1086:58: error: expected '}' before ';' token
-     .clock_autogate_enable = sun6i_enable_clock_autogate_a23;
-                                                             ^
-   drivers/dma/sun6i-dma.c:292:13: warning: 'sun6i_set_burst_length_h3' defined but not used [-Wunused-function]
-    static void sun6i_set_burst_length_h3(u32 *p_cfg, s8 src_burst, s8 dst_burst)
-                ^
-   cc1: some warnings being treated as errors
+> > +static int internal_vm_prep_mem(struct kvm *kvm,
+> > +???????????????????????????????const struct
+> > kvm_userspace_memory_region *mem)
+> > +{
+> > +???????phys_addr_t addr, end;
+> > +???????unsigned long pfn;
+> > +???????int ret;
+> > +???????struct kvm_mmu_memory_cache cache = { 0 };
+> > +
+> > +???????end = mem->guest_phys_addr + mem->memory_size;
+> > +???????pfn = __phys_to_pfn(mem->guest_phys_addr);
+> > +???????addr = mem->guest_phys_addr;
+> My main concern here is that we don't do any checks on this region
+> and we could be mapping device memory here as well.??Are we intending
+> that to be ok, and are we then relying on the guest to use proper
+> memory attributes ?
 
-vim +627 drivers/dma/sun6i-dma.c
+Indeed, being able to map device memory is intended. It is needed for
+Runtime Services sandboxing. It also relies on the guest being
+correctly configured.
 
-   584	
-   585	static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
-   586			struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
-   587			size_t len, unsigned long flags)
-   588	{
-   589		struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
-   590		struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-   591		struct sun6i_dma_lli *v_lli;
-   592		struct sun6i_desc *txd;
-   593		dma_addr_t p_lli;
-   594		s8 burst, width;
-   595	
-   596		dev_dbg(chan2dev(chan),
-   597			"%s; chan: %d, dest: %pad, src: %pad, len: %zu. flags: 0x%08lx\n",
-   598			__func__, vchan->vc.chan.chan_id, &dest, &src, len, flags);
-   599	
-   600		if (!len)
-   601			return NULL;
-   602	
-   603		txd = kzalloc(sizeof(*txd), GFP_NOWAIT);
-   604		if (!txd)
-   605			return NULL;
-   606	
-   607		v_lli = dma_pool_alloc(sdev->pool, GFP_NOWAIT, &p_lli);
-   608		if (!v_lli) {
-   609			dev_err(sdev->slave.dev, "Failed to alloc lli memory\n");
-   610			goto err_txd_free;
-   611		}
-   612	
-   613		v_lli->src = src;
-   614		v_lli->dst = dest;
-   615		v_lli->len = len;
-   616		v_lli->para = NORMAL_WAIT;
-   617	
-   618		burst = convert_burst(8);
-   619		width = convert_buswidth(DMA_SLAVE_BUSWIDTH_4_BYTES);
-   620		v_lli->cfg = DMA_CHAN_CFG_SRC_DRQ(DRQ_SDRAM) |
-   621			DMA_CHAN_CFG_DST_DRQ(DRQ_SDRAM) |
-   622			DMA_CHAN_CFG_DST_LINEAR_MODE |
-   623			DMA_CHAN_CFG_SRC_LINEAR_MODE |
-   624			DMA_CHAN_CFG_SRC_WIDTH(width) |
-   625			DMA_CHAN_CFG_DST_WIDTH(width);
-   626	
- > 627		sdev->cfg->set_burst_length(v_lli->cfg, burst, burst);
-   628	
-   629		sun6i_dma_lli_add(NULL, v_lli, p_lli, txd);
-   630	
-   631		sun6i_dma_dump_lli(vchan, v_lli);
-   632	
-   633		return vchan_tx_prep(&vchan->vc, &txd->vd, flags);
-   634	
-   635	err_txd_free:
-   636		kfree(txd);
-   637		return NULL;
-   638	}
-   639	
+> > +
+> > +???????for (; addr < end; addr += PAGE_SIZE) {
+> > +???????????????pte_t pte = pfn_pte(pfn, PAGE_S2);
+> > +
+> > +???????????????pte = kvm_s2pte_mkwrite(pte);
+> > +
+> > +???????????????ret = mmu_topup_memory_cache(&cache,
+> > +????????????????????????????????????????????KVM_MMU_CACHE_MIN_PAGE
+> > S,
+> > +????????????????????????????????????????????KVM_NR_MEM_OBJS);
+> You should be able to allocate all you need up front instead of doing
+> it in sequences.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 51625 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170927/9cc9219b/attachment-0001.gz>
+Ok.
+
+> > 
+> > +???????????????if (ret) {
+> > +???????????????????????mmu_free_memory_cache(&cache);
+> > +???????????????????????return ret;
+> > +???????????????}
+> > +???????????????spin_lock(&kvm->mmu_lock);
+> > +???????????????ret = stage2_set_pte(kvm, &cache, addr, &pte, 0);
+> > +???????????????spin_unlock(&kvm->mmu_lock);
+> Since you're likely to allocate some large contiguous chunks here,
+> can you have a look at using section mappings?
+
+Will do.
+
+Thank you very much,
+? ? Florent
