@@ -1,111 +1,47 @@
-From: philip@balister.org (Philip Balister)
-Date: Tue, 26 Sep 2017 13:58:38 -0400
-Subject: [PATCH 1/2] arm: dts: Add support for National Instruments
- Project Sulfur SDRs
-In-Reply-To: <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
-References: <20170911232223.91894-1-mdf@kernel.org>
- <314acb1f-1f0f-7893-70a8-9379c01112ac@xilinx.com>
- <20170925161136.GA12943@tyrael.ni.corp.natinst.com>
- <6b87e902-3201-6710-4921-d465dea19dcd@xilinx.com>
- <20170926175018.GA14962@tyrael.ni.corp.natinst.com>
-Message-ID: <dfb517fe-8584-2a1a-22e5-946980cc9644@balister.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Sep 2017 19:03:07 +0100
+Subject: [PATCH] arm64: avoid instrumenting atomic_ll_sc.o
+Message-ID: <1506448987-31070-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2017 01:50 PM, Moritz Fischer wrote:
-> Michal,
-> 
-> On Tue, Sep 26, 2017 at 02:54:48PM +0200, Michal Simek wrote:
->> Hi,
->>
->> On 25.9.2017 18:11, Moritz Fischer wrote:
->>> Hi Michal,
->>>
->>> On Mon, Sep 25, 2017 at 10:19:44AM +0200, Michal Simek wrote:
->>>> Hi Moritz
->>>>
->>>> sorry for delay.
->>>
->>> No problem.
->>>
->>>>
->>>> On 12.9.2017 01:22, Moritz Fischer wrote:
->>>>> Add support for the National Instruments Project Sulfur SDR
->>>>> motherboards Rev 2,3 and 4.
->>>>>
->>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>>>> ---
->>>>>  arch/arm/boot/dts/Makefile                |   3 +
->>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts |  84 +++++++++++++++++++
->>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts | 118 ++++++++++++++++++++++++++
->>>>>  arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts |  26 ++++++
->>>>>  arch/arm/boot/dts/zynq-ni-sulfur.dtsi     | 133 ++++++++++++++++++++++++++++++
->>>>>  5 files changed, 364 insertions(+)
->>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev2.dts
->>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev3.dts
->>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur-rev4.dts
->>>>>  create mode 100644 arch/arm/boot/dts/zynq-ni-sulfur.dtsi
->>>>
->>>> Is this publicly available board?
->>>
->>> Will be in Q1 2018 was announced at GRCon'17 ([1]).
->>> Some of the Rev3s are currently deployed in Norway as part of a radar
->>> system.
->>>
->>>> I am not quite sure we should apply these dts files. There are a lot of
->>>> boards with zynq and there must be any strong argument for applying this
->>>> to the tree. For arm32 with even flat tree structure.
->>>
->>> What's the issue with merging them, except for having 3 more files? 
->>
->> For me this is not a problem because on Linux side it is not increasing
->> build time.
->> I want to see the value for community. All xilinx platforms are
->> evaluation generic purpose boards which are showing how to connect stuff
->> together.
->> On the other hand this is real product.
-> 
-> Uh.
-> 
->> I would let arm-soc maintainer to decide if this is fine or not. I
->> definitely don't want to end up in situation that we will have dts for
->> real products which are not bringing any value for others.
-> 
-> Sure, it's the maintainers call.
-> 
-> I do intend to have my customers run mainline on it eventually, currently
-> I'm a handful of patches away from making that happen. So yes, running
-> mainline is a usecase that matters to me.
-> 
-> It is one thing to keep bitching about vendor kernels as a community
-> continuously, but then if someone goes through the effort and actually
-> tries to run mainline, you give them crap like that above.
-> 
-> Our products usually come with full schematics [1], firmware, fpga code and all
-> available, I don't know what makes them less useful to the community as a
-> platform to experiment and develop on than Xilinx eval boards.
-> 
-> There's several people that I know of both hobbyists and companies that
-> build systems around these platforms, so I don't know ...
+Our out-of-line atomics are built with a special calling convention,
+preventing pointless stack spilling, and allowing us to patch call sites
+with ARMv8.1 atomic instructions.
 
-I expect this product to be delivered with full source and a mainline
-kernel, so lets make it easy for Moritz to do the right thing here. This
-makes long term support of this product much easier.
+Instrumentation inserted by the compiler may result in calls to
+functions not following this special calling convention, resulting in
+registers being unexpectedly clobbered, and various problems resulting
+from this.
 
-Acked-by: Philip Balister <philip@opensdr.com>
+For example, if a kernel is built with KCOV and ARM64_LSE_ATOMICS, the
+compiler inserts calls to __sanitizer_cov_trace_pc in the prologues of
+the atomic functions. This has been observed to result in spurious
+cmpxchg failures, leading to a hang early on in the boot process.
 
-Philip
+This patch avoids such issues by preventing instrumentation of our
+out-of-line atomics.
 
-> 
-> - Moritz
-> 
-> [1] http://files.ettus.com/schematics/
-> 
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/lib/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 516 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/a7b5fe99/attachment-0001.sig>
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index a0abc14..8fea178 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -17,5 +17,9 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+ 		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
+ 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
+ 		   -fcall-saved-x18
++GCOV_PROFILE_atomic_ll_sc.o	:= n
++KASAN_SANITIZE_atomic_ll_sc.o	:= n
++KCOV_INSTRUMENT_atomic_ll_sc.o	:= n
++UBSAN_SANITIZE_atomic_ll_sc.o	:= n
+ 
+ lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
+-- 
+1.9.1
