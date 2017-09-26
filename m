@@ -1,35 +1,97 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Sep 2017 21:08:54 +0800
-Subject: [PATCH v2 01/10] pinctrl: move gpio-axp209 to pinctrl
-In-Reply-To: <cca522e6-1dbf-b682-b8fe-907fa293f335@free-electrons.com>
-References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
- <e193f8efe9092171ebeffb77ab77422179fd3cab.1506428208.git-series.quentin.schulz@free-electrons.com>
- <20170926125518.kulkohinaojty2zl@flea>
- <cca522e6-1dbf-b682-b8fe-907fa293f335@free-electrons.com>
-Message-ID: <CAGb2v65nJLVrTRu1W52dp3SUb-9Sx63Xyr1z+tjerNKwCwGLGg@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue, 26 Sep 2017 23:09:59 +1000
+Subject: [linux-sunxi] Re: [PATCH v2 1/2] ARM: dts: sun7i: Fix
+ A20-OLinuXino-MICRO dts for LAN8710
+In-Reply-To: <e7e61776-b8d7-c42f-4e9e-04da835374a9@gmail.com>
+References: <1503901963-9457-1-git-send-email-stefan@olimex.com>
+ <1503901963-9457-2-git-send-email-stefan@olimex.com>
+ <20170830143728.friajjequvioqjpu@flea.lan>
+ <e7e61776-b8d7-c42f-4e9e-04da835374a9@gmail.com>
+Message-ID: <CANwerB2G1Acxn_Acf-68R=a_kchrro5vo4sQ_gNoMUUu7vYT3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 8:59 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> Hi Maxime,
->
-> On 26/09/2017 14:55, Maxime Ripard wrote:
->> On Tue, Sep 26, 2017 at 12:17:11PM +0000, Quentin Schulz wrote:
->>> To prepare the driver for the upcoming pinctrl features, move the GPIO
->>> driver AXP209 from GPIO to pinctrl subsystem.
+Hi Stefan,
+
+On 31 August 2017 at 15:20, Stefan Mavrodiev <stefan.mavrodiev@gmail.com> wrote:
+> On 08/30/2017 05:37 PM, Maxime Ripard wrote:
+>>
+>> Hi,
+>>
+>> On Mon, Aug 28, 2017 at 09:32:42AM +0300, Stefan Mavrodiev wrote:
 >>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>>  From revision J the board uses new phy chip LAN8710. Compared
+>>> with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
+>>> not to work. To fix this PA17 is muxed with GMAC function. This
+>>> makes the pin output-low.
+>>>
+>>> This patch is compatible with earlier board revisions, since this
+>>> pin wasn't connected to phy.
+>>>
+>>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+>>> ---
+>>>   arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 7 ++++++-
+>>>   1 file changed, 6 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>>> b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>>> index 0b7403e..cb1b081 100644
+>>> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>>> @@ -102,7 +102,7 @@
+>>>     &gmac {
+>>>         pinctrl-names = "default";
+>>> -       pinctrl-0 = <&gmac_pins_mii_a>;
+>>> +       pinctrl-0 = <&gmac_pins_mii_a>,<&gmac_txerr>;
+>>>         phy = <&phy1>;
+>>>         phy-mode = "mii";
+>>>         status = "okay";
+>>> @@ -229,6 +229,11 @@
+>>>   };
+>>>     &pio {
+>>> +       gmac_txerr: gmac_txerr at 0 {
+>>> +               pins = "PA17";
+>>> +               function = "gmac";
+>>> +       };
+>>> +
 >>
->> I'm not sure we actually need to do this. Can't we just keep the
->> driver here?
+>> The patch looks fine, I still have one question though.
 >>
+>> Can a PHY operate without this signal? My real question is, would it
+>> make sense to mux that pin for all the users, or is it an optional
+>> signal that each board designer can choose to use or not?
+>>
+>> Thanks!
+>> Maxime
+>>
+> This phy (LAN8710) cannot work without this pin. Part of the problem is in
+> that we've replaced
+> without paying attention to this signal.
 >
-> That's not what I understood from:
-> https://lkml.org/lkml/2016/11/24/360 and the following answers from
-> Linus on the first version.
+> RTL8201 has no TXERR pin. The pin PA17 is used as reset signal and therefore
+> is pulled up with
+> resistor. However on old revisions this option (there is jumper pad between
+> SOC and PHY).
+>
+> As I said, LAN8710 cannot work without this signal. In the datasheet is
+> written:
+>         ...
+>         The controller drives TXER high when a transmit error is detected.
+>         ...
+>
+> In the current variant of the dts, all data is threated as error.
+>
+> So to answer you question. This is feature only on our board and highly
+> depends on the chosen PHY.
+> I don't think this should be muxed for all users.
+>
+>
+>
+> Best regards,
+> Stefan Mavrodiev,
+> Olimex Ltd.
 
-Please remember to add -M to git format-patch, as Linus mentioned,
-if you resend.
+Will you be submitting a patch for U-Boot as well?
 
-Chenyu
+Regards,
+Jonathan
