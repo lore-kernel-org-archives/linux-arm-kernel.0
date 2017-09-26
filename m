@@ -1,86 +1,106 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 26 Sep 2017 10:08:19 +0200
-Subject: [PATCH 7/7] drm/rockchip: Cocci spatch "vma_pages"
-In-Reply-To: <b6f6fb10-d8ef-1b6e-0770-898d7277a983@rock-chips.com>
-References: <1505946334393-568186305-0-diffsplit-thomas@m3y3r.de>
- <1505946334393-988165015-7-diffsplit-thomas@m3y3r.de>
- <d2298979-3094-744c-3d28-76a0ba4a1137@rock-chips.com>
- <20170926051241.rwzpxlk4sfju7ctv@phenom.ffwll.local>
- <b6f6fb10-d8ef-1b6e-0770-898d7277a983@rock-chips.com>
-Message-ID: <20170926080819.23ujfvsbsmq4jwtd@phenom.ffwll.local>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 26 Sep 2017 08:23:46 +0000
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
+ register range for ACPI case
+In-Reply-To: <CAKv+Gu8x0j-O3WPE7Cvi4oX5J5Cq1vUhDNB_UdjE88eQh83DDA@mail.gmail.com>
+References: <20160920140518.GD13855@localhost>
+ <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+ <20160920191744.GA4941@localhost> <20160921140549.GA11968@red-moon>
+ <20160921180457.GB20006@localhost> <20160922094955.GB18637@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8815A9@lhreml507-mbx>
+ <20160922124446.GA21681@red-moon> <20160922183101.GA14510@localhost>
+ <20160922221042.GA1514@localhost> <20160923101145.GA31120@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F884340@lhreml507-mbx>
+ <CAKv+Gu8x0j-O3WPE7Cvi4oX5J5Cq1vUhDNB_UdjE88eQh83DDA@mail.gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40C43928@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 02:33:07PM +0800, Mark yao wrote:
-> On 2017?09?26? 13:12, Daniel Vetter wrote:
-> > On Thu, Sep 21, 2017 at 09:02:22AM +0800, Mark yao wrote:
-> > > On 2017?09?21? 06:29, Thomas Meyer wrote:
-> > > > Use vma_pages function on vma object instead of explicit computation.
-> > > > Found by coccinelle spatch "api/vma_pages.cocci"
-> > > > 
-> > > > Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
-> > > > ---
-> > > Looks good for me:
-> > > Acked-by: Mark Yao <mark.yao@rock-chips.com>
-> > Once more a maintainer who acks a patch and doesn't push it. This is
-> > really confusing, who exactly do you expect to handle this patch for you?
-> > 
-> > Please push to drm-misc-next (also for future patches), thanks.
-> > -Daniel
-> 
-> Hi Daniel
-> I Saw the patch title is "[PATCH 7/7]", I guessed it's one of a series of patches and maybe it can pushed by series.
-> 
-> Ok, Pushed it to drm-misc-next.
+Hi Ard
 
-Hm right, but I only see 7/7 here. Either way, except when the author asks
-for a preferred tree it's best if you just pick things up right away. And
-if you're unsure, just ask instead of risking that a patch drops through
-the cracks.
--Daniel
+Sorry to reply late on this
+
+> -----Original Message-----
+> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> Sent: 14 September 2017 15:07
+> To: Gabriele Paoloni
+> Cc: Lorenzo Pieralisi; Hanjun Guo; Marcin Wojtas; Wangyijing; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; liudongdong
+> (C); linux-acpi at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-
+> specific register range for ACPI case
+> 
+> (remove most cc's)
+> 
+> Hi all,
+> 
+> Apologies for digging up this old thread.
+> 
+> I am currently looking into whether it is feasible to refactor some of
+> the ACPI PCI quirk code we have so it can apply to more instances of
+> the Synopsys Designware PCIe (i.e., for Marvell and Socionext SOCs),
+> which all suffer from the same issue that type 0 config TLPs are not
+> filtered before being sent out on the link, resulting in devices
+> appearing multiple times.
+
+What do you mean by "filtered"? Looking at
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=5f00f1a0178cf52928366a5e1f376a65f1f3f389
+you can see that the issue is that accesses to the root buses config space
+are done using a specific HW location rather than the ECAM space area
+(used for the rest of the hierarchy).
+Also only 32b accessors can operate on the root bus config space.
 
 > 
-> > 
-> > > > diff -u -p a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > > > @@ -220,7 +220,7 @@ static int rockchip_drm_gem_object_mmap_
-> > > >    {
-> > > >    	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-> > > >    	unsigned int i, count = obj->size >> PAGE_SHIFT;
-> > > > -	unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-> > > > +	unsigned long user_count = vma_pages(vma);
-> > > >    	unsigned long uaddr = vma->vm_start;
-> > > >    	unsigned long offset = vma->vm_pgoff;
-> > > >    	unsigned long end = user_count + offset;
-> > > > 
-> > > > _______________________________________________
-> > > > Linux-rockchip mailing list
-> > > > Linux-rockchip at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> > > > 
-> > > > 
-> > > > 
-> > > -- 
-> > > ?ark Yao
-> > > 
-> > > 
-> > > _______________________________________________
-> > > dri-devel mailing list
-> > > dri-devel at lists.freedesktop.org
-> > > https://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
-> 
-> -- 
-> ?ark Ya
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> The pci-hisi.c quirk already appears to do exactly what would solve
+> the problem on other SoCs as well. So I will try to refactor this code
+> into something that I could propose for upstream, while probably
+> getting the ARM SBSA authors to offer some guidance that this IP must
+> not be used for new designs.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Mmm I am not sure how Kernel maintainers would open to accept more quirks...
+as I remember we discussed to accept quirks only for existing platform
+but not for any future one (i.e. future HW should not use the non-ECAM
+DW IP). However this is my understanding, I may be wrong here...
+
+> 
+> In any case, the chances of any such changes being acceptable upstream
+> are probably higher if we can reuse the exact same quirk as we have
+> already implemented for HiSilicon, so I wonder if anyone from Huawei
+> could comment on some questions I have:
+> - Why does the config space accessor override use 32-bit accesses only
+> for bus #0? Is that really necessary?
+
+I have talked to our SoC HW designers and they said that 32b accesses is
+a constraint due to Synopsys DW IP limitation and yes it is necessary
+
+> - Why does the Hisi quirk use different config base addresses for bus
+> #0 and the other buses? Is this simply because the firmware does not
+> use contiguous iATU windows for bus #0 and buses #1 and up? So is
+
+As I remember there is a dedicated continuous device memory slice that is
+dedicated for all the root buses (therefore you cannot spilt such area
+to have root bus slices contiguous with the different ECAM areas of each
+RP hierarchy)
+
+> there anything mapped in the 1 MB slice at the base of the respective
+> 256 MB mappings that generate type1 config cycles?
+
+If I remember correctly we map device memory to the 1MB slice but
+we never access it (instead we in the accessors we use cfg->busr.start
+to understand is the current cfg rd/wr if being done on a root bus and
+eventually rout the access to the dedicate root bus cfg space) 
+
+> 
+> Having just a shared set of config space accessor overrides would
+> already be an improvement, given that they can be shared with a DT
+> based driver for this IP in ECAM mode as well.
+
+Probably we could have shared accessors, but again we need to see
+if the community is open to accept more quirks
+
+Thanks
+Gab
+
+> 
+> Thanks,
+> Ard.
