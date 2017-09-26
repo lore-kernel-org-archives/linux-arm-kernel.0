@@ -1,31 +1,41 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Sep 2017 17:09:22 -0700
-Subject: [PATCH 01/10] MAINTAINERS: Update Broadcom iProc regexp with
- Hurricane 2
+Date: Mon, 25 Sep 2017 17:09:23 -0700
+Subject: [PATCH 02/10] dt-bindings: Add documentation for Broadcom Hurricane 2
+ SoCs
 In-Reply-To: <20170926000931.670-1-f.fainelli@gmail.com>
 References: <20170926000931.670-1-f.fainelli@gmail.com>
-Message-ID: <20170926000931.670-2-f.fainelli@gmail.com>
+Message-ID: <20170926000931.670-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Broadcom iProc regepx with recently added Hurricane 2 SoC support.
+Add binding documentation for the Broadcom Hurricane 2 SoCs used in switching
+control planes.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6671f375f7fc..3b48a1c2ddb8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2923,6 +2923,7 @@ N:	bcm583*
- N:	bcm585*
- N:	bcm586*
- N:	bcm88312
-+N:	hr2
- F:	arch/arm64/boot/dts/broadcom/ns2*
- F:	drivers/clk/bcm/clk-ns*
- F:	drivers/pinctrl/bcm/pinctrl-ns*
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
+new file mode 100644
+index 000000000000..a124c7fc4dcd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
+@@ -0,0 +1,14 @@
++Broadcom Hurricane 2 device tree bindings
++---------------------------------------
++
++Broadcom Hurricane 2 family of SoCs are used for switching control. These SoCs
++are based on Broadcom's iProc SoC architecture and feature a single core Cortex
++A9 ARM CPUs, DDR2/DDR3 memory, PCIe GEN-2, USB 2.0 and USB 3.0, serial and NAND
++flash and a PCIe attached integrated switching engine.
++
++Boards with Hurricane SoCs shall have the following properties:
++
++Required root node property:
++
++BCM53342
++compatible = "brcm,bcm53342", "brcm,hr2";
 -- 
 2.14.1
