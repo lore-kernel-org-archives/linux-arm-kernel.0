@@ -1,101 +1,63 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 26 Sep 2017 06:50:47 +0200
-Subject: [PATCH v3 0/3] Split default display handling out from VGA arbiter
-In-Reply-To: <87d16oeeti.fsf@linkitivity.dja.id.au>
-References: <20170901072744.2409-1-dja@axtens.net>
- <87d16oeeti.fsf@linkitivity.dja.id.au>
-Message-ID: <CAKMK7uFq=WEYoeBBvBgSeFq9PCsqzbGiq6KiC10b1KabcayDQA@mail.gmail.com>
+Date: Tue, 26 Sep 2017 07:12:41 +0200
+Subject: [PATCH 7/7] drm/rockchip: Cocci spatch "vma_pages"
+In-Reply-To: <d2298979-3094-744c-3d28-76a0ba4a1137@rock-chips.com>
+References: <1505946334393-568186305-0-diffsplit-thomas@m3y3r.de>
+ <1505946334393-988165015-7-diffsplit-thomas@m3y3r.de>
+ <d2298979-3094-744c-3d28-76a0ba4a1137@rock-chips.com>
+Message-ID: <20170926051241.rwzpxlk4sfju7ctv@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 7:49 AM, Daniel Axtens <dja@axtens.net> wrote:
-> Hi all,
->
-> The merge window is well over by now - is there anything else I can do
-> to get this series to a mergeable state? I'm not particularly across the
-> rules for drm-misc, so please let me know if there are things I need to
-> be doing.
+On Thu, Sep 21, 2017 at 09:02:22AM +0800, Mark yao wrote:
+> On 2017?09?21? 06:29, Thomas Meyer wrote:
+> > Use vma_pages function on vma object instead of explicit computation.
+> > Found by coccinelle spatch "api/vma_pages.cocci"
+> > 
+> > Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
+> > ---
+> Looks good for me:
+> Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-drm-misc is always open for feature merging, but the patch series
-lacks full r-b by someone with clue on this stuff (i.e. probably not
-me). Pls find someone who can do the in-depth review. Just an Ack
-feels a bit thin.
+Once more a maintainer who acks a patch and doesn't push it. This is
+really confusing, who exactly do you expect to handle this patch for you?
+
+Please push to drm-misc-next (also for future patches), thanks.
 -Daniel
 
->
-> Regards,
-> Daniel
->
-> Daniel Axtens <dja@axtens.net> writes:
->
->> This patch set:
->>
->>  - splits the default display handling out from VGA arbiter, into its
->>    own file and behind its own Kconfig option (and gives the functions
->>    better names).
->>
->>  - adds extra detection of default devices. To be nominated, the vga
->>    arbiter and platform hooks must not have nominated a default. A
->>    card will then only be nominated if it has a driver attached and
->>    has IO or memory decoding enabled.
->>
->>  - adds relevant documentation.
->>
->> The practical impact of this is improved X autoconfiguration on some
->> arm64 systems.
->>
->> Changes in v3:
->>
->>  - Add documentation - thanks Daniel Vetter for pointing it out.
->>
->>  - Clarify explanations. Thanks to everyone for continuing to bear
->>    with my incomplete understanding of PCI and provide some clarity.
->>
->>  - Split refactoring and adding functionality.
->>
->> Changes in v2: https://www.spinics.net/lists/linux-pci/msg64007.html
->>
->> Drop all the powerpc patches. [explanation snipped]
->>
->> v1: https://www.spinics.net/lists/linux-pci/msg63581.html
->>
->> Regards,
->> Daniel
->>
->> Daniel Axtens (3):
->>   drm: split default display handler out of VGA arbiter
->>   drm: add fallback default device detection
->>   drm: documentation for default display device
->>
->>  Documentation/gpu/default_display.rst |  93 +++++++++++++++++++
->>  Documentation/gpu/index.rst           |   1 +
->>  arch/ia64/pci/fixup.c                 |   6 +-
->>  arch/powerpc/kernel/pci-common.c      |   6 +-
->>  arch/x86/pci/fixup.c                  |   6 +-
->>  arch/x86/video/fbdev.c                |   4 +-
->>  drivers/gpu/vga/Kconfig               |  12 +++
->>  drivers/gpu/vga/Makefile              |   1 +
->>  drivers/gpu/vga/default_display.c     | 163 ++++++++++++++++++++++++++++++++++
->>  drivers/gpu/vga/vga_switcheroo.c      |   8 +-
->>  drivers/gpu/vga/vgaarb.c              |  61 +++----------
->>  drivers/pci/pci-sysfs.c               |   4 +-
->>  include/linux/default_display.h       |  44 +++++++++
->>  include/linux/vgaarb.h                |  15 ----
->>  14 files changed, 344 insertions(+), 80 deletions(-)
->>  create mode 100644 Documentation/gpu/default_display.rst
->>  create mode 100644 drivers/gpu/vga/default_display.c
->>  create mode 100644 include/linux/default_display.h
->>
->> --
->> 2.11.0
+> 
+> > 
+> > diff -u -p a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > @@ -220,7 +220,7 @@ static int rockchip_drm_gem_object_mmap_
+> >   {
+> >   	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+> >   	unsigned int i, count = obj->size >> PAGE_SHIFT;
+> > -	unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+> > +	unsigned long user_count = vma_pages(vma);
+> >   	unsigned long uaddr = vma->vm_start;
+> >   	unsigned long offset = vma->vm_pgoff;
+> >   	unsigned long end = user_count + offset;
+> > 
+> > _______________________________________________
+> > Linux-rockchip mailing list
+> > Linux-rockchip at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> > 
+> > 
+> > 
+> 
+> -- 
+> ?ark Yao
+> 
+> 
 > _______________________________________________
 > dri-devel mailing list
 > dri-devel at lists.freedesktop.org
 > https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-
-
 -- 
 Daniel Vetter
 Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+http://blog.ffwll.ch
