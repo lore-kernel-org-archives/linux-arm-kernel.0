@@ -1,63 +1,88 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 26 Sep 2017 11:00:59 -0400
-Subject: [PATCH 00/10] ARM: bcm: Add support for Broadcom Hurricane 2 SoC
-In-Reply-To: <20170926000931.670-1-f.fainelli@gmail.com>
-References: <20170926000931.670-1-f.fainelli@gmail.com>
-Message-ID: <CAC3K-4rioegE+UGmOiTjiw=WqRPr7sYf23kap5gz=TvYKT+z5g@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 26 Sep 2017 08:13:09 -0700
+Subject: [PATCH v4 1/2] watchdog: dw_wdt: add stop watchdog operation
+In-Reply-To: <20170926061123.29614-1-o.rempel@pengutronix.de>
+References: <20170926061123.29614-1-o.rempel@pengutronix.de>
+Message-ID: <20170926151309.GA14894@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 8:09 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Hi all,
->
-> This patch series adds basic (boot to prompt with essential peripherals
-> working) support for Broadcom's Hurricane 2 SoC which is found in switching
-> applications.
->
-> This is also an iProc-family chip with a number of variations, including
-> some in the clock controller that I have not been able to identify yet.
->
-> Florian Fainelli (10):
->   MAINTAINERS: Update Broadcom iProc regexp with Hurricane 2
->   dt-bindings: Add documentation for Broadcom Hurricane 2 SoCs
->   ARM: bcm: Add support for Broadcom Hurricane 2 SoC
->   dt-bindings: Document Broadcom Hurricane 2 clocks
->   clk: bcm: Add Broadcom Hurricane 2 clock support
->   ARM: dts: Add Broadcom Hurricane 2 DTS include file
->   ARM: debug: Add Hurricane 2 UART2 debug addresses
->   dt-bindings: Add Ubiquiti Networks vendor prefix
->   ARM: dts: Hurricane 2: Add basic support for Ubiquiti UniFi Switch 8
->   ARM: multi_v7_defconfig: Enable CONFIG_ARCH_BCM_HR2
->
->  .../devicetree/bindings/arm/bcm/brcm,hr2.txt       |  14 +
->  .../bindings/clock/brcm,iproc-clocks.txt           |  14 +
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  MAINTAINERS                                        |   1 +
->  arch/arm/Kconfig.debug                             |  10 +-
->  arch/arm/boot/dts/Makefile                         |   2 +
->  arch/arm/boot/dts/bcm-hr2.dtsi                     | 368 +++++++++++++++++++++
->  arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts  |  85 +++++
->  arch/arm/configs/multi_v7_defconfig                |   1 +
->  arch/arm/mach-bcm/Kconfig                          |   9 +
->  arch/arm/mach-bcm/Makefile                         |   3 +
->  arch/arm/mach-bcm/bcm_hr2.c                        |  25 ++
->  drivers/clk/bcm/Kconfig                            |   9 +
->  drivers/clk/bcm/Makefile                           |   1 +
->  drivers/clk/bcm/clk-hr2.c                          |  27 ++
->  15 files changed, 569 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
->  create mode 100644 arch/arm/boot/dts/bcm-hr2.dtsi
->  create mode 100644 arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts
->  create mode 100644 arch/arm/mach-bcm/bcm_hr2.c
->  create mode 100644 drivers/clk/bcm/clk-hr2.c
+On Tue, Sep 26, 2017 at 08:11:22AM +0200, Oleksij Rempel wrote:
+> The only way of stopping the watchdog is by resetting it.
+> Add the watchdog op for stopping the device and reset if
+> a reset line is provided.
+> 
+> At same time WDOG_HW_RUNNING should be remove from dw_wdt_start.
+> As commented by Guenter Roeck:
+> dw_wdt sets WDOG_HW_RUNNING in its open function. Result is
+> that the kref_get() in watchdog_open() won't be executed. But then
+> kref_put() in close will be called since the watchdog now does stop.
+> This causes the imbalance.
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: linux-watchdog at vger.kernel.org
 
-The series looks good to me.  Please feel free to add
-Acked-by: Jon Mason <jon.mason@broadcom.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-Thanks,
-Jon
-
-
-> --
-> 2.14.1
->
+> ---
+> 
+> changes v4:
+>  - remove WDOG_HW_RUNNING from dw_wdt_start.
+> 
+> changes v3:
+>  - don't return error if rst is not present and set WDOG_HW_RUNNING bit
+>    to notify watchdog core.
+> 
+> changes v2:
+>  - test if dw_wdt->rst is NULL instead of IS_ERR
+> 
+>  drivers/watchdog/dw_wdt.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> index 36be987ff9ef..c2f4ff516230 100644
+> --- a/drivers/watchdog/dw_wdt.c
+> +++ b/drivers/watchdog/dw_wdt.c
+> @@ -127,14 +127,27 @@ static int dw_wdt_start(struct watchdog_device *wdd)
+>  
+>  	dw_wdt_set_timeout(wdd, wdd->timeout);
+>  
+> -	set_bit(WDOG_HW_RUNNING, &wdd->status);
+> -
+>  	writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+>  	       dw_wdt->regs + WDOG_CONTROL_REG_OFFSET);
+>  
+>  	return 0;
+>  }
+>  
+> +static int dw_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
+> +
+> +	if (!dw_wdt->rst) {
+> +		set_bit(WDOG_HW_RUNNING, &wdd->status);
+> +		return 0;
+> +	}
+> +
+> +	reset_control_assert(dw_wdt->rst);
+> +	reset_control_deassert(dw_wdt->rst);
+> +
+> +	return 0;
+> +}
+> +
+>  static int dw_wdt_restart(struct watchdog_device *wdd,
+>  			  unsigned long action, void *data)
+>  {
+> @@ -173,6 +186,7 @@ static const struct watchdog_info dw_wdt_ident = {
+>  static const struct watchdog_ops dw_wdt_ops = {
+>  	.owner		= THIS_MODULE,
+>  	.start		= dw_wdt_start,
+> +	.stop		= dw_wdt_stop,
+>  	.ping		= dw_wdt_ping,
+>  	.set_timeout	= dw_wdt_set_timeout,
+>  	.get_timeleft	= dw_wdt_get_timeleft,
+> -- 
+> 2.11.0
+> 
