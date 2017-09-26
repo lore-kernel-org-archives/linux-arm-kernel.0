@@ -1,57 +1,57 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 26 Sep 2017 18:17:05 +0800
-Subject: [PATCH v2 05/10] arm: dts: mt7623: update pio, usb and crypto
- nodes
-In-Reply-To: <93734b87262a8305b67e989777dfa1297d66cee4.1506390597.git.ryder.lee@mediatek.com>
-References: <cover.1506390597.git.ryder.lee@mediatek.com>
- <93734b87262a8305b67e989777dfa1297d66cee4.1506390597.git.ryder.lee@mediatek.com>
-Message-ID: <1506421025.5626.6.camel@mtksdaap41>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Sep 2017 11:23:24 +0100
+Subject: ARM64: kernel panics in DABT in sys_msync path
+In-Reply-To: <a3b714ae-97a5-8458-9bf7-140eeeebc4b9@codeaurora.org>
+References: <20170924213622.75e7r3k56tgxlezh@yury-thinkpad>
+ <20170925105335.GA24042@arm.com>
+ <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
+ <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
+ <a3b714ae-97a5-8458-9bf7-140eeeebc4b9@codeaurora.org>
+Message-ID: <20170926102324.GC8693@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-09-26 at 10:02 +0800, Ryder Lee wrote:
-> This patch updates pio, usb and crypto nodes to make them be consistent
-> with the binding documents.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt7623.dtsi | 52 ++++++++++++++++++++++---------------------
->  1 file changed, 27 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> index 381843e..9ec3767 100644
-> --- a/arch/arm/boot/dts/mt7623.dtsi
-> +++ b/arch/arm/boot/dts/mt7623.dtsi
-> @@ -226,21 +226,6 @@
->  		#reset-cells = <1>;
->  	};
+On Mon, Sep 25, 2017 at 01:54:57PM -0600, Ruigrok, Richard wrote:
+> I also found this issue with kernels from 4.11 through 4.13.  In my tests, I
+> found that it reproduces only with 4K page and Transparent Huge Pages. With 64K
+> page I was not able to reproduce. RH also reported it here: https://
+> bugzilla.redhat.com/show_bug.cgi?id=1491504 Linaro reported on the RPK kernel
+> (4.12) on Centriq2400 and ThunderX
 >  
-> -	pio: pinctrl at 10005000 {
-> -		compatible = "mediatek,mt7623-pinctrl",
-> -			     "mediatek,mt2701-pinctrl";
-> -		reg = <0 0x1000b000 0 0x1000>;
-> -		mediatek,pctl-regmap = <&syscfg_pctl_a>;
-> -		pins-are-numbered;
-> -		gpio-controller;
-> -		#gpio-cells = <2>;
-> -		interrupt-controller;
-> -		interrupt-parent = <&gic>;
-> -		#interrupt-cells = <2>;
-> -		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-> -	};
-> -
->  	syscfg_pctl_a: syscfg at 10005000 {
->  		compatible = "mediatek,mt7623-pctl-a-syscfg", "syscon";
->  		reg = <0 0x10005000 0 0x1000>;
+> 
+> https://bugs.linaro.org/show_bug.cgi?id=3191
+> 
+> https://bugs.linaro.org/show_bug.cgi?id=3068.
 
+These two aren't the same bug (that's a forward progress issue that we're
+currently working on). I don't have permission to look at the redhat one,
+but is it just an RCU stall or actually the Oops reported by Yury?
 
-Hi Ryder,
+> I was able to bisect down to a specific commit.
 
-pio node is special, it have 2 registers space.
-The address 10005000 is for PIO, it was accesed through syscfg_pctl_a
-regmap. The other one, 0x1000b000, is for EINT.
+I think we're chasing two different things here, so not sure I trust the
+bisect!
 
-So,I think using address @10005000 is correct.
+Will
 
-Joe.C
+> First bad commit is:
+> commit f27176cfc363d395eea8dc5c4a26e5d6d7d65eaf
+> Author: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> Date: Fri Feb 24 14:57:57 2017 -0800
+> 
+> mm: convert page_mkclean_one() to use page_vma_mapped_walk()
+> 
+> For consistency, it worth converting all page_check_address() to
+> page_vma_mapped_walk(), so we could drop the former.
+> 
+> PMD handling here is future-proofing, we don't have users yet. ext4
+> with huge pages will be the first.
+> 
+> I did not use virtualization, simply booting kernel and running the LTP
+> rwtest:   ./runltp -p -f fs -s rwtest
+> To validate bisecting (good points), I ran 30 iterations.  Usually it
+> reproduces in 5-10 iterations.
+> 
+> If you have any suggestions for instrumentation I can run tests, we can work
+> with 4.13 or on 4.11 at the above bisect point.
+> I have not tried the 4.14-rc's yet.
