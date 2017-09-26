@@ -1,141 +1,64 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 26 Sep 2017 16:23:23 -0600
-Subject: [PATCH 2/3] arm64: cpuinfo: add human readable CPU names to
- /proc/cpuinfo
-In-Reply-To: <20170926222324.17409-1-ahs3@redhat.com>
-References: <20170926222324.17409-1-ahs3@redhat.com>
-Message-ID: <20170926222324.17409-3-ahs3@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Sep 2017 00:33:59 +0200
+Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1505355021.8308.4.camel@mhfsdcap03>
+References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
+ <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
+ <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
+ <1505355021.8308.4.camel@mhfsdcap03>
+Message-ID: <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the interest of making things easier for humans to use, add a
-"CPU name" line to /proc/cpuinfo for each CPU that uses plain old
-words instead of hex values.  For example, instead of printing only
-CPU implementer 0x43 and CPU part 0x0A1, print also "CPU name :
-Cavium ThunderX".
+On 14 September 2017 at 04:10, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> On Wed, 2017-09-13 at 09:10 -0500, Rob Herring wrote:
+>> On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
+>> > Change the comptiable for support of multi-platform
+>> > Add description for reg
+>> > Add description for source_cg
+>> > Add description for mediatek,latch-ck
+>>
+>> This is at least the 3rd patch with exactly the same vague subject.
+>> Please make the subject somewhat unique.
+>>
+> Thx, will change the subject at next version
+>> >
+>> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
+>> >  1 file changed, 10 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>> > index 4182ea3..405cd06 100644
+>> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>> > @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
+>> >  and the properties used by the msdc driver.
+>> >
+>> >  Required properties:
+>> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+>> > +- compatible: value should be either of the following.
+>> > +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+>> > +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+>> > +   "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+>> > +   "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+>> > +- reg: physical base address of the controller and length
+>> >  - interrupts: Should contain MSDC interrupt number
+>> > -- clocks: MSDC source clock, HCLK
+>> > -- clock-names: "source", "hclk"
+>> > +- clocks: MSDC source clock, HCLK, source_cg
+>> > +- clock-names: "source", "hclk", "source_cg"
+>>
+>> All chips support source_cg? That's not backwards compatible for
+>> existing compatible strings if the driver requires it.
+> Not all chips support source_cg, for chips which do not support
+> source_cg, no need source_cg here, and the driver will parse it
+> to know if current chip support it.
 
-Note that this is not meant to be an exhaustive list of all possible
-implementers or CPUs (I'm not even sure that is knowable); this patch
-is intentionally limited to only those willing to provide info in
-arch/arm64/include/asm/cputype.h
+In such case you must not add add a required binding for it. I think
+that is what Rob is trying to point out for you.
 
-Signed-off-by: Al Stone <ahs3@redhat.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/kernel/cpuinfo.c | 84 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+[...]
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index e505007138eb..0b4261884862 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -75,6 +75,61 @@ static const char *const hwcap_str[] = {
- 	NULL
- };
- 
-+struct hw_part {
-+	u16	id;
-+	char	*name;
-+};
-+
-+static const struct hw_part arm_hw_part[] = {
-+	{ ARM_CPU_PART_AEM_V8,		"AEMv8 Model" },
-+	{ ARM_CPU_PART_FOUNDATION,	"Foundation Model" },
-+	{ ARM_CPU_PART_CORTEX_A57,	"Cortex A57" },
-+	{ ARM_CPU_PART_CORTEX_A53,	"Cortex A53" },
-+	{ ARM_CPU_PART_CORTEX_A73,	"Cortex A73" },
-+	{ (-1), "unknown" }		/* Potenza == 0, unfortunately */
-+};
-+
-+static const struct hw_part apm_hw_part[] = {
-+	{ APM_CPU_PART_POTENZA,		"Potenza" },
-+	{ (-1), "unknown" }		/* Potenza == 0, unfortunately */
-+};
-+
-+static const struct hw_part brcm_hw_part[] = {
-+	{ BRCM_CPU_PART_VULCAN,		"Vulcan" },
-+	{ (-1), "unknown" }		/* Potenza == 0, unfortunately */
-+};
-+
-+static const struct hw_part cavium_hw_part[] = {
-+	{ CAVIUM_CPU_PART_THUNDERX,	 "ThunderX" },
-+	{ CAVIUM_CPU_PART_THUNDERX_81XX, "ThunderX 81XX" },
-+	{ CAVIUM_CPU_PART_THUNDERX_83XX, "ThunderX 83XX" },
-+	{ (-1), "unknown" }		/* Potenza == 0, unfortunately */
-+};
-+
-+static const struct hw_part qcom_hw_part[] = {
-+	{ QCOM_CPU_PART_FALKOR_V1,	"Falkor v1" },
-+	{ (-1), "unknown" }		/* Potenza == 0, unfortunately */
-+};
-+
-+static const struct hw_part unknown_hw_part[] = {
-+	{ (-1), "unknown" }		/* Potenza == 0, unfortunately */
-+};
-+
-+struct hw_impl {
-+	u8			id;
-+	const struct hw_part	*parts;
-+	char			*name;
-+};
-+
-+static const struct hw_impl hw_implementer[] = {
-+	{ ARM_CPU_IMP_ARM,	arm_hw_part,	"ARM Ltd." },
-+	{ ARM_CPU_IMP_APM,	apm_hw_part,	"Applied Micro" },
-+	{ ARM_CPU_IMP_CAVIUM,	cavium_hw_part,	"Cavium" },
-+	{ ARM_CPU_IMP_BRCM,	brcm_hw_part,	"Broadcom" },
-+	{ ARM_CPU_IMP_QCOM,	qcom_hw_part,	"Qualcomm" },
-+	{ 0, unknown_hw_part, "unknown" }
-+};
-+
- #ifdef CONFIG_COMPAT
- static const char *const compat_hwcap_str[] = {
- 	"swp",
-@@ -116,6 +171,9 @@ static int c_show(struct seq_file *m, void *v)
- {
- 	int i, j;
- 	bool compat = personality(current->personality) == PER_LINUX32;
-+	u8 impl;
-+	u16 part;
-+	const struct hw_part *parts;
- 
- 	for_each_online_cpu(i) {
- 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
-@@ -132,6 +190,32 @@ static int c_show(struct seq_file *m, void *v)
- 			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
- 				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
- 
-+		impl = (u8) MIDR_IMPLEMENTOR(midr);
-+		for (j = 0; hw_implementer[j].id != 0; j++) {
-+			if (hw_implementer[j].id == impl) {
-+				seq_printf(m, "CPU name\t: %s ",
-+					   hw_implementer[j].name);
-+				parts = hw_implementer[j].parts;
-+				break;
-+			}
-+		}
-+		if (hw_implementer[j].id == 0) {
-+			seq_printf(m, "CPU name\t: %s ",
-+				   hw_implementer[j].name);
-+			parts = hw_implementer[j].parts;
-+		}
-+
-+		part = (u16) MIDR_PARTNUM(midr);
-+		for (j = 0; parts[j].id != (-1); j++) {
-+			if (parts[j].id == part) {
-+				seq_printf(m, "%s\n", parts[j].name);
-+				break;
-+			}
-+		}
-+		if (parts[j].id == (-1))
-+			seq_printf(m, "%s", parts[j].name);
-+		seq_puts(m, "\n");
-+
- 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
- 			   loops_per_jiffy / (500000UL/HZ),
- 			   loops_per_jiffy / (5000UL/HZ) % 100);
--- 
-2.13.5
+Kind regards
+Uffe
