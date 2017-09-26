@@ -1,63 +1,37 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 26 Sep 2017 14:00:32 +0200
-Subject: [v4,0/3] Workaround for bus/slot reset on Cavium cn8xxx root ports
-In-Reply-To: <20170920120912.7544420d@t450s.home>
-References: <20170908081033.3025-1-jglauber@cavium.com>
- <20170912094049.GA14111@localhost.localdomain>
- <20170920120912.7544420d@t450s.home>
-Message-ID: <20170926120032.GA29861@hc>
+From: gohai@sukzessiv.net (gohai at sukzessiv.net)
+Date: Tue, 26 Sep 2017 11:59:51 +0000
+Subject: [RESEND][PATCH] pwm: Set class for exported channels in sysfs
+Message-ID: <20170926115951.GA29367@sukzessiv.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 12:09:12PM -0600, Alex Williamson wrote:
-> On Tue, 12 Sep 2017 02:40:49 -0700
-> Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com> wrote:
-> 
-> > Hi all,
-> > 
-> > Are there any updates on this ?
-> > Comments/objections/acks/nacks ?
-> > 
-> > WBBR,
-> > Vadim
-> > 
-> > On Fri, Sep 08, 2017 at 10:10:30AM +0200, Jan Glauber wrote:
-> > > Using vfio-pci on a combination of cn8xxx and some PCI devices results in
-> > > a kernel panic. This is triggered by issuing a bus or a slot reset
-> > > on the PCI device.
-> > > 
-> > > With this series both checks indicate that the reset is not possible
-> > > preventing the kernel panic.
-> > > 
-> > > David Daney (2):
-> > >   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device
-> > >   PCI: Avoid bus reset for Cavium cn8xxx root ports
-> > > 
-> > > Jan Glauber (1):
-> > >   PCI: Avoid slot reset if bus reset is not possible
-> > > 
-> > >  drivers/pci/pci.c    | 8 ++++++++
-> > >  drivers/pci/quirks.c | 8 ++++++++
-> > >  2 files changed, 16 insertions(+)  
-> 
-> 
-> Looks ok to me, for series:
-> 
-> Reviewed-by: Alex Williamson <alex.williamson@redhat.com>
-> 
-> I am curious why we're happy targeting this quirk at a single device ID
-> while at the same time trying to expand the ACS quirk to a notable
-> fraction of the Cavium PCI device ID address space.  Thanks,
-> 
-> Alex
+Notifications for devices without bus or class set get dropped by
+dev_uevent_filter. Adding the class to the exported child matches
+what the gpio subsystem is doing.
 
-Bjorn, would you take these patches? 
+With this change exporting a channel triggers a udev event, which
+gives userspace a chance to fixup permissions and makes it possible
+for non-root users to make use of the pwm subsystem.
 
-We might need to extend the quirk to cover more cn8xxx variants,
-this is not yet entirely clear on our side.
+Signed-off-by: Gottfried Haider <gottfried.haider@gmail.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: H Hartley Sweeten <hsweeten@visionengravers.com>
+CC: linux-pwm at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-rpi-kernel at lists.infradead.org
+---
+ drivers/pwm/sysfs.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Therefore I'd like to ask if we could merge this patches now to solve the
-long-standing issue for cn88xx.
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index a813239..83f2b0b 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -263,6 +263,7 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+        export->pwm = pwm;
+        mutex_init(&export->lock);
 
-thanks,
-Jan
++       export->child.class = parent->class;
+        export->child.release = pwm_export_release;
+        export->child.parent = parent;
+        export->child.devt = MKDEV(0, 0);
