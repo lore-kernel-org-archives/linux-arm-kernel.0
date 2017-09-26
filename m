@@ -1,517 +1,195 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 26 Sep 2017 16:17:49 +0200
-Subject: [PATCH v3] drm: exynos: Add driver for HDMI audio interface
-References: <CGME20170926141814epcas1p1923ab779847932395bf2c2899291dfcd@epcas1p1.samsung.com>
-Message-ID: <1506435469-10591-1-git-send-email-s.nawrocki@samsung.com>
+From: rruigrok@codeaurora.org (Ruigrok, Richard)
+Date: Tue, 26 Sep 2017 08:23:35 -0600
+Subject: ARM64: kernel panics in DABT in sys_msync path
+In-Reply-To: <20170926102324.GC8693@arm.com>
+References: <20170924213622.75e7r3k56tgxlezh@yury-thinkpad>
+ <20170925105335.GA24042@arm.com>
+ <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
+ <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
+ <a3b714ae-97a5-8458-9bf7-140eeeebc4b9@codeaurora.org>
+ <20170926102324.GC8693@arm.com>
+Message-ID: <547ed590-3ab4-cc11-cbea-f587541d2b08@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hdmi-codec interface added in this patch is required to properly
-support HDMI audio. Currently the audio part of the SoC internal
-HDMI transmitter is configured with fixed values, which makes HDMI
-audio working by chance, only on boards having an external audio
-codec connected in parallel with the HDMI audio transmitter's input
-I2S interface.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
----
-Tested on Odroid XU3 and Odroid XU4 with Ubuntu 14.04.
+On 9/26/2017 4:23 AM, Will Deacon wrote:
+> On Mon, Sep 25, 2017 at 01:54:57PM -0600, Ruigrok, Richard wrote:
+>> I also found this issue with kernels from 4.11 through 4.13.  In my tests, I
+>> found that it reproduces only with 4K page and Transparent Huge Pages. With 64K
+>> page I was not able to reproduce. RH also reported it here: https://
+>> bugzilla.redhat.com/show_bug.cgi?id=1491504 Linaro reported on the RPK kernel
+>> (4.12) on Centriq2400 and ThunderX
+>>  
+>>
+>> https://bugs.linaro.org/show_bug.cgi?id=3191
+>>
+>> https://bugs.linaro.org/show_bug.cgi?id=3068.
+> These two aren't the same bug (that's a forward progress issue that we're
+> currently working on). I don't have permission to look at the redhat one,
+> but is it just an RCU stall or actually the Oops reported by Yury?
+>
+>> I was able to bisect down to a specific commit.
+> I think we're chasing two different things here, so not sure I trust the
+> bisect!
+>
+> Will
+The RCU stall is side effect.? The issue I'm seeing has the same stack trace and same stimulus (rwtest).? Following are the details.
 
-Changes since v2:
- - u8 replaced with bool type,
- - the  HDMI codec iec.status data used directly for setting up
-   the HDMI controller registers rather than using hard coded
-   constants,
- - constants used for configuring the HDMI_AUI_CON register
-   instead of plain numbers,
- - if/IS_ERR/return replaced with PTR_ERR_OR_ZERO().
+I agree the bisect needs to be verified.? Yury could you test commits before and at the bisect point I provided.? I did extensive test on our platform and bisect converged consistently to the same commit.
 
-Changes since v1:
- - rebased onto v4.14-rc1 and adapted locking
+Details:
 
-Changes since RFC version:
- - fixed hdmi-codec locking issue
- - added a comment documenting struct hdmi_contex::mutex
----
- drivers/gpu/drm/exynos/Kconfig       |   1 +
- drivers/gpu/drm/exynos/exynos_hdmi.c | 253 ++++++++++++++++++++++++++---------
- drivers/gpu/drm/exynos/regs-hdmi.h   |   8 +-
- 3 files changed, 197 insertions(+), 65 deletions(-)
+When running ARM64 kernel configured with THP enabled:
+CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+And 4k page (CONFIG_ARM64_4K_PAGES=y)
+?
+Running ltp release 20170516-182-g738dbdb? rwtest:? runltp -p -f fs -s rwtest
+?
+An unhandled page fault occurs in the mm code, when PC hits? line at mm/page_vma_mapped.c
+http://elixir.free-electrons.com/linux/v4.13/source/mm/page_vma_mapped.c#L163
+When an invalid pvmw pointer is passed to check_pte, in addition to the unhandled page fault, the entire system is brought down since the core on which the page fault occurs halts while holding the spinlock:??? spin_lock(pvmw->ptl);
+>From <http://elixir.free-electrons.com/linux/v4.13/source/mm/page_vma_mapped.c#L163>
+All other cores will show:? NMI watchdog: BUG: soft lockup - CPU#<n> stuck for 22s! [doio:4152]
 
-diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
-index 305dc3d..5a7c9d8 100644
---- a/drivers/gpu/drm/exynos/Kconfig
-+++ b/drivers/gpu/drm/exynos/Kconfig
-@@ -3,6 +3,7 @@ config DRM_EXYNOS
- 	depends on OF && DRM && (ARCH_S3C64XX || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
- 	select DRM_KMS_HELPER
- 	select VIDEOMODE_HELPERS
-+	select SND_SOC_HDMI_CODEC if SND_SOC
- 	help
- 	  Choose this option if you have a Samsung SoC EXYNOS chipset.
- 	  If M is selected the module will be called exynosdrm.
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 214fa5e..d2b389a 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -40,7 +40,7 @@
- #include <linux/component.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
--
-+#include <sound/hdmi-codec.h>
- #include <drm/exynos_drm.h>
 
- #include <media/cec-notifier.h>
-@@ -111,12 +111,18 @@ struct hdmi_driver_data {
- 	struct string_array_spec clk_muxes;
- };
+list *(?? 0xffff0000081b9210 +0x70)
+?
+(gdb) list *(?? 0xffff0000081b9210 +0x70)
+0xffff0000081b9280 is in page_mkclean_one (mm/rmap.c:1028).
+1023??????????????????? .address = address,
+1024??????????????????? .flags = PVMW_SYNC,
+1025??????????? };
+1026??????????? int *cleaned = arg;
+1027
+1028??????????? while (page_vma_mapped_walk(&pvmw)) {
+1029??????????????????? int ret = 0;
+1030??????????????????? address = pvmw.address;
+1031??????????????????? if (pvmw.pte) {
+1032??????????????????????????? pte_t entry;
+(gdb)
+?
+?
+Dump of assembler code for function check_pte:
+?? 0xffff0000081b80c0 <+0>:???? ldr???? w1, [x0,#48]
+list *(0xffff0000081b80c0 + 0x68)
+?
+(gdb) list *(0xffff0000081b80c0 + 0x68)
+0xffff0000081b8128 is in check_pte (mm/page_vma_mapped.c:63).
+58????????????????????????????? return false;
+59????? #else
+60????????????????????? WARN_ON_ONCE(1);
+61????? #endif
+62????????????? } else {
+63????????????????????? if (!pte_present(*pvmw->pte))
+64????????????????????????????? return false;
+65
+66????????????????????? /* THP can be referenced by any subpage */
+67????????????????????? if (pte_page(*pvmw->pte) - pvmw->page >=
+?
+?
+?
+[? 544.799399] Unable to handle kernel paging request at virtual address ffff800000000c10
+[? 544.806371] pgd = ffff8007d4d7b000
+[? 544.809753] [ffff800000000c10] *pgd=0000000000000000
+[? 544.814695] Internal error: Oops: 96000006 [#1] PREEMPT SMP
+[? 544.820248] Modules linked in:
+[? 544.823287] CPU: 2 PID: 4153 Comm: doio Not tainted 4.10.0-dev-0907-t64-09623-g726c7c0 #93
+[? 544.831526] Hardware name: Qualcomm Qualcomm Centriq(TM) 2400 Development Platform/ABW|SYS|CVR,1DPC|V3?????????? , BIOS XBL.DF.2.0.R1-00542 QDF2400_REL CR
+[? 544.845328] task: ffff8007d8428d00 task.stack: ffff8007db4ac000
+[? 544.851248] PC is at check_pte+0x68/0x150
+[? 544.855231] LR is at page_vma_mapped_walk+0x260/0x3d8
+[? 544.860259] pc : [<ffff0000081b8128>] lr : [<ffff0000081b8470>] pstate: 00400145
+[? 544.867637] sp : ffff8007db4af8a0
+[? 544.870942] x29: ffff8007db4af8a0 x28: 0000000000000714
+[? 544.876231] x27: 0088000000000000 x26: ff77ffffffffffff
+[? 544.881526] x25: 0400000000000001 x24: 0040000000000041
+[? 544.886821] x23: ffff8007d77f7000 x22: ffff8007db4afa34
+[? 544.892116] x21: ffff000009276000 x20: ffff7e001f292600
+[? 544.897411] x19: ffff8007db4af958 x18: 0000000000000a03
+[? 544.902706] x17: 0000ffff945fb1a0 x16: ffff0000081b7ee8
+[? 544.908001] x15: ffff8007bd6a6b48 x14: 0000000000000040
+[? 544.913297] x13: 0000000000000000 x12: 0000000000000002
+[? 544.918592] x11: 0000000000000230 x10: 0000000000001200
+[? 544.923887] x9 : ffff7e001f2925c0 x8 : 0000000000001200
+[? 544.929182] x7 : 0000000000000001 x6 : 0000000000000c35
+[? 544.934477] x5 : 0000000000000001 x4 : 0000000000000182
+[? 544.939772] x3 : 0400000000000001 x2 : ffff800000000c10
+[? 544.945067] x1 : 0000000000000000 x0 : ffff8007db4af958
+?
+?
+?
+?
+?
+[? 545.425022] Call trace:??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????? [10/44993]
+[? 545.427453] Exception stack(0xffff8007db4af6d0 to 0xffff8007db4af800)
+[? 545.433870] f6c0:?????????????????????????????????? ffff8007db4af958 0001000000000000
+[? 545.441683] f6e0: ffff8007db4af8a0 ffff0000081b8128 ffff8007db4af710 ffff0000081dc514
+[? 545.449495] f700: 0000000000000000 ffff0000091ef000 ffff8007db4af770 ffff0000087f0444
+[? 545.457308] f720: ffff8007d9f1e148 ffff0000095ad000 ffff8007d80eb000 0000000001011200
+[? 545.465120] f740: ffff8007db4af7a0 ffff00000817cf40 0000000000000000 ffff8007d8e7f700
+[? 545.472933] f760: 0000000001091220 ffff0000080fd998 ffff8007db4af958 0000000000000000
+[? 545.480745] f780: ffff800000000c10 0400000000000001 0000000000000182 0000000000000001
+[? 545.488558] f7a0: 0000000000000c35 0000000000000001 0000000000001200 ffff7e001f2925c0
+[? 545.496370] f7c0: 0000000000001200 0000000000000230 0000000000000002 0000000000000000
+[? 545.504183] f7e0: 0000000000000040 ffff8007bd6a6b48 ffff0000081b7ee8 0000ffff945fb1a0
+[? 545.512008] [<ffff0000081b8128>] check_pte+0x68/0x150
+[? 545.517043] [<ffff0000081b9280>] page_mkclean_one+0x70/0x1a0
+[? 545.522672] [<ffff0000081b94dc>] rmap_walk_file+0xe4/0x290
+[? 545.528141] [<ffff0000081bb788>] rmap_walk+0x48/0x70
+[? 545.533089] [<ffff0000081bb9a8>] page_mkclean+0x88/0xa0
+[? 545.538313] [<ffff0000081866dc>] clear_page_dirty_for_io+0x9c/0x200
+[? 545.544564] [<ffff000008280a20>] mpage_submit_page+0x48/0x98
+[? 545.550190] [<ffff000008280bb8>] mpage_process_page_bufs+0x148/0x158
+[? 545.556526] [<ffff000008280d0c>] mpage_prepare_extent_to_map+0x144/0x270
+[? 545.563217] [<ffff000008284f20>] ext4_writepages+0x3b0/0xa00
+[? 545.568853] [<ffff000008188ccc>] do_writepages+0x24/0x48
+[? 545.574161] [<ffff00000817b454>] __filemap_fdatawrite_range+0x9c/0xe8
+[? 545.580571] [<ffff00000817b5b4>] filemap_write_and_wait_range+0x2c/0x88
+[? 545.587175] [<ffff00000827c540>] ext4_sync_file+0x58/0x300
+[? 545.592652] [<ffff00000822b46c>] vfs_fsync_range+0x44/0xc0
+[? 545.598107] [<ffff0000081b806c>] SyS_msync+0x184/0x1d8
+[? 545.603242] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
+[? 545.608530] Code: f9401002 d2800023 f2e08003 52800001 (f9400042)
+[? 545.614630] ---[ end trace 065a200dac27fe87 ]---
+[? 545.619213] note: doio[4153] exited with preempt_count 1
+[? 569.734898] NMI watchdog: BUG: soft lockup - CPU#27 stuck for 22s! [doio:4152]
+[? 569.741155] Modules linked in:
+[? 569.744193]
+[? 569.745671] CPU: 27 PID: 4152 Comm: doio Tainted: G????? D???????? 4.10.0-dev-0907-t64-09623-g726c7c0 #93
+[? 569.755218] Hardware name: Qualcomm Qualcomm Centriq(TM) 2400 Development Platform/ABW|SYS|CVR,1DPC|V3?????????? , BIOS XBL.DF.2.0.R1-00542 QDF2400_REL CR
+[? 569.769020] task: ffff8007d842ce00 task.stack: ffff8007d8280000
+[? 569.774938] PC is at _raw_spin_lock+0x34/0x48
+[? 569.779279] LR is at alloc_set_pte+0x438/0x560
 
-+struct hdmi_audio {
-+	struct platform_device		*pdev;
-+	struct hdmi_audio_infoframe	infoframe;
-+	struct hdmi_codec_params	params;
-+	bool				enable;
-+};
-+
- struct hdmi_context {
- 	struct drm_encoder		encoder;
- 	struct device			*dev;
- 	struct drm_device		*drm_dev;
- 	struct drm_connector		connector;
--	bool				powered;
- 	bool				dvi_mode;
- 	struct delayed_work		hotplug_work;
- 	struct drm_display_mode		current_mode;
-@@ -137,6 +143,11 @@ struct hdmi_context {
- 	struct regulator		*reg_hdmi_en;
- 	struct exynos_drm_clk		phy_clk;
- 	struct drm_bridge		*bridge;
-+
-+	/* mutex protecting subsequent fields below */
-+	struct mutex			mutex;
-+	struct hdmi_audio		audio;
-+	bool				powered;
- };
+Thanks,
+Richard.
+>> First bad commit is:
+>> commit f27176cfc363d395eea8dc5c4a26e5d6d7d65eaf
+>> Author: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+>> Date: Fri Feb 24 14:57:57 2017 -0800
+>>
+>> mm: convert page_mkclean_one() to use page_vma_mapped_walk()
+>>
+>> For consistency, it worth converting all page_check_address() to
+>> page_vma_mapped_walk(), so we could drop the former.
+>>
+>> PMD handling here is future-proofing, we don't have users yet. ext4
+>> with huge pages will be the first.
+>>
+>> I did not use virtualization, simply booting kernel and running the LTP
+>> rwtest:   ./runltp -p -f fs -s rwtest
+>> To validate bisecting (good points), I ran 30 iterations.  Usually it
+>> reproduces in 5-10 iterations.
+>>
+>> If you have any suggestions for instrumentation I can run tests, we can work
+>> with 4.13 or on 4.11 at the above bisect point.
+>> I have not tried the 4.14-rc's yet.
 
- static inline struct hdmi_context *encoder_to_hdmi(struct drm_encoder *e)
-@@ -768,6 +779,22 @@ static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
- 	return ret;
- }
-
-+static int hdmi_audio_infoframe_apply(struct hdmi_context *hdata)
-+{
-+	struct hdmi_audio_infoframe *infoframe = &hdata->audio.infoframe;
-+	u8 buf[HDMI_INFOFRAME_SIZE(AUDIO)];
-+	int len;
-+
-+	len = hdmi_audio_infoframe_pack(infoframe, buf, sizeof(buf));
-+	if (len < 0)
-+		return len;
-+
-+	hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
-+	hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, len);
-+
-+	return 0;
-+}
-+
- static void hdmi_reg_infoframes(struct hdmi_context *hdata)
- {
- 	union hdmi_infoframe frm;
-@@ -805,15 +832,7 @@ static void hdmi_reg_infoframes(struct hdmi_context *hdata)
- 		hdmi_reg_write_buf(hdata, HDMI_VSI_DATA(0), buf + 3, ret - 3);
- 	}
-
--	ret = hdmi_audio_infoframe_init(&frm.audio);
--	if (!ret) {
--		frm.audio.channels = 2;
--		ret = hdmi_audio_infoframe_pack(&frm.audio, buf, sizeof(buf));
--	}
--	if (ret > 0) {
--		hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
--		hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, ret);
--	}
-+	hdmi_audio_infoframe_apply(hdata);
- }
-
- static enum drm_connector_status hdmi_detect(struct drm_connector *connector,
-@@ -995,23 +1014,18 @@ static void hdmi_reg_acr(struct hdmi_context *hdata, u32 freq)
- 	hdmi_reg_writeb(hdata, HDMI_ACR_CON, 4);
- }
-
--static void hdmi_audio_init(struct hdmi_context *hdata)
-+static void hdmi_audio_config(struct hdmi_context *hdata)
- {
--	u32 sample_rate, bits_per_sample;
--	u32 data_num, bit_ch, sample_frq;
--	u32 val;
--
--	sample_rate = 44100;
--	bits_per_sample = 16;
-+	u32 bit_ch = 1;
-+	u32 data_num, val;
-+	int i;
-
--	switch (bits_per_sample) {
-+	switch (hdata->audio.params.sample_width) {
- 	case 20:
- 		data_num = 2;
--		bit_ch = 1;
- 		break;
- 	case 24:
- 		data_num = 3;
--		bit_ch = 1;
- 		break;
- 	default:
- 		data_num = 1;
-@@ -1019,7 +1033,7 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
- 		break;
- 	}
-
--	hdmi_reg_acr(hdata, sample_rate);
-+	hdmi_reg_acr(hdata, hdata->audio.params.sample_rate);
-
- 	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
- 				| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
-@@ -1029,12 +1043,6 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
- 			| HDMI_I2S_CH1_EN | HDMI_I2S_CH2_EN);
-
- 	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
--
--	sample_frq = (sample_rate == 44100) ? 0 :
--			(sample_rate == 48000) ? 2 :
--			(sample_rate == 32000) ? 3 :
--			(sample_rate == 96000) ? 0xa : 0x0;
--
- 	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
- 	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
-
-@@ -1058,31 +1066,24 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
- 			| HDMI_I2S_SET_SDATA_BIT(data_num)
- 			| HDMI_I2S_BASIC_FORMAT);
-
--	/* Configure register related to CUV information */
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_0, HDMI_I2S_CH_STATUS_MODE_0
--			| HDMI_I2S_2AUD_CH_WITHOUT_PREEMPH
--			| HDMI_I2S_COPYRIGHT
--			| HDMI_I2S_LINEAR_PCM
--			| HDMI_I2S_CONSUMER_FORMAT);
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_1, HDMI_I2S_CD_PLAYER);
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_2, HDMI_I2S_SET_SOURCE_NUM(0));
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_3, HDMI_I2S_CLK_ACCUR_LEVEL_2
--			| HDMI_I2S_SET_SMP_FREQ(sample_frq));
--	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_4,
--			HDMI_I2S_ORG_SMP_FREQ_44_1
--			| HDMI_I2S_WORD_LEN_MAX24_24BITS
--			| HDMI_I2S_WORD_LEN_MAX_24BITS);
-+	/* Configure registers related to CUV information */
-+	for (i = 0; i < HDMI_I2S_CH_ST_MAXNUM; i++)
-+		hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST(i),
-+				hdata->audio.params.iec.status[i]);
-
- 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
- }
-
--static void hdmi_audio_control(struct hdmi_context *hdata, bool onoff)
-+static void hdmi_audio_control(struct hdmi_context *hdata)
- {
-+	bool enable = hdata->audio.enable;
-+
- 	if (hdata->dvi_mode)
- 		return;
-
--	hdmi_reg_writeb(hdata, HDMI_AUI_CON, onoff ? 2 : 0);
--	hdmi_reg_writemask(hdata, HDMI_CON_0, onoff ?
-+	hdmi_reg_writeb(hdata, HDMI_AUI_CON, enable ?
-+			HDMI_AVI_CON_EVERY_VSYNC : HDMI_AUI_CON_NO_TRAN);
-+	hdmi_reg_writemask(hdata, HDMI_CON_0, enable ?
- 			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
- }
-
-@@ -1398,13 +1399,14 @@ static void hdmiphy_conf_apply(struct hdmi_context *hdata)
- 	hdmiphy_wait_for_pll(hdata);
- }
-
-+/* Should be called with hdata->mutex mutex held */
- static void hdmi_conf_apply(struct hdmi_context *hdata)
- {
- 	hdmi_start(hdata, false);
- 	hdmi_conf_init(hdata);
--	hdmi_audio_init(hdata);
-+	hdmi_audio_config(hdata);
- 	hdmi_mode_apply(hdata);
--	hdmi_audio_control(hdata, true);
-+	hdmi_audio_control(hdata);
- }
-
- static void hdmi_mode_set(struct drm_encoder *encoder,
-@@ -1431,6 +1433,7 @@ static void hdmi_set_refclk(struct hdmi_context *hdata, bool on)
- 			   SYSREG_HDMI_REFCLK_INT_CLK, on ? ~0 : 0);
- }
-
-+/* Should be called with hdata->mutex mutex held. */
- static void hdmiphy_enable(struct hdmi_context *hdata)
- {
- 	if (hdata->powered)
-@@ -1453,6 +1456,7 @@ static void hdmiphy_enable(struct hdmi_context *hdata)
- 	hdata->powered = true;
- }
-
-+/* Should be called with hdata->mutex mutex held. */
- static void hdmiphy_disable(struct hdmi_context *hdata)
- {
- 	if (!hdata->powered)
-@@ -1478,28 +1482,38 @@ static void hdmi_enable(struct drm_encoder *encoder)
- {
- 	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
-
-+	mutex_lock(&hdata->mutex);
-+
- 	hdmiphy_enable(hdata);
- 	hdmi_conf_apply(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
- }
-
- static void hdmi_disable(struct drm_encoder *encoder)
- {
- 	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
-
--	if (!hdata->powered)
-+	mutex_lock(&hdata->mutex);
-+
-+	if (hdata->powered) {
-+		/*
-+		 * The SFRs of VP and Mixer are updated by Vertical Sync of
-+		 * Timing generator which is a part of HDMI so the sequence
-+		 * to disable TV Subsystem should be as following,
-+		 *	VP -> Mixer -> HDMI
-+		 *
-+		 * To achieve such sequence HDMI is disabled together with
-+		 * HDMI PHY, via pipe clock callback.
-+		 */
-+		mutex_unlock(&hdata->mutex);
-+		cancel_delayed_work(&hdata->hotplug_work);
-+		cec_notifier_set_phys_addr(hdata->notifier,
-+					   CEC_PHYS_ADDR_INVALID);
- 		return;
-+	}
-
--	/*
--	 * The SFRs of VP and Mixer are updated by Vertical Sync of
--	 * Timing generator which is a part of HDMI so the sequence
--	 * to disable TV Subsystem should be as following,
--	 *	VP -> Mixer -> HDMI
--	 *
--	 * To achieve such sequence HDMI is disabled together with HDMI PHY, via
--	 * pipe clock callback.
--	 */
--	cancel_delayed_work(&hdata->hotplug_work);
--	cec_notifier_set_phys_addr(hdata->notifier, CEC_PHYS_ADDR_INVALID);
-+	mutex_unlock(&hdata->mutex);
- }
-
- static const struct drm_encoder_helper_funcs exynos_hdmi_encoder_helper_funcs = {
-@@ -1513,6 +1527,104 @@ static void hdmi_disable(struct drm_encoder *encoder)
- 	.destroy = drm_encoder_cleanup,
- };
-
-+static void hdmi_audio_shutdown(struct device *dev, void *data)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+
-+	mutex_lock(&hdata->mutex);
-+
-+	hdata->audio.enable = false;
-+
-+	if (hdata->powered)
-+		hdmi_audio_control(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
-+}
-+
-+static int hdmi_audio_hw_params(struct device *dev, void *data,
-+				struct hdmi_codec_daifmt *daifmt,
-+				struct hdmi_codec_params *params)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+
-+	if (daifmt->fmt != HDMI_I2S || daifmt->bit_clk_inv ||
-+	    daifmt->frame_clk_inv || daifmt->bit_clk_master ||
-+	    daifmt->frame_clk_master) {
-+		dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
-+			daifmt->bit_clk_inv, daifmt->frame_clk_inv,
-+			daifmt->bit_clk_master,
-+			daifmt->frame_clk_master);
-+		return -EINVAL;
-+	}
-+
-+	mutex_lock(&hdata->mutex);
-+
-+	hdata->audio.params = *params;
-+
-+	if (hdata->powered) {
-+		hdmi_audio_config(hdata);
-+		hdmi_audio_infoframe_apply(hdata);
-+	}
-+
-+	mutex_unlock(&hdata->mutex);
-+
-+	return 0;
-+}
-+
-+static int hdmi_audio_digital_mute(struct device *dev, void *data, bool mute)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+
-+	mutex_lock(&hdata->mutex);
-+
-+	hdata->audio.enable = !mute;
-+
-+	if (hdata->powered)
-+		hdmi_audio_control(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
-+
-+	return 0;
-+}
-+
-+static int hdmi_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
-+			      size_t len)
-+{
-+	struct hdmi_context *hdata = dev_get_drvdata(dev);
-+	struct drm_connector *connector = &hdata->connector;
-+
-+	memcpy(buf, connector->eld, min(sizeof(connector->eld), len));
-+
-+	return 0;
-+}
-+
-+static const struct hdmi_codec_ops audio_codec_ops = {
-+	.hw_params = hdmi_audio_hw_params,
-+	.audio_shutdown = hdmi_audio_shutdown,
-+	.digital_mute = hdmi_audio_digital_mute,
-+	.get_eld = hdmi_audio_get_eld,
-+};
-+
-+static int hdmi_register_audio_device(struct hdmi_context *hdata)
-+{
-+	struct hdmi_codec_pdata codec_data = {
-+		.ops = &audio_codec_ops,
-+		.max_i2s_channels = 6,
-+		.i2s = 1,
-+	};
-+
-+	hdata->audio.pdev = platform_device_register_data(
-+		hdata->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
-+		&codec_data, sizeof(codec_data));
-+
-+	return PTR_ERR_OR_ZERO(hdata->audio.pdev);
-+}
-+
-+static void hdmi_unregister_audio_device(struct hdmi_context *hdata)
-+{
-+	platform_device_unregister(hdata->audio.pdev);
-+}
-+
- static void hdmi_hotplug_work_func(struct work_struct *work)
- {
- 	struct hdmi_context *hdata;
-@@ -1588,11 +1700,14 @@ static void hdmiphy_clk_enable(struct exynos_drm_clk *clk, bool enable)
- {
- 	struct hdmi_context *hdata = container_of(clk, struct hdmi_context,
- 						  phy_clk);
-+	mutex_lock(&hdata->mutex);
-
- 	if (enable)
- 		hdmiphy_enable(hdata);
- 	else
- 		hdmiphy_disable(hdata);
-+
-+	mutex_unlock(&hdata->mutex);
- }
-
- static int hdmi_bridge_init(struct hdmi_context *hdata)
-@@ -1697,6 +1812,7 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
- 	struct drm_device *drm_dev = data;
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
- 	struct drm_encoder *encoder = &hdata->encoder;
-+	struct hdmi_audio_infoframe *audio_infoframe = &hdata->audio.infoframe;
- 	struct exynos_drm_crtc *crtc;
- 	int ret;
-
-@@ -1704,6 +1820,12 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
-
- 	hdata->phy_clk.enable = hdmiphy_clk_enable;
-
-+	hdmi_audio_infoframe_init(audio_infoframe);
-+	audio_infoframe->coding_type = HDMI_AUDIO_CODING_TYPE_STREAM;
-+	audio_infoframe->sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
-+	audio_infoframe->sample_frequency = HDMI_AUDIO_SAMPLE_FREQUENCY_STREAM;
-+	audio_infoframe->channels = 2;
-+
- 	drm_encoder_init(drm_dev, encoder, &exynos_hdmi_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
-
-@@ -1818,6 +1940,8 @@ static int hdmi_probe(struct platform_device *pdev)
-
- 	hdata->dev = dev;
-
-+	mutex_init(&hdata->mutex);
-+
- 	ret = hdmi_resources_init(hdata);
- 	if (ret) {
- 		if (ret != -EPROBE_DEFER)
-@@ -1877,12 +2001,19 @@ static int hdmi_probe(struct platform_device *pdev)
-
- 	pm_runtime_enable(dev);
-
--	ret = component_add(&pdev->dev, &hdmi_component_ops);
-+	ret = hdmi_register_audio_device(hdata);
- 	if (ret)
- 		goto err_notifier_put;
-
-+	ret = component_add(&pdev->dev, &hdmi_component_ops);
-+	if (ret)
-+		goto err_unregister_audio;
-+
- 	return ret;
-
-+err_unregister_audio:
-+	hdmi_unregister_audio_device(hdata);
-+
- err_notifier_put:
- 	cec_notifier_put(hdata->notifier);
- 	pm_runtime_disable(dev);
-@@ -1921,6 +2052,8 @@ static int hdmi_remove(struct platform_device *pdev)
-
- 	put_device(&hdata->ddc_adpt->dev);
-
-+	mutex_destroy(&hdata->mutex);
-+
- 	return 0;
- }
-
-diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
-index a0507dc..d843b1f 100644
---- a/drivers/gpu/drm/exynos/regs-hdmi.h
-+++ b/drivers/gpu/drm/exynos/regs-hdmi.h
-@@ -419,11 +419,9 @@
- #define HDMI_I2S_DSD_CON		HDMI_I2S_BASE(0x01c)
- #define HDMI_I2S_MUX_CON		HDMI_I2S_BASE(0x020)
- #define HDMI_I2S_CH_ST_CON		HDMI_I2S_BASE(0x024)
--#define HDMI_I2S_CH_ST_0		HDMI_I2S_BASE(0x028)
--#define HDMI_I2S_CH_ST_1		HDMI_I2S_BASE(0x02c)
--#define HDMI_I2S_CH_ST_2		HDMI_I2S_BASE(0x030)
--#define HDMI_I2S_CH_ST_3		HDMI_I2S_BASE(0x034)
--#define HDMI_I2S_CH_ST_4		HDMI_I2S_BASE(0x038)
-+/* n must be withing range 0...(HDMI_I2S_CH_ST_MAXNUM - 1) */
-+#define HDMI_I2S_CH_ST_MAXNUM		5
-+#define HDMI_I2S_CH_ST(n)		HDMI_I2S_BASE(0x028 + 4 * (n))
- #define HDMI_I2S_CH_ST_SH_0		HDMI_I2S_BASE(0x03c)
- #define HDMI_I2S_CH_ST_SH_1		HDMI_I2S_BASE(0x040)
- #define HDMI_I2S_CH_ST_SH_2		HDMI_I2S_BASE(0x044)
---
-1.9.1
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
