@@ -1,76 +1,71 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 26 Sep 2017 15:17:40 -0700
-Subject: [PATCH v5 2/2] thermal: add brcmstb AVS TMON driver
-In-Reply-To: <9587b134-9727-d7cb-7a46-6df5ee4a0494@gmail.com>
-References: <20170926212800.4879-1-code@mmayer.net>
- <20170926212800.4879-3-code@mmayer.net>
- <4cb98266-6936-7668-fc88-199ac907b437@broadcom.com>
- <CANEuBv7pij+szVQZHZxNr4kXcCT0miTsYzG7g28zOmF9MqXKJQ@mail.gmail.com>
- <9bdd9959-da47-9adb-e550-31bf06254310@broadcom.com>
- <9587b134-9727-d7cb-7a46-6df5ee4a0494@gmail.com>
-Message-ID: <5245cf8e-d35f-c1fd-b7ea-e3a58c468688@broadcom.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 26 Sep 2017 16:23:22 -0600
+Subject: [PATCH 1/3] arm64: cpuinfo: add MPIDR value to /proc/cpuinfo
+In-Reply-To: <20170926222324.17409-1-ahs3@redhat.com>
+References: <20170926222324.17409-1-ahs3@redhat.com>
+Message-ID: <20170926222324.17409-2-ahs3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When displaying cpuinfo on an arm64 system, include the MPIDR register
+value which can be used to understand the CPU topology on a platform.
+This can serve as a cross-check to the information provided in sysfs,
+and has been useful in understanding CPU and NUMA allocation issues.
 
+Signed-off-by: Al Stone <ahs3@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/cpu.h | 1 +
+ arch/arm64/kernel/cpuinfo.c  | 8 ++++++++
+ 2 files changed, 9 insertions(+)
 
-On 17-09-26 03:14 PM, Florian Fainelli wrote:
-> On 09/26/2017 03:08 PM, Scott Branden wrote:
->>
->> On 17-09-26 02:38 PM, Markus Mayer wrote:
->>> On 26 September 2017 at 14:32, Scott Branden
->>> <scott.branden@broadcom.com> wrote:
->>>> Hi Markus,
->>>>
->>>>
->>>> On 17-09-26 02:27 PM, Markus Mayer wrote:
->>>>> From: Brian Norris <computersforpeace@gmail.com>
->>>>>
->>>>> The AVS TMON core provides temperature readings, a pair of configurable
->>>>> high- and low-temperature threshold interrupts, and an emergency
->>>>> over-temperature chip reset. The driver utilizes the first two to
->>>>> provide temperature readings and high-temperature notifications to
->>>>> applications. The over-temperature reset is not exposed to
->>>>> applications; this reset threshold is critical to the system and should
->>>>> be set with care within the bootloader.
->>>>>
->>>>> Applications may choose to utilize the notification mechanism, the
->>>>> temperature reading mechanism (e.g., through polling), or both.
->>>>>
->>>>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
->>>>> Signed-off-by: Doug Berger <opendmb@gmail.com>
->>>>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->>>>> ---
->>>>>     drivers/thermal/Kconfig                    |   2 +-
->>>>>     drivers/thermal/broadcom/Kconfig           |   7 +
->>>>>     drivers/thermal/broadcom/Makefile          |   1 +
->>>>>     drivers/thermal/broadcom/brcmstb_thermal.c | 387
->>>>> +++++++++++++++++++++++++++++
->>>>>     4 files changed, 396 insertions(+), 1 deletion(-)
->>>>>     create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
->>>>>
->>>>> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->>>>> index 07002df..96774a7 100644
->>>>> --- a/drivers/thermal/Kconfig
->>>>> +++ b/drivers/thermal/Kconfig
->>>>> @@ -408,7 +408,7 @@ config MTK_THERMAL
->>>>>             controller present in Mediatek SoCs
->>>>>       menu "Broadcom thermal drivers"
->>>>> -depends on ARCH_BCM || COMPILE_TEST
->>>>> +depends on ARCH_BCM || ARCH_BRCMSTB || COMPILE_TEST
->>>> No need for this additional depends.  ARCH_BCM is always defined before
->>>> ARCH_BRCMSTB can be selected.
->>> ARCH_BCM does not exist in arch/arm64/configs/defconfig. ARCH_BRCMSTB
->>> does. So, we do need both or the driver won't be built on ARM64.
->>> (After internal discussions we went with that approach rather than
->>> defining ARCH_BCM on ARM64.)
->> Got it.  Looking at our internal iproc tree I see we've done exactly the
->> same with ARCH_BCM_IPROC needing to be added.  We haven't upstreamed
->> the thermal driver needing it yet.
->>
->> Perhaps we should add ARCH_BCM to ARM64....
-> If it is just added to satisfy dependencies, I don't see much value in
-> doing that. It does make sense in the ARM v7 multiplatform context, but
-> outside of that, not so sur.
-OK - we'll just continue to add ARCH_BCM_IPROC || ARCH_BRCMSTB 
-everywhere as needed.
+diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+index 889226b4c6e1..ac40894df247 100644
+--- a/arch/arm64/include/asm/cpu.h
++++ b/arch/arm64/include/asm/cpu.h
+@@ -32,6 +32,7 @@ struct cpuinfo_arm64 {
+ 	u32		reg_midr;
+ 	u32		reg_revidr;
+ 
++	u64		reg_id_aa64mpidr;
+ 	u64		reg_id_aa64dfr0;
+ 	u64		reg_id_aa64dfr1;
+ 	u64		reg_id_aa64isar0;
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 4a6f875ac854..e505007138eb 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -120,6 +120,7 @@ static int c_show(struct seq_file *m, void *v)
+ 	for_each_online_cpu(i) {
+ 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
+ 		u32 midr = cpuinfo->reg_midr;
++		u64 mpidr = cpuinfo->reg_id_aa64mpidr;
+ 
+ 		/*
+ 		 * glibc reads /proc/cpuinfo to determine the number of
+@@ -159,6 +160,12 @@ static int c_show(struct seq_file *m, void *v)
+ 		}
+ 		seq_puts(m, "\n");
+ 
++		seq_printf(m, "CPU MPIDR\t: 0x%016llx ", mpidr);
++		seq_printf(m, "(Aff3 %d Aff2 %d Aff1 %d Aff0 %d)\n",
++			   (u8) MPIDR_AFFINITY_LEVEL(mpidr, 3),
++			   (u8) MPIDR_AFFINITY_LEVEL(mpidr, 2),
++			   (u8) MPIDR_AFFINITY_LEVEL(mpidr, 1),
++			   (u8) MPIDR_AFFINITY_LEVEL(mpidr, 0));
+ 		seq_printf(m, "CPU implementer\t: 0x%02x\n",
+ 			   MIDR_IMPLEMENTOR(midr));
+ 		seq_printf(m, "CPU architecture: 8\n");
+@@ -372,6 +379,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ 	info->reg_midr = read_cpuid_id();
+ 	info->reg_revidr = read_cpuid(REVIDR_EL1);
+ 
++	info->reg_id_aa64mpidr = read_cpuid_mpidr();
+ 	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
+ 	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
+ 	info->reg_id_aa64isar0 = read_cpuid(ID_AA64ISAR0_EL1);
+-- 
+2.13.5
