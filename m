@@ -1,32 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Sep 2017 10:58:55 +0200
-Subject: [PATCH v3 00/14] ARM: dts: sunxi: Fix DT build warnings
-In-Reply-To: <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
-References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
- <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
-Message-ID: <20170926085855.7yn6zdx3sfuwwxyj@flea>
+Date: Tue, 26 Sep 2017 11:24:31 +0200
+Subject: [PATCH v2 01/13] clk: sunxi-ng: sun6i: Export video PLLs
+In-Reply-To: <20170926065919.24446-2-wens@csie.org>
+References: <20170926065919.24446-1-wens@csie.org>
+ <20170926065919.24446-2-wens@csie.org>
+Message-ID: <20170926092431.puk7e5ippmjwfy4x@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 07:48:17AM +0000, Chen-Yu Tsai wrote:
-> On Tue, Sep 26, 2017 at 3:22 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > Hello
-> >
-> > The goal of this patch series is to have a clean DT build with W=1.
-> >
-> > Regards
-> >
-> > Changes since v1:
-> > - moved i2c2 unit address change from patch #2 in patch #1
-> >
-> > Changes since v2
-> > - added two patch for fixing pin names
+On Tue, Sep 26, 2017 at 06:59:07AM +0000, Chen-Yu Tsai wrote:
+> The 2x outputs of the 2 video PLL clocks are directly used by the
+> HDMI controller block.
 > 
-> The first twelve patches are good. Maxime, I think we can go ahead and
-> merge them, instead of having them resent again in v3?
+> Export them so they can be referenced in the device tree.
+> 
+> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Yep, that works for me. Can you push them?
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Thanks!
 Maxime
@@ -41,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/0b8f750b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/6b033da0/attachment.sig>
