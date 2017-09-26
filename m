@@ -1,69 +1,187 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 26 Sep 2017 10:02:53 +0800
-Subject: [PATCH v2 02/10] arm: dts: mt2701: enable display pwm backlight
+Date: Tue, 26 Sep 2017 10:03:01 +0800
+Subject: [PATCH v2 10/10] arm: dts: mt7623: add PCIe related nodes
 In-Reply-To: <cover.1506390597.git.ryder.lee@mediatek.com>
 References: <cover.1506390597.git.ryder.lee@mediatek.com>
-Message-ID: <0f9441e9fc40e47e94927a3a4c96dd3f7f287d94.1506390597.git.ryder.lee@mediatek.com>
+Message-ID: <d7a6c9c853914370c8d4a69bd172ffb6fd466b31.1506390597.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Weiqing Kong <weiqing.kong@mediatek.com>
+This patch adds devices nodes and updates pinmux setting for the PICe
+function block. Just note that PCIe port2 PHY is shared with U3 port.
 
-This patch adds board related config for MT2701 pwm backlight.
-
-Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701-evb.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/mt7623.dtsi                 | 108 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  30 +++++++
+ 2 files changed, 138 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index f484973..63af4b1 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -56,12 +56,29 @@
- 	bt_sco_codec:bt_sco_codec {
- 		compatible = "linux,bt-sco";
- 	};
-+
-+	backlight_lcd: backlight_lcd {
-+		compatible = "pwm-backlight";
-+		pwms = <&bls 0 100000>;
-+		brightness-levels = <
-+			  0  16  32  48  64  80  96 112
-+			128 144 160 176 192 208 224 240
-+			255
-+		>;
-+		default-brightness-level = <9>;
-+	};
- };
- 
- &auxadc {
- 	status = "okay";
- };
- 
-+&bls {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm_bls_gpio>;
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins_a>;
-@@ -111,6 +128,12 @@
- 		};
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 043bae6..1895107 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -862,6 +862,114 @@
+ 		#reset-cells = <1>;
  	};
  
-+	pwm_bls_gpio: pwm_bls_gpio {
-+		pins_cmd_dat {
-+			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
++	pcie: pcie-controller at 1a140000 {
++		compatible = "mediatek,mt7623-pcie";
++		device_type = "pci";
++		reg = <0 0x1a140000 0 0x1000>, /* PCIe shared registers */
++		      <0 0x1a142000 0 0x1000>, /* Port0 registers */
++		      <0 0x1a143000 0 0x1000>, /* Port1 registers */
++		      <0 0x1a144000 0 0x1000>; /* Port2 registers */
++		reg-names = "subsys", "port0", "port1", "port2";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0xf800 0 0 0>;
++		interrupt-map = <0x0000 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>,
++				<0x0800 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>,
++				<0x1000 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
++			 <&hifsys CLK_HIFSYS_PCIE0>,
++			 <&hifsys CLK_HIFSYS_PCIE1>,
++			 <&hifsys CLK_HIFSYS_PCIE2>;
++		clock-names = "free_ck", "sys_ck0", "sys_ck1", "sys_ck2";
++		resets = <&hifsys MT2701_HIFSYS_PCIE0_RST>,
++			 <&hifsys MT2701_HIFSYS_PCIE1_RST>,
++			 <&hifsys MT2701_HIFSYS_PCIE2_RST>;
++		reset-names = "pcie-rst0", "pcie-rst1", "pcie-rst2";
++		phys = <&pcie0_port PHY_TYPE_PCIE>,
++		       <&pcie1_port PHY_TYPE_PCIE>,
++		       <&u3port1 PHY_TYPE_PCIE>;
++		phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
++		bus-range = <0x00 0xff>;
++		status = "disabled";
++		ranges = <0x81000000 0 0x1a160000 0 0x1a160000 0 0x00010000
++			  0x83000000 0 0x60000000 0 0x60000000 0 0x10000000>;
++
++		pcie at 0,0 {
++			device_type = "pci";
++			reg = <0x0000 0 0 0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>;
++			ranges;
++			num-lanes = <1>;
++			status = "disabled";
++		};
++
++		pcie at 1,0 {
++			device_type = "pci";
++			reg = <0x0800 0 0 0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
++			ranges;
++			num-lanes = <1>;
++			status = "disabled";
++		};
++
++		pcie at 2,0 {
++			device_type = "pci";
++			reg = <0x1000 0 0 0 0>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
++			ranges;
++			num-lanes = <1>;
++			status = "disabled";
 +		};
 +	};
 +
- 	spi_pins_a: spi0 at 0 {
- 		pins_spi {
- 			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
++	pcie0_phy: pcie-phy at 1a149000 {
++		compatible = "mediatek,generic-tphy-v1";
++		reg = <0 0x1a149000 0 0x0700>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
++
++		pcie0_port: pcie-phy at 1a149900 {
++			reg = <0 0x1a149900 0 0x0700>;
++			clocks = <&clk26m>;
++			clock-names = "ref";
++			#phy-cells = <1>;
++			status = "okay";
++		};
++	};
++
++	pcie1_phy: pcie-phy at 1a14a000 {
++		compatible = "mediatek,generic-tphy-v1";
++		reg = <0 0x1a14a000 0 0x0700>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
++
++		pcie1_port: pcie-phy at 1a14a900 {
++			reg = <0 0x1a14a900 0 0x0700>;
++			clocks = <&clk26m>;
++			clock-names = "ref";
++			#phy-cells = <1>;
++			status = "okay";
++		};
++	};
++
+ 	usb1: usb at 1a1c0000 {
+ 		compatible = "mediatek,mt7623-xhci",
+ 			     "mediatek,mt8173-xhci";
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 267a05a..134a39a 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -226,6 +226,28 @@
+ 	vqmmc-supply = <&mt6323_vio18_reg>;
+ };
+ 
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcie_default>;
++	status = "okay";
++
++	pcie at 0,0 {
++		status = "okay";
++	};
++
++	pcie at 1,0 {
++		status = "okay";
++	};
++};
++
++&pcie0_phy {
++	status = "okay";
++};
++
++&pcie1_phy {
++	status = "okay";
++};
++
+ &pio {
+ 	bls_pins_a: bls at 0 {
+ 		pins_cmd_dat {
+@@ -414,6 +436,14 @@
+ 		};
+ 	};
+ 
++	pcie_default: pcie_pin_default {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_208_AUD_EXT_CK1_FUNC_PCIE0_PERST_N>,
++				 <MT7623_PIN_209_AUD_EXT_CK2_FUNC_PCIE1_PERST_N>;
++			bias-disable;
++		};
++	};
++
+ 	pwm_pins_a: pwm at 0 {
+ 		pins_pwm {
+ 			pinmux = <MT7623_PIN_204_PWM1_FUNC_PWM1>,
 -- 
 1.9.1
