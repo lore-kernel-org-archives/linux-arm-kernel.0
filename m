@@ -1,32 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Sep 2017 11:58:38 +0200
-Subject: [PATCH v2 06/13] drm/sun4i: hdmi: Allow using second PLL as TMDS
- clk parent
-In-Reply-To: <20170926065919.24446-7-wens@csie.org>
+Date: Tue, 26 Sep 2017 12:01:50 +0200
+Subject: [PATCH v2 09/13] drm/sun4i: hdmi: Add support for controller
+ hardware variants
+In-Reply-To: <20170926065919.24446-10-wens@csie.org>
 References: <20170926065919.24446-1-wens@csie.org>
- <20170926065919.24446-7-wens@csie.org>
-Message-ID: <20170926095838.vvgdnm7bdodwtjzv@flea>
+ <20170926065919.24446-10-wens@csie.org>
+Message-ID: <20170926100150.5rgmraenrriekhna@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 06:59:12AM +0000, Chen-Yu Tsai wrote:
-> Allwinner SoCs typically have two PLLs reserved for video related usage.
-> At the moment we only support using the first one to feed the HDMI
-> transmitter block's TMDS clock.
+On Tue, Sep 26, 2017 at 06:59:15AM +0000, Chen-Yu Tsai wrote:
+> The HDMI controller found in earlier Allwinner SoCs have slight
+> differences between the A10, A10s, and the A31:
 > 
-> Let the HDMI encoder's TMDS clock go through all of its parents when
-> calculating possible clock rates. This allows usage of the second video
-> PLL as its parent.
+>   - Need different initial values for the PLL related registers
 > 
-> Note that this does not handle conflicting pixel clocks. It is entirely
-> possible to have an LCD panel use one pixel clock rate, only to be
-> overridden by the HDMI transmitter's clock rate request when the second
-> display pipeline is enabled.
+>   - Different behavior of the DDC and TMDS clocks
 > 
-> This should be handled by having all the clock drivers honor clock rate
-> ranges, and have the consumers use clk_set_rate_min/clk_set_rate_max.
-
-That, or relying on clk_set_rate_protect
+>   - Different register layout for the DDC portion
+> 
+>   - Separate DDC parent clock on the A31
+> 
+>   - Explicit reset control
+> 
+> For the A31, the HDMI TMDS clock has a different value offset for
+> the divider. The HDMI DDC block is different from the one in the
+> other SoCs. As far as the DDC clock goes, it has no pre-divider,
+> as it is clocked from a slower parent clock, not the TMDS clock.
+> The divider offset from the register value is different. And the
+> clock control register is at a different offset.
+> 
+> A new variant data structure is created to store pointers to the
+> above functions, structures, and the different initial values.
+> Another flag notates whether there is a separate DDC parent clock.
+> If not, the TMDS clock is passed to the DDC clock create function,
+> as before.
+> 
+> Regmap fields are used to deal with the different register layout
+> of the DDC block.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
@@ -42,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/cdcc1c49/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170926/1040c9b5/attachment.sig>
