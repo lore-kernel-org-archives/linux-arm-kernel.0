@@ -1,28 +1,54 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 27 Sep 2017 16:06:55 +0530
-Subject: [RESEND PATCH v5 4/4] ARM: configs: stm32: Add DMAMUX support in
- STM32 defconfig
-In-Reply-To: <cbbfc620-064c-e400-0490-a1ce5b26c894@st.com>
-References: <1506065492-31478-1-git-send-email-pierre-yves.mordret@st.com>
- <1506065492-31478-5-git-send-email-pierre-yves.mordret@st.com>
- <20170926164603.GP30097@localhost>
- <cbbfc620-064c-e400-0490-a1ce5b26c894@st.com>
-Message-ID: <20170927103655.GM30097@localhost>
+From: net147@gmail.com (Jonathan Liu)
+Date: Wed, 27 Sep 2017 20:35:22 +1000
+Subject: [PATCH] usb: musb: Check for host-mode using is_host_active() on
+ reset interrupt
+Message-ID: <20170927103522.30202-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 08:59:55AM +0200, Alexandre Torgue wrote:
-> Hi Vinod
-> 
-> On 09/26/2017 06:46 PM, Vinod Koul wrote:
-> >On Fri, Sep 22, 2017 at 09:31:32AM +0200, Pierre-Yves MORDRET wrote:
-> >>This patch adds DMAMUX support in STM32 defconfig file
-> >
-> >Need ACK from ARM folks on this.
-> 
-> I will take it in my pull request.
+The sunxi musb has a bug where sometimes it will generate a babble
+error on device disconnect instead of a disconnect IRQ. When this
+happens the musb controller switches from host mode to device mode
+(it clears MUSB_DEVCTL_HM/MUSB_DEVCTL_SESSION and sets
+MUSB_DEVCTL_BDEVICE) and gets stuck in this state.
 
-sure, other are applied now
+The babble error is misdetected as a bus reset because MUSB_DEVCTL_HM
+was cleared.
 
+To fix this, use is_host_active() rather than (devctl & MUSB_DEVCTL_HM)
+to detect babble error so that sunxi musb babble recovery can handle it
+by restoring the mode. This information is provided by the driver logic
+and does not rely on register contents.
+
+Cc: stable at vger.kernel.org # v4.1+
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ drivers/usb/musb/musb_core.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 029692053dd3..1bce7df3e110 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -906,7 +906,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
+ 	 */
+ 	if (int_usb & MUSB_INTR_RESET) {
+ 		handled = IRQ_HANDLED;
+-		if (devctl & MUSB_DEVCTL_HM) {
++		if (is_host_active(musb)) {
+ 			/*
+ 			 * When BABBLE happens what we can depends on which
+ 			 * platform MUSB is running, because some platforms
+@@ -916,9 +916,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
+ 			 * drop the session.
+ 			 */
+ 			dev_err(musb->controller, "Babble\n");
+-
+-			if (is_host_active(musb))
+-				musb_recover_from_babble(musb);
++			musb_recover_from_babble(musb);
+ 		} else {
+ 			musb_dbg(musb, "BUS RESET as %s",
+ 				usb_otg_state_string(musb->xceiv->otg->state));
 -- 
-~Vinod
+2.13.2
