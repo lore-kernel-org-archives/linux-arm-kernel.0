@@ -1,91 +1,80 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 Sep 2017 09:20:15 +0800
-Subject: [PATCH 4/4] ACPI: IORT: SMMUv3 nodes MSI support
-In-Reply-To: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
-References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1506475215-2731-5-git-send-email-hanjun.guo@linaro.org>
+From: douly.fnst@cn.fujitsu.com (Dou Liyang)
+Date: Wed, 27 Sep 2017 09:41:49 +0800
+Subject: [PATCH v9] ACPI / init: Invoke early ACPI initialization earlier
+In-Reply-To: <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
+References: <1505293975-26005-1-git-send-email-douly.fnst@cn.fujitsu.com>
+ <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
+Message-ID: <e4eadcbc-fe58-2d2c-818d-34e2f545db16@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Rafael, Zheng,
 
-Since we make single mappings valid for SMMUv3 (and PMCG), also
-we have a mapping index for SMMUv3 MSI, we can directly use that
-index to get the map entry, then retrieve ITS parent to add SMMUv3
-MSI support.
+Welcome any comments!
 
-Introduce a new API iort_set_device_domain() to find the MSI domain
-for an SMMUv3 (or any other IORT table node) to reduce the complex
-of doing that via acpi_configure_pmsi_domain().
+Now, our patches are in tip tree, they are based on this
+independent patch, we hope it can be merged earlier than our
+patches to avoid ACPI Error. we need your advice and confirmation.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/arm64/iort.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+Thanks,
+	dou.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 1c1160e..06b38de 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -633,6 +633,49 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
- 	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
- }
- 
-+static void iort_set_device_domain(struct device *dev,
-+				   struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_its_group *its;
-+	struct acpi_iort_node *msi_parent;
-+	struct acpi_iort_id_mapping *map;
-+	struct fwnode_handle *iort_fwnode;
-+	struct irq_domain *domain;
-+	int index;
-+
-+	index = iort_get_id_mapping_index(node);
-+	if (index < 0)
-+		return;
-+
-+	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-+			   node->mapping_offset + index * sizeof(*map));
-+
-+	/* Firmware bug! */
-+	if (!map->output_reference ||
-+	    !(map->flags & ACPI_IORT_ID_SINGLE_MAPPING)) {
-+		pr_err(FW_BUG "[node %p type %d] Invalid MSI mapping\n",
-+		       node, node->type);
-+		return;
-+	}
-+
-+	msi_parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-+				  map->output_reference);
-+
-+	if (!msi_parent || msi_parent->type != ACPI_IORT_NODE_ITS_GROUP)
-+		return;
-+
-+	/* Move to ITS specific data */
-+	its = (struct acpi_iort_its_group *)msi_parent->node_data;
-+
-+	iort_fwnode = iort_find_domain_token(its->identifiers[0]);
-+	if (!iort_fwnode)
-+		return;
-+
-+	domain = irq_find_matching_fwnode(iort_fwnode, DOMAIN_BUS_PLATFORM_MSI);
-+	if (domain)
-+		dev_set_msi_domain(dev, domain);
-+}
-+
- /**
-  * iort_get_platform_device_domain() - Find MSI domain related to a
-  * platform device
-@@ -1259,6 +1302,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 	/* Configure DMA for the page table walker */
- 	acpi_dma_configure(&pdev->dev, attr);
- 
-+	iort_set_device_domain(&pdev->dev, node);
-+
- 	ret = platform_device_add(pdev);
- 	if (ret)
- 		goto dma_deconfigure;
--- 
-1.9.1
+At 09/13/2017 05:17 PM, Dou Liyang wrote:
+> Linux uses acpi_early_init() to put the ACPI table management into the
+> late stage from the early stage. This two stages are different. the
+> mapped ACPI tables in early stage is temporary and should be unmapped,
+> but in late stage, it is permanent and don't need to be unmapped.
+>
+> Originally, mapping and parsing the DMAR table should be in the late stage.
+> However, Initializing interrupt delivery mode earlier will move it into
+> the early stage. This causes an ACPI error warning when Linux reallocates
+> the ACPI root tables.
+>
+> Commit b064a8fa77df ("ACPI / init: Switch over platform to the ACPI mode
+> later") splits the ACPI early initialization code into acpi_early_init()
+> and acpi_subsystem_init(). This makes acpi_early_init() more independently
+>
+> So, invoke acpi_early_init() earlier before late_time_init(), Keep the DMAR
+> be mapped and parsed in late stage like before.
+>
+> Reported-by: Xiaolong Ye <xiaolong.ye@intel.com>
+> Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
+> Cc: linux-acpi at vger.kernel.org
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Zheng, Lv <lv.zheng@intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: x86 at kernel.org
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: linux-ia64 at vger.kernel.org
+> Cc: yinghai at kernel.org
+> Cc: bhe at redhat.com
+> Cc: bp at alien8.de
+> ---
+>  init/main.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/init/main.c b/init/main.c
+> index 0ee9c686..2fb98a4 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -664,12 +664,12 @@ asmlinkage __visible void __init start_kernel(void)
+>  	debug_objects_mem_init();
+>  	setup_per_cpu_pageset();
+>  	numa_policy_init();
+> +	acpi_early_init();
+>  	if (late_time_init)
+>  		late_time_init();
+>  	calibrate_delay();
+>  	pidmap_init();
+>  	anon_vma_init();
+> -	acpi_early_init();
+>  #ifdef CONFIG_X86
+>  	if (efi_enabled(EFI_RUNTIME_SERVICES))
+>  		efi_enter_virtual_mode();
+>
