@@ -1,34 +1,119 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 18:58:30 +0800
-Subject: [PATCH 01/12] usb: mtu3: fix error return code in ssusb_gadget_init()
-Message-ID: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
+Date: Wed, 27 Sep 2017 18:58:31 +0800
+Subject: [PATCH 02/12] usb: mtu3: support option to disable usb3 ports
+In-Reply-To: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
+References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
+Message-ID: <fb29854f0aaf32fca65d5c52b1968e4a1e01553c.1506509658.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When fail to get irq number, platform_get_irq() may return
--EPROBE_DEFER, but we ignore it and always return -ENODEV,
-so fix it.
+Add support to disable specific usb3 ports, it's useful when
+usb3 phy is shared with PCIe or SATA, because we should disable
+the corresponding usb3 port if the phy is used by PCIe or SATA.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3_core.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/mtu3/mtu3.h      |    3 +++
+ drivers/usb/mtu3/mtu3_host.c |   16 +++++++++++++---
+ drivers/usb/mtu3/mtu3_plat.c |    8 ++++++--
+ 3 files changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index 99c65b0..9475798 100644
---- a/drivers/usb/mtu3/mtu3_core.c
-+++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -774,9 +774,9 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
- 		return -ENOMEM;
+diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
+index b26fffc..112723d 100644
+--- a/drivers/usb/mtu3/mtu3.h
++++ b/drivers/usb/mtu3/mtu3.h
+@@ -210,6 +210,8 @@ struct otg_switch_mtk {
+  *		host only, device only or dual-role mode
+  * @u2_ports: number of usb2.0 host ports
+  * @u3_ports: number of usb3.0 host ports
++ * @u3p_dis_msk: mask of disabling usb3 ports, for example, bit0==1 to
++ *		disable u3port0, bit1==1 to disable u3port1,... etc
+  * @dbgfs_root: only used when supports manual dual-role switch via debugfs
+  * @wakeup_en: it's true when supports remote wakeup in host mode
+  * @wk_deb_p0: port0's wakeup debounce clock
+@@ -232,6 +234,7 @@ struct ssusb_mtk {
+ 	bool is_host;
+ 	int u2_ports;
+ 	int u3_ports;
++	int u3p_dis_msk;
+ 	struct dentry *dbgfs_root;
+ 	/* usb wakeup for host mode */
+ 	bool wakeup_en;
+diff --git a/drivers/usb/mtu3/mtu3_host.c b/drivers/usb/mtu3/mtu3_host.c
+index e42d308..4dd9508 100644
+--- a/drivers/usb/mtu3/mtu3_host.c
++++ b/drivers/usb/mtu3/mtu3_host.c
+@@ -151,6 +151,7 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
+ 	void __iomem *ibase = ssusb->ippc_base;
+ 	int num_u3p = ssusb->u3_ports;
+ 	int num_u2p = ssusb->u2_ports;
++	int u3_ports_disabed;
+ 	u32 check_clk;
+ 	u32 value;
+ 	int i;
+@@ -158,8 +159,14 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
+ 	/* power on host ip */
+ 	mtu3_clrbits(ibase, U3D_SSUSB_IP_PW_CTRL1, SSUSB_IP_HOST_PDN);
  
- 	mtu->irq = platform_get_irq(pdev, 0);
--	if (mtu->irq <= 0) {
-+	if (mtu->irq < 0) {
- 		dev_err(dev, "fail to get irq number\n");
--		return -ENODEV;
-+		return mtu->irq;
+-	/* power on and enable all u3 ports */
++	/* power on and enable u3 ports except skipped ones */
++	u3_ports_disabed = 0;
+ 	for (i = 0; i < num_u3p; i++) {
++		if ((0x1 << i) & ssusb->u3p_dis_msk) {
++			u3_ports_disabed++;
++			continue;
++		}
++
+ 		value = mtu3_readl(ibase, SSUSB_U3_CTRL(i));
+ 		value &= ~(SSUSB_U3_PORT_PDN | SSUSB_U3_PORT_DIS);
+ 		value |= SSUSB_U3_PORT_HOST_SEL;
+@@ -175,7 +182,7 @@ int ssusb_host_enable(struct ssusb_mtk *ssusb)
  	}
- 	dev_info(dev, "irq %d\n", mtu->irq);
  
+ 	check_clk = SSUSB_XHCI_RST_B_STS;
+-	if (num_u3p)
++	if (num_u3p > u3_ports_disabed)
+ 		check_clk = SSUSB_U3_MAC_RST_B_STS;
+ 
+ 	return ssusb_check_clocks(ssusb, check_clk);
+@@ -190,8 +197,11 @@ int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
+ 	int ret;
+ 	int i;
+ 
+-	/* power down and disable all u3 ports */
++	/* power down and disable u3 ports except skipped ones */
+ 	for (i = 0; i < num_u3p; i++) {
++		if ((0x1 << i) & ssusb->u3p_dis_msk)
++			continue;
++
+ 		value = mtu3_readl(ibase, SSUSB_U3_CTRL(i));
+ 		value |= SSUSB_U3_PORT_PDN;
+ 		value |= suspend ? 0 : SSUSB_U3_PORT_DIS;
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 088e3e6..9edad30 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -276,6 +276,10 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	if (ret)
+ 		return ret;
+ 
++	/* optional property, ignore the error if it does not exist */
++	of_property_read_u32(node, "mediatek,u3p-dis-msk",
++			     &ssusb->u3p_dis_msk);
++
+ 	if (ssusb->dr_mode != USB_DR_MODE_OTG)
+ 		return 0;
+ 
+@@ -304,8 +308,8 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 		}
+ 	}
+ 
+-	dev_info(dev, "dr_mode: %d, is_u3_dr: %d\n",
+-		ssusb->dr_mode, otg_sx->is_u3_drd);
++	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, u3p_dis_msk:%x\n",
++		ssusb->dr_mode, otg_sx->is_u3_drd, ssusb->u3p_dis_msk);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
