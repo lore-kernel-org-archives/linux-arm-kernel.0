@@ -1,28 +1,16 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 27 Sep 2017 14:23:34 -0700
-Subject: [PATCH] MAINTAINERS: Remove myself as reviewer
-Message-ID: <20170927212334.28124-1-soren.brinkmann@xilinx.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Sep 2017 23:24:09 +0200
+Subject: [GIT PULL] DTS updates for the Integrator PCIv3 driver
+Message-ID: <CACRpkdZ0X1OiC6gogxD9EGkoMbY2yy81PPyrTWU-74ego9m+vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This address is gonna bounce in the not too far away future.
+Hi ARM SoC folks,
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- MAINTAINERS | 1 -
- 1 file changed, 1 deletion(-)
+these are some three patches readying the Integrator/AP device tree to work
+properly with the modernized and corrected PCIv3 driver.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index dc3ff3aaa588..4502f016be12 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2161,7 +2161,6 @@ F:	sound/soc/zte/
- 
- ARM/ZYNQ ARCHITECTURE
- M:	Michal Simek <michal.simek@xilinx.com>
--R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://wiki.xilinx.com
- T:	git https://github.com/Xilinx/linux-xlnx.git
--- 
-2.14.1.3.g5766cf452
+Please pull them in for DTS changes.
+
+Yours,
+Linus Walleij
