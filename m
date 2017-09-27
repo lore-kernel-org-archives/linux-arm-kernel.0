@@ -1,146 +1,61 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 17:23:02 +0800
-Subject: [PATCH 6/9] usb: xhci-mtk: add optional mcu and dma bus clocks
+Date: Wed, 27 Sep 2017 17:22:58 +0800
+Subject: [PATCH 2/9] usb: xhci-mtk: use ports count from xhci in
+ xhci_mtk_sch_init()
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-Message-ID: <3f81e076f513ef7d3e3e20ba2f752ed5bd48c9a2.1506503879.git.chunfeng.yun@mediatek.com>
+Message-ID: <2a1d5bad7e63918e1bfdaa7bb328594d36567d9d.1506503879.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are mcu_bus and dma_bus clocks needed to be controlled by
-driver on some SoCs, so add them as optional ones
+Make use of ports count from xhci but not from ippc in
+xhci_mtk_sch_init()
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk.c |   79 ++++++++++++++++++++++++++++++++-----------
- drivers/usb/host/xhci-mtk.h |    2 ++
- 2 files changed, 62 insertions(+), 19 deletions(-)
+ drivers/usb/host/xhci-mtk-sch.c |    3 ++-
+ drivers/usb/host/xhci-mtk.c     |    3 ---
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/usb/host/xhci-mtk-sch.c b/drivers/usb/host/xhci-mtk-sch.c
+index 6e7ddf6..bfc51bc 100644
+--- a/drivers/usb/host/xhci-mtk-sch.c
++++ b/drivers/usb/host/xhci-mtk-sch.c
+@@ -287,12 +287,13 @@ static bool need_bw_sch(struct usb_host_endpoint *ep,
+ 
+ int xhci_mtk_sch_init(struct xhci_hcd_mtk *mtk)
+ {
++	struct xhci_hcd *xhci = hcd_to_xhci(mtk->hcd);
+ 	struct mu3h_sch_bw_info *sch_array;
+ 	int num_usb_bus;
+ 	int i;
+ 
+ 	/* ss IN and OUT are separated */
+-	num_usb_bus = mtk->num_u3_ports * 2 + mtk->num_u2_ports;
++	num_usb_bus = xhci->num_usb3_ports * 2 + xhci->num_usb2_ports;
+ 
+ 	sch_array = kcalloc(num_usb_bus, sizeof(*sch_array), GFP_KERNEL);
+ 	if (sch_array == NULL)
 diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index d60463c..e5caabe 100644
+index c197a6d..9502ca4 100644
 --- a/drivers/usb/host/xhci-mtk.c
 +++ b/drivers/usb/host/xhci-mtk.c
-@@ -221,6 +221,44 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
- 	return xhci_mtk_host_enable(mtk);
- }
- 
-+/* ignore the error if the clock does not exist */
-+static struct clk *optional_clk_get(struct device *dev, const char *id)
-+{
-+	struct clk *opt_clk;
-+
-+	opt_clk = devm_clk_get(dev, id);
-+	/* ignore error number except EPROBE_DEFER */
-+	if (IS_ERR(opt_clk) && (PTR_ERR(opt_clk) != -EPROBE_DEFER))
-+		opt_clk = NULL;
-+
-+	return opt_clk;
-+}
-+
-+static int xhci_mtk_clks_get(struct xhci_hcd_mtk *mtk)
-+{
-+	struct device *dev = mtk->dev;
-+
-+	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
-+	if (IS_ERR(mtk->sys_clk)) {
-+		dev_err(dev, "fail to get sys_ck\n");
-+		return PTR_ERR(mtk->sys_clk);
-+	}
-+
-+	mtk->ref_clk = optional_clk_get(dev, "ref_ck");
-+	if (IS_ERR(mtk->ref_clk))
-+		return PTR_ERR(mtk->ref_clk);
-+
-+	mtk->mcu_clk = optional_clk_get(dev, "mcu_ck");
-+	if (IS_ERR(mtk->mcu_clk))
-+		return PTR_ERR(mtk->mcu_clk);
-+
-+	mtk->dma_clk = optional_clk_get(dev, "dma_ck");
-+	if (IS_ERR(mtk->dma_clk))
-+		return PTR_ERR(mtk->dma_clk);
-+
-+	return 0;
-+}
-+
- static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+@@ -492,7 +492,6 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+ /* called during probe() after chip reset completes */
+ static int xhci_mtk_setup(struct usb_hcd *hcd)
  {
+-	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
  	int ret;
-@@ -237,16 +275,34 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
- 		goto sys_clk_err;
- 	}
  
-+	ret = clk_prepare_enable(mtk->mcu_clk);
-+	if (ret) {
-+		dev_err(mtk->dev, "failed to enable mcu_clk\n");
-+		goto mcu_clk_err;
-+	}
-+
-+	ret = clk_prepare_enable(mtk->dma_clk);
-+	if (ret) {
-+		dev_err(mtk->dev, "failed to enable dma_clk\n");
-+		goto dma_clk_err;
-+	}
-+
- 	return 0;
+@@ -507,8 +506,6 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ 		return ret;
  
-+dma_clk_err:
-+	clk_disable_unprepare(mtk->mcu_clk);
-+mcu_clk_err:
-+	clk_disable_unprepare(mtk->sys_clk);
- sys_clk_err:
- 	clk_disable_unprepare(mtk->ref_clk);
- ref_clk_err:
--	return -EINVAL;
-+	return ret;
- }
- 
- static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
- {
-+	clk_disable_unprepare(mtk->dma_clk);
-+	clk_disable_unprepare(mtk->mcu_clk);
- 	clk_disable_unprepare(mtk->sys_clk);
- 	clk_disable_unprepare(mtk->ref_clk);
- }
-@@ -529,24 +585,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 		return PTR_ERR(mtk->vusb33);
- 	}
- 
--	mtk->sys_clk = devm_clk_get(dev, "sys_ck");
--	if (IS_ERR(mtk->sys_clk)) {
--		dev_err(dev, "fail to get sys_ck\n");
--		return PTR_ERR(mtk->sys_clk);
--	}
--
--	/*
--	 * reference clock is usually a "fixed-clock", make it optional
--	 * for backward compatibility and ignore the error if it does
--	 * not exist.
--	 */
--	mtk->ref_clk = devm_clk_get(dev, "ref_ck");
--	if (IS_ERR(mtk->ref_clk)) {
--		if (PTR_ERR(mtk->ref_clk) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
--
--		mtk->ref_clk = NULL;
--	}
-+	ret = xhci_mtk_clks_get(mtk);
-+	if (ret)
-+		return ret;
- 
- 	mtk->lpm_support = of_property_read_bool(node, "usb3-lpm-capable");
- 	/* optional property, ignore the error if it does not exist */
-diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
-index 67783a7..45ff5c6 100644
---- a/drivers/usb/host/xhci-mtk.h
-+++ b/drivers/usb/host/xhci-mtk.h
-@@ -126,6 +126,8 @@ struct xhci_hcd_mtk {
- 	struct regulator *vbus;
- 	struct clk *sys_clk;	/* sys and mac clock */
- 	struct clk *ref_clk;
-+	struct clk *mcu_clk;
-+	struct clk *dma_clk;
- 	struct regmap *pericfg;
- 	struct phy **phys;
- 	int num_phys;
+ 	if (usb_hcd_is_primary_hcd(hcd)) {
+-		mtk->num_u3_ports = xhci->num_usb3_ports;
+-		mtk->num_u2_ports = xhci->num_usb2_ports;
+ 		ret = xhci_mtk_sch_init(mtk);
+ 		if (ret)
+ 			return ret;
 -- 
 1.7.9.5
