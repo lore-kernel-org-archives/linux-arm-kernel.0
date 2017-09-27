@@ -1,39 +1,38 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 27 Sep 2017 14:15:40 +0200
-Subject: [RFC] iommu: arm-smmu: stall support
-In-Reply-To: <CAF6AEGuh0FiNWEAmFm+7-7pc6MV5hKKz9cyA_J0d256bY-nYOQ@mail.gmail.com>
-References: <20170914194444.32551-1-robdclark@gmail.com>
- <20170919123038.GF8398@8bytes.org>
- <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
- <20170922090204.GJ8398@8bytes.org>
- <32e3ab2c-a996-c805-2a0d-a2e85deb3a50@arm.com>
- <CAF6AEGuh0FiNWEAmFm+7-7pc6MV5hKKz9cyA_J0d256bY-nYOQ@mail.gmail.com>
-Message-ID: <20170927121540.GL8398@8bytes.org>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed, 27 Sep 2017 20:26:42 +0800
+Subject: [PATCH] drm/rockchip: Fix memory leak in rockchip_drm_sys_resume()
+Message-ID: <20170927122642.18628-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Jean,
+Free the drm_atomic_state allocated by drm_atomic_helper_suspend().
 
-On Fri, Sep 22, 2017 at 02:42:44PM -0400, Rob Clark wrote:
-> I'm in favour if splitting the reporting *somehow*.. the two
-> approaches that seemed sane are:
-> 
-> 1) call fault handler from irq and having separate domain->resume()
-> called by the driver, potentially from a wq
-> 2) or having two fault callbacks, first called before wq and then
-> based on returned value, optionally 2nd callback called from wq
-> 
-> The first seemed less intrusive to me, but I'm flexible.
+Fixes: 5a5873830972 ("drm/rockchip: Use atomic PM helpers")
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-How about adding a flag to the fault-handler call-back that tells us
-whether it wants to sleep or not. If it wants, we call it from a wq, if
-not we call call it directly like we do today in the
-report_iommu_fault() function.
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-In any case we call iommu_ops->resume() when set on completion of the
-fault-handler either from the workqueue or report_iommu_fault itself.
-
-
-Regards,
-
-	Joerg
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index 76d63de5921d..80235b672deb 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -15,6 +15,7 @@
+  */
+ 
+ #include <drm/drmP.h>
++#include <drm/drm_atomic.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
+@@ -299,6 +300,7 @@ static int rockchip_drm_sys_resume(struct device *dev)
+ 
+ 	priv = drm->dev_private;
+ 	drm_atomic_helper_resume(drm, priv->state);
++	drm_atomic_state_put(priv->state);
+ 	rockchip_drm_fb_resume(drm);
+ 	drm_kms_helper_poll_enable(drm);
+ 
+-- 
+2.11.0
