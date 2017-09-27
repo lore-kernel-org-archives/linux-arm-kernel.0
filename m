@@ -1,77 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Sep 2017 15:08:41 +0100
-Subject: [PATCH] arm64: avoid instrumenting atomic_ll_sc.o
-In-Reply-To: <20170927092149.GB19753@arm.com>
-References: <1506448987-31070-1-git-send-email-mark.rutland@arm.com>
- <20170927092149.GB19753@arm.com>
-Message-ID: <20170927140840.GI32150@leverpostej>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Sep 2017 16:12:13 +0200
+Subject: [PATCH v6 11/11] of: mdio: Prevent of_mdiobus_register from
+ scanning mdio-mux nodes
+In-Reply-To: <20170927073414.17361-12-clabbe.montjoie@gmail.com>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+ <20170927073414.17361-12-clabbe.montjoie@gmail.com>
+Message-ID: <20170927141213.GF13516@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 10:21:49AM +0100, Will Deacon wrote:
-> On Tue, Sep 26, 2017 at 07:03:07PM +0100, Mark Rutland wrote:
-> > Our out-of-line atomics are built with a special calling convention,
-> > preventing pointless stack spilling, and allowing us to patch call sites
-> > with ARMv8.1 atomic instructions.
-> > 
-> > Instrumentation inserted by the compiler may result in calls to
-> > functions not following this special calling convention, resulting in
-> > registers being unexpectedly clobbered, and various problems resulting
-> > from this.
-> > 
-> > For example, if a kernel is built with KCOV and ARM64_LSE_ATOMICS, the
-> > compiler inserts calls to __sanitizer_cov_trace_pc in the prologues of
-> > the atomic functions. This has been observed to result in spurious
-> > cmpxchg failures, leading to a hang early on in the boot process.
-> > 
-> > This patch avoids such issues by preventing instrumentation of our
-> > out-of-line atomics.
+On Wed, Sep 27, 2017 at 09:34:14AM +0200, Corentin Labbe wrote:
+> Each child node of an MDIO node is scanned as a PHY when calling
+> of_mdiobus_register() givint the following result:
+> [   18.175379] mdio_bus stmmac-0: /soc/ethernet at 1c30000/mdio/mdio-mux has invalid PHY address
+> [   18.175408] mdio_bus stmmac-0: scan phy mdio-mux at address 0
+> [   18.175450] mdio_bus stmmac-0: scan phy mdio-mux at address 1
+> [...]
+> [   18.176420] mdio_bus stmmac-0: scan phy mdio-mux at address 30
+> [   18.176452] mdio_bus stmmac-0: scan phy mdio-mux at address 31
 > 
-> Why doesn't decorating them with "notrace" like we do via the __LL_SC_INLINE
-> macro help here? Do we just need to extend that somehow?
+> Since mdio-mux nodes are not PHY, this patch a way to to not scan
+> them.
 
-AFAICT, notrace only guarantees that profiling function calls won't be
-generated, and that won't inhibit KASAN, UBSAN, KCOV, etc.
+Hi Corentin
 
-I think we need __noinstrument / NOINSTRUMENT_obj.o helpers that inhibit
-*all* automated instrumentation, since there are a sufficient number of
-places where we want that (vdso, efi stub, hyp, etc).
+I still don't like this, but ...
 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/lib/Makefile | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-> > index a0abc14..8fea178 100644
-> > --- a/arch/arm64/lib/Makefile
-> > +++ b/arch/arm64/lib/Makefile
-> > @@ -17,5 +17,9 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
-> >  		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
-> >  		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
-> >  		   -fcall-saved-x18
-> > +GCOV_PROFILE_atomic_ll_sc.o	:= n
-> > +KASAN_SANITIZE_atomic_ll_sc.o	:= n
-> > +KCOV_INSTRUMENT_atomic_ll_sc.o	:= n
-> > +UBSAN_SANITIZE_atomic_ll_sc.o	:= n
 > 
-> Hmm... do we need similar things for the vDSO?
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  drivers/of/of_mdio.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+> index d94dd8b77abd..d90ddb0d90f2 100644
+> --- a/drivers/of/of_mdio.c
+> +++ b/drivers/of/of_mdio.c
+> @@ -190,6 +190,10 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
+>  	struct device_node *child;
+>  	bool scanphys = false;
+>  	int addr, rc;
+> +	static const struct of_device_id do_not_scan[] = {
+> +		{ .compatible = "mdio-mux" },
+> +		{}
+> +	};
 
-If it were written in C, yes.
+Please rename this to some less generic. What i don't want is other
+compatible strings added here. We want to make the exception for
+muxes, but nothing else. So something like compatible_muxes?
 
-> I can only spot the GCOV entry, and other architectures have a mixed
-> bag of these.
-
-I don't think we need that currently, given our vDSO is written in
-assembly. I think we cargo-culted that from x86, where the vDSO is
-written in C.
-
-> It would be nice if there was something a little less ad-hoc and error
-> prone provided by kbuild.
-
-I completely agree. I'll have a go at the noinstrument approach above.
-
-Thanks,
-Mark.
+       Andrew
