@@ -1,162 +1,173 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 27 Sep 2017 11:02:31 +0200
-Subject: [PATCH v9] ACPI / init: Invoke early ACPI initialization earlier
-In-Reply-To: <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
-References: <1505293975-26005-1-git-send-email-douly.fnst@cn.fujitsu.com>
- <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
-Message-ID: <20170927090231.god7clzl6cyoxoxa@pd.tnic>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Sep 2017 11:09:22 +0200
+Subject: [PATCH v2 07/10] dmaengine: sun6i: Retrieve channel count/max
+ request from devicetree
+In-Reply-To: <3154933.I7MMVk5mkV@sbruens-linux>
+References: <20170917031956.28010-1-stefan.bruens@rwth-aachen.de>
+ <6028407.VKu5LCmQv0@sbruens-linux>
+ <20170922213027.xpnaut3an5or6edl@flea.home>
+ <3154933.I7MMVk5mkV@sbruens-linux>
+Message-ID: <20170927090922.u2hnvgz7yi55sjl3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 05:17:54PM +0800, Dou Liyang wrote:
-> Linux uses acpi_early_init() to put the ACPI table management into the
-> late stage from the early stage. This two stages are different. the
-> mapped ACPI tables in early stage is temporary and should be unmapped,
-> but in late stage, it is permanent and don't need to be unmapped.
+On Sat, Sep 23, 2017 at 12:00:15AM +0000, Br?ns, Stefan wrote:
+> On Freitag, 22. September 2017 23:30:27 CEST Maxime Ripard wrote:
+> > On Tue, Sep 19, 2017 at 04:17:59PM +0000, Br?ns, Stefan wrote:
+> > > On Dienstag, 19. September 2017 16:25:08 CEST Maxime Ripard wrote:
+> > > > On Mon, Sep 18, 2017 at 02:09:43PM +0000, Br?ns, Stefan wrote:
+> > > > > On Montag, 18. September 2017 10:18:24 CEST you wrote:
+> > > > > > Hi,
+> > > > > > 
+> > > > > > On Sun, Sep 17, 2017 at 05:19:53AM +0200, Stefan Br?ns wrote:
+> > > > > > > +	ret = of_property_read_u32(np, "dma-channels",
+> > > > > > > &sdc->num_pchans);
+> > > > > > > +	if (ret && !sdc->num_pchans) {
+> > > > > > > +		dev_err(&pdev->dev, "Can't get dma-channels.\n");
+> > > > > > > +		return ret;
+> > > > > > > +	}
+> > > > > > > +
+> > > > > > > +	if (sdc->num_pchans > DMA_MAX_CHANNELS) {
+> > > > > > > +		dev_err(&pdev->dev, "Number of dma-channels out of range.
+> \n");
+> > > > > > > +		return -EINVAL;
+> > > > > > > +	}
+> > > > > > > +
+> > > > > > > +	ret = of_property_read_u32(np, "dma-requests",
+> > > > > > > &sdc->max_request);
+> > > > > > > +	if (ret && !sdc->max_request) {
+> > > > > > > +		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
+> > > > > > > +			 DMA_CHAN_MAX_DRQ);
+> > > > > > > +		sdc->max_request = DMA_CHAN_MAX_DRQ;
+> > > > > > > +	}
+> > > > > > > +
+> > > > > > > +	if (sdc->max_request > DMA_CHAN_MAX_DRQ) {
+> > > > > > > +		dev_err(&pdev->dev, "Value of dma-requests out of range.\n");
+> > > > > > > +		return -EINVAL;
+> > > > > > > +	}
+> > > > > > 
+> > > > > > I'm not really convinced about these two checks. They don't catch
+> > > > > > all
+> > > > > > errors (the range between the actual number of channels / DRQ and
+> > > > > > the
+> > > > > > maximum allowed per the registers), they might increase in the
+> > > > > > future
+> > > > > > too, and if we want to make that check actually working, we would
+> > > > > > have
+> > > > > > to duplicate the number of requests and channels into the driver.
+> > > > > 
+> > > > > 1. If these values increase, we have a new register layout and and
+> > > > > need a new compatible anyway.
+> > > > 
+> > > > And you want to store a new maximum attached to the compatible? Isn't
+> > > > that exactly the situation you're trying to get away from?
+> > > 
+> > > Yes, and no. H3, H5, A64 and R40 have the exact same register layout, but
+> > > different number of channels and ports. They could share a compatible (if
+> > > DMA channels were generalized), and we already have several register
+> > > offsets/ widths (implicitly via the callbacks) attached to the compatible
+> > > (so these don't need generalization via DT).
+> > > 
+> > > Now, we could also move everything that is currently attached to the
+> > > compatible, i.e. clock gate register offset, burst widths/lengths etc.
+> > > into
+> > > the devicetree binding, but that would just be too much.
+> > > 
+> > > The idea is to find a middle ground here, using common patterns in the
+> > > existing SoCs. The register layout has hardly changed, while the number of
+> > > DMA channels and ports changes all the time. Moving the number of DMA
+> > > channels and ports to the DT is trivial, and a pattern also found in
+> > > other DMA controller drivers.
+> > 
+> > I'm sorry, but the code is inconsistent here. You basically have two
+> > variables from one SoC to the other, the number of channels and
+> > requests.
+> > 
+> > In one case (channels), it mandates that the property is provided in
+> > the device tree, and doesn't default to anything.
+> > 
+> > In the other case (requests), the property is optional and it will
+> > provide a default. All that in 20 lines.
 > 
-> Originally, mapping and parsing the DMAR table should be in the late stage.
-> However, Initializing interrupt delivery mode earlier will move it into
-> the early stage. This causes an ACPI error warning when Linux reallocates
-> the ACPI root tables.
+> The channel number is a hardware property. Using more channels than the 
+> hardware provides is a bug. There is no default.
 > 
-> Commit b064a8fa77df ("ACPI / init: Switch over platform to the ACPI mode
-> later") splits the ACPI early initialization code into acpi_early_init()
-> and acpi_subsystem_init(). This makes acpi_early_init() more independently
+> The port/request is just some lax property to limit the resource allocation 
+> upfront. As long as the bindings of the different IP blocks (SPI, audio, ...) 
+> provide the correct port numbers, all required information is available.
+
+Using an improper request ID or out of bounds will be just as much as
+a bug. You will not get your DMA transfer to the proper device you
+were trying to, the data will not reach the device or memory, your
+driver will not work => a bug.
+
+It will not be for the same reasons, you will not overwrite other
+registers, but the end result is just the same: your transfer will not
+work.
+
+> > I guess we already reached that middle ground by providing them
+> > through the DT, we just have to make sure we remain consistent.
+> > 
+> > > *If* the number of dma channels and ports is ever increased,
+> > > exceeding the current maximum, this would amount to major changes in
+> > > the driver and maybe even warrant a completely new driver.
+> > > 
+> > > > > 2. As long as the the limits are adhered to, no other
+> > > > > registers/register
+> > > > > fields are overwritten. As the channel number and port are used to
+> > > > > calculate memory offsets bounds checking is IMHO a good idea.
+> > > > 
+> > > > And this is true for many other resources, starting with the one
+> > > > defined in reg. We don't error check every register range, clock
+> > > > index, reset line, interrupt, DMA channel, the memory size, etc. yet
+> > > > you could make the same argument.
+> > > > 
+> > > > The DT has to be right, and we have to trust it. Otherwise we can just
+> > > > throw it away.
+> > > 
+> > > So your argument here basically is - don't do any checks on DT provided
+> > > values, these are always correct. So, following this argument, not only
+> > > the
+> > > range check, but also the of_property_read return values should be
+> > > ignored, as the DT is correct, thus of_property_read will never return an
+> > > error.
+> > No, my argument is don't do a check if you can catch only half of the
+> > errors, and with no hope of fixing it.
+> > 
+> > The functions you mentionned have a 100% error catch rate. This is the
+> > difference.
+> > 
+> > > That clearly does not match the implementation of drivers throughout the
+> > > various subsystems for DT properties, which is in general - do all the
+> > > checks that can be done, trust everything you can not verify.
+> > 
+> > And my point is that we're falling into the latter here. You cannot
+> > verify it properly.
 > 
-> So, invoke acpi_early_init() earlier before late_time_init(), Keep the DMAR
-> be mapped and parsed in late stage like before.
+> Please check the following line:
 > 
-> Reported-by: Xiaolong Ye <xiaolong.ye@intel.com>
-> Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
-> Cc: linux-acpi at vger.kernel.org
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Zheng, Lv <lv.zheng@intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: linux-ia64 at vger.kernel.org
-> Cc: yinghai at kernel.org
-> Cc: bhe at redhat.com
-> Cc: bp at alien8.de
-> ---
->  init/main.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/dma/sun6i-dma.c#n951
 > 
-> diff --git a/init/main.c b/init/main.c
-> index 0ee9c686..2fb98a4 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -664,12 +664,12 @@ asmlinkage __visible void __init start_kernel(void)
->  	debug_objects_mem_init();
->  	setup_per_cpu_pageset();
->  	numa_policy_init();
-> +	acpi_early_init();
->  	if (late_time_init)
->  		late_time_init();
->  	calibrate_delay();
->  	pidmap_init();
->  	anon_vma_init();
-> -	acpi_early_init();
->  #ifdef CONFIG_X86
->  	if (efi_enabled(EFI_RUNTIME_SERVICES))
->  		efi_enter_virtual_mode();
-> -- 
+> Thats far from 100% - the highest allowed port for each SoC differs between RX 
+> and TX, and port allocation is sparse.
 
-Tested-by: Borislav Petkov <bp@suse.de>
+But until your patches, you *could* fix it and reach that 100%.
 
-This one fixes the early ioremap leak check I get here with tip/master:
+And I guess now we could indeed remove it.
 
-Debug warning: early ioremap leak of 1 areas detected.
-please boot with early_ioremap_debug and report the dmesg.
-------------[ cut here ]------------
-WARNING: CPU: 3 PID: 1 at mm/early_ioremap.c:98 check_early_ioremap_leak+0x31/0x39
-Modules linked in:
-CPU: 3 PID: 1 Comm: swapper/0 Not tainted 4.14.0-rc2+ #1
-Hardware name: LENOVO 2320CTO/2320CTO, BIOS G2ET86WW (2.06 ) 11/13/2012
-task: ffff8802138e0000 task.stack: ffffc90000c90000
-RIP: 0010:check_early_ioremap_leak+0x31/0x39
-RSP: 0000:ffffc90000c93ea8 EFLAGS: 00010296
-RAX: 0000000000000071 RBX: 0000000000000000 RCX: 0000000000000000
-RDX: ffff8802138e0000 RSI: 0000000000000001 RDI: 0000000000000282
-RBP: ffffffff82089d8e R08: ffffffff810cc9c5 R09: 0000000000000000
-R10: 0000000000000000 R11: 0000000000000000 R12: ffffffff82182d30
-R13: 0000000000000008 R14: ffffffff8205d7f6 R15: 0000000000000000
-FS:  0000000000000000(0000) GS:ffff88021d380000(0000) knlGS:0000000000000000
-CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-CR2: 0000000000000000 CR3: 0000000001c10001 CR4: 00000000001606e0
-Call Trace:
- do_one_initcall+0x4b/0x18c
- kernel_init_freeable+0x120/0x1a2
- ? rest_init+0xd0/0xd0
- kernel_init+0xa/0x100
- ret_from_fork+0x2a/0x40
-Code: d2 31 c0 48 83 3c d5 a0 3a 11 82 00 74 02 ff c0 48 ff c2 48 83 fa 08 75 ea 85 c0 74 15 89 c6 48 c7 c7 20 c7 a6 81 e8 bc 2b 04 ff <0f> ff b8 01 00 00 00 c3 0f 1f 44 00 00 41 57 48 89 f1 41 56 41 
----[ end trace f7d67c4805284a92 ]---
+Look, this discussion is going nowhere. I told you what the condition
+for my Acked-by was already.
 
-Booting with early_ioremap_debug showed this last ioremap call in the Intel
-iommu code ioremapping the DMAR table but not unmapping it:
-
-__early_ioremap(dafdb000, 00001000) [0] => 00000000 + ffffffffff200000
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 0 at mm/early_ioremap.c:161 __early_ioremap+0x150/0x17f
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.14.0-rc2+ #2
-Hardware name: LENOVO 2320CTO/2320CTO, BIOS G2ET86WW (2.06 ) 11/13/2012
-task: ffffffff81c15500 task.stack: ffffffff81c00000
-RIP: 0010:__early_ioremap+0x150/0x17f
-RSP: 0000:ffffffff81c03d70 EFLAGS: 00010282
-RAX: 0000000000000046 RBX: 00000000dafda000 RCX: 0000000000000000
-RDX: 0000000000000002 RSI: 0000000000000001 RDI: 0000000000000001
-RBP: 0000000000000001 R08: 0000000000000001 R09: 0000000000000000
-R10: 0000000000000000 R11: 0000000000000000 R12: 00000000dafdb000
-R13: 0000000000000000 R14: 0000000000000000 R15: 0000000000000000
-FS:  0000000000000000(0000) GS:ffff88021d200000(0000) knlGS:0000000000000000
-CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-CR2: ffff88021e5ff000 CR3: 0000000001c10001 CR4: 00000000000606b0
-Call Trace:
- acpi_tb_acquire_table+0x39/0x64
- acpi_tb_validate_table+0x21/0x33
- acpi_tb_get_table+0x25/0x5e
- acpi_get_table+0x59/0x82
- dmar_table_detect+0x1a/0x43
- dmar_table_init+0x73/0x13e
- ? dmar_free_dev_scope+0xe0/0xe0
- ? intel_iommu_setup+0x211/0x211
- ? iommu_calculate_agaw+0x20/0x20
- ? dmar_walk_remapping_entries+0x170/0x170
- ? detect_intel_iommu+0xca/0xca
- intel_prepare_irq_remapping+0x3a/0x22a
- irq_remapping_prepare+0x1a/0x2a
- enable_IR_x2apic+0x21/0x198
- default_setup_apic_routing+0x12/0x6f
- apic_intr_mode_init+0x14b/0x181
- x86_late_time_init+0x11/0x16
- start_kernel+0x3ae/0x44c
- secondary_startup_64+0xa5/0xa5
-Code: 1a 74 2b 42 ff 34 ed 20 3a 11 82 45 89 f0 48 c7 c6 90 df 81 81 48 c7 c7 c0 c7 a6 81 4c 8b 4c 24 08 48 8b 4c 24 10 e8 64 2a 04 ff <0f> ff 58 48 8b 04 24 4a 03 04 ed 20 3a 11 82 4a 89 04 ed a0 3a 
----[ end trace 52caafcde4fdbc68 ]---
-DMAR: Host address width 36
-DMAR: DRHD base: 0x000000fed90000 flags: 0x0
-DMAR: dmar0: reg_base_addr fed90000 ver 1:0 cap c0000020e60262 ecap f0101a
-DMAR: DRHD base: 0x000000fed91000 flags: 0x1
-DMAR: dmar1: reg_base_addr fed91000 ver 1:0 cap c9008020660262 ecap f0105a
-DMAR: RMRR base: 0x000000da2ba000 end: 0x000000da2d0fff
-DMAR: RMRR base: 0x000000db800000 end: 0x000000df9fffff
-DMAR-IR: IOAPIC id 2 under DRHD base  0xfed91000 IOMMU 1
-DMAR-IR: HPET id 0 under DRHD base 0xfed91000
-DMAR-IR: Queued invalidation will be enabled to support x2apic and Intr-remapping.
-DMAR-IR: Enabled IRQ remapping in x2apic mode
-x2apic enabled
-Switched APIC routing to cluster x2apic.
+Maxime
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170927/090b5c6d/attachment.sig>
