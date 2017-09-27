@@ -1,102 +1,96 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 27 Sep 2017 12:14:08 -0400
-Subject: [RFC] iommu: arm-smmu: stall support
-In-Reply-To: <4e2fc08e-3e7e-3355-17e5-72106196c732@arm.com>
-References: <20170914194444.32551-1-robdclark@gmail.com>
- <20170919123038.GF8398@8bytes.org>
- <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
- <20170922090204.GJ8398@8bytes.org>
- <32e3ab2c-a996-c805-2a0d-a2e85deb3a50@arm.com>
- <CAF6AEGuh0FiNWEAmFm+7-7pc6MV5hKKz9cyA_J0d256bY-nYOQ@mail.gmail.com>
- <20170927121540.GL8398@8bytes.org>
- <4e2fc08e-3e7e-3355-17e5-72106196c732@arm.com>
-Message-ID: <CAF6AEGvdsqhxGrLEDJ-fT72Rd1ANDYwdU08bYt26Gyr_BO=kuQ@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 27 Sep 2017 18:15:26 +0200
+Subject: [PATCH] clk/spear: Delete five error messages for a failed memory
+ allocation
+Message-ID: <4283fdab-7005-f774-9594-821582c5a9fb@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 9:49 AM, Jean-Philippe Brucker
-<jean-philippe.brucker@arm.com> wrote:
-> Hi Joerg,
->
-> On 27/09/17 13:15, Joerg Roedel wrote:
->> Hi Rob, Jean,
->>
->> On Fri, Sep 22, 2017 at 02:42:44PM -0400, Rob Clark wrote:
->>> I'm in favour if splitting the reporting *somehow*.. the two
->>> approaches that seemed sane are:
->>>
->>> 1) call fault handler from irq and having separate domain->resume()
->>> called by the driver, potentially from a wq
->>> 2) or having two fault callbacks, first called before wq and then
->>> based on returned value, optionally 2nd callback called from wq
->>>
->>> The first seemed less intrusive to me, but I'm flexible.
->>
->> How about adding a flag to the fault-handler call-back that tells us
->> whether it wants to sleep or not. If it wants, we call it from a wq, if
->> not we call call it directly like we do today in the
->> report_iommu_fault() function.
->>
->> In any case we call iommu_ops->resume() when set on completion of the
->> fault-handler either from the workqueue or report_iommu_fault itself.
->
-> I like this approach. When the device driver registers a fault handler,
-> it also tells when it would like to be called (either in atomic context,
-> blocking context, or both).
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 27 Sep 2017 18:00:21 +0200
 
-What I have in mind is still a case-by-case decision.  Ie. I'd decide
-if it is the first fault from a particular submit (job), in which case
-I'd want to schedule the wq, or if it is one of the 999 following
-faults from the same submit (in which case, skip the wq).
+Omit extra messages for a memory allocation failure in these functions.
 
-So a static decision when registering the fault handler doesn't work.
+This issue was detected by using the Coccinelle software.
 
-BR,
--R
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/clk/spear/clk-aux-synth.c  | 4 +---
+ drivers/clk/spear/clk-frac-synth.c | 4 +---
+ drivers/clk/spear/clk-gpt-synth.c  | 4 +---
+ drivers/clk/spear/clk-vco-pll.c    | 8 ++------
+ 4 files changed, 5 insertions(+), 15 deletions(-)
 
-
-> Then the handler itself receives a flag that says which context it's
-> being called from. It returns a value telling the IOMMU how to proceed.
-> Depending on this value we either resume/abort immediately, or add the
-> fault to the workqueue if necessary.
->
-> How about using the following return values:
->
-> /**
->  * enum iommu_fault_status - Return status of fault handlers, telling the IOMMU
->  *      driver how to proceed with the fault.
->  *
->  * @IOMMU_FAULT_STATUS_NONE: Fault was not handled. Call the next handler, or
->  *      terminate.
->  * @IOMMU_FAULT_STATUS_FAILURE: General error. Drop all subsequent faults from
->  *      this device if possible. This is "Response Failure" in PCI PRI.
->  * @IOMMU_FAULT_STATUS_INVALID: Could not handle this fault, don't retry the
->  *      access. This is "Invalid Request" in PCI PRI.
->  * @IOMMU_FAULT_STATUS_HANDLED: Fault has been handled and the page tables
->  *      populated, retry the access.
->  * @IOMMU_FAULT_STATUS_IGNORE: Stop processing the fault, and do not send a
->  *      reply to the device.
->  *
->  * For unrecoverable faults, the only valid status is IOMMU_FAULT_STATUS_NONE
->  * For a recoverable fault, if no one handled the fault, treat as
->  * IOMMU_FAULT_STATUS_INVALID.
->  */
-> enum iommu_fault_status {
->         IOMMU_FAULT_STATUS_NONE = 0,
->         IOMMU_FAULT_STATUS_FAILURE,
->         IOMMU_FAULT_STATUS_INVALID,
->         IOMMU_FAULT_STATUS_HANDLED,
->         IOMMU_FAULT_STATUS_IGNORE,
-> };
->
-> This would probably cover the two use-cases of reporting faults to
-> device drivers, and injecting them into the guest with VFIO, as well as
-> handling PPRs internally. I'm also working on providing more details
-> (pasid for instance) in the fault callback.
->
-> We could also use the fault handler for invalid PRI Page Requests
-> (currently specialized by amd_iommu_set_invalid_ppr_cb). It's just a
-> matter of adding a registration flag to iommu_set_fault_handler.
->
-> Thanks,
-> Jean
+diff --git a/drivers/clk/spear/clk-aux-synth.c b/drivers/clk/spear/clk-aux-synth.c
+index f271c350ef94..ee7a7c043e3b 100644
+--- a/drivers/clk/spear/clk-aux-synth.c
++++ b/drivers/clk/spear/clk-aux-synth.c
+@@ -149,10 +149,8 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
+ 	}
+ 
+ 	aux = kzalloc(sizeof(*aux), GFP_KERNEL);
+-	if (!aux) {
+-		pr_err("could not allocate aux clk\n");
++	if (!aux)
+ 		return ERR_PTR(-ENOMEM);
+-	}
+ 
+ 	/* struct clk_aux assignments */
+ 	if (!masks)
+diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
+index 58d678b5b40a..c48f3ed2d570 100644
+--- a/drivers/clk/spear/clk-frac-synth.c
++++ b/drivers/clk/spear/clk-frac-synth.c
+@@ -136,10 +136,8 @@ struct clk *clk_register_frac(const char *name, const char *parent_name,
+ 	}
+ 
+ 	frac = kzalloc(sizeof(*frac), GFP_KERNEL);
+-	if (!frac) {
+-		pr_err("could not allocate frac clk\n");
++	if (!frac)
+ 		return ERR_PTR(-ENOMEM);
+-	}
+ 
+ 	/* struct clk_frac assignments */
+ 	frac->reg = reg;
+diff --git a/drivers/clk/spear/clk-gpt-synth.c b/drivers/clk/spear/clk-gpt-synth.c
+index 1a722e99e76e..6e95d7f3ade9 100644
+--- a/drivers/clk/spear/clk-gpt-synth.c
++++ b/drivers/clk/spear/clk-gpt-synth.c
+@@ -125,10 +125,8 @@ struct clk *clk_register_gpt(const char *name, const char *parent_name, unsigned
+ 	}
+ 
+ 	gpt = kzalloc(sizeof(*gpt), GFP_KERNEL);
+-	if (!gpt) {
+-		pr_err("could not allocate gpt clk\n");
++	if (!gpt)
+ 		return ERR_PTR(-ENOMEM);
+-	}
+ 
+ 	/* struct clk_gpt assignments */
+ 	gpt->reg = reg;
+diff --git a/drivers/clk/spear/clk-vco-pll.c b/drivers/clk/spear/clk-vco-pll.c
+index dc21ca4601aa..e06b821fa60e 100644
+--- a/drivers/clk/spear/clk-vco-pll.c
++++ b/drivers/clk/spear/clk-vco-pll.c
+@@ -292,16 +292,12 @@ struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
+ 	}
+ 
+ 	vco = kzalloc(sizeof(*vco), GFP_KERNEL);
+-	if (!vco) {
+-		pr_err("could not allocate vco clk\n");
++	if (!vco)
+ 		return ERR_PTR(-ENOMEM);
+-	}
+ 
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("could not allocate pll clk\n");
++	if (!pll)
+ 		goto free_vco;
+-	}
+ 
+ 	/* struct clk_vco assignments */
+ 	vco->mode_reg = mode_reg;
+-- 
+2.14.2
