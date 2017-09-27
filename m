@@ -1,38 +1,65 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 27 Sep 2017 09:34:07 +0200
-Subject: [PATCH v6 04/11] net: stmmac: sun8i: Restore the compatibles
+Date: Wed, 27 Sep 2017 09:34:09 +0200
+Subject: [PATCH v6 06/11] ARM: dts: sunxi: h3/h5: represent the mdio switch
+ used by sun8i-h3-emac
 In-Reply-To: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
 References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170927073414.17361-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170927073414.17361-7-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch restore compatibles about dwmac-sun8i
-This reverts commit ad4540cc5aa3 ("net: stmmac: sun8i: Remove the compatibles")
+Since dwmac-sun8i could use either an integrated PHY or an external PHY
+(which could be at same MDIO address), we need to represent this selection
+by a MDIO switch.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 31 +++++++++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index 39c2122a4f26..fffd6d5fc907 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -979,6 +979,14 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- }
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 3b7d953429a6..a8e9b8f378ba 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -422,14 +422,33 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
  
- static const struct of_device_id sun8i_dwmac_match[] = {
-+	{ .compatible = "allwinner,sun8i-h3-emac",
-+		.data = &emac_variant_h3 },
-+	{ .compatible = "allwinner,sun8i-v3s-emac",
-+		.data = &emac_variant_v3s },
-+	{ .compatible = "allwinner,sun8i-a83t-emac",
-+		.data = &emac_variant_a83t },
-+	{ .compatible = "allwinner,sun50i-a64-emac",
-+		.data = &emac_variant_a64 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun8i_dwmac_match);
+-			mdio: mdio {
++			mdio0: mdio {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				int_mii_phy: ethernet-phy at 1 {
+-					compatible = "ethernet-phy-ieee802.3-c22";
+-					reg = <1>;
+-					clocks = <&ccu CLK_BUS_EPHY>;
+-					resets = <&ccu RST_BUS_EPHY>;
++				compatible = "snps,dwmac-mdio";
++
++				mdio-mux {
++					compatible = "mdio-mux";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					/* Only one MDIO is usable at the time */
++					internal_mdio: mdio at 1 {
++						reg = <1>;
++						#address-cells = <1>;
++						#size-cells = <0>;
++						int_mii_phy: ethernet-phy at 1 {
++							compatible = "ethernet-phy-ieee802.3-c22";
++							reg = <1>;
++							clocks = <&ccu CLK_BUS_EPHY>;
++							resets = <&ccu RST_BUS_EPHY>;
++							phy-is-integrated;
++						};
++					};
++					mdio: mdio at 2 {
++						reg = <2>;
++						#address-cells = <1>;
++						#size-cells = <0>;
++					};
+ 				};
+ 			};
+ 		};
 -- 
 2.13.5
