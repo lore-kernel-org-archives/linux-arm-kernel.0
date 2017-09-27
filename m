@@ -1,48 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 27 Sep 2017 23:18:09 +0800
-Subject: [PATCH v3 00/14] ARM: dts: sunxi: Fix DT build warnings
-In-Reply-To: <CAGb2v67=VyHd3n1PgT-2_2efUNijOM8TkwDO9oAQvUd8wYH-qg@mail.gmail.com>
-References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
- <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
- <20170926085855.7yn6zdx3sfuwwxyj@flea>
- <CAGb2v67=VyHd3n1PgT-2_2efUNijOM8TkwDO9oAQvUd8wYH-qg@mail.gmail.com>
-Message-ID: <CAGb2v67=Esq3mHkRhP6sBuzFtyDWjeON4Uwx93H5z2LMQ63eJA@mail.gmail.com>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Wed, 27 Sep 2017 23:37:18 +0800
+Subject: [PATCH v6 6/7] KVM: arm64: allow get exception information from
+ userspace
+In-Reply-To: <8be64586-3722-cd96-80fd-6e815d2e911d@huawei.com>
+References: <1503916701-13516-1-git-send-email-gengdongjiu@huawei.com>
+ <1503916701-13516-7-git-send-email-gengdongjiu@huawei.com>
+ <59B17438.5070501@arm.com> <2a42d1ea-3456-2873-c9ea-d8a027b59789@huawei.com>
+ <59BA7D72.4090403@arm.com> <92f2fecc-9833-15e4-30cc-b4dd5ba93cb7@huawei.com>
+ <59C53FA7.2080803@arm.com> <8be64586-3722-cd96-80fd-6e815d2e911d@huawei.com>
+Message-ID: <CAMj-D2AuCqAgQBRAp2CSf24HsHWteNLigZAUEKK8oKL_SAmBNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 9:01 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Tue, Sep 26, 2017 at 4:58 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Tue, Sep 26, 2017 at 07:48:17AM +0000, Chen-Yu Tsai wrote:
->>> On Tue, Sep 26, 2017 at 3:22 PM, Corentin Labbe
->>> <clabbe.montjoie@gmail.com> wrote:
->>> > Hello
->>> >
->>> > The goal of this patch series is to have a clean DT build with W=1.
->>> >
->>> > Regards
->>> >
->>> > Changes since v1:
->>> > - moved i2c2 unit address change from patch #2 in patch #1
->>> >
->>> > Changes since v2
->>> > - added two patch for fixing pin names
->>>
->>> The first twelve patches are good. Maxime, I think we can go ahead and
->>> merge them, instead of having them resent again in v3?
+>> What you may be seeing is some awkwardness with the change in the SError ESR
+>> with v8.2. Previously the VSE mechanism injected an impdef SError, (but they
+>> were all impdef so it didn't matter).
+>> With VSESR_EL2 KVM has to specify one, and all-zeros is a bad choice as this
+>> means 'classified as a RAS error ... unknown!'.
 >>
->> Yep, that works for me. Can you push them?
+>> I have a patch in the upcoming SError/RAS series that changes KVMs virtual-abort
+>> code to specify an impdef ESR for this path.
+> Before I remember Marc and you suggest me specify the an impdef ESR (set the vsesr_el2) in
+> the userspace,
+
+I pasted Marc's propose and your suggestion that set VSESR_EL2(specify
+virtual SError syndrome) by the user space.
+https://lkml.org/lkml/2017/3/20/441
+https://lkml.org/lkml/2017/3/20/516
+
+
+> now do you want to specify an impdef ESR in KVM instead of usrspace?
+> if setting the vsesr_el2 in the KVM, whether user-space need to specify?
+> May be we can combine the patches that specify an impdef ESR(set vsesr_el2) patch to one.
 >
-> Patches 1 and 12 didn't apply cleanly. I fixed them.
-
-Patch 10 didn't apply cleanly either. I fixed it.
-
-> Patches 4~9 do the same type of cleanup for various h3 board dts files.
-> Maybe we should just squash them together. Arnd seems to prefer squashing
-> identical changes to different boards together.
-
-Squashed them and mentioned it in the commit message.
-
-Please check the sunxi tree on git.kernel.org if the results are correct.
-
-ChenYu
