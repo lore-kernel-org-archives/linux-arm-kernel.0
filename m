@@ -1,36 +1,207 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 27 Sep 2017 17:04:05 +0930
-Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
-In-Reply-To: <CACPK8Xd8RQ4s1xMsSuxHgQRiHS6vDtxVTAxu8Ba3J3it45MC5g@mail.gmail.com>
-References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-4-joel@jms.id.au> <1506343255.30138.29.camel@aj.id.au>
- <CACPK8Xd8RQ4s1xMsSuxHgQRiHS6vDtxVTAxu8Ba3J3it45MC5g@mail.gmail.com>
-Message-ID: <1506497645.30138.37.camel@aj.id.au>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 27 Sep 2017 09:34:08 +0200
+Subject: [PATCH v6 05/11] dt-bindings: net: dwmac-sun8i: update documentation
+ about integrated PHY
+In-Reply-To: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170927073414.17361-6-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-09-27 at 16:13 +1000, Joel Stanley wrote:
-> > > +???????????????????? div_table,
-> > 
-> > This doesn't seem to be correct. There's the problem of 0b000 and 0b001 mapping
-> > the same value of 2 for the AST2500, whose table then increments in steps of 1.
-> > The AST2400 mapping on the otherhand is multiples of 2 starting at 2, with no
-> > inconsistency for 0b000 vs 0b001.
-> 
-> Yep, we do use a different table for ast2400 vs ast2500. See
-> ast2400_div_table vs ast2500_div_table.
+This patch add documentation about the MDIO switch used on sun8i-h3-emac
+for integrated PHY.
 
-Yep, but for the AST2500 this is a different table again to what you've
-already defined (for the AST2500). However, for the AST2400 the table
-looks the same as the other AST2400 tables.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 138 +++++++++++++++++++--
+ 1 file changed, 126 insertions(+), 12 deletions(-)
 
-Cheers,
-
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170927/f60dc2e6/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+index 725f3b187886..e2ef4683df08 100644
+--- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -4,18 +4,18 @@ This device is a platform glue layer for stmmac.
+ Please see stmmac.txt for the other unchanged properties.
+ 
+ Required properties:
+-- compatible: should be one of the following string:
++- compatible: must be one of the following string:
+ 		"allwinner,sun8i-a83t-emac"
+ 		"allwinner,sun8i-h3-emac"
+ 		"allwinner,sun8i-v3s-emac"
+ 		"allwinner,sun50i-a64-emac"
+ - reg: address and length of the register for the device.
+ - interrupts: interrupt for the device
+-- interrupt-names: should be "macirq"
++- interrupt-names: must be "macirq"
+ - clocks: A phandle to the reference clock for this device
+-- clock-names: should be "stmmaceth"
++- clock-names: must be "stmmaceth"
+ - resets: A phandle to the reset control for this device
+-- reset-names: should be "stmmaceth"
++- reset-names: must be "stmmaceth"
+ - phy-mode: See ethernet.txt
+ - phy-handle: See ethernet.txt
+ - #address-cells: shall be 1
+@@ -39,23 +39,38 @@ Optional properties for the following compatibles:
+ - allwinner,leds-active-low: EPHY LEDs are active low
+ 
+ Required child node of emac:
+-- mdio bus node: should be named mdio
++- mdio bus node: with compatible "snps,dwmac-mdio"
+ 
+ Required properties of the mdio node:
+ - #address-cells: shall be 1
+ - #size-cells: shall be 0
+ 
+-The device node referenced by "phy" or "phy-handle" should be a child node
++The device node referenced by "phy" or "phy-handle" must be a child node
+ of the mdio node. See phy.txt for the generic PHY bindings.
+ 
+-Required properties of the phy node with the following compatibles:
++The following compatibles require that the mdio node have a mdio-mux child
++node called "mdio-mux":
++  - "allwinner,sun8i-h3-emac"
++  - "allwinner,sun8i-v3s-emac":
++Required properties for the mdio-mux node:
++  - compatible = "mdio-mux"
++  - one child mdio for the integrated mdio
++  - one child mdio for the external mdio if present (V3s have none)
++Required properties for the mdio-mux children node:
++  - reg: 1 for internal MDIO bus, 2 for external MDIO bus
++
++The following compatibles require a PHY node representing the integrated
++PHY, under the integrated MDIO bus node if an mdio-mux node is used:
+   - "allwinner,sun8i-h3-emac",
+   - "allwinner,sun8i-v3s-emac":
++
++Required properties of the integrated phy node:
+ - clocks: a phandle to the reference clock for the EPHY
+ - resets: a phandle to the reset control for the EPHY
++- phy-is-integrated
++- Must be a child of the integrated mdio
+ 
+-Example:
+-
++Example with integrated PHY:
+ emac: ethernet at 1c0b000 {
+ 	compatible = "allwinner,sun8i-h3-emac";
+ 	syscon = <&syscon>;
+@@ -72,13 +87,112 @@ emac: ethernet at 1c0b000 {
+ 	phy-handle = <&int_mii_phy>;
+ 	phy-mode = "mii";
+ 	allwinner,leds-active-low;
++
++	mdio0: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++
++		mdio-mux {
++			compatible = "mdio-mux";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			int_mdio: mdio at 1 {
++				reg = <1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				int_mii_phy: ethernet-phy at 1 {
++					reg = <1>;
++					clocks = <&ccu CLK_BUS_EPHY>;
++					resets = <&ccu RST_BUS_EPHY>;
++					phy-is-integrated;
++				};
++			};
++			ext_mdio: mdio at 2 {
++				reg = <2>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++	};
++};
++
++Example with external PHY:
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-h3-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	allwinner,leds-active-low;
++
++	mdio0: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++
++		mdio-mux {
++			compatible = "mdio-mux";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			int_mdio: mdio at 1 {
++				reg = <1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				int_mii_phy: ethernet-phy at 1 {
++					reg = <1>;
++					clocks = <&ccu CLK_BUS_EPHY>;
++					resets = <&ccu RST_BUS_EPHY>;
++					phy-is-integrated;
++				};
++			};
++			ext_mdio: mdio at 2 {
++				reg = <2>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				ext_rgmii_phy: ethernet-phy at 1 {
++					reg = <1>;
++				};
++			}:
++		};
++	};
++};
++
++Example with SoC without integrated PHY
++
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-a83t-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++
+ 	mdio: mdio {
++		compatible = "snps,dwmac-mdio";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		int_mii_phy: ethernet-phy at 1 {
++		ext_rgmii_phy: ethernet-phy at 1 {
+ 			reg = <1>;
+-			clocks = <&ccu CLK_BUS_EPHY>;
+-			resets = <&ccu RST_BUS_EPHY>;
+ 		};
+ 	};
+ };
+-- 
+2.13.5
