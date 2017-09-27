@@ -1,36 +1,59 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Wed, 27 Sep 2017 20:50:17 +0800
-Subject: [PATCH v4 1/4] ACPI, CPER: add arm error info type definition
+Date: Wed, 27 Sep 2017 20:50:20 +0800
+Subject: [PATCH v4 4/4] arm64/ras: save error address from memory section for
+ recovery
 In-Reply-To: <1506516620-20033-1-git-send-email-xiexiuqi@huawei.com>
 References: <1506516620-20033-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1506516620-20033-2-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1506516620-20033-5-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add arm error info type definition according to ACPI6.1
-Table 261. ARM Processor Error Information Structure,
-which is used for error recovery in the following patches.
+In some platform, when SEA triggerred, physical address might be
+reported by memory section, so we save it for error recovery later.
 
 Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
 ---
- include/linux/cper.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/kernel/ras.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/include/linux/cper.h b/include/linux/cper.h
-index 723e952..9106e2b 100644
---- a/include/linux/cper.h
-+++ b/include/linux/cper.h
-@@ -275,6 +275,11 @@ enum {
- #define CPER_ARM_INFO_FLAGS_PROPAGATED		BIT(2)
- #define CPER_ARM_INFO_FLAGS_OVERFLOW		BIT(3)
- 
-+#define CPER_ARM_INFO_TYPE_CACHE		0
-+#define CPER_ARM_INFO_TYPE_TLB			1
-+#define CPER_ARM_INFO_TYPE_BUS			2
-+#define CPER_ARM_INFO_TYPE_UARCH		3
+diff --git a/arch/arm64/kernel/ras.c b/arch/arm64/kernel/ras.c
+index c48503c..ff24181 100644
+--- a/arch/arm64/kernel/ras.c
++++ b/arch/arm64/kernel/ras.c
+@@ -140,3 +140,34 @@ void ghes_arm_process_error(struct ghes *ghes, struct cper_sec_proc_arm *err)
+ 	if (info_saved)
+ 		set_thread_flag(TIF_SEA_NOTIFY);
+ }
 +
- /*
-  * All tables and structs must be byte-packed to match CPER
-  * specification, since the tables are provided by the system BIOS
++int ghes_mem_err_callback(struct notifier_block *nb, unsigned long val, void *data)
++{
++	bool info_saved = false;
++	struct ghes_mem_err *ghes_mem = (struct ghes_mem_err *)data;
++	struct cper_sec_mem_err *mem_err = ghes_mem->mem_err;
++
++	if ((ghes_mem->notify_type != ACPI_HEST_NOTIFY_SEA) ||
++	    (ghes_mem->severity != CPER_SEV_RECOVERABLE))
++		return 0;
++
++	if (mem_err->validation_bits & CPER_MEM_VALID_PA)
++		info_saved = sea_save_info(mem_err->physical_addr);
++
++	if (info_saved)
++		set_thread_flag(TIF_SEA_NOTIFY);
++
++	return 0;
++}
++
++static struct notifier_block ghes_mem_err_nb = {
++	.notifier_call	= ghes_mem_err_callback,
++};
++
++static int arm64_err_recov_init(void)
++{
++	atomic_notifier_chain_register(&ghes_mem_err_chain, &ghes_mem_err_nb);
++	return 0;
++}
++
++late_initcall(arm64_err_recov_init);
 -- 
 1.8.3.1
