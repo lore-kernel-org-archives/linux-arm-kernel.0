@@ -1,137 +1,206 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 27 Sep 2017 16:11:15 +1000
-Subject: [PATCH v2 1/5] clk: Add clock driver for ASPEED BMC SoCs
-In-Reply-To: <1506310811.30138.15.camel@aj.id.au>
+Date: Wed, 27 Sep 2017 16:13:07 +1000
+Subject: [PATCH v2 2/5] clk: aspeed: Register core clocks
+In-Reply-To: <1506340924.30138.26.camel@aj.id.au>
 References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-2-joel@jms.id.au>
- <1506310811.30138.15.camel@aj.id.au>
-Message-ID: <CACPK8XeQz=63PyEEC8947ppBa3UAJ0u5Na_oT6aHGk3OurKCJw@mail.gmail.com>
+ <20170921042641.7326-3-joel@jms.id.au>
+ <1506340924.30138.26.camel@aj.id.au>
+Message-ID: <CACPK8XcmwypP9HfjKKKYk55589Z0GGSa8mc=Uswzu6Dg01KwLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 25, 2017 at 1:40 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+On Mon, Sep 25, 2017 at 10:02 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
 
->> +struct aspeed_clk_gate {
->> +     struct clk_hw   hw;
->> +     struct regmap   *map;
->> +     u8              clock_idx;
->> +     s8              reset_idx;
->> +     u8              flags;
->> +     spinlock_t      *lock;
+>> +static const struct clk_div_table ast2400_div_table[] = {
+>> +     { 0x0, 2 },
+>> +     { 0x1, 4 },
+>> +     { 0x2, 6 },
+>> +     { 0x3, 8 },
+>> +     { 0x4, 10 },
+>> +     { 0x5, 12 },
+>> +     { 0x6, 14 },
+>> +     { 0x7, 16 },
+>> +     { 0 }
+>> +};
+>> +
+>> +static const struct clk_div_table ast2500_div_table[] = {
+>> +     { 0x0, 4 },
+>> +     { 0x1, 8 },
+>> +     { 0x2, 12 },
+>> +     { 0x3, 16 },
+>> +     { 0x4, 20 },
+>> +     { 0x5, 24 },
+>> +     { 0x6, 28 },
+>> +     { 0x7, 32 },
+>> +     { 0 }
 >> +};
 >
-> It feels like the two structures could be unified, but the result turns into a
-> bit of a mess with a union of structs to limit the space impact, so perhaps we
-> shouldn't go there?
+> ast2500_div_table is unused?
 
-I agree; it's not going to make it any easier to read so lets leave it as is.
+In this patch, yeah. It gets used in the next one. I defined it next
+to the ast2400_div_table so that it is clear why we need the separate
+ones.
 
->
+>> +static void __init aspeed_ast2400_cc(struct regmap *map)
+>> +{
+>> +     struct clk_hw *hw;
+>> +     u32 val, div, mult;
 >> +
->> +#define to_aspeed_clk_gate(_hw) container_of(_hw, struct aspeed_clk_gate, hw)
->> +
->> +/* TODO: ask Aspeed about the actual parent data */
->> +static const struct aspeed_gate_data aspeed_gates[] __initconst = {
->> +/*    clk rst   name                 parent          flags   */
->> +     {  0, -1, "eclk-gate",          "eclk",         0 }, /* Video Engine */
->> +     {  1,  7, "gclk-gate",          NULL,           0 }, /* 2D engine */
->> +     {  2, -1, "mclk-gate",          "mpll",         CLK_IS_CRITICAL }, /* SDRAM */
->> +     {  3,  6, "vclk-gate",          NULL,           0 }, /* Video Capture */
->> +     {  4, 10, "bclk-gate",          "bclk",         0 }, /* PCIe/PCI */
->> +     {  5, -1, "dclk-gate",          NULL,           0 }, /* DAC */
->> +     {  6, -1, "refclk-gate",        "clkin",        CLK_IS_CRITICAL },
->> +     {  7,  3, "usb-port2-gate",     NULL,           0 }, /* USB2.0 Host port 2 */
->> +     {  8,  5, "lclk-gate",          NULL,           0 }, /* LPC */
->> +     {  9, 15, "usb-uhci-gate",      NULL,           0 }, /* USB1.1 (requires port 2 enabled) */
->> +     { 10, 13, "d1clk-gate",         NULL,           0 }, /* GFX CRT */
->
-> Is there a typo in the AST2400 datasheet? It claims bit 10 is "D2CLK".
-
-The ast2500 says d1clk, and the ast2400 says d2clk. Both call it the
-GFX CRT clock. Normally changes between the two are in a different
-colour, but we don't have that here :(
-
-I'll ask Ryan if he knows what's going on.
-
->
->> +     /* 11: reserved */
->> +     /* 12: reserved */
->> +     { 13, 4,  "yclk-gate",          NULL,           0 }, /* HAC */
->> +     { 14, 14, "usb-port1-gate",     NULL,           0 }, /* USB2 hub/USB2 host port 1/USB1.1 dev */
->> +     { 15, -1, "uart1clk-gate",      "uart",         0 }, /* UART1 */
->> +     { 16, -1, "uart2clk-gate",      "uart",         0 }, /* UART2 */
->> +     { 17, -1, "uart5clk-gate",      "uart",         0 }, /* UART5 */
->> +     /* 18: reserved */
->> +     { 19, -1, "espiclk-gate",       NULL,           0 }, /* eSPI */
->
-> 19 is reserved on the AST2400, and must be kept at '1'.
-
-Yeah. This is another difference between the SoCs that isn't called
-out by the "this has changed" colouring of the datasheet.
-
-I'd suggest it's not worth adding the code to make the driver return
-an error when requesting this one. If anyone feels strongly about it
-we could skip the registration of this one at probe time on the
-ast2400.
-
->
->> +     { 20, 11, "mac1clk-gate",       "clkin",        0 }, /* MAC1 */
->> +     { 21, 12, "mac2clk-gate",       "clkin",        0 }, /* MAC2 */
->> +     /* 22: reserved */
->> +     /* 23: reserved */
->> +     { 24, -1, "rsaclk-gate",        NULL,           0 }, /* RSA */
->> +     { 25, -1, "uart3clk-gate",      "uart",         0 }, /* UART3 */
->> +     { 26, -1, "uart4clk-gate",      "uart",         0 }, /* UART4 */
->> +     { 27, 16, "sdclk-gate",         NULL,           0 }, /* SDIO/SD */
->> +     { 28, -1, "lhclk-gate",         "lhclk",        0 }, /* LPC master/LPC+ */
->> +     /* 29: reserved */
->> +     /* 30: reserved */
->> +     /* 31: reserved */
->
-> Interestingly bits 29-30 are reserved in both the AST2400 and AST2500
-> datasheets, but are reserved-clear in the AST2400 datasheet and reserved-set in
-> the AST2500 datasheet. This may affect how we write register.
-
-The driver doesn't change the value, so I think we're safe.
-
-> Separately, at one point I mistook the clk column for the index the entry
-> should appear at, which isn't the case. Do you think designated intializers
-> might help?
-
-Will make the table a bit awkward, but it's a good suggestion. I'll
-give it a go for v3.
-
 >> +     /*
->> +      * This way all clock fetched before the platform device probes,
->
-> Typo: "clocks"
-
-Nice catch. It's a typo in the Gemini driver as well ;)
-
->
->> +      * except those we assign here for early use, will be deferred.
+>> +      * High-speed PLL clock derived from the crystal. This the CPU clock,
+>> +      * and we assume that it is enabled
 >> +      */
->> +     for (i = 0; i < ASPEED_NUM_CLKS; i++)
->> +             aspeed_clk_data->hws[i] = ERR_PTR(-EPROBE_DEFER);
+>> +     regmap_read(map, ASPEED_HPLL_PARAM, &val);
+>> +     WARN(val & BIT(18), "clock is strapped not configured");
+>
+> I don't quite understand the intent of the warning - are we just trying to say
+> that the defaults have been assumed and they may not match reality? It's
+> probably not a great idea to not strap the board properly, but you could get
+> away with it for a given configuration (Numerator = 20, H-PLL Output Divider
+> set, H-PLL denominator = 1)
 
->> +++ b/include/dt-bindings/clock/aspeed-clock.h
->> @@ -0,0 +1,43 @@
->> +#ifndef DT_BINDINGS_ASPEED_CLOCK_H
->> +#define DT_BINDINGS_ASPEED_CLOCK_H
+The vlaue of the PLL can be configured in two different ways; one is
+via the strapping registers and the other is configured via the
+ASPEED_HPLL_PARAM.
+
+I added this warning as the driver does not support reading the value
+of hpll from the strapping.
+
+>
+>> +     if (val & BIT(17)) {
+>> +             /* Pass through mode */
+>> +             mult = div = 1;
+>> +     } else {
+>> +             /* F = 24Mhz * (2-OD) * [(N + 2) / (D + 1)] */
+>> +             u32 n = (val >> 5) & 0x3f;
+>> +             u32 od = (val >> 4) & 0x1;
+>> +             u32 d = val & 0xf;
 >> +
->> +#define ASPEED_NUM_CLKS      34
+>> +             mult = (2 - od) * (n + 2);
+>> +             div = d + 1;
+>> +     }
+>> +     hw = clk_hw_register_fixed_factor(NULL, "hpll", "clkin", 0, mult, div);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_HPLL] = hw;
+>> +
+>> +     /*
+>> +      * Strap bits 11:10 define the CPU/AHB clock frequency ratio (aka HCLK)
+>> +      *   00: Select CPU:AHB = 1:1
+>> +      *   01: Select CPU:AHB = 2:1
+>> +      *   10: Select CPU:AHB = 4:1
+>> +      *   11: Select CPU:AHB = 3:1
+>> +      */
+>> +     regmap_read(map, ASPEED_STRAP, &val);
+>> +     val = (val >> 10) & 0x3;
 >
-> This is a bit of a nit pick: Do the constants below represent all the
-> clocks in the SoC(s)? Maybe if not it's better to define
-> ASPEED_NUM_CLKS in terms of (n + ASPEED_CLK_GATES) at the bottom - that
-> way when a clock or gate is added ASPEED_NUM_CLKS has better locality and
-> better visual progression in context.
-
-Okay, I put it at the bottom.
-
->> +#define ASPEED_CLK_GATE_LHCCLK               (23 + ASPEED_CLK_GATES)
+> How do the calculations below line up with the comment above? I can't see the
+> connection and I feel like I've missed something.
 >
-> Looks like there's an off-by-one error here: ASPEED_NUM_CLKS should be (23 +
-> ASPEED_CLK_GATES + 1) = 35.
 
-Thanks, fixed.
+The code should read like this:
+
+if (div == 3)
+  div = 4;
+else if (div == 3)
+  div = 4;
+
+Fixed in v3.
+
+>
+>> +     hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1, div);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
+>> +
+>> +     /* APB clock clock selection register SCU08 (aka PCLK) */
+>> +     hw = clk_hw_register_divider_table(NULL, "apb", "hpll", 0,
+>> +                     scu_base + ASPEED_CLK_SELECTION, 23, 3, 0,
+>> +                     ast2400_div_table,
+>> +                     &aspeed_clk_lock);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
+>> +}
+>> +
+>> +static void __init aspeed_ast2500_cc(struct regmap *map)
+>> +{
+>> +     struct clk_hw *hw;
+>> +     u32 val, div;
+>> +
+>> +     /*
+>> +      * High-speed PLL clock derived from the crystal. This the CPU clock,
+>> +      * and we assume that it is enabled
+>> +      */
+>> +     regmap_read(map, ASPEED_HPLL_PARAM, &val);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_HPLL] = aspeed_calc_pll("hpll", val);
+>
+> Why did you extract the aspeed_calc_pll() implementation for the ast2500 but
+> not the ast2400?
+
+It was used more than once for the ast2500, but only once for the
+ast2400. That's changed it v3 so I broke it out again.
+
+>> +
+>> +     /* Strap bits 11:9 define the AXI/AHB clock frequency ratio (aka HCLK)*/
+>> +     regmap_read(map, ASPEED_STRAP, &val);
+>> +     val = (val >> 9) & 0x7;
+>> +     WARN_ON(val == 0);
+>
+> Maybe WARN() would be better here to explain what's going wrong (zero is an
+> undefined value)?
+
+Done.
+
+>
+>> +     div = 2 * (val + 1);
+>> +     hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1, div);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
+>> +
+>> +     /* APB clock clock selection register SCU08 (aka PCLK) */
+>> +     /* TODO: this is wrong! */
+>
+> Why is this wrong?
+
+I think I must have been looking at the ast2400 data sheet and gotten
+confused. It looks good to me. I removed the comment in v3.
+
+>
+>> +     regmap_read(map, ASPEED_CLK_SELECTION, &val);
+>> +     val = (val >> 23) & 0x7;
+>> +     div = 4 * (val + 1);
+>> +     hw = clk_hw_register_fixed_factor(NULL, "apb", "hpll", 0, 1, div);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
+>> +};
+>> +
+>> +
+>>  static void __init aspeed_cc_init(struct device_node *np)
+>>  {
+>>       struct regmap *map;
+>> +     unsigned long freq;
+>> +     struct clk_hw *hw;
+>>       u32 val;
+>>       int ret;
+>>       int i;
+>> @@ -153,6 +284,21 @@ static void __init aspeed_cc_init(struct device_node *np)
+>>               return;
+>>       }
+>>
+>> +     /* CLKIN is the crystal oscillator, 24 or 25MHz selected by strapping */
+>> +     if (val & BIT(23))
+>> +             freq = 25000000;
+>> +     else
+>> +             freq = 24000000;
+>
+> This isn't true on the AST2400, where CLKIN could be 24 OR 48MHz when BIT(23) is
+> clear. You need to test BIT(18) as well on the AST2400 to disambiguate.
+
+Fixed. I moved the clkin calcs into the soc specific functions.
+
+>
+>> +     hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, freq);
+>> +     pr_debug("clkin @%lu MHz\n", freq / 1000000);
+>> +
+>> +     if (of_device_is_compatible(np, "aspeed,ast2400-scu"))
+>> +             aspeed_ast2400_cc(map);
+>> +     else if (of_device_is_compatible(np, "aspeed,ast2500-scu"))
+>> +             aspeed_ast2500_cc(map);
+>> +     else
+>> +             pr_err("unknown platform, failed to add clocks\n");
+>
+> I'm not confident that "borrowing" the SCU compatible like this is entirely in
+> the spirit of its MFD nature, but maybe others can chime in.
