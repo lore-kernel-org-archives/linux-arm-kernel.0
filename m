@@ -1,96 +1,74 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Wed, 27 Sep 2017 16:48:46 +0100
-Subject: [PATCH v10 6/7] perf: cavium: Support transmit-link PMU counters
-In-Reply-To: <20170925123502.17289-7-jglauber@cavium.com>
-References: <20170925123502.17289-1-jglauber@cavium.com>
- <20170925123502.17289-7-jglauber@cavium.com>
-Message-ID: <20170927164846.00001cbe@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 27 Sep 2017 10:40:26 -0700
+Subject: [PATCH ] cpufreq: ti-cpufreq: kfree opp_data when failure
+In-Reply-To: <1506496097-30852-1-git-send-email-zumeng.chen@windriver.com>
+References: <1506496097-30852-1-git-send-email-zumeng.chen@windriver.com>
+Message-ID: <20170927174026.GB12211@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Sep 2017 14:35:01 +0200
-Jan Glauber <jglauber@cavium.com> wrote:
-
-> Add support for the transmit-link (OCX TLK) PMU counters found
-> on Caviums SOCs with a processor interconnect.
+On 27-09-17, 15:08, Zumeng Chen wrote:
+> From: Zumeng Chen <zumeng.chen@gmail.com>
 > 
-> Properties of the OCX TLK counters:
-> - per-unit control
-> - fixed purpose
-> - writable
-> - one PCI device with multiple TLK units
+> memory leakage was found by kmemleak. opp_data needs to be freed
+> when failure, including fail_put_node.
 > 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-
-Something odd happened in
-drivers/soc/cavium/Kconfig...
-
-Otherwise whole series looks sensible to me.
-
-Jonathan
-
+> unreferenced object 0xccdd4c40 (size 64):
+>   comm "swapper", pid 1, jiffies 4294938465 (age 888.520s)
+>   hex dump (first 32 bytes):
+>     00 7c 00 c1 98 69 d8 ce 00 24 03 ce 00 24 03 ce  .|...i...$...$..
+>     20 35 23 c1 00 00 00 00 00 00 00 00 00 00 00 00   5#.............
+>   backtrace:
+>     [<c028fb64>] kmem_cache_alloc_trace+0x2c4/0x3cc
+>     [<c076d5f0>] ti_cpufreq_probe+0x6c/0x334
+>     [<c068d6e4>] platform_drv_probe+0x60/0xc0
+>     [<c068b384>] driver_probe_device+0x218/0x2c4
+>     [<c068b5a4>] __device_attach_driver+0xa8/0xdc
+>     [<c0689340>] bus_for_each_drv+0x70/0xa4
+>     [<c068b020>] __device_attach+0xc0/0x124
+>     [<c068b634>] device_initial_probe+0x1c/0x20
+>     [<c068a3b8>] bus_probe_device+0x94/0x9c
+>     [<c0688300>] device_add+0x404/0x590
+>     [<c068d408>] platform_device_add+0x11c/0x230
+>     [<c068df40>] platform_device_register_full+0x10c/0x128
+>     [<c076d578>] ti_cpufreq_init+0x44/0x50
+>     [<c01017c4>] do_one_initcall+0x54/0x180
+>     [<c0e00fe0>] kernel_init_freeable+0x270/0x33c
+>     [<c093f2bc>] kernel_init+0x18/0x124
+> 
+> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
 > ---
->  drivers/perf/Kconfig            |   7 ++
->  drivers/perf/cavium_pmu.c       | 230 ++++++++++++++++++++++++++++++++++++++++
->  drivers/soc/cavium/Kconfig      |   4 +
->  drivers/soc/cavium/cavium_ocx.c |   4 +
->  include/linux/soc/cavium/ocx.h  |   3 +
->  5 files changed, 248 insertions(+)
+>  drivers/cpufreq/ti-cpufreq.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-
-<snip>
-
->  static int __init cvm_pmu_init(void)
->  {
->  	INIT_LIST_HEAD(&cvm_pmu_lmcs);
-> diff --git a/drivers/soc/cavium/Kconfig b/drivers/soc/cavium/Kconfig
-> index fe56503d20f4..2c7406872b18 100644
-> --- a/drivers/soc/cavium/Kconfig
-> +++ b/drivers/soc/cavium/Kconfig
-> @@ -8,3 +8,7 @@ config CAVIUM_LMC
->  config CAVIUM_OCX
->  	depends on ARCH_THUNDER
->  	def_tristate m
-> +
-> +config CAVIUM_OCX
-> +        depends on ARCH_THUNDER
-> +	def_tristate m
-
-Something odd going on here...
-
-> diff --git a/drivers/soc/cavium/cavium_ocx.c b/drivers/soc/cavium/cavium_ocx.c
-> index fa3341b0744f..de1ad146c0dd 100644
-> --- a/drivers/soc/cavium/cavium_ocx.c
-> +++ b/drivers/soc/cavium/cavium_ocx.c
-> @@ -13,6 +13,8 @@
->  static int cvm_ocx_probe(struct pci_dev *pdev,
->  			 const struct pci_device_id *ent)
->  {
-> +	if (IS_ENABLED(CONFIG_CAVIUM_PMU_OCX_TLK))
-> +		cvm_ocx_tlk_pmu_probe(pdev, ent);
->  	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
->  		thunderx_edac_ocx_probe(pdev, ent);
->  	return 0;
-> @@ -20,6 +22,8 @@ static int cvm_ocx_probe(struct pci_dev *pdev,
+> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+> index 4bf47de..ffcddcd 100644
+> --- a/drivers/cpufreq/ti-cpufreq.c
+> +++ b/drivers/cpufreq/ti-cpufreq.c
+> @@ -217,7 +217,8 @@ static int ti_cpufreq_init(void)
+>  	opp_data->cpu_dev = get_cpu_device(0);
+>  	if (!opp_data->cpu_dev) {
+>  		pr_err("%s: Failed to get device for CPU0\n", __func__);
+> -		return -ENODEV;
+> +		ret = ENODEV;
+> +		goto free_opp_data;
+>  	}
 >  
->  static void cvm_ocx_remove(struct pci_dev *pdev)
->  {
-> +	if (IS_ENABLED(CONFIG_CAVIUM_PMU_OCX_TLK))
-> +		cvm_ocx_tlk_pmu_remove(pdev);
->  	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
->  		thunderx_edac_ocx_remove(pdev);
+>  	opp_data->opp_node = dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
+> @@ -262,6 +263,8 @@ static int ti_cpufreq_init(void)
+>  
+>  fail_put_node:
+>  	of_node_put(opp_data->opp_node);
+> +free_opp_data:
+> +	kfree(opp_data);
+>  
+>  	return ret;
 >  }
-> diff --git a/include/linux/soc/cavium/ocx.h b/include/linux/soc/cavium/ocx.h
-> index 29f55b3d3171..f7b2caada671 100644
-> --- a/include/linux/soc/cavium/ocx.h
-> +++ b/include/linux/soc/cavium/ocx.h
-> @@ -3,6 +3,9 @@
->  
->  #include <linux/pci.h>
->  
-> +int cvm_ocx_tlk_pmu_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
-> +void cvm_ocx_tlk_pmu_remove(struct pci_dev *pdev);
-> +
->  int thunderx_edac_ocx_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
->  void thunderx_edac_ocx_remove(struct pci_dev *pdev);
->  
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+I also see that you are missing an of_node_put(np) in the driver. Maybe you
+want to fix that as well (in a separate patch) ?
+
+-- 
+viresh
