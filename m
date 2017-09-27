@@ -1,31 +1,94 @@
-From: zhangshaokun@hisilicon.com (Shaokun Zhang)
-Date: Wed, 27 Sep 2017 14:30:24 +0800
-Subject: [PATCH] drivers/perf: arm_pmu_acpi: drop redundant acpi_disabled check
-Message-ID: <1506493824-94829-1-git-send-email-zhangshaokun@hisilicon.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 27 Sep 2017 12:12:27 +0530
+Subject: [RFC PATCH 1/1] iommu/arm-smmu: Add support for multiple TBU
+ child devices
+In-Reply-To: <20170919141034.ahhmuxfk6ldpegfp@rob-hp-laptop>
+References: <1505217667-31184-1-git-send-email-vivek.gautam@codeaurora.org>
+ <20170919141034.ahhmuxfk6ldpegfp@rob-hp-laptop>
+Message-ID: <b148de29-be38-41f1-7eb5-1ea81c15243e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-acpi_disabled has been checked in armv8_pmu_driver_init and it shall
-be ZERO in arm_pmu_acpi_probe, clean up this unnecessary check.
+Hi Rob,
 
-Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
----
- drivers/perf/arm_pmu_acpi.c | 3 ---
- 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-index 3303dd8..705f1a3 100644
---- a/drivers/perf/arm_pmu_acpi.c
-+++ b/drivers/perf/arm_pmu_acpi.c
-@@ -193,9 +193,6 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
- 	int pmu_idx = 0;
- 	int cpu, ret;
- 
--	if (acpi_disabled)
--		return 0;
--
- 	/*
- 	 * Initialise and register the set of PMUs which we know about right
- 	 * now. Ideally we'd do this in arm_pmu_acpi_cpu_starting() so that we
+On 09/19/2017 07:40 PM, Rob Herring wrote:
+
+Thanks for reviewing the patch.
+
+> On Tue, Sep 12, 2017 at 05:31:07PM +0530, Vivek Gautam wrote:
+>> ARM MMU-500 implements a TBU (uTLB) for each connected master
+>> besides a single TCU which controls and manages the address
+>> translations. Each of these TBUs can either be in the same
+>> power domain as the master, or they can have a independent
+>> power switch.
+>> This design addresses the challenges to control TBU power.
+>> Adding child devices for each TBUs present in the configuration
+>> lets us control the power and clocks to TLBs having individual
+>> power domains. The device link between master devices (such as,
+>> display, and GPU) and TBU devices ensures that the master takes
+>> care of powering the smmu as long as it's available.
+>> When the master is not available, the TBUs are identified with
+>> sid and powered on.
+>>
+>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>> ---
+>>
+>>   - The idea behind this patch is to handle the distributed smmu
+>>     architectures, similar to MMU-500.
+>>   - Untested yet.
+>>   - There are still few instances where the correct tbu device has
+>>     to be referenced and thus powered on to handle TLB maintenance
+>>     operations.
+>>
+>>   .../devicetree/bindings/iommu/arm,smmu.txt         |  27 +++
+>>   drivers/iommu/arm-smmu.c                           | 191 +++++++++++++++++++--
+>>   2 files changed, 205 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index d97a6bc8e608..7cf67e75022e 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -98,6 +98,18 @@ conditions.
+>>                     accessed before master gets enabled and linked to its
+>>                     SMMU.
+>>   
+>> +- child nodes:    ARM MMU-500 implements a TBU (page table cache or TLB) for
+>> +                  each connected master besides a single TCU that controls
+>> +                  and manages the address translations.
+>> +                  Each of the child nodes represents a TBU that is attached to
+>> +                  the master. This child node will have following property:
+>> +
+>> +  - compatibe:       must be "arm,mmu-500-tbu" for TBU child nodes of arm,mmu-500
+>> +                     smmu.
+>> +  - stream-id-range: array representing the starting stream id and the number
+>> +                     of supported stream-ids. This gives information about
+>> +                     the range of stream-ids that are supported by this TBU.
+> Needs a vendor prefix.
+
+Sure will add the vendor prefix.
+This can be a generic arm-mmu500 implementation where,
+a range of stream-ids are serviced by a TBU.
+Would "arm,stream-id-range" make sense?
+
+>
+> Also need to document reg property. What does reg represent? If just an
+> index with no correlation to h/w numbering, then perhaps stream ids
+> could be put into reg instead.
+
+Okay. Stream-ids make sense, since the reg doesn't necessarily represent
+any hardware number such as channel number, etc.
+
+Best regards
+Vivek
+
+>
+> Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.9.1
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
