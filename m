@@ -1,32 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 27 Sep 2017 14:37:16 -0500
-Subject: [RFC v2 1/2] dt-bindings: mmc: Document the Amlogic Meson8 and
- Meson8b SDIO bindings
-In-Reply-To: <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
-References: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
- <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20170927193716.bxqihkm7f3omrnd6@rob-hp-laptop>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 27 Sep 2017 16:27:09 -0400
+Subject: [PATCH] drm/rockchip: Fix memory leak in rockchip_drm_sys_resume()
+In-Reply-To: <20170927122642.18628-1-jeffy.chen@rock-chips.com>
+References: <20170927122642.18628-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170927202709.ugbjyi3ktfjssiyp@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 24, 2017 at 09:05:27PM +0200, Martin Blumenstingl wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+On Wed, Sep 27, 2017 at 08:26:42PM +0800, Jeffy Chen wrote:
+> Free the drm_atomic_state allocated by drm_atomic_helper_suspend().
 > 
-> This documents the devicetree bindings for the SDIO/MMC host found in
-> Amlogic Meson8 and Meson8b SoCs. It supports the SD specification v2.0
-> and the eMMC specification v4.41.
-> It has an internal "mux" which allows connecting up to three MMC devices
-> to it. The maximum supported bus-width is 4-bits.
-> 
-> Amlogic's GPL kernel sources call it "SDIO" to differentiate it from the
-> other MMC controller in (at least the Meson8 and Meson8b) the SoCs (they
-> call the other one "SDHC", which supports a bus-width of up to 8-bits).
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Fixes: 5a5873830972 ("drm/rockchip: Use atomic PM helpers")
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 > ---
->  .../bindings/mmc/amlogic,meson-mx-sdio.txt         | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+> 
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> index 76d63de5921d..80235b672deb 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> @@ -15,6 +15,7 @@
+>   */
+>  
+>  #include <drm/drmP.h>
+> +#include <drm/drm_atomic.h>
+>  #include <drm/drm_crtc_helper.h>
+>  #include <drm/drm_fb_helper.h>
+>  #include <drm/drm_gem_cma_helper.h>
+> @@ -299,6 +300,7 @@ static int rockchip_drm_sys_resume(struct device *dev)
+>  
+>  	priv = drm->dev_private;
+>  	drm_atomic_helper_resume(drm, priv->state);
+> +	drm_atomic_state_put(priv->state);
 
-Acked-by: Rob Herring <robh@kernel.org>
+Won't this be freed for you eventually in commit_tail()?
+
+Sean
+
+>  	rockchip_drm_fb_resume(drm);
+>  	drm_kms_helper_poll_enable(drm);
+>  
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
