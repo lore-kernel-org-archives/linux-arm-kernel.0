@@ -1,51 +1,32 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 27 Sep 2017 14:36:16 -0500
-Subject: [RFC v2 0/2] Add support for Meson MX "SDIO" MMC controller
-In-Reply-To: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
+Date: Wed, 27 Sep 2017 14:37:16 -0500
+Subject: [RFC v2 1/2] dt-bindings: mmc: Document the Amlogic Meson8 and
+ Meson8b SDIO bindings
+In-Reply-To: <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
 References: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170927193616.32gxszmk4cjjoqmo@rob-hp-laptop>
+ <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20170927193716.bxqihkm7f3omrnd6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 24, 2017 at 09:05:26PM +0200, Martin Blumenstingl wrote:
-> This is the successor to Carlo Caione's "Add support for Amlogic Meson
-> MMC driver" series (v5) from [0].
-> This new driver is for the "SDIO" controller found in Amlogic Meson6,
-> Meson8 and Meson8b SoCs and supports an internal mux to allow connecting
-> three cards to it.
+On Sun, Sep 24, 2017 at 09:05:27PM +0200, Martin Blumenstingl wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
+> This documents the devicetree bindings for the SDIO/MMC host found in
+> Amlogic Meson8 and Meson8b SoCs. It supports the SD specification v2.0
+> and the eMMC specification v4.41.
+> It has an internal "mux" which allows connecting up to three MMC devices
+> to it. The maximum supported bus-width is 4-bits.
 > 
-> changes since RFC v1 at [1]:
-> - added COMMON_CLK dependency as reported by the kbuild test robot
-> - use of_platform_device_{create,destroy} instead of open-coding it's
->   logic
-> - moved struct device (which was an array) from meson_mx_mmc_host to
->   the corresponding meson_mx_mmc_slot
-> - use struct mmc_command's busy_timeout instead of hard-coding the
->   timeout values in meson_mx_mmc_start_cmd()
-> - don't use arrays with only one element for the clock parents in
->   meson_mx_mmc_register_clks()
-> - removed the wrapper functions meson_mx_mmc_readl() meson_mx_mmc_writel()
-> - allow setting the MMC clock to 0 for UHS speed mode (the actual
->   hardware clock cannot be gated as far as I know, so instead the
->   lowest supported rate is chosen)
-> - remove unused #include <linux/init.h>
-> - add MMC_CAP_ERASE
-> - removed multiple slot support after discussing this with Ulf
->   (this is a feature that needs to be part of the MMC core before drivers
->   can use it)
-> - removed SDIO interrupt support (as I currently don't have a way to
->   test it)
-> - merge meson_mx_mmc_apply_ios into meson_mx_mmc_set_ios (as that's
->   the only place where it's needed after removing multiple slot support)
-> - updated the commit message of the driver patch to indicate the
->   difference between the meson-mx-sdio.c and meson-gx.c (and the "still
->   missing SDHC") driver
-> - NOTE: I did not add Rob's ACK on the dt-bindings patch because I
->   introduced the "mmc-slot" compatible for the child nodes as suggested
->   by Ulf (and I want confirmation from the DT maintainers that I did this
->   correctly)
+> Amlogic's GPL kernel sources call it "SDIO" to differentiate it from the
+> other MMC controller in (at least the Meson8 and Meson8b) the SoCs (they
+> call the other one "SDHC", which supports a bus-width of up to 8-bits).
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  .../bindings/mmc/amlogic,meson-mx-sdio.txt         | 52 ++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
 
-Didn't slot support get removed as no h/w really uses that feature?
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
