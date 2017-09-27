@@ -1,36 +1,57 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Wed, 27 Sep 2017 18:44:04 +0800
-Subject: [PATCH v5 2/6] dt-bindings: input: Add common keyboard document
- bindings
-In-Reply-To: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
-References: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <1506509048-19032-3-git-send-email-chen.zhong@mediatek.com>
+Date: Wed, 27 Sep 2017 18:44:02 +0800
+Subject: [PATCH v5 0/6] Add MediaTek PMIC keys support
+Message-ID: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree binding documentation for common
-keyboard.
+Changes since v4:
+- rebase to Linux 4.14-rc1
+- add a common keyboard binding document
+- use child device tree node to define each key
 
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
----
- Documentation/devicetree/bindings/input/keys.txt |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Changes since v3:
+- make the naming to be consistent as mtk_pmic or MTK_PMIC
+- add suspend/resume functions to enable/disable irq
+- change binding properties to define wakeup sources
+
+Changes since v2:
+- use standard properties for keycodes and debounce time
+- change to use platform_get_irq in leaf drivers
+- use better ways to define IRQ resources
+
+Changes since v1:
+- create irq mappings in mfd core driver instead of leaf drivers
+- remove some unused parts in mtk-pmic-keys driver
+
+MediaTek PMIC are multi-function devices that can handle key interrupts,
+typically there are two keys attached to PMIC, which called pwrkey
+and homekey. PWRKEY usually used to wake up system from sleep. Homekey
+can used as volume down key due to board design. Long press keys can
+shutdown PMIC, the mode can be choose to be one key only or two keys
+together.
+This series add support for key functions for MediaTek PMIC MT6397/MT6323.
+
+Chen Zhong (6):
+  mfd: mt6397: create irq mappings in mfd core driver
+  dt-bindings: input: Add common keyboard document bindings
+  dt-bindings: input: Add document bindings for mtk-pmic-keys
+  dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
+  input: Add MediaTek PMIC keys support
+  mfd: mt6397: Add PMIC keys support to MT6397 driver
+
+ Documentation/devicetree/bindings/input/keys.txt   |   8 +
+ .../devicetree/bindings/input/mtk-pmic-keys.txt    |  43 +++
+ Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
+ drivers/input/keyboard/Kconfig                     |   9 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/mtk-pmic-keys.c             | 341 +++++++++++++++++++++
+ drivers/mfd/mt6397-core.c                          |  26 +-
+ drivers/rtc/rtc-mt6397.c                           |   7 +-
+ 8 files changed, 434 insertions(+), 7 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/input/keys.txt
+ create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+ create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
 
-diff --git a/Documentation/devicetree/bindings/input/keys.txt b/Documentation/devicetree/bindings/input/keys.txt
-new file mode 100644
-index 0000000..a0ea7eb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/keys.txt
-@@ -0,0 +1,8 @@
-+General Keys Properties:
-+
-+Optional properties for Keys:
-+- power-off-time-sec: Duration in seconds which the key should be kept
-+ 	pressed for device to power off automatically. Device with key pressed
-+ 	shutdown feature can specify this property.
-+- linux,keycodes: Specifies the numeric keycode values to be used for
-+	reporting key presses.
-\ No newline at end of file
 -- 
-1.7.9.5
+1.9.1
