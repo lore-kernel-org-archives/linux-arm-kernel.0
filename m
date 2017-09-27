@@ -1,88 +1,48 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Wed, 27 Sep 2017 11:10:43 -0400
-Subject: [PATCH] perf: qcom_l2_pmu: add event names
-In-Reply-To: <20170925150829.GA30917@arm.com>
-References: <1505417413-30757-1-git-send-email-nleeder@codeaurora.org>
- <20170925150829.GA30917@arm.com>
-Message-ID: <963de773-5501-029b-f9a2-d35a0864394f@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 27 Sep 2017 23:18:09 +0800
+Subject: [PATCH v3 00/14] ARM: dts: sunxi: Fix DT build warnings
+In-Reply-To: <CAGb2v67=VyHd3n1PgT-2_2efUNijOM8TkwDO9oAQvUd8wYH-qg@mail.gmail.com>
+References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
+ <CAGb2v64AK-xifjcowUk1mp4TRwHFPOqjZR58Bd5w7Bei52T06g@mail.gmail.com>
+ <20170926085855.7yn6zdx3sfuwwxyj@flea>
+ <CAGb2v67=VyHd3n1PgT-2_2efUNijOM8TkwDO9oAQvUd8wYH-qg@mail.gmail.com>
+Message-ID: <CAGb2v67=Esq3mHkRhP6sBuzFtyDWjeON4Uwx93H5z2LMQ63eJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/25/2017 11:08 AM, Will Deacon wrote:
-> On Thu, Sep 14, 2017 at 03:30:13PM -0400, Neil Leeder wrote:
->> Add event names so that common events can be
->> specified symbolically, for example:
+On Tue, Sep 26, 2017 at 9:01 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Tue, Sep 26, 2017 at 4:58 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Tue, Sep 26, 2017 at 07:48:17AM +0000, Chen-Yu Tsai wrote:
+>>> On Tue, Sep 26, 2017 at 3:22 PM, Corentin Labbe
+>>> <clabbe.montjoie@gmail.com> wrote:
+>>> > Hello
+>>> >
+>>> > The goal of this patch series is to have a clean DT build with W=1.
+>>> >
+>>> > Regards
+>>> >
+>>> > Changes since v1:
+>>> > - moved i2c2 unit address change from patch #2 in patch #1
+>>> >
+>>> > Changes since v2
+>>> > - added two patch for fixing pin names
+>>>
+>>> The first twelve patches are good. Maxime, I think we can go ahead and
+>>> merge them, instead of having them resent again in v3?
 >>
->> l2cache_0/total-reads/,l2cache_0/cycles/
->>
->> Event names are displayed in 'perf list'.
->>
->> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
->> ---
->>  drivers/perf/qcom_l2_pmu.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 54 insertions(+)
->>
->> diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
->> index b242cce..4fdc848 100644
->> --- a/drivers/perf/qcom_l2_pmu.c
->> +++ b/drivers/perf/qcom_l2_pmu.c
->> @@ -92,6 +92,21 @@
->>  
->>  #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
->>  
->> +/*
->> + * Events
->> + */
->> +#define L2_EVENT_CYCLES                    0xfe
->> +#define L2_EVENT_DCACHE_OPS                0x400
->> +#define L2_EVENT_ICACHE_OPS                0x401
->> +#define L2_EVENT_TLBI                      0x402
->> +#define L2_EVENT_BARRIERS                  0x403
->> +#define L2_EVENT_TOTAL_READS               0x405
->> +#define L2_EVENT_TOTAL_WRITES              0x406
->> +#define L2_EVENT_TOTAL_REQUESTS            0x407
->> +#define L2_EVENT_LDREX                     0x420
->> +#define L2_EVENT_STREX                     0x421
->> +#define L2_EVENT_CLREX                     0x422
->> +
->>  static DEFINE_RAW_SPINLOCK(l2_access_lock);
->>  
->>  /**
->> @@ -700,9 +715,12 @@ static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
->>  /* CCG format for perf RAW codes. */
->>  PMU_FORMAT_ATTR(l2_code,   "config:4-11");
->>  PMU_FORMAT_ATTR(l2_group,  "config:0-3");
->> +PMU_FORMAT_ATTR(event,     "config:0-11");
->> +
->>  static struct attribute *l2_cache_pmu_formats[] = {
->>  	&format_attr_l2_code.attr,
->>  	&format_attr_l2_group.attr,
->> +	&format_attr_event.attr,
->>  	NULL,
->>  };
->>  
->> @@ -711,9 +729,45 @@ static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
->>  	.attrs = l2_cache_pmu_formats,
->>  };
->>  
->> +static ssize_t l2cache_pmu_event_show(struct device *dev,
->> +				      struct device_attribute *attr, char *page)
->> +{
->> +	struct perf_pmu_events_attr *pmu_attr;
->> +
->> +	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
->> +	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
-> 
-> Nit: do you want a 0x%03llx here?
-> 
-> (I'm happy to take the patch either way, so just let me know)
-> 
-> Will
-> 
-Thanks Will. I'm leaning toward leaving it the way it is, if it's all the same to you.
+>> Yep, that works for me. Can you push them?
+>
+> Patches 1 and 12 didn't apply cleanly. I fixed them.
 
-Neil
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Patch 10 didn't apply cleanly either. I fixed it.
+
+> Patches 4~9 do the same type of cleanup for various h3 board dts files.
+> Maybe we should just squash them together. Arnd seems to prefer squashing
+> identical changes to different boards together.
+
+Squashed them and mentioned it in the commit message.
+
+Please check the sunxi tree on git.kernel.org if the results are correct.
+
+ChenYu
