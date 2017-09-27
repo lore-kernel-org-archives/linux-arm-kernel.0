@@ -1,65 +1,65 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 27 Sep 2017 15:08:17 +0800
-Subject: [PATCH ] cpufreq: ti-cpufreq: kfree opp_data when failure
-Message-ID: <1506496097-30852-1-git-send-email-zumeng.chen@windriver.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 27 Sep 2017 09:14:25 +0200
+Subject: [PATCH v4 3/4] ARM: dts: stm32: Add MDMA support for STM32H743 SoC
+In-Reply-To: <20170926174442.GU30097@localhost>
+References: <1503671466-32029-1-git-send-email-pierre-yves.mordret@st.com>
+ <1503671466-32029-4-git-send-email-pierre-yves.mordret@st.com>
+ <20170926174442.GU30097@localhost>
+Message-ID: <f41aee87-fb1f-396b-e6c4-df14c614ee00@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zumeng Chen <zumeng.chen@gmail.com>
+Hi Vinod
 
-memory leakage was found by kmemleak. opp_data needs to be freed
-when failure, including fail_put_node.
+On 09/26/2017 07:44 PM, Vinod Koul wrote:
+> On Fri, Aug 25, 2017 at 04:31:05PM +0200, Pierre-Yves MORDRET wrote:
+>> This patch adds MDMA support for STM32H743 SoC.
+> 
+> Need ACK from ARM folks
 
-unreferenced object 0xccdd4c40 (size 64):
-  comm "swapper", pid 1, jiffies 4294938465 (age 888.520s)
-  hex dump (first 32 bytes):
-    00 7c 00 c1 98 69 d8 ce 00 24 03 ce 00 24 03 ce  .|...i...$...$..
-    20 35 23 c1 00 00 00 00 00 00 00 00 00 00 00 00   5#.............
-  backtrace:
-    [<c028fb64>] kmem_cache_alloc_trace+0x2c4/0x3cc
-    [<c076d5f0>] ti_cpufreq_probe+0x6c/0x334
-    [<c068d6e4>] platform_drv_probe+0x60/0xc0
-    [<c068b384>] driver_probe_device+0x218/0x2c4
-    [<c068b5a4>] __device_attach_driver+0xa8/0xdc
-    [<c0689340>] bus_for_each_drv+0x70/0xa4
-    [<c068b020>] __device_attach+0xc0/0x124
-    [<c068b634>] device_initial_probe+0x1c/0x20
-    [<c068a3b8>] bus_probe_device+0x94/0x9c
-    [<c0688300>] device_add+0x404/0x590
-    [<c068d408>] platform_device_add+0x11c/0x230
-    [<c068df40>] platform_device_register_full+0x10c/0x128
-    [<c076d578>] ti_cpufreq_init+0x44/0x50
-    [<c01017c4>] do_one_initcall+0x54/0x180
-    [<c0e00fe0>] kernel_init_freeable+0x270/0x33c
-    [<c093f2bc>] kernel_init+0x18/0x124
+I will take ARM patches (config + DT) in my pull request for 4.15 (if 
+you plan to take driver part in your PR for 4.15)
 
-Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
----
- drivers/cpufreq/ti-cpufreq.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Regards
+Alex
 
-diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-index 4bf47de..ffcddcd 100644
---- a/drivers/cpufreq/ti-cpufreq.c
-+++ b/drivers/cpufreq/ti-cpufreq.c
-@@ -217,7 +217,8 @@ static int ti_cpufreq_init(void)
- 	opp_data->cpu_dev = get_cpu_device(0);
- 	if (!opp_data->cpu_dev) {
- 		pr_err("%s: Failed to get device for CPU0\n", __func__);
--		return -ENODEV;
-+		ret = ENODEV;
-+		goto free_opp_data;
- 	}
- 
- 	opp_data->opp_node = dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
-@@ -262,6 +263,8 @@ static int ti_cpufreq_init(void)
- 
- fail_put_node:
- 	of_node_put(opp_data->opp_node);
-+free_opp_data:
-+	kfree(opp_data);
- 
- 	return ret;
- }
--- 
-2.7.4
+> 
+>>
+>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+>> ---
+>>   Version history:
+>>      v4:
+>>      v3:
+>>          * None
+>>      v2:
+>>          * Add MDMA support in DT for H7
+>> ---
+>> ---
+>>   arch/arm/boot/dts/stm32h743.dtsi | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+>> index 36a99db..af44eae 100644
+>> --- a/arch/arm/boot/dts/stm32h743.dtsi
+>> +++ b/arch/arm/boot/dts/stm32h743.dtsi
+>> @@ -82,6 +82,16 @@
+>>   			interrupts = <50>;
+>>   			clocks = <&timer_clk>;
+>>   		};
+>> +
+>> +		mdma1: dma at 52000000 {
+>> +			compatible = "st,stm32h7-mdma";
+>> +			reg = <0x52000000 0x1000>;
+>> +			interrupts = <122>;
+>> +			clocks = <&timer_clk>;
+>> +			#dma-cells = <5>;
+>> +			dma-channels = <16>;
+>> +			dma-requests = <32>;
+>> +		};
+>>   	};
+>>   };
+>>   
+>> -- 
+>> 2.7.4
+>>
+> 
