@@ -1,46 +1,36 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Wed, 27 Sep 2017 18:44:06 +0800
-Subject: [PATCH v5 4/6] dt-bindings: mfd: Add bindings for the keys as subnode
- of PMIC
+Date: Wed, 27 Sep 2017 18:44:04 +0800
+Subject: [PATCH v5 2/6] dt-bindings: input: Add common keyboard document
+ bindings
 In-Reply-To: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
 References: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <1506509048-19032-5-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1506509048-19032-3-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for device tree bindings for keys support
-as the subnode of MT6397/MT6323 PMIC.
+This patch adds the device tree binding documentation for common
+keyboard.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 ---
- Documentation/devicetree/bindings/mfd/mt6397.txt |    6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/input/keys.txt |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/keys.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-index 522a3bb..d1df77f 100644
---- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-+++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-@@ -7,6 +7,7 @@ MT6397/MT6323 is a multifunction device with the following sub modules:
- - GPIO
- - Clock
- - LED
-+- Keys
- 
- It is interfaced to host controller using SPI interface by a proprietary hardware
- called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
-@@ -40,6 +41,11 @@ Optional subnodes:
- 		- compatible: "mediatek,mt6323-led"
- 	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
- 
-+- keys
-+	Required properties:
-+		- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-+	see Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+diff --git a/Documentation/devicetree/bindings/input/keys.txt b/Documentation/devicetree/bindings/input/keys.txt
+new file mode 100644
+index 0000000..a0ea7eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/keys.txt
+@@ -0,0 +1,8 @@
++General Keys Properties:
 +
- Example:
- 	pwrap: pwrap at 1000f000 {
- 		compatible = "mediatek,mt8135-pwrap";
++Optional properties for Keys:
++- power-off-time-sec: Duration in seconds which the key should be kept
++ 	pressed for device to power off automatically. Device with key pressed
++ 	shutdown feature can specify this property.
++- linux,keycodes: Specifies the numeric keycode values to be used for
++	reporting key presses.
+\ No newline at end of file
 -- 
 1.7.9.5
