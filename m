@@ -1,57 +1,70 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Wed, 27 Sep 2017 18:44:02 +0800
-Subject: [PATCH v5 0/6] Add MediaTek PMIC keys support
-Message-ID: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
+Date: Wed, 27 Sep 2017 18:44:05 +0800
+Subject: [PATCH v5 3/6] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
+References: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1506509048-19032-4-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v4:
-- rebase to Linux 4.14-rc1
-- add a common keyboard binding document
-- use child device tree node to define each key
+This patch adds the device tree binding documentation for the MediaTek
+pmic keys found on PMIC MT6397/MT6323.
 
-Changes since v3:
-- make the naming to be consistent as mtk_pmic or MTK_PMIC
-- add suspend/resume functions to enable/disable irq
-- change binding properties to define wakeup sources
-
-Changes since v2:
-- use standard properties for keycodes and debounce time
-- change to use platform_get_irq in leaf drivers
-- use better ways to define IRQ resources
-
-Changes since v1:
-- create irq mappings in mfd core driver instead of leaf drivers
-- remove some unused parts in mtk-pmic-keys driver
-
-MediaTek PMIC are multi-function devices that can handle key interrupts,
-typically there are two keys attached to PMIC, which called pwrkey
-and homekey. PWRKEY usually used to wake up system from sleep. Homekey
-can used as volume down key due to board design. Long press keys can
-shutdown PMIC, the mode can be choose to be one key only or two keys
-together.
-This series add support for key functions for MediaTek PMIC MT6397/MT6323.
-
-Chen Zhong (6):
-  mfd: mt6397: create irq mappings in mfd core driver
-  dt-bindings: input: Add common keyboard document bindings
-  dt-bindings: input: Add document bindings for mtk-pmic-keys
-  dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
-  input: Add MediaTek PMIC keys support
-  mfd: mt6397: Add PMIC keys support to MT6397 driver
-
- Documentation/devicetree/bindings/input/keys.txt   |   8 +
- .../devicetree/bindings/input/mtk-pmic-keys.txt    |  43 +++
- Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
- drivers/input/keyboard/Kconfig                     |   9 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/mtk-pmic-keys.c             | 341 +++++++++++++++++++++
- drivers/mfd/mt6397-core.c                          |  26 +-
- drivers/rtc/rtc-mt6397.c                           |   7 +-
- 8 files changed, 434 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/keys.txt
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ .../devicetree/bindings/input/mtk-pmic-keys.txt    |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
- create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
 
+diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+new file mode 100644
+index 0000000..2888d07
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+@@ -0,0 +1,43 @@
++MediaTek MT6397/MT6323 PMIC Keys Device Driver
++
++There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
++and homekey. The key functions are defined as the subnode of the function
++node provided by MT6397/MT6323 PMIC that is being defined as one kind
++of Muti-Function Device (MFD)
++
++For MT6397/MT6323 MFD bindings see:
++Documentation/devicetree/bindings/mfd/mt6397.txt
++
++Required properties:
++- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
++- linux,keycodes: See Documentation/devicetree/bindings/input/keys.txt
++
++Optional Properties:
++- wakeup-source: See Documentation/devicetree/bindings/power/wakeup-source.txt
++- mediatek,long-press-mode: Long press key shutdown setting, 1 for
++	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
++- power-off-time-sec: See Documentation/devicetree/bindings/input/keys.txt
++
++Example:
++
++	pmic: mt6397 {
++		compatible = "mediatek,mt6397";
++
++		...
++
++		mt6397keys: mt6397keys {
++			compatible = "mediatek,mt6397-keys";
++			mediatek,long-press-mode = <1>;
++			power-off-time-sec = <0>;
++
++			power {
++				linux,keycodes = <116>;
++				wakeup-source;
++			};
++
++			home {
++				linux,keycodes = <114>;
++			};
++		};
++
++	};
 -- 
-1.9.1
+1.7.9.5
