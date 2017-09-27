@@ -1,35 +1,28 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 27 Sep 2017 11:44:30 +0200
-Subject: [PATCH] clk: rockchip: Delete an error message for a failed memory
- allocation in rockchip_clk_register_cpuclk()
-Message-ID: <dfcd3f8a-f858-ab71-b08c-e5b2e3005d7c@users.sourceforge.net>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Wed, 27 Sep 2017 11:56:46 +0200
+Subject: [PATCH 01/10] dt-bindings: bus: Minimal TI sysc interconnect
+ target module binding
+In-Reply-To: <20170925174413.GH4394@atomide.com>
+References: <20170920224621.16236-1-tony@atomide.com>
+ <20170920224621.16236-2-tony@atomide.com>
+ <20170925063545.nn3gr5drea6o2g6m@squirrel.local>
+ <20170925142520.GE4394@atomide.com>
+ <20170925172120.xu6k3leg4ac6mjya@squirrel.local>
+ <20170925174413.GH4394@atomide.com>
+Message-ID: <20170927095646.fi4l7jbbvrubfe25@squirrel.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 27 Sep 2017 11:38:17 +0200
+On Mon, Sep 25, 2017 at 10:44:14AM -0700, Tony Lindgren wrote:
+> * Matthijs van Duin <matthijsvanduin@gmail.com> [170925 10:22]:
+> > Ah... three "foreign" modules with an idlemode carelessly thrown into a
+> > register without care for existing layouts.  I think these are more just
+> > exceptional cases which happen to agree by coincidence since they all
+> > just added idlemode in the simplest way possible, but I can understand
+> > how it came to be viewed as a standard type.
+> 
+> So we shall then name this fine centauroid sysc ti,81xx-sysc?
 
-Omit an extra message for a memory allocation failure in this function.
+There's nothing centauroid specific about this, mcasp on omap4 has it too.
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/clk/rockchip/clk-cpu.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
-index 0e09684d43a5..32c19c0f1e14 100644
---- a/drivers/clk/rockchip/clk-cpu.c
-+++ b/drivers/clk/rockchip/clk-cpu.c
-@@ -322,8 +322,6 @@ struct clk *rockchip_clk_register_cpuclk(const char *name,
- 					     sizeof(*rates) * nrates,
- 					     GFP_KERNEL);
- 		if (!cpuclk->rate_table) {
--			pr_err("%s: could not allocate memory for cpuclk rates\n",
--			       __func__);
- 			ret = -ENOMEM;
- 			goto unregister_notifier;
- 		}
--- 
-2.14.1
+Matthijs
