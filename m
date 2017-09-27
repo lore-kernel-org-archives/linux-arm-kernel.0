@@ -1,93 +1,93 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 17:23:01 +0800
-Subject: [PATCH 5/9] usb: xhci-mtk: remove dummy wakeup debounce clocks
+Date: Wed, 27 Sep 2017 17:23:00 +0800
+Subject: [PATCH 4/9] usb: xhci-mtk: support option to disable usb3 ports
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-Message-ID: <ff9ee49a872084b4fc8c7fbabddc820058acb9b7.1506503879.git.chunfeng.yun@mediatek.com>
+Message-ID: <c84bf052966ee2845d3a5b676e37cfd54dbc03cf.1506503879.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeup debounce clocks for each ports in fact are not
-needed, so remove them.
+Add support to disable specific usb3 ports, it's useful when
+usb3 phy is shared with PCIe or SATA, because we should disable
+the corresponding usb3 port if the phy is used by PCIe or SATA.
+Sometimes it's helpful to analyse and solve problems.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk.c |   33 ---------------------------------
- drivers/usb/host/xhci-mtk.h |    2 --
- 2 files changed, 35 deletions(-)
+ drivers/usb/host/xhci-mtk.c |   18 +++++++++++++++---
+ drivers/usb/host/xhci-mtk.h |    1 +
+ 2 files changed, 16 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 97ba51e..d60463c 100644
+index 7a92bb7..97ba51e 100644
 --- a/drivers/usb/host/xhci-mtk.c
 +++ b/drivers/usb/host/xhci-mtk.c
-@@ -237,25 +237,8 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
- 		goto sys_clk_err;
- 	}
- 
--	if (mtk->wakeup_src) {
--		ret = clk_prepare_enable(mtk->wk_deb_p0);
--		if (ret) {
--			dev_err(mtk->dev, "failed to enable wk_deb_p0\n");
--			goto usb_p0_err;
--		}
--
--		ret = clk_prepare_enable(mtk->wk_deb_p1);
--		if (ret) {
--			dev_err(mtk->dev, "failed to enable wk_deb_p1\n");
--			goto usb_p1_err;
--		}
--	}
- 	return 0;
- 
--usb_p1_err:
--	clk_disable_unprepare(mtk->wk_deb_p0);
--usb_p0_err:
--	clk_disable_unprepare(mtk->sys_clk);
- sys_clk_err:
- 	clk_disable_unprepare(mtk->ref_clk);
- ref_clk_err:
-@@ -264,10 +247,6 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
- 
- static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
+@@ -92,6 +92,7 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
  {
--	if (mtk->wakeup_src) {
--		clk_disable_unprepare(mtk->wk_deb_p1);
--		clk_disable_unprepare(mtk->wk_deb_p0);
--	}
- 	clk_disable_unprepare(mtk->sys_clk);
- 	clk_disable_unprepare(mtk->ref_clk);
- }
-@@ -371,18 +350,6 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
- 	if (!mtk->wakeup_src)
+ 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+ 	u32 value, check_val;
++	int u3_ports_disabed = 0;
+ 	int ret;
+ 	int i;
+ 
+@@ -103,8 +104,13 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	value &= ~CTRL1_IP_HOST_PDN;
+ 	writel(value, &ippc->ip_pw_ctr1);
+ 
+-	/* power on and enable all u3 ports */
++	/* power on and enable u3 ports except skipped ones */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
++		if ((0x1 << i) & mtk->u3p_dis_msk) {
++			u3_ports_disabed++;
++			continue;
++		}
++
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+ 		value &= ~(CTRL_U3_PORT_PDN | CTRL_U3_PORT_DIS);
+ 		value |= CTRL_U3_PORT_HOST_SEL;
+@@ -126,7 +132,7 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	check_val = STS1_SYSPLL_STABLE | STS1_REF_RST |
+ 			STS1_SYS125_RST | STS1_XHCI_RST;
+ 
+-	if (mtk->num_u3_ports)
++	if (mtk->num_u3_ports > u3_ports_disabed)
+ 		check_val |= STS1_U3_MAC_RST;
+ 
+ 	ret = readl_poll_timeout(&ippc->ip_pw_sts1, value,
+@@ -149,8 +155,11 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+ 	if (!mtk->has_ippc)
  		return 0;
  
--	mtk->wk_deb_p0 = devm_clk_get(dev, "wakeup_deb_p0");
--	if (IS_ERR(mtk->wk_deb_p0)) {
--		dev_err(dev, "fail to get wakeup_deb_p0\n");
--		return PTR_ERR(mtk->wk_deb_p0);
--	}
--
--	mtk->wk_deb_p1 = devm_clk_get(dev, "wakeup_deb_p1");
--	if (IS_ERR(mtk->wk_deb_p1)) {
--		dev_err(dev, "fail to get wakeup_deb_p1\n");
--		return PTR_ERR(mtk->wk_deb_p1);
--	}
--
- 	mtk->pericfg = syscon_regmap_lookup_by_phandle(dn,
- 						"mediatek,syscon-wakeup");
- 	if (IS_ERR(mtk->pericfg)) {
+-	/* power down all u3 ports */
++	/* power down u3 ports except skipped ones */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
++		if ((0x1 << i) & mtk->u3p_dis_msk)
++			continue;
++
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+ 		value |= CTRL_U3_PORT_PDN;
+ 		writel(value, &ippc->u3_ctrl_p[i]);
+@@ -573,6 +582,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mtk->lpm_support = of_property_read_bool(node, "usb3-lpm-capable");
++	/* optional property, ignore the error if it does not exist */
++	of_property_read_u32(node, "mediatek,u3p-dis-msk",
++			     &mtk->u3p_dis_msk);
+ 
+ 	ret = usb_wakeup_of_property_parse(mtk, node);
+ 	if (ret)
 diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
-index db55a12..67783a7 100644
+index 3aa5e1d..db55a12 100644
 --- a/drivers/usb/host/xhci-mtk.h
 +++ b/drivers/usb/host/xhci-mtk.h
-@@ -126,8 +126,6 @@ struct xhci_hcd_mtk {
+@@ -121,6 +121,7 @@ struct xhci_hcd_mtk {
+ 	bool has_ippc;
+ 	int num_u2_ports;
+ 	int num_u3_ports;
++	int u3p_dis_msk;
+ 	struct regulator *vusb33;
  	struct regulator *vbus;
  	struct clk *sys_clk;	/* sys and mac clock */
- 	struct clk *ref_clk;
--	struct clk *wk_deb_p0;	/* port0's wakeup debounce clock */
--	struct clk *wk_deb_p1;
- 	struct regmap *pericfg;
- 	struct phy **phys;
- 	int num_phys;
 -- 
 1.7.9.5
