@@ -1,109 +1,56 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Sep 2017 10:13:33 +0100
-Subject: [PATCH] arm64: fix documentation on kernel pages mappings to HYP
- VA
-In-Reply-To: <86bmlwo842.fsf@arm.com>
-References: <20170913180830.8608-1-ynorov@caviumnetworks.com>
- <20170926184542.t56zpdx2s5et77gy@yury-thinkpad>
- <86bmlwo842.fsf@arm.com>
-Message-ID: <20170927091332.GA19317@arm.com>
+Date: Wed, 27 Sep 2017 10:21:49 +0100
+Subject: [PATCH] arm64: avoid instrumenting atomic_ll_sc.o
+In-Reply-To: <1506448987-31070-1-git-send-email-mark.rutland@arm.com>
+References: <1506448987-31070-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170927092149.GB19753@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 09:31:41AM +0100, Marc Zyngier wrote:
-> On Tue, Sep 26 2017 at  9:45:42 pm BST, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > On Wed, Sep 13, 2017 at 09:08:30PM +0300, Yury Norov wrote:
-> >> The Documentation/arm64/memory.txt says:
-> >> When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-> >> offset from the kernel VA (top 24bits of the kernel VA set to zero):
-> >> 
-> >> In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
-> >> which has more options, and none of them assumes clearing of top 24bits
-> >> of the kernel VA.
-> >> 
-> >> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> >> ---
-> >>  Documentation/arm64/memory.txt | 15 +++++++++------
-> >>  1 file changed, 9 insertions(+), 6 deletions(-)
-> >> 
-> >> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-> >> index d7273a5f6456..c39895d7e3a2 100644
-> >> --- a/Documentation/arm64/memory.txt
-> >> +++ b/Documentation/arm64/memory.txt
-> >> @@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
-> >>   +-------------------------------------------------> [63] TTBR0/1
-> >>  
-> >>  
-> >> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-> >> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
-> >> -
-> >> -Start			End			Size		Use
-> >> ------------------------------------------------------------------------
-> >> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
-> >> +When using KVM without Virtualization Host Extensions, the hypervisor maps
-> >> +kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
-> >> +or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
-> >> +ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
-> >> +VA set to zero if CPU has Reduced HYP mapping offset capability. See
-> >> +kern_hyp_va macro.
+On Tue, Sep 26, 2017 at 07:03:07PM +0100, Mark Rutland wrote:
+> Our out-of-line atomics are built with a special calling convention,
+> preventing pointless stack spilling, and allowing us to patch call sites
+> with ARMv8.1 atomic instructions.
 > 
-> What is this "Reduced HYP mapping offset capability"?
+> Instrumentation inserted by the compiler may result in calls to
+> functions not following this special calling convention, resulting in
+> registers being unexpectedly clobbered, and various problems resulting
+> from this.
 > 
-> You're missing the point that the location of the EL2 mapping is
-> conditioned by the location of the identity mapping that is used to
-> bring up / tear down KVM. You have to express the VA transformation in
-> terms of both VA_BITS (and there is more cases than just 39 or 48 bits)
-> *and* the idmap address, not to mention the case where KVM's VA_BITS is
-> larger than the rest of the kernel. See the extensive blurb in
-> kvm_mmu.h.
+> For example, if a kernel is built with KCOV and ARM64_LSE_ATOMICS, the
+> compiler inserts calls to __sanitizer_cov_trace_pc in the prologues of
+> the atomic functions. This has been observed to result in spurious
+> cmpxchg failures, leading to a hang early on in the boot process.
 > 
-> >> +
-> >> +When using KVM with Virtualization Host Extensions, no additional mappings
-> >> +created as host kernel already operates in EL2.
-> 
-> This bit is fine.
+> This patch avoids such issues by preventing instrumentation of our
+> out-of-line atomics.
 
-FWIW, I was going to queue a simplified version along the lines of the patch
-below.
+Why doesn't decorating them with "notrace" like we do via the __LL_SC_INLINE
+macro help here? Do we just need to extend that somehow?
+
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/lib/Makefile | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+> index a0abc14..8fea178 100644
+> --- a/arch/arm64/lib/Makefile
+> +++ b/arch/arm64/lib/Makefile
+> @@ -17,5 +17,9 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+>  		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
+>  		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
+>  		   -fcall-saved-x18
+> +GCOV_PROFILE_atomic_ll_sc.o	:= n
+> +KASAN_SANITIZE_atomic_ll_sc.o	:= n
+> +KCOV_INSTRUMENT_atomic_ll_sc.o	:= n
+> +UBSAN_SANITIZE_atomic_ll_sc.o	:= n
+
+Hmm... do we need similar things for the vDSO? I can only spot the GCOV
+entry, and other architectures have a mixed bag of these. It would be
+nice if there was something a little less ad-hoc and error prone provided
+by kbuild.
 
 Will
-
---->8
-
-commit dbf7393b7738a0ba0284551e7b6e014cfb100661
-Author: Yury Norov <ynorov@caviumnetworks.com>
-Date:   Wed Sep 13 21:08:30 2017 +0300
-
-    arm64: fix documentation on kernel pages mappings to HYP VA
-    
-    The Documentation/arm64/memory.txt says:
-    When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-    offset from the kernel VA (top 24bits of the kernel VA set to zero):
-    
-    In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
-    which has more options, and none of them assumes clearing of top 24bits
-    of the kernel VA.
-    
-    Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-    [will: removed gory details]
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index d7273a5f6456..ea9ee39784a2 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -86,9 +86,9 @@ Translation table lookup with 64KB pages:
-  +-------------------------------------------------> [63] TTBR0/1
- 
- 
--When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
--offset from the kernel VA (top 24bits of the kernel VA set to zero):
-+When using KVM without the Virtualization Host Extensions, the hypervisor
-+maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
-+kern_hyp_va macro for more details.
- 
--Start			End			Size		Use
-------------------------------------------------------------------------
--0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
-+When using KVM with the Virtualization Host Extensions, no additional
-+mappings are created, since the host kernel runs directly in EL2.
