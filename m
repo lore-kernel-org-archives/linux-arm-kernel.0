@@ -1,46 +1,73 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Sep 2017 15:25:23 +0200
-Subject: [PATCH] rtc: sun6i: fix memory leak
-In-Reply-To: <1505652190-4942-1-git-send-email-sudipm.mukherjee@gmail.com>
-References: <1505652190-4942-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <20170927132523.u6miojeax67idtsj@piout.net>
+From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
+Date: Wed, 27 Sep 2017 14:32:37 +0100
+Subject: [PATCH v8 1/5] Doc: iommu/arm-smmu-v3: Add workaround for HiSilicon
+ erratum 161010801
+In-Reply-To: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170927133241.21036-2-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: John Garry <john.garry@huawei.com>
 
-On 17/09/2017 at 13:43:10 +0100, Sudip Mukherjee wrote:
-> If 'clk_data' is not allocated we returned but we failed to free 'rtc'.
-> 
-> Signed-off-by: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
-> ---
->  drivers/rtc/rtc-sun6i.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-> index 3d2216c..5bc28ee 100644
-> --- a/drivers/rtc/rtc-sun6i.c
-> +++ b/drivers/rtc/rtc-sun6i.c
-> @@ -201,8 +201,10 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
->  
->  	clk_data = kzalloc(sizeof(*clk_data) + (sizeof(*clk_data->hws) * 2),
->  			   GFP_KERNEL);
-> -	if (!clk_data)
-> +	if (!clk_data) {
-> +		kfree(rtc);
->  		return;
-> +	}
+The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+platforms hip06/hip07 to support the SMMU mappings for MSI transactions.
 
-Please also fix the other occurrence of the issue in the same function.
+On these platforms, GICv3 ITS translator is presented with the deviceID
+by extending the MSI payload data to 64 bits to include the deviceID.
+Hence, the PCIe controller on this platforms has to differentiate the MSI
+payload against other DMA payload and has to modify the MSI payload.
+This basically makes it difficult for this platforms to have a SMMU
+translation for MSI.
 
->  
->  	spin_lock_init(&rtc->lock);
->  
-> -- 
-> 2.7.4
-> 
+This patch adds a compatible string to implement this errata for
+HiSilicon Hi161x SMMUv3 model on hip06/hip07 platforms.
 
+Also, the arm64 silicon errata is updated with this same erratum.
+
+Signed-off-by: John Garry <john.garry@huawei.com>
+[Shameer: Modified to use compatible string for errata]
+Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+---
+ Documentation/arm64/silicon-errata.txt                  | 1 +
+ Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 9 ++++++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 66e8ce1..02816b1 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -70,6 +70,7 @@ stable kernels.
+ |                |                 |                 |                             |
+ | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
+ | Hisilicon      | Hip0{6,7}       | #161010701      | N/A                         |
++| Hisilicon      | Hip0{6,7}       | #161010801      | N/A                         |
+ |                |                 |                 |                             |
+ | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+index c9abbf3..3b0d599 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+@@ -7,11 +7,18 @@ the PCIe specification.
+ 
+ ** SMMUv3 required properties:
+ 
+-- compatible        : Should include:
++- compatible        : Should be one of:
++
++                      "arm,smmu-v3"
++                      "hisilicon,hi161x-smmu-v3"
++
++                      depending on the particular implementation.
+ 
+                       * "arm,smmu-v3" for any SMMUv3 compliant
+                         implementation. This entry should be last in the
+                         compatible list.
++                      * "hisilicon,hi161x-smmu-v3" for HiSilicon hi161x
++                         SMMUv3 implementation on hip06/hip07 platforms.
+ 
+ - reg               : Base address and size of the SMMU.
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
