@@ -1,32 +1,38 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 17:23:04 +0800
-Subject: [PATCH 8/9] dt-bindings: usb: mtk-xhci: add a optional property to
- disable u3ports
+Date: Wed, 27 Sep 2017 17:23:03 +0800
+Subject: [PATCH 7/9] usb: host: modify description for MTK xHCI config
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-Message-ID: <fd8b6099192ddee3b277f5ca3a699c20fb273ffe.1506503880.git.chunfeng.yun@mediatek.com>
+Message-ID: <37153cd259af6e1fc34b32a2e0dd1a15b8214579.1506503879.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new optional property to disable u3ports
+Due to all MediaTek SoCs with xHCI host controller use this
+driver, remove limitation for specific SoCs
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/usb/host/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-index 5611a2e..2d9b459 100644
---- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-@@ -38,6 +38,8 @@ Optional properties:
- 	mode;
-  - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
- 	control register, it depends on "mediatek,wakeup-src".
-+ - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
-+	bit1 for u3port1, ... etc;
-  - vbus-supply : reference to the VBUS regulator;
-  - usb3-lpm-capable : supports USB3.0 LPM
-  - pinctrl-names : a pinctrl state named "default" must be defined
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index fa5692d..bc09a2e 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -45,12 +45,12 @@ config USB_XHCI_PLATFORM
+ 	  If unsure, say N.
+ 
+ config USB_XHCI_MTK
+-	tristate "xHCI support for Mediatek MT65xx/MT7621"
++	tristate "xHCI support for MediaTek SoCs"
+ 	select MFD_SYSCON
+ 	depends on (MIPS && SOC_MT7621) || ARCH_MEDIATEK || COMPILE_TEST
+ 	---help---
+ 	  Say 'Y' to enable the support for the xHCI host controller
+-	  found in Mediatek MT65xx SoCs.
++	  found in MediaTek SoCs.
+ 	  If unsure, say N.
+ 
+ config USB_XHCI_MVEBU
 -- 
 1.7.9.5
