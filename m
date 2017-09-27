@@ -1,24 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Sep 2017 23:25:41 +0200
-Subject: [GIT PULL] DTS updates for the Integrator PCIv3 driver
-In-Reply-To: <CACRpkdZ0X1OiC6gogxD9EGkoMbY2yy81PPyrTWU-74ego9m+vQ@mail.gmail.com>
-References: <CACRpkdZ0X1OiC6gogxD9EGkoMbY2yy81PPyrTWU-74ego9m+vQ@mail.gmail.com>
-Message-ID: <CACRpkdYQeOVy=g2K5dE1FErUvAGj+p+bTh8kr4uFhb-VLrXChA@mail.gmail.com>
+Date: Wed, 27 Sep 2017 23:27:32 +0200
+Subject: [GIT PULL] Delete old PCIv3 driver
+Message-ID: <CACRpkdY9KSaHNyhrWC2te84eiFMfdUC0j7SGxo6MJ5JZpPorAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 11:24 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+Hi ARM SoC folks,
 
-> Hi ARM SoC folks,
->
-> these are some three patches readying the Integrator/AP device tree to work
-> properly with the modernized and corrected PCIv3 driver.
->
-> Please pull them in for DTS changes.
+the new PCIv3 driver is merged and ready in the PCI tree so please pull in
+this patch deleting the old driver in mach-integrator.
 
-Sorry I forgot the actual pull request... sometimes I'm doing too
-stupid mistakes:
+Yours,
+Linus Walleij
+
 
 The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
@@ -27,22 +21,25 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-pciv3-dts
+tags/integrator-pciv3-delete
 
-for you to fetch changes up to afd5d2f7af33fd4a57a68bca9e651ca7fd41263b:
+for you to fetch changes up to 70f8e9cc2362bbbd9ba482dcfa2245bd18c700ba:
 
-  ARM: dts: Update Integrator/AP PCI v3 compatible (2017-09-27 23:11:16 +0200)
-
-----------------------------------------------------------------
-These are the DTS file changes required to fix bugs and satisfy
-requirements for the new PCIv3 driver in the PCI subsystem.
-The binding changes have been merged to the PCI tree.
+  ARM: integrator: Delete the V3 PCI driver (2017-09-27 23:20:22 +0200)
 
 ----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: add the PCI clock to the device tree
-      ARM: dts: integratorap: Fix PCI windows
-      ARM: dts: Update Integrator/AP PCI v3 compatible
+This deletes the old PCIv3 driver in the Integrator machine.
+It has been superceded by a modernized driver in the PCI
+subsystem host/ directory.
 
- arch/arm/boot/dts/integratorap.dts | 25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: integrator: Delete the V3 PCI driver
+
+ arch/arm/mach-integrator/Makefile        |   2 -
+ arch/arm/mach-integrator/integrator_ap.c |   2 -
+ arch/arm/mach-integrator/pci_v3.c        | 900 -------------------------------
+ arch/arm/mach-integrator/pci_v3.h        |   9 -
+ 4 files changed, 913 deletions(-)
+ delete mode 100644 arch/arm/mach-integrator/pci_v3.c
+ delete mode 100644 arch/arm/mach-integrator/pci_v3.h
