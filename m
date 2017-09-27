@@ -1,63 +1,109 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 17:23:05 +0800
-Subject: [PATCH 9/9] dt-bindings: usb: mtk-xhci: remove dummy clocks and add
- optional ones
-In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-Message-ID: <95192dfda40c60cbe24b0f1e0bd6c82d318aa4ed.1506503880.git.chunfeng.yun@mediatek.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Sep 2017 11:28:15 +0200
+Subject: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features
+In-Reply-To: <0bc7efe6-8d0e-ddae-617b-36e4357f76ce@free-electrons.com>
+References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <6b89df1bf07dac2ab295fca5fdf0e55179c47ed6.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <20170926130009.r5isgrjvkwmm44nn@flea>
+ <5596280a-51bb-7491-31f4-5800219888ad@free-electrons.com>
+ <20170926132709.od3myumh5xtungvs@flea>
+ <0bc7efe6-8d0e-ddae-617b-36e4357f76ce@free-electrons.com>
+Message-ID: <20170927092815.4y57ej5qbilioxr5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove dummy clocks for usb wakeup and add optional ones for
-MCU_BUS_CK and DMA_BUS_CK.
+On Tue, Sep 26, 2017 at 01:37:37PM +0000, Quentin Schulz wrote:
+> On 26/09/2017 15:27, Maxime Ripard wrote:
+> > On Tue, Sep 26, 2017 at 01:08:21PM +0000, Quentin Schulz wrote:
+> >> Hi Maxime,
+> >>
+> >> On 26/09/2017 15:00, Maxime Ripard wrote:
+> >>> On Tue, Sep 26, 2017 at 12:17:12PM +0000, Quentin Schulz wrote:
+> >>>> +static const struct axp20x_desc_pin axp209_pins[] = {
+> >>>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
+> >>>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+> >>>> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
+> >>>> +		   AXP20X_FUNCTION(0x3, "ldo"),
+> >>>> +		   AXP20X_FUNCTION(0x4, "adc")),
+> >>>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(1, "GPIO1"),
+> >>>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+> >>>> +		   AXP20X_FUNCTION(0x2, "gpio_in"),
+> >>>> +		   AXP20X_FUNCTION(0x3, "ldo"),
+> >>>> +		   AXP20X_FUNCTION(0x4, "adc")),
+> >>>> +	AXP20X_PIN(AXP20X_PINCTRL_PIN(2, "GPIO2"),
+> >>>> +		   AXP20X_FUNCTION(0x0, "gpio_out"),
+> >>>> +		   AXP20X_FUNCTION(0x2, "gpio_in")),
+> >>>> +};
+> >>>
+> >>> If all the functions are the same, and at the same offset, can't we
+> >>> just hardcode it, instead of having (and duplicate) all the logic
+> >>> below?
+> >>>
+> >>
+> >> AXP20X_PIN(AXP20X_PINCTRL_PIN(0, "GPIO0"),
+> >> 		AXP20X_GPIO_OUT,
+> >> 		AXP20X_GPIO_IN,
+> >> 		AXP20X_LDO,
+> >> 		AXP20X_ADC))
+> >>
+> >> That's what you mean?
+> > 
+> > What I mean is:
+> > 
+> > static int axp20x_get_func(char *func)
+> > {
+> > 	if (!strcmp(func, "gpio_out"))
+> > 		return 0;
+> > 
+> > 	if (!strcmp(func, "gpio_in"))
+> > 		return 2;
+> >  
+> > 	if (!strcmp(func, "ldo"))
+> >  		return 3;
+> >  
+> > 	if (!strcmp(func, "adc"))
+> >  		return 4;
+> > 
+> > 	return -EINVAL;
+> > }
+> > 
+> 
+> GPIO2 on AXP209 does not support ldo nor adc.
+> GPIO1 on AXP813 does not support adc.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |   18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+Right, and surely that can be caught as well. This was a global
+approach. You could add a bitmap for example to encode whether ldo and
+adc are available. It takes two bytes, and two or operations.
 
-diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-index 2d9b459..3059596 100644
---- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-@@ -26,10 +26,11 @@ Required properties:
-  - clocks : a list of phandle + clock-specifier pairs, one for each
- 	entry in clock-names
-  - clock-names : must contain
--	"sys_ck": for clock of xHCI MAC
--	"ref_ck": for reference clock of xHCI MAC
--	"wakeup_deb_p0": for USB wakeup debounce clock of port0
--	"wakeup_deb_p1": for USB wakeup debounce clock of port1
-+	"sys_ck": controller clock used by normal mode,
-+	the following ones are optional:
-+	"ref_ck": reference clock used by low power mode etc,
-+	"mcu_ck": mcu_bus clock for register access,
-+	"dma_ck": dma_bus clock for data transfer by DMA
- 
-  - phys : a list of phandle + phy specifier pairs
- 
-@@ -57,9 +58,7 @@ usb30: usb at 11270000 {
- 	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
- 		 <&pericfg CLK_PERI_USB0>,
- 		 <&pericfg CLK_PERI_USB1>;
--	clock-names = "sys_ck", "ref_ck",
--		      "wakeup_deb_p0",
--		      "wakeup_deb_p1";
-+	clock-names = "sys_ck", "ref_ck";
- 	phys = <&phy_port0 PHY_TYPE_USB3>,
- 	       <&phy_port1 PHY_TYPE_USB2>;
- 	vusb33-supply = <&mt6397_vusb_reg>;
-@@ -91,9 +90,8 @@ Required properties:
- 
-  - clocks : a list of phandle + clock-specifier pairs, one for each
- 	entry in clock-names
-- - clock-names : must be
--	"sys_ck": for clock of xHCI MAC
--	"ref_ck": for reference clock of xHCI MAC
-+ - clock-names : must contain "sys_ck", and the following ones are optional:
-+	"ref_ck", "mcu_ck" and "dma_ck"
- 
- Optional properties:
-  - vbus-supply : reference to the VBUS regulator;
+> I find it more complex to handle those two cases in a function than by
+> hardcoding it in structures like above.
+
+You find more complex to add a 10 lines function than 450 lines of
+code that you ripped off from another driver, that generates 4
+structures many structures (groups, functions, pins and pins'
+functions) and will provide three different lookup methods? Really? :)
+
+It's way overkill for that driver. Most of these lists can be
+hardcoded as well.
+
+> Moreover, nothing tells us that it would be the same offset for
+> other PMICs.
+
+Again, let's worry about those PMICs when we'll need to support
+them. Unless you already have an example in mind of course. Otherwise,
+it's just building things on theories that have never been proven (and
+might never be).
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170927/0af8035c/attachment.sig>
