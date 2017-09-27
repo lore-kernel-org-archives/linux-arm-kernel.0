@@ -1,38 +1,93 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 17:23:03 +0800
-Subject: [PATCH 7/9] usb: host: modify description for MTK xHCI config
+Date: Wed, 27 Sep 2017 17:23:01 +0800
+Subject: [PATCH 5/9] usb: xhci-mtk: remove dummy wakeup debounce clocks
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-Message-ID: <37153cd259af6e1fc34b32a2e0dd1a15b8214579.1506503879.git.chunfeng.yun@mediatek.com>
+Message-ID: <ff9ee49a872084b4fc8c7fbabddc820058acb9b7.1506503879.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to all MediaTek SoCs with xHCI host controller use this
-driver, remove limitation for specific SoCs
+The wakeup debounce clocks for each ports in fact are not
+needed, so remove them.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/Kconfig |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/host/xhci-mtk.c |   33 ---------------------------------
+ drivers/usb/host/xhci-mtk.h |    2 --
+ 2 files changed, 35 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index fa5692d..bc09a2e 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -45,12 +45,12 @@ config USB_XHCI_PLATFORM
- 	  If unsure, say N.
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 97ba51e..d60463c 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -237,25 +237,8 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+ 		goto sys_clk_err;
+ 	}
  
- config USB_XHCI_MTK
--	tristate "xHCI support for Mediatek MT65xx/MT7621"
-+	tristate "xHCI support for MediaTek SoCs"
- 	select MFD_SYSCON
- 	depends on (MIPS && SOC_MT7621) || ARCH_MEDIATEK || COMPILE_TEST
- 	---help---
- 	  Say 'Y' to enable the support for the xHCI host controller
--	  found in Mediatek MT65xx SoCs.
-+	  found in MediaTek SoCs.
- 	  If unsure, say N.
+-	if (mtk->wakeup_src) {
+-		ret = clk_prepare_enable(mtk->wk_deb_p0);
+-		if (ret) {
+-			dev_err(mtk->dev, "failed to enable wk_deb_p0\n");
+-			goto usb_p0_err;
+-		}
+-
+-		ret = clk_prepare_enable(mtk->wk_deb_p1);
+-		if (ret) {
+-			dev_err(mtk->dev, "failed to enable wk_deb_p1\n");
+-			goto usb_p1_err;
+-		}
+-	}
+ 	return 0;
  
- config USB_XHCI_MVEBU
+-usb_p1_err:
+-	clk_disable_unprepare(mtk->wk_deb_p0);
+-usb_p0_err:
+-	clk_disable_unprepare(mtk->sys_clk);
+ sys_clk_err:
+ 	clk_disable_unprepare(mtk->ref_clk);
+ ref_clk_err:
+@@ -264,10 +247,6 @@ static int xhci_mtk_clks_enable(struct xhci_hcd_mtk *mtk)
+ 
+ static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
+ {
+-	if (mtk->wakeup_src) {
+-		clk_disable_unprepare(mtk->wk_deb_p1);
+-		clk_disable_unprepare(mtk->wk_deb_p0);
+-	}
+ 	clk_disable_unprepare(mtk->sys_clk);
+ 	clk_disable_unprepare(mtk->ref_clk);
+ }
+@@ -371,18 +350,6 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
+ 	if (!mtk->wakeup_src)
+ 		return 0;
+ 
+-	mtk->wk_deb_p0 = devm_clk_get(dev, "wakeup_deb_p0");
+-	if (IS_ERR(mtk->wk_deb_p0)) {
+-		dev_err(dev, "fail to get wakeup_deb_p0\n");
+-		return PTR_ERR(mtk->wk_deb_p0);
+-	}
+-
+-	mtk->wk_deb_p1 = devm_clk_get(dev, "wakeup_deb_p1");
+-	if (IS_ERR(mtk->wk_deb_p1)) {
+-		dev_err(dev, "fail to get wakeup_deb_p1\n");
+-		return PTR_ERR(mtk->wk_deb_p1);
+-	}
+-
+ 	mtk->pericfg = syscon_regmap_lookup_by_phandle(dn,
+ 						"mediatek,syscon-wakeup");
+ 	if (IS_ERR(mtk->pericfg)) {
+diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+index db55a12..67783a7 100644
+--- a/drivers/usb/host/xhci-mtk.h
++++ b/drivers/usb/host/xhci-mtk.h
+@@ -126,8 +126,6 @@ struct xhci_hcd_mtk {
+ 	struct regulator *vbus;
+ 	struct clk *sys_clk;	/* sys and mac clock */
+ 	struct clk *ref_clk;
+-	struct clk *wk_deb_p0;	/* port0's wakeup debounce clock */
+-	struct clk *wk_deb_p1;
+ 	struct regmap *pericfg;
+ 	struct phy **phys;
+ 	int num_phys;
 -- 
 1.7.9.5
