@@ -1,69 +1,39 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 27 Sep 2017 09:18:20 +0800
-Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
-References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
- <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
- <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
- <1505355021.8308.4.camel@mhfsdcap03>
- <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
-Message-ID: <1506475100.19851.9.camel@mhfsdcap03>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 Sep 2017 09:20:11 +0800
+Subject: [PATCH 0/4] IORT SMMUv3 MSI support
+Message-ID: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-09-27 at 00:33 +0200, Ulf Hansson wrote:
-> On 14 September 2017 at 04:10, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > On Wed, 2017-09-13 at 09:10 -0500, Rob Herring wrote:
-> >> On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
-> >> > Change the comptiable for support of multi-platform
-> >> > Add description for reg
-> >> > Add description for source_cg
-> >> > Add description for mediatek,latch-ck
-> >>
-> >> This is at least the 3rd patch with exactly the same vague subject.
-> >> Please make the subject somewhat unique.
-> >>
-> > Thx, will change the subject at next version
-> >> >
-> >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> >> > ---
-> >> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
-> >> >  1 file changed, 10 insertions(+), 3 deletions(-)
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> >> > index 4182ea3..405cd06 100644
-> >> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> >> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> >> > @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
-> >> >  and the properties used by the msdc driver.
-> >> >
-> >> >  Required properties:
-> >> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> >> > +- compatible: value should be either of the following.
-> >> > +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> >> > +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> >> > +   "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> >> > +   "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> >> > +- reg: physical base address of the controller and length
-> >> >  - interrupts: Should contain MSDC interrupt number
-> >> > -- clocks: MSDC source clock, HCLK
-> >> > -- clock-names: "source", "hclk"
-> >> > +- clocks: MSDC source clock, HCLK, source_cg
-> >> > +- clock-names: "source", "hclk", "source_cg"
-> >>
-> >> All chips support source_cg? That's not backwards compatible for
-> >> existing compatible strings if the driver requires it.
-> > Not all chips support source_cg, for chips which do not support
-> > source_cg, no need source_cg here, and the driver will parse it
-> > to know if current chip support it.
-> 
-> In such case you must not add add a required binding for it. I think
-> that is what Rob is trying to point out for you.
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
-The source_cg is required(MUST) at MT2712 and future SoCs, but not
-required(do not have it) at previous SoCs, so that put it at required
-properties, let the driver to handle it.
+IORT revision C introduced SMMUv3 MSI support for control interrupts,
+which introduced a device ID mapping index to retrieve the dev ID
+and ITS parent, adding its support in this patch set, please refer
+to each patch for detail commit message.
+
+RFC v2 -> v1:
+ - Drop RFC tag;
+ - return the index value directly from iort_get_id_mapping_index()
+   then make the logic simple in iort_node_map_id();
+ - To make sure ID mapping index is only ignored if all interrupts are
+   GSIV based
+ - Sqursh part of the patch 4 to patch 3
+
+RFC v1 -> RFC v2:
+ - Introduce a new API iort_set_device_domain() to find the MSI domain
+   for an SMMUv3 (or any other IORT table node) to reduce the complex
+   of doing that via acpi_configure_pmsi_domain().
+
+Hanjun Guo (3):
+  ACPICA: Add SMMUv3 device ID mapping index support
+  ACPI: IORT: lookup iort node via fwnode
+  ACPI: IORT: Skip SMMUv3 device ID map for two steps mappings
+
+Lorenzo Pieralisi (1):
+  ACPI: IORT: SMMUv3 nodes MSI support
+
+ drivers/acpi/arm64/iort.c | 152 ++++++++++++++++++++++++++++++++++++++++++++--
+ include/acpi/actbl2.h     |   1 +
+ 2 files changed, 147 insertions(+), 6 deletions(-)
+
+-- 
+1.9.1
