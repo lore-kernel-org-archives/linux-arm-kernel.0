@@ -1,67 +1,46 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Wed, 27 Sep 2017 18:44:08 +0800
-Subject: [PATCH v5 6/6] mfd: mt6397: Add PMIC keys support to MT6397 driver
+Date: Wed, 27 Sep 2017 18:44:06 +0800
+Subject: [PATCH v5 4/6] dt-bindings: mfd: Add bindings for the keys as subnode
+ of PMIC
 In-Reply-To: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
 References: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <1506509048-19032-7-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1506509048-19032-5-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds compatible strings and interrupts for pmic keys
-which serves as child device of MFD.
+This patch adds documentation for device tree bindings for keys support
+as the subnode of MT6397/MT6323 PMIC.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 ---
- drivers/mfd/mt6397-core.c |   22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mfd/mt6397.txt |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 6546d7f..77b64bd 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -43,6 +43,16 @@
- 	},
- };
+diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+index 522a3bb..d1df77f 100644
+--- a/Documentation/devicetree/bindings/mfd/mt6397.txt
++++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
+@@ -7,6 +7,7 @@ MT6397/MT6323 is a multifunction device with the following sub modules:
+ - GPIO
+ - Clock
+ - LED
++- Keys
  
-+static const struct resource mt6323_keys_resources[] = {
-+	DEFINE_RES_IRQ(MT6323_IRQ_STATUS_PWRKEY),
-+	DEFINE_RES_IRQ(MT6323_IRQ_STATUS_FCHRKEY),
-+};
+ It is interfaced to host controller using SPI interface by a proprietary hardware
+ called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
+@@ -40,6 +41,11 @@ Optional subnodes:
+ 		- compatible: "mediatek,mt6323-led"
+ 	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
+ 
++- keys
++	Required properties:
++		- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
++	see Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
 +
-+static const struct resource mt6397_keys_resources[] = {
-+	DEFINE_RES_IRQ(MT6397_IRQ_PWRKEY),
-+	DEFINE_RES_IRQ(MT6397_IRQ_HOMEKEY),
-+};
-+
- static const struct mfd_cell mt6323_devs[] = {
- 	{
- 		.name = "mt6323-regulator",
-@@ -50,6 +60,11 @@
- 	}, {
- 		.name = "mt6323-led",
- 		.of_compatible = "mediatek,mt6323-led"
-+	}, {
-+		.name = "mtk-pmic-keys",
-+		.num_resources = ARRAY_SIZE(mt6323_keys_resources),
-+		.resources = mt6323_keys_resources,
-+		.of_compatible = "mediatek,mt6323-keys"
- 	},
- };
- 
-@@ -71,7 +86,12 @@
- 	}, {
- 		.name = "mt6397-pinctrl",
- 		.of_compatible = "mediatek,mt6397-pinctrl",
--	},
-+	}, {
-+		.name = "mtk-pmic-keys",
-+		.num_resources = ARRAY_SIZE(mt6397_keys_resources),
-+		.resources = mt6397_keys_resources,
-+		.of_compatible = "mediatek,mt6397-keys"
-+	}
- };
- 
- static void mt6397_irq_lock(struct irq_data *data)
+ Example:
+ 	pwrap: pwrap at 1000f000 {
+ 		compatible = "mediatek,mt8135-pwrap";
 -- 
 1.7.9.5
