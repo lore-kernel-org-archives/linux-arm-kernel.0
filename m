@@ -1,80 +1,73 @@
-From: douly.fnst@cn.fujitsu.com (Dou Liyang)
-Date: Wed, 27 Sep 2017 09:41:49 +0800
-Subject: [PATCH v9] ACPI / init: Invoke early ACPI initialization earlier
-In-Reply-To: <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
-References: <1505293975-26005-1-git-send-email-douly.fnst@cn.fujitsu.com>
- <1505294274-441-1-git-send-email-douly.fnst@cn.fujitsu.com>
-Message-ID: <e4eadcbc-fe58-2d2c-818d-34e2f545db16@cn.fujitsu.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 27 Sep 2017 11:40:21 +0900
+Subject: [PATCH v6 1/2] dt-bindings: gpio: uniphier: add UniPhier GPIO binding
+In-Reply-To: <1506480022-8995-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1506480022-8995-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1506480022-8995-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael, Zheng,
+This GPIO controller is used on UniPhier SoC family.
 
-Welcome any comments!
+The vendor specific property "socionext,interrupt-ranges" is for
+specifying interrupt mapping to the parent interrupt controller
+because the mapping is not contiguous.  It works like "ranges",
+but transforms "interrupts" instead of "reg".
 
-Now, our patches are in tip tree, they are based on this
-independent patch, we hope it can be merged earlier than our
-patches to avoid ACPI Error. we need your advice and confirmation.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-Thanks,
-	dou.
 
-At 09/13/2017 05:17 PM, Dou Liyang wrote:
-> Linux uses acpi_early_init() to put the ACPI table management into the
-> late stage from the early stage. This two stages are different. the
-> mapped ACPI tables in early stage is temporary and should be unmapped,
-> but in late stage, it is permanent and don't need to be unmapped.
->
-> Originally, mapping and parsing the DMAR table should be in the late stage.
-> However, Initializing interrupt delivery mode earlier will move it into
-> the early stage. This causes an ACPI error warning when Linux reallocates
-> the ACPI root tables.
->
-> Commit b064a8fa77df ("ACPI / init: Switch over platform to the ACPI mode
-> later") splits the ACPI early initialization code into acpi_early_init()
-> and acpi_subsystem_init(). This makes acpi_early_init() more independently
->
-> So, invoke acpi_early_init() earlier before late_time_init(), Keep the DMAR
-> be mapped and parsed in late stage like before.
->
-> Reported-by: Xiaolong Ye <xiaolong.ye@intel.com>
-> Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
-> Cc: linux-acpi at vger.kernel.org
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Zheng, Lv <lv.zheng@intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: linux-ia64 at vger.kernel.org
-> Cc: yinghai at kernel.org
-> Cc: bhe at redhat.com
-> Cc: bp at alien8.de
-> ---
->  init/main.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/init/main.c b/init/main.c
-> index 0ee9c686..2fb98a4 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -664,12 +664,12 @@ asmlinkage __visible void __init start_kernel(void)
->  	debug_objects_mem_init();
->  	setup_per_cpu_pageset();
->  	numa_policy_init();
-> +	acpi_early_init();
->  	if (late_time_init)
->  		late_time_init();
->  	calibrate_delay();
->  	pidmap_init();
->  	anon_vma_init();
-> -	acpi_early_init();
->  #ifdef CONFIG_X86
->  	if (efi_enabled(EFI_RUNTIME_SERVICES))
->  		efi_enter_virtual_mode();
->
+ .../devicetree/bindings/gpio/gpio-uniphier.txt     | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+new file mode 100644
+index 0000000..6d9251a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+@@ -0,0 +1,40 @@
++UniPhier GPIO controller
++
++Required properties:
++- compatible: Should be "socionext,uniphier-gpio".
++- reg: Specifies offset and length of the register set for the device.
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be 2.  The first cell is the pin number and the second
++  cell is used to specify optional parameters.
++- interrupt-parent: Specifies the parent interrupt controller.
++- interrupt-controller: Marks the device node as an interrupt controller.
++- #interrupt-cells: Should be 2.  The first cell defines the interrupt number.
++  The second cell bits[3:0] is used to specify trigger type as follows:
++    1 = low-to-high edge triggered
++    2 = high-to-low edge triggered
++    4 = active high level-sensitive
++    8 = active low level-sensitive
++  Valid combinations are 1, 2, 3, 4, 8.
++- ngpios: Specifies the number of GPIO lines.
++- gpio-ranges: Mapping to pin controller pins (as described in gpio.txt)
++- socionext,interrupt-ranges: Specifies an interrupt number mapping between
++  this GPIO controller and its interrupt parent, in the form of arbitrary
++  number of <child-interrupt-base parent-interrupt-base length> triplets.
++
++Optional properties:
++- gpio-ranges-group-names: Used for named gpio ranges (as described in gpio.txt)
++
++Example:
++	gpio: gpio at 55000000 {
++		compatible = "socionext,uniphier-gpio";
++		reg = <0x55000000 0x200>;
++		interrupt-parent = <&aidet>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-ranges = <&pinctrl 0 0 0>;
++		gpio-ranges-group-names = "gpio_range";
++		ngpios = <248>;
++		socionext,interrupt-ranges = <0 48 16>, <16 154 5>, <21 217 3>;
++	};
+-- 
+2.7.4
