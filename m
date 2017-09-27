@@ -1,167 +1,373 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 18:58:36 +0800
-Subject: [PATCH 07/12] usb: mtu3: add support for usb3.1 IP
+Date: Wed, 27 Sep 2017 18:58:34 +0800
+Subject: [PATCH 05/12] usb: mtu3: support 36-bit DMA address
 In-Reply-To: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
 References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
-Message-ID: <f862f79fce3eb723a7d9bb6d27e60b82d031d918.1506509659.git.chunfeng.yun@mediatek.com>
+Message-ID: <f83d3d489b37dd097a32fea2dae398bba762cee3.1506509658.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support SuperSpeedPlus for usb3.1 device IP
+add support for 36-bit DMA address
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3.h            |    1 +
- drivers/usb/mtu3/mtu3_core.c       |   14 +++++++++++---
- drivers/usb/mtu3/mtu3_gadget.c     |    3 ++-
- drivers/usb/mtu3/mtu3_gadget_ep0.c |   16 ++++++++--------
- drivers/usb/mtu3/mtu3_hw_regs.h    |    1 +
- 5 files changed, 23 insertions(+), 12 deletions(-)
+ drivers/usb/mtu3/mtu3.h         |   17 ++++++-
+ drivers/usb/mtu3/mtu3_core.c    |   34 ++++++++++++-
+ drivers/usb/mtu3/mtu3_hw_regs.h |   10 ++++
+ drivers/usb/mtu3/mtu3_qmu.c     |  102 ++++++++++++++++++++++++++++++++-------
+ 4 files changed, 142 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
-index b0c2b5d..d80e4e8 100644
+index 2795294..ef2dc92 100644
 --- a/drivers/usb/mtu3/mtu3.h
 +++ b/drivers/usb/mtu3/mtu3.h
-@@ -94,6 +94,7 @@ enum mtu3_speed {
- 	MTU3_SPEED_FULL = 1,
- 	MTU3_SPEED_HIGH = 3,
- 	MTU3_SPEED_SUPER = 4,
-+	MTU3_SPEED_SUPER_PLUS = 5,
- };
+@@ -46,6 +46,9 @@
+ #define	MU3D_EP_RXCR1(epnum)	(U3D_RX1CSR1 + (((epnum) - 1) * 0x10))
+ #define	MU3D_EP_RXCR2(epnum)	(U3D_RX1CSR2 + (((epnum) - 1) * 0x10))
  
- /**
++#define USB_QMU_TQHIAR(epnum)	(U3D_TXQHIAR1 + (((epnum) - 1) * 0x4))
++#define USB_QMU_RQHIAR(epnum)	(U3D_RXQHIAR1 + (((epnum) - 1) * 0x4))
++
+ #define USB_QMU_RQCSR(epnum)	(U3D_RXQCSR1 + (((epnum) - 1) * 0x10))
+ #define USB_QMU_RQSAR(epnum)	(U3D_RXQSAR1 + (((epnum) - 1) * 0x10))
+ #define USB_QMU_RQCPR(epnum)	(U3D_RXQCPR1 + (((epnum) - 1) * 0x10))
+@@ -138,23 +141,33 @@ struct mtu3_fifo_info {
+  *	Checksum value is calculated over the 16 bytes of the GPD by default;
+  * @data_buf_len (RX ONLY): This value indicates the length of
+  *	the assigned data buffer
++ * @tx_ext_addr (TX ONLY): [3:0] are 4 extension bits of @buffer,
++ *	[7:4] are 4 extension bits of @next_gpd
+  * @next_gpd: Physical address of the next GPD
+  * @buffer: Physical address of the data buffer
+  * @buf_len:
+  *	(TX): This value indicates the length of the assigned data buffer
+  *	(RX): The total length of data received
+  * @ext_len: reserved
++ * @rx_ext_addr(RX ONLY): [3:0] are 4 extension bits of @buffer,
++ *	[7:4] are 4 extension bits of @next_gpd
+  * @ext_flag:
+  *	bit5 (TX ONLY): Zero Length Packet (ZLP),
+  */
+ struct qmu_gpd {
+ 	__u8 flag;
+ 	__u8 chksum;
+-	__le16 data_buf_len;
++	union {
++		__le16 data_buf_len;
++		__le16 tx_ext_addr;
++	};
+ 	__le32 next_gpd;
+ 	__le32 buffer;
+ 	__le16 buf_len;
+-	__u8 ext_len;
++	union {
++		__u8 ext_len;
++		__u8 rx_ext_addr;
++	};
+ 	__u8 ext_flag;
+ } __packed;
+ 
 diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index cd4528f..67f7a30 100644
+index 9475798..cd4528f 100644
 --- a/drivers/usb/mtu3/mtu3_core.c
 +++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -237,7 +237,7 @@ void mtu3_ep_stall_set(struct mtu3_ep *mep, bool set)
+@@ -17,6 +17,7 @@
+  *
+  */
  
- void mtu3_dev_on_off(struct mtu3 *mtu, int is_on)
- {
--	if (mtu->is_u3_ip && (mtu->max_speed == USB_SPEED_SUPER))
-+	if (mtu->is_u3_ip && mtu->max_speed >= USB_SPEED_SUPER)
- 		mtu3_ss_func_set(mtu, is_on);
- 	else
- 		mtu3_hs_softconn_set(mtu, is_on);
-@@ -547,6 +547,9 @@ static void mtu3_set_speed(struct mtu3 *mtu)
- 		mtu3_clrbits(mbase, U3D_USB3_CONFIG, USB3_EN);
- 		/* HS/FS detected by HW */
- 		mtu3_setbits(mbase, U3D_POWER_MANAGEMENT, HS_ENABLE);
-+	} else if (mtu->max_speed == USB_SPEED_SUPER) {
-+		mtu3_clrbits(mtu->ippc_base, SSUSB_U3_CTRL(0),
-+			     SSUSB_U3_PORT_SSP_SPEED);
- 	}
++#include <linux/dma-mapping.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+@@ -759,7 +760,31 @@ static void mtu3_hw_exit(struct mtu3 *mtu)
+ 	mtu3_mem_free(mtu);
+ }
  
- 	dev_info(mtu->dev, "max_speed: %s\n",
-@@ -624,6 +627,10 @@ static irqreturn_t mtu3_link_isr(struct mtu3 *mtu)
- 		udev_speed = USB_SPEED_SUPER;
- 		maxpkt = 512;
- 		break;
-+	case MTU3_SPEED_SUPER_PLUS:
-+		udev_speed = USB_SPEED_SUPER_PLUS;
-+		maxpkt = 512;
-+		break;
- 	default:
- 		udev_speed = USB_SPEED_UNKNOWN;
- 		break;
-@@ -825,14 +832,15 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
- 	case USB_SPEED_FULL:
- 	case USB_SPEED_HIGH:
- 	case USB_SPEED_SUPER:
-+	case USB_SPEED_SUPER_PLUS:
- 		break;
- 	default:
- 		dev_err(dev, "invalid max_speed: %s\n",
- 			usb_speed_string(mtu->max_speed));
- 		/* fall through */
- 	case USB_SPEED_UNKNOWN:
--		/* default as SS */
--		mtu->max_speed = USB_SPEED_SUPER;
-+		/* default as SSP */
-+		mtu->max_speed = USB_SPEED_SUPER_PLUS;
- 		break;
- 	}
- 
-diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
-index 434fca5..b495471 100644
---- a/drivers/usb/mtu3/mtu3_gadget.c
-+++ b/drivers/usb/mtu3/mtu3_gadget.c
-@@ -89,6 +89,7 @@ static int mtu3_ep_enable(struct mtu3_ep *mep)
- 
- 	switch (mtu->g.speed) {
- 	case USB_SPEED_SUPER:
-+	case USB_SPEED_SUPER_PLUS:
- 		if (usb_endpoint_xfer_int(desc) ||
- 				usb_endpoint_xfer_isoc(desc)) {
- 			interval = desc->bInterval;
-@@ -456,7 +457,7 @@ static int mtu3_gadget_wakeup(struct usb_gadget *gadget)
- 		return  -EOPNOTSUPP;
- 
- 	spin_lock_irqsave(&mtu->lock, flags);
--	if (mtu->g.speed == USB_SPEED_SUPER) {
-+	if (mtu->g.speed >= USB_SPEED_SUPER) {
- 		mtu3_setbits(mtu->mac_base, U3D_LINK_POWER_CONTROL, UX_EXIT);
- 	} else {
- 		mtu3_setbits(mtu->mac_base, U3D_POWER_MANAGEMENT, RESUME);
-diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
-index 958d74d..1ca77e8 100644
---- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
-+++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
-@@ -212,8 +212,8 @@ static int ep0_set_sel(struct mtu3 *mtu, struct usb_ctrlrequest *setup)
- 	case USB_RECIP_DEVICE:
- 		result[0] = mtu->is_self_powered << USB_DEVICE_SELF_POWERED;
- 		result[0] |= mtu->may_wakeup << USB_DEVICE_REMOTE_WAKEUP;
--		/* superspeed only */
--		if (mtu->g.speed == USB_SPEED_SUPER) {
+-/*-------------------------------------------------------------------------*/
++/**
++ * we set 32-bit DMA mask by default, here check whether the controller
++ * supports 36-bit DMA or not, if it does, set 36-bit DMA mask.
++ */
++static int mtu3_set_dma_mask(struct mtu3 *mtu)
++{
++	struct device *dev = mtu->dev;
++	bool is_36bit = false;
++	int ret = 0;
++	u32 value;
 +
-+		if (mtu->g.speed >= USB_SPEED_SUPER) {
- 			result[0] |= mtu->u1_enable << USB_DEV_STAT_U1_ENABLED;
- 			result[0] |= mtu->u2_enable << USB_DEV_STAT_U2_ENABLED;
- 		}
-@@ -329,8 +329,8 @@ static int ep0_handle_feature_dev(struct mtu3 *mtu,
- 		handled = handle_test_mode(mtu, setup);
- 		break;
- 	case USB_DEVICE_U1_ENABLE:
--		if (mtu->g.speed != USB_SPEED_SUPER ||
--			mtu->g.state != USB_STATE_CONFIGURED)
-+		if (mtu->g.speed <= USB_SPEED_SUPER ||
-+		    mtu->g.state != USB_STATE_CONFIGURED)
- 			break;
++	value = mtu3_readl(mtu->mac_base, U3D_MISC_CTRL);
++	if (value & DMA_ADDR_36BIT) {
++		is_36bit = true;
++		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(36));
++		/* If set 36-bit DMA mask fails, fall back to 32-bit DMA mask */
++		if (ret) {
++			is_36bit = false;
++			ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
++		}
++	}
++	dev_info(dev, "dma mask: %s bits\n", is_36bit ? "36" : "32");
++
++	return ret;
++}
  
- 		lpc = mtu3_readl(mbase, U3D_LINK_POWER_CONTROL);
-@@ -344,8 +344,8 @@ static int ep0_handle_feature_dev(struct mtu3 *mtu,
- 		handled = 1;
- 		break;
- 	case USB_DEVICE_U2_ENABLE:
--		if (mtu->g.speed != USB_SPEED_SUPER ||
--			mtu->g.state != USB_STATE_CONFIGURED)
-+		if (mtu->g.speed <= USB_SPEED_SUPER ||
-+		    mtu->g.state != USB_STATE_CONFIGURED)
- 			break;
+ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+ {
+@@ -820,6 +845,12 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+ 		return ret;
+ 	}
  
- 		lpc = mtu3_readl(mbase, U3D_LINK_POWER_CONTROL);
-@@ -384,8 +384,8 @@ static int ep0_handle_feature(struct mtu3 *mtu,
- 		break;
- 	case USB_RECIP_INTERFACE:
- 		/* superspeed only */
--		if ((value == USB_INTRF_FUNC_SUSPEND)
--			&& (mtu->g.speed == USB_SPEED_SUPER)) {
-+		if (value == USB_INTRF_FUNC_SUSPEND &&
-+		    mtu->g.speed >= USB_SPEED_SUPER) {
- 			/*
- 			 * forward the request because function drivers
- 			 * should handle it
++	ret = mtu3_set_dma_mask(mtu);
++	if (ret) {
++		dev_err(dev, "mtu3 set dma_mask failed:%d\n", ret);
++		goto dma_mask_err;
++	}
++
+ 	ret = devm_request_irq(dev, mtu->irq, mtu3_irq, 0, dev_name(dev), mtu);
+ 	if (ret) {
+ 		dev_err(dev, "request irq %d failed!\n", mtu->irq);
+@@ -845,6 +876,7 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+ gadget_err:
+ 	device_init_wakeup(dev, false);
+ 
++dma_mask_err:
+ irq_err:
+ 	mtu3_hw_exit(mtu);
+ 	ssusb->u3d = NULL;
 diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
-index a7e35f6..6953436 100644
+index 06b2966..b605975 100644
 --- a/drivers/usb/mtu3/mtu3_hw_regs.h
 +++ b/drivers/usb/mtu3/mtu3_hw_regs.h
-@@ -467,6 +467,7 @@
- #define SSUSB_VBUS_CHG_INT_B_EN		BIT(6)
+@@ -58,6 +58,8 @@
+ #define U3D_QCR1		(SSUSB_DEV_BASE + 0x0404)
+ #define U3D_QCR2		(SSUSB_DEV_BASE + 0x0408)
+ #define U3D_QCR3		(SSUSB_DEV_BASE + 0x040C)
++#define U3D_TXQHIAR1		(SSUSB_DEV_BASE + 0x0484)
++#define U3D_RXQHIAR1		(SSUSB_DEV_BASE + 0x04C4)
  
- /* U3D_SSUSB_U3_CTRL_0P */
-+#define SSUSB_U3_PORT_SSP_SPEED	BIT(9)
- #define SSUSB_U3_PORT_HOST_SEL		BIT(2)
- #define SSUSB_U3_PORT_PDN		BIT(1)
- #define SSUSB_U3_PORT_DIS		BIT(0)
+ #define U3D_TXQCSR1		(SSUSB_DEV_BASE + 0x0510)
+ #define U3D_TXQSAR1		(SSUSB_DEV_BASE + 0x0514)
+@@ -189,6 +191,13 @@
+ #define QMU_RX_COZ(x)		(BIT(16) << (x))
+ #define QMU_RX_ZLP(x)		(BIT(0) << (x))
+ 
++/* U3D_TXQHIAR1 */
++/* U3D_RXQHIAR1 */
++#define QMU_LAST_DONE_PTR_HI(x)	(((x) >> 16) & 0xf)
++#define QMU_CUR_GPD_ADDR_HI(x)	(((x) >> 8) & 0xf)
++#define QMU_START_ADDR_HI_MSK	GENMASK(3, 0)
++#define QMU_START_ADDR_HI(x)	(((x) & 0xf) << 0)
++
+ /* U3D_TXQCSR1 */
+ /* U3D_RXQCSR1 */
+ #define QMU_Q_ACTIVE		BIT(15)
+@@ -225,6 +234,7 @@
+ #define CAP_TX_EP_NUM(x)	((x) & 0x1f)
+ 
+ /* U3D_MISC_CTRL */
++#define DMA_ADDR_36BIT		BIT(31)
+ #define VBUS_ON			BIT(1)
+ #define VBUS_FRC_EN		BIT(0)
+ 
+diff --git a/drivers/usb/mtu3/mtu3_qmu.c b/drivers/usb/mtu3/mtu3_qmu.c
+index 7d9ba8a..10d8f60 100644
+--- a/drivers/usb/mtu3/mtu3_qmu.c
++++ b/drivers/usb/mtu3/mtu3_qmu.c
+@@ -40,7 +40,58 @@
+ #define GPD_FLAGS_IOC	BIT(7)
+ 
+ #define GPD_EXT_FLAG_ZLP	BIT(5)
++#define GPD_EXT_NGP(x)		(((x) & 0xf) << 4)
++#define GPD_EXT_BUF(x)		(((x) & 0xf) << 0)
+ 
++#define HILO_GEN64(hi, lo) (((u64)(hi) << 32) + (lo))
++#define HILO_DMA(hi, lo)	\
++	((dma_addr_t)HILO_GEN64((le32_to_cpu(hi)), (le32_to_cpu(lo))))
++
++static dma_addr_t read_txq_cur_addr(void __iomem *mbase, u8 epnum)
++{
++	u32 txcpr;
++	u32 txhiar;
++
++	txcpr = mtu3_readl(mbase, USB_QMU_TQCPR(epnum));
++	txhiar = mtu3_readl(mbase, USB_QMU_TQHIAR(epnum));
++
++	return HILO_DMA(QMU_CUR_GPD_ADDR_HI(txhiar), txcpr);
++}
++
++static dma_addr_t read_rxq_cur_addr(void __iomem *mbase, u8 epnum)
++{
++	u32 rxcpr;
++	u32 rxhiar;
++
++	rxcpr = mtu3_readl(mbase, USB_QMU_RQCPR(epnum));
++	rxhiar = mtu3_readl(mbase, USB_QMU_RQHIAR(epnum));
++
++	return HILO_DMA(QMU_CUR_GPD_ADDR_HI(rxhiar), rxcpr);
++}
++
++static void write_txq_start_addr(void __iomem *mbase, u8 epnum, dma_addr_t dma)
++{
++	u32 tqhiar;
++
++	mtu3_writel(mbase, USB_QMU_TQSAR(epnum),
++		    cpu_to_le32(lower_32_bits(dma)));
++	tqhiar = mtu3_readl(mbase, USB_QMU_TQHIAR(epnum));
++	tqhiar &= ~QMU_START_ADDR_HI_MSK;
++	tqhiar |= QMU_START_ADDR_HI(upper_32_bits(dma));
++	mtu3_writel(mbase, USB_QMU_TQHIAR(epnum), tqhiar);
++}
++
++static void write_rxq_start_addr(void __iomem *mbase, u8 epnum, dma_addr_t dma)
++{
++	u32 rqhiar;
++
++	mtu3_writel(mbase, USB_QMU_RQSAR(epnum),
++		    cpu_to_le32(lower_32_bits(dma)));
++	rqhiar = mtu3_readl(mbase, USB_QMU_RQHIAR(epnum));
++	rqhiar &= ~QMU_START_ADDR_HI_MSK;
++	rqhiar |= QMU_START_ADDR_HI(upper_32_bits(dma));
++	mtu3_writel(mbase, USB_QMU_RQHIAR(epnum), rqhiar);
++}
+ 
+ static struct qmu_gpd *gpd_dma_to_virt(struct mtu3_gpd_ring *ring,
+ 		dma_addr_t dma_addr)
+@@ -193,21 +244,27 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
+ 	struct mtu3_gpd_ring *ring = &mep->gpd_ring;
+ 	struct qmu_gpd *gpd = ring->enqueue;
+ 	struct usb_request *req = &mreq->request;
++	dma_addr_t enq_dma;
++	u16 ext_addr;
+ 
+ 	/* set all fields to zero as default value */
+ 	memset(gpd, 0, sizeof(*gpd));
+ 
+-	gpd->buffer = cpu_to_le32((u32)req->dma);
++	gpd->buffer = cpu_to_le32(lower_32_bits(req->dma));
++	ext_addr = GPD_EXT_BUF(upper_32_bits(req->dma));
+ 	gpd->buf_len = cpu_to_le16(req->length);
+ 	gpd->flag |= GPD_FLAGS_IOC;
+ 
+ 	/* get the next GPD */
+ 	enq = advance_enq_gpd(ring);
+-	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p\n",
+-		mep->epnum, gpd, enq);
++	enq_dma = gpd_virt_to_dma(ring, enq);
++	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p, qdma=%llx\n",
++		mep->epnum, gpd, enq, enq_dma);
+ 
+ 	enq->flag &= ~GPD_FLAGS_HWO;
+-	gpd->next_gpd = cpu_to_le32((u32)gpd_virt_to_dma(ring, enq));
++	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
++	ext_addr |= GPD_EXT_NGP(upper_32_bits(enq_dma));
++	gpd->tx_ext_addr = cpu_to_le16(ext_addr);
+ 
+ 	if (req->zero)
+ 		gpd->ext_flag |= GPD_EXT_FLAG_ZLP;
+@@ -226,21 +283,27 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
+ 	struct mtu3_gpd_ring *ring = &mep->gpd_ring;
+ 	struct qmu_gpd *gpd = ring->enqueue;
+ 	struct usb_request *req = &mreq->request;
++	dma_addr_t enq_dma;
++	u16 ext_addr;
+ 
+ 	/* set all fields to zero as default value */
+ 	memset(gpd, 0, sizeof(*gpd));
+ 
+-	gpd->buffer = cpu_to_le32((u32)req->dma);
++	gpd->buffer = cpu_to_le32(lower_32_bits(req->dma));
++	ext_addr = GPD_EXT_BUF(upper_32_bits(req->dma));
+ 	gpd->data_buf_len = cpu_to_le16(req->length);
+ 	gpd->flag |= GPD_FLAGS_IOC;
+ 
+ 	/* get the next GPD */
+ 	enq = advance_enq_gpd(ring);
+-	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p\n",
+-		mep->epnum, gpd, enq);
++	enq_dma = gpd_virt_to_dma(ring, enq);
++	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p, qdma=%llx\n",
++		mep->epnum, gpd, enq, enq_dma);
+ 
+ 	enq->flag &= ~GPD_FLAGS_HWO;
+-	gpd->next_gpd = cpu_to_le32((u32)gpd_virt_to_dma(ring, enq));
++	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
++	ext_addr |= GPD_EXT_NGP(upper_32_bits(enq_dma));
++	gpd->rx_ext_addr = cpu_to_le16(ext_addr);
+ 	gpd->chksum = qmu_calc_checksum((u8 *)gpd);
+ 	gpd->flag |= GPD_FLAGS_HWO;
+ 
+@@ -267,8 +330,8 @@ int mtu3_qmu_start(struct mtu3_ep *mep)
+ 
+ 	if (mep->is_in) {
+ 		/* set QMU start address */
+-		mtu3_writel(mbase, USB_QMU_TQSAR(mep->epnum), ring->dma);
+-		mtu3_setbits(mbase, MU3D_EP_TXCR0(mep->epnum), TX_DMAREQEN);
++		write_txq_start_addr(mbase, epnum, ring->dma);
++		mtu3_setbits(mbase, MU3D_EP_TXCR0(epnum), TX_DMAREQEN);
+ 		mtu3_setbits(mbase, U3D_QCR0, QMU_TX_CS_EN(epnum));
+ 		/* send zero length packet according to ZLP flag in GPD */
+ 		mtu3_setbits(mbase, U3D_QCR1, QMU_TX_ZLP(epnum));
+@@ -282,8 +345,8 @@ int mtu3_qmu_start(struct mtu3_ep *mep)
+ 		mtu3_writel(mbase, USB_QMU_TQCSR(epnum), QMU_Q_START);
+ 
+ 	} else {
+-		mtu3_writel(mbase, USB_QMU_RQSAR(mep->epnum), ring->dma);
+-		mtu3_setbits(mbase, MU3D_EP_RXCR0(mep->epnum), RX_DMAREQEN);
++		write_rxq_start_addr(mbase, epnum, ring->dma);
++		mtu3_setbits(mbase, MU3D_EP_RXCR0(epnum), RX_DMAREQEN);
+ 		mtu3_setbits(mbase, U3D_QCR0, QMU_RX_CS_EN(epnum));
+ 		/* don't expect ZLP */
+ 		mtu3_clrbits(mbase, U3D_QCR3, QMU_RX_ZLP(epnum));
+@@ -353,9 +416,9 @@ static void qmu_tx_zlp_error_handler(struct mtu3 *mtu, u8 epnum)
+ 	struct mtu3_gpd_ring *ring = &mep->gpd_ring;
+ 	void __iomem *mbase = mtu->mac_base;
+ 	struct qmu_gpd *gpd_current = NULL;
+-	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_TQCPR(epnum));
+ 	struct usb_request *req = NULL;
+ 	struct mtu3_request *mreq;
++	dma_addr_t cur_gpd_dma;
+ 	u32 txcsr = 0;
+ 	int ret;
+ 
+@@ -365,7 +428,8 @@ static void qmu_tx_zlp_error_handler(struct mtu3 *mtu, u8 epnum)
+ 	else
+ 		return;
+ 
+-	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
++	cur_gpd_dma = read_txq_cur_addr(mbase, epnum);
++	gpd_current = gpd_dma_to_virt(ring, cur_gpd_dma);
+ 
+ 	if (le16_to_cpu(gpd_current->buf_len) != 0) {
+ 		dev_err(mtu->dev, "TX EP%d buffer length error(!=0)\n", epnum);
+@@ -408,12 +472,13 @@ static void qmu_done_tx(struct mtu3 *mtu, u8 epnum)
+ 	void __iomem *mbase = mtu->mac_base;
+ 	struct qmu_gpd *gpd = ring->dequeue;
+ 	struct qmu_gpd *gpd_current = NULL;
+-	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_TQCPR(epnum));
+ 	struct usb_request *request = NULL;
+ 	struct mtu3_request *mreq;
++	dma_addr_t cur_gpd_dma;
+ 
+ 	/*transfer phy address got from QMU register to virtual address */
+-	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
++	cur_gpd_dma = read_txq_cur_addr(mbase, epnum);
++	gpd_current = gpd_dma_to_virt(ring, cur_gpd_dma);
+ 
+ 	dev_dbg(mtu->dev, "%s EP%d, last=%p, current=%p, enq=%p\n",
+ 		__func__, epnum, gpd, gpd_current, ring->enqueue);
+@@ -446,11 +511,12 @@ static void qmu_done_rx(struct mtu3 *mtu, u8 epnum)
+ 	void __iomem *mbase = mtu->mac_base;
+ 	struct qmu_gpd *gpd = ring->dequeue;
+ 	struct qmu_gpd *gpd_current = NULL;
+-	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_RQCPR(epnum));
+ 	struct usb_request *req = NULL;
+ 	struct mtu3_request *mreq;
++	dma_addr_t cur_gpd_dma;
+ 
+-	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
++	cur_gpd_dma = read_rxq_cur_addr(mbase, epnum);
++	gpd_current = gpd_dma_to_virt(ring, cur_gpd_dma);
+ 
+ 	dev_dbg(mtu->dev, "%s EP%d, last=%p, current=%p, enq=%p\n",
+ 		__func__, epnum, gpd, gpd_current, ring->enqueue);
 -- 
 1.7.9.5
