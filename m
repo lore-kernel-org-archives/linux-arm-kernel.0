@@ -1,117 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Sep 2017 15:28:42 +0100
-Subject: [PATCH] arm64: fix documentation on kernel pages mappings to HYP
- VA
-In-Reply-To: <20170927091332.GA19317@arm.com> (Will Deacon's message of "Wed,
- 27 Sep 2017 10:13:33 +0100")
-References: <20170913180830.8608-1-ynorov@caviumnetworks.com>
- <20170926184542.t56zpdx2s5et77gy@yury-thinkpad>
- <86bmlwo842.fsf@arm.com> <20170927091332.GA19317@arm.com>
-Message-ID: <867ewknrl1.fsf@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 27 Sep 2017 15:33:16 +0100
+Subject: [PATCH] arm64: Expose ASIMD dot product instruction support
+Message-ID: <20170927143316.14761-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27 2017 at 10:13:33 am BST, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 27, 2017 at 09:31:41AM +0100, Marc Zyngier wrote:
->> On Tue, Sep 26 2017 at  9:45:42 pm BST, Yury Norov <ynorov@caviumnetworks.com> wrote:
->> > On Wed, Sep 13, 2017 at 09:08:30PM +0300, Yury Norov wrote:
->> >> The Documentation/arm64/memory.txt says:
->> >> When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
->> >> offset from the kernel VA (top 24bits of the kernel VA set to zero):
->> >> 
->> >> In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
->> >> which has more options, and none of them assumes clearing of top 24bits
->> >> of the kernel VA.
->> >> 
->> >> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
->> >> ---
->> >>  Documentation/arm64/memory.txt | 15 +++++++++------
->> >>  1 file changed, 9 insertions(+), 6 deletions(-)
->> >> 
->> >> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
->> >> index d7273a5f6456..c39895d7e3a2 100644
->> >> --- a/Documentation/arm64/memory.txt
->> >> +++ b/Documentation/arm64/memory.txt
->> >> @@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
->> >>   +-------------------------------------------------> [63] TTBR0/1
->> >>  
->> >>  
->> >> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
->> >> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
->> >> -
->> >> -Start			End			Size		Use
->> >> ------------------------------------------------------------------------
->> >> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
->> >> +When using KVM without Virtualization Host Extensions, the hypervisor maps
->> >> +kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
->> >> +or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
->> >> +ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
->> >> +VA set to zero if CPU has Reduced HYP mapping offset capability. See
->> >> +kern_hyp_va macro.
->> 
->> What is this "Reduced HYP mapping offset capability"?
->> 
->> You're missing the point that the location of the EL2 mapping is
->> conditioned by the location of the identity mapping that is used to
->> bring up / tear down KVM. You have to express the VA transformation in
->> terms of both VA_BITS (and there is more cases than just 39 or 48 bits)
->> *and* the idmap address, not to mention the case where KVM's VA_BITS is
->> larger than the rest of the kernel. See the extensive blurb in
->> kvm_mmu.h.
->> 
->> >> +
->> >> +When using KVM with Virtualization Host Extensions, no additional mappings
->> >> +created as host kernel already operates in EL2.
->> 
->> This bit is fine.
->
-> FWIW, I was going to queue a simplified version along the lines of the patch
-> below.
->
-> Will
->
-> --->8
->
-> commit dbf7393b7738a0ba0284551e7b6e014cfb100661
-> Author: Yury Norov <ynorov@caviumnetworks.com>
-> Date:   Wed Sep 13 21:08:30 2017 +0300
->
->     arm64: fix documentation on kernel pages mappings to HYP VA
->     
->     The Documentation/arm64/memory.txt says:
->     When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
->     offset from the kernel VA (top 24bits of the kernel VA set to zero):
->     
->     In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
->     which has more options, and none of them assumes clearing of top 24bits
->     of the kernel VA.
->     
->     Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
->     [will: removed gory details]
->     Signed-off-by: Will Deacon <will.deacon@arm.com>
->
-> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-> index d7273a5f6456..ea9ee39784a2 100644
-> --- a/Documentation/arm64/memory.txt
-> +++ b/Documentation/arm64/memory.txt
-> @@ -86,9 +86,9 @@ Translation table lookup with 64KB pages:
->   +-------------------------------------------------> [63] TTBR0/1
->  
->  
-> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
-> +When using KVM without the Virtualization Host Extensions, the hypervisor
-> +maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
-> +kern_hyp_va macro for more details.
->  
-> -Start			End			Size		Use
-> ------------------------------------------------------------------------
-> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
-> +When using KVM with the Virtualization Host Extensions, no additional
-> +mappings are created, since the host kernel runs directly in EL2.
+ARM v8-A adds two new optional instructions in architecture version v8.2
+and v8.3, for performing dot product of 8bit elements in each 32bit element
+of two vectors and accumulating the result into a third vector. Expose the
+functionality via ELF HWCAPs and MRS emulation.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ Documentation/arm64/cpu-feature-registers.txt | 6 +++++-
+ arch/arm64/include/asm/sysreg.h               | 1 +
+ arch/arm64/include/uapi/asm/hwcap.h           | 1 +
+ arch/arm64/kernel/cpufeature.c                | 2 ++
+ arch/arm64/kernel/cpuinfo.c                   | 1 +
+ 5 files changed, 10 insertions(+), 1 deletion(-)
 
-	M.
+diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
+index dad411d635d8..f25cfbfa91a7 100644
+--- a/Documentation/arm64/cpu-feature-registers.txt
++++ b/Documentation/arm64/cpu-feature-registers.txt
+@@ -110,7 +110,11 @@ infrastructure:
+      x--------------------------------------------------x
+      | Name                         |  bits   | visible |
+      |--------------------------------------------------|
+-     | RES0                         | [63-32] |    n    |
++     | RES0                         | [63-48] |    n    |
++     |--------------------------------------------------|
++     | DP                           | [47-44] |    y    |
++     |--------------------------------------------------|
++     | RES0                         | [43-32] |    n    |
+      |--------------------------------------------------|
+      | RDM                          | [31-28] |    y    |
+      |--------------------------------------------------|
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index f707fed5886f..2084c70ce164 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -318,6 +318,7 @@
+ #define SCTLR_EL1_CP15BEN	(1 << 5)
+ 
+ /* id_aa64isar0 */
++#define ID_AA64ISAR0_DP_SHIFT		44
+ #define ID_AA64ISAR0_RDM_SHIFT		28
+ #define ID_AA64ISAR0_ATOMICS_SHIFT	20
+ #define ID_AA64ISAR0_CRC32_SHIFT	16
+diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+index 4b9344cba83a..7af8ef6f5297 100644
+--- a/arch/arm64/include/uapi/asm/hwcap.h
++++ b/arch/arm64/include/uapi/asm/hwcap.h
+@@ -36,5 +36,6 @@
+ #define HWCAP_FCMA		(1 << 14)
+ #define HWCAP_LRCPC		(1 << 15)
+ #define HWCAP_DCPOP		(1 << 16)
++#define HWCAP_ASIMDDP		(1 << 17)
+ 
+ #endif /* _UAPI__ASM_HWCAP_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index cd52d365d1f0..415450017d70 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -107,6 +107,7 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+  * sync with the documentation of the CPU feature register ABI.
+  */
+ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+@@ -924,6 +925,7 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_CRC32),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_ATOMICS),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_RDM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDRDM),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 311885962830..027a321ba6d3 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -69,6 +69,7 @@ static const char *const hwcap_str[] = {
+ 	"fcma",
+ 	"lrcpc",
+ 	"dcpop",
++	"asimddp",
+ 	NULL
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny.
+2.13.5
