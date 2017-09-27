@@ -1,39 +1,97 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 Sep 2017 09:20:11 +0800
-Subject: [PATCH 0/4] IORT SMMUv3 MSI support
-Message-ID: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
+Date: Wed, 27 Sep 2017 09:20:13 +0800
+Subject: [PATCH 2/4] ACPI: IORT: lookup iort node via fwnode
+In-Reply-To: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
+References: <1506475215-2731-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1506475215-2731-3-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IORT revision C introduced SMMUv3 MSI support for control interrupts,
-which introduced a device ID mapping index to retrieve the dev ID
-and ITS parent, adding its support in this patch set, please refer
-to each patch for detail commit message.
+Now we have a helper function iort_get_fwnode() which
+lookup fwnode via iort node for SMMU, but sometimes we
+just need something exctly the opposite, which means we
+need to get the iort node via fwnode.
 
-RFC v2 -> v1:
- - Drop RFC tag;
- - return the index value directly from iort_get_id_mapping_index()
-   then make the logic simple in iort_node_map_id();
- - To make sure ID mapping index is only ignored if all interrupts are
-   GSIV based
- - Sqursh part of the patch 4 to patch 3
+For example, we need to get SMMU's iort node when adding
+support for SMMU MSI, but SMMU is not a named component
+which has a associated device node in DSDT, that means
+we can't match the ACPI full path name to get the iort
+node for SMMU.
 
-RFC v1 -> RFC v2:
- - Introduce a new API iort_set_device_domain() to find the MSI domain
-   for an SMMUv3 (or any other IORT table node) to reduce the complex
-   of doing that via acpi_configure_pmsi_domain().
+But with SMMU or other devices in IORT probed as platform
+device, it created a fwnode to associate with the iort
+node, so we introduce iort_get_iort_node() to get the
+iort node via fwnode.
 
-Hanjun Guo (3):
-  ACPICA: Add SMMUv3 device ID mapping index support
-  ACPI: IORT: lookup iort node via fwnode
-  ACPI: IORT: Skip SMMUv3 device ID map for two steps mappings
+This can be extended to PMCG node usage in IORT too.
 
-Lorenzo Pieralisi (1):
-  ACPI: IORT: SMMUv3 nodes MSI support
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
- drivers/acpi/arm64/iort.c | 152 ++++++++++++++++++++++++++++++++++++++++++++--
- include/acpi/actbl2.h     |   1 +
- 2 files changed, 147 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 9565d57..db71d7f 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -126,6 +126,31 @@ static inline void iort_delete_fwnode(struct acpi_iort_node *node)
+ 	spin_unlock(&iort_fwnode_lock);
+ }
+ 
++/**
++ * iort_get_iort_node() - Retrieve iort_node associated with an fwnode
++ *
++ * @fwnode: fwnode associated with device to be looked-up
++ *
++ * Returns: iort_node pointer on success, NULL on failure
++ */
++static inline
++struct acpi_iort_node *iort_get_iort_node(struct fwnode_handle *fwnode)
++{
++	struct iort_fwnode *curr;
++	struct acpi_iort_node *iort_node = NULL;
++
++	spin_lock(&iort_fwnode_lock);
++	list_for_each_entry(curr, &iort_fwnode_list, list) {
++		if (curr->fwnode == fwnode) {
++			iort_node = curr->iort_node;
++			break;
++		}
++	}
++	spin_unlock(&iort_fwnode_lock);
++
++	return iort_node;
++}
++
+ typedef acpi_status (*iort_find_node_callback)
+ 	(struct acpi_iort_node *node, void *context);
+ 
+@@ -424,9 +449,25 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
+ {
+ 	struct pci_bus *pbus;
+ 
+-	if (!dev_is_pci(dev))
++	if (!dev_is_pci(dev)) {
++		struct acpi_iort_node *node;
++		/*
++		 * scan iort_fwnode_list to see if it's an iort platform
++		 * device (such as SMMU, PMCG),its iort node already cached
++		 * and associated with fwnode when iort platform devices
++		 * were initialized.
++		 */
++		node = iort_get_iort_node(dev->fwnode);
++		if (node)
++			return node;
++
++		/*
++		 * if not, then it should be a platform device defined in
++		 * DSDT/SSDT (with Named Component node in IORT)
++		 */
+ 		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+ 				      iort_match_node_callback, dev);
++	}
+ 
+ 	/* Find a PCI root bus */
+ 	pbus = to_pci_dev(dev)->bus;
 -- 
 1.9.1
