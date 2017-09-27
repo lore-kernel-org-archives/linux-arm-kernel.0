@@ -1,185 +1,92 @@
 From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Wed, 27 Sep 2017 14:32:39 +0100
-Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation helper
+Date: Wed, 27 Sep 2017 14:32:40 +0100
+Subject: [PATCH v8 4/5] iommu/dma: Add a helper function to reserve HW MSI
+ address regions for IOMMU drivers
 In-Reply-To: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
 References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170927133241.21036-5-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Garry <john.garry@huawei.com>
+IOMMU drivers can use this to implement their .get_resv_regions callback
+for HW MSI specific reservations(e.g. ARM GICv3 ITS MSI region).
 
-On some platforms msi-controller address regions have to be excluded
-from normal IOVA allocation in that they are detected and decoded in
-a HW specific way by system components and so they cannot be considered
-normal IOVA address space.
-
-Add a helper function that retrieves msi address regions through device
-tree msi mapping, so that these regions will not be translated by IOMMU
-and will be excluded from IOVA allocations.
-
-Signed-off-by: John Garry <john.garry@huawei.com>
-[Shameer: Modified msi-parent retrieval logic]
 Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+[John: added DT support]
+Signed-off-by: John Garry <john.garry@huawei.com>
 ---
- drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_iommu.h | 10 +++++
- 2 files changed, 105 insertions(+)
+ drivers/iommu/dma-iommu.c | 19 +++++++++++++++++++
+ include/linux/dma-iommu.h |  7 +++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index e60e3db..ffd7fb7 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -21,6 +21,7 @@
- #include <linux/iommu.h>
- #include <linux/limits.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_iommu.h>
- #include <linux/of_pci.h>
- #include <linux/slab.h>
-@@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
- 	return ops->of_xlate(dev, iommu_spec);
- }
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 9d1cebe..f8709a2 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
-+static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-+{
-+	u32 *rid = data;
-+
-+	*rid = alias;
-+	return 0;
-+}
-+
- struct of_pci_iommu_alias_info {
- 	struct device *dev;
- 	struct device_node *np;
-@@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
- 	return info->np == pdev->bus->dev.of_node;
++#include <linux/acpi_iort.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/gfp.h>
+@@ -27,6 +28,7 @@
+ #include <linux/iova.h>
+ #include <linux/irq.h>
+ #include <linux/mm.h>
++#include <linux/of_iommu.h>
+ #include <linux/pci.h>
+ #include <linux/scatterlist.h>
+ #include <linux/vmalloc.h>
+@@ -198,6 +200,23 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
  }
- 
-+static int of_iommu_alloc_resv_region(struct device_node *np,
-+				      struct list_head *head)
-+{
-+	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+	struct iommu_resv_region *region;
-+	struct resource res;
-+	int err;
-+
-+	err = of_address_to_resource(np, 0, &res);
-+	if (err)
-+		return err;
-+
-+	region = iommu_alloc_resv_region(res.start, resource_size(&res),
-+					 prot, IOMMU_RESV_MSI);
-+	if (!region)
-+		return -ENOMEM;
-+
-+	list_add_tail(&region->list, head);
-+
-+	return 0;
-+}
-+
-+static int of_pci_msi_get_resv_regions(struct device *dev,
-+				       struct list_head *head)
-+{
-+	struct device_node *msi_np;
-+	struct device *pdev;
-+	u32 rid;
-+	int err, resv = 0;
-+
-+	pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
-+
-+	for_each_node_with_property(msi_np, "msi-controller") {
-+		for (pdev = dev; pdev; pdev = pdev->parent) {
-+			if (!of_pci_map_rid(pdev->of_node, rid, "msi-map",
-+					    "msi-map-mask", &msi_np, NULL)) {
-+
-+				err = of_iommu_alloc_resv_region(msi_np, head);
-+				if (err)
-+					return err;
-+				resv++;
-+			}
-+		}
-+	}
-+
-+	return resv;
-+}
-+
-+static int of_platform_msi_get_resv_regions(struct device *dev,
-+				       struct list_head *head)
-+{
-+	struct of_phandle_args args;
-+	int err, resv = 0;
-+
-+	while (!of_parse_phandle_with_args(dev->of_node, "msi-parent",
-+					   "#msi-cells", resv, &args)) {
-+
-+		err = of_iommu_alloc_resv_region(args.np, head);
-+		of_node_put(args.np);
-+		if (err)
-+			return err;
-+		resv++;
-+	}
-+
-+	return resv;
-+}
-+
- const struct iommu_ops *of_iommu_configure(struct device *dev,
- 					   struct device_node *master_np)
- {
-@@ -235,6 +311,25 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	return ops;
- }
+ EXPORT_SYMBOL(iommu_dma_get_resv_regions);
  
 +/**
-+ * of_iommu_msi_get_resv_regions - Reserved region driver helper
++ * iommu_dma_get_msi_resv_regions - Reserved region driver helper
 + * @dev: Device from iommu_get_resv_regions()
-+ * @head: Reserved region list from iommu_get_resv_regions()
++ * @list: Reserved region list from iommu_get_resv_regions()
 + *
-+ * Returns: Number of reserved regions on success (0 if no associated
-+ *          msi parent), appropriate error value otherwise.
++ * IOMMU drivers can use this to implement their .get_resv_regions
++ * callback for HW MSI specific reservations.
 + */
-+int of_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
 +{
++	if (is_of_node(dev->iommu_fwspec->iommu_fwnode))
++		return of_iommu_msi_get_resv_regions(dev, list);
 +
-+	if (dev_is_pci(dev))
-+		return of_pci_msi_get_resv_regions(dev, head);
-+	else if (dev->of_node)
-+		return of_platform_msi_get_resv_regions(dev, head);
-+
-+	return 0;
++	return iort_iommu_msi_get_resv_regions(dev, list);
 +}
++EXPORT_SYMBOL(iommu_dma_get_msi_resv_regions);
 +
- static int __init of_iommu_init(void)
+ static int cookie_init_hw_msi_region(struct iommu_dma_cookie *cookie,
+ 		phys_addr_t start, phys_addr_t end)
  {
- 	struct device_node *np;
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 13394ac..9267772 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -14,6 +14,9 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- extern const struct iommu_ops *of_iommu_configure(struct device *dev,
- 					struct device_node *master_np);
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 92f2083..6062ef0 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -74,6 +74,8 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
  
-+extern int of_iommu_msi_get_resv_regions(struct device *dev,
-+					struct list_head *head);
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list);
 +
  #else
  
- static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-@@ -29,6 +32,13 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	return NULL;
+ struct iommu_domain;
+@@ -107,6 +109,11 @@ static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_he
+ {
  }
  
-+static int of_iommu_msi_get_resv_regions(struct device *dev,
-+					struct list_head *head)
++static inline int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
 +{
 +	return -ENODEV;
 +}
 +
-+
- #endif	/* CONFIG_OF_IOMMU */
- 
- extern struct of_device_id __iommu_of_table;
+ #endif	/* CONFIG_IOMMU_DMA */
+ #endif	/* __KERNEL__ */
+ #endif	/* __DMA_IOMMU_H */
 -- 
 1.9.1
