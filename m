@@ -1,53 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 27 Sep 2017 08:51:30 -0700
-Subject: [PATCH v2] arm64: Unconditionally support
- {ARCH_}HAVE_NMI{_SAFE_CMPXCHG}
-Message-ID: <20170927155130.28539-1-sboyd@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Sep 2017 18:02:59 +0200
+Subject: [PATCH] arm64: defconfig: enable NAND on Armada 7K/8K SoCs
+Message-ID: <20170927160259.6074-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From what I can see there isn't anything about ACPI_APEI_SEA that
-means the arm64 architecture can or cannot support NMI safe
-cmpxchg or NMIs, so the 'if' condition here is not important.
-Let's remove it. Doing that allows us to support ftrace
-histograms via CONFIG_HIST_TRIGGERS that depends on the arch
-having the ARCH_HAVE_NMI_SAFE_CMPXCHG config selected.
+The PXA3xx NAND driver supports also the NAND controller found on the
+Armada 7K/8K SoCs, so enable it.
 
-Cc: Tyler Baicar <tbaicar@codeaurora.org>
-Cc: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Cc: James Morse <james.morse@arm.com>
-Cc: Dongjiu Geng <gengdongjiu@huawei.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes from v1:
- * Also drop condition from HAVE_NMI (James Morse)
-
- arch/arm64/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6a56d4..0e4cc113b74e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -21,7 +21,7 @@ config ARM64
- 	select ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_HAS_STRICT_MODULE_RWX
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
--	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
-+	select ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_SUPPORTS_MEMORY_FAILURE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-@@ -98,7 +98,7 @@ config ARM64
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
--	select HAVE_NMI if ACPI_APEI_SEA
-+	select HAVE_NMI
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 8495b88a0966..c7fda967719b 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -156,6 +156,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_DENALI_DT=y
++CONFIG_MTD_NAND_PXA3xx=y
+ CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_NBD=m
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.14.1
