@@ -1,66 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Sep 2017 16:50:08 +0100
-Subject: ARM64: kernel panics in DABT in sys_msync path
-In-Reply-To: <20170926173112.GA16650@arm.com>
-References: <20170924213622.75e7r3k56tgxlezh@yury-thinkpad>
- <20170925105335.GA24042@arm.com>
- <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
- <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
- <a3b714ae-97a5-8458-9bf7-140eeeebc4b9@codeaurora.org>
- <20170926102324.GC8693@arm.com>
- <547ed590-3ab4-cc11-cbea-f587541d2b08@codeaurora.org>
- <20170926173112.GA16650@arm.com>
-Message-ID: <20170927155007.GA16211@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 27 Sep 2017 08:51:30 -0700
+Subject: [PATCH v2] arm64: Unconditionally support
+ {ARCH_}HAVE_NMI{_SAFE_CMPXCHG}
+Message-ID: <20170927155130.28539-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 06:31:12PM +0100, Will Deacon wrote:
-> On Tue, Sep 26, 2017 at 08:23:35AM -0600, Ruigrok, Richard wrote:
-> > On 9/26/2017 4:23 AM, Will Deacon wrote:
-> > > On Mon, Sep 25, 2017 at 01:54:57PM -0600, Ruigrok, Richard wrote:
-> > >> I also found this issue with kernels from 4.11 through 4.13.  In my tests, I
-> > >> found that it reproduces only with 4K page and Transparent Huge Pages. With 64K
-> > >> page I was not able to reproduce. RH also reported it here: https://
-> > >> bugzilla.redhat.com/show_bug.cgi?id=1491504 Linaro reported on the RPK kernel
-> > >> (4.12) on Centriq2400 and ThunderX
-> > >>  
-> > >>
-> > >> https://bugs.linaro.org/show_bug.cgi?id=3191
-> > >>
-> > >> https://bugs.linaro.org/show_bug.cgi?id=3068.
-> > > These two aren't the same bug (that's a forward progress issue that we're
-> > > currently working on). I don't have permission to look at the redhat one,
-> > > but is it just an RCU stall or actually the Oops reported by Yury?
-> > >
-> > >> I was able to bisect down to a specific commit.
-> > > I think we're chasing two different things here, so not sure I trust the
-> > > bisect!
-> > >
-> > The RCU stall is side effect.? The issue I'm seeing has the same stack
-> > trace and same stimulus (rwtest).? Following are the details.
-> 
-> FWIW, I think I've worked out what's going on here and I should have a patch
-> tomorrow.
+>From what I can see there isn't anything about ACPI_APEI_SEA that
+means the arm64 architecture can or cannot support NMI safe
+cmpxchg or NMIs, so the 'if' condition here is not important.
+Let's remove it. Doing that allows us to support ftrace
+histograms via CONFIG_HIST_TRIGGERS that depends on the arch
+having the ARCH_HAVE_NMI_SAFE_CMPXCHG config selected.
 
-Diff below. I'm going to follow up with a separate thread about this,
-because the proper fix is going to be invasive. I'll keep you on cc.
+Cc: Tyler Baicar <tbaicar@codeaurora.org>
+Cc: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Cc: James Morse <james.morse@arm.com>
+Cc: Dongjiu Geng <gengdongjiu@huawei.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-Out of curiosity: what version of GCC are you using to compile the kernel?
+Changes from v1:
+ * Also drop condition from HAVE_NMI (James Morse)
 
-Will
+ arch/arm64/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
---->8
-
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index bc4e92337d16..b46e54c2399b 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -401,7 +401,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- /* Find an entry in the third-level page table. */
- #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
- 
--#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
-+#define pte_offset_phys(dir,addr)	(pmd_page_paddr(READ_ONCE(*(dir))) + pte_index(addr) * sizeof(pte_t))
- #define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
- 
- #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..0e4cc113b74e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -21,7 +21,7 @@ config ARM64
+ 	select ARCH_HAS_STRICT_KERNEL_RWX
+ 	select ARCH_HAS_STRICT_MODULE_RWX
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+-	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
++	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+ 	select ARCH_SUPPORTS_MEMORY_FAILURE
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
+@@ -98,7 +98,7 @@ config ARM64
+ 	select HAVE_IRQ_TIME_ACCOUNTING
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
+-	select HAVE_NMI if ACPI_APEI_SEA
++	select HAVE_NMI
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
