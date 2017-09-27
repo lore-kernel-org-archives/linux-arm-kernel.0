@@ -1,42 +1,32 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 17:22:59 +0800
-Subject: [PATCH 3/9] usb: xhci-mtk: check clock stability of U3_MAC
+Date: Wed, 27 Sep 2017 17:23:04 +0800
+Subject: [PATCH 8/9] dt-bindings: usb: mtk-xhci: add a optional property to
+ disable u3ports
 In-Reply-To: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
 References: <994382d16d6bdc0f3d7c11b22f1710252e056e34.1506503879.git.chunfeng.yun@mediatek.com>
-Message-ID: <afc5cff346c5a349177990999df3dd7604966de4.1506503879.git.chunfeng.yun@mediatek.com>
+Message-ID: <fd8b6099192ddee3b277f5ca3a699c20fb273ffe.1506503880.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is useful to find out the root cause when the Super Speed doesn't
-work. Such as when the T-PHY is switched to PCIe or SATA, and affects
-Super Speed function, the check will fail.
+Add a new optional property to disable u3ports
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 9502ca4..7a92bb7 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -43,6 +43,7 @@
- 
- /* ip_pw_sts1 register */
- #define STS1_IP_SLEEP_STS	BIT(30)
-+#define STS1_U3_MAC_RST	BIT(16)
- #define STS1_XHCI_RST		BIT(11)
- #define STS1_SYS125_RST	BIT(10)
- #define STS1_REF_RST		BIT(8)
-@@ -125,6 +126,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
- 	check_val = STS1_SYSPLL_STABLE | STS1_REF_RST |
- 			STS1_SYS125_RST | STS1_XHCI_RST;
- 
-+	if (mtk->num_u3_ports)
-+		check_val |= STS1_U3_MAC_RST;
-+
- 	ret = readl_poll_timeout(&ippc->ip_pw_sts1, value,
- 			  (check_val == (value & check_val)), 100, 20000);
- 	if (ret) {
+diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+index 5611a2e..2d9b459 100644
+--- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+@@ -38,6 +38,8 @@ Optional properties:
+ 	mode;
+  - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
+ 	control register, it depends on "mediatek,wakeup-src".
++ - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
++	bit1 for u3port1, ... etc;
+  - vbus-supply : reference to the VBUS regulator;
+  - usb3-lpm-capable : supports USB3.0 LPM
+  - pinctrl-names : a pinctrl state named "default" must be defined
 -- 
 1.7.9.5
