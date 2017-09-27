@@ -1,74 +1,66 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 27 Sep 2017 20:46:45 +0200
-Subject: [PATCH 1/2] clk/ux500: Delete an error message for a failed memory
- allocation in three functions
+Date: Wed, 27 Sep 2017 20:47:53 +0200
+Subject: [PATCH 2/2] clk/ux500: Improve a size determination in three functions
 In-Reply-To: <d23a685d-f8a0-f4ca-078a-414d7b8674ca@users.sourceforge.net>
 References: <d23a685d-f8a0-f4ca-078a-414d7b8674ca@users.sourceforge.net>
-Message-ID: <db799483-7084-8e93-2bfe-2da0e426d08b@users.sourceforge.net>
+Message-ID: <1991a7d3-59b8-1a5f-dcef-a0a493e3829d@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 27 Sep 2017 20:23:58 +0200
+Date: Wed, 27 Sep 2017 20:30:53 +0200
 
-Omit extra messages for a memory allocation failure in these functions.
+Replace the specification of data structures by pointer dereferences
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
 This issue was detected by using the Coccinelle software.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/clk/ux500/clk-prcc.c    | 4 +---
- drivers/clk/ux500/clk-prcmu.c   | 4 +---
- drivers/clk/ux500/clk-sysctrl.c | 4 +---
- 3 files changed, 3 insertions(+), 9 deletions(-)
+ drivers/clk/ux500/clk-prcc.c    | 2 +-
+ drivers/clk/ux500/clk-prcmu.c   | 2 +-
+ drivers/clk/ux500/clk-sysctrl.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
-index f50592775c9d..5ca07e6d1f64 100644
+index 5ca07e6d1f64..7cfb59c9136d 100644
 --- a/drivers/clk/ux500/clk-prcc.c
 +++ b/drivers/clk/ux500/clk-prcc.c
-@@ -108,10 +108,8 @@ static struct clk *clk_reg_prcc(const char *name,
+@@ -107,7 +107,7 @@ static struct clk *clk_reg_prcc(const char *name,
+ 		return ERR_PTR(-EINVAL);
  	}
  
- 	clk = kzalloc(sizeof(struct clk_prcc), GFP_KERNEL);
--	if (!clk) {
--		pr_err("clk_prcc: %s could not allocate clk\n", __func__);
-+	if (!clk)
+-	clk = kzalloc(sizeof(struct clk_prcc), GFP_KERNEL);
++	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+ 	if (!clk)
  		return ERR_PTR(-ENOMEM);
--	}
  
- 	clk->base = ioremap(phy_base, SZ_4K);
- 	if (!clk->base)
 diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-index 6e3e16b2e5ca..c137934f23ab 100644
+index c137934f23ab..9d1f2d4550ad 100644
 --- a/drivers/clk/ux500/clk-prcmu.c
 +++ b/drivers/clk/ux500/clk-prcmu.c
-@@ -259,10 +259,8 @@ static struct clk *clk_reg_prcmu(const char *name,
+@@ -258,7 +258,7 @@ static struct clk *clk_reg_prcmu(const char *name,
+ 		return ERR_PTR(-EINVAL);
  	}
  
- 	clk = kzalloc(sizeof(struct clk_prcmu), GFP_KERNEL);
--	if (!clk) {
--		pr_err("clk_prcmu: %s could not allocate clk\n", __func__);
-+	if (!clk)
+-	clk = kzalloc(sizeof(struct clk_prcmu), GFP_KERNEL);
++	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+ 	if (!clk)
  		return ERR_PTR(-ENOMEM);
--	}
  
- 	clk->cg_sel = cg_sel;
- 	clk->is_prepared = 1;
 diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
-index 8a4e93ce1e42..e0a834c08a04 100644
+index e0a834c08a04..7c0403b733ae 100644
 --- a/drivers/clk/ux500/clk-sysctrl.c
 +++ b/drivers/clk/ux500/clk-sysctrl.c
-@@ -140,10 +140,8 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
+@@ -139,7 +139,7 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
+ 		return ERR_PTR(-EINVAL);
  	}
  
- 	clk = devm_kzalloc(dev, sizeof(struct clk_sysctrl), GFP_KERNEL);
--	if (!clk) {
--		dev_err(dev, "clk_sysctrl: could not allocate clk\n");
-+	if (!clk)
+-	clk = devm_kzalloc(dev, sizeof(struct clk_sysctrl), GFP_KERNEL);
++	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
+ 	if (!clk)
  		return ERR_PTR(-ENOMEM);
--	}
  
- 	/* set main clock registers */
- 	clk->reg_sel[0] = reg_sel[0];
 -- 
 2.14.2
