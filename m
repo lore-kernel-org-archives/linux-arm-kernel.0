@@ -1,122 +1,110 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 27 Sep 2017 09:34:03 +0200
-Subject: [PATCH v6 00/11] net: stmmac: dwmac-sun8i: Handle integrated PHY
-Message-ID: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+Date: Wed, 27 Sep 2017 09:34:04 +0200
+Subject: [PATCH v6 01/11] dt-bindings: net: Restore sun8i dwmac binding
+In-Reply-To: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170927073414.17361-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+This patch restore dt-bindings documentation about dwmac-sun8i
+This reverts commit 8aa33ec2f481 ("dt-bindings: net: Revert sun8i dwmac binding")
 
-The current way to find if the PHY is internal is to compare DT phy-mode
-and emac_variant/internal_phy.
-But it will negate a possible future SoC where an external PHY use the
-same phy mode than the integrated one.
-
-This patchs series adds a new way to find if the PHY is integrated, via
-the phy-is-integrated DT property.
-
-Since it exists both integrated and external ethernet-phy at 1, they are merged in
-the final DTB and so share all properties.
-For avoiding this, and better represent the reality, we use a MDIO mux.
-
-The first try was to create a new MDIO mux "mdio-mux-syscon".
-mdio-mux-syscon working the same way than mdio-mux-mmioreg with the exception
-that the register is used via syscon/regmap.
-But this solution does not work for two reason:
-- changing the MDIO selection need the reset of MAC which cannot be done by the
-        mdio-mux-syscon driver
-- There were driver loading order problem:
-        - mdio-mux-syscon needing that stmmac register the parent MDIO
-        - stmmac needing that child MDIO was registered just after registering parent MDIO
-
-So we cannot use any external MDIO-mux.
-
-The final solution was to represent a mdio-mux and let the MAC handle all things.
-Note that phy-is-integrated is still needed (even if we use a MDIO mux) since
-some properties apply only on integrated PHY and we need to know the final MDIO
-bus in mdio_mux_syscon_switch_fn().
-
-Since DT bits was reverted in 4.13, this patch series include the revert of the revert.
-So
-- the first four patchs bring back DT/stmmac stuff that was in 4.13 (and reverted)
-- fifth patch document how DT MDIO mux is implemented
-- patch 6 and 7 modify DT
-- patch 8, 9, 10 Modify stmmac according to the new bindings
-
-I have let patch splited for easy review. (for seeing what's new)
-But the final serie could have some patch squashed if someone want.
-Like squashing patch and 2 and 5 (documentation)
-
-Since DT worked well in 4.13, could it be targeted for 4.14 ?
-If necessary I could split this serie in two:
-- bring back A64/A83T (patchs 1, 2, 4, 7, 9)
-- add MXIO-mux and H3 (patchs 3, 4, 5, 6, 8, 10)
-
-Regards
-
-Changes since v5:
-- reordered patch 1 and 2
-- mdio-mux node is now a mdio's child
-- added patch 11 for removing unnecessary scan of mdio-mux
-
-Changes since v4:
-- Update documentation for new bindings
-- Added 4 patchs for bring back reverted stuff of 4.13
-- dwmac-sun8i now handle mdio-mux
-- MDIO use now compatible = "snps,dwmac-mdio";
-
-Changes since v3:
-- Added a patch for handling fixed-link
-- Updated documentation
-
-Changes since v2:
-- Add a MDIO mux for creating distinction between integrated and external MDIO.
-- phy-is-integrated is not set in dtsi.
-
-Changes since v1:
-- Dropped phy-is-integrated documentation patch since another same patch was already merged
-- Moved phy-is-integrated from SoC dtsi to final board DT.
-
-Corentin Labbe (11):
-  dt-bindings: net: Restore sun8i dwmac binding
-  arm: dts: sunxi: Restore EMAC changes
-  arm64: dts: allwinner: Restore EMAC changes
-  net: stmmac: sun8i: Restore the compatibles
-  dt-bindings: net: dwmac-sun8i: update documentation about integrated
-    PHY
-  ARM: dts: sunxi: h3/h5: represent the mdio switch used by
-    sun8i-h3-emac
-  arm64: dts: allwinner: add snps,dwmac-mdio compatible to emac/mdio
-  net: stmmac: snps,dwmac-mdio MDIOs are automatically registered
-  net: stmmac: dwmac-sun8i: choose internal PHY via phy-is-integrated
-  net: stmmac: dwmac-sun8i: Handle integrated/external MDIOs
-  of: mdio: Prevent of_mdiobus_register from scanning mdio-mux nodes
-
- .../devicetree/bindings/net/dwmac-sun8i.txt        | 198 +++++++++++++++++++++
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |   9 +
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  19 ++
- arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          |   7 +
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |   5 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  22 +++
- arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts     |  16 ++
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  45 +++++
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  16 ++
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  15 ++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  17 ++
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  16 ++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  21 +++
- .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   |  17 ++
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  17 ++
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     |  17 ++
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  | 140 ++++++++++++---
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   4 -
- drivers/of/of_mdio.c                               |  10 ++
- 23 files changed, 611 insertions(+), 25 deletions(-)
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 84 ++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
 
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+new file mode 100644
+index 000000000000..725f3b187886
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -0,0 +1,84 @@
++* Allwinner sun8i GMAC ethernet controller
++
++This device is a platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++Required properties:
++- compatible: should be one of the following string:
++		"allwinner,sun8i-a83t-emac"
++		"allwinner,sun8i-h3-emac"
++		"allwinner,sun8i-v3s-emac"
++		"allwinner,sun50i-a64-emac"
++- reg: address and length of the register for the device.
++- interrupts: interrupt for the device
++- interrupt-names: should be "macirq"
++- clocks: A phandle to the reference clock for this device
++- clock-names: should be "stmmaceth"
++- resets: A phandle to the reset control for this device
++- reset-names: should be "stmmaceth"
++- phy-mode: See ethernet.txt
++- phy-handle: See ethernet.txt
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++- syscon: A phandle to the syscon of the SoC with one of the following
++ compatible string:
++  - allwinner,sun8i-h3-system-controller
++  - allwinner,sun8i-v3s-system-controller
++  - allwinner,sun50i-a64-system-controller
++  - allwinner,sun8i-a83t-system-controller
++
++Optional properties:
++- allwinner,tx-delay-ps: TX clock delay chain value in ps. Range value is 0-700. Default is 0)
++- allwinner,rx-delay-ps: RX clock delay chain value in ps. Range value is 0-3100. Default is 0)
++Both delay properties need to be a multiple of 100. They control the delay for
++external PHY.
++
++Optional properties for the following compatibles:
++  - "allwinner,sun8i-h3-emac",
++  - "allwinner,sun8i-v3s-emac":
++- allwinner,leds-active-low: EPHY LEDs are active low
++
++Required child node of emac:
++- mdio bus node: should be named mdio
++
++Required properties of the mdio node:
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++
++The device node referenced by "phy" or "phy-handle" should be a child node
++of the mdio node. See phy.txt for the generic PHY bindings.
++
++Required properties of the phy node with the following compatibles:
++  - "allwinner,sun8i-h3-emac",
++  - "allwinner,sun8i-v3s-emac":
++- clocks: a phandle to the reference clock for the EPHY
++- resets: a phandle to the reset control for the EPHY
++
++Example:
++
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-h3-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	mdio: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		int_mii_phy: ethernet-phy at 1 {
++			reg = <1>;
++			clocks = <&ccu CLK_BUS_EPHY>;
++			resets = <&ccu RST_BUS_EPHY>;
++		};
++	};
++};
 -- 
 2.13.5
