@@ -1,85 +1,69 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 27 Sep 2017 09:14:45 +0800
-Subject: [PATCH 02/12] arm64: dts: mt8173: remove "mediatek,mt8135-mmc"
- from mmc nodes
-In-Reply-To: <CAPDyKFo7rC5UVWw9VyJ7ws1wW4kCvSW7Jcsgqd6gY_nifB6fTw@mail.gmail.com>
+Date: Wed, 27 Sep 2017 09:18:20 +0800
+Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
 References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
- <1505207272-16983-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFo7rC5UVWw9VyJ7ws1wW4kCvSW7Jcsgqd6gY_nifB6fTw@mail.gmail.com>
-Message-ID: <1506474885.19851.5.camel@mhfsdcap03>
+ <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
+ <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
+ <1505355021.8308.4.camel@mhfsdcap03>
+ <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
+Message-ID: <1506475100.19851.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-09-27 at 00:37 +0200, Ulf Hansson wrote:
-> On 12 September 2017 at 11:07, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > devicetree bindings has been updated to support multi-platforms,
-> > so that each platform has its owns compatible name.
-> > And, this compatible name may used in driver to distinguish with
-> > other platform.
+On Wed, 2017-09-27 at 00:33 +0200, Ulf Hansson wrote:
+> On 14 September 2017 at 04:10, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > On Wed, 2017-09-13 at 09:10 -0500, Rob Herring wrote:
+> >> On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
+> >> > Change the comptiable for support of multi-platform
+> >> > Add description for reg
+> >> > Add description for source_cg
+> >> > Add description for mediatek,latch-ck
+> >>
+> >> This is at least the 3rd patch with exactly the same vague subject.
+> >> Please make the subject somewhat unique.
+> >>
+> > Thx, will change the subject at next version
+> >> >
+> >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> >> > ---
+> >> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
+> >> >  1 file changed, 10 insertions(+), 3 deletions(-)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > index 4182ea3..405cd06 100644
+> >> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >> > @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
+> >> >  and the properties used by the msdc driver.
+> >> >
+> >> >  Required properties:
+> >> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+> >> > +- compatible: value should be either of the following.
+> >> > +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> >> > +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> >> > +   "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+> >> > +   "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+> >> > +- reg: physical base address of the controller and length
+> >> >  - interrupts: Should contain MSDC interrupt number
+> >> > -- clocks: MSDC source clock, HCLK
+> >> > -- clock-names: "source", "hclk"
+> >> > +- clocks: MSDC source clock, HCLK, source_cg
+> >> > +- clock-names: "source", "hclk", "source_cg"
+> >>
+> >> All chips support source_cg? That's not backwards compatible for
+> >> existing compatible strings if the driver requires it.
+> > Not all chips support source_cg, for chips which do not support
+> > source_cg, no need source_cg here, and the driver will parse it
+> > to know if current chip support it.
 > 
-> This does not seems to be DT backwards compatible.
+> In such case you must not add add a required binding for it. I think
+> that is what Rob is trying to point out for you.
 > 
-> If the driver starts interpreting the "mt8135-mmc" differently,
-> wouldn't that lead to old DTBs to become broken?
+> [...]
 > 
 > Kind regards
 > Uffe
-At patch 03/12, it shows that no difference between "mt8135-mmc" and
-"mt8173-mmc", and following changes will make difference between these
-two.
-but, the user should update DTS & driver together,then will do not have
-compatible issue.
-> 
-> >
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++--------
-> >  1 file changed, 4 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index b99a273..26396ef 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -682,8 +682,7 @@
-> >                 };
-> >
-> >                 mmc0: mmc at 11230000 {
-> > -                       compatible = "mediatek,mt8173-mmc",
-> > -                                    "mediatek,mt8135-mmc";
-> > +                       compatible = "mediatek,mt8173-mmc";
-> >                         reg = <0 0x11230000 0 0x1000>;
-> >                         interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_LOW>;
-> >                         clocks = <&pericfg CLK_PERI_MSDC30_0>,
-> > @@ -693,8 +692,7 @@
-> >                 };
-> >
-> >                 mmc1: mmc at 11240000 {
-> > -                       compatible = "mediatek,mt8173-mmc",
-> > -                                    "mediatek,mt8135-mmc";
-> > +                       compatible = "mediatek,mt8173-mmc";
-> >                         reg = <0 0x11240000 0 0x1000>;
-> >                         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
-> >                         clocks = <&pericfg CLK_PERI_MSDC30_1>,
-> > @@ -704,8 +702,7 @@
-> >                 };
-> >
-> >                 mmc2: mmc at 11250000 {
-> > -                       compatible = "mediatek,mt8173-mmc",
-> > -                                    "mediatek,mt8135-mmc";
-> > +                       compatible = "mediatek,mt8173-mmc";
-> >                         reg = <0 0x11250000 0 0x1000>;
-> >                         interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_LOW>;
-> >                         clocks = <&pericfg CLK_PERI_MSDC30_2>,
-> > @@ -715,8 +712,7 @@
-> >                 };
-> >
-> >                 mmc3: mmc at 11260000 {
-> > -                       compatible = "mediatek,mt8173-mmc",
-> > -                                    "mediatek,mt8135-mmc";
-> > +                       compatible = "mediatek,mt8173-mmc";
-> >                         reg = <0 0x11260000 0 0x1000>;
-> >                         interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_LOW>;
-> >                         clocks = <&pericfg CLK_PERI_MSDC30_3>,
-> > --
-> > 1.8.1.1.dirty
-> >
+The source_cg is required(MUST) at MT2712 and future SoCs, but not
+required(do not have it) at previous SoCs, so that put it at required
+properties, let the driver to handle it.
