@@ -1,373 +1,235 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 18:58:34 +0800
-Subject: [PATCH 05/12] usb: mtu3: support 36-bit DMA address
+Date: Wed, 27 Sep 2017 18:58:33 +0800
+Subject: [PATCH 04/12] usb: mtu3: add optional mcu and dma bus clocks
 In-Reply-To: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
 References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
-Message-ID: <f83d3d489b37dd097a32fea2dae398bba762cee3.1506509658.git.chunfeng.yun@mediatek.com>
+Message-ID: <ed894dac25c1895f43e82d52eee7bbe7fbc04b6b.1506509658.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add support for 36-bit DMA address
+There are mcu_bus and dma_bus clocks needed to be turned on/off by
+driver on some SoCs, so add them as optional ones
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3.h         |   17 ++++++-
- drivers/usb/mtu3/mtu3_core.c    |   34 ++++++++++++-
- drivers/usb/mtu3/mtu3_hw_regs.h |   10 ++++
- drivers/usb/mtu3/mtu3_qmu.c     |  102 ++++++++++++++++++++++++++++++++-------
- 4 files changed, 142 insertions(+), 21 deletions(-)
+ drivers/usb/mtu3/mtu3.h      |    5 ++
+ drivers/usb/mtu3/mtu3_plat.c |  121 ++++++++++++++++++++++++++++--------------
+ 2 files changed, 86 insertions(+), 40 deletions(-)
 
 diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
-index 2795294..ef2dc92 100644
+index 6d3278e..2795294 100644
 --- a/drivers/usb/mtu3/mtu3.h
 +++ b/drivers/usb/mtu3/mtu3.h
-@@ -46,6 +46,9 @@
- #define	MU3D_EP_RXCR1(epnum)	(U3D_RX1CSR1 + (((epnum) - 1) * 0x10))
- #define	MU3D_EP_RXCR2(epnum)	(U3D_RX1CSR2 + (((epnum) - 1) * 0x10))
- 
-+#define USB_QMU_TQHIAR(epnum)	(U3D_TXQHIAR1 + (((epnum) - 1) * 0x4))
-+#define USB_QMU_RQHIAR(epnum)	(U3D_RXQHIAR1 + (((epnum) - 1) * 0x4))
-+
- #define USB_QMU_RQCSR(epnum)	(U3D_RXQCSR1 + (((epnum) - 1) * 0x10))
- #define USB_QMU_RQSAR(epnum)	(U3D_RXQSAR1 + (((epnum) - 1) * 0x10))
- #define USB_QMU_RQCPR(epnum)	(U3D_RXQCPR1 + (((epnum) - 1) * 0x10))
-@@ -138,23 +141,33 @@ struct mtu3_fifo_info {
-  *	Checksum value is calculated over the 16 bytes of the GPD by default;
-  * @data_buf_len (RX ONLY): This value indicates the length of
-  *	the assigned data buffer
-+ * @tx_ext_addr (TX ONLY): [3:0] are 4 extension bits of @buffer,
-+ *	[7:4] are 4 extension bits of @next_gpd
-  * @next_gpd: Physical address of the next GPD
-  * @buffer: Physical address of the data buffer
-  * @buf_len:
-  *	(TX): This value indicates the length of the assigned data buffer
-  *	(RX): The total length of data received
-  * @ext_len: reserved
-+ * @rx_ext_addr(RX ONLY): [3:0] are 4 extension bits of @buffer,
-+ *	[7:4] are 4 extension bits of @next_gpd
-  * @ext_flag:
-  *	bit5 (TX ONLY): Zero Length Packet (ZLP),
-  */
- struct qmu_gpd {
- 	__u8 flag;
- 	__u8 chksum;
--	__le16 data_buf_len;
-+	union {
-+		__le16 data_buf_len;
-+		__le16 tx_ext_addr;
-+	};
- 	__le32 next_gpd;
- 	__le32 buffer;
- 	__le16 buf_len;
--	__u8 ext_len;
-+	union {
-+		__u8 ext_len;
-+		__u8 rx_ext_addr;
-+	};
- 	__u8 ext_flag;
- } __packed;
- 
-diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index 9475798..cd4528f 100644
---- a/drivers/usb/mtu3/mtu3_core.c
-+++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -17,6 +17,7 @@
-  *
-  */
- 
-+#include <linux/dma-mapping.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
-@@ -759,7 +760,31 @@ static void mtu3_hw_exit(struct mtu3 *mtu)
- 	mtu3_mem_free(mtu);
+@@ -206,6 +206,9 @@ struct otg_switch_mtk {
+  * @ippc_base: register base address of IP Power and Clock interface (IPPC)
+  * @vusb33: usb3.3V shared by device/host IP
+  * @sys_clk: system clock of mtu3, shared by device/host IP
++ * @ref_clk: reference clock
++ * @mcu_clk: mcu_bus_ck clock for AHB bus etc
++ * @dma_clk: dma_bus_ck clock for AXI bus etc
+  * @dr_mode: works in which mode:
+  *		host only, device only or dual-role mode
+  * @u2_ports: number of usb2.0 host ports
+@@ -226,6 +229,8 @@ struct ssusb_mtk {
+ 	struct regulator *vusb33;
+ 	struct clk *sys_clk;
+ 	struct clk *ref_clk;
++	struct clk *mcu_clk;
++	struct clk *dma_clk;
+ 	/* otg */
+ 	struct otg_switch_mtk otg_switch;
+ 	enum usb_dr_mode dr_mode;
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 9edad30..fb89920 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -110,15 +110,9 @@ static void ssusb_phy_power_off(struct ssusb_mtk *ssusb)
+ 		phy_power_off(ssusb->phys[i]);
  }
  
--/*-------------------------------------------------------------------------*/
-+/**
-+ * we set 32-bit DMA mask by default, here check whether the controller
-+ * supports 36-bit DMA or not, if it does, set 36-bit DMA mask.
-+ */
-+static int mtu3_set_dma_mask(struct mtu3 *mtu)
-+{
-+	struct device *dev = mtu->dev;
-+	bool is_36bit = false;
-+	int ret = 0;
-+	u32 value;
-+
-+	value = mtu3_readl(mtu->mac_base, U3D_MISC_CTRL);
-+	if (value & DMA_ADDR_36BIT) {
-+		is_36bit = true;
-+		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(36));
-+		/* If set 36-bit DMA mask fails, fall back to 32-bit DMA mask */
-+		if (ret) {
-+			is_36bit = false;
-+			ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
-+		}
-+	}
-+	dev_info(dev, "dma mask: %s bits\n", is_36bit ? "36" : "32");
-+
-+	return ret;
-+}
- 
- int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+-static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
++static int ssusb_clks_enable(struct ssusb_mtk *ssusb)
  {
-@@ -820,6 +845,12 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
- 		return ret;
+-	int ret = 0;
+-
+-	ret = regulator_enable(ssusb->vusb33);
+-	if (ret) {
+-		dev_err(ssusb->dev, "failed to enable vusb33\n");
+-		goto vusb33_err;
+-	}
++	int ret;
+ 
+ 	ret = clk_prepare_enable(ssusb->sys_clk);
+ 	if (ret) {
+@@ -132,6 +126,52 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+ 		goto ref_clk_err;
  	}
  
-+	ret = mtu3_set_dma_mask(mtu);
++	ret = clk_prepare_enable(ssusb->mcu_clk);
 +	if (ret) {
-+		dev_err(dev, "mtu3 set dma_mask failed:%d\n", ret);
-+		goto dma_mask_err;
++		dev_err(ssusb->dev, "failed to enable mcu_clk\n");
++		goto mcu_clk_err;
 +	}
 +
- 	ret = devm_request_irq(dev, mtu->irq, mtu3_irq, 0, dev_name(dev), mtu);
++	ret = clk_prepare_enable(ssusb->dma_clk);
++	if (ret) {
++		dev_err(ssusb->dev, "failed to enable dma_clk\n");
++		goto dma_clk_err;
++	}
++
++	return 0;
++
++dma_clk_err:
++	clk_disable_unprepare(ssusb->mcu_clk);
++mcu_clk_err:
++	clk_disable_unprepare(ssusb->ref_clk);
++ref_clk_err:
++	clk_disable_unprepare(ssusb->sys_clk);
++sys_clk_err:
++	return ret;
++}
++
++static void ssusb_clks_disable(struct ssusb_mtk *ssusb)
++{
++	clk_disable_unprepare(ssusb->dma_clk);
++	clk_disable_unprepare(ssusb->mcu_clk);
++	clk_disable_unprepare(ssusb->ref_clk);
++	clk_disable_unprepare(ssusb->sys_clk);
++}
++
++static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
++{
++	int ret = 0;
++
++	ret = regulator_enable(ssusb->vusb33);
++	if (ret) {
++		dev_err(ssusb->dev, "failed to enable vusb33\n");
++		goto vusb33_err;
++	}
++
++	ret = ssusb_clks_enable(ssusb);
++	if (ret)
++		goto clks_err;
++
+ 	ret = ssusb_phy_init(ssusb);
  	if (ret) {
- 		dev_err(dev, "request irq %d failed!\n", mtu->irq);
-@@ -845,6 +876,7 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
- gadget_err:
- 	device_init_wakeup(dev, false);
+ 		dev_err(ssusb->dev, "failed to init phy\n");
+@@ -149,20 +189,16 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+ phy_err:
+ 	ssusb_phy_exit(ssusb);
+ phy_init_err:
+-	clk_disable_unprepare(ssusb->ref_clk);
+-ref_clk_err:
+-	clk_disable_unprepare(ssusb->sys_clk);
+-sys_clk_err:
++	ssusb_clks_disable(ssusb);
++clks_err:
+ 	regulator_disable(ssusb->vusb33);
+ vusb33_err:
+-
+ 	return ret;
+ }
  
-+dma_mask_err:
- irq_err:
- 	mtu3_hw_exit(mtu);
- 	ssusb->u3d = NULL;
-diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
-index 06b2966..b605975 100644
---- a/drivers/usb/mtu3/mtu3_hw_regs.h
-+++ b/drivers/usb/mtu3/mtu3_hw_regs.h
-@@ -58,6 +58,8 @@
- #define U3D_QCR1		(SSUSB_DEV_BASE + 0x0404)
- #define U3D_QCR2		(SSUSB_DEV_BASE + 0x0408)
- #define U3D_QCR3		(SSUSB_DEV_BASE + 0x040C)
-+#define U3D_TXQHIAR1		(SSUSB_DEV_BASE + 0x0484)
-+#define U3D_RXQHIAR1		(SSUSB_DEV_BASE + 0x04C4)
+ static void ssusb_rscs_exit(struct ssusb_mtk *ssusb)
+ {
+-	clk_disable_unprepare(ssusb->sys_clk);
+-	clk_disable_unprepare(ssusb->ref_clk);
++	ssusb_clks_disable(ssusb);
+ 	regulator_disable(ssusb->vusb33);
+ 	ssusb_phy_power_off(ssusb);
+ 	ssusb_phy_exit(ssusb);
+@@ -203,6 +239,19 @@ static int get_iddig_pinctrl(struct ssusb_mtk *ssusb)
+ 	return 0;
+ }
  
- #define U3D_TXQCSR1		(SSUSB_DEV_BASE + 0x0510)
- #define U3D_TXQSAR1		(SSUSB_DEV_BASE + 0x0514)
-@@ -189,6 +191,13 @@
- #define QMU_RX_COZ(x)		(BIT(16) << (x))
- #define QMU_RX_ZLP(x)		(BIT(0) << (x))
- 
-+/* U3D_TXQHIAR1 */
-+/* U3D_RXQHIAR1 */
-+#define QMU_LAST_DONE_PTR_HI(x)	(((x) >> 16) & 0xf)
-+#define QMU_CUR_GPD_ADDR_HI(x)	(((x) >> 8) & 0xf)
-+#define QMU_START_ADDR_HI_MSK	GENMASK(3, 0)
-+#define QMU_START_ADDR_HI(x)	(((x) & 0xf) << 0)
-+
- /* U3D_TXQCSR1 */
- /* U3D_RXQCSR1 */
- #define QMU_Q_ACTIVE		BIT(15)
-@@ -225,6 +234,7 @@
- #define CAP_TX_EP_NUM(x)	((x) & 0x1f)
- 
- /* U3D_MISC_CTRL */
-+#define DMA_ADDR_36BIT		BIT(31)
- #define VBUS_ON			BIT(1)
- #define VBUS_FRC_EN		BIT(0)
- 
-diff --git a/drivers/usb/mtu3/mtu3_qmu.c b/drivers/usb/mtu3/mtu3_qmu.c
-index 7d9ba8a..10d8f60 100644
---- a/drivers/usb/mtu3/mtu3_qmu.c
-+++ b/drivers/usb/mtu3/mtu3_qmu.c
-@@ -40,7 +40,58 @@
- #define GPD_FLAGS_IOC	BIT(7)
- 
- #define GPD_EXT_FLAG_ZLP	BIT(5)
-+#define GPD_EXT_NGP(x)		(((x) & 0xf) << 4)
-+#define GPD_EXT_BUF(x)		(((x) & 0xf) << 0)
- 
-+#define HILO_GEN64(hi, lo) (((u64)(hi) << 32) + (lo))
-+#define HILO_DMA(hi, lo)	\
-+	((dma_addr_t)HILO_GEN64((le32_to_cpu(hi)), (le32_to_cpu(lo))))
-+
-+static dma_addr_t read_txq_cur_addr(void __iomem *mbase, u8 epnum)
++/* ignore the error if the clock does not exist */
++static struct clk *get_optional_clk(struct device *dev, const char *id)
 +{
-+	u32 txcpr;
-+	u32 txhiar;
++	struct clk *opt_clk;
 +
-+	txcpr = mtu3_readl(mbase, USB_QMU_TQCPR(epnum));
-+	txhiar = mtu3_readl(mbase, USB_QMU_TQHIAR(epnum));
++	opt_clk = devm_clk_get(dev, id);
++	/* ignore error number except EPROBE_DEFER */
++	if (IS_ERR(opt_clk) && (PTR_ERR(opt_clk) != -EPROBE_DEFER))
++		opt_clk = NULL;
 +
-+	return HILO_DMA(QMU_CUR_GPD_ADDR_HI(txhiar), txcpr);
++	return opt_clk;
 +}
 +
-+static dma_addr_t read_rxq_cur_addr(void __iomem *mbase, u8 epnum)
-+{
-+	u32 rxcpr;
-+	u32 rxhiar;
+ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
+@@ -225,18 +274,17 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 		return PTR_ERR(ssusb->sys_clk);
+ 	}
+ 
+-	/*
+-	 * reference clock is usually a "fixed-clock", make it optional
+-	 * for backward compatibility and ignore the error if it does
+-	 * not exist.
+-	 */
+-	ssusb->ref_clk = devm_clk_get(dev, "ref_ck");
+-	if (IS_ERR(ssusb->ref_clk)) {
+-		if (PTR_ERR(ssusb->ref_clk) == -EPROBE_DEFER)
+-			return -EPROBE_DEFER;
++	ssusb->ref_clk = get_optional_clk(dev, "ref_ck");
++	if (IS_ERR(ssusb->ref_clk))
++		return PTR_ERR(ssusb->ref_clk);
+ 
+-		ssusb->ref_clk = NULL;
+-	}
++	ssusb->mcu_clk = get_optional_clk(dev, "mcu_ck");
++	if (IS_ERR(ssusb->mcu_clk))
++		return PTR_ERR(ssusb->mcu_clk);
 +
-+	rxcpr = mtu3_readl(mbase, USB_QMU_RQCPR(epnum));
-+	rxhiar = mtu3_readl(mbase, USB_QMU_RQHIAR(epnum));
-+
-+	return HILO_DMA(QMU_CUR_GPD_ADDR_HI(rxhiar), rxcpr);
-+}
-+
-+static void write_txq_start_addr(void __iomem *mbase, u8 epnum, dma_addr_t dma)
-+{
-+	u32 tqhiar;
-+
-+	mtu3_writel(mbase, USB_QMU_TQSAR(epnum),
-+		    cpu_to_le32(lower_32_bits(dma)));
-+	tqhiar = mtu3_readl(mbase, USB_QMU_TQHIAR(epnum));
-+	tqhiar &= ~QMU_START_ADDR_HI_MSK;
-+	tqhiar |= QMU_START_ADDR_HI(upper_32_bits(dma));
-+	mtu3_writel(mbase, USB_QMU_TQHIAR(epnum), tqhiar);
-+}
-+
-+static void write_rxq_start_addr(void __iomem *mbase, u8 epnum, dma_addr_t dma)
-+{
-+	u32 rqhiar;
-+
-+	mtu3_writel(mbase, USB_QMU_RQSAR(epnum),
-+		    cpu_to_le32(lower_32_bits(dma)));
-+	rqhiar = mtu3_readl(mbase, USB_QMU_RQHIAR(epnum));
-+	rqhiar &= ~QMU_START_ADDR_HI_MSK;
-+	rqhiar |= QMU_START_ADDR_HI(upper_32_bits(dma));
-+	mtu3_writel(mbase, USB_QMU_RQHIAR(epnum), rqhiar);
-+}
++	ssusb->dma_clk = get_optional_clk(dev, "dma_ck");
++	if (IS_ERR(ssusb->dma_clk))
++		return PTR_ERR(ssusb->dma_clk);
  
- static struct qmu_gpd *gpd_dma_to_virt(struct mtu3_gpd_ring *ring,
- 		dma_addr_t dma_addr)
-@@ -193,21 +244,27 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
- 	struct mtu3_gpd_ring *ring = &mep->gpd_ring;
- 	struct qmu_gpd *gpd = ring->enqueue;
- 	struct usb_request *req = &mreq->request;
-+	dma_addr_t enq_dma;
-+	u16 ext_addr;
+ 	ssusb->num_phys = of_count_phandle_with_args(node,
+ 			"phys", "#phy-cells");
+@@ -451,8 +499,7 @@ static int __maybe_unused mtu3_suspend(struct device *dev)
  
- 	/* set all fields to zero as default value */
- 	memset(gpd, 0, sizeof(*gpd));
+ 	ssusb_host_disable(ssusb, true);
+ 	ssusb_phy_power_off(ssusb);
+-	clk_disable_unprepare(ssusb->sys_clk);
+-	clk_disable_unprepare(ssusb->ref_clk);
++	ssusb_clks_disable(ssusb);
+ 	ssusb_wakeup_enable(ssusb);
  
--	gpd->buffer = cpu_to_le32((u32)req->dma);
-+	gpd->buffer = cpu_to_le32(lower_32_bits(req->dma));
-+	ext_addr = GPD_EXT_BUF(upper_32_bits(req->dma));
- 	gpd->buf_len = cpu_to_le16(req->length);
- 	gpd->flag |= GPD_FLAGS_IOC;
+ 	return 0;
+@@ -470,27 +517,21 @@ static int __maybe_unused mtu3_resume(struct device *dev)
+ 		return 0;
  
- 	/* get the next GPD */
- 	enq = advance_enq_gpd(ring);
--	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p\n",
--		mep->epnum, gpd, enq);
-+	enq_dma = gpd_virt_to_dma(ring, enq);
-+	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p, qdma=%llx\n",
-+		mep->epnum, gpd, enq, enq_dma);
+ 	ssusb_wakeup_disable(ssusb);
+-	ret = clk_prepare_enable(ssusb->sys_clk);
+-	if (ret)
+-		goto err_sys_clk;
+-
+-	ret = clk_prepare_enable(ssusb->ref_clk);
++	ret = ssusb_clks_enable(ssusb);
+ 	if (ret)
+-		goto err_ref_clk;
++		goto clks_err;
  
- 	enq->flag &= ~GPD_FLAGS_HWO;
--	gpd->next_gpd = cpu_to_le32((u32)gpd_virt_to_dma(ring, enq));
-+	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
-+	ext_addr |= GPD_EXT_NGP(upper_32_bits(enq_dma));
-+	gpd->tx_ext_addr = cpu_to_le16(ext_addr);
+ 	ret = ssusb_phy_power_on(ssusb);
+ 	if (ret)
+-		goto err_power_on;
++		goto phy_err;
  
- 	if (req->zero)
- 		gpd->ext_flag |= GPD_EXT_FLAG_ZLP;
-@@ -226,21 +283,27 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
- 	struct mtu3_gpd_ring *ring = &mep->gpd_ring;
- 	struct qmu_gpd *gpd = ring->enqueue;
- 	struct usb_request *req = &mreq->request;
-+	dma_addr_t enq_dma;
-+	u16 ext_addr;
+ 	ssusb_host_enable(ssusb);
  
- 	/* set all fields to zero as default value */
- 	memset(gpd, 0, sizeof(*gpd));
+ 	return 0;
  
--	gpd->buffer = cpu_to_le32((u32)req->dma);
-+	gpd->buffer = cpu_to_le32(lower_32_bits(req->dma));
-+	ext_addr = GPD_EXT_BUF(upper_32_bits(req->dma));
- 	gpd->data_buf_len = cpu_to_le16(req->length);
- 	gpd->flag |= GPD_FLAGS_IOC;
+-err_power_on:
+-	clk_disable_unprepare(ssusb->ref_clk);
+-err_ref_clk:
+-	clk_disable_unprepare(ssusb->sys_clk);
+-err_sys_clk:
++phy_err:
++	ssusb_clks_disable(ssusb);
++clks_err:
+ 	return ret;
+ }
  
- 	/* get the next GPD */
- 	enq = advance_enq_gpd(ring);
--	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p\n",
--		mep->epnum, gpd, enq);
-+	enq_dma = gpd_virt_to_dma(ring, enq);
-+	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p, qdma=%llx\n",
-+		mep->epnum, gpd, enq, enq_dma);
- 
- 	enq->flag &= ~GPD_FLAGS_HWO;
--	gpd->next_gpd = cpu_to_le32((u32)gpd_virt_to_dma(ring, enq));
-+	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
-+	ext_addr |= GPD_EXT_NGP(upper_32_bits(enq_dma));
-+	gpd->rx_ext_addr = cpu_to_le16(ext_addr);
- 	gpd->chksum = qmu_calc_checksum((u8 *)gpd);
- 	gpd->flag |= GPD_FLAGS_HWO;
- 
-@@ -267,8 +330,8 @@ int mtu3_qmu_start(struct mtu3_ep *mep)
- 
- 	if (mep->is_in) {
- 		/* set QMU start address */
--		mtu3_writel(mbase, USB_QMU_TQSAR(mep->epnum), ring->dma);
--		mtu3_setbits(mbase, MU3D_EP_TXCR0(mep->epnum), TX_DMAREQEN);
-+		write_txq_start_addr(mbase, epnum, ring->dma);
-+		mtu3_setbits(mbase, MU3D_EP_TXCR0(epnum), TX_DMAREQEN);
- 		mtu3_setbits(mbase, U3D_QCR0, QMU_TX_CS_EN(epnum));
- 		/* send zero length packet according to ZLP flag in GPD */
- 		mtu3_setbits(mbase, U3D_QCR1, QMU_TX_ZLP(epnum));
-@@ -282,8 +345,8 @@ int mtu3_qmu_start(struct mtu3_ep *mep)
- 		mtu3_writel(mbase, USB_QMU_TQCSR(epnum), QMU_Q_START);
- 
- 	} else {
--		mtu3_writel(mbase, USB_QMU_RQSAR(mep->epnum), ring->dma);
--		mtu3_setbits(mbase, MU3D_EP_RXCR0(mep->epnum), RX_DMAREQEN);
-+		write_rxq_start_addr(mbase, epnum, ring->dma);
-+		mtu3_setbits(mbase, MU3D_EP_RXCR0(epnum), RX_DMAREQEN);
- 		mtu3_setbits(mbase, U3D_QCR0, QMU_RX_CS_EN(epnum));
- 		/* don't expect ZLP */
- 		mtu3_clrbits(mbase, U3D_QCR3, QMU_RX_ZLP(epnum));
-@@ -353,9 +416,9 @@ static void qmu_tx_zlp_error_handler(struct mtu3 *mtu, u8 epnum)
- 	struct mtu3_gpd_ring *ring = &mep->gpd_ring;
- 	void __iomem *mbase = mtu->mac_base;
- 	struct qmu_gpd *gpd_current = NULL;
--	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_TQCPR(epnum));
- 	struct usb_request *req = NULL;
- 	struct mtu3_request *mreq;
-+	dma_addr_t cur_gpd_dma;
- 	u32 txcsr = 0;
- 	int ret;
- 
-@@ -365,7 +428,8 @@ static void qmu_tx_zlp_error_handler(struct mtu3 *mtu, u8 epnum)
- 	else
- 		return;
- 
--	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
-+	cur_gpd_dma = read_txq_cur_addr(mbase, epnum);
-+	gpd_current = gpd_dma_to_virt(ring, cur_gpd_dma);
- 
- 	if (le16_to_cpu(gpd_current->buf_len) != 0) {
- 		dev_err(mtu->dev, "TX EP%d buffer length error(!=0)\n", epnum);
-@@ -408,12 +472,13 @@ static void qmu_done_tx(struct mtu3 *mtu, u8 epnum)
- 	void __iomem *mbase = mtu->mac_base;
- 	struct qmu_gpd *gpd = ring->dequeue;
- 	struct qmu_gpd *gpd_current = NULL;
--	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_TQCPR(epnum));
- 	struct usb_request *request = NULL;
- 	struct mtu3_request *mreq;
-+	dma_addr_t cur_gpd_dma;
- 
- 	/*transfer phy address got from QMU register to virtual address */
--	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
-+	cur_gpd_dma = read_txq_cur_addr(mbase, epnum);
-+	gpd_current = gpd_dma_to_virt(ring, cur_gpd_dma);
- 
- 	dev_dbg(mtu->dev, "%s EP%d, last=%p, current=%p, enq=%p\n",
- 		__func__, epnum, gpd, gpd_current, ring->enqueue);
-@@ -446,11 +511,12 @@ static void qmu_done_rx(struct mtu3 *mtu, u8 epnum)
- 	void __iomem *mbase = mtu->mac_base;
- 	struct qmu_gpd *gpd = ring->dequeue;
- 	struct qmu_gpd *gpd_current = NULL;
--	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_RQCPR(epnum));
- 	struct usb_request *req = NULL;
- 	struct mtu3_request *mreq;
-+	dma_addr_t cur_gpd_dma;
- 
--	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
-+	cur_gpd_dma = read_rxq_cur_addr(mbase, epnum);
-+	gpd_current = gpd_dma_to_virt(ring, cur_gpd_dma);
- 
- 	dev_dbg(mtu->dev, "%s EP%d, last=%p, current=%p, enq=%p\n",
- 		__func__, epnum, gpd, gpd_current, ring->enqueue);
 -- 
 1.7.9.5
