@@ -1,109 +1,185 @@
 From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Wed, 27 Sep 2017 14:32:36 +0100
-Subject: [PATCH v8 0/5] iommu/smmu-v3: Workaround for hisilicon 161010801
- erratum(reserve HW MSI)
-Message-ID: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+Date: Wed, 27 Sep 2017 14:32:39 +0100
+Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation helper
+In-Reply-To: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
-deviates from the standard implementation and this breaks PCIe MSI
-functionality when SMMU is enabled.
+From: John Garry <john.garry@huawei.com>
 
-The HiSilicon erratum 161010801 describes this limitation of certain
-HiSilicon platforms to support the SMMU mappings for MSI transactions.
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the MSI
-payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
+On some platforms msi-controller address regions have to be excluded
+from normal IOVA allocation in that they are detected and decoded in
+a HW specific way by system components and so they cannot be considered
+normal IOVA address space.
 
-This patch implements an ACPI and DT based quirk to reserve the hw msi
-regions in the smmu-v3 driver which means these address regions will
-not be translated and will be excluded from iova allocations.
+Add a helper function that retrieves msi address regions through device
+tree msi mapping, so that these regions will not be translated by IOMMU
+and will be excluded from IOVA allocations.
 
-To implement this quirk, the following changes are incorporated:
-1. Added a generic helper function to IORT code to retrieve the
-   associated ITS base address from a device IORT node.
-2. Added a generic helper function to of iommu code to retrieve the
-   associated msi controller base address from for a PCI RC
-   msi-mapping and also platform device msi-parent.
-3. Added quirk to SMMUv3 to retrieve the HW ITS address and replace
-   the default SW MSI reserve address based on the IORT SMMU model
-   or DT bindings.
+Signed-off-by: John Garry <john.garry@huawei.com>
+[Shameer: Modified msi-parent retrieval logic]
+Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+---
+ drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_iommu.h | 10 +++++
+ 2 files changed, 105 insertions(+)
 
-Changelog:
-
-v7 --> v8
-Addressed comments from Rob and Lorenzo:
- -Modified to use DT compatible string for errata.
- -Changed logic to retrieve the msi-parent for DT case.
-
-v6 --> v7
-Addressed request from Will to add DT support for the erratum:
- - added bt binding
- - add of_iommu_msi_get_resv_regions()
-New arm64 silicon errata entry
-Rename iort_iommu_{its->msi}_get_resv_regions
-
-v5 --> v6
-Addressed comments from Robin and Lorenzo:
--No change to patch#1 .
--Reverted v5 patch#2 as this might break the platforms where this quirk
-  is not applicable. Provided a generic function in iommu code and added
-  back the quirk implementation in SMMU v3 driver(patch#3)
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index e60e3db..ffd7fb7 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -21,6 +21,7 @@
+ #include <linux/iommu.h>
+ #include <linux/limits.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_iommu.h>
+ #include <linux/of_pci.h>
+ #include <linux/slab.h>
+@@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
+ 	return ops->of_xlate(dev, iommu_spec);
+ }
  
-v4 --> v5
-Addressed comments from Robin and Lorenzo:
--Added a comment to make it clear that, for now, only straightforward 
-  HW topologies are handled while reserving ITS regions(patch #1).
-
-v3 --> v4
-Rebased on 4.13-rc1.
-Addressed comments from Robin, Will and Lorenzo:
--As suggested by Robin, moved the ITS msi reservation into 
-  iommu_dma_get_resv_regions().
--Added its_count != resv region failure case(patch #1).
-
-v2 --> v3
-Addressed comments from Lorenzo and Robin:
--Removed dev_is_pci() check in smmuV3 driver.
--Don't treat device not having an ITS mapping as an error in
-  iort helper function.
-
-v1 --> v2
--patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
-
-RFCv2 -->PATCH
--Incorporated Lorenzo's review comments.
-
-RFC v1 --> RFC v2
-Based on Robin's review comments,
--Removed  the generic erratum framework.
--Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor specific CSRT table.
-
-John Garry (2):
-  Doc: iommu/arm-smmu-v3: Add workaround for HiSilicon erratum 161010801
-  iommu/of: Add msi address regions reservation helper
-
-Shameer Kolothum (3):
-  ACPI/IORT: Add msi address regions reservation helper
-  iommu/dma: Add a helper function to reserve HW MSI address regions for
-    IOMMU drivers
-  iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
-
- Documentation/arm64/silicon-errata.txt             |  1 +
- .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  9 +-
- drivers/acpi/arm64/iort.c                          | 96 +++++++++++++++++++++-
- drivers/iommu/arm-smmu-v3.c                        | 41 +++++++--
- drivers/iommu/dma-iommu.c                          | 19 +++++
- drivers/iommu/of_iommu.c                           | 95 +++++++++++++++++++++
- drivers/irqchip/irq-gic-v3-its.c                   |  3 +-
- include/linux/acpi_iort.h                          |  7 +-
- include/linux/dma-iommu.h                          |  7 ++
- include/linux/of_iommu.h                           | 10 +++
- 10 files changed, 276 insertions(+), 12 deletions(-)
-
++static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
++{
++	u32 *rid = data;
++
++	*rid = alias;
++	return 0;
++}
++
+ struct of_pci_iommu_alias_info {
+ 	struct device *dev;
+ 	struct device_node *np;
+@@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+ 	return info->np == pdev->bus->dev.of_node;
+ }
+ 
++static int of_iommu_alloc_resv_region(struct device_node *np,
++				      struct list_head *head)
++{
++	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++	struct iommu_resv_region *region;
++	struct resource res;
++	int err;
++
++	err = of_address_to_resource(np, 0, &res);
++	if (err)
++		return err;
++
++	region = iommu_alloc_resv_region(res.start, resource_size(&res),
++					 prot, IOMMU_RESV_MSI);
++	if (!region)
++		return -ENOMEM;
++
++	list_add_tail(&region->list, head);
++
++	return 0;
++}
++
++static int of_pci_msi_get_resv_regions(struct device *dev,
++				       struct list_head *head)
++{
++	struct device_node *msi_np;
++	struct device *pdev;
++	u32 rid;
++	int err, resv = 0;
++
++	pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
++
++	for_each_node_with_property(msi_np, "msi-controller") {
++		for (pdev = dev; pdev; pdev = pdev->parent) {
++			if (!of_pci_map_rid(pdev->of_node, rid, "msi-map",
++					    "msi-map-mask", &msi_np, NULL)) {
++
++				err = of_iommu_alloc_resv_region(msi_np, head);
++				if (err)
++					return err;
++				resv++;
++			}
++		}
++	}
++
++	return resv;
++}
++
++static int of_platform_msi_get_resv_regions(struct device *dev,
++				       struct list_head *head)
++{
++	struct of_phandle_args args;
++	int err, resv = 0;
++
++	while (!of_parse_phandle_with_args(dev->of_node, "msi-parent",
++					   "#msi-cells", resv, &args)) {
++
++		err = of_iommu_alloc_resv_region(args.np, head);
++		of_node_put(args.np);
++		if (err)
++			return err;
++		resv++;
++	}
++
++	return resv;
++}
++
+ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 					   struct device_node *master_np)
+ {
+@@ -235,6 +311,25 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 	return ops;
+ }
+ 
++/**
++ * of_iommu_msi_get_resv_regions - Reserved region driver helper
++ * @dev: Device from iommu_get_resv_regions()
++ * @head: Reserved region list from iommu_get_resv_regions()
++ *
++ * Returns: Number of reserved regions on success (0 if no associated
++ *          msi parent), appropriate error value otherwise.
++ */
++int of_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
++{
++
++	if (dev_is_pci(dev))
++		return of_pci_msi_get_resv_regions(dev, head);
++	else if (dev->of_node)
++		return of_platform_msi_get_resv_regions(dev, head);
++
++	return 0;
++}
++
+ static int __init of_iommu_init(void)
+ {
+ 	struct device_node *np;
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index 13394ac..9267772 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -14,6 +14,9 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+ extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 					struct device_node *master_np);
+ 
++extern int of_iommu_msi_get_resv_regions(struct device *dev,
++					struct list_head *head);
++
+ #else
+ 
+ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+@@ -29,6 +32,13 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 	return NULL;
+ }
+ 
++static int of_iommu_msi_get_resv_regions(struct device *dev,
++					struct list_head *head)
++{
++	return -ENODEV;
++}
++
++
+ #endif	/* CONFIG_OF_IOMMU */
+ 
+ extern struct of_device_id __iommu_of_table;
 -- 
 1.9.1
