@@ -1,88 +1,76 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 27 Sep 2017 14:49:00 +0100
-Subject: [RFC] iommu: arm-smmu: stall support
-In-Reply-To: <20170927121540.GL8398@8bytes.org>
-References: <20170914194444.32551-1-robdclark@gmail.com>
- <20170919123038.GF8398@8bytes.org>
- <CAF6AEGuutkqjrWk4jagE=p-NwHgxdiPZjjsaFsfwtczK568j+A@mail.gmail.com>
- <20170922090204.GJ8398@8bytes.org>
- <32e3ab2c-a996-c805-2a0d-a2e85deb3a50@arm.com>
- <CAF6AEGuh0FiNWEAmFm+7-7pc6MV5hKKz9cyA_J0d256bY-nYOQ@mail.gmail.com>
- <20170927121540.GL8398@8bytes.org>
-Message-ID: <4e2fc08e-3e7e-3355-17e5-72106196c732@arm.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 27 Sep 2017 15:47:09 +0200
+Subject: [PATCH v6 06/11] ARM: dts: sunxi: h3/h5: represent the mdio
+ switch used by sun8i-h3-emac
+In-Reply-To: <20170927101622.v7odmreccwh7ldg2@flea>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+ <20170927073414.17361-7-clabbe.montjoie@gmail.com>
+ <20170927101622.v7odmreccwh7ldg2@flea>
+Message-ID: <20170927134709.GA14370@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-
-On 27/09/17 13:15, Joerg Roedel wrote:
-> Hi Rob, Jean,
+On Wed, Sep 27, 2017 at 12:16:22PM +0200, Maxime Ripard wrote:
+> On Wed, Sep 27, 2017 at 07:34:09AM +0000, Corentin Labbe wrote:
+> > Since dwmac-sun8i could use either an integrated PHY or an external PHY
+> > (which could be at same MDIO address), we need to represent this selection
+> > by a MDIO switch.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 31 +++++++++++++++++++++++++------
+> >  1 file changed, 25 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > index 3b7d953429a6..a8e9b8f378ba 100644
+> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > @@ -422,14 +422,33 @@
+> >  			#size-cells = <0>;
+> >  			status = "disabled";
+> >  
+> > -			mdio: mdio {
+> > +			mdio0: mdio {
+> >  				#address-cells = <1>;
+> >  				#size-cells = <0>;
+> > -				int_mii_phy: ethernet-phy at 1 {
+> > -					compatible = "ethernet-phy-ieee802.3-c22";
+> > -					reg = <1>;
+> > -					clocks = <&ccu CLK_BUS_EPHY>;
+> > -					resets = <&ccu RST_BUS_EPHY>;
+> > +				compatible = "snps,dwmac-mdio";
+> > +
+> > +				mdio-mux {
+> > +					compatible = "mdio-mux";
+> > +					#address-cells = <1>;
+> > +					#size-cells = <0>;
 > 
-> On Fri, Sep 22, 2017 at 02:42:44PM -0400, Rob Clark wrote:
->> I'm in favour if splitting the reporting *somehow*.. the two
->> approaches that seemed sane are:
->> 
->> 1) call fault handler from irq and having separate domain->resume()
->> called by the driver, potentially from a wq
->> 2) or having two fault callbacks, first called before wq and then
->> based on returned value, optionally 2nd callback called from wq
->> 
->> The first seemed less intrusive to me, but I'm flexible.
+> Newline
 > 
-> How about adding a flag to the fault-handler call-back that tells us
-> whether it wants to sleep or not. If it wants, we call it from a wq, if
-> not we call call it directly like we do today in the
-> report_iommu_fault() function.
+> > +					/* Only one MDIO is usable at the time */
+> > +					internal_mdio: mdio at 1 {
+> > +						reg = <1>;
+> > +						#address-cells = <1>;
+> > +						#size-cells = <0>;
 > 
-> In any case we call iommu_ops->resume() when set on completion of the
-> fault-handler either from the workqueue or report_iommu_fault itself.
+> Newline
+> 
+> > +						int_mii_phy: ethernet-phy at 1 {
+> > +							compatible = "ethernet-phy-ieee802.3-c22";
+> > +							reg = <1>;
+> > +							clocks = <&ccu CLK_BUS_EPHY>;
+> > +							resets = <&ccu RST_BUS_EPHY>;
+> > +							phy-is-integrated;
+> > +						};
+> > +					};
+> 
+> Newline
+> 
+> > +					mdio: mdio at 2 {
+> 
+> This is quite confusing. Why not call the label external_mdio?
+> 
 
-I like this approach. When the device driver registers a fault handler,
-it also tells when it would like to be called (either in atomic context,
-blocking context, or both).
+I will do it. (at origin I was not changing it for limiting changes on board with external PHY, but now all DT are reverted, it will be easy)
 
-Then the handler itself receives a flag that says which context it's
-being called from. It returns a value telling the IOMMU how to proceed.
-Depending on this value we either resume/abort immediately, or add the
-fault to the workqueue if necessary.
-
-How about using the following return values:
-
-/**
- * enum iommu_fault_status - Return status of fault handlers, telling the IOMMU
- *      driver how to proceed with the fault.
- *
- * @IOMMU_FAULT_STATUS_NONE: Fault was not handled. Call the next handler, or
- *      terminate.
- * @IOMMU_FAULT_STATUS_FAILURE: General error. Drop all subsequent faults from
- *      this device if possible. This is "Response Failure" in PCI PRI.
- * @IOMMU_FAULT_STATUS_INVALID: Could not handle this fault, don't retry the
- *      access. This is "Invalid Request" in PCI PRI.
- * @IOMMU_FAULT_STATUS_HANDLED: Fault has been handled and the page tables
- *      populated, retry the access.
- * @IOMMU_FAULT_STATUS_IGNORE: Stop processing the fault, and do not send a
- *      reply to the device.
- *
- * For unrecoverable faults, the only valid status is IOMMU_FAULT_STATUS_NONE
- * For a recoverable fault, if no one handled the fault, treat as
- * IOMMU_FAULT_STATUS_INVALID.
- */
-enum iommu_fault_status {
-        IOMMU_FAULT_STATUS_NONE = 0,
-        IOMMU_FAULT_STATUS_FAILURE,
-        IOMMU_FAULT_STATUS_INVALID,
-        IOMMU_FAULT_STATUS_HANDLED,
-        IOMMU_FAULT_STATUS_IGNORE,
-};
-
-This would probably cover the two use-cases of reporting faults to
-device drivers, and injecting them into the guest with VFIO, as well as
-handling PPRs internally. I'm also working on providing more details
-(pasid for instance) in the fault callback.
-
-We could also use the fault handler for invalid PRI Page Requests
-(currently specialized by amd_iommu_set_invalid_ppr_cb). It's just a
-matter of adding a registration flag to iommu_set_fault_handler.
-
-Thanks,
-Jean
+Regards
