@@ -1,292 +1,167 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 27 Sep 2017 18:58:35 +0800
-Subject: [PATCH 06/12] usb: mtu3: use FORCE/RG_IDDIG to implement manual DRD
- switch
+Date: Wed, 27 Sep 2017 18:58:36 +0800
+Subject: [PATCH 07/12] usb: mtu3: add support for usb3.1 IP
 In-Reply-To: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
 References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
-Message-ID: <bfe4b110c3128498d9c36cd49c8cfb4370f43891.1506509658.git.chunfeng.yun@mediatek.com>
+Message-ID: <f862f79fce3eb723a7d9bb6d27e60b82d031d918.1506509659.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to keep manual DRD switch independent on IDDIG interrupt,
-make use of FORCE/RG_IDDIG instead of IDDIG EINT interrupt to
-implement manual DRD switch function.
+Support SuperSpeedPlus for usb3.1 device IP
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3.h         |   18 ++++++++----
- drivers/usb/mtu3/mtu3_dr.c      |   61 +++++++++++++++++++++++++++++----------
- drivers/usb/mtu3/mtu3_dr.h      |    6 ++++
- drivers/usb/mtu3/mtu3_host.c    |    5 ++++
- drivers/usb/mtu3/mtu3_hw_regs.h |    2 ++
- drivers/usb/mtu3/mtu3_plat.c    |   38 ++----------------------
- 6 files changed, 74 insertions(+), 56 deletions(-)
+ drivers/usb/mtu3/mtu3.h            |    1 +
+ drivers/usb/mtu3/mtu3_core.c       |   14 +++++++++++---
+ drivers/usb/mtu3/mtu3_gadget.c     |    3 ++-
+ drivers/usb/mtu3/mtu3_gadget_ep0.c |   16 ++++++++--------
+ drivers/usb/mtu3/mtu3_hw_regs.h    |    1 +
+ 5 files changed, 23 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
-index ef2dc92..b0c2b5d 100644
+index b0c2b5d..d80e4e8 100644
 --- a/drivers/usb/mtu3/mtu3.h
 +++ b/drivers/usb/mtu3/mtu3.h
-@@ -115,6 +115,19 @@ enum mtu3_g_ep0_state {
+@@ -94,6 +94,7 @@ enum mtu3_speed {
+ 	MTU3_SPEED_FULL = 1,
+ 	MTU3_SPEED_HIGH = 3,
+ 	MTU3_SPEED_SUPER = 4,
++	MTU3_SPEED_SUPER_PLUS = 5,
  };
  
  /**
-+ * MTU3_DR_FORCE_NONE: automatically switch host and periperal mode
-+ *		by IDPIN signal.
-+ * MTU3_DR_FORCE_HOST: force to enter host mode and override OTG
-+ *		IDPIN signal.
-+ * MTU3_DR_FORCE_DEVICE: force to enter peripheral mode.
-+ */
-+enum mtu3_dr_force_mode {
-+	MTU3_DR_FORCE_NONE = 0,
-+	MTU3_DR_FORCE_HOST,
-+	MTU3_DR_FORCE_DEVICE,
-+};
-+
-+/**
-  * @base: the base address of fifo
-  * @limit: the bitmap size in bits
-  * @bitmap: fifo bitmap in unit of @MTU3_EP_FIFO_UNIT
-@@ -196,7 +209,6 @@ struct mtu3_gpd_ring {
- *		xHCI driver initialization, it's necessary for system bootup
- *		as device.
- * @is_u3_drd: whether port0 supports usb3.0 dual-role device or not
--* @id_*: used to maually switch between host and device modes by idpin
- * @manual_drd_enabled: it's true when supports dual-role device by debugfs
- *		to switch host/device modes depending on user input.
- */
-@@ -207,10 +219,6 @@ struct otg_switch_mtk {
- 	struct notifier_block id_nb;
- 	struct delayed_work extcon_reg_dwork;
- 	bool is_u3_drd;
--	/* dual-role switch by debugfs */
--	struct pinctrl *id_pinctrl;
--	struct pinctrl_state *id_float;
--	struct pinctrl_state *id_ground;
- 	bool manual_drd_enabled;
- };
+diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
+index cd4528f..67f7a30 100644
+--- a/drivers/usb/mtu3/mtu3_core.c
++++ b/drivers/usb/mtu3/mtu3_core.c
+@@ -237,7 +237,7 @@ void mtu3_ep_stall_set(struct mtu3_ep *mep, bool set)
  
-diff --git a/drivers/usb/mtu3/mtu3_dr.c b/drivers/usb/mtu3/mtu3_dr.c
-index 5602561..ec442cd 100644
---- a/drivers/usb/mtu3/mtu3_dr.c
-+++ b/drivers/usb/mtu3/mtu3_dr.c
-@@ -261,21 +261,22 @@ static void extcon_register_dwork(struct work_struct *work)
-  * depending on user input.
-  * This is useful in special cases, such as uses TYPE-A receptacle but also
-  * wants to support dual-role mode.
-- * It generates cable state changes by pulling up/down IDPIN and
-- * notifies driver to switch mode by "extcon-usb-gpio".
-- * NOTE: when use MICRO receptacle, should not enable this interface.
-  */
- static void ssusb_mode_manual_switch(struct ssusb_mtk *ssusb, int to_host)
+ void mtu3_dev_on_off(struct mtu3 *mtu, int is_on)
  {
- 	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
- 
--	if (to_host)
--		pinctrl_select_state(otg_sx->id_pinctrl, otg_sx->id_ground);
--	else
--		pinctrl_select_state(otg_sx->id_pinctrl, otg_sx->id_float);
-+	if (to_host) {
-+		ssusb_set_force_mode(ssusb, MTU3_DR_FORCE_HOST);
-+		ssusb_set_mailbox(otg_sx, MTU3_VBUS_OFF);
-+		ssusb_set_mailbox(otg_sx, MTU3_ID_GROUND);
-+	} else {
-+		ssusb_set_force_mode(ssusb, MTU3_DR_FORCE_DEVICE);
-+		ssusb_set_mailbox(otg_sx, MTU3_ID_FLOAT);
-+		ssusb_set_mailbox(otg_sx, MTU3_VBUS_VALID);
-+	}
- }
- 
--
- static int ssusb_mode_show(struct seq_file *sf, void *unused)
- {
- 	struct ssusb_mtk *ssusb = sf->private;
-@@ -388,17 +389,45 @@ static void ssusb_debugfs_exit(struct ssusb_mtk *ssusb)
- 	debugfs_remove_recursive(ssusb->dbgfs_root);
- }
- 
-+void ssusb_set_force_mode(struct ssusb_mtk *ssusb,
-+			  enum mtu3_dr_force_mode mode)
-+{
-+	u32 value;
-+
-+	value = mtu3_readl(ssusb->ippc_base, SSUSB_U2_CTRL(0));
-+	switch (mode) {
-+	case MTU3_DR_FORCE_DEVICE:
-+		value |= SSUSB_U2_PORT_FORCE_IDDIG | SSUSB_U2_PORT_RG_IDDIG;
-+		break;
-+	case MTU3_DR_FORCE_HOST:
-+		value |= SSUSB_U2_PORT_FORCE_IDDIG;
-+		value &= ~SSUSB_U2_PORT_RG_IDDIG;
-+		break;
-+	case MTU3_DR_FORCE_NONE:
-+		value &= ~(SSUSB_U2_PORT_FORCE_IDDIG | SSUSB_U2_PORT_RG_IDDIG);
-+		break;
-+	default:
-+		return;
-+	}
-+	mtu3_writel(ssusb->ippc_base, SSUSB_U2_CTRL(0), value);
-+}
-+
- int ssusb_otg_switch_init(struct ssusb_mtk *ssusb)
- {
- 	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
- 
--	INIT_DELAYED_WORK(&otg_sx->extcon_reg_dwork, extcon_register_dwork);
--
--	if (otg_sx->manual_drd_enabled)
-+	if (otg_sx->manual_drd_enabled) {
- 		ssusb_debugfs_init(ssusb);
--
--	/* It is enough to delay 1s for waiting for host initialization */
--	schedule_delayed_work(&otg_sx->extcon_reg_dwork, HZ);
-+	} else {
-+		INIT_DELAYED_WORK(&otg_sx->extcon_reg_dwork,
-+				  extcon_register_dwork);
-+
-+		/*
-+		 * It is enough to delay 1s for waiting for
-+		 * host initialization
-+		 */
-+		schedule_delayed_work(&otg_sx->extcon_reg_dwork, HZ);
-+	}
- 
- 	return 0;
- }
-@@ -407,8 +436,8 @@ void ssusb_otg_switch_exit(struct ssusb_mtk *ssusb)
- {
- 	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
- 
--	cancel_delayed_work(&otg_sx->extcon_reg_dwork);
--
- 	if (otg_sx->manual_drd_enabled)
- 		ssusb_debugfs_exit(ssusb);
-+	else
-+		cancel_delayed_work(&otg_sx->extcon_reg_dwork);
- }
-diff --git a/drivers/usb/mtu3/mtu3_dr.h b/drivers/usb/mtu3/mtu3_dr.h
-index 9b228b5..0f0cbac 100644
---- a/drivers/usb/mtu3/mtu3_dr.h
-+++ b/drivers/usb/mtu3/mtu3_dr.h
-@@ -87,6 +87,8 @@ static inline void ssusb_gadget_exit(struct ssusb_mtk *ssusb)
- int ssusb_otg_switch_init(struct ssusb_mtk *ssusb);
- void ssusb_otg_switch_exit(struct ssusb_mtk *ssusb);
- int ssusb_set_vbus(struct otg_switch_mtk *otg_sx, int is_on);
-+void ssusb_set_force_mode(struct ssusb_mtk *ssusb,
-+			  enum mtu3_dr_force_mode mode);
- 
- #else
- 
-@@ -103,6 +105,10 @@ static inline int ssusb_set_vbus(struct otg_switch_mtk *otg_sx, int is_on)
- 	return 0;
- }
- 
-+static inline void
-+ssusb_set_force_mode(struct ssusb_mtk *ssusb, enum mtu3_dr_force_mode mode)
-+{}
-+
- #endif
- 
- #endif		/* _MTU3_DR_H_ */
-diff --git a/drivers/usb/mtu3/mtu3_host.c b/drivers/usb/mtu3/mtu3_host.c
-index edcc591..ec76b86 100644
---- a/drivers/usb/mtu3/mtu3_host.c
-+++ b/drivers/usb/mtu3/mtu3_host.c
-@@ -189,6 +189,8 @@ int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
- 
- static void ssusb_host_setup(struct ssusb_mtk *ssusb)
- {
-+	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
-+
- 	host_ports_num_get(ssusb);
- 
- 	/*
-@@ -197,6 +199,9 @@ static void ssusb_host_setup(struct ssusb_mtk *ssusb)
- 	 */
- 	ssusb_host_enable(ssusb);
- 
-+	if (otg_sx->manual_drd_enabled)
-+		ssusb_set_force_mode(ssusb, MTU3_DR_FORCE_HOST);
-+
- 	/* if port0 supports dual-role, works as host mode by default */
- 	ssusb_set_vbus(&ssusb->otg_switch, 1);
- }
-diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
-index b605975..a7e35f6 100644
---- a/drivers/usb/mtu3/mtu3_hw_regs.h
-+++ b/drivers/usb/mtu3/mtu3_hw_regs.h
-@@ -472,6 +472,8 @@
- #define SSUSB_U3_PORT_DIS		BIT(0)
- 
- /* U3D_SSUSB_U2_CTRL_0P */
-+#define SSUSB_U2_PORT_RG_IDDIG		BIT(12)
-+#define SSUSB_U2_PORT_FORCE_IDDIG	BIT(11)
- #define SSUSB_U2_PORT_VBUSVALID	BIT(9)
- #define SSUSB_U2_PORT_OTG_SEL		BIT(7)
- #define SSUSB_U2_PORT_HOST		BIT(2)
-diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-index fb89920..1e473b0 100644
---- a/drivers/usb/mtu3/mtu3_plat.c
-+++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -21,7 +21,6 @@
- #include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
--#include <linux/pinctrl/consumer.h>
- #include <linux/platform_device.h>
- 
- #include "mtu3.h"
-@@ -212,33 +211,6 @@ static void ssusb_ip_sw_reset(struct ssusb_mtk *ssusb)
- 	mtu3_clrbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL0, SSUSB_IP_SW_RST);
- }
- 
--static int get_iddig_pinctrl(struct ssusb_mtk *ssusb)
--{
--	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
--
--	otg_sx->id_pinctrl = devm_pinctrl_get(ssusb->dev);
--	if (IS_ERR(otg_sx->id_pinctrl)) {
--		dev_err(ssusb->dev, "Cannot find id pinctrl!\n");
--		return PTR_ERR(otg_sx->id_pinctrl);
--	}
--
--	otg_sx->id_float =
--		pinctrl_lookup_state(otg_sx->id_pinctrl, "id_float");
--	if (IS_ERR(otg_sx->id_float)) {
--		dev_err(ssusb->dev, "Cannot find pinctrl id_float!\n");
--		return PTR_ERR(otg_sx->id_float);
--	}
--
--	otg_sx->id_ground =
--		pinctrl_lookup_state(otg_sx->id_pinctrl, "id_ground");
--	if (IS_ERR(otg_sx->id_ground)) {
--		dev_err(ssusb->dev, "Cannot find pinctrl id_ground!\n");
--		return PTR_ERR(otg_sx->id_ground);
--	}
--
--	return 0;
--}
--
- /* ignore the error if the clock does not exist */
- static struct clk *get_optional_clk(struct device *dev, const char *id)
- {
-@@ -349,15 +321,11 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- 			dev_err(ssusb->dev, "couldn't get extcon device\n");
- 			return -EPROBE_DEFER;
- 		}
--		if (otg_sx->manual_drd_enabled) {
--			ret = get_iddig_pinctrl(ssusb);
--			if (ret)
--				return ret;
--		}
+-	if (mtu->is_u3_ip && (mtu->max_speed == USB_SPEED_SUPER))
++	if (mtu->is_u3_ip && mtu->max_speed >= USB_SPEED_SUPER)
+ 		mtu3_ss_func_set(mtu, is_on);
+ 	else
+ 		mtu3_hs_softconn_set(mtu, is_on);
+@@ -547,6 +547,9 @@ static void mtu3_set_speed(struct mtu3 *mtu)
+ 		mtu3_clrbits(mbase, U3D_USB3_CONFIG, USB3_EN);
+ 		/* HS/FS detected by HW */
+ 		mtu3_setbits(mbase, U3D_POWER_MANAGEMENT, HS_ENABLE);
++	} else if (mtu->max_speed == USB_SPEED_SUPER) {
++		mtu3_clrbits(mtu->ippc_base, SSUSB_U3_CTRL(0),
++			     SSUSB_U3_PORT_SSP_SPEED);
  	}
  
--	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, u3p_dis_msk:%x\n",
--		ssusb->dr_mode, otg_sx->is_u3_drd, ssusb->u3p_dis_msk);
-+	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, u3p_dis_msk: %x, drd: %s\n",
-+		ssusb->dr_mode, otg_sx->is_u3_drd, ssusb->u3p_dis_msk,
-+		otg_sx->manual_drd_enabled ? "manual" : "auto");
+ 	dev_info(mtu->dev, "max_speed: %s\n",
+@@ -624,6 +627,10 @@ static irqreturn_t mtu3_link_isr(struct mtu3 *mtu)
+ 		udev_speed = USB_SPEED_SUPER;
+ 		maxpkt = 512;
+ 		break;
++	case MTU3_SPEED_SUPER_PLUS:
++		udev_speed = USB_SPEED_SUPER_PLUS;
++		maxpkt = 512;
++		break;
+ 	default:
+ 		udev_speed = USB_SPEED_UNKNOWN;
+ 		break;
+@@ -825,14 +832,15 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
+ 	case USB_SPEED_FULL:
+ 	case USB_SPEED_HIGH:
+ 	case USB_SPEED_SUPER:
++	case USB_SPEED_SUPER_PLUS:
+ 		break;
+ 	default:
+ 		dev_err(dev, "invalid max_speed: %s\n",
+ 			usb_speed_string(mtu->max_speed));
+ 		/* fall through */
+ 	case USB_SPEED_UNKNOWN:
+-		/* default as SS */
+-		mtu->max_speed = USB_SPEED_SUPER;
++		/* default as SSP */
++		mtu->max_speed = USB_SPEED_SUPER_PLUS;
+ 		break;
+ 	}
  
- 	return 0;
- }
+diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
+index 434fca5..b495471 100644
+--- a/drivers/usb/mtu3/mtu3_gadget.c
++++ b/drivers/usb/mtu3/mtu3_gadget.c
+@@ -89,6 +89,7 @@ static int mtu3_ep_enable(struct mtu3_ep *mep)
+ 
+ 	switch (mtu->g.speed) {
+ 	case USB_SPEED_SUPER:
++	case USB_SPEED_SUPER_PLUS:
+ 		if (usb_endpoint_xfer_int(desc) ||
+ 				usb_endpoint_xfer_isoc(desc)) {
+ 			interval = desc->bInterval;
+@@ -456,7 +457,7 @@ static int mtu3_gadget_wakeup(struct usb_gadget *gadget)
+ 		return  -EOPNOTSUPP;
+ 
+ 	spin_lock_irqsave(&mtu->lock, flags);
+-	if (mtu->g.speed == USB_SPEED_SUPER) {
++	if (mtu->g.speed >= USB_SPEED_SUPER) {
+ 		mtu3_setbits(mtu->mac_base, U3D_LINK_POWER_CONTROL, UX_EXIT);
+ 	} else {
+ 		mtu3_setbits(mtu->mac_base, U3D_POWER_MANAGEMENT, RESUME);
+diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+index 958d74d..1ca77e8 100644
+--- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
++++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+@@ -212,8 +212,8 @@ static int ep0_set_sel(struct mtu3 *mtu, struct usb_ctrlrequest *setup)
+ 	case USB_RECIP_DEVICE:
+ 		result[0] = mtu->is_self_powered << USB_DEVICE_SELF_POWERED;
+ 		result[0] |= mtu->may_wakeup << USB_DEVICE_REMOTE_WAKEUP;
+-		/* superspeed only */
+-		if (mtu->g.speed == USB_SPEED_SUPER) {
++
++		if (mtu->g.speed >= USB_SPEED_SUPER) {
+ 			result[0] |= mtu->u1_enable << USB_DEV_STAT_U1_ENABLED;
+ 			result[0] |= mtu->u2_enable << USB_DEV_STAT_U2_ENABLED;
+ 		}
+@@ -329,8 +329,8 @@ static int ep0_handle_feature_dev(struct mtu3 *mtu,
+ 		handled = handle_test_mode(mtu, setup);
+ 		break;
+ 	case USB_DEVICE_U1_ENABLE:
+-		if (mtu->g.speed != USB_SPEED_SUPER ||
+-			mtu->g.state != USB_STATE_CONFIGURED)
++		if (mtu->g.speed <= USB_SPEED_SUPER ||
++		    mtu->g.state != USB_STATE_CONFIGURED)
+ 			break;
+ 
+ 		lpc = mtu3_readl(mbase, U3D_LINK_POWER_CONTROL);
+@@ -344,8 +344,8 @@ static int ep0_handle_feature_dev(struct mtu3 *mtu,
+ 		handled = 1;
+ 		break;
+ 	case USB_DEVICE_U2_ENABLE:
+-		if (mtu->g.speed != USB_SPEED_SUPER ||
+-			mtu->g.state != USB_STATE_CONFIGURED)
++		if (mtu->g.speed <= USB_SPEED_SUPER ||
++		    mtu->g.state != USB_STATE_CONFIGURED)
+ 			break;
+ 
+ 		lpc = mtu3_readl(mbase, U3D_LINK_POWER_CONTROL);
+@@ -384,8 +384,8 @@ static int ep0_handle_feature(struct mtu3 *mtu,
+ 		break;
+ 	case USB_RECIP_INTERFACE:
+ 		/* superspeed only */
+-		if ((value == USB_INTRF_FUNC_SUSPEND)
+-			&& (mtu->g.speed == USB_SPEED_SUPER)) {
++		if (value == USB_INTRF_FUNC_SUSPEND &&
++		    mtu->g.speed >= USB_SPEED_SUPER) {
+ 			/*
+ 			 * forward the request because function drivers
+ 			 * should handle it
+diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
+index a7e35f6..6953436 100644
+--- a/drivers/usb/mtu3/mtu3_hw_regs.h
++++ b/drivers/usb/mtu3/mtu3_hw_regs.h
+@@ -467,6 +467,7 @@
+ #define SSUSB_VBUS_CHG_INT_B_EN		BIT(6)
+ 
+ /* U3D_SSUSB_U3_CTRL_0P */
++#define SSUSB_U3_PORT_SSP_SPEED	BIT(9)
+ #define SSUSB_U3_PORT_HOST_SEL		BIT(2)
+ #define SSUSB_U3_PORT_PDN		BIT(1)
+ #define SSUSB_U3_PORT_DIS		BIT(0)
 -- 
 1.7.9.5
