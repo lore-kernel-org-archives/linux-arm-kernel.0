@@ -1,96 +1,110 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 27 Sep 2017 18:15:26 +0200
-Subject: [PATCH] clk/spear: Delete five error messages for a failed memory
- allocation
-Message-ID: <4283fdab-7005-f774-9594-821582c5a9fb@users.sourceforge.net>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 27 Sep 2017 18:19:01 +0200
+Subject: [PATCH v10 3/7] edac, soc: thunderx: Add wrapper for EDAC LMC PCI
+ device
+In-Reply-To: <20170925123502.17289-4-jglauber@cavium.com>
+References: <20170925123502.17289-1-jglauber@cavium.com>
+ <20170925123502.17289-4-jglauber@cavium.com>
+Message-ID: <20170927161901.4hto7mrc2s4yuugn@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 27 Sep 2017 18:00:21 +0200
+On Mon, Sep 25, 2017 at 02:34:58PM +0200, Jan Glauber wrote:
+> Cavium SOCs contain a memory controller that is presented as a
+> PCI device. This PCI device will be used by an EDAC driver and
+> by a PMU driver.
+> 
+> To allow both subsystems to access the device a small wrapper is
+> introduced that multi-plexes PCI probe and removal calls of the
+> device to the EDAC driver.
+> 
+> The same mechanism will be used later to call the PMU driver.
+> 
+> The ThunderX EDAC driver is limited to only build as module
+> with this patch. The reason is that with multiple users of the
+> multi-plexer all users must be either builtin or modules.
+> 
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> ---
 
-Omit extra messages for a memory allocation failure in these functions.
+...
 
-This issue was detected by using the Coccinelle software.
+> diff --git a/drivers/soc/cavium/cavium_lmc.c b/drivers/soc/cavium/cavium_lmc.c
+> new file mode 100644
+> index 000000000000..87248e83c55b
+> --- /dev/null
+> +++ b/drivers/soc/cavium/cavium_lmc.c
+> @@ -0,0 +1,49 @@
+> +/*
+> + * These PCI devices contain RAS functionality and PMU counters. To allow
+> + * independent RAS and PMU drivers this driver registers for the PCI devices
+> + * and multi-plexes probe and removal.
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + *
+> + * Copyright: Cavium, Inc. (C) 2017
+> + *
+> + */
+> +#include <linux/module.h>
+> +#include <linux/pci.h>
+> +#include <linux/soc/cavium/lmc.h>
+> +
+> +static int cvm_lmc_probe(struct pci_dev *pdev,
+> +			 const struct pci_device_id *ent)
+> +{
+> +	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
+> +		thunderx_edac_lmc_probe(pdev, ent);
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/clk/spear/clk-aux-synth.c  | 4 +---
- drivers/clk/spear/clk-frac-synth.c | 4 +---
- drivers/clk/spear/clk-gpt-synth.c  | 4 +---
- drivers/clk/spear/clk-vco-pll.c    | 8 ++------
- 4 files changed, 5 insertions(+), 15 deletions(-)
+You could save yourself the if (IS_ENABLED()) here by adding stubs in
+the lmc.h header for those functions for the !CONFIG_EDAC_THUNDERX case.
 
-diff --git a/drivers/clk/spear/clk-aux-synth.c b/drivers/clk/spear/clk-aux-synth.c
-index f271c350ef94..ee7a7c043e3b 100644
---- a/drivers/clk/spear/clk-aux-synth.c
-+++ b/drivers/clk/spear/clk-aux-synth.c
-@@ -149,10 +149,8 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
- 	}
- 
- 	aux = kzalloc(sizeof(*aux), GFP_KERNEL);
--	if (!aux) {
--		pr_err("could not allocate aux clk\n");
-+	if (!aux)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	/* struct clk_aux assignments */
- 	if (!masks)
-diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
-index 58d678b5b40a..c48f3ed2d570 100644
---- a/drivers/clk/spear/clk-frac-synth.c
-+++ b/drivers/clk/spear/clk-frac-synth.c
-@@ -136,10 +136,8 @@ struct clk *clk_register_frac(const char *name, const char *parent_name,
- 	}
- 
- 	frac = kzalloc(sizeof(*frac), GFP_KERNEL);
--	if (!frac) {
--		pr_err("could not allocate frac clk\n");
-+	if (!frac)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	/* struct clk_frac assignments */
- 	frac->reg = reg;
-diff --git a/drivers/clk/spear/clk-gpt-synth.c b/drivers/clk/spear/clk-gpt-synth.c
-index 1a722e99e76e..6e95d7f3ade9 100644
---- a/drivers/clk/spear/clk-gpt-synth.c
-+++ b/drivers/clk/spear/clk-gpt-synth.c
-@@ -125,10 +125,8 @@ struct clk *clk_register_gpt(const char *name, const char *parent_name, unsigned
- 	}
- 
- 	gpt = kzalloc(sizeof(*gpt), GFP_KERNEL);
--	if (!gpt) {
--		pr_err("could not allocate gpt clk\n");
-+	if (!gpt)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	/* struct clk_gpt assignments */
- 	gpt->reg = reg;
-diff --git a/drivers/clk/spear/clk-vco-pll.c b/drivers/clk/spear/clk-vco-pll.c
-index dc21ca4601aa..e06b821fa60e 100644
---- a/drivers/clk/spear/clk-vco-pll.c
-+++ b/drivers/clk/spear/clk-vco-pll.c
-@@ -292,16 +292,12 @@ struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
- 	}
- 
- 	vco = kzalloc(sizeof(*vco), GFP_KERNEL);
--	if (!vco) {
--		pr_err("could not allocate vco clk\n");
-+	if (!vco)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
--	if (!pll) {
--		pr_err("could not allocate pll clk\n");
-+	if (!pll)
- 		goto free_vco;
--	}
- 
- 	/* struct clk_vco assignments */
- 	vco->mode_reg = mode_reg;
+One thing I'm not clear on though, is the design of the whole thing:
+cvm_lmc_probe() probes the EDAC driver during its own probe, which
+means, thunderx_edac needs to be loaded first. And the other things that
+get loaded, do the same.
+
+What I was expecting is those small cavium_lmc.c and cavium_ocx.c
+wrappers to probe and register the respective PCI device and then its
+*users* - EDAC and PMU drivers to go and request the PCI device from
+them:
+
+cavium_lmc_get_pci_dev()
+cavium_ocx_get_pci_dev()
+
+and so on. Those will be exported to modules. And the small stubs can
+also be built-in too.
+
+This way you can do reference counting and whatever else.
+
+If the above calls fail, neither EDAC nor PMU will load properly but you
+solve the multiplexing issue by having those wrappers arbitrate access
+to the PCI devices.
+
+Because right now the wrappers are simply weakly hiding the calls into
+EDAC and that's exactly what I was opposing to.
+
+Hmmm?
+
+> +	return 0;
+> +}
+> +
+> +static void cvm_lmc_remove(struct pci_dev *pdev)
+> +{
+> +	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
+> +		thunderx_edac_lmc_remove(pdev);
+> +}
+> +
+> +static const struct pci_device_id cvm_lmc_pci_table[] = {
+> +	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa022) },
+
+        { PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_LMC) },
+
+You already have that PCI device id define.
+
 -- 
-2.14.2
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
