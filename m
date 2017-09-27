@@ -1,65 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 27 Sep 2017 11:42:07 +0100
-Subject: [PATCH 3/3] arm64: cpuinfo: display product info in /proc/cpuinfo
-In-Reply-To: <20170926222324.17409-4-ahs3@redhat.com>
-References: <20170926222324.17409-1-ahs3@redhat.com>
- <20170926222324.17409-4-ahs3@redhat.com>
-Message-ID: <f09e55d8-28ba-30e3-d58a-ad125fd73019@arm.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Wed, 27 Sep 2017 18:44:03 +0800
+Subject: [PATCH v5 1/6] mfd: mt6397: create irq mappings in mfd core driver
+In-Reply-To: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
+References: <1506509048-19032-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1506509048-19032-2-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/17 23:23, Al Stone wrote:
-> While it is very useful to know what CPU is being used, it is also
-> useful to know who made the platform being used.  On servers, this
-> can point to the right person to contact when a server is having
-> trouble.
-> 
-> Go get the product info -- manufacturer, product name and version --
-> from DMI (aka SMBIOS) and display it in /proc/cpuinfo.  To look more
-> like other server platforms, include the CPU type and frequency when
-> displaying the product info, too.
-> 
-> Signed-off-by: Al Stone <ahs3@redhat.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
-[...]
-> @@ -190,6 +298,31 @@ static int c_show(struct seq_file *m, void *v)
->  			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
->  				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
->  
-> +		if (IS_ENABLED(CONFIG_DMI)) {
-> +			seq_puts(m, "product name\t: ");
-> +
-> +			if (!dmi_product_info)
-> +				get_dmi_product_info();
-> +			if (dmi_product_info)
-> +				seq_printf(m, "%s", dmi_product_info);
-> +			else
-> +				seq_puts(m, "<unknown>");
-> +
-> +			seq_printf(m, ", ARM 8.%d (r%dp%d) CPU",
-> +				   MIDR_VARIANT(midr),
-> +				   MIDR_VARIANT(midr),
-> +				   MIDR_REVISION(midr));
+The core driver should create and manage irq mappings instead of
+leaf drivers. This patch change to pass irq domain to
+devm_mfd_add_devices() and it will create mapping for irq resources
+automatically. And remove irq mapping in rtc driver since this has
+been done in core driver.
 
-What is "ARM 8.1" meant to infer for, say, a typical Cortex-A57?
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ drivers/mfd/mt6397-core.c |    4 ++--
+ drivers/rtc/rtc-mt6397.c  |    7 +++----
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
-Robin.
-
-> +
-> +			if (!dmi_max_mhz)
-> +				dmi_max_mhz = get_dmi_max_mhz();
-> +			if (dmi_max_mhz)
-> +				seq_printf(m, " @ %d.%02dGHz\n",
-> +					   (int)(dmi_max_mhz / 1000),
-> +					   (int)(dmi_max_mhz % 1000));
-> +			else
-> +				seq_puts(m, " @ <unknown>GHz\n");
-> +		}
-> +
->  		impl = (u8) MIDR_IMPLEMENTOR(midr);
->  		for (j = 0; hw_implementer[j].id != 0; j++) {
->  			if (hw_implementer[j].id == impl) {
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 04a601f..6546d7f 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
+ 
+ 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
+ 					   ARRAY_SIZE(mt6323_devs), NULL,
+-					   0, NULL);
++					   0, pmic->irq_domain);
+ 		break;
+ 
+ 	case MT6397_CID_CODE:
+@@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
+ 
+ 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+ 					   ARRAY_SIZE(mt6397_devs), NULL,
+-					   0, NULL);
++					   0, pmic->irq_domain);
+ 		break;
+ 
+ 	default:
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index 1a61fa5..385f830 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -322,10 +322,9 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	rtc->addr_base = res->start;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+-	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
+-	if (rtc->irq <= 0)
+-		return -EINVAL;
++	rtc->irq = platform_get_irq(pdev, 0);
++	if (rtc->irq < 0)
++		return rtc->irq;
+ 
+ 	rtc->regmap = mt6397_chip->regmap;
+ 	rtc->dev = &pdev->dev;
+-- 
+1.7.9.5
