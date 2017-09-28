@@ -1,59 +1,46 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 28 Sep 2017 11:46:00 +0100
-Subject: [RESEND][PATCH 2/4] firmware: qcom_scm: drop redandant
- of_platform_populate
+Date: Thu, 28 Sep 2017 11:45:59 +0100
+Subject: [RESEND][PATCH 1/4] of: platform: populate /firmware/ node from
+ of_platform_default_populate_init()
 In-Reply-To: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
 References: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1506595562-10592-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1506595562-10592-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that of_platform_default_populate_init() takes care of populating
-all the devices under the /firmware/ node, this patch removes the
-redandant call to of_platform_populate here.
+Since "/firmware" does not have its own "compatible" property as it's
+just collection of nodes representing firmware interface, it's sub-nodes
+are not populated during system initialization.
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: linux-arm-msm at vger.kernel.org
+Currently different firmware drivers search the /firmware/ node and
+populate the sub-node devices selectively. Instead we can populate
+the /firmware/ node during init to avoid more drivers continuing to
+populate the devices selectively.
+
+To generalize the solution this patch populates the /firmware/ node
+explicitly from of_platform_default_populate_init().
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Herring <robh@kernel.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/qcom_scm.c | 24 ------------------------
- 1 file changed, 24 deletions(-)
+ drivers/of/platform.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index bb16510d75ba..a11e06e5cdb0 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -440,30 +440,6 @@ static struct platform_driver qcom_scm_driver = {
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index ac15d0e3d27d..3a213a6aee89 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -515,6 +515,10 @@ static int __init of_platform_default_populate_init(void)
+ 			of_platform_device_create(node, NULL, NULL);
+ 	}
  
- static int __init qcom_scm_init(void)
- {
--	struct device_node *np, *fw_np;
--	int ret;
--
--	fw_np = of_find_node_by_name(NULL, "firmware");
--
--	if (!fw_np)
--		return -ENODEV;
--
--	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
--
--	if (!np) {
--		of_node_put(fw_np);
--		return -ENODEV;
--	}
--
--	of_node_put(np);
--
--	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
--
--	of_node_put(fw_np);
--
--	if (ret)
--		return ret;
--
- 	return platform_driver_register(&qcom_scm_driver);
- }
- subsys_initcall(qcom_scm_init);
++	node = of_find_node_by_path("/firmware");
++	if (node)
++		of_platform_populate(node, NULL, NULL, NULL);
++
+ 	/* Populate everything else. */
+ 	of_platform_default_populate(NULL, NULL, NULL);
+ 
 -- 
 2.7.4
