@@ -1,47 +1,51 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 28 Sep 2017 14:11:31 +0100
-Subject: [PATCH v3 07/22] firmware: arm_scmi: add initial support for clock
+Date: Thu, 28 Sep 2017 14:11:32 +0100
+Subject: [PATCH v3 08/22] firmware: arm_scmi: add initial support for power
  protocol
 In-Reply-To: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
 References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1506604306-20739-8-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1506604306-20739-9-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock protocol is intended for management of clocks. It is used to
-enable or disable clocks, and to set and get the clock rates. This
-protocol provides commands to describe the protocol version, discover
-various implementation specific attributes, describe a clock, enable
-and disable a clock and get/set the rate of the clock synchronously or
-asynchronously.
+The power protocol is intended for management of power states of various
+power domains. The power domain management protocol provides commands to
+describe the protocol version, discover the implementation specific
+attributes, set and get the power state of a domain.
 
-This patch adds initial support for the clock protocol.
+This patch adds support for the above mention features of the protocol.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+--
+ drivers/firmware/arm_scmi/Makefile |   2 +-
+ drivers/firmware/arm_scmi/power.c  | 242 +++++++++++++++++++++++++++++++++++++
+ include/linux/scmi_protocol.h      |  28 +++++
+ 3 files changed, 271 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/power.c
 ---
  drivers/firmware/arm_scmi/Makefile |   2 +-
- drivers/firmware/arm_scmi/clock.c  | 339 +++++++++++++++++++++++++++++++++++++
- include/linux/scmi_protocol.h      |  40 +++++
- 3 files changed, 380 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/clock.c
+ drivers/firmware/arm_scmi/power.c  | 242 +++++++++++++++++++++++++++++++++++++
+ include/linux/scmi_protocol.h      |  28 +++++
+ 3 files changed, 271 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/power.c
 
 diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-index 159de726ee45..6836b1f38f7f 100644
+index 6836b1f38f7f..52ecc08556a2 100644
 --- a/drivers/firmware/arm_scmi/Makefile
 +++ b/drivers/firmware/arm_scmi/Makefile
 @@ -1,2 +1,2 @@
  obj-$(CONFIG_ARM_SCMI_PROTOCOL)	= arm_scmi.o
--arm_scmi-y = base.o driver.o perf.o
-+arm_scmi-y = base.o clock.o driver.o perf.o
-diff --git a/drivers/firmware/arm_scmi/clock.c b/drivers/firmware/arm_scmi/clock.c
+-arm_scmi-y = base.o clock.o driver.o perf.o
++arm_scmi-y = base.o clock.o driver.o perf.o power.o
+diff --git a/drivers/firmware/arm_scmi/power.c b/drivers/firmware/arm_scmi/power.c
 new file mode 100644
-index 000000000000..87d0befab07d
+index 000000000000..34c45f101abb
 --- /dev/null
-+++ b/drivers/firmware/arm_scmi/clock.c
-@@ -0,0 +1,339 @@
++++ b/drivers/firmware/arm_scmi/power.c
+@@ -0,0 +1,242 @@
 +/*
-+ * System Control and Management Interface (SCMI) Clock Protocol
++ * System Control and Management Interface (SCMI) Power Protocol
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -60,80 +64,66 @@ index 000000000000..87d0befab07d
 +
 +#include "common.h"
 +
-+enum scmi_clock_protocol_cmd {
-+	CLOCK_ATTRIBUTES = 0x3,
-+	CLOCK_DESCRIBE_RATES = 0x4,
-+	CLOCK_RATE_SET = 0x5,
-+	CLOCK_RATE_GET = 0x6,
-+	CLOCK_CONFIG_SET = 0x7,
++enum scmi_power_protocol_cmd {
++	POWER_DOMAIN_ATTRIBUTES = 0x3,
++	POWER_STATE_SET = 0x4,
++	POWER_STATE_GET = 0x5,
++	POWER_STATE_NOTIFY = 0x6,
 +};
 +
-+struct scmi_msg_resp_clock_protocol_attributes {
-+	__le16 num_clocks;
-+	    u8 max_async_req;
-+	    u8 reserved;
++struct scmi_msg_resp_power_attributes {
++	__le16 num_domains;
++	__le16 reserved;
++	__le32 stats_addr_low;
++	__le32 stats_addr_high;
++	__le32 stats_size;
 +};
 +
-+struct scmi_msg_resp_clock_attributes {
-+	__le32 attributes;
-+#define	CLOCK_ENABLE	BIT(0)
++struct scmi_msg_resp_power_domain_attributes {
++	__le32 flags;
++#define SUPPORTS_STATE_SET_NOTIFY(x)	((x) & BIT(31))
++#define SUPPORTS_STATE_SET_ASYNC(x)	((x) & BIT(30))
++#define SUPPORTS_STATE_SET_SYNC(x)	((x) & BIT(29))
 +	    u8 name[SCMI_MAX_STR_SIZE];
 +};
 +
-+struct scmi_clock_set_config {
-+	__le32 id;
-+	__le32 attributes;
-+};
-+
-+struct scmi_msg_clock_describe_rates {
-+	__le32 id;
-+	__le32 rate_index;
-+};
-+
-+struct scmi_msg_resp_clock_describe_rates {
-+	__le32 num_rates_flags;
-+#define NUM_RETURNED(x)		((x) & 0xfff)
-+#define RATE_DISCRETE(x)	!((x) & BIT(12))
-+#define NUM_REMAINING(x)	((x) >> 16)
-+	struct {
-+		__le32 value_low;
-+		__le32 value_high;
-+	} rate[0];
-+#define RATE_TO_U64(X)		\
-+({				\
-+	typeof(X) x = (X);	\
-+	le32_to_cpu((x).value_low) | (u64)le32_to_cpu((x).value_high) << 32; \
-+})
-+};
-+
-+struct scmi_clock_set_rate {
++struct scmi_power_set_state {
 +	__le32 flags;
-+#define CLOCK_SET_ASYNC		BIT(0)
-+#define CLOCK_SET_DELAYED	BIT(1)
-+#define CLOCK_SET_ROUND_UP	BIT(2)
-+#define CLOCK_SET_ROUND_AUTO	BIT(3)
-+	__le32 id;
-+	__le32 value_low;
-+	__le32 value_high;
++#define STATE_SET_ASYNC		BIT(0)
++	__le32 domain;
++	__le32 state;
 +};
 +
-+struct clock_info {
-+	int num_clocks;
-+	int max_async_req;
-+	struct scmi_clock_info *clk;
++struct scmi_power_state_notify {
++	__le32 domain;
++	__le32 notify_enable;
 +};
 +
-+static struct clock_info clocks;
++struct power_dom_info {
++	bool state_set_sync;
++	bool state_set_async;
++	bool state_set_notify;
++	char name[SCMI_MAX_STR_SIZE];
++};
 +
-+static int scmi_clock_protocol_attributes_get(const struct scmi_handle *handle,
-+					      struct clock_info *clocks)
++struct scmi_power_info {
++	int num_domains;
++	u64 stats_addr;
++	u32 stats_size;
++	struct power_dom_info *dom_info;
++};
++
++static struct scmi_power_info power_info;
++
++static int scmi_power_attributes_get(const struct scmi_handle *handle,
++				     struct scmi_power_info *power_info)
 +{
 +	int ret;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_resp_clock_protocol_attributes *attr;
++	struct scmi_msg_resp_power_attributes *attr;
 +
 +	ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
-+				 SCMI_PROTOCOL_CLOCK, 0, sizeof(*attr), &t);
++				 SCMI_PROTOCOL_POWER, 0, sizeof(*attr), &t);
 +	if (ret)
 +		return ret;
 +
@@ -141,151 +131,106 @@ index 000000000000..87d0befab07d
 +
 +	ret = scmi_do_xfer(handle, t);
 +	if (!ret) {
-+		clocks->num_clocks = le16_to_cpu(attr->num_clocks);
-+		clocks->max_async_req = attr->max_async_req;
++		power_info->num_domains = le16_to_cpu(attr->num_domains);
++		power_info->stats_addr = le32_to_cpu(attr->stats_addr_low) |
++				(u64)le32_to_cpu(attr->stats_addr_high) << 32;
++		power_info->stats_size = le32_to_cpu(attr->stats_size);
 +	}
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static int scmi_clock_attributes_get(const struct scmi_handle *handle,
-+				     u32 clk_id, struct scmi_clock_info *clk)
++static int
++scmi_power_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
++				 struct power_dom_info *dom_info)
 +{
 +	int ret;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_resp_clock_attributes *attr;
++	struct scmi_msg_resp_power_domain_attributes *attr;
 +
-+	ret = scmi_one_xfer_init(handle, CLOCK_ATTRIBUTES, SCMI_PROTOCOL_CLOCK,
-+				 sizeof(clk_id), sizeof(*attr), &t);
++	ret = scmi_one_xfer_init(handle, POWER_DOMAIN_ATTRIBUTES,
++				 SCMI_PROTOCOL_POWER, sizeof(domain),
++				 sizeof(*attr), &t);
 +	if (ret)
 +		return ret;
 +
-+	*(__le32 *)t->tx.buf = cpu_to_le32(clk_id);
++	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
 +	attr = t->rx.buf;
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret) {
++		u32 flags = le32_to_cpu(attr->flags);
++
++		dom_info->state_set_notify = SUPPORTS_STATE_SET_NOTIFY(flags);
++		dom_info->state_set_async = SUPPORTS_STATE_SET_ASYNC(flags);
++		dom_info->state_set_sync = SUPPORTS_STATE_SET_SYNC(flags);
++		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
++	}
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++static int
++scmi_power_state_set(const struct scmi_handle *handle, u32 domain, u32 state)
++{
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_power_set_state *st;
++
++	ret = scmi_one_xfer_init(handle, POWER_STATE_SET, SCMI_PROTOCOL_POWER,
++				 sizeof(*st), 0, &t);
++	if (ret)
++		return ret;
++
++	st = t->tx.buf;
++	st->flags = cpu_to_le32(0);
++	st->domain = cpu_to_le32(domain);
++	st->state = cpu_to_le32(state);
++
++	ret = scmi_do_xfer(handle, t);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++static int
++scmi_power_state_get(const struct scmi_handle *handle, u32 domain, u32 *state)
++{
++	int ret;
++	struct scmi_xfer *t;
++
++	ret = scmi_one_xfer_init(handle, POWER_STATE_GET, SCMI_PROTOCOL_POWER,
++				 sizeof(u32), sizeof(u32), &t);
++	if (ret)
++		return ret;
++
++	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
 +
 +	ret = scmi_do_xfer(handle, t);
 +	if (!ret)
-+		memcpy(clk->name, attr->name, SCMI_MAX_STR_SIZE);
-+	else
-+		clk->name[0] = '\0';
++		*state = le32_to_cpu(*(__le32 *)t->rx.buf);
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static int
-+scmi_clock_describe_rates_get(const struct scmi_handle *handle, u32 clk_id,
-+			      struct scmi_clock_info *clk)
-+{
-+	u64 *rate;
-+	int ret, cnt;
-+	bool rate_discrete;
-+	u32 tot_rate_cnt = 0, rates_flag;
-+	u16 num_returned, num_remaining;
-+	struct scmi_xfer *t;
-+	struct scmi_msg_clock_describe_rates *clk_desc;
-+	struct scmi_msg_resp_clock_describe_rates *rlist;
-+
-+	ret = scmi_one_xfer_init(handle, CLOCK_DESCRIBE_RATES,
-+				 SCMI_PROTOCOL_CLOCK, sizeof(*clk_desc), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	clk_desc = t->tx.buf;
-+	rlist = t->rx.buf;
-+
-+	do {
-+		clk_desc->id = cpu_to_le32(clk_id);
-+		/* Set the number of rates to be skipped/already read */
-+		clk_desc->rate_index = cpu_to_le32(tot_rate_cnt);
-+
-+		ret = scmi_do_xfer(handle, t);
-+		if (ret)
-+			break;
-+
-+		rates_flag = le32_to_cpu(rlist->num_rates_flags);
-+		num_remaining = NUM_REMAINING(rates_flag);
-+		rate_discrete = RATE_DISCRETE(rates_flag);
-+		num_returned = NUM_RETURNED(rates_flag);
-+
-+		if (tot_rate_cnt + num_returned > SCMI_MAX_NUM_RATES) {
-+			dev_err(handle->dev, "No. of rates > MAX_NUM_RATES");
-+			break;
-+		}
-+
-+		if (!rate_discrete) {
-+			clk->range.min_rate = RATE_TO_U64(rlist->rate[0]);
-+			clk->range.max_rate = RATE_TO_U64(rlist->rate[1]);
-+			clk->range.step_size = RATE_TO_U64(rlist->rate[2]);
-+			dev_dbg(handle->dev, "Min %llu Max %llu Step %llu Hz\n",
-+				clk->range.min_rate, clk->range.max_rate,
-+				clk->range.step_size);
-+			break;
-+		}
-+
-+		rate = &clk->list.rates[tot_rate_cnt];
-+		for (cnt = 0; cnt < num_returned; cnt++, rate++) {
-+			*rate = RATE_TO_U64(rlist->rate[cnt]);
-+			dev_dbg(handle->dev, "Rate %llu Hz\n", *rate);
-+		}
-+
-+		tot_rate_cnt += num_returned;
-+		/*
-+		 * check for both returned and remaining to avoid infinite
-+		 * loop due to buggy firmware
-+		 */
-+	} while (num_returned && num_remaining);
-+
-+	if (rate_discrete)
-+		clk->list.num_rates = tot_rate_cnt;
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int
-+scmi_clock_rate_get(const struct scmi_handle *handle, u32 clk_id, u64 *value)
++static int scmi_power_state_notify_enable(const struct scmi_handle *handle,
++					  u32 domain, bool enable)
 +{
 +	int ret;
 +	struct scmi_xfer *t;
++	struct scmi_power_state_notify *notify;
 +
-+	ret = scmi_one_xfer_init(handle, CLOCK_RATE_GET, SCMI_PROTOCOL_CLOCK,
-+				 sizeof(__le32), sizeof(u64), &t);
++	ret = scmi_one_xfer_init(handle, POWER_STATE_NOTIFY,
++				 SCMI_PROTOCOL_POWER, sizeof(*notify), 0, &t);
 +	if (ret)
 +		return ret;
 +
-+	*(__le32 *)t->tx.buf = cpu_to_le32(clk_id);
-+
-+	ret = scmi_do_xfer(handle, t);
-+	if (!ret) {
-+		__le32 *pval = t->rx.buf;
-+
-+		*value = le32_to_cpu(*pval);
-+		*value |= (u64)le32_to_cpu(*(pval + 1)) << 32;
-+	}
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int scmi_clock_rate_set(const struct scmi_handle *handle, u32 clk_id,
-+			       u32 config, u64 rate)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_clock_set_rate *cfg;
-+
-+	ret = scmi_one_xfer_init(handle, CLOCK_RATE_SET, SCMI_PROTOCOL_CLOCK,
-+				 sizeof(*cfg), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	cfg = t->tx.buf;
-+	cfg->flags = cpu_to_le32(config);
-+	cfg->id = cpu_to_le32(clk_id);
-+	cfg->value_low = cpu_to_le32(rate & 0xffffffff);
-+	cfg->value_high = cpu_to_le32(rate >> 32);
++	notify = t->tx.buf;
++	notify->domain = cpu_to_le32(domain);
++	notify->notify_enable = cpu_to_le32(enable & BIT(0));
 +
 +	ret = scmi_do_xfer(handle, t);
 +
@@ -293,164 +238,102 @@ index 000000000000..87d0befab07d
 +	return ret;
 +}
 +
-+static int
-+scmi_clock_config_set(const struct scmi_handle *handle, u32 clk_id, u32 config)
++static int scmi_power_num_domains_get(const struct scmi_handle *handle)
 +{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_clock_set_config *cfg;
-+
-+	ret = scmi_one_xfer_init(handle, CLOCK_CONFIG_SET, SCMI_PROTOCOL_CLOCK,
-+				 sizeof(*cfg), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	cfg = t->tx.buf;
-+	cfg->id = cpu_to_le32(clk_id);
-+	cfg->attributes = cpu_to_le32(config);
-+
-+	ret = scmi_do_xfer(handle, t);
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
++	return power_info.num_domains;
 +}
 +
-+static int scmi_clock_enable(const struct scmi_handle *handle, u32 clk_id)
++static char *scmi_power_name_get(const struct scmi_handle *handle, u32 domain)
 +{
-+	return scmi_clock_config_set(handle, clk_id, CLOCK_ENABLE);
++	struct power_dom_info *dom = power_info.dom_info + domain;
++
++	return dom->name;
 +}
 +
-+static int scmi_clock_disable(const struct scmi_handle *handle, u32 clk_id)
-+{
-+	return scmi_clock_config_set(handle, clk_id, 0);
-+}
-+
-+static int scmi_clock_count_get(const struct scmi_handle *handle)
-+{
-+	return clocks.num_clocks;
-+}
-+
-+static const struct scmi_clock_info *
-+scmi_clock_info_get(const struct scmi_handle *handle, u32 clk_id)
-+{
-+	struct scmi_clock_info *clk = clocks.clk + clk_id;
-+
-+	if (!clk->name || !clk->name[0])
-+		return NULL;
-+
-+	return clk;
-+}
-+
-+static struct scmi_clk_ops clk_ops = {
-+	.count_get = scmi_clock_count_get,
-+	.info_get = scmi_clock_info_get,
-+	.rate_get = scmi_clock_rate_get,
-+	.rate_set = scmi_clock_rate_set,
-+	.enable = scmi_clock_enable,
-+	.disable = scmi_clock_disable,
++static struct scmi_power_ops power_ops = {
++	.num_domains_get = scmi_power_num_domains_get,
++	.name_get = scmi_power_name_get,
++	.state_set = scmi_power_state_set,
++	.state_get = scmi_power_state_get,
++	.state_notify_enable = scmi_power_state_notify_enable,
 +};
 +
-+int scmi_clock_protocol_init(struct scmi_handle *handle)
++int scmi_power_protocol_init(struct scmi_handle *handle)
 +{
-+	int clkid, ret;
 +	u32 version;
++	int domain;
 +
-+	scmi_version_get(handle, SCMI_PROTOCOL_CLOCK, &version);
++	scmi_version_get(handle, SCMI_PROTOCOL_POWER, &version);
 +
-+	dev_dbg(handle->dev, "Clock Version %d.%d\n",
++	dev_dbg(handle->dev, "Power Version %d.%d\n",
 +		PROTOCOL_REV_MAJOR(version), PROTOCOL_REV_MINOR(version));
 +
-+	scmi_clock_protocol_attributes_get(handle, &clocks);
++	scmi_power_attributes_get(handle, &power_info);
 +
-+	clocks.clk = devm_kcalloc(handle->dev, clocks.num_clocks,
-+				  sizeof(struct scmi_clock_info), GFP_KERNEL);
-+	if (!clocks.clk)
++	power_info.dom_info = devm_kcalloc(handle->dev, power_info.num_domains,
++					   sizeof(struct power_dom_info),
++					   GFP_KERNEL);
++	if (!power_info.dom_info)
 +		return -ENOMEM;
 +
-+	for (clkid = 0; clkid < clocks.num_clocks; clkid++) {
-+		struct scmi_clock_info *clk = clocks.clk + clkid;
++	for (domain = 0; domain < power_info.num_domains; domain++) {
++		struct power_dom_info *dom = power_info.dom_info + domain;
 +
-+		ret = scmi_clock_attributes_get(handle, clkid, clk);
-+		if (!ret)
-+			scmi_clock_describe_rates_get(handle, clkid, clk);
++		scmi_power_domain_attributes_get(handle, domain, dom);
 +	}
 +
-+	handle->clk_ops = &clk_ops;
++	handle->power_ops = &power_ops;
 +
 +	return 0;
 +}
 diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index c9f97e69444a..c15f37c86025 100644
+index c15f37c86025..e5a80511f88c 100644
 --- a/include/linux/scmi_protocol.h
 +++ b/include/linux/scmi_protocol.h
-@@ -18,6 +18,7 @@
- #include <linux/types.h>
- 
- #define SCMI_MAX_STR_SIZE	16
-+#define SCMI_MAX_NUM_RATES	16
- 
- /**
-  * struct scmi_revision_info - version information structure
-@@ -43,9 +44,46 @@ struct scmi_revision_info {
- 	char sub_vendor_id[SCMI_MAX_STR_SIZE];
+@@ -111,16 +111,44 @@ struct scmi_perf_ops {
  };
  
-+struct scmi_clock_info {
-+	char name[SCMI_MAX_STR_SIZE];
-+	bool rate_discrete;
-+	union {
-+		struct {
-+			int num_rates;
-+			u64 rates[SCMI_MAX_NUM_RATES];
-+		} list;
-+		struct {
-+			u64 min_rate;
-+			u64 max_rate;
-+			u64 step_size;
-+		} range;
-+	};
-+};
-+
- struct scmi_handle;
- 
  /**
-+ * struct scmi_clk_ops - represents the various operations provided
-+ *	by SCMI Clock Protocol
++ * struct scmi_power_ops - represents the various operations provided
++ *	by SCMI Power Protocol
 + *
-+ * @count_get: get the count of clocks provided by SCMI
-+ * @info_get: get the information of the specified clock
-+ * @rate_get: request the current clock rate of a clock
-+ * @rate_set: set the clock rate of a clock
-+ * @enable: enables the specified clock
-+ * @disable: disables the specified clock
++ * @num_domains_get: get the count of power domains provided by SCMI
++ * @name_get: gets the name of a power domain
++ * @state_set: sets the power state of a power domain
++ * @state_get: gets the power state of a power domain
++ * @state_notify_enable: request notifications from the platform for
++ *	state changes in a specific power domain
 + */
-+struct scmi_clk_ops {
-+	int (*count_get)(const struct scmi_handle *);
-+	const struct scmi_clock_info *(*info_get)(const struct scmi_handle *,
-+						  u32);
-+	int (*rate_get)(const struct scmi_handle *, u32, u64*);
-+	int (*rate_set)(const struct scmi_handle *, u32, u32, u64);
-+	int (*enable)(const struct scmi_handle *, u32);
-+	int (*disable)(const struct scmi_handle *, u32);
++struct scmi_power_ops {
++	int (*num_domains_get)(const struct scmi_handle *);
++	char *(*name_get)(const struct scmi_handle *, u32);
++#define SCMI_POWER_STATE_TYPE_SHIFT	30
++#define SCMI_POWER_STATE_ID_MASK	(BIT(28) - 1)
++#define SCMI_POWER_STATE_PARAM(type, id) \
++	((((type) & BIT(0)) << SCMI_POWER_STATE_TYPE_SHIFT) | \
++		((id) & SCMI_POWER_STATE_ID_MASK))
++#define SCMI_POWER_STATE_GENERIC_ON	SCMI_POWER_STATE_PARAM(0, 0)
++#define SCMI_POWER_STATE_GENERIC_OFF	SCMI_POWER_STATE_PARAM(1, 0)
++	int (*state_set)(const struct scmi_handle *, u32, u32);
++	int (*state_get)(const struct scmi_handle *, u32, u32 *);
++	int (*state_notify_enable)(const struct scmi_handle *, u32, bool);
 +};
 +
 +/**
-  * struct scmi_perf_ops - represents the various operations provided
-  *	by SCMI Performance Protocol
+  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
   *
-@@ -78,11 +116,13 @@ struct scmi_perf_ops {
   * @dev: pointer to the SCMI device
   * @version: pointer to the structure containing SCMI version information
++ * @power_ops: pointer to set of power protocol operations
   * @perf_ops: pointer to set of performance protocol operations
-+ * @clk_ops: pointer to set of clock protocol operations
+  * @clk_ops: pointer to set of clock protocol operations
   */
  struct scmi_handle {
  	struct device *dev;
  	struct scmi_revision_info *version;
++	struct scmi_power_ops *power_ops;
  	struct scmi_perf_ops *perf_ops;
-+	struct scmi_clk_ops *clk_ops;
+ 	struct scmi_clk_ops *clk_ops;
  };
- 
- #if IS_REACHABLE(CONFIG_ARM_SCMI_PROTOCOL)
 -- 
 2.7.4
