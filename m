@@ -1,45 +1,88 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 28 Sep 2017 16:14:56 -0700
-Subject: [PATCH v2 04/10] dt-bindings: Document Broadcom Hurricane 2 clocks
+Date: Thu, 28 Sep 2017 16:14:55 -0700
+Subject: [PATCH v2 03/10] ARM: bcm: Add support for Broadcom Hurricane 2 SoC
 In-Reply-To: <20170928231502.27069-1-f.fainelli@gmail.com>
 References: <20170928231502.27069-1-f.fainelli@gmail.com>
-Message-ID: <20170928231502.27069-5-f.fainelli@gmail.com>
+Message-ID: <20170928231502.27069-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Device Tree binding document for the Broadcom Hurricane 2 SoC
-which is an iProc based system.
+Add a Kconfig entry point and basic machine board code for the Broadcom
+Hurricane 2 SoCs used in switching products.
 
 Acked-by: Jon Mason <jon.mason@broadcom.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- .../devicetree/bindings/clock/brcm,iproc-clocks.txt        | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/mach-bcm/Kconfig   |  9 +++++++++
+ arch/arm/mach-bcm/Makefile  |  3 +++
+ arch/arm/mach-bcm/bcm_hr2.c | 25 +++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
+ create mode 100644 arch/arm/mach-bcm/bcm_hr2.c
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-index f2c5f0e4a363..f8e4a93466cb 100644
---- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-@@ -137,6 +137,20 @@ These clock IDs are defined in:
-     ch1_audio  audiopll         2       BCM_CYGNUS_AUDIOPLL_CH1
-     ch2_audio  audiopll         3       BCM_CYGNUS_AUDIOPLL_CH2
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 73be3d578851..76807581f9f3 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -36,6 +36,15 @@ config ARCH_BCM_CYGNUS
+ 	  BCM11300, BCM11320, BCM11350, BCM11360,
+ 	  BCM58300, BCM58302, BCM58303, BCM58305.
  
-+Hurricane 2
-+------
-+PLL and leaf clock compatible strings for Hurricane 2 are:
-+ "brcm,hr2-armpll"
++config ARCH_BCM_HR2
++	bool "Broadcom Hurricane 2 SoC support"
++	depends on ARCH_MULTI_V7
++	select ARCH_BCM_IPROC
++	help
++	  Enable support for the Hurricane 2 family,
++	  which includes the following variants:
++	  BCM53342, BCM53343, BCM53344, BCM53346.
 +
-+The following table defines the set of PLL/clock for Hurricane 2:
+ config ARCH_BCM_NSP
+ 	bool "Broadcom Northstar Plus SoC Support"
+ 	depends on ARCH_MULTI_V7
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 980f5850097c..ec93c849a100 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -13,6 +13,9 @@
+ # Cygnus
+ obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
+ 
++# Hurricane 2
++obj-$(CONFIG_ARCH_BCM_HR2)	+= bcm_hr2.o
 +
-+    Clock	Source		Index	ID
-+    ---		-----		-----	---------
-+    crystal	N/A		N/A	N/A
+ # Northstar Plus
+ obj-$(CONFIG_ARCH_BCM_NSP)	+= bcm_nsp.o
+ 
+diff --git a/arch/arm/mach-bcm/bcm_hr2.c b/arch/arm/mach-bcm/bcm_hr2.c
+new file mode 100644
+index 000000000000..c104f28995d7
+--- /dev/null
++++ b/arch/arm/mach-bcm/bcm_hr2.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2017 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+    armpll	crystal		N/A	N/A
++#include <asm/mach/arch.h>
 +
++static const char * const bcm_hr2_dt_compat[] __initconst = {
++	"brcm,hr2",
++	NULL,
++};
 +
- Northstar and Northstar Plus
- ------
- PLL and leaf clock compatible strings for Northstar and Northstar Plus are:
++DT_MACHINE_START(BCM_HR2_DT, "Broadcom Hurricane 2 SoC")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++	.dt_compat = bcm_hr2_dt_compat,
++MACHINE_END
 -- 
 2.14.1
