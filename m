@@ -1,161 +1,40 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Thu, 28 Sep 2017 03:49:21 +0200
-Subject: [PATCH v4 04/11] dmaengine: sun6i: Enable additional burst
- lengths/widths on H3
+Date: Thu, 28 Sep 2017 03:49:28 +0200
+Subject: [PATCH v4 11/11] arm: allwinner: Correct unit name in devicetree
+ binding example
 In-Reply-To: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
 References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <fa51787d-9b5e-4905-bacb-34ec4f4d00a8@rwthex-w2-a.rwth-ad.de>
+Message-ID: <5b7a8fb3-21bb-417c-9471-1330dd379fd9@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3 supports bursts lengths of 1, 4, 8 and 16 transfers, each with
-a width of 1, 2, 4 or 8 bytes.
-
-The register value for the the width is log2-encoded, change the
-conversion function to provide the correct value for width == 8.
+Unit-names must not start with a leading 0.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 ---
 
 Changes in v4:
-- Fix config initialization
+- Split minor fix in devicetree example from patch 6/10
 
 Changes in v3: None
-Changes in v2:
-- Store burst widths in config
+Changes in v2: None
 
- drivers/dma/sun6i-dma.c | 54 ++++++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 45 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/dma/sun6i-dma.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 24dc7fac7447..eb45ab39eddd 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -123,6 +123,8 @@ struct sun6i_dma_config {
- 	void (*set_burst_length)(u32 *p_cfg, s8 src_burst, s8 dst_burst);
- 	u32 src_burst_lengths;
- 	u32 dst_burst_lengths;
-+	u32 src_addr_widths;
-+	u32 dst_addr_widths;
- };
+diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+index 9700b1d00fed..b2df4f0f1488 100644
+--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
++++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+@@ -18,7 +18,7 @@ Required properties:
+ - #dma-cells :	Should be 1, a single cell holding a line request number
  
- /*
-@@ -262,8 +264,12 @@ static inline s8 convert_burst(u32 maxburst)
- 	switch (maxburst) {
- 	case 1:
- 		return 0;
-+	case 4:
-+		return 1;
- 	case 8:
- 		return 2;
-+	case 16:
-+		return 3;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -271,7 +277,7 @@ static inline s8 convert_burst(u32 maxburst)
- 
- static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
- {
--	return addr_width >> 1;
-+	return ilog2(addr_width);
- }
- 
- static void sun6i_enable_clock_autogate_a23(struct sun6i_dma_dev *sdev)
-@@ -1043,6 +1049,12 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
- 	.set_burst_length = sun6i_set_burst_length_a31,
- 	.src_burst_lengths = BIT(1) | BIT(8),
- 	.dst_burst_lengths = BIT(1) | BIT(8),
-+	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
-+	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
- };
- 
- /*
-@@ -1058,6 +1070,12 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
- 	.set_burst_length = sun6i_set_burst_length_a31,
- 	.src_burst_lengths = BIT(1) | BIT(8),
- 	.dst_burst_lengths = BIT(1) | BIT(8),
-+	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
-+	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
- };
- 
- static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
-@@ -1068,11 +1086,19 @@ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
- 	.set_burst_length = sun6i_set_burst_length_a31,
- 	.src_burst_lengths = BIT(1) | BIT(8),
- 	.dst_burst_lengths = BIT(1) | BIT(8),
-+	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
-+	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
- };
- 
- /*
-  * The H3 has 12 physical channels, a maximum DRQ port id of 27,
-  * and a total of 34 usable source and destination endpoints.
-+ * It also supports additional burst lengths and bus widths,
-+ * and the burst length fields have different offsets.
-  */
- 
- static struct sun6i_dma_config sun8i_h3_dma_cfg = {
-@@ -1081,8 +1107,16 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_h3,
- 	.set_burst_length = sun6i_set_burst_length_h3,
--	.src_burst_lengths = BIT(1) | BIT(8),
--	.dst_burst_lengths = BIT(1) | BIT(8),
-+	.src_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16),
-+	.dst_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16),
-+	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES),
-+	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES),
- };
- 
- /*
-@@ -1098,6 +1132,12 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
- 	.set_burst_length = sun6i_set_burst_length_a31,
- 	.src_burst_lengths = BIT(1) | BIT(8),
- 	.dst_burst_lengths = BIT(1) | BIT(8),
-+	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
-+	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
- };
- 
- static const struct of_device_id sun6i_dma_match[] = {
-@@ -1177,12 +1217,8 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_pause			= sun6i_dma_pause;
- 	sdc->slave.device_resume		= sun6i_dma_resume;
- 	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
--	sdc->slave.src_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
--						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
--						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
--	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
--						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
--						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	sdc->slave.src_addr_widths		= sdc->cfg->src_addr_widths;
-+	sdc->slave.dst_addr_widths		= sdc->cfg->dst_addr_widths;
- 	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
- 						  BIT(DMA_MEM_TO_DEV);
- 	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
+ Example:
+-	dma: dma-controller at 01c02000 {
++	dma: dma-controller at 1c02000 {
+ 		compatible = "allwinner,sun6i-a31-dma";
+ 		reg = <0x01c02000 0x1000>;
+ 		interrupts = <0 50 4>;
 -- 
 2.14.1
