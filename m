@@ -1,100 +1,44 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Thu, 28 Sep 2017 21:04:03 +0300
-Subject: [PATCH v1 06/14] tee: optee: add page list manipulation functions
-In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Sep 2017 20:06:14 +0100
+Subject: [PATCH v2 07/10] mfd: axp20x: add pinctrl cell for AXP813
+In-Reply-To: <20170926131445.xo2uawiovjtmyivj@flea>
+References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <5345a2e94013f4e4f7b545cd4d84b098bd2fa349.1506428208.git-series.quentin.schulz@free-electrons.com>
+ <20170926131445.xo2uawiovjtmyivj@flea>
+Message-ID: <20170928190614.v5jgejvgdlyxbxrh@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+On Tue, 26 Sep 2017, Maxime Ripard wrote:
 
-These functions will be used to pass information about shared
-buffers to OP-TEE.
+> On Tue, Sep 26, 2017 at 12:17:17PM +0000, Quentin Schulz wrote:
+> > As pinctrl and GPIO driver now supports AXP813, add a cell for it.
+> > 
+> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > ---
+> >  drivers/mfd/axp20x.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> > index 336de66..a457528 100644
+> > --- a/drivers/mfd/axp20x.c
+> > +++ b/drivers/mfd/axp20x.c
+> > @@ -876,6 +876,9 @@ static struct mfd_cell axp813_cells[] = {
+> >  		.name			= "axp221-pek",
+> >  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+> >  		.resources		= axp803_pek_resources,
+> > +	}, {
+> > +		.name			= "axp20x-gpio",
+> > +		.of_compatible		= "x-powers,axp813-pctl",
+> 
+> This was probably introduced in the previous driver, but why are you
+> using the pctl suffix? Can't we just use the GPIO one to remain
+> consistent with the previous users and the datasheet?
 
-Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
----
- drivers/tee/optee/call.c          | 48 +++++++++++++++++++++++++++++++++++++++
- drivers/tee/optee/optee_private.h |  4 ++++
- 2 files changed, 52 insertions(+)
+Right.  Pinctrl is a Linuxisum.  GPIO sounds more appropriate.
 
-diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-index f7b7b40..f8e044d 100644
---- a/drivers/tee/optee/call.c
-+++ b/drivers/tee/optee/call.c
-@@ -11,6 +11,7 @@
-  * GNU General Public License for more details.
-  *
-  */
-+#include <asm/pgtable.h>
- #include <linux/arm-smccc.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -442,3 +443,50 @@ void optee_disable_shm_cache(struct optee *optee)
- 	}
- 	optee_cq_wait_final(&optee->call_queue, &w);
- }
-+
-+/**
-+ * optee_fill_pages_list() - write list of user pages to given shared
-+ * buffer.
-+ *
-+ * @dst: page-aligned buffer where list of pages will be stored
-+ * @pages: array of pages that represents shared buffer
-+ * @num_pages: number of entries in @pages
-+ *
-+ * @dst should be big enough to hold list of user page addresses and
-+ *	links to the next pages of buffer
-+ */
-+void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages)
-+{
-+	size_t i;
-+
-+	/* TODO: add support for RichOS page sizes that != 4096 */
-+	BUILD_BUG_ON(PAGE_SIZE != OPTEE_MSG_NONCONTIG_PAGE_SIZE);
-+	for (i = 0; i < num_pages; i++, dst++) {
-+		/* Check if we are going to roll over the page boundary */
-+		if (IS_ALIGNED((uintptr_t)(dst + 1),
-+			       OPTEE_MSG_NONCONTIG_PAGE_SIZE)) {
-+			*dst = virt_to_phys(dst + 1);
-+			dst++;
-+		}
-+		*dst = page_to_phys(pages[i]);
-+	}
-+}
-+
-+static size_t get_pages_array_size(size_t num_entries)
-+{
-+	/* Number of user pages + number of pages to hold list of user pages */
-+	return sizeof(u64) *
-+		(num_entries + (sizeof(u64) * num_entries) /
-+		 OPTEE_MSG_NONCONTIG_PAGE_SIZE);
-+}
-+
-+u64 *optee_allocate_pages_array(size_t num_entries)
-+{
-+	return alloc_pages_exact(get_pages_array_size(num_entries), GFP_KERNEL);
-+}
-+
-+void optee_free_pages_array(void *array, size_t num_entries)
-+{
-+	free_pages_exact(array, get_pages_array_size(num_entries));
-+}
-+
-diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-index c374cd5..caa3c04 100644
---- a/drivers/tee/optee/optee_private.h
-+++ b/drivers/tee/optee/optee_private.h
-@@ -165,6 +165,10 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
- int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
- 		       const struct tee_param *params);
- 
-+u64 *optee_allocate_pages_array(size_t num_entries);
-+void optee_free_pages_array(void *array, size_t num_entries);
-+void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages);
-+
- /*
-  * Small helpers
-  */
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
