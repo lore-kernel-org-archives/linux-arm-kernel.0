@@ -1,151 +1,77 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Thu, 28 Sep 2017 21:04:09 +0300
-Subject: [PATCH v1 12/14] tee: optee: enable dynamic SHM support
+Date: Thu, 28 Sep 2017 21:04:11 +0300
+Subject: [PATCH v1 14/14] tee: shm: inline tee_shm getter functions
 In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1506621851-6929-13-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1506621851-6929-15-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Previous patches added various features that are needed for dynamic SHM.
-Dynamic SHM allows Normal World to share any buffers with OP-TEE.
-While original design suggested to use pre-allocated region (usually of
-1M to 2M of size), this new approach allows to use all non-secure RAM for
-command buffers, RPC allocations and TA parameters.
-
-This patch checks capability OPTEE_SMC_SEC_CAP_DYNAMIC_SHM. If it was set
-by OP-TEE, then kernel part of OP-TEE will use kernel page allocator
-to allocate command buffers. Also it will set TEE_GEN_CAP_REG_MEM
-capability to tell userspace that it supports shared memory registration.
+Now, when struct tee_shm is defined in public header,
+we can inline small getter functions.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/core.c | 69 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 51 insertions(+), 18 deletions(-)
+ drivers/tee/tee_shm.c   | 17 -----------------
+ include/linux/tee_drv.h | 10 ++++++++--
+ 2 files changed, 8 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 8e012ea..e8fd9af 100644
---- a/drivers/tee/optee/core.c
-+++ b/drivers/tee/optee/core.c
-@@ -28,6 +28,7 @@
- #include <linux/uaccess.h>
- #include "optee_private.h"
- #include "optee_smc.h"
-+#include "shm_pool.h"
- 
- #define DRIVER_NAME "optee"
- 
-@@ -227,6 +228,10 @@ static void optee_get_version(struct tee_device *teedev,
- 		.impl_caps = TEE_OPTEE_CAP_TZ,
- 		.gen_caps = TEE_GEN_CAP_GP,
- 	};
-+	struct optee *optee = tee_get_drvdata(teedev);
-+
-+	if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-+		v.gen_caps |= TEE_GEN_CAP_REG_MEM;
- 	*vers = v;
+diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
+index 5176c83..453700a 100644
+--- a/drivers/tee/tee_shm.c
++++ b/drivers/tee/tee_shm.c
+@@ -494,23 +494,6 @@ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id)
  }
+ EXPORT_SYMBOL_GPL(tee_shm_get_from_id);
  
-@@ -405,21 +410,22 @@ static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
- }
- 
- static struct tee_shm_pool *
--optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
-+optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm,
-+			  u32 sec_caps)
- {
- 	union {
- 		struct arm_smccc_res smccc;
- 		struct optee_smc_get_shm_config_result result;
- 	} res;
--	struct tee_shm_pool *pool;
- 	unsigned long vaddr;
- 	phys_addr_t paddr;
- 	size_t size;
- 	phys_addr_t begin;
- 	phys_addr_t end;
- 	void *va;
--	struct tee_shm_pool_mem_info priv_info;
--	struct tee_shm_pool_mem_info dmabuf_info;
-+	struct tee_shm_pool_mgr *priv_mgr;
-+	struct tee_shm_pool_mgr *dmabuf_mgr;
-+	void *rc;
- 
- 	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res.smccc);
- 	if (res.result.status != OPTEE_SMC_RETURN_OK) {
-@@ -449,22 +455,49 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
- 	}
- 	vaddr = (unsigned long)va;
- 
--	priv_info.vaddr = vaddr;
--	priv_info.paddr = paddr;
--	priv_info.size = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--	dmabuf_info.vaddr = vaddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
--	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+-bool tee_shm_is_registered(struct tee_shm *shm)
+-{
+-	return shm && (shm->flags & TEE_SHM_REGISTER);
+-}
+-EXPORT_SYMBOL_GPL(tee_shm_is_registered);
 -
--	pool = tee_shm_pool_alloc_res_mem(&priv_info, &dmabuf_info);
--	if (IS_ERR(pool)) {
--		memunmap(va);
--		goto out;
-+	/*
-+	 * If OP-TEE can work with unregistered SHM, we will use own pool
-+	 * for private shm
-+	 */
-+	if (sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM) {
-+		rc = optee_shm_pool_alloc_pages();
-+		if (IS_ERR(rc))
-+			goto err_memunmap;
-+		priv_mgr = rc;
-+	} else {
-+		const size_t sz = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-+
-+		rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, sz,
-+						    3 /* 8 bytes aligned */);
-+		if (IS_ERR(rc))
-+			goto err_memunmap;
-+		priv_mgr = rc;
-+
-+		vaddr += sz;
-+		paddr += sz;
-+		size -= sz;
- 	}
+-/**
+- * tee_shm_get_id() - Get id of a shared memory object
+- * @shm:	Shared memory handle
+- * @returns id
+- */
+-int tee_shm_get_id(struct tee_shm *shm)
+-{
+-	return shm->id;
+-}
+-EXPORT_SYMBOL_GPL(tee_shm_get_id);
+-
+ /**
+  * tee_shm_put() - Decrease reference count on a shared memory handle
+  * @shm:	Shared memory handle
+diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+index 6aaef65..2ae0286 100644
+--- a/include/linux/tee_drv.h
++++ b/include/linux/tee_drv.h
+@@ -429,7 +429,10 @@ static inline size_t tee_shm_get_page_offset(struct tee_shm *shm)
+  * @shm:	Shared memory handle
+  * @returns id
+  */
+-int tee_shm_get_id(struct tee_shm *shm);
++static inline int tee_shm_get_id(struct tee_shm *shm)
++{
++	return shm->id;
++}
  
-+	rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, size, PAGE_SHIFT);
-+	if (IS_ERR(rc))
-+		goto err_free_priv_mgr;
-+	dmabuf_mgr = rc;
-+
-+	rc = tee_shm_pool_alloc(priv_mgr, dmabuf_mgr);
-+	if (IS_ERR(rc))
-+		goto err_free_dmabuf_mgr;
-+
- 	*memremaped_shm = va;
--out:
--	return pool;
-+
-+	return rc;
-+
-+err_free_dmabuf_mgr:
-+	tee_shm_pool_mgr_destroy(dmabuf_mgr);
-+err_free_priv_mgr:
-+	tee_shm_pool_mgr_destroy(priv_mgr);
-+err_memunmap:
-+	memunmap(va);
-+	return rc;
- }
+ /**
+  * tee_shm_get_from_id() - Find shared memory object and increase reference
+@@ -445,6 +448,9 @@ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
+  * @shm:	Shared memory handle
+  * @returns true if object is registered in TEE
+  */
+-bool tee_shm_is_registered(struct tee_shm *shm);
++static inline bool tee_shm_is_registered(struct tee_shm *shm)
++{
++	return shm && (shm->flags & TEE_SHM_REGISTER);
++}
  
- /* Simple wrapper functions to be able to use a function pointer */
-@@ -542,7 +575,7 @@ static struct optee *optee_probe(struct device_node *np)
- 	if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM))
- 		return ERR_PTR(-EINVAL);
- 
--	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm);
-+	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm, sec_caps);
- 	if (IS_ERR(pool))
- 		return (void *)pool;
- 
+ #endif /*__TEE_DRV_H*/
 -- 
 2.7.4
