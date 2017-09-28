@@ -1,100 +1,111 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 28 Sep 2017 15:37:04 +0100
-Subject: [PATCH] scripts/decodecode: Fix decoding for AArch64 (arm64)
- instructions
-In-Reply-To: <20170928141447.GA27788@arm.com>
-References: <1506596147-23630-1-git-send-email-will.deacon@arm.com>
- <20170928124206.GA3611@e103592.cambridge.arm.com>
- <20170928141447.GA27788@arm.com>
-Message-ID: <20170928143704.GC3611@e103592.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 28 Sep 2017 15:55:02 +0100
+Subject: [PATCH v2 2/2] iommu/io-pgtable-arm-v7s: Convert to IOMMU API TLB sync
+In-Reply-To: <1eaf255a7a334b3b1b100da8b75b73d19c924860.1506610256.git.robin.murphy@arm.com>
+References: <1eaf255a7a334b3b1b100da8b75b73d19c924860.1506610256.git.robin.murphy@arm.com>
+Message-ID: <e00ef8af9b0dfe89a6680a485f3b27283df2b77b.1506610256.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 03:14:47PM +0100, Will Deacon wrote:
-> On Thu, Sep 28, 2017 at 01:42:31PM +0100, Dave Martin wrote:
-> > On Thu, Sep 28, 2017 at 11:55:47AM +0100, Will Deacon wrote:
-> > > There are a couple of problems with the decodecode script and arm64:
-> > > 
-> > > 1. AArch64 objdump refuses to disassemble .4byte directives as instructions,
-> > >    insisting that they are data values and displaying them as:
-> > > 
-> > > 	a94153f3	.word	0xa94153f3		<-- trapping instruction
-> > > 
-> > >    This is resolved by using the .inst directive instead.
-> > > 
-> > > 2. Disassembly of branch instructions attempts to provide the target as
-> > >    an offset from a symbol, e.g.:
-> > > 
-> > >    0:	34000082	cbz	w2, 10 <.text+0x10>
-> > > 
-> > >   however this falls foul of the grep -v, which matches lines containing
-> > >   ".text" and ends up removing all branch instructions from the dump.
-> > 
-> > Any idea why this doesn't affect other arches too ... or does it?
-> 
-> I'm not sure, although I don't know how .inst works for architectures
-> with variable-length instructions and I *guess* the disassembly is less
-> fussy about data vs text for those targets.
+Now that the core API issues its own post-unmap TLB sync call, push that
+operation out from the io-pgtable-arm-v7s internals into the users. For
+now, we leave the invalidation implicit in the unmap operation, since
+none of the current users would benefit much from any change to that.
 
-I rather meant the target disassembly for relative branches in the
-absence of labels.
+Note that the conversion of msm_iommu is implicit, since that apparently
+has no specific TLB sync operation anyway.
 
-Anyway, I think this is at least harmless to other arches, and possibly
-helpful to them (if they disassemble those branch targets in the same
-sort of way).
+CC: Yong Wu <yong.wu@mediatek.com>
+CC: Rob Clark <robdclark@gmail.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-> > > This patch resolves both issues by using the .inst directive for 4-byte
-> > > quantities on arm64 and stripping the resulting binaries (as is done on
-> > > arm already) to remove the mapping symbols.
-> > > 
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > 
-> > > ---
-> > >  scripts/decodecode | 8 ++++++++
-> > >  1 file changed, 8 insertions(+)
-> > > 
-> > > diff --git a/scripts/decodecode b/scripts/decodecode
-> > > index d8824f37acce..67214ec5b2cb 100755
-> > > --- a/scripts/decodecode
-> > > +++ b/scripts/decodecode
-> > > @@ -58,6 +58,14 @@ disas() {
-> > >  		${CROSS_COMPILE}strip $1.o
-> > >  	fi
-> > >  
-> > > +	if [ "$ARCH" = "arm64" ]; then
-> > > +		if [ $width -eq 4 ]; then
-> > > +			type=inst
-> > 
-> > Can we merge with arm here, or does arm still support toolchains that
-> > don't have .inst?  Anyway, no big deal.
-> 
-> I thought we still supported those, so I'd be reluctant to merge the
-> clauses unless it's broken (the script works as-is for me with arm). I'm
-> also not sure what we should do for 16-bit Thumb-2 encodings, where we
-> have inst.n and inst.w to contend with.
+v2: Wire up .flush_iotlb_all and cope with uninitialised domains
 
-Fair enough.  I suspected as much, too.
+ drivers/iommu/io-pgtable-arm-v7s.c |  7 +------
+ drivers/iommu/mtk_iommu.c          |  7 +++++++
+ drivers/iommu/qcom_iommu.c         | 15 +++++++++++++++
+ 3 files changed, 23 insertions(+), 6 deletions(-)
 
-Cheers
----Dave
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index d665d0dc16e8..397531da8d9c 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -660,16 +660,11 @@ static int arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+ 			 size_t size)
+ {
+ 	struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);
+-	size_t unmapped;
  
-> > > +		fi
-> > > +
-> > > +		${CROSS_COMPILE}strip $1.o
-> > > +	fi
-> > > +
-> > >  	${CROSS_COMPILE}objdump $OBJDUMPFLAGS -S $1.o | \
-> > >  		grep -v "/tmp\|Disassembly\|\.text\|^$" > $1.dis 2>&1
-> > 
-> > FWIW,
-> > 
-> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> Thanks!
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ 	if (WARN_ON(upper_32_bits(iova)))
+ 		return 0;
+ 
+-	unmapped = __arm_v7s_unmap(data, iova, size, 1, data->pgd);
+-	if (unmapped)
+-		io_pgtable_tlb_sync(&data->iop);
+-
+-	return unmapped;
++	return __arm_v7s_unmap(data, iova, size, 1, data->pgd);
+ }
+ 
+ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index bd515be5b380..d0c8dfbbd74d 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -391,6 +391,11 @@ static size_t mtk_iommu_unmap(struct iommu_domain *domain,
+ 	return unmapsz;
+ }
+ 
++static void mtk_iommu_iotlb_sync(struct iommu_domain *domain)
++{
++	mtk_iommu_tlb_sync(mtk_iommu_get_m4u_data());
++}
++
+ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
+ 					  dma_addr_t iova)
+ {
+@@ -490,6 +495,8 @@ static struct iommu_ops mtk_iommu_ops = {
+ 	.map		= mtk_iommu_map,
+ 	.unmap		= mtk_iommu_unmap,
+ 	.map_sg		= default_iommu_map_sg,
++	.flush_iotlb_all = mtk_iommu_iotlb_sync,
++	.iotlb_sync	= mtk_iommu_iotlb_sync,
+ 	.iova_to_phys	= mtk_iommu_iova_to_phys,
+ 	.add_device	= mtk_iommu_add_device,
+ 	.remove_device	= mtk_iommu_remove_device,
+diff --git a/drivers/iommu/qcom_iommu.c b/drivers/iommu/qcom_iommu.c
+index c8a587d034b0..4a2c4378b3db 100644
+--- a/drivers/iommu/qcom_iommu.c
++++ b/drivers/iommu/qcom_iommu.c
+@@ -443,6 +443,19 @@ static size_t qcom_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 	return ret;
+ }
+ 
++static void qcom_iommu_iotlb_sync(struct iommu_domain *domain)
++{
++	struct qcom_iommu_domain *qcom_domain = to_qcom_iommu_domain(domain);
++	struct io_pgtable *pgtable = container_of(qcom_domain->pgtbl_ops,
++						  struct io_pgtable, ops);
++	if (!qcom_domain->pgtbl_ops)
++		return;
++
++	pm_runtime_get_sync(qcom_domain->iommu->dev);
++	qcom_iommu_tlb_sync(pgtable->cookie);
++	pm_runtime_put_sync(qcom_domain->iommu->dev);
++}
++
+ static phys_addr_t qcom_iommu_iova_to_phys(struct iommu_domain *domain,
+ 					   dma_addr_t iova)
+ {
+@@ -570,6 +583,8 @@ static const struct iommu_ops qcom_iommu_ops = {
+ 	.map		= qcom_iommu_map,
+ 	.unmap		= qcom_iommu_unmap,
+ 	.map_sg		= default_iommu_map_sg,
++	.flush_iotlb_all = qcom_iommu_iotlb_sync,
++	.iotlb_sync	= qcom_iommu_iotlb_sync,
+ 	.iova_to_phys	= qcom_iommu_iova_to_phys,
+ 	.add_device	= qcom_iommu_add_device,
+ 	.remove_device	= qcom_iommu_remove_device,
+-- 
+2.13.4.dirty
