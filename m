@@ -1,69 +1,76 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 28 Sep 2017 17:21:48 +0930
-Subject: [PATCH 7/8] ARM: dts: aspeed: Add aliases for UARTs
-In-Reply-To: <20170928075149.8154-1-joel@jms.id.au>
-References: <20170928075149.8154-1-joel@jms.id.au>
-Message-ID: <20170928075149.8154-8-joel@jms.id.au>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 28 Sep 2017 09:56:38 +0200
+Subject: [PATCH 2/2] dt-bindings: i2c: Update documentation for
+ "mv78230-a0-i2c"
+In-Reply-To: <20170928040407.8933-3-kalyan.kinthada@alliedtelesis.co.nz>
+ (Kalyan Kinthada's message of "Thu, 28 Sep 2017 17:04:07 +1300")
+References: <20170928040407.8933-1-kalyan.kinthada@alliedtelesis.co.nz>
+ <20170928040407.8933-3-kalyan.kinthada@alliedtelesis.co.nz>
+Message-ID: <87wp4jgssp.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Existing userspace expects the console (UART5) to be at /dev/ttyS4.  To
-ensure the UARTs show up where users expect them, we give them fixed
-aliases starting at 0.
+Hi Kalyan,
+ 
+ On jeu., sept. 28 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 4 ----
- arch/arm/boot/dts/aspeed-g4.dtsi              | 5 +++++
- arch/arm/boot/dts/aspeed-g5.dtsi              | 5 +++++
- 3 files changed, 10 insertions(+), 4 deletions(-)
+> This commit modifies the documentation for
+> "marvell,mv78230-a0-i2c" compatible string.
+>
+> The "marvell,mv78230-a0-i2c" compatible string enables the workaround
+> for an i2c repeated start timing violation, but unlike
+> "marvell,mv78230-i2c" it disables the i2c offload support. This is
+> applicable to a number of SoCs such as early revisions of the Armada XP
+> and the Armada 38x.
+>
+> Deleted the special note for "marvell,mv78230-a0-i2c" as it can
+> be used by other SoCs as well.
+>
+> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 4 ----
+>  1 file changed, 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index 5c30026921ae..37c00ad1c0bb 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -10,10 +10,6 @@ Required properties :
+>                       - "marvell,mv64xxx-i2c"
+>                       - "marvell,mv78230-i2c"
+>                       - "marvell,mv78230-a0-i2c"
+> -                       * Note: Only use "marvell,mv78230-a0-i2c" for a
+> -                         very rare, initial version of the SoC which
+> -                         had broken offload support.  Linux
+> -                         auto-detects this and sets it appropriately.
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index e387c80b7f4f..be51be5a5f39 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -6,10 +6,6 @@
- 	model = "Palmetto BMC";
- 	compatible = "tyan,palmetto-bmc", "aspeed,ast2400";
- 
--	aliases {
--		serial4 = &uart5;
--	};
--
- 	chosen {
- 		stdout-path = &uart5;
- 		bootargs = "console=ttyS4,115200 earlyprintk";
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index f8611d5a6465..191c33d18122 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -22,6 +22,11 @@
- 		i2c11 = &i2c11;
- 		i2c12 = &i2c12;
- 		i2c13 = &i2c13;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
- 	};
- 
- 	cpus {
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index de127370131d..251fc9f4637e 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -22,6 +22,11 @@
- 		i2c11 = &i2c11;
- 		i2c12 = &i2c12;
- 		i2c13 = &i2c13;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
- 	};
- 
- 	cpus {
+I think here we should pour more details like what you wrote in the
+commit log. Maybe something like:
+
+                        - "marvell,mv78230-a0-i2c": for controller which
+                          do not support offload but still have the i2c
+                          repeated start timing violation issue, such as
+                          the ones found in the Armada XP A0 and the
+                          Armada 38x SoCs.
+
+
+And I still have to check it for Armada 375 and Armada 39x, but of
+course it is not preventing merging your patches.
+
+Gregory
+
+
+
+
+>   - interrupts      : The interrupt number
+>  
+>  Optional properties :
+> -- 
+> 2.14.1
+>
+
 -- 
-2.14.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
