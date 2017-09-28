@@ -1,102 +1,128 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Sep 2017 10:33:18 +0200
-Subject: [patch v9 0/4] JTAG driver introduction
-In-Reply-To: <1505985932-27568-1-git-send-email-oleksandrs@mellanox.com>
-References: <1505985932-27568-1-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <CAMuHMdWfoYzWPJYaGOhF8qshKhvngwFKs=kvuH62PYif9q9+0g@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Sep 2017 09:38:27 +0100
+Subject: [PATCH v4 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170927000355.30597-3-d-gerlach@ti.com>
+References: <20170927000355.30597-1-d-gerlach@ti.com>
+ <20170927000355.30597-3-d-gerlach@ti.com>
+Message-ID: <20170928083827.GE23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+On Tue, Sep 26, 2017 at 07:03:55PM -0500, Dave Gerlach wrote:
+> diff --git a/drivers/memory/emif-asm-offsets.c b/drivers/memory/emif-asm-offsets.c
+> new file mode 100644
+> index 000000000000..bdb153c9e948
+> --- /dev/null
+> +++ b/drivers/memory/emif-asm-offsets.c
+> @@ -0,0 +1,22 @@
+> +/*
+> + * TI AM33XX EMIF PM Assembly Offsets
+> + *
+> + * Copyright (C) 2016-2017 Texas Instruments Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/ti-emif-sram.h>
+> +
+> +int main(void)
+> +{
+> +	ti_emif_offsets();
+> +
+> +	return 0;
+> +}
 
-[My attention was drawn by https://lwn.net/Articles/734440/]
-[CC linux-spi, which was never included, while linux-serial was]
+...
 
-On Thu, Sep 21, 2017 at 11:25 AM, Oleksandr Shamray
-<oleksandrs@mellanox.com> wrote:
-> When a need raise up to use JTAG interface for system's devices
-> programming or CPU debugging, usually the user layer
-> application implements jtag protocol by bit-bang or using a
-> proprietary connection to vendor hardware.
-> This method can be slow and not generic.
->
-> We propose to implement general JTAG interface and infrastructure
-> to communicate with user layer application. In such way, we can
-> have the standard JTAG interface core part and separation from
-> specific HW implementation.
-> This allow new capability to debug the CPU or program system's
-> device via BMC without additional devices nor cost.
->
-> This patch purpose is to add JTAG master core infrastructure by
-> defining new JTAG class and provide generic JTAG interface
-> to allow hardware specific drivers to connect this interface.
-> This will enable all JTAG drivers to use the common interface
-> part and will have separate for hardware implementation.
->
-> The JTAG (Joint Test Action Group) core driver provides minimal generic
-> JTAG interface, which can be used by hardware specific JTAG master
-> controllers. By providing common interface for the JTAG controllers,
-> user space device programing is hardware independent.
->
-> Modern SoC which in use for embedded system' equipped with
-> internal JTAG master interface.
-> This interface is used for programming and debugging system's
-> hardware components, like CPLD, FPGA, CPU, voltage and
-> industrial controllers.
-> Firmware for such devices can be upgraded through JTAG interface during
-> Runtime. The JTAG standard support for multiple devices programming,
-> is in case their lines are daisy-chained together.
->
-> For example, systems which equipped with host CPU, BMC SoC or/and
-> number of programmable devices are capable to connect a pin and
-> select system components dynamically for programming and debugging,
-> This is using by the BMC which is equipped with internal SoC master
-> controller.
-> For example:
->
-> BMC JTAG master --> pin selected to CPLDs chain for programming (filed
-> upgrade, production)
-> BMC JTAG master --> pin selected to voltage monitors for programming
-> (field upgrade, production)
-> BMC JTAG master --> pin selected to host CPU (on-site debugging
-> and developers debugging)
->
-> For example, we can have application in user space which using calls
-> to JTAG driver executes CPLD programming directly from SVF file
->
-> The JTAG standard (IEEE 1149.1) defines the next connector pins:
-> - TDI (Test Data In);
-> - TDO (Test Data Out);
-> - TCK (Test Clock);
-> - TMS (Test Mode Select);
-> - TRST (Test Reset) (Optional);
->
-> The SoC equipped with JTAG master controller, performs
-> device programming on command or vector level. For example
-> a file in a standard SVF (Serial Vector Format) that contains
-> boundary scan vectors, can be used by sending each vector
-> to the JTAG interface and the JTAG controller will execute
-> the programming.
->
-> Initial version provides the system calls set for:
-> - SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-> - SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-> - RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
->   number of clocks.
->
-> SoC which are not equipped with JTAG master interface, can be built
-> on top of JTAG core driver infrastructure, by applying bit-banging of
-> TDI, TDO, TCK and TMS pins within the hardware specific driver.
+> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+> +static inline void ti_emif_offsets(void)
+> +{
+> +	DEFINE(EMIF_SDCFG_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_sdcfg_val));
+> +	DEFINE(EMIF_TIMING1_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_timing1_val));
+> +	DEFINE(EMIF_TIMING2_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_timing2_val));
+> +	DEFINE(EMIF_TIMING3_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_timing3_val));
+> +	DEFINE(EMIF_REF_CTRL_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_ref_ctrl_val));
+> +	DEFINE(EMIF_ZQCFG_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_zqcfg_val));
+> +	DEFINE(EMIF_PMCR_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_pmcr_val));
+> +	DEFINE(EMIF_PMCR_SHDW_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_pmcr_shdw_val));
+> +	DEFINE(EMIF_RD_WR_LEVEL_RAMP_CTRL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_rd_wr_level_ramp_ctrl));
+> +	DEFINE(EMIF_RD_WR_EXEC_THRESH_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_rd_wr_exec_thresh));
+> +	DEFINE(EMIF_COS_CONFIG_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_cos_config));
+> +	DEFINE(EMIF_PRIORITY_TO_COS_MAPPING_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_priority_to_cos_mapping));
+> +	DEFINE(EMIF_CONNECT_ID_SERV_1_MAP_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_connect_id_serv_1_map));
+> +	DEFINE(EMIF_CONNECT_ID_SERV_2_MAP_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_connect_id_serv_2_map));
+> +	DEFINE(EMIF_OCP_CONFIG_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_ocp_config_val));
+> +	DEFINE(EMIF_LPDDR2_NVM_TIM_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_lpddr2_nvm_tim));
+> +	DEFINE(EMIF_LPDDR2_NVM_TIM_SHDW_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_lpddr2_nvm_tim_shdw));
+> +	DEFINE(EMIF_DLL_CALIB_CTRL_VAL_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_dll_calib_ctrl_val));
+> +	DEFINE(EMIF_DLL_CALIB_CTRL_VAL_SHDW_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_dll_calib_ctrl_val_shdw));
+> +	DEFINE(EMIF_DDR_PHY_CTLR_1_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_ddr_phy_ctlr_1));
+> +	DEFINE(EMIF_EXT_PHY_CTRL_VALS_OFFSET,
+> +	       offsetof(struct emif_regs_amx3, emif_ext_phy_ctrl_vals));
+> +	DEFINE(EMIF_REGS_AMX3_SIZE, sizeof(struct emif_regs_amx3));
+> +
+> +	BLANK();
+> +
+> +	DEFINE(EMIF_PM_BASE_ADDR_VIRT_OFFSET,
+> +	       offsetof(struct ti_emif_pm_data, ti_emif_base_addr_virt));
+> +	DEFINE(EMIF_PM_BASE_ADDR_PHYS_OFFSET,
+> +	       offsetof(struct ti_emif_pm_data, ti_emif_base_addr_phys));
+> +	DEFINE(EMIF_PM_CONFIG_OFFSET,
+> +	       offsetof(struct ti_emif_pm_data, ti_emif_sram_config));
+> +	DEFINE(EMIF_PM_REGS_VIRT_OFFSET,
+> +	       offsetof(struct ti_emif_pm_data, regs_virt));
+> +	DEFINE(EMIF_PM_REGS_PHYS_OFFSET,
+> +	       offsetof(struct ti_emif_pm_data, regs_phys));
+> +	DEFINE(EMIF_PM_DATA_SIZE, sizeof(struct ti_emif_pm_data));
+> +
+> +	BLANK();
+> +
+> +	DEFINE(EMIF_PM_SAVE_CONTEXT_OFFSET,
+> +	       offsetof(struct ti_emif_pm_functions, save_context));
+> +	DEFINE(EMIF_PM_RESTORE_CONTEXT_OFFSET,
+> +	       offsetof(struct ti_emif_pm_functions, restore_context));
+> +	DEFINE(EMIF_PM_ENTER_SR_OFFSET,
+> +	       offsetof(struct ti_emif_pm_functions, enter_sr));
+> +	DEFINE(EMIF_PM_EXIT_SR_OFFSET,
+> +	       offsetof(struct ti_emif_pm_functions, exit_sr));
+> +	DEFINE(EMIF_PM_ABORT_SR_OFFSET,
+> +	       offsetof(struct ti_emif_pm_functions, abort_sr));
+> +	DEFINE(EMIF_PM_FUNCTIONS_SIZE, sizeof(struct ti_emif_pm_functions));
+> +}
+> +#else
+> +static inline void ti_emif_offsets(void) {}
+> +#endif
 
-Or by using an SPI master?
+Any reason the above can't be part of emif-asm-offsets.c ?
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
