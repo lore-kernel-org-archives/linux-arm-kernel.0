@@ -1,142 +1,116 @@
-From: yehuday@marvell.com (Yehuda Yitschak)
-Date: Thu, 28 Sep 2017 14:28:36 +0000
-Subject: [PATCH v2] arm64: dts: marvell: fix interrupt-map property for
- Armada CP110 PCIe controller
-In-Reply-To: <20170928140633.13942-1-thomas.petazzoni@free-electrons.com>
-References: <20170928140633.13942-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <62042484a9484a64b8bcbc6a2a5b9b43@IL-EXCH02.marvell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Sep 2017 16:31:42 +0200
+Subject: [PATCH 1/3] clk: sunxi-ng: add mux and pll notifiers for A64 CPU
+ clock
+In-Reply-To: <bae0f40adef1ef1ffd3a15c32af7bf42@aosc.io>
+References: <20170923001531.14285-1-icenowy@aosc.io>
+ <20170923001531.14285-2-icenowy@aosc.io>
+ <20170928102752.ceo54qccqakb4xyx@flea>
+ <975c0c884d9a83faad6141df474a93af@aosc.io>
+ <20170928142050.gkbdqlwpfjmpdlg3@flea>
+ <bae0f40adef1ef1ffd3a15c32af7bf42@aosc.io>
+Message-ID: <20170928143142.f6wtekvkia3bvoq2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 28, 2017 at 02:24:18PM +0000, icenowy at aosc.io wrote:
+> ? 2017-09-28 22:20?Maxime Ripard ???
+> > On Thu, Sep 28, 2017 at 10:42:39AM +0000, icenowy at aosc.io wrote:
+> > > > On Sat, Sep 23, 2017 at 12:15:29AM +0000, Icenowy Zheng wrote:
+> > > > > The A64 PLL_CPU clock has the same instability if some factor changed
+> > > > > without the PLL gated like other SoCs with sun6i-style CCU, e.g. A33,
+> > > > > H3.
+> > > > >
+> > > > > Add the mux and pll notifiers for A64 CPU clock to workaround the
+> > > > > problem.
+> > > > >
+> > > > > Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > > ---
+> > > > >  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 28
+> > > > > +++++++++++++++++++++++++++-
+> > > > >  1 file changed, 27 insertions(+), 1 deletion(-)
+> > > > >
+> > > > > diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > > > b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > > > index 2bb4cabf802f..b55fa69dd0c1 100644
+> > > > > --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > > > +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > > > @@ -879,11 +879,26 @@ static const struct sunxi_ccu_desc
+> > > > > sun50i_a64_ccu_desc = {
+> > > > >  	.num_resets	= ARRAY_SIZE(sun50i_a64_ccu_resets),
+> > > > >  };
+> > > > >
+> > > > > +static struct ccu_pll_nb sun50i_a64_pll_cpu_nb = {
+> > > > > +	.common	= &pll_cpux_clk.common,
+> > > > > +	/* copy from pll_cpux_clk */
+> > > > > +	.enable	= BIT(31),
+> > > > > +	.lock	= BIT(28),
+> > > > > +};
+> > > > > +
+> > > > > +static struct ccu_mux_nb sun50i_a64_cpu_nb = {
+> > > > > +	.common		= &cpux_clk.common,
+> > > > > +	.cm		= &cpux_clk.mux,
+> > > > > +	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
+> > > > > +	.bypass_index	= 1, /* index of 24 MHz oscillator */
+> > > > > +};
+> > > > > +
+> > > > >
+> > > > >  static int sun50i_a64_ccu_probe(struct platform_device *pdev)
+> > > > >  {
+> > > > >  	struct resource *res;
+> > > > >  	void __iomem *reg;
+> > > > >  	u32 val;
+> > > > > +	int ret;
+> > > > >
+> > > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > >  	reg = devm_ioremap_resource(&pdev->dev, res);
+> > > > > @@ -897,7 +912,18 @@ static int sun50i_a64_ccu_probe(struct
+> > > > > platform_device *pdev)
+> > > > >
+> > > > >  	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
+> > > > >
+> > > > > -	return sunxi_ccu_probe(pdev->dev.of_node, reg,
+> > > > > &sun50i_a64_ccu_desc);
+> > > > > +	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun50i_a64_ccu_desc);
+> > > > > +	if (ret)
+> > > > > +		return ret;
+> > > > > +
+> > > > > +	/* Gate then ungate PLL CPU after any rate changes */
+> > > > > +	ccu_pll_notifier_register(&sun50i_a64_pll_cpu_nb);
+> > > > > +
+> > > > > +	/* Reparent CPU during PLL CPU rate changes */
+> > > > > +	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
+> > > > > +				  &sun50i_a64_cpu_nb);
+> > > > > +
+> > > > > +	return 0;
+> > > >
+> > > > So this is the fourth user of the exact same code, can you turn that
+> > > > into a shared function?
+> > > 
+> > > I think it's not so worthful to extract the code, as:
+> > 
+> > It does, because the order is important. If you do not register the
+> > notifiers in the right order, you have a bug, and:
+> > 
+> > > - the notifier structs contains info of the clocks
+> > 
+> > this should be passed as a parameter anyway,
+> 
+> So the function only does these two registers?
 
-Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+Yes.
 
-> -----Original Message-----
-> From: Thomas Petazzoni [mailto:thomas.petazzoni at free-electrons.com]
-> Sent: Thursday, September 28, 2017 17:07
-> To: Jason Cooper; Andrew Lunn; Sebastian Hesselbarth; Gregory Clement
-> Cc: Nadav Haklai; Hanna Hawa; Yehuda Yitschak; Antoine Tenart; Miqu?l
-> Raynal; linux-arm-kernel at lists.infradead.org; Thomas Petazzoni
-> Subject: [PATCH v2] arm64: dts: marvell: fix interrupt-map property for
-> Armada CP110 PCIe controller
-> 
-> The interrupt-map property used in the description of the Marvell Armada
-> 7K/8K PCIe controllers has a bogus extraneous 0 that causes the interrupt
-> conversion to not be done properly. This causes the PCIe PME and AER root
-> port service drivers to fail their initialization:
-> 
-> [    5.019900] genirq: Setting trigger mode 7 for irq 114 failed
-> (irq_chip_set_type_parent+0x0/0x30)
-> [    5.028821] pcie_pme: probe of 0001:00:00.0:pcie001 failed with error -22
-> [    5.035687] genirq: Setting trigger mode 7 for irq 114 failed
-> (irq_chip_set_type_parent+0x0/0x30)
-> [    5.044614] aer: probe of 0001:00:00.0:pcie002 failed with error -22
-> 
-> This problem was introduced when the interrupt description was switched
-> from using the GIC directly to using the ICU interrupt controller. Indeed, the
-> GIC has address-cells = <1>, which requires a parent unit address, while the
-> ICU has address-cells = <0>.
-> 
-> Fixes: 6ef84a827c37 ("arm64: dts: marvell: enable GICP and ICU on Armada
-> 7K/8K")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Changes since v1:
->  - Fix the commit log with a proper explanation, as noticed by Yehuda
->  - Adjust the Fixes tag accordingly
->  - Squash both patches together since they fix the same commit
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 6 +++---
-> arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 6 +++---
->  2 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 8263a8a504a8..f2aa2a81de4d 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -336,7 +336,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xf6000000 0  0xf6000000 0
-> 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR
-> 22 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cpm_icu ICU_GRP_NSR 22
-> +IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 22
-> IRQ_TYPE_LEVEL_HIGH>;
->  			num-lanes = <1>;
->  			clocks = <&cpm_clk 1 13>;
-> @@ -362,7 +362,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xf7000000 0  0xf7000000 0
-> 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR
-> 24 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cpm_icu ICU_GRP_NSR 24
-> +IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 24
-> IRQ_TYPE_LEVEL_HIGH>;
-> 
->  			num-lanes = <1>;
-> @@ -389,7 +389,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xf8000000 0  0xf8000000 0
-> 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR
-> 23 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cpm_icu ICU_GRP_NSR 23
-> +IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 23
-> IRQ_TYPE_LEVEL_HIGH>;
-> 
->  			num-lanes = <1>;
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index b71ee6c83668..4fe70323abb3 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -335,7 +335,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xfa000000 0  0xfa000000 0
-> 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cps_icu 0 ICU_GRP_NSR 22
-> IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cps_icu ICU_GRP_NSR 22
-> +IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 22
-> IRQ_TYPE_LEVEL_HIGH>;
->  			num-lanes = <1>;
->  			clocks = <&cps_clk 1 13>;
-> @@ -361,7 +361,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xfb000000 0  0xfb000000 0
-> 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cps_icu 0 ICU_GRP_NSR 24
-> IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cps_icu ICU_GRP_NSR 24
-> +IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 24
-> IRQ_TYPE_LEVEL_HIGH>;
-> 
->  			num-lanes = <1>;
-> @@ -388,7 +388,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xfc000000 0  0xfc000000 0
-> 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cps_icu 0 ICU_GRP_NSR 23
-> IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cps_icu ICU_GRP_NSR 23
-> +IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 23
-> IRQ_TYPE_LEVEL_HIGH>;
-> 
->  			num-lanes = <1>;
-> --
-> 2.13.5
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170928/57c1bf49/attachment.sig>
