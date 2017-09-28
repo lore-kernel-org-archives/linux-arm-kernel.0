@@ -1,81 +1,114 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Sep 2017 15:14:47 +0100
-Subject: [PATCH] scripts/decodecode: Fix decoding for AArch64 (arm64)
- instructions
-In-Reply-To: <20170928124206.GA3611@e103592.cambridge.arm.com>
-References: <1506596147-23630-1-git-send-email-will.deacon@arm.com>
- <20170928124206.GA3611@e103592.cambridge.arm.com>
-Message-ID: <20170928141447.GA27788@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Sep 2017 16:20:50 +0200
+Subject: [PATCH 1/3] clk: sunxi-ng: add mux and pll notifiers for A64 CPU
+ clock
+In-Reply-To: <975c0c884d9a83faad6141df474a93af@aosc.io>
+References: <20170923001531.14285-1-icenowy@aosc.io>
+ <20170923001531.14285-2-icenowy@aosc.io>
+ <20170928102752.ceo54qccqakb4xyx@flea>
+ <975c0c884d9a83faad6141df474a93af@aosc.io>
+Message-ID: <20170928142050.gkbdqlwpfjmpdlg3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 01:42:31PM +0100, Dave Martin wrote:
-> On Thu, Sep 28, 2017 at 11:55:47AM +0100, Will Deacon wrote:
-> > There are a couple of problems with the decodecode script and arm64:
+On Thu, Sep 28, 2017 at 10:42:39AM +0000, icenowy at aosc.io wrote:
+> > On Sat, Sep 23, 2017 at 12:15:29AM +0000, Icenowy Zheng wrote:
+> > > The A64 PLL_CPU clock has the same instability if some factor changed
+> > > without the PLL gated like other SoCs with sun6i-style CCU, e.g. A33,
+> > > H3.
+> > > 
+> > > Add the mux and pll notifiers for A64 CPU clock to workaround the
+> > > problem.
+> > > 
+> > > Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > ---
+> > >  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 28
+> > > +++++++++++++++++++++++++++-
+> > >  1 file changed, 27 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > index 2bb4cabf802f..b55fa69dd0c1 100644
+> > > --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > > @@ -879,11 +879,26 @@ static const struct sunxi_ccu_desc
+> > > sun50i_a64_ccu_desc = {
+> > >  	.num_resets	= ARRAY_SIZE(sun50i_a64_ccu_resets),
+> > >  };
+> > > 
+> > > +static struct ccu_pll_nb sun50i_a64_pll_cpu_nb = {
+> > > +	.common	= &pll_cpux_clk.common,
+> > > +	/* copy from pll_cpux_clk */
+> > > +	.enable	= BIT(31),
+> > > +	.lock	= BIT(28),
+> > > +};
+> > > +
+> > > +static struct ccu_mux_nb sun50i_a64_cpu_nb = {
+> > > +	.common		= &cpux_clk.common,
+> > > +	.cm		= &cpux_clk.mux,
+> > > +	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
+> > > +	.bypass_index	= 1, /* index of 24 MHz oscillator */
+> > > +};
+> > > +
+> > > 
+> > >  static int sun50i_a64_ccu_probe(struct platform_device *pdev)
+> > >  {
+> > >  	struct resource *res;
+> > >  	void __iomem *reg;
+> > >  	u32 val;
+> > > +	int ret;
+> > > 
+> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > >  	reg = devm_ioremap_resource(&pdev->dev, res);
+> > > @@ -897,7 +912,18 @@ static int sun50i_a64_ccu_probe(struct
+> > > platform_device *pdev)
+> > > 
+> > >  	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
+> > > 
+> > > -	return sunxi_ccu_probe(pdev->dev.of_node, reg,
+> > > &sun50i_a64_ccu_desc);
+> > > +	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun50i_a64_ccu_desc);
+> > > +	if (ret)
+> > > +		return ret;
+> > > +
+> > > +	/* Gate then ungate PLL CPU after any rate changes */
+> > > +	ccu_pll_notifier_register(&sun50i_a64_pll_cpu_nb);
+> > > +
+> > > +	/* Reparent CPU during PLL CPU rate changes */
+> > > +	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
+> > > +				  &sun50i_a64_cpu_nb);
+> > > +
+> > > +	return 0;
 > > 
-> > 1. AArch64 objdump refuses to disassemble .4byte directives as instructions,
-> >    insisting that they are data values and displaying them as:
-> > 
-> > 	a94153f3	.word	0xa94153f3		<-- trapping instruction
-> > 
-> >    This is resolved by using the .inst directive instead.
-> > 
-> > 2. Disassembly of branch instructions attempts to provide the target as
-> >    an offset from a symbol, e.g.:
-> > 
-> >    0:	34000082	cbz	w2, 10 <.text+0x10>
-> > 
-> >   however this falls foul of the grep -v, which matches lines containing
-> >   ".text" and ends up removing all branch instructions from the dump.
+> > So this is the fourth user of the exact same code, can you turn that
+> > into a shared function?
 > 
-> Any idea why this doesn't affect other arches too ... or does it?
+> I think it's not so worthful to extract the code, as:
 
-I'm not sure, although I don't know how .inst works for architectures
-with variable-length instructions and I *guess* the disassembly is less
-fussy about data vs text for those targets.
+It does, because the order is important. If you do not register the
+notifiers in the right order, you have a bug, and:
 
-> > This patch resolves both issues by using the .inst directive for 4-byte
-> > quantities on arm64 and stripping the resulting binaries (as is done on
-> > arm already) to remove the mapping symbols.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > ---
-> >  scripts/decodecode | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/scripts/decodecode b/scripts/decodecode
-> > index d8824f37acce..67214ec5b2cb 100755
-> > --- a/scripts/decodecode
-> > +++ b/scripts/decodecode
-> > @@ -58,6 +58,14 @@ disas() {
-> >  		${CROSS_COMPILE}strip $1.o
-> >  	fi
-> >  
-> > +	if [ "$ARCH" = "arm64" ]; then
-> > +		if [ $width -eq 4 ]; then
-> > +			type=inst
-> 
-> Can we merge with arm here, or does arm still support toolchains that
-> don't have .inst?  Anyway, no big deal.
+> - the notifier structs contains info of the clocks
 
-I thought we still supported those, so I'd be reluctant to merge the
-clauses unless it's broken (the script works as-is for me with arm). I'm
-also not sure what we should do for 16-bit Thumb-2 encodings, where we
-have inst.n and inst.w to contend with.
+this should be passed as a parameter anyway,
 
-> > +		fi
-> > +
-> > +		${CROSS_COMPILE}strip $1.o
-> > +	fi
-> > +
-> >  	${CROSS_COMPILE}objdump $OBJDUMPFLAGS -S $1.o | \
-> >  		grep -v "/tmp\|Disassembly\|\.text\|^$" > $1.dis 2>&1
-> 
-> FWIW,
-> 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> - A31 seems not to need the PLL notifier.
 
-Thanks!
+And you don't care about the ordering in that case, since there's just
+one. If was talking about the H3, A64, R40 and A33 that all have that
+code.
 
-Will
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170928/d10bc7f2/attachment.sig>
