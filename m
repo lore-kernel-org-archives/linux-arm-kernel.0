@@ -1,130 +1,161 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Thu, 28 Sep 2017 03:49:22 +0200
-Subject: [PATCH v4 05/11] dmaengine: sun6i: Move number of
- pchans/vchans/request to device struct
+Date: Thu, 28 Sep 2017 03:49:21 +0200
+Subject: [PATCH v4 04/11] dmaengine: sun6i: Enable additional burst
+ lengths/widths on H3
 In-Reply-To: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
 References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <86c0dfa0-9284-4501-b845-a67a766b51cc@rwthex-w2-a.rwth-ad.de>
+Message-ID: <fa51787d-9b5e-4905-bacb-34ec4f4d00a8@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Preparatory patch: If the same compatible is used for different SoCs which
-have a common register layout, but different number of channels, the
-channel count can no longer be stored in the config. Store it in the
-device structure instead.
+The H3 supports bursts lengths of 1, 4, 8 and 16 transfers, each with
+a width of 1, 2, 4 or 8 bytes.
+
+The register value for the the width is log2-encoded, change the
+conversion function to provide the correct value for width == 8.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
 ---
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+Changes in v4:
+- Fix config initialization
 
- drivers/dma/sun6i-dma.c | 26 ++++++++++++++++----------
- 1 file changed, 16 insertions(+), 10 deletions(-)
+Changes in v3: None
+Changes in v2:
+- Store burst widths in config
+
+ drivers/dma/sun6i-dma.c | 54 ++++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 45 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index eb45ab39eddd..7fce976a13d8 100644
+index 24dc7fac7447..eb45ab39eddd 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -188,6 +188,9 @@ struct sun6i_dma_dev {
- 	struct sun6i_pchan	*pchans;
- 	struct sun6i_vchan	*vchans;
- 	const struct sun6i_dma_config *cfg;
-+	u32			num_pchans;
-+	u32			num_vchans;
-+	u32			max_request;
+@@ -123,6 +123,8 @@ struct sun6i_dma_config {
+ 	void (*set_burst_length)(u32 *p_cfg, s8 src_burst, s8 dst_burst);
+ 	u32 src_burst_lengths;
+ 	u32 dst_burst_lengths;
++	u32 src_addr_widths;
++	u32 dst_addr_widths;
  };
  
- static struct device *chan2dev(struct dma_chan *chan)
-@@ -434,7 +437,6 @@ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
- static void sun6i_dma_tasklet(unsigned long data)
- {
- 	struct sun6i_dma_dev *sdev = (struct sun6i_dma_dev *)data;
--	const struct sun6i_dma_config *cfg = sdev->cfg;
- 	struct sun6i_vchan *vchan;
- 	struct sun6i_pchan *pchan;
- 	unsigned int pchan_alloc = 0;
-@@ -462,7 +464,7 @@ static void sun6i_dma_tasklet(unsigned long data)
+ /*
+@@ -262,8 +264,12 @@ static inline s8 convert_burst(u32 maxburst)
+ 	switch (maxburst) {
+ 	case 1:
+ 		return 0;
++	case 4:
++		return 1;
+ 	case 8:
+ 		return 2;
++	case 16:
++		return 3;
+ 	default:
+ 		return -EINVAL;
  	}
+@@ -271,7 +277,7 @@ static inline s8 convert_burst(u32 maxburst)
  
- 	spin_lock_irq(&sdev->lock);
--	for (pchan_idx = 0; pchan_idx < cfg->nr_max_channels; pchan_idx++) {
-+	for (pchan_idx = 0; pchan_idx < sdev->num_pchans; pchan_idx++) {
- 		pchan = &sdev->pchans[pchan_idx];
- 
- 		if (pchan->vchan || list_empty(&sdev->pending))
-@@ -483,7 +485,7 @@ static void sun6i_dma_tasklet(unsigned long data)
- 	}
- 	spin_unlock_irq(&sdev->lock);
- 
--	for (pchan_idx = 0; pchan_idx < cfg->nr_max_channels; pchan_idx++) {
-+	for (pchan_idx = 0; pchan_idx < sdev->num_pchans; pchan_idx++) {
- 		if (!(pchan_alloc & BIT(pchan_idx)))
- 			continue;
- 
-@@ -505,7 +507,7 @@ static irqreturn_t sun6i_dma_interrupt(int irq, void *dev_id)
- 	int i, j, ret = IRQ_NONE;
- 	u32 status;
- 
--	for (i = 0; i < sdev->cfg->nr_max_channels / DMA_IRQ_CHAN_NR; i++) {
-+	for (i = 0; i < sdev->num_pchans / DMA_IRQ_CHAN_NR; i++) {
- 		status = readl(sdev->base + DMA_IRQ_STAT(i));
- 		if (!status)
- 			continue;
-@@ -985,7 +987,7 @@ static struct dma_chan *sun6i_dma_of_xlate(struct of_phandle_args *dma_spec,
- 	struct dma_chan *chan;
- 	u8 port = dma_spec->args[0];
- 
--	if (port > sdev->cfg->nr_max_requests)
-+	if (port > sdev->max_request)
- 		return NULL;
- 
- 	chan = dma_get_any_slave_channel(&sdev->slave);
-@@ -1018,7 +1020,7 @@ static inline void sun6i_dma_free(struct sun6i_dma_dev *sdev)
+ static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
  {
- 	int i;
+-	return addr_width >> 1;
++	return ilog2(addr_width);
+ }
  
--	for (i = 0; i < sdev->cfg->nr_max_vchans; i++) {
-+	for (i = 0; i < sdev->num_vchans; i++) {
- 		struct sun6i_vchan *vchan = &sdev->vchans[i];
+ static void sun6i_enable_clock_autogate_a23(struct sun6i_dma_dev *sdev)
+@@ -1043,6 +1049,12 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
+ 	.set_burst_length = sun6i_set_burst_length_a31,
+ 	.src_burst_lengths = BIT(1) | BIT(8),
+ 	.dst_burst_lengths = BIT(1) | BIT(8),
++	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
++	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
+ };
  
- 		list_del(&vchan->vc.chan.device_node);
-@@ -1224,26 +1226,30 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ /*
+@@ -1058,6 +1070,12 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+ 	.set_burst_length = sun6i_set_burst_length_a31,
+ 	.src_burst_lengths = BIT(1) | BIT(8),
+ 	.dst_burst_lengths = BIT(1) | BIT(8),
++	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
++	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
+ };
+ 
+ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+@@ -1068,11 +1086,19 @@ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+ 	.set_burst_length = sun6i_set_burst_length_a31,
+ 	.src_burst_lengths = BIT(1) | BIT(8),
+ 	.dst_burst_lengths = BIT(1) | BIT(8),
++	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
++	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
+ };
+ 
+ /*
+  * The H3 has 12 physical channels, a maximum DRQ port id of 27,
+  * and a total of 34 usable source and destination endpoints.
++ * It also supports additional burst lengths and bus widths,
++ * and the burst length fields have different offsets.
+  */
+ 
+ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+@@ -1081,8 +1107,16 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+ 	.nr_max_vchans   = 34,
+ 	.clock_autogate_enable = sun6i_enable_clock_autogate_h3,
+ 	.set_burst_length = sun6i_set_burst_length_h3,
+-	.src_burst_lengths = BIT(1) | BIT(8),
+-	.dst_burst_lengths = BIT(1) | BIT(8),
++	.src_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16),
++	.dst_burst_lengths = BIT(1) | BIT(4) | BIT(8) | BIT(16),
++	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES),
++	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_8_BYTES),
+ };
+ 
+ /*
+@@ -1098,6 +1132,12 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
+ 	.set_burst_length = sun6i_set_burst_length_a31,
+ 	.src_burst_lengths = BIT(1) | BIT(8),
+ 	.dst_burst_lengths = BIT(1) | BIT(8),
++	.src_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
++	.dst_addr_widths   = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++			     BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++			     BIT(DMA_SLAVE_BUSWIDTH_4_BYTES),
+ };
+ 
+ static const struct of_device_id sun6i_dma_match[] = {
+@@ -1177,12 +1217,8 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->slave.device_pause			= sun6i_dma_pause;
+ 	sdc->slave.device_resume		= sun6i_dma_resume;
+ 	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
+-	sdc->slave.src_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+-						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+-						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+-						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+-						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	sdc->slave.src_addr_widths		= sdc->cfg->src_addr_widths;
++	sdc->slave.dst_addr_widths		= sdc->cfg->dst_addr_widths;
+ 	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
+ 						  BIT(DMA_MEM_TO_DEV);
  	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
- 
--	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->cfg->nr_max_channels,
-+	sdc->num_pchans = sdc->cfg->nr_max_channels;
-+	sdc->num_vchans = sdc->cfg->nr_max_vchans;
-+	sdc->max_request = sdc->cfg->nr_max_requests;
-+
-+	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
- 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
- 	if (!sdc->pchans)
- 		return -ENOMEM;
- 
--	sdc->vchans = devm_kcalloc(&pdev->dev, sdc->cfg->nr_max_vchans,
-+	sdc->vchans = devm_kcalloc(&pdev->dev, sdc->num_vchans,
- 				   sizeof(struct sun6i_vchan), GFP_KERNEL);
- 	if (!sdc->vchans)
- 		return -ENOMEM;
- 
- 	tasklet_init(&sdc->task, sun6i_dma_tasklet, (unsigned long)sdc);
- 
--	for (i = 0; i < sdc->cfg->nr_max_channels; i++) {
-+	for (i = 0; i < sdc->num_pchans; i++) {
- 		struct sun6i_pchan *pchan = &sdc->pchans[i];
- 
- 		pchan->idx = i;
- 		pchan->base = sdc->base + 0x100 + i * 0x40;
- 	}
- 
--	for (i = 0; i < sdc->cfg->nr_max_vchans; i++) {
-+	for (i = 0; i < sdc->num_vchans; i++) {
- 		struct sun6i_vchan *vchan = &sdc->vchans[i];
- 
- 		INIT_LIST_HEAD(&vchan->node);
 -- 
 2.14.1
