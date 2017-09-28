@@ -1,43 +1,35 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 28 Sep 2017 15:09:21 +0300
-Subject: [PATCH v2 13/17] media: v4l2-async: simplify v4l2_async_subdev
- structure
-In-Reply-To: <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
-References: <cover.1506548682.git.mchehab@s-opensource.com>
- <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
-Message-ID: <20170928120920.ywgbtikkrts25qlj@valkosipuli.retiisi.org.uk>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 28 Sep 2017 14:22:03 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable USB3503 driver
+In-Reply-To: <20170928104351.GE6726@otheros>
+References: <20170928024022.2071-1-linus.luessing@c0d3.blue>
+ <CAJKOXPfQ3nXHVYXUn0iDfzVQc+ML1sSCz3NG_bwUw=WDK0id_w@mail.gmail.com>
+ <20170928104351.GE6726@otheros>
+Message-ID: <CAJKOXPeN+Rtseaz+szF6-QFqq2kRYPVEwy+t8NTqO6VyefUiJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+On Thu, Sep 28, 2017 at 12:43 PM, Linus L?ssing
+<linus.luessing@c0d3.blue> wrote:
+> Hi Krzysztof,
+>
+> Thanks for your quick reply!
+>
+> On Thu, Sep 28, 2017 at 08:21:26AM +0200, Krzysztof Kozlowski wrote:
+>> [...]
+>> Anyway please define this as a module (unless it can't... but it
+>> worked in my case).
+>
+> In that case you used an initrd, right? I see various cases of USB
+> built-ins, like CONFIG_USB_STORAGE=y, CONFIG_USB_DWC2=y and so on in
+> multi_v7_defconfig. So my impression was that multi_v7_defconfig was
+> supposed to allow booting a rootfs from a USB storage device even
+> without an initrd.
 
-On Wed, Sep 27, 2017 at 06:46:56PM -0300, Mauro Carvalho Chehab wrote:
-> The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
-> struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
-> match criteria requires just a device name.
-> 
-> So, it doesn't make sense to enclose those into structs,
-> as the criteria can go directly into the union.
-> 
-> That makes easier to document it, as we don't need to document
-> weird senseless structs.
+We use modules for multi_v7 as much as possible with that exception as
+fair as I remember - no need of initramfs/initrd for boots. If this is
+your intention, please mention this in commit message ("using usb3503
+as builtin to provide boot from USB without initrd/initramfs").
 
-The idea is that in the union, there's a struct which is specific to the
-match_type field. I wouldn't call it senseless.
-
-In the two cases there's just a single field in the containing struct. You
-could remove the struct in that case as you do in this patch, and just use
-the field. But I think the result is less clean and so I wouldn't make this
-change.
-
-The confusion comes possibly from the fact that the struct is named the
-same as the field in the struct. These used to be called of and node, but
-with the fwnode property framework the references to the fwnode are, well,
-typically similarly called "fwnode". There's no underlying firmware
-interface with that name, fwnode property API is just an API.
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Best regards,
+Krzysztof
