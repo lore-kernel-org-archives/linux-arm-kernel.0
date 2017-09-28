@@ -1,68 +1,75 @@
-From: yehuday@marvell.com (Yehuda Yitschak)
-Date: Thu, 28 Sep 2017 13:18:40 +0000
-Subject: [EXT] [PATCH 1/2] arm64: dts: marvell: fix interrupt-map property
- for Armada CP110 master PCIe controller
-In-Reply-To: <20170928145647.35f21186@windsurf.lan>
-References: <20170928124550.11492-1-thomas.petazzoni@free-electrons.com>
- <20170928124550.11492-2-thomas.petazzoni@free-electrons.com>
- <2164f35d99974e1480790dac98be4a5d@IL-EXCH02.marvell.com>
- <20170928145647.35f21186@windsurf.lan>
-Message-ID: <bfd1e045ba7d4e82a3d9f00c913a1d14@IL-EXCH02.marvell.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 28 Sep 2017 14:11:46 +0100
+Subject: [PATCH v3 22/22] cpufreq: scmi: add support for fast frequency
+ switching
+In-Reply-To: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1506604306-20739-23-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes...but 
+The cpufreq core provides option for drivers to implement fast_switch
+callback which is invoked for frequency switching from interrupt context.
 
-That zero you removed is the "parent unit address" according to the "interrupt-map" documentation 
+This patch adds support for fast_switch callback in SCMI cpufreq driver
+by making use of polling based SCMI transfer. It also sets the flag
+fast_switch_possible.
 
-	parent unit address  - The unit address in the domain of the interrupt parent. The number of 32-bit
-			            cells required to specify this address is described by the #address-cells property of the node
-			           pointed to by the interrupt-parent field.
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm at vger.kernel.org
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/cpufreq/scmi-cpufreq.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Now,  the gic has #address-cells =  <0x1>
-And the icu has  #address-cells = <0x0>
-
-So when switching to ICU, the parent unit address was no longer needed and should have been removed 
-
-Best Regards
-
-Yehuda
-
-
-> -----Original Message-----
-> From: Thomas Petazzoni [mailto:thomas.petazzoni at free-electrons.com]
-> Sent: Thursday, September 28, 2017 15:57
-> To: Yehuda Yitschak
-> Cc: Jason Cooper; Andrew Lunn; Sebastian Hesselbarth; Gregory Clement;
-> Nadav Haklai; Hanna Hawa; Antoine Tenart; Miqu?l Raynal; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [EXT] [PATCH 1/2] arm64: dts: marvell: fix interrupt-map
-> property for Armada CP110 master PCIe controller
-> 
-> Hello,
-> 
-> On Thu, 28 Sep 2017 12:52:07 +0000, Yehuda Yitschak wrote:
-> 
-> > The initial version referenced the GIC interrupt controller.
-> > Maybe this issue was introduced during the switch to the ICU  ?
-> 
-> No, it was not introduced by the switch to the ICU. The switch to the ICU
-> looked like this:
-> 
-> -                       interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 34
-> IRQ_TYPE_LEVEL_HIGH>;
-> -                       interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR 24
-> IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupts = <ICU_GRP_NSR 24
-> + IRQ_TYPE_LEVEL_HIGH>;
-> 
-> As you can see there was already a bogus "0" after &gic.
-> 
-> Best regards,
-> 
-> Thomas
-> --
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+index bc5385638eb4..067a39bd5167 100644
+--- a/drivers/cpufreq/scmi-cpufreq.c
++++ b/drivers/cpufreq/scmi-cpufreq.c
+@@ -65,6 +65,19 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	return perf_ops->freq_set(handle, priv->domain_id, freq, false);
+ }
+ 
++static unsigned int scmi_cpufreq_fast_switch(struct cpufreq_policy *policy,
++					     unsigned int target_freq)
++{
++	struct scmi_data *priv = policy->driver_data;
++	struct scmi_perf_ops *perf_ops = handle->perf_ops;
++
++	if (!perf_ops->freq_set(handle, priv->domain_id,
++				target_freq * 1000, true))
++		return target_freq;
++
++	return 0;
++}
++
+ static int
+ scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
+ {
+@@ -168,6 +181,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	policy->cpuinfo.transition_latency = latency;
+ 
++	policy->fast_switch_possible = true;
+ 	return 0;
+ 
+ out_free_cpufreq_table:
+@@ -184,6 +198,7 @@ static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
+ {
+ 	struct scmi_data *priv = policy->driver_data;
+ 
++	policy->fast_switch_possible = false;
+ 	cpufreq_cooling_unregister(priv->cdev);
+ 	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
+ 	kfree(priv);
+@@ -227,6 +242,7 @@ static struct cpufreq_driver scmi_cpufreq_driver = {
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+ 	.attr	= cpufreq_generic_attr,
+ 	.target_index	= scmi_cpufreq_set_target,
++	.fast_switch	= scmi_cpufreq_fast_switch,
+ 	.get	= scmi_cpufreq_get_rate,
+ 	.init	= scmi_cpufreq_init,
+ 	.exit	= scmi_cpufreq_exit,
+-- 
+2.7.4
