@@ -1,46 +1,82 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 28 Sep 2017 11:16:38 +0800
-Subject: [PATCH] drm/rockchip: Fix memory leak in rockchip_drm_sys_resume()
-In-Reply-To: <20170927202709.ugbjyi3ktfjssiyp@art_vandelay>
-References: <20170927122642.18628-1-jeffy.chen@rock-chips.com>
- <20170927202709.ugbjyi3ktfjssiyp@art_vandelay>
-Message-ID: <59CC6996.2000402@rock-chips.com>
+From: rruigrok@codeaurora.org (Richard Ruigrok)
+Date: Wed, 27 Sep 2017 21:31:59 -0600
+Subject: ARM64: kernel panics in DABT in sys_msync path
+In-Reply-To: <38058a06-1c8a-015c-cb9d-1c1b17a1edf3@codeaurora.org>
+References: <20170924213622.75e7r3k56tgxlezh@yury-thinkpad>
+ <20170925105335.GA24042@arm.com>
+ <20170925140240.vl5mvbce5lb37dxe@yury-thinkpad>
+ <20170925190426.6prpcfn7lly26clm@yury-thinkpad>
+ <a3b714ae-97a5-8458-9bf7-140eeeebc4b9@codeaurora.org>
+ <20170926102324.GC8693@arm.com>
+ <547ed590-3ab4-cc11-cbea-f587541d2b08@codeaurora.org>
+ <20170926173112.GA16650@arm.com> <20170927155007.GA16211@arm.com>
+ <38058a06-1c8a-015c-cb9d-1c1b17a1edf3@codeaurora.org>
+Message-ID: <78816aa1-299c-6894-f426-f0dff4a41cee@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
 
-On 09/28/2017 04:27 AM, Sean Paul wrote:
->> >@@ -299,6 +300,7 @@ static int rockchip_drm_sys_resume(struct device *dev)
->> >
->> >  	priv = drm->dev_private;
->> >  	drm_atomic_helper_resume(drm, priv->state);
->> >+	drm_atomic_state_put(priv->state);
-> Won't this be freed for you eventually in commit_tail()?
+
+On 9/27/2017 12:00 PM, Richard Ruigrok wrote:
 >
-i think the drm_atomic_state_put in commit_tail is paired to the 
-drm_atomic_state_get in drm_atomic_helper_commit.
+> On 9/27/2017 9:50 AM, Will Deacon wrote:
+>> On Tue, Sep 26, 2017 at 06:31:12PM +0100, Will Deacon wrote:
+>>> On Tue, Sep 26, 2017 at 08:23:35AM -0600, Ruigrok, Richard wrote:
+>>>> On 9/26/2017 4:23 AM, Will Deacon wrote:
+>>>>> On Mon, Sep 25, 2017 at 01:54:57PM -0600, Ruigrok, Richard wrote:
+>>>>>> I also found this issue with kernels from 4.11 through 4.13.  In my tests, I
+>>>>>> found that it reproduces only with 4K page and Transparent Huge Pages. With 64K
+>>>>>> page I was not able to reproduce. RH also reported it here: https://
+>>>>>> bugzilla.redhat.com/show_bug.cgi?id=1491504 Linaro reported on the RPK kernel
+>>>>>> (4.12) on Centriq2400 and ThunderX
+>>>>>>  
+>>>>>>
+>>>>>> https://bugs.linaro.org/show_bug.cgi?id=3191
+>>>>>>
+>>>>>> https://bugs.linaro.org/show_bug.cgi?id=3068.
+>>>>> These two aren't the same bug (that's a forward progress issue that we're
+>>>>> currently working on). I don't have permission to look at the redhat one,
+>>>>> but is it just an RCU stall or actually the Oops reported by Yury?
+>>>>>
+>>>>>> I was able to bisect down to a specific commit.
+>>>>> I think we're chasing two different things here, so not sure I trust the
+>>>>> bisect!
+>>>>>
+>>>> The RCU stall is side effect.? The issue I'm seeing has the same stack
+>>>> trace and same stimulus (rwtest).? Following are the details.
+>>> FWIW, I think I've worked out what's going on here and I should have a patch
+>>> tomorrow.
+>> Diff below. I'm going to follow up with a separate thread about this,
+>> because the proper fix is going to be invasive. I'll keep you on cc.
+>>
+>> Out of curiosity: what version of GCC are you using to compile the kernel?
+> I'm using gcc-linaro-6.3.1-2017.02-x86_64_aarch64-linux-gnu
+> Thanks for the patch, test results to follow.
+> Richard
+With this change applied on v4.13, the LTP rwtest passed 50 iterations, it appears to solve the issue I was seeing.
+This kernel was built with 5.2.1,? I've also started using 6.3.1.? If you think it makes a difference I can test also with 6.3.1.
+Linux version 4.13.0-00002-g8540910-dirty (rruigrok at rruigrok-lnx) (gcc version 5.2.1 20151005 (Linaro GCC 5.2-2015.11-1)) #55 SMP PREEMPT Wed Sep 27 13:37:25 MDT 2017
 
-and the kmemleak shows(after a few suspend/resume):
+Richard
+>> Will
+>>
+>> --->8
+>>
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index bc4e92337d16..b46e54c2399b 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -401,7 +401,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+>>  /* Find an entry in the third-level page table. */
+>>  #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+>>  
+>> -#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
+>> +#define pte_offset_phys(dir,addr)	(pmd_page_paddr(READ_ONCE(*(dir))) + pte_index(addr) * sizeof(pte_t))
+>>  #define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
+>>  
+>>  #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
 
-     unreferenced object 0xffffffc0ce0fa400 (size 256):
-     ...
-       backtrace:
-         [<ffffffc00034a9a8>] __save_stack_trace+0x48/0x6c
-         [<ffffffc00034b088>] create_object+0x138/0x254
-         [<ffffffc0009d5504>] kmemleak_alloc+0x58/0x8c
-         [<ffffffc000345f78>] __kmalloc+0x1d4/0x2a0
-         [<ffffffc0006765bc>] usb_alloc_urb+0x30/0x60
-         [<ffffffbffc128598>] alloc_ctrl_urb+0x38/0x120 [btusb]
-         [<ffffffbffc129e7c>] btusb_send_frame+0x64/0xf8 [btusb]
-
-
-
-
-checking the current code, i saw only i915/intel_display.c has this 
-drm_atomic_state_put for the state allocated by 
-drm_atomic_helper_suspend(), there're many drivers missing that(or maybe 
-they free it in some other way?)
-
-> Sean
->
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
