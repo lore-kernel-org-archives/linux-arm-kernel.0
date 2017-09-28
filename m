@@ -1,92 +1,99 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Sep 2017 12:28:30 +0200
-Subject: [PATCH 0/3] Simple DVFS support for Allwinner A64 SoC
-In-Reply-To: <9b3aeb6cb155bb2f9a7cee438de82ccb@aosc.io>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Thu, 28 Sep 2017 18:42:39 +0800
+Subject: [PATCH 1/3] clk: sunxi-ng: add mux and pll notifiers for A64 CPU
+ clock
+In-Reply-To: <20170928102752.ceo54qccqakb4xyx@flea>
 References: <20170923001531.14285-1-icenowy@aosc.io>
- <20170925101027.lghnnll4h6inreqm@flea.home>
- <27EF78BD-6285-4D8D-AA65-8294D797E2FB@aosc.io>
- <20170925102744.qixfwlheeimemhcf@flea.home>
- <9b3aeb6cb155bb2f9a7cee438de82ccb@aosc.io>
-Message-ID: <20170928102830.uuicirbjb5q64vwz@flea>
+ <20170923001531.14285-2-icenowy@aosc.io>
+ <20170928102752.ceo54qccqakb4xyx@flea>
+Message-ID: <975c0c884d9a83faad6141df474a93af@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+? 2017-09-28 18:27?Maxime Ripard ???
+> Hi,
+> 
+> On Sat, Sep 23, 2017 at 12:15:29AM +0000, Icenowy Zheng wrote:
+>> The A64 PLL_CPU clock has the same instability if some factor changed
+>> without the PLL gated like other SoCs with sun6i-style CCU, e.g. A33,
+>> H3.
+>> 
+>> Add the mux and pll notifiers for A64 CPU clock to workaround the
+>> problem.
+>> 
+>> Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 28 
+>> +++++++++++++++++++++++++++-
+>>  1 file changed, 27 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c 
+>> b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+>> index 2bb4cabf802f..b55fa69dd0c1 100644
+>> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+>> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+>> @@ -879,11 +879,26 @@ static const struct sunxi_ccu_desc 
+>> sun50i_a64_ccu_desc = {
+>>  	.num_resets	= ARRAY_SIZE(sun50i_a64_ccu_resets),
+>>  };
+>> 
+>> +static struct ccu_pll_nb sun50i_a64_pll_cpu_nb = {
+>> +	.common	= &pll_cpux_clk.common,
+>> +	/* copy from pll_cpux_clk */
+>> +	.enable	= BIT(31),
+>> +	.lock	= BIT(28),
+>> +};
+>> +
+>> +static struct ccu_mux_nb sun50i_a64_cpu_nb = {
+>> +	.common		= &cpux_clk.common,
+>> +	.cm		= &cpux_clk.mux,
+>> +	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
+>> +	.bypass_index	= 1, /* index of 24 MHz oscillator */
+>> +};
+>> +
+>> 
+>>  static int sun50i_a64_ccu_probe(struct platform_device *pdev)
+>>  {
+>>  	struct resource *res;
+>>  	void __iomem *reg;
+>>  	u32 val;
+>> +	int ret;
+>> 
+>>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>  	reg = devm_ioremap_resource(&pdev->dev, res);
+>> @@ -897,7 +912,18 @@ static int sun50i_a64_ccu_probe(struct 
+>> platform_device *pdev)
+>> 
+>>  	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
+>> 
+>> -	return sunxi_ccu_probe(pdev->dev.of_node, reg, 
+>> &sun50i_a64_ccu_desc);
+>> +	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun50i_a64_ccu_desc);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/* Gate then ungate PLL CPU after any rate changes */
+>> +	ccu_pll_notifier_register(&sun50i_a64_pll_cpu_nb);
+>> +
+>> +	/* Reparent CPU during PLL CPU rate changes */
+>> +	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
+>> +				  &sun50i_a64_cpu_nb);
+>> +
+>> +	return 0;
+> 
+> So this is the fourth user of the exact same code, can you turn that
+> into a shared function?
 
-On Wed, Sep 27, 2017 at 11:51:30AM +0000, icenowy at aosc.io wrote:
-> ? 2017-09-25 18:27?Maxime Ripard ???
-> > On Mon, Sep 25, 2017 at 10:12:09AM +0000, Icenowy Zheng wrote:
-> > > ? 2017?9?25? GMT+08:00 ??6:10:27, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> ??:
-> > > >Hi,
-> > > >
-> > > >On Sat, Sep 23, 2017 at 12:15:28AM +0000, Icenowy Zheng wrote:
-> > > >> This patchset imports simple DVFS support for Allwinner A64 SoC.
-> > > >>
-> > > >> As the thermal sensor driver is not yet implemented and some boards
-> > > >> have still no AXP PMIC support, now only two OPPs are present --
-> > > >> 648MHz at 1.04V and 816MHz at 1.1V to prevent overheat or undervoltage.
-> > > >>
-> > > >> PATCH 1 is a fix to the CCU driver of A64, and the remaining patches
-> > > >> set up the device tree bits of the DVFS on Pine64.
-> > > >
-> > > >How has this been tested?
-> > > >
-> > > >What tasks did you run, with what governor, etc...
-> > > 
-> > > I only tested manual frequency switching between 648MHz and
-> > > 816MHz, and tested the PLL stuck issue by change the OPPs to
-> > > some random value.
-> > 
-> > Ideally, we should test that it's actually reliable. Poorly chosen
-> > OPPs might lead to corrupt data that you might not get before a while.
-> > 
-> > Please test using:
-> > https://linux-sunxi.org/Hardware_Reliability_Tests#Reliability_of_cpufreq_voltage.2Ffrequency_settings
-> > 
-> > And post the report.
-> 
-> ```
-> root at p64 [ cpuburn-arm at master ] # ./cpuburn-a53 &
-> [1] 2543
-> root at p64 [ cpuburn-arm at master ] # ./cpufreq-ljt-stress-test
-> Creating './whitenoise-1920x1080.jpg' ... done
-> CPU stress test, which is doing JPEG decoding by libjpeg-turbo
-> at different cpufreq operating points.
-> 
-> Testing CPU 0
->   816 MHz ............................................................ OK
->   648 MHz ............................................................ OK
-> 
-> Testing CPU 1
->   816 MHz ............................................................ OK
->   648 MHz ............................................................ OK
-> 
-> Testing CPU 2
->   816 MHz ............................................................ OK
->   648 MHz ............................................................ OK
-> 
-> Testing CPU 3
->   816 MHz ............................................................ OK
->   648 MHz ............................................................ OK
-> 
-> Overall result : PASSED
-> ```
+I think it's not so worthful to extract the code, as:
+- the notifier structs contains info of the clocks
+- A31 seems not to need the PLL notifier.
 
-Great, thanks!
-
-Can you put that in your cover letter for the next version?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170928/065a9cb9/attachment.sig>
+> 
+> Thanks!
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
