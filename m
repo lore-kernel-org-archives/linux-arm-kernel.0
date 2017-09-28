@@ -1,114 +1,182 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Sep 2017 16:20:50 +0200
-Subject: [PATCH 1/3] clk: sunxi-ng: add mux and pll notifiers for A64 CPU
- clock
-In-Reply-To: <975c0c884d9a83faad6141df474a93af@aosc.io>
-References: <20170923001531.14285-1-icenowy@aosc.io>
- <20170923001531.14285-2-icenowy@aosc.io>
- <20170928102752.ceo54qccqakb4xyx@flea>
- <975c0c884d9a83faad6141df474a93af@aosc.io>
-Message-ID: <20170928142050.gkbdqlwpfjmpdlg3@flea>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 Sep 2017 15:22:12 +0100
+Subject: [PATCH v2 16/28] arm64/sve: Probe SVE capabilities and usable
+ vector lengths
+In-Reply-To: <87fubpaa1o.fsf@linaro.org>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-17-git-send-email-Dave.Martin@arm.com>
+ <87fubpaa1o.fsf@linaro.org>
+Message-ID: <20170928142212.GB3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 10:42:39AM +0000, icenowy at aosc.io wrote:
-> > On Sat, Sep 23, 2017 at 12:15:29AM +0000, Icenowy Zheng wrote:
-> > > The A64 PLL_CPU clock has the same instability if some factor changed
-> > > without the PLL gated like other SoCs with sun6i-style CCU, e.g. A33,
-> > > H3.
-> > > 
-> > > Add the mux and pll notifiers for A64 CPU clock to workaround the
-> > > problem.
-> > > 
-> > > Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > ---
-> > >  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 28
-> > > +++++++++++++++++++++++++++-
-> > >  1 file changed, 27 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> > > b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> > > index 2bb4cabf802f..b55fa69dd0c1 100644
-> > > --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> > > +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> > > @@ -879,11 +879,26 @@ static const struct sunxi_ccu_desc
-> > > sun50i_a64_ccu_desc = {
-> > >  	.num_resets	= ARRAY_SIZE(sun50i_a64_ccu_resets),
-> > >  };
-> > > 
-> > > +static struct ccu_pll_nb sun50i_a64_pll_cpu_nb = {
-> > > +	.common	= &pll_cpux_clk.common,
-> > > +	/* copy from pll_cpux_clk */
-> > > +	.enable	= BIT(31),
-> > > +	.lock	= BIT(28),
-> > > +};
-> > > +
-> > > +static struct ccu_mux_nb sun50i_a64_cpu_nb = {
-> > > +	.common		= &cpux_clk.common,
-> > > +	.cm		= &cpux_clk.mux,
-> > > +	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
-> > > +	.bypass_index	= 1, /* index of 24 MHz oscillator */
-> > > +};
-> > > +
-> > > 
-> > >  static int sun50i_a64_ccu_probe(struct platform_device *pdev)
-> > >  {
-> > >  	struct resource *res;
-> > >  	void __iomem *reg;
-> > >  	u32 val;
-> > > +	int ret;
-> > > 
-> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > >  	reg = devm_ioremap_resource(&pdev->dev, res);
-> > > @@ -897,7 +912,18 @@ static int sun50i_a64_ccu_probe(struct
-> > > platform_device *pdev)
-> > > 
-> > >  	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
-> > > 
-> > > -	return sunxi_ccu_probe(pdev->dev.of_node, reg,
-> > > &sun50i_a64_ccu_desc);
-> > > +	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun50i_a64_ccu_desc);
-> > > +	if (ret)
-> > > +		return ret;
-> > > +
-> > > +	/* Gate then ungate PLL CPU after any rate changes */
-> > > +	ccu_pll_notifier_register(&sun50i_a64_pll_cpu_nb);
-> > > +
-> > > +	/* Reparent CPU during PLL CPU rate changes */
-> > > +	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
-> > > +				  &sun50i_a64_cpu_nb);
-> > > +
-> > > +	return 0;
-> > 
-> > So this is the fourth user of the exact same code, can you turn that
-> > into a shared function?
+On Thu, Sep 14, 2017 at 10:45:07AM +0100, Alex Benn?e wrote:
 > 
-> I think it's not so worthful to extract the code, as:
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > This patch uses the cpufeatures framework to determine common SVE
+> > capabilities and vector lengths, and configures the runtime SVE
+> > support code appropriately.
+> >
+> > ZCR_ELx is not really a feature register, but it is convenient to
+> > use it as a template for recording the maximum vector length
+> > supported by a CPU, using the LEN field.  This field is similar to
+> > a feature field in that it is a contiguous bitfield for which we
+> > want to determine the minimum system-wide value.  This patch adds
+> > ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
+> > custom code to populate it.  Finding the minimum supported value of
+> > the LEN field is left to the cpufeatures framework in the usual
+> > way.
+> >
+> > The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
+> > so for now we just require it to be zero.
+> >
+> > Note that much of this code is dormant and SVE still won't be used
+> > yet, since system_supports_sve() remains hardwired to false.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> > Cc: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+> >
+> > ---
+> >
+> > Changes since v1
+> > ----------------
+> >
+> > Requested by Alex Benn?e:
+> >
+> > * Thin out BUG_ON()s:
+> > Redundant BUG_ON()s and ones that just check invariants are removed.
+> > Important sanity-checks are migrated to WARN_ON()s, with some
+> > minimal best-effort patch-up code.
+> >
+> > Other changes related to Alex Benn?e's comments:
+> >
+> > * Migrate away from magic numbers for converting VL to VQ.
+> >
+> > Requested by Suzuki Poulose:
+> >
+> > * Make sve_vq_map __ro_after_init.
+> >
+> > Other changes related to Suzuki Poulose's comments:
+> >
+> > * Rely on cpufeatures for not attempting to update the vq map after boot.
+> > ---
+> >  arch/arm64/include/asm/cpu.h        |   4 ++
+> >  arch/arm64/include/asm/cpufeature.h |  29 ++++++++++
+> >  arch/arm64/include/asm/fpsimd.h     |  10 ++++
+> >  arch/arm64/kernel/cpufeature.c      |  50 +++++++++++++++++
+> >  arch/arm64/kernel/cpuinfo.c         |   6 ++
+> >  arch/arm64/kernel/fpsimd.c          | 106 +++++++++++++++++++++++++++++++++++-
+> >  6 files changed, 202 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+> > index 889226b..8839227 100644
+> > --- a/arch/arm64/include/asm/cpu.h
+> > +++ b/arch/arm64/include/asm/cpu.h
+> > @@ -41,6 +41,7 @@ struct cpuinfo_arm64 {
+> >  	u64		reg_id_aa64mmfr2;
+> >  	u64		reg_id_aa64pfr0;
+> >  	u64		reg_id_aa64pfr1;
+> > +	u64		reg_id_aa64zfr0;
+> >
+> >  	u32		reg_id_dfr0;
+> >  	u32		reg_id_isar0;
+> > @@ -59,6 +60,9 @@ struct cpuinfo_arm64 {
+> >  	u32		reg_mvfr0;
+> >  	u32		reg_mvfr1;
+> >  	u32		reg_mvfr2;
+> > +
+> > +	/* pseudo-ZCR for recording maximum ZCR_EL1 LEN value: */
+> > +	u64		reg_zcr;
+> >  };
+> >
+> >  DECLARE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+> > diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> > index 4ea3441..d98e7ba 100644
+> > --- a/arch/arm64/include/asm/cpufeature.h
+> > +++ b/arch/arm64/include/asm/cpufeature.h
+> > @@ -10,7 +10,9 @@
+> >  #define __ASM_CPUFEATURE_H
+> >
+> >  #include <asm/cpucaps.h>
+> > +#include <asm/fpsimd.h>
+> >  #include <asm/hwcap.h>
+> > +#include <asm/sigcontext.h>
+> >  #include <asm/sysreg.h>
+> >
+> >  /*
+> > @@ -223,6 +225,13 @@ static inline bool id_aa64pfr0_32bit_el0(u64 pfr0)
+> >  	return val == ID_AA64PFR0_EL0_32BIT_64BIT;
+> >  }
+> >
+> > +static inline bool id_aa64pfr0_sve(u64 pfr0)
+> > +{
+> > +	u32 val = cpuid_feature_extract_unsigned_field(pfr0, ID_AA64PFR0_SVE_SHIFT);
+> > +
+> > +	return val > 0;
+> > +}
+> > +
+> >  void __init setup_cpu_features(void);
+> >
+> >  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+> > @@ -267,6 +276,26 @@ static inline bool system_supports_sve(void)
+> >  	return false;
+> >  }
+> >
+> > +/*
+> > + * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
+> > + * vector length.
+> > + * Use only if SVE is present.  This function clobbers the SVE vector length.
+> > + */
+> 
+> :nit whitespace formatting.
 
-It does, because the order is important. If you do not register the
-notifiers in the right order, you have a bug, and:
+I'll add some newlines now to make this cleaner.
 
-> - the notifier structs contains info of the clocks
+/*
+ * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
+ * vector length.
+ *
+ * Use only if SVE is present.
+ * This function clobbers the SVE vector length.
+ */
 
-this should be passed as a parameter anyway,
+OK?
 
-> - A31 seems not to need the PLL notifier.
+> 
+> > +static u64 __maybe_unused read_zcr_features(void)
+> > +{
+> > +	u64 zcr;
+> > +	unsigned int vq_max;
+> > +
+> > +	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
+> 
+> I'm confused, why are we writing something here? You mention clobbering
+> the SVE vector length but what was the point?
 
-And you don't care about the ordering in that case, since there's just
-one. If was talking about the H3, A64, R40 and A33 that all have that
-code.
+Hmm, this deserves a comment -- coming back to this code, I had to think
+about it.  Are the following extra comments sufficient explanation?
 
-Maxime
+	/*
+	 * Set the maximum possible VL, and write zeroes to all other
+	 * bits to see if they stick.
+	 */
+	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170928/d10bc7f2/attachment.sig>
+	zcr = read_sysreg_s(SYS_ZCR_EL1);
+	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* flag up sticky 1s outside LEN field */
+	vq_max = sve_vq_from_vl(sve_get_vl());
+	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
+
+
+[...]
+
+> Otherwise:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+I'll wait on your responses to the above first.
+
+Cheers
+---Dave
