@@ -1,128 +1,48 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 29 Sep 2017 00:25:43 +0300
-Subject: [PATCH v3 3/5] media: atmel-isc: Enable the clocks during probe
-In-Reply-To: <20170928081828.20335-4-wenyou.yang@microchip.com>
-References: <20170928081828.20335-1-wenyou.yang@microchip.com>
- <20170928081828.20335-4-wenyou.yang@microchip.com>
-Message-ID: <20170928212543.sltvd4rgswfowtcd@valkosipuli.retiisi.org.uk>
+From: kalyan.kinthada@alliedtelesis.co.nz (Kalyan Kinthada)
+Date: Fri, 29 Sep 2017 10:36:04 +1300
+Subject: [PATCH v2 1/2] ARM: dts: Fix I2C repeated start issue on Armada-38x
+In-Reply-To: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+Message-ID: <20170928213605.22874-2-kalyan.kinthada@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
+All the Armada 38x(380, 385, 388) have a silicon issue in
+the I2C controller which violates the I2C repeated start timing
+(errata FE-8471889).
 
-On Thu, Sep 28, 2017 at 04:18:26PM +0800, Wenyou Yang wrote:
-> To meet the relationship, enable the HCLOCK and ispck during the
-> device probe, "isc_pck frequency is less than or equal to isc_ispck,
-> and isc_ispck is greater than or equal to HCLOCK."
-> Meanwhile, call the pm_runtime_enable() in the right place.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
-> ---
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
->  1 file changed, 25 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-> index 0b15dc1a3a0b..f092c95587c1 100644
-> --- a/drivers/media/platform/atmel/atmel-isc.c
-> +++ b/drivers/media/platform/atmel/atmel-isc.c
-> @@ -1594,6 +1594,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
->  	struct isc_subdev_entity *sd_entity;
->  	struct video_device *vdev = &isc->video_dev;
->  	struct vb2_queue *q = &isc->vb2_vidq;
-> +	struct device *dev = isc->dev;
->  	int ret;
->  
->  	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
-> @@ -1677,6 +1678,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
->  		return ret;
->  	}
->  
-> +	pm_runtime_set_active(dev);
-> +	pm_runtime_enable(dev);
-> +	pm_request_idle(dev);
+i2c-mv64xxx driver handles this errata based on the compatible string
+"marvell,mv78230-a0-i2c".
 
-Remember that the driver's async complete function could never get called.
+This patch activates the "marvell,mv78230-a0-i2c" compatible string
+for the I2C controller on armada-38x SoC based devices.
 
-What would be the reason to move it here?
+Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +
->  	return 0;
->  }
->  
-> @@ -1856,25 +1861,37 @@ static int atmel_isc_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	ret = clk_prepare_enable(isc->hclock);
-> +	if (ret) {
-> +		dev_err(dev, "failed to enable hclock: %d\n", ret);
-> +		return ret;
-> +	}
-> +
->  	ret = isc_clk_init(isc);
->  	if (ret) {
->  		dev_err(dev, "failed to init isc clock: %d\n", ret);
-> -		goto clean_isc_clk;
-> +		goto unprepare_hclk;
->  	}
->  
->  	isc->ispck = isc->isc_clks[ISC_ISPCK].clk;
->  
-> +	ret = clk_prepare_enable(isc->ispck);
-> +	if (ret) {
-> +		dev_err(dev, "failed to enable ispck: %d\n", ret);
-> +		goto unprepare_hclk;
-> +	}
-> +
->  	/* ispck should be greater or equal to hclock */
->  	ret = clk_set_rate(isc->ispck, clk_get_rate(isc->hclock));
->  	if (ret) {
->  		dev_err(dev, "failed to set ispck rate: %d\n", ret);
-> -		goto clean_isc_clk;
-> +		goto unprepare_clk;
->  	}
->  
->  	ret = v4l2_device_register(dev, &isc->v4l2_dev);
->  	if (ret) {
->  		dev_err(dev, "unable to register v4l2 device.\n");
-> -		goto clean_isc_clk;
-> +		goto unprepare_clk;
->  	}
->  
->  	ret = isc_parse_dt(dev, isc);
-> @@ -1907,8 +1924,6 @@ static int atmel_isc_probe(struct platform_device *pdev)
->  			break;
->  	}
->  
-> -	pm_runtime_enable(dev);
-> -
->  	return 0;
->  
->  cleanup_subdev:
-> @@ -1917,7 +1932,11 @@ static int atmel_isc_probe(struct platform_device *pdev)
->  unregister_v4l2_device:
->  	v4l2_device_unregister(&isc->v4l2_dev);
->  
-> -clean_isc_clk:
-> +unprepare_clk:
-> +	clk_disable_unprepare(isc->ispck);
-> +unprepare_hclk:
-> +	clk_disable_unprepare(isc->hclock);
-
-I think you're missing clk_disable_unprepare() in the driver's remove
-callback.
-
-> +
->  	isc_clk_cleanup(isc);
->  
->  	return ret;
-
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 7ff0811e61db..4960722aab32 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -178,7 +178,7 @@
+ 			};
+ 
+ 			i2c0: i2c at 11000 {
+-				compatible = "marvell,mv64xxx-i2c";
++				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+ 				reg = <0x11000 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+@@ -189,7 +189,7 @@
+ 			};
+ 
+ 			i2c1: i2c at 11100 {
+-				compatible = "marvell,mv64xxx-i2c";
++				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+ 				reg = <0x11100 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+2.14.1
