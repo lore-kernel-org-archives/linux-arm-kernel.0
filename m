@@ -1,44 +1,39 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 28 Sep 2017 09:37:08 +0200
-Subject: [PATCH v6 05/11] dt-bindings: net: dwmac-sun8i: update
- documentation about integrated PHY
-In-Reply-To: <20170927140210.GE13516@lunn.ch>
-References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
- <20170927073414.17361-6-clabbe.montjoie@gmail.com>
- <20170927140210.GE13516@lunn.ch>
-Message-ID: <20170928073708.GB32676@Red>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 28 Sep 2017 17:21:41 +0930
+Subject: [PATCH 0/8] ARM: dts: aspeed: Device tree updates
+Message-ID: <20170928075149.8154-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 04:02:10PM +0200, Andrew Lunn wrote:
-> Hi Corentin
-> 
-> > +Required properties for the mdio-mux node:
-> > +  - compatible = "mdio-mux"
-> 
-> This is too generic. Please add a more specific compatible for this
-> particular mux. You can keep "mdio-mux", since that is what the MDIO
-> subsystem will look for.
-> 
+This series adds support for the i2c buses and vuart in the ASPEED device
+trees, as well as making a few cleanups.
 
-I will add allwinner,sun8i-h3-mdio-mux
+I will merge these into my Aspeed devicetree tree once they have some acks.
 
-> > +Required properties of the integrated phy node:
-> >  - clocks: a phandle to the reference clock for the EPHY
-> >  - resets: a phandle to the reset control for the EPHY
-> > +- phy-is-integrated
-> 
-> So the last thing you said is that the mux is not the problem
-> here. Something else is locking up. Did you discover what?
-> 
-> I really would like phy-is-integrated to go away.
-> 
+I have a second series ready to go as soon as our clk driver is merged.
 
-I have found the problem: by enabling ephy clk/reset the timeout does not occur anymore.
-So we could remove phy-is-integrated by:
-Moving internal phy clk/reset handling in mdio_mux_syscon_switch_fn()
-But this means:
-- getting internalphy node always by manually get internal_mdio/internal_phy (and not by the given phyhandle)
-- doing some unnecessary tasks (enable/scan/disable) when external_phy is needed
+Cheers,
 
-Regards
+Joel
+
+Andrew Jeffery (1):
+  ARM: dts: aspeed: Move pinctrl subnodes to improve readability
+
+Joel Stanley (7):
+  ARM: dts: aspeed: Reorder ADC node
+  ARM: dts: aspeed: Add I2C buses
+  ARM: dts: aspeed-romulus: Add I2C devices
+  ARM: dts: aspeed-palmetto: Add I2C devices
+  ARM: dts: aspeed-ast2500: Add I2C devices
+  ARM: dts: aspeed: Add aliases for UARTs
+  ARM: dts: aspeed: Clean up UART nodes
+
+ arch/arm/boot/dts/aspeed-ast2500-evb.dts      |   19 +
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |   52 +-
+ arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts  |   54 +
+ arch/arm/boot/dts/aspeed-g4.dtsi              | 1773 +++++++++++++-----------
+ arch/arm/boot/dts/aspeed-g5.dtsi              | 1810 ++++++++++++++-----------
+ 5 files changed, 2176 insertions(+), 1532 deletions(-)
+
+-- 
+2.14.1
