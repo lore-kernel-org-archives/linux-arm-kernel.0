@@ -1,246 +1,151 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Thu, 28 Sep 2017 21:04:06 +0300
-Subject: [PATCH v1 09/14] tee: optee: add registered buffers handling into RPC
- calls
+Date: Thu, 28 Sep 2017 21:04:09 +0300
+Subject: [PATCH v1 12/14] tee: optee: enable dynamic SHM support
 In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1506621851-6929-10-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1506621851-6929-13-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-With latest changes to OP-TEE we can use any buffers as a shared memory.
-Thus, it is possible for supplicant to provide part of own memory
-when OP-TEE asks to allocate a shared buffer.
+Previous patches added various features that are needed for dynamic SHM.
+Dynamic SHM allows Normal World to share any buffers with OP-TEE.
+While original design suggested to use pre-allocated region (usually of
+1M to 2M of size), this new approach allows to use all non-secure RAM for
+command buffers, RPC allocations and TA parameters.
 
-This patch adds support for such feature into RPC handling code.
-Now when OP-TEE asks supplicant to allocate shared buffer, supplicant
-can use TEE_IOC_SHM_REGISTER to provide such buffer. RPC handler is
-aware of this, so it will pass list of allocated pages to OP-TEE.
+This patch checks capability OPTEE_SMC_SEC_CAP_DYNAMIC_SHM. If it was set
+by OP-TEE, then kernel part of OP-TEE will use kernel page allocator
+to allocate command buffers. Also it will set TEE_GEN_CAP_REG_MEM
+capability to tell userspace that it supports shared memory registration.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/call.c          | 19 ++++++++++-
- drivers/tee/optee/core.c          |  2 ++
- drivers/tee/optee/optee_private.h | 15 +++++++-
- drivers/tee/optee/rpc.c           | 72 ++++++++++++++++++++++++++++++++++-----
- 4 files changed, 97 insertions(+), 11 deletions(-)
+ drivers/tee/optee/core.c | 69 +++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 51 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-index ec53dca..7702991 100644
---- a/drivers/tee/optee/call.c
-+++ b/drivers/tee/optee/call.c
-@@ -136,6 +136,7 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
- 	struct optee *optee = tee_get_drvdata(ctx->teedev);
- 	struct optee_call_waiter w;
- 	struct optee_rpc_param param = { };
-+	struct optee_call_ctx call_ctx = { };
- 	u32 ret;
- 
- 	param.a0 = OPTEE_SMC_CALL_WITH_ARG;
-@@ -160,13 +161,14 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
- 			param.a1 = res.a1;
- 			param.a2 = res.a2;
- 			param.a3 = res.a3;
--			optee_handle_rpc(ctx, &param);
-+			optee_handle_rpc(ctx, &param, &call_ctx);
- 		} else {
- 			ret = res.a0;
- 			break;
- 		}
- 	}
- 
-+	optee_rpc_finalize_call(&call_ctx);
- 	/*
- 	 * We're done with our thread in secure world, if there's any
- 	 * thread waiters wake up one.
-@@ -554,3 +556,18 @@ int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
- 	tee_shm_free(shm_arg);
- 	return rc;
- }
-+
-+int optee_shm_register_supp(struct tee_context *ctx, struct tee_shm *shm,
-+			    struct page **pages, size_t num_pages)
-+{
-+	/*
-+	 * We don't want to register supplicant memory in OP-TEE.
-+	 * Instead information about it will be passed in RPC code.
-+	 */
-+	return 0;
-+}
-+
-+int optee_shm_unregister_supp(struct tee_context *ctx, struct tee_shm *shm)
-+{
-+	return 0;
-+}
 diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index a962f60..9883592 100644
+index 8e012ea..e8fd9af 100644
 --- a/drivers/tee/optee/core.c
 +++ b/drivers/tee/optee/core.c
-@@ -339,6 +339,8 @@ static const struct tee_driver_ops optee_supp_ops = {
- 	.release = optee_release,
- 	.supp_recv = optee_supp_recv,
- 	.supp_send = optee_supp_send,
-+	.shm_register = optee_shm_register_supp,
-+	.shm_unregister = optee_shm_unregister_supp,
- };
+@@ -28,6 +28,7 @@
+ #include <linux/uaccess.h>
+ #include "optee_private.h"
+ #include "optee_smc.h"
++#include "shm_pool.h"
  
- static const struct tee_desc optee_supp_desc = {
-diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-index 3ea7f7a..dfe1158 100644
---- a/drivers/tee/optee/optee_private.h
-+++ b/drivers/tee/optee/optee_private.h
-@@ -130,7 +130,16 @@ struct optee_rpc_param {
- 	u32	a7;
- };
+ #define DRIVER_NAME "optee"
  
--void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param);
-+/* Holds context that is preserved during one STD call */
-+struct optee_call_ctx {
-+	/* information about page array used in last allocation */
-+	void *pages_array;
-+	size_t num_entries;
-+};
+@@ -227,6 +228,10 @@ static void optee_get_version(struct tee_device *teedev,
+ 		.impl_caps = TEE_OPTEE_CAP_TZ,
+ 		.gen_caps = TEE_GEN_CAP_GP,
+ 	};
++	struct optee *optee = tee_get_drvdata(teedev);
 +
-+void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param,
-+		      struct optee_call_ctx *call_ctx);
-+void optee_rpc_finalize_call(struct optee_call_ctx *call_ctx);
- 
- void optee_wait_queue_init(struct optee_wait_queue *wq);
- void optee_wait_queue_exit(struct optee_wait_queue *wq);
-@@ -164,6 +173,10 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
- 		       struct page **pages, size_t num_pages);
- int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm);
- 
-+int optee_shm_register_supp(struct tee_context *ctx, struct tee_shm *shm,
-+			    struct page **pages, size_t num_pages);
-+int optee_shm_unregister_supp(struct tee_context *ctx, struct tee_shm *shm);
-+
- int optee_from_msg_param(struct tee_param *params, size_t num_params,
- 			 const struct optee_msg_param *msg_params);
- int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
-diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
-index cef417f..1ff86bd 100644
---- a/drivers/tee/optee/rpc.c
-+++ b/drivers/tee/optee/rpc.c
-@@ -200,7 +200,8 @@ static struct tee_shm *cmd_alloc_suppl(struct tee_context *ctx, size_t sz)
++	if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
++		v.gen_caps |= TEE_GEN_CAP_REG_MEM;
+ 	*vers = v;
  }
  
- static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
--					  struct optee_msg_arg *arg)
-+					  struct optee_msg_arg *arg,
-+					  struct optee_call_ctx *call_ctx)
+@@ -405,21 +410,22 @@ static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
+ }
+ 
+ static struct tee_shm_pool *
+-optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
++optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm,
++			  u32 sec_caps)
  {
- 	phys_addr_t pa;
- 	struct tee_shm *shm;
-@@ -245,10 +246,44 @@ static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
- 		goto bad;
+ 	union {
+ 		struct arm_smccc_res smccc;
+ 		struct optee_smc_get_shm_config_result result;
+ 	} res;
+-	struct tee_shm_pool *pool;
+ 	unsigned long vaddr;
+ 	phys_addr_t paddr;
+ 	size_t size;
+ 	phys_addr_t begin;
+ 	phys_addr_t end;
+ 	void *va;
+-	struct tee_shm_pool_mem_info priv_info;
+-	struct tee_shm_pool_mem_info dmabuf_info;
++	struct tee_shm_pool_mgr *priv_mgr;
++	struct tee_shm_pool_mgr *dmabuf_mgr;
++	void *rc;
+ 
+ 	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res.smccc);
+ 	if (res.result.status != OPTEE_SMC_RETURN_OK) {
+@@ -449,22 +455,49 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
+ 	}
+ 	vaddr = (unsigned long)va;
+ 
+-	priv_info.vaddr = vaddr;
+-	priv_info.paddr = paddr;
+-	priv_info.size = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+-	dmabuf_info.vaddr = vaddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+-	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+-	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+-
+-	pool = tee_shm_pool_alloc_res_mem(&priv_info, &dmabuf_info);
+-	if (IS_ERR(pool)) {
+-		memunmap(va);
+-		goto out;
++	/*
++	 * If OP-TEE can work with unregistered SHM, we will use own pool
++	 * for private shm
++	 */
++	if (sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM) {
++		rc = optee_shm_pool_alloc_pages();
++		if (IS_ERR(rc))
++			goto err_memunmap;
++		priv_mgr = rc;
++	} else {
++		const size_t sz = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
++
++		rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, sz,
++						    3 /* 8 bytes aligned */);
++		if (IS_ERR(rc))
++			goto err_memunmap;
++		priv_mgr = rc;
++
++		vaddr += sz;
++		paddr += sz;
++		size -= sz;
  	}
  
--	arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT;
--	arg->params[0].u.tmem.buf_ptr = pa;
--	arg->params[0].u.tmem.size = sz;
--	arg->params[0].u.tmem.shm_ref = (unsigned long)shm;
-+	sz = tee_shm_get_size(shm);
++	rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, size, PAGE_SHIFT);
++	if (IS_ERR(rc))
++		goto err_free_priv_mgr;
++	dmabuf_mgr = rc;
 +
-+	if (tee_shm_is_registered(shm)) {
-+		struct page **pages;
-+		u64 *pages_array;
-+		size_t page_num;
++	rc = tee_shm_pool_alloc(priv_mgr, dmabuf_mgr);
++	if (IS_ERR(rc))
++		goto err_free_dmabuf_mgr;
 +
-+		pages = tee_shm_get_pages(shm, &page_num);
-+		if (!pages || !page_num) {
-+			arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
-+			goto bad;
-+		}
+ 	*memremaped_shm = va;
+-out:
+-	return pool;
 +
-+		pages_array = optee_allocate_pages_array(page_num);
-+		if (!pages_array) {
-+			arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
-+			goto bad;
-+		}
++	return rc;
 +
-+		call_ctx->pages_array = pages_array;
-+		call_ctx->num_entries = page_num;
-+
-+		arg->params[0].attr =  OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
-+				       OPTEE_MSG_ATTR_NONCONTIG;
-+		arg->params[0].u.tmem.buf_ptr = virt_to_phys(pages_array) +
-+						tee_shm_get_page_offset(shm);
-+
-+		arg->params[0].u.tmem.size = tee_shm_get_size(shm);
-+		arg->params[0].u.tmem.shm_ref = (unsigned long)shm;
-+
-+		optee_fill_pages_list(pages_array, pages, page_num);
-+	} else {
-+		arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT;
-+		arg->params[0].u.tmem.buf_ptr = pa;
-+		arg->params[0].u.tmem.size = sz;
-+		arg->params[0].u.tmem.shm_ref = (unsigned long)shm;
-+	}
-+
- 	arg->ret = TEEC_SUCCESS;
- 	return;
- bad:
-@@ -307,8 +342,24 @@ static void handle_rpc_func_cmd_shm_free(struct tee_context *ctx,
- 	arg->ret = TEEC_SUCCESS;
++err_free_dmabuf_mgr:
++	tee_shm_pool_mgr_destroy(dmabuf_mgr);
++err_free_priv_mgr:
++	tee_shm_pool_mgr_destroy(priv_mgr);
++err_memunmap:
++	memunmap(va);
++	return rc;
  }
  
-+static void free_page_array(struct optee_call_ctx *call_ctx)
-+{
-+	if (call_ctx->pages_array) {
-+		optee_free_pages_array(call_ctx->pages_array,
-+				       call_ctx->num_entries);
-+		call_ctx->pages_array = NULL;
-+		call_ctx->num_entries = 0;
-+	}
-+}
-+
-+void optee_rpc_finalize_call(struct optee_call_ctx *call_ctx)
-+{
-+	free_page_array(call_ctx);
-+}
-+
- static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
--				struct tee_shm *shm)
-+				struct tee_shm *shm,
-+				struct optee_call_ctx *call_ctx)
- {
- 	struct optee_msg_arg *arg;
+ /* Simple wrapper functions to be able to use a function pointer */
+@@ -542,7 +575,7 @@ static struct optee *optee_probe(struct device_node *np)
+ 	if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM))
+ 		return ERR_PTR(-EINVAL);
  
-@@ -329,7 +380,8 @@ static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
- 		handle_rpc_func_cmd_wait(arg);
- 		break;
- 	case OPTEE_MSG_RPC_CMD_SHM_ALLOC:
--		handle_rpc_func_cmd_shm_alloc(ctx, arg);
-+		free_page_array(call_ctx);
-+		handle_rpc_func_cmd_shm_alloc(ctx, arg, call_ctx);
- 		break;
- 	case OPTEE_MSG_RPC_CMD_SHM_FREE:
- 		handle_rpc_func_cmd_shm_free(ctx, arg);
-@@ -343,10 +395,12 @@ static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
-  * optee_handle_rpc() - handle RPC from secure world
-  * @ctx:	context doing the RPC
-  * @param:	value of registers for the RPC
-+ * @call_ctx:	call context. Preserved during one OP-TEE invocation
-  *
-  * Result of RPC is written back into @param.
-  */
--void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
-+void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param,
-+		      struct optee_call_ctx *call_ctx)
- {
- 	struct tee_device *teedev = ctx->teedev;
- 	struct optee *optee = tee_get_drvdata(teedev);
-@@ -381,7 +435,7 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
- 		break;
- 	case OPTEE_SMC_RPC_FUNC_CMD:
- 		shm = reg_pair_to_ptr(param->a1, param->a2);
--		handle_rpc_func_cmd(ctx, optee, shm);
-+		handle_rpc_func_cmd(ctx, optee, shm, call_ctx);
- 		break;
- 	default:
- 		pr_warn("Unknown RPC func 0x%x\n",
+-	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm);
++	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm, sec_caps);
+ 	if (IS_ERR(pool))
+ 		return (void *)pool;
+ 
 -- 
 2.7.4
