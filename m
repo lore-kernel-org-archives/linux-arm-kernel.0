@@ -1,51 +1,44 @@
-From: linus.luessing@c0d3.blue (Linus =?utf-8?Q?L=C3=BCssing?=)
-Date: Thu, 28 Sep 2017 09:10:54 +0200
-Subject: Build error for NVIDIA Tegra DRM since 4.14-rc1
-Message-ID: <20170928071054.GD6726@otheros>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 28 Sep 2017 09:37:08 +0200
+Subject: [PATCH v6 05/11] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <20170927140210.GE13516@lunn.ch>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+ <20170927073414.17361-6-clabbe.montjoie@gmail.com>
+ <20170927140210.GE13516@lunn.ch>
+Message-ID: <20170928073708.GB32676@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 27, 2017 at 04:02:10PM +0200, Andrew Lunn wrote:
+> Hi Corentin
+> 
+> > +Required properties for the mdio-mux node:
+> > +  - compatible = "mdio-mux"
+> 
+> This is too generic. Please add a more specific compatible for this
+> particular mux. You can keep "mdio-mux", since that is what the MDIO
+> subsystem will look for.
+> 
 
-Sorry, did not search for the exact commit yet, but since v4.14-rc1
-I get a build error when trying to build the ARM multi_v7_defconfig
-target:
+I will add allwinner,sun8i-h3-mdio-mux
 
-~~~~~~~~~~
-$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- LOADADDR=0x00208000 zImage uImage modules dtbs
-[...]
-  CHK     include/config/kernel.release
-  CHK     include/generated/uapi/linux/version.h
-  CHK     include/generated/utsrelease.h
-  CHK     include/generated/bounds.h
-  CHK     include/generated/timeconst.h
-  CHK     include/generated/asm-offsets.h
-  CALL    scripts/checksyscalls.sh
-  CHK     scripts/mod/devicetable-offsets.h
-  CHK     include/generated/compile.h
-  CHK     include/generated/at91_pm_data-offsets.h
-  CC      drivers/gpu/drm/tegra/trace.o
-In file included from drivers/gpu/drm/tegra/trace.h:68:0,
-                 from drivers/gpu/drm/tegra/trace.c:2:
-./include/trace/define_trace.h:88:42: fatal error: ./trace.h: No such file or directory
- #include TRACE_INCLUDE(TRACE_INCLUDE_FILE)
-                                          ^
-compilation terminated.
-scripts/Makefile.build:311: recipe for target 'drivers/gpu/drm/tegra/trace.o' failed
-make[4]: *** [drivers/gpu/drm/tegra/trace.o] Error 1
-scripts/Makefile.build:570: recipe for target 'drivers/gpu/drm/tegra' failed
-make[3]: *** [drivers/gpu/drm/tegra] Error 2
-scripts/Makefile.build:570: recipe for target 'drivers/gpu/drm' failed
-make[2]: *** [drivers/gpu/drm] Error 2
-scripts/Makefile.build:570: recipe for target 'drivers/gpu' failed
-make[1]: *** [drivers/gpu] Error 2
-Makefile:1019: recipe for target 'drivers' failed
-make: *** [drivers] Error 2
-~~~~~~~~~~
+> > +Required properties of the integrated phy node:
+> >  - clocks: a phandle to the reference clock for the EPHY
+> >  - resets: a phandle to the reset control for the EPHY
+> > +- phy-is-integrated
+> 
+> So the last thing you said is that the mux is not the problem
+> here. Something else is locking up. Did you discover what?
+> 
+> I really would like phy-is-integrated to go away.
+> 
 
-v4.14-rc2 fails, too. v4.13.2 and v4.13.3 worked fine with multi_v7_defconfig.
+I have found the problem: by enabling ephy clk/reset the timeout does not occur anymore.
+So we could remove phy-is-integrated by:
+Moving internal phy clk/reset handling in mdio_mux_syscon_switch_fn()
+But this means:
+- getting internalphy node always by manually get internal_mdio/internal_phy (and not by the given phyhandle)
+- doing some unnecessary tasks (enable/scan/disable) when external_phy is needed
 
-Setting CONFIG_DRM_TEGRA=n for v4.14-rc1 or v4.14-rc2 helps for
-the build to succeed, too.
-
-Regards, Linus
+Regards
