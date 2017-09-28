@@ -1,67 +1,226 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 27 Sep 2017 21:50:46 -0700
-Subject: [PATCH v6 11/11] of: mdio: Prevent of_mdiobus_register from
- scanning mdio-mux nodes
-In-Reply-To: <20170927141213.GF13516@lunn.ch>
+Date: Wed, 27 Sep 2017 21:53:15 -0700
+Subject: [PATCH v6 05/11] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <20170927073414.17361-6-clabbe.montjoie@gmail.com>
 References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
- <20170927073414.17361-12-clabbe.montjoie@gmail.com>
- <20170927141213.GF13516@lunn.ch>
-Message-ID: <c8697b60-294f-7cc1-8425-aa5b837fcca0@gmail.com>
+ <20170927073414.17361-6-clabbe.montjoie@gmail.com>
+Message-ID: <25e44368-2c07-9b7e-a0d3-a2a642286e5d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 09/27/2017 07:12 AM, Andrew Lunn wrote:
-> On Wed, Sep 27, 2017 at 09:34:14AM +0200, Corentin Labbe wrote:
->> Each child node of an MDIO node is scanned as a PHY when calling
->> of_mdiobus_register() givint the following result:
->> [   18.175379] mdio_bus stmmac-0: /soc/ethernet at 1c30000/mdio/mdio-mux has invalid PHY address
->> [   18.175408] mdio_bus stmmac-0: scan phy mdio-mux at address 0
->> [   18.175450] mdio_bus stmmac-0: scan phy mdio-mux at address 1
->> [...]
->> [   18.176420] mdio_bus stmmac-0: scan phy mdio-mux at address 30
->> [   18.176452] mdio_bus stmmac-0: scan phy mdio-mux at address 31
->>
->> Since mdio-mux nodes are not PHY, this patch a way to to not scan
->> them.
+On 09/27/2017 12:34 AM, Corentin Labbe wrote:
+> This patch add documentation about the MDIO switch used on sun8i-h3-emac
+> for integrated PHY.
 > 
-> Hi Corentin
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  .../devicetree/bindings/net/dwmac-sun8i.txt        | 138 +++++++++++++++++++--
+>  1 file changed, 126 insertions(+), 12 deletions(-)
 > 
-> I still don't like this, but ...
+> diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> index 725f3b187886..e2ef4683df08 100644
+> --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> @@ -4,18 +4,18 @@ This device is a platform glue layer for stmmac.
+>  Please see stmmac.txt for the other unchanged properties.
+>  
+>  Required properties:
+> -- compatible: should be one of the following string:
+> +- compatible: must be one of the following string:
+>  		"allwinner,sun8i-a83t-emac"
+>  		"allwinner,sun8i-h3-emac"
+>  		"allwinner,sun8i-v3s-emac"
+>  		"allwinner,sun50i-a64-emac"
+>  - reg: address and length of the register for the device.
+>  - interrupts: interrupt for the device
+> -- interrupt-names: should be "macirq"
+> +- interrupt-names: must be "macirq"
+>  - clocks: A phandle to the reference clock for this device
+> -- clock-names: should be "stmmaceth"
+> +- clock-names: must be "stmmaceth"
+>  - resets: A phandle to the reset control for this device
+> -- reset-names: should be "stmmaceth"
+> +- reset-names: must be "stmmaceth"
+>  - phy-mode: See ethernet.txt
+>  - phy-handle: See ethernet.txt
+>  - #address-cells: shall be 1
+> @@ -39,23 +39,38 @@ Optional properties for the following compatibles:
+>  - allwinner,leds-active-low: EPHY LEDs are active low
+>  
+>  Required child node of emac:
+> -- mdio bus node: should be named mdio
+> +- mdio bus node: with compatible "snps,dwmac-mdio"
+>  
+>  Required properties of the mdio node:
+>  - #address-cells: shall be 1
+>  - #size-cells: shall be 0
+>  
+> -The device node referenced by "phy" or "phy-handle" should be a child node
+> +The device node referenced by "phy" or "phy-handle" must be a child node
+>  of the mdio node. See phy.txt for the generic PHY bindings.
+>  
+> -Required properties of the phy node with the following compatibles:
+> +The following compatibles require that the mdio node have a mdio-mux child
+> +node called "mdio-mux":
+> +  - "allwinner,sun8i-h3-emac"
+> +  - "allwinner,sun8i-v3s-emac":
+> +Required properties for the mdio-mux node:
+> +  - compatible = "mdio-mux"
+> +  - one child mdio for the integrated mdio
+> +  - one child mdio for the external mdio if present (V3s have none)
+> +Required properties for the mdio-mux children node:
+> +  - reg: 1 for internal MDIO bus, 2 for external MDIO bus
+> +
+> +The following compatibles require a PHY node representing the integrated
+> +PHY, under the integrated MDIO bus node if an mdio-mux node is used:
+>    - "allwinner,sun8i-h3-emac",
+>    - "allwinner,sun8i-v3s-emac":
+> +
+> +Required properties of the integrated phy node:
+>  - clocks: a phandle to the reference clock for the EPHY
+>  - resets: a phandle to the reset control for the EPHY
+> +- phy-is-integrated
+> +- Must be a child of the integrated mdio
+>  
+> -Example:
+> -
+> +Example with integrated PHY:
+>  emac: ethernet at 1c0b000 {
+>  	compatible = "allwinner,sun8i-h3-emac";
+>  	syscon = <&syscon>;
+> @@ -72,13 +87,112 @@ emac: ethernet at 1c0b000 {
+>  	phy-handle = <&int_mii_phy>;
+>  	phy-mode = "mii";
+>  	allwinner,leds-active-low;
+> +
+> +	mdio0: mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "snps,dwmac-mdio";
+> +
+> +		mdio-mux {
+> +			compatible = "mdio-mux";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
 
-Me neither, even more so as I don't understand the reasoning behind
-putting the mux as a child node of the MDIO bus controller in the first
-place.
+Sorry for chiming in so late, but why don't we have the mdio-mux be the
+root node here in the mdio bus hierarchy? I understand that with this
+binding proposed here, we need to have patch 11 included (which btw,
+should come before any DTS change), but this does not seem to accurately
+model the HW.
 
-Also, you need to re-order patches such that this patch comes before the
-DTS changes.
+The mux itself is not a child node of the MDIO bus controller, it does
+not really belong in that address space although it does mangle the MDIO
+bus controller address space between the two ends of the mux.
 
-> 
->>
->> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
->> ---
->>  drivers/of/of_mdio.c | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
->> index d94dd8b77abd..d90ddb0d90f2 100644
->> --- a/drivers/of/of_mdio.c
->> +++ b/drivers/of/of_mdio.c
->> @@ -190,6 +190,10 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
->>  	struct device_node *child;
->>  	bool scanphys = false;
->>  	int addr, rc;
->> +	static const struct of_device_id do_not_scan[] = {
->> +		{ .compatible = "mdio-mux" },
->> +		{}
->> +	};
-> 
-> Please rename this to some less generic. What i don't want is other
-> compatible strings added here. We want to make the exception for
-> muxes, but nothing else. So something like compatible_muxes?
-> 
->        Andrew
+If this has been debated before, apologies for missing that part of the
+discussion.
+
+> +
+> +			int_mdio: mdio at 1 {
+> +				reg = <1>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				int_mii_phy: ethernet-phy at 1 {
+> +					reg = <1>;
+> +					clocks = <&ccu CLK_BUS_EPHY>;
+> +					resets = <&ccu RST_BUS_EPHY>;
+> +					phy-is-integrated;
+> +				};
+> +			};
+> +			ext_mdio: mdio at 2 {
+> +				reg = <2>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +Example with external PHY:
+> +emac: ethernet at 1c0b000 {
+> +	compatible = "allwinner,sun8i-h3-emac";
+> +	syscon = <&syscon>;
+> +	reg = <0x01c0b000 0x104>;
+> +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "macirq";
+> +	resets = <&ccu RST_BUS_EMAC>;
+> +	reset-names = "stmmaceth";
+> +	clocks = <&ccu CLK_BUS_EMAC>;
+> +	clock-names = "stmmaceth";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	phy-handle = <&ext_rgmii_phy>;
+> +	phy-mode = "rgmii";
+> +	allwinner,leds-active-low;
+> +
+> +	mdio0: mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "snps,dwmac-mdio";
+> +
+> +		mdio-mux {
+> +			compatible = "mdio-mux";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			int_mdio: mdio at 1 {
+> +				reg = <1>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				int_mii_phy: ethernet-phy at 1 {
+> +					reg = <1>;
+> +					clocks = <&ccu CLK_BUS_EPHY>;
+> +					resets = <&ccu RST_BUS_EPHY>;
+> +					phy-is-integrated;
+> +				};
+> +			};
+> +			ext_mdio: mdio at 2 {
+> +				reg = <2>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				ext_rgmii_phy: ethernet-phy at 1 {
+> +					reg = <1>;
+> +				};
+> +			}:
+> +		};
+> +	};
+> +};
+> +
+> +Example with SoC without integrated PHY
+> +
+> +emac: ethernet at 1c0b000 {
+> +	compatible = "allwinner,sun8i-a83t-emac";
+> +	syscon = <&syscon>;
+> +	reg = <0x01c0b000 0x104>;
+> +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "macirq";
+> +	resets = <&ccu RST_BUS_EMAC>;
+> +	reset-names = "stmmaceth";
+> +	clocks = <&ccu CLK_BUS_EMAC>;
+> +	clock-names = "stmmaceth";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	phy-handle = <&ext_rgmii_phy>;
+> +	phy-mode = "rgmii";
+> +
+>  	mdio: mdio {
+> +		compatible = "snps,dwmac-mdio";
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		int_mii_phy: ethernet-phy at 1 {
+> +		ext_rgmii_phy: ethernet-phy at 1 {
+>  			reg = <1>;
+> -			clocks = <&ccu CLK_BUS_EPHY>;
+> -			resets = <&ccu RST_BUS_EPHY>;
+>  		};
+>  	};
+>  };
 > 
 
 -- 
