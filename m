@@ -1,36 +1,68 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 28 Sep 2017 14:29:22 +1000
-Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
-In-Reply-To: <1506497645.30138.37.camel@aj.id.au>
-References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-4-joel@jms.id.au>
- <1506343255.30138.29.camel@aj.id.au>
- <CACPK8Xd8RQ4s1xMsSuxHgQRiHS6vDtxVTAxu8Ba3J3it45MC5g@mail.gmail.com>
- <1506497645.30138.37.camel@aj.id.au>
-Message-ID: <CACPK8XeJE025GRT9kk9L1x1VsDGEmLG80G9LMM03vsvpHS+sYA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 27 Sep 2017 21:50:46 -0700
+Subject: [PATCH v6 11/11] of: mdio: Prevent of_mdiobus_register from
+ scanning mdio-mux nodes
+In-Reply-To: <20170927141213.GF13516@lunn.ch>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+ <20170927073414.17361-12-clabbe.montjoie@gmail.com>
+ <20170927141213.GF13516@lunn.ch>
+Message-ID: <c8697b60-294f-7cc1-8425-aa5b837fcca0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 5:34 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> On Wed, 2017-09-27 at 16:13 +1000, Joel Stanley wrote:
->> > > +                     div_table,
->> >
->> > This doesn't seem to be correct. There's the problem of 0b000 and 0b001 mapping
->> > the same value of 2 for the AST2500, whose table then increments in steps of 1.
->> > The AST2400 mapping on the otherhand is multiples of 2 starting at 2, with no
->> > inconsistency for 0b000 vs 0b001.
+
+
+On 09/27/2017 07:12 AM, Andrew Lunn wrote:
+> On Wed, Sep 27, 2017 at 09:34:14AM +0200, Corentin Labbe wrote:
+>> Each child node of an MDIO node is scanned as a PHY when calling
+>> of_mdiobus_register() givint the following result:
+>> [   18.175379] mdio_bus stmmac-0: /soc/ethernet at 1c30000/mdio/mdio-mux has invalid PHY address
+>> [   18.175408] mdio_bus stmmac-0: scan phy mdio-mux at address 0
+>> [   18.175450] mdio_bus stmmac-0: scan phy mdio-mux at address 1
+>> [...]
+>> [   18.176420] mdio_bus stmmac-0: scan phy mdio-mux at address 30
+>> [   18.176452] mdio_bus stmmac-0: scan phy mdio-mux at address 31
 >>
->> Yep, we do use a different table for ast2400 vs ast2500. See
->> ast2400_div_table vs ast2500_div_table.
->
-> Yep, but for the AST2500 this is a different table again to what you've
-> already defined (for the AST2500). However, for the AST2400 the table
-> looks the same as the other AST2400 tables.
+>> Since mdio-mux nodes are not PHY, this patch a way to to not scan
+>> them.
+> 
+> Hi Corentin
+> 
+> I still don't like this, but ...
 
-You're right. I didn't realise you were pointing out something strange
-about eclk.
+Me neither, even more so as I don't understand the reasoning behind
+putting the mux as a child node of the MDIO bus controller in the first
+place.
 
-I added another table for eclk, and the correct one is selected by the
-platform data.
+Also, you need to re-order patches such that this patch comes before the
+DTS changes.
 
-I'll send out v4 today if no more reviews come in.
+> 
+>>
+>> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+>> ---
+>>  drivers/of/of_mdio.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+>> index d94dd8b77abd..d90ddb0d90f2 100644
+>> --- a/drivers/of/of_mdio.c
+>> +++ b/drivers/of/of_mdio.c
+>> @@ -190,6 +190,10 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
+>>  	struct device_node *child;
+>>  	bool scanphys = false;
+>>  	int addr, rc;
+>> +	static const struct of_device_id do_not_scan[] = {
+>> +		{ .compatible = "mdio-mux" },
+>> +		{}
+>> +	};
+> 
+> Please rename this to some less generic. What i don't want is other
+> compatible strings added here. We want to make the exception for
+> muxes, but nothing else. So something like compatible_muxes?
+> 
+>        Andrew
+> 
+
+-- 
+Florian
