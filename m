@@ -1,64 +1,64 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 28 Sep 2017 16:14:55 -0700
-Subject: [PATCH v2 03/10] ARM: bcm: Add support for Broadcom Hurricane 2 SoC
+Date: Thu, 28 Sep 2017 16:14:57 -0700
+Subject: [PATCH v2 05/10] clk: bcm: Add Broadcom Hurricane 2 clock support
 In-Reply-To: <20170928231502.27069-1-f.fainelli@gmail.com>
 References: <20170928231502.27069-1-f.fainelli@gmail.com>
-Message-ID: <20170928231502.27069-4-f.fainelli@gmail.com>
+Message-ID: <20170928231502.27069-6-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Kconfig entry point and basic machine board code for the Broadcom
-Hurricane 2 SoCs used in switching products.
+Add support for the Broadcom Hurricane 2 SoC clock controller. We can
+re-use the existing iProc clock library since the SoC's architecture is
+largely the same as its predecessors. For now, we just initialize the
+iProc ARM PLL.
 
 Acked-by: Jon Mason <jon.mason@broadcom.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mach-bcm/Kconfig   |  9 +++++++++
- arch/arm/mach-bcm/Makefile  |  3 +++
- arch/arm/mach-bcm/bcm_hr2.c | 25 +++++++++++++++++++++++++
+ drivers/clk/bcm/Kconfig   |  9 +++++++++
+ drivers/clk/bcm/Makefile  |  1 +
+ drivers/clk/bcm/clk-hr2.c | 27 +++++++++++++++++++++++++++
  3 files changed, 37 insertions(+)
- create mode 100644 arch/arm/mach-bcm/bcm_hr2.c
+ create mode 100644 drivers/clk/bcm/clk-hr2.c
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 73be3d578851..76807581f9f3 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -36,6 +36,15 @@ config ARCH_BCM_CYGNUS
- 	  BCM11300, BCM11320, BCM11350, BCM11360,
- 	  BCM58300, BCM58302, BCM58303, BCM58305.
+diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
+index 1d9187df167b..4c4bd85f707c 100644
+--- a/drivers/clk/bcm/Kconfig
++++ b/drivers/clk/bcm/Kconfig
+@@ -30,6 +30,15 @@ config CLK_BCM_CYGNUS
+ 	help
+ 	  Enable common clock framework support for the Broadcom Cygnus SoC
  
-+config ARCH_BCM_HR2
-+	bool "Broadcom Hurricane 2 SoC support"
-+	depends on ARCH_MULTI_V7
-+	select ARCH_BCM_IPROC
++config CLK_BCM_HR2
++	bool "Broadcom Hurricane 2 clock support"
++	depends on ARCH_BCM_HR2 || COMPILE_TEST
++	select COMMON_CLK_IPROC
++	default ARCH_BCM_HR2
 +	help
-+	  Enable support for the Hurricane 2 family,
-+	  which includes the following variants:
-+	  BCM53342, BCM53343, BCM53344, BCM53346.
++	  Enable common clock framework support for the Broadcom Hurricane 2
++	  SoC
 +
- config ARCH_BCM_NSP
- 	bool "Broadcom Northstar Plus SoC Support"
- 	depends on ARCH_MULTI_V7
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 980f5850097c..ec93c849a100 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -13,6 +13,9 @@
- # Cygnus
- obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
- 
-+# Hurricane 2
-+obj-$(CONFIG_ARCH_BCM_HR2)	+= bcm_hr2.o
-+
- # Northstar Plus
- obj-$(CONFIG_ARCH_BCM_NSP)	+= bcm_nsp.o
- 
-diff --git a/arch/arm/mach-bcm/bcm_hr2.c b/arch/arm/mach-bcm/bcm_hr2.c
+ config CLK_BCM_NSP
+ 	bool "Broadcom Northstar/Northstar Plus clock support"
+ 	depends on ARCH_BCM_5301X || ARCH_BCM_NSP || COMPILE_TEST
+diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
+index a0c14fa4aa1e..755144195541 100644
+--- a/drivers/clk/bcm/Makefile
++++ b/drivers/clk/bcm/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835-aux.o
+ obj-$(CONFIG_ARCH_BCM_53573)	+= clk-bcm53573-ilp.o
+ obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
++obj-$(CONFIG_CLK_BCM_HR2)	+= clk-hr2.o
+ obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
+ obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
+ obj-$(CONFIG_CLK_BCM_SR)	+= clk-sr.o
+diff --git a/drivers/clk/bcm/clk-hr2.c b/drivers/clk/bcm/clk-hr2.c
 new file mode 100644
-index 000000000000..c104f28995d7
+index 000000000000..f7c5b7379475
 --- /dev/null
-+++ b/arch/arm/mach-bcm/bcm_hr2.c
-@@ -0,0 +1,25 @@
++++ b/drivers/clk/bcm/clk-hr2.c
+@@ -0,0 +1,27 @@
 +/*
 + * Copyright (C) 2017 Broadcom
 + *
@@ -72,17 +72,19 @@ index 000000000000..c104f28995d7
 + * GNU General Public License for more details.
 + */
 +
-+#include <asm/mach/arch.h>
++#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +
-+static const char * const bcm_hr2_dt_compat[] __initconst = {
-+	"brcm,hr2",
-+	NULL,
-+};
++#include "clk-iproc.h"
 +
-+DT_MACHINE_START(BCM_HR2_DT, "Broadcom Hurricane 2 SoC")
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
-+	.dt_compat = bcm_hr2_dt_compat,
-+MACHINE_END
++static void __init hr2_armpll_init(struct device_node *node)
++{
++	iproc_armpll_setup(node);
++}
++CLK_OF_DECLARE(hr2_armpll, "brcm,hr2-armpll", hr2_armpll_init);
 -- 
 2.14.1
