@@ -1,17 +1,112 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 28 Sep 2017 11:37:58 -0700
-Subject: [PATCH 6/8] ARM: dts: aspeed-ast2500: Add I2C devices
-In-Reply-To: <20170928075149.8154-7-joel@jms.id.au>
-References: <20170928075149.8154-1-joel@jms.id.au>
- <20170928075149.8154-7-joel@jms.id.au>
-Message-ID: <CAFd5g44PLd7S8QS=DD1HCRKE+jF57cWFrUU6mijEk=t-4REg5Q@mail.gmail.com>
+From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
+Date: Thu, 28 Sep 2017 21:04:02 +0300
+Subject: [PATCH v1 05/14] tee: optee: Update protocol definitions
+In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1506621851-6929-6-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 12:51 AM, Joel Stanley <joel@jms.id.au> wrote:
-> Enable the buses that are in use and the devices that are attached.
-> Currently that includes temperature measurement and EEPROM.
->
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+There were changes in REE<->OP-TEE ABI recently.
+Now ABI allows us to pass non-contiguous memory buffers as list of
+pages to OP-TEE. This can be achieved by using new parameter attribute
+OPTEE_MSG_ATTR_NONCONTIG.
+
+OP-TEE also is able to use all non-secure RAM for shared buffers. This
+new capability is enabled with OPTEE_SMC_SEC_CAP_DYNAMIC_SHM flag.
+
+This patch adds necessary definitions to the protocol definition files at
+Linux side.
+
+Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+---
+ drivers/tee/optee/optee_msg.h | 38 ++++++++++++++++++++++++++++++++------
+ drivers/tee/optee/optee_smc.h |  7 +++++++
+ 2 files changed, 39 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
+index dd7a06e..3050490 100644
+--- a/drivers/tee/optee/optee_msg.h
++++ b/drivers/tee/optee/optee_msg.h
+@@ -67,11 +67,32 @@
+ #define OPTEE_MSG_ATTR_META			BIT(8)
+ 
+ /*
+- * The temporary shared memory object is not physically contigous and this
+- * temp memref is followed by another fragment until the last temp memref
+- * that doesn't have this bit set.
++ * Pointer to a list of pages used to register user-defined SHM buffer.
++ * Used with OPTEE_MSG_ATTR_TYPE_TMEM_*.
++ * buf_ptr should point to the beginning of the buffer. Buffer will contain
++ * list of page addresses. OP-TEE core can reconstruct contiguous buffer from
++ * that page addresses list. Page addresses are stored as 64 bit values.
++ * Last entry on a page should point to the next page of buffer.
++ * Every entry in buffer should point to a 4k page beginning (12 least
++ * significant bits must be equal to zero).
++ *
++ * 12 least significant bints of optee_msg_param.u.tmem.buf_ptr should hold page
++ * offset of the user buffer.
++ *
++ * So, entries should be placed like members of this structure:
++ *
++ * struct page_data {
++ *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
++ *   uint64_t next_page_data;
++ * };
++ *
++ * Structure is designed to exactly fit into the page size
++ * OPTEE_MSG_NONCONTIG_PAGE_SIZE which is a standard 4KB page.
++ *
++ * The size of 4KB is chosen because this is the smallest page size for ARM
++ * architectures. If REE uses larger pages, it should divide them to 4KB ones.
+  */
+-#define OPTEE_MSG_ATTR_FRAGMENT			BIT(9)
++#define OPTEE_MSG_ATTR_NONCONTIG		BIT(9)
+ 
+ /*
+  * Memory attributes for caching passed with temp memrefs. The actual value
+@@ -94,6 +115,11 @@
+ #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
+ #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
+ 
++/*
++ * Page size used in non-contiguous buffer entries
++ */
++#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
++
+ /**
+  * struct optee_msg_param_tmem - temporary memory reference parameter
+  * @buf_ptr:	Address of the buffer
+@@ -145,8 +171,8 @@ struct optee_msg_param_value {
+  *
+  * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
+  * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
+- * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
+- * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
++ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates @tmem and
++ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates @rmem,
+  * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
+  */
+ struct optee_msg_param {
+diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
+index 069c8e1..7cd3272 100644
+--- a/drivers/tee/optee/optee_smc.h
++++ b/drivers/tee/optee/optee_smc.h
+@@ -222,6 +222,13 @@ struct optee_smc_get_shm_config_result {
+ #define OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM	BIT(0)
+ /* Secure world can communicate via previously unregistered shared memory */
+ #define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	BIT(1)
++
++/*
++ * Secure world supports commands "register/unregister shared memory",
++ * secure world accepts command buffers located in any parts of non-secure RAM
++ */
++#define OPTEE_SMC_SEC_CAP_DYNAMIC_SHM		BIT(2)
++
+ #define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
+ #define OPTEE_SMC_EXCHANGE_CAPABILITIES \
+ 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
+-- 
+2.7.4
