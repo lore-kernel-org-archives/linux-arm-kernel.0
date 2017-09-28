@@ -1,42 +1,45 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 28 Sep 2017 16:14:54 -0700
-Subject: [PATCH v2 02/10] dt-bindings: Add documentation for Broadcom
- Hurricane 2 SoCs
+Date: Thu, 28 Sep 2017 16:14:56 -0700
+Subject: [PATCH v2 04/10] dt-bindings: Document Broadcom Hurricane 2 clocks
 In-Reply-To: <20170928231502.27069-1-f.fainelli@gmail.com>
 References: <20170928231502.27069-1-f.fainelli@gmail.com>
-Message-ID: <20170928231502.27069-3-f.fainelli@gmail.com>
+Message-ID: <20170928231502.27069-5-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the Broadcom Hurricane 2 SoCs used in
-switching control planes.
+Add a Device Tree binding document for the Broadcom Hurricane 2 SoC
+which is an iProc based system.
 
 Acked-by: Jon Mason <jon.mason@broadcom.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt | 14 ++++++++++++++
+ .../devicetree/bindings/clock/brcm,iproc-clocks.txt        | 14 ++++++++++++++
  1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
-new file mode 100644
-index 000000000000..a124c7fc4dcd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,hr2.txt
-@@ -0,0 +1,14 @@
-+Broadcom Hurricane 2 device tree bindings
-+---------------------------------------
+diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+index f2c5f0e4a363..f8e4a93466cb 100644
+--- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+@@ -137,6 +137,20 @@ These clock IDs are defined in:
+     ch1_audio  audiopll         2       BCM_CYGNUS_AUDIOPLL_CH1
+     ch2_audio  audiopll         3       BCM_CYGNUS_AUDIOPLL_CH2
+ 
++Hurricane 2
++------
++PLL and leaf clock compatible strings for Hurricane 2 are:
++ "brcm,hr2-armpll"
 +
-+Broadcom Hurricane 2 family of SoCs are used for switching control. These SoCs
-+are based on Broadcom's iProc SoC architecture and feature a single core Cortex
-+A9 ARM CPUs, DDR2/DDR3 memory, PCIe GEN-2, USB 2.0 and USB 3.0, serial and NAND
-+flash and a PCIe attached integrated switching engine.
++The following table defines the set of PLL/clock for Hurricane 2:
 +
-+Boards with Hurricane SoCs shall have the following properties:
++    Clock	Source		Index	ID
++    ---		-----		-----	---------
++    crystal	N/A		N/A	N/A
 +
-+Required root node property:
++    armpll	crystal		N/A	N/A
 +
-+BCM53342
-+compatible = "brcm,bcm53342", "brcm,hr2";
++
+ Northstar and Northstar Plus
+ ------
+ PLL and leaf clock compatible strings for Northstar and Northstar Plus are:
 -- 
 2.14.1
