@@ -1,90 +1,62 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 28 Sep 2017 16:14:57 -0700
-Subject: [PATCH v2 05/10] clk: bcm: Add Broadcom Hurricane 2 clock support
+Date: Thu, 28 Sep 2017 16:14:59 -0700
+Subject: [PATCH v2 07/10] ARM: debug: Add Hurricane 2 UART2 debug addresses
 In-Reply-To: <20170928231502.27069-1-f.fainelli@gmail.com>
 References: <20170928231502.27069-1-f.fainelli@gmail.com>
-Message-ID: <20170928231502.27069-6-f.fainelli@gmail.com>
+Message-ID: <20170928231502.27069-8-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Broadcom Hurricane 2 SoC clock controller. We can
-re-use the existing iProc clock library since the SoC's architecture is
-largely the same as its predecessors. For now, we just initialize the
-iProc ARM PLL.
+Broadcom Hurricane 2 SoCs typically use their secondary UART for
+debug/console, provide a known good location for that.
 
 Acked-by: Jon Mason <jon.mason@broadcom.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/clk/bcm/Kconfig   |  9 +++++++++
- drivers/clk/bcm/Makefile  |  1 +
- drivers/clk/bcm/clk-hr2.c | 27 +++++++++++++++++++++++++++
- 3 files changed, 37 insertions(+)
- create mode 100644 drivers/clk/bcm/clk-hr2.c
+ arch/arm/Kconfig.debug | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-index 1d9187df167b..4c4bd85f707c 100644
---- a/drivers/clk/bcm/Kconfig
-+++ b/drivers/clk/bcm/Kconfig
-@@ -30,6 +30,15 @@ config CLK_BCM_CYGNUS
- 	help
- 	  Enable common clock framework support for the Broadcom Cygnus SoC
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6dcea8e8e941..0346805fe33c 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -169,6 +169,11 @@ choice
+ 		depends on ARCH_BCM_5301X || ARCH_BCM_NSP
+ 		select DEBUG_UART_8250
  
-+config CLK_BCM_HR2
-+	bool "Broadcom Hurricane 2 clock support"
-+	depends on ARCH_BCM_HR2 || COMPILE_TEST
-+	select COMMON_CLK_IPROC
-+	default ARCH_BCM_HR2
-+	help
-+	  Enable common clock framework support for the Broadcom Hurricane 2
-+	  SoC
++	config DEBUG_BCM_HR2
++		bool "Kernel low-level debugging on Hurricane 2 UART2"
++		depends on ARCH_BCM_HR2
++		select DEBUG_UART_8250
 +
- config CLK_BCM_NSP
- 	bool "Broadcom Northstar/Northstar Plus clock support"
- 	depends on ARCH_BCM_5301X || ARCH_BCM_NSP || COMPILE_TEST
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index a0c14fa4aa1e..755144195541 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835-aux.o
- obj-$(CONFIG_ARCH_BCM_53573)	+= clk-bcm53573-ilp.o
- obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
-+obj-$(CONFIG_CLK_BCM_HR2)	+= clk-hr2.o
- obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
- obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
- obj-$(CONFIG_CLK_BCM_SR)	+= clk-sr.o
-diff --git a/drivers/clk/bcm/clk-hr2.c b/drivers/clk/bcm/clk-hr2.c
-new file mode 100644
-index 000000000000..f7c5b7379475
---- /dev/null
-+++ b/drivers/clk/bcm/clk-hr2.c
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) 2017 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include "clk-iproc.h"
-+
-+static void __init hr2_armpll_init(struct device_node *node)
-+{
-+	iproc_armpll_setup(node);
-+}
-+CLK_OF_DECLARE(hr2_armpll, "brcm,hr2-armpll", hr2_armpll_init);
+ 	config DEBUG_BCM_KONA_UART
+ 		bool "Kernel low-level debugging messages via BCM KONA UART"
+ 		depends on ARCH_BCM_MOBILE
+@@ -1508,6 +1513,7 @@ config DEBUG_UART_PHYS
+ 	default 0x11009000 if DEBUG_MT8135_UART3
+ 	default 0x16000000 if DEBUG_INTEGRATOR
+ 	default 0x18000300 if DEBUG_BCM_5301X
++	default 0x18000400 if DEBUG_BCM_HR2
+ 	default 0x18010000 if DEBUG_SIRFATLAS7_UART0
+ 	default 0x18020000 if DEBUG_SIRFATLAS7_UART1
+ 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
+@@ -1623,6 +1629,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835 || DEBUG_BCM2836
+ 	default 0xf1000300 if DEBUG_BCM_5301X
++	default 0xf1000400 if DEBUG_BCM_HR2
+ 	default 0xf1002000 if DEBUG_MT8127_UART0
+ 	default 0xf1006000 if DEBUG_MT6589_UART0
+ 	default 0xf1009000 if DEBUG_MT8135_UART3
+@@ -1728,7 +1735,8 @@ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default 0 if DEBUG_FOOTBRIDGE_COM1 || ARCH_IOP32X || DEBUG_BCM_5301X || \
+-		DEBUG_OMAP7XXUART1 || DEBUG_OMAP7XXUART2 || DEBUG_OMAP7XXUART3
++		DEBUG_BCM_HR2 || DEBUG_OMAP7XXUART1 || DEBUG_OMAP7XXUART2 || \
++		DEBUG_OMAP7XXUART3
+ 	default 2
+ 
+ config DEBUG_UART_8250_WORD
 -- 
 2.14.1
