@@ -1,77 +1,54 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Thu, 28 Sep 2017 21:04:11 +0300
-Subject: [PATCH v1 14/14] tee: shm: inline tee_shm getter functions
+Date: Thu, 28 Sep 2017 21:04:07 +0300
+Subject: [PATCH v1 10/14] tee: optee: store OP-TEE capabilities in private data
 In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1506621851-6929-15-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1506621851-6929-11-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Now, when struct tee_shm is defined in public header,
-we can inline small getter functions.
+Those capabilities will be used in subsequent patches.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/tee_shm.c   | 17 -----------------
- include/linux/tee_drv.h | 10 ++++++++--
- 2 files changed, 8 insertions(+), 19 deletions(-)
+ drivers/tee/optee/core.c          | 1 +
+ drivers/tee/optee/optee_private.h | 3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-index 5176c83..453700a 100644
---- a/drivers/tee/tee_shm.c
-+++ b/drivers/tee/tee_shm.c
-@@ -494,23 +494,6 @@ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id)
- }
- EXPORT_SYMBOL_GPL(tee_shm_get_from_id);
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 9883592..8e012ea 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -553,6 +553,7 @@ static struct optee *optee_probe(struct device_node *np)
+ 	}
  
--bool tee_shm_is_registered(struct tee_shm *shm)
--{
--	return shm && (shm->flags & TEE_SHM_REGISTER);
--}
--EXPORT_SYMBOL_GPL(tee_shm_is_registered);
--
--/**
-- * tee_shm_get_id() - Get id of a shared memory object
-- * @shm:	Shared memory handle
-- * @returns id
-- */
--int tee_shm_get_id(struct tee_shm *shm)
--{
--	return shm->id;
--}
--EXPORT_SYMBOL_GPL(tee_shm_get_id);
--
- /**
-  * tee_shm_put() - Decrease reference count on a shared memory handle
-  * @shm:	Shared memory handle
-diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-index 6aaef65..2ae0286 100644
---- a/include/linux/tee_drv.h
-+++ b/include/linux/tee_drv.h
-@@ -429,7 +429,10 @@ static inline size_t tee_shm_get_page_offset(struct tee_shm *shm)
-  * @shm:	Shared memory handle
-  * @returns id
+ 	optee->invoke_fn = invoke_fn;
++	optee->sec_caps = sec_caps;
+ 
+ 	teedev = tee_device_alloc(&optee_desc, NULL, pool, optee);
+ 	if (IS_ERR(teedev)) {
+diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
+index dfe1158..fc534d7 100644
+--- a/drivers/tee/optee/optee_private.h
++++ b/drivers/tee/optee/optee_private.h
+@@ -96,6 +96,8 @@ struct optee_supp {
+  * @supp:		supplicant synchronization struct for RPC to supplicant
+  * @pool:		shared memory pool
+  * @memremaped_shm	virtual address of memory in shared memory pool
++ * @sec_caps:		secure world capabilities defined by
++ *			OPTEE_SMC_SEC_CAP_* in optee_smc.h
   */
--int tee_shm_get_id(struct tee_shm *shm);
-+static inline int tee_shm_get_id(struct tee_shm *shm)
-+{
-+	return shm->id;
-+}
+ struct optee {
+ 	struct tee_device *supp_teedev;
+@@ -106,6 +108,7 @@ struct optee {
+ 	struct optee_supp supp;
+ 	struct tee_shm_pool *pool;
+ 	void *memremaped_shm;
++	u32 sec_caps;
+ };
  
- /**
-  * tee_shm_get_from_id() - Find shared memory object and increase reference
-@@ -445,6 +448,9 @@ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
-  * @shm:	Shared memory handle
-  * @returns true if object is registered in TEE
-  */
--bool tee_shm_is_registered(struct tee_shm *shm);
-+static inline bool tee_shm_is_registered(struct tee_shm *shm)
-+{
-+	return shm && (shm->flags & TEE_SHM_REGISTER);
-+}
- 
- #endif /*__TEE_DRV_H*/
+ struct optee_session {
 -- 
 2.7.4
