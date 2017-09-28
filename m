@@ -1,79 +1,30 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 28 Sep 2017 18:04:18 +0200
-Subject: [PATCH 2/2] clk/ux500: Improve a size determination in three
- functions
-In-Reply-To: <1991a7d3-59b8-1a5f-dcef-a0a493e3829d@users.sourceforge.net>
-References: <d23a685d-f8a0-f4ca-078a-414d7b8674ca@users.sourceforge.net>
- <1991a7d3-59b8-1a5f-dcef-a0a493e3829d@users.sourceforge.net>
-Message-ID: <CAPDyKFozYOX3P=pgHsWWV+2dsmwQVUc4d422Buf8+frChyPpig@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 28 Sep 2017 23:38:59 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sun8i: Add board dts file for Banana Pi
+ M2 Ultra
+In-Reply-To: <20170928151225.n4pyvn65u6hvpjd7@flea>
+References: <20170928092543.45648-1-icenowy@aosc.io>
+ <20170928092543.45648-3-icenowy@aosc.io>
+ <20170928151225.n4pyvn65u6hvpjd7@flea>
+Message-ID: <FCCC8A9F-4818-4CE3-A7E8-62ED9A864F92@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 September 2017 at 20:47, SF Markus Elfring
-<elfring@users.sourceforge.net> wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Wed, 27 Sep 2017 20:30:53 +0200
->
-> Replace the specification of data structures by pointer dereferences
-> as the parameter for the operator "sizeof" to make the corresponding size
-> determination a bit safer according to the Linux coding style convention.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-> ---
->  drivers/clk/ux500/clk-prcc.c    | 2 +-
->  drivers/clk/ux500/clk-prcmu.c   | 2 +-
->  drivers/clk/ux500/clk-sysctrl.c | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+? 2017?9?28? GMT+08:00 ??11:12:25, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Thu, Sep 28, 2017 at 09:25:42AM +0000, Icenowy Zheng wrote:
+>> +&mmc2 {
+>> +	vmmc-supply = <&reg_dcdc1>;
+>> +	bus-width = <8>;
+>> +	non-removable;
+>> +	status = "okay";
+>> +};
 >
-> diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
-> index 5ca07e6d1f64..7cfb59c9136d 100644
-> --- a/drivers/clk/ux500/clk-prcc.c
-> +++ b/drivers/clk/ux500/clk-prcc.c
-> @@ -107,7 +107,7 @@ static struct clk *clk_reg_prcc(const char *name,
->                 return ERR_PTR(-EINVAL);
->         }
+>I guess it's an emmc, it doesn't have a vqmmmc regulator?
+
+vqmmc is also 3v3.
+
 >
-> -       clk = kzalloc(sizeof(struct clk_prcc), GFP_KERNEL);
-> +       clk = kzalloc(sizeof(*clk), GFP_KERNEL);
->         if (!clk)
->                 return ERR_PTR(-ENOMEM);
->
-> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-> index c137934f23ab..9d1f2d4550ad 100644
-> --- a/drivers/clk/ux500/clk-prcmu.c
-> +++ b/drivers/clk/ux500/clk-prcmu.c
-> @@ -258,7 +258,7 @@ static struct clk *clk_reg_prcmu(const char *name,
->                 return ERR_PTR(-EINVAL);
->         }
->
-> -       clk = kzalloc(sizeof(struct clk_prcmu), GFP_KERNEL);
-> +       clk = kzalloc(sizeof(*clk), GFP_KERNEL);
->         if (!clk)
->                 return ERR_PTR(-ENOMEM);
->
-> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
-> index e0a834c08a04..7c0403b733ae 100644
-> --- a/drivers/clk/ux500/clk-sysctrl.c
-> +++ b/drivers/clk/ux500/clk-sysctrl.c
-> @@ -139,7 +139,7 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
->                 return ERR_PTR(-EINVAL);
->         }
->
-> -       clk = devm_kzalloc(dev, sizeof(struct clk_sysctrl), GFP_KERNEL);
-> +       clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
->         if (!clk)
->                 return ERR_PTR(-ENOMEM);
->
-> --
-> 2.14.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>Looks good otherwise, thanks!
+>Maxime
