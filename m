@@ -1,92 +1,48 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Thu, 28 Sep 2017 07:49:15 +0800
-Subject: [PATCH ] cpufreq: ti-cpufreq: kfree opp_data when failure
-In-Reply-To: <20170927174026.GB12211@ubuntu>
-References: <1506496097-30852-1-git-send-email-zumeng.chen@windriver.com>
- <20170927174026.GB12211@ubuntu>
-Message-ID: <7b7315f0-c2e4-a09e-8769-2d15a167fa73@windriver.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 28 Sep 2017 08:17:19 +0800
+Subject: [PATCH 11/12] dt-bindings: usb: mtu3: remove dummy clocks and add
+ optional ones
+In-Reply-To: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
+References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
+Message-ID: <a3918b553f483fd1a519fe09a3e5df48c5375b60.1506509659.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2017 01:40 AM, Viresh Kumar wrote:
-> On 27-09-17, 15:08, Zumeng Chen wrote:
->> From: Zumeng Chen <zumeng.chen@gmail.com>
->>
->> memory leakage was found by kmemleak. opp_data needs to be freed
->> when failure, including fail_put_node.
->>
->> unreferenced object 0xccdd4c40 (size 64):
->>    comm "swapper", pid 1, jiffies 4294938465 (age 888.520s)
->>    hex dump (first 32 bytes):
->>      00 7c 00 c1 98 69 d8 ce 00 24 03 ce 00 24 03 ce  .|...i...$...$..
->>      20 35 23 c1 00 00 00 00 00 00 00 00 00 00 00 00   5#.............
->>    backtrace:
->>      [<c028fb64>] kmem_cache_alloc_trace+0x2c4/0x3cc
->>      [<c076d5f0>] ti_cpufreq_probe+0x6c/0x334
->>      [<c068d6e4>] platform_drv_probe+0x60/0xc0
->>      [<c068b384>] driver_probe_device+0x218/0x2c4
->>      [<c068b5a4>] __device_attach_driver+0xa8/0xdc
->>      [<c0689340>] bus_for_each_drv+0x70/0xa4
->>      [<c068b020>] __device_attach+0xc0/0x124
->>      [<c068b634>] device_initial_probe+0x1c/0x20
->>      [<c068a3b8>] bus_probe_device+0x94/0x9c
->>      [<c0688300>] device_add+0x404/0x590
->>      [<c068d408>] platform_device_add+0x11c/0x230
->>      [<c068df40>] platform_device_register_full+0x10c/0x128
->>      [<c076d578>] ti_cpufreq_init+0x44/0x50
->>      [<c01017c4>] do_one_initcall+0x54/0x180
->>      [<c0e00fe0>] kernel_init_freeable+0x270/0x33c
->>      [<c093f2bc>] kernel_init+0x18/0x124
->>
->> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
->> ---
->>   drivers/cpufreq/ti-cpufreq.c | 5 ++++-
->>   1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
->> index 4bf47de..ffcddcd 100644
->> --- a/drivers/cpufreq/ti-cpufreq.c
->> +++ b/drivers/cpufreq/ti-cpufreq.c
->> @@ -217,7 +217,8 @@ static int ti_cpufreq_init(void)
->>   	opp_data->cpu_dev = get_cpu_device(0);
->>   	if (!opp_data->cpu_dev) {
->>   		pr_err("%s: Failed to get device for CPU0\n", __func__);
->> -		return -ENODEV;
->> +		ret = ENODEV;
->> +		goto free_opp_data;
->>   	}
->>   
->>   	opp_data->opp_node = dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
->> @@ -262,6 +263,8 @@ static int ti_cpufreq_init(void)
->>   
->>   fail_put_node:
->>   	of_node_put(opp_data->opp_node);
->> +free_opp_data:
->> +	kfree(opp_data);
->>   
->>   	return ret;
->>   }
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> I also see that you are missing an of_node_put(np) in the driver. Maybe you
-> want to fix that as well (in a separate patch) ?
+Remove dummy clocks for usb wakeup and add optional ones for
+mcu_bus and dma_bus bus.
 
-Ha, thanks, I'm not sure if I follow your meanings.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mediatek,mtu3.txt      |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-opp_data->opp_node will be set after goto free_opp_data, so are we safe 
-here?
-
-         opp_data->cpu_dev = get_cpu_device(0);
-         if (!opp_data->cpu_dev) {
-                 pr_err("%s: Failed to get device for CPU0\n", __func__);
-                 ret = ENODEV;
-                 goto free_opp_data;
-         }
-
-         opp_data->opp_node = 
-dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
-
-Cheers,
-Zumeng
-
->
+diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+index 7c611d1..49c982b 100644
+--- a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+@@ -14,9 +14,9 @@ Required properties:
+  - vusb33-supply : regulator of USB avdd3.3v
+  - clocks : a list of phandle + clock-specifier pairs, one for each
+ 	entry in clock-names
+- - clock-names : must contain "sys_ck" and "ref_ck" for clock of controller;
+-	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
+-	depends on "mediatek,enable-wakeup"
++ - clock-names : must contain "sys_ck" for clock of controller,
++	the following clocks are optional:
++	"ref_ck", "mcu_ck" and "dam_ck";
+  - phys : a list of phandle + phy specifier pairs
+  - dr_mode : should be one of "host", "peripheral" or "otg",
+ 	refer to usb/generic.txt
+@@ -65,9 +65,7 @@ ssusb: usb at 11271000 {
+ 	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
+ 		 <&pericfg CLK_PERI_USB0>,
+ 		 <&pericfg CLK_PERI_USB1>;
+-	clock-names = "sys_ck", "ref_ck",
+-		      "wakeup_deb_p0",
+-		      "wakeup_deb_p1";
++	clock-names = "sys_ck", "ref_ck";
+ 	vusb33-supply = <&mt6397_vusb_reg>;
+ 	vbus-supply = <&usb_p0_vbus>;
+ 	extcon = <&extcon_usb>;
+-- 
+1.7.9.5
