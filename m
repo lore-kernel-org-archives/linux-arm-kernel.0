@@ -1,61 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Sep 2017 12:52:53 +0100
-Subject: [PATCH] arm64: consistently log boot/secondary CPU IDs
-In-Reply-To: <20170928085446.GB19060@arm.com>
-References: <1506520238-8306-1-git-send-email-mark.rutland@arm.com>
- <20170928085446.GB19060@arm.com>
-Message-ID: <20170928115253.GB11310@leverpostej>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 28 Sep 2017 15:09:21 +0300
+Subject: [PATCH v2 13/17] media: v4l2-async: simplify v4l2_async_subdev
+ structure
+In-Reply-To: <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
+References: <cover.1506548682.git.mchehab@s-opensource.com>
+ <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
+Message-ID: <20170928120920.ywgbtikkrts25qlj@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 09:54:47AM +0100, Will Deacon wrote:
-> On Wed, Sep 27, 2017 at 02:50:38PM +0100, Mark Rutland wrote:
-> > Currently we inconsistently log identifying information for the boot CPU
-> > and secondary CPUs. For the boot CPU, we log the MIDR and MPIDR across
-> > separate messages, whereas for the secondary CPUs we only log the MIDR.
-> > 
-> > In some cases, it would be useful to know the MPIDR of secondary CPUs,
-> > and it would be nice for these messages to be consistent.
-> > 
-> > This patch ensures that in the primary and secondary boot paths, we log
-> > both the MPIDR and MIDR in a single message, with a consistent format.
-> > the MPIDR is consistently padded to 10 hex characters to cover Aff3 in
-> > bits 39:32, so that IDs can be compared easily.
-> > 
-> > The newly redundant message in setup_arch() is removed.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Al Stone <ahs3@redhat.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/setup.c | 5 ++---
-> >  arch/arm64/kernel/smp.c   | 6 ++++--
-> >  2 files changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index d4b7405..819c1d1 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -103,7 +103,8 @@ void __init smp_setup_processor_id(void)
-> >  	 * access percpu variable inside lock_release
-> >  	 */
-> >  	set_my_cpu_offset(0);
-> > -	pr_info("Booting Linux on physical CPU 0x%lx\n", (unsigned long)mpidr);
-> > +	pr_info("Booting Linux on physical CPU 0x%010lx [%08x]\n",
-> > +		(unsigned long)mpidr, read_cpuid_id());
+Hi Mauro,
+
+On Wed, Sep 27, 2017 at 06:46:56PM -0300, Mauro Carvalho Chehab wrote:
+> The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
+> struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
+> match criteria requires just a device name.
 > 
-> We should probably be consistent in whether or not we include the '0x'
-> prefix for these hex numbers, otherwise it could get confusing. I don't mind
-> which way we go.
+> So, it doesn't make sense to enclose those into structs,
+> as the criteria can go directly into the union.
+> 
+> That makes easier to document it, as we don't need to document
+> weird senseless structs.
 
-Sure.
+The idea is that in the union, there's a struct which is specific to the
+match_type field. I wouldn't call it senseless.
 
-My preference would be to add the 0x in both cases so that there's no
-ambiguity.
+In the two cases there's just a single field in the containing struct. You
+could remove the struct in that case as you do in this patch, and just use
+the field. But I think the result is less clean and so I wouldn't make this
+change.
 
-I can send a new version with that fixed up, unless you're happy to do
-that locally?
+The confusion comes possibly from the fact that the struct is named the
+same as the field in the struct. These used to be called of and node, but
+with the fwnode property framework the references to the fwnode are, well,
+typically similarly called "fwnode". There's no underlying firmware
+interface with that name, fwnode property API is just an API.
 
-Thanks,
-Mark.
+-- 
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
