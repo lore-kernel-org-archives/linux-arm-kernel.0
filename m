@@ -1,112 +1,100 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Thu, 28 Sep 2017 21:04:02 +0300
-Subject: [PATCH v1 05/14] tee: optee: Update protocol definitions
+Date: Thu, 28 Sep 2017 21:04:03 +0300
+Subject: [PATCH v1 06/14] tee: optee: add page list manipulation functions
 In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1506621851-6929-6-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-There were changes in REE<->OP-TEE ABI recently.
-Now ABI allows us to pass non-contiguous memory buffers as list of
-pages to OP-TEE. This can be achieved by using new parameter attribute
-OPTEE_MSG_ATTR_NONCONTIG.
-
-OP-TEE also is able to use all non-secure RAM for shared buffers. This
-new capability is enabled with OPTEE_SMC_SEC_CAP_DYNAMIC_SHM flag.
-
-This patch adds necessary definitions to the protocol definition files at
-Linux side.
+These functions will be used to pass information about shared
+buffers to OP-TEE.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/optee_msg.h | 38 ++++++++++++++++++++++++++++++++------
- drivers/tee/optee/optee_smc.h |  7 +++++++
- 2 files changed, 39 insertions(+), 6 deletions(-)
+ drivers/tee/optee/call.c          | 48 +++++++++++++++++++++++++++++++++++++++
+ drivers/tee/optee/optee_private.h |  4 ++++
+ 2 files changed, 52 insertions(+)
 
-diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
-index dd7a06e..3050490 100644
---- a/drivers/tee/optee/optee_msg.h
-+++ b/drivers/tee/optee/optee_msg.h
-@@ -67,11 +67,32 @@
- #define OPTEE_MSG_ATTR_META			BIT(8)
- 
- /*
-- * The temporary shared memory object is not physically contigous and this
-- * temp memref is followed by another fragment until the last temp memref
-- * that doesn't have this bit set.
-+ * Pointer to a list of pages used to register user-defined SHM buffer.
-+ * Used with OPTEE_MSG_ATTR_TYPE_TMEM_*.
-+ * buf_ptr should point to the beginning of the buffer. Buffer will contain
-+ * list of page addresses. OP-TEE core can reconstruct contiguous buffer from
-+ * that page addresses list. Page addresses are stored as 64 bit values.
-+ * Last entry on a page should point to the next page of buffer.
-+ * Every entry in buffer should point to a 4k page beginning (12 least
-+ * significant bits must be equal to zero).
-+ *
-+ * 12 least significant bints of optee_msg_param.u.tmem.buf_ptr should hold page
-+ * offset of the user buffer.
-+ *
-+ * So, entries should be placed like members of this structure:
-+ *
-+ * struct page_data {
-+ *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
-+ *   uint64_t next_page_data;
-+ * };
-+ *
-+ * Structure is designed to exactly fit into the page size
-+ * OPTEE_MSG_NONCONTIG_PAGE_SIZE which is a standard 4KB page.
-+ *
-+ * The size of 4KB is chosen because this is the smallest page size for ARM
-+ * architectures. If REE uses larger pages, it should divide them to 4KB ones.
-  */
--#define OPTEE_MSG_ATTR_FRAGMENT			BIT(9)
-+#define OPTEE_MSG_ATTR_NONCONTIG		BIT(9)
- 
- /*
-  * Memory attributes for caching passed with temp memrefs. The actual value
-@@ -94,6 +115,11 @@
- #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
- #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
- 
-+/*
-+ * Page size used in non-contiguous buffer entries
-+ */
-+#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
-+
- /**
-  * struct optee_msg_param_tmem - temporary memory reference parameter
-  * @buf_ptr:	Address of the buffer
-@@ -145,8 +171,8 @@ struct optee_msg_param_value {
+diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
+index f7b7b40..f8e044d 100644
+--- a/drivers/tee/optee/call.c
++++ b/drivers/tee/optee/call.c
+@@ -11,6 +11,7 @@
+  * GNU General Public License for more details.
   *
-  * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
-  * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
-- * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
-- * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
-+ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates @tmem and
-+ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates @rmem,
-  * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
   */
- struct optee_msg_param {
-diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
-index 069c8e1..7cd3272 100644
---- a/drivers/tee/optee/optee_smc.h
-+++ b/drivers/tee/optee/optee_smc.h
-@@ -222,6 +222,13 @@ struct optee_smc_get_shm_config_result {
- #define OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM	BIT(0)
- /* Secure world can communicate via previously unregistered shared memory */
- #define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	BIT(1)
++#include <asm/pgtable.h>
+ #include <linux/arm-smccc.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+@@ -442,3 +443,50 @@ void optee_disable_shm_cache(struct optee *optee)
+ 	}
+ 	optee_cq_wait_final(&optee->call_queue, &w);
+ }
 +
-+/*
-+ * Secure world supports commands "register/unregister shared memory",
-+ * secure world accepts command buffers located in any parts of non-secure RAM
++/**
++ * optee_fill_pages_list() - write list of user pages to given shared
++ * buffer.
++ *
++ * @dst: page-aligned buffer where list of pages will be stored
++ * @pages: array of pages that represents shared buffer
++ * @num_pages: number of entries in @pages
++ *
++ * @dst should be big enough to hold list of user page addresses and
++ *	links to the next pages of buffer
 + */
-+#define OPTEE_SMC_SEC_CAP_DYNAMIC_SHM		BIT(2)
++void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages)
++{
++	size_t i;
 +
- #define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
- #define OPTEE_SMC_EXCHANGE_CAPABILITIES \
- 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
++	/* TODO: add support for RichOS page sizes that != 4096 */
++	BUILD_BUG_ON(PAGE_SIZE != OPTEE_MSG_NONCONTIG_PAGE_SIZE);
++	for (i = 0; i < num_pages; i++, dst++) {
++		/* Check if we are going to roll over the page boundary */
++		if (IS_ALIGNED((uintptr_t)(dst + 1),
++			       OPTEE_MSG_NONCONTIG_PAGE_SIZE)) {
++			*dst = virt_to_phys(dst + 1);
++			dst++;
++		}
++		*dst = page_to_phys(pages[i]);
++	}
++}
++
++static size_t get_pages_array_size(size_t num_entries)
++{
++	/* Number of user pages + number of pages to hold list of user pages */
++	return sizeof(u64) *
++		(num_entries + (sizeof(u64) * num_entries) /
++		 OPTEE_MSG_NONCONTIG_PAGE_SIZE);
++}
++
++u64 *optee_allocate_pages_array(size_t num_entries)
++{
++	return alloc_pages_exact(get_pages_array_size(num_entries), GFP_KERNEL);
++}
++
++void optee_free_pages_array(void *array, size_t num_entries)
++{
++	free_pages_exact(array, get_pages_array_size(num_entries));
++}
++
+diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
+index c374cd5..caa3c04 100644
+--- a/drivers/tee/optee/optee_private.h
++++ b/drivers/tee/optee/optee_private.h
+@@ -165,6 +165,10 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
+ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ 		       const struct tee_param *params);
+ 
++u64 *optee_allocate_pages_array(size_t num_entries);
++void optee_free_pages_array(void *array, size_t num_entries);
++void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages);
++
+ /*
+  * Small helpers
+  */
 -- 
 2.7.4
