@@ -1,72 +1,50 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Thu, 28 Sep 2017 03:49:23 +0200
-Subject: [PATCH v4 06/11] arm64: allwinner: a64: Add devicetree binding for
- DMA controller
+Date: Thu, 28 Sep 2017 03:49:27 +0200
+Subject: [PATCH v4 10/11] arm64: allwinner: a64: add dma controller references
+ to spi nodes
 In-Reply-To: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
 References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <b8a9df1a-f1ae-4b27-9ee7-73ffef00c654@rwthex-w2-a.rwth-ad.de>
+Message-ID: <c54acd7f-a75c-4053-a5f3-f9a14f1d2e5b@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 is register compatible with the H3, but has a different number
-of dma channels and request ports.
+The spi controller nodes omit the dma controller/channel references, add
+it.
 
-Attach additional properties to the node to allow future reuse of the
-compatible for controllers with different number of channels/requests.
-
-If dma-requests is not specified, the register layout defined maximum
-of 32 is used.
+This does not yet enable DMA for SPI transfers, as the spi-sun6i driver
+lacks support for DMA, but always uses PIO to the FIFO.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-Acked-by: Rob Herring <robh@kernel.org>
-
 ---
 
 Changes in v4: None
-Changes in v3:
-- Drop leading 0 from unit name in DT example
-
+Changes in v3: None
 Changes in v2: None
 
- .../devicetree/bindings/dma/sun6i-dma.txt          | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-index 98fbe1a5c6dd..9700b1d00fed 100644
---- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-@@ -27,6 +27,32 @@ Example:
- 		#dma-cells = <1>;
- 	};
- 
-+------------------------------------------------------------------------------
-+For A64 DMA controller:
-+
-+Required properties:
-+- compatible:	"allwinner,sun50i-a64-dma"
-+- dma-channels: Number of DMA channels supported by the controller.
-+		Refer to Documentation/devicetree/bindings/dma/dma.txt
-+- all properties above, i.e. reg, interrupts, clocks, resets and #dma-cells
-+
-+Optional properties:
-+- dma-requests: Number of DMA request signals supported by the controller.
-+		Refer to Documentation/devicetree/bindings/dma/dma.txt
-+
-+Example:
-+	dma: dma-controller at 1c02000 {
-+		compatible = "allwinner,sun50i-a64-dma";
-+		reg = <0x01c02000 0x1000>;
-+		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&ccu CLK_BUS_DMA>;
-+		dma-channels = <8>;
-+		dma-requests = <27>;
-+		resets = <&ccu RST_BUS_DMA>;
-+		#dma-cells = <1>;
-+	};
-+------------------------------------------------------------------------------
-+
- Clients:
- 
- DMA clients connected to the A31 DMA controller must use the format
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index cbffefce0e71..a6a5a40d76d0 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -476,6 +476,8 @@
+ 			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 23>, <&dma 23>;
++			dma-names = "rx", "tx";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&spi0_pins>;
+ 			resets = <&ccu RST_BUS_SPI0>;
+@@ -491,6 +493,8 @@
+ 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 24>, <&dma 24>;
++			dma-names = "rx", "tx";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&spi1_pins>;
+ 			resets = <&ccu RST_BUS_SPI1>;
 -- 
 2.14.1
