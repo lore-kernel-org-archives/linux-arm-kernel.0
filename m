@@ -1,131 +1,144 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Thu, 28 Sep 2017 21:04:04 +0300
-Subject: [PATCH v1 07/14] tee: optee: add shared buffer registration functions
+Date: Thu, 28 Sep 2017 21:04:05 +0300
+Subject: [PATCH v1 08/14] tee: optee: add registered shared parameters handling
 In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1506621851-6929-8-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1506621851-6929-9-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-This change adds ops for shm_(un)register functions in tee interface.
-Client application can use these functions to (un)register an own shared
-buffer in OP-TEE address space. This allows zero copy data sharing between
-Normal and Secure Worlds.
+Now, when client applications can register own shared buffers in OP-TEE,
+we need to extend ABI for parameter passing to/from OP-TEE.
 
-Please note that while those functions were added to optee code,
-it does not report to userspace that those functions are available.
-OP-TEE code does not set TEE_GEN_CAP_REG_MEM flag. This flag will be
-enabled only after all other features of dynamic shared memory will be
-implemented in subsequent patches.
+So, if OP-TEE core detects that parameter belongs to registered shared
+memory, it will use corresponding parameter attribute.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/call.c          | 64 +++++++++++++++++++++++++++++++++++++++
- drivers/tee/optee/core.c          |  2 ++
- drivers/tee/optee/optee_private.h |  4 +++
- 3 files changed, 70 insertions(+)
+ drivers/tee/optee/core.c | 86 +++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 71 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-index f8e044d..ec53dca 100644
---- a/drivers/tee/optee/call.c
-+++ b/drivers/tee/optee/call.c
-@@ -490,3 +490,67 @@ void optee_free_pages_array(void *array, size_t num_entries)
- 	free_pages_exact(array, get_pages_array_size(num_entries));
- }
- 
-+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
-+		       struct page **pages, size_t num_pages)
-+{
-+	struct tee_shm *shm_arg = NULL;
-+	struct optee_msg_arg *msg_arg;
-+	u64 *pages_array;
-+	phys_addr_t msg_parg;
-+	int rc = 0;
-+
-+	if (!num_pages)
-+		return -EINVAL;
-+
-+	pages_array = optee_allocate_pages_array(num_pages);
-+	if (!pages_array)
-+		return -ENOMEM;
-+
-+	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
-+	if (IS_ERR(shm_arg)) {
-+		rc = PTR_ERR(shm_arg);
-+		goto out;
-+	}
-+
-+	optee_fill_pages_list(pages_array, pages, num_pages);
-+
-+	msg_arg->cmd = OPTEE_MSG_CMD_REGISTER_SHM;
-+	msg_arg->params->attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
-+				OPTEE_MSG_ATTR_NONCONTIG;
-+	msg_arg->params->u.tmem.shm_ref = (unsigned long)shm;
-+	msg_arg->params->u.tmem.size = tee_shm_get_size(shm);
-+	msg_arg->params->u.tmem.buf_ptr = virt_to_phys(pages_array) |
-+					  tee_shm_get_page_offset(shm);
-+
-+	if (optee_do_call_with_arg(ctx, msg_parg) ||
-+	    msg_arg->ret != TEEC_SUCCESS)
-+		rc = -EINVAL;
-+
-+	tee_shm_free(shm_arg);
-+out:
-+	optee_free_pages_array(pages_array, num_pages);
-+	return rc;
-+}
-+
-+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
-+{
-+	struct tee_shm *shm_arg;
-+	struct optee_msg_arg *msg_arg;
-+	phys_addr_t msg_parg;
-+	int rc = 0;
-+
-+	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
-+	if (IS_ERR(shm_arg))
-+		return PTR_ERR(shm_arg);
-+
-+	msg_arg->cmd = OPTEE_MSG_CMD_UNREGISTER_SHM;
-+
-+	msg_arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
-+	msg_arg->params[0].u.rmem.shm_ref = (unsigned long)shm;
-+
-+	if (optee_do_call_with_arg(ctx, msg_parg) ||
-+	    msg_arg->ret != TEEC_SUCCESS)
-+		rc = -EINVAL;
-+	tee_shm_free(shm_arg);
-+	return rc;
-+}
 diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 7952357..4d448bf 100644
+index 4d448bf..a962f60 100644
 --- a/drivers/tee/optee/core.c
 +++ b/drivers/tee/optee/core.c
-@@ -267,6 +267,8 @@ static const struct tee_driver_ops optee_ops = {
- 	.close_session = optee_close_session,
- 	.invoke_func = optee_invoke_func,
- 	.cancel_req = optee_cancel_req,
-+	.shm_register = optee_shm_register,
-+	.shm_unregister = optee_shm_unregister,
- };
- 
- static const struct tee_desc optee_desc = {
-diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-index caa3c04..3ea7f7a 100644
---- a/drivers/tee/optee/optee_private.h
-+++ b/drivers/tee/optee/optee_private.h
-@@ -160,6 +160,10 @@ int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session);
- void optee_enable_shm_cache(struct optee *optee);
- void optee_disable_shm_cache(struct optee *optee);
- 
-+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
-+		       struct page **pages, size_t num_pages);
-+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm);
+@@ -97,6 +97,33 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
+ 					return rc;
+ 			}
+ 			break;
++		case OPTEE_MSG_ATTR_TYPE_RMEM_INPUT:
++		case OPTEE_MSG_ATTR_TYPE_RMEM_OUTPUT:
++		case OPTEE_MSG_ATTR_TYPE_RMEM_INOUT:
++			p->attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT +
++				  attr - OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
++			p->u.memref.size = mp->u.rmem.size;
++			shm = (struct tee_shm *)(unsigned long)
++				mp->u.rmem.shm_ref;
 +
- int optee_from_msg_param(struct tee_param *params, size_t num_params,
- 			 const struct optee_msg_param *msg_params);
- int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
++			if (!shm) {
++				p->u.memref.shm_offs = 0;
++				p->u.memref.shm = NULL;
++				break;
++			}
++			p->u.memref.shm_offs = mp->u.rmem.offs;
++			p->u.memref.shm = shm;
++
++			/* Check that the memref is covered by the shm object */
++			if (p->u.memref.size) {
++				size_t o = p->u.memref.shm_offs +
++					   p->u.memref.size;
++
++				if (o > tee_shm_get_size(shm))
++					return -EINVAL;
++			}
++			break;
++
+ 		default:
+ 			return -EINVAL;
+ 		}
+@@ -104,6 +131,46 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
+ 	return 0;
+ }
+ 
++static int to_msg_param_tmp_mem(struct optee_msg_param *mp,
++				const struct tee_param *p)
++{
++	int rc;
++	phys_addr_t pa;
++
++	mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT + p->attr -
++		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
++
++	mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
++	mp->u.tmem.size = p->u.memref.size;
++
++	if (!p->u.memref.shm) {
++		mp->u.tmem.buf_ptr = 0;
++		return 0;
++	}
++
++	rc = tee_shm_get_pa(p->u.memref.shm, p->u.memref.shm_offs, &pa);
++	if (rc)
++		return rc;
++
++	mp->u.tmem.buf_ptr = pa;
++	mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
++		    OPTEE_MSG_ATTR_CACHE_SHIFT;
++
++	return 0;
++}
++
++static int to_msg_param_reg_mem(struct optee_msg_param *mp,
++				const struct tee_param *p)
++{
++	mp->attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT + p->attr -
++		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
++
++	mp->u.rmem.shm_ref = (unsigned long)p->u.memref.shm;
++	mp->u.rmem.size = p->u.memref.size;
++	mp->u.rmem.offs = p->u.memref.shm_offs;
++	return 0;
++}
++
+ /**
+  * optee_to_msg_param() - convert from struct tee_params to OPTEE_MSG parameters
+  * @msg_params:	OPTEE_MSG parameters
+@@ -116,7 +183,6 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ {
+ 	int rc;
+ 	size_t n;
+-	phys_addr_t pa;
+ 
+ 	for (n = 0; n < num_params; n++) {
+ 		const struct tee_param *p = params + n;
+@@ -139,22 +205,12 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
+-			mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT +
+-				   p->attr -
+-				   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
+-			mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
+-			mp->u.tmem.size = p->u.memref.size;
+-			if (!p->u.memref.shm) {
+-				mp->u.tmem.buf_ptr = 0;
+-				break;
+-			}
+-			rc = tee_shm_get_pa(p->u.memref.shm,
+-					    p->u.memref.shm_offs, &pa);
++			if (tee_shm_is_registered(p->u.memref.shm))
++				rc = to_msg_param_reg_mem(mp, p);
++			else
++				rc = to_msg_param_tmp_mem(mp, p);
+ 			if (rc)
+ 				return rc;
+-			mp->u.tmem.buf_ptr = pa;
+-			mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
+-					OPTEE_MSG_ATTR_CACHE_SHIFT;
+ 			break;
+ 		default:
+ 			return -EINVAL;
 -- 
 2.7.4
