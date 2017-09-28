@@ -1,84 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Sep 2017 19:01:35 +0100
-Subject: [PATCH] scripts/decodecode: Fix decoding for AArch64 (arm64)
- instructions
-In-Reply-To: <20170928143704.GC3611@e103592.cambridge.arm.com>
-References: <1506596147-23630-1-git-send-email-will.deacon@arm.com>
- <20170928124206.GA3611@e103592.cambridge.arm.com>
- <20170928141447.GA27788@arm.com>
- <20170928143704.GC3611@e103592.cambridge.arm.com>
-Message-ID: <20170928180135.GH9892@arm.com>
+From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
+Date: Thu, 28 Sep 2017 21:03:57 +0300
+Subject: [PATCH v1 00/14] tee: optee: add dynamic shared memory support
+Message-ID: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 03:37:04PM +0100, Dave Martin wrote:
-> On Thu, Sep 28, 2017 at 03:14:47PM +0100, Will Deacon wrote:
-> > On Thu, Sep 28, 2017 at 01:42:31PM +0100, Dave Martin wrote:
-> > > On Thu, Sep 28, 2017 at 11:55:47AM +0100, Will Deacon wrote:
-> > > > There are a couple of problems with the decodecode script and arm64:
-> > > > 
-> > > > 1. AArch64 objdump refuses to disassemble .4byte directives as instructions,
-> > > >    insisting that they are data values and displaying them as:
-> > > > 
-> > > > 	a94153f3	.word	0xa94153f3		<-- trapping instruction
-> > > > 
-> > > >    This is resolved by using the .inst directive instead.
-> > > > 
-> > > > 2. Disassembly of branch instructions attempts to provide the target as
-> > > >    an offset from a symbol, e.g.:
-> > > > 
-> > > >    0:	34000082	cbz	w2, 10 <.text+0x10>
-> > > > 
-> > > >   however this falls foul of the grep -v, which matches lines containing
-> > > >   ".text" and ends up removing all branch instructions from the dump.
-> > > 
-> > > Any idea why this doesn't affect other arches too ... or does it?
-> > 
-> > I'm not sure, although I don't know how .inst works for architectures
-> > with variable-length instructions and I *guess* the disassembly is less
-> > fussy about data vs text for those targets.
-> 
-> I rather meant the target disassembly for relative branches in the
-> absence of labels.
-> 
-> Anyway, I think this is at least harmless to other arches, and possibly
-> helpful to them (if they disassemble those branch targets in the same
-> sort of way).
+From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-Ah, I see what you mean. Something like the fixup below on top.
+This patch series enables dynamic shared memory support in the TEE
+subsystem as a whole and in OP-TEE in particular.
 
-Will
+Global Platform TEE specification [1] allows client applications
+to register part of own memory as a shared buffer between
+application and TEE. This allows fast zero-copy communication between
+TEE and REE. But current implementation of TEE in Linux does not support
+this feature.
 
---->8
+Also, current implementation of OP-TEE transport uses fixed size
+pre-shared buffer for all communications with OP-TEE OS. This is okay
+in the most use cases. But this prevents use of OP-TEE in virtualized
+environments, because:
+ a) We can't share the same buffer between different virtual machines
+ b) Physically contiguous memory as seen by VM can be non-contiguous
+    in reality (and as seen by OP-TEE OS) due to second stage of
+    MMU translation.
+ c) Size of this pre-shared buffer is limited.
 
-diff --git a/scripts/decodecode b/scripts/decodecode
-index 67214ec5b2cb..f1ec57c3cbf7 100755
---- a/scripts/decodecode
-+++ b/scripts/decodecode
-@@ -49,21 +49,14 @@ esac
- 
- disas() {
- 	${CROSS_COMPILE}as $AFLAGS -o $1.o $1.s > /dev/null 2>&1
-+	${CROSS_COMPILE}strip $1.o
- 
--	if [ "$ARCH" = "arm" ]; then
--		if [ $width -eq 2 ]; then
--			OBJDUMPFLAGS="-M force-thumb"
--		fi
--
--		${CROSS_COMPILE}strip $1.o
-+	if [ "$ARCH" = "arm" -a $width -eq 2 ]; then
-+		OBJDUMPFLAGS="-M force-thumb"
- 	fi
- 
--	if [ "$ARCH" = "arm64" ]; then
--		if [ $width -eq 4 ]; then
--			type=inst
--		fi
--
--		${CROSS_COMPILE}strip $1.o
-+	if [ "$ARCH" = "arm64" -a $width -eq 4 ]; then
-+		type=inst
- 	fi
- 
- 	${CROSS_COMPILE}objdump $OBJDUMPFLAGS -S $1.o | \
+So, first part of this patch series adds generic register/unregister
+interface to tee subsystem. Next patches add necessary features
+into OP-TEE driver, so it can use not only static pre-shared buffer,
+but whole RAM to communicate with OP-TEE OS.
+
+[1] https://www.globalplatform.org/specificationsdevice.asp
+
+Jens Wiklander (2):
+  tee: flexible shared memory  pool creation
+  tee: add register user memory
+
+Volodymyr Babchuk (12):
+  tee: shm: add accessors for buffer size and page offset
+  tee: shm: add page accessor functions
+  tee: optee: Update protocol definitions
+  tee: optee: add page list manipulation functions
+  tee: optee: add shared buffer registration functions
+  tee: optee: add registered shared parameters handling
+  tee: optee: add registered buffers handling into RPC calls
+  tee: optee: store OP-TEE capabilities in private data
+  tee: optee: add optee-specific shared pool implementation
+  tee: optee: enable dynamic SHM support
+  tee: use reference counting for tee_context
+  tee: shm: inline tee_shm getter functions
+
+ drivers/tee/optee/Makefile        |   1 +
+ drivers/tee/optee/call.c          | 131 +++++++++++++++++++++-
+ drivers/tee/optee/core.c          | 160 +++++++++++++++++++++------
+ drivers/tee/optee/optee_msg.h     |  38 ++++++-
+ drivers/tee/optee/optee_private.h |  26 ++++-
+ drivers/tee/optee/optee_smc.h     |   7 ++
+ drivers/tee/optee/rpc.c           |  72 ++++++++++--
+ drivers/tee/optee/shm_pool.c      |  75 +++++++++++++
+ drivers/tee/optee/shm_pool.h      |  23 ++++
+ drivers/tee/tee_core.c            |  81 ++++++++++++--
+ drivers/tee/tee_private.h         |  60 +---------
+ drivers/tee/tee_shm.c             | 226 +++++++++++++++++++++++++++++++-------
+ drivers/tee/tee_shm_pool.c        | 165 +++++++++++++++++-----------
+ include/linux/tee_drv.h           | 184 ++++++++++++++++++++++++++++++-
+ include/uapi/linux/tee.h          |  30 +++++
+ 15 files changed, 1058 insertions(+), 221 deletions(-)
+ create mode 100644 drivers/tee/optee/shm_pool.c
+ create mode 100644 drivers/tee/optee/shm_pool.h
+
+-- 
+2.7.4
