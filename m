@@ -1,32 +1,48 @@
 From: lori.hikichi@broadcom.com (Lori Hikichi)
-Date: Thu, 28 Sep 2017 15:29:32 -0700
-Subject: [PATCH v1 1/3] ASoC: cygnus: Add EXPORT_SYMBOL for helper function
+Date: Thu, 28 Sep 2017 15:29:33 -0700
+Subject: [PATCH INTERNAL 1/1] ASoC: cygnus: Remove set_fmt from SPDIF dai ops
 In-Reply-To: <1506637775-18293-1-git-send-email-lori.hikichi@broadcom.com>
 References: <1506637775-18293-1-git-send-email-lori.hikichi@broadcom.com>
-Message-ID: <1506637775-18293-2-git-send-email-lori.hikichi@broadcom.com>
+Message-ID: <1506637775-18293-3-git-send-email-lori.hikichi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The helper function cygnus_ssp_set_custom_fsync_width() is intended
-to be called from an ASoC machine driver, need to export symbol
-if using modules.
+The SPDIF port cannot modify its format so a set_fmt function is not
+needed. Previously, we used a generic set_fmt for all ports and returned
+an error code for the SPDIF port. It is cleaner to not populate the
+set_fmt field.
 
 Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
 ---
- sound/soc/bcm/cygnus-ssp.c | 1 +
- 1 file changed, 1 insertion(+)
+ sound/soc/bcm/cygnus-ssp.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
-index 15c438f..e9c73a4 100644
+index 15c438f..b9a3bb8d 100644
 --- a/sound/soc/bcm/cygnus-ssp.c
 +++ b/sound/soc/bcm/cygnus-ssp.c
-@@ -842,6 +842,7 @@ int cygnus_ssp_set_custom_fsync_width(struct snd_soc_dai *cpu_dai, int len)
- 		return -EINVAL;
- 	}
- }
-+EXPORT_SYMBOL_GPL(cygnus_ssp_set_custom_fsync_width);
+@@ -1136,6 +1136,13 @@ static int cygnus_ssp_resume(struct snd_soc_dai *cpu_dai)
+ 	.set_tdm_slot	= cygnus_set_dai_tdm_slot,
+ };
  
- static int cygnus_ssp_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- {
++static const struct snd_soc_dai_ops cygnus_spdif_dai_ops = {
++	.startup	= cygnus_ssp_startup,
++	.shutdown	= cygnus_ssp_shutdown,
++	.trigger	= cygnus_ssp_trigger,
++	.hw_params	= cygnus_ssp_hw_params,
++	.set_sysclk	= cygnus_ssp_set_sysclk,
++};
+ 
+ #define INIT_CPU_DAI(num) { \
+ 	.name = "cygnus-ssp" #num, \
+@@ -1174,7 +1181,7 @@ static int cygnus_ssp_resume(struct snd_soc_dai *cpu_dai)
+ 		.formats = SNDRV_PCM_FMTBIT_S16_LE |
+ 			SNDRV_PCM_FMTBIT_S32_LE,
+ 	},
+-	.ops = &cygnus_ssp_dai_ops,
++	.ops = &cygnus_spdif_dai_ops,
+ 	.suspend = cygnus_ssp_suspend,
+ 	.resume = cygnus_ssp_resume,
+ };
 -- 
 1.9.1
