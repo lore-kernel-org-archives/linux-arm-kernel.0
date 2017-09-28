@@ -1,47 +1,36 @@
 From: kalyan.kinthada@alliedtelesis.co.nz (Kalyan Kinthada)
-Date: Fri, 29 Sep 2017 10:36:05 +1300
-Subject: [PATCH v2 2/2] dt-bindings: i2c: Update documentation for
- "mv78230-a0-i2c"
-In-Reply-To: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
-References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
-Message-ID: <20170928213605.22874-3-kalyan.kinthada@alliedtelesis.co.nz>
+Date: Fri, 29 Sep 2017 10:36:03 +1300
+Subject: [PATCH v2 0/2] Fix I2C repeated start timing violation on Armada-38x.
+Message-ID: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit modifies the documentation for
-"marvell,mv78230-a0-i2c" compatible string.
+All the Armada 38x(380, 385, 388) have a silicon issue in
+the I2C controller which violates the I2C repeated start timing
+(errata FE-8471889).
 
-The "marvell,mv78230-a0-i2c" compatible string enables the workaround
-for an i2c repeated start timing violation, but unlike
-"marvell,mv78230-i2c" it disables the i2c offload support. This is
-applicable to a number of SoCs such as early revisions of the Armada XP
-and the Armada 38x.
+Activate the compatible string "marvell,mv78230-a0-i2c" in the
+device tree file of Armada-38x to fx this errata (FE-8471889).
 
-Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
----
+Updated the Documentation for the compatible string
+"marvell,mv78230-a0-i2c".
+
+Thank You Gregory Clement for suggesting to reuse the
+"marvell,mv78230-a0-i2c" compatible string on Armada-38x SoCs.
+
+Changes since v1:
+* "dt-bindings: i2c: Update documentation for "mv78230-a0-i2c""
+   Modified commit message.
+   Added details describing the compatible string "mv78230-a0-i2c"
+
+-------
+Kalyan Kinthada (2):
+  ARM: dts: Fix I2C repeated start issue on Armada-38x
+  dt-bindings: i2c: Update documentation for "mv78230-a0-i2c"
+
  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-38x.dtsi                     |  4 ++--
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-index 5c30026921ae..c6cbab17ed0a 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-@@ -10,10 +10,12 @@ Required properties :
-                      - "marvell,mv64xxx-i2c"
-                      - "marvell,mv78230-i2c"
-                      - "marvell,mv78230-a0-i2c"
--                       * Note: Only use "marvell,mv78230-a0-i2c" for a
--                         very rare, initial version of the SoC which
--                         had broken offload support.  Linux
--                         auto-detects this and sets it appropriately.
-+                       * Note: Use "marvell,mv78230-a0-i2c" for
-+                         controller which do not support offload
-+                         but still have the i2c repeated start
-+                         timing violation issue, such as the
-+                         ones found in the Armada XP A0 and the
-+                         Armada 38x SoCs.
-  - interrupts      : The interrupt number
- 
- Optional properties :
 -- 
 2.14.1
