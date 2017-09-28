@@ -1,28 +1,95 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Sep 2017 08:04:05 +0200
-Subject: [PATCH] ARM: dts: r8a7743: Add MSIOF[012] support
-In-Reply-To: <1506506225-5015-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1506506225-5015-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20170928060405.GC5562@verge.net.au>
+From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
+Date: Thu, 28 Sep 2017 14:11:41 +0800
+Subject: [PATCH v2 1/5] media: atmel_isc: Add spin lock for clock enable
+ ops
+In-Reply-To: <20170927071626.mok5h3ckisyipy53@valkosipuli.retiisi.org.uk>
+References: <20170918063925.6372-1-wenyou.yang@microchip.com>
+ <20170918063925.6372-2-wenyou.yang@microchip.com>
+ <20170927071626.mok5h3ckisyipy53@valkosipuli.retiisi.org.uk>
+Message-ID: <ab5896f3-8631-4ce4-b996-5b679f66909b@Microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 10:57:04AM +0100, Fabrizio Castro wrote:
-> Add the DT nodes needed by MSIOF[012] interfaces to the SoC dtsi.
-> Also, define aliases for spi[123].
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> ---
-> 
-> This patch depends on the corresponding dt-bindings patch:
-> * spi: sh-msiof: Add r8a774[35] to the compatible list
-> which has been applied to linux-next already.
+Hi Sakari,
 
-Thanks, applied for v4.15 with Geert's tags.
 
-Thanks for providing a cover letter and threading the
-patches a reply to the cover letter. This is very helpful.
+On 2017/9/27 15:16, Sakari Ailus wrote:
+> Hi Wenyou,
+>
+> On subject:
+>
+> s/_/-/
+>
+> On Mon, Sep 18, 2017 at 02:39:21PM +0800, Wenyou Yang wrote:
+>> Add the spin lock for the clock enable and disable operations.
+>>
+>> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+>> ---
+>>
+>> Changes in v2: None
+>>
+>>   drivers/media/platform/atmel/atmel-isc.c | 14 +++++++++++++-
+>>   1 file changed, 13 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+>> index 2f8e345d297e..78114193af4c 100644
+>> --- a/drivers/media/platform/atmel/atmel-isc.c
+>> +++ b/drivers/media/platform/atmel/atmel-isc.c
+>> @@ -65,6 +65,7 @@ struct isc_clk {
+>>   	struct clk_hw   hw;
+>>   	struct clk      *clk;
+>>   	struct regmap   *regmap;
+>> +	spinlock_t	*lock;
+> Can this work? I don't see lock being assigned anywhere. Did you mean
+>
+> 	spinlock_t	lock;
+>
+> ?
+Ooh. I made a mistake.
 
-Please consider enumerating patches in a series. In this case it would be
-0/2 for the cover then 1/2 and 2/2 for the patches themselves.
+Thank you very much.
+>
+>>   	u8		id;
+>>   	u8		parent_id;
+>>   	u32		div;
+>> @@ -312,26 +313,37 @@ static int isc_clk_enable(struct clk_hw *hw)
+>>   	struct isc_clk *isc_clk = to_isc_clk(hw);
+>>   	u32 id = isc_clk->id;
+>>   	struct regmap *regmap = isc_clk->regmap;
+>> +	unsigned long flags;
+>> +	unsigned int status;
+>>   
+>>   	dev_dbg(isc_clk->dev, "ISC CLK: %s, div = %d, parent id = %d\n",
+>>   		__func__, isc_clk->div, isc_clk->parent_id);
+>>   
+>> +	spin_lock_irqsave(isc_clk->lock, flags);
+>>   	regmap_update_bits(regmap, ISC_CLKCFG,
+>>   			   ISC_CLKCFG_DIV_MASK(id) | ISC_CLKCFG_SEL_MASK(id),
+>>   			   (isc_clk->div << ISC_CLKCFG_DIV_SHIFT(id)) |
+>>   			   (isc_clk->parent_id << ISC_CLKCFG_SEL_SHIFT(id)));
+>>   
+>>   	regmap_write(regmap, ISC_CLKEN, ISC_CLK(id));
+>> +	spin_unlock_irqrestore(isc_clk->lock, flags);
+>>   
+>> -	return 0;
+>> +	regmap_read(regmap, ISC_CLKSR, &status);
+>> +	if (status & ISC_CLK(id))
+>> +		return 0;
+>> +	else
+>> +		return -EINVAL;
+>>   }
+>>   
+>>   static void isc_clk_disable(struct clk_hw *hw)
+>>   {
+>>   	struct isc_clk *isc_clk = to_isc_clk(hw);
+>>   	u32 id = isc_clk->id;
+>> +	unsigned long flags;
+>>   
+>> +	spin_lock_irqsave(isc_clk->lock, flags);
+>>   	regmap_write(isc_clk->regmap, ISC_CLKDIS, ISC_CLK(id));
+>> +	spin_unlock_irqrestore(isc_clk->lock, flags);
+>>   }
+>>   
+>>   static int isc_clk_is_enabled(struct clk_hw *hw)
+Best Regards,
+Wenyou Yang
