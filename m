@@ -1,72 +1,53 @@
-From: vikas.manocha@st.com (Vikas Manocha)
-Date: Thu, 28 Sep 2017 15:51:24 -0700
-Subject: [PATCH 1/3] Arm: dts: stm32: remove extra compatible string for uart
-In-Reply-To: <1506639114-16913-1-git-send-email-vikas.manocha@st.com>
-References: <1506639114-16913-1-git-send-email-vikas.manocha@st.com>
-Message-ID: <1506639114-16913-2-git-send-email-vikas.manocha@st.com>
+From: lori.hikichi@broadcom.com (Lori Hikichi)
+Date: Thu, 28 Sep 2017 16:50:10 -0700
+Subject: [PATCH INTERNAL 1/1] ASoC: cygnus: Remove set_fmt from SPDIF dai
+ ops
+In-Reply-To: <1506637775-18293-3-git-send-email-lori.hikichi@broadcom.com>
+References: <1506637775-18293-1-git-send-email-lori.hikichi@broadcom.com>
+ <1506637775-18293-3-git-send-email-lori.hikichi@broadcom.com>
+Message-ID: <18d0bb50-7a5d-8099-7d98-57f9e40bd6cd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the extra compatibility string "st,stm32-usart" to
-avoid confusion, save some time & space.
 
-Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
-Reviewed-by: Patrice Chotard <patrice.chotard@st.com>
----
- Documentation/devicetree/bindings/dma/stm32-dma.txt         |  2 +-
- Documentation/devicetree/bindings/serial/st,stm32-usart.txt | 10 +++-------
- 2 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-index 4408af6..6f44df9 100644
---- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-@@ -71,7 +71,7 @@ channel: a phandle to the DMA controller plus the following four integer cells:
- Example:
- 
- 	usart1: serial at 40011000 {
--		compatible = "st,stm32-usart", "st,stm32-uart";
-+		compatible = "st,stm32-uart";
- 		reg = <0x40011000 0x400>;
- 		interrupts = <37>;
- 		clocks = <&clk_pclk2>;
-diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-index 3657f9f..d150b04 100644
---- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-@@ -2,14 +2,10 @@
- 
- Required properties:
- - compatible: can be either:
--  - "st,stm32-usart",
-   - "st,stm32-uart",
--  - "st,stm32f7-usart",
-   - "st,stm32f7-uart",
--  - "st,stm32h7-usart"
-   - "st,stm32h7-uart".
--  depending on whether the device supports synchronous mode
--  and is compatible with stm32(f4), stm32f7 or stm32h7.
-+  depending is compatible with stm32(f4), stm32f7 or stm32h7.
- - reg: The address and length of the peripheral registers space
- - interrupts:
-   - The interrupt line for the USART instance,
-@@ -33,7 +29,7 @@ usart4: serial at 40004c00 {
- };
- 
- usart2: serial at 40004400 {
--	compatible = "st,stm32-usart", "st,stm32-uart";
-+	compatible = "st,stm32-uart";
- 	reg = <0x40004400 0x400>;
- 	interrupts = <38>;
- 	clocks = <&clk_pclk1>;
-@@ -43,7 +39,7 @@ usart2: serial at 40004400 {
- };
- 
- usart1: serial at 40011000 {
--	compatible = "st,stm32-usart", "st,stm32-uart";
-+	compatible = "st,stm32-uart";
- 	reg = <0x40011000 0x400>;
- 	interrupts = <37>;
- 	clocks = <&rcc 0 164>;
--- 
-1.9.1
+On 9/28/2017 3:29 PM, Lori Hikichi wrote:
+> The SPDIF port cannot modify its format so a set_fmt function is not
+> needed. Previously, we used a generic set_fmt for all ports and returned
+> an error code for the SPDIF port. It is cleaner to not populate the
+> set_fmt field.
+>
+> Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
+> ---
+>  sound/soc/bcm/cygnus-ssp.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+> index 15c438f..b9a3bb8d 100644
+> --- a/sound/soc/bcm/cygnus-ssp.c
+> +++ b/sound/soc/bcm/cygnus-ssp.c
+> @@ -1136,6 +1136,13 @@ static int cygnus_ssp_resume(struct snd_soc_dai *cpu_dai)
+>  	.set_tdm_slot	= cygnus_set_dai_tdm_slot,
+>  };
+>  
+> +static const struct snd_soc_dai_ops cygnus_spdif_dai_ops = {
+> +	.startup	= cygnus_ssp_startup,
+> +	.shutdown	= cygnus_ssp_shutdown,
+> +	.trigger	= cygnus_ssp_trigger,
+> +	.hw_params	= cygnus_ssp_hw_params,
+> +	.set_sysclk	= cygnus_ssp_set_sysclk,
+> +};
+>  
+>  #define INIT_CPU_DAI(num) { \
+>  	.name = "cygnus-ssp" #num, \
+> @@ -1174,7 +1181,7 @@ static int cygnus_ssp_resume(struct snd_soc_dai *cpu_dai)
+>  		.formats = SNDRV_PCM_FMTBIT_S16_LE |
+>  			SNDRV_PCM_FMTBIT_S32_LE,
+>  	},
+> -	.ops = &cygnus_ssp_dai_ops,
+> +	.ops = &cygnus_spdif_dai_ops,
+>  	.suspend = cygnus_ssp_suspend,
+>  	.resume = cygnus_ssp_resume,
+>  };
+Please ignore this patch. It was accidentally included in the patch set and is a
+duplicate of another patch already in the patch set.
