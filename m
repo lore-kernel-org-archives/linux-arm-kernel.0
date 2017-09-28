@@ -1,127 +1,86 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 Sep 2017 17:57:41 +0200
-Subject: [PATCH] mmc: sdhci-xenon: Fix clock resource by adding an
- optional bus clock
-In-Reply-To: <20170928150520.27616-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Thu, 28 Sep 2017 17:05:20 +0200")
-References: <20170928150520.27616-1-gregory.clement@free-electrons.com>
-Message-ID: <87o9puhl3e.fsf@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 Sep 2017 18:03:57 +0200
+Subject: [PATCH 1/2] clk/ux500: Delete an error message for a failed
+ memory allocation in three functions
+In-Reply-To: <db799483-7084-8e93-2bfe-2da0e426d08b@users.sourceforge.net>
+References: <d23a685d-f8a0-f4ca-078a-414d7b8674ca@users.sourceforge.net>
+ <db799483-7084-8e93-2bfe-2da0e426d08b@users.sourceforge.net>
+Message-ID: <CAPDyKFo3LUS4fy0U88nqoMgTKszhBwrjMAJvS_3hn5whCg=Yrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., sept. 28 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
-> index 2eec2e652c53..845575593b59 100644
-> --- a/drivers/mmc/host/sdhci-xenon.c
-> +++ b/drivers/mmc/host/sdhci-xenon.c
-> @@ -466,6 +466,7 @@ static int xenon_probe(struct platform_device *pdev)
->  {
->  	struct sdhci_pltfm_host *pltfm_host;
->  	struct sdhci_host *host;
-> +	struct xenon_priv *priv;
->  	int err;
->  
->  	host = sdhci_pltfm_init(pdev, &sdhci_xenon_pdata,
-> @@ -474,6 +475,7 @@ static int xenon_probe(struct platform_device *pdev)
->  		return PTR_ERR(host);
->  
->  	pltfm_host = sdhci_priv(host);
-> +	priv = sdhci_pltfm_priv(pltfm_host);
->  
->  	/*
->  	 * Link Xenon specific mmc_host_ops function,
-> @@ -491,9 +493,20 @@ static int xenon_probe(struct platform_device *pdev)
->  	if (err)
->  		goto free_pltfm;
->  
-> +	priv->axi_clk = devm_clk_get(&pdev->dev, "axi");
-> +	if (IS_ERR(priv->axi_clk)) {
-> +		err = PTR_ERR(priv->axi_clk);
-> +		dev_err(&pdev->dev, "Failed to setup axi clk: %d\n", err);
-
-I should manage the -EPROBE_DEFER case here. So a v2 of this patch is
-coming soon.
-
-Sorry to not have seen this before sending the patch.
-
-Gregory
-
-> +		priv->axi_clk = NULL;
-> +	} else {
-> +		err = clk_prepare_enable(priv->axi_clk);
-> +		if (err)
-> +			goto err_clk;
-> +	}
-> +
->  	err = mmc_of_parse(host->mmc);
->  	if (err)
-> -		goto err_clk;
-> +		goto err_clk_axi;
->  
->  	sdhci_get_of_property(pdev);
->  
-> @@ -502,11 +515,11 @@ static int xenon_probe(struct platform_device *pdev)
->  	/* Xenon specific dt parse */
->  	err = xenon_probe_dt(pdev);
->  	if (err)
-> -		goto err_clk;
-> +		goto err_clk_axi;
->  
->  	err = xenon_sdhc_prepare(host);
->  	if (err)
-> -		goto err_clk;
-> +		goto err_clk_axi;
->  
->  	pm_runtime_get_noresume(&pdev->dev);
->  	pm_runtime_set_active(&pdev->dev);
-> @@ -527,6 +540,9 @@ static int xenon_probe(struct platform_device *pdev)
->  	pm_runtime_disable(&pdev->dev);
->  	pm_runtime_put_noidle(&pdev->dev);
->  	xenon_sdhc_unprepare(host);
-> +err_clk_axi:
-> +	if (priv->axi_clk)
-> +		clk_disable_unprepare(priv->axi_clk);
->  err_clk:
->  	clk_disable_unprepare(pltfm_host->clk);
->  free_pltfm:
-> @@ -538,6 +554,7 @@ static int xenon_remove(struct platform_device *pdev)
->  {
->  	struct sdhci_host *host = platform_get_drvdata(pdev);
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
->  
->  	pm_runtime_get_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> @@ -546,6 +563,8 @@ static int xenon_remove(struct platform_device *pdev)
->  	sdhci_remove_host(host, 0);
->  
->  	xenon_sdhc_unprepare(host);
-> +	if (priv->axi_clk)
-> +		clk_disable_unprepare(priv->axi_clk);
->  
->  	clk_disable_unprepare(pltfm_host->clk);
->  
-> diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
-> index 2bc0510c0769..9994995c7c56 100644
-> --- a/drivers/mmc/host/sdhci-xenon.h
-> +++ b/drivers/mmc/host/sdhci-xenon.h
-> @@ -83,6 +83,7 @@ struct xenon_priv {
->  	unsigned char	bus_width;
->  	unsigned char	timing;
->  	unsigned int	clock;
-> +	struct clk      *axi_clk;
->  
->  	int		phy_type;
->  	/*
-> -- 
-> 2.14.1
+On 27 September 2017 at 20:46, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Wed, 27 Sep 2017 20:23:58 +0200
 >
+> Omit extra messages for a memory allocation failure in these functions.
+>
+> This issue was detected by using the Coccinelle software.
+>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+> ---
+>  drivers/clk/ux500/clk-prcc.c    | 4 +---
+>  drivers/clk/ux500/clk-prcmu.c   | 4 +---
+>  drivers/clk/ux500/clk-sysctrl.c | 4 +---
+>  3 files changed, 3 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
+> index f50592775c9d..5ca07e6d1f64 100644
+> --- a/drivers/clk/ux500/clk-prcc.c
+> +++ b/drivers/clk/ux500/clk-prcc.c
+> @@ -108,10 +108,8 @@ static struct clk *clk_reg_prcc(const char *name,
+>         }
+>
+>         clk = kzalloc(sizeof(struct clk_prcc), GFP_KERNEL);
+> -       if (!clk) {
+> -               pr_err("clk_prcc: %s could not allocate clk\n", __func__);
+> +       if (!clk)
+>                 return ERR_PTR(-ENOMEM);
+> -       }
+>
+>         clk->base = ioremap(phy_base, SZ_4K);
+>         if (!clk->base)
+> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+> index 6e3e16b2e5ca..c137934f23ab 100644
+> --- a/drivers/clk/ux500/clk-prcmu.c
+> +++ b/drivers/clk/ux500/clk-prcmu.c
+> @@ -259,10 +259,8 @@ static struct clk *clk_reg_prcmu(const char *name,
+>         }
+>
+>         clk = kzalloc(sizeof(struct clk_prcmu), GFP_KERNEL);
+> -       if (!clk) {
+> -               pr_err("clk_prcmu: %s could not allocate clk\n", __func__);
+> +       if (!clk)
+>                 return ERR_PTR(-ENOMEM);
+> -       }
+>
+>         clk->cg_sel = cg_sel;
+>         clk->is_prepared = 1;
+> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
+> index 8a4e93ce1e42..e0a834c08a04 100644
+> --- a/drivers/clk/ux500/clk-sysctrl.c
+> +++ b/drivers/clk/ux500/clk-sysctrl.c
+> @@ -140,10 +140,8 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
+>         }
+>
+>         clk = devm_kzalloc(dev, sizeof(struct clk_sysctrl), GFP_KERNEL);
+> -       if (!clk) {
+> -               dev_err(dev, "clk_sysctrl: could not allocate clk\n");
+> +       if (!clk)
+>                 return ERR_PTR(-ENOMEM);
+> -       }
+>
+>         /* set main clock registers */
+>         clk->reg_sel[0] = reg_sel[0];
+> --
+> 2.14.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
