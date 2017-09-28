@@ -1,32 +1,37 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 28 Sep 2017 08:17:18 +0800
-Subject: [PATCH 10/12] dt-bindings: usb: mtu3: add a optional property to
- disable u3ports
+Date: Thu, 28 Sep 2017 08:17:20 +0800
+Subject: [PATCH 12/12] dt-bindings: usb: mtu3: remove optional pinctrls
 In-Reply-To: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
 References: <fe8df8503f602586bcea4b1598eb09678b1525e3.1506509658.git.chunfeng.yun@mediatek.com>
-Message-ID: <fd4890851d8233635b334a0fad7742a58e53bc7a.1506509659.git.chunfeng.yun@mediatek.com>
+Message-ID: <ec8e65205c6e0a83850e11c030ed440d7b9be2e8.1506509659.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new optional property to disable u3ports
+Remove optional pinctrls due to using FORCE/RG_IDDIG to implement
+manual switch function.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- .../devicetree/bindings/usb/mediatek,mtu3.txt      |    2 ++
- 1 file changed, 2 insertions(+)
+ .../devicetree/bindings/usb/mediatek,mtu3.txt      |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-index 49f5476..7c611d1 100644
+index 49c982b..b2271d8 100644
 --- a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
 +++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-@@ -44,6 +44,8 @@ Optional properties:
-  - mediatek,enable-wakeup : supports ip sleep wakeup used by host mode
-  - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
- 	control register, it depends on "mediatek,enable-wakeup".
-+ - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
-+	bit1 for u3port1, ... etc;
+@@ -30,9 +30,10 @@ Optional properties:
+ 	when supports dual-role mode.
+  - vbus-supply : reference to the VBUS regulator, needed when supports
+ 	dual-role mode.
+- - pinctl-names : a pinctrl state named "default" must be defined,
+-	"id_float" and "id_ground" are optinal which depends on
+-	"mediatek,enable-manual-drd"
++ - pinctrl-names : a pinctrl state named "default" is optional, and need be
++	defined if auto drd switch is enabled, that means the property dr_mode
++	is set as "otg", and meanwhile the property "mediatek,enable-manual-drd"
++	is not set.
+  - pinctrl-0 : pin control group
+ 	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
  
- Sub-nodes:
- The xhci should be added as subnode to mtu3 as shown in the following example
 -- 
 1.7.9.5
