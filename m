@@ -1,52 +1,117 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 28 Sep 2017 21:09:42 +0200
-Subject: [PATCH] PM: ARM: sa1111: Drop suspend and resume bus type
- callbacks
-In-Reply-To: <20170928094936.GV20805@n2100.armlinux.org.uk>
-References: <2654085.Tx1JnNWXkX@aspire.rjw.lan>
- <20170926212812.GS20805@n2100.armlinux.org.uk>
- <CAJZ5v0i1iwBpkUYN=DbpbtVDu+xMKwza=4EbjYNyGr5rs7-D8Q@mail.gmail.com>
- <20170928094936.GV20805@n2100.armlinux.org.uk>
-Message-ID: <CAJZ5v0iuzDk+gT=6KG3fX1d4C9dfzp0s8t-Y0pAM4SsVgaU=0A@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 28 Sep 2017 22:50:59 +0300
+Subject: [PATCH] arm64: fix documentation on kernel pages mappings to HYP
+ VA
+In-Reply-To: <20170927091332.GA19317@arm.com>
+References: <20170913180830.8608-1-ynorov@caviumnetworks.com>
+ <20170926184542.t56zpdx2s5et77gy@yury-thinkpad>
+ <86bmlwo842.fsf@arm.com> <20170927091332.GA19317@arm.com>
+Message-ID: <20170928195059.jzwglkrx2vzyzjpf@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 11:49 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Sep 26, 2017 at 11:37:40PM +0200, Rafael J. Wysocki wrote:
->> On Tue, Sep 26, 2017 at 11:28 PM, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> > On Tue, Sep 26, 2017 at 10:47:10PM +0200, Rafael J. Wysocki wrote:
->> >> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> >>
->> >> None of the sa1111 drivers in the tree implements the suspend and
->> >> resume callbacks from struct sa1111_driver, so drop them and drop
->> >> the corresponding callbacks from sa1111_bus_type.
->> >>
->> >> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> >
->> > This will conflict with some patches I have - would you like me to queue
->> > it along with my changes?
->>
->> Yes, please.
->>
->> >  When would you like to get this merged?
->>
->> When possible. :-)
->>
->> I would like to drop the legacy suspend/resume callbacks from struct
->> bus_type eventually, as that's long overdue, and this is needed for
->> that purpose.  Not too urgent, though.
->
-> Sorry, I'd forgotten that I already had a similar patch:
->
-> http://git.armlinux.org.uk/cgit/linux-arm.git/commit/?h=sa1100&id=0e4ec3edb1c7e44aba1f48b924ab0c77431fd155
->
-> so no need to merge your veresion... I just need to get my version merged.
+On Wed, Sep 27, 2017 at 10:13:33AM +0100, Will Deacon wrote:
+> On Wed, Sep 27, 2017 at 09:31:41AM +0100, Marc Zyngier wrote:
+> > On Tue, Sep 26 2017 at  9:45:42 pm BST, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > > On Wed, Sep 13, 2017 at 09:08:30PM +0300, Yury Norov wrote:
+> > >> The Documentation/arm64/memory.txt says:
+> > >> When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+> > >> offset from the kernel VA (top 24bits of the kernel VA set to zero):
+> > >> 
+> > >> In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
+> > >> which has more options, and none of them assumes clearing of top 24bits
+> > >> of the kernel VA.
+> > >> 
+> > >> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > >> ---
+> > >>  Documentation/arm64/memory.txt | 15 +++++++++------
+> > >>  1 file changed, 9 insertions(+), 6 deletions(-)
+> > >> 
+> > >> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+> > >> index d7273a5f6456..c39895d7e3a2 100644
+> > >> --- a/Documentation/arm64/memory.txt
+> > >> +++ b/Documentation/arm64/memory.txt
+> > >> @@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
+> > >>   +-------------------------------------------------> [63] TTBR0/1
+> > >>  
+> > >>  
+> > >> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+> > >> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
+> > >> -
+> > >> -Start			End			Size		Use
+> > >> ------------------------------------------------------------------------
+> > >> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
+> > >> +When using KVM without Virtualization Host Extensions, the hypervisor maps
+> > >> +kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
+> > >> +or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
+> > >> +ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
+> > >> +VA set to zero if CPU has Reduced HYP mapping offset capability. See
+> > >> +kern_hyp_va macro.
+> > 
+> > What is this "Reduced HYP mapping offset capability"?
 
-OK
+This is the description of ARM64_HYP_OFFSET_LOW capability in
+arch/arm64/kernel/cpufeature.c
 
-What about the locomo one?
+> > You're missing the point that the location of the EL2 mapping is
+> > conditioned by the location of the identity mapping that is used to
+> > bring up / tear down KVM. You have to express the VA transformation in
+> > terms of both VA_BITS (and there is more cases than just 39 or 48 bits)
+> > *and* the idmap address, not to mention the case where KVM's VA_BITS is
+> > larger than the rest of the kernel. See the extensive blurb in
+> > kvm_mmu.h.
+> > 
+> > >> +
+> > >> +When using KVM with Virtualization Host Extensions, no additional mappings
+> > >> +created as host kernel already operates in EL2.
+> > 
+> > This bit is fine.
+> 
+> FWIW, I was going to queue a simplified version along the lines of the patch
+> below.
+> 
+> Will
 
-Thanks,
-Rafael
+Thanks.
+
+Yury
+
+> --->8
+> 
+> commit dbf7393b7738a0ba0284551e7b6e014cfb100661
+> Author: Yury Norov <ynorov@caviumnetworks.com>
+> Date:   Wed Sep 13 21:08:30 2017 +0300
+> 
+>     arm64: fix documentation on kernel pages mappings to HYP VA
+>     
+>     The Documentation/arm64/memory.txt says:
+>     When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+>     offset from the kernel VA (top 24bits of the kernel VA set to zero):
+>     
+>     In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
+>     which has more options, and none of them assumes clearing of top 24bits
+>     of the kernel VA.
+>     
+>     Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+>     [will: removed gory details]
+>     Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+> index d7273a5f6456..ea9ee39784a2 100644
+> --- a/Documentation/arm64/memory.txt
+> +++ b/Documentation/arm64/memory.txt
+> @@ -86,9 +86,9 @@ Translation table lookup with 64KB pages:
+>   +-------------------------------------------------> [63] TTBR0/1
+>  
+>  
+> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
+> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
+> +When using KVM without the Virtualization Host Extensions, the hypervisor
+> +maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
+> +kern_hyp_va macro for more details.
+>  
+> -Start			End			Size		Use
+> ------------------------------------------------------------------------
+> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
+> +When using KVM with the Virtualization Host Extensions, no additional
+> +mappings are created, since the host kernel runs directly in EL2.
