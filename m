@@ -1,43 +1,45 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Sep 2017 14:58:33 +0200
-Subject: [PATCH v2 2/7] PCI: aardvark: set PIO_ADDR_LS correctly in
- advk_pcie_rd_conf()
-In-Reply-To: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170928125838.11887-3-thomas.petazzoni@free-electrons.com>
+Date: Thu, 28 Sep 2017 14:58:31 +0200
+Subject: [PATCH v2 0/7] PCI: aardvark: improve compatibility with PCI devices
+Message-ID: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+Hello,
 
-When setting the PIO_ADDR_LS register during a configuration read, we
-were properly passing the device number, function number and register
-number, but not the bus number, causing issues when reading the
-configuration of PCIe devices.
+This patch series brings a number of fixes to the pci-aardvark driver
+that allows a much larger number of PCIe devices to be used.
 
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Wilson Ding <dingwei@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-[Thomas: tweak commit log.]
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-aardvark.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It fixes kernel bug
+https://bugzilla.kernel.org/show_bug.cgi?id=196339, and has been
+tested with an IGB NIC and a Marvell SATA PCIe card, which were not
+working previously.
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index da2881ba7737..af7a9c4a61a4 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -459,7 +459,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 	advk_writel(pcie, reg, PIO_CTRL);
- 
- 	/* Program the address registers */
--	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
-+	reg = PCIE_CONF_ADDR(bus->number, devfn, where);
- 	advk_writel(pcie, reg, PIO_ADDR_LS);
- 	advk_writel(pcie, 0, PIO_ADDR_MS);
- 
+They should be taken for the 4.14 cycle, as they are all bug fixes.
+
+Changes since v1:
+ - Rebased on top of v4.14-rc2, in order to resolve a minor conflict
+   with another patch merged in the mean time.
+
+Thanks a lot!
+
+Thomas
+
+Evan Wang (1):
+  PCI: aardvark: fix PCIe max read request size setting
+
+Thomas Petazzoni (1):
+  PCI: aardvark: define IRQ related hooks in pci_host_bridge
+
+Victor Gu (5):
+  PCI: aardvark: fix logic in PCI configuration read/write functions
+  PCI: aardvark: set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
+  PCI: aardvark: set host and device to the same MAX payload size
+  PCI: aardvark: use isr1 instead of isr0 interrupt in legacy irq mode
+  PCI: aardvark: disable LOS state by default
+
+ drivers/pci/host/pci-aardvark.c | 116 +++++++++++++++++++++++++++++++---------
+ 1 file changed, 92 insertions(+), 24 deletions(-)
+
 -- 
 2.13.5
