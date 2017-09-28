@@ -1,35 +1,71 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 28 Sep 2017 14:22:03 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable USB3503 driver
-In-Reply-To: <20170928104351.GE6726@otheros>
-References: <20170928024022.2071-1-linus.luessing@c0d3.blue>
- <CAJKOXPfQ3nXHVYXUn0iDfzVQc+ML1sSCz3NG_bwUw=WDK0id_w@mail.gmail.com>
- <20170928104351.GE6726@otheros>
-Message-ID: <CAJKOXPeN+Rtseaz+szF6-QFqq2kRYPVEwy+t8NTqO6VyefUiJg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 Sep 2017 13:42:31 +0100
+Subject: [PATCH] scripts/decodecode: Fix decoding for AArch64 (arm64)
+ instructions
+In-Reply-To: <1506596147-23630-1-git-send-email-will.deacon@arm.com>
+References: <1506596147-23630-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20170928124206.GA3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 12:43 PM, Linus L?ssing
-<linus.luessing@c0d3.blue> wrote:
-> Hi Krzysztof,
->
-> Thanks for your quick reply!
->
-> On Thu, Sep 28, 2017 at 08:21:26AM +0200, Krzysztof Kozlowski wrote:
->> [...]
->> Anyway please define this as a module (unless it can't... but it
->> worked in my case).
->
-> In that case you used an initrd, right? I see various cases of USB
-> built-ins, like CONFIG_USB_STORAGE=y, CONFIG_USB_DWC2=y and so on in
-> multi_v7_defconfig. So my impression was that multi_v7_defconfig was
-> supposed to allow booting a rootfs from a USB storage device even
-> without an initrd.
+On Thu, Sep 28, 2017 at 11:55:47AM +0100, Will Deacon wrote:
+> There are a couple of problems with the decodecode script and arm64:
+> 
+> 1. AArch64 objdump refuses to disassemble .4byte directives as instructions,
+>    insisting that they are data values and displaying them as:
+> 
+> 	a94153f3	.word	0xa94153f3		<-- trapping instruction
+> 
+>    This is resolved by using the .inst directive instead.
+> 
+> 2. Disassembly of branch instructions attempts to provide the target as
+>    an offset from a symbol, e.g.:
+> 
+>    0:	34000082	cbz	w2, 10 <.text+0x10>
+> 
+>   however this falls foul of the grep -v, which matches lines containing
+>   ".text" and ends up removing all branch instructions from the dump.
 
-We use modules for multi_v7 as much as possible with that exception as
-fair as I remember - no need of initramfs/initrd for boots. If this is
-your intention, please mention this in commit message ("using usb3503
-as builtin to provide boot from USB without initrd/initramfs").
+Any idea why this doesn't affect other arches too ... or does it?
 
-Best regards,
-Krzysztof
+> This patch resolves both issues by using the .inst directive for 4-byte
+> quantities on arm64 and stripping the resulting binaries (as is done on
+> arm already) to remove the mapping symbols.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> ---
+>  scripts/decodecode | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/scripts/decodecode b/scripts/decodecode
+> index d8824f37acce..67214ec5b2cb 100755
+> --- a/scripts/decodecode
+> +++ b/scripts/decodecode
+> @@ -58,6 +58,14 @@ disas() {
+>  		${CROSS_COMPILE}strip $1.o
+>  	fi
+>  
+> +	if [ "$ARCH" = "arm64" ]; then
+> +		if [ $width -eq 4 ]; then
+> +			type=inst
+
+Can we merge with arm here, or does arm still support toolchains that
+don't have .inst?  Anyway, no big deal.
+
+> +		fi
+> +
+> +		${CROSS_COMPILE}strip $1.o
+> +	fi
+> +
+>  	${CROSS_COMPILE}objdump $OBJDUMPFLAGS -S $1.o | \
+>  		grep -v "/tmp\|Disassembly\|\.text\|^$" > $1.dis 2>&1
+
+FWIW,
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+Here's hoping someone runs this as a CGI script somewhere ;) 
+
+Cheers
+---Dave
