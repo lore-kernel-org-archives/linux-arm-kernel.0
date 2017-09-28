@@ -1,80 +1,50 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Thu, 28 Sep 2017 08:53:12 +0000
-Subject: [patch v9 0/4] JTAG driver introduction
-In-Reply-To: <CAMuHMdWfoYzWPJYaGOhF8qshKhvngwFKs=kvuH62PYif9q9+0g@mail.gmail.com>
-References: <1505985932-27568-1-git-send-email-oleksandrs@mellanox.com>
- <CAMuHMdWfoYzWPJYaGOhF8qshKhvngwFKs=kvuH62PYif9q9+0g@mail.gmail.com>
-Message-ID: <AM4PR0501MB2194D67623C640E20B3A7FABB1790@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Sep 2017 09:54:47 +0100
+Subject: [PATCH] arm64: consistently log boot/secondary CPU IDs
+In-Reply-To: <1506520238-8306-1-git-send-email-mark.rutland@arm.com>
+References: <1506520238-8306-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170928085446.GB19060@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
-> On Behalf Of Geert Uytterhoeven
-> Sent: Thursday, September 28, 2017 11:33 AM
-> To: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Cc: Greg KH <gregkh@linuxfoundation.org>; Arnd Bergmann
-> <arnd@arndb.de>; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> openbmc at lists.ozlabs.org; Joel Stanley <joel@jms.id.au>; Jiri Pirko
-> <jiri@resnulli.us>; Tobias Klauser <tklauser@distanz.ch>; linux-
-> serial at vger.kernel.org; mec at shout.net; Vadim Pasternak
-> <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
-> level at mellanox.com>; Rob Herring <robh+dt@kernel.org>; openocd-devel-
-> owner at lists.sourceforge.net; linux-api at vger.kernel.org; David S. Miller
-> <davem@davemloft.net>; Mauro Carvalho Chehab <mchehab@kernel.org>;
-> linux-spi <linux-spi@vger.kernel.org>; Mark Brown <broonie@kernel.org>
-> Subject: Re: [patch v9 0/4] JTAG driver introduction
+On Wed, Sep 27, 2017 at 02:50:38PM +0100, Mark Rutland wrote:
+> Currently we inconsistently log identifying information for the boot CPU
+> and secondary CPUs. For the boot CPU, we log the MIDR and MPIDR across
+> separate messages, whereas for the secondary CPUs we only log the MIDR.
 > 
-> Hi Oleksandr,
+> In some cases, it would be useful to know the MPIDR of secondary CPUs,
+> and it would be nice for these messages to be consistent.
 > 
-> [My attention was drawn by
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flwn.net
-> %2FArticles%2F734440%2F&data=02%7C01%7Coleksandrs%40mellanox.com%7
-> C97b8ba88686a42daaace08d5064b92eb%7Ca652971c7d2e4d9ba6a4d149256f
-> 461b%7C0%7C0%7C636421844026854216&sdata=TeHD4a3%2FBN6a5XG3Jizf5
-> pmsyJHJjzkEzkpnqsXC6S0%3D&reserved=0]
-> [CC linux-spi, which was never included, while linux-serial was]
+> This patch ensures that in the primary and secondary boot paths, we log
+> both the MPIDR and MIDR in a single message, with a consistent format.
+> the MPIDR is consistently padded to 10 hex characters to cover Aff3 in
+> bits 39:32, so that IDs can be compared easily.
 > 
-> On Thu, Sep 21, 2017 at 11:25 AM, Oleksandr Shamray
-> <oleksandrs@mellanox.com> wrote:
-> > When a need raise up to use JTAG interface for system's devices
-> > programming or CPU debugging, usually the user layer application
-> > implements jtag protocol by bit-bang or using a proprietary connection
-> > to vendor hardware.
-> > This method can be slow and not generic.
-> >
+> The newly redundant message in setup_arch() is removed.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Al Stone <ahs3@redhat.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/setup.c | 5 ++---
+>  arch/arm64/kernel/smp.c   | 6 ++++--
+>  2 files changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index d4b7405..819c1d1 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -103,7 +103,8 @@ void __init smp_setup_processor_id(void)
+>  	 * access percpu variable inside lock_release
+>  	 */
+>  	set_my_cpu_offset(0);
+> -	pr_info("Booting Linux on physical CPU 0x%lx\n", (unsigned long)mpidr);
+> +	pr_info("Booting Linux on physical CPU 0x%010lx [%08x]\n",
+> +		(unsigned long)mpidr, read_cpuid_id());
 
+We should probably be consistent in whether or not we include the '0x'
+prefix for these hex numbers, otherwise it could get confusing. I don't mind
+which way we go.
 
-[..]
-
-> >
-> > Initial version provides the system calls set for:
-> > - SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-> > - SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-> > - RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
-> >   number of clocks.
-> >
-> > SoC which are not equipped with JTAG master interface, can be built on
-> > top of JTAG core driver infrastructure, by applying bit-banging of
-> > TDI, TDO, TCK and TMS pins within the hardware specific driver.
-> 
-> Or by using an SPI master?
-> 
-
-I think it depends on how flexible the SPI interface is. If you can set it to transfer 
-from 1 to n bits at a time, and you control the TMS line in software, you should 
-be able to use it. If the SPI interface can only transfer a multiple of 8 bits 
-at a time, then in general it would not be suitable for JTAG.
-
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Will
