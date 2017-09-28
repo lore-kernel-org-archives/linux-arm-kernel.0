@@ -1,55 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Sep 2017 11:55:47 +0100
-Subject: [PATCH] scripts/decodecode: Fix decoding for AArch64 (arm64)
- instructions
-Message-ID: <1506596147-23630-1-git-send-email-will.deacon@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 28 Sep 2017 11:44:27 +0100
+Subject: [RESEND][PATCH 0/4] firmware: of: populate /firmware/ node during init
+Message-ID: <1506595471-10418-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a couple of problems with the decodecode script and arm64:
+Hi Rob, Arnd,
 
-1. AArch64 objdump refuses to disassemble .4byte directives as instructions,
-   insisting that they are data values and displaying them as:
+There's a push to place all firmware related device node under
+/firmware/ node. However all the associated drivers are dealing with
+device creation in their own ways. For example, qcom_scm, optee and
+meson-sm drivers deal with the node in their own way. The SCMI drivers
+I am about to add also needs to do the same. This small series is to
+make it generic so that all the users of /firmware/ node need not
+repeat the same.
 
-	a94153f3	.word	0xa94153f3		<-- trapping instruction
+There was concern that /firmware in DT is fit for /sys/firmware in sysfs.
+IMO anything exposed to userspace from such firmware interface must
+be in "/sys/firmware", but I don't see any issue with kernel handling
+them as platform device/driver internally.
 
-   This is resolved by using the .inst directive instead.
+Sudeep Holla (4):
+  of: platform: populate /firmware/ node from
+    of_platform_default_populate_init()
+  firmware: qcom_scm: drop redandant of_platform_populate
+  drivers: tee: rework optee_driver_{init,exit} to use platform device
+  firmware: meson-sm: rework meson_sm_init to use
+    module_platform_driver_probe
 
-2. Disassembly of branch instructions attempts to provide the target as
-   an offset from a symbol, e.g.:
+ drivers/firmware/meson/meson_sm.c | 21 ++++++-----
+ drivers/firmware/qcom_scm.c       | 24 -------------
+ drivers/of/platform.c             |  4 +++
+ drivers/tee/optee/core.c          | 74 +++++++++++++--------------------------
+ 4 files changed, 41 insertions(+), 82 deletions(-)
 
-   0:	34000082	cbz	w2, 10 <.text+0x10>
-
-  however this falls foul of the grep -v, which matches lines containing
-  ".text" and ends up removing all branch instructions from the dump.
-
-This patch resolves both issues by using the .inst directive for 4-byte
-quantities on arm64 and stripping the resulting binaries (as is done on
-arm already) to remove the mapping symbols.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- scripts/decodecode | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/scripts/decodecode b/scripts/decodecode
-index d8824f37acce..67214ec5b2cb 100755
---- a/scripts/decodecode
-+++ b/scripts/decodecode
-@@ -58,6 +58,14 @@ disas() {
- 		${CROSS_COMPILE}strip $1.o
- 	fi
- 
-+	if [ "$ARCH" = "arm64" ]; then
-+		if [ $width -eq 4 ]; then
-+			type=inst
-+		fi
-+
-+		${CROSS_COMPILE}strip $1.o
-+	fi
-+
- 	${CROSS_COMPILE}objdump $OBJDUMPFLAGS -S $1.o | \
- 		grep -v "/tmp\|Disassembly\|\.text\|^$" > $1.dis 2>&1
- }
--- 
-2.1.4
+--
+2.7.4
