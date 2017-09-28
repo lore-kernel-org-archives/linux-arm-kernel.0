@@ -1,154 +1,88 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 28 Sep 2017 15:57:18 +0100
-Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
-In-Reply-To: <87bmmda15n.fsf@linaro.org>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-20-git-send-email-Dave.Martin@arm.com>
- <87bmmda15n.fsf@linaro.org>
-Message-ID: <20170928145717.GD3611@e103592.cambridge.arm.com>
+From: matthew.gerlach@linux.intel.com (matthew.gerlach at linux.intel.com)
+Date: Thu, 28 Sep 2017 08:01:36 -0700 (PDT)
+Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
+ support
+In-Reply-To: <7237fa9e-4d3a-8a82-10c6-76737c23ed6f@ti.com>
+References: <20170924105924.23923-1-vigneshr@ti.com>
+ <20170924105924.23923-6-vigneshr@ti.com>
+ <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
+ <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
+ <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
+ <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
+ <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
+ <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
+ <fdfe29bf-ff46-7542-8e36-e8e45e1ca85f@gmail.com>
+ <7237fa9e-4d3a-8a82-10c6-76737c23ed6f@ti.com>
+Message-ID: <alpine.DEB.2.20.1709280757230.2488@mgerlach-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 01:57:08PM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > This patch defines and implements a new regset NT_ARM_SVE, which
-> > describes a thread's SVE register state.  This allows a debugger to
-> > manipulate the SVE state, as well as being included in ELF
-> > coredumps for post-mortem debugging.
-> >
-> > Because the regset size and layout are dependent on the thread's
-> > current vector length, it is not possible to define a C struct to
-> > describe the regset contents as is done for existing regsets.
-> > Instead, and for the same reasons, NT_ARM_SVE is based on the
-> > freeform variable-layout approach used for the SVE signal frame.
-> >
-> > Additionally, to reduce debug overhead when debugging threads that
-> > might or might not have live SVE register state, NT_ARM_SVE may be
-> > presented in one of two different formats: the old struct
-> > user_fpsimd_state format is embedded for describing the state of a
-> > thread with no live SVE state, whereas a new variable-layout
-> > structure is embedded for describing live SVE state.  This avoids a
-> > debugger needing to poll NT_PRFPREG in addition to NT_ARM_SVE, and
-> > allows existing userspace code to handle the non-SVE case without
-> > too much modification.
-> >
-> > For this to work, NT_ARM_SVE is defined with a fixed-format header
-> > of type struct user_sve_header, which the recipient can use to
-> > figure out the content, size and layout of the reset of the regset.
-> > Accessor macros are defined to allow the vector-length-dependent
-> > parts of the regset to be manipulated.
-> >
-> > Signed-off-by: Alan Hayward <alan.hayward@arm.com>
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Cc: Alex Benn?e <alex.bennee@linaro.org>
-> >
-> > ---
-> >
-> > Changes since v1
-> > ----------------
-> >
-> > Other changes related to Alex Benn?e's comments:
-> >
-> > * Migrate to SVE_VQ_BYTES instead of magic numbers.
-> >
-> > Requested by Alex Benn?e:
-> >
-> > * Thin out BUG_ON()s:
-> > Redundant BUG_ON()s and ones that just check invariants are removed.
-> > Important sanity-checks are migrated to WARN_ON()s, with some
-> > minimal best-effort patch-up code.
-> >
-> > Other:
-> >
-> > * [ABI fix] Bail out with -EIO if attempting to set the
-> > SVE regs for an unsupported VL, instead of misparsing the regset data.
-> >
-> > * Replace some in-kernel open-coded arithmetic with ALIGN()/
-> > DIV_ROUND_UP().
-> > ---
 
-[...]
+Hi Vignesh,
 
-> > diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-> > index d1ff83d..1915ab0 100644
-> > --- a/arch/arm64/include/uapi/asm/ptrace.h
-> > +++ b/arch/arm64/include/uapi/asm/ptrace.h
-> > @@ -22,6 +22,7 @@
-> >  #include <linux/types.h>
-> >
-> >  #include <asm/hwcap.h>
-> > +#include <asm/sigcontext.h>
-> >
-> >
-> >  /*
-> > @@ -63,6 +64,8 @@
-> >
-> >  #ifndef __ASSEMBLY__
-> >
-> > +#include <linux/prctl.h>
-> > +
-> >  /*
-> >   * User structures for general purpose, floating point and debug registers.
-> >   */
-> > @@ -90,6 +93,138 @@ struct user_hwdebug_state {
-> >  	}		dbg_regs[16];
-> >  };
-> >
-> > +/* SVE/FP/SIMD state (NT_ARM_SVE) */
-> > +
-> > +struct user_sve_header {
-> > +	__u32 size; /* total meaningful regset content in bytes */
-> > +	__u32 max_size; /* maxmium possible size for this thread */
-> > +	__u16 vl; /* current vector length */
-> > +	__u16 max_vl; /* maximum possible vector length */
-> > +	__u16 flags;
-> > +	__u16 __reserved;
-> > +};
-> > +
-> > +/* Definitions for user_sve_header.flags: */
-> > +#define SVE_PT_REGS_MASK		(1 << 0)
-> > +
-> > +/* Flags: must be kept in sync with prctl interface in
-> > <linux/ptrace.h> */
-> 
-> Which flags? We base some on PR_foo flags but we seem to shift them
+I tried this patch on an Arria10 SOCFPGA devkit against the 4.1.33-ltsi 
+kernel, and it did not go well.  Commands to the flash chip timedout 
+resulting in the probe function failing.  I ran into other problems, not 
+related to cadence-quadspi, that prevented me from testing against 4.9 and 
+4.12 kernels, but I suspect similar behavior.
 
-All the prctl flags that have equivalents here, because they're part of
-the internal API to sve_set_vector_length().  It didn't quite seem
-appropriate to document that in a userspace header, but it's probably
-better to say something here than not.  I'll improve the comment.
+Matthew Gerlach
 
-> anyway so where is the requirement for them to match from?
+On Wed, 27 Sep 2017, Vignesh R wrote:
 
-There is a bug here though: sve_set() in ptrace.c is supposed to shift
-the flags from header.flags (which is a u16) back into the
-PR_SVE_SET_VL position (<< 16) for the flags argument of
-sve_set_vector_length().  But this isn't done, so attempting to set (or
-restore) those flags through ptrace may resulting EINVALs from
-sve_set_vector_length().
-
-I'll write a test for this case and implement a fix, something like...
-
--8<-
-
- static int sve_set(struct task_struct *target,
-[...]
- 	ret = sve_set_vector_length(target, header.vl,
--				    header.flags & ~SVE_PT_REGS_MASK);
-+				    (header.flags & ~SVE_PT_REGS_MASK) << 16UL);
-
-
-->8-
-
-What do you think?
-
-[...]
-
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-Again, I'll wait for your feedback first.
-
-Cheers
----Dave
+> Hi Matthew,
+>
+> On Tuesday 26 September 2017 05:19 AM, Marek Vasut wrote:
+> [...]
+>>>>> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
+>>>>> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
+>>>>> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
+>>>>
+>>>> Not of the top of my head, sorry. +CC Matthew, he should know.
+>>>
+>>> I am not an expert at the clock framework nor the power management, but I
+>>> did ask around a bit.? No one I asked was planning to change the clk_*()
+>>> calls to pm_*() call, but the feedback was that it would be a good idea.
+>>
+>> The question is, if we do the replacement, will it break on socfpga ?
+>> A quick test might be useful.
+>>
+>
+> yes, a quick qspi test with clk_prepare_enable() replaced by pm_*() calls
+> like below patch would be helpful:
+>
+>
+> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+> index 53c7d8e0327a..7ad3e176cc88 100644
+> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+> @@ -34,6 +34,7 @@
+> #include <linux/sched.h>
+> #include <linux/spi/spi.h>
+> #include <linux/timer.h>
+> +#include <linux/pm_runtime.h>
+>
+> #define CQSPI_NAME                     "cadence-qspi"
+> #define CQSPI_MAX_CHIPSELECT           16
+> @@ -1206,11 +1207,8 @@ static int cqspi_probe(struct platform_device *pdev)
+>                return -ENXIO;
+>        }
+>
+> -       ret = clk_prepare_enable(cqspi->clk);
+> -       if (ret) {
+> -               dev_err(dev, "Cannot enable QSPI clock.\n");
+> -               return ret;
+> -       }
+> +       pm_runtime_enable(dev);
+> +       pm_runtime_get_sync(dev);
+>
+>        cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+>
+>
+>
+>
+>
+> -- 
+> Regards
+> Vignesh
+>
