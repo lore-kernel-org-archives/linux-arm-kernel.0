@@ -1,188 +1,80 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 28 Sep 2017 17:21:49 +0930
-Subject: [PATCH 8/8] ARM: dts: aspeed: Clean up UART nodes
+Date: Thu, 28 Sep 2017 17:21:46 +0930
+Subject: [PATCH 5/8] ARM: dts: aspeed-palmetto: Add I2C devices
 In-Reply-To: <20170928075149.8154-1-joel@jms.id.au>
 References: <20170928075149.8154-1-joel@jms.id.au>
-Message-ID: <20170928075149.8154-9-joel@jms.id.au>
+Message-ID: <20170928075149.8154-6-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- - Shorten size of reg property so it covers only the implemented
- registers
+Enable the buses that are in use and the devices that are attached.
+Currently that includes the battery backed RTC, temperature measurement
+and EEPROM.
 
- - Add VUART compatible
-
- - Move stray uart1 in g5 definition
-
- - Remove outdated current-speed property. Different bootloaders use
- different speeds, so this is no longer helpful
+Some of these buses are for hotplugged cards, such as PCIe cards.
+Others do not yet have upstream drivers, so there are no devices
+attached.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 17 +++++++++--------
- arch/arm/boot/dts/aspeed-g5.dtsi | 36 ++++++++++++++++++------------------
- 2 files changed, 27 insertions(+), 26 deletions(-)
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 48 +++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 191c33d18122..7a4a53666d70 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -27,6 +27,7 @@
- 		serial2 = &uart3;
- 		serial3 = &uart4;
- 		serial4 = &uart5;
-+		serial5 = &vuart;
- 	};
- 
- 	cpus {
-@@ -199,7 +200,7 @@
- 
- 			uart1: serial at 1e783000 {
- 				compatible = "ns16550a";
--				reg = <0x1e783000 0x1000>;
-+				reg = <0x1e783000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <9>;
- 				clocks = <&clk_uart>;
-@@ -209,7 +210,7 @@
- 
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
--				reg = <0x1e78d000 0x1000>;
-+				reg = <0x1e78d000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <32>;
- 				clocks = <&clk_uart>;
-@@ -219,7 +220,7 @@
- 
- 			uart3: serial at 1e78e000 {
- 				compatible = "ns16550a";
--				reg = <0x1e78e000 0x1000>;
-+				reg = <0x1e78e000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <33>;
- 				clocks = <&clk_uart>;
-@@ -229,7 +230,7 @@
- 
- 			uart4: serial at 1e78f000 {
- 				compatible = "ns16550a";
--				reg = <0x1e78f000 0x1000>;
-+				reg = <0x1e78f000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <34>;
- 				clocks = <&clk_uart>;
-@@ -239,7 +240,7 @@
- 
- 			uart5: serial at 1e784000 {
- 				compatible = "ns16550a";
--				reg = <0x1e784000 0x1000>;
-+				reg = <0x1e784000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <10>;
- 				clocks = <&clk_uart>;
-@@ -248,9 +249,9 @@
- 				status = "disabled";
- 			};
- 
--			uart6: serial at 1e787000 {
--				compatible = "ns16550a";
--				reg = <0x1e787000 0x1000>;
-+			vuart: vuart at 1e787000 {
-+				compatible = "aspeed,ast2400-vuart";
-+				reg = <0x1e787000 0x40>;
- 				reg-shift = <2>;
- 				interrupts = <10>;
- 				clocks = <&clk_uart>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 251fc9f4637e..0b793305120a 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -27,6 +27,7 @@
- 		serial2 = &uart3;
- 		serial3 = &uart4;
- 		serial4 = &uart5;
-+		serial5 = &vuart;
- 	};
- 
- 	cpus {
-@@ -247,16 +248,6 @@
- 				status = "disabled";
- 			};
- 
--			uart1: serial at 1e783000 {
--				compatible = "ns16550a";
--				reg = <0x1e783000 0x1000>;
--				reg-shift = <2>;
--				interrupts = <9>;
--				clocks = <&clk_uart>;
--				no-loopback-test;
--				status = "disabled";
--			};
--
- 			lpc: lpc at 1e789000 {
- 				compatible = "aspeed,ast2500-lpc", "simple-mfd";
- 				reg = <0x1e789000 0x1000>;
-@@ -287,9 +278,19 @@
- 				};
- 			};
- 
-+			uart1: serial at 1e783000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e783000 0x20>;
-+				reg-shift = <2>;
-+				interrupts = <9>;
-+				clocks = <&clk_uart>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+index 112551766275..e387c80b7f4f 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -61,3 +61,51 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_rmii1_default>;
+ };
 +
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
--				reg = <0x1e78d000 0x1000>;
-+				reg = <0x1e78d000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <32>;
- 				clocks = <&clk_uart>;
-@@ -299,7 +300,7 @@
- 
- 			uart3: serial at 1e78e000 {
- 				compatible = "ns16550a";
--				reg = <0x1e78e000 0x1000>;
-+				reg = <0x1e78e000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <33>;
- 				clocks = <&clk_uart>;
-@@ -309,7 +310,7 @@
- 
- 			uart4: serial at 1e78f000 {
- 				compatible = "ns16550a";
--				reg = <0x1e78f000 0x1000>;
-+				reg = <0x1e78f000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <34>;
- 				clocks = <&clk_uart>;
-@@ -319,18 +320,17 @@
- 
- 			uart5: serial at 1e784000 {
- 				compatible = "ns16550a";
--				reg = <0x1e784000 0x1000>;
-+				reg = <0x1e784000 0x20>;
- 				reg-shift = <2>;
- 				interrupts = <10>;
- 				clocks = <&clk_uart>;
--				current-speed = <38400>;
- 				no-loopback-test;
- 				status = "disabled";
- 			};
- 
--			uart6: serial at 1e787000 {
--				compatible = "ns16550a";
--				reg = <0x1e787000 0x1000>;
-+			vuart: vuart at 1e787000 {
-+				compatible = "aspeed,ast2500-vuart";
-+				reg = <0x1e787000 0x40>;
- 				reg-shift = <2>;
- 				interrupts = <10>;
- 				clocks = <&clk_uart>;
++&i2c0 {
++	status = "okay";
++
++	eeprom at 50 {
++		compatible = "atmel,24c256";
++		reg = <0x50>;
++		pagesize = <64>;
++	};
++
++	rtc at 68 {
++		compatible = "dallas,ds3231";
++		reg = <0x68>;
++	};
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++
++	tmp423 at 4c {
++		compatible = "ti,tmp423";
++		reg = <0x4c>;
++	};
++};
++
++&i2c3 {
++	status = "okay";
++};
++
++&i2c4 {
++	status = "okay";
++};
++
++&i2c5 {
++	status = "okay";
++};
++
++&i2c6 {
++	status = "okay";
++};
++
++&i2c7 {
++	status = "okay";
++};
 -- 
 2.14.1
