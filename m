@@ -1,52 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Sep 2017 18:09:27 +0100
-Subject: [GIT PULL] arm64 fixes for 4.14-rc3
-Message-ID: <20170929170924.sb52kp7fcvzwg2sh@armageddon.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 28 Sep 2017 12:00:20 -0700
+Subject: next-20170926 build: 2 failures 1 warnings (next-20170926)
+In-Reply-To: <20170926161100.nzyb33o6l6lad2da@sirena.org.uk>
+References: <E1dwn6w-0002eY-VE@optimist>
+ <20170926161100.nzyb33o6l6lad2da@sirena.org.uk>
+Message-ID: <20170928190020.yyntjpmh5jebydsa@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Sep 26, 2017 at 09:11:00AM -0700, Mark Brown wrote:
+> On Tue, Sep 26, 2017 at 11:29:06AM +0100, Build bot for Mark Brown wrote:
+> 
+> Today's -next fails to build an arm and arm64 allmodconfig with:
+> 
+> > 	arm64-allmodconfig
+> > ERROR: "clk_bulk_prepare" [drivers/mmc/host/sdhci-msm.ko] undefined!
+> > 
+> > 	arm-allmodconfig
+> > ERROR: "clk_bulk_prepare" [drivers/mmc/host/sdhci-msm.ko] undefined!
+> 
+> caused by d8034e3379a83 (mmc: sdhci-msm: Utilize bulk clock API).
 
-Please pull the arm64 fixes below. Thanks.
-
-The following changes since commit e19b205be43d11bff638cad4487008c48d21c103:
-
-  Linux 4.14-rc2 (2017-09-24 16:38:56 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 760bfb47c36a07741a089bf6a28e854ffbee7dc9:
-
-  arm64: fault: Route pte translation faults via do_translation_fault (2017-09-29 16:47:40 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- SPsel register initialisation on reset as the architecture defines its
-  state as unknown
-
-- Use READ_ONCE when dereferencing pmd_t pointers to avoid race
-  conditions in page_vma_mapped_walk() (or fast GUP) with concurrent
-  modifications of the page table
-
-- Avoid invoking the mm fault handling code for kernel addresses (check
-  against TASK_SIZE) which would otherwise result in calling
-  might_sleep() in atomic context
-
-----------------------------------------------------------------
-Marc Zyngier (1):
-      arm64: Make sure SPsel is always set
-
-Will Deacon (2):
-      arm64: mm: Use READ_ONCE when dereferencing pointer to pte table
-      arm64: fault: Route pte translation faults via do_translation_fault
-
- arch/arm64/include/asm/pgtable.h | 2 +-
- arch/arm64/kernel/head.S         | 1 +
- arch/arm64/mm/fault.c            | 2 +-
- 3 files changed, 3 insertions(+), 2 deletions(-)
-
--- 
-Catalin
+This is still present in today's -next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170928/ff0be493/attachment.sig>
