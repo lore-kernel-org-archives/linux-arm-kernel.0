@@ -1,44 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 28 Sep 2017 20:06:14 +0100
-Subject: [PATCH v2 07/10] mfd: axp20x: add pinctrl cell for AXP813
-In-Reply-To: <20170926131445.xo2uawiovjtmyivj@flea>
-References: <cover.1c314f4154a6d27354625f03d0a5269eee55a9c5.1506428208.git-series.quentin.schulz@free-electrons.com>
- <5345a2e94013f4e4f7b545cd4d84b098bd2fa349.1506428208.git-series.quentin.schulz@free-electrons.com>
- <20170926131445.xo2uawiovjtmyivj@flea>
-Message-ID: <20170928190614.v5jgejvgdlyxbxrh@dell>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 28 Sep 2017 21:09:42 +0200
+Subject: [PATCH] PM: ARM: sa1111: Drop suspend and resume bus type
+ callbacks
+In-Reply-To: <20170928094936.GV20805@n2100.armlinux.org.uk>
+References: <2654085.Tx1JnNWXkX@aspire.rjw.lan>
+ <20170926212812.GS20805@n2100.armlinux.org.uk>
+ <CAJZ5v0i1iwBpkUYN=DbpbtVDu+xMKwza=4EbjYNyGr5rs7-D8Q@mail.gmail.com>
+ <20170928094936.GV20805@n2100.armlinux.org.uk>
+Message-ID: <CAJZ5v0iuzDk+gT=6KG3fX1d4C9dfzp0s8t-Y0pAM4SsVgaU=0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Sep 2017, Maxime Ripard wrote:
+On Thu, Sep 28, 2017 at 11:49 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Sep 26, 2017 at 11:37:40PM +0200, Rafael J. Wysocki wrote:
+>> On Tue, Sep 26, 2017 at 11:28 PM, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>> > On Tue, Sep 26, 2017 at 10:47:10PM +0200, Rafael J. Wysocki wrote:
+>> >> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>> >>
+>> >> None of the sa1111 drivers in the tree implements the suspend and
+>> >> resume callbacks from struct sa1111_driver, so drop them and drop
+>> >> the corresponding callbacks from sa1111_bus_type.
+>> >>
+>> >> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>> >
+>> > This will conflict with some patches I have - would you like me to queue
+>> > it along with my changes?
+>>
+>> Yes, please.
+>>
+>> >  When would you like to get this merged?
+>>
+>> When possible. :-)
+>>
+>> I would like to drop the legacy suspend/resume callbacks from struct
+>> bus_type eventually, as that's long overdue, and this is needed for
+>> that purpose.  Not too urgent, though.
+>
+> Sorry, I'd forgotten that I already had a similar patch:
+>
+> http://git.armlinux.org.uk/cgit/linux-arm.git/commit/?h=sa1100&id=0e4ec3edb1c7e44aba1f48b924ab0c77431fd155
+>
+> so no need to merge your veresion... I just need to get my version merged.
 
-> On Tue, Sep 26, 2017 at 12:17:17PM +0000, Quentin Schulz wrote:
-> > As pinctrl and GPIO driver now supports AXP813, add a cell for it.
-> > 
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > ---
-> >  drivers/mfd/axp20x.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> > index 336de66..a457528 100644
-> > --- a/drivers/mfd/axp20x.c
-> > +++ b/drivers/mfd/axp20x.c
-> > @@ -876,6 +876,9 @@ static struct mfd_cell axp813_cells[] = {
-> >  		.name			= "axp221-pek",
-> >  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
-> >  		.resources		= axp803_pek_resources,
-> > +	}, {
-> > +		.name			= "axp20x-gpio",
-> > +		.of_compatible		= "x-powers,axp813-pctl",
-> 
-> This was probably introduced in the previous driver, but why are you
-> using the pctl suffix? Can't we just use the GPIO one to remain
-> consistent with the previous users and the datasheet?
+OK
 
-Right.  Pinctrl is a Linuxisum.  GPIO sounds more appropriate.
+What about the locomo one?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Rafael
