@@ -1,54 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Sep 2017 14:58:37 +0200
-Subject: [PATCH v2 6/7] PCI: aardvark: fix PCIe max read request size setting
+Date: Thu, 28 Sep 2017 14:58:38 +0200
+Subject: [PATCH v2 7/7] PCI: aardvark: define IRQ related hooks in
+ pci_host_bridge
 In-Reply-To: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
 References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170928125838.11887-7-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170928125838.11887-8-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Evan Wang <xswang@marvell.com>
+Commit 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from
+pcibios_alloc_irq()") was assuming all PCI host controller drivers had
+been converted to use ->map_irq(), but that wasn't the case:
+pci-aardvark had not been converted. Due to this, it broke the support
+for legacy PCI interrupts when using the pci-aardvark driver (used on
+Marvell Armada 3720 platforms).
 
-There is an obvious typo issue in the definition of the PCIe maximum
-read request size: a bit shift is directly used as a value, while it
-should be used to shift the correct value.
+In order to fix this, we make sure the ->map_irq and ->swizzle_irq
+fields of pci_host_bridge are properly filled in.
 
-This is part of fixing bug
-https://bugzilla.kernel.org/show_bug.cgi?id=196339, this commit was
-reported as the user to be important to get a Intel 7260 mini-PCIe
-WiFi card working.
-
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Signed-off-by: Evan Wang <xswang@marvell.com>
-Reviewed-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-[Thomas: tweak commit log.]
+Fixes: 769b461fc0c0 ("arm64: PCI: Drop DT IRQ allocation from pcibios_alloc_irq()")
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v4.13+
 ---
- drivers/pci/host/pci-aardvark.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/pci/host/pci-aardvark.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index a173f31853df..c1093b023e48 100644
+index c1093b023e48..249a088b463c 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -33,6 +33,7 @@
- #define     PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ		0x2
- #define     PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE		(0 << 11)
- #define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT	12
-+#define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ		0x2
- #define     PCIE_CORE_MPS_UNIT_BYTE				128
- #define PCIE_CORE_LINK_CTRL_STAT_REG				0xd0
- #define     PCIE_CORE_LINK_L0S_ENTRY				BIT(0)
-@@ -303,7 +304,8 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
- 		(PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ <<
- 		 PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
- 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
--		PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT;
-+		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ <<
-+		 PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT);
- 	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
+@@ -998,6 +998,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
+ 	bridge->sysdata = pcie;
+ 	bridge->busnr = 0;
+ 	bridge->ops = &advk_pcie_ops;
++	bridge->map_irq = of_irq_parse_and_map_pci;
++	bridge->swizzle_irq = pci_common_swizzle;
  
- 	/* Program PCIe Control 2 to disable strict ordering */
+ 	ret = pci_scan_root_bus_bridge(bridge);
+ 	if (ret < 0) {
 -- 
 2.13.5
