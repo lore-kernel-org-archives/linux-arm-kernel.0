@@ -1,95 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 27 Sep 2017 21:19:33 -0700
-Subject: [PATCH ] cpufreq: ti-cpufreq: kfree opp_data when failure
-In-Reply-To: <7b7315f0-c2e4-a09e-8769-2d15a167fa73@windriver.com>
-References: <1506496097-30852-1-git-send-email-zumeng.chen@windriver.com>
- <20170927174026.GB12211@ubuntu>
- <7b7315f0-c2e4-a09e-8769-2d15a167fa73@windriver.com>
-Message-ID: <20170928041933.GG12211@ubuntu>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 28 Sep 2017 14:29:22 +1000
+Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
+In-Reply-To: <1506497645.30138.37.camel@aj.id.au>
+References: <20170921042641.7326-1-joel@jms.id.au>
+ <20170921042641.7326-4-joel@jms.id.au>
+ <1506343255.30138.29.camel@aj.id.au>
+ <CACPK8Xd8RQ4s1xMsSuxHgQRiHS6vDtxVTAxu8Ba3J3it45MC5g@mail.gmail.com>
+ <1506497645.30138.37.camel@aj.id.au>
+Message-ID: <CACPK8XeJE025GRT9kk9L1x1VsDGEmLG80G9LMM03vsvpHS+sYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28-09-17, 07:49, Zumeng Chen wrote:
-> On 09/28/2017 01:40 AM, Viresh Kumar wrote:
-> >On 27-09-17, 15:08, Zumeng Chen wrote:
-> >>From: Zumeng Chen <zumeng.chen@gmail.com>
-> >>
-> >>memory leakage was found by kmemleak. opp_data needs to be freed
-> >>when failure, including fail_put_node.
-> >>
-> >>unreferenced object 0xccdd4c40 (size 64):
-> >>   comm "swapper", pid 1, jiffies 4294938465 (age 888.520s)
-> >>   hex dump (first 32 bytes):
-> >>     00 7c 00 c1 98 69 d8 ce 00 24 03 ce 00 24 03 ce  .|...i...$...$..
-> >>     20 35 23 c1 00 00 00 00 00 00 00 00 00 00 00 00   5#.............
-> >>   backtrace:
-> >>     [<c028fb64>] kmem_cache_alloc_trace+0x2c4/0x3cc
-> >>     [<c076d5f0>] ti_cpufreq_probe+0x6c/0x334
-> >>     [<c068d6e4>] platform_drv_probe+0x60/0xc0
-> >>     [<c068b384>] driver_probe_device+0x218/0x2c4
-> >>     [<c068b5a4>] __device_attach_driver+0xa8/0xdc
-> >>     [<c0689340>] bus_for_each_drv+0x70/0xa4
-> >>     [<c068b020>] __device_attach+0xc0/0x124
-> >>     [<c068b634>] device_initial_probe+0x1c/0x20
-> >>     [<c068a3b8>] bus_probe_device+0x94/0x9c
-> >>     [<c0688300>] device_add+0x404/0x590
-> >>     [<c068d408>] platform_device_add+0x11c/0x230
-> >>     [<c068df40>] platform_device_register_full+0x10c/0x128
-> >>     [<c076d578>] ti_cpufreq_init+0x44/0x50
-> >>     [<c01017c4>] do_one_initcall+0x54/0x180
-> >>     [<c0e00fe0>] kernel_init_freeable+0x270/0x33c
-> >>     [<c093f2bc>] kernel_init+0x18/0x124
-> >>
-> >>Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
-> >>---
-> >>  drivers/cpufreq/ti-cpufreq.c | 5 ++++-
-> >>  1 file changed, 4 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-> >>index 4bf47de..ffcddcd 100644
-> >>--- a/drivers/cpufreq/ti-cpufreq.c
-> >>+++ b/drivers/cpufreq/ti-cpufreq.c
-> >>@@ -217,7 +217,8 @@ static int ti_cpufreq_init(void)
-> >>  	opp_data->cpu_dev = get_cpu_device(0);
-> >>  	if (!opp_data->cpu_dev) {
-> >>  		pr_err("%s: Failed to get device for CPU0\n", __func__);
-> >>-		return -ENODEV;
-> >>+		ret = ENODEV;
-> >>+		goto free_opp_data;
-> >>  	}
-> >>  	opp_data->opp_node = dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
-> >>@@ -262,6 +263,8 @@ static int ti_cpufreq_init(void)
-> >>  fail_put_node:
-> >>  	of_node_put(opp_data->opp_node);
-> >>+free_opp_data:
-> >>+	kfree(opp_data);
-> >>  	return ret;
-> >>  }
-> >Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >
-> >I also see that you are missing an of_node_put(np) in the driver. Maybe you
-> >want to fix that as well (in a separate patch) ?
-> 
-> Ha, thanks, I'm not sure if I follow your meanings.
-> 
-> opp_data->opp_node will be set after goto free_opp_data, so are we safe
-> here?
-> 
->         opp_data->cpu_dev = get_cpu_device(0);
->         if (!opp_data->cpu_dev) {
->                 pr_err("%s: Failed to get device for CPU0\n", __func__);
->                 ret = ENODEV;
->                 goto free_opp_data;
->         }
-> 
->         opp_data->opp_node =
-> dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
+On Wed, Sep 27, 2017 at 5:34 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> On Wed, 2017-09-27 at 16:13 +1000, Joel Stanley wrote:
+>> > > +                     div_table,
+>> >
+>> > This doesn't seem to be correct. There's the problem of 0b000 and 0b001 mapping
+>> > the same value of 2 for the AST2500, whose table then increments in steps of 1.
+>> > The AST2400 mapping on the otherhand is multiples of 2 starting at 2, with no
+>> > inconsistency for 0b000 vs 0b001.
+>>
+>> Yep, we do use a different table for ast2400 vs ast2500. See
+>> ast2400_div_table vs ast2500_div_table.
+>
+> Yep, but for the AST2500 this is a different table again to what you've
+> already defined (for the AST2500). However, for the AST2400 the table
+> looks the same as the other AST2400 tables.
 
-I was talking about this one.
+You're right. I didn't realise you were pointing out something strange
+about eclk.
 
-        np = of_find_node_by_path("/");
+I added another table for eclk, and the correct one is selected by the
+platform data.
 
-There is no counterpart of this one.
-
--- 
-viresh
+I'll send out v4 today if no more reviews come in.
