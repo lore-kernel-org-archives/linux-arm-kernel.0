@@ -1,43 +1,36 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 28 Sep 2017 15:53:58 +0300
-Subject: [RESEND PATCH v2 13/17] media: v4l2-async: simplify
- v4l2_async_subdev structure
-In-Reply-To: <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
-References: <cover.1506548682.git.mchehab@s-opensource.com>
- <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
-Message-ID: <20170928125358.pkolmjxc4hdqcrud@valkosipuli.retiisi.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 28 Sep 2017 14:56:47 +0200
+Subject: [EXT] [PATCH 1/2] arm64: dts: marvell: fix interrupt-map
+ property for Armada CP110 master PCIe controller
+In-Reply-To: <2164f35d99974e1480790dac98be4a5d@IL-EXCH02.marvell.com>
+References: <20170928124550.11492-1-thomas.petazzoni@free-electrons.com>
+ <20170928124550.11492-2-thomas.petazzoni@free-electrons.com>
+ <2164f35d99974e1480790dac98be4a5d@IL-EXCH02.marvell.com>
+Message-ID: <20170928145647.35f21186@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Hello,
 
-On Wed, Sep 27, 2017 at 06:46:56PM -0300, Mauro Carvalho Chehab wrote:
-> The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
-> struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
-> match criteria requires just a device name.
-> 
-> So, it doesn't make sense to enclose those into structs,
-> as the criteria can go directly into the union.
-> 
-> That makes easier to document it, as we don't need to document
-> weird senseless structs.
+On Thu, 28 Sep 2017 12:52:07 +0000, Yehuda Yitschak wrote:
 
-The idea is that in the union, there's a struct which is specific to the
-match_type field. I wouldn't call it senseless.
+> The initial version referenced the GIC interrupt controller. 
+> Maybe this issue was introduced during the switch to the ICU  ?
 
-In the two cases there's just a single field in the containing struct. You
-could remove the struct in that case as you do in this patch, and just use
-the field. But I think the result is less clean and so I wouldn't make this
-change.
+No, it was not introduced by the switch to the ICU. The switch to the
+ICU looked like this:
 
-The confusion comes possibly from the fact that the struct is named the
-same as the field in the struct. These used to be called of and node, but
-with the fwnode property framework the references to the fwnode are, well,
-typically similarly called "fwnode". There's no underlying firmware
-interface with that name, fwnode property API is just an API.
+-                       interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+-                       interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++                       interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
++                       interrupts = <ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
 
+As you can see there was already a bogus "0" after &gic.
+
+Best regards,
+
+Thomas
 -- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
