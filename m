@@ -1,100 +1,214 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Thu, 28 Sep 2017 13:00:42 +0800
-Subject: [PATCH ] cpufreq: ti-cpufreq: kfree opp_data when failure
-In-Reply-To: <20170928041933.GG12211@ubuntu>
-References: <1506496097-30852-1-git-send-email-zumeng.chen@windriver.com>
- <20170927174026.GB12211@ubuntu>
- <7b7315f0-c2e4-a09e-8769-2d15a167fa73@windriver.com>
- <20170928041933.GG12211@ubuntu>
-Message-ID: <7a2171a3-d594-7fd7-2ccf-75ef7110dd98@windriver.com>
+From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
+Date: Thu, 28 Sep 2017 13:32:42 +0800
+Subject: [PATCH v2 5/5] media: atmel-isc: Rework the format list
+In-Reply-To: <c3a96aa1-2faf-1d1d-b73e-347b25affeab@xs4all.nl>
+References: <20170918063925.6372-1-wenyou.yang@microchip.com>
+ <20170918063925.6372-6-wenyou.yang@microchip.com>
+ <33dbaf5d-f51a-c148-460b-9079a2696fb1@xs4all.nl>
+ <2557b706-9786-0d81-08d5-b61547ddb3e1@Microchip.com>
+ <c3a96aa1-2faf-1d1d-b73e-347b25affeab@xs4all.nl>
+Message-ID: <38ec3518-556f-7d0c-932b-bb475de02c8b@Microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2017 12:19 PM, Viresh Kumar wrote:
-> On 28-09-17, 07:49, Zumeng Chen wrote:
->> On 09/28/2017 01:40 AM, Viresh Kumar wrote:
->>> On 27-09-17, 15:08, Zumeng Chen wrote:
->>>> From: Zumeng Chen <zumeng.chen@gmail.com>
->>>>
->>>> memory leakage was found by kmemleak. opp_data needs to be freed
->>>> when failure, including fail_put_node.
->>>>
->>>> unreferenced object 0xccdd4c40 (size 64):
->>>>    comm "swapper", pid 1, jiffies 4294938465 (age 888.520s)
->>>>    hex dump (first 32 bytes):
->>>>      00 7c 00 c1 98 69 d8 ce 00 24 03 ce 00 24 03 ce  .|...i...$...$..
->>>>      20 35 23 c1 00 00 00 00 00 00 00 00 00 00 00 00   5#.............
->>>>    backtrace:
->>>>      [<c028fb64>] kmem_cache_alloc_trace+0x2c4/0x3cc
->>>>      [<c076d5f0>] ti_cpufreq_probe+0x6c/0x334
->>>>      [<c068d6e4>] platform_drv_probe+0x60/0xc0
->>>>      [<c068b384>] driver_probe_device+0x218/0x2c4
->>>>      [<c068b5a4>] __device_attach_driver+0xa8/0xdc
->>>>      [<c0689340>] bus_for_each_drv+0x70/0xa4
->>>>      [<c068b020>] __device_attach+0xc0/0x124
->>>>      [<c068b634>] device_initial_probe+0x1c/0x20
->>>>      [<c068a3b8>] bus_probe_device+0x94/0x9c
->>>>      [<c0688300>] device_add+0x404/0x590
->>>>      [<c068d408>] platform_device_add+0x11c/0x230
->>>>      [<c068df40>] platform_device_register_full+0x10c/0x128
->>>>      [<c076d578>] ti_cpufreq_init+0x44/0x50
->>>>      [<c01017c4>] do_one_initcall+0x54/0x180
->>>>      [<c0e00fe0>] kernel_init_freeable+0x270/0x33c
->>>>      [<c093f2bc>] kernel_init+0x18/0x124
->>>>
->>>> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
->>>> ---
->>>>   drivers/cpufreq/ti-cpufreq.c | 5 ++++-
->>>>   1 file changed, 4 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
->>>> index 4bf47de..ffcddcd 100644
->>>> --- a/drivers/cpufreq/ti-cpufreq.c
->>>> +++ b/drivers/cpufreq/ti-cpufreq.c
->>>> @@ -217,7 +217,8 @@ static int ti_cpufreq_init(void)
->>>>   	opp_data->cpu_dev = get_cpu_device(0);
->>>>   	if (!opp_data->cpu_dev) {
->>>>   		pr_err("%s: Failed to get device for CPU0\n", __func__);
->>>> -		return -ENODEV;
->>>> +		ret = ENODEV;
->>>> +		goto free_opp_data;
->>>>   	}
->>>>   	opp_data->opp_node = dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
->>>> @@ -262,6 +263,8 @@ static int ti_cpufreq_init(void)
->>>>   fail_put_node:
->>>>   	of_node_put(opp_data->opp_node);
->>>> +free_opp_data:
->>>> +	kfree(opp_data);
->>>>   	return ret;
->>>>   }
->>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+
+On 2017/9/27 16:03, Hans Verkuil wrote:
+> On 09/27/2017 07:15 AM, Yang, Wenyou wrote:
+>> Hi Hans,
+>>
+>> Thank? you very much for your review.
+>>
+>> On 2017/9/25 21:24, Hans Verkuil wrote:
+>>> Hi Wenyou,
 >>>
->>> I also see that you are missing an of_node_put(np) in the driver. Maybe you
->>> want to fix that as well (in a separate patch) ?
->> Ha, thanks, I'm not sure if I follow your meanings.
->>
->> opp_data->opp_node will be set after goto free_opp_data, so are we safe
->> here?
->>
->>          opp_data->cpu_dev = get_cpu_device(0);
->>          if (!opp_data->cpu_dev) {
->>                  pr_err("%s: Failed to get device for CPU0\n", __func__);
->>                  ret = ENODEV;
->>                  goto free_opp_data;
->>          }
->>
->>          opp_data->opp_node =
->> dev_pm_opp_of_get_opp_desc_node(opp_data->cpu_dev);
-> I was talking about this one.
->
->          np = of_find_node_by_path("/");
->
-> There is no counterpart of this one.
+>>> On 18/09/17 08:39, Wenyou Yang wrote:
+>>>> To improve the readability of code, split the format array into two,
+>>>> one for the format description, other for the register configuration.
+>>>> Meanwhile, add the flag member to indicate the format can be achieved
+>>>> from the sensor or be produced by the controller, and rename members
+>>>> related to the register configuration.
+>>>>
+>>>> Also add more formats support: GREY, ARGB444, ARGB555 and ARGB32.
+>>>>
+>>>> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+>>> This looks better. Just a few comments, see below.
+>>>
+>>>> ---
+>>>>
+>>>> Changes in v2:
+>>>>    - Add the new patch to remove the unnecessary member from
+>>>>      isc_subdev_entity struct.
+>>>>    - Rebase on the patch set,
+>>>>           [PATCH 0/6] [media] Atmel: Adjustments for seven function implementations
+>>>>           https://www.mail-archive.com/linux-media at vger.kernel.org/msg118342.html
+>>>>
+>>>>    drivers/media/platform/atmel/atmel-isc.c | 524 ++++++++++++++++++++++++-------
+>>>>    1 file changed, 405 insertions(+), 119 deletions(-)
+>>>>
+>>>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+>>>> index 2d876903da71..90bd0b28a975 100644
+>>>> --- a/drivers/media/platform/atmel/atmel-isc.c
+>>>> +++ b/drivers/media/platform/atmel/atmel-isc.c
+>>>> @@ -89,34 +89,56 @@ struct isc_subdev_entity {
+>>>>    	struct list_head list;
+>>>>    };
+>>>>    
+>>>> +#define FMT_FLAG_FROM_SENSOR		BIT(0)
+>>>> +#define FMT_FLAG_FROM_CONTROLLER	BIT(1)
+>>> Document the meaning of these flags.
+>> Will add it in next version.
+>>>> +
+>>>>    /*
+>>>>     * struct isc_format - ISC media bus format information
+>>>>     * @fourcc:		Fourcc code for this format
+>>>>     * @mbus_code:		V4L2 media bus format code.
+>>>> + * flags:		Indicate format from sensor or converted by controller
+>>>>     * @bpp:		Bits per pixel (when stored in memory)
+>>>> - * @reg_bps:		reg value for bits per sample
+>>>>     *			(when transferred over a bus)
+>>>> - * @pipeline:		pipeline switch
+>>>>     * @sd_support:		Subdev supports this format
+>>>>     * @isc_support:	ISC can convert raw format to this format
+>>>>     */
+>>>> +
+>>>>    struct isc_format {
+>>>>    	u32	fourcc;
+>>>>    	u32	mbus_code;
+>>>> +	u32	flags;
+>>>>    	u8	bpp;
+>>>>    
+>>>> -	u32	reg_bps;
+>>>> -	u32	reg_bay_cfg;
+>>>> -	u32	reg_rlp_mode;
+>>>> -	u32	reg_dcfg_imode;
+>>>> -	u32	reg_dctrl_dview;
+>>>> -
+>>>> -	u32	pipeline;
+>>>> -
+>>>>    	bool	sd_support;
+>>>>    	bool	isc_support;
+>>>>    };
+>>>>    
+>>>> +/* Pipeline bitmap */
+>>>> +#define WB_ENABLE	BIT(0)
+>>>> +#define CFA_ENABLE	BIT(1)
+>>>> +#define CC_ENABLE	BIT(2)
+>>>> +#define GAM_ENABLE	BIT(3)
+>>>> +#define GAM_BENABLE	BIT(4)
+>>>> +#define GAM_GENABLE	BIT(5)
+>>>> +#define GAM_RENABLE	BIT(6)
+>>>> +#define CSC_ENABLE	BIT(7)
+>>>> +#define CBC_ENABLE	BIT(8)
+>>>> +#define SUB422_ENABLE	BIT(9)
+>>>> +#define SUB420_ENABLE	BIT(10)
+>>>> +
+>>>> +#define GAM_ENABLES	(GAM_RENABLE | GAM_GENABLE | GAM_BENABLE | GAM_ENABLE)
+>>>> +
+>>>> +struct fmt_config {
+>>>> +	u32	fourcc;
+>>>> +
+>>>> +	u32	pfe_cfg0_bps;
+>>>> +	u32	cfa_baycfg;
+>>>> +	u32	rlp_cfg_mode;
+>>>> +	u32	dcfg_imode;
+>>>> +	u32	dctrl_dview;
+>>>> +
+>>>> +	u32	bits_pipeline;
+>>>> +};
+>>>>    
+>>>>    #define HIST_ENTRIES		512
+>>>>    #define HIST_BAYER		(ISC_HIS_CFG_MODE_B + 1)
+>>>> @@ -181,80 +203,321 @@ struct isc_device {
+>>>>    	struct list_head		subdev_entities;
+>>>>    };
+>>>>    
+>>>> -#define RAW_FMT_IND_START    0
+>>>> -#define RAW_FMT_IND_END      11
+>>>> -#define ISC_FMT_IND_START    12
+>>>> -#define ISC_FMT_IND_END      14
+>>>> -
+>>>> -static struct isc_format isc_formats[] = {
+>>>> -	{ V4L2_PIX_FMT_SBGGR8, MEDIA_BUS_FMT_SBGGR8_1X8, 8,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT8,
+>>>> -	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SGBRG8, MEDIA_BUS_FMT_SGBRG8_1X8, 8,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_GBGB, ISC_RLP_CFG_MODE_DAT8,
+>>>> -	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SGRBG8, MEDIA_BUS_FMT_SGRBG8_1X8, 8,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_GRGR, ISC_RLP_CFG_MODE_DAT8,
+>>>> -	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SRGGB8, MEDIA_BUS_FMT_SRGGB8_1X8, 8,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_RGRG, ISC_RLP_CFG_MODE_DAT8,
+>>>> -	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -
+>>>> -	{ V4L2_PIX_FMT_SBGGR10, MEDIA_BUS_FMT_SBGGR10_1X10, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT10,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SGBRG10, MEDIA_BUS_FMT_SGBRG10_1X10, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_GBGB, ISC_RLP_CFG_MODE_DAT10,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SGRBG10, MEDIA_BUS_FMT_SGRBG10_1X10, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_GRGR, ISC_RLP_CFG_MODE_DAT10,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SRGGB10, MEDIA_BUS_FMT_SRGGB10_1X10, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_RGRG, ISC_RLP_CFG_MODE_DAT10,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -
+>>>> -	{ V4L2_PIX_FMT_SBGGR12, MEDIA_BUS_FMT_SBGGR12_1X12, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT12,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SGBRG12, MEDIA_BUS_FMT_SGBRG12_1X12, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_GBGB, ISC_RLP_CFG_MODE_DAT12,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SGRBG12, MEDIA_BUS_FMT_SGRBG12_1X12, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_GRGR, ISC_RLP_CFG_MODE_DAT12,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_SRGGB12, MEDIA_BUS_FMT_SRGGB12_1X12, 16,
+>>>> -	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_RGRG, ISC_RLP_CFG_MODE_DAT12,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> -
+>>>> -	{ V4L2_PIX_FMT_YUV420, 0x0, 12,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
+>>>> -	  ISC_DCFG_IMODE_YC420P, ISC_DCTRL_DVIEW_PLANAR, 0x7fb,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_YUV422P, 0x0, 16,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
+>>>> -	  ISC_DCFG_IMODE_YC422P, ISC_DCTRL_DVIEW_PLANAR, 0x3fb,
+>>>> -	  false, false },
+>>>> -	{ V4L2_PIX_FMT_RGB565, MEDIA_BUS_FMT_RGB565_2X8_LE, 16,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_RGB565,
+>>>> -	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x7b,
+>>>> -	  false, false },
+>>>> -
+>>>> -	{ V4L2_PIX_FMT_YUYV, MEDIA_BUS_FMT_YUYV8_2X8, 16,
+>>>> -	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT8,
+>>>> -	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
+>>>> -	  false, false },
+>>>> +#define MAX_RAW_FMT_INDEX	11
+>>> Do you still need this? The FMT_FLAG_FROM_SENSOR already tells you if it
+>>> is a raw format or not.
+>>>
+>>> As far as I can tell you can drop this define.
+>> The MAX_RAW_FMT_INDEX is used to get the raw format supported by the sensor.
+>> Some sensor provide more formats other than the raw format, so the
+>> FMT_FLAG_FROM_SENSOR is not enough.
+> So, add a new flag. The problem with a define like that is that is easily
+> can get out-of-sync with the array. It's a fragile coding approach.
+Yes, adding a new flag is better.
+Thanks.
 
-Yes, you are right, it seems of_node_put(np) that you mentioned were
-ignored by both paths. If you don't mind I can deliver a separate patch
-to fix this based on some testing later.
-
-Cheers,
-Zumeng
->
+Best Regards,
+Wenyou Yang
