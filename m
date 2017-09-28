@@ -1,19 +1,19 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Thu, 28 Sep 2017 03:49:19 +0200
-Subject: [PATCH v4 02/11] dmaengine: sun6i: Correct burst length field offsets
- for H3
+Date: Thu, 28 Sep 2017 03:49:24 +0200
+Subject: [PATCH v4 07/11] dmaengine: sun6i: Retrieve channel count/max request
+ from devicetree
 In-Reply-To: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
 References: <20170928014928.2272-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <8bff4e60-f464-4b96-874b-f8a610b5a2ef@rwthex-w2-a.rwth-ad.de>
+Message-ID: <6277478a-601a-48b0-8e1f-1d309049d4f4@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the H3, the burst lengths field offsets in the channel configuration
-register differs from earlier SoC generations.
+To avoid introduction of a new compatible for each small SoC/DMA controller
+variation, move the definition of the channel count to the devicetree.
 
-Using the A31 register macros actually configured the H3 controller
-do to bursts of length 1 always, which although working leads to higher
-bus utilisation.
+The number of vchans is no longer explicit, but limited by the highest
+port/DMA request number. The result is a slight overallocation for SoCs
+with a sparse port mapping.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -21,133 +21,73 @@ Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
 
 Changes in v4:
-- Pass reference to config instead of config itself
-- Fix config initialization
+- remove range checks for dma-channels/dma-requests DT properties
 
 Changes in v3: None
 Changes in v2:
-- Use controller specific callback for burst length setting
+- Set default number of dma-request if not provided in config or devicetree
 
- drivers/dma/sun6i-dma.c | 34 +++++++++++++++++++++++++++-------
- 1 file changed, 27 insertions(+), 7 deletions(-)
+ drivers/dma/sun6i-dma.c | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 6f9d7c4ac7c0..48b3701c9aa1 100644
+index 7fce976a13d8..b5906da2a975 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -68,13 +68,15 @@
- #define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
+@@ -42,6 +42,9 @@
+ 
+ #define DMA_STAT		0x30
+ 
++/* Offset between DMA_IRQ_EN and DMA_IRQ_STAT limits number of channels */
++#define DMA_MAX_CHANNELS	(DMA_IRQ_CHAN_NR * 0x10 / 4)
++
+ /*
+  * sun8i specific registers
+  */
+@@ -65,7 +68,8 @@
+ #define DMA_CHAN_LLI_ADDR	0x08
+ 
+ #define DMA_CHAN_CUR_CFG	0x0c
+-#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
++#define DMA_CHAN_MAX_DRQ		0x1f
++#define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & DMA_CHAN_MAX_DRQ)
  #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
  #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
--#define DMA_CHAN_CFG_SRC_BURST(x)	(((x) & 0x3) << 7)
-+#define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
-+#define DMA_CHAN_CFG_SRC_BURST_H3(x)	(((x) & 0x3) << 6)
- #define DMA_CHAN_CFG_SRC_WIDTH(x)	(((x) & 0x3) << 9)
- 
- #define DMA_CHAN_CFG_DST_DRQ(x)		(DMA_CHAN_CFG_SRC_DRQ(x) << 16)
- #define DMA_CHAN_CFG_DST_IO_MODE	(DMA_CHAN_CFG_SRC_IO_MODE << 16)
- #define DMA_CHAN_CFG_DST_LINEAR_MODE	(DMA_CHAN_CFG_SRC_LINEAR_MODE << 16)
--#define DMA_CHAN_CFG_DST_BURST(x)	(DMA_CHAN_CFG_SRC_BURST(x) << 16)
-+#define DMA_CHAN_CFG_DST_BURST_A31(x)	(DMA_CHAN_CFG_SRC_BURST_A31(x) << 16)
-+#define DMA_CHAN_CFG_DST_BURST_H3(x)	(DMA_CHAN_CFG_SRC_BURST_H3(x) << 16)
- #define DMA_CHAN_CFG_DST_WIDTH(x)	(DMA_CHAN_CFG_SRC_WIDTH(x) << 16)
- 
- #define DMA_CHAN_CUR_SRC	0x10
-@@ -118,6 +120,7 @@ struct sun6i_dma_config {
- 	 * BSP kernel source code.
- 	 */
- 	void (*clock_autogate_enable)(struct sun6i_dma_dev *);
-+	void (*set_burst_length)(u32 *p_cfg, s8 src_burst, s8 dst_burst);
- };
- 
- /*
-@@ -283,6 +286,18 @@ static void sun6i_enable_clock_autogate_h3(struct sun6i_dma_dev *sdev)
- 	writel(SUNXI_H3_DMA_GATE_ENABLE, sdev->base + SUNXI_H3_DMA_GATE);
- }
- 
-+static void sun6i_set_burst_length_a31(u32 *p_cfg, s8 src_burst, s8 dst_burst)
-+{
-+	*p_cfg |= DMA_CHAN_CFG_SRC_BURST_A31(src_burst) |
-+		  DMA_CHAN_CFG_DST_BURST_A31(dst_burst);
-+}
-+
-+static void sun6i_set_burst_length_h3(u32 *p_cfg, s8 src_burst, s8 dst_burst)
-+{
-+	*p_cfg |= DMA_CHAN_CFG_SRC_BURST_H3(src_burst) |
-+		  DMA_CHAN_CFG_DST_BURST_H3(dst_burst);
-+}
-+
- static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
+ #define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
+@@ -1155,6 +1159,7 @@ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+ static int sun6i_dma_probe(struct platform_device *pdev)
  {
- 	struct sun6i_desc *txd = pchan->desc;
-@@ -562,11 +577,11 @@ static int set_config(struct sun6i_dma_dev *sdev,
- 	if (dst_width < 0)
- 		return dst_width;
+ 	const struct of_device_id *device;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct sun6i_dma_dev *sdc;
+ 	struct resource *res;
+ 	int ret, i;
+@@ -1230,6 +1235,26 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->num_vchans = sdc->cfg->nr_max_vchans;
+ 	sdc->max_request = sdc->cfg->nr_max_requests;
  
--	*p_cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
--		DMA_CHAN_CFG_SRC_WIDTH(src_width) |
--		DMA_CHAN_CFG_DST_BURST(dst_burst) |
-+	*p_cfg = DMA_CHAN_CFG_SRC_WIDTH(src_width) |
- 		DMA_CHAN_CFG_DST_WIDTH(dst_width);
- 
-+	sdev->cfg->set_burst_length(p_cfg, src_burst, dst_burst);
++	ret = of_property_read_u32(np, "dma-channels", &sdc->num_pchans);
++	if (ret && !sdc->num_pchans) {
++		dev_err(&pdev->dev, "Can't get dma-channels.\n");
++		return ret;
++	}
 +
- 	return 0;
- }
- 
-@@ -609,11 +624,11 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
- 		DMA_CHAN_CFG_DST_DRQ(DRQ_SDRAM) |
- 		DMA_CHAN_CFG_DST_LINEAR_MODE |
- 		DMA_CHAN_CFG_SRC_LINEAR_MODE |
--		DMA_CHAN_CFG_SRC_BURST(burst) |
- 		DMA_CHAN_CFG_SRC_WIDTH(width) |
--		DMA_CHAN_CFG_DST_BURST(burst) |
- 		DMA_CHAN_CFG_DST_WIDTH(width);
- 
-+	sdev->cfg->set_burst_length(&v_lli->cfg, burst, burst);
++	ret = of_property_read_u32(np, "dma-requests", &sdc->max_request);
++	if (ret && !sdc->max_request) {
++		dev_info(&pdev->dev, "Missing dma-requests, using %u.\n",
++			 DMA_CHAN_MAX_DRQ);
++		sdc->max_request = DMA_CHAN_MAX_DRQ;
++	}
 +
- 	sun6i_dma_lli_add(NULL, v_lli, p_lli, txd);
- 
- 	sun6i_dma_dump_lli(vchan, v_lli);
-@@ -1025,6 +1040,7 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
- 	.nr_max_channels = 16,
- 	.nr_max_requests = 30,
- 	.nr_max_vchans   = 53,
-+	.set_burst_length = sun6i_set_burst_length_a31,
- };
- 
- /*
-@@ -1037,6 +1053,7 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
- 	.nr_max_requests = 24,
- 	.nr_max_vchans   = 37,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23,
-+	.set_burst_length = sun6i_set_burst_length_a31,
- };
- 
- static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
-@@ -1044,6 +1061,7 @@ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
- 	.nr_max_requests = 28,
- 	.nr_max_vchans   = 39,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23,
-+	.set_burst_length = sun6i_set_burst_length_a31,
- };
- 
- /*
-@@ -1056,6 +1074,7 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_requests = 27,
- 	.nr_max_vchans   = 34,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_h3,
-+	.set_burst_length = sun6i_set_burst_length_h3,
- };
- 
- /*
-@@ -1068,6 +1087,7 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
- 	.nr_max_requests = 23,
- 	.nr_max_vchans   = 24,
- 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23,
-+	.set_burst_length = sun6i_set_burst_length_a31,
- };
- 
- static const struct of_device_id sun6i_dma_match[] = {
++	/*
++	 * If the number of vchans is not specified, derive it from the
++	 * highest port number, at most one channel per port and direction.
++	 */
++	if (!sdc->num_vchans)
++		sdc->num_vchans = 2 * (sdc->max_request + 1);
++
+ 	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->num_pchans,
+ 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
+ 	if (!sdc->pchans)
 -- 
 2.14.1
