@@ -1,117 +1,32 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 28 Sep 2017 22:50:59 +0300
-Subject: [PATCH] arm64: fix documentation on kernel pages mappings to HYP
- VA
-In-Reply-To: <20170927091332.GA19317@arm.com>
-References: <20170913180830.8608-1-ynorov@caviumnetworks.com>
- <20170926184542.t56zpdx2s5et77gy@yury-thinkpad>
- <86bmlwo842.fsf@arm.com> <20170927091332.GA19317@arm.com>
-Message-ID: <20170928195059.jzwglkrx2vzyzjpf@yury-thinkpad>
+From: linus.luessing@c0d3.blue (=?UTF-8?q?Linus=20L=C3=BCssing?=)
+Date: Thu, 28 Sep 2017 22:27:03 +0200
+Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable USB3503 driver
+Message-ID: <20170928202703.21364-1-linus.luessing@c0d3.blue>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 10:13:33AM +0100, Will Deacon wrote:
-> On Wed, Sep 27, 2017 at 09:31:41AM +0100, Marc Zyngier wrote:
-> > On Tue, Sep 26 2017 at  9:45:42 pm BST, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > > On Wed, Sep 13, 2017 at 09:08:30PM +0300, Yury Norov wrote:
-> > >> The Documentation/arm64/memory.txt says:
-> > >> When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-> > >> offset from the kernel VA (top 24bits of the kernel VA set to zero):
-> > >> 
-> > >> In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
-> > >> which has more options, and none of them assumes clearing of top 24bits
-> > >> of the kernel VA.
-> > >> 
-> > >> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > >> ---
-> > >>  Documentation/arm64/memory.txt | 15 +++++++++------
-> > >>  1 file changed, 9 insertions(+), 6 deletions(-)
-> > >> 
-> > >> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-> > >> index d7273a5f6456..c39895d7e3a2 100644
-> > >> --- a/Documentation/arm64/memory.txt
-> > >> +++ b/Documentation/arm64/memory.txt
-> > >> @@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
-> > >>   +-------------------------------------------------> [63] TTBR0/1
-> > >>  
-> > >>  
-> > >> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-> > >> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
-> > >> -
-> > >> -Start			End			Size		Use
-> > >> ------------------------------------------------------------------------
-> > >> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
-> > >> +When using KVM without Virtualization Host Extensions, the hypervisor maps
-> > >> +kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
-> > >> +or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
-> > >> +ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
-> > >> +VA set to zero if CPU has Reduced HYP mapping offset capability. See
-> > >> +kern_hyp_va macro.
-> > 
-> > What is this "Reduced HYP mapping offset capability"?
+The Odroid U3 (Exynos 4412 based) for instance needs this driver,
+otherwise its USB hub will not come up.
 
-This is the description of ARM64_HYP_OFFSET_LOW capability in
-arch/arm64/kernel/cpufeature.c
+Also selecting it as built-in to allow booting from USB without
+an initrd/initramfs. exynos_defconfig does the same already, too.
 
-> > You're missing the point that the location of the EL2 mapping is
-> > conditioned by the location of the identity mapping that is used to
-> > bring up / tear down KVM. You have to express the VA transformation in
-> > terms of both VA_BITS (and there is more cases than just 39 or 48 bits)
-> > *and* the idmap address, not to mention the case where KVM's VA_BITS is
-> > larger than the rest of the kernel. See the extensive blurb in
-> > kvm_mmu.h.
-> > 
-> > >> +
-> > >> +When using KVM with Virtualization Host Extensions, no additional mappings
-> > >> +created as host kernel already operates in EL2.
-> > 
-> > This bit is fine.
-> 
-> FWIW, I was going to queue a simplified version along the lines of the patch
-> below.
-> 
-> Will
+Signed-off-by: Linus L?ssing <linus.luessing@c0d3.blue>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks.
-
-Yury
-
-> --->8
-> 
-> commit dbf7393b7738a0ba0284551e7b6e014cfb100661
-> Author: Yury Norov <ynorov@caviumnetworks.com>
-> Date:   Wed Sep 13 21:08:30 2017 +0300
-> 
->     arm64: fix documentation on kernel pages mappings to HYP VA
->     
->     The Documentation/arm64/memory.txt says:
->     When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
->     offset from the kernel VA (top 24bits of the kernel VA set to zero):
->     
->     In fact, kernel addresses are transleted to HYP with kern_hyp_va macro,
->     which has more options, and none of them assumes clearing of top 24bits
->     of the kernel VA.
->     
->     Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
->     [will: removed gory details]
->     Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-> index d7273a5f6456..ea9ee39784a2 100644
-> --- a/Documentation/arm64/memory.txt
-> +++ b/Documentation/arm64/memory.txt
-> @@ -86,9 +86,9 @@ Translation table lookup with 64KB pages:
->   +-------------------------------------------------> [63] TTBR0/1
->  
->  
-> -When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-> -offset from the kernel VA (top 24bits of the kernel VA set to zero):
-> +When using KVM without the Virtualization Host Extensions, the hypervisor
-> +maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
-> +kern_hyp_va macro for more details.
->  
-> -Start			End			Size		Use
-> ------------------------------------------------------------------------
-> -0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
-> +When using KVM with the Virtualization Host Extensions, no additional
-> +mappings are created, since the host kernel runs directly in EL2.
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 0cacdbf..c2484ef 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -693,6 +693,7 @@ CONFIG_USB_MUSB_HDRC=m
+ CONFIG_USB_MUSB_SUNXI=m
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC2=y
++CONFIG_USB_HSIC_USB3503=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-- 
+2.1.4
