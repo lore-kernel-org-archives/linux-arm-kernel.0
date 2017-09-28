@@ -1,211 +1,128 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 28 Sep 2017 23:18:55 +0200
-Subject: [PATCH v3 17/22] firmware: arm_scmi: add device power domain
- support using genpd
-In-Reply-To: <1506604306-20739-18-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-18-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAPDyKFo0oFrtGgb9REX-y3mAgQ7pTFnyD6ZcqwhEZ7oSRfV4oA@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 29 Sep 2017 00:25:43 +0300
+Subject: [PATCH v3 3/5] media: atmel-isc: Enable the clocks during probe
+In-Reply-To: <20170928081828.20335-4-wenyou.yang@microchip.com>
+References: <20170928081828.20335-1-wenyou.yang@microchip.com>
+ <20170928081828.20335-4-wenyou.yang@microchip.com>
+Message-ID: <20170928212543.sltvd4rgswfowtcd@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 September 2017 at 15:11, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> This patch hooks up the support for device power domain provided by
-> SCMI using the Linux generic power domain infrastructure.
->
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi Wenyou,
+
+On Thu, Sep 28, 2017 at 04:18:26PM +0800, Wenyou Yang wrote:
+> To meet the relationship, enable the HCLOCK and ispck during the
+> device probe, "isc_pck frequency is less than or equal to isc_ispck,
+> and isc_ispck is greater than or equal to HCLOCK."
+> Meanwhile, call the pm_runtime_enable() in the right place.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 > ---
->  drivers/firmware/Kconfig                   |  13 +++
->  drivers/firmware/arm_scmi/Makefile         |   1 +
->  drivers/firmware/arm_scmi/scmi_pm_domain.c | 134 +++++++++++++++++++++++++++++
->  3 files changed, 148 insertions(+)
->  create mode 100644 drivers/firmware/arm_scmi/scmi_pm_domain.c
->
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index c3d1a12763ce..a4462bc661c8 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -40,6 +40,19 @@ config ARM_SCMI_PROTOCOL
->           This protocol library provides interface for all the client drivers
->           making use of the features offered by the SCMI.
->
-> +config ARM_SCMI_POWER_DOMAIN
-> +       tristate "SCMI power domain driver"
-> +       depends on ARM_SCMI_PROTOCOL || (COMPILE_TEST && OF)
-> +       default y
-> +       select PM_GENERIC_DOMAINS if PM
-> +       help
-> +         This enables support for the SCMI power domains which can be
-> +         enabled or disabled via the SCP firmware
-> +
-> +         This driver can also be built as a module.  If so, the module
-> +         will be called scmi_pm_domain. Note this may needed early in boot
-> +         before rootfs may be available.
-> +
->  config ARM_SCPI_PROTOCOL
->         tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
->         depends on ARM || ARM64 || COMPILE_TEST
-> diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-> index 7fb026c71833..289e9e5a4764 100644
-> --- a/drivers/firmware/arm_scmi/Makefile
-> +++ b/drivers/firmware/arm_scmi/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_ARM_SCMI_PROTOCOL)        = arm_scmi.o
->  arm_scmi-y = base.o clock.o driver.o mbox_if.o perf.o power.o sensors.o
->  arm_scmi-$(CONFIG_ARM_MHU) += arm_mhu_if.o
-> +obj-$(CONFIG_ARM_SCMI_POWER_DOMAIN) += scmi_pm_domain.o
-> diff --git a/drivers/firmware/arm_scmi/scmi_pm_domain.c b/drivers/firmware/arm_scmi/scmi_pm_domain.c
-> new file mode 100644
-> index 000000000000..e53aa9d0af6e
-> --- /dev/null
-> +++ b/drivers/firmware/arm_scmi/scmi_pm_domain.c
-> @@ -0,0 +1,134 @@
-> +/*
-> + * SCMI Generic power domain support.
-> + *
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program. If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/pm_domain.h>
-> +#include <linux/scmi_protocol.h>
-> +
-> +struct scmi_pm_domain {
-> +       struct generic_pm_domain genpd;
-> +       const struct scmi_handle *handle;
-> +       const char *name;
-> +       u32 domain;
-> +};
-> +
-> +#define to_scmi_pd(gpd) container_of(gpd, struct scmi_pm_domain, genpd)
-> +
-> +static int scmi_pd_power(struct generic_pm_domain *domain, bool power_on)
-> +{
-> +       int ret;
-> +       u32 state, ret_state;
-> +       struct scmi_pm_domain *pd = to_scmi_pd(domain);
-> +       const struct scmi_power_ops *ops = pd->handle->power_ops;
-> +
-> +       if (power_on)
-> +               state = SCMI_POWER_STATE_GENERIC_ON;
-> +       else
-> +               state = SCMI_POWER_STATE_GENERIC_OFF;
-> +
-> +       ret = ops->state_set(pd->handle, pd->domain, state);
-> +       if (!ret)
-> +               ret = ops->state_get(pd->handle, pd->domain, &ret_state);
-> +       if (!ret && state != ret_state)
-> +               return -EIO;
-> +
-> +       return ret;
-> +}
-> +
-> +static int scmi_pd_power_on(struct generic_pm_domain *domain)
-> +{
-> +       return scmi_pd_power(domain, true);
-> +}
-> +
-> +static int scmi_pd_power_off(struct generic_pm_domain *domain)
-> +{
-> +       return scmi_pd_power(domain, false);
-> +}
-> +
-> +static int scmi_pm_domain_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +       struct scmi_pm_domain *scmi_pd;
-> +       struct genpd_onecell_data *scmi_pd_data;
-> +       struct generic_pm_domain **domains;
-> +       int num_domains, i;
-> +       const struct scmi_handle *handle = devm_scmi_handle_get(dev);
-> +
-> +       if (IS_ERR_OR_NULL(handle) || !handle->power_ops)
-> +               return -EPROBE_DEFER;
-> +
-> +       num_domains = handle->power_ops->num_domains_get(handle);
-> +       if (num_domains < 0) {
-> +               dev_err(dev, "number of domains not found\n");
-> +               return num_domains;
-> +       }
-> +
-> +       scmi_pd = devm_kcalloc(dev, num_domains, sizeof(*scmi_pd), GFP_KERNEL);
-> +       if (!scmi_pd)
-> +               return -ENOMEM;
-> +
-> +       scmi_pd_data = devm_kzalloc(dev, sizeof(*scmi_pd_data), GFP_KERNEL);
-> +       if (!scmi_pd_data)
-> +               return -ENOMEM;
-> +
-> +       domains = devm_kcalloc(dev, num_domains, sizeof(*domains), GFP_KERNEL);
-> +       if (!domains)
-> +               return -ENOMEM;
-> +
-> +       for (i = 0; i < num_domains; i++, scmi_pd++) {
-> +               domains[i] = &scmi_pd->genpd;
-> +
-> +               scmi_pd->domain = i;
-> +               scmi_pd->handle = handle;
-> +               scmi_pd->name = handle->power_ops->name_get(handle, i);
-> +               scmi_pd->genpd.name = scmi_pd->name;
-> +               scmi_pd->genpd.power_off = scmi_pd_power_off;
-> +               scmi_pd->genpd.power_on = scmi_pd_power_on;
-> +
-> +               /*
-> +                * Treat all power domains as off at boot.
-> +                *
-> +                * The SCP firmware itself may have switched on some domains,
-> +                * but for reference counting purpose, keep it this way.
-> +                */
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
+>  1 file changed, 25 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+> index 0b15dc1a3a0b..f092c95587c1 100644
+> --- a/drivers/media/platform/atmel/atmel-isc.c
+> +++ b/drivers/media/platform/atmel/atmel-isc.c
+> @@ -1594,6 +1594,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+>  	struct isc_subdev_entity *sd_entity;
+>  	struct video_device *vdev = &isc->video_dev;
+>  	struct vb2_queue *q = &isc->vb2_vidq;
+> +	struct device *dev = isc->dev;
+>  	int ret;
+>  
+>  	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
+> @@ -1677,6 +1678,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+>  		return ret;
+>  	}
+>  
+> +	pm_runtime_set_active(dev);
+> +	pm_runtime_enable(dev);
+> +	pm_request_idle(dev);
 
-I think it would be better to give the correct information about the
-state of the PM domain. Otherwise genpd may end up thinking a PM
-domain is off, while in fact it's on - thus wasting power.
+Remember that the driver's async complete function could never get called.
 
-> +               pm_genpd_init(&scmi_pd->genpd, NULL, true);
-> +       }
-> +
-> +       scmi_pd_data->domains = domains;
-> +       scmi_pd_data->num_domains = num_domains;
-> +
-> +       of_genpd_add_provider_onecell(np, scmi_pd_data);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver scmi_power_domain_driver = {
-> +       .driver = {
-> +               .name = "scmi-power-domain",
-> +       },
-> +       .probe = scmi_pm_domain_probe,
-> +};
-> +module_platform_driver(scmi_power_domain_driver);
-> +
-> +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-> +MODULE_DESCRIPTION("ARM SCMI power domain driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.7.4
->
+What would be the reason to move it here?
 
-Otherwise this looks good to me.
+> +
+>  	return 0;
+>  }
+>  
+> @@ -1856,25 +1861,37 @@ static int atmel_isc_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	ret = clk_prepare_enable(isc->hclock);
+> +	if (ret) {
+> +		dev_err(dev, "failed to enable hclock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>  	ret = isc_clk_init(isc);
+>  	if (ret) {
+>  		dev_err(dev, "failed to init isc clock: %d\n", ret);
+> -		goto clean_isc_clk;
+> +		goto unprepare_hclk;
+>  	}
+>  
+>  	isc->ispck = isc->isc_clks[ISC_ISPCK].clk;
+>  
+> +	ret = clk_prepare_enable(isc->ispck);
+> +	if (ret) {
+> +		dev_err(dev, "failed to enable ispck: %d\n", ret);
+> +		goto unprepare_hclk;
+> +	}
+> +
+>  	/* ispck should be greater or equal to hclock */
+>  	ret = clk_set_rate(isc->ispck, clk_get_rate(isc->hclock));
+>  	if (ret) {
+>  		dev_err(dev, "failed to set ispck rate: %d\n", ret);
+> -		goto clean_isc_clk;
+> +		goto unprepare_clk;
+>  	}
+>  
+>  	ret = v4l2_device_register(dev, &isc->v4l2_dev);
+>  	if (ret) {
+>  		dev_err(dev, "unable to register v4l2 device.\n");
+> -		goto clean_isc_clk;
+> +		goto unprepare_clk;
+>  	}
+>  
+>  	ret = isc_parse_dt(dev, isc);
+> @@ -1907,8 +1924,6 @@ static int atmel_isc_probe(struct platform_device *pdev)
+>  			break;
+>  	}
+>  
+> -	pm_runtime_enable(dev);
+> -
+>  	return 0;
+>  
+>  cleanup_subdev:
+> @@ -1917,7 +1932,11 @@ static int atmel_isc_probe(struct platform_device *pdev)
+>  unregister_v4l2_device:
+>  	v4l2_device_unregister(&isc->v4l2_dev);
+>  
+> -clean_isc_clk:
+> +unprepare_clk:
+> +	clk_disable_unprepare(isc->ispck);
+> +unprepare_hclk:
+> +	clk_disable_unprepare(isc->hclock);
 
-Kind regards
-Uffe
+I think you're missing clk_disable_unprepare() in the driver's remove
+callback.
+
+> +
+>  	isc_clk_cleanup(isc);
+>  
+>  	return ret;
+
+-- 
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
