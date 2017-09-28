@@ -1,7 +1,9 @@
 From: kalyan.kinthada@alliedtelesis.co.nz (Kalyan Kinthada)
-Date: Thu, 28 Sep 2017 17:04:05 +1300
-Subject: [PATCH 0/2] Fix I2C repeated start timing violation on Armada-38x.
-Message-ID: <20170928040407.8933-1-kalyan.kinthada@alliedtelesis.co.nz>
+Date: Thu, 28 Sep 2017 17:04:06 +1300
+Subject: [PATCH 1/2] ARM: dts: Fix I2C repeated start issue on Armada-38x
+In-Reply-To: <20170928040407.8933-1-kalyan.kinthada@alliedtelesis.co.nz>
+References: <20170928040407.8933-1-kalyan.kinthada@alliedtelesis.co.nz>
+Message-ID: <20170928040407.8933-2-kalyan.kinthada@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,25 +11,38 @@ All the Armada 38x(380, 385, 388) have a silicon issue in
 the I2C controller which violates the I2C repeated start timing
 (errata FE-8471889).
 
-Activate the compatible string "marvell,mv78230-a0-i2c" in the
-device tree file of Armada-38x to fx this errata (FE-8471889).
+i2c-mv64xxx driver handles this errata based on the compatible string
+"marvell,mv78230-a0-i2c".
 
-Updated the Documentation for the compatible string
-"marvell,mv78230-a0-i2c" by removing the "notes" because
-this is applicable for a number of SoCs such as early revisions
-of Armada XP and the Armada 38x variants.
+This patch activates the "marvell,mv78230-a0-i2c" compatible string
+for the I2C controller on armada-38x SoC based devices.
 
-Thank You Gregory Clement for suggesting to reuse the
-"marvell,mv78230-a0-i2c" compatible string on Armada-38x SoCs.
+Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-------
-Kalyan Kinthada (2):
-  ARM: dts: Fix I2C repeated start issue on Armada-38x
-  dt-bindings: i2c: Update documentation for "mv78230-a0-i2c"
-
- Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 4 ----
- arch/arm/boot/dts/armada-38x.dtsi                     | 4 ++--
- 2 files changed, 2 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 7ff0811e61db..4960722aab32 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -178,7 +178,7 @@
+ 			};
+ 
+ 			i2c0: i2c at 11000 {
+-				compatible = "marvell,mv64xxx-i2c";
++				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+ 				reg = <0x11000 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+@@ -189,7 +189,7 @@
+ 			};
+ 
+ 			i2c1: i2c at 11100 {
+-				compatible = "marvell,mv64xxx-i2c";
++				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+ 				reg = <0x11100 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
 2.14.1
