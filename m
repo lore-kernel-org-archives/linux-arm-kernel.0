@@ -1,96 +1,117 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Thu, 28 Sep 2017 11:11:42 +0000
-Subject: [patch v9 0/4] JTAG driver introduction
-In-Reply-To: <CAMuHMdX1HNym4n67y2VbZqFDLHFGunfRp-LPn0g2K4qhya_w9g@mail.gmail.com>
-References: <1505985932-27568-1-git-send-email-oleksandrs@mellanox.com>
- <CAMuHMdWfoYzWPJYaGOhF8qshKhvngwFKs=kvuH62PYif9q9+0g@mail.gmail.com>
- <AM4PR0501MB2194D67623C640E20B3A7FABB1790@AM4PR0501MB2194.eurprd05.prod.outlook.com>
- <CAMuHMdX1HNym4n67y2VbZqFDLHFGunfRp-LPn0g2K4qhya_w9g@mail.gmail.com>
-Message-ID: <AM4PR0501MB219466B15EB1314E3AF8413FB1790@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 28 Sep 2017 12:37:07 +0100
+Subject: [PATCH] PCI: Fix legacy IRQ assignment execution stage
+Message-ID: <1506598627-8985-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
-> On Behalf Of Geert Uytterhoeven
-> Sent: Thursday, September 28, 2017 12:02 PM
-> To: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Cc: Greg KH <gregkh@linuxfoundation.org>; Arnd Bergmann
-> <arnd@arndb.de>; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> openbmc at lists.ozlabs.org; Joel Stanley <joel@jms.id.au>; Jiri Pirko
-> <jiri@resnulli.us>; Tobias Klauser <tklauser@distanz.ch>; linux-
-> serial at vger.kernel.org; mec at shout.net; Vadim Pasternak
-> <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
-> level at mellanox.com>; Rob Herring <robh+dt@kernel.org>; openocd-devel-
-> owner at lists.sourceforge.net; linux-api at vger.kernel.org; David S. Miller
-> <davem@davemloft.net>; Mauro Carvalho Chehab <mchehab@kernel.org>;
-> linux-spi <linux-spi@vger.kernel.org>; Mark Brown <broonie@kernel.org>
-> Subject: Re: [patch v9 0/4] JTAG driver introduction
-> 
-> Hi Oleksandr,
-> 
-> On Thu, Sep 28, 2017 at 10:53 AM, Oleksandr Shamray
-> <oleksandrs@mellanox.com> wrote:
-> >> [My attention was drawn by
-> >> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flw
-> >> n.net
-> >>
-> %2FArticles%2F734440%2F&data=02%7C01%7Coleksandrs%40mellanox.com%7
-> >>
-> C97b8ba88686a42daaace08d5064b92eb%7Ca652971c7d2e4d9ba6a4d149256f
-> >>
-> 461b%7C0%7C0%7C636421844026854216&sdata=TeHD4a3%2FBN6a5XG3Jizf5
-> >> pmsyJHJjzkEzkpnqsXC6S0%3D&reserved=0]
-> >> [CC linux-spi, which was never included, while linux-serial was]
-> >>
-> >> On Thu, Sep 21, 2017 at 11:25 AM, Oleksandr Shamray
-> >> <oleksandrs@mellanox.com> wrote:
-> >> > When a need raise up to use JTAG interface for system's devices
-> >> > programming or CPU debugging, usually the user layer application
-> >> > implements jtag protocol by bit-bang or using a proprietary
-> >> > connection to vendor hardware.
-> >> > This method can be slow and not generic.
-> >> >
-> >
-> >
-> > [..]
-> >
-> >> >
-> >> > Initial version provides the system calls set for:
-> >> > - SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-> >> > - SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-> >> > - RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
-> >> >   number of clocks.
-> >> >
-> >> > SoC which are not equipped with JTAG master interface, can be built
-> >> > on top of JTAG core driver infrastructure, by applying bit-banging
-> >> > of TDI, TDO, TCK and TMS pins within the hardware specific driver.
-> >>
-> >> Or by using an SPI master?
-> >>
-> >
-> > I think it depends on how flexible the SPI interface is. If you can
-> > set it to transfer from 1 to n bits at a time, and you control the TMS
-> > line in software, you should be able to use it. If the SPI interface
-> > can only transfer a multiple of 8 bits at a time, then in general it would not be
-> suitable for JTAG.
-> 
-> Sure, that depends on the actual SPI master interface.
-> But I guess you can write a generic JTAG-over-SPI driver, and use a tms-gpios
-> property in DT to specify how to control TMS.
-> 
+Through struct pci_host_bridge->{map/swizzle}_irq() hooks is now
+possible to define IRQ mapping functions on a per PCI host bridge basis.
 
-Yes, this is a good idea for SoC which are not equipped with JTAG hardware.
+Actual IRQ allocation is carried out by the pci_assign_irq() function in
+pci_device_probe() - to make sure a device is assigned an IRQ only if it
+is probed (ie match a driver); it retrieves a struct pci_host_bridge*
+for a given PCI device and through {map/swizzle}_irq() hooks it carries
+out the PCI IRQ allocation.
 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+As it turned out, some legacy drivers (eg IDE layer) require that a
+device allocates IRQ as soon as it is added so that its actual IRQ
+settings are available early in the boot process. With current code
+calling pci_assign_irq() in pci_device_probe() IDE IRQ probing fails
+for some drivers:
+
+ide0: disabled, no IRQ
+ide0: failed to initialize IDE interface
+ide0: disabling port
+cmd64x 0000:00:02.0: IDE controller (0x1095:0x0646 rev 0x07)
+CMD64x_IDE 0000:00:02.0: BAR 0: can't reserve [io  0x8050-0x8057]
+cmd64x 0000:00:02.0: can't reserve resources
+CMD64x_IDE: probe of 0000:00:02.0 failed with error -16
+ide_generic: please use "probe_mask=0x3f" module parameter for probing
+all legacy ISA IDE ports
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at fs/sysfs/dir.c:31 sysfs_warn_dup+0x94/0xd0
+sysfs: cannot create duplicate filename '/class/ide_port/ide0'
+...
+
+Trace:
+[<fffffc00003308a0>] __warn+0x160/0x190
+[<fffffc000048c9f4>] sysfs_warn_dup+0x94/0xd0
+[<fffffc0000330928>] warn_slowpath_fmt+0x58/0x70
+[<fffffc000048c9f4>] sysfs_warn_dup+0x94/0xd0
+[<fffffc0000486d40>] kernfs_path_from_node+0x30/0x60
+[<fffffc00004874ac>] kernfs_put+0x16c/0x2c0
+[<fffffc00004874ac>] kernfs_put+0x16c/0x2c0
+[<fffffc000048d010>] sysfs_do_create_link_sd.isra.2+0x100/0x120
+[<fffffc00005b9d64>] device_add+0x2a4/0x7c0
+[<fffffc00005ba5cc>] device_create_groups_vargs+0x14c/0x170
+[<fffffc00005ba518>] device_create_groups_vargs+0x98/0x170
+[<fffffc00005ba690>] device_create+0x50/0x70
+[<fffffc00005df36c>] ide_host_register+0x48c/0xa00
+[<fffffc00005df330>] ide_host_register+0x450/0xa00
+[<fffffc00005ba2a0>] device_register+0x20/0x50
+[<fffffc00005df330>] ide_host_register+0x450/0xa00
+[<fffffc00005df944>] ide_host_add+0x64/0xe0
+[<fffffc000079b41c>] kobject_uevent_env+0x16c/0x710
+[<fffffc0000310288>] do_one_initcall+0x68/0x260
+[<fffffc00007b13bc>] kernel_init+0x1c/0x1a0
+[<fffffc00007b13a0>] kernel_init+0x0/0x1a0
+[<fffffc0000311868>] ret_from_kernel_thread+0x18/0x20
+[<fffffc00007b13a0>] kernel_init+0x0/0x1a0
+
+---[ end trace 24a70433c3e4d374 ]---
+ide0: disabling port
+
+Fix the IRQ allocation issue by moving the pci_assign_irq() call from
+pci_device_probe() to pci_device_add(), so that IRQs for a given PCI
+device are allocated as soon as it is scanned by the PCI enumeration.
+
+This has the drawback of allocating an IRQ even for PCI devices that
+do not have a matching kernel driver but it should be safe to carry
+out in all configurations.
+
+Fixes: 30fdfb929e82 ("PCI: Add a call to pci_assign_irq() in
+pci_device_probe()")
+Link: http://lkml.kernel.org/r/32ec730f-c1b0-5584-cd35-f8a809122b96 at roeck-us.net
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reported-by: Guenter Roeck <linux@roeck-us.net>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Richard Henderson <rth@twiddle.net>
+Cc: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: Matt Turner <mattst88@gmail.com>
+---
+ drivers/pci/pci-driver.c | 2 --
+ drivers/pci/probe.c      | 3 +++
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
+index 11bd267..750d688 100644
+--- a/drivers/pci/pci-driver.c
++++ b/drivers/pci/pci-driver.c
+@@ -415,8 +415,6 @@ static int pci_device_probe(struct device *dev)
+ 	struct pci_dev *pci_dev = to_pci_dev(dev);
+ 	struct pci_driver *drv = to_pci_driver(dev->driver);
+ 
+-	pci_assign_irq(pci_dev);
+-
+ 	error = pcibios_alloc_irq(pci_dev);
+ 	if (error < 0)
+ 		return error;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index ff94b69..ba4e466 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2103,6 +2103,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ 	/* Initialize various capabilities */
+ 	pci_init_capabilities(dev);
+ 
++	/* Assign device IRQ number */
++	pci_assign_irq(dev);
++
+ 	/*
+ 	 * Add the device to our list of discovered devices
+ 	 * and the bus list for fixup functions, etc.
+-- 
+2.4.12
