@@ -1,17 +1,17 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Sep 2017 14:58:36 +0200
-Subject: [PATCH v2 5/7] PCI: aardvark: disable LOS state by default
+Date: Thu, 28 Sep 2017 14:58:37 +0200
+Subject: [PATCH v2 6/7] PCI: aardvark: fix PCIe max read request size setting
 In-Reply-To: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
 References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170928125838.11887-6-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170928125838.11887-7-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+From: Evan Wang <xswang@marvell.com>
 
-Some PCIe devices do not support LOS, and will cause timeouts if the
-root complex forces the LOS state. This patch disables the LOS state
-by default.
+There is an obvious typo issue in the definition of the PCIe maximum
+read request size: a bit shift is directly used as a value, while it
+should be used to shift the correct value.
 
 This is part of fixing bug
 https://bugzilla.kernel.org/show_bug.cgi?id=196339, this commit was
@@ -19,28 +19,36 @@ reported as the user to be important to get a Intel 7260 mini-PCIe
 WiFi card working.
 
 Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Evan Wang <xswang@marvell.com>
+Signed-off-by: Evan Wang <xswang@marvell.com>
+Reviewed-by: Victor Gu <xigu@marvell.com>
 Reviewed-by: Nadav Haklai <nadavh@marvell.com>
 [Thomas: tweak commit log.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/host/pci-aardvark.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/pci/host/pci-aardvark.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 23e243135ebe..a173f31853df 100644
+index a173f31853df..c1093b023e48 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -368,8 +368,7 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
+@@ -33,6 +33,7 @@
+ #define     PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ		0x2
+ #define     PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE		(0 << 11)
+ #define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT	12
++#define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ		0x2
+ #define     PCIE_CORE_MPS_UNIT_BYTE				128
+ #define PCIE_CORE_LINK_CTRL_STAT_REG				0xd0
+ #define     PCIE_CORE_LINK_L0S_ENTRY				BIT(0)
+@@ -303,7 +304,8 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
+ 		(PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ <<
+ 		 PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
+ 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
+-		PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT;
++		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ <<
++		 PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT);
+ 	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
  
- 	advk_pcie_wait_for_link(pcie);
- 
--	reg = PCIE_CORE_LINK_L0S_ENTRY |
--		(1 << PCIE_CORE_LINK_WIDTH_SHIFT);
-+	reg = (1 << PCIE_CORE_LINK_WIDTH_SHIFT);
- 	advk_writel(pcie, reg, PCIE_CORE_LINK_CTRL_STAT_REG);
- 
- 	reg = advk_readl(pcie, PCIE_CORE_CMD_STATUS_REG);
+ 	/* Program PCIe Control 2 to disable strict ordering */
 -- 
 2.13.5
