@@ -1,182 +1,154 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 28 Sep 2017 15:55:01 +0100
-Subject: [PATCH v2 1/2] iommu/io-pgtable-arm: Convert to IOMMU API TLB sync
-Message-ID: <1eaf255a7a334b3b1b100da8b75b73d19c924860.1506610256.git.robin.murphy@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 Sep 2017 15:57:18 +0100
+Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
+In-Reply-To: <87bmmda15n.fsf@linaro.org>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-20-git-send-email-Dave.Martin@arm.com>
+ <87bmmda15n.fsf@linaro.org>
+Message-ID: <20170928145717.GD3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the core API issues its own post-unmap TLB sync call, push that
-operation out from the io-pgtable-arm internals into the users. For now,
-we leave the invalidation implicit in the unmap operation, since none of
-the current users would benefit much from any change to that.
+On Thu, Sep 14, 2017 at 01:57:08PM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > This patch defines and implements a new regset NT_ARM_SVE, which
+> > describes a thread's SVE register state.  This allows a debugger to
+> > manipulate the SVE state, as well as being included in ELF
+> > coredumps for post-mortem debugging.
+> >
+> > Because the regset size and layout are dependent on the thread's
+> > current vector length, it is not possible to define a C struct to
+> > describe the regset contents as is done for existing regsets.
+> > Instead, and for the same reasons, NT_ARM_SVE is based on the
+> > freeform variable-layout approach used for the SVE signal frame.
+> >
+> > Additionally, to reduce debug overhead when debugging threads that
+> > might or might not have live SVE register state, NT_ARM_SVE may be
+> > presented in one of two different formats: the old struct
+> > user_fpsimd_state format is embedded for describing the state of a
+> > thread with no live SVE state, whereas a new variable-layout
+> > structure is embedded for describing live SVE state.  This avoids a
+> > debugger needing to poll NT_PRFPREG in addition to NT_ARM_SVE, and
+> > allows existing userspace code to handle the non-SVE case without
+> > too much modification.
+> >
+> > For this to work, NT_ARM_SVE is defined with a fixed-format header
+> > of type struct user_sve_header, which the recipient can use to
+> > figure out the content, size and layout of the reset of the regset.
+> > Accessor macros are defined to allow the vector-length-dependent
+> > parts of the regset to be manipulated.
+> >
+> > Signed-off-by: Alan Hayward <alan.hayward@arm.com>
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> >
+> > ---
+> >
+> > Changes since v1
+> > ----------------
+> >
+> > Other changes related to Alex Benn?e's comments:
+> >
+> > * Migrate to SVE_VQ_BYTES instead of magic numbers.
+> >
+> > Requested by Alex Benn?e:
+> >
+> > * Thin out BUG_ON()s:
+> > Redundant BUG_ON()s and ones that just check invariants are removed.
+> > Important sanity-checks are migrated to WARN_ON()s, with some
+> > minimal best-effort patch-up code.
+> >
+> > Other:
+> >
+> > * [ABI fix] Bail out with -EIO if attempting to set the
+> > SVE regs for an unsupported VL, instead of misparsing the regset data.
+> >
+> > * Replace some in-kernel open-coded arithmetic with ALIGN()/
+> > DIV_ROUND_UP().
+> > ---
 
-CC: Magnus Damm <damm+renesas@opensource.se>
-CC: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+[...]
 
-v2: Wire up .flush_iotlb_all and cope with uninitialised domains
+> > diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> > index d1ff83d..1915ab0 100644
+> > --- a/arch/arm64/include/uapi/asm/ptrace.h
+> > +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/types.h>
+> >
+> >  #include <asm/hwcap.h>
+> > +#include <asm/sigcontext.h>
+> >
+> >
+> >  /*
+> > @@ -63,6 +64,8 @@
+> >
+> >  #ifndef __ASSEMBLY__
+> >
+> > +#include <linux/prctl.h>
+> > +
+> >  /*
+> >   * User structures for general purpose, floating point and debug registers.
+> >   */
+> > @@ -90,6 +93,138 @@ struct user_hwdebug_state {
+> >  	}		dbg_regs[16];
+> >  };
+> >
+> > +/* SVE/FP/SIMD state (NT_ARM_SVE) */
+> > +
+> > +struct user_sve_header {
+> > +	__u32 size; /* total meaningful regset content in bytes */
+> > +	__u32 max_size; /* maxmium possible size for this thread */
+> > +	__u16 vl; /* current vector length */
+> > +	__u16 max_vl; /* maximum possible vector length */
+> > +	__u16 flags;
+> > +	__u16 __reserved;
+> > +};
+> > +
+> > +/* Definitions for user_sve_header.flags: */
+> > +#define SVE_PT_REGS_MASK		(1 << 0)
+> > +
+> > +/* Flags: must be kept in sync with prctl interface in
+> > <linux/ptrace.h> */
+> 
+> Which flags? We base some on PR_foo flags but we seem to shift them
 
- drivers/iommu/arm-smmu-v3.c    | 10 ++++++++++
- drivers/iommu/arm-smmu.c       | 20 +++++++++++++++-----
- drivers/iommu/io-pgtable-arm.c |  7 +------
- drivers/iommu/ipmmu-vmsa.c     | 10 ++++++++++
- 4 files changed, 36 insertions(+), 11 deletions(-)
+All the prctl flags that have equivalents here, because they're part of
+the internal API to sve_set_vector_length().  It didn't quite seem
+appropriate to document that in a userspace header, but it's probably
+better to say something here than not.  I'll improve the comment.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e67ba6c40faf..ee0c7b73cff7 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1743,6 +1743,14 @@ arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- 	return ops->unmap(ops, iova, size);
- }
- 
-+static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
-+
-+	if (smmu)
-+		__arm_smmu_tlb_sync(smmu);
-+}
-+
- static phys_addr_t
- arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
- {
-@@ -1963,6 +1971,8 @@ static struct iommu_ops arm_smmu_ops = {
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.map_sg			= default_iommu_map_sg,
-+	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-+	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 3bdb799d3b4b..e4a82d70d446 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -250,6 +250,7 @@ enum arm_smmu_domain_stage {
- struct arm_smmu_domain {
- 	struct arm_smmu_device		*smmu;
- 	struct io_pgtable_ops		*pgtbl_ops;
-+	const struct iommu_gather_ops	*tlb_ops;
- 	struct arm_smmu_cfg		cfg;
- 	enum arm_smmu_domain_stage	stage;
- 	struct mutex			init_mutex; /* Protects smmu pointer */
-@@ -735,7 +736,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	enum io_pgtable_fmt fmt;
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
--	const struct iommu_gather_ops *tlb_ops;
- 
- 	mutex_lock(&smmu_domain->init_mutex);
- 	if (smmu_domain->smmu)
-@@ -813,7 +813,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 			ias = min(ias, 32UL);
- 			oas = min(oas, 32UL);
- 		}
--		tlb_ops = &arm_smmu_s1_tlb_ops;
-+		smmu_domain->tlb_ops = &arm_smmu_s1_tlb_ops;
- 		break;
- 	case ARM_SMMU_DOMAIN_NESTED:
- 		/*
-@@ -833,9 +833,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 			oas = min(oas, 40UL);
- 		}
- 		if (smmu->version == ARM_SMMU_V2)
--			tlb_ops = &arm_smmu_s2_tlb_ops_v2;
-+			smmu_domain->tlb_ops = &arm_smmu_s2_tlb_ops_v2;
- 		else
--			tlb_ops = &arm_smmu_s2_tlb_ops_v1;
-+			smmu_domain->tlb_ops = &arm_smmu_s2_tlb_ops_v1;
- 		break;
- 	default:
- 		ret = -EINVAL;
-@@ -863,7 +863,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		.pgsize_bitmap	= smmu->pgsize_bitmap,
- 		.ias		= ias,
- 		.oas		= oas,
--		.tlb		= tlb_ops,
-+		.tlb		= smmu_domain->tlb_ops,
- 		.iommu_dev	= smmu->dev,
- 	};
- 
-@@ -1259,6 +1259,14 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return ops->unmap(ops, iova, size);
- }
- 
-+static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+
-+	if (smmu_domain->tlb_ops)
-+		smmu_domain->tlb_ops->tlb_sync(smmu_domain);
-+}
-+
- static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 					      dma_addr_t iova)
- {
-@@ -1562,6 +1570,8 @@ static struct iommu_ops arm_smmu_ops = {
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.map_sg			= default_iommu_map_sg,
-+	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-+	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index e8018a308868..51e5c43caed1 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -609,7 +609,6 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 			  size_t size)
- {
--	size_t unmapped;
- 	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
- 	arm_lpae_iopte *ptep = data->pgd;
- 	int lvl = ARM_LPAE_START_LVL(data);
-@@ -617,11 +616,7 @@ static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
- 		return 0;
- 
--	unmapped = __arm_lpae_unmap(data, iova, size, lvl, ptep);
--	if (unmapped)
--		io_pgtable_tlb_sync(&data->iop);
--
--	return unmapped;
-+	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
- }
- 
- static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 195d6e93ac71..af8140054273 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -619,6 +619,14 @@ static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
- 	return domain->iop->unmap(domain->iop, iova, size);
- }
- 
-+static void ipmmu_iotlb_sync(struct iommu_domain *io_domain)
-+{
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
-+
-+	if (domain->mmu)
-+		ipmmu_tlb_flush_all(domain);
-+}
-+
- static phys_addr_t ipmmu_iova_to_phys(struct iommu_domain *io_domain,
- 				      dma_addr_t iova)
- {
-@@ -876,6 +884,8 @@ static const struct iommu_ops ipmmu_ops = {
- 	.detach_dev = ipmmu_detach_device,
- 	.map = ipmmu_map,
- 	.unmap = ipmmu_unmap,
-+	.flush_iotlb_all = ipmmu_iotlb_sync,
-+	.iotlb_sync = ipmmu_iotlb_sync,
- 	.map_sg = default_iommu_map_sg,
- 	.iova_to_phys = ipmmu_iova_to_phys,
- 	.add_device = ipmmu_add_device_dma,
--- 
-2.13.4.dirty
+> anyway so where is the requirement for them to match from?
+
+There is a bug here though: sve_set() in ptrace.c is supposed to shift
+the flags from header.flags (which is a u16) back into the
+PR_SVE_SET_VL position (<< 16) for the flags argument of
+sve_set_vector_length().  But this isn't done, so attempting to set (or
+restore) those flags through ptrace may resulting EINVALs from
+sve_set_vector_length().
+
+I'll write a test for this case and implement a fix, something like...
+
+-8<-
+
+ static int sve_set(struct task_struct *target,
+[...]
+ 	ret = sve_set_vector_length(target, header.vl,
+-				    header.flags & ~SVE_PT_REGS_MASK);
++				    (header.flags & ~SVE_PT_REGS_MASK) << 16UL);
+
+
+->8-
+
+What do you think?
+
+[...]
+
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+Again, I'll wait for your feedback first.
+
+Cheers
+---Dave
