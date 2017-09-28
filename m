@@ -1,32 +1,118 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 28 Sep 2017 15:02:37 +0200
-Subject: [RESEND PATCH v2 13/17] media: v4l2-async: simplify
- v4l2_async_subdev structure
-In-Reply-To: <20170928125316.texy2qrzpvzekp7a@valkosipuli.retiisi.org.uk>
-References: <cover.1506548682.git.mchehab@s-opensource.com>
- <20170928125316.texy2qrzpvzekp7a@valkosipuli.retiisi.org.uk>
- <CGME20170928130249epcas2p2c1f6e52226c3a5c72829b1bf3cbaa0cd@epcas2p2.samsung.com>
-Message-ID: <90cfb08b-b363-a317-8781-dcb191805c80@samsung.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 28 Sep 2017 15:07:29 +0200
+Subject: [RFC PATCH 3/4] extcon: add possibility to get extcon device by of
+ node
+In-Reply-To: <20170928130730.8747-1-a.hajda@samsung.com>
+References: <20170928130730.8747-1-a.hajda@samsung.com>
+ <CGME20170928130736eucas1p250bb9d854204ea142a2160cd9ab56194@eucas1p2.samsung.com>
+Message-ID: <20170928130730.8747-4-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2017 02:53 PM, Mauro Carvalho Chehab wrote:
-> (Resending for Mauro, while dropping the non-list recipients. The original
-> likely had too many recipients.)
-> 
-> The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
-> struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
-> match criteria requires just a device name.
-> 
-> So, it doesn't make sense to enclose those into structs,
-> as the criteria can go directly into the union.
-> 
-> That makes easier to document it, as we don't need to document
-> weird senseless structs.
-> 
-> At drivers, this makes even clearer about the match criteria.
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+Since extcon property is not allowed in DT, extcon subsystem requires
+another way to get extcon device. Lets try the simplest approach - get
+edev by of_node.
 
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ drivers/extcon/extcon.c | 44 ++++++++++++++++++++++++++++++++++----------
+ include/linux/extcon.h  |  6 ++++++
+ 2 files changed, 40 insertions(+), 10 deletions(-)
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+index cb38c2747684..fdb8c1d767c1 100644
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -1336,6 +1336,28 @@ void extcon_dev_unregister(struct extcon_dev *edev)
+ EXPORT_SYMBOL_GPL(extcon_dev_unregister);
+ 
+ #ifdef CONFIG_OF
++
++/*
++ * extcon_get_edev_by_of_node - Get the extcon device from devicetree.
++ * @node	: OF node identyfying edev
++ *
++ * Return the pointer of extcon device if success or ERR_PTR(err) if fail.
++ */
++struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
++{
++	struct extcon_dev *edev;
++
++	mutex_lock(&extcon_dev_list_lock);
++	list_for_each_entry(edev, &extcon_dev_list, entry)
++		if (edev->dev.parent && edev->dev.parent->of_node == node)
++			goto end;
++	edev = ERR_PTR(-EPROBE_DEFER);
++end:
++	mutex_unlock(&extcon_dev_list_lock);
++
++	return edev;
++}
++
+ /*
+  * extcon_get_edev_by_phandle - Get the extcon device from devicetree.
+  * @dev		: the instance to the given device
+@@ -1363,25 +1385,27 @@ struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev, int index)
+ 		return ERR_PTR(-ENODEV);
+ 	}
+ 
+-	mutex_lock(&extcon_dev_list_lock);
+-	list_for_each_entry(edev, &extcon_dev_list, entry) {
+-		if (edev->dev.parent && edev->dev.parent->of_node == node) {
+-			mutex_unlock(&extcon_dev_list_lock);
+-			of_node_put(node);
+-			return edev;
+-		}
+-	}
+-	mutex_unlock(&extcon_dev_list_lock);
++	edev = extcon_get_edev_by_of_node(node);
+ 	of_node_put(node);
+ 
+-	return ERR_PTR(-EPROBE_DEFER);
++	return edev;
+ }
++
+ #else
++
++struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
+ struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev, int index)
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
++
+ #endif /* CONFIG_OF */
++
++EXPORT_SYMBOL_GPL(extcon_get_edev_by_of_node);
+ EXPORT_SYMBOL_GPL(extcon_get_edev_by_phandle);
+ 
+ /**
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+index 744d60ca80c3..2f88e7491672 100644
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -261,6 +261,7 @@ extern void devm_extcon_unregister_notifier_all(struct device *dev,
+  * Following APIs get the extcon_dev from devicetree or by through extcon name.
+  */
+ extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
++extern struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node);
+ extern struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
+ 						     int index);
+ 
+@@ -382,6 +383,11 @@ static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static inline struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
++{
++	return ERR_PTR(-ENODEV);
++}
++
+ static inline struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
+ 				int index)
+ {
+-- 
+2.14.1
