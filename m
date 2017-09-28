@@ -1,128 +1,188 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Sep 2017 09:38:27 +0100
-Subject: [PATCH v4 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170927000355.30597-3-d-gerlach@ti.com>
-References: <20170927000355.30597-1-d-gerlach@ti.com>
- <20170927000355.30597-3-d-gerlach@ti.com>
-Message-ID: <20170928083827.GE23750@n2100.armlinux.org.uk>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 28 Sep 2017 17:21:49 +0930
+Subject: [PATCH 8/8] ARM: dts: aspeed: Clean up UART nodes
+In-Reply-To: <20170928075149.8154-1-joel@jms.id.au>
+References: <20170928075149.8154-1-joel@jms.id.au>
+Message-ID: <20170928075149.8154-9-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 26, 2017 at 07:03:55PM -0500, Dave Gerlach wrote:
-> diff --git a/drivers/memory/emif-asm-offsets.c b/drivers/memory/emif-asm-offsets.c
-> new file mode 100644
-> index 000000000000..bdb153c9e948
-> --- /dev/null
-> +++ b/drivers/memory/emif-asm-offsets.c
-> @@ -0,0 +1,22 @@
-> +/*
-> + * TI AM33XX EMIF PM Assembly Offsets
-> + *
-> + * Copyright (C) 2016-2017 Texas Instruments Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/ti-emif-sram.h>
-> +
-> +int main(void)
-> +{
-> +	ti_emif_offsets();
-> +
-> +	return 0;
-> +}
+ - Shorten size of reg property so it covers only the implemented
+ registers
 
-...
+ - Add VUART compatible
 
-> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
-> +static inline void ti_emif_offsets(void)
-> +{
-> +	DEFINE(EMIF_SDCFG_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_sdcfg_val));
-> +	DEFINE(EMIF_TIMING1_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_timing1_val));
-> +	DEFINE(EMIF_TIMING2_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_timing2_val));
-> +	DEFINE(EMIF_TIMING3_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_timing3_val));
-> +	DEFINE(EMIF_REF_CTRL_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_ref_ctrl_val));
-> +	DEFINE(EMIF_ZQCFG_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_zqcfg_val));
-> +	DEFINE(EMIF_PMCR_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_pmcr_val));
-> +	DEFINE(EMIF_PMCR_SHDW_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_pmcr_shdw_val));
-> +	DEFINE(EMIF_RD_WR_LEVEL_RAMP_CTRL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_rd_wr_level_ramp_ctrl));
-> +	DEFINE(EMIF_RD_WR_EXEC_THRESH_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_rd_wr_exec_thresh));
-> +	DEFINE(EMIF_COS_CONFIG_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_cos_config));
-> +	DEFINE(EMIF_PRIORITY_TO_COS_MAPPING_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_priority_to_cos_mapping));
-> +	DEFINE(EMIF_CONNECT_ID_SERV_1_MAP_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_connect_id_serv_1_map));
-> +	DEFINE(EMIF_CONNECT_ID_SERV_2_MAP_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_connect_id_serv_2_map));
-> +	DEFINE(EMIF_OCP_CONFIG_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_ocp_config_val));
-> +	DEFINE(EMIF_LPDDR2_NVM_TIM_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_lpddr2_nvm_tim));
-> +	DEFINE(EMIF_LPDDR2_NVM_TIM_SHDW_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_lpddr2_nvm_tim_shdw));
-> +	DEFINE(EMIF_DLL_CALIB_CTRL_VAL_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_dll_calib_ctrl_val));
-> +	DEFINE(EMIF_DLL_CALIB_CTRL_VAL_SHDW_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_dll_calib_ctrl_val_shdw));
-> +	DEFINE(EMIF_DDR_PHY_CTLR_1_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_ddr_phy_ctlr_1));
-> +	DEFINE(EMIF_EXT_PHY_CTRL_VALS_OFFSET,
-> +	       offsetof(struct emif_regs_amx3, emif_ext_phy_ctrl_vals));
-> +	DEFINE(EMIF_REGS_AMX3_SIZE, sizeof(struct emif_regs_amx3));
-> +
-> +	BLANK();
-> +
-> +	DEFINE(EMIF_PM_BASE_ADDR_VIRT_OFFSET,
-> +	       offsetof(struct ti_emif_pm_data, ti_emif_base_addr_virt));
-> +	DEFINE(EMIF_PM_BASE_ADDR_PHYS_OFFSET,
-> +	       offsetof(struct ti_emif_pm_data, ti_emif_base_addr_phys));
-> +	DEFINE(EMIF_PM_CONFIG_OFFSET,
-> +	       offsetof(struct ti_emif_pm_data, ti_emif_sram_config));
-> +	DEFINE(EMIF_PM_REGS_VIRT_OFFSET,
-> +	       offsetof(struct ti_emif_pm_data, regs_virt));
-> +	DEFINE(EMIF_PM_REGS_PHYS_OFFSET,
-> +	       offsetof(struct ti_emif_pm_data, regs_phys));
-> +	DEFINE(EMIF_PM_DATA_SIZE, sizeof(struct ti_emif_pm_data));
-> +
-> +	BLANK();
-> +
-> +	DEFINE(EMIF_PM_SAVE_CONTEXT_OFFSET,
-> +	       offsetof(struct ti_emif_pm_functions, save_context));
-> +	DEFINE(EMIF_PM_RESTORE_CONTEXT_OFFSET,
-> +	       offsetof(struct ti_emif_pm_functions, restore_context));
-> +	DEFINE(EMIF_PM_ENTER_SR_OFFSET,
-> +	       offsetof(struct ti_emif_pm_functions, enter_sr));
-> +	DEFINE(EMIF_PM_EXIT_SR_OFFSET,
-> +	       offsetof(struct ti_emif_pm_functions, exit_sr));
-> +	DEFINE(EMIF_PM_ABORT_SR_OFFSET,
-> +	       offsetof(struct ti_emif_pm_functions, abort_sr));
-> +	DEFINE(EMIF_PM_FUNCTIONS_SIZE, sizeof(struct ti_emif_pm_functions));
-> +}
-> +#else
-> +static inline void ti_emif_offsets(void) {}
-> +#endif
+ - Move stray uart1 in g5 definition
 
-Any reason the above can't be part of emif-asm-offsets.c ?
+ - Remove outdated current-speed property. Different bootloaders use
+ different speeds, so this is no longer helpful
 
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ arch/arm/boot/dts/aspeed-g4.dtsi | 17 +++++++++--------
+ arch/arm/boot/dts/aspeed-g5.dtsi | 36 ++++++++++++++++++------------------
+ 2 files changed, 27 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 191c33d18122..7a4a53666d70 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -27,6 +27,7 @@
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
+ 		serial4 = &uart5;
++		serial5 = &vuart;
+ 	};
+ 
+ 	cpus {
+@@ -199,7 +200,7 @@
+ 
+ 			uart1: serial at 1e783000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e783000 0x1000>;
++				reg = <0x1e783000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <9>;
+ 				clocks = <&clk_uart>;
+@@ -209,7 +210,7 @@
+ 
+ 			uart2: serial at 1e78d000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e78d000 0x1000>;
++				reg = <0x1e78d000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <32>;
+ 				clocks = <&clk_uart>;
+@@ -219,7 +220,7 @@
+ 
+ 			uart3: serial at 1e78e000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e78e000 0x1000>;
++				reg = <0x1e78e000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <33>;
+ 				clocks = <&clk_uart>;
+@@ -229,7 +230,7 @@
+ 
+ 			uart4: serial at 1e78f000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e78f000 0x1000>;
++				reg = <0x1e78f000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <34>;
+ 				clocks = <&clk_uart>;
+@@ -239,7 +240,7 @@
+ 
+ 			uart5: serial at 1e784000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e784000 0x1000>;
++				reg = <0x1e784000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <10>;
+ 				clocks = <&clk_uart>;
+@@ -248,9 +249,9 @@
+ 				status = "disabled";
+ 			};
+ 
+-			uart6: serial at 1e787000 {
+-				compatible = "ns16550a";
+-				reg = <0x1e787000 0x1000>;
++			vuart: vuart at 1e787000 {
++				compatible = "aspeed,ast2400-vuart";
++				reg = <0x1e787000 0x40>;
+ 				reg-shift = <2>;
+ 				interrupts = <10>;
+ 				clocks = <&clk_uart>;
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 251fc9f4637e..0b793305120a 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -27,6 +27,7 @@
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
+ 		serial4 = &uart5;
++		serial5 = &vuart;
+ 	};
+ 
+ 	cpus {
+@@ -247,16 +248,6 @@
+ 				status = "disabled";
+ 			};
+ 
+-			uart1: serial at 1e783000 {
+-				compatible = "ns16550a";
+-				reg = <0x1e783000 0x1000>;
+-				reg-shift = <2>;
+-				interrupts = <9>;
+-				clocks = <&clk_uart>;
+-				no-loopback-test;
+-				status = "disabled";
+-			};
+-
+ 			lpc: lpc at 1e789000 {
+ 				compatible = "aspeed,ast2500-lpc", "simple-mfd";
+ 				reg = <0x1e789000 0x1000>;
+@@ -287,9 +278,19 @@
+ 				};
+ 			};
+ 
++			uart1: serial at 1e783000 {
++				compatible = "ns16550a";
++				reg = <0x1e783000 0x20>;
++				reg-shift = <2>;
++				interrupts = <9>;
++				clocks = <&clk_uart>;
++				no-loopback-test;
++				status = "disabled";
++			};
++
+ 			uart2: serial at 1e78d000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e78d000 0x1000>;
++				reg = <0x1e78d000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <32>;
+ 				clocks = <&clk_uart>;
+@@ -299,7 +300,7 @@
+ 
+ 			uart3: serial at 1e78e000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e78e000 0x1000>;
++				reg = <0x1e78e000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <33>;
+ 				clocks = <&clk_uart>;
+@@ -309,7 +310,7 @@
+ 
+ 			uart4: serial at 1e78f000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e78f000 0x1000>;
++				reg = <0x1e78f000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <34>;
+ 				clocks = <&clk_uart>;
+@@ -319,18 +320,17 @@
+ 
+ 			uart5: serial at 1e784000 {
+ 				compatible = "ns16550a";
+-				reg = <0x1e784000 0x1000>;
++				reg = <0x1e784000 0x20>;
+ 				reg-shift = <2>;
+ 				interrupts = <10>;
+ 				clocks = <&clk_uart>;
+-				current-speed = <38400>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+ 
+-			uart6: serial at 1e787000 {
+-				compatible = "ns16550a";
+-				reg = <0x1e787000 0x1000>;
++			vuart: vuart at 1e787000 {
++				compatible = "aspeed,ast2500-vuart";
++				reg = <0x1e787000 0x40>;
+ 				reg-shift = <2>;
+ 				interrupts = <10>;
+ 				clocks = <&clk_uart>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.1
