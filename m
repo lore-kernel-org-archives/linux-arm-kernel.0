@@ -1,23 +1,19 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Sep 2017 14:58:32 +0200
-Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
- read/write functions
+Date: Thu, 28 Sep 2017 14:58:33 +0200
+Subject: [PATCH v2 2/7] PCI: aardvark: set PIO_ADDR_LS correctly in
+ advk_pcie_rd_conf()
 In-Reply-To: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
 References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170928125838.11887-3-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Gu <xigu@marvell.com>
 
-The PCI configuration space read/write functions were special casing
-the situation where PCI_SLOT(devfn) != 0, and returned
-PCIBIOS_DEVICE_NOT_FOUND in this case.
-
-However, will this is what is intended for the root bus, it is not
-intended for the child busses, as it prevents discovering devices with
-PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
-if we're on the root bus.
+When setting the PIO_ADDR_LS register during a configuration read, we
+were properly passing the device number, function number and register
+number, but not the bus number, causing issues when reading the
+configuration of PCIe devices.
 
 Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
 Cc: <stable@vger.kernel.org>
@@ -27,30 +23,21 @@ Reviewed-by: Nadav Haklai <nadavh@marvell.com>
 [Thomas: tweak commit log.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/host/pci-aardvark.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/host/pci-aardvark.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 89f4e3d072d7..da2881ba7737 100644
+index da2881ba7737..af7a9c4a61a4 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -440,7 +440,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 	u32 reg;
- 	int ret;
+@@ -459,7 +459,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	advk_writel(pcie, reg, PIO_CTRL);
  
--	if (PCI_SLOT(devfn) != 0) {
-+	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
- 		*val = 0xffffffff;
- 		return PCIBIOS_DEVICE_NOT_FOUND;
- 	}
-@@ -494,7 +494,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 	int offset;
- 	int ret;
+ 	/* Program the address registers */
+-	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
++	reg = PCIE_CONF_ADDR(bus->number, devfn, where);
+ 	advk_writel(pcie, reg, PIO_ADDR_LS);
+ 	advk_writel(pcie, 0, PIO_ADDR_MS);
  
--	if (PCI_SLOT(devfn) != 0)
-+	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0))
- 		return PCIBIOS_DEVICE_NOT_FOUND;
- 
- 	if (where % size)
 -- 
 2.13.5
