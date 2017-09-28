@@ -1,36 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Sep 2017 14:56:47 +0200
-Subject: [EXT] [PATCH 1/2] arm64: dts: marvell: fix interrupt-map
- property for Armada CP110 master PCIe controller
-In-Reply-To: <2164f35d99974e1480790dac98be4a5d@IL-EXCH02.marvell.com>
-References: <20170928124550.11492-1-thomas.petazzoni@free-electrons.com>
- <20170928124550.11492-2-thomas.petazzoni@free-electrons.com>
- <2164f35d99974e1480790dac98be4a5d@IL-EXCH02.marvell.com>
-Message-ID: <20170928145647.35f21186@windsurf.lan>
+Date: Thu, 28 Sep 2017 14:58:32 +0200
+Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
+ read/write functions
+In-Reply-To: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Victor Gu <xigu@marvell.com>
 
-On Thu, 28 Sep 2017 12:52:07 +0000, Yehuda Yitschak wrote:
+The PCI configuration space read/write functions were special casing
+the situation where PCI_SLOT(devfn) != 0, and returned
+PCIBIOS_DEVICE_NOT_FOUND in this case.
 
-> The initial version referenced the GIC interrupt controller. 
-> Maybe this issue was introduced during the switch to the ICU  ?
+However, will this is what is intended for the root bus, it is not
+intended for the child busses, as it prevents discovering devices with
+PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
+if we're on the root bus.
 
-No, it was not introduced by the switch to the ICU. The switch to the
-ICU looked like this:
+Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+[Thomas: tweak commit log.]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-aardvark.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
--                       interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
--                       interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+                       interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
-+                       interrupts = <ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
-
-As you can see there was already a bogus "0" after &gic.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index 89f4e3d072d7..da2881ba7737 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -440,7 +440,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	u32 reg;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0) {
++	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
+@@ -494,7 +494,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	int offset;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0)
++	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0))
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	if (where % size)
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.13.5
