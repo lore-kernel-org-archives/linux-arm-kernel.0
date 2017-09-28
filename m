@@ -1,175 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 28 Sep 2017 14:11:38 +0100
-Subject: [PATCH v3 14/22] firmware: arm_scmi: add per-protocol channels
- support using idr objects
-In-Reply-To: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1506604306-20739-15-git-send-email-sudeep.holla@arm.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 28 Sep 2017 15:17:49 +0200
+Subject: [PATCH v4 2/4] dmaengine: Add STM32 MDMA driver
+In-Reply-To: <20170928081310.GA30097@localhost>
+References: <1503671466-32029-1-git-send-email-pierre-yves.mordret@st.com>
+ <1503671466-32029-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170928081310.GA30097@localhost>
+Message-ID: <1a869018-31e7-9fd4-2017-9c8cdd8c7d88@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to maintain the channel information per protocol, we need
-some sort of list or hashtable to hold all this information. IDR
-provides sparse array mapping of small integer ID numbers onto arbitrary
-pointers. In this case the arbitrary pointers can be pointers to the
-channel information.
 
-This patch adds support for per-protocol channels using those idr
-objects.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/firmware/arm_scmi/driver.c | 47 +++++++++++++++++++++++++++++---------
- 1 file changed, 36 insertions(+), 11 deletions(-)
+On 09/28/2017 10:13 AM, Vinod Koul wrote:
+> On Fri, Aug 25, 2017 at 04:31:04PM +0200, Pierre-Yves MORDRET wrote:
+>> +static int stm32_mdma_probe(struct platform_device *pdev)
+>> +{
+> 
+> [snip]
+> 
+>> +	dmadev = devm_kzalloc(&pdev->dev, sizeof(*dmadev) + sizeof(u32) * count,
+>> +			      GFP_KERNEL);
+>> +	if (!dmadev)
+>> +		return -ENOMEM;
+>> +
+>> +	dmadev->nr_channels = nr_channels;
+>> +	dmadev->nr_requests = nr_requests;
+>> +	device_property_read_u32_array(&pdev->dev, "st,ahb-addr-masks",
+>> +				       dmadev->ahb_addr_masks,
+>> +				       count);
+>> +	dmadev->nr_ahb_addr_masks = count;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	dmadev->base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(dmadev->base))
+>> +		return PTR_ERR(dmadev->base);
+>> +
+>> +	dmadev->clk = devm_clk_get(&pdev->dev, NULL);
+>> +	if (IS_ERR(dmadev->clk)) {
+>> +		dev_err(&pdev->dev, "Error: Missing controller clock\n");
+>> +		return PTR_ERR(dmadev->clk);
+>> +	}
+> 
+> I am assuming if clk is not availble at this point of time you return clk
+> error which maybe defer probe, right?
 
-diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-index 93b3bd8d437f..92ef21d6aa5a 100644
---- a/drivers/firmware/arm_scmi/driver.c
-+++ b/drivers/firmware/arm_scmi/driver.c
-@@ -128,7 +128,7 @@ struct scmi_chan_info {
-  * @version: SCMI revision information containing protocol version,
-  *	implementation version and (sub-)vendor identification.
-  * @minfo: Message info
-- * @tx_cinfo: Reference to SCMI channel information
-+ * @tx_idr: IDR object to map protocol id to channel info pointer
-  * @protocols_imp: list of protocols implemented, currently maximum of
-  *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
-  * @node: list head
-@@ -140,7 +140,7 @@ struct scmi_info {
- 	struct scmi_revision_info version;
- 	struct scmi_handle handle;
- 	struct scmi_xfers_info minfo;
--	struct scmi_chan_info *tx_cinfo;
-+	struct idr tx_idr;
- 	u8 *protocols_imp;
- 	struct list_head node;
- 	int users;
-@@ -413,7 +413,11 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
- 	int timeout;
- 	struct scmi_info *info = handle_to_scmi_info(handle);
- 	struct device *dev = info->dev;
--	struct scmi_chan_info *cinfo = info->tx_cinfo;
-+	struct scmi_chan_info *cinfo;
-+
-+	cinfo = idr_find(&info->tx_idr, xfer->hdr.protocol_id);
-+	if (unlikely(!cinfo))
-+		return -EINVAL;
- 
- 	ret = mbox_send_message(cinfo->chan, xfer);
- 	if (ret < 0) {
-@@ -771,13 +775,18 @@ static int scmi_mailbox_check(struct device_node *np)
- 	return of_parse_phandle_with_args(np, "mboxes", "#mbox-cells", 0, &arg);
- }
- 
--static int scmi_mbox_free_channel(struct scmi_chan_info *cinfo)
-+static int scmi_mbox_free_channel(int id, void *p, void *data)
- {
-+	struct scmi_chan_info *cinfo = p;
-+	struct idr *idr = data;
-+
- 	if (!IS_ERR_OR_NULL(cinfo->chan)) {
- 		mbox_free_channel(cinfo->chan);
- 		cinfo->chan = NULL;
- 	}
- 
-+	idr_remove(idr, id);
-+
- 	return 0;
- }
- 
-@@ -785,6 +794,7 @@ static int scmi_remove(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct scmi_info *info = platform_get_drvdata(pdev);
-+	struct idr *idr = &info->tx_idr;
- 
- 	of_platform_depopulate(&pdev->dev);
- 
-@@ -795,28 +805,34 @@ static int scmi_remove(struct platform_device *pdev)
- 		list_del(&info->node);
- 	mutex_unlock(&scmi_list_mutex);
- 
--	if (!ret)
-+	if (!ret) {
- 		/* Safe to free channels since no more users */
--		return scmi_mbox_free_channel(info->tx_cinfo);
-+		ret = idr_for_each(idr, scmi_mbox_free_channel, idr);
-+		idr_destroy(&info->tx_idr);
-+	}
- 
- 	return ret;
- }
- 
--static inline int scmi_mbox_chan_setup(struct scmi_info *info)
-+static inline int
-+scmi_mbox_chan_setup(struct scmi_info *info, struct device *dev, int prot_id)
- {
- 	int ret;
- 	struct resource res;
- 	resource_size_t size;
--	struct device *dev = info->dev;
- 	struct device_node *shmem, *np = dev->of_node;
- 	struct scmi_chan_info *cinfo;
- 	struct mbox_client *cl;
- 
-+	if (scmi_mailbox_check(np)) {
-+		cinfo = idr_find(&info->tx_idr, SCMI_PROTOCOL_BASE);
-+		goto idr_alloc;
-+	}
-+
- 	cinfo = devm_kzalloc(info->dev, sizeof(*cinfo), GFP_KERNEL);
- 	if (!cinfo)
- 		return -ENOMEM;
- 
--	info->tx_cinfo = cinfo;
- 	cinfo->dev = dev;
- 
- 	cl = &cinfo->cl;
-@@ -850,6 +866,13 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
- 		return ret;
- 	}
- 
-+idr_alloc:
-+	ret = idr_alloc(&info->tx_idr, cinfo, prot_id, prot_id + 1, GFP_KERNEL);
-+	if (ret != prot_id) {
-+		dev_err(dev, "unable to allocate SCMI idr slot err %d\n", ret);
-+		return ret;
-+	}
-+
- 	return 0;
- }
- 
-@@ -868,6 +891,8 @@ scmi_create_protocol_device(struct device_node *np, struct scmi_info *info,
- 
- 	platform_set_drvdata(cdev, info);
- 
-+	scmi_mbox_chan_setup(info, &cdev->dev, match->protocol_id);
-+
- 	init_ret = match->fn(&info->handle);
- 	if (init_ret) {
- 		dev_err(info->dev, "SCMI protocol %d init error %d\n",
-@@ -906,19 +931,19 @@ static int scmi_probe(struct platform_device *pdev)
- 		return ret;
- 
- 	platform_set_drvdata(pdev, info);
-+	idr_init(&info->tx_idr);
- 
- 	handle = &info->handle;
- 	handle->dev = info->dev;
- 	handle->version = &info->version;
- 
--	ret = scmi_mbox_chan_setup(info);
-+	ret = scmi_mbox_chan_setup(info, dev, SCMI_PROTOCOL_BASE);
- 	if (ret)
- 		return ret;
- 
- 	ret = scmi_base_protocol_init(handle);
- 	if (ret) {
- 		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
--		scmi_mbox_free_channel(info->tx_cinfo);
- 		return ret;
- 	}
- 
--- 
-2.7.4
+Yes. So I will add an "if" statement as I did for DMAMUX
+if (ret == -EPROBE_DEFER)
+   dev_info .... (instead of dev_err)
+
+> 
+>> +static struct platform_driver stm32_mdma_driver = {
+>> +	.driver = {
+>> +		.name = "stm32-mdma",
+>> +		.of_match_table = stm32_mdma_of_match,
+>> +	},
+>> +};
+>> +
+>> +static int __init stm32_mdma_init(void)
+>> +{
+>> +	return platform_driver_probe(&stm32_mdma_driver, stm32_mdma_probe);
+> 
+> and you register platform_driver_probe() which per
+> drivers/base/platform.c:760 is incompatible with defer probing.
+> So this need a fix
+> 
+
+Will change to platform_driver_register
+
+Thanks and regards
