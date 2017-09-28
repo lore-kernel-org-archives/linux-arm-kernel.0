@@ -1,128 +1,43 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 28 Sep 2017 16:15:01 -0700
-Subject: [PATCH v2 09/10] ARM: dts: Hurricane 2: Add basic support for
- Ubiquiti UniFi Switch 8
-In-Reply-To: <20170928231502.27069-1-f.fainelli@gmail.com>
-References: <20170928231502.27069-1-f.fainelli@gmail.com>
-Message-ID: <20170928231502.27069-10-f.fainelli@gmail.com>
+From: vikas.manocha@st.com (Vikas Manocha)
+Date: Thu, 28 Sep 2017 15:51:26 -0700
+Subject: [PATCH 3/3] ARM: dts: stm32h7: correct uart nodes compatible string
+In-Reply-To: <1506639114-16913-1-git-send-email-vikas.manocha@st.com>
+References: <1506639114-16913-1-git-send-email-vikas.manocha@st.com>
+Message-ID: <1506639114-16913-4-git-send-email-vikas.manocha@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic board support for the Ubiquiti UniFi Switch 8 port model. This
-is a small home and office use managed switch based on the BCM53342
-switching control SoC.
+With this change, stm32h743 will use its own uart configuration.
+Major difference between stm32f7 & stm32h7 uart configuration is FIFO
+availability in stm32h7.
 
-Acked-by: Jon Mason <jon.mason@broadcom.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+Reviewed-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- arch/arm/boot/dts/Makefile                        |  2 +
- arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts | 85 +++++++++++++++++++++++
- 2 files changed, 87 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts
+ arch/arm/boot/dts/stm32h743.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faf46abaa4a2..6942c48d0d88 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -117,6 +117,8 @@ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
- 	bcm911360k.dtb \
- 	bcm958300k.dtb \
- 	bcm958305k.dtb
-+dtb-$(CONFIG_ARCH_BCM_HR2) += \
-+	bcm53340-ubnt-unifi-switch8.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
- 	bcm28155-ap.dtb \
- 	bcm21664-garnet.dtb \
-diff --git a/arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts b/arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts
-new file mode 100644
-index 000000000000..431cda514230
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dts
-@@ -0,0 +1,85 @@
-+/*
-+ * DTS for Unifi Switch 8 port
-+ *
-+ * Copyright (C) 2017 Florian Fainelli <f.fainelli@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm-hr2.dtsi"
-+
-+/ {
-+	compatible = "ubnt,unifi-switch8", "brcm,bcm53342", "brcm,hr2";
-+	model = "Ubiquiti UniFi Switch 8 (BCM53342)";
-+
-+	/* Hurricane 2 designs use the second UART */
-+	chosen {
-+		bootargs = "console=ttyS1,115200 earlyprintk";
-+	};
-+
-+	memory at 0 {
-+		reg = <0x00000000 0x08000000>,
-+		      <0x68000000 0x08000000>;
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&qspi {
-+	status = "okay";
-+	bspi-sel = <0>;
-+
-+	flash: m25p80 at 0 {
-+		compatible = "m25p80";
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <12500000>;
-+		spi-cpol;
-+		spi-cpha;
-+
-+		partition at 0 {
-+			label = "u-boot";
-+			reg = <0x0 0xc0000>;
-+		};
-+
-+		partition at c0000 {
-+			label = "u-boot-env";
-+			reg = <0xc0000 0x10000>;
-+		};
-+
-+		partition at d0000 {
-+			label = "shmoo";
-+			reg = <0xd0000 0x10000>;
-+		};
-+
-+		partition at e0000 {
-+			label = "kernel0";
-+			reg = <0xe0000 0xf00000>;
-+		};
-+
-+		partition at fe0000 {
-+			label = "kernel1";
-+			reg = <0xfe0000 0xf10000>;
-+		};
-+
-+		partition at 1ef0000 {
-+			label = "cfg";
-+			reg = <0x1ef0000 0x100000>;
-+		};
-+
-+		partition at 1ff0000 {
-+			label = "EEPROM";
-+			reg = <0x1ff0000 0x10000>;
-+		};
-+	};
-+};
-+
-+&pcie0 {
-+	/* Attaches to the internal switch */
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 26de315..fab637b 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -67,7 +67,7 @@
+ 		};
+ 
+ 		usart2: serial at 40004400 {
+-			compatible = "st,stm32f7-uart";
++			compatible = "st,stm32h7-uart";
+ 			reg = <0x40004400 0x400>;
+ 			interrupts = <38>;
+ 			status = "disabled";
+@@ -99,7 +99,7 @@
+ 		};
+ 
+ 		usart1: serial at 40011000 {
+-			compatible = "st,stm32f7-uart";
++			compatible = "st,stm32h7-uart";
+ 			reg = <0x40011000 0x400>;
+ 			interrupts = <37>;
+ 			status = "disabled";
 -- 
-2.14.1
+1.9.1
