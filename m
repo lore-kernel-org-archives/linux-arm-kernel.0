@@ -1,29 +1,38 @@
-From: linus.luessing@c0d3.blue (Linus =?utf-8?Q?L=C3=BCssing?=)
-Date: Thu, 28 Sep 2017 12:43:51 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable USB3503 driver
-In-Reply-To: <CAJKOXPfQ3nXHVYXUn0iDfzVQc+ML1sSCz3NG_bwUw=WDK0id_w@mail.gmail.com>
-References: <20170928024022.2071-1-linus.luessing@c0d3.blue>
- <CAJKOXPfQ3nXHVYXUn0iDfzVQc+ML1sSCz3NG_bwUw=WDK0id_w@mail.gmail.com>
-Message-ID: <20170928104351.GE6726@otheros>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 28 Sep 2017 11:45:58 +0100
+Subject: [RESEND][PATCH 0/4] firmware: of: populate /firmware/ node during init
+Message-ID: <1506595562-10592-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Rob, Arnd,
 
-Thanks for your quick reply!
+There's a push to place all firmware related device node under
+/firmware/ node. However all the associated drivers are dealing with
+device creation in their own ways. For example, qcom_scm, optee and
+meson-sm drivers deal with the node in their own way. The SCMI drivers
+I am about to add also needs to do the same. This small series is to
+make it generic so that all the users of /firmware/ node need not
+repeat the same.
 
-On Thu, Sep 28, 2017 at 08:21:26AM +0200, Krzysztof Kozlowski wrote:
-> [...]
-> Anyway please define this as a module (unless it can't... but it
-> worked in my case).
+There was concern that /firmware in DT is fit for /sys/firmware in sysfs.
+IMO anything exposed to userspace from such firmware interface must
+be in "/sys/firmware", but I don't see any issue with kernel handling
+them as platform device/driver internally.
 
-In that case you used an initrd, right? I see various cases of USB
-built-ins, like CONFIG_USB_STORAGE=y, CONFIG_USB_DWC2=y and so on in
-multi_v7_defconfig. So my impression was that multi_v7_defconfig was
-supposed to allow booting a rootfs from a USB storage device even
-without an initrd.
+Sudeep Holla (4):
+  of: platform: populate /firmware/ node from
+    of_platform_default_populate_init()
+  firmware: qcom_scm: drop redandant of_platform_populate
+  drivers: tee: rework optee_driver_{init,exit} to use platform device
+  firmware: meson-sm: rework meson_sm_init to use
+    module_platform_driver_probe
 
-Let me know if that impression is wrong though, I'll happily resend
-(and test) the patch with CONFIG_USB_HSIC_USB3503=m then :-).
+ drivers/firmware/meson/meson_sm.c | 21 ++++++-----
+ drivers/firmware/qcom_scm.c       | 24 -------------
+ drivers/of/platform.c             |  4 +++
+ drivers/tee/optee/core.c          | 74 +++++++++++++--------------------------
+ 4 files changed, 41 insertions(+), 82 deletions(-)
 
-Regards, Linus
+--
+2.7.4
