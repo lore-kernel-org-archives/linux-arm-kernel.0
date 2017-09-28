@@ -1,16 +1,14 @@
 From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Thu, 28 Sep 2017 16:18:26 +0800
-Subject: [PATCH v3 3/5] media: atmel-isc: Enable the clocks during probe
+Date: Thu, 28 Sep 2017 16:18:27 +0800
+Subject: [PATCH v3 4/5] media: atmel-isc: Remove unnecessary member
 In-Reply-To: <20170928081828.20335-1-wenyou.yang@microchip.com>
 References: <20170928081828.20335-1-wenyou.yang@microchip.com>
-Message-ID: <20170928081828.20335-4-wenyou.yang@microchip.com>
+Message-ID: <20170928081828.20335-5-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To meet the relationship, enable the HCLOCK and ispck during the
-device probe, "isc_pck frequency is less than or equal to isc_ispck,
-and isc_ispck is greater than or equal to HCLOCK."
-Meanwhile, call the pm_runtime_enable() in the right place.
+Remove the memeber *config from the isc_subdev_entity struct,
+the member is useless afterward.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 ---
@@ -18,94 +16,57 @@ Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 Changes in v3: None
 Changes in v2: None
 
- drivers/media/platform/atmel/atmel-isc.c | 31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+ drivers/media/platform/atmel/atmel-isc.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index 0b15dc1a3a0b..f092c95587c1 100644
+index f092c95587c1..0ff9dfbfff70 100644
 --- a/drivers/media/platform/atmel/atmel-isc.c
 +++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -1594,6 +1594,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 	struct isc_subdev_entity *sd_entity;
- 	struct video_device *vdev = &isc->video_dev;
- 	struct vb2_queue *q = &isc->vb2_vidq;
-+	struct device *dev = isc->dev;
- 	int ret;
+@@ -83,7 +83,6 @@ struct isc_subdev_entity {
+ 	struct v4l2_subdev		*sd;
+ 	struct v4l2_async_subdev	*asd;
+ 	struct v4l2_async_notifier      notifier;
+-	struct v4l2_subdev_pad_config	*config;
  
- 	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
-@@ -1677,6 +1678,10 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+ 	u32 pfe_cfg0;
+ 
+@@ -984,6 +983,7 @@ static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
+ {
+ 	struct isc_format *isc_fmt;
+ 	struct v4l2_pix_format *pixfmt = &f->fmt.pix;
++	struct v4l2_subdev_pad_config pad_cfg;
+ 	struct v4l2_subdev_format format = {
+ 		.which = V4L2_SUBDEV_FORMAT_TRY,
+ 	};
+@@ -1014,7 +1014,7 @@ static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
+ 
+ 	v4l2_fill_mbus_format(&format.format, pixfmt, mbus_code);
+ 	ret = v4l2_subdev_call(isc->current_subdev->sd, pad, set_fmt,
+-			       isc->current_subdev->config, &format);
++			       &pad_cfg, &format);
+ 	if (ret < 0)
  		return ret;
- 	}
  
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+	pm_request_idle(dev);
-+
- 	return 0;
+@@ -1479,8 +1479,6 @@ static void isc_async_unbind(struct v4l2_async_notifier *notifier,
+ 					      struct isc_device, v4l2_dev);
+ 	cancel_work_sync(&isc->awb_work);
+ 	video_unregister_device(&isc->video_dev);
+-	if (isc->current_subdev->config)
+-		v4l2_subdev_free_pad_config(isc->current_subdev->config);
+ 	v4l2_ctrl_handler_free(&isc->ctrls.handler);
  }
  
-@@ -1856,25 +1861,37 @@ static int atmel_isc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+@@ -1633,10 +1631,6 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
+ 	INIT_LIST_HEAD(&isc->dma_queue);
+ 	spin_lock_init(&isc->dma_queue_lock);
  
-+	ret = clk_prepare_enable(isc->hclock);
-+	if (ret) {
-+		dev_err(dev, "failed to enable hclock: %d\n", ret);
-+		return ret;
-+	}
-+
- 	ret = isc_clk_init(isc);
- 	if (ret) {
- 		dev_err(dev, "failed to init isc clock: %d\n", ret);
--		goto clean_isc_clk;
-+		goto unprepare_hclk;
- 	}
- 
- 	isc->ispck = isc->isc_clks[ISC_ISPCK].clk;
- 
-+	ret = clk_prepare_enable(isc->ispck);
-+	if (ret) {
-+		dev_err(dev, "failed to enable ispck: %d\n", ret);
-+		goto unprepare_hclk;
-+	}
-+
- 	/* ispck should be greater or equal to hclock */
- 	ret = clk_set_rate(isc->ispck, clk_get_rate(isc->hclock));
- 	if (ret) {
- 		dev_err(dev, "failed to set ispck rate: %d\n", ret);
--		goto clean_isc_clk;
-+		goto unprepare_clk;
- 	}
- 
- 	ret = v4l2_device_register(dev, &isc->v4l2_dev);
- 	if (ret) {
- 		dev_err(dev, "unable to register v4l2 device.\n");
--		goto clean_isc_clk;
-+		goto unprepare_clk;
- 	}
- 
- 	ret = isc_parse_dt(dev, isc);
-@@ -1907,8 +1924,6 @@ static int atmel_isc_probe(struct platform_device *pdev)
- 			break;
- 	}
- 
--	pm_runtime_enable(dev);
+-	sd_entity->config = v4l2_subdev_alloc_pad_config(sd_entity->sd);
+-	if (!sd_entity->config)
+-		return -ENOMEM;
 -
- 	return 0;
- 
- cleanup_subdev:
-@@ -1917,7 +1932,11 @@ static int atmel_isc_probe(struct platform_device *pdev)
- unregister_v4l2_device:
- 	v4l2_device_unregister(&isc->v4l2_dev);
- 
--clean_isc_clk:
-+unprepare_clk:
-+	clk_disable_unprepare(isc->ispck);
-+unprepare_hclk:
-+	clk_disable_unprepare(isc->hclock);
-+
- 	isc_clk_cleanup(isc);
- 
- 	return ret;
+ 	ret = isc_formats_init(isc);
+ 	if (ret < 0) {
+ 		v4l2_err(&isc->v4l2_dev,
 -- 
 2.13.0
