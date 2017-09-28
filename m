@@ -1,36 +1,68 @@
-From: kalyan.kinthada@alliedtelesis.co.nz (Kalyan Kinthada)
-Date: Fri, 29 Sep 2017 10:36:03 +1300
-Subject: [PATCH v2 0/2] Fix I2C repeated start timing violation on Armada-38x.
-Message-ID: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 29 Sep 2017 01:14:46 +0300
+Subject: [PATCH v1 04/14] tee: shm: add page accessor functions
+In-Reply-To: <1506621851-6929-5-git-send-email-volodymyr_babchuk@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+ <1506621851-6929-5-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <20170928221446.s4qdrzfaurzus76d@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the Armada 38x(380, 385, 388) have a silicon issue in
-the I2C controller which violates the I2C repeated start timing
-(errata FE-8471889).
+Hi Volodymyr,
 
-Activate the compatible string "marvell,mv78230-a0-i2c" in the
-device tree file of Armada-38x to fx this errata (FE-8471889).
+On Thu, Sep 28, 2017 at 09:04:01PM +0300, Volodymyr Babchuk wrote:
+> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+> 
+> In order to register a shared buffer in TEE, we need accessor
+> function that return list of pages for that buffer.
+> 
+> Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+> ---
+>  include/linux/tee_drv.h | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+> index 6ba8b76..d773827 100644
+> --- a/include/linux/tee_drv.h
+> +++ b/include/linux/tee_drv.h
+> @@ -394,6 +394,20 @@ static inline size_t tee_shm_get_size(struct tee_shm *shm)
+>  }
+>  
+>  /**
+> + * tee_shm_get_pages() - Get list of pages that hold shared buffer
+> + * @shm:	Shared memory handle
+> + * @num_pages:	Number of pages will be stored there
+> + * @returns pointer to pages array
+> + */
+> +static inline struct page **tee_shm_get_pages(struct tee_shm *shm,
+> +					      size_t *num_pages)
+> +{
+> +	if (num_pages)
+> +		*num_pages = shm->num_pages;
 
-Updated the Documentation for the compatible string
-"marvell,mv78230-a0-i2c".
+My concern is about this check
 
-Thank You Gregory Clement for suggesting to reuse the
-"marvell,mv78230-a0-i2c" compatible string on Armada-38x SoCs.
+The only use of the tee_shm_get_pages() I found is in patch #9:
++               size_t page_num;
++
++               pages = tee_shm_get_pages(shm, &page_num);
 
-Changes since v1:
-* "dt-bindings: i2c: Update documentation for "mv78230-a0-i2c""
-   Modified commit message.
-   Added details describing the compatible string "mv78230-a0-i2c"
+So there's no any valid scenario where you should pass NULL to the
+function. And I don't understand why you do this check.
 
--------
-Kalyan Kinthada (2):
-  ARM: dts: Fix I2C repeated start issue on Armada-38x
-  dt-bindings: i2c: Update documentation for "mv78230-a0-i2c"
+Even more, if in future there will be an occasion when function will
+be passed with NULL, the error will become hidden by this code.
 
- Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 10 ++++++----
- arch/arm/boot/dts/armada-38x.dtsi                     |  4 ++--
- 2 files changed, 8 insertions(+), 6 deletions(-)
+What about just drop it?
 
--- 
-2.14.1
+Yury
+
+> +	return shm->pages;
+> +}
+> +
+> +/**
+>   * tee_shm_get_page_offset() - Get shared buffer offset from page start
+>   * @shm:	Shared memory handle
+>   * @returns page offset of shared buffer
+> -- 
+> 2.7.4
