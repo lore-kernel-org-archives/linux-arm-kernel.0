@@ -1,57 +1,87 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Fri, 29 Sep 2017 17:19:40 -0500
-Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2
- Statistical Profiling Extension
-In-Reply-To: <1506607791-8621-7-git-send-email-will.deacon@arm.com>
-References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
- <1506607791-8621-7-git-send-email-will.deacon@arm.com>
-Message-ID: <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Sep 2017 15:34:04 -0700
+Subject: [PATCHv4 0/7] Fix remaining issues to drop more omap platform data 
+Message-ID: <20170929223411.9691-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Sep 2017 15:09:50 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+Hi all,
 
-> +/* Perf callbacks */
-> +static int arm_spe_pmu_event_init(struct perf_event *event)
-> +{
-> +	u64 reg;
-> +	struct perf_event_attr *attr = &event->attr;
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +
-> +	/* This is, of course, deeply driver-specific */
-> +	if (attr->type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	if (event->cpu >= 0 &&
-> +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-> +		return -ENOENT;
+Here's v4 of the remaining fixes needed before we can drop omap hwmod
+platform data for interrupts, dma channels and IO ranges.
 
-So -ENOENT will make tools/perf/util/evsel.c tell the user "The %s event is not
-supported." whereas returning -ENODEV will say "No such device - did
-you specify an out-of-range profile CPU?" which may or may not be more
-appropriate for this check.
+I've dropped the clockctrl clock nodes and dts patches to avoid a
+dependency to Tero's pending clock patches. As we are still relying on
+"ti,hwmods" property this is just fine, and can be patched later once
+the dependencies have cleared.
 
-> +	if (arm_spe_event_to_pmsevfr(event) & SYS_PMSEVFR_EL1_RES0)
-> +		return -EOPNOTSUPP;
-> +	if (attr->exclude_idle)
-> +		return -EOPNOTSUPP;
+These patches are based on current Linux next.
 
-"PMU Hardware doesn't support sampling/overflow-interrupts." will be
-printed if the user didn't specify a sample period.  Otherwise, a
-string with "/bin/dmesg may provide additional information." will be
-printed.
+Regards,
 
-I was hoping for a response from acme by now for this:
+Tony
 
-https://www.spinics.net/lists/linux-perf-users/msg04066.html
 
-Alas, nothing.  Looking at the #ifdef x86 in evsel.c, I'm guessing
-it'll be ok, although I'm still not sure how PMU-specific we can get in
-evsel.c, nor whether it's ok to communicate lists of h/w supported
-sample periods through /sys/bus/event_source/devices/...
+Changes since v3:
 
-acme?  OK to refactor evsel messaging for Arm, including parsing for
-which PMUs are being used, so customize the message?
+- Use sysc compatible names based on the SoC name where they are first
+  seen instead of type1/2/3 as suggested by Matthijs
 
-Kim
+- Use "fck" and "ick" naming instead of "clkctrl" for clocks as we will
+  need the interface clock too in many cases, and udpate the ti-sysc
+  driver accordingly
+
+- Drop the clock nodes for now to avoid a dependency to pending clock
+  patches, the clock nodes can be added later on after the dependencies
+  have cleared
+
+Changes since v2:
+
+- Drop attempted bindings for devices with no drivers and start using
+  generic ti sysc interconnect target module binding, the bindings
+  for the child devices can be sent separately as needed
+
+- Add Tero's pathces for omap4 clkctrl nodes as we need those
+
+- Add support for parsing IO ranges from dts if "ti,hwmods" is set
+  and fix-up omap device code to work without platform data for
+  legacy dma and smartreflex
+
+- Add minimal ti-sysc driver
+
+Changes since v1:
+
+- Updated hsi, iss, fdif, gpu, and smartreflex patches based on
+  the subsystem maintainer comments
+
+- Added Rob and Mark in Cc for the patches touching binding
+  documentation
+
+Tony Lindgren (7):
+  dt-bindings: bus: Minimal TI sysc interconnect target module binding
+  ARM: OMAP2+: Parse module IO range from dts for legacy "ti,hwmods"
+    support
+  ARM: OMAP2+: Populate legacy resources for dma and smartreflex
+  bus: ti-sysc: Add minimal TI sysc interconnect target driver
+  ARM: dts: Add nodes for missing omap4 interconnect target modules
+  ARM: dts: Configure SmartReflex only to idle the interconnect target
+    module
+  ARM: dts: Use ti-sysc module driver for omap4 musb
+
+ Documentation/devicetree/bindings/bus/ti-sysc.txt |  93 ++++
+ arch/arm/boot/dts/dra7.dtsi                       |  26 +
+ arch/arm/boot/dts/omap4.dtsi                      | 195 +++++++-
+ arch/arm/mach-omap2/Kconfig                       |   1 +
+ arch/arm/mach-omap2/omap_device.c                 | 137 ++++--
+ arch/arm/mach-omap2/omap_device.h                 |   4 -
+ arch/arm/mach-omap2/omap_hwmod.c                  |  80 +++-
+ arch/arm/mach-omap2/omap_hwmod.h                  |   5 +
+ drivers/bus/Kconfig                               |   7 +
+ drivers/bus/Makefile                              |   1 +
+ drivers/bus/ti-sysc.c                             | 558 ++++++++++++++++++++++
+ 11 files changed, 1047 insertions(+), 60 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti-sysc.txt
+ create mode 100644 drivers/bus/ti-sysc.c
+
+-- 
+2.14.2
