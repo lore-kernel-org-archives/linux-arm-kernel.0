@@ -1,27 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Sep 2017 11:21:16 +0100
-Subject: [PATCH v2 0/4] Make PL031 interrupt optional
-Message-ID: <20170929102116.GX20805@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 29 Sep 2017 11:22:00 +0100
+Subject: [PATCH v2 1/4] rtc: pl031: constify amba_ids
+In-Reply-To: <20170929102116.GX20805@n2100.armlinux.org.uk>
+References: <20170929102116.GX20805@n2100.armlinux.org.uk>
+Message-ID: <E1dxsQi-0006NV-EF@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some boards out there which have a PL031 RTC, but its
-interrupt is not wired up.  To support these, we need the PL031
-to support the primecell without interrupts.
+The AMBA device IDs should be marked const.  Make that so.
 
-When no interrupt is present, there's little point exposing the
-RTC's alarm capabilities, so we omit the alarm-related function
-calls - the RTC merely becomes a source of time-of-day.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/rtc/rtc-pl031.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch series cleans up the pl031 driver a little, and adds
-support for this configuration.
-
- drivers/rtc/rtc-pl031.c | 48 +++++++++++++++++++++++++++---------------------
- 1 file changed, 27 insertions(+), 21 deletions(-)
-
-v2: update patch 2 & 3 for review comment on v1.
-
+diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+index e1687e19c59f..0d87b90b1903 100644
+--- a/drivers/rtc/rtc-pl031.c
++++ b/drivers/rtc/rtc-pl031.c
+@@ -446,7 +446,7 @@ static struct pl031_vendor_data stv2_pl031 = {
+ 	.irqflags = IRQF_SHARED | IRQF_COND_SUSPEND,
+ };
+ 
+-static struct amba_id pl031_ids[] = {
++static const struct amba_id pl031_ids[] = {
+ 	{
+ 		.id = 0x00041031,
+ 		.mask = 0x000fffff,
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
