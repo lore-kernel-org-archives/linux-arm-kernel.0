@@ -1,62 +1,55 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 29 Sep 2017 16:18:55 +0200
-Subject: [PATCH v3] ARM: dts: stm32: Add DMAMUX support for STM32H743 SoC
-Message-ID: <1506694735-14227-1-git-send-email-pierre-yves.mordret@st.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Fri, 29 Sep 2017 14:20:54 +0000
+Subject: [PATCHv2 2/7] usb: dwc2: add support for STM32F7 USB OTG HS
+In-Reply-To: <1503930018-536-3-git-send-email-amelie.delaunay@st.com>
+References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
+ <1503930018-536-3-git-send-email-amelie.delaunay@st.com>
+Message-ID: <a0f2971e-d41a-01bb-88e1-8ffed786e954@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DMAMUX support for STM32H743 SoC.
+Hi,
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
- Version history:
-    v3:
-       * Rebase on v4.14-rc2
-    v2:
-       * Update DTS to be compliant with up-streamed bindings
-    v1:
-       * Initial
----
----
- arch/arm/boot/dts/stm32h743.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Gentle ping for driver review submitted on August 28th.
 
-diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
-index 58ec227..e8457f6 100644
---- a/arch/arm/boot/dts/stm32h743.dtsi
-+++ b/arch/arm/boot/dts/stm32h743.dtsi
-@@ -121,6 +121,7 @@
- 			clocks = <&timer_clk>;
- 			#dma-cells = <4>;
- 			st,mem2mem;
-+			dma-requests = <8>;
- 			status = "disabled";
- 		};
- 
-@@ -138,6 +139,7 @@
- 			clocks = <&timer_clk>;
- 			#dma-cells = <4>;
- 			st,mem2mem;
-+			dma-requests = <8>;
- 			status = "disabled";
- 		};
- 
-@@ -193,6 +195,16 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		dmamux1: dma-router at 40020800 {
-+			compatible = "st,stm32h7-dmamux";
-+			reg = <0x40020800 0x1c>;
-+			#dma-cells = <3>;
-+			dma-channels = <16>;
-+			dma-requests = <128>;
-+			dma-masters = <&dma1 &dma2>;
-+			clocks = <&timer_clk>;
-+		};
- 	};
- };
- 
--- 
-2.7.4
+Thanks,
+Amelie
+
+On 08/28/2017 04:20 PM, Amelie Delaunay wrote:
+> This patch adds the dwc2_set_params function for STM32F7 USB OTG HS.
+> 
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>   drivers/usb/dwc2/params.c | 11 +++++++++++
+>   1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
+> index a3ffe97..d5b672d 100644
+> --- a/drivers/usb/dwc2/params.c
+> +++ b/drivers/usb/dwc2/params.c
+> @@ -136,6 +136,15 @@ static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
+>   	p->activate_stm_fs_transceiver = true;
+>   }
+>   
+> +static void dwc2_set_stm32f7_hsotg_params(struct dwc2_hsotg *hsotg)
+> +{
+> +	struct dwc2_core_params *p = &hsotg->params;
+> +
+> +	p->host_rx_fifo_size = 622;
+> +	p->host_nperio_tx_fifo_size = 128;
+> +	p->host_perio_tx_fifo_size = 256;
+> +}
+> +
+>   const struct of_device_id dwc2_of_match_table[] = {
+>   	{ .compatible = "brcm,bcm2835-usb", .data = dwc2_set_bcm_params },
+>   	{ .compatible = "hisilicon,hi6220-usb", .data = dwc2_set_his_params  },
+> @@ -154,6 +163,8 @@ const struct of_device_id dwc2_of_match_table[] = {
+>   	{ .compatible = "st,stm32f4x9-fsotg",
+>   	  .data = dwc2_set_stm32f4x9_fsotg_params },
+>   	{ .compatible = "st,stm32f4x9-hsotg" },
+> +	{ .compatible = "st,stm32f7-hsotg",
+> +	  .data = dwc2_set_stm32f7_hsotg_params },
+>   	{},
+>   };
+>   MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
+> 
