@@ -1,117 +1,129 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 29 Sep 2017 17:08:50 +0100
-Subject: [PATCH] ACPI/IORT: Fix PCI ACS enablement
-In-Reply-To: <59CDCAB6.3000906@hisilicon.com>
-References: <20170919170539.6265-1-lorenzo.pieralisi@arm.com>
- <59C3A36A.2060202@hisilicon.com> <20170922094546.GE1523@red-moon>
- <59C5C655.8030607@hisilicon.com> <20170928154625.GA25853@red-moon>
- <59CDCAB6.3000906@hisilicon.com>
-Message-ID: <20170929160850.GA31394@red-moon>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 29 Sep 2017 19:23:16 +0300
+Subject: [PATCH v1 06/14] tee: optee: add page list manipulation functions
+In-Reply-To: <e7896e03-a12a-69b9-4b98-7737576f718b@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+ <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
+ <20170929002300.zxu4n47m5jdymdyt@yury-thinkpad>
+ <e7896e03-a12a-69b9-4b98-7737576f718b@epam.com>
+Message-ID: <20170929162316.v3liotucoyshetz3@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 12:23:18PM +0800, Zhou Wang wrote:
-> On 2017/9/28 23:46, Lorenzo Pieralisi wrote:
-> > On Sat, Sep 23, 2017 at 10:26:29AM +0800, Zhou Wang wrote:
-> >> On 2017/9/22 17:45, Lorenzo Pieralisi wrote:
-> >>> On Thu, Sep 21, 2017 at 07:32:58PM +0800, Zhou Wang wrote:
-> >>>> On 2017/9/20 1:05, Lorenzo Pieralisi wrote:
-> >>>>> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> >>>>> workarounds") removed kernel code that was allowing to initialize
-> >>>>> and probe the SMMU devices early (ie earlier than PCI devices through
-> >>>>> linker script callback entries) in the boot process because it was not
-> >>>>> needed any longer in that the SMMU devices/drivers now support deferred
-> >>>>> probing.
-> >>>>>
-> >>>>> Since the SMMUs probe routines are also in charge of requesting global
-> >>>>> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
-> >>>>> up early-probing workarounds") also postponed PCI ACS enablement to
-> >>>>> SMMUs devices probe time, which may be too late given that PCI devices
-> >>>>> needs to detect if PCI ACS is enabled to init the respective capability
-> >>>>> through the following call path:
-> >>>>>
-> >>>>> pci_device_add()
-> >>>>>  -> pci_init_capabilities()
-> >>>>>   -> pci_enable_acs()
-> >>>>>
-> >>>>> Add code in the ACPI IORT SMMU platform devices initialization path
-> >>>>> (that is called before ACPI PCI enumeration) to detect if an SMMU is
-> >>>>> present in HW and enable PCI ACS if it actually is, restoring the
-> >>>>> correct PCI ACS enablement sequencing.
-> >>>>>
-> >>>>> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> >>>>> Signed-workarounds")
-> >>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>>> Cc: Will Deacon <will.deacon@arm.com>
-> >>>>> Cc: Robin Murphy <robin.murphy@arm.com>
-> >>>>> Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> >>>>> Cc: Alex Williamson <alex.williamson@redhat.com>
-> >>>>> ---
-> >>>>>  drivers/acpi/arm64/iort.c | 11 +++++++++++
-> >>>>>  1 file changed, 11 insertions(+)
-> >>>>>
-> >>>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> >>>>> index 9565d57..71a7694 100644
-> >>>>> --- a/drivers/acpi/arm64/iort.c
-> >>>>> +++ b/drivers/acpi/arm64/iort.c
-> >>>>> @@ -1184,6 +1184,7 @@ static void __init iort_init_platform_devices(void)
-> >>>>>  	struct acpi_table_iort *iort;
-> >>>>>  	struct fwnode_handle *fwnode;
-> >>>>>  	int i, ret;
-> >>>>> +	bool smmu_detected = false;
-> >>>>>  
-> >>>>>  	/*
-> >>>>>  	 * iort_table and iort both point to the start of IORT table, but
-> >>>>> @@ -1218,11 +1219,21 @@ static void __init iort_init_platform_devices(void)
-> >>>>>  				acpi_free_fwnode_static(fwnode);
-> >>>>>  				return;
-> >>>>>  			}
-> >>>>> +
-> >>>>> +			smmu_detected = true;
-> >>>>>  		}
-> >>>>>  
-> >>>>>  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-> >>>>>  					 iort_node->length);
-> >>>>>  	}
-> >>>>> +
-> >>>>> +	/*
-> >>>>> +	 * If IORT reports an SMMU component make sure PCI ACS is
-> >>>>> +	 * requested so that PCI devices can enable it in their
-> >>>>> +	 * capabilities.
-> >>>>> +	 */
-> >>>>> +	if (smmu_detected)
-> >>>>> +		pci_request_acs();
-> >>>>>  }
-> >>>>>  
-> >>>>>  void __init acpi_iort_init(void)
-> >>>>>
-> >>>>
-> >>>> Hi Lorenzo,
-> >>>>
-> >>>> I tested this patch, it works well in my HiSilicon Hip08 based system.
-> >>>> However, setting ACS flag at the stage of SMMU device init seems not good,
-> >>>> I mean what if in one system there are only platform devices connected to
-> >>>> SMMU device.
-> >>>
-> >>> That's a fair point if you explain to me how current pci_request_acs()
-> >>> usage copes with your remark above.
-> >>
-> >> The current pci_request_acs usage for ARM SMMU-V3 sets ACS flags under CONFIG_PCI.
-> >> However, as mentioned in your commit message, this setting is too late.
-> >>
-> >> For the usage of X86 and AMD, as I am not familiar with the devices used in these
-> >> two platforms, maybe the default devices in these platforms are PCIe based :)
-> > 
-> > I do not understand what your point is. ACS enablement is a global flag,
-> > that is currently set whenever an x86/AMD/ARM IOMMU is detected/probed
-> > AFAICS.
+On Fri, Sep 29, 2017 at 01:34:13PM +0300, Volodymyr Babchuk wrote:
 > 
-> There are named devices(platform devices) and/or PCI devices connected to SMMU.
-> However, ACS flags is only for PCI devices. So setting this flag in SMMU device init
-> maybe need check if there are PCIe devices connected to SMMU, as maybe devices connected
-> to SMMU are all named devices.
+> 
+> On 29.09.17 03:23, Yury Norov wrote:
+> > On Thu, Sep 28, 2017 at 09:04:03PM +0300, Volodymyr Babchuk wrote:
+> > > From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+> > > 
+> > > These functions will be used to pass information about shared
+> > > buffers to OP-TEE.
+> > > 
+> > > Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+> > > ---
+> > >   drivers/tee/optee/call.c          | 48 +++++++++++++++++++++++++++++++++++++++
+> > >   drivers/tee/optee/optee_private.h |  4 ++++
+> > >   2 files changed, 52 insertions(+)
+> > > 
+> > > diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
+> > > index f7b7b40..f8e044d 100644
+> > > --- a/drivers/tee/optee/call.c
+> > > +++ b/drivers/tee/optee/call.c
+> > > @@ -11,6 +11,7 @@
+> > >    * GNU General Public License for more details.
+> > >    *
+> > >    */
+> > > +#include <asm/pgtable.h>
+> > >   #include <linux/arm-smccc.h>
+> > >   #include <linux/device.h>
+> > >   #include <linux/err.h>
+> > > @@ -442,3 +443,50 @@ void optee_disable_shm_cache(struct optee *optee)
+> > >   	}
+> > >   	optee_cq_wait_final(&optee->call_queue, &w);
+> > >   }
+> > > +
+> > > +/**
+> > > + * optee_fill_pages_list() - write list of user pages to given shared
+> > > + * buffer.
+> > > + *
+> > > + * @dst: page-aligned buffer where list of pages will be stored
+> > 
+> > I'm not much familiar with the subsystem you work on, but I don't
+> > understand why the type of dst is u64*. If it's just a buffer, it
+> > should be void *. Also, if we assuming running it on arm were pointers
+> > are 32-bit, the result of page_to_phys() will be u32, and you will
+> > waste half of your u64 array for storing zeroes; this line:
+> > 		*dst = page_to_phys(pages[i]);
+> Yep. There is defined ABI between OP-TEE OS and OP-TEE clients. That ABI
+> demands that page addresses should be stored in 64-bit fields even on 32-bit
+> architectures.
+> 
+> 
+> > > + * @pages: array of pages that represents shared buffer
+> > > + * @num_pages: number of entries in @pages
+> > > + *
+> > > + * @dst should be big enough to hold list of user page addresses and
+> > > + *	links to the next pages of buffer
+> > > + */
+> > > +void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages)
+> > > +{
+> > > +	size_t i;
+> > > +
+> > > +	/* TODO: add support for RichOS page sizes that != 4096 */
+> > > +	BUILD_BUG_ON(PAGE_SIZE != OPTEE_MSG_NONCONTIG_PAGE_SIZE);
+> > 
+> > RichOS stands for Linux? Why I am still not a rich OS developer? :)
+> I'm asking the same question :) Yes, in terms of TEE, Linux is RichOS
+> and OP-TEE is TrustedOS.
+> 
+> > This is the first occurrence of the term in kernel sources, please
+> > explain it.
+> I'd rather change "RichOS" to "Linux".
+> 
+> > Also, I think that it would be more logical to add the dependency on
+> > page size to Kconfig, not here, and move the comment there, so user
+> > will be simply unable to build the whole module.
+> I event didn't thought of this. Thank you for suggestion. Will do in this
+> way.
+> 
+> > > +	for (i = 0; i < num_pages; i++, dst++) {
+> > > +		/* Check if we are going to roll over the page boundary */
+> > > +		if (IS_ALIGNED((uintptr_t)(dst + 1),
+> > > +			       OPTEE_MSG_NONCONTIG_PAGE_SIZE)) {
+> > > +			*dst = virt_to_phys(dst + 1);
+> > > +			dst++;
+> > > +		}
+> > 
+> > Is my understanding correct that @dst is not a simple array of buffer
+> > page addresses?  Instead, it has a complex structure: First 511 records
+> > store buffer page entries, and last one points to the next page of dst.
+> > Is it somehow documented? Also, did you consider to create a header structure
+> > for the buffer page, like memory allocators do? You can place there number
+> > of entries, pointer to the next page, maybe some flags. I think it will be
+> > more transparent, especially if we consider communication protocol between
+> > independent software products.
+> This is documented in the previous patch "tee: optee: Update protocol
+> definitions" (5/14).
 
-Understood but that's a problem that exists in the current kernel,
-what I am saying is that's not what I am fixing with this patch.
+Ah, OK. 
 
-Lorenzo
+> I like your idea about header structure. Just to clarify: it should be
+> structure that covers whole page. Like that described in the previous patch:
+> 
+> + * struct page_data {
+> + *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) -
+> 1];
+> + *   uint64_t next_page_data;
+> + * };
+> 
+> Right?
+
+It's OK, if there's the requirement to allocate the whole page for
+shmem pagerefs array. If not, the proposed approach means that you'll
+waste the whole page to store shared memory descriptors, even if
+shared memory is as small as one page, and so a single u64 is needed
+to describe it. I think it makes sense for compile-time declared
+shmems.
+
+Yury
