@@ -1,45 +1,62 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 29 Sep 2017 10:15:16 -0400
-Subject: [PATCH v2 01/10] MAINTAINERS: Update Broadcom iProc regexp with
- Hurricane 2
-In-Reply-To: <1506669761.29089.30.camel@perches.com>
-References: <20170928231502.27069-1-f.fainelli@gmail.com>
- <20170928231502.27069-2-f.fainelli@gmail.com>
- <1506669761.29089.30.camel@perches.com>
-Message-ID: <CAC3K-4qMLtUnjitn4CA+MxVeXZ03-AR0D+zANbZo-vR98S+Djw@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 29 Sep 2017 16:18:55 +0200
+Subject: [PATCH v3] ARM: dts: stm32: Add DMAMUX support for STM32H743 SoC
+Message-ID: <1506694735-14227-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 3:22 AM, Joe Perches <joe@perches.com> wrote:
-> On Thu, 2017-09-28 at 16:14 -0700, Florian Fainelli wrote:
->> Update the Broadcom iProc regepx with recently added Hurricane 2 SoC
->> support.
->>
->> Acked-by: Jon Mason <jon.mason@broadcom.com>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  MAINTAINERS | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 6671f375f7fc..3b48a1c2ddb8 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -2923,6 +2923,7 @@ N:      bcm583*
->>  N:   bcm585*
->>  N:   bcm586*
->
-> These don't match anything
+This patch adds DMAMUX support for STM32H743 SoC.
 
-This comment is outside the scope of this patch.  I'll do a clean-up
-separate from this series to address the issue.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+ Version history:
+    v3:
+       * Rebase on v4.14-rc2
+    v2:
+       * Update DTS to be compliant with up-streamed bindings
+    v1:
+       * Initial
+---
+---
+ arch/arm/boot/dts/stm32h743.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Thanks,
-Jon
-
->
->>  N:   bcm88312
->> +N:   hr2
->>  F:   arch/arm64/boot/dts/broadcom/ns2*
->>  F:   drivers/clk/bcm/clk-ns*
->>  F:   drivers/pinctrl/bcm/pinctrl-ns*
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 58ec227..e8457f6 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -121,6 +121,7 @@
+ 			clocks = <&timer_clk>;
+ 			#dma-cells = <4>;
+ 			st,mem2mem;
++			dma-requests = <8>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -138,6 +139,7 @@
+ 			clocks = <&timer_clk>;
+ 			#dma-cells = <4>;
+ 			st,mem2mem;
++			dma-requests = <8>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -193,6 +195,16 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		dmamux1: dma-router at 40020800 {
++			compatible = "st,stm32h7-dmamux";
++			reg = <0x40020800 0x1c>;
++			#dma-cells = <3>;
++			dma-channels = <16>;
++			dma-requests = <128>;
++			dma-masters = <&dma1 &dma2>;
++			clocks = <&timer_clk>;
++		};
+ 	};
+ };
+ 
+-- 
+2.7.4
