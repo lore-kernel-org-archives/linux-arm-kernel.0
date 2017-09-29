@@ -1,73 +1,147 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 29 Sep 2017 11:51:22 +0100
-Subject: [PATCH 6/8] video: sa1100fb: clean up failure path
-In-Reply-To: <20170929105004.GY20805@n2100.armlinux.org.uk>
-References: <20170929105004.GY20805@n2100.armlinux.org.uk>
-Message-ID: <E1dxst8-0006jN-Vn@rmk-PC.armlinux.org.uk>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 29 Sep 2017 11:52:29 +0100
+Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
+In-Reply-To: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We merely return from the failed path, so remove all the gotos and use
-return statements instead.
+The arch timer configuration for a CPU might get reset after suspending
+said CPU.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+In order to reliably use the event stream in the kernel (e.g. for delays),
+we keep track of the state where we can safely concider the event stream as
+properly configured.
+
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/video/fbdev/sa1100fb.c | 21 ++++++++-------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/arch_timer.h    |  1 +
+ arch/arm64/include/asm/arch_timer.h  |  1 +
+ drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
+ include/clocksource/arm_arch_timer.h |  6 ++++++
+ 4 files changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/fbdev/sa1100fb.c b/drivers/video/fbdev/sa1100fb.c
-index 7fa6c8f74ec6..16a974471c02 100644
---- a/drivers/video/fbdev/sa1100fb.c
-+++ b/drivers/video/fbdev/sa1100fb.c
-@@ -1222,41 +1222,36 @@ static int sa1100fb_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 
- 	fbi = sa1100fb_init_fbinfo(&pdev->dev);
--	ret = -ENOMEM;
- 	if (!fbi)
--		goto failed;
-+		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	fbi->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(fbi->base)) {
--		ret = PTR_ERR(fbi->base);
--		goto failed;
--	}
-+	if (IS_ERR(fbi->base))
-+		return PTR_ERR(fbi->base);
- 
- 	fbi->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(fbi->clk)) {
--		ret = PTR_ERR(fbi->clk);
--		goto failed;
--	}
-+	if (IS_ERR(fbi->clk))
-+		return PTR_ERR(fbi->clk);
- 
- 	ret = devm_request_irq(&pdev->dev, irq, sa1100fb_handle_irq, 0,
- 			       "LCD", fbi);
- 	if (ret) {
- 		dev_err(&pdev->dev, "request_irq failed: %d\n", ret);
--		goto failed;
-+		return ret;
- 	}
- 
- 	if (machine_is_shannon()) {
- 		ret = devm_gpio_request_one(&pdev->dev, SHANNON_GPIO_DISP_EN,
- 			GPIOF_OUT_INIT_LOW, "display enable");
- 		if (ret)
--			goto failed;
-+			return ret;
- 	}
- 
- 	/* Initialize video memory */
- 	ret = sa1100fb_map_video_memory(fbi);
- 	if (ret)
--		goto failed;
-+		return ret;
- 
- 	/*
- 	 * This makes sure that our colour bitfield
--- 
-2.7.4
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index d4ebf56..0b6e104 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
+ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+ {
+ 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
++	isb();
+ }
+
+ #endif
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index a652ce0..bdedd8f 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
+ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+ {
+ 	write_sysreg(cntkctl, cntkctl_el1);
++	isb();
+ }
+
+ static inline u64 arch_counter_get_cntpct(void)
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index fd4b7f6..47cf15e 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -77,6 +77,7 @@ struct arch_timer {
+ static bool arch_counter_suspend_stop;
+ static bool vdso_default = true;
+
++static cpumask_t evtstrm_available;
+ static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
+
+ static int __init early_evtstrm_cfg(char *buf)
+@@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
+ #ifdef CONFIG_COMPAT
+ 	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
+ #endif
++	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
+ }
+
+ static void arch_timer_configure_evtstream(void)
+@@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
+ 	return arch_timer_rate;
+ }
+
++bool arch_timer_evtstrm_available(void)
++{
++	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
++}
++
+ static u64 arch_counter_get_cntvct_mem(void)
+ {
+ 	u32 vct_lo, vct_hi, tmp_hi;
+@@ -929,6 +936,8 @@ static int arch_timer_dying_cpu(unsigned int cpu)
+ {
+ 	struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
+
++	cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
++
+ 	arch_timer_stop(clk);
+ 	return 0;
+ }
+@@ -938,10 +947,16 @@ static int arch_timer_dying_cpu(unsigned int cpu)
+ static int arch_timer_cpu_pm_notify(struct notifier_block *self,
+ 				    unsigned long action, void *hcpu)
+ {
+-	if (action == CPU_PM_ENTER)
++	if (action == CPU_PM_ENTER) {
+ 		__this_cpu_write(saved_cntkctl, arch_timer_get_cntkctl());
+-	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
++
++		cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
++	} else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT) {
+ 		arch_timer_set_cntkctl(__this_cpu_read(saved_cntkctl));
++
++		if (elf_hwcap & HWCAP_EVTSTRM)
++			cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
++	}
+ 	return NOTIFY_OK;
+ }
+
+@@ -1017,6 +1032,7 @@ static int __init arch_timer_register(void)
+ 	if (err)
+ 		goto out_unreg_notify;
+
++	cpumask_clear(&evtstrm_available);
+
+ 	/* Register and immediately configure the timer on the boot CPU */
+ 	err = cpuhp_setup_state(CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index cc805b7..4e28283 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -93,6 +93,7 @@ struct arch_timer_mem {
+ extern u32 arch_timer_get_rate(void);
+ extern u64 (*arch_timer_read_counter)(void);
+ extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
++extern bool arch_timer_evtstrm_available(void);
+
+ #else
+
+@@ -106,6 +107,11 @@ static inline u64 arch_timer_read_counter(void)
+ 	return 0;
+ }
+
++static inline bool arch_timer_evtstrm_available(void)
++{
++	return false;
++}
++
+ #endif
+
+ #endif
+--
+1.9.1
