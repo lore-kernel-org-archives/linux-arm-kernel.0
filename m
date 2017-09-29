@@ -1,159 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:52:58 +0200
-Subject: [PATCH 06/48] ARM: dts: r8a7793: Stop grouping clocks under a
- "clocks" subnode
+Date: Fri, 29 Sep 2017 13:53:04 +0200
+Subject: [PATCH 12/48] ARM: dts: iwg22m: Add iWave RZG1E SODIMM SOM
 In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
 References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <c67e243ccf06aec0fece59b8a1f3eb719e07b0e3.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <c9a41f515d1e5955c44cb04926f5f5f4be4a0cd0.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Biju Das <biju.das@bp.renesas.com>
 
-The current practice is to not group clocks under a "clocks" subnode,
-but just put them together with the other on-SoC devices.
+Add support for iWave RZG1E SODIMM System On Module.
+http://www.iwavesystems.com/rz-g1e-sodimm-module.html
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 125 ++++++++++++++++++++---------------------
- 1 file changed, 60 insertions(+), 65 deletions(-)
+ arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7745-iwg22m.dtsi
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index ef8009c01e66..d48b97c853cd 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -972,71 +972,66 @@
- 		status = "disabled";
- 	};
- 
--	clocks {
--		#address-cells = <2>;
--		#size-cells = <2>;
--		ranges;
--
--		/* External root clock */
--		extal_clk: extal {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			/* This value must be overridden by the board. */
--			clock-frequency = <0>;
--		};
--
--		/*
--		 * The external audio clocks are configured as 0 Hz fixed frequency clocks by
--		 * default. Boards that provide audio clocks should override them.
--		 */
--		audio_clk_a: audio_clk_a {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <0>;
--		};
--		audio_clk_b: audio_clk_b {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <0>;
--		};
--		audio_clk_c: audio_clk_c {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <0>;
--		};
--
--		/* External USB clock - can be overridden by the board */
--		usb_extal_clk: usb_extal {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <48000000>;
--		};
--
--		/* External CAN clock */
--		can_clk: can {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			/* This value must be overridden by the board. */
--			clock-frequency = <0>;
--		};
--
--		/* External SCIF clock */
--		scif_clk: scif {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			/* This value must be overridden by the board. */
--			clock-frequency = <0>;
--		};
--
--		/* Special CPG clocks */
--		cpg: clock-controller at e6150000 {
--			compatible = "renesas,r8a7793-cpg-mssr";
--			reg = <0 0xe6150000 0 0x1000>;
--			clocks = <&extal_clk>, <&usb_extal_clk>;
--			clock-names = "extal", "usb_extal";
--			#clock-cells = <2>;
--			#power-domain-cells = <0>;
--		};
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+new file mode 100644
+index 000000000000..9dbd854aacf8
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+@@ -0,0 +1,24 @@
++/*
++ * Device Tree Source for the iWave-RZG1E-G22M SODIMM SOM
++ *
++ * Copyright (C) 2017 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
++#include "r8a7745.dtsi"
 +
-+	/* External USB clock - can be overridden by the board */
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <48000000>;
-+	};
++/ {
++	compatible = "iwave,g22m", "renesas,r8a7745";
 +
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x20000000>;
 +	};
++};
 +
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* Special CPG clocks */
-+	cpg: clock-controller at e6150000 {
-+		compatible = "renesas,r8a7793-cpg-mssr";
-+		reg = <0 0xe6150000 0 0x1000>;
-+		clocks = <&extal_clk>, <&usb_extal_clk>;
-+		clock-names = "extal", "usb_extal";
-+		#clock-cells = <2>;
-+		#power-domain-cells = <0>;
- 	};
- 
- 	rst: reset-controller at e6160000 {
++&extal_clk {
++	clock-frequency = <20000000>;
++};
 -- 
 2.1.4
