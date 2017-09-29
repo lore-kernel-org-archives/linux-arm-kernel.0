@@ -1,166 +1,163 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Sep 2017 15:34:05 -0700
-Subject: [PATCH 1/7] dt-bindings: bus: Minimal TI sysc interconnect target
- module binding
+Date: Fri, 29 Sep 2017 15:34:06 -0700
+Subject: [PATCH 2/7] ARM: OMAP2+: Parse module IO range from dts for legacy
+ "ti, hwmods" support
 In-Reply-To: <20170929223411.9691-1-tony@atomide.com>
 References: <20170929223411.9691-1-tony@atomide.com>
-Message-ID: <20170929223411.9691-2-tony@atomide.com>
+Message-ID: <20170929223411.9691-3-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recently introduced omap clkctrl module binding, we can start
-moving omap hwmod data to device tree and drivers from arch/arm/mach-omap2.
+When removing legacy platform data for IO ranges for the hwmod
+interconnect code, we still need to support the "ti,hwmods"
+property.
 
-To start doing this, let's introduce a device tree binding for TI
-sysc interconnect target module hardware. The sysc manages module clocks,
-idlemodes and interconnect level resets. Each interconnect target module
-can have one or more child devices connected to it.
+And as we're going to use a generic sysc device driver to handle the
+interconnect target instances, we can parse the information needed
+for legacy "ti,hwmods" IO range from the dts. It's always the first
+range the interconnect target module provides.
 
-TI sysc interconnect target module hardware is independent of the
-interconnect. It is used at least with TI L3 interconnect (Arteris NoC)
-and TI L4 interconnect (Sonics s3220). The sysc is mostly used for
-interaction between module and PRCM. It participates in the OCP Disconnect
-Protocol but other than that is mostly indepenent of the interconnect.
+Note that we want to parse the range instead of the first child
+device IO regs as the child device may not always be defined.
 
-As all the features may not be supported for a given sysc module, we
-need to use device tree configuration for the revision of the interconnect
-target module.
+The child IP device node may not exist in cases where there is no
+driver binding for the device, or when the child IP block may not
+even be functional for some SoC revisions. But the IO range of the
+interconnect target module is always known.
 
-Note that the interconnect target module control registers are always
-sprinked at varying locations in the unused address space of the first
-child device IP block. To avoid device tree reg conflicts, the sysc device
-provides ranges for it's children.
-
-For a non-intrusive transition from static hwmod data to using device
-tree defined TI interconnect target module binding, we can keep things
-working with static hwmod data if device tree property "ti,hwmods" is
-specified for the the interconnect target module.
-
-Note that additional properties for sysc capabilities will be added
-later on. For now, we can already use this binding for interconnect
-target modules that do not have any child device drivers available.
-This allows us to idle the unused interconnect target modules during
-init without the need for legacy hwmod platform data for doing it.
-
-Cc: Beno?t Cousson <bcousson@baylibre.com>
-Cc: Dave Gerlach <d-gerlach@ti.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Cc: Lokesh Vutla <lokeshvutla@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Sakari Ailus <sakari.ailus@iki.fi>
-Cc: Suman Anna <s-anna@ti.com>
 Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- Documentation/devicetree/bindings/bus/ti-sysc.txt | 93 +++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/ti-sysc.txt
+ arch/arm/mach-omap2/omap_hwmod.c | 80 +++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod.h |  5 +++
+ 2 files changed, 84 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/bus/ti-sysc.txt b/Documentation/devicetree/bindings/bus/ti-sysc.txt
-new file mode 100644
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/ti-sysc.txt
-@@ -0,0 +1,93 @@
-+Texas Instruments sysc interconnect target module wrapper binding
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2395,6 +2395,75 @@ static int of_dev_hwmod_lookup(struct device_node *np,
+ 	return -ENODEV;
+ }
+ 
++/**
++ * omap_hwmod_parse_module_range - map module IO range from device tree
++ * @oh: struct omap_hwmod *
++ * @np: struct device_node *
++ *
++ * Parse the device tree range an interconnect target module provides
++ * for it's child device IP blocks. This way we can support the old
++ * "ti,hwmods" property with just dts data without a need for platform
++ * data for IO resources. And we don't need all the child IP device
++ * nodes available in the dts.
++ */
++int omap_hwmod_parse_module_range(struct omap_hwmod *oh,
++				  struct device_node *np,
++				  struct resource *res)
++{
++	struct property *prop;
++	const __be32 *ranges;
++	const char *name;
++	u32 nr_addr, nr_size;
++	u64 base, size;
++	int len, error;
 +
-+Texas Instruments SoCs can have a generic interconnect target module
-+hardware for devices connected to various interconnects such as L3
-+interconnect (Arteris NoC) and L4 interconnect (Sonics s3220). The sysc
-+is mostly used for interaction between module and PRCM. It participates
-+in the OCP Disconnect Protocol but other than that is mostly indepenent
-+of the interconnect.
++	if (!res)
++		return -EINVAL;
 +
-+Each interconnect target module can have one or more devices connected to
-+it. There is a set of control registers for managing interconnect target
-+module clocks, idle modes and interconnect level resets for the module.
++	ranges = of_get_property(np, "ranges", &len);
++	if (!ranges)
++		return -ENOENT;
 +
-+These control registers are sprinkled into the unused register address
-+space of the first child device IP block managed by the interconnect
-+target module and typically are named REVISION, SYSCONFIG and SYSSTATUS.
++	len /= sizeof(*ranges);
 +
-+Required standard properties:
++	if (len < 3)
++		return -EINVAL;
 +
-+- compatible	shall be one of the following generic types:
++	of_property_for_each_string(np, "compatible", prop, name)
++		if (!strncmp("ti,sysc-", name, 8))
++			break;
 +
-+		"ti,sysc-omap2"
-+		"ti,sysc-omap4"
-+		"ti,sysc-omap4-simple"
++	if (!name)
++		return -ENOENT;
 +
-+		or one of the following derivative types for hardware
-+		needing special workarounds:
++	error = of_property_read_u32(np, "#address-cells", &nr_addr);
++	if (error)
++		return -ENOENT;
 +
-+		"ti,sysc-omap3430-sr"
-+		"ti,sysc-omap3630-sr"
-+		"ti,sysc-omap4-sr"
-+		"ti,sysc-omap3-sham"
-+		"ti,sysc-omap-aes"
-+		"ti,sysc-mcasp"
-+		"ti,sysc-usb-host-fs"
++	error = of_property_read_u32(np, "#size-cells", &nr_size);
++	if (error)
++		return -ENOENT;
 +
-+- reg		shall have register areas implemented for the interconnect
-+		target module in question such as revision, sysc and syss
++	if (nr_addr != 1 || nr_size != 1) {
++		pr_err("%s: invalid range for %s->%s\n", __func__,
++		       oh->name, np->name);
++		return -EINVAL;
++	}
 +
-+- reg-names	shall contain the register names implemented for the
-+		interconnect target module in question such as
-+		"rev, "sysc", and "syss"
++	ranges++;
++	base = of_translate_address(np, ranges++);
++	size = be32_to_cpup(ranges);
 +
-+- ranges	shall contain the interconnect target module IO range
-+		available for one or more child device IP blocks managed
-+		by the interconnect target module, the ranges may include
-+		multiple ranges such as device L4 range for control and
-+		parent L3 range for DMA access
++	pr_debug("omap_hwmod: %s %s at 0x%llx size 0x%llx\n",
++		 oh->name, np->name, base, size);
 +
-+Optional properties:
++	res->start = base;
++	res->end = base + size - 1;
++	res->flags = IORESOURCE_MEM;
 +
-+- clocks	clock specifier for each name in the clock-names as
-+		specified in the binding documentation for ti-clkctrl,
-+		typically available for all interconnect targets on TI SoCs
-+		based on omap4 except if it's read-only register in hwauto
-+		mode as for example omap4 L4_CFG_CLKCTRL
++	return 0;
++}
 +
-+- clock-names	should contain at least "fck", and optionally also "ick"
-+		depending on the SoC and the interconnect target module
+ /**
+  * _init_mpu_rt_base - populate the virtual address for a hwmod
+  * @oh: struct omap_hwmod * to locate the virtual address
+@@ -2417,6 +2486,8 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
+ {
+ 	struct omap_hwmod_addr_space *mem;
+ 	void __iomem *va_start = NULL;
++	struct resource res;
++	int error;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+@@ -2442,7 +2513,14 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
+ 			return -ENXIO;
+ 		}
+ 
+-		va_start = of_iomap(np, index + oh->mpu_rt_idx);
++		/* Do we have a dts range for the interconnect target module? */
++		error = omap_hwmod_parse_module_range(oh, np, &res);
++		if (!error)
++			va_start = ioremap(res.start, resource_size(&res));
 +
-+- ti,hwmods	optional TI interconnect module name to use legacy
-+		hwmod platform data
++		/* No ranges, rely on device reg entry */
++		if (!va_start)
++			va_start = of_iomap(np, index + oh->mpu_rt_idx);
+ 	} else {
+ 		va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
+ 	}
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -690,11 +690,16 @@ struct omap_hwmod {
+ 	struct omap_hwmod		*parent_hwmod;
+ };
+ 
++struct device_node;
 +
-+
-+Example: Single instance of MUSB controller on omap4 using interconnect ranges
-+using offsets from l4_cfg second segment (0x4a000000 + 0x80000 = 0x4a0ab000):
-+
-+	target-module at 2b000 {		/* 0x4a0ab000, ap 84 12.0 */
-+		compatible = "ti,sysc-omap2";
-+		ti,hwmods = "usb_otg_hs";
-+		reg = <0x2b400 0x4>,
-+		      <0x2b404 0x4>,
-+		      <0x2b408 0x4>;
-+		reg-names = "rev", "sysc", "syss";
-+		clocks = <&l3_init_clkctrl OMAP4_USB_OTG_HS_CLKCTRL 0>;
-+		clock-names = "fck";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x2b000 0x1000>;
-+
-+		usb_otg_hs: otg at 0 {
-+			compatible = "ti,omap4-musb";
-+			reg = <0x0 0x7ff>;
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+			usb-phy = <&usb2_phy>;
-+			...
-+		};
-+	};
-+
-+Note that other SoCs, such as am335x can have multipe child devices. On am335x
-+there are two MUSB instances, two USB PHY instances, and a single CPPI41 DMA
-+instance as children of a single interconnet target module.
+ struct omap_hwmod *omap_hwmod_lookup(const char *name);
+ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
+ 			void *data);
+ 
+ int __init omap_hwmod_setup_one(const char *name);
++int omap_hwmod_parse_module_range(struct omap_hwmod *oh,
++				  struct device_node *np,
++				  struct resource *res);
+ 
+ int omap_hwmod_enable(struct omap_hwmod *oh);
+ int omap_hwmod_idle(struct omap_hwmod *oh);
 -- 
 2.14.2
