@@ -1,93 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:53:40 +0200
-Subject: [PATCH 48/48] ARM: dts: r8a7743: Add MSIOF[012] support
+Date: Fri, 29 Sep 2017 13:53:25 +0200
+Subject: [PATCH 33/48] ARM: dts: alt: use correct logic for SD WP pins
 In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
 References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <7031a219f649d12acda8a70a4b6b816ee123c8e2.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <a2f74d0e655eac78dbbd4ade88ee08b1f8ec7ec1.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Add the DT nodes needed by MSIOF[012] interfaces to the SoC dtsi.
-Also, define aliases for spi[123].
+The WP pins are ACTIVE_HIGH, fix it in the DTS.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fixes: 2b41091b896b ("ARM: dts: alt: add SDHI0 and 1 support")
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 51 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm/boot/dts/r8a7794-alt.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 454f98060d6f..d541fd9ffafb 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -29,6 +29,9 @@
- 		i2c7 = &iic1;
- 		i2c8 = &iic3;
- 		spi0 = &qspi;
-+		spi1 = &msiof0;
-+		spi2 = &msiof1;
-+		spi3 = &msiof2;
- 	};
- 
- 	cpus {
-@@ -852,6 +855,54 @@
- 			status = "disabled";
- 		};
- 
-+		msiof0: spi at e6e20000 {
-+			compatible = "renesas,msiof-r8a7743",
-+				     "renesas,rcar-gen2-msiof";
-+			reg = <0 0xe6e20000 0 0x0064>;
-+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 000>;
-+			dmas = <&dmac0 0x51>, <&dmac0 0x52>,
-+			       <&dmac1 0x51>, <&dmac1 0x52>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			resets = <&cpg 000>;
-+			status = "disabled";
-+		};
-+
-+		msiof1: spi at e6e10000 {
-+			compatible = "renesas,msiof-r8a7743",
-+				     "renesas,rcar-gen2-msiof";
-+			reg = <0 0xe6e10000 0 0x0064>;
-+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 208>;
-+			dmas = <&dmac0 0x55>, <&dmac0 0x56>,
-+			       <&dmac1 0x55>, <&dmac1 0x56>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			resets = <&cpg 208>;
-+			status = "disabled";
-+		};
-+
-+		msiof2: spi at e6e00000 {
-+			compatible = "renesas,msiof-r8a7743",
-+				     "renesas,rcar-gen2-msiof";
-+			reg = <0 0xe6e00000 0 0x0064>;
-+			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 205>;
-+			dmas = <&dmac0 0x41>, <&dmac0 0x42>,
-+			       <&dmac1 0x41>, <&dmac1 0x42>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			resets = <&cpg 205>;
-+			status = "disabled";
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7743";
- 			reg = <0 0xee100000 0 0x328>;
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index e45f92b5eb11..bd98790d964e 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -304,7 +304,7 @@
+ 	vmmc-supply = <&vcc_sdhi0>;
+ 	vqmmc-supply = <&vccq_sdhi0>;
+ 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+-	wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+ 	sd-uhs-sdr50;
+ 	sd-uhs-sdr104;
+ 	status = "okay";
+@@ -318,7 +318,7 @@
+ 	vmmc-supply = <&vcc_sdhi1>;
+ 	vqmmc-supply = <&vccq_sdhi1>;
+ 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+-	wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
+ 	sd-uhs-sdr50;
+ 	status = "okay";
+ };
 -- 
 2.1.4
