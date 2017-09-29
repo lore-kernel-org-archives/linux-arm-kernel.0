@@ -1,22 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Sep 2017 10:46:58 +0200
-Subject: [PATCH v3 01/14] clk: sunxi-ng: sun6i: Export video PLLs
-In-Reply-To: <20170929082306.16193-2-wens@csie.org>
+Date: Fri, 29 Sep 2017 10:47:55 +0200
+Subject: [PATCH v3 02/14] clk: sunxi-ng: sun6i: Rename HDMI DDC clock to
+ avoid name collision
+In-Reply-To: <20170929082306.16193-3-wens@csie.org>
 References: <20170929082306.16193-1-wens@csie.org>
- <20170929082306.16193-2-wens@csie.org>
-Message-ID: <20170929084658.la46onmwcibicd4b@flea>
+ <20170929082306.16193-3-wens@csie.org>
+Message-ID: <20170929084755.vsbqn4bq6z2n7c64@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 08:22:53AM +0000, Chen-Yu Tsai wrote:
-> The 2x outputs of the 2 video PLL clocks are directly used by the
-> HDMI controller block.
+On Fri, Sep 29, 2017 at 08:22:54AM +0000, Chen-Yu Tsai wrote:
+> The HDMI DDC clock found in the CCU is the parent of the actual DDC
+> clock within the HDMI controller. That clock is also named "hdmi-ddc".
 > 
-> Export them so they can be referenced in the device tree.
+> Rename the one in the CCU to "ddc". This makes more sense than renaming
+> the one in the HDMI controller to something else.
 > 
 > Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Applied, thanks!
 Maxime
@@ -31,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/0fdb4054/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/d70ffdea/attachment-0001.sig>
