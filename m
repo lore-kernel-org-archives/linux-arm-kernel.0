@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:53:37 +0200
-Subject: [PATCH 45/48] ARM: dts: iwg22m: Add SPI NOR support
+Date: Fri, 29 Sep 2017 13:53:35 +0200
+Subject: [PATCH 43/48] ARM: dts: iwg20m: Add SPI NOR support
 In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
 References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <cf1cc6f1da41ceb60f6389b6b46f4f6dc06a2b63.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <781e923a5fe4751d3aaa740ca3de0f9d179c34ef.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 26 ++++++++++++++++++++++++++
  1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-index f7f9ceff35a6..ed9a8cf3fe36 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-+++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-@@ -39,6 +39,11 @@
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+index 4119737cb883..75a8ca571846 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
++++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+@@ -44,6 +44,11 @@
  		function = "mmc";
  	};
  
@@ -33,9 +33,9 @@ index f7f9ceff35a6..ed9a8cf3fe36 100644
 +		function = "qspi";
 +	};
 +
- 	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
 @@ -61,6 +66,27 @@
  	status = "okay";
  };
@@ -61,8 +61,8 @@ index f7f9ceff35a6..ed9a8cf3fe36 100644
 +	};
 +};
 +
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
  	pinctrl-names = "default";
 -- 
 2.1.4
