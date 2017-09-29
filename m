@@ -1,61 +1,45 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 29 Sep 2017 13:17:03 +0300
-Subject: [PATCH v1 04/14] tee: shm: add page accessor functions
-In-Reply-To: <20170928221446.s4qdrzfaurzus76d@yury-thinkpad>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1506621851-6929-5-git-send-email-volodymyr_babchuk@epam.com>
- <20170928221446.s4qdrzfaurzus76d@yury-thinkpad>
-Message-ID: <856145cd-2edb-d692-4459-9a1b0c57ce80@epam.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Sep 2017 12:17:40 +0200
+Subject: [PATCH v2 2/3] ARM: dts: sun8i: Add board dts file for Banana Pi
+ M2 Ultra
+In-Reply-To: <FCCC8A9F-4818-4CE3-A7E8-62ED9A864F92@aosc.io>
+References: <20170928092543.45648-1-icenowy@aosc.io>
+ <20170928092543.45648-3-icenowy@aosc.io>
+ <20170928151225.n4pyvn65u6hvpjd7@flea>
+ <FCCC8A9F-4818-4CE3-A7E8-62ED9A864F92@aosc.io>
+Message-ID: <20170929101740.reahjw7wjaspwjld@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
+On Thu, Sep 28, 2017 at 03:38:59PM +0000, Icenowy Zheng wrote:
+> 
+> 
+> ? 2017?9?28? GMT+08:00 ??11:12:25, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Thu, Sep 28, 2017 at 09:25:42AM +0000, Icenowy Zheng wrote:
+> >> +&mmc2 {
+> >> +	vmmc-supply = <&reg_dcdc1>;
+> >> +	bus-width = <8>;
+> >> +	non-removable;
+> >> +	status = "okay";
+> >> +};
+> >
+> >I guess it's an emmc, it doesn't have a vqmmmc regulator?
+> 
+> vqmmc is also 3v3.
 
-On 29.09.17 01:14, Yury Norov wrote:
-> Hi Volodymyr,
-> 
-> On Thu, Sep 28, 2017 at 09:04:01PM +0300, Volodymyr Babchuk wrote:
->> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
->>
->> In order to register a shared buffer in TEE, we need accessor
->> function that return list of pages for that buffer.
->>
->> Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
->> ---
->>   include/linux/tee_drv.h | 14 ++++++++++++++
->>   1 file changed, 14 insertions(+)
->>
->> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
->> index 6ba8b76..d773827 100644
->> --- a/include/linux/tee_drv.h
->> +++ b/include/linux/tee_drv.h
->> @@ -394,6 +394,20 @@ static inline size_t tee_shm_get_size(struct tee_shm *shm)
->>   }
->>   
->>   /**
->> + * tee_shm_get_pages() - Get list of pages that hold shared buffer
->> + * @shm:	Shared memory handle
->> + * @num_pages:	Number of pages will be stored there
->> + * @returns pointer to pages array
->> + */
->> +static inline struct page **tee_shm_get_pages(struct tee_shm *shm,
->> +					      size_t *num_pages)
->> +{
->> +	if (num_pages)
->> +		*num_pages = shm->num_pages;
-> 
-> My concern is about this check
-> 
-> The only use of the tee_shm_get_pages() I found is in patch #9:
-> +               size_t page_num;
-> +
-> +               pages = tee_shm_get_pages(shm, &page_num);
-> 
-> So there's no any valid scenario where you should pass NULL to the
-> function. And I don't understand why you do this check.
-> 
-> Even more, if in future there will be an occasion when function will
-> be passed with NULL, the error will become hidden by this code.
-Yes, I think you are right. I added that check in case someone want
-to get only pointer to pages. But this is semantically invalid.
-I'll remove that check. Thank you for review.
+You should still put it.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/60a8d275/attachment.sig>
