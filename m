@@ -1,55 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Sep 2017 16:47:54 +0100
-Subject: [PATCH] arm64: fault: Route pte translation faults via
- do_translation_fault
-In-Reply-To: <1506684461-24162-1-git-send-email-will.deacon@arm.com>
-References: <1506684461-24162-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20170929154754.mziqf3bftly7dp3k@armageddon.cambridge.arm.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Fri, 29 Sep 2017 17:52:56 +0200
+Subject: [PATCH] ARM64: dts: meson-gxbb-nexbox-a95x: Enable USB Nodes
+Message-ID: <20170929155256.7080-1-peter@korsgaard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 12:27:41PM +0100, Will Deacon wrote:
-> We currently route pte translation faults via do_page_fault, which elides
-> the address check against TASK_SIZE before invoking the mm fault handling
-> code. However, this can cause issues with the path walking code in
-> conjunction with our word-at-a-time implementation because
-> load_unaligned_zeropad can end up faulting in kernel space if it reads
-> across a page boundary and runs into a page fault (e.g. by attempting to
-> read from a guard region).
-> 
-> In the case of such a fault, load_unaligned_zeropad has registered a
-> fixup to shift the valid data and pad with zeroes, however the abort is
-> reported as a level 3 translation fault and we dispatch it straight to
-> do_page_fault, despite it being a kernel address. This results in calling
-> a sleeping function from atomic context:
-> 
->   BUG: sleeping function called from invalid context at arch/arm64/mm/fault.c:313
->   in_atomic(): 0, irqs_disabled(): 0, pid: 10290
->   Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
->   [...]
->   [<ffffff8e016cd0cc>] ___might_sleep+0x134/0x144
->   [<ffffff8e016cd158>] __might_sleep+0x7c/0x8c
->   [<ffffff8e016977f0>] do_page_fault+0x140/0x330
->   [<ffffff8e01681328>] do_mem_abort+0x54/0xb0
->   Exception stack(0xfffffffb20247a70 to 0xfffffffb20247ba0)
->   [...]
->   [<ffffff8e016844fc>] el1_da+0x18/0x78
->   [<ffffff8e017f399c>] path_parentat+0x44/0x88
->   [<ffffff8e017f4c9c>] filename_parentat+0x5c/0xd8
->   [<ffffff8e017f5044>] filename_create+0x4c/0x128
->   [<ffffff8e017f59e4>] SyS_mkdirat+0x50/0xc8
->   [<ffffff8e01684e30>] el0_svc_naked+0x24/0x28
->   Code: 36380080 d5384100 f9400800 9402566d (d4210000)
->   ---[ end trace 2d01889f2bca9b9f ]---
-> 
-> Fix this by dispatching all translation faults to do_translation_faults,
-> which avoids invoking the page fault logic for faults on kernel addresses.
-> 
-> Cc: <stable@vger.kernel.org>
-> Reported-by: Ankit Jain <ankijain@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Enable both gxbb USB controllers and add a 5V regulator for the OTG port
+VBUS, similar to p20x.
 
-Applied. Thanks.
+Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
+---
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+index 38dfdde5c147..60cd9c3b11c8 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+@@ -88,6 +88,18 @@
+ 		};
+ 	};
+ 
++	usb_pwr: regulator-usb-pwrs {
++		compatible = "regulator-fixed";
++
++		regulator-name = "USB_PWR";
++
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	vddio_card: gpio-regulator {
+ 		compatible = "regulator-gpio";
+ 
+@@ -294,3 +306,20 @@
+ 	pinctrl-0 = <&uart_ao_a_pins>;
+ 	pinctrl-names = "default";
+ };
++
++&usb0_phy {
++	status = "okay";
++	phy-supply = <&usb_pwr>;
++};
++
++&usb1_phy {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
 -- 
-Catalin
+2.11.0
