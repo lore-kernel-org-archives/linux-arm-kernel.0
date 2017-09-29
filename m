@@ -1,43 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Sep 2017 22:42:44 +0200
-Subject: [PATCH] arm64: dts: hikey960: Update HiKey960 with GPIO line names
-In-Reply-To: <20170929203020.24879-1-linus.walleij@linaro.org>
-References: <20170929203020.24879-1-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbZgDyHd9mPrOCQ2Mk4qe8+mvN6p-XPVir4TBM239A8qA@mail.gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Fri, 29 Sep 2017 23:25:36 +0200
+Subject: [PATCH 0/5] firmware: arm_scpi: series with smaller improvements
+Message-ID: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 10:30 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+This series includes smaller improvements to make all memory allocations
+device-managed and eventually get rid of scpi_remove. This also improves
+the cleanup path in scpi_probe.
 
-> This adds line names for all the GPIOs I could identify on the HiKey960
-> schematic.
->
-> "GPIO-A" through "GPIO-L" are the most important since they give users
-> a handle to look up the standard 96boards GPIOs from the GPIO character
-> device.
->
-> The rest of the names are more informational, nice debug information
-> for "lsgpio" so you can see that the right line is taken for the right
-> function in the kernel for example.
->
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Zhangfei Gao <zhangfei.gao@hisilicon.com>
-> Cc: Guodong Xu <guodong.xu@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Heiner Kallweit (5):
+  firmware: arm_scpi: remove usage of drvdata and don't reset scpi_info to null
+  firmware: arm_scpi: remove two unneeded devm_kfree's in scpi_remove
+  firmware: arm_scpi: pre-populate dvfs info in scpi_probe
+  firmware: arm_scpi: make freeing mbox channels device-managed
+  firmware: arm_scpi: remove scpi_remove
 
-I just noticed that the recently merhed Poplar board has these GPIO
-lines named "LS-GPIO-A" etc.
+ drivers/firmware/arm_scpi.c | 120 +++++++++++++++++++-------------------------
+ 1 file changed, 51 insertions(+), 69 deletions(-)
 
-We have to decide for one format. Either "LS-GPIO-A" or just "GPIO-A"
-and change all the others (including this patch).
-
-The namespace needs to be consistent across all 96boards.
-
-Wei et al: what do you prefer? I can fix it up either way.
-
-If we want it "LS-GPIO-A" then we need to patch up the old 6220
-DTS as well.
-
-Yours,
-Linus Walleij
+-- 
+2.14.2
