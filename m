@@ -1,67 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 29 Sep 2017 16:22:53 +0800
-Subject: [PATCH v3 01/14] clk: sunxi-ng: sun6i: Export video PLLs
+Date: Fri, 29 Sep 2017 16:22:54 +0800
+Subject: [PATCH v3 02/14] clk: sunxi-ng: sun6i: Rename HDMI DDC clock to avoid
+ name collision
 In-Reply-To: <20170929082306.16193-1-wens@csie.org>
 References: <20170929082306.16193-1-wens@csie.org>
-Message-ID: <20170929082306.16193-2-wens@csie.org>
+Message-ID: <20170929082306.16193-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2x outputs of the 2 video PLL clocks are directly used by the
-HDMI controller block.
+The HDMI DDC clock found in the CCU is the parent of the actual DDC
+clock within the HDMI controller. That clock is also named "hdmi-ddc".
 
-Export them so they can be referenced in the device tree.
+Rename the one in the CCU to "ddc". This makes more sense than renaming
+the one in the HDMI controller to something else.
 
 Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun6i-a31.h      | 8 ++++++--
- include/dt-bindings/clock/sun6i-a31-ccu.h | 4 ++++
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.h b/drivers/clk/sunxi-ng/ccu-sun6i-a31.h
-index 4e434011e9e7..27e6ad4133ab 100644
---- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.h
-@@ -27,7 +27,9 @@
- #define CLK_PLL_AUDIO_4X	4
- #define CLK_PLL_AUDIO_8X	5
- #define CLK_PLL_VIDEO0		6
--#define CLK_PLL_VIDEO0_2X	7
-+
-+/* The PLL_VIDEO0_2X clock is exported */
-+
- #define CLK_PLL_VE		8
- #define CLK_PLL_DDR		9
+diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+index 8af434815fba..241fb13f1c06 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
++++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+@@ -608,7 +608,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", lcd_ch1_parents,
+ 				 0x150, 0, 4, 24, 2, BIT(31),
+ 				 CLK_SET_RATE_PARENT);
  
-@@ -35,7 +37,9 @@
+-static SUNXI_CCU_GATE(hdmi_ddc_clk, "hdmi-ddc", "osc24M", 0x150, BIT(30), 0);
++static SUNXI_CCU_GATE(hdmi_ddc_clk, "ddc", "osc24M", 0x150, BIT(30), 0);
  
- #define CLK_PLL_PERIPH_2X	11
- #define CLK_PLL_VIDEO1		12
--#define CLK_PLL_VIDEO1_2X	13
-+
-+/* The PLL_VIDEO1_2X clock is exported */
-+
- #define CLK_PLL_GPU		14
- #define CLK_PLL_MIPI		15
- #define CLK_PLL9		16
-diff --git a/include/dt-bindings/clock/sun6i-a31-ccu.h b/include/dt-bindings/clock/sun6i-a31-ccu.h
-index 4482530fb6f5..c5d13340184a 100644
---- a/include/dt-bindings/clock/sun6i-a31-ccu.h
-+++ b/include/dt-bindings/clock/sun6i-a31-ccu.h
-@@ -43,8 +43,12 @@
- #ifndef _DT_BINDINGS_CLK_SUN6I_A31_H_
- #define _DT_BINDINGS_CLK_SUN6I_A31_H_
+ static SUNXI_CCU_GATE(ps_clk, "ps", "lcd1-ch1", 0x140, BIT(31), 0);
  
-+#define CLK_PLL_VIDEO0_2X	7
-+
- #define CLK_PLL_PERIPH		10
- 
-+#define CLK_PLL_VIDEO1_2X	13
-+
- #define CLK_CPU			18
- 
- #define CLK_AHB1_MIPIDSI	23
 -- 
 2.14.2
