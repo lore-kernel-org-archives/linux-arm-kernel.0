@@ -1,79 +1,61 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Fri, 29 Sep 2017 23:44:15 +0200
-Subject: [PATCH 5/5] firmware: arm_scpi: remove scpi_remove
-In-Reply-To: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
-References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
-Message-ID: <a661fe23-d11b-35da-36f0-cdfa59587a88@gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Fri, 29 Sep 2017 15:03:24 -0700
+Subject: [PATCH] ASoC: rockchip: Allocate enough memory so we don't overflow
+ routes
+Message-ID: <20170929220324.16413-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sysfs_create_groups and of_platform_populate can be replaced with the
-device-managed versions what allows us to remove scpi_remove.
+In the recent commit d9f9c167edae ("ASoC: rockchip: Init dapm routes
+dynamically") we improperly allocated memory for the card->dapm_routes
+causing us to overflow the allocation on every boot.  Oops.
 
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+Let's allocate the correct amount of memory.  We'll also add a check
+to make sure that we don't overrun memory even if we encounter some
+sort of weird device tree.
+
+Fixes: d9f9c167edae ("ASoC: rockchip: Init dapm routes dynamically")
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- drivers/firmware/arm_scpi.c | 20 +++-----------------
- 1 file changed, 3 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index c91f3241..a71907e6 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -911,16 +911,6 @@ static void scpi_free_channels(void *data)
- 		mbox_free_channel(info->channels[i].chan);
- }
+ sound/soc/rockchip/rk3399_gru_sound.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 30eed83e8a13..d64fbbd50544 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -494,13 +494,17 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 	struct snd_soc_dai_link *dai;
+ 	struct snd_soc_dapm_route *routes;
+ 	int i, index;
++	int num_routes;
  
--static int scpi_remove(struct platform_device *pdev)
--{
--	struct device *dev = &pdev->dev;
--
--	of_platform_depopulate(dev);
--	sysfs_remove_groups(&dev->kobj, versions_groups);
--
--	return 0;
--}
--
- #define MAX_SCPI_XFERS		10
- static int scpi_alloc_xfer_list(struct device *dev, struct scpi_chan *ch)
- {
-@@ -1038,15 +1028,12 @@ static int scpi_probe(struct platform_device *pdev)
- 	ret = scpi_init_versions(scpi_info);
- 	if (ret) {
- 		dev_err(dev, "incorrect or no SCP firmware found\n");
--		scpi_remove(pdev);
- 		return ret;
- 	}
+ 	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
+ 				      GFP_KERNEL);
+ 	if (!card->dai_link)
+ 		return -ENOMEM;
  
- 	ret = scpi_dvfs_populate(dev);
--	if (ret) {
--		scpi_remove(pdev);
-+	if (ret)
- 		return ret;
--	}
+-	routes = devm_kzalloc(dev, sizeof(rockchip_routes),
++	num_routes = 0;
++	for (i = 0; i < ARRAY_SIZE(rockchip_routes); i++)
++		num_routes += rockchip_routes[i].num_routes;
++	routes = devm_kzalloc(dev, num_routes * sizeof(*routes),
+ 			      GFP_KERNEL);
+ 	if (!routes)
+ 		return -ENOMEM;
+@@ -538,6 +542,12 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 		dai->platform_of_node = np_cpu;
+ 		dai->cpu_of_node = np_cpu;
  
- 	_dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
- 		  PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
-@@ -1055,11 +1042,11 @@ static int scpi_probe(struct platform_device *pdev)
- 		  FW_REV_MINOR(scpi_info->firmware_version),
- 		  FW_REV_PATCH(scpi_info->firmware_version));
- 
--	ret = sysfs_create_groups(&dev->kobj, versions_groups);
-+	ret = devm_device_add_groups(dev, versions_groups);
- 	if (ret)
- 		dev_err(dev, "unable to create sysfs version group\n");
- 
--	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-+	return devm_of_platform_populate(dev);
- }
- 
- static const struct of_device_id scpi_of_match[] = {
-@@ -1076,7 +1063,6 @@ static struct platform_driver scpi_driver = {
- 		.of_match_table = scpi_of_match,
- 	},
- 	.probe = scpi_probe,
--	.remove = scpi_remove,
- };
- module_platform_driver(scpi_driver);
- 
++		if (card->num_dapm_routes + rockchip_routes[index].num_routes >
++		    num_routes) {
++			dev_err(dev, "Too many routes\n");
++			return -EINVAL;
++		}
++
+ 		memcpy(routes + card->num_dapm_routes,
+ 		       rockchip_routes[index].routes,
+ 		       rockchip_routes[index].num_routes * sizeof(*routes));
 -- 
-2.14.2
+2.14.2.822.g60be5d43e6-goog
