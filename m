@@ -1,123 +1,194 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Sep 2017 14:00:49 +0100
-Subject: [PATCH v1 06/14] tee: optee: add page list manipulation functions
-In-Reply-To: <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <20170929130049.GD5781@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 29 Sep 2017 15:04:35 +0200
+Subject: [PATCH v2] mmc: sdhci-xenon: Fix clock resource by adding an optional
+ bus clock
+Message-ID: <20170929130435.6805-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 09:04:03PM +0300, Volodymyr Babchuk wrote:
-> +/**
-> + * optee_fill_pages_list() - write list of user pages to given shared
-> + * buffer.
-> + *
-> + * @dst: page-aligned buffer where list of pages will be stored
-> + * @pages: array of pages that represents shared buffer
-> + * @num_pages: number of entries in @pages
-> + *
-> + * @dst should be big enough to hold list of user page addresses and
-> + *	links to the next pages of buffer
-> + */
-> +void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages)
-> +{
-> +	size_t i;
+On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+is optional because not all the SoCs need them but at least for Armada
+7K/8K it is actually mandatory.
 
-Why size_t? It's unusual for an array index.
+The binding documentation is updating accordingly.
 
-> +	/* TODO: add support for RichOS page sizes that != 4096 */
-> +	BUILD_BUG_ON(PAGE_SIZE != OPTEE_MSG_NONCONTIG_PAGE_SIZE);
+Without this patch the kernel hand during boot if the mvpp2.2 network
+driver was not present in the kernel. Indeed the clock needed by the
+xenon controller was set by the network driver.
 
-This must be fixed before this can be considered for merging.
+Fixes: 3a3748dba881 ("mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+functionality)"
+CC: Stable <stable@vger.kernel.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi Ulf and Adrian,
 
-A large number of people build arm64 kernels with 64K pages, and this
-will need to see some testing.
+This patch should be merged in 4.14-rc, as it fixes real issues.
 
-> +	for (i = 0; i < num_pages; i++, dst++) {
-> +		/* Check if we are going to roll over the page boundary */
-> +		if (IS_ALIGNED((uintptr_t)(dst + 1),
-> +			       OPTEE_MSG_NONCONTIG_PAGE_SIZE)) {
-> +			*dst = virt_to_phys(dst + 1);
-> +			dst++;
-> +		}
-> +		*dst = page_to_phys(pages[i]);
+This patch maye looks like just as a nice clean-up but it is not. On
+the earlier version of the series adding the support for the xenon
+controller there was already this axi bus clock. But at this moment
+the documentation for the clock on the Armada 7K/8K was missing and
+there was no driver for it, so we just use the clock set by the
+bootloader and never change them that's why it worked without any
+visible problem.
 
-... so this pagelist management will need to be reworked.
-
-> +	}
-> +}
-> +
-> +static size_t get_pages_array_size(size_t num_entries)
-> +{
-> +	/* Number of user pages + number of pages to hold list of user pages */
-> +	return sizeof(u64) *
-> +		(num_entries + (sizeof(u64) * num_entries) /
-> +		 OPTEE_MSG_NONCONTIG_PAGE_SIZE);
-> +}
-
-I don't think this is correct.
-
-For P 4096-byte pages, we can have 511 * P (8-byte) page entries, and P
-(8-byte) next entries.
-
-So if we need to list 1023 page entries, we need 3 (4096-byte) pages.
-The first page holds 511 entries, the second holds 511 entries, and the
-third holds 1 entry.
-
-However, the above calculates that we need 2 (4096-byte) pages, as it
-calculates that in bytes we need:
-
-  8 * (1023 + (8 * 1023) / 4096)
-  8 * (1023 + (8184) / 4096)
-  8 * (1023 + 1)
-  8 * 1024
-  8192
-
-... or 2 (4096-byte) pages.
-
-
-I think it would be clearer to write this over a number of steps, e.g.
-
-/*
- * The final entry in each pagelist page is a pointer to the next
- * pagelist page.
- */
-#define PAGELIST_ENTRIES_PER_PAGE \
-	((OPTEE_MSG_NONCONTIG_PAGE_SIZE / sizeof(u64)) - 1)
-
-static size_t get_pages_array_size(size_t num_entries)
-{
-	int pages = DIV_ROUND_UP(num_entries, PAGELIST_ENTRIES_PER_PAGE);
-
-	return pages * OPTEE_MSG_NONCONTIG_PAGE_SIZE;
-}
-
-> +
-> +u64 *optee_allocate_pages_array(size_t num_entries)
-> +{
-> +	return alloc_pages_exact(get_pages_array_size(num_entries), GFP_KERNEL);
-> +}
-> +
-> +void optee_free_pages_array(void *array, size_t num_entries)
-> +{
-> +	free_pages_exact(array, get_pages_array_size(num_entries));
-> +}
-> +
-> diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-> index c374cd5..caa3c04 100644
-> --- a/drivers/tee/optee/optee_private.h
-> +++ b/drivers/tee/optee/optee_private.h
-> @@ -165,6 +165,10 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
->  int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
->  		       const struct tee_param *params);
->  
-> +u64 *optee_allocate_pages_array(size_t num_entries);
-> +void optee_free_pages_array(void *array, size_t num_entries);
-> +void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages);
-
-Any reason for the array/list naming disparity? IIUC, these are the same
-structure.
+Then as explained in the commit log the network driver enabled the
+clock for us, and it happened that it was setup before the xenon
+driver. It is only thanks the new information we received on the
+clocks of the Sov and with more exhaustive testes that we found this
+issue and the fix for it.
 
 Thanks,
-Mark.
+
+Gregory
+
+Changelog:
+v1->v2:
+ - manage the -EPROBE_DEFER case
+ - remove warning message when axi clock is not present
+ - remove useless test before clk_disable_unprepare()
+
+ .../bindings/mmc/marvell,xenon-sdhci.txt           | 12 ++++++-----
+ drivers/mmc/host/sdhci-xenon.c                     | 25 ++++++++++++++++++----
+ drivers/mmc/host/sdhci-xenon.h                     |  1 +
+ 3 files changed, 29 insertions(+), 9 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+index b878a1e305af..ed1456f5c94d 100644
+--- a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+@@ -16,11 +16,13 @@ Required Properties:
+ 
+ - clocks:
+   Array of clocks required for SDHC.
+-  Require at least input clock for Xenon IP core.
++  Require at least input clock for Xenon IP core. For Armada AP806 and
++  CP110, the AXI clock is also mandatory.
+ 
+ - clock-names:
+   Array of names corresponding to clocks property.
+   The input clock for Xenon IP core should be named as "core".
++  The input clock for the AXI bus must be named as "axi".
+ 
+ - reg:
+   * For "marvell,armada-3700-sdhci", two register areas.
+@@ -106,8 +108,8 @@ Example:
+ 		compatible = "marvell,armada-ap806-sdhci";
+ 		reg = <0xaa0000 0x1000>;
+ 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
+-		clocks = <&emmc_clk>;
+-		clock-names = "core";
++		clocks = <&emmc_clk>, <&axi_clk>;
++		clock-names = "core", "axi";
+ 		bus-width = <4>;
+ 		marvell,xenon-phy-slow-mode;
+ 		marvell,xenon-tun-count = <11>;
+@@ -126,8 +128,8 @@ Example:
+ 		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
+ 		vqmmc-supply = <&sd_vqmmc_regulator>;
+ 		vmmc-supply = <&sd_vmmc_regulator>;
+-		clocks = <&sdclk>;
+-		clock-names = "core";
++		clocks = <&sdclk>, <&axi_clk>;
++		clock-names = "core", "axi";
+ 		bus-width = <4>;
+ 		marvell,xenon-tun-count = <9>;
+ 	};
+diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+index 2eec2e652c53..15f912d08a4c 100644
+--- a/drivers/mmc/host/sdhci-xenon.c
++++ b/drivers/mmc/host/sdhci-xenon.c
+@@ -466,6 +466,7 @@ static int xenon_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_host *host;
++	struct xenon_priv *priv;
+ 	int err;
+ 
+ 	host = sdhci_pltfm_init(pdev, &sdhci_xenon_pdata,
+@@ -474,6 +475,7 @@ static int xenon_probe(struct platform_device *pdev)
+ 		return PTR_ERR(host);
+ 
+ 	pltfm_host = sdhci_priv(host);
++	priv = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	/*
+ 	 * Link Xenon specific mmc_host_ops function,
+@@ -491,9 +493,21 @@ static int xenon_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto free_pltfm;
+ 
++	priv->axi_clk = devm_clk_get(&pdev->dev, "axi");
++	if (IS_ERR(priv->axi_clk)) {
++		err = PTR_ERR(priv->axi_clk);
++		if (err == -EPROBE_DEFER)
++			goto err_clk;
++		priv->axi_clk = NULL;
++	} else {
++		err = clk_prepare_enable(priv->axi_clk);
++		if (err)
++			goto err_clk;
++	}
++
+ 	err = mmc_of_parse(host->mmc);
+ 	if (err)
+-		goto err_clk;
++		goto err_clk_axi;
+ 
+ 	sdhci_get_of_property(pdev);
+ 
+@@ -502,11 +516,11 @@ static int xenon_probe(struct platform_device *pdev)
+ 	/* Xenon specific dt parse */
+ 	err = xenon_probe_dt(pdev);
+ 	if (err)
+-		goto err_clk;
++		goto err_clk_axi;
+ 
+ 	err = xenon_sdhc_prepare(host);
+ 	if (err)
+-		goto err_clk;
++		goto err_clk_axi;
+ 
+ 	pm_runtime_get_noresume(&pdev->dev);
+ 	pm_runtime_set_active(&pdev->dev);
+@@ -527,6 +541,8 @@ static int xenon_probe(struct platform_device *pdev)
+ 	pm_runtime_disable(&pdev->dev);
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 	xenon_sdhc_unprepare(host);
++err_clk_axi:
++	clk_disable_unprepare(priv->axi_clk);
+ err_clk:
+ 	clk_disable_unprepare(pltfm_host->clk);
+ free_pltfm:
+@@ -538,6 +554,7 @@ static int xenon_remove(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host = platform_get_drvdata(pdev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+@@ -546,7 +563,7 @@ static int xenon_remove(struct platform_device *pdev)
+ 	sdhci_remove_host(host, 0);
+ 
+ 	xenon_sdhc_unprepare(host);
+-
++	clk_disable_unprepare(priv->axi_clk);
+ 	clk_disable_unprepare(pltfm_host->clk);
+ 
+ 	sdhci_pltfm_free(pdev);
+diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+index 2bc0510c0769..9994995c7c56 100644
+--- a/drivers/mmc/host/sdhci-xenon.h
++++ b/drivers/mmc/host/sdhci-xenon.h
+@@ -83,6 +83,7 @@ struct xenon_priv {
+ 	unsigned char	bus_width;
+ 	unsigned char	timing;
+ 	unsigned int	clock;
++	struct clk      *axi_clk;
+ 
+ 	int		phy_type;
+ 	/*
+-- 
+2.14.1
