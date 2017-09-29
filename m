@@ -1,54 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:53:21 +0200
-Subject: [PATCH 29/48] ARM: dts: r8a7743: Add USB PHY DT support
+Date: Fri, 29 Sep 2017 13:53:09 +0200
+Subject: [PATCH 17/48] ARM: dts: iwg22m: Add RTC support
 In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
 References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <9412c391af67fc8aa4e2d8975ba6143cd5289296.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <a7b8f48d2fa14330a1886f7fd640187c8b4470c5.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Define the r8a7743 generic part of the USB PHY device node.
+Add support for the bq32000 RTC to the iwg22m device tree.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 3f1faad7c24f..a81d70e713ea 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -822,6 +822,28 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+index afb1148baa2f..e306e7c5b644 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
++++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+@@ -37,6 +37,11 @@
+ 		groups = "mmc_data8", "mmc_ctrl";
+ 		function = "mmc";
+ 	};
++
++	i2c3_pins: i2c3 {
++		groups = "i2c3_b";
++		function = "i2c3";
++	};
+ };
  
-+		usbphy: usb-phy at e6590100 {
-+			compatible = "renesas,usb-phy-r8a7743",
-+				     "renesas,rcar-gen2-usb-phy";
-+			reg = <0 0xe6590100 0 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cpg CPG_MOD 704>;
-+			clock-names = "usbhs";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 704>;
-+			status = "disabled";
+ &mmcif0 {
+@@ -48,3 +53,16 @@
+ 	non-removable;
+ 	status = "okay";
+ };
 +
-+			usb0: usb-channel at 0 {
-+				reg = <0>;
-+				#phy-cells = <1>;
-+			};
-+			usb2: usb-channel at 2 {
-+				reg = <2>;
-+				#phy-cells = <1>;
-+			};
-+		};
++&i2c3 {
++	pinctrl-0 = <&i2c3_pins>;
++	pinctrl-names = "default";
 +
- 		pci0: pci at ee090000 {
- 			compatible = "renesas,pci-r8a7743",
- 				     "renesas,pci-rcar-gen2";
++	status = "okay";
++	clock-frequency = <400000>;
++
++	rtc at 68 {
++		compatible = "ti,bq32000";
++		reg = <0x68>;
++	};
++};
 -- 
 2.1.4
