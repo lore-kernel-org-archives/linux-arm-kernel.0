@@ -1,44 +1,79 @@
-From: linus.luessing@c0d3.blue (Linus =?utf-8?Q?L=C3=BCssing?=)
-Date: Fri, 29 Sep 2017 13:29:59 +0200
-Subject: [PATCH v7 6/6] ARM: dts: meson8b: add support for booting the
- secondary CPU cores
-In-Reply-To: <20170917164523.6970-7-martin.blumenstingl@googlemail.com>
-Message-ID: <20170929112959.GM6726@otheros>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Fri, 29 Sep 2017 19:50:37 +0800
+Subject: [PATCH v3] mmc: dt-bindings: Add reg/source_cg/latch-ck for
+ Mediatek MMC bindings
+In-Reply-To: <f5ef95bf-a085-194b-4412-c72a7813ac08@gmail.com>
+References: <1506081829-29296-1-git-send-email-chaotian.jing@mediatek.com>
+ <f5ef95bf-a085-194b-4412-c72a7813ac08@gmail.com>
+Message-ID: <1506685837.5896.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A five hours test run with the stress-ng tool worked fine for this
-patchset for me.
+On Fri, 2017-09-29 at 13:11 +0200, Matthias Brugger wrote:
+> 
+> On 09/22/2017 02:03 PM, Chaotian Jing wrote:
+> > Change the comptiable for support of multi-platform
+> > Add description for reg
+> > Add description for source_cg
+> > Add description for mediatek,latch-ck
+> > Note that source_cg and mediatek,latch-ck are optional for some projects,
+> > eg, MT2701 do not have source_cg, and MT2712 do not need
+> > mediatek,latch-ck
+> > 
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >   Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
+> >   1 file changed, 10 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > index 4182ea3..b934a29 100644
+> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
+> >   and the properties used by the msdc driver.
+> >   
+> >   Required properties:
+> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+> > +- compatible: value should be either of the following.
+> > +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
+> > +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> > +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+> > +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+> 
+> NAK, this has to be:
+> You have to add the fallback compatible ("mediatek,mt8135-mmc") to the binding 
+> description as otherwise the driver does not get probed.
+> 
+> Regards,
+> Matthias
 
-stress-ng command:
-$ stress-ng -v --sequential 0 -t 120s --exclude sysfs,opcode --metrics
-
-Logfile (6.3MB):
-http://metameute.de/~tux/linux/amlogic/stress-ng-odroidc1%2b-with-resmem%2bsmp-log.txt
-
-Tested device:
-- Odroid C1+
-
-Tested OS:
-- Debian stable (stress-ng 0.07.16)
-
-Tested kernel: v4.14-rc1 plus this patchset plus:
-- "ARM: dts: meson: fixing USB support on Meson6, Meson8 and Meson8b"
-  https://patchwork.kernel.org/patch/9965871/
-- "ARM: dts: meson: enabling the USB Host controller on Odroid-C1/C1+ board"
-  https://patchwork.kernel.org/patch/9961565/
-- "[RFC] ARM: dts: meson8b: add reserved memory zones"
-  https://patchwork.kernel.org/patch/9977479/
-
-Tested kernel config:
-- multi_v7_defconfig, except CONFIG_DRM_TEGRA=n (build error otherwise)
-
- 
-I had to exclude the sysfs and opcode tests though. The former
-created an unhandled kernel paging request. And the latter a
-silent freeze after some seconds.
-
-Those two issues seem unrelated to this patchset though,
-therefore
-
-Tested-by: Linus L?ssing <linus.luessing@c0d3.blue>
+Thanks for your comments, will add the fallback compatible
+("mediatek,mt8135-mmc") to the binding in this patch.
+but, is possible to remove the fallback compatible at next patch ?
+eg, following patches will modify the driver like below:
+static const struct of_device_id msdc_of_ids[] = {
+        { .compatible = "mediatek,mt8135-mmc", .data = &mt8135_compat},
+        { .compatible = "mediatek,mt8173-mmc", .data = &mt8173_compat},
+};
+then, there is no probe issue and remove the fallback compatible.
+Thx!
+> 
+> > +- reg: physical base address of the controller and length
+> >   - interrupts: Should contain MSDC interrupt number
+> > -- clocks: MSDC source clock, HCLK
+> > -- clock-names: "source", "hclk"
+> > +- clocks: MSDC source clock, HCLK, source_cg
+> > +- clock-names: "source", "hclk", "source_cg"
+> >   - pinctrl-names: should be "default", "state_uhs"
+> >   - pinctrl-0: should contain default/high speed pin ctrl
+> >   - pinctrl-1: should contain uhs mode pin ctrl
+> > @@ -30,6 +35,8 @@ Optional properties:
+> >   - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
+> >   				       If present,HS400 command responses are sampled on rising edges.
+> >   				       If not present,HS400 command responses are sampled on falling edges.
+> > +- mediatek,latch-ck: Some SoCs do not support enhance_rx, need set correct latch-ck to avoid data crc
+> > +		     error caused by stop clock(fifo full)
+> >   
+> >   Examples:
+> >   mmc0: mmc at 11230000 {
+> > 
