@@ -1,25 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Sep 2017 10:47:55 +0200
-Subject: [PATCH v3 02/14] clk: sunxi-ng: sun6i: Rename HDMI DDC clock to
- avoid name collision
-In-Reply-To: <20170929082306.16193-3-wens@csie.org>
-References: <20170929082306.16193-1-wens@csie.org>
- <20170929082306.16193-3-wens@csie.org>
-Message-ID: <20170929084755.vsbqn4bq6z2n7c64@flea>
+Date: Fri, 29 Sep 2017 10:33:37 +0200
+Subject: [PATCH 2/7] regulator: axp20x: Add support for AXP813 regulators
+In-Reply-To: <20170929032514.31727-3-wens@csie.org>
+References: <20170929032514.31727-1-wens@csie.org>
+ <20170929032514.31727-3-wens@csie.org>
+Message-ID: <20170929083337.fv7ed5utnofqgsi4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 08:22:54AM +0000, Chen-Yu Tsai wrote:
-> The HDMI DDC clock found in the CCU is the parent of the actual DDC
-> clock within the HDMI controller. That clock is also named "hdmi-ddc".
+On Fri, Sep 29, 2017 at 03:25:09AM +0000, Chen-Yu Tsai wrote:
+> The AXP813 PMIC has 7 DC-DC buck regulators, 16 LDOs (including the
+> fixed RTC LDO and 2 GPIO LDOs), and 1 switchable. The drive-vbus
+> feature is also supported. All the hardware details are very similar
+> to the AXP803, with the following exceptions:
 > 
-> Rename the one in the CCU to "ddc". This makes more sense than renaming
-> the one in the HDMI controller to something else.
+>   - Extra DCDC7 buck regulator, with the same range as DCDC6
 > 
-> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+>   - SWitch now has a separate supply pin, instead of being chained
+>     internaly from DCDC1
+> 
+>   - RTC LDO output voltage is now 1.8V
+> 
+>   - FLDO3 is an LDO with switchable supplies, but unconfigurable output
+>     voltage. The voltage is always half that of its supply.
+> 
+> Support for FLDO3 is currently unimplemented, as it requires runtime
+> switching of its supplies, something the regulator subsystem does not
+> support. It is not used in either the reference designs nor actually
+> produced boards available.
+> 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied, thanks!
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
 Maxime
 
 -- 
@@ -32,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/d70ffdea/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/64b124a8/attachment.sig>
