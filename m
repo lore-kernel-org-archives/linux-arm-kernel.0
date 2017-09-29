@@ -1,51 +1,33 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 29 Sep 2017 14:13:50 +0200
-Subject: [PATCH 3/4] iommu/arm-smmu-v3: Use NUMA memory allocations for
- stream tables and comamnd queues
-In-Reply-To: <db28d6ff-77e5-ed59-c1b8-57c917564a68@arm.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <20170921085922.11659-4-ganapatrao.kulkarni@cavium.com>
- <CGME20170921115811epcas5p49012d8793fc765bb86830bfc377b6d36@epcas5p4.samsung.com>
- <db28d6ff-77e5-ed59-c1b8-57c917564a68@arm.com>
-Message-ID: <7e270ffc-963c-c1c7-410c-ff3c2e767984@samsung.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 29 Sep 2017 14:13:13 +0200
+Subject: [PATCH v1] ARM: configs: stm32: Add I2C support in STM32 defconfig
+Message-ID: <1506687193-21159-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+This patch adds I2C support for STM32
 
-On 2017-09-21 13:58, Robin Murphy wrote:
-> [+Christoph and Marek]
->
-> On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
->> Introduce smmu_alloc_coherent and smmu_free_coherent functions to
->> allocate/free dma coherent memory from NUMA node associated with SMMU.
->> Replace all calls of dmam_alloc_coherent with smmu_alloc_coherent
->> for SMMU stream tables and command queues.
-> This doesn't work - not only do you lose the 'managed' aspect and risk
-> leaking various tables on probe failure or device removal, but more
-> importantly, unless you add DMA syncs around all the CPU accesses to the
-> tables, you lose the critical 'coherent' aspect, and that's a horribly
-> invasive change that I really don't want to make.
->
-> Christoph, Marek; how reasonable do you think it is to expect
-> dma_alloc_coherent() to be inherently NUMA-aware on NUMA-capable
-> systems? SWIOTLB looks fairly straightforward to fix up (for the simple
-> allocation case; I'm not sure it's even worth it for bounce-buffering),
-> but the likes of CMA might be a little trickier...
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+ Version history:
+    v1:
+        * Initial
+---
+---
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-I'm not sure if there is any dma-coherent implementation that is NUMA aware.
-
-Maybe author should provide some benchmarks, which show that those 
-structures
-should be allocated in NUMA-aware way?
-
-On the other hand it is not that hard to add required dma_sync_* calls 
-around
-all the code which updated those tables.
-
- > ...
-
-Best regards
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 3ed3158..80c7406 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -49,6 +49,7 @@ CONFIG_SERIAL_STM32_CONSOLE=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_STM32F4=y
++CONFIG_I2C_STM32F7=y
+ CONFIG_GPIO_STMPE=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.7.4
