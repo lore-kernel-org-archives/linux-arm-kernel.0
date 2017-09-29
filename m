@@ -1,66 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Sep 2017 12:27:41 +0100
-Subject: [PATCH] arm64: fault: Route pte translation faults via
- do_translation_fault
-Message-ID: <1506684461-24162-1-git-send-email-will.deacon@arm.com>
+From: linus.luessing@c0d3.blue (Linus =?utf-8?Q?L=C3=BCssing?=)
+Date: Fri, 29 Sep 2017 13:29:59 +0200
+Subject: [PATCH v7 6/6] ARM: dts: meson8b: add support for booting the
+ secondary CPU cores
+In-Reply-To: <20170917164523.6970-7-martin.blumenstingl@googlemail.com>
+Message-ID: <20170929112959.GM6726@otheros>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently route pte translation faults via do_page_fault, which elides
-the address check against TASK_SIZE before invoking the mm fault handling
-code. However, this can cause issues with the path walking code in
-conjunction with our word-at-a-time implementation because
-load_unaligned_zeropad can end up faulting in kernel space if it reads
-across a page boundary and runs into a page fault (e.g. by attempting to
-read from a guard region).
+A five hours test run with the stress-ng tool worked fine for this
+patchset for me.
 
-In the case of such a fault, load_unaligned_zeropad has registered a
-fixup to shift the valid data and pad with zeroes, however the abort is
-reported as a level 3 translation fault and we dispatch it straight to
-do_page_fault, despite it being a kernel address. This results in calling
-a sleeping function from atomic context:
+stress-ng command:
+$ stress-ng -v --sequential 0 -t 120s --exclude sysfs,opcode --metrics
 
-  BUG: sleeping function called from invalid context at arch/arm64/mm/fault.c:313
-  in_atomic(): 0, irqs_disabled(): 0, pid: 10290
-  Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-  [...]
-  [<ffffff8e016cd0cc>] ___might_sleep+0x134/0x144
-  [<ffffff8e016cd158>] __might_sleep+0x7c/0x8c
-  [<ffffff8e016977f0>] do_page_fault+0x140/0x330
-  [<ffffff8e01681328>] do_mem_abort+0x54/0xb0
-  Exception stack(0xfffffffb20247a70 to 0xfffffffb20247ba0)
-  [...]
-  [<ffffff8e016844fc>] el1_da+0x18/0x78
-  [<ffffff8e017f399c>] path_parentat+0x44/0x88
-  [<ffffff8e017f4c9c>] filename_parentat+0x5c/0xd8
-  [<ffffff8e017f5044>] filename_create+0x4c/0x128
-  [<ffffff8e017f59e4>] SyS_mkdirat+0x50/0xc8
-  [<ffffff8e01684e30>] el0_svc_naked+0x24/0x28
-  Code: 36380080 d5384100 f9400800 9402566d (d4210000)
-  ---[ end trace 2d01889f2bca9b9f ]---
+Logfile (6.3MB):
+http://metameute.de/~tux/linux/amlogic/stress-ng-odroidc1%2b-with-resmem%2bsmp-log.txt
 
-Fix this by dispatching all translation faults to do_translation_faults,
-which avoids invoking the page fault logic for faults on kernel addresses.
+Tested device:
+- Odroid C1+
 
-Cc: <stable@vger.kernel.org>
-Reported-by: Ankit Jain <ankijain@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/fault.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Tested OS:
+- Debian stable (stress-ng 0.07.16)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 89993c4be1be..2069e9bc0fca 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -651,7 +651,7 @@ static const struct fault_info fault_info[] = {
- 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 0 translation fault"	},
- 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
- 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
--	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
-+	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
- 	{ do_bad,		SIGBUS,  0,		"unknown 8"			},
- 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
- 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
--- 
-2.1.4
+Tested kernel: v4.14-rc1 plus this patchset plus:
+- "ARM: dts: meson: fixing USB support on Meson6, Meson8 and Meson8b"
+  https://patchwork.kernel.org/patch/9965871/
+- "ARM: dts: meson: enabling the USB Host controller on Odroid-C1/C1+ board"
+  https://patchwork.kernel.org/patch/9961565/
+- "[RFC] ARM: dts: meson8b: add reserved memory zones"
+  https://patchwork.kernel.org/patch/9977479/
+
+Tested kernel config:
+- multi_v7_defconfig, except CONFIG_DRM_TEGRA=n (build error otherwise)
+
+ 
+I had to exclude the sysfs and opcode tests though. The former
+created an unhandled kernel paging request. And the latter a
+silent freeze after some seconds.
+
+Those two issues seem unrelated to this patchset though,
+therefore
+
+Tested-by: Linus L?ssing <linus.luessing@c0d3.blue>
