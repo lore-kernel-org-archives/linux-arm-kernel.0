@@ -1,59 +1,49 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 29 Sep 2017 13:55:58 +0900
-Subject: [PATCH] extcon: Split out extcon header file for consumer and
- provider device
-In-Reply-To: <TY1PR06MB0992097F0FBBE04CD282EEE7D87E0@TY1PR06MB0992.apcprd06.prod.outlook.com>
-References: <CGME20170929000148epcas2p200e56186b067ec626a033c7ae2d4bbdb@epcas2p2.samsung.com>
- <1506643305-4581-1-git-send-email-cw00.choi@samsung.com>
- <TY1PR06MB0992097F0FBBE04CD282EEE7D87E0@TY1PR06MB0992.apcprd06.prod.outlook.com>
-Message-ID: <59CDD25E.9050202@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 29 Sep 2017 14:23:31 +0800
+Subject: [PATCH v4 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170927000355.30597-3-d-gerlach@ti.com>
+Message-ID: <201709291400.QaIXheU8%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dave,
 
-On 2017? 09? 29? 11:03, Yoshihiro Shimoda wrote:
-> Hi,
-> 
->> From: Chanwoo Choi
->> Sent: Friday, September 29, 2017 9:02 AM
->>
-> < snip >
->>  drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
-> < snip >
->>  drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
-> 
-> These two drivers need the modification.
-> But...
-> 
-> < snip >
->> diff --git a/drivers/usb/renesas_usbhs/common.h b/drivers/usb/renesas_usbhs/common.h
->> index 8c5fc12ad778..a78764bc23eb 100644
->> --- a/drivers/usb/renesas_usbhs/common.h
->> +++ b/drivers/usb/renesas_usbhs/common.h
->> @@ -17,7 +17,7 @@
->>  #ifndef RENESAS_USB_DRIVER_H
->>  #define RENESAS_USB_DRIVER_H
->>
->> -#include <linux/extcon.h>
->> +#include <linux/extcon-provider.h>
-> 
-> Since this driver doesn't use any extcon-provider APIs for now,
-> we doesn't need the modification, IIUC.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.14-rc2]
+[cannot apply to next-20170928]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I don't modify 'drivers/usb/renesas_usbhs/common.h'
-on v2 patch. Thanks for your comment.
+url:    https://github.com/0day-ci/linux/commits/Dave-Gerlach/Documentation-dt-Update-ti-emif-bindings/20170929-111250
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
-> Best regards,
-> Yoshihiro Shimoda
-> 
-> 
-> 
-> 
+All errors (new ones prefixed by >>):
 
+>> drivers/memory/ti-emif-sram-pm.S:22:30: fatal error: emif-asm-offsets.h: No such file or directory
+    #include "emif-asm-offsets.h"
+                                 ^
+   compilation terminated.
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+vim +22 drivers/memory/ti-emif-sram-pm.S
+
+    20	
+    21	#include "emif.h"
+  > 22	#include "emif-asm-offsets.h"
+    23	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63995 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/cba8c2ac/attachment-0001.gz>
