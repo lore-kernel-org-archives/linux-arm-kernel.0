@@ -1,150 +1,78 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 29 Sep 2017 11:23:31 +0100
-Subject: [PATCH] rtc: armada38x: add support for trimming the RTC
-Message-ID: <E1dxsSB-0006RM-08@rmk-PC.armlinux.org.uk>
+Date: Fri, 29 Sep 2017 11:22:05 +0100
+Subject: [PATCH v2 2/4] rtc: pl031: use devm_* for allocating memory and
+ mapping resource
+In-Reply-To: <20170929102116.GX20805@n2100.armlinux.org.uk>
+References: <20170929102116.GX20805@n2100.armlinux.org.uk>
+Message-ID: <E1dxsQn-0006Nd-IQ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for trimming the RTC using the offset mechanism.  This RTC
-supports two modes: low update mode and high update mode.  Low update
-mode has finer precision than high update mode, so we use the low mode
-where possible.
+Use the devm_* APIs for allocating memory and mapping the memory in
+the probe function to relieve the driver from having to deal with
+this in the cleanup paths.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/rtc/rtc-armada38x.c | 101 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 101 insertions(+)
+ drivers/rtc/rtc-pl031.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 21f355c37eab..1e4978c96ffd 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -28,6 +28,8 @@
- #define RTC_IRQ_AL_EN		    BIT(0)
- #define RTC_IRQ_FREQ_EN		    BIT(1)
- #define RTC_IRQ_FREQ_1HZ	    BIT(2)
-+#define RTC_CCR		    0x18
-+#define RTC_CCR_MODE		    BIT(15)
+diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+index 0d87b90b1903..777da06d53ee 100644
+--- a/drivers/rtc/rtc-pl031.c
++++ b/drivers/rtc/rtc-pl031.c
+@@ -310,8 +310,6 @@ static int pl031_remove(struct amba_device *adev)
+ 	device_init_wakeup(&adev->dev, false);
+ 	free_irq(adev->irq[0], ldata);
+ 	rtc_device_unregister(ldata->rtc);
+-	iounmap(ldata->base);
+-	kfree(ldata);
+ 	amba_release_regions(adev);
  
- #define RTC_TIME	    0xC
- #define RTC_ALARM1	    0x10
-@@ -343,18 +345,117 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
+ 	return 0;
+@@ -329,18 +327,19 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (ret)
+ 		goto err_req;
  
-+/*
-+ * The information given in the Armada 388 functional spec is complex.
-+ * They give two different formulas for calculating the offset value,
-+ * but when considering "Offset" as an 8-bit signed integer, they both
-+ * reduce down to (we shall rename "Offset" as "val" here):
-+ *
-+ *   val = (f_ideal / f_measured - 1) / resolution   where f_ideal = 32768
-+ *
-+ * Converting to time, f = 1/t:
-+ *   val = (t_measured / t_ideal - 1) / resolution   where t_ideal = 1/32768
-+ *
-+ *   =>  t_measured / t_ideal = val * resolution + 1
-+ *
-+ * "offset" in the RTC interface is defined as:
-+ *   t = t0 * (1 + offset * 1e-9)
-+ * where t is the desired period, t0 is the measured period with a zero
-+ * offset, which is t_measured above. With t0 = t_measured and t = t_ideal,
-+ *   offset = (t_ideal / t_measured - 1) / 1e-9
-+ *
-+ *   => t_ideal / t_measured = offset * 1e-9 + 1
-+ *
-+ * so:
-+ *
-+ *   offset * 1e-9 + 1 = 1 / (val * resolution + 1)
-+ *
-+ * We want "resolution" to be an integer, so resolution = R * 1e-9, giving
-+ *   offset = 1e18 / (val * R + 1e9) - 1e9
-+ *   val = (1e18 / (offset + 1e9) - 1e9) / R
-+ * with a common transformation:
-+ *   f(x) = 1e18 / (x + 1e9) - 1e9
-+ *   offset = f(val * R)
-+ *   val = f(offset) / R
-+ *
-+ * Armada 38x supports two modes, fine mode (954ppb) and coarse mode (3815ppb).
-+ */
-+static long armada38x_ppb_convert(long ppb)
-+{
-+	long div = ppb + 1000000000L;
-+
-+	return div_s64(1000000000000000000LL + div / 2, div) - 1000000000L;
-+}
-+
-+static int armada38x_rtc_read_offset(struct device *dev, long *offset)
-+{
-+	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
-+	unsigned long ccr, flags;
-+	long ppb_cor;
-+
-+	spin_lock_irqsave(&rtc->lock, flags);
-+	ccr = rtc->data->read_rtc_reg(rtc, RTC_CCR);
-+	spin_unlock_irqrestore(&rtc->lock, flags);
-+
-+	ppb_cor = (ccr & RTC_CCR_MODE ? 3815 : 954) * (s8)ccr;
-+	/* ppb_cor + 1000000000L can never be zero */
-+	*offset = armada38x_ppb_convert(ppb_cor);
-+
-+	return 0;
-+}
-+
-+static int armada38x_rtc_set_offset(struct device *dev, long offset)
-+{
-+	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
-+	unsigned long ccr = 0;
-+	long ppb_cor, off;
-+
-+	/*
-+	 * The maximum ppb_cor is -128 * 3815 .. 127 * 3815, but we
-+	 * need to clamp the input.  This equates to -484270 .. 488558.
-+	 * Not only is this to stop out of range "off" but also to
-+	 * avoid the division by zero in armada38x_ppb_convert().
-+	 */
-+	offset = clamp(offset, -484270L, 488558L);
-+
-+	ppb_cor = armada38x_ppb_convert(offset);
-+
-+	/*
-+	 * Use low update mode where possible, which gives a better
-+	 * resolution of correction.
-+	 */
-+	off = DIV_ROUND_CLOSEST(ppb_cor, 954);
-+	if (off > 127 || off < -128) {
-+		ccr = RTC_CCR_MODE;
-+		off = DIV_ROUND_CLOSEST(ppb_cor, 3815);
-+	}
-+
-+	/*
-+	 * Armada 388 requires a bit pattern in bits 14..8 depending on
-+	 * the sign bit: { 0, ~S, S, S, S, S, S }
-+	 */
-+	ccr |= (off & 0x3fff) ^ 0x2000;
-+	rtc_delayed_write(ccr, rtc, RTC_CCR);
-+
-+	return 0;
-+}
-+
- static const struct rtc_class_ops armada38x_rtc_ops = {
- 	.read_time = armada38x_rtc_read_time,
- 	.set_time = armada38x_rtc_set_time,
- 	.read_alarm = armada38x_rtc_read_alarm,
- 	.set_alarm = armada38x_rtc_set_alarm,
- 	.alarm_irq_enable = armada38x_rtc_alarm_irq_enable,
-+	.read_offset = armada38x_rtc_read_offset,
-+	.set_offset = armada38x_rtc_set_offset,
- };
+-	ldata = kzalloc(sizeof(struct pl031_local), GFP_KERNEL);
++	ldata = devm_kzalloc(&adev->dev, sizeof(struct pl031_local),
++			     GFP_KERNEL);
+ 	if (!ldata) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 	ldata->vendor = vendor;
  
- static const struct rtc_class_ops armada38x_rtc_ops_noirq = {
- 	.read_time = armada38x_rtc_read_time,
- 	.set_time = armada38x_rtc_set_time,
- 	.read_alarm = armada38x_rtc_read_alarm,
-+	.read_offset = armada38x_rtc_read_offset,
-+	.set_offset = armada38x_rtc_set_offset,
- };
+-	ldata->base = ioremap(adev->res.start, resource_size(&adev->res));
+-
++	ldata->base = devm_ioremap(&adev->dev, adev->res.start,
++				   resource_size(&adev->res));
+ 	if (!ldata->base) {
+ 		ret = -ENOMEM;
+-		goto out_no_remap;
++		goto out;
+ 	}
  
- static const struct armada38x_rtc_data armada38x_data = {
+ 	amba_set_drvdata(adev, ldata);
+@@ -378,7 +377,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 					THIS_MODULE);
+ 	if (IS_ERR(ldata->rtc)) {
+ 		ret = PTR_ERR(ldata->rtc);
+-		goto out_no_rtc;
++		goto out;
+ 	}
+ 
+ 	if (request_irq(adev->irq[0], pl031_interrupt,
+@@ -391,10 +390,6 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ out_no_irq:
+ 	rtc_device_unregister(ldata->rtc);
+-out_no_rtc:
+-	iounmap(ldata->base);
+-out_no_remap:
+-	kfree(ldata);
+ out:
+ 	amba_release_regions(adev);
+ err_req:
 -- 
 2.7.4
