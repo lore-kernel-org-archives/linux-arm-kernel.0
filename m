@@ -1,369 +1,757 @@
 From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Fri, 29 Sep 2017 15:09:11 +0200
-Subject: [RFC 09/11] drm/mediatek: add fbdev support
+Date: Fri, 29 Sep 2017 15:09:05 +0200
+Subject: [RFC 03/11] platform/chrome: ChromeOS firmware interface driver
 In-Reply-To: <1506690553-27357-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 References: <1506690553-27357-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1506690553-27357-10-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1506690553-27357-4-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward-ported from chromeos-3.18 vendor kernel.
+Ported from chromeos-3.18 kernel.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- drivers/gpu/drm/mediatek/Makefile        |   2 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c   |   9 ++
- drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   4 +-
- drivers/gpu/drm/mediatek/mtk_drm_fb.c    |  13 +++
- drivers/gpu/drm/mediatek/mtk_drm_fb.h    |   3 +
- drivers/gpu/drm/mediatek/mtk_drm_fbdev.c | 184 +++++++++++++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_fbdev.h |  32 ++++++
- 7 files changed, 246 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
- create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
+ drivers/platform/chrome/Kconfig        |  18 +++
+ drivers/platform/chrome/Makefile       |   2 +
+ drivers/platform/chrome/chromeos.c     | 120 +++++++++++++++
+ drivers/platform/chrome/chromeos.h     |  61 ++++++++
+ drivers/platform/chrome/chromeos_arm.c | 264 +++++++++++++++++++++++++++++++++
+ drivers/platform/chrome/elog.h         | 186 +++++++++++++++++++++++
+ include/linux/chromeos_platform.h      |  27 ++++
+ 7 files changed, 678 insertions(+)
+ create mode 100644 drivers/platform/chrome/chromeos.c
+ create mode 100644 drivers/platform/chrome/chromeos.h
+ create mode 100644 drivers/platform/chrome/chromeos_arm.c
+ create mode 100644 drivers/platform/chrome/elog.h
+ create mode 100644 include/linux/chromeos_platform.h
 
-diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-index e37b55a..8306fb5 100644
---- a/drivers/gpu/drm/mediatek/Makefile
-+++ b/drivers/gpu/drm/mediatek/Makefile
-@@ -12,6 +12,8 @@ mediatek-drm-y := mtk_disp_color.o \
- 		  mtk_mipi_tx.o \
- 		  mtk_dpi.o
+diff --git a/drivers/platform/chrome/Kconfig b/drivers/platform/chrome/Kconfig
+index 0ad6e29..f8b1876 100644
+--- a/drivers/platform/chrome/Kconfig
++++ b/drivers/platform/chrome/Kconfig
+@@ -14,6 +14,24 @@ menuconfig CHROME_PLATFORMS
  
-+mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
+ if CHROME_PLATFORMS
+ 
++config CHROMEOS
++	bool
++	depends on CHROMEOS_OF_FIRMWARE || (NVRAM && ACPI_CHROMEOS)
 +
- obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
- 
- mediatek-drm-hdmi-objs := mtk_cec.o \
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 8c92630..a69aa2f 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -30,6 +30,7 @@
- #include "mtk_drm_ddp_comp.h"
- #include "mtk_drm_drv.h"
- #include "mtk_drm_fb.h"
-+#include "mtk_drm_fbdev.h"
- #include "mtk_drm_gem.h"
- 
- #define DRIVER_NAME "mediatek"
-@@ -257,8 +258,15 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 	drm_kms_helper_poll_init(drm);
- 	drm_mode_config_reset(drm);
- 
-+	ret = mtk_fbdev_init(drm);
-+	if (ret)
-+		goto err_kms_helper_poll_fini;
++	---help---
++	  Provides abstracted interfaces to the firmware features provided on
++	  ChromeOS devices. It depends on a lowlevel driver to implement the
++	  firmware interface on the platform.
 +
- 	return 0;
- 
-+err_kms_helper_poll_fini:
-+	drm_kms_helper_poll_fini(drm);
-+//	drm_vblank_cleanup(drm);
- err_component_unbind:
- 	component_unbind_all(drm->dev, drm);
- err_config_cleanup:
-@@ -269,6 +277,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 
- static void mtk_drm_kms_deinit(struct drm_device *drm)
- {
-+	mtk_fbdev_fini(drm);
- 	drm_kms_helper_poll_fini(drm);
- 
- 	component_unbind_all(drm->dev, drm);
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index c3378c4..4edc002 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -14,6 +14,7 @@
- #ifndef MTK_DRM_DRV_H
- #define MTK_DRM_DRV_H
- 
-+#include <drm/drm_fb_helper.h>
- #include <linux/io.h>
- #include "mtk_drm_ddp_comp.h"
- 
-@@ -24,7 +25,6 @@ struct device;
- struct device_node;
- struct drm_crtc;
- struct drm_device;
--struct drm_fb_helper;
- struct drm_property;
- struct regmap;
- 
-@@ -56,6 +56,8 @@ struct mtk_drm_private {
- 	} commit;
- 
- 	struct drm_atomic_state *suspend_state;
-+	struct drm_fb_helper fb_helper;
-+	struct drm_gem_object *fbdev_bo;
- };
- 
- extern struct platform_driver mtk_ddp_driver;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-index 0d8d506..ac8561d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-@@ -96,6 +96,19 @@ static struct mtk_drm_fb *mtk_drm_framebuffer_init(struct drm_device *dev,
- 	return mtk_fb;
- }
- 
-+struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-+		const struct drm_mode_fb_cmd2 *mode,
-+		struct drm_gem_object *obj)
-+{
-+	struct mtk_drm_fb *mtk_fb;
++config CHROMEOS_OF_FIRMWARE
++	bool "ChromeOS firmware interface driver"
++	depends on OF
++	select CHROMEOS
++	---help---
++	  This driver provides an interface to ChromeOS firmware.
 +
-+	mtk_fb = mtk_drm_framebuffer_init(dev, mode, obj);
-+	if (IS_ERR(mtk_fb))
-+		return ERR_CAST(mtk_fb);
++	  Say Y here if you are building for a ChromeOS device.
 +
-+	return &mtk_fb->base;
-+}
-+
- /*
-  * Wait for any exclusive fence in fb's gem object's reservation object.
-  *
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.h b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-index 9b2ae34..9ee1ac2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-@@ -19,5 +19,8 @@ int mtk_fb_wait(struct drm_framebuffer *fb);
- struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
- 					       struct drm_file *file,
- 					       const struct drm_mode_fb_cmd2 *cmd);
-+struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-+		const struct drm_mode_fb_cmd2 *mode,
-+		struct drm_gem_object *obj);
+ config CHROMEOS_LAPTOP
+ 	tristate "Chrome OS Laptop"
+ 	depends on I2C && DMI && X86
+diff --git a/drivers/platform/chrome/Makefile b/drivers/platform/chrome/Makefile
+index 66c345c..f10a7b6 100644
+--- a/drivers/platform/chrome/Makefile
++++ b/drivers/platform/chrome/Makefile
+@@ -1,4 +1,6 @@
  
- #endif /* MTK_DRM_FB_H */
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
++obj-$(CONFIG_CHROMEOS)		+= chromeos.o
++obj-$(CONFIG_CHROMEOS_OF_FIRMWARE) += chromeos_arm.o
+ obj-$(CONFIG_CHROMEOS_LAPTOP)		+= chromeos_laptop.o
+ obj-$(CONFIG_CHROMEOS_PSTORE)		+= chromeos_pstore.o
+ cros_ec_devs-objs			:= cros_ec_dev.o cros_ec_sysfs.o \
+diff --git a/drivers/platform/chrome/chromeos.c b/drivers/platform/chrome/chromeos.c
 new file mode 100644
-index 0000000..1e46216
+index 0000000..8b01630
 --- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-@@ -0,0 +1,184 @@
++++ b/drivers/platform/chrome/chromeos.c
+@@ -0,0 +1,120 @@
 +/*
-+ * Copyright (c) 2016 MediaTek Inc.
++ *  ChromeOS platform support code. Glue layer between higher level functions
++ *  and per-platform firmware interfaces.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ *  Copyright (C) 2010 The Chromium OS Authors
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_fb_helper.h>
-+#include <drm/drm_gem.h>
++#include <linux/types.h>
++#include <linux/chromeos_platform.h>
++#include <linux/module.h>
++#include "chromeos.h"
 +
-+#include "mtk_drm_drv.h"
-+#include "mtk_drm_fb.h"
-+#include "mtk_drm_gem.h"
++static struct chromeos_vbc *chromeos_vbc_ptr;
 +
-+#define to_drm_private(x) \
-+		container_of(x, struct mtk_drm_private, fb_helper)
++static int vbc_read(u8 *buf, int buf_size);
++static int vbc_write_byte(unsigned offset, u8 value);
 +
-+#if 1
-+static int mtk_drm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
++/* the following defines are copied from
++ * vboot_reference:firmware/lib/vboot_nvstorage.c.
++ */
++#define RECOVERY_OFFSET              2
++#define VBNV_RECOVERY_RW_INVALID_OS  0x43
++
++int chromeos_set_need_recovery(void)
 +{
-+	struct drm_fb_helper *helper = info->par;
-+	struct mtk_drm_private *private = helper->dev->dev_private;//to_drm_private(helper);
++	if (!chromeos_legacy_set_need_recovery())
++		return 0;
 +
-+	return mtk_drm_gem_mmap_buf(private->fbdev_bo, vma);
++	return vbc_write_byte(RECOVERY_OFFSET, VBNV_RECOVERY_RW_INVALID_OS);
 +}
-+#endif
++EXPORT_SYMBOL(chromeos_set_need_recovery);
 +
-+static struct fb_ops mtk_fbdev_ops = {
-+	.owner = THIS_MODULE,
-+	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-+	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-+	.fb_imageblit = drm_fb_helper_cfb_imageblit,
-+	.fb_check_var = drm_fb_helper_check_var,
-+	.fb_set_par = drm_fb_helper_set_par,
-+	.fb_blank = drm_fb_helper_blank,
-+	.fb_pan_display = drm_fb_helper_pan_display,
-+	.fb_setcmap = drm_fb_helper_setcmap,
-+	.fb_mmap = mtk_drm_fbdev_mmap,
-+};
-+
-+static int mtk_fbdev_probe(struct drm_fb_helper *helper,
-+			   struct drm_fb_helper_surface_size *sizes)
++/*
++ * Lifted from vboot_reference:firmware/lib/vboot_nvstorage.c and formatted.
++ *
++ * Return CRC-8 of the data, using x^8 + x^2 + x + 1 polynomial. A table-based
++ * algorithm would be faster, but for only 15 bytes isn't worth the code size.
++ */
++static u8 crc8(const u8 *data, int len)
 +{
-+	struct drm_device *dev = helper->dev;
-+	struct mtk_drm_private *private = helper->dev->dev_private;//to_drm_private(helper);
-+	struct drm_mode_fb_cmd2 mode = { 0 };
-+	struct mtk_drm_gem_obj *mtk_gem;
-+	struct fb_info *info;
-+	struct drm_framebuffer *fb;
-+	unsigned int bytes_per_pixel;
-+	unsigned long offset;
-+	size_t size;
-+	int err;
++	unsigned crc = 0;
++	int i, j;
 +
-+	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-+
-+	mode.width = sizes->surface_width;
-+	mode.height = sizes->surface_height;
-+	mode.pitches[0] = sizes->surface_width * bytes_per_pixel;
-+	mode.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-+						      sizes->surface_depth);
-+
-+	size = mode.pitches[0] * mode.height;
-+
-+	mtk_gem = mtk_drm_gem_create(dev, size, true);
-+	if (IS_ERR(mtk_gem))
-+		return PTR_ERR(mtk_gem);
-+
-+	private->fbdev_bo = &mtk_gem->base;
-+
-+	info = drm_fb_helper_alloc_fbi(helper);
-+	if (IS_ERR(info)) {
-+		err = PTR_ERR(info);
-+		dev_err(dev->dev, "failed to allocate framebuffer info, %d\n",
-+			err);
-+		goto err_gem_free_object;
++	for (j = len; j; j--, data++) {
++		crc ^= (*data << 8);
++		for (i = 8; i; i--) {
++			if (crc & 0x8000)
++				crc ^= (0x1070 << 3);
++			crc <<= 1;
++		}
 +	}
-+
-+	fb = mtk_drm_framebuffer_create(dev, &mode, private->fbdev_bo);
-+	if (IS_ERR(fb)) {
-+		err = PTR_ERR(fb);
-+		dev_err(dev->dev, "failed to allocate DRM framebuffer, %d\n",
-+			err);
-+		goto err_release_fbi;
-+	}
-+	helper->fb = fb;
-+
-+	info->par = helper;
-+	info->flags = FBINFO_FLAG_DEFAULT;
-+	info->fbops = &mtk_fbdev_ops;
-+
-+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
-+	drm_fb_helper_fill_var(info, helper, sizes->fb_width, sizes->fb_height);
-+
-+	offset = info->var.xoffset * bytes_per_pixel;
-+	offset += info->var.yoffset * fb->pitches[0];
-+
-+	dev->mode_config.fb_base = 0;
-+	info->screen_base = mtk_gem->kvaddr + offset;
-+	info->screen_size = size;
-+	info->fix.smem_len = size;
-+
-+	DRM_DEBUG_KMS("FB [%ux%u]-%u offset=%lu size=%zd\n",
-+		      fb->width, fb->height, fb->format->depth, offset, size);
-+
-+	info->skip_vt_switch = true;
-+
-+	return 0;
-+
-+err_release_fbi:
-+err_gem_free_object:
-+	mtk_drm_gem_free_object(&mtk_gem->base);
-+	return err;
++	return (u8)(crc >> 8);
 +}
 +
-+static const struct drm_fb_helper_funcs mtk_drm_fb_helper_funcs = {
-+	.fb_probe = mtk_fbdev_probe,
-+};
-+
-+int mtk_fbdev_init(struct drm_device *dev)
++static int vbc_write_byte(unsigned offset, u8 value)
 +{
-+	struct mtk_drm_private *priv = dev->dev_private;
-+	struct drm_fb_helper *helper = &priv->fb_helper;
-+	int ret;
++	u8 buf[MAX_VBOOT_CONTEXT_BUFFER_SIZE];
++	ssize_t size;
 +
-+	if (!dev->mode_config.num_crtc || !dev->mode_config.num_connector)
++	if (!chromeos_vbc_ptr)
++		return -ENOSYS;
++
++	size = vbc_read(buf, sizeof(buf));
++	if (size <= 0)
 +		return -EINVAL;
 +
-+	drm_fb_helper_prepare(dev, helper, &mtk_drm_fb_helper_funcs);
++	if (offset >= (size - 1))
++		return -EINVAL;
 +
-+	ret = drm_fb_helper_init(dev, helper, /*dev->mode_config.num_crtc,*/
-+				 dev->mode_config.num_connector);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to initialize DRM FB helper, %d\n",
-+			ret);
-+		goto fini;
++	if (buf[offset] == value)
++		return 0;
++
++	buf[offset] = value;
++	buf[size - 1] = crc8(buf, size - 1);
++
++	return chromeos_vbc_ptr->write(buf, size);
++}
++
++/*
++ * Read vboot context and verify it.  If everything checks out, return number
++ * of bytes in the vboot context buffer, -1 on any error (uninitialized
++ * subsystem, corrupted crc8 value, not enough room in the buffer, etc.).
++ */
++static int vbc_read(u8 *buf, int buf_size)
++{
++	ssize_t size;
++
++	if (!chromeos_vbc_ptr)
++		return -ENOSYS;
++
++	size = chromeos_vbc_ptr->read(buf, buf_size);
++	if (size <= 0)
++		return -1;
++
++	if (buf[size - 1] != crc8(buf, size - 1)) {
++		pr_err("%s: vboot context contents corrupted\n", __func__);
++		return -1;
++	}
++	return size;
++}
++
++int chromeos_vbc_register(struct chromeos_vbc *chromeos_vbc)
++{
++	chromeos_vbc_ptr = chromeos_vbc;
++	return 0;
++}
+diff --git a/drivers/platform/chrome/chromeos.h b/drivers/platform/chrome/chromeos.h
+new file mode 100644
+index 0000000..8f4384a
+--- /dev/null
++++ b/drivers/platform/chrome/chromeos.h
+@@ -0,0 +1,61 @@
++/*
++ *  Copyright (C) 2011 The Chromium OS Authors
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++#ifndef _DRIVERS_PLATFORM_CHROMEOS_H
++#define _DRIVERS_PLATFORM_CHROMEOS_H
++
++#define MAX_VBOOT_CONTEXT_BUFFER_SIZE 64  /* Should be enough for anything. */
++
++#ifdef CONFIG_ACPI_CHROMEOS
++extern int chromeos_legacy_set_need_recovery(void);
++#else
++static inline int chromeos_legacy_set_need_recovery(void) { return -ENODEV; }
++#endif
++
++struct chromeos_vbc {
++	/**
++	 * Read vboot context to buffer
++	 *
++	 * @param buf		Pointer to buffer for storing vboot context
++	 * @param count		Size of buffer
++	 * @return	on success, the number of bytes read is returned and
++	 *		on error, -err is returned.
++	 */
++	ssize_t (*read)(void *buf, size_t count);
++
++	/**
++	 * Write vboot context from buffer
++	 *
++	 * @param buf		Pointer to buffer of new vboot context content
++	 * @param count		Size of buffer
++	 * @return	on success, the number of bytes written is returned and
++	 *		on error, -err is returned.
++	 */
++	ssize_t (*write)(const void *buf, size_t count);
++
++	const char *name;
++};
++
++/**
++ * Register chromeos_vbc callbacks.
++ *
++ * @param chromeos_vbc	Pointer to struct holding callbacks
++ * @return	on success, return 0, on error, -err is returned.
++ */
++int chromeos_vbc_register(struct chromeos_vbc *chromeos_vbc);
++
++#endif /* _DRIVERS_PLATFORM_CHROMEOS_H */
+diff --git a/drivers/platform/chrome/chromeos_arm.c b/drivers/platform/chrome/chromeos_arm.c
+new file mode 100644
+index 0000000..337e24d
+--- /dev/null
++++ b/drivers/platform/chrome/chromeos_arm.c
+@@ -0,0 +1,264 @@
++/*
++ *  Copyright (C) 2011 The Chromium OS Authors
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#define pr_fmt(fmt) "chromeos_arm: " fmt
++
++#include <linux/bcd.h>
++#include <linux/gpio.h>
++#include <linux/notifier.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#include "chromeos.h"
++#include "elog.h"
++
++struct chromeos_arm_elog_panic_buffer {
++	uint32_t start;
++	uint32_t size;
++	void __iomem *virt_addr;
++	struct notifier_block nb;
++};
++
++/*
++ * Update the checksum at the last byte
++ */
++static void elog_update_checksum(struct event_header *event, u8 checksum)
++{
++	u8 *event_data = (u8 *)event;
++	event_data[event->length - 1] = checksum;
++}
++
++/*
++ * Simple byte checksum for events
++ */
++static u8 elog_checksum_event(struct event_header *event)
++{
++	u8 index, checksum = 0;
++	u8 *data = (u8 *)event;
++
++	for (index = 0; index < event->length; index++)
++		checksum += data[index];
++	return checksum;
++}
++
++/*
++ * Populate timestamp in event header with current time
++ */
++static void elog_fill_timestamp(struct event_header *event)
++{
++	struct timeval timeval;
++	struct tm time;
++
++	do_gettimeofday(&timeval);
++	time_to_tm(timeval.tv_sec, 0, &time);
++
++	event->second = bin2bcd(time.tm_sec);
++	event->minute = bin2bcd(time.tm_min);
++	event->hour   = bin2bcd(time.tm_hour);
++	event->day    = bin2bcd(time.tm_mday);
++	event->month  = bin2bcd(time.tm_mon + 1);
++	event->year   = bin2bcd(time.tm_year % 100);
++}
++
++/*
++ * Fill out an event structure with space for the data and checksum.
++ */
++void elog_prepare_event(struct event_header *event, u8 event_type, void *data,
++			u8 data_size)
++{
++	event->type = event_type;
++	event->length = sizeof(*event) + data_size + 1;
++	elog_fill_timestamp(event);
++
++	if (data_size)
++		memcpy(&event[1], data, data_size);
++
++	/* Zero the checksum byte and then compute checksum */
++	elog_update_checksum(event, 0);
++	elog_update_checksum(event, -(elog_checksum_event(event)));
++}
++
++static int chromeos_arm_elog_panic(struct notifier_block *this,
++				   unsigned long p_event, void *ptr)
++{
++	struct chromeos_arm_elog_panic_buffer *buf;
++	uint32_t reason = ELOG_SHUTDOWN_PANIC;
++	const u8 data_size = sizeof(reason);
++	union {
++		struct event_header hdr;
++		u8 bytes[sizeof(struct event_header) + data_size + 1];
++	} event;
++
++	buf = container_of(this, struct chromeos_arm_elog_panic_buffer, nb);
++	elog_prepare_event(&event.hdr, ELOG_TYPE_OS_EVENT, &reason, data_size);
++	memcpy_toio(buf->virt_addr, event.bytes, sizeof(event.bytes));
++
++	return NOTIFY_DONE;
++}
++
++static int chromeos_arm_panic_init(struct platform_device *pdev, u32 start,
++				   u32 size)
++{
++	int ret = -EINVAL;
++	struct chromeos_arm_elog_panic_buffer *buf;
++
++	buf = kmalloc(sizeof(*buf), GFP_KERNEL);
++	if (!buf) {
++		dev_err(&pdev->dev, "failed to allocate panic notifier.\n");
++		ret = -ENOMEM;
++		goto fail1;
 +	}
 +
-+	ret = drm_fb_helper_single_add_all_connectors(helper);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to add connectors, %d\n", ret);
-+		goto fini;
++	buf->start = start;
++	buf->size = size;
++	buf->nb.notifier_call = chromeos_arm_elog_panic;
++
++	if (!request_mem_region(start, size, "elog panic event")) {
++		dev_err(&pdev->dev, "failed to request panic event buffer.\n");
++		goto fail2;
 +	}
 +
-+	/* disable all the possible outputs/crtcs before entering KMS mode */
-+//	drm_helper_disable_unused_functions(dev);
-+
-+	ret = drm_fb_helper_initial_config(helper, 32);
-+	if (ret) {
-+		dev_err(dev->dev, "failed to set initial configuration, %d\n",
-+			ret);
-+		goto fini;
++	buf->virt_addr = ioremap(start, size);
++	if (!buf->virt_addr) {
++		dev_err(&pdev->dev, "failed to map panic event buffer.\n");
++		goto fail3;
 +	}
++
++	atomic_notifier_chain_register(&panic_notifier_list, &buf->nb);
++
++	platform_set_drvdata(pdev, buf);
 +
 +	return 0;
 +
-+fini:
-+	drm_fb_helper_fini(helper);
-+
++fail3:
++	release_mem_region(start, size);
++fail2:
++	kfree(buf);
++fail1:
 +	return ret;
 +}
 +
-+void mtk_fbdev_fini(struct drm_device *dev)
++static int dt_gpio_init(struct platform_device *pdev, const char *of_list_name,
++			const char *gpio_desc_name, const char *sysfs_name)
 +{
-+	struct mtk_drm_private *priv = dev->dev_private;
-+	struct drm_fb_helper *helper = &priv->fb_helper;
++	int gpio, err, active_low;
++	enum of_gpio_flags flags;
++	struct device_node *np = pdev->dev.of_node;
 +
-+	drm_fb_helper_unregister_fbi(helper);
-+
-+	if (helper->fb) {
-+		drm_framebuffer_unregister_private(helper->fb);
-+		drm_framebuffer_remove(helper->fb);
++	gpio = of_get_named_gpio_flags(np, of_list_name, 0, &flags);
++	if (!gpio_is_valid(gpio)) {
++		dev_err(&pdev->dev, "invalid %s descriptor\n", of_list_name);
++		return -EINVAL;
 +	}
 +
-+	drm_fb_helper_fini(helper);
++	err = gpio_request_one(gpio, GPIOF_DIR_IN, gpio_desc_name);
++	if (err)
++		return err;
++
++	active_low = !!(flags & OF_GPIO_ACTIVE_LOW);
++//	err = gpio_sysfs_set_active_low(gpio, active_low);
++//	if (err)
++//		return err;
++
++	gpio_export(gpio, 0);
++	gpio_export_link(&pdev->dev, sysfs_name, gpio);
++	return 0;
 +}
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
++
++static int chromeos_arm_probe(struct platform_device *pdev)
++{
++	int err;
++	u32 elog_panic_event[2];
++	struct device_node *np = pdev->dev.of_node;
++
++	if (!np) {
++		err = -ENODEV;
++		goto err;
++	}
++
++	err = dt_gpio_init(pdev, "write-protect-gpio",
++			   "firmware-write-protect", "write-protect");
++	if (err)
++		goto err;
++	err = dt_gpio_init(pdev, "recovery-switch",
++			   "firmware-recovery-switch", "recovery-switch");
++	err = dt_gpio_init(pdev, "developer-switch",
++			   "firmware-developer-switch", "developer-switch");
++
++	if (!of_property_read_u32_array(np, "elog-panic-event",
++					elog_panic_event,
++					ARRAY_SIZE(elog_panic_event))) {
++		err = chromeos_arm_panic_init(pdev, elog_panic_event[0],
++					      elog_panic_event[1]);
++		if (err)
++			goto err;
++	}
++
++	dev_info(&pdev->dev, "chromeos system detected\n");
++
++	err = 0;
++err:
++	of_node_put(np);
++
++	return err;
++}
++
++static int chromeos_arm_remove(struct platform_device *pdev)
++{
++	struct chromeos_arm_elog_panic_buffer *buf;
++
++	buf = platform_get_drvdata(pdev);
++	platform_set_drvdata(pdev, NULL);
++	if (buf) {
++		atomic_notifier_chain_unregister(&panic_notifier_list,
++						 &buf->nb);
++		release_mem_region(buf->start, buf->size);
++		iounmap(buf->virt_addr);
++		kfree(buf);
++	}
++	return 0;
++}
++
++static struct platform_driver chromeos_arm_driver = {
++	.probe = chromeos_arm_probe,
++	.remove = chromeos_arm_remove,
++	.driver = {
++		.name = "chromeos_arm",
++	},
++};
++
++static int __init chromeos_arm_init(void)
++{
++	struct device_node *fw_dn;
++	struct platform_device *pdev;
++
++	fw_dn = of_find_compatible_node(NULL, NULL, "chromeos-firmware");
++	if (!fw_dn)
++		return -ENODEV;
++
++	pdev = platform_device_register_simple("chromeos_arm", -1, NULL, 0);
++	pdev->dev.of_node = fw_dn;
++
++	platform_driver_register(&chromeos_arm_driver);
++
++	return 0;
++}
++subsys_initcall(chromeos_arm_init);
+diff --git a/drivers/platform/chrome/elog.h b/drivers/platform/chrome/elog.h
 new file mode 100644
-index 0000000..f3e0949
+index 0000000..84b005f
 --- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-@@ -0,0 +1,32 @@
++++ b/drivers/platform/chrome/elog.h
+@@ -0,0 +1,186 @@
 +/*
-+ * Copyright (c) 2016 MediaTek Inc.
++ * This file is part of the coreboot project.
++ *
++ * Copyright (C) 2012 The ChromiumOS Authors.  All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA, 02110-1301 USA
 + */
 +
-+#ifndef MTK_DRM_FBDEV_H
-+#define MTK_DRM_FBDEV_H
++#ifndef ELOG_H_
++#define ELOG_H_
 +
-+#ifdef CONFIG_DRM_FBDEV_EMULATION
-+int mtk_fbdev_init(struct drm_device *dev);
-+void mtk_fbdev_fini(struct drm_device *dev);
++/* SMI command code for GSMI event logging */
++#define ELOG_GSMI_APM_CNT                 0xEF
++
++#define MAX_EVENT_SIZE                    0x7F
++
++/* End of log */
++#define ELOG_TYPE_EOL                     0xFF
++
++/*
++ * Standard SMBIOS event log types below 0x80
++ */
++#define ELOG_TYPE_UNDEFINED_EVENT         0x00
++#define ELOG_TYPE_SINGLE_BIT_ECC_MEM_ERR  0x01
++#define ELOG_TYPE_MULTI_BIT_ECC_MEM_ERR   0x02
++#define ELOG_TYPE_MEM_PARITY_ERR          0x03
++#define ELOG_TYPE_BUS_TIMEOUT             0x04
++#define ELOG_TYPE_IO_CHECK                0x05
++#define ELOG_TYPE_SW_NMI                  0x06
++#define ELOG_TYPE_POST_MEM_RESIZE         0x07
++#define ELOG_TYPE_POST_ERR                0x08
++#define ELOG_TYPE_PCI_PERR                0x09
++#define ELOG_TYPE_PCI_SERR                0x0A
++#define ELOG_TYPE_CPU_FAIL                0x0B
++#define ELOG_TYPE_EISA_TIMEOUT            0x0C
++#define ELOG_TYPE_CORRECTABLE_MEMLOG_DIS  0x0D
++#define ELOG_TYPE_LOG_DISABLED            0x0E
++#define ELOG_TYPE_UNDEFINED_EVENT2        0x0F
++#define ELOG_TYPE_SYS_LIMIT_EXCEED        0x10
++#define ELOG_TYPE_ASYNC_HW_TIMER_EXPIRED  0x11
++#define ELOG_TYPE_SYS_CONFIG_INFO         0x12
++#define ELOG_TYPE_HDD_INFO                0x13
++#define ELOG_TYPE_SYS_RECONFIG            0x14
++#define ELOG_TYPE_CPU_ERROR               0x15
++#define ELOG_TYPE_LOG_CLEAR               0x16
++#define ELOG_TYPE_BOOT                    0x17
++
++/*
++ * Extended defined OEM event types start at 0x80
++ */
++
++/* OS/kernel events */
++#define ELOG_TYPE_OS_EVENT                0x81
++#define  ELOG_SHUTDOWN_CLEAN              0    /* Clean Shutdown */
++#define  ELOG_SHUTDOWN_NMIWDT             1    /* NMI Watchdog */
++#define  ELOG_SHUTDOWN_PANIC              2    /* Panic */
++#define  ELOG_SHUTDOWN_OOPS               3    /* Oops */
++#define  ELOG_SHUTDOWN_DIE                4    /* Die - No longer meaningful */
++#define  ELOG_SHUTDOWN_MCE                5    /* Machine Check */
++#define  ELOG_SHUTDOWN_SOFTWDT            6    /* Software Watchdog */
++#define  ELOG_SHUTDOWN_MBE                7    /* Uncorrected ECC */
++#define  ELOG_SHUTDOWN_TRIPLE             8    /* Triple Fault */
++#define  ELOG_SHUTDOWN_THERMAL            9    /* Critical Thermal Threshold */
++
++/* Last event from coreboot */
++#define ELOG_TYPE_OS_BOOT                 0x90
++
++/* Embedded controller event */
++#define ELOG_TYPE_EC_EVENT                0x91
++#define EC_EVENT_LID_CLOSED                0x01
++#define EC_EVENT_LID_OPEN                  0x02
++#define EC_EVENT_POWER_BUTTON              0x03
++#define EC_EVENT_AC_CONNECTED              0x04
++#define EC_EVENT_AC_DISCONNECTED           0x05
++#define EC_EVENT_BATTERY_LOW               0x06
++#define EC_EVENT_BATTERY_CRITICAL          0x07
++#define EC_EVENT_BATTERY                   0x08
++#define EC_EVENT_THERMAL_THRESHOLD         0x09
++#define EC_EVENT_THERMAL_OVERLOAD          0x0a
++#define EC_EVENT_THERMAL                   0x0b
++#define EC_EVENT_USB_CHARGER               0x0c
++#define EC_EVENT_KEY_PRESSED               0x0d
++#define EC_EVENT_INTERFACE_READY           0x0e
++#define EC_EVENT_KEYBOARD_RECOVERY         0x0f
++#define EC_EVENT_THERMAL_SHUTDOWN          0x10
++#define EC_EVENT_BATTERY_SHUTDOWN          0x11
++#define EC_EVENT_FAN_ERROR                 0x12
++
++/* Power */
++#define ELOG_TYPE_POWER_FAIL              0x92
++#define ELOG_TYPE_SUS_POWER_FAIL          0x93
++#define ELOG_TYPE_PWROK_FAIL              0x94
++#define ELOG_TYPE_SYS_PWROK_FAIL          0x95
++#define ELOG_TYPE_POWER_ON                0x96
++#define ELOG_TYPE_POWER_BUTTON            0x97
++#define ELOG_TYPE_POWER_BUTTON_OVERRIDE   0x98
++
++/* Reset */
++#define ELOG_TYPE_RESET_BUTTON            0x99
++#define ELOG_TYPE_SYSTEM_RESET            0x9a
++#define ELOG_TYPE_RTC_RESET               0x9b
++#define ELOG_TYPE_TCO_RESET               0x9c
++
++/* Sleep/Wake */
++#define ELOG_TYPE_ACPI_ENTER              0x9d
++#define ELOG_TYPE_ACPI_WAKE               0x9e
++#define ELOG_TYPE_WAKE_SOURCE             0x9f
++#define  ELOG_WAKE_SOURCE_PCIE             0x00
++#define  ELOG_WAKE_SOURCE_PME              0x01
++#define  ELOG_WAKE_SOURCE_PME_INTERNAL     0x02
++#define  ELOG_WAKE_SOURCE_RTC              0x03
++#define  ELOG_WAKE_SOURCE_GPIO             0x04
++#define  ELOG_WAKE_SOURCE_SMBUS            0x05
++#define  ELOG_WAKE_SOURCE_PWRBTN           0x06
++struct elog_event_data_wake {
++	u8 source;
++	u32 instance;
++} __packed;
++
++/* Chrome OS related events */
++#define ELOG_TYPE_CROS_DEVELOPER_MODE     0xa0
++#define ELOG_TYPE_CROS_RECOVERY_MODE      0xa1
++#define  ELOG_CROS_RECOVERY_MODE_BUTTON    0x02
++
++/* Management Engine Events */
++#define ELOG_TYPE_MANAGEMENT_ENGINE       0xa2
++#define ELOG_TYPE_MANAGEMENT_ENGINE_EXT   0xa4
++struct elog_event_data_me_extended {
++	u8 current_working_state;
++	u8 operation_state;
++	u8 operation_mode;
++	u8 error_code;
++	u8 progress_code;
++	u8 current_pmevent;
++	u8 current_state;
++} __packed;
++
++/* Last post code from previous boot */
++#define ELOG_TYPE_LAST_POST_CODE          0xa3
++
++/* EC Shutdown Reason */
++#define ELOG_TYPE_EC_SHUTDOWN             0xa5
++
++/* ARM/generic versions of sleep/wake */
++#define ELOG_TYPE_SLEEP                   0xa7
++#define ELOG_TYPE_WAKE                    0xa8
++
++/* ELOG header */
++struct elog_header {
++	u32 magic;
++	u8 version;
++	u8 header_size;
++	u8 reserved[2];
++} __packed;
++
++/* ELOG related constants */
++#define ELOG_SIGNATURE			0x474f4c45  /* 'ELOG' */
++#define ELOG_VERSION			1
++
++/* SMBIOS event log header */
++struct event_header {
++	u8 type;
++	u8 length;
++	u8 year;
++	u8 month;
++	u8 day;
++	u8 hour;
++	u8 minute;
++	u8 second;
++} __packed;
++
++extern void elog_prepare_event(struct event_header *event, u8 event_type,
++			       void *data, u8 data_size);
++
++#endif /* ELOG_H_ */
+diff --git a/include/linux/chromeos_platform.h b/include/linux/chromeos_platform.h
+new file mode 100644
+index 0000000..32c4510
+--- /dev/null
++++ b/include/linux/chromeos_platform.h
+@@ -0,0 +1,27 @@
++#ifndef _LINUX_CHROMEOS_PLATFORM_H
++#define _LINUX_CHROMEOS_PLATFORM_H
++
++#include <linux/errno.h>
++#include <linux/types.h>
++
++#ifdef CONFIG_CHROMEOS
++/*
++ * ChromeOS platform support code. Glue layer between higher level functions
++ * and per-platform firmware interfaces.
++ */
++
++/*
++ * Set the taint bit telling firmware that the currently running side needs
++ * recovery (or reinstall).
++ */
++extern int chromeos_set_need_recovery(void);
++
 +#else
-+int mtk_fbdev_init(struct drm_device *dev)
++
++static inline int chromeos_set_need_recovery(void)
 +{
-+	return 0;
++	return -ENODEV;
 +}
++#endif /* CONFIG_CHROMEOS */
 +
-+void mtk_fbdev_fini(struct drm_device *dev)
-+{
-+
-+}
-+#endif /* CONFIG_DRM_FBDEV_EMULATION */
-+
-+#endif /* MTK_DRM_FBDEV_H */
++#endif /* _LINUX_CHROMEOS_PLATFORM_H */
 -- 
 2.7.4
