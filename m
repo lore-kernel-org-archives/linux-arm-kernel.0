@@ -1,39 +1,29 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Sep 2017 20:06:25 +0100
-Subject: [arm:for-next 9/10] awk: line 2: function strtonum never defined
-In-Reply-To: <201709300322.kIz06Tci%fengguang.wu@intel.com>
-References: <201709300322.kIz06Tci%fengguang.wu@intel.com>
-Message-ID: <20170929190624.GD20805@n2100.armlinux.org.uk>
+From: matwey.kornilov@gmail.com (Matwey V. Kornilov)
+Date: Fri, 29 Sep 2017 22:23:54 +0300
+Subject: undefined instruction d5380001
+Message-ID: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Which awk are you using?
+Hello,
 
-On Sat, Sep 30, 2017 at 03:05:25AM +0800, kbuild test robot wrote:
-> tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
-> head:   23b907cf143ec004c227fa2649c64d8e53f7fd2f
-> commit: 887518f5e9963a82c3fc2ad8911eedb2304f8c57 [9/10] ARM: decompressor: fix BSS size calculation
-> config: arm-at91_dt_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 887518f5e9963a82c3fc2ad8911eedb2304f8c57
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
-> >> awk: line 2: function strtonum never defined
-> >> awk: line 2: function strtonum never defined
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
+and see the following at booting:
+
+[   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
+[   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+[   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
+[   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+[   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
+[   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+[   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
+[   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+
+As far as I understand d5380001 should be emulated in cpufeature.c but
+it is not. What could be wrong here?
 
 
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+With best regards,
+Matwey V. Kornilov
