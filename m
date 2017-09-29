@@ -1,134 +1,57 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 30 Sep 2017 01:05:24 +0300
-Subject: [PATCH v2 13/17] media: v4l2-async: simplify v4l2_async_subdev
- structure
-In-Reply-To: <20170929062119.192e4fd1@vento.lan>
-References: <cover.1506548682.git.mchehab@s-opensource.com>
- <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
- <20170928120920.ywgbtikkrts25qlj@valkosipuli.retiisi.org.uk>
- <20170929062119.192e4fd1@vento.lan>
-Message-ID: <20170929220524.gsx3tmirdni2mhpx@valkosipuli.retiisi.org.uk>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Fri, 29 Sep 2017 17:19:40 -0500
+Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <1506607791-8621-7-git-send-email-will.deacon@arm.com>
+References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
+ <1506607791-8621-7-git-send-email-will.deacon@arm.com>
+Message-ID: <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+On Thu, 28 Sep 2017 15:09:50 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-(Removing the non-list recipients.)
+> +/* Perf callbacks */
+> +static int arm_spe_pmu_event_init(struct perf_event *event)
+> +{
+> +	u64 reg;
+> +	struct perf_event_attr *attr = &event->attr;
+> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
+> +
+> +	/* This is, of course, deeply driver-specific */
+> +	if (attr->type != event->pmu->type)
+> +		return -ENOENT;
+> +
+> +	if (event->cpu >= 0 &&
+> +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
+> +		return -ENOENT;
 
-On Fri, Sep 29, 2017 at 06:27:13AM -0300, Mauro Carvalho Chehab wrote:
-> Em Thu, 28 Sep 2017 15:09:21 +0300
-> Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-> 
-> > Hi Mauro,
-> > 
-> > On Wed, Sep 27, 2017 at 06:46:56PM -0300, Mauro Carvalho Chehab wrote:
-> > > The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
-> > > struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
-> > > match criteria requires just a device name.
-> > > 
-> > > So, it doesn't make sense to enclose those into structs,
-> > > as the criteria can go directly into the union.
-> > > 
-> > > That makes easier to document it, as we don't need to document
-> > > weird senseless structs.  
-> > 
-> > The idea is that in the union, there's a struct which is specific to the
-> > match_type field. I wouldn't call it senseless.
-> 
-> Why a struct for each specific match_type is **needed**? It it is not
-> needed, then it is senseless per definition :-) 
-> 
-> In the specific case of fwnode, there's already a named struct
-> for fwnode_handle. The only thing is that it is declared outside
-> enum v4l2_async_match_type. So, I don't see any reason to do things
-> like:
-> 
-> 		struct {
-> 			struct fwnode_handle *fwnode;
-> 		} fwnode;
-> 
-> If you're in doubt about that, think on how would you document
-> both fwnode structs. Both fwnode structs specify the match
-> criteria if %V4L2_ASYNC_MATCH_FWNODE.
-> 
-> The same applies to this:
-> 
-> 		struct {
-> 			const char *name;
-> 		} device_name;
-> 
-> Both device_name and name specifies the match criteria if
-> %V4L2_ASYNC_MATCH_DEVNAME.
-> 
-> > 
-> > In the two cases there's just a single field in the containing struct. You
-> > could remove the struct in that case as you do in this patch, and just use
-> > the field. But I think the result is less clean and so I wouldn't make this
-> > change.
-> 
-> It is actually cleaner without the stucts.
-> 
-> Without the useless struct, if one wants to match a firmware node, it
-> should be doing:
-> 
->  		pdata->asd[i]->match_type = V4L2_ASYNC_MATCH_FWNODE;
-> 		pdata->asd[i]->match.fwnode = of_fwnode_handle(rem);
+So -ENOENT will make tools/perf/util/evsel.c tell the user "The %s event is not
+supported." whereas returning -ENODEV will say "No such device - did
+you specify an out-of-range profile CPU?" which may or may not be more
+appropriate for this check.
 
-This code should be and will be moved out of drivers. See:
+> +	if (arm_spe_event_to_pmsevfr(event) & SYS_PMSEVFR_EL1_RES0)
+> +		return -EOPNOTSUPP;
+> +	if (attr->exclude_idle)
+> +		return -EOPNOTSUPP;
 
-<URL:http://www.spinics.net/lists/linux-media/msg122688.html>
+"PMU Hardware doesn't support sampling/overflow-interrupts." will be
+printed if the user didn't specify a sample period.  Otherwise, a
+string with "/bin/dmesg may provide additional information." will be
+printed.
 
-So there are going to be quite a bit fewer instances of it, and none should
-remain in drivers. I frankly don't have a strong opinion on this; there are
-arguments for and against. I just don't see a reason to change it.
+I was hoping for a response from acme by now for this:
 
-It'd be nice to have Hans's and Laurent's opinion though.
+https://www.spinics.net/lists/linux-perf-users/msg04066.html
 
-> 
-> And that' it. For anyone that reads the above code, even not knowing
-> all details of "match", is clear that the match criteria is whatever
-> of_fwnode_handle() returns.
-> 
-> Now, on this:
-> 
->  		pdata->asd[i]->match_type = V4L2_ASYNC_MATCH_FWNODE;
-> 		pdata->asd[i]->match.fwnode.fwnode = of_fwnode_handle(rem);
-> 
-> It sounds that something is missing, as only one field of match.fwnode
-> was specified. Anyone not familiar with that non-conventional usage of
-> a struct with just one struct field inside would need to seek for the
-> header file declaring the struct. That would consume a lot of time for
-> code reviewers for no good reason.
-> 
-> The same apply for devname search:
-> 
-> In this case:
-> 		asd->match_type = V4L2_ASYNC_MATCH_DEVNAME;
-> 		asd->match.device_name.name = imxsd->devname;
-> 
-> I would be expecting something else to be filled at device_name's
-> struct, for example to specify a case sensitive or case insensitive
-> match criteria, to allow seeking for a device's substring, or to
-> allow using other struct device fields to narrow the seek.
-> 
-> With this:
-> 
-> 		asd->match_type = V4L2_ASYNC_MATCH_DEVNAME;
-> 		asd->match.device_name = imxsd->devname;
-> 
-> It is clear that the match criteria is fully specified.
-> 
-> > The confusion comes possibly from the fact that the struct is named the
-> > same as the field in the struct. These used to be called of and node, but
-> > with the fwnode property framework the references to the fwnode are, well,
-> > typically similarly called "fwnode". There's no underlying firmware
-> > interface with that name, fwnode property API is just an API.
-> 
-> The duplicated "fwnode" name only made it more evident that we don't
-> need to enclose a single match criteria field inside a struct.
+Alas, nothing.  Looking at the #ifdef x86 in evsel.c, I'm guessing
+it'll be ok, although I'm still not sure how PMU-specific we can get in
+evsel.c, nor whether it's ok to communicate lists of h/w supported
+sample periods through /sys/bus/event_source/devices/...
 
--- 
-Kind regards,
+acme?  OK to refactor evsel messaging for Arm, including parsing for
+which PMUs are being used, so customize the message?
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Kim
