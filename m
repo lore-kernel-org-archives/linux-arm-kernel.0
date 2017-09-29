@@ -1,163 +1,86 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 29 Sep 2017 15:19:46 -0500
-Subject: [PATCH] PCI: Fix legacy IRQ assignment execution stage
-In-Reply-To: <20170929171958.GA18114@red-moon>
-References: <1506598627-8985-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20170928223719.GY15970@bhelgaas-glaptop.roam.corp.google.com>
- <20170929160226.GA17398@red-moon> <20170929171958.GA18114@red-moon>
-Message-ID: <20170929201946.GC31210@bhelgaas-glaptop.roam.corp.google.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 30 Sep 2017 04:22:43 +0800
+Subject: [arm:phy 2/10] drivers/net/ethernet/marvell/mvneta.c:4555:35: error:
+ 'struct mvneta_port' has no member named 'phy_interface'
+Message-ID: <201709300440.zI207cjm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 06:19:58PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Sep 29, 2017 at 05:02:26PM +0100, Lorenzo Pieralisi wrote:
-> > On Thu, Sep 28, 2017 at 05:37:19PM -0500, Bjorn Helgaas wrote:
-> > > On Thu, Sep 28, 2017 at 12:37:07PM +0100, Lorenzo Pieralisi wrote:
-> > > > Through struct pci_host_bridge->{map/swizzle}_irq() hooks is now
-> > > > possible to define IRQ mapping functions on a per PCI host bridge basis.
-> > > > 
-> > > > Actual IRQ allocation is carried out by the pci_assign_irq() function in
-> > > > pci_device_probe() - to make sure a device is assigned an IRQ only if it
-> > > > is probed (ie match a driver); it retrieves a struct pci_host_bridge*
-> > > > for a given PCI device and through {map/swizzle}_irq() hooks it carries
-> > > > out the PCI IRQ allocation.
-> > > > 
-> > > > As it turned out, some legacy drivers (eg IDE layer) require that a
-> > > > device allocates IRQ as soon as it is added so that its actual IRQ
-> > > > settings are available early in the boot process. With current code
-> > > > calling pci_assign_irq() in pci_device_probe() IDE IRQ probing fails
-> > > > for some drivers:
-> > > 
-> > > I think the patch is fine, but I don't understand the changelog.  I
-> > > want to know specifically what the dependency on dev->irq is.  "Early
-> > > in the boot process" is pretty vague.
-> > > 
-> > > I *thought* we were doing something like this:
-> > > 
-> > >   pci_device_probe(dev1)
-> > >     pci_assign_irq(dev1)
-> > >       ...
-> > >         ide_pci_init_two(dev1, dev2, ...)
-> > >           do_ide_setup_pci_device(dev1)
-> > >             pciirq = dev1->irq                # this one is fine
-> > >           do_ide_setup_pci_device(dev2)
-> > >             pciirq = dev2->irq                # not fine
-> > > 
-> > > where the problem is that we haven't called pci_assign_irq(dev2), so
-> > > dev2->irq hasn't been set.
-> > > 
-> > > But that doesn't match the data because we should be coming through
-> > > cmd64x_init_one(), which calls ide_pci_init_one(), so we shouldn't
-> > > have a dev2 in this path.
-> > 
-> > I *think* I understand what's going on here, the key is:
-> > 
-> > ide_scan_pcibus()
-> > 
-> > and CONFIG_IDEPCI_PCIBUS_ORDER
-> > 
-> > I still have to replicate it but I suspect that
-> > do_ide_setup_pci_device() for dev1 finds an unallocated IRQ (ie dev->irq
-> > == 0) because the probing did NOT happen via pci_device_probe(), ie
-> > pci_device_probe() was not called for the dev1, the cmd64x probe
-> > routine is called straight from ide_scan_pcidev().
-> > 
-> > I am struggling to understand the logic behind:
-> > 
-> > ide_pci_register_driver() and ide_scan_pcibus()
-> > 
-> > and the sequence wrt PCI bus probing but I think that's the problem
-> > and that's why moving pci_assign_irq() to pci_device_add() will
-> > sort this out, adding pci_assign_irq() in ide_scan_pcidev() will
-> > solve the problem too (patch below).
-> > 
-> > Needless to say, ide_scan_pcibus() relies on pre_init global variable
-> > to make sure ide_pci_register_driver() chooses the "right" way of
-> > registering a driver, see:
-> > 
-> > __ide_pci_register_driver()
-> > 
-> > Patch here to verify my assumption in case Guenter has a chance to
-> > run it if I do not beat him to it:
-> 
-> That's what's happening unfortunately.
-> 
-> We end up probing twice (both fails):
-> 
-> (1)
-> 
-> ->ide_scan_pcidev()
->   ->d->probe()
->      ->cmd64x_init_one()
->        ->ide_pci_init_one()
->          ->ide_pci_init_two()
->            [...]
->            -> ide_host_register() !! Fails in hwif_init(), no IRQ
-> 
-> (2) ->pci_device_probe()
->      ->cmd64x_init_one()
->        ->ide_pci_init_one()
->          ->ide_pci_init_two()
-> 	   [...]
-> 	   -> ide_pci_enable() !! Fails with -EBUSY,
-> 	   pci_request_selected_regions() can't reserve already reserved
-> 	   regions (ie step (1) did not unwind resource reservation)
-> 
-> That's my reading and patch patch below fixes it and given that
-> IDE created its own PCI bus probing layer may be a more appropriate
-> kludge than forcing us to move pci_assign_irq() to pci_device_add()
-> for all PCI devices, please let me know what's your preferred solution.
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
+head:   dfaea820e59784cc983e158b10ecc78af3162c4f
+commit: 3d6bda8e8ab387536f2a743f8bddde904fd38a3e [2/10] net: mvneta: convert to phylink
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 3d6bda8e8ab387536f2a743f8bddde904fd38a3e
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-Oh, this is lovely :(  I wonder what other things this breaks.
+Note: the arm/phy HEAD dfaea820e59784cc983e158b10ecc78af3162c4f builds fine.
+      It only hurts bisectibility.
 
-This IDE probing path misses the IRQ assignment, the "initialize the
-driver on the device's node" stuff, the PM code, the IOV autoprobe
-checks, the ACPI IRQ init in pcibios_alloc_irq(), etc.  Ugh.
+All errors (new ones prefixed by >>):
 
-I think your solution below is the best one so far.  It's still hacky
-because the whole ide_scan_pcibus() is a hack, but at least this fixes
-it at the point where we need it, so it's obvious why it's there and
-it's clear that if we could ever get rid of ide_scan_pcibus(), we
-could get rid of this pci_assign_irq() call as well.
+   drivers/net/ethernet/marvell/mvneta.c: In function 'mvneta_resume':
+>> drivers/net/ethernet/marvell/mvneta.c:4555:35: error: 'struct mvneta_port' has no member named 'phy_interface'
+     err = mvneta_port_power_up(pp, pp->phy_interface);
+                                      ^~
 
-> With fix below (1) still tries to re-probe cmd64x through
-> pci_device_probe() but the device has already a driver attached
-> to it so second probe stops before calling the cmd64x probe routine.
-> 
-> I hope Guenter can give it a go too to confirm my findings.
-> 
-> Lorenzo
-> 
-> > -- >8 --
-> > diff --git a/drivers/ide/ide-scan-pci.c b/drivers/ide/ide-scan-pci.c
-> > index 86aa88a..86b570a 100644
-> > --- a/drivers/ide/ide-scan-pci.c
-> > +++ b/drivers/ide/ide-scan-pci.c
-> > @@ -56,6 +56,8 @@ static int __init ide_scan_pcidev(struct pci_dev *dev)
-> >  {
-> >  	struct list_head *l;
-> >  	struct pci_driver *d;
-> > +	int ret;
-> > +
-> >  
-> >  	list_for_each(l, &ide_pci_drivers) {
-> >  		d = list_entry(l, struct pci_driver, node);
-> > @@ -63,10 +65,14 @@ static int __init ide_scan_pcidev(struct pci_dev *dev)
-> >  			const struct pci_device_id *id =
-> >  				pci_match_id(d->id_table, dev);
-> >  
-> > -			if (id != NULL && d->probe(dev, id) >= 0) {
-> > -				dev->driver = d;
-> > -				pci_dev_get(dev);
-> > -				return 1;
-> > +			if (id != NULL) {
-> > +				pci_assign_irq(dev);
-> > +				ret = d->probe(dev, id);
-> > +				if (ret >= 0) {
-> > +					dev->driver = d;
-> > +					pci_dev_get(dev);
-> > +					return 1;
-> > +				}
-> >  			}
-> >  		}
-> >  	}
+vim +4555 drivers/net/ethernet/marvell/mvneta.c
+
+9768b45c Jane Li       2017-03-16  4534  
+9768b45c Jane Li       2017-03-16  4535  static int mvneta_resume(struct device *device)
+9768b45c Jane Li       2017-03-16  4536  {
+9768b45c Jane Li       2017-03-16  4537  	struct platform_device *pdev = to_platform_device(device);
+9768b45c Jane Li       2017-03-16  4538  	struct net_device *dev = dev_get_drvdata(device);
+9768b45c Jane Li       2017-03-16  4539  	struct mvneta_port *pp = netdev_priv(dev);
+9768b45c Jane Li       2017-03-16  4540  	int err;
+9768b45c Jane Li       2017-03-16  4541  
+9768b45c Jane Li       2017-03-16  4542  	clk_prepare_enable(pp->clk);
+9768b45c Jane Li       2017-03-16  4543  	if (!IS_ERR(pp->clk_bus))
+9768b45c Jane Li       2017-03-16  4544  		clk_prepare_enable(pp->clk_bus);
+9768b45c Jane Li       2017-03-16  4545  	if (pp->dram_target_info || pp->neta_armada3700)
+9768b45c Jane Li       2017-03-16  4546  		mvneta_conf_mbus_windows(pp, pp->dram_target_info);
+9768b45c Jane Li       2017-03-16  4547  	if (pp->bm_priv) {
+9768b45c Jane Li       2017-03-16  4548  		err = mvneta_bm_port_init(pdev, pp);
+9768b45c Jane Li       2017-03-16  4549  		if (err < 0) {
+9768b45c Jane Li       2017-03-16  4550  			dev_info(&pdev->dev, "use SW buffer management\n");
+9768b45c Jane Li       2017-03-16  4551  			pp->bm_priv = NULL;
+9768b45c Jane Li       2017-03-16  4552  		}
+9768b45c Jane Li       2017-03-16  4553  	}
+9768b45c Jane Li       2017-03-16  4554  	mvneta_defaults_set(pp);
+9768b45c Jane Li       2017-03-16 @4555  	err = mvneta_port_power_up(pp, pp->phy_interface);
+9768b45c Jane Li       2017-03-16  4556  	if (err < 0) {
+9768b45c Jane Li       2017-03-16  4557  		dev_err(device, "can't power up port\n");
+9768b45c Jane Li       2017-03-16  4558  		return err;
+9768b45c Jane Li       2017-03-16  4559  	}
+9768b45c Jane Li       2017-03-16  4560  
+9768b45c Jane Li       2017-03-16  4561  	netif_device_attach(dev);
+d6956ac8 Jisheng Zhang 2017-03-29  4562  	if (netif_running(dev)) {
+9768b45c Jane Li       2017-03-16  4563  		mvneta_open(dev);
+d6956ac8 Jisheng Zhang 2017-03-29  4564  		mvneta_set_rx_mode(dev);
+d6956ac8 Jisheng Zhang 2017-03-29  4565  	}
+d6956ac8 Jisheng Zhang 2017-03-29  4566  
+9768b45c Jane Li       2017-03-16  4567  	return 0;
+9768b45c Jane Li       2017-03-16  4568  }
+9768b45c Jane Li       2017-03-16  4569  #endif
+9768b45c Jane Li       2017-03-16  4570  
+
+:::::: The code at line 4555 was first introduced by commit
+:::::: 9768b45ceb0bc7bdee61837afad331dd6bf7977f net: mvneta: support suspend and resume
+
+:::::: TO: Jane Li <jiel@marvell.com>
+:::::: CC: David S. Miller <davem@davemloft.net>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 45914 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170930/710bf4ec/attachment-0001.gz>
