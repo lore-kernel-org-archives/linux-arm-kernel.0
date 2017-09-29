@@ -1,53 +1,44 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 29 Sep 2017 11:22:15 +0100
-Subject: [PATCH v2 4/4] rtc: pl031: make interrupt optional
-In-Reply-To: <20170929102116.GX20805@n2100.armlinux.org.uk>
-References: <20170929102116.GX20805@n2100.armlinux.org.uk>
-Message-ID: <E1dxsQx-0006Nw-RL@rmk-PC.armlinux.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 29 Sep 2017 18:22:42 +0800
+Subject: [PATCH v3 04/14] drm/sun4i: tcon: Add support for demuxing TCON
+ output on A31
+In-Reply-To: <20170929102006.2wz7wrkpplxwynoh@flea>
+References: <20170929082306.16193-1-wens@csie.org>
+ <20170929082306.16193-5-wens@csie.org>
+ <20170929102006.2wz7wrkpplxwynoh@flea>
+Message-ID: <CAGb2v65VhtEckRCXi4X5AjmC-5CSHavATu8fKyEHOivmYqZkww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, the interrupt for the PL031 is optional.  Avoid
-trying to claim the interrupt if it's not specified.
+On Fri, Sep 29, 2017 at 6:20 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Sep 29, 2017 at 08:22:56AM +0000, Chen-Yu Tsai wrote:
+>> On systems with 2 TCONs such as the A31, it is possible to demux the
+>> output of the TCONs to one encoder.
+>>
+>> Add support for this for the A31.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> index 7bf51abaee97..c949309d4285 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> @@ -112,6 +112,21 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+>>  }
+>>  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
+>>
+>> +static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
+>
+> Would that make sense to make it a bit more generic, and pass the id
+> to look for as an argument?
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/rtc/rtc-pl031.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+The reason to look for TCON0 explicitly is to access the muxing registers, which
+are only available in TCON0. Other than that, there's nothing else
+shared between
+the two TCONs. So there's no particular reason to look for TCON1 explicitly.
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 64c77ec1b4ea..82eb7da2c478 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -308,7 +308,8 @@ static int pl031_remove(struct amba_device *adev)
- 
- 	dev_pm_clear_wake_irq(&adev->dev);
- 	device_init_wakeup(&adev->dev, false);
--	free_irq(adev->irq[0], ldata);
-+	if (adev->irq[0])
-+		free_irq(adev->irq[0], ldata);
- 	rtc_device_unregister(ldata->rtc);
- 	amba_release_regions(adev);
- 
-@@ -389,12 +390,13 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto out;
- 	}
- 
--	if (request_irq(adev->irq[0], pl031_interrupt,
--			vendor->irqflags, "rtc-pl031", ldata)) {
--		ret = -EIO;
--		goto out_no_irq;
-+	if (adev->irq[0]) {
-+		ret = request_irq(adev->irq[0], pl031_interrupt,
-+				  vendor->irqflags, "rtc-pl031", ldata);
-+		if (ret)
-+			goto out_no_irq;
-+		dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
- 	}
--	dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
- 	return 0;
- 
- out_no_irq:
--- 
-2.7.4
+ChenYu
