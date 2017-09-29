@@ -1,74 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:52:52 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.15
-Message-ID: <cover.1506676368.git.horms+renesas@verge.net.au>
+Date: Fri, 29 Sep 2017 13:53:00 +0200
+Subject: [PATCH 08/48] ARM: dts: r8a7743: Add SDHI controllers
+In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
+References: <cover.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <63ce8a617b5129f7cb20ed0d6d822a31ecca4696.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Biju Das <biju.das@bp.renesas.com>
 
-Please consider these Renesas ARM based SoC DT bindings updates for v4.15.
+Add the SDHI controllers to the r8a7743 device tree.
 
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7743.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
-
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.15
-
-for you to fetch changes up to 2e931b06de97d762ef139bffbbe75e1483735734:
-
-  ARM: shmobile: remove inconsistent ; from documentation (2017-09-25 09:02:47 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Bindings Updates for v4.15
-
-* Consistently do not use ';' in documentation of compat strings
-  for boards. A misture of using and not using a trailing ';' had
-  krept in over time with not using being dominant.
-
-* Document bindings for
-  - Eagle board and r8a77970 (V3M) SoC bindings.
-    Eagle is a board for the V3M SoC
-  - Document Kingfisher board bindings.
-    Kingfisher is an extension board for the H3ULCB and M3ULCB boards.
-
-* Add r8a77970 (V3M) SYSC power domain definitions
-
-  Add macros usable by the device tree sources to reference r8a77970 SYSC
-  power domains by index.
-
-* Add Renesas SoC DT bindings doc to Renesas ARM section of MAINTAINERS file
-
-* Drop bogus node name suffix from example of /renesas,dw-hdmi binding
-
-* Document APMU and SMP enable method for r8a7745 (RZ/G1E) SoC
-
-----------------------------------------------------------------
-Fabrizio Castro (1):
-      dt-bindings: apmu: Document r8a7745 support
-
-Geert Uytterhoeven (3):
-      dt-bindings: display: renesas: dw-hdmi: Drop bogus node name suffix
-      ARM: shmobile: Document R-Car V3M SoC DT bindings
-      MAINTAINERS: Add Renesas SoC DT bindings doc to Renesas ARM sections
-
-Sergei Shtylyov (2):
-      dt-bindings: power: add R8A77970 SYSC power domain definitions
-      arm64: renesas: document Eagle board bindings
-
-Simon Horman (1):
-      ARM: shmobile: remove inconsistent ; from documentation
-
-Vladimir Barinov (1):
-      arm: shmobile: Document Kingfisher board DT bindings
-
- Documentation/devicetree/bindings/arm/shmobile.txt | 16 +++++++----
- .../bindings/display/bridge/renesas,dw-hdmi.txt    |  2 +-
- .../devicetree/bindings/power/renesas,apmu.txt     |  1 +
- MAINTAINERS                                        |  2 ++
- include/dt-bindings/power/r8a77970-sysc.h          | 32 ++++++++++++++++++++++
- 5 files changed, 47 insertions(+), 6 deletions(-)
- create mode 100644 include/dt-bindings/power/r8a77970-sysc.h
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 14222c72f0e0..6dd9b0b3d818 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -779,6 +779,48 @@
+ 			max-frequency = <97500000>;
+ 			status = "disabled";
+ 		};
++
++		sdhi0: sd at ee100000 {
++			compatible = "renesas,sdhi-r8a7743";
++			reg = <0 0xee100000 0 0x328>;
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
++			       <&dmac1 0xcd>, <&dmac1 0xce>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <195000000>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 314>;
++			status = "disabled";
++		};
++
++		sdhi1: sd at ee140000 {
++			compatible = "renesas,sdhi-r8a7743";
++			reg = <0 0xee140000 0 0x100>;
++			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 312>;
++			dmas = <&dmac0 0xc1>, <&dmac0 0xc2>,
++			       <&dmac1 0xc1>, <&dmac1 0xc2>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <97500000>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 312>;
++			status = "disabled";
++		};
++
++		sdhi2: sd at ee160000 {
++			compatible = "renesas,sdhi-r8a7743";
++			reg = <0 0xee160000 0 0x100>;
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 311>;
++			dmas = <&dmac0 0xd3>, <&dmac0 0xd4>,
++			       <&dmac1 0xd3>, <&dmac1 0xd4>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <97500000>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 311>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	/* External root clock */
+-- 
+2.1.4
