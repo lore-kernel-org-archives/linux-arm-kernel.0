@@ -1,71 +1,63 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 29 Sep 2017 11:51:07 +0100
-Subject: [PATCH 3/8] video: sa1100fb: use devm_ioremap_resource()
+Date: Fri, 29 Sep 2017 11:51:12 +0100
+Subject: [PATCH 4/8] video: sa1100fb: use devm_request_irq()
 In-Reply-To: <20170929105004.GY20805@n2100.armlinux.org.uk>
 References: <20170929105004.GY20805@n2100.armlinux.org.uk>
-Message-ID: <E1dxsst-0006j1-2Y@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dxssy-0006j9-86@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_ioremap_resource() to map the LCD controller memory region,
-and remove the unnecessary cleanup for this.
+Use devm_request_irq() to request the interrupt (a little earlier too)
+so we can avoid having to manually clean this up.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/video/fbdev/sa1100fb.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ drivers/video/fbdev/sa1100fb.c | 17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/video/fbdev/sa1100fb.c b/drivers/video/fbdev/sa1100fb.c
-index 1562d7607dd2..ab83970dbfd9 100644
+index ab83970dbfd9..a48fdb676f3e 100644
 --- a/drivers/video/fbdev/sa1100fb.c
 +++ b/drivers/video/fbdev/sa1100fb.c
-@@ -1217,29 +1217,28 @@ static int sa1100fb_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
--	if (irq < 0 || !res)
-+	if (irq < 0)
- 		return -EINVAL;
- 
--	if (!request_mem_region(res->start, resource_size(res), "LCD"))
--		return -EBUSY;
--
- 	fbi = sa1100fb_init_fbinfo(&pdev->dev);
- 	ret = -ENOMEM;
- 	if (!fbi)
- 		goto failed;
- 
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	fbi->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fbi->base)) {
-+		ret = PTR_ERR(fbi->base);
-+		goto failed;
-+	}
-+
- 	fbi->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(fbi->clk)) {
- 		ret = PTR_ERR(fbi->clk);
+@@ -1239,22 +1239,23 @@ static int sa1100fb_probe(struct platform_device *pdev)
  		goto failed;
  	}
  
--	fbi->base = ioremap(res->start, resource_size(res));
--	if (!fbi->base)
+-	/* Initialize video memory */
+-	ret = sa1100fb_map_video_memory(fbi);
+-	if (ret)
 -		goto failed;
 -
- 	/* Initialize video memory */
- 	ret = sa1100fb_map_video_memory(fbi);
- 	if (ret)
-@@ -1286,9 +1285,6 @@ static int sa1100fb_probe(struct platform_device *pdev)
-  err_free_irq:
- 	free_irq(irq, fbi);
+-	ret = request_irq(irq, sa1100fb_handle_irq, 0, "LCD", fbi);
++	ret = devm_request_irq(&pdev->dev, irq, sa1100fb_handle_irq, 0,
++			       "LCD", fbi);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "request_irq failed: %d\n", ret);
+ 		goto failed;
+ 	}
+ 
++	/* Initialize video memory */
++	ret = sa1100fb_map_video_memory(fbi);
++	if (ret)
++		goto failed;
++
+ 	if (machine_is_shannon()) {
+ 		ret = gpio_request_one(SHANNON_GPIO_DISP_EN,
+ 			GPIOF_OUT_INIT_LOW, "display enable");
+ 		if (ret)
+-			goto err_free_irq;
++			goto failed;
+ 	}
+ 
+ 	/*
+@@ -1282,8 +1283,6 @@ static int sa1100fb_probe(struct platform_device *pdev)
+  err_reg_fb:
+ 	if (machine_is_shannon())
+ 		gpio_free(SHANNON_GPIO_DISP_EN);
+- err_free_irq:
+-	free_irq(irq, fbi);
   failed:
--	if (fbi)
--		iounmap(fbi->base);
--	release_mem_region(res->start, resource_size(res));
  	return ret;
  }
- 
 -- 
 2.7.4
