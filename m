@@ -1,104 +1,47 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 29 Sep 2017 16:22:59 +0800
-Subject: [PATCH v3 07/14] drm/sun4i: hdmi: Allow using second PLL as TMDS clk
- parent
+Date: Fri, 29 Sep 2017 16:23:00 +0800
+Subject: [PATCH v3 08/14] dt-bindings: display: sun4i: Add binding for A31
+ HDMI controller
 In-Reply-To: <20170929082306.16193-1-wens@csie.org>
 References: <20170929082306.16193-1-wens@csie.org>
-Message-ID: <20170929082306.16193-8-wens@csie.org>
+Message-ID: <20170929082306.16193-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SoCs with two display pipelines, it is possible that the two
-pipelines are active at the same time, with potentially incompatible
-dot clocks.
+The HDMI controller in the A31 SoC is slightly different from the
+earlier version. In addition to the TMDS clock and DDC controls,
+this version now takes a second DDC clock input.
 
-Let the HDMI encoder's TMDS clock go through all of its parents when
-calculating possible clock rates. This allows usage of the second video
-PLL as its parent.
+Add a compatible string for it, and add the DDC clock input to the
+list of clocks required.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 53 ++++++++++++++++-------------
- 1 file changed, 29 insertions(+), 24 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index 5cf2527bffc8..e8d4c311b80d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -67,11 +67,11 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
- static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 				     struct clk_rate_request *req)
- {
--	struct clk_hw *parent;
-+	struct clk_hw *parent = NULL;
- 	unsigned long best_parent = 0;
- 	unsigned long rate = req->rate;
- 	int best_div = 1, best_half = 1;
--	int i, j;
-+	int i, j, p;
- 
- 	/*
- 	 * We only consider PLL3, since the TCON is very likely to be
-@@ -79,32 +79,37 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 	 * clock, so we should not need to do anything.
- 	 */
- 
--	parent = clk_hw_get_parent_by_index(hw, 0);
--	if (!parent)
--		return -EINVAL;
--
--	for (i = 1; i < 3; i++) {
--		for (j = 1; j < 16; j++) {
--			unsigned long ideal = rate * i * j;
--			unsigned long rounded;
--
--			rounded = clk_hw_round_rate(parent, ideal);
--
--			if (rounded == ideal) {
--				best_parent = rounded;
--				best_half = i;
--				best_div = j;
--				goto out;
--			}
--
--			if (abs(rate - rounded / i) <
--			    abs(rate - best_parent / best_div)) {
--				best_parent = rounded;
--				best_div = i;
-+	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
-+		parent = clk_hw_get_parent_by_index(hw, p);
-+		if (!parent)
-+			continue;
-+
-+		for (i = 1; i < 3; i++) {
-+			for (j = 1; j < 16; j++) {
-+				unsigned long ideal = rate * i * j;
-+				unsigned long rounded;
-+
-+				rounded = clk_hw_round_rate(parent, ideal);
-+
-+				if (rounded == ideal) {
-+					best_parent = rounded;
-+					best_half = i;
-+					best_div = j;
-+					goto out;
-+				}
-+
-+				if (abs(rate - rounded / i) <
-+				    abs(rate - best_parent / best_div)) {
-+					best_parent = rounded;
-+					best_div = i;
-+				}
- 			}
- 		}
- 	}
- 
-+	if (!parent)
-+		return -EINVAL;
-+
- out:
- 	req->rate = best_parent / best_half / best_div;
- 	req->best_parent_rate = best_parent;
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 92441086caba..46df3b78ae9e 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -41,14 +41,17 @@ CEC. It is one end of the pipeline.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun5i-a10s-hdmi
++    * allwinner,sun6i-a31-hdmi
+   - reg: base address and size of memory-mapped region
+   - interrupts: interrupt associated to this IP
+   - clocks: phandles to the clocks feeding the HDMI encoder
+     * ahb: the HDMI interface clock
+     * mod: the HDMI module clock
++    * ddc: the HDMI ddc clock (A31 only)
+     * pll-0: the first video PLL
+     * pll-1: the second video PLL
+   - clock-names: the clock names mentioned above
++  - resets: phandle to the reset control for the HDMI encoder (A31 only)
+   - dmas: phandles to the DMA channels used by the HDMI encoder
+     * ddc-tx: The channel for DDC transmission
+     * ddc-rx: The channel for DDC reception
 -- 
 2.14.2
