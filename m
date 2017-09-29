@@ -1,67 +1,66 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 29 Sep 2017 13:11:49 +0200
-Subject: [PATCH v3] mmc: dt-bindings: Add reg/source_cg/latch-ck for
- Mediatek MMC bindings
-In-Reply-To: <1506081829-29296-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1506081829-29296-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <f5ef95bf-a085-194b-4412-c72a7813ac08@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Sep 2017 12:27:41 +0100
+Subject: [PATCH] arm64: fault: Route pte translation faults via
+ do_translation_fault
+Message-ID: <1506684461-24162-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We currently route pte translation faults via do_page_fault, which elides
+the address check against TASK_SIZE before invoking the mm fault handling
+code. However, this can cause issues with the path walking code in
+conjunction with our word-at-a-time implementation because
+load_unaligned_zeropad can end up faulting in kernel space if it reads
+across a page boundary and runs into a page fault (e.g. by attempting to
+read from a guard region).
 
+In the case of such a fault, load_unaligned_zeropad has registered a
+fixup to shift the valid data and pad with zeroes, however the abort is
+reported as a level 3 translation fault and we dispatch it straight to
+do_page_fault, despite it being a kernel address. This results in calling
+a sleeping function from atomic context:
 
-On 09/22/2017 02:03 PM, Chaotian Jing wrote:
-> Change the comptiable for support of multi-platform
-> Add description for reg
-> Add description for source_cg
-> Add description for mediatek,latch-ck
-> Note that source_cg and mediatek,latch-ck are optional for some projects,
-> eg, MT2701 do not have source_cg, and MT2712 do not need
-> mediatek,latch-ck
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->   Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
->   1 file changed, 10 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index 4182ea3..b934a29 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
->   and the properties used by the msdc driver.
->   
->   Required properties:
-> -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> +- compatible: value should be either of the following.
-> +	"mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> +	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> +	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+  BUG: sleeping function called from invalid context at arch/arm64/mm/fault.c:313
+  in_atomic(): 0, irqs_disabled(): 0, pid: 10290
+  Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+  [...]
+  [<ffffff8e016cd0cc>] ___might_sleep+0x134/0x144
+  [<ffffff8e016cd158>] __might_sleep+0x7c/0x8c
+  [<ffffff8e016977f0>] do_page_fault+0x140/0x330
+  [<ffffff8e01681328>] do_mem_abort+0x54/0xb0
+  Exception stack(0xfffffffb20247a70 to 0xfffffffb20247ba0)
+  [...]
+  [<ffffff8e016844fc>] el1_da+0x18/0x78
+  [<ffffff8e017f399c>] path_parentat+0x44/0x88
+  [<ffffff8e017f4c9c>] filename_parentat+0x5c/0xd8
+  [<ffffff8e017f5044>] filename_create+0x4c/0x128
+  [<ffffff8e017f59e4>] SyS_mkdirat+0x50/0xc8
+  [<ffffff8e01684e30>] el0_svc_naked+0x24/0x28
+  Code: 36380080 d5384100 f9400800 9402566d (d4210000)
+  ---[ end trace 2d01889f2bca9b9f ]---
 
-NAK, this has to be:
-You have to add the fallback comatible ("mediatek,mt8135-mmc") to the binding 
-description as otherwise the driver does not get probed.
+Fix this by dispatching all translation faults to do_translation_faults,
+which avoids invoking the page fault logic for faults on kernel addresses.
 
-Regards,
-Matthias
+Cc: <stable@vger.kernel.org>
+Reported-by: Ankit Jain <ankijain@codeaurora.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/fault.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +- reg: physical base address of the controller and length
->   - interrupts: Should contain MSDC interrupt number
-> -- clocks: MSDC source clock, HCLK
-> -- clock-names: "source", "hclk"
-> +- clocks: MSDC source clock, HCLK, source_cg
-> +- clock-names: "source", "hclk", "source_cg"
->   - pinctrl-names: should be "default", "state_uhs"
->   - pinctrl-0: should contain default/high speed pin ctrl
->   - pinctrl-1: should contain uhs mode pin ctrl
-> @@ -30,6 +35,8 @@ Optional properties:
->   - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
->   				       If present,HS400 command responses are sampled on rising edges.
->   				       If not present,HS400 command responses are sampled on falling edges.
-> +- mediatek,latch-ck: Some SoCs do not support enhance_rx, need set correct latch-ck to avoid data crc
-> +		     error caused by stop clock(fifo full)
->   
->   Examples:
->   mmc0: mmc at 11230000 {
-> 
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 89993c4be1be..2069e9bc0fca 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -651,7 +651,7 @@ static const struct fault_info fault_info[] = {
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 0 translation fault"	},
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
+-	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
+ 	{ do_bad,		SIGBUS,  0,		"unknown 8"			},
+ 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
+ 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
+-- 
+2.1.4
