@@ -1,93 +1,38 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 29 Sep 2017 11:52:30 +0100
-Subject: [PATCH v3 2/2] arm64: use WFE for long delays
-In-Reply-To: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1506682350-9023-3-git-send-email-julien.thierry@arm.com>
+Date: Fri, 29 Sep 2017 11:52:28 +0100
+Subject: [PATCH v3 0/2] WFE for long delays
+Message-ID: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current delay implementation uses the yield instruction, which is a
-hint that it is beneficial to schedule another thread. As this is a hint,
-it may be implemented as a NOP, causing all delays to be busy loops. This
-is the case for many existing CPUs.
+It was pointed out that there are some windows where the event stream might not
+be configured, meaning we cannot safely use WFE (e.g. when using PSCI
+CPU_SUSPEND for idle, PSCI might reset CPU state).
 
-Taking advantage of the generic timer sending periodic events to all
-cores, we can use WFE during delays to reduce power consumption. This is
-beneficial only for delays longer than the period of the timer event
-stream.
+The first patch provide a function to check whether the task is in state where
+it can expect events from the event stream.
 
-If timer event stream is not enabled, delays will behave as yield/busy
-loops.
+Second patch actually makes use of WFE in delays.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
+Changes since v1:
+- Keep track of event stream state
+- Do not use WFE when event stream might be misconfigured
+
+Changes since v2:
+- Use cpumask to track event stream state instead of percpu variable
+- Tidy a bit code in arm64/lib/delay
+- Do not factor asm-generic/delay code
+
+Julien Thierry (2):
+  arm_arch_timer: Expose event stream status
+  arm64: use WFE for long delays
+
+ arch/arm/include/asm/arch_timer.h    |  1 +
+ arch/arm64/include/asm/arch_timer.h  |  1 +
  arch/arm64/lib/delay.c               | 23 +++++++++++++++++++----
- include/clocksource/arm_arch_timer.h |  4 +++-
- 2 files changed, 22 insertions(+), 5 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
+ include/clocksource/arm_arch_timer.h | 10 +++++++++-
+ 5 files changed, 48 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
-index dad4ec9..4dc27f3 100644
---- a/arch/arm64/lib/delay.c
-+++ b/arch/arm64/lib/delay.c
-@@ -24,10 +24,28 @@
- #include <linux/module.h>
- #include <linux/timex.h>
-
-+#include <clocksource/arm_arch_timer.h>
-+
-+#define USECS_TO_CYCLES(TIME_USECS)			\
-+	xloops_to_cycles((TIME_USECS) * 0x10C7UL)
-+
-+static inline unsigned long xloops_to_cycles(unsigned long xloops)
-+{
-+	return (xloops * loops_per_jiffy * HZ) >> 32;
-+}
-+
- void __delay(unsigned long cycles)
- {
- 	cycles_t start = get_cycles();
-
-+	if (arch_timer_evtstrm_available()) {
-+		const cycles_t timer_evt_period =
-+			USECS_TO_CYCLES(ARCH_TIMER_EVT_STREAM_PERIOD_US);
-+
-+		while ((get_cycles() - start + timer_evt_period) < cycles)
-+			wfe();
-+	}
-+
- 	while ((get_cycles() - start) < cycles)
- 		cpu_relax();
- }
-@@ -35,10 +53,7 @@ void __delay(unsigned long cycles)
-
- inline void __const_udelay(unsigned long xloops)
- {
--	unsigned long loops;
--
--	loops = xloops * loops_per_jiffy * HZ;
--	__delay(loops >> 32);
-+	__delay(xloops_to_cycles(xloops));
- }
- EXPORT_SYMBOL(__const_udelay);
-
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 4e28283..349e595 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -67,7 +67,9 @@ enum arch_timer_spi_nr {
- #define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
- #define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
-
--#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
-+#define ARCH_TIMER_EVT_STREAM_PERIOD_US	100
-+#define ARCH_TIMER_EVT_STREAM_FREQ				\
-+	(USEC_PER_SEC / ARCH_TIMER_EVT_STREAM_PERIOD_US)
-
- struct arch_timer_kvm_info {
- 	struct timecounter timecounter;
 --
 1.9.1
