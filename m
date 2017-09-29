@@ -1,47 +1,96 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 29 Sep 2017 16:23:00 +0800
-Subject: [PATCH v3 08/14] dt-bindings: display: sun4i: Add binding for A31
- HDMI controller
+Date: Fri, 29 Sep 2017 16:22:57 +0800
+Subject: [PATCH v3 05/14] drm/sun4i: hdmi: Disable clks in bind function error
+ path and unbind function
 In-Reply-To: <20170929082306.16193-1-wens@csie.org>
 References: <20170929082306.16193-1-wens@csie.org>
-Message-ID: <20170929082306.16193-9-wens@csie.org>
+Message-ID: <20170929082306.16193-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HDMI controller in the A31 SoC is slightly different from the
-earlier version. In addition to the TMDS clock and DDC controls,
-this version now takes a second DDC clock input.
+The HDMI driver enables the bus and mod clocks in the bind function, but
+does not disable them if it then bails our due to any errors. Neither
+does it disable the clocks in the unbind function.
 
-Add a compatible string for it, and add the DDC clock input to the
-list of clocks required.
+Fix this by adding a proper error path to the bind function, and
+clk_disable_unprepare calls to the unbind function.
 
+Also rename the err_cleanup_connector label to err_cleanup_encoder,
+since it is the encoder that gets cleaned up.
+
+Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 92441086caba..46df3b78ae9e 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -41,14 +41,17 @@ CEC. It is one end of the pipeline.
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun5i-a10s-hdmi
-+    * allwinner,sun6i-a31-hdmi
-   - reg: base address and size of memory-mapped region
-   - interrupts: interrupt associated to this IP
-   - clocks: phandles to the clocks feeding the HDMI encoder
-     * ahb: the HDMI interface clock
-     * mod: the HDMI module clock
-+    * ddc: the HDMI ddc clock (A31 only)
-     * pll-0: the first video PLL
-     * pll-1: the second video PLL
-   - clock-names: the clock names mentioned above
-+  - resets: phandle to the reset control for the HDMI encoder (A31 only)
-   - dmas: phandles to the DMA channels used by the HDMI encoder
-     * ddc-tx: The channel for DDC transmission
-     * ddc-rx: The channel for DDC reception
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index 9ea6cd5a1370..3cf1a6932fac 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -302,26 +302,29 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->mod_clk = devm_clk_get(dev, "mod");
+ 	if (IS_ERR(hdmi->mod_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI mod clock\n");
+-		return PTR_ERR(hdmi->mod_clk);
++		ret = PTR_ERR(hdmi->mod_clk);
++		goto err_disable_bus_clk;
+ 	}
+ 	clk_prepare_enable(hdmi->mod_clk);
+ 
+ 	hdmi->pll0_clk = devm_clk_get(dev, "pll-0");
+ 	if (IS_ERR(hdmi->pll0_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI PLL 0 clock\n");
+-		return PTR_ERR(hdmi->pll0_clk);
++		ret = PTR_ERR(hdmi->pll0_clk);
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	hdmi->pll1_clk = devm_clk_get(dev, "pll-1");
+ 	if (IS_ERR(hdmi->pll1_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI PLL 1 clock\n");
+-		return PTR_ERR(hdmi->pll1_clk);
++		ret = PTR_ERR(hdmi->pll1_clk);
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	ret = sun4i_tmds_create(hdmi);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't create the TMDS clock\n");
+-		return ret;
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	writel(SUN4I_HDMI_CTRL_ENABLE, hdmi->base + SUN4I_HDMI_CTRL_REG);
+@@ -362,7 +365,7 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	ret = sun4i_hdmi_i2c_create(dev, hdmi);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't create the HDMI I2C adapter\n");
+-		return ret;
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	drm_encoder_helper_add(&hdmi->encoder,
+@@ -422,6 +425,10 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	drm_encoder_cleanup(&hdmi->encoder);
+ err_del_i2c_adapter:
+ 	i2c_del_adapter(hdmi->i2c);
++err_disable_mod_clk:
++	clk_disable_unprepare(hdmi->mod_clk);
++err_disable_bus_clk:
++	clk_disable_unprepare(hdmi->bus_clk);
+ 	return ret;
+ }
+ 
+@@ -434,6 +441,8 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
+ 	drm_connector_cleanup(&hdmi->connector);
+ 	drm_encoder_cleanup(&hdmi->encoder);
+ 	i2c_del_adapter(hdmi->i2c);
++	clk_disable_unprepare(hdmi->mod_clk);
++	clk_disable_unprepare(hdmi->bus_clk);
+ }
+ 
+ static const struct component_ops sun4i_hdmi_ops = {
 -- 
 2.14.2
