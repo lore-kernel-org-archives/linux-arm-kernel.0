@@ -1,112 +1,117 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 29 Sep 2017 17:02:26 +0100
-Subject: [PATCH] PCI: Fix legacy IRQ assignment execution stage
-In-Reply-To: <20170928223719.GY15970@bhelgaas-glaptop.roam.corp.google.com>
-References: <1506598627-8985-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20170928223719.GY15970@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170929160226.GA17398@red-moon>
+Date: Fri, 29 Sep 2017 17:08:50 +0100
+Subject: [PATCH] ACPI/IORT: Fix PCI ACS enablement
+In-Reply-To: <59CDCAB6.3000906@hisilicon.com>
+References: <20170919170539.6265-1-lorenzo.pieralisi@arm.com>
+ <59C3A36A.2060202@hisilicon.com> <20170922094546.GE1523@red-moon>
+ <59C5C655.8030607@hisilicon.com> <20170928154625.GA25853@red-moon>
+ <59CDCAB6.3000906@hisilicon.com>
+Message-ID: <20170929160850.GA31394@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 05:37:19PM -0500, Bjorn Helgaas wrote:
-> On Thu, Sep 28, 2017 at 12:37:07PM +0100, Lorenzo Pieralisi wrote:
-> > Through struct pci_host_bridge->{map/swizzle}_irq() hooks is now
-> > possible to define IRQ mapping functions on a per PCI host bridge basis.
+On Fri, Sep 29, 2017 at 12:23:18PM +0800, Zhou Wang wrote:
+> On 2017/9/28 23:46, Lorenzo Pieralisi wrote:
+> > On Sat, Sep 23, 2017 at 10:26:29AM +0800, Zhou Wang wrote:
+> >> On 2017/9/22 17:45, Lorenzo Pieralisi wrote:
+> >>> On Thu, Sep 21, 2017 at 07:32:58PM +0800, Zhou Wang wrote:
+> >>>> On 2017/9/20 1:05, Lorenzo Pieralisi wrote:
+> >>>>> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
+> >>>>> workarounds") removed kernel code that was allowing to initialize
+> >>>>> and probe the SMMU devices early (ie earlier than PCI devices through
+> >>>>> linker script callback entries) in the boot process because it was not
+> >>>>> needed any longer in that the SMMU devices/drivers now support deferred
+> >>>>> probing.
+> >>>>>
+> >>>>> Since the SMMUs probe routines are also in charge of requesting global
+> >>>>> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
+> >>>>> up early-probing workarounds") also postponed PCI ACS enablement to
+> >>>>> SMMUs devices probe time, which may be too late given that PCI devices
+> >>>>> needs to detect if PCI ACS is enabled to init the respective capability
+> >>>>> through the following call path:
+> >>>>>
+> >>>>> pci_device_add()
+> >>>>>  -> pci_init_capabilities()
+> >>>>>   -> pci_enable_acs()
+> >>>>>
+> >>>>> Add code in the ACPI IORT SMMU platform devices initialization path
+> >>>>> (that is called before ACPI PCI enumeration) to detect if an SMMU is
+> >>>>> present in HW and enable PCI ACS if it actually is, restoring the
+> >>>>> correct PCI ACS enablement sequencing.
+> >>>>>
+> >>>>> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
+> >>>>> Signed-workarounds")
+> >>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>>>> Cc: Will Deacon <will.deacon@arm.com>
+> >>>>> Cc: Robin Murphy <robin.murphy@arm.com>
+> >>>>> Cc: Zhou Wang <wangzhou1@hisilicon.com>
+> >>>>> Cc: Alex Williamson <alex.williamson@redhat.com>
+> >>>>> ---
+> >>>>>  drivers/acpi/arm64/iort.c | 11 +++++++++++
+> >>>>>  1 file changed, 11 insertions(+)
+> >>>>>
+> >>>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> >>>>> index 9565d57..71a7694 100644
+> >>>>> --- a/drivers/acpi/arm64/iort.c
+> >>>>> +++ b/drivers/acpi/arm64/iort.c
+> >>>>> @@ -1184,6 +1184,7 @@ static void __init iort_init_platform_devices(void)
+> >>>>>  	struct acpi_table_iort *iort;
+> >>>>>  	struct fwnode_handle *fwnode;
+> >>>>>  	int i, ret;
+> >>>>> +	bool smmu_detected = false;
+> >>>>>  
+> >>>>>  	/*
+> >>>>>  	 * iort_table and iort both point to the start of IORT table, but
+> >>>>> @@ -1218,11 +1219,21 @@ static void __init iort_init_platform_devices(void)
+> >>>>>  				acpi_free_fwnode_static(fwnode);
+> >>>>>  				return;
+> >>>>>  			}
+> >>>>> +
+> >>>>> +			smmu_detected = true;
+> >>>>>  		}
+> >>>>>  
+> >>>>>  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> >>>>>  					 iort_node->length);
+> >>>>>  	}
+> >>>>> +
+> >>>>> +	/*
+> >>>>> +	 * If IORT reports an SMMU component make sure PCI ACS is
+> >>>>> +	 * requested so that PCI devices can enable it in their
+> >>>>> +	 * capabilities.
+> >>>>> +	 */
+> >>>>> +	if (smmu_detected)
+> >>>>> +		pci_request_acs();
+> >>>>>  }
+> >>>>>  
+> >>>>>  void __init acpi_iort_init(void)
+> >>>>>
+> >>>>
+> >>>> Hi Lorenzo,
+> >>>>
+> >>>> I tested this patch, it works well in my HiSilicon Hip08 based system.
+> >>>> However, setting ACS flag at the stage of SMMU device init seems not good,
+> >>>> I mean what if in one system there are only platform devices connected to
+> >>>> SMMU device.
+> >>>
+> >>> That's a fair point if you explain to me how current pci_request_acs()
+> >>> usage copes with your remark above.
+> >>
+> >> The current pci_request_acs usage for ARM SMMU-V3 sets ACS flags under CONFIG_PCI.
+> >> However, as mentioned in your commit message, this setting is too late.
+> >>
+> >> For the usage of X86 and AMD, as I am not familiar with the devices used in these
+> >> two platforms, maybe the default devices in these platforms are PCIe based :)
 > > 
-> > Actual IRQ allocation is carried out by the pci_assign_irq() function in
-> > pci_device_probe() - to make sure a device is assigned an IRQ only if it
-> > is probed (ie match a driver); it retrieves a struct pci_host_bridge*
-> > for a given PCI device and through {map/swizzle}_irq() hooks it carries
-> > out the PCI IRQ allocation.
-> > 
-> > As it turned out, some legacy drivers (eg IDE layer) require that a
-> > device allocates IRQ as soon as it is added so that its actual IRQ
-> > settings are available early in the boot process. With current code
-> > calling pci_assign_irq() in pci_device_probe() IDE IRQ probing fails
-> > for some drivers:
+> > I do not understand what your point is. ACS enablement is a global flag,
+> > that is currently set whenever an x86/AMD/ARM IOMMU is detected/probed
+> > AFAICS.
 > 
-> I think the patch is fine, but I don't understand the changelog.  I
-> want to know specifically what the dependency on dev->irq is.  "Early
-> in the boot process" is pretty vague.
-> 
-> I *thought* we were doing something like this:
-> 
->   pci_device_probe(dev1)
->     pci_assign_irq(dev1)
->       ...
->         ide_pci_init_two(dev1, dev2, ...)
->           do_ide_setup_pci_device(dev1)
->             pciirq = dev1->irq                # this one is fine
->           do_ide_setup_pci_device(dev2)
->             pciirq = dev2->irq                # not fine
-> 
-> where the problem is that we haven't called pci_assign_irq(dev2), so
-> dev2->irq hasn't been set.
-> 
-> But that doesn't match the data because we should be coming through
-> cmd64x_init_one(), which calls ide_pci_init_one(), so we shouldn't
-> have a dev2 in this path.
+> There are named devices(platform devices) and/or PCI devices connected to SMMU.
+> However, ACS flags is only for PCI devices. So setting this flag in SMMU device init
+> maybe need check if there are PCIe devices connected to SMMU, as maybe devices connected
+> to SMMU are all named devices.
 
-I *think* I understand what's going on here, the key is:
+Understood but that's a problem that exists in the current kernel,
+what I am saying is that's not what I am fixing with this patch.
 
-ide_scan_pcibus()
-
-and CONFIG_IDEPCI_PCIBUS_ORDER
-
-I still have to replicate it but I suspect that
-do_ide_setup_pci_device() for dev1 finds an unallocated IRQ (ie dev->irq
-== 0) because the probing did NOT happen via pci_device_probe(), ie
-pci_device_probe() was not called for the dev1, the cmd64x probe
-routine is called straight from ide_scan_pcidev().
-
-I am struggling to understand the logic behind:
-
-ide_pci_register_driver() and ide_scan_pcibus()
-
-and the sequence wrt PCI bus probing but I think that's the problem
-and that's why moving pci_assign_irq() to pci_device_add() will
-sort this out, adding pci_assign_irq() in ide_scan_pcidev() will
-solve the problem too (patch below).
-
-Needless to say, ide_scan_pcibus() relies on pre_init global variable
-to make sure ide_pci_register_driver() chooses the "right" way of
-registering a driver, see:
-
-__ide_pci_register_driver()
-
-Patch here to verify my assumption in case Guenter has a chance to
-run it if I do not beat him to it:
-
--- >8 --
-diff --git a/drivers/ide/ide-scan-pci.c b/drivers/ide/ide-scan-pci.c
-index 86aa88a..86b570a 100644
---- a/drivers/ide/ide-scan-pci.c
-+++ b/drivers/ide/ide-scan-pci.c
-@@ -56,6 +56,8 @@ static int __init ide_scan_pcidev(struct pci_dev *dev)
- {
- 	struct list_head *l;
- 	struct pci_driver *d;
-+	int ret;
-+
- 
- 	list_for_each(l, &ide_pci_drivers) {
- 		d = list_entry(l, struct pci_driver, node);
-@@ -63,10 +65,14 @@ static int __init ide_scan_pcidev(struct pci_dev *dev)
- 			const struct pci_device_id *id =
- 				pci_match_id(d->id_table, dev);
- 
--			if (id != NULL && d->probe(dev, id) >= 0) {
--				dev->driver = d;
--				pci_dev_get(dev);
--				return 1;
-+			if (id != NULL) {
-+				pci_assign_irq(dev);
-+				ret = d->probe(dev, id);
-+				if (ret >= 0) {
-+					dev->driver = d;
-+					pci_dev_get(dev);
-+					return 1;
-+				}
- 			}
- 		}
- 	}
+Lorenzo
