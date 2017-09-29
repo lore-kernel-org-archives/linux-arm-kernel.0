@@ -1,84 +1,56 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 29 Sep 2017 15:43:40 +0100
-Subject: [PATCH v2 23/28] arm64/sve: KVM: Treat guest SVE use as undefined
- instruction execution
-In-Reply-To: <20170929130029.GG3611@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-24-git-send-email-Dave.Martin@arm.com>
- <874ls59zku.fsf@linaro.org> <20170929130029.GG3611@e103592.cambridge.arm.com>
-Message-ID: <87bmltd0pv.fsf@linaro.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 29 Sep 2017 17:14:11 +0200
+Subject: [PATCH] ARM: configs: stm32: Update default configuration for
+ v4.14-rc1
+Message-ID: <1506698051-23983-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Regenerate the default configuration on top of v4.14-rc1.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
 
-> On Thu, Sep 14, 2017 at 02:31:13PM +0100, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > When trapping forbidden attempts by a guest to use SVE, we want the
->> > guest to see a trap consistent with SVE not being implemented.
->> >
->> > This patch injects an undefined instruction exception into the
->> > guest in response to such an exception.
->>
->> I do wonder if this should be merged with the previous trap enabling
->> patch though?
->
-> Yes, that would make sense now I look at it.
->
-> Can I keep your Reviewed-by on the combined patch?
-
-Sure.
-
->
-> Cheers
-> ---Dave
->
->>
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> > ---
->> >  arch/arm64/kvm/handle_exit.c | 8 ++++++++
->> >  1 file changed, 8 insertions(+)
->> >
->> > diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> > index 17d8a16..e3e42d0 100644
->> > --- a/arch/arm64/kvm/handle_exit.c
->> > +++ b/arch/arm64/kvm/handle_exit.c
->> > @@ -147,6 +147,13 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> >  	return 1;
->> >  }
->> >
->> > +static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> > +{
->> > +	/* Until SVE is supported for guests: */
->> > +	kvm_inject_undefined(vcpu);
->> > +	return 1;
->> > +}
->> > +
->> >  static exit_handle_fn arm_exit_handlers[] = {
->> >  	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
->> >  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
->> > @@ -160,6 +167,7 @@ static exit_handle_fn arm_exit_handlers[] = {
->> >  	[ESR_ELx_EC_HVC64]	= handle_hvc,
->> >  	[ESR_ELx_EC_SMC64]	= handle_smc,
->> >  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
->> > +	[ESR_ELx_EC_SVE]	= handle_sve,
->> >  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
->> >  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
->> >  	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
->>
->>
->> --
->> Alex Benn?e
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
---
-Alex Benn?e
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 90e5c46..3ed3158 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -18,7 +18,6 @@ CONFIG_EMBEDDED=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_MMU is not set
+-CONFIG_ARM_SINGLE_ARMV7M=y
+ CONFIG_ARCH_STM32=y
+ CONFIG_CPU_V7M_NUM_IRQ=240
+ CONFIG_SET_MEM_PARAM=y
+@@ -44,18 +43,17 @@ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_UNIX98_PTYS is not set
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_NONSTANDARD=y
+-# CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_STM32=y
+ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_STM32F4=y
++CONFIG_GPIO_STMPE=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+-CONFIG_REGULATOR=y
+-CONFIG_GPIO_STMPE=y
+ CONFIG_MFD_STMPE=y
++CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+@@ -81,8 +79,6 @@ CONFIG_DEBUG_INFO=y
+ CONFIG_MAGIC_SYSRQ=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+-# CONFIG_FTRACE is not set
+ CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_DEV_STM32=y
+ CONFIG_CRC_ITU_T=y
+ CONFIG_CRC7=y
+-- 
+2.7.4
