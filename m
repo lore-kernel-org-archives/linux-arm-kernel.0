@@ -1,21 +1,20 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:52:54 +0200
-Subject: [PATCH 7/8] arm64: renesas: document Eagle board bindings
+Date: Fri, 29 Sep 2017 13:52:53 +0200
+Subject: [PATCH 6/8] arm: shmobile: Document Kingfisher board DT bindings
 In-Reply-To: <cover.1506676368.git.horms+renesas@verge.net.au>
 References: <cover.1506676368.git.horms+renesas@verge.net.au>
-Message-ID: <e22b36bd75ad57fdf1010ce7d6d92df96311947b.1506676368.git.horms+renesas@verge.net.au>
+Message-ID: <5418a9004126992aa2bbd07d79e8305659cb0dc9.1506676368.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Document the Eagle device tree bindings, listing it as a supported board.
+Add Kingfisher Device tree bindings Documentation, listing it as a
+supported board.
+Kingfisher is the H3ULCB/M3ULCB extension board.
 
-This allows to use checkpatch.pl to validate .dts files referring to the
-Eagle board.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
@@ -23,17 +22,17 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
  1 file changed, 2 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index e9bd3091dcf6..4fa984ada912 100644
+index a1f06711a4dd..e9bd3091dcf6 100644
 --- a/Documentation/devicetree/bindings/arm/shmobile.txt
 +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -59,6 +59,8 @@ Boards:
-     compatible = "renesas,bockw", "renesas,r8a7778"
-   - Draak (RTP0RC77995SEB0010S)
-     compatible = "renesas,draak", "renesas,r8a77995"
-+  - Eagle (RTP0RC77970SEB0010S)
-+    compatible = "renesas,eagle", "renesas,r8a77970"
-   - Genmai (RTK772100BC00000BR)
-     compatible = "renesas,genmai", "renesas,r7s72100"
-   - GR-Peach (X28A-M01-E/F)
+@@ -78,6 +78,8 @@ Boards:
+     compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743"
+   - iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
+     compatible = "iwave,g20m", "renesas,r8a7743"
++  - Kingfisher (SBEV-RCAR-KF-M03)
++    compatible = "shimafuji,kingfisher"
+   - Koelsch (RTP0RC7791SEB00010S)
+     compatible = "renesas,koelsch", "renesas,r8a7791"
+   - Kyoto Microcomputer Co. KZM-A9-Dual
 -- 
 2.1.4
