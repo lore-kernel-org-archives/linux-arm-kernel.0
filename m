@@ -1,129 +1,83 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 29 Sep 2017 03:23:00 +0300
-Subject: [PATCH v1 06/14] tee: optee: add page list manipulation functions
-In-Reply-To: <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
+Date: Fri, 29 Sep 2017 03:50:29 +0300
+Subject: [PATCH v1 14/14] tee: shm: inline tee_shm getter functions
+In-Reply-To: <1506621851-6929-15-git-send-email-volodymyr_babchuk@epam.com>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <20170929002300.zxu4n47m5jdymdyt@yury-thinkpad>
+ <1506621851-6929-15-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <20170929005029.7kf5vros6yavrgtn@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 09:04:03PM +0300, Volodymyr Babchuk wrote:
+On Thu, Sep 28, 2017 at 09:04:11PM +0300, Volodymyr Babchuk wrote:
 > From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 > 
-> These functions will be used to pass information about shared
-> buffers to OP-TEE.
+> Now, when struct tee_shm is defined in public header,
+> we can inline small getter functions.
+
+struct tee_shm is moved to public header in first patch of series,
+so you can put tee_shm_is_registered() in proper place at once, right?
+
 > 
 > Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 > ---
->  drivers/tee/optee/call.c          | 48 +++++++++++++++++++++++++++++++++++++++
->  drivers/tee/optee/optee_private.h |  4 ++++
->  2 files changed, 52 insertions(+)
+>  drivers/tee/tee_shm.c   | 17 -----------------
+>  include/linux/tee_drv.h | 10 ++++++++--
+>  2 files changed, 8 insertions(+), 19 deletions(-)
 > 
-> diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-> index f7b7b40..f8e044d 100644
-> --- a/drivers/tee/optee/call.c
-> +++ b/drivers/tee/optee/call.c
-> @@ -11,6 +11,7 @@
->   * GNU General Public License for more details.
->   *
->   */
-> +#include <asm/pgtable.h>
->  #include <linux/arm-smccc.h>
->  #include <linux/device.h>
->  #include <linux/err.h>
-> @@ -442,3 +443,50 @@ void optee_disable_shm_cache(struct optee *optee)
->  	}
->  	optee_cq_wait_final(&optee->call_queue, &w);
+> diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
+> index 5176c83..453700a 100644
+> --- a/drivers/tee/tee_shm.c
+> +++ b/drivers/tee/tee_shm.c
+> @@ -494,23 +494,6 @@ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id)
 >  }
-> +
-> +/**
-> + * optee_fill_pages_list() - write list of user pages to given shared
-> + * buffer.
-> + *
-> + * @dst: page-aligned buffer where list of pages will be stored
-
-I'm not much familiar with the subsystem you work on, but I don't
-understand why the type of dst is u64*. If it's just a buffer, it
-should be void *. Also, if we assuming running it on arm were pointers
-are 32-bit, the result of page_to_phys() will be u32, and you will
-waste half of your u64 array for storing zeroes; this line:
-		*dst = page_to_phys(pages[i]);
-
-> + * @pages: array of pages that represents shared buffer
-> + * @num_pages: number of entries in @pages
-> + *
-> + * @dst should be big enough to hold list of user page addresses and
-> + *	links to the next pages of buffer
-> + */
-> +void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages)
-> +{
-> +	size_t i;
-> +
-> +	/* TODO: add support for RichOS page sizes that != 4096 */
-> +	BUILD_BUG_ON(PAGE_SIZE != OPTEE_MSG_NONCONTIG_PAGE_SIZE);
-
-RichOS stands for Linux? Why I am still not a rich OS developer? :)
-This is the first occurrence of the term in kernel sources, please
-explain it.
-
-Also, I think that it would be more logical to add the dependency on
-page size to Kconfig, not here, and move the comment there, so user
-will be simply unable to build the whole module.
-
-> +	for (i = 0; i < num_pages; i++, dst++) {
-> +		/* Check if we are going to roll over the page boundary */
-> +		if (IS_ALIGNED((uintptr_t)(dst + 1),
-> +			       OPTEE_MSG_NONCONTIG_PAGE_SIZE)) {
-> +			*dst = virt_to_phys(dst + 1);
-> +			dst++;
-> +		}
-
-Is my understanding correct that @dst is not a simple array of buffer
-page addresses?  Instead, it has a complex structure: First 511 records
-store buffer page entries, and last one points to the next page of dst.
-Is it somehow documented? Also, did you consider to create a header structure
-for the buffer page, like memory allocators do? You can place there number
-of entries, pointer to the next page, maybe some flags. I think it will be
-more transparent, especially if we consider communication protocol between
-independent software products.
-
-> +		*dst = page_to_phys(pages[i]);
-> +	}
-> +}
-> +
-> +static size_t get_pages_array_size(size_t num_entries)
-> +{
-> +	/* Number of user pages + number of pages to hold list of user pages */
-> +	return sizeof(u64) *
-> +		(num_entries + (sizeof(u64) * num_entries) /
-> +		 OPTEE_MSG_NONCONTIG_PAGE_SIZE);
-> +}
-> +
-> +u64 *optee_allocate_pages_array(size_t num_entries)
-> +{
-> +	return alloc_pages_exact(get_pages_array_size(num_entries), GFP_KERNEL);
-> +}
-> +
-> +void optee_free_pages_array(void *array, size_t num_entries)
-> +{
-> +	free_pages_exact(array, get_pages_array_size(num_entries));
-> +}
-> +
-> diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-> index c374cd5..caa3c04 100644
-> --- a/drivers/tee/optee/optee_private.h
-> +++ b/drivers/tee/optee/optee_private.h
-> @@ -165,6 +165,10 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
->  int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
->  		       const struct tee_param *params);
+>  EXPORT_SYMBOL_GPL(tee_shm_get_from_id);
 >  
-> +u64 *optee_allocate_pages_array(size_t num_entries);
-> +void optee_free_pages_array(void *array, size_t num_entries);
-> +void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages);
-> +
->  /*
->   * Small helpers
+> -bool tee_shm_is_registered(struct tee_shm *shm)
+> -{
+> -	return shm && (shm->flags & TEE_SHM_REGISTER);
+> -}
+> -EXPORT_SYMBOL_GPL(tee_shm_is_registered);
+> -
+> -/**
+> - * tee_shm_get_id() - Get id of a shared memory object
+> - * @shm:	Shared memory handle
+> - * @returns id
+> - */
+> -int tee_shm_get_id(struct tee_shm *shm)
+> -{
+> -	return shm->id;
+> -}
+> -EXPORT_SYMBOL_GPL(tee_shm_get_id);
+> -
+>  /**
+>   * tee_shm_put() - Decrease reference count on a shared memory handle
+>   * @shm:	Shared memory handle
+> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+> index 6aaef65..2ae0286 100644
+> --- a/include/linux/tee_drv.h
+> +++ b/include/linux/tee_drv.h
+> @@ -429,7 +429,10 @@ static inline size_t tee_shm_get_page_offset(struct tee_shm *shm)
+>   * @shm:	Shared memory handle
+>   * @returns id
 >   */
+> -int tee_shm_get_id(struct tee_shm *shm);
+> +static inline int tee_shm_get_id(struct tee_shm *shm)
+> +{
+> +	return shm->id;
+> +}
+>  
+>  /**
+>   * tee_shm_get_from_id() - Find shared memory object and increase reference
+> @@ -445,6 +448,9 @@ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
+>   * @shm:	Shared memory handle
+>   * @returns true if object is registered in TEE
+>   */
+> -bool tee_shm_is_registered(struct tee_shm *shm);
+> +static inline bool tee_shm_is_registered(struct tee_shm *shm)
+> +{
+> +	return shm && (shm->flags & TEE_SHM_REGISTER);
+> +}
+>  
+>  #endif /*__TEE_DRV_H*/
 > -- 
 > 2.7.4
