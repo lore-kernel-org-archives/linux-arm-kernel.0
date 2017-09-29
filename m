@@ -1,39 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:52:12 +0200
-Subject: [PATCH 03/22] arm64: dts: renesas: r8a77995: update PFC node name to
- pin-controller
+Date: Fri, 29 Sep 2017 13:52:13 +0200
+Subject: [PATCH 04/22] arm64: dts: renesas: ulcb: Enable display output
 In-Reply-To: <cover.1506678250.git.horms+renesas@verge.net.au>
 References: <cover.1506678250.git.horms+renesas@verge.net.au>
-Message-ID: <5a979972b6cb799944423f00c4e269d826c6d2c7.1506678250.git.horms+renesas@verge.net.au>
+Message-ID: <7da2ed12da2c81b782ee4c3b4b0b87098048aae8.1506678250.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This patch changes the name from from e6060000.pfc and pfc at e6060000 to
-e6060000.pin-controller and pin-controller at e6060000 like other Renesas
-SoCs.
+The DU is already wired up to the HDMI encoder, all we need to do is
+enable it.
 
-Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index d0f95b78c022..72c303362b16 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -122,7 +122,7 @@
- 			reg = <0 0xe6160000 0 0x0200>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 1b868df2393f..dfec9072718b 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -157,6 +157,10 @@
+ 	};
+ };
  
--		pfc: pfc at e6060000 {
-+		pfc: pin-controller at e6060000 {
- 			compatible = "renesas,pfc-r8a77995";
- 			reg = <0 0xe6060000 0 0x508>;
- 		};
++&du {
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
 -- 
 2.1.4
