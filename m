@@ -1,147 +1,138 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 29 Sep 2017 11:52:29 +0100
-Subject: [PATCH v3 1/2] arm_arch_timer: Expose event stream status
-In-Reply-To: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
-References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1506682350-9023-2-git-send-email-julien.thierry@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Sep 2017 11:53:11 +0100
+Subject: [PATCH v1 02/14] tee: add register user memory
+In-Reply-To: <1506621851-6929-3-git-send-email-volodymyr_babchuk@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+ <1506621851-6929-3-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <20170929105311.GC5781@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch timer configuration for a CPU might get reset after suspending
-said CPU.
+On Thu, Sep 28, 2017 at 09:03:59PM +0300, Volodymyr Babchuk wrote:
+> +static int
+> +tee_ioctl_shm_register(struct tee_context *ctx,
+> +		       struct tee_ioctl_shm_register_data __user *udata)
+> +{
+> +	long ret;
+> +	struct tee_ioctl_shm_register_data data;
+> +	struct tee_shm *shm;
+> +
+> +	if (copy_from_user(&data, udata, sizeof(data)))
+> +		return -EFAULT;
+> +
+> +	/* Currently no input flags are supported */
+> +	if (data.flags)
+> +		return -EINVAL;
+> +
+> +	shm = tee_shm_register(ctx, data.addr, data.length,
+> +			       TEE_SHM_DMA_BUF | TEE_SHM_USER_MAPPED);
+> +	if (IS_ERR(shm))
+> +		return PTR_ERR(shm);
+> +
+> +	data.id = shm->id;
+> +	data.flags = shm->flags;
+> +	data.length = shm->size;
+> +
+> +	if (copy_to_user(udata, &data, sizeof(data)))
+> +		ret = -EFAULT;
+> +	else
+> +		ret = tee_shm_get_fd(shm);
 
-In order to reliably use the event stream in the kernel (e.g. for delays),
-we keep track of the state where we can safely concider the event stream as
-properly configured.
+Why do you need both the fd and an id? That seems redundant.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/arch_timer.h    |  1 +
- arch/arm64/include/asm/arch_timer.h  |  1 +
- drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++++--
- include/clocksource/arm_arch_timer.h |  6 ++++++
- 4 files changed, 26 insertions(+), 2 deletions(-)
+[...]
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index d4ebf56..0b6e104 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -106,6 +106,7 @@ static inline u32 arch_timer_get_cntkctl(void)
- static inline void arch_timer_set_cntkctl(u32 cntkctl)
- {
- 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-+	isb();
- }
+> +struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
+> +				 size_t length, u32 flags)
+> +{
+> +	struct tee_device *teedev = ctx->teedev;
+> +	const u32 req_flags = TEE_SHM_DMA_BUF | TEE_SHM_USER_MAPPED;
+> +	struct tee_shm *shm;
+> +	void *ret;
+> +	int rc;
+> +	int num_pages;
+> +	unsigned long start;
+> +
+> +	if (flags != req_flags) {
+> +		dev_err(teedev->dev.parent, "invliad shm flags %#x", flags);
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	if (!tee_device_get(teedev))
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	if (!teedev->desc->ops->shm_register ||
+> +	    !teedev->desc->ops->shm_unregister) {
+> +		dev_err(teedev->dev.parent,
+> +			"register shared memory unspported by device");
 
- #endif
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index a652ce0..bdedd8f 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -144,6 +144,7 @@ static inline u32 arch_timer_get_cntkctl(void)
- static inline void arch_timer_set_cntkctl(u32 cntkctl)
- {
- 	write_sysreg(cntkctl, cntkctl_el1);
-+	isb();
- }
+I don't think this should be a dev_err. The user requested something
+that the device did not support, but that's not a device-side error.
 
- static inline u64 arch_counter_get_cntpct(void)
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index fd4b7f6..47cf15e 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -77,6 +77,7 @@ struct arch_timer {
- static bool arch_counter_suspend_stop;
- static bool vdso_default = true;
+A user may legitmiately do this to probe whether the TEE supports
+registering memory.
 
-+static cpumask_t evtstrm_available;
- static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
+> +		tee_device_put(teedev);
+> +		return ERR_PTR(-EINVAL);
 
- static int __init early_evtstrm_cfg(char *buf)
-@@ -740,6 +741,7 @@ static void arch_timer_evtstrm_enable(int divider)
- #ifdef CONFIG_COMPAT
- 	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
- #endif
-+	cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
- }
+Perhaps EOPNOTSUPP?
 
- static void arch_timer_configure_evtstream(void)
-@@ -864,6 +866,11 @@ u32 arch_timer_get_rate(void)
- 	return arch_timer_rate;
- }
+> +	}
+> +
+> +	shm = kzalloc(sizeof(*shm), GFP_KERNEL);
+> +	if (!shm) {
+> +		ret = ERR_PTR(-ENOMEM);
+> +		goto err;
+> +	}
+> +
+> +	shm->flags = flags | TEE_SHM_REGISTER;
+> +	shm->teedev = teedev;
+> +	shm->ctx = ctx;
+> +	shm->id = -1;
+> +	start = rounddown(addr, PAGE_SIZE);
+> +	shm->offset = addr - start;
+> +	shm->size = length;
+> +	num_pages = (roundup(addr + length, PAGE_SIZE) - start) / PAGE_SIZE;
 
-+bool arch_timer_evtstrm_available(void)
-+{
-+	return !!cpumask_test_cpu(smp_processor_id(), &evtstrm_available);
-+}
-+
- static u64 arch_counter_get_cntvct_mem(void)
- {
- 	u32 vct_lo, vct_hi, tmp_hi;
-@@ -929,6 +936,8 @@ static int arch_timer_dying_cpu(unsigned int cpu)
- {
- 	struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
+Why not mandate that the user passes a buffer which has a start and end
+aligned to PAGE_SIZE?
 
-+	cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
-+
- 	arch_timer_stop(clk);
- 	return 0;
- }
-@@ -938,10 +947,16 @@ static int arch_timer_dying_cpu(unsigned int cpu)
- static int arch_timer_cpu_pm_notify(struct notifier_block *self,
- 				    unsigned long action, void *hcpu)
- {
--	if (action == CPU_PM_ENTER)
-+	if (action == CPU_PM_ENTER) {
- 		__this_cpu_write(saved_cntkctl, arch_timer_get_cntkctl());
--	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
-+
-+		cpumask_clear_cpu(smp_processor_id(), &evtstrm_available);
-+	} else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT) {
- 		arch_timer_set_cntkctl(__this_cpu_read(saved_cntkctl));
-+
-+		if (elf_hwcap & HWCAP_EVTSTRM)
-+			cpumask_set_cpu(smp_processor_id(), &evtstrm_available);
-+	}
- 	return NOTIFY_OK;
- }
+Otherwise, the buffer is size is silently upgraded without the user's
+knowledge, which seems likely to result in bugs.
 
-@@ -1017,6 +1032,7 @@ static int __init arch_timer_register(void)
- 	if (err)
- 		goto out_unreg_notify;
+> +	shm->pages = kcalloc(num_pages, sizeof(struct page), GFP_KERNEL);
 
-+	cpumask_clear(&evtstrm_available);
+I think you mean sizeof(struct page *) here.
 
- 	/* Register and immediately configure the timer on the boot CPU */
- 	err = cpuhp_setup_state(CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index cc805b7..4e28283 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -93,6 +93,7 @@ struct arch_timer_mem {
- extern u32 arch_timer_get_rate(void);
- extern u64 (*arch_timer_read_counter)(void);
- extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
-+extern bool arch_timer_evtstrm_available(void);
+Generally, for:
 
- #else
+  lhs = some_alloc(sizeof(x))
 
-@@ -106,6 +107,11 @@ static inline u64 arch_timer_read_counter(void)
- 	return 0;
- }
+... it's preferred that x is *lhs, so as to keep the types in sync. e.g.
 
-+static inline bool arch_timer_evtstrm_available(void)
-+{
-+	return false;
-+}
-+
- #endif
+  shm->pages = kcalloc(num_pages, sizeof(*shm->pages), GFP_KERNEL);
 
- #endif
---
-1.9.1
+> +	if (!shm->pages) {
+> +		ret = ERR_PTR(-ENOMEM);
+> +		goto err;
+> +	}
+> +
+> +	rc = get_user_pages_fast(start, num_pages, 1, shm->pages);
+> +	if (rc > 0)
+> +		shm->num_pages = rc;
+> +	if (rc != num_pages) {
+> +		if (rc > 0)
+> +			rc = -ENOMEM;
+> +		ret = ERR_PTR(rc);
+> +		goto err;
+> +	}
+> +
+> +	mutex_lock(&teedev->mutex);
+> +	shm->id = idr_alloc(&teedev->idr, shm, 1, 0, GFP_KERNEL);
+> +	mutex_unlock(&teedev->mutex);
+
+AFAICT, idr_alloc() can fail, so I beleive you're missing a sanity check
+on the return value here.
+
+THanks,
+Mark.
