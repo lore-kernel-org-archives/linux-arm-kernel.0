@@ -1,75 +1,41 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Fri, 29 Sep 2017 09:56:02 +0800
-Subject: [PATCH 01/12] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <1506475100.19851.9.camel@mhfsdcap03>
-References: <1505207272-16983-1-git-send-email-chaotian.jing@mediatek.com>
- <1505207272-16983-2-git-send-email-chaotian.jing@mediatek.com>
- <20170913141026.43oh4n4foipmahsk@rob-hp-laptop>
- <1505355021.8308.4.camel@mhfsdcap03>
- <CAPDyKFrUe-0hEsxVRQSZvujcXY8WrR6m-0DMW=VwDDLvz7Lexw@mail.gmail.com>
- <1506475100.19851.9.camel@mhfsdcap03>
-Message-ID: <1506650162.19851.12.camel@mhfsdcap03>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Fri, 29 Sep 2017 02:03:47 +0000
+Subject: [PATCH] extcon: Split out extcon header file for consumer and
+ provider device
+In-Reply-To: <1506643305-4581-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20170929000148epcas2p200e56186b067ec626a033c7ae2d4bbdb@epcas2p2.samsung.com>
+ <1506643305-4581-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <TY1PR06MB0992097F0FBBE04CD282EEE7D87E0@TY1PR06MB0992.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-09-27 at 09:18 +0800, Chaotian Jing wrote:
-> On Wed, 2017-09-27 at 00:33 +0200, Ulf Hansson wrote:
-> > On 14 September 2017 at 04:10, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > > On Wed, 2017-09-13 at 09:10 -0500, Rob Herring wrote:
-> > >> On Tue, Sep 12, 2017 at 05:07:41PM +0800, Chaotian Jing wrote:
-> > >> > Change the comptiable for support of multi-platform
-> > >> > Add description for reg
-> > >> > Add description for source_cg
-> > >> > Add description for mediatek,latch-ck
-> > >>
-> > >> This is at least the 3rd patch with exactly the same vague subject.
-> > >> Please make the subject somewhat unique.
-> > >>
-> > > Thx, will change the subject at next version
-> > >> >
-> > >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > >> > ---
-> > >> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 13 ++++++++++---
-> > >> >  1 file changed, 10 insertions(+), 3 deletions(-)
-> > >> >
-> > >> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > >> > index 4182ea3..405cd06 100644
-> > >> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > >> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > >> > @@ -7,10 +7,15 @@ This file documents differences between the core properties in mmc.txt
-> > >> >  and the properties used by the msdc driver.
-> > >> >
-> > >> >  Required properties:
-> > >> > -- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-> > >> > +- compatible: value should be either of the following.
-> > >> > +   "mediatek,mt8135-mmc": for mmc host ip compatible with mt8135
-> > >> > +   "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
-> > >> > +   "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
-> > >> > +   "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> > >> > +- reg: physical base address of the controller and length
-> > >> >  - interrupts: Should contain MSDC interrupt number
-> > >> > -- clocks: MSDC source clock, HCLK
-> > >> > -- clock-names: "source", "hclk"
-> > >> > +- clocks: MSDC source clock, HCLK, source_cg
-> > >> > +- clock-names: "source", "hclk", "source_cg"
-> > >>
-> > >> All chips support source_cg? That's not backwards compatible for
-> > >> existing compatible strings if the driver requires it.
-> > > Not all chips support source_cg, for chips which do not support
-> > > source_cg, no need source_cg here, and the driver will parse it
-> > > to know if current chip support it.
-> > 
-> > In such case you must not add add a required binding for it. I think
-> > that is what Rob is trying to point out for you.
-> > 
-> > [...]
-> > 
-> > Kind regards
-> > Uffe
-> The source_cg is required(MUST) at MT2712 and future SoCs, but not
-> required(do not have it) at previous SoCs, so that put it at required
-> properties, let the driver to handle it.
+Hi,
 
-Any other comments about it ? still must not add a required binding for
-it ? if add a optional binding for it, how to add it ? as cannot
-duplicate "clocks" & "clock-names" in one node.
+> From: Chanwoo Choi
+> Sent: Friday, September 29, 2017 9:02 AM
+> 
+< snip >
+>  drivers/phy/renesas/phy-rcar-gen3-usb2.c      |   2 +-
+< snip >
+>  drivers/usb/gadget/udc/renesas_usb3.c         |   2 +-
+
+These two drivers need the modification.
+But...
+
+< snip >
+> diff --git a/drivers/usb/renesas_usbhs/common.h b/drivers/usb/renesas_usbhs/common.h
+> index 8c5fc12ad778..a78764bc23eb 100644
+> --- a/drivers/usb/renesas_usbhs/common.h
+> +++ b/drivers/usb/renesas_usbhs/common.h
+> @@ -17,7 +17,7 @@
+>  #ifndef RENESAS_USB_DRIVER_H
+>  #define RENESAS_USB_DRIVER_H
+> 
+> -#include <linux/extcon.h>
+> +#include <linux/extcon-provider.h>
+
+Since this driver doesn't use any extcon-provider APIs for now,
+we doesn't need the modification, IIUC.
+
+Best regards,
+Yoshihiro Shimoda
