@@ -1,44 +1,150 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 29 Sep 2017 18:22:42 +0800
-Subject: [PATCH v3 04/14] drm/sun4i: tcon: Add support for demuxing TCON
- output on A31
-In-Reply-To: <20170929102006.2wz7wrkpplxwynoh@flea>
-References: <20170929082306.16193-1-wens@csie.org>
- <20170929082306.16193-5-wens@csie.org>
- <20170929102006.2wz7wrkpplxwynoh@flea>
-Message-ID: <CAGb2v65VhtEckRCXi4X5AjmC-5CSHavATu8fKyEHOivmYqZkww@mail.gmail.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 29 Sep 2017 11:23:31 +0100
+Subject: [PATCH] rtc: armada38x: add support for trimming the RTC
+Message-ID: <E1dxsSB-0006RM-08@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 6:20 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Sep 29, 2017 at 08:22:56AM +0000, Chen-Yu Tsai wrote:
->> On systems with 2 TCONs such as the A31, it is possible to demux the
->> output of the TCONs to one encoder.
->>
->> Add support for this for the A31.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 38 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 38 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> index 7bf51abaee97..c949309d4285 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> @@ -112,6 +112,21 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
->>  }
->>  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
->>
->> +static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
->
-> Would that make sense to make it a bit more generic, and pass the id
-> to look for as an argument?
+Add support for trimming the RTC using the offset mechanism.  This RTC
+supports two modes: low update mode and high update mode.  Low update
+mode has finer precision than high update mode, so we use the low mode
+where possible.
 
-The reason to look for TCON0 explicitly is to access the muxing registers, which
-are only available in TCON0. Other than that, there's nothing else
-shared between
-the two TCONs. So there's no particular reason to look for TCON1 explicitly.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/rtc/rtc-armada38x.c | 101 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
 
-ChenYu
+diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+index 21f355c37eab..1e4978c96ffd 100644
+--- a/drivers/rtc/rtc-armada38x.c
++++ b/drivers/rtc/rtc-armada38x.c
+@@ -28,6 +28,8 @@
+ #define RTC_IRQ_AL_EN		    BIT(0)
+ #define RTC_IRQ_FREQ_EN		    BIT(1)
+ #define RTC_IRQ_FREQ_1HZ	    BIT(2)
++#define RTC_CCR		    0x18
++#define RTC_CCR_MODE		    BIT(15)
+ 
+ #define RTC_TIME	    0xC
+ #define RTC_ALARM1	    0x10
+@@ -343,18 +345,117 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
++/*
++ * The information given in the Armada 388 functional spec is complex.
++ * They give two different formulas for calculating the offset value,
++ * but when considering "Offset" as an 8-bit signed integer, they both
++ * reduce down to (we shall rename "Offset" as "val" here):
++ *
++ *   val = (f_ideal / f_measured - 1) / resolution   where f_ideal = 32768
++ *
++ * Converting to time, f = 1/t:
++ *   val = (t_measured / t_ideal - 1) / resolution   where t_ideal = 1/32768
++ *
++ *   =>  t_measured / t_ideal = val * resolution + 1
++ *
++ * "offset" in the RTC interface is defined as:
++ *   t = t0 * (1 + offset * 1e-9)
++ * where t is the desired period, t0 is the measured period with a zero
++ * offset, which is t_measured above. With t0 = t_measured and t = t_ideal,
++ *   offset = (t_ideal / t_measured - 1) / 1e-9
++ *
++ *   => t_ideal / t_measured = offset * 1e-9 + 1
++ *
++ * so:
++ *
++ *   offset * 1e-9 + 1 = 1 / (val * resolution + 1)
++ *
++ * We want "resolution" to be an integer, so resolution = R * 1e-9, giving
++ *   offset = 1e18 / (val * R + 1e9) - 1e9
++ *   val = (1e18 / (offset + 1e9) - 1e9) / R
++ * with a common transformation:
++ *   f(x) = 1e18 / (x + 1e9) - 1e9
++ *   offset = f(val * R)
++ *   val = f(offset) / R
++ *
++ * Armada 38x supports two modes, fine mode (954ppb) and coarse mode (3815ppb).
++ */
++static long armada38x_ppb_convert(long ppb)
++{
++	long div = ppb + 1000000000L;
++
++	return div_s64(1000000000000000000LL + div / 2, div) - 1000000000L;
++}
++
++static int armada38x_rtc_read_offset(struct device *dev, long *offset)
++{
++	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
++	unsigned long ccr, flags;
++	long ppb_cor;
++
++	spin_lock_irqsave(&rtc->lock, flags);
++	ccr = rtc->data->read_rtc_reg(rtc, RTC_CCR);
++	spin_unlock_irqrestore(&rtc->lock, flags);
++
++	ppb_cor = (ccr & RTC_CCR_MODE ? 3815 : 954) * (s8)ccr;
++	/* ppb_cor + 1000000000L can never be zero */
++	*offset = armada38x_ppb_convert(ppb_cor);
++
++	return 0;
++}
++
++static int armada38x_rtc_set_offset(struct device *dev, long offset)
++{
++	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
++	unsigned long ccr = 0;
++	long ppb_cor, off;
++
++	/*
++	 * The maximum ppb_cor is -128 * 3815 .. 127 * 3815, but we
++	 * need to clamp the input.  This equates to -484270 .. 488558.
++	 * Not only is this to stop out of range "off" but also to
++	 * avoid the division by zero in armada38x_ppb_convert().
++	 */
++	offset = clamp(offset, -484270L, 488558L);
++
++	ppb_cor = armada38x_ppb_convert(offset);
++
++	/*
++	 * Use low update mode where possible, which gives a better
++	 * resolution of correction.
++	 */
++	off = DIV_ROUND_CLOSEST(ppb_cor, 954);
++	if (off > 127 || off < -128) {
++		ccr = RTC_CCR_MODE;
++		off = DIV_ROUND_CLOSEST(ppb_cor, 3815);
++	}
++
++	/*
++	 * Armada 388 requires a bit pattern in bits 14..8 depending on
++	 * the sign bit: { 0, ~S, S, S, S, S, S }
++	 */
++	ccr |= (off & 0x3fff) ^ 0x2000;
++	rtc_delayed_write(ccr, rtc, RTC_CCR);
++
++	return 0;
++}
++
+ static const struct rtc_class_ops armada38x_rtc_ops = {
+ 	.read_time = armada38x_rtc_read_time,
+ 	.set_time = armada38x_rtc_set_time,
+ 	.read_alarm = armada38x_rtc_read_alarm,
+ 	.set_alarm = armada38x_rtc_set_alarm,
+ 	.alarm_irq_enable = armada38x_rtc_alarm_irq_enable,
++	.read_offset = armada38x_rtc_read_offset,
++	.set_offset = armada38x_rtc_set_offset,
+ };
+ 
+ static const struct rtc_class_ops armada38x_rtc_ops_noirq = {
+ 	.read_time = armada38x_rtc_read_time,
+ 	.set_time = armada38x_rtc_set_time,
+ 	.read_alarm = armada38x_rtc_read_alarm,
++	.read_offset = armada38x_rtc_read_offset,
++	.set_offset = armada38x_rtc_set_offset,
+ };
+ 
+ static const struct armada38x_rtc_data armada38x_data = {
+-- 
+2.7.4
