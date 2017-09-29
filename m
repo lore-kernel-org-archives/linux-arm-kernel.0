@@ -1,65 +1,103 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:53:33 +0200
-Subject: [PATCH 41/48] ARM: dts: iwg22m: Enable SDHI1 controller
-In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
-References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <599114ee21057040c058043fdc1367878350d5e4.1506683482.git.horms+renesas@verge.net.au>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 29 Sep 2017 14:27:39 +0200
+Subject: [PATCH v2 net] net: mvpp2: Fix clock resource by adding an optional
+ bus clock
+Message-ID: <20170929122739.5296-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+is optional because not all the SoCs need them but at least for Armada
+7K/8K it is actually mandatory.
 
-Enable the SDHI1 controller on iWave RZ/G1E SoM.
+The binding documentation is updating accordingly.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Changelog:
+v1 -> v2:
+ - manage the -EPROBE_DEFER case
+ - fix typos in documentation
+ - remove useless test before clk_disable_unprepare()
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-index e306e7c5b644..f7f9ceff35a6 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-+++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-@@ -9,6 +9,7 @@
-  */
+ Documentation/devicetree/bindings/net/marvell-pp2.txt | 10 ++++++----
+ drivers/net/ethernet/marvell/mvpp2.c                  | 15 +++++++++++++++
+ 2 files changed, 21 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+index 7e2dad08a12e..1814fa13f6ab 100644
+--- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
++++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+@@ -21,8 +21,9 @@ Required properties:
+ 	- main controller clock (for both armada-375-pp2 and armada-7k-pp2)
+ 	- GOP clock (for both armada-375-pp2 and armada-7k-pp2)
+ 	- MG clock (only for armada-7k-pp2)
+-- clock-names: names of used clocks, must be "pp_clk", "gop_clk" and
+-  "mg_clk" (the latter only for armada-7k-pp2).
++	- AXI clock (only for armada-7k-pp2)
++- clock-names: names of used clocks, must be "pp_clk", "gop_clk", "mg_clk"
++  and "axi_clk" (the 2 latter only for armada-7k-pp2).
  
- #include "r8a7745.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ The ethernet ports are represented by subnodes. At least one port is
+ required.
+@@ -78,8 +79,9 @@ Example for marvell,armada-7k-pp2:
+ cpm_ethernet: ethernet at 0 {
+ 	compatible = "marvell,armada-7k-pp22";
+ 	reg = <0x0 0x100000>, <0x129000 0xb000>;
+-	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+-	clock-names = "pp_clk", "gop_clk", "gp_clk";
++	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>,
++		 <&cpm_syscon0 1 5>, <&cpm_syscon0 1 18>;
++	clock-names = "pp_clk", "gop_clk", "gp_clk", "axi_clk";
  
- / {
- 	compatible = "iwave,g22m", "renesas,r8a7745";
-@@ -38,6 +39,12 @@
- 		function = "mmc";
- 	};
+ 	eth0: eth0 {
+ 		interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index dd0ee2691c86..f2656112986b 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -792,6 +792,7 @@ struct mvpp2 {
+ 	struct clk *pp_clk;
+ 	struct clk *gop_clk;
+ 	struct clk *mg_clk;
++	struct clk *axi_clk;
  
-+	sdhi1_pins: sd1 {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <3300>;
-+	};
+ 	/* List of pointers to port structures */
+ 	struct mvpp2_port **port_list;
+@@ -7963,6 +7964,18 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 		err = clk_prepare_enable(priv->mg_clk);
+ 		if (err < 0)
+ 			goto err_gop_clk;
 +
- 	i2c3_pins: i2c3 {
- 		groups = "i2c3_b";
- 		function = "i2c3";
-@@ -54,6 +61,16 @@
- 	status = "okay";
- };
++		priv->axi_clk = devm_clk_get(&pdev->dev, "axi_clk");
++		if (IS_ERR(priv->axi_clk)) {
++			err = PTR_ERR(priv->axi_clk);
++			if (err == -EPROBE_DEFER)
++				goto err_gop_clk;
++			priv->axi_clk = NULL;
++		} else {
++			err = clk_prepare_enable(priv->axi_clk);
++			if (err < 0)
++				goto err_gop_clk;
++		}
+ 	}
  
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_3p3v>;
-+	cd-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &i2c3 {
- 	pinctrl-0 = <&i2c3_pins>;
- 	pinctrl-names = "default";
+ 	/* Get system's tclk rate */
+@@ -8015,6 +8028,7 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_mg_clk:
++	clk_disable_unprepare(priv->axi_clk);
+ 	if (priv->hw_version == MVPP22)
+ 		clk_disable_unprepare(priv->mg_clk);
+ err_gop_clk:
+@@ -8052,6 +8066,7 @@ static int mvpp2_remove(struct platform_device *pdev)
+ 				  aggr_txq->descs_dma);
+ 	}
+ 
++	clk_disable_unprepare(priv->axi_clk);
+ 	clk_disable_unprepare(priv->mg_clk);
+ 	clk_disable_unprepare(priv->pp_clk);
+ 	clk_disable_unprepare(priv->gop_clk);
 -- 
-2.1.4
+2.14.1
