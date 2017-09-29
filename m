@@ -1,264 +1,105 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Sep 2017 15:34:09 -0700
-Subject: [PATCH 5/7] ARM: dts: Add nodes for missing omap4 interconnect target
- modules
-In-Reply-To: <20170929223411.9691-1-tony@atomide.com>
-References: <20170929223411.9691-1-tony@atomide.com>
-Message-ID: <20170929223411.9691-6-tony@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 29 Sep 2017 15:48:21 -0700
+Subject: [PATCH V4 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
+References: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170929224821.GM457@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On omap4 we are missing dts nodes for several interconnect target
-modules that we are idling on init. This currently works with the
-legacy platform data still around.
+On 09/26, Dong Aisheng wrote:
+> 'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
 
-To fix this, let's add the interconnect target modules so we can
-idle the unused interconnect target module on init.
+s/optinal/optional/
 
-Also note that adding the interconnect target module node does not
-necessarily mean that there is a driver available for the child IP
-block, or that the child IP block is even functional.
+> here to handle this for DT users without 'clock-names' specified.
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Reported-by: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> ---
+> Changes since v3:
+>  * fix build warning on the SH platform
+> 
+> Changes since v2:
+>  * of_clk_bulk_get should return -ENOENT;
+> 
+> Changes since v1:
+>  * using %pOF instead of full_name
+> ---
+>  drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
+>  include/linux/clk.h    |  8 ++++++++
+>  2 files changed, 39 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+> index c834f5a..896aa3b 100644
+> --- a/drivers/clk/clk-bulk.c
+> +++ b/drivers/clk/clk-bulk.c
+> @@ -19,6 +19,37 @@
+>  #include <linux/clk.h>
+>  #include <linux/device.h>
+>  #include <linux/export.h>
+> +#include <linux/of.h>
+> +
+> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> +				 struct clk_bulk_data *clks)
+> +{
+> +	int ret;
+> +	int i;
+> +
+> +	for (i = 0; i < num_clks; i++)
+> +		clks[i].clk = NULL;
+> +
+> +	for (i = 0; i < num_clks; i++) {
+> +		clks[i].clk = of_clk_get(np, i);
+> +		if (IS_ERR(clks[i].clk)) {
+> +			ret = PTR_ERR(clks[i].clk);
+> +			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
+> +			       np, i, ret);
+> +			clks[i].clk = NULL;
+> +			goto err;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +
+> +err:
+> +	clk_bulk_put(i, clks);
+> +
+> +	return ret;
+> +}
 
-In the SGX case, the PowerVR driver is closed source. And McASP on
-omap4 has at least the TX path disabled and is not supported by the
-davinci-mcasp driver. For AESS there is old Android 3.4 kernel
-driver available.
+Export the symbol?
 
-For smarflex, we are still probing with platform data and the
-driver needs more work before we can add the device ip child nodes.
+> +#endif
+>  
+>  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+>  {
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 12c96d9..073cb3b 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+>  }
+>  
+>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> +				 struct clk_bulk_data *clks);
+>  struct clk *of_clk_get(struct device_node *np, int index);
+>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  #else
+> +static inline int of_clk_bulk_get(struct device_node *np, int num_clks,
 
-And finally, we're not yet using the interconnet ranges. I will
-be posting separate patches for those later on.
+Do we need __must_check here too? We should do the same for the
+other bulk get APIs. Seems we missed that part last time.
 
-Cc: Beno?t Cousson <bcousson@baylibre.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Sakari Ailus <sakari.ailus@iki.fi>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap4.dtsi | 159 +++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 147 insertions(+), 12 deletions(-)
+I'll fix all these things up when applying.
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -382,6 +382,19 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		target-module at 48076000 {
-+			compatible = "ti,sysc-omap4";
-+			ti,hwmods = "slimbus2";
-+			reg = <0x48076000 0x4>,
-+			      <0x48076010 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x48076000 0x001000>;
-+
-+			/* No child device binding or driver in mainline */
-+		};
-+
- 		elm: elm at 48078000 {
- 			compatible = "ti,am3352-elm";
- 			reg = <0x48078000 0x2000>;
-@@ -442,25 +455,55 @@
- 			clock-frequency = <48000000>;
- 		};
- 
--		smartreflex_iva: smartreflex at 4a0db000 {
--			compatible = "ti,omap4-smartreflex-iva";
--			reg = <0x4a0db000 0x80>;
--			interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-+		target-module at 4a0db000 {
-+			compatible = "ti,sysc-sr";
- 			ti,hwmods = "smartreflex_iva";
-+			reg = <0x4a0db000 0x4>,
-+			      <0x4a0db008 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x4a0db000 0x001000>;
-+
-+			smartreflex_iva: smartreflex at 0 {
-+				compatible = "ti,omap4-smartreflex-iva";
-+				reg = <0 0x80>;
-+				interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-+			};
- 		};
- 
--		smartreflex_core: smartreflex at 4a0dd000 {
--			compatible = "ti,omap4-smartreflex-core";
--			reg = <0x4a0dd000 0x80>;
--			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+		target-module at 4a0dd000 {
-+			compatible = "ti,sysc-sr";
- 			ti,hwmods = "smartreflex_core";
-+			reg = <0x4a0dd000 0x4>,
-+			      <0x4a0dd008 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x4a0dd000 0x001000>;
-+
-+			smartreflex_core: smartreflex at 0 {
-+				compatible = "ti,omap4-smartreflex-core";
-+				reg = <0 0x80>;
-+				interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+			};
- 		};
- 
--		smartreflex_mpu: smartreflex at 4a0d9000 {
--			compatible = "ti,omap4-smartreflex-mpu";
--			reg = <0x4a0d9000 0x80>;
--			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+		target-module at 4a0d9000 {
-+			compatible = "ti,sysc-sr";
- 			ti,hwmods = "smartreflex_mpu";
-+			reg = <0x4a0d9000 0x4>,
-+			      <0x4a0d9008 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x4a0d9000 0x001000>;
-+
-+			smartreflex_mpu: smartreflex at 0 {
-+				compatible = "ti,omap4-smartreflex-mpu";
-+				reg = <0 0x80>;
-+				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			};
- 		};
- 
- 		hwspinlock: spinlock at 4a0f6000 {
-@@ -666,6 +709,19 @@
- 			#iommu-cells = <0>;
- 		};
- 
-+		target-module at 52000000 {
-+			compatible = "ti,sysc-omap4";
-+			ti,hwmods = "iss";
-+			reg = <0x52000000 0x4>,
-+			      <0x52000010 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x52000000 0x1000000>;
-+
-+			/* No child device binding, driver in staging */
-+		};
-+
- 		mmu_ipu: mmu at 55082000 {
- 			compatible = "ti,omap4-iommu";
- 			reg = <0x55082000 0x100>;
-@@ -760,6 +816,56 @@
- 			status = "disabled";
- 		};
- 
-+		target-module at 40128000 {
-+			compatible = "ti,sysc-mcasp";
-+			ti,hwmods = "mcasp";
-+			reg = <0x40128004 0x4>;
-+			reg-names = "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x00000000 0x40128000 0x1000>, /* MPU */
-+				 <0x49028000 0x49028000 0x1000>; /* L3 */
-+
-+			/*
-+			 * Child device unsupported by davinci-mcasp. At least
-+			 * TX path is disabled for omap4, and only DIT mode
-+			 * works with no I2S. See also old Android kernel
-+			 * omap-mcasp driver for more information.
-+			 */
-+		};
-+
-+		target-module at 4012c000 {
-+			compatible = "ti,sysc-omap4";
-+			ti,hwmods = "slimbus1";
-+			reg = <0x4012c000 0x4>,
-+			      <0x4012c010 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x00000000 0x4012c000 0x1000>, /* MPU */
-+				 <0x4902c000 0x4902c000 0x1000>; /* L3 */
-+
-+			/* No child device binding or driver in mainline */
-+		};
-+
-+		target-module at 401f1000 {
-+			compatible = "ti,sysc-omap4";
-+			ti,hwmods = "aess";
-+			reg = <0x401f1000 0x4>,
-+			      <0x401f1010 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x00000000 0x401f1000 0x1000>, /* MPU */
-+				 <0x490f1000 0x490f1000 0x1000>; /* L3 */
-+
-+			/*
-+			 * No child device binding or driver in mainline.
-+			 * See Android tree and related upstreaming efforts
-+			 * for the old driver.
-+			 */
-+		};
-+
- 		mcbsp4: mcbsp at 48096000 {
- 			compatible = "ti,omap4-mcbsp";
- 			reg = <0x48096000 0xff>; /* L4 Interconnect */
-@@ -848,6 +954,19 @@
- 			};
- 		};
- 
-+		target-module at 4a10a000 {
-+			compatible = "ti,sysc-omap4";
-+			ti,hwmods = "fdif";
-+			reg = <0x4a10a000 0x4>,
-+			      <0x4a10a010 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x4a10a000 0x1000>;
-+
-+			/* No child device binding or driver in mainline */
-+		};
-+
- 		timer1: timer at 4a318000 {
- 			compatible = "ti,omap3430-timer";
- 			reg = <0x4a318000 0x80>;
-@@ -1063,6 +1182,22 @@
- 			status = "disabled";
- 		};
- 
-+		target-module at 56000000 {
-+			compatible = "ti,sysc-omap4";
-+			ti,hwmods = "gpu";
-+			reg = <0x5601fc00 0x4>,
-+			      <0x5601fc10 0x4>;
-+			reg-names = "rev", "sysc";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x56000000 0x2000000>;
-+
-+			/*
-+			 * Closed source PowerVR driver, no child device
-+			 * binding or driver in mainline
-+			 */
-+		};
-+
- 		dss: dss at 58000000 {
- 			compatible = "ti,omap4-dss";
- 			reg = <0x58000000 0x80>;
 -- 
-2.14.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
