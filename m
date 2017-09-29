@@ -1,137 +1,132 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:53:03 +0200
-Subject: [PATCH 11/48] ARM: dts: r8a7745: Add GPIO support
+Date: Fri, 29 Sep 2017 13:53:06 +0200
+Subject: [PATCH 14/48] ARM: dts: r8a7745: Add I2C DT support
 In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
 References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <3163c03ec37aef502474122b857452fb948c7596.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <282fbf4066e58b4c60683ab5cba30c5c998c7250.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Describe GPIO blocks in the R8A7745 device tree.
+Add I2C[0-5] devices to the r8a7745 device tree.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 105 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 93 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index aff90dfb8b32..18ca7ae8dd3f 100644
+index 18ca7ae8dd3f..2fa989f631a9 100644
 --- a/arch/arm/boot/dts/r8a7745.dtsi
 +++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -65,6 +65,111 @@
- 			resets = <&cpg 408>;
- 		};
+@@ -18,6 +18,15 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
  
-+		gpio0: gpio at e6050000 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 912>;
++	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -613,6 +622,90 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		i2c0: i2c at e6508000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6508000 0 0x40>;
++			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 931>;
 +			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 912>;
++			resets = <&cpg 931>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
 +		};
 +
-+		gpio1: gpio at e6051000 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 26>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 911>;
++		i2c1: i2c at e6518000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6518000 0 0x40>;
++			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 930>;
 +			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 911>;
++			resets = <&cpg 930>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
 +		};
 +
-+		gpio2: gpio at e6052000 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 910>;
++		i2c2: i2c at e6530000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6530000 0 0x40>;
++			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 929>;
 +			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 910>;
++			resets = <&cpg 929>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
 +		};
 +
-+		gpio3: gpio at e6053000 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 909>;
++		i2c3: i2c at e6540000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6540000 0 0x40>;
++			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 928>;
 +			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 909>;
++			resets = <&cpg 928>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
 +		};
 +
-+		gpio4: gpio at e6054000 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 908>;
++		i2c4: i2c at e6520000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6520000 0 0x40>;
++			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 927>;
 +			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 908>;
++			resets = <&cpg 927>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
 +		};
 +
-+		gpio5: gpio at e6055000 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 28>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 907>;
++		i2c5: i2c at e6528000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6528000 0 0x40>;
++			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 925>;
 +			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 907>;
++			resets = <&cpg 925>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
 +		};
-+
-+		gpio6: gpio at e6055400 {
-+			compatible = "renesas,gpio-r8a7745",
-+				     "renesas,rcar-gen2-gpio";
-+			reg = <0 0xe6055400 0 0x50>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 192 26>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 905>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 905>;
-+		};
-+
- 		irqc: interrupt-controller at e61c0000 {
- 			compatible = "renesas,irqc-r8a7745", "renesas,irqc";
- 			#interrupt-cells = <2>;
+ 	};
+ 
+ 	/* External root clock */
 -- 
 2.1.4
