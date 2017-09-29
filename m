@@ -1,45 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:52:30 +0200
-Subject: [PATCH 21/22] arm64: dts: renesas: r8a7795: add USB3.0 peripheral
- device node
+Date: Fri, 29 Sep 2017 13:52:28 +0200
+Subject: [PATCH 19/22] arm64: dts: renesas: r8a77995: draak: enable USB2.0
+ Host (EHCI/OHCI)
 In-Reply-To: <cover.1506678250.git.horms+renesas@verge.net.au>
 References: <cover.1506678250.git.horms+renesas@verge.net.au>
-Message-ID: <3bdba1b26771496ad8db8cd948ce144fc1ce1ca2.1506678250.git.horms+renesas@verge.net.au>
+Message-ID: <607c73c38e8492677da02a999eabd669e96f6d88.1506678250.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-This patch adds USB3.0 peripheral channel 0 device node for r8a7795.
+This patch enables USB2.0 Host (EHCI/OHCI) for r8a77995.
 
 Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 5d5174d8635d..d5cfd1a1c539 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1471,6 +1471,17 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+index 454658ac6efc..7b776cb7e928 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+@@ -48,6 +48,14 @@
+ 	};
+ };
  
-+		usb3_peri0: usb at ee020000 {
-+			compatible = "renesas,r8a7795-usb3-peri",
-+				     "renesas,rcar-gen3-usb3-peri";
-+			reg = <0 0xee020000 0 0x400>;
-+			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 328>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			resets = <&cpg 328>;
-+			status = "disabled";
-+		};
++&ehci0 {
++	status = "okay";
++};
 +
- 		usb_dmac0: dma-controller at e65a0000 {
- 			compatible = "renesas,r8a7795-usb-dmac",
- 				     "renesas,usb-dmac";
++&ohci0 {
++	status = "okay";
++};
++
+ &scif2 {
+ 	pinctrl-0 = <&scif2_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.1.4
