@@ -1,26 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Sep 2017 11:50:04 +0100
-Subject: [PATCH 0/8] sa1100fb updates
-Message-ID: <20170929105004.GY20805@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 29 Sep 2017 11:50:56 +0100
+Subject: [PATCH 1/8] video: sa1100fb: use devm_kzalloc()
+In-Reply-To: <20170929105004.GY20805@n2100.armlinux.org.uk>
+References: <20170929105004.GY20805@n2100.armlinux.org.uk>
+Message-ID: <E1dxssi-0006im-JD@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bart,
+Use devm_kzalloc() when allocating the private data for the framebuffer
+device.
 
-This series updates the sa1100fb fbdev driver's initialisation paths
-to be more robust.  In doing these updates, I realised that we omitted
-to free some memory which was allocated for the framebuffer if
-initialisation fails - something that was hidden due to the complex
-cleanup that the driver performs.  Switching to managed resources made
-this more obvious.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/video/fbdev/sa1100fb.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Tested on H3600 iPAQ and Assabet.
-
- drivers/video/fbdev/sa1100fb.c | 75 +++++++++++++++---------------------------
- drivers/video/fbdev/sa1100fb.h |  2 ++
- 2 files changed, 29 insertions(+), 48 deletions(-)
-
+diff --git a/drivers/video/fbdev/sa1100fb.c b/drivers/video/fbdev/sa1100fb.c
+index fc2aaa5aca23..05a80e08dcde 100644
+--- a/drivers/video/fbdev/sa1100fb.c
++++ b/drivers/video/fbdev/sa1100fb.c
+@@ -1132,12 +1132,11 @@ static struct sa1100fb_info *sa1100fb_init_fbinfo(struct device *dev)
+ 	struct sa1100fb_info *fbi;
+ 	unsigned i;
+ 
+-	fbi = kmalloc(sizeof(struct sa1100fb_info) + sizeof(u32) * 16,
+-		      GFP_KERNEL);
++	fbi = devm_kzalloc(dev, sizeof(struct sa1100fb_info) + sizeof(u32) * 16,
++			   GFP_KERNEL);
+ 	if (!fbi)
+ 		return NULL;
+ 
+-	memset(fbi, 0, sizeof(struct sa1100fb_info));
+ 	fbi->dev = dev;
+ 
+ 	strcpy(fbi->fb.fix.id, SA1100_NAME);
+@@ -1292,7 +1291,6 @@ static int sa1100fb_probe(struct platform_device *pdev)
+ 		iounmap(fbi->base);
+ 	if (fbi->clk)
+ 		clk_put(fbi->clk);
+-	kfree(fbi);
+ 	release_mem_region(res->start, resource_size(res));
+ 	return ret;
+ }
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
