@@ -1,71 +1,67 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Fri, 29 Sep 2017 18:37:00 +0300
-Subject: [PATCH v1 07/14] tee: optee: add shared buffer registration
- functions
-In-Reply-To: <20170929130643.GE5781@leverpostej>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1506621851-6929-8-git-send-email-volodymyr_babchuk@epam.com>
- <20170929130643.GE5781@leverpostej>
-Message-ID: <b0524d62-c72e-f884-cb78-9377e929dea7@epam.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 29 Sep 2017 16:47:27 +0100
+Subject: [PATCH] arm64: mm: Use READ_ONCE when dereferencing pointer to
+ pte table
+In-Reply-To: <1506680995-9000-1-git-send-email-will.deacon@arm.com>
+References: <1506680995-9000-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20170929154726.jyxgdepdtzf2nli2@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 29.09.17 16:06, Mark Rutland wrote:
-> On Thu, Sep 28, 2017 at 09:04:04PM +0300, Volodymyr Babchuk wrote:
->> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
->>
->> This change adds ops for shm_(un)register functions in tee interface.
->> Client application can use these functions to (un)register an own shared
->> buffer in OP-TEE address space. This allows zero copy data sharing between
->> Normal and Secure Worlds.
->>
->> Please note that while those functions were added to optee code,
->> it does not report to userspace that those functions are available.
->> OP-TEE code does not set TEE_GEN_CAP_REG_MEM flag. This flag will be
->> enabled only after all other features of dynamic shared memory will be
->> implemented in subsequent patches.
+On Fri, Sep 29, 2017 at 11:29:55AM +0100, Will Deacon wrote:
+> On kernels built with support for transparent huge pages, different CPUs
+> can access the PMD concurrently due to e.g. fast GUP or page_vma_mapped_walk
+> and they must take care to use READ_ONCE to avoid value tearing or caching
+> of stale values by the compiler. Unfortunately, these functions call into
+> our pgtable macros, which don't use READ_ONCE, and compiler caching has
+> been observed to cause the following crash during ext4 writeback:
 > 
-> While it's not adveritsed to the user, AFAICT the user could still
-> invoke these via ioctls, right?
-
-> Is there a problem if the user were to do so, or is it simply not useful
-> without the other features?
-Yes, user can invoke this via ioctl. And this buffer will be 
-registeredin OP-TEE. But user will not be able to use this registered 
-buffer, because optee driver does not know how to handle references to 
-registered buffers.
-
-This is a complex feature and I tried to split it into different commits 
-to ease up review.
-
-Probably, I can remove
-+       .shm_register = optee_shm_register,
-+       .shm_unregister = optee_shm_unregister,
-
-from this patch, so user will be not able to call this functions at all. 
-How do you thing? Should I do this?
-
+> PC is at check_pte+0x20/0x170
+> LR is at page_vma_mapped_walk+0x2e0/0x540
+> [...]
+> Process doio (pid: 2463, stack limit = 0xffff00000f2e8000)
+> Call trace:
+> [<ffff000008233328>] check_pte+0x20/0x170
+> [<ffff000008233758>] page_vma_mapped_walk+0x2e0/0x540
+> [<ffff000008234adc>] page_mkclean_one+0xac/0x278
+> [<ffff000008234d98>] rmap_walk_file+0xf0/0x238
+> [<ffff000008236e74>] rmap_walk+0x64/0xa0
+> [<ffff0000082370c8>] page_mkclean+0x90/0xa8
+> [<ffff0000081f3c64>] clear_page_dirty_for_io+0x84/0x2a8
+> [<ffff00000832f984>] mpage_submit_page+0x34/0x98
+> [<ffff00000832fb4c>] mpage_process_page_bufs+0x164/0x170
+> [<ffff00000832fc8c>] mpage_prepare_extent_to_map+0x134/0x2b8
+> [<ffff00000833530c>] ext4_writepages+0x484/0xe30
+> [<ffff0000081f6ab4>] do_writepages+0x44/0xe8
+> [<ffff0000081e5bd4>] __filemap_fdatawrite_range+0xbc/0x110
+> [<ffff0000081e5e68>] file_write_and_wait_range+0x48/0xd8
+> [<ffff000008324310>] ext4_sync_file+0x80/0x4b8
+> [<ffff0000082bd434>] vfs_fsync_range+0x64/0xc0
+> [<ffff0000082332b4>] SyS_msync+0x194/0x1e8
 > 
->> +int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
->> +		       struct page **pages, size_t num_pages)
->> +{
+> This is because page_vma_mapped_walk loads the PMD twice before calling
+> pte_offset_map: the first time without READ_ONCE (where it gets all zeroes
+> due to a concurrent pmdp_invalidate) and the second time with READ_ONCE
+> (where it sees a valid table pointer due to a concurrent pmd_populate).
+> However, the compiler inlines everything and caches the first value in
+> a register, which is subsequently used in pte_offset_phys which returns
+> a junk pointer that is later dereferenced when attempting to access the
+> relevant pte.
 > 
->> +	pages_array = optee_allocate_pages_array(num_pages);
->> +	if (!pages_array)
->> +		return -ENOMEM;
+> This patch fixes the issue by using READ_ONCE in pte_offset_phys to ensure
+> that a stale value is not used. Whilst this is a point fix for a known
+> failure (and simple to backport), a full fix moving all of our page table
+> accessors over to {READ,WRITE}_ONCE and consistently using READ_ONCE in
+> page_vma_mapped_walk is in the works for a future kernel release.
 > 
->> +	msg_arg->params->u.tmem.buf_ptr = virt_to_phys(pages_array) |
->> +					  tee_shm_get_page_offset(shm);
-> 
-> This doesn't look right. Why is the shm page offset being orred-in to
-> the pages_array physical address? They're completely separate objects.
-They present the same registered shared buffer. You have a list of pages 
-and offset from the first page. Strictly speaking this is not buf_ptr 
-anymore, but it is named so...
+> Cc: Jon Masters <jcm@redhat.com>
+> Cc: Timur Tabi <timur@codeaurora.org>
+> Cc: <stable@vger.kernel.org>
+> Fixes: f27176cfc363 ("mm: convert page_mkclean_one() to use page_vma_mapped_walk()")
+> Tested-by: Richard Ruigrok <rruigrok@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-This is a part of OP-TEE ABI. We considered different approaches at [1].
-This fits into general ABI design.
+Applied to arm64 fixes/core. Thanks
 
-[1] https://github.com/OP-TEE/optee_os/pull/1232#issuecomment-301851514
+-- 
+Catalin
