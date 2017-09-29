@@ -1,23 +1,33 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Fri, 29 Sep 2017 23:25:36 +0200
-Subject: [PATCH 0/5] firmware: arm_scpi: series with smaller improvements
-Message-ID: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+Date: Fri, 29 Sep 2017 23:44:01 +0200
+Subject: [PATCH 2/5] firmware: arm_scpi: remove two unneeded devm_kfree's in
+ scpi_remove
+In-Reply-To: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+Message-ID: <16d143b8-b8a9-d456-dd38-84131e3a5bd9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes smaller improvements to make all memory allocations
-device-managed and eventually get rid of scpi_remove. This also improves
-the cleanup path in scpi_probe.
+Both memory areas are free'd anyway when the device is destroyed,
+so we don't have to do it manually.
 
-Heiner Kallweit (5):
-  firmware: arm_scpi: remove usage of drvdata and don't reset scpi_info to null
-  firmware: arm_scpi: remove two unneeded devm_kfree's in scpi_remove
-  firmware: arm_scpi: pre-populate dvfs info in scpi_probe
-  firmware: arm_scpi: make freeing mbox channels device-managed
-  firmware: arm_scpi: remove scpi_remove
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
+ drivers/firmware/arm_scpi.c | 2 --
+ 1 file changed, 2 deletions(-)
 
- drivers/firmware/arm_scpi.c | 120 +++++++++++++++++++-------------------------
- 1 file changed, 51 insertions(+), 69 deletions(-)
-
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index c942761e..d80d11ae 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -914,8 +914,6 @@ static int scpi_remove(struct platform_device *pdev)
+ 		kfree(scpi_info->dvfs[i]->opps);
+ 		kfree(scpi_info->dvfs[i]);
+ 	}
+-	devm_kfree(dev, scpi_info->channels);
+-	devm_kfree(dev, scpi_info);
+ 
+ 	return 0;
+ }
 -- 
 2.14.2
