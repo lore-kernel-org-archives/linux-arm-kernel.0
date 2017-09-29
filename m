@@ -1,43 +1,132 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 29 Sep 2017 11:52:52 +0800
-Subject: [PATCH] ASoC: rockchip: Fix wrong allocation size of dapm routes
-Message-ID: <20170929035252.19808-1-jeffy.chen@rock-chips.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Fri, 29 Sep 2017 12:23:18 +0800
+Subject: [PATCH] ACPI/IORT: Fix PCI ACS enablement
+In-Reply-To: <20170928154625.GA25853@red-moon>
+References: <20170919170539.6265-1-lorenzo.pieralisi@arm.com>
+ <59C3A36A.2060202@hisilicon.com> <20170922094546.GE1523@red-moon>
+ <59C5C655.8030607@hisilicon.com> <20170928154625.GA25853@red-moon>
+Message-ID: <59CDCAB6.3000906@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The allocation size of dapm routes is wrong, correct it.
+On 2017/9/28 23:46, Lorenzo Pieralisi wrote:
+> On Sat, Sep 23, 2017 at 10:26:29AM +0800, Zhou Wang wrote:
+>> On 2017/9/22 17:45, Lorenzo Pieralisi wrote:
+>>> On Thu, Sep 21, 2017 at 07:32:58PM +0800, Zhou Wang wrote:
+>>>> On 2017/9/20 1:05, Lorenzo Pieralisi wrote:
+>>>>> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
+>>>>> workarounds") removed kernel code that was allowing to initialize
+>>>>> and probe the SMMU devices early (ie earlier than PCI devices through
+>>>>> linker script callback entries) in the boot process because it was not
+>>>>> needed any longer in that the SMMU devices/drivers now support deferred
+>>>>> probing.
+>>>>>
+>>>>> Since the SMMUs probe routines are also in charge of requesting global
+>>>>> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
+>>>>> up early-probing workarounds") also postponed PCI ACS enablement to
+>>>>> SMMUs devices probe time, which may be too late given that PCI devices
+>>>>> needs to detect if PCI ACS is enabled to init the respective capability
+>>>>> through the following call path:
+>>>>>
+>>>>> pci_device_add()
+>>>>>  -> pci_init_capabilities()
+>>>>>   -> pci_enable_acs()
+>>>>>
+>>>>> Add code in the ACPI IORT SMMU platform devices initialization path
+>>>>> (that is called before ACPI PCI enumeration) to detect if an SMMU is
+>>>>> present in HW and enable PCI ACS if it actually is, restoring the
+>>>>> correct PCI ACS enablement sequencing.
+>>>>>
+>>>>> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
+>>>>> Signed-workarounds")
+>>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>> Cc: Robin Murphy <robin.murphy@arm.com>
+>>>>> Cc: Zhou Wang <wangzhou1@hisilicon.com>
+>>>>> Cc: Alex Williamson <alex.williamson@redhat.com>
+>>>>> ---
+>>>>>  drivers/acpi/arm64/iort.c | 11 +++++++++++
+>>>>>  1 file changed, 11 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>>>>> index 9565d57..71a7694 100644
+>>>>> --- a/drivers/acpi/arm64/iort.c
+>>>>> +++ b/drivers/acpi/arm64/iort.c
+>>>>> @@ -1184,6 +1184,7 @@ static void __init iort_init_platform_devices(void)
+>>>>>  	struct acpi_table_iort *iort;
+>>>>>  	struct fwnode_handle *fwnode;
+>>>>>  	int i, ret;
+>>>>> +	bool smmu_detected = false;
+>>>>>  
+>>>>>  	/*
+>>>>>  	 * iort_table and iort both point to the start of IORT table, but
+>>>>> @@ -1218,11 +1219,21 @@ static void __init iort_init_platform_devices(void)
+>>>>>  				acpi_free_fwnode_static(fwnode);
+>>>>>  				return;
+>>>>>  			}
+>>>>> +
+>>>>> +			smmu_detected = true;
+>>>>>  		}
+>>>>>  
+>>>>>  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+>>>>>  					 iort_node->length);
+>>>>>  	}
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * If IORT reports an SMMU component make sure PCI ACS is
+>>>>> +	 * requested so that PCI devices can enable it in their
+>>>>> +	 * capabilities.
+>>>>> +	 */
+>>>>> +	if (smmu_detected)
+>>>>> +		pci_request_acs();
+>>>>>  }
+>>>>>  
+>>>>>  void __init acpi_iort_init(void)
+>>>>>
+>>>>
+>>>> Hi Lorenzo,
+>>>>
+>>>> I tested this patch, it works well in my HiSilicon Hip08 based system.
+>>>> However, setting ACS flag at the stage of SMMU device init seems not good,
+>>>> I mean what if in one system there are only platform devices connected to
+>>>> SMMU device.
+>>>
+>>> That's a fair point if you explain to me how current pci_request_acs()
+>>> usage copes with your remark above.
+>>
+>> The current pci_request_acs usage for ARM SMMU-V3 sets ACS flags under CONFIG_PCI.
+>> However, as mentioned in your commit message, this setting is too late.
+>>
+>> For the usage of X86 and AMD, as I am not familiar with the devices used in these
+>> two platforms, maybe the default devices in these platforms are PCIe based :)
+> 
+> I do not understand what your point is. ACS enablement is a global flag,
+> that is currently set whenever an x86/AMD/ARM IOMMU is detected/probed
+> AFAICS.
 
-Fixes: d9f9c167edae ("ASoC: rockchip: Init dapm routes dynamically")
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+There are named devices(platform devices) and/or PCI devices connected to SMMU.
+However, ACS flags is only for PCI devices. So setting this flag in SMMU device init
+maybe need check if there are PCIe devices connected to SMMU, as maybe devices connected
+to SMMU are all named devices.
 
- sound/soc/rockchip/rk3399_gru_sound.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> I agree that ACS enablement should be done before PCI enumeration,
+> for other comments either you are questioning the current policy
+> behind ACS enablement in the kernel - which can be a fair point - or
+> I do not understand what you mean.
+> 
+> Let me know since I would like to queue this patch unless I hear
+> a compelling objection to it.
 
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 30eed83e8a13..008452e55ef8 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -493,14 +493,18 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 	struct device_node *np_codec;
- 	struct snd_soc_dai_link *dai;
- 	struct snd_soc_dapm_route *routes;
--	int i, index;
-+	int i, index, max_num_routes;
- 
- 	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
- 				      GFP_KERNEL);
- 	if (!card->dai_link)
- 		return -ENOMEM;
- 
--	routes = devm_kzalloc(dev, sizeof(rockchip_routes),
-+	max_num_routes = 0;
-+	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++)
-+		max_num_routes += rockchip_routes[i].num_routes;
-+
-+	routes = devm_kzalloc(dev, max_num_routes * sizeof(*routes),
- 			      GFP_KERNEL);
- 	if (!routes)
- 		return -ENOMEM;
--- 
-2.11.0
+I think this is not a big problem. If you want to queue this patch, you can add:
+
+Tested-by: Zhou Wang <wangzhou1@hisilicon.com>
+
+Thanks,
+Zhou
+
+> 
+> Lorenzo
+> 
+> .
+> 
