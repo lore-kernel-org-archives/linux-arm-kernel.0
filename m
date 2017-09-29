@@ -1,78 +1,64 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 29 Sep 2017 11:22:05 +0100
-Subject: [PATCH v2 2/4] rtc: pl031: use devm_* for allocating memory and
- mapping resource
+Date: Fri, 29 Sep 2017 11:22:10 +0100
+Subject: [PATCH v2 3/4] rtc: pl031: avoid exposing alarm if no interrupt
 In-Reply-To: <20170929102116.GX20805@n2100.armlinux.org.uk>
 References: <20170929102116.GX20805@n2100.armlinux.org.uk>
-Message-ID: <E1dxsQn-0006Nd-IQ@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dxsQs-0006Nm-Lz@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the devm_* APIs for allocating memory and mapping the memory in
-the probe function to relieve the driver from having to deal with
-this in the cleanup paths.
+If the RTC has no interrupt, there is little point in exposing the RTC
+alarm capabilities, as it can't be used as a wakeup source nor can it
+deliver an event to userspace.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/rtc/rtc-pl031.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ drivers/rtc/rtc-pl031.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 0d87b90b1903..777da06d53ee 100644
+index 777da06d53ee..64c77ec1b4ea 100644
 --- a/drivers/rtc/rtc-pl031.c
 +++ b/drivers/rtc/rtc-pl031.c
-@@ -310,8 +310,6 @@ static int pl031_remove(struct amba_device *adev)
- 	device_init_wakeup(&adev->dev, false);
- 	free_irq(adev->irq[0], ldata);
- 	rtc_device_unregister(ldata->rtc);
--	iounmap(ldata->base);
--	kfree(ldata);
- 	amba_release_regions(adev);
+@@ -320,7 +320,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 	int ret;
+ 	struct pl031_local *ldata;
+ 	struct pl031_vendor_data *vendor = id->data;
+-	struct rtc_class_ops *ops = &vendor->ops;
++	struct rtc_class_ops *ops;
+ 	unsigned long time, data;
  
- 	return 0;
-@@ -329,18 +327,19 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (ret)
- 		goto err_req;
+ 	ret = amba_request_regions(adev, NULL);
+@@ -329,12 +329,14 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
  
--	ldata = kzalloc(sizeof(struct pl031_local), GFP_KERNEL);
-+	ldata = devm_kzalloc(&adev->dev, sizeof(struct pl031_local),
-+			     GFP_KERNEL);
- 	if (!ldata) {
+ 	ldata = devm_kzalloc(&adev->dev, sizeof(struct pl031_local),
+ 			     GFP_KERNEL);
+-	if (!ldata) {
++	ops = devm_kmemdup(&adev->dev, &vendor->ops, sizeof(vendor->ops),
++			   GFP_KERNEL);
++	if (!ldata || !ops) {
  		ret = -ENOMEM;
  		goto out;
  	}
- 	ldata->vendor = vendor;
+-	ldata->vendor = vendor;
  
--	ldata->base = ioremap(adev->res.start, resource_size(&adev->res));
--
-+	ldata->base = devm_ioremap(&adev->dev, adev->res.start,
-+				   resource_size(&adev->res));
++	ldata->vendor = vendor;
+ 	ldata->base = devm_ioremap(&adev->dev, adev->res.start,
+ 				   resource_size(&adev->res));
  	if (!ldata->base) {
- 		ret = -ENOMEM;
--		goto out_no_remap;
-+		goto out;
+@@ -372,6 +374,13 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 		}
  	}
  
- 	amba_set_drvdata(adev, ldata);
-@@ -378,7 +377,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
++	if (!adev->irq[0]) {
++		/* When there's no interrupt, no point in exposing the alarm */
++		ops->read_alarm = NULL;
++		ops->set_alarm = NULL;
++		ops->alarm_irq_enable = NULL;
++	}
++
+ 	device_init_wakeup(&adev->dev, true);
+ 	ldata->rtc = rtc_device_register("pl031", &adev->dev, ops,
  					THIS_MODULE);
- 	if (IS_ERR(ldata->rtc)) {
- 		ret = PTR_ERR(ldata->rtc);
--		goto out_no_rtc;
-+		goto out;
- 	}
- 
- 	if (request_irq(adev->irq[0], pl031_interrupt,
-@@ -391,10 +390,6 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 
- out_no_irq:
- 	rtc_device_unregister(ldata->rtc);
--out_no_rtc:
--	iounmap(ldata->base);
--out_no_remap:
--	kfree(ldata);
- out:
- 	amba_release_regions(adev);
- err_req:
 -- 
 2.7.4
