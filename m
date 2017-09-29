@@ -1,122 +1,155 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 29 Sep 2017 13:46:06 +0100
-Subject: [PATCH v2 19/28] arm64/sve: ptrace and ELF coredump support
-In-Reply-To: <87bmmda15n.fsf@linaro.org>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-20-git-send-email-Dave.Martin@arm.com>
- <87bmmda15n.fsf@linaro.org>
-Message-ID: <20170929124605.GF3611@e103592.cambridge.arm.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 29 Sep 2017 14:50:34 +0200 (CEST)
+Subject: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features (fwd)
+In-Reply-To: <21b7da6c-1d93-c7a1-65b6-80a59d8c982e@free-electrons.com>
+References: <alpine.DEB.2.20.1709291413090.2776@hadrien>
+ <21b7da6c-1d93-c7a1-65b6-80a59d8c982e@free-electrons.com>
+Message-ID: <alpine.DEB.2.20.1709291449460.2863@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 01:57:08PM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > This patch defines and implements a new regset NT_ARM_SVE, which
-> > describes a thread's SVE register state.  This allows a debugger to
-> > manipulate the SVE state, as well as being included in ELF
-> > coredumps for post-mortem debugging.
+
+
+On Fri, 29 Sep 2017, Quentin Schulz wrote:
+
+> Hi Julia,
+>
+> On 29/09/2017 14:15, Julia Lawall wrote:
+> > I'm not sure that it is allowed to do krealloc on devm allocated data.
+> > See lins 468 and 485.
 > >
-> > Because the regset size and layout are dependent on the thread's
-> > current vector length, it is not possible to define a C struct to
-> > describe the regset contents as is done for existing regsets.
-> > Instead, and for the same reasons, NT_ARM_SVE is based on the
-> > freeform variable-layout approach used for the SVE signal frame.
+>
+> Indeed, from a glance at the code, it does not look like it is a good idea.
+>
+> For v3, this piece of code will be deleted anyway so it won't be a
+> problem anymore.
+>
+> However, this logic is used in drivers/pinctrl/sunxi/pinctrl-sunxi.c[1][2]
+>
+> @Maxime, @Chen-Yu:
+> We should check more thoroughly than what I did but I think Julia is right.
+>
+> The following is my understanding from a very quick look at the code.
+>
+> devm_kzalloc will register gpio->functions as a res of the device.
+>
+> However it's possible that the pointer is different after krealloc. In
+> that case, krealloc will free the "old" gpio->functions[3] which is
+> managed by devres.
+>
+> 1) We might be exposed to a free of a NULL pointer when devres takes
+> care of unregistering the device.
+
+I guess it would be a double free?  krealloc won't update the devres view
+of the pointer.
+
+> 2) The "new" gpio->functions would never be freed.
+
+That too.
+
+julia
+
+>
+> Is that correct? If so, we should get rid of devm_kzalloc in favor of a
+> simple kzalloc and free the pointer in the remove function of the driver.
+>
+> [1]
+> http://elixir.free-electrons.com/linux/latest/source/drivers/pinctrl/sunxi/pinctrl-sunxi.c#L1078
+> [2]
+> http://elixir.free-electrons.com/linux/latest/source/drivers/pinctrl/sunxi/pinctrl-sunxi.c#L1107
+> [3]
+> http://elixir.free-electrons.com/linux/latest/source/mm/slab_common.c#L1414
+>
+> Thanks,
+> Quentin
+>
+> > julia
 > >
-> > Additionally, to reduce debug overhead when debugging threads that
-> > might or might not have live SVE register state, NT_ARM_SVE may be
-> > presented in one of two different formats: the old struct
-> > user_fpsimd_state format is embedded for describing the state of a
-> > thread with no live SVE state, whereas a new variable-layout
-> > structure is embedded for describing live SVE state.  This avoids a
-> > debugger needing to poll NT_PRFPREG in addition to NT_ARM_SVE, and
-> > allows existing userspace code to handle the non-SVE case without
-> > too much modification.
+> > ---------- Forwarded message ----------
+> > Date: Fri, 29 Sep 2017 20:00:03 +0800
+> > From: kbuild test robot <fengguang.wu@intel.com>
+> > To: kbuild at 01.org
+> > Cc: Julia Lawall <julia.lawall@lip6.fr>
+> > Subject: Re: [PATCH v2 02/10] pinctrl: axp209: add pinctrl features
 > >
-> > For this to work, NT_ARM_SVE is defined with a fixed-format header
-> > of type struct user_sve_header, which the recipient can use to
-> > figure out the content, size and layout of the reset of the regset.
-> > Accessor macros are defined to allow the vector-length-dependent
-> > parts of the regset to be manipulated.
+> > Hi Quentin,
 > >
-> > Signed-off-by: Alan Hayward <alan.hayward@arm.com>
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> > [auto build test WARNING on ]
+> >
+> > url:    https://github.com/0day-ci/linux/commits/Quentin-Schulz/add-pinmuxing-support-for-pins-in-AXP209-and-AXP813-PMICs/20170929-162846
+> > base:
+> > :::::: branch date: 4 hours ago
+> > :::::: commit date: 4 hours ago
+> >
+> >>> drivers/pinctrl/pinctrl-axp209.c:485:19-27: WARNING: invalid free of devm_ allocated data
+> >
+> > # https://github.com/0day-ci/linux/commit/1e016076fb841f90f047d2b001c9f8d9fd5e2953
+> > git remote add linux-review https://github.com/0day-ci/linux
+> > git remote update linux-review
+> > git checkout 1e016076fb841f90f047d2b001c9f8d9fd5e2953
+> > vim +485 drivers/pinctrl/pinctrl-axp209.c
+> >
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  446
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  447  static int axp20x_build_state(struct platform_device *pdev)
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  448  {
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  449  	struct axp20x_gpio *gpio = platform_get_drvdata(pdev);
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  450  	unsigned int npins = gpio->desc->npins;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  451  	const struct axp20x_desc_pin *pin;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  452  	struct axp20x_desc_function *func;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  453  	int i, ret;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  454
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  455  	gpio->ngroups = npins;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  456  	gpio->groups = devm_kzalloc(&pdev->dev,
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  457  				    gpio->ngroups * sizeof(*gpio->groups),
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  458  				    GFP_KERNEL);
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  459  	if (!gpio->groups)
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  460  		return -ENOMEM;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  461
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  462  	for (i = 0; i < npins; i++) {
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  463  		gpio->groups[i].name = gpio->desc->pins[i].pin.name;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  464  		gpio->groups[i].pin = gpio->desc->pins[i].pin.number;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  465  	}
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  466
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  467  	/* We assume 4 functions per pin should be enough as a default max */
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  468  	gpio->functions = devm_kzalloc(&pdev->dev,
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  469  				       npins * 4 * sizeof(*gpio->functions),
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  470  				       GFP_KERNEL);
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  471  	if (!gpio->functions)
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  472  		return -ENOMEM;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  473
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  474  	/* Create a list of uniquely named functions */
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  475  	for (i = 0; i < npins; i++) {
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  476  		pin = &gpio->desc->pins[i];
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  477  		func = pin->functions;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  478
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  479  		while (func->name) {
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  480  			axp20x_pinctrl_add_function(gpio, func->name);
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  481  			func++;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  482  		}
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  483  	}
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  484
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26 @485  	gpio->functions = krealloc(gpio->functions,
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  486  				   gpio->nfunctions * sizeof(*gpio->functions),
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  487  				   GFP_KERNEL);
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  488
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  489  	for (i = 0; i < npins; i++) {
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  490  		pin = &gpio->desc->pins[i];
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  491  		ret = axp20x_attach_group_function(pdev, pin);
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  492  		if (ret)
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  493  			return ret;
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  494  	}
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  495
+> > 1e016076fb drivers/pinctrl/pinctrl-axp209.c Quentin Schulz 2017-09-26  496  	return 0;
+> > f72f4b44df drivers/gpio/gpio-axp209.c       Maxime Ripard  2016-07-20  497  }
+> > f72f4b44df drivers/gpio/gpio-axp209.c       Maxime Ripard  2016-07-20  498
 > >
 > > ---
+> > 0-DAY kernel test infrastructure                Open Source Technology Center
+> > https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > >
-> > Changes since v1
-> > ----------------
-> >
-> > Other changes related to Alex Benn?e's comments:
-> >
-> > * Migrate to SVE_VQ_BYTES instead of magic numbers.
-> >
-> > Requested by Alex Benn?e:
-> >
-> > * Thin out BUG_ON()s:
-> > Redundant BUG_ON()s and ones that just check invariants are removed.
-> > Important sanity-checks are migrated to WARN_ON()s, with some
-> > minimal best-effort patch-up code.
-> >
-> > Other:
-> >
-> > * [ABI fix] Bail out with -EIO if attempting to set the
-> > SVE regs for an unsupported VL, instead of misparsing the regset data.
-> >
-> > * Replace some in-kernel open-coded arithmetic with ALIGN()/
-> > DIV_ROUND_UP().
-> > ---
-
-[...]
-
-> > diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-
-[...]
-
-> > +/* Definitions for user_sve_header.flags: */
-> > +#define SVE_PT_REGS_MASK		(1 << 0)
-> > +
-> > +/* Flags: must be kept in sync with prctl interface in
-> > <linux/ptrace.h> */
-> 
-> Which flags? We base some on PR_foo flags but we seem to shift them
-> anyway so where is the requirement for them to match from?
-
-I've rearranged this as:
-
--8<-
-
-/* Definitions for user_sve_header.flags: */
-#define SVE_PT_REGS_MASK		(1 << 0)
-
-#define SVE_PT_REGS_FPSIMD		0
-#define SVE_PT_REGS_SVE			SVE_PT_REGS_MASK
-
-/*
- * Common SVE_PT_* flags:
- * These must be kept in sync with prctl interface in <linux/ptrace.h>
- */
-#define SVE_PT_VL_INHERIT		(PR_SVE_VL_INHERIT >> 16)
-#define SVE_PT_VL_ONEXEC		(PR_SVE_SET_VL_ONEXEC >> 16)
-
-->8-
-
-This avoids the suggestion that SVE_PT_REGS_{MASK,FPSIMD,SVE} are
-supposed to have prctl counterparts.
-
-I don't really want to write more, in case it is misinterpreted as
-specification of behaviour.
-
-This comment is really only meant as a reminder to maintainers that
-they should go look at prctl.h too, before blindly making changes
-here.
-
-
-Any good?  If you have a different suggestion, I'm all ears...
-
-[...]
-
-Cheers
----Dave
+>
+> --
+> Quentin Schulz, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
