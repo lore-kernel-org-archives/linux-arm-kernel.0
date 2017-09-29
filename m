@@ -1,46 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Sep 2017 12:20:06 +0200
-Subject: [PATCH v3 04/14] drm/sun4i: tcon: Add support for demuxing TCON
- output on A31
-In-Reply-To: <20170929082306.16193-5-wens@csie.org>
-References: <20170929082306.16193-1-wens@csie.org>
- <20170929082306.16193-5-wens@csie.org>
-Message-ID: <20170929102006.2wz7wrkpplxwynoh@flea>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Sep 2017 11:21:16 +0100
+Subject: [PATCH v2 0/4] Make PL031 interrupt optional
+Message-ID: <20170929102116.GX20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 08:22:56AM +0000, Chen-Yu Tsai wrote:
-> On systems with 2 TCONs such as the A31, it is possible to demux the
-> output of the TCONs to one encoder.
-> 
-> Add support for this for the A31.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 7bf51abaee97..c949309d4285 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -112,6 +112,21 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
->  }
->  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
->  
-> +static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
+There are some boards out there which have a PL031 RTC, but its
+interrupt is not wired up.  To support these, we need the PL031
+to support the primecell without interrupts.
 
-Would that make sense to make it a bit more generic, and pass the id
-to look for as an argument?
+When no interrupt is present, there's little point exposing the
+RTC's alarm capabilities, so we omit the alarm-related function
+calls - the RTC merely becomes a source of time-of-day.
+
+This patch series cleans up the pl031 driver a little, and adds
+support for this configuration.
+
+ drivers/rtc/rtc-pl031.c | 48 +++++++++++++++++++++++++++---------------------
+ 1 file changed, 27 insertions(+), 21 deletions(-)
+
+v2: update patch 2 & 3 for review comment on v1.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170929/671f9852/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
