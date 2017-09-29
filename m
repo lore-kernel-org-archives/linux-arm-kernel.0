@@ -1,97 +1,115 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Sep 2017 11:31:49 +0100
-Subject: [PATCH v1 00/14] tee: optee: add dynamic shared memory support
-In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
+Date: Fri, 29 Sep 2017 13:34:13 +0300
+Subject: [PATCH v1 06/14] tee: optee: add page list manipulation functions
+In-Reply-To: <20170929002300.zxu4n47m5jdymdyt@yury-thinkpad>
 References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <20170929103149.GB5781@leverpostej>
+ <1506621851-6929-7-git-send-email-volodymyr_babchuk@epam.com>
+ <20170929002300.zxu4n47m5jdymdyt@yury-thinkpad>
+Message-ID: <e7896e03-a12a-69b9-4b98-7737576f718b@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thu, Sep 28, 2017 at 09:03:57PM +0300, Volodymyr Babchuk wrote:
-> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
-> 
-> This patch series enables dynamic shared memory support in the TEE
-> subsystem as a whole and in OP-TEE in particular.
-> 
-> Global Platform TEE specification [1] allows client applications
-> to register part of own memory as a shared buffer between
-> application and TEE. This allows fast zero-copy communication between
-> TEE and REE. But current implementation of TEE in Linux does not support
-> this feature.
-> 
-> Also, current implementation of OP-TEE transport uses fixed size
-> pre-shared buffer for all communications with OP-TEE OS. This is okay
-> in the most use cases. But this prevents use of OP-TEE in virtualized
-> environments, because:
->  a) We can't share the same buffer between different virtual machines
->  b) Physically contiguous memory as seen by VM can be non-contiguous
->     in reality (and as seen by OP-TEE OS) due to second stage of
->     MMU translation.
->  c) Size of this pre-shared buffer is limited.
 
-I'm afraid that I don't follow the arguments for virtualized OP-TEE
-usage.
+On 29.09.17 03:23, Yury Norov wrote:
+> On Thu, Sep 28, 2017 at 09:04:03PM +0300, Volodymyr Babchuk wrote:
+>> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+>>
+>> These functions will be used to pass information about shared
+>> buffers to OP-TEE.
+>>
+>> Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+>> ---
+>>   drivers/tee/optee/call.c          | 48 +++++++++++++++++++++++++++++++++++++++
+>>   drivers/tee/optee/optee_private.h |  4 ++++
+>>   2 files changed, 52 insertions(+)
+>>
+>> diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
+>> index f7b7b40..f8e044d 100644
+>> --- a/drivers/tee/optee/call.c
+>> +++ b/drivers/tee/optee/call.c
+>> @@ -11,6 +11,7 @@
+>>    * GNU General Public License for more details.
+>>    *
+>>    */
+>> +#include <asm/pgtable.h>
+>>   #include <linux/arm-smccc.h>
+>>   #include <linux/device.h>
+>>   #include <linux/err.h>
+>> @@ -442,3 +443,50 @@ void optee_disable_shm_cache(struct optee *optee)
+>>   	}
+>>   	optee_cq_wait_final(&optee->call_queue, &w);
+>>   }
+>> +
+>> +/**
+>> + * optee_fill_pages_list() - write list of user pages to given shared
+>> + * buffer.
+>> + *
+>> + * @dst: page-aligned buffer where list of pages will be stored
+> 
+> I'm not much familiar with the subsystem you work on, but I don't
+> understand why the type of dst is u64*. If it's just a buffer, it
+> should be void *. Also, if we assuming running it on arm were pointers
+> are 32-bit, the result of page_to_phys() will be u32, and you will
+> waste half of your u64 array for storing zeroes; this line:
+> 		*dst = page_to_phys(pages[i]);
+Yep. There is defined ABI between OP-TEE OS and OP-TEE clients. That ABI 
+demands that page addresses should be stored in 64-bit fields even on 
+32-bit architectures.
 
-In a virtualised environment, TEE access *must* be mediated via the
-hypervisor, which can virtualise the interface, pin pages, etc.
 
-Could you elaborate on how you expect TEE access to work in a
-virtualised environment?
+>> + * @pages: array of pages that represents shared buffer
+>> + * @num_pages: number of entries in @pages
+>> + *
+>> + * @dst should be big enough to hold list of user page addresses and
+>> + *	links to the next pages of buffer
+>> + */
+>> +void optee_fill_pages_list(u64 *dst, struct page **pages, size_t num_pages)
+>> +{
+>> +	size_t i;
+>> +
+>> +	/* TODO: add support for RichOS page sizes that != 4096 */
+>> +	BUILD_BUG_ON(PAGE_SIZE != OPTEE_MSG_NONCONTIG_PAGE_SIZE);
+> 
+> RichOS stands for Linux? Why I am still not a rich OS developer? :)
+I'm asking the same question :) Yes, in terms of TEE, Linux is RichOS
+and OP-TEE is TrustedOS.
 
-Thanks,
-Mark.
+> This is the first occurrence of the term in kernel sources, please
+> explain it.
+I'd rather change "RichOS" to "Linux".
 
-> So, first part of this patch series adds generic register/unregister
-> interface to tee subsystem. Next patches add necessary features
-> into OP-TEE driver, so it can use not only static pre-shared buffer,
-> but whole RAM to communicate with OP-TEE OS.
+> Also, I think that it would be more logical to add the dependency on
+> page size to Kconfig, not here, and move the comment there, so user
+> will be simply unable to build the whole module.
+I event didn't thought of this. Thank you for suggestion. Will do in 
+this way.
+
+>> +	for (i = 0; i < num_pages; i++, dst++) {
+>> +		/* Check if we are going to roll over the page boundary */
+>> +		if (IS_ALIGNED((uintptr_t)(dst + 1),
+>> +			       OPTEE_MSG_NONCONTIG_PAGE_SIZE)) {
+>> +			*dst = virt_to_phys(dst + 1);
+>> +			dst++;
+>> +		}
 > 
-> [1] https://www.globalplatform.org/specificationsdevice.asp
-> 
-> Jens Wiklander (2):
->   tee: flexible shared memory  pool creation
->   tee: add register user memory
-> 
-> Volodymyr Babchuk (12):
->   tee: shm: add accessors for buffer size and page offset
->   tee: shm: add page accessor functions
->   tee: optee: Update protocol definitions
->   tee: optee: add page list manipulation functions
->   tee: optee: add shared buffer registration functions
->   tee: optee: add registered shared parameters handling
->   tee: optee: add registered buffers handling into RPC calls
->   tee: optee: store OP-TEE capabilities in private data
->   tee: optee: add optee-specific shared pool implementation
->   tee: optee: enable dynamic SHM support
->   tee: use reference counting for tee_context
->   tee: shm: inline tee_shm getter functions
-> 
->  drivers/tee/optee/Makefile        |   1 +
->  drivers/tee/optee/call.c          | 131 +++++++++++++++++++++-
->  drivers/tee/optee/core.c          | 160 +++++++++++++++++++++------
->  drivers/tee/optee/optee_msg.h     |  38 ++++++-
->  drivers/tee/optee/optee_private.h |  26 ++++-
->  drivers/tee/optee/optee_smc.h     |   7 ++
->  drivers/tee/optee/rpc.c           |  72 ++++++++++--
->  drivers/tee/optee/shm_pool.c      |  75 +++++++++++++
->  drivers/tee/optee/shm_pool.h      |  23 ++++
->  drivers/tee/tee_core.c            |  81 ++++++++++++--
->  drivers/tee/tee_private.h         |  60 +---------
->  drivers/tee/tee_shm.c             | 226 +++++++++++++++++++++++++++++++-------
->  drivers/tee/tee_shm_pool.c        | 165 +++++++++++++++++-----------
->  include/linux/tee_drv.h           | 184 ++++++++++++++++++++++++++++++-
->  include/uapi/linux/tee.h          |  30 +++++
->  15 files changed, 1058 insertions(+), 221 deletions(-)
->  create mode 100644 drivers/tee/optee/shm_pool.c
->  create mode 100644 drivers/tee/optee/shm_pool.h
-> 
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Is my understanding correct that @dst is not a simple array of buffer
+> page addresses?  Instead, it has a complex structure: First 511 records
+> store buffer page entries, and last one points to the next page of dst.
+> Is it somehow documented? Also, did you consider to create a header structure
+> for the buffer page, like memory allocators do? You can place there number
+> of entries, pointer to the next page, maybe some flags. I think it will be
+> more transparent, especially if we consider communication protocol between
+> independent software products.
+This is documented in the previous patch "tee: optee: Update protocol 
+definitions" (5/14).
+I like your idea about header structure. Just to clarify: it should be 
+structure that covers whole page. Like that described in the previous patch:
+
++ * struct page_data {
++ *   uint64_t 
+pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
++ *   uint64_t next_page_data;
++ * };
+
+Right?
