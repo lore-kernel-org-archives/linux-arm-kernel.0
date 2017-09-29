@@ -1,138 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Sep 2017 11:53:11 +0100
-Subject: [PATCH v1 02/14] tee: add register user memory
-In-Reply-To: <1506621851-6929-3-git-send-email-volodymyr_babchuk@epam.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1506621851-6929-3-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <20170929105311.GC5781@leverpostej>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 29 Sep 2017 11:52:30 +0100
+Subject: [PATCH v3 2/2] arm64: use WFE for long delays
+In-Reply-To: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+References: <1506682350-9023-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1506682350-9023-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 09:03:59PM +0300, Volodymyr Babchuk wrote:
-> +static int
-> +tee_ioctl_shm_register(struct tee_context *ctx,
-> +		       struct tee_ioctl_shm_register_data __user *udata)
-> +{
-> +	long ret;
-> +	struct tee_ioctl_shm_register_data data;
-> +	struct tee_shm *shm;
-> +
-> +	if (copy_from_user(&data, udata, sizeof(data)))
-> +		return -EFAULT;
-> +
-> +	/* Currently no input flags are supported */
-> +	if (data.flags)
-> +		return -EINVAL;
-> +
-> +	shm = tee_shm_register(ctx, data.addr, data.length,
-> +			       TEE_SHM_DMA_BUF | TEE_SHM_USER_MAPPED);
-> +	if (IS_ERR(shm))
-> +		return PTR_ERR(shm);
-> +
-> +	data.id = shm->id;
-> +	data.flags = shm->flags;
-> +	data.length = shm->size;
-> +
-> +	if (copy_to_user(udata, &data, sizeof(data)))
-> +		ret = -EFAULT;
-> +	else
-> +		ret = tee_shm_get_fd(shm);
+The current delay implementation uses the yield instruction, which is a
+hint that it is beneficial to schedule another thread. As this is a hint,
+it may be implemented as a NOP, causing all delays to be busy loops. This
+is the case for many existing CPUs.
 
-Why do you need both the fd and an id? That seems redundant.
+Taking advantage of the generic timer sending periodic events to all
+cores, we can use WFE during delays to reduce power consumption. This is
+beneficial only for delays longer than the period of the timer event
+stream.
 
-[...]
+If timer event stream is not enabled, delays will behave as yield/busy
+loops.
 
-> +struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
-> +				 size_t length, u32 flags)
-> +{
-> +	struct tee_device *teedev = ctx->teedev;
-> +	const u32 req_flags = TEE_SHM_DMA_BUF | TEE_SHM_USER_MAPPED;
-> +	struct tee_shm *shm;
-> +	void *ret;
-> +	int rc;
-> +	int num_pages;
-> +	unsigned long start;
-> +
-> +	if (flags != req_flags) {
-> +		dev_err(teedev->dev.parent, "invliad shm flags %#x", flags);
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	if (!tee_device_get(teedev))
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	if (!teedev->desc->ops->shm_register ||
-> +	    !teedev->desc->ops->shm_unregister) {
-> +		dev_err(teedev->dev.parent,
-> +			"register shared memory unspported by device");
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/lib/delay.c               | 23 +++++++++++++++++++----
+ include/clocksource/arm_arch_timer.h |  4 +++-
+ 2 files changed, 22 insertions(+), 5 deletions(-)
 
-I don't think this should be a dev_err. The user requested something
-that the device did not support, but that's not a device-side error.
+diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
+index dad4ec9..4dc27f3 100644
+--- a/arch/arm64/lib/delay.c
++++ b/arch/arm64/lib/delay.c
+@@ -24,10 +24,28 @@
+ #include <linux/module.h>
+ #include <linux/timex.h>
 
-A user may legitmiately do this to probe whether the TEE supports
-registering memory.
++#include <clocksource/arm_arch_timer.h>
++
++#define USECS_TO_CYCLES(TIME_USECS)			\
++	xloops_to_cycles((TIME_USECS) * 0x10C7UL)
++
++static inline unsigned long xloops_to_cycles(unsigned long xloops)
++{
++	return (xloops * loops_per_jiffy * HZ) >> 32;
++}
++
+ void __delay(unsigned long cycles)
+ {
+ 	cycles_t start = get_cycles();
 
-> +		tee_device_put(teedev);
-> +		return ERR_PTR(-EINVAL);
++	if (arch_timer_evtstrm_available()) {
++		const cycles_t timer_evt_period =
++			USECS_TO_CYCLES(ARCH_TIMER_EVT_STREAM_PERIOD_US);
++
++		while ((get_cycles() - start + timer_evt_period) < cycles)
++			wfe();
++	}
++
+ 	while ((get_cycles() - start) < cycles)
+ 		cpu_relax();
+ }
+@@ -35,10 +53,7 @@ void __delay(unsigned long cycles)
 
-Perhaps EOPNOTSUPP?
+ inline void __const_udelay(unsigned long xloops)
+ {
+-	unsigned long loops;
+-
+-	loops = xloops * loops_per_jiffy * HZ;
+-	__delay(loops >> 32);
++	__delay(xloops_to_cycles(xloops));
+ }
+ EXPORT_SYMBOL(__const_udelay);
 
-> +	}
-> +
-> +	shm = kzalloc(sizeof(*shm), GFP_KERNEL);
-> +	if (!shm) {
-> +		ret = ERR_PTR(-ENOMEM);
-> +		goto err;
-> +	}
-> +
-> +	shm->flags = flags | TEE_SHM_REGISTER;
-> +	shm->teedev = teedev;
-> +	shm->ctx = ctx;
-> +	shm->id = -1;
-> +	start = rounddown(addr, PAGE_SIZE);
-> +	shm->offset = addr - start;
-> +	shm->size = length;
-> +	num_pages = (roundup(addr + length, PAGE_SIZE) - start) / PAGE_SIZE;
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 4e28283..349e595 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -67,7 +67,9 @@ enum arch_timer_spi_nr {
+ #define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
+ #define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
 
-Why not mandate that the user passes a buffer which has a start and end
-aligned to PAGE_SIZE?
+-#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
++#define ARCH_TIMER_EVT_STREAM_PERIOD_US	100
++#define ARCH_TIMER_EVT_STREAM_FREQ				\
++	(USEC_PER_SEC / ARCH_TIMER_EVT_STREAM_PERIOD_US)
 
-Otherwise, the buffer is size is silently upgraded without the user's
-knowledge, which seems likely to result in bugs.
-
-> +	shm->pages = kcalloc(num_pages, sizeof(struct page), GFP_KERNEL);
-
-I think you mean sizeof(struct page *) here.
-
-Generally, for:
-
-  lhs = some_alloc(sizeof(x))
-
-... it's preferred that x is *lhs, so as to keep the types in sync. e.g.
-
-  shm->pages = kcalloc(num_pages, sizeof(*shm->pages), GFP_KERNEL);
-
-> +	if (!shm->pages) {
-> +		ret = ERR_PTR(-ENOMEM);
-> +		goto err;
-> +	}
-> +
-> +	rc = get_user_pages_fast(start, num_pages, 1, shm->pages);
-> +	if (rc > 0)
-> +		shm->num_pages = rc;
-> +	if (rc != num_pages) {
-> +		if (rc > 0)
-> +			rc = -ENOMEM;
-> +		ret = ERR_PTR(rc);
-> +		goto err;
-> +	}
-> +
-> +	mutex_lock(&teedev->mutex);
-> +	shm->id = idr_alloc(&teedev->idr, shm, 1, 0, GFP_KERNEL);
-> +	mutex_unlock(&teedev->mutex);
-
-AFAICT, idr_alloc() can fail, so I beleive you're missing a sanity check
-on the return value here.
-
-THanks,
-Mark.
+ struct arch_timer_kvm_info {
+ 	struct timecounter timecounter;
+--
+1.9.1
