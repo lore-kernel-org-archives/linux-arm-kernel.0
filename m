@@ -1,78 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Sep 2017 11:29:55 +0100
-Subject: [PATCH] arm64: mm: Use READ_ONCE when dereferencing pointer to pte
- table
-Message-ID: <1506680995-9000-1-git-send-email-will.deacon@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 29 Sep 2017 18:31:53 +0800
+Subject: [linux-sunxi] Re: [PATCH v2 1/3] ARM: dts: sun8i: Add basic dtsi
+ file for Allwinner R40
+In-Reply-To: <7F10060D-6A37-4417-9E24-1BB007580126@aosc.io>
+References: <20170928092543.45648-1-icenowy@aosc.io>
+ <20170928092543.45648-2-icenowy@aosc.io>
+ <20170928151103.ov3o5pn5h7inzzan@flea>
+ <7F10060D-6A37-4417-9E24-1BB007580126@aosc.io>
+Message-ID: <CAGb2v647i7uecshOO=1Pr8U97duSwL_V92GhS3S4J4+0GEkjYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On kernels built with support for transparent huge pages, different CPUs
-can access the PMD concurrently due to e.g. fast GUP or page_vma_mapped_walk
-and they must take care to use READ_ONCE to avoid value tearing or caching
-of stale values by the compiler. Unfortunately, these functions call into
-our pgtable macros, which don't use READ_ONCE, and compiler caching has
-been observed to cause the following crash during ext4 writeback:
+On Fri, Sep 29, 2017 at 6:25 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>
+>
+> ? 2017?9?28? GMT+08:00 ??11:11:03, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>>Hi,
+>>
+>>On Thu, Sep 28, 2017 at 09:25:41AM +0000, Icenowy Zheng wrote:
+>>> +            /*
+>>> +             * The max-frequency properties in all MMC controller nodes
+>>> +             * are conservative values proven to work on Banana Pi M2
+>>> +             * Ultra (the first community available R40 board).
+>>> +             * As the board doesn't wire MMC3 out, the property is not
+>>> +             * set in MMC3.
+>>> +             * TODO: measure the accurate max frequency of the controllers.
+>>> +             */
+>>> +            mmc0: mmc at 1c0f000 {
+>>> +                    compatible = "allwinner,sun8i-r40-mmc",
+>>> +                                 "allwinner,sun50i-a64-mmc";
+>>> +                    reg = <0x01c0f000 0x1000>;
+>>> +                    clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
+>>> +                    clock-names = "ahb", "mmc";
+>>> +                    resets = <&ccu RST_BUS_MMC0>;
+>>> +                    reset-names = "ahb";
+>>> +                    pinctrl-0 = <&mmc0_pins>;
+>>> +                    pinctrl-names = "default";
+>>> +                    interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>>> +                    max-frequency = <25000000>;
+>>> +                    status = "disabled";
+>>> +                    #address-cells = <1>;
+>>> +                    #size-cells = <0>;
+>>> +            };
+>>
+>>Sorry if it wasn't really clear, but my point was more than you should
+>>just drop the max-frequency property
+>
+> Then set it in the boards' DTS?
 
-PC is at check_pte+0x20/0x170
-LR is at page_vma_mapped_walk+0x2e0/0x540
-[...]
-Process doio (pid: 2463, stack limit = 0xffff00000f2e8000)
-Call trace:
-[<ffff000008233328>] check_pte+0x20/0x170
-[<ffff000008233758>] page_vma_mapped_walk+0x2e0/0x540
-[<ffff000008234adc>] page_mkclean_one+0xac/0x278
-[<ffff000008234d98>] rmap_walk_file+0xf0/0x238
-[<ffff000008236e74>] rmap_walk+0x64/0xa0
-[<ffff0000082370c8>] page_mkclean+0x90/0xa8
-[<ffff0000081f3c64>] clear_page_dirty_for_io+0x84/0x2a8
-[<ffff00000832f984>] mpage_submit_page+0x34/0x98
-[<ffff00000832fb4c>] mpage_process_page_bufs+0x164/0x170
-[<ffff00000832fc8c>] mpage_prepare_extent_to_map+0x134/0x2b8
-[<ffff00000833530c>] ext4_writepages+0x484/0xe30
-[<ffff0000081f6ab4>] do_writepages+0x44/0xe8
-[<ffff0000081e5bd4>] __filemap_fdatawrite_range+0xbc/0x110
-[<ffff0000081e5e68>] file_write_and_wait_range+0x48/0xd8
-[<ffff000008324310>] ext4_sync_file+0x80/0x4b8
-[<ffff0000082bd434>] vfs_fsync_range+0x64/0xc0
-[<ffff0000082332b4>] SyS_msync+0x194/0x1e8
+Why do you need to set them in the first place? The higher speeds need
+voltage control, and the lack of said control means the system won't
+use them anyway.
 
-This is because page_vma_mapped_walk loads the PMD twice before calling
-pte_offset_map: the first time without READ_ONCE (where it gets all zeroes
-due to a concurrent pmdp_invalidate) and the second time with READ_ONCE
-(where it sees a valid table pointer due to a concurrent pmd_populate).
-However, the compiler inlines everything and caches the first value in
-a register, which is subsequently used in pte_offset_phys which returns
-a junk pointer that is later dereferenced when attempting to access the
-relevant pte.
+max-frequency would apply better in situations where the board layout
+can't guarantee proper signal propagation or timing beyond a certain
+frequency. Or if that particular controller instance is flawed or
+restricted in some way.
 
-This patch fixes the issue by using READ_ONCE in pte_offset_phys to ensure
-that a stale value is not used. Whilst this is a point fix for a known
-failure (and simple to backport), a full fix moving all of our page table
-accessors over to {READ,WRITE}_ONCE and consistently using READ_ONCE in
-page_vma_mapped_walk is in the works for a future kernel release.
 
-Cc: Jon Masters <jcm@redhat.com>
-Cc: Timur Tabi <timur@codeaurora.org>
-Cc: <stable@vger.kernel.org>
-Fixes: f27176cfc363 ("mm: convert page_mkclean_one() to use page_vma_mapped_walk()")
-Tested-by: Richard Ruigrok <rruigrok@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index bc4e92337d16..b46e54c2399b 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -401,7 +401,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- /* Find an entry in the third-level page table. */
- #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
- 
--#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
-+#define pte_offset_phys(dir,addr)	(pmd_page_paddr(READ_ONCE(*(dir))) + pte_index(addr) * sizeof(pte_t))
- #define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
- 
- #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
--- 
-2.1.4
+ChenYu
