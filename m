@@ -1,103 +1,251 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Sep 2017 14:27:39 +0200
-Subject: [PATCH v2 net] net: mvpp2: Fix clock resource by adding an optional
- bus clock
-Message-ID: <20170929122739.5296-1-gregory.clement@free-electrons.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 29 Sep 2017 13:38:14 +0100
+Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
+ instructions
+In-Reply-To: <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
+References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
+ <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
+ <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
+ <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
+ <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
+ <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
+ <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
+ <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
+ <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
+ <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
+ <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
+Message-ID: <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-is optional because not all the SoCs need them but at least for Armada
-7K/8K it is actually mandatory.
+On 31/08/17 15:01, Christoffer Dall wrote:
+> On Thu, Aug 31, 2017 at 3:57 PM, Julien Thierry <julien.thierry@arm.com> wrote:
+>>
+>>
+>> On 31/08/17 14:28, Christoffer Dall wrote:
+>>>
+>>> On Thu, Aug 31, 2017 at 2:56 PM, Julien Thierry <julien.thierry@arm.com>
+>>> wrote:
+>>>>
+>>>>
+>>>>
+>>>> On 31/08/17 11:53, Christoffer Dall wrote:
+>>>>>
+>>>>>
+>>>>> On Thu, Aug 31, 2017 at 11:37 AM, Julien Thierry
+>>>>> <julien.thierry@arm.com>
+>>>>> wrote:
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On 31/08/17 09:54, Christoffer Dall wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Aug 31, 2017 at 10:45 AM, Julien Thierry
+>>>>>>> <julien.thierry@arm.com>
+>>>>>>> wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> Hi Christoffer,
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> On 30/08/17 19:53, Christoffer Dall wrote:
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Hi Julien,
+>>>>>>>>>
+>>>>>>>>> [cc'ing Alex Benn?e here who wrote the debug code for arm64]
+>>>>>>>>>
+>>>>>>>>> On Wed, Aug 30, 2017 at 11:01 AM, Julien Thierry
+>>>>>>>>> <julien.thierry@arm.com>
+>>>>>>>>> wrote:
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> Software Step exception is missing after trapping instruction from
+>>>>>>>>>> the
+>>>>>>>>>> guest.
+>>>>>>>>>>
+>>>>>>>>>> We need to set the PSR.SS to 0 for the guest vcpu before resuming
+>>>>>>>>>> guest
+>>>>>>>>>> execution.
+>>>>>>>>>>
+>>>>>>>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>>>>>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>>>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>>>>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>>>>>>>
+>>>>>>>>>> ---
+>>>>>>>>>>       arch/arm64/include/asm/kvm_asm.h     |  2 ++
+>>>>>>>>>>       arch/arm64/include/asm/kvm_emulate.h |  2 ++
+>>>>>>>>>>       arch/arm64/kvm/debug.c               | 12 +++++++++++-
+>>>>>>>>>>       arch/arm64/kvm/hyp/switch.c          | 12 ++++++++++++
+>>>>>>>>>>       4 files changed, 27 insertions(+), 1 deletion(-)
+>>>>>>>>>>
+>>>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>>>> b/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>>>> index 26a64d0..398bbaa 100644
+>>>>>>>>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>>>> @@ -32,6 +32,8 @@
+>>>>>>>>>>
+>>>>>>>>>>       #define KVM_ARM64_DEBUG_DIRTY_SHIFT    0
+>>>>>>>>>>       #define KVM_ARM64_DEBUG_DIRTY          (1 <<
+>>>>>>>>>> KVM_ARM64_DEBUG_DIRTY_SHIFT)
+>>>>>>>>>> +#define KVM_ARM64_DEBUG_INST_SKIP_SHIFT        1
+>>>>>>>>>> +#define KVM_ARM64_DEBUG_INST_SKIP      (1 <<
+>>>>>>>>>> KVM_ARM64_DEBUG_INST_SKIP_SHIFT)
+>>>>>>>>>>
+>>>>>>>>>>       #define kvm_ksym_ref(sym)
+>>>>>>>>>> \
+>>>>>>>>>>              ({
+>>>>>>>>>> \
+>>>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h
+>>>>>>>>>> b/arch/arm64/include/asm/kvm_emulate.h
+>>>>>>>>>> index fe39e68..d401c64 100644
+>>>>>>>>>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>>>>>>>>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>>>>>>>>>> @@ -95,6 +95,8 @@ static inline void kvm_skip_instr(struct kvm_vcpu
+>>>>>>>>>> *vcpu, bool is_wide_instr)
+>>>>>>>>>>                      kvm_skip_instr32(vcpu, is_wide_instr);
+>>>>>>>>>>              else
+>>>>>>>>>>                      *vcpu_pc(vcpu) += 4;
+>>>>>>>>>> +       /* Let debug engine know we skipped an instruction */
+>>>>>>>>>> +       vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_INST_SKIP;
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Why do we need to defer this action until later?
+>>>>>>>>>
+>>>>>>>>> Can't we simply do clear DBG_SPSR_SS here?
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> That was my first intention, but it turns out that the current state
+>>>>>>>> of
+>>>>>>>> things (without this patch) is that every time we enter a guest,
+>>>>>>>> kvm_arm_setup_debug gets called and if single step is requested for
+>>>>>>>> the
+>>>>>>>> guest it will set the flag in the SPSR (ignoring the fact that we
+>>>>>>>> cleared
+>>>>>>>> it).
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> Ah, right, duh.
+>>>>>>>
+>>>>>>>> This happens even if we exit the guest because of a data abort.
+>>>>>>>>
+>>>>>>>> For normal single step execution, we do need to reset SPSR.SS to 1
+>>>>>>>> before
+>>>>>>>> running the guest since completion of a step should clear that bit
+>>>>>>>> before
+>>>>>>>> taking a software step exception. So what kvm_arm_setup_debug does
+>>>>>>>> seems
+>>>>>>>> correct to me but missed the case for trapped/emulated instructions.
+>>>>>>>>
+>>>>>>>> So even if we just clear DBG_SPSR_SS here, we would still need to
+>>>>>>>> tell
+>>>>>>>> kvm_arm_setup_debug not to change the bit. Or resetting SPSR.SS to 1
+>>>>>>>> for
+>>>>>>>> normal single stepping needs to be done before we skip instructions
+>>>>>>>> in
+>>>>>>>> KVM
+>>>>>>>> but that doesn't sound right to me...
+>>>>>>>>
+>>>>>>>
+>>>>>>> So I'm wondering if we're going about this wrong.  Perhaps we need to
+>>>>>>> discover at the end of the run loop that we were asked to single step
+>>>>>>> execution and simply return to userspace, setting the debug exit
+>>>>>>> reason etc., instead of entering the guest with PSTATE.SS==0 and
+>>>>>>> relying on another trap back in to the guest just to set two fields on
+>>>>>>> the kvm_run structure and exit to user space ?
+>>>>>>>
+>>>>>>
+>>>>>> So if I understand correctly, the suggestion is that when we trap an
+>>>>>> instruction we check whether it was supposed to be single stepped, if
+>>>>>> it
+>>>>>> was
+>>>>>> we set up the vcpu registers as if it had taken a software step
+>>>>>> exception
+>>>>>> and return from kvm_arch_vcpu_ioctl_run. Is that right?
+>>>>>
+>>>>>
+>>>>>
+>>>>> yes, that's the idea.  If there's a lot of complexity in setting up
+>>>>> CPU register state, then it may not be a good idea, but if it's
+>>>>> relatively clean, I think it can be preferred over the "let's keep a
+>>>>> flag aroudn for later" approach.
+>>>>>
+>>>>
+>>>> So I looked a bit into it.
+>>>>
+>>>> One annoying thing is that the single step mechanic is specific to arm64.
+>>>> MMU and MMIO code is shared between arm and arm64 and do some handling of
+>>>> traps.
+>>>>
+>>>> So cleanest way I can think of doing this would be to clear SPSR.SS in
+>>>> arm64::kvm_skip_instr, then have some function (e.g.
+>>>> kvm_handle/manage_debug_state) at the end of the run loop. For arm, the
+>>>> function is empty. For arm64, the function,  if we are in an active
+>>>> pending
+>>>> state (SPSR.D == 0 && SPSR.SS == 0 && MDSCR_EL1.SS == 1) and not about to
+>>>> return to userland, returns with a "fake debug exception".
+>>>>
+>>>> So instead of a flag, we would just use SPSR.SS (or more generally the
+>>>> vcpu
+>>>> state) to know if we need to exit with a debug exception or not. And the
+>>>> kvm_arm_setup_debug would be left untouched (always setting SPSR.SS when
+>>>> requested by userland).
+>>>>
+>>>> Does that sound like what you had in mind? Or does it seem better than
+>>>> the
+>>>> current patch?
+>>>>
+>>> I was thinking to change the skip_instruction function to return an
+>>> int, and then call kvm_handle_debug_ss() from skip_instruction, which
+>>> would update the kvm_run structure and exit here and then.
+>>>
+>>
+>> Setting up the debug exception from within kvm_skip_instruction seem to
+>> change a bit too much its semantic from arm to arm64. I would find this
+>> easily confusing.
+>>
+>>> However, I'm now thinking that this doesn't really work either,
+>>> because we could have to emulate a trapped MMIO instruction in user
+>>> space, and then it's not clear how to exit with a debug exception at
+>>> the same time.
+>>>
+>>> So perhaps we should stick with your original approach.
+>>>
+>>
+>> I had not realized that was possible. This makes things more complicated for
+>> avoiding a back and forth with the guest for trapped exceptions. Out of
+>> luck, having the debug flag does look like single stepping would work as
+>> expected for userland MMIOs.
+> 
+> Yes, I think your approach is the best choice now, considering.
+> 
+>>
+>> I can try to detail the comment in kvm_arm_setup_debug when we set SPSR,
+>> hopefully making things clearer when seeing that part of the code.
+>>
+> 
+> I also think we need to improve the comment in the world-switch return
+> path, and I'd like Alex to weigh in here before we merge this.   He's
+> back from holiday on Monday.
+> 
 
-The binding documentation is updating accordingly.
+Ping Alex?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Changelog:
-v1 -> v2:
- - manage the -EPROBE_DEFER case
- - fix typos in documentation
- - remove useless test before clk_disable_unprepare()
-
- Documentation/devicetree/bindings/net/marvell-pp2.txt | 10 ++++++----
- drivers/net/ethernet/marvell/mvpp2.c                  | 15 +++++++++++++++
- 2 files changed, 21 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-index 7e2dad08a12e..1814fa13f6ab 100644
---- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-@@ -21,8 +21,9 @@ Required properties:
- 	- main controller clock (for both armada-375-pp2 and armada-7k-pp2)
- 	- GOP clock (for both armada-375-pp2 and armada-7k-pp2)
- 	- MG clock (only for armada-7k-pp2)
--- clock-names: names of used clocks, must be "pp_clk", "gop_clk" and
--  "mg_clk" (the latter only for armada-7k-pp2).
-+	- AXI clock (only for armada-7k-pp2)
-+- clock-names: names of used clocks, must be "pp_clk", "gop_clk", "mg_clk"
-+  and "axi_clk" (the 2 latter only for armada-7k-pp2).
- 
- The ethernet ports are represented by subnodes. At least one port is
- required.
-@@ -78,8 +79,9 @@ Example for marvell,armada-7k-pp2:
- cpm_ethernet: ethernet at 0 {
- 	compatible = "marvell,armada-7k-pp22";
- 	reg = <0x0 0x100000>, <0x129000 0xb000>;
--	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
--	clock-names = "pp_clk", "gop_clk", "gp_clk";
-+	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>,
-+		 <&cpm_syscon0 1 5>, <&cpm_syscon0 1 18>;
-+	clock-names = "pp_clk", "gop_clk", "gp_clk", "axi_clk";
- 
- 	eth0: eth0 {
- 		interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index dd0ee2691c86..f2656112986b 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -792,6 +792,7 @@ struct mvpp2 {
- 	struct clk *pp_clk;
- 	struct clk *gop_clk;
- 	struct clk *mg_clk;
-+	struct clk *axi_clk;
- 
- 	/* List of pointers to port structures */
- 	struct mvpp2_port **port_list;
-@@ -7963,6 +7964,18 @@ static int mvpp2_probe(struct platform_device *pdev)
- 		err = clk_prepare_enable(priv->mg_clk);
- 		if (err < 0)
- 			goto err_gop_clk;
-+
-+		priv->axi_clk = devm_clk_get(&pdev->dev, "axi_clk");
-+		if (IS_ERR(priv->axi_clk)) {
-+			err = PTR_ERR(priv->axi_clk);
-+			if (err == -EPROBE_DEFER)
-+				goto err_gop_clk;
-+			priv->axi_clk = NULL;
-+		} else {
-+			err = clk_prepare_enable(priv->axi_clk);
-+			if (err < 0)
-+				goto err_gop_clk;
-+		}
- 	}
- 
- 	/* Get system's tclk rate */
-@@ -8015,6 +8028,7 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_mg_clk:
-+	clk_disable_unprepare(priv->axi_clk);
- 	if (priv->hw_version == MVPP22)
- 		clk_disable_unprepare(priv->mg_clk);
- err_gop_clk:
-@@ -8052,6 +8066,7 @@ static int mvpp2_remove(struct platform_device *pdev)
- 				  aggr_txq->descs_dma);
- 	}
- 
-+	clk_disable_unprepare(priv->axi_clk);
- 	clk_disable_unprepare(priv->mg_clk);
- 	clk_disable_unprepare(priv->pp_clk);
- 	clk_disable_unprepare(priv->gop_clk);
 -- 
-2.14.1
+Julien Thierry
