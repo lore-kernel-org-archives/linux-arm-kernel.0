@@ -1,86 +1,363 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 30 Sep 2017 04:22:43 +0800
-Subject: [arm:phy 2/10] drivers/net/ethernet/marvell/mvneta.c:4555:35: error:
- 'struct mvneta_port' has no member named 'phy_interface'
-Message-ID: <201709300440.zI207cjm%fengguang.wu@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Sep 2017 22:30:20 +0200
+Subject: [PATCH] arm64: dts: hikey960: Update HiKey960 with GPIO line names
+Message-ID: <20170929203020.24879-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
-head:   dfaea820e59784cc983e158b10ecc78af3162c4f
-commit: 3d6bda8e8ab387536f2a743f8bddde904fd38a3e [2/10] net: mvneta: convert to phylink
-config: blackfin-allmodconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 3d6bda8e8ab387536f2a743f8bddde904fd38a3e
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+This adds line names for all the GPIOs I could identify on the HiKey960
+schematic.
 
-Note: the arm/phy HEAD dfaea820e59784cc983e158b10ecc78af3162c4f builds fine.
-      It only hurts bisectibility.
+"GPIO-A" through "GPIO-L" are the most important since they give users
+a handle to look up the standard 96boards GPIOs from the GPIO character
+device.
 
-All errors (new ones prefixed by >>):
+The rest of the names are more informational, nice debug information
+for "lsgpio" so you can see that the right line is taken for the right
+function in the kernel for example.
 
-   drivers/net/ethernet/marvell/mvneta.c: In function 'mvneta_resume':
->> drivers/net/ethernet/marvell/mvneta.c:4555:35: error: 'struct mvneta_port' has no member named 'phy_interface'
-     err = mvneta_port_power_up(pp, pp->phy_interface);
-                                      ^~
-
-vim +4555 drivers/net/ethernet/marvell/mvneta.c
-
-9768b45c Jane Li       2017-03-16  4534  
-9768b45c Jane Li       2017-03-16  4535  static int mvneta_resume(struct device *device)
-9768b45c Jane Li       2017-03-16  4536  {
-9768b45c Jane Li       2017-03-16  4537  	struct platform_device *pdev = to_platform_device(device);
-9768b45c Jane Li       2017-03-16  4538  	struct net_device *dev = dev_get_drvdata(device);
-9768b45c Jane Li       2017-03-16  4539  	struct mvneta_port *pp = netdev_priv(dev);
-9768b45c Jane Li       2017-03-16  4540  	int err;
-9768b45c Jane Li       2017-03-16  4541  
-9768b45c Jane Li       2017-03-16  4542  	clk_prepare_enable(pp->clk);
-9768b45c Jane Li       2017-03-16  4543  	if (!IS_ERR(pp->clk_bus))
-9768b45c Jane Li       2017-03-16  4544  		clk_prepare_enable(pp->clk_bus);
-9768b45c Jane Li       2017-03-16  4545  	if (pp->dram_target_info || pp->neta_armada3700)
-9768b45c Jane Li       2017-03-16  4546  		mvneta_conf_mbus_windows(pp, pp->dram_target_info);
-9768b45c Jane Li       2017-03-16  4547  	if (pp->bm_priv) {
-9768b45c Jane Li       2017-03-16  4548  		err = mvneta_bm_port_init(pdev, pp);
-9768b45c Jane Li       2017-03-16  4549  		if (err < 0) {
-9768b45c Jane Li       2017-03-16  4550  			dev_info(&pdev->dev, "use SW buffer management\n");
-9768b45c Jane Li       2017-03-16  4551  			pp->bm_priv = NULL;
-9768b45c Jane Li       2017-03-16  4552  		}
-9768b45c Jane Li       2017-03-16  4553  	}
-9768b45c Jane Li       2017-03-16  4554  	mvneta_defaults_set(pp);
-9768b45c Jane Li       2017-03-16 @4555  	err = mvneta_port_power_up(pp, pp->phy_interface);
-9768b45c Jane Li       2017-03-16  4556  	if (err < 0) {
-9768b45c Jane Li       2017-03-16  4557  		dev_err(device, "can't power up port\n");
-9768b45c Jane Li       2017-03-16  4558  		return err;
-9768b45c Jane Li       2017-03-16  4559  	}
-9768b45c Jane Li       2017-03-16  4560  
-9768b45c Jane Li       2017-03-16  4561  	netif_device_attach(dev);
-d6956ac8 Jisheng Zhang 2017-03-29  4562  	if (netif_running(dev)) {
-9768b45c Jane Li       2017-03-16  4563  		mvneta_open(dev);
-d6956ac8 Jisheng Zhang 2017-03-29  4564  		mvneta_set_rx_mode(dev);
-d6956ac8 Jisheng Zhang 2017-03-29  4565  	}
-d6956ac8 Jisheng Zhang 2017-03-29  4566  
-9768b45c Jane Li       2017-03-16  4567  	return 0;
-9768b45c Jane Li       2017-03-16  4568  }
-9768b45c Jane Li       2017-03-16  4569  #endif
-9768b45c Jane Li       2017-03-16  4570  
-
-:::::: The code at line 4555 was first introduced by commit
-:::::: 9768b45ceb0bc7bdee61837afad331dd6bf7977f net: mvneta: support suspend and resume
-
-:::::: TO: Jane Li <jiel@marvell.com>
-:::::: CC: David S. Miller <davem@davemloft.net>
-
+Cc: Wei Xu <xuwei5@hisilicon.com>
+Cc: Zhangfei Gao <zhangfei.gao@hisilicon.com>
+Cc: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45914 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170930/710bf4ec/attachment-0001.gz>
+Wei: can you test this please? I'm not sure it even compiles but
+I think it should look like this with maybe minor tweaks, if you know
+some of the undefined lines or see some errors feel free to fix it
+up.
+---
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 319 ++++++++++++++++++++++
+ 1 file changed, 319 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index fd4705c451e2..426e4bcf6803 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -196,6 +196,325 @@
+ 	};
+ };
+ 
++/*
++ * Legend: proper name = the GPIO line is used as GPIO
++ *         NC = not connected (pin out but not routed from the chip to
++ *              anything the board)
++ *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
++ *         "" = no idea, schematic doesn't say, could be
++ *              unrouted (not connected to any external pin)
++ *         LSEC = Low Speed External Connector
++ *         HSEC = High Speed External Connector
++ *
++ * Line names are taken from "HiKey 960 Board ver A" schematics
++ * from Huawei. The 40 pin low speed expansion connector is named
++ * J2002 63453-140LF.
++ *
++ * For the lines routed to the external connectors the
++ * lines are named after the 96Boards CE Specification 1.0,
++ * Appendix "Expansion Connector Signal Description".
++ *
++ * When the 96Board naming of a line and the schematic name of
++ * the same line are in conflict, the 96Board specification
++ * takes precedence, which means that the external UART on the
++ * LSEC is named UART0 while the schematic and SoC names this
++ * UART3. This is only for the informational lines i.e. "[FOO]",
++ * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
++ * ones actually used for GPIO.
++ */
++&gpio0 {
++	/* GPIO_000-GPIO_007 */
++	gpio-line-names =
++		"",
++		"TP901", /* TEST_MODE connected to TP901 */
++		"[PMU0_SSI]",
++		"[PMU1_SSI]",
++		"[PMU2_SSI]",
++		"[PMU0_CLKOUT]",
++		"[JTAG_TCK]",
++		"[JTAG_TMS]";
++};
++
++&gpio1 {
++	/* GPIO_008-GPIO_015 */
++	gpio-line-names =
++		"[JTAG_TRST_N]",
++		"[JTAG_TDI]",
++		"[JTAG_TDO]",
++		"NC", "NC",
++		"[I2C3_SCL]",
++		"[I2C3_SDA]",
++		"NC";
++};
++
++&gpio2 {
++	/* GPIO_016-GPIO_023 */
++	gpio-line-names =
++		"NC", "NC", "NC",
++		"GPIO-J", /* LSEC pin 32: GPIO_019 */
++		"GPIO_020_HDMI_SEL",
++		"GPIO-L", /* LSEC pin 34: GPIO_021 */
++		"GPIO_022_UFSBUCK_INT_N",
++		"GPIO-G"; /* LSEC pin 29: LCD_TE0 */
++};
++
++&gpio3 {
++	/* GPIO_024-GPIO_031 */
++	/* The rail from pin BK36 is named LCD_TE0, we assume to be muxed as GPIO for GPIO-G */
++	gpio-line-names =
++		"[CSI0_MCLK]", /* HSEC pin 15: ISP_CCLK0_MCAM */
++		"[CSI1_MCLK]", /* HSEC pin 17: ISP_CCLK1_SCAM */
++		"NC",
++		"[I2C2_SCL]", /* HSEC pin 32: ISP_SCL0 */
++		"[I2C2_SDA]", /* HSEC pin 34: ISP_SDA0 */
++		"[I2C3_SCL]", /* HSEC pin 36: ISP_SCL1 */
++		"[I2C3_SDA]", /* HSEC pin 38: ISP_SDA1 */
++		"NC";
++};
++
++&gpio4 {
++	/* GPIO_032-GPIO_039 */
++	gpio-line-names =
++		"NC", "NC",
++		"PWR_BTN_N", /* LSEC pin 4: GPIO_034_PWRON_DET */
++		"GPIO_035_PMU2_EN",
++		"GPIO_036_USB_HUB_RESET",
++		"NC", "NC", "NC";
++};
++
++&gpio5 {
++	/* GPIO_040-GPIO_047 */
++	gpio-line-names =
++		"GPIO-H", /* LSEC pin 30: GPIO_040_LCD_RST_N */
++		"GPIO_041_HDMI_PD",
++		"TP904", /* Test point */
++		"TP905", /* Test point */
++		"NC", "NC",
++		"GPIO_046_HUB_VDD33_EN",
++		"GPIO_047_PMU1_EN";
++};
++
++&gpio6 {
++	/* GPIO_048-GPIO_055 */
++	gpio-line-names =
++		"NC", "NC", "NC",
++		"GPIO_051_WIFI_EN",
++		"GPIO-I", /* LSEC pin 31: GPIO_052_CAM0_RST_N */
++		/*
++		 * These two pins should be used for SD(IO) data according to the
++		 * 96boards specification but seems to be repurposed for a IRDA UART.
++		 * They are however named according to the spec.
++		 */
++		"[SD_DAT1]", /* HSEC pin 3: UART0_IRDA_RXD */
++		"[SD_DAT2]", /* HSEC pin 5: UART0_IRDA_TXD */
++		"[UART1_RXD]"; /* LSEC pin 13: DEBUG_UART6_RXD */
++};
++
++&gpio7 {
++	/* GPIO_056-GPIO_063 */
++	gpio-line-names =
++		"[UART1_TXD]", /* LSEC pin 11: DEBUG_UART6_TXD */
++		"[UART0_CTS]", /* LSEC pin 3: UART3_CTS_N */
++		"[UART0_RTS]", /* LSEC pin 9: UART3_RTS_N */
++		"[UART0_RXD]", /* LSEC pin 7: UART3_RXD */
++		"[UART0_TXD]", /* LSEC pin 5: UART3_TXD */
++		"[SOC_BT_UART4_CTS_N]",
++		"[SOC_BT_UART4_RTS_N]",
++		"[SOC_BT_UART4_RXD]";
++};
++
++&gpio8 {
++	/* GPIO_064-GPIO_071 */
++	gpio-line-names =
++		"[SOC_BT_UART4_TXD]",
++		"NC",
++		"[PMU_HKADC_SSI]",
++		"NC",
++		"GPIO_068_SEL",
++		"NC", "NC", "NC";
++
++};
++
++&gpio9 {
++	/* GPIO_072-GPIO_079 */
++	gpio-line-names =
++		"NC", "NC", "NC",
++		"GPIO-K", /* LSEC pin 33: GPIO_075_CAM1_RST_N */
++		"NC", "NC", "NC", "NC";
++};
++
++&gpio10 {
++	/* GPIO_080-GPIO_087 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio11 {
++	/* GPIO_088-GPIO_095 */
++	gpio-line-names =
++		"NC",
++		"[PCIE_PERST_N]",
++		"NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio12 {
++	/* GPIO_096-GPIO_103 */
++	gpio-line-names = "NC", "NC", "NC", "", "", "", "", "NC";
++};
++
++&gpio13 {
++	/* GPIO_104-GPIO_111 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio14 {
++	/* GPIO_112-GPIO_119 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio15 {
++	/* GPIO_120-GPIO_127 */
++	gpio-line-names =
++		"NC", "NC", "NC", "NC", "NC", "NC",
++		"GPIO_126_BT_EN",
++		"TP902"; /* GPIO_127_JTAG_SEL0 */
++};
++
++&gpio16 {
++	/* GPIO_128-GPIO_135 */
++	gpio-line-names = "", "", "", "", "", "", "", "";
++};
++
++&gpio17 {
++	/* GPIO_136-GPIO_143 */
++	gpio-line-names = "", "", "", "", "", "", "", "";
++};
++
++&gpio18 {
++	/* GPIO_144-GPIO_151 */
++	gpio-line-names =
++		"[UFS_REF_CLK]",
++		"[UFS_RST_N]",
++		"[SPI1_SCLK]", /* HSEC pin 9: GPIO_146_SPI3_CLK */
++		"[SPI1_DIN]", /* HSEC pin 11: GPIO_147_SPI3_DI */
++		"[SPI1_DOUT]", /* HSEC pin 1: GPIO_148_SPI3_DO */
++		"[SPI1_CS]", /* HSEC pin 7: GPIO_149_SPI3_CS0_N */
++		"GPIO_150_USER_LED1",
++		"GPIO_151_USER_LED2";
++};
++
++&gpio19 {
++	/* GPIO_152-GPIO_159 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "", "", "", "";
++};
++
++&gpio20 {
++	/* GPIO_160-GPIO_167 */
++	gpio-line-names =
++		"[SD_CLK]",
++		"[SD_CMD]",
++		"[SD_DATA0]",
++		"[SD_DATA1]",
++		"[SD_DATA2]",
++		"[SD_DATA3]",
++		"", "";
++};
++
++&gpio21 {
++	/* GPIO_168-GPIO_175 */
++	gpio-line-names =
++		"[WL_SDIO_CLK]",
++		"[WL_SDIO_CMD]",
++		"[WL_SDIO_DATA0]",
++		"[WL_SDIO_DATA1]",
++		"[WL_SDIO_DATA2]",
++		"[WL_SDIO_DATA3]",
++		"", "";
++};
++
++&gpio22 {
++	/* GPIO_176-GPIO_183 */
++	gpio-line-names =
++		"[GPIO_176_PMU_PWR_HOLD]",
++		"NA",
++		"[SYSCLK_EN]",
++		"GPIO_179_WL_WAKEUP_AP",
++		"GPIO_180_HDMI_INT",
++		"NA",
++		"GPIO-F", /* LSEC pin 28: LCD_BL_PWM */
++		"[I2C0_SCL]"; /* LSEC pin 15 */
++};
++
++&gpio23 {
++	/* GPIO_184-GPIO_191 */
++	gpio-line-names =
++		"[I2C0_SDA]", /* LSEC pin 17 */
++		"[I2C1_SCL]", /* Actual SoC I2C1 */
++		"[I2C1_SDA]", /* Actual SoC I2C1 */
++		"[I2C1_SCL]", /* LSEC pin 19: I2C7_SCL */
++		"[I2C1_SDA]", /* LSEC pin 21: I2C7_SDA */
++		"GPIO_189_USER_LED3",
++		"GPIO_190_USER_LED4",
++		"",
++};
++
++&gpio24 {
++	/* GPIO_192-GPIO_199 */
++	gpio-line-names =
++		"[PCM_DI]", /* LSEC pin 22: GPIO_192_I2S0_DI */
++		"[PCM_DO]", /* LSEC pin 20: GPIO_193_I2S0_DO */
++		"[PCM_CLK]", /* LSEC pin 18: GPIO_194_I2S0_XCLK */
++		"[PCM_FS]", /* LSEC pin 16: GPIO_195_I2S0_XFS */
++		"[GPIO_196_I2S2_DI]",
++		"[GPIO_197_I2S2_DO]",
++		"[GPIO_198_I2S2_XCLK]",
++		"[GPIO_199_I2S2_XFS]";
++};
++
++&gpio25 {
++	/* GPIO_200-GPIO_207 */
++	gpio-line-names =
++		"NC",
++		"NC",
++		"GPIO_202_VBUS_TYPEC",
++		"GPIO_203_SD_DET",
++		"GPIO_204_PMU12_IRQ_N",
++		"GPIO_205_WIFI_ACTIVE",
++		"GPIO_206_USBSW_SEL",
++		"GPIO_207_BT_ACTIVE";
++};
++
++&gpio26 {
++	/* GPIO_208-GPIO_215 */
++	gpio-line-names =
++		"GPIO-A", /* LSEC pin 23: GPIO_208 */
++		"GPIO-B", /* LSEC pin 24: GPIO_209 */
++		"GPIO-C", /* LSEC pin 25: GPIO_210 */
++		"GPIO-D", /* LSEC pin 26: GPIO_211 */
++		"GPIO-E", /* LSEC pin 27: GPIO_212 */
++		"[PCIE_CLKREQ_N]",
++		"[PCIE_WAKE_N]",
++		"[SPI0_CLK]"; /* LSEC pin 8: SPI2_CLK */
++};
++
++&gpio27 {
++	/* GPIO_216-GPIO_223 */
++	gpio-line-names =
++		"[SPI0_DIN]", /* LSEC pin 10: SPI2_DI */
++		"[SPI0_DOUT]", /* LSEC pin 14: SPI2_DO */
++		"[SPI0_CS]", /* LSEC pin 12: SPI2_CS0_N */
++		"GPIO_219_CC_INT",
++		"NC",
++		"NC",
++		"[PMU_INT]",
++		"";
++};
++
++&gpio28 {
++	/* GPIO_224-GPIO_231 */
++	gpio-line-names =
++		"", "", "", "", "", "", "", "";
++};
++
+ &i2c0 {
+ 	/* On Low speed expansion */
+ 	label = "LS-I2C0";
+-- 
+2.13.5
