@@ -1,35 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 Sep 2017 13:53:16 +0200
-Subject: [PATCH 24/48] ARM: dts: iwg20d-q7: Add chosen node
+Date: Fri, 29 Sep 2017 13:53:18 +0200
+Subject: [PATCH 26/48] ARM: dts: iwg22d-sodimm: Add pinctl support for scif4
 In-Reply-To: <cover.1506683482.git.horms+renesas@verge.net.au>
 References: <cover.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <f9c1e87e77ca1ef1c4de2d419b0dcb42e4a47043.1506683482.git.horms+renesas@verge.net.au>
+Message-ID: <67dbb081815e013e1e7911305b43b44537a78ed2.1506683482.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Biju Das <biju.das@bp.renesas.com>
 
+Adding pinctrl support for scif4 interface.
+
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 4ff27d23ecf0..e30c58625e65 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -20,6 +20,11 @@
- 		ethernet0 = &avb;
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+index cbc19feb1565..442a5cbb0838 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+@@ -24,6 +24,16 @@
  	};
+ };
  
-+	chosen {
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
-+		stdout-path = "serial0:115200n8";
++&pfc {
++	scif4_pins: scif4 {
++		groups = "scif4_data_b";
++		function = "scif4";
 +	};
++};
 +
- 	vcc_sdhi1: regulator-vcc-sdhi1 {
- 		compatible = "regulator-fixed";
- 
+ &scif4 {
++	pinctrl-0 = <&scif4_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
 -- 
 2.1.4
