@@ -1,25 +1,26 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 29 Sep 2017 11:51:12 +0100
-Subject: [PATCH 4/8] video: sa1100fb: use devm_request_irq()
+Date: Fri, 29 Sep 2017 11:51:17 +0100
+Subject: [PATCH 5/8] video: sa1100fb: use devm_gpio_request_one()
 In-Reply-To: <20170929105004.GY20805@n2100.armlinux.org.uk>
 References: <20170929105004.GY20805@n2100.armlinux.org.uk>
-Message-ID: <E1dxssy-0006j9-86@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dxst3-0006jG-JT@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_request_irq() to request the interrupt (a little earlier too)
-so we can avoid having to manually clean this up.
+Switch to using devm_gpio_request_one() to request the shannon gpio
+and move the request before the video memory allocation, so we request
+all device managed resources before this large allocation attempt.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/video/fbdev/sa1100fb.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ drivers/video/fbdev/sa1100fb.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/video/fbdev/sa1100fb.c b/drivers/video/fbdev/sa1100fb.c
-index ab83970dbfd9..a48fdb676f3e 100644
+index a48fdb676f3e..7fa6c8f74ec6 100644
 --- a/drivers/video/fbdev/sa1100fb.c
 +++ b/drivers/video/fbdev/sa1100fb.c
-@@ -1239,22 +1239,23 @@ static int sa1100fb_probe(struct platform_device *pdev)
+@@ -1246,18 +1246,18 @@ static int sa1100fb_probe(struct platform_device *pdev)
  		goto failed;
  	}
  
@@ -28,12 +29,12 @@ index ab83970dbfd9..a48fdb676f3e 100644
 -	if (ret)
 -		goto failed;
 -
--	ret = request_irq(irq, sa1100fb_handle_irq, 0, "LCD", fbi);
-+	ret = devm_request_irq(&pdev->dev, irq, sa1100fb_handle_irq, 0,
-+			       "LCD", fbi);
- 	if (ret) {
- 		dev_err(&pdev->dev, "request_irq failed: %d\n", ret);
- 		goto failed;
+ 	if (machine_is_shannon()) {
+-		ret = gpio_request_one(SHANNON_GPIO_DISP_EN,
++		ret = devm_gpio_request_one(&pdev->dev, SHANNON_GPIO_DISP_EN,
+ 			GPIOF_OUT_INIT_LOW, "display enable");
+ 		if (ret)
+ 			goto failed;
  	}
  
 +	/* Initialize video memory */
@@ -41,21 +42,25 @@ index ab83970dbfd9..a48fdb676f3e 100644
 +	if (ret)
 +		goto failed;
 +
- 	if (machine_is_shannon()) {
- 		ret = gpio_request_one(SHANNON_GPIO_DISP_EN,
- 			GPIOF_OUT_INIT_LOW, "display enable");
- 		if (ret)
--			goto err_free_irq;
-+			goto failed;
- 	}
- 
  	/*
-@@ -1282,8 +1283,6 @@ static int sa1100fb_probe(struct platform_device *pdev)
-  err_reg_fb:
- 	if (machine_is_shannon())
- 		gpio_free(SHANNON_GPIO_DISP_EN);
-- err_free_irq:
--	free_irq(irq, fbi);
+ 	 * This makes sure that our colour bitfield
+ 	 * descriptors are correctly initialised.
+@@ -1268,7 +1268,7 @@ static int sa1100fb_probe(struct platform_device *pdev)
+ 
+ 	ret = register_framebuffer(&fbi->fb);
+ 	if (ret < 0)
+-		goto err_reg_fb;
++		goto failed;
+ 
+ #ifdef CONFIG_CPU_FREQ
+ 	fbi->freq_transition.notifier_call = sa1100fb_freq_transition;
+@@ -1280,9 +1280,6 @@ static int sa1100fb_probe(struct platform_device *pdev)
+ 	/* This driver cannot be unloaded at the moment */
+ 	return 0;
+ 
+- err_reg_fb:
+-	if (machine_is_shannon())
+-		gpio_free(SHANNON_GPIO_DISP_EN);
   failed:
  	return ret;
  }
