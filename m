@@ -1,292 +1,126 @@
 From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Fri, 29 Sep 2017 15:09:07 +0200
-Subject: [RFC 05/11] drm/bridge: Analogix ANX7688 HDMI -> DP bridge driver
+Date: Fri, 29 Sep 2017 15:09:09 +0200
+Subject: [RFC 07/11] hack: mediatek: get mmsys to register as both DRM and
+ clock device
 In-Reply-To: <1506690553-27357-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 References: <1506690553-27357-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1506690553-27357-6-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1506690553-27357-8-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ported from chromeos-3.18.
+"mediatek,mt8173-mmsys" is the compatible string for both a clock controller
+and a DRM device. The assumption seems to be that all compatible strings
+trigger, and that mmsys will be registered as two devices.
+This does work in the 3.18 vendor kernel, but it is not what happens in
+mainline: only the clock portion is probed.
+
+This hack probes the clocks from mtk_drm_probe(), and has all drivers
+that need these clocks defer instead of fail. Fixes DRM initialization
+on Acer Chromebook R13.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- drivers/gpu/drm/bridge/Kconfig            |   9 ++
- drivers/gpu/drm/bridge/Makefile           |   1 +
- drivers/gpu/drm/bridge/analogix-anx7688.c | 233 ++++++++++++++++++++++++++++++
- 3 files changed, 243 insertions(+)
- create mode 100644 drivers/gpu/drm/bridge/analogix-anx7688.c
+ drivers/clk/mediatek/clk-mt8173.c      | 4 ++--
+ drivers/gpu/drm/mediatek/mtk_dpi.c     | 5 +++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 5 +++--
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 7 +++++++
+ drivers/gpu/drm/mediatek/mtk_hdmi.c    | 5 +++--
+ 5 files changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index a1c0d95..712ac0a 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -38,6 +38,15 @@ config DRM_PARADE_PS8640
- 	  The PS8640 is a high-performance and low-power
- 	  MIPI DSI to eDP converter
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 96c292c..9339d2c 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -1152,7 +1152,7 @@ static void __init mtk_imgsys_init(struct device_node *node)
+ }
+ CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt8173-imgsys", mtk_imgsys_init);
  
-+config DRM_ANALOGIX_ANX7688
-+	tristate "Analogix ANX7688 bridge"
-+	depends on DRM
-+	select DRM_KMS_HELPER
-+	---help---
-+	  ANX7688 is a transmitter to support DisplayPort over USB-C for
-+	  smartphone and tablets.
-+	  This driver only supports the HDMI to DP component of the chip.
-+
- config DRM_ANALOGIX_ANX78XX
- 	tristate "Analogix ANX78XX bridge"
- 	select DRM_KMS_HELPER
-diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
-index 6be8a9d..9cbf788 100644
---- a/drivers/gpu/drm/bridge/Makefile
-+++ b/drivers/gpu/drm/bridge/Makefile
-@@ -1,6 +1,7 @@
- ccflags-y := -Iinclude/drm
+-static void __init mtk_mmsys_init(struct device_node *node)
++/*static*/ void /*__init*/ mtk_mmsys_init(struct device_node *node)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	int r;
+@@ -1167,7 +1167,7 @@ static void __init mtk_mmsys_init(struct device_node *node)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
+ }
+-CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys", mtk_mmsys_init);
++//CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys", mtk_mmsys_init);
  
- obj-$(CONFIG_DRM_PARADE_PS8640) += parade-ps8640.o
-+obj-$(CONFIG_DRM_ANALOGIX_ANX7688) += analogix-anx7688.o
- obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
- obj-$(CONFIG_DRM_GENERIC_GPIO_MUX) += generic-gpio-mux.o
- obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
-diff --git a/drivers/gpu/drm/bridge/analogix-anx7688.c b/drivers/gpu/drm/bridge/analogix-anx7688.c
-new file mode 100644
-index 0000000..cc995c8
---- /dev/null
-+++ b/drivers/gpu/drm/bridge/analogix-anx7688.c
-@@ -0,0 +1,233 @@
-+/*
-+ * ANX7688 HDMI->DP bridge driver
-+ *
-+ * Copyright (C) 2016 Google, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/i2c.h>
-+#include <linux/module.h>
-+#include <drm/drm_crtc.h>
-+
-+/* Register addresses */
-+#define VENDOR_ID_REG 0x00
-+#define DEVICE_ID_REG 0x02
-+
-+#define FW_VERSION_REG 0x80
-+
-+#define DP_BANDWIDTH_REG 0x85
-+#define DP_LANE_COUNT_REG 0x86
-+
-+#define VENDOR_ID 0x1f29
-+#define DEVICE_ID 0x7688
-+
-+/* First supported firmware version (0.85) */
-+#define MINIMUM_FW_VERSION 0x0085
-+
-+struct anx7688 {
-+	struct drm_bridge bridge;
-+	struct i2c_client *client;
-+
-+	bool filter;
-+};
-+
-+static int anx7688_read(struct i2c_client *client, u8 reg, u8 *data,
-+			u16 data_len)
-+{
-+	int ret;
-+	struct i2c_msg msgs[] = {
-+		{
-+		 .addr = client->addr,
-+		 .flags = 0,
-+		 .len = 1,
-+		 .buf = &reg,
-+		 },
-+		{
-+		 .addr = client->addr,
-+		 .flags = I2C_M_RD,
-+		 .len = data_len,
-+		 .buf = data,
-+		 }
-+	};
-+
-+	ret = i2c_transfer(client->adapter, msgs, 2);
-+
-+	if (ret == 2)
-+		return 0;
-+	if (ret < 0)
-+		return ret;
-+	else
-+		return -EIO;
-+}
-+
-+static inline struct anx7688 *bridge_to_anx7688(struct drm_bridge *bridge)
-+{
-+	return container_of(bridge, struct anx7688, bridge);
-+}
-+
-+static bool anx7688_bridge_mode_fixup(struct drm_bridge *bridge,
-+				      const struct drm_display_mode *mode,
-+				      struct drm_display_mode *adjusted_mode)
-+{
-+	struct anx7688 *anx7688 = bridge_to_anx7688(bridge);
-+	u8 regs[2];
-+	u8 dpbw, lanecount;
-+	int totalbw, requiredbw;
-+	int ret;
-+
-+	if (!anx7688->filter)
-+		return true;
-+
-+	/* Read both regs 0x85 (bandwidth) and 0x86 (lane count). */
-+	ret = anx7688_read(anx7688->client, DP_BANDWIDTH_REG, regs, 2);
-+	if (ret < 0) {
-+		dev_err(&anx7688->client->dev,
-+			"Failed to read bandwidth/lane count\n");
-+		return false;
-+	}
-+	dpbw = regs[0];
-+	lanecount = regs[1];
-+
-+	/* Maximum 0x19 bandwidth (6.75 Gbps Turbo mode), 2 lanes */
-+	if (dpbw > 0x19 || lanecount > 2) {
-+		dev_err(&anx7688->client->dev,
-+			"Invalid bandwidth/lane count (%02x/%d)\n",
-+			dpbw, lanecount);
-+		return false;
+ static void __init mtk_vdecsys_init(struct device_node *node)
+ {
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index e80a603..ed999891 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -682,8 +682,9 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 	dpi->engine_clk = devm_clk_get(dev, "engine");
+ 	if (IS_ERR(dpi->engine_clk)) {
+ 		ret = PTR_ERR(dpi->engine_clk);
+-		dev_err(dev, "Failed to get engine clock: %d\n", ret);
+-		return ret;
++		dev_err(dev, "Failed to get engine clock: %d, deferring\n", ret);
++		return -EPROBE_DEFER;
++		//return ret;
+ 	}
+ 
+ 	dpi->pixel_clk = devm_clk_get(dev, "pixel");
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 8130f3d..465ee60 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -382,8 +382,9 @@ static int mtk_ddp_probe(struct platform_device *pdev)
+ 
+ 	ddp->clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(ddp->clk)) {
+-		dev_err(dev, "Failed to get clock\n");
+-		return PTR_ERR(ddp->clk);
++		dev_err(dev, "Failed to get clock, deferring\n");
++		return -EPROBE_DEFER;
++		//return PTR_ERR(ddp->clk);
+ 	}
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index a2ca90f..8c92630 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -381,6 +381,8 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+ 	{ }
+ };
+ 
++static int foo = 0;
++void mtk_mmsys_init(struct device_node *node);
+ static int mtk_drm_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -391,6 +393,11 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 	int ret;
+ 	int i;
+ 
++	if (!foo) {
++		mtk_mmsys_init(dev->of_node);
++		foo = 1;
 +	}
 +
-+	/* Compute available bandwidth (kHz) */
-+	totalbw = dpbw * lanecount * 270000 * 8 / 10;
-+
-+	/* Required bandwidth (8 bpc, kHz) */
-+	requiredbw = mode->clock * 8 * 3;
-+
-+	dev_dbg(&anx7688->client->dev,
-+		"DP bandwidth: %d kHz (%02x/%d); mode requires %d Khz\n",
-+		totalbw, dpbw, lanecount, requiredbw);
-+
-+	if (totalbw == 0) {
-+		dev_warn(&anx7688->client->dev,
-+			 "Bandwidth/lane count are 0, not rejecting modes\n");
-+		return true;
-+	}
-+
-+	return totalbw >= requiredbw;
-+}
-+
-+static const struct drm_bridge_funcs anx7688_bridge_funcs = {
-+	.mode_fixup	= anx7688_bridge_mode_fixup,
-+};
-+
-+static int anx7688_i2c_probe(struct i2c_client *client,
-+			     const struct i2c_device_id *id)
-+{
-+	struct anx7688 *anx7688;
-+	int ret;
-+	u8 buffer[4];
-+	u16 vendor, device, fwversion;
-+
-+	anx7688 = devm_kzalloc(&client->dev, sizeof(*anx7688), GFP_KERNEL);
-+	if (!anx7688)
-+		return -ENOMEM;
-+
-+#if IS_ENABLED(CONFIG_OF)
-+	anx7688->bridge.of_node = client->dev.of_node;
-+#endif
-+
-+	anx7688->client = client;
-+	i2c_set_clientdata(client, anx7688);
-+
-+	/* Read both vendor and device id (4 bytes). */
-+	ret = anx7688_read(client, VENDOR_ID_REG, buffer, 4);
-+	if (ret) {
-+		dev_err(&client->dev, "Failed to read chip vendor/device id\n");
-+		return ret;
-+	}
-+
-+	vendor = (u16)buffer[1] << 8 | buffer[0];
-+	device = (u16)buffer[3] << 8 | buffer[2];
-+	if (vendor != VENDOR_ID || device != DEVICE_ID) {
-+		dev_err(&client->dev,
-+			"Invalid vendor/device id %04x/%04x\n",
-+			vendor, device);
-+		return -ENODEV;
-+	}
-+
-+	ret = anx7688_read(client, FW_VERSION_REG, buffer, 2);
-+	if (ret) {
-+		dev_err(&client->dev, "Failed to read firmware version\n");
-+		return ret;
-+	}
-+
-+	fwversion = (u16)buffer[0] << 8 | buffer[1];
-+	dev_info(&client->dev, "ANX7688 firwmare version %02x.%02x\n",
-+		 buffer[0], buffer[1]);
-+
-+	/* FW version >= 0.85 supports bandwidth/lane count registers */
-+	if (fwversion >= MINIMUM_FW_VERSION) {
-+		anx7688->filter = true;
-+	} else {
-+		/* Warn, but not fail, for backwards compatibility. */
-+		dev_warn(&client->dev,
-+			 "Old ANX7688 FW version (%02x.%02x), not filtering\n",
-+			 buffer[0], buffer[1]);
-+	}
-+
-+	anx7688->bridge.funcs = &anx7688_bridge_funcs;
-+	ret = drm_bridge_add(&anx7688->bridge);
-+	if (ret < 0) {
-+		dev_err(&client->dev, "Failed to add drm bridge\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int anx7688_i2c_remove(struct i2c_client *client)
-+{
-+	struct anx7688 *anx7688 = i2c_get_clientdata(client);
-+
-+	drm_bridge_remove(&anx7688->bridge);
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id anx7688_id[] = {
-+	{ "anx7688", 0 },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(i2c, anx7688_id);
-+
-+#if IS_ENABLED(CONFIG_OF)
-+static const struct of_device_id anx7688_match_table[] = {
-+	{ .compatible = "analogix,anx7688", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, anx7688_match_table);
-+#endif
-+
-+static struct i2c_driver anx7688_driver = {
-+	.driver = {
-+		   .name = "anx7688",
-+		   .of_match_table = of_match_ptr(anx7688_match_table),
-+		  },
-+	.probe = anx7688_i2c_probe,
-+	.remove = anx7688_i2c_remove,
-+	.id_table = anx7688_id,
-+};
-+
-+module_i2c_driver(anx7688_driver);
-+
-+MODULE_DESCRIPTION("ANX7688 SlimPort Transmitter driver");
-+MODULE_AUTHOR("Nicolas Boichat <drinkcat@chromium.org>");
-+MODULE_LICENSE("GPL v2");
+ 	private = devm_kzalloc(dev, sizeof(*private), GFP_KERNEL);
+ 	if (!private)
+ 		return -ENOMEM;
+diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+index 690c675..715c0e0 100644
+--- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
++++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+@@ -1441,8 +1441,9 @@ static int mtk_hdmi_dt_parse_pdata(struct mtk_hdmi *hdmi,
+ 
+ 	ret = mtk_hdmi_get_all_clk(hdmi, np);
+ 	if (ret) {
+-		dev_err(dev, "Failed to get clocks: %d\n", ret);
+-		return ret;
++		dev_err(dev, "Failed to get clocks: %d, deferring\n", ret);
++		return -EPROBE_DEFER;
++		//return ret;
+ 	}
+ 
+ 	/* The CEC module handles HDMI hotplug detection */
 -- 
 2.7.4
