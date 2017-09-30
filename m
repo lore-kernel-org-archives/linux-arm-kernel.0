@@ -1,81 +1,33 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Sat, 30 Sep 2017 16:26:32 +1000
-Subject: [linux-sunxi] Re: [PATCH v3 04/14] drm/sun4i: tcon: Add support
- for demuxing TCON output on A31
-In-Reply-To: <CAGb2v66epS9OLAQthYOrn7B48E80jsfy9dhyLPHyo4NmAOTCbg@mail.gmail.com>
-References: <20170929082306.16193-1-wens@csie.org>
- <20170929082306.16193-5-wens@csie.org>
- <20170929102006.2wz7wrkpplxwynoh@flea>
- <CAGb2v65VhtEckRCXi4X5AjmC-5CSHavATu8fKyEHOivmYqZkww@mail.gmail.com>
- <CAGRGNgUmo6ZztajhG=uZrXGsC9pxySswxLd4P-gk6xdknLX-NQ@mail.gmail.com>
- <CAGb2v66epS9OLAQthYOrn7B48E80jsfy9dhyLPHyo4NmAOTCbg@mail.gmail.com>
-Message-ID: <CAGRGNgUFAmoBH4OFi+DUW6JU0tOPAZbS_9Dq7tKA+m8UT7vhnw@mail.gmail.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Sat, 30 Sep 2017 16:25:06 +0800
+Subject: [PATCH v2 0/3] Add support rockchip RGB output interface
+In-Reply-To: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
+References: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
+Message-ID: <b66bc75d-b217-a54f-272a-b5ee7d0b57d3@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Do you  have any suggests for this series of patches?
+Or apply to drm-misc-next?
 
-On Sat, Sep 30, 2017 at 3:58 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sat, Sep 30, 2017 at 1:35 PM, Julian Calaby <julian.calaby@gmail.com> wrote:
->> Hi Chen-Yu,
->>
->> On Fri, Sep 29, 2017 at 8:22 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->>> On Fri, Sep 29, 2017 at 6:20 PM, Maxime Ripard
->>> <maxime.ripard@free-electrons.com> wrote:
->>>> On Fri, Sep 29, 2017 at 08:22:56AM +0000, Chen-Yu Tsai wrote:
->>>>> On systems with 2 TCONs such as the A31, it is possible to demux the
->>>>> output of the TCONs to one encoder.
->>>>>
->>>>> Add support for this for the A31.
->>>>>
->>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>>> ---
->>>>>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 38 ++++++++++++++++++++++++++++++++++++++
->>>>>  1 file changed, 38 insertions(+)
->>>>>
->>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>> index 7bf51abaee97..c949309d4285 100644
->>>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>> @@ -112,6 +112,21 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
->>>>>  }
->>>>>  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
->>>>>
->>>>> +static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
->>>>
->>>> Would that make sense to make it a bit more generic, and pass the id
->>>> to look for as an argument?
->>>
->>> The reason to look for TCON0 explicitly is to access the muxing registers, which
->>> are only available in TCON0. Other than that, there's nothing else
->>> shared between
->>> the two TCONs. So there's no particular reason to look for TCON1 explicitly.
->>
->> In that case: in the bizarre case where we're trying to use this mux
->> type and there is no TCON0, shouldn't we fail?
->
-> It gives out a big warning, indicating something is wrong. If TCON0 is not found
-> it is most likely your device tree is broken. There's nothing more the
-> driver can do.
-> Are you suggesting to return NULL in this case, and also do error
-> handling in the
-> callers?
-
-You're already returning -EINVAL for other failure cases, so a lack of
-TCON0 might as well do the same.
-
->> (Also, the code doesn't make sense if we have some TCON1 and TCON2 in
->> that order as it'll return TCON2)
->
-> I'm guessing you want it to return NULL.
-
-I'm just pointing out the mismatch between getting the "first" TCON
-and the actual behaviour.
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+? 2017/9/22 11:00, Sandy Huang ??:
+> This patches add support rockchip RGB output, Some Rockchip CRTCs, like rv1108,
+> can directly output parallel and serial RGB data to panel or to conversion chip.
+> So we add this driver to probe encoder and connector to support this case.
+> 
+> Sandy Huang (3):
+>    dt-bindings: Add document for rockchip RGB output interface
+>    drm/rockchip: Add support for Rockchip Soc RGB output interface
+>    drm/rockchip: vop: Add more RGB output interface type
+> 
+>   .../bindings/display/rockchip/rockchip-rgb.txt     |  78 +++++
+>   drivers/gpu/drm/rockchip/Kconfig                   |   9 +
+>   drivers/gpu/drm/rockchip/Makefile                  |   1 +
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |   2 +
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |   1 +
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
+>   drivers/gpu/drm/rockchip/rockchip_rgb.c            | 343 +++++++++++++++++++++
+>   7 files changed, 436 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>   create mode 100644 drivers/gpu/drm/rockchip/rockchip_rgb.c
+> 
