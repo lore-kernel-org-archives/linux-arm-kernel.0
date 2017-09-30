@@ -1,62 +1,104 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Sat, 30 Sep 2017 17:16:08 +0000
-Subject: [PATCHv2 2/7] usb: dwc2: add support for STM32F7 USB OTG HS
-References: <1503930018-536-1-git-send-email-amelie.delaunay@st.com>
- <1503930018-536-3-git-send-email-amelie.delaunay@st.com>
- <a0f2971e-d41a-01bb-88e1-8ffed786e954@st.com>
-Message-ID: <2B3535C5ECE8B5419E3ECBE3007729090269FF8113@US01WEMBX2.internal.synopsys.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 30 Sep 2017 18:45:38 +0100
+Subject: [PATCH 1/2] iio: adc: sun4i-gpadc-iio: register in the thermal
+ after registering in pm
+In-Reply-To: <f7b1b9c493c563a2f5b5f5f44596d45d3d719d26.1506430136.git-series.quentin.schulz@free-electrons.com>
+References: <f7b1b9c493c563a2f5b5f5f44596d45d3d719d26.1506430136.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20170930184538.10ec70f1@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2017 07:22 AM, Amelie DELAUNAY wrote:
-> Hi,
->
-> Gentle ping for driver review submitted on August 28th.
->
-> Thanks,
-> Amelie
->
-> On 08/28/2017 04:20 PM, Amelie Delaunay wrote:
->> This patch adds the dwc2_set_params function for STM32F7 USB OTG HS.
->>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->> ---
->>   drivers/usb/dwc2/params.c | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
->> index a3ffe97..d5b672d 100644
->> --- a/drivers/usb/dwc2/params.c
->> +++ b/drivers/usb/dwc2/params.c
->> @@ -136,6 +136,15 @@ static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
->>   	p->activate_stm_fs_transceiver = true;
->>   }
->>
->> +static void dwc2_set_stm32f7_hsotg_params(struct dwc2_hsotg *hsotg)
->> +{
->> +	struct dwc2_core_params *p = &hsotg->params;
->> +
->> +	p->host_rx_fifo_size = 622;
->> +	p->host_nperio_tx_fifo_size = 128;
->> +	p->host_perio_tx_fifo_size = 256;
->> +}
->> +
->>   const struct of_device_id dwc2_of_match_table[] = {
->>   	{ .compatible = "brcm,bcm2835-usb", .data = dwc2_set_bcm_params },
->>   	{ .compatible = "hisilicon,hi6220-usb", .data = dwc2_set_his_params  },
->> @@ -154,6 +163,8 @@ const struct of_device_id dwc2_of_match_table[] = {
->>   	{ .compatible = "st,stm32f4x9-fsotg",
->>   	  .data = dwc2_set_stm32f4x9_fsotg_params },
->>   	{ .compatible = "st,stm32f4x9-hsotg" },
->> +	{ .compatible = "st,stm32f7-hsotg",
->> +	  .data = dwc2_set_stm32f7_hsotg_params },
->>   	{},
->>   };
->>   MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
->>
+On Tue, 26 Sep 2017 14:52:18 +0200
+Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
+> This driver has a get_temp function used by the thermal framework that
+> uses pm functions.
+> 
+> However, the driver isn't registered in pm before it is registered in
+> thermal framework, resulting in the pm_resume not being called and thus
+> the IP not enabled.
+> 
+> When the IP is disabled, the raw temp value is always 0. With the
+> devices currently supported, it isn't a problem since with their
+> respective formula, they return a really cold SoC temperature which
+> isn't a problem for the thermal framework. But for future SoC that have
+> a different formula, it could return a critically hot temperature,
+> forcing the thermal framework to shutdown the board.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Acked-by: John Youn <johnyoun@synopsys.com>
+Hmm. I wondered about sending this as a fix, but decided in the end
+that your argument convinced me we could let this go the slow way.
 
+Applied to the togreg branch of iio.git and pushed out as testing
+for the autobuilders to play with.
 
-John
+Thanks,
+
+Jonathan
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 34 ++++++++++++++------------------
+>  1 file changed, 15 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 137f577..392d47f 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -529,17 +529,10 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  		return ret;
+>  	}
+>  
+> -	if (!IS_ENABLED(CONFIG_THERMAL_OF))
+> -		return 0;
+> +	if (IS_ENABLED(CONFIG_THERMAL_OF))
+> +		info->sensor_device = &pdev->dev;
+>  
+> -	info->sensor_device = &pdev->dev;
+> -	info->tzd = thermal_zone_of_sensor_register(info->sensor_device, 0,
+> -						    info, &sun4i_ts_tz_ops);
+> -	if (IS_ERR(info->tzd))
+> -		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
+> -			PTR_ERR(info->tzd));
+> -
+> -	return PTR_ERR_OR_ZERO(info->tzd);
+> +	return 0;
+>  }
+>  
+>  static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+> @@ -586,15 +579,6 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>  		 * return the temperature.
+>  		 */
+>  		info->sensor_device = pdev->dev.parent;
+> -		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+> -							    0, info,
+> -							    &sun4i_ts_tz_ops);
+> -		if (IS_ERR(info->tzd)) {
+> -			dev_err(&pdev->dev,
+> -				"could not register thermal sensor: %ld\n",
+> -				PTR_ERR(info->tzd));
+> -			return PTR_ERR(info->tzd);
+> -		}
+>  	} else {
+>  		indio_dev->num_channels =
+>  			ARRAY_SIZE(sun4i_gpadc_channels_no_temp);
+> @@ -664,6 +648,18 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	pm_runtime_set_suspended(&pdev->dev);
+>  	pm_runtime_enable(&pdev->dev);
+>  
+> +	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+> +		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+> +							    0, info,
+> +							    &sun4i_ts_tz_ops);
+> +		if (IS_ERR(info->tzd)) {
+> +			dev_err(&pdev->dev,
+> +				"could not register thermal sensor: %ld\n",
+> +				PTR_ERR(info->tzd));
+> +			return PTR_ERR(info->tzd);
+> +		}
+> +	}
+> +
+>  	ret = devm_iio_device_register(&pdev->dev, indio_dev);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "could not register the device\n");
+> 
+> base-commit: 1f183459b5144384e2669a3f757d36bacab108cf
