@@ -1,65 +1,38 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 30 Sep 2017 13:58:25 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 04/14] drm/sun4i: tcon: Add support
- for demuxing TCON output on A31
-In-Reply-To: <CAGRGNgUmo6ZztajhG=uZrXGsC9pxySswxLd4P-gk6xdknLX-NQ@mail.gmail.com>
-References: <20170929082306.16193-1-wens@csie.org>
- <20170929082306.16193-5-wens@csie.org>
- <20170929102006.2wz7wrkpplxwynoh@flea>
- <CAGb2v65VhtEckRCXi4X5AjmC-5CSHavATu8fKyEHOivmYqZkww@mail.gmail.com>
- <CAGRGNgUmo6ZztajhG=uZrXGsC9pxySswxLd4P-gk6xdknLX-NQ@mail.gmail.com>
-Message-ID: <CAGb2v66epS9OLAQthYOrn7B48E80jsfy9dhyLPHyo4NmAOTCbg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 30 Sep 2017 08:07:10 +0200
+Subject: [PATCH v2] mmc: sdhci-xenon: Fix clock resource by adding an
+ optional bus clock
+In-Reply-To: <20170930104109.60853202@xhacker.debian>
+References: <20170929130435.6805-1-gregory.clement@free-electrons.com>
+ <20170930104109.60853202@xhacker.debian>
+Message-ID: <20170930080710.119c0258@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 30, 2017 at 1:35 PM, Julian Calaby <julian.calaby@gmail.com> wrote:
-> Hi Chen-Yu,
->
-> On Fri, Sep 29, 2017 at 8:22 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> On Fri, Sep 29, 2017 at 6:20 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>> On Fri, Sep 29, 2017 at 08:22:56AM +0000, Chen-Yu Tsai wrote:
->>>> On systems with 2 TCONs such as the A31, it is possible to demux the
->>>> output of the TCONs to one encoder.
->>>>
->>>> Add support for this for the A31.
->>>>
->>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>> ---
->>>>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 38 ++++++++++++++++++++++++++++++++++++++
->>>>  1 file changed, 38 insertions(+)
->>>>
->>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>> index 7bf51abaee97..c949309d4285 100644
->>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>> @@ -112,6 +112,21 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
->>>>  }
->>>>  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
->>>>
->>>> +static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
->>>
->>> Would that make sense to make it a bit more generic, and pass the id
->>> to look for as an argument?
->>
->> The reason to look for TCON0 explicitly is to access the muxing registers, which
->> are only available in TCON0. Other than that, there's nothing else
->> shared between
->> the two TCONs. So there's no particular reason to look for TCON1 explicitly.
->
-> In that case: in the bizarre case where we're trying to use this mux
-> type and there is no TCON0, shouldn't we fail?
+Hello,
 
-It gives out a big warning, indicating something is wrong. If TCON0 is not found
-it is most likely your device tree is broken. There's nothing more the
-driver can do.
-Are you suggesting to return NULL in this case, and also do error
-handling in the
-callers?
+On Sat, 30 Sep 2017 10:41:09 +0800, Jisheng Zhang wrote:
 
-> (Also, the code doesn't make sense if we have some TCON1 and TCON2 in
-> that order as it'll return TCON2)
+> > +	priv->axi_clk = devm_clk_get(&pdev->dev, "axi");
+> > +	if (IS_ERR(priv->axi_clk)) {
+> > +		err = PTR_ERR(priv->axi_clk);
+> > +		if (err == -EPROBE_DEFER)
+> > +			goto err_clk;
+> > +		priv->axi_clk = NULL;  
+> 
+> IMHO, this assignment could be removed. What do you think?
 
-I'm guessing you want it to return NULL.
+No, because if the clock is not present in the Device Tree,
+priv->axi_clk will contain an error code encoded as a pointer, so
+priv->axi_clk will not be NULL. Hence the rest of the code that will
+operate on this clock will believe there is a valid clock pointed by
+priv->axi_clk. So we really want to reset it to NULL when there was an
+error getting the clock.
 
-ChenYu
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
