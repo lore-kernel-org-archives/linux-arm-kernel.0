@@ -1,34 +1,40 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Sat, 30 Sep 2017 06:06:40 +0200
-Subject: [PATCH 1/1] arm64: dts: rockchip: default serial for Firefly-RK3399
-Message-ID: <20170930040640.25526-1-xypron.glpk@gmx.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 29 Sep 2017 22:34:08 -0700
+Subject: [PATCH 0/7] gpio: brcmstb: improved interrupt and wake support
+In-Reply-To: <20170930034057.15166-1-opendmb@gmail.com>
+References: <20170930034057.15166-1-opendmb@gmail.com>
+Message-ID: <b2758902-a1b7-1621-5eec-651f3ada92e7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Firefly-RK3399 uses serial2 with 1,500,000 baud by default
-for communication in U-Boot and in the vendor provided distros.
 
-So let us set the same default in the Linux kernel.
 
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
----
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+On 09/29/2017 08:40 PM, Doug Berger wrote:
+> This patch set collects a number of improvements to the GPIO driver
+> used by Broadcom Set-Top-Box devices.
+> 
+> Primarily they are aimed at correcting problems with the interrupt
+> controller implementation, but they also extend the functionality for
+> waking on GPIO interrupts.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index 7fd4bfcaa38e..3bc2863583ce 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -49,6 +49,10 @@
- 	model = "Firefly-RK3399 Board";
- 	compatible = "firefly,firefly-rk3399", "rockchip,rk3399";
- 
-+	chosen {
-+		stdout-path = "serial2:1500000n8";
-+	};
-+
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		enable-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_HIGH>;
+This all looks good to me, thanks a lot for sending those patches out!
+
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+
+> 
+> Doug Berger (7):
+>   gpio: brcmstb: allow all instances to be wakeup sources
+>   gpio: brcmstb: release the bgpio lock during irq handlers
+>   gpio: brcmstb: switch to handle_level_irq flow
+>   gpio: brcmstb: correct the configuration of level interrupts
+>   gpio: brcmstb: enable masking of interrupts when changing type
+>   gpio: brcmstb: consolidate interrupt domains
+>   gpio: brcmstb: implement suspend/resume/shutdown
+> 
+>  drivers/gpio/Kconfig        |   2 +-
+>  drivers/gpio/gpio-brcmstb.c | 419 +++++++++++++++++++++++++++++++++-----------
+>  2 files changed, 321 insertions(+), 100 deletions(-)
+> 
+
 -- 
-2.14.2
+Florian
