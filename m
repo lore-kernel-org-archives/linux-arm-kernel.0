@@ -1,51 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 30 Sep 2017 13:36:18 +0300
-Subject: [PATCH 22/48] ARM: dts: gr-peach: Add user led device nodes
-In-Reply-To: <cfce5ac1aaf08fc0920d6572779360f80e8f3489.1506683482.git.horms+renesas@verge.net.au>
-References: <cover.1506683482.git.horms+renesas@verge.net.au>
- <cfce5ac1aaf08fc0920d6572779360f80e8f3489.1506683482.git.horms+renesas@verge.net.au>
-Message-ID: <e2e2b3a5-23b2-7f11-4fb3-2f835fdbc11a@cogentembedded.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Sat, 30 Sep 2017 03:38:18 -0700
+Subject: [PATCH] phy: rockchip-typec: Check for errors from
+ tcphy_phy_init()
+In-Reply-To: <20170929235846.1913-1-dianders@chromium.org>
+References: <20170929235846.1913-1-dianders@chromium.org>
+Message-ID: <CABXOdTdukST-8tRh6Z2mRTFYwseiknEzB7FL+uiz_PxYrYYjgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Fri, Sep 29, 2017 at 4:58 PM, Douglas Anderson <dianders@chromium.org> wrote:
+> The function tcphy_phy_init() could return an error but the callers
+> weren't checking the return value.  They should.  In at least one case
+> while testing I saw the message "wait pma ready timeout" which
+> indicates that tcphy_phy_init() really could return an error and we
+> should account for it.
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-On 9/29/2017 2:53 PM, Simon Horman wrote:
+Reviewed-by: Guenter Roeck <groeck@chromium.org>
 
-> From: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> 
-> Add device nodes for user leds on gr-peach board.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->   arch/arm/boot/dts/r7s72100-gr-peach.dts | 10 ++++++++++
->   1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> index bcfa6445bbaa..13d745bb56a5 100644
-> --- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> +++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-[...]
-> @@ -51,6 +52,15 @@
->   			reg = <0x00600000 0x00200000>;
->   		};
->   	};
-> +
-> +leds {
-
-    Not indented properly...
-
-> +		status = "okay";
-> +		compatible = "gpio-leds";
-> +
-> +		led1 {
-> +			gpios = <&port6 12 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
->   };
->   
->   &pinctrl {
-
-MBR, Sergei
+>
+>  drivers/phy/rockchip/phy-rockchip-typec.c | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
+> index 4d2c57f21d76..38831eebc934 100644
+> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
+> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
+> @@ -685,8 +685,11 @@ static int rockchip_usb3_phy_power_on(struct phy *phy)
+>         if (tcphy->mode == new_mode)
+>                 goto unlock_ret;
+>
+> -       if (tcphy->mode == MODE_DISCONNECT)
+> -               tcphy_phy_init(tcphy, new_mode);
+> +       if (tcphy->mode == MODE_DISCONNECT) {
+> +               ret = tcphy_phy_init(tcphy, new_mode);
+> +               if (ret)
+> +                       goto unlock_ret;
+> +       }
+>
+>         /* wait TCPHY for pipe ready */
+>         for (timeout = 0; timeout < 100; timeout++) {
+> @@ -760,10 +763,12 @@ static int rockchip_dp_phy_power_on(struct phy *phy)
+>          */
+>         if (new_mode == MODE_DFP_DP && tcphy->mode != MODE_DISCONNECT) {
+>                 tcphy_phy_deinit(tcphy);
+> -               tcphy_phy_init(tcphy, new_mode);
+> +               ret = tcphy_phy_init(tcphy, new_mode);
+>         } else if (tcphy->mode == MODE_DISCONNECT) {
+> -               tcphy_phy_init(tcphy, new_mode);
+> +               ret = tcphy_phy_init(tcphy, new_mode);
+>         }
+> +       if (ret)
+> +               goto unlock_ret;
+>
+>         ret = readx_poll_timeout(readl, tcphy->base + DP_MODE_CTL,
+>                                  val, val & DP_MODE_A2, 1000,
+> --
+> 2.14.2.822.g60be5d43e6-goog
+>
