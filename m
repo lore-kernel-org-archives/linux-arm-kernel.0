@@ -1,114 +1,260 @@
-From: aik@ozlabs.ru (Alexey Kardashevskiy)
-Date: Sat, 30 Sep 2017 21:58:03 +1000
-Subject: [RESEND RFC PATCH 0/7] sun8i H3 HDMI glue driver for DW HDMI
-In-Reply-To: <20170920200124.20457-1-jernej.skrabec@siol.net>
-References: <20170920200124.20457-1-jernej.skrabec@siol.net>
-Message-ID: <51c50157-6794-852b-f89d-647b9cf06ef2@ozlabs.ru>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 30 Sep 2017 09:13:01 -0300
+Subject: [PATCH v2] cpufreq: imx6q: Move speed grading check to cpufreq driver
+Message-ID: <1506773581-1226-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/17 06:01, Jernej Skrabec wrote:
-> [added media mailing list due to CEC question]
-> 
-> This patch series adds a HDMI glue driver for Allwinner H3 SoC. For now, only
-> video and CEC functionality is supported. Audio needs more tweaks.
-> 
-> Series is based on the H3 DE2 patch series available on mailing list:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-August/522697.html
-> (ignore patches marked with [NOT FOR REVIEW NOW] tag)
-> 
-> Patch 1 adds support for polling plug detection since custom PHY used here
-> doesn't support HPD interrupt.
-> 
-> Patch 2 enables overflow workaround for v1.32a. This HDMI controller exhibits
-> same issues as HDMI controller used in iMX6 SoCs.
-> 
-> Patch 3 adds CLK_SET_RATE_PARENT to hdmi clock.
-> 
-> Patch 4 adds dt bindings documentation.
-> 
-> Patch 5 adds actual H3 HDMI glue driver.
-> 
-> Patch 6 and 7 add HDMI node to DT and enable it where needed.
-> 
-> Allwinner used DW HDMI controller in a non standard way:
-> - register offsets obfuscation layer, which can fortunately be turned off
-> - register read lock, which has to be disabled by magic number
-> - custom PHY, which have to be initialized before DW HDMI controller
-> - non standard clocks
-> - no HPD interrupt
-> 
-> Because of that, I have two questions:
-> - Since HPD have to be polled, is it enough just to enable poll mode? I'm
->   mainly concerned about invalidating CEC address here.
-> - PHY has to be initialized before DW HDMI controller to disable offset
->   obfuscation and read lock among other things. This means that all clocks have
->   to be enabled in glue driver. This poses a problem, since when using
->   component model, dw-hdmi bridge uses drvdata for it's own private data and
->   prevents glue layer to pass a pointer to unbind function, where clocks should
->   be disabled. I noticed same issue in meson DW HDMI glue driver, where clocks
->   are also not disabled when unbind callback is called. I noticed that when H3
->   SoC is shutdown, HDMI output is still enabled and lastest image is shown on
->   monitor until it is unplugged from power supply. Is there any simple solution
->   to this?
-> 
-> Chen-Yu,
-> TL Lim was unable to obtain any answer from Allwinner about HDMI clocks. I think
-> it is safe to assume that divider in HDMI clock doesn't have any effect.
-> 
-> Branch based on linux-next from 1. September with integrated patches is
-> available here:
-> https://github.com/jernejsk/linux-1/tree/h3_hdmi_rfc
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
+On some i.MX6 SoCs (like i.MX6UL, i.MX6SX and i.MX6UL) that do not have
+speed grading check, opp table will not be created in platform code,
+so cpufreq driver prints the following error message:
 
-Out of curiosity I tried this one and got:
+cpu cpu0: dev_pm_opp_get_opp_count: OPP table not found (-19)
 
+However, this is not really an error in this case because the
+imx6q-cpufreq driver first calls dev_pm_opp_get_opp_count()
+and if it fails, it means that platform code does not provide
+OPP and then dev_pm_opp_of_add_table() will be called.
 
+In order to avoid such confusing error message, move the speed grading
+check from platform code to the imx6q-cpufreq driver.
 
-[    0.071711] sun4i-usb-phy 1c19400.phy: Couldn't request ID GPIO
-[    0.074809] sun8i-h3-pinctrl 1c20800.pinctrl: initialized sunXi PIO driver
-[    0.076167] sun8i-h3-r-pinctrl 1f02c00.pinctrl: initialized sunXi PIO driver
-[    0.148009] ------------[ cut here ]------------
-[    0.148035] WARNING: CPU: 0 PID: 1 at
-drivers/clk/sunxi-ng/ccu_common.c:41 ccu_nm_set_rate+0x1d0/0x274
-[    0.148046] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-4.13.0-rc6-next-20170825-aik-aik #24
-[    0.148051] Hardware name: Allwinner sun8i Family
-[    0.148082] [<c010de6c>] (unwind_backtrace) from [<c010b260>]
-(show_stack+0x10/0x14)
-[    0.148101] [<c010b260>] (show_stack) from [<c077a464>]
-(dump_stack+0x84/0x98)
-[    0.148117] [<c077a464>] (dump_stack) from [<c011abe0>] (__warn+0xe0/0xfc)
-[    0.148132] [<c011abe0>] (__warn) from [<c011acac>]
-(warn_slowpath_null+0x20/0x28)
-[    0.148145] [<c011acac>] (warn_slowpath_null) from [<c03d1888>]
-(ccu_nm_set_rate+0x1d0/0x274)
-[    0.148161] [<c03d1888>] (ccu_nm_set_rate) from [<c03c78b4>]
-(clk_change_rate+0x19c/0x250)
-[    0.148175] [<c03c78b4>] (clk_change_rate) from [<c03c7b7c>]
-(clk_core_set_rate_nolock+0x68/0xb0)
-[    0.148187] [<c03c7b7c>] (clk_core_set_rate_nolock) from [<c03c8134>]
-(clk_set_rate+0x20/0x30)
-[    0.148202] [<c03c8134>] (clk_set_rate) from [<c03cc560>]
-(of_clk_set_defaults+0x200/0x364)
-[    0.148219] [<c03cc560>] (of_clk_set_defaults) from [<c045427c>]
-(platform_drv_probe+0x18/0xb0)
-[    0.148233] [<c045427c>] (platform_drv_probe) from [<c0452efc>]
-(driver_probe_device+0x234/0x2e8)
-[    0.148246] [<c0452efc>] (driver_probe_device) from [<c0453068>]
-(__driver_attach+0xb8/0xbc)
-[    0.148258] [<c0453068>] (__driver_attach) from [<c0451414[    1.336154]
-Unable to handle kernel NULL pointer dereference@virtual address 00000008
+This way the imx6q-cpufreq no longer has to check whether OPP table
+is supplied by platform code.
 
-and a bit later:
+Tested on a i.MX6Q and i.MX6UL based boards.
 
-[    1.995572] Rebooting in 10 seconds..
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Previous discussion on this topic:
+https://patchwork.kernel.org/patch/9295059/
 
-Orange PI PC, script.bin.OPI-PC_1080p60_hdmi.
+Changes since v1:
+- Remove unneeded has_speed_grading() function.
 
-What do I miss? Thanks.
+ arch/arm/mach-imx/mach-imx6q.c  | 88 +----------------------------------------
+ drivers/cpufreq/imx6q-cpufreq.c | 85 +++++++++++++++++++++++++++++----------
+ 2 files changed, 67 insertions(+), 106 deletions(-)
 
-
-
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 45801b2..b5f89fd 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -286,88 +286,6 @@ static void __init imx6q_init_machine(void)
+ 	imx6q_axi_init();
+ }
+ 
+-#define OCOTP_CFG3			0x440
+-#define OCOTP_CFG3_SPEED_SHIFT		16
+-#define OCOTP_CFG3_SPEED_1P2GHZ		0x3
+-#define OCOTP_CFG3_SPEED_996MHZ		0x2
+-#define OCOTP_CFG3_SPEED_852MHZ		0x1
+-
+-static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
+-{
+-	struct device_node *np;
+-	void __iomem *base;
+-	u32 val;
+-
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
+-	if (!np) {
+-		pr_warn("failed to find ocotp node\n");
+-		return;
+-	}
+-
+-	base = of_iomap(np, 0);
+-	if (!base) {
+-		pr_warn("failed to map ocotp\n");
+-		goto put_node;
+-	}
+-
+-	/*
+-	 * SPEED_GRADING[1:0] defines the max speed of ARM:
+-	 * 2b'11: 1200000000Hz;
+-	 * 2b'10: 996000000Hz;
+-	 * 2b'01: 852000000Hz; -- i.MX6Q Only, exclusive with 996MHz.
+-	 * 2b'00: 792000000Hz;
+-	 * We need to set the max speed of ARM according to fuse map.
+-	 */
+-	val = readl_relaxed(base + OCOTP_CFG3);
+-	val >>= OCOTP_CFG3_SPEED_SHIFT;
+-	val &= 0x3;
+-
+-	if ((val != OCOTP_CFG3_SPEED_1P2GHZ) && cpu_is_imx6q())
+-		if (dev_pm_opp_disable(cpu_dev, 1200000000))
+-			pr_warn("failed to disable 1.2 GHz OPP\n");
+-	if (val < OCOTP_CFG3_SPEED_996MHZ)
+-		if (dev_pm_opp_disable(cpu_dev, 996000000))
+-			pr_warn("failed to disable 996 MHz OPP\n");
+-	if (cpu_is_imx6q()) {
+-		if (val != OCOTP_CFG3_SPEED_852MHZ)
+-			if (dev_pm_opp_disable(cpu_dev, 852000000))
+-				pr_warn("failed to disable 852 MHz OPP\n");
+-	}
+-	iounmap(base);
+-put_node:
+-	of_node_put(np);
+-}
+-
+-static void __init imx6q_opp_init(void)
+-{
+-	struct device_node *np;
+-	struct device *cpu_dev = get_cpu_device(0);
+-
+-	if (!cpu_dev) {
+-		pr_warn("failed to get cpu0 device\n");
+-		return;
+-	}
+-	np = of_node_get(cpu_dev->of_node);
+-	if (!np) {
+-		pr_warn("failed to find cpu0 node\n");
+-		return;
+-	}
+-
+-	if (dev_pm_opp_of_add_table(cpu_dev)) {
+-		pr_warn("failed to init OPP table\n");
+-		goto put_node;
+-	}
+-
+-	imx6q_opp_check_speed_grading(cpu_dev);
+-
+-put_node:
+-	of_node_put(np);
+-}
+-
+-static struct platform_device imx6q_cpufreq_pdev = {
+-	.name = "imx6q-cpufreq",
+-};
+-
+ static void __init imx6q_init_late(void)
+ {
+ 	/*
+@@ -377,10 +295,8 @@ static void __init imx6q_init_late(void)
+ 	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
+ 		imx6q_cpuidle_init();
+ 
+-	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+-		imx6q_opp_init();
+-		platform_device_register(&imx6q_cpufreq_pdev);
+-	}
++	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
++		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+ }
+ 
+ static void __init imx6q_map_io(void)
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 14466a9..45d90e6 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -12,6 +12,7 @@
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/pm_opp.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/consumer.h>
+@@ -191,6 +192,57 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.suspend = cpufreq_generic_suspend,
+ };
+ 
++#define OCOTP_CFG3			0x440
++#define OCOTP_CFG3_SPEED_SHIFT		16
++#define OCOTP_CFG3_SPEED_1P2GHZ		0x3
++#define OCOTP_CFG3_SPEED_996MHZ		0x2
++#define OCOTP_CFG3_SPEED_852MHZ		0x1
++
++static void __init imx6q_opp_check_speed_grading(struct device *dev)
++{
++	struct device_node *np;
++	void __iomem *base;
++	u32 val;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
++	if (!np)
++		return;
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		dev_err(dev, "failed to map ocotp\n");
++		goto put_node;
++	}
++
++	/*
++	 * SPEED_GRADING[1:0] defines the max speed of ARM:
++	 * 2b'11: 1200000000Hz;
++	 * 2b'10: 996000000Hz;
++	 * 2b'01: 852000000Hz; -- i.MX6Q Only, exclusive with 996MHz.
++	 * 2b'00: 792000000Hz;
++	 * We need to set the max speed of ARM according to fuse map.
++	 */
++	val = readl_relaxed(base + OCOTP_CFG3);
++	val >>= OCOTP_CFG3_SPEED_SHIFT;
++	val &= 0x3;
++
++	if ((val != OCOTP_CFG3_SPEED_1P2GHZ) &&
++	     of_machine_is_compatible("fsl,imx6q"))
++		if (dev_pm_opp_disable(dev, 1200000000))
++			dev_warn(dev, "failed to disable 1.2GHz OPP\n");
++	if (val < OCOTP_CFG3_SPEED_996MHZ)
++		if (dev_pm_opp_disable(dev, 996000000))
++			dev_warn(dev, "failed to disable 996MHz OPP\n");
++	if (of_machine_is_compatible("fsl,imx6q")) {
++		if (val != OCOTP_CFG3_SPEED_852MHZ)
++			if (dev_pm_opp_disable(dev, 852000000))
++				dev_warn(dev, "failed to disable 852MHz OPP\n");
++	}
++	iounmap(base);
++put_node:
++	of_node_put(np);
++}
++
+ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np;
+@@ -252,28 +304,21 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		goto put_reg;
+ 	}
+ 
+-	/*
+-	 * We expect an OPP table supplied by platform.
+-	 * Just, incase the platform did not supply the OPP
+-	 * table, it will try to get it.
+-	 */
+-	num = dev_pm_opp_get_opp_count(cpu_dev);
+-	if (num < 0) {
+-		ret = dev_pm_opp_of_add_table(cpu_dev);
+-		if (ret < 0) {
+-			dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
+-			goto put_reg;
+-		}
++	ret = dev_pm_opp_of_add_table(cpu_dev);
++	if (ret < 0) {
++		dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
++		goto put_reg;
++	}
+ 
+-		/* Because we have added the OPPs here, we must free them */
+-		free_opp = true;
++	imx6q_opp_check_speed_grading(cpu_dev);
+ 
+-		num = dev_pm_opp_get_opp_count(cpu_dev);
+-		if (num < 0) {
+-			ret = num;
+-			dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
+-			goto out_free_opp;
+-		}
++	/* Because we have added the OPPs here, we must free them */
++	free_opp = true;
++	num = dev_pm_opp_get_opp_count(cpu_dev);
++	if (num < 0) {
++		ret = num;
++		dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
++		goto out_free_opp;
+ 	}
+ 
+ 	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
 -- 
-Alexey
+2.7.4
