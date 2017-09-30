@@ -1,77 +1,29 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Sat, 30 Sep 2017 10:56:38 +0800
-Subject: [PATCH] mmc: sdhci-xenon: Fix clock resource by adding an
- optional bus clock
-In-Reply-To: <CAG18LKhU0Ecjmh=7_YAM8pOpO295Fu1NXy2mL46KwxkVmQ9O2A@mail.gmail.com>
-References: <20170928150520.27616-1-gregory.clement@free-electrons.com>
- <CAG18LKhU0Ecjmh=7_YAM8pOpO295Fu1NXy2mL46KwxkVmQ9O2A@mail.gmail.com>
-Message-ID: <20170930105638.145dcb1e@xhacker.debian>
+From: opendmb@gmail.com (Doug Berger)
+Date: Fri, 29 Sep 2017 20:40:50 -0700
+Subject: [PATCH 0/7] gpio: brcmstb: improved interrupt and wake support
+Message-ID: <20170930034057.15166-1-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ziji,
+This patch set collects a number of improvements to the GPIO driver
+used by Broadcom Set-Top-Box devices.
 
-On Sat, 30 Sep 2017 10:47:39 +0800 Ziji Hu wrote:
+Primarily they are aimed at correcting problems with the interrupt
+controller implementation, but they also extend the functionality for
+waking on GPIO interrupts.
 
-> Hi Gregory,
-> 
-> 2017-09-28 23:05 GMT+08:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> > On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-> > is optional because not all the SoCs need them but at least for Armada
-> > 7K/8K it is actually mandatory.
-> >
-> > The binding documentation is updating accordingly.
-> >
-> > Without this patch the kernel hand during boot if the mvpp2.2 network
-> > driver was not present in the kernel. Indeed the clock needed by the
-> > xenon controller was set by the network driver.
-> >
-> > Fixes: 3a3748dba881 ("mmc: sdhci-xenon: Add Marvell Xenon SDHC core
-> > functionality)"
-> > CC: Stable <stable@vger.kernel.org>
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > ---
-> > Hi Ulf and Adrian,
-> >
-> > This patch should be merged in 4.14-rc, as it fixes real issues.
-> >
-> > This patch maye looks like just as a nice clean-up but it is not. On
-> > the earlier version of the series adding the support for the xenon
-> > controller there was already this axi bus clock. But at this moment
-> > the documentation for the clock on the Armada 7K/8K was missing and
-> > there was no driver for it, so we just use the clock set by the
-> > bootloader and never change them that's why it worked without any
-> > visible problem.
-> >
-> > Then as explained in the commit log the network driver enabled the
-> > clock for us, and it happened that it was setup before the xenon
-> > driver. It is only thanks the new information we received on the
-> > clocks of the Sov and with more exhaustive testes that we found this
-> > issue and the fix for it.  
-> 
->     I know very little about clk in Linux.
->     But I just happened to review this very issue before I left Marvell.
->     I had some concerns about this patch at that time.
->     Please check the following.
-> 
->     1. If that network device is used again, so that clock will be setup *twice*
->     since there are two duplicated clock setup in that network driver
-> and Xenon driver. Right?
+Doug Berger (7):
+  gpio: brcmstb: allow all instances to be wakeup sources
+  gpio: brcmstb: release the bgpio lock during irq handlers
+  gpio: brcmstb: switch to handle_level_irq flow
+  gpio: brcmstb: correct the configuration of level interrupts
+  gpio: brcmstb: enable masking of interrupts when changing type
+  gpio: brcmstb: consolidate interrupt domains
+  gpio: brcmstb: implement suspend/resume/shutdown
 
-The first "setup" will be executed, the second one just increase the enable
-and prepare count.
+ drivers/gpio/Kconfig        |   2 +-
+ drivers/gpio/gpio-brcmstb.c | 419 +++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 321 insertions(+), 100 deletions(-)
 
->     2. If that network device is used again and Xenon later exists and
-> shutdown the clock,
->     will that network device be corrupted?
-
-No. The enable and prepare count is reduced to 1, nothing else could happen.
-The clock won't be shutdown until there's no users.
-
->     3. In my very own opinion, such a shared AXI bus clock might be
-> controlled in u-boot or
->     a "SoC-level" init routine.
-
-IMHO, it's the driver's responsibility to manage its own clocks.
-
-Thanks
+-- 
+2.14.1
