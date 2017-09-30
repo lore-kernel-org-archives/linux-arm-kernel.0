@@ -1,8 +1,8 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Sat, 30 Sep 2017 22:35:25 +0200
+Date: Sat, 30 Sep 2017 22:33:59 +0200
 Subject: [PATCH 0/8] pinctrl: meson: clean pin offsets
 References: <20170920133927.17390-1-jbrunet@baylibre.com>
-Message-ID: <7hk20fexgy.fsf@baylibre.com>
+Message-ID: <7hmv5cdiyw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
