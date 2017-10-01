@@ -1,70 +1,101 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun,  1 Oct 2017 14:56:58 +0200
-Subject: [PATCH 2/4] nvmem: meson-efuse: indicate that this driver is only for
- Meson GX SoCs
+Date: Sun,  1 Oct 2017 14:57:00 +0200
+Subject: [PATCH 4/4] ARM: dts: meson: add the efuse node
 In-Reply-To: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
 References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20171001125700.1520-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20171001125700.1520-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current Amlogic Meson eFuse driver only supports the 64-bit SoCs
-(GXBB and newer). Older SoCs cannot be supported by the same driver
-because they do not use the meson secure monitor firmware to access the
-hardware.
+Meson6, Meson8 and Meson8b use a similar IP block which has access to
+512 bytes of efuse data.
+During SoC manufacturing some calibration settings for the CVBS
+connector and the internal temperature sensor are written to this efuse.
+On some boards it additionally stores for example the MAC addresses.
+
+The efuse is enabled on Meson8 and Meson8b but kept disabled on Meson6
+since we do not have a clock driver there (which is required to read
+data from the efuse).
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt | 2 +-
- drivers/nvmem/Kconfig                                     | 4 ++--
- drivers/nvmem/meson-efuse.c                               | 4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/meson.dtsi   | 13 +++++++++++++
+ arch/arm/boot/dts/meson6.dtsi  |  3 +++
+ arch/arm/boot/dts/meson8.dtsi  |  6 ++++++
+ arch/arm/boot/dts/meson8b.dtsi |  7 +++++++
+ 4 files changed, 29 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-index fafd85bd67a6..e3298e18de26 100644
---- a/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-+++ b/Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
-@@ -1,4 +1,4 @@
--= Amlogic eFuse device tree bindings =
-+= Amlogic Meson GX eFuse device tree bindings =
+diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
+index 163dac42bf2e..9c1b21be94f4 100644
+--- a/arch/arm/boot/dts/meson.dtsi
++++ b/arch/arm/boot/dts/meson.dtsi
+@@ -262,5 +262,18 @@
+ 			compatible = "amlogic,meson-mx-bootrom", "syscon";
+ 			reg = <0xd9040000 0x10000>;
+ 		};
++
++		secbus: secbus at da000000 {
++			compatible = "simple-bus";
++			reg = <0xda000000 0x6000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0xda000000 0x6000>;
++
++			efuse: nvmem at 0 {
++				compatible = "amlogic,meson6-efuse";
++				reg = <0x0 0x2000>;
++			};
++		};
+ 	};
+ }; /* end of / */
+diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
+index ef281d290052..9b463211339f 100644
+--- a/arch/arm/boot/dts/meson6.dtsi
++++ b/arch/arm/boot/dts/meson6.dtsi
+@@ -84,6 +84,9 @@
+ 	};
+ }; /* end of / */
  
- Required properties:
- - compatible: should be "amlogic,meson-gxbb-efuse"
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 101ced4c84be..a21a781f587d 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -135,11 +135,11 @@ config NVMEM_VF610_OCOTP
- 	  be called nvmem-vf610-ocotp.
++&efuse {
++	status = "disabled";
++};
  
- config MESON_EFUSE
--	tristate "Amlogic eFuse Support"
-+	tristate "Amlogic Meson GX eFuse Support"
- 	depends on (ARCH_MESON || COMPILE_TEST) && MESON_SM
- 	help
- 	  This is a driver to retrieve specific values from the eFuse found on
--	  the Amlogic Meson SoCs.
-+	  the Amlogic Meson GX SoCs.
+ &uart_AO {
+ 	clocks = <&xtal>, <&clk81>, <&clk81>;
+diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+index 2095a002ea8d..dad8b234c172 100644
+--- a/arch/arm/boot/dts/meson8.dtsi
++++ b/arch/arm/boot/dts/meson8.dtsi
+@@ -275,6 +275,12 @@
+ 	};
+ };
  
- 	  This driver can also be built as a module. If so, the module
- 	  will be called nvmem_meson_efuse.
-diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-index 70bfc9839bb2..1ea3cd24a508 100644
---- a/drivers/nvmem/meson-efuse.c
-+++ b/drivers/nvmem/meson-efuse.c
-@@ -1,5 +1,5 @@
- /*
-- * Amlogic eFuse Driver
-+ * Amlogic Meson GX eFuse Driver
-  *
-  * Copyright (c) 2016 Endless Computers, Inc.
-  * Author: Carlo Caione <carlo@endlessm.com>
-@@ -89,5 +89,5 @@ static struct platform_driver meson_efuse_driver = {
- module_platform_driver(meson_efuse_driver);
++&efuse {
++	compatible = "amlogic,meson8-efuse";
++	clocks = <&clkc CLKID_EFUSE>;
++	clock-names = "core";
++};
++
+ &ethmac {
+ 	clocks = <&clkc CLKID_ETH>;
+ 	clock-names = "stmmaceth";
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index 111e01809ad7..4f8fc01ee0f0 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -183,6 +183,13 @@
+ 	};
+ };
  
- MODULE_AUTHOR("Carlo Caione <carlo@endlessm.com>");
--MODULE_DESCRIPTION("Amlogic Meson NVMEM driver");
-+MODULE_DESCRIPTION("Amlogic Meson GX NVMEM driver");
- MODULE_LICENSE("GPL v2");
++
++&efuse {
++	compatible = "amlogic,meson8b-efuse";
++	clocks = <&clkc CLKID_EFUSE>;
++	clock-names = "core";
++};
++
+ &ethmac {
+ 	clocks = <&clkc CLKID_ETH>;
+ 	clock-names = "stmmaceth";
 -- 
 2.14.2
