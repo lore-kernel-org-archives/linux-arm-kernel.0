@@ -1,37 +1,109 @@
 From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Sun,  1 Oct 2017 13:02:16 +0200
-Subject: [PATCH 2/6] bcm63xx_enet: do not write to random DMA channel on
- BCM6345
+Date: Sun,  1 Oct 2017 13:02:15 +0200
+Subject: [PATCH 1/6] bcm63xx_enet: correct clock usage
 In-Reply-To: <20171001110220.27668-1-jonas.gorski@gmail.com>
 References: <20171001110220.27668-1-jonas.gorski@gmail.com>
-Message-ID: <20171001110220.27668-3-jonas.gorski@gmail.com>
+Message-ID: <20171001110220.27668-2-jonas.gorski@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA controller regs actually point to DMA channel 0, so the write to
-ENETDMA_CFG_REG will actually modify a random DMA channel.
-
-Since DMA controller registers do not exist on BCM6345, guard the write
-with the usual check for dma_has_sram.
+Check the return code of prepare_enable and change one last instance of
+enable only to prepare_enable. Also properly disable and release the
+clock in error paths and on remove for enetsw.
 
 Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
 ---
- drivers/net/ethernet/broadcom/bcm63xx_enet.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c | 31 +++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index a45ec97b5b1e..a1e1e12e187a 100644
+index c6221f04a748..a45ec97b5b1e 100644
 --- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
 +++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1062,7 +1062,8 @@ static int bcm_enet_open(struct net_device *dev)
- 	val = enet_readl(priv, ENET_CTL_REG);
- 	val |= ENET_CTL_ENABLE_MASK;
- 	enet_writel(priv, val, ENET_CTL_REG);
--	enet_dma_writel(priv, ENETDMA_CFG_EN_MASK, ENETDMA_CFG_REG);
-+	if (priv->dma_has_sram)
-+		enet_dma_writel(priv, ENETDMA_CFG_EN_MASK, ENETDMA_CFG_REG);
- 	enet_dmac_writel(priv, priv->dma_chan_en_mask,
- 			 ENETDMAC_CHANCFG, priv->rx_chan);
+@@ -1773,7 +1773,9 @@ static int bcm_enet_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(priv->mac_clk);
+ 		goto out;
+ 	}
+-	clk_prepare_enable(priv->mac_clk);
++	ret = clk_prepare_enable(priv->mac_clk);
++	if (ret)
++		goto out_put_clk_mac;
  
+ 	/* initialize default and fetch platform data */
+ 	priv->rx_ring_size = BCMENET_DEF_RX_DESC;
+@@ -1805,9 +1807,11 @@ static int bcm_enet_probe(struct platform_device *pdev)
+ 		if (IS_ERR(priv->phy_clk)) {
+ 			ret = PTR_ERR(priv->phy_clk);
+ 			priv->phy_clk = NULL;
+-			goto out_put_clk_mac;
++			goto out_disable_clk_mac;
+ 		}
+-		clk_prepare_enable(priv->phy_clk);
++		ret = clk_prepare_enable(priv->phy_clk);
++		if (ret)
++			goto out_put_clk_phy;
+ 	}
+ 
+ 	/* do minimal hardware init to be able to probe mii bus */
+@@ -1900,13 +1904,16 @@ static int bcm_enet_probe(struct platform_device *pdev)
+ out_uninit_hw:
+ 	/* turn off mdc clock */
+ 	enet_writel(priv, 0, ENET_MIISC_REG);
+-	if (priv->phy_clk) {
++	if (priv->phy_clk)
+ 		clk_disable_unprepare(priv->phy_clk);
++
++out_put_clk_phy:
++	if (priv->phy_clk)
+ 		clk_put(priv->phy_clk);
+-	}
+ 
+-out_put_clk_mac:
++out_disable_clk_mac:
+ 	clk_disable_unprepare(priv->mac_clk);
++out_put_clk_mac:
+ 	clk_put(priv->mac_clk);
+ out:
+ 	free_netdev(dev);
+@@ -2748,7 +2755,9 @@ static int bcm_enetsw_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(priv->mac_clk);
+ 		goto out_unmap;
+ 	}
+-	clk_enable(priv->mac_clk);
++	ret = clk_prepare_enable(priv->mac_clk);
++	if (ret)
++		goto out_put_clk;
+ 
+ 	priv->rx_chan = 0;
+ 	priv->tx_chan = 1;
+@@ -2769,7 +2778,7 @@ static int bcm_enetsw_probe(struct platform_device *pdev)
+ 
+ 	ret = register_netdev(dev);
+ 	if (ret)
+-		goto out_put_clk;
++		goto out_disable_clk;
+ 
+ 	netif_carrier_off(dev);
+ 	platform_set_drvdata(pdev, dev);
+@@ -2778,6 +2787,9 @@ static int bcm_enetsw_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++out_disable_clk:
++	clk_disable_unprepare(priv->mac_clk);
++
+ out_put_clk:
+ 	clk_put(priv->mac_clk);
+ 
+@@ -2809,6 +2821,9 @@ static int bcm_enetsw_remove(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(res->start, resource_size(res));
+ 
++	clk_disable_unprepare(priv->mac_clk);
++	clk_put(priv->mac_clk);
++
+ 	free_netdev(dev);
+ 	return 0;
+ }
 -- 
 2.13.2
