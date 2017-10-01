@@ -1,67 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 1 Oct 2017 22:42:15 +0200
-Subject: i2c-omap.c vs. qemu: too much work in one irq (and broken boot)
-Message-ID: <20171001204215.GA9928@amd>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 1 Oct 2017 22:48:34 +0200
+Subject: [PATCH 1/7] dt-bindings: bus: Minimal TI sysc interconnect
+ target module binding
+In-Reply-To: <20171001171406.GL4394@atomide.com>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-2-tony@atomide.com>
+ <20171001131151.loanjnvarkihbhik@earth>
+ <20171001171406.GL4394@atomide.com>
+Message-ID: <20171001204834.kqc6fgfo7dx6m7rn@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-I'm trying to get qemu emulation of Nokia N900 to work, but
-unfortunately i2c-omap.c breaks boot in the emulator (real hardware
-works ok).
+On Sun, Oct 01, 2017 at 10:14:07AM -0700, Tony Lindgren wrote:
+> * Sebastian Reichel <sre@ring0.de> [171001 06:12]:
+> > On Fri, Sep 29, 2017 at 03:34:05PM -0700, Tony Lindgren wrote:
+> > > Note that additional properties for sysc capabilities will be added
+> > > later on. For now, we can already use this binding for interconnect
+> > > target modules that do not have any child device drivers available.
+> > > This allows us to idle the unused interconnect target modules during
+> > > init without the need for legacy hwmod platform data for doing it.
+> > 
+> > DT backwards compatibility is about booting an old DT file with a
+> > newer kernel. Since old DT file does not contain a "ti,sysc-omap*"
+> > node you don't need to add "ti,hwmod = *" support to it. Instead a
+> > DT file, that uses ti,hwmod in the device node and does not have a
+> > "ti,sysc-omap*" at all should still work.
+> 
+> Not sure if I parse that right, but I'm assuming you suggest leaving
+> out ti,hwmod to start with. Well I considered that, but it causes
+> the "waiting for a magical flip issue". So initially we need to use
+> both ti,sysc and ti,hwmod until ti,sysc alone has the equal
+> functionality. That's because then we can do the following steps:
+> 
+> 1. We want to add compatible = ti,sysc so we can define the
+>    nodes and get the parent-children hierarhcy right. We can
+>    already use the parent-child features even with ti,hwmods
+>    before we have complete dts based data. We are currently
+>    missing that capability without doing device specific parent
+>    drivers like we do with drivers/usb/musb/musb_am335x.c. Note
+>    that in this step we are moving the ti,hwmod to the parent
+>    node
+> 
+> 2. When ti,sysc can configure things based on dts data alone the
+>    same way as the legacy platform data, we can just drop the
+>    ti,hwmod property. We also want to be able to test one driver
+>    at a time between ti,sysc + ti,hwmod vs ti,sysc only
+> 
+> 3. Once ti,hwmod properties have been removed from the mainline
+>    kernel, we can add a warning about ti,hwmod properties being
+>    deprecated
+> 
+> 4. Then later on, we can also drop the hwmod platform data and
+>    continue produce warnings if ti,hwmod is seen
 
-[    0.837524] omap2-onenand omap2-onenand: initializing on CS0, phys
-base 0x01000000, virtual base d00c0000, freq 66 MHz
-[    0.838958] Muxed OneNAND 256MB 1.8V 16-bit (0x40)
-[    0.839752] OneNAND version = 0x0121
-[    0.842102] Scanning device for bad blocks
-[    1.012451] 6 ofpart partitions found on MTD device omap2-onenand
-[    1.013153] Creating 6 MTD partitions on "omap2-onenand":
-[    1.014007] 0x000000000000-0x000000020000 : "bootloader"
-[    1.018066] 0x000000020000-0x000000080000 : "config"
-[    1.020660] 0x000000080000-0x0000000c0000 : "log"
-[    1.022827] 0x0000000c0000-0x0000002c0000 : "kernel"
-[    1.025848] 0x0000002c0000-0x0000004c0000 : "initfs"
-[    1.028106] 0x0000004c0000-0x000010000000 : "rootfs"
-[    1.047668] omap_i2c 48070000.i2c: addr: 0x004b, len: 2, flags:
-0x0, stop: 1
-[    1.048828] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.049530] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.050018] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.050476] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.050872] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.051422] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.052001] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.052398] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.052825] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.053222] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.053619] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.054016] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.054412] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-[    1.054840] omap_i2c 48070000.i2c: IRQ (ISR = 0x0010)
-...
+Ok, I misunderstood the reason for keeping/adding "ti,hwmod".
+I thought it was only about keeping backwards compatibility, but
+it's still required since hwmod is only partially converted to DT
+by this patchset.
 
-After 100 messages I get "Too much work in one IRQ" message, and then
-repeat. I tried just disabling omap_i2c in the dts, but 1) its not
-easy 2) I'd lose quite fundamental functionality.
+That basically means, that this patchset breaks DT ABI *now*, since
+old DT has no ti,sysc node?
 
-Ideas welcome.
-
-Best regards,
-								Pavel
-								
-PS: If anyone is interested, this is why working qemu would be useful:
-https://wiki.postmarketos.org/wiki/Nokia_N900_(nokia-rx51) . There's a
-lot of work to be done in the userspace, and swapping SD cards is kind
-of slow.
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-- Sebastian
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171001/807547fb/attachment.sig>
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171001/f2fa2027/attachment.sig>
