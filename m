@@ -1,93 +1,294 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 1 Oct 2017 11:01:33 +0200
-Subject: Questions about bluetooth on N900
-In-Reply-To: <87h8vkpvtu.fsf@sange.fi>
-References: <87tvzow7jv.fsf@sange.fi>
- <20170927160611.GA10775@xo-6d-61-c0.localdomain>
- <87h8vkpvtu.fsf@sange.fi>
-Message-ID: <20171001090133.GA16848@amd>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 1 Oct 2017 11:29:34 +0100
+Subject: [PATCH 1/4] iio: adc: ina2xx: Make max expected current
+ configurable
+In-Reply-To: <1506603015-27202-2-git-send-email-m.purski@samsung.com>
+References: <1506603015-27202-1-git-send-email-m.purski@samsung.com>
+ <CGME20170928125053eucas1p19e757ac5c3774f54c7cd0ee4525decbe@eucas1p1.samsung.com>
+ <1506603015-27202-2-git-send-email-m.purski@samsung.com>
+Message-ID: <20171001112934.360c840b@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, 28 Sep 2017 14:50:12 +0200
+Maciej Purski <m.purski@samsung.com> wrote:
 
->  > There is some interest. I'd like to have working bluetooth, and people from postmarketos
->  > would probably like something, too. Unfortunately my experience is same as yours -- current
->  > mainline does not work well on N900.
+> Max expected current is used for calculating calibration register value,
+> Current LSB and Power LSB according to equations found in ina datasheet.
+> Max expected current is now implicitly set to default value,
+> which is 2^15, thanks to which Current LSB is equal to 1 mA and
+> Power LSB is equal to 20000 uW or 25000 uW depending on ina model.
 > 
-> I might try debugging that at some point, but I doubt I can resolve the issue,
-> because I have no experience in serial port programming. With latest BlueZ I
-> got my braille display working for few seconds, before it stalled.
-> 
->  > > I'm considering to rebase the old hci_h4p driver on current mainline, because
->  > > I just need a working BT connection, not code that is of good quality. Some
-> 
->  > Ok, I may save you some work. I have rebased version, it should be in
->  > linux-n900 on kernel.org.
-> 
-> I found a repo from
-> https://kernel.googlesource.com/pub/scm/linux/kernel/git/pavel/linux-n900/. I
-> assume that's what you meant.
-> 
-> The latest version is based on 4.13, but it has also some changes which seem
-> not to be related to BT. I incorporated them also, but I don't know if they
-> are valid.
+> Make max expected current configurable, just like it's already done
+> with shunt resistance: from device tree, platform_data or later
+> from sysfs. On each max_expected_current change, calculate new values
+> for Current LSB and Power LSB. According to datasheet Current LSB should
+> be calculated by dividing max expected current by 2^15, as values read
+> from device registers are in this case 16-bit integers. Power LSB
+> is calculated by multiplying Current LSB by a factor, which is defined
+> in ina documentation.
 
-Feel free to take those or not.
+One odd bit of casting inline.  Also this is new userspace ABI.
+It needs documenting in 
 
-> I was lucky that you had done rebasing of nokia_h4p, because I wouldn't have
-> known what to do with DTS.
-> 
-> Unfortunately the driver does not work properly. I can access N900 to some
-> extent with my braille display, but the connection has random freezes, and
-> accessing my GPS receiver (through RFCOMM) causes the whole system to hang.
-> 
-> I get the following message to syslog something like 100 times per second when
-> BRLTTY (the braille display daemon) is communicating with the display:
-> Got IIR_RX_TIMEOUT, handling it as IIR_DRI
-> 
-> Active BT connection also seems to trigger a bug in nokia_h4p related to
-> spinlocks. This happens in random intervals between 0.1 s and 30 s.
-> 
-> The bugs are:
-> BUG: scheduling while atomic
-> and
-> BUG: workqueue leaked lock or atomic
-> 
-> Stack traces suggest that it is (at least sometimes) caused by h4p_set_clk
-> calling clk_prepare_enable and clk_disable_unprepare functions, which should
-> only be used in non-atomic context.
-> 
-> So, I thought it would be good for you to know that BT does not really work. I
-> would like to work on this, but I'm afraid my knowledge is too limited to
-> track this down. It would be good to know what is causing those IIR RX
-> timeouts.
-> 
-> Also working on an obsolete driver feels like stupid now that there is a
-> driver written more properly.
+Documentation/ABI/testing/sysfs-bus-iio* as appropriate.
+I'm also unclear on one element about this - is it a value used only
+for calibration or are we talking about the actual 'range' of the device?
 
-Yes, fixing obsolete driver is hard and has drawbacks. The new one
-should be fixed.
+The interpretation of this value isn't clear against the more general
+ABI.
 
-I believe the way forward would be
+In particular it is it in raw units (adc counts) or mA?  Docs say
+that but the naming of the attribute doesn't make this clear.
 
-a) add logging to the old driver, to see exact data being exchanged
-during initialization.
+Also I'm unconvinced this isn't better represented using the
+range specifications available for any IIO attribute on the raw
+value in combination with adjusting the scale value.
+Note not many drivers yet provide ranges on their raw outputs
+but we do have core support for it.  I've been meaning to start
+pushing this out into drivers, but been busy since we introduced
+the core support.  The dpot-dac driver does use it for examplel
 
-b) add logging to the new driver, and compare old and new driver
+This moves the burden of calculating the 1lsb value to userspace,
+but importantly it would give us a consistent ABI where this fits
+in with existing elements (largely buy not introducing any new
+ones :).
 
-c) fix the new driver to do the initialization same way the old driver
-did
+Thanks,
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171001/5665a0f4/attachment-0001.sig>
+Jonathan
+> 
+> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> ---
+>  drivers/iio/adc/ina2xx-adc.c         | 110 ++++++++++++++++++++++++++++++-----
+>  include/linux/platform_data/ina2xx.h |   2 +
+>  2 files changed, 98 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/ina2xx-adc.c b/drivers/iio/adc/ina2xx-adc.c
+> index f387b97..883fede 100644
+> --- a/drivers/iio/adc/ina2xx-adc.c
+> +++ b/drivers/iio/adc/ina2xx-adc.c
+> @@ -56,6 +56,7 @@
+>  #define INA226_DEFAULT_IT		1110
+>  
+>  #define INA2XX_RSHUNT_DEFAULT           10000
+> +#define INA2XX_MAX_EXPECTED_A_DEFAULT	(1 << 15)	/* current_lsb = 1 mA */
+>  
+>  /*
+>   * bit masks for reading the settings in the configuration register
+> @@ -114,7 +115,7 @@ struct ina2xx_config {
+>  	int shunt_div;
+>  	int bus_voltage_shift;
+>  	int bus_voltage_lsb;	/* uV */
+> -	int power_lsb;		/* uW */
+> +	int power_lsb_factor;
+>  	enum ina2xx_ids chip_id;
+>  };
+>  
+> @@ -123,7 +124,10 @@ struct ina2xx_chip_info {
+>  	struct task_struct *task;
+>  	const struct ina2xx_config *config;
+>  	struct mutex state_lock;
+> -	unsigned int shunt_resistor;
+> +	unsigned int shunt_resistor;		/* uOhms */
+> +	unsigned int max_expected_current;	/* mA */
+> +	int current_lsb;			/* uA */
+> +	int power_lsb;				/* uW */
+>  	int avg;
+>  	int int_time_vbus; /* Bus voltage integration time uS */
+>  	int int_time_vshunt; /* Shunt voltage integration time uS */
+> @@ -137,7 +141,7 @@ static const struct ina2xx_config ina2xx_config[] = {
+>  		.shunt_div = 100,
+>  		.bus_voltage_shift = 3,
+>  		.bus_voltage_lsb = 4000,
+> -		.power_lsb = 20000,
+> +		.power_lsb_factor = 20,
+>  		.chip_id = ina219,
+>  	},
+>  	[ina226] = {
+> @@ -146,7 +150,7 @@ static const struct ina2xx_config ina2xx_config[] = {
+>  		.shunt_div = 400,
+>  		.bus_voltage_shift = 0,
+>  		.bus_voltage_lsb = 1250,
+> -		.power_lsb = 25000,
+> +		.power_lsb_factor = 25,
+>  		.chip_id = ina226,
+>  	},
+>  };
+> @@ -210,14 +214,15 @@ static int ina2xx_read_raw(struct iio_dev *indio_dev,
+>  
+>  		case INA2XX_POWER:
+>  			/* processed (mW) = raw*lsb (uW) / 1000 */
+> -			*val = chip->config->power_lsb;
+> +			*val = chip->power_lsb;
+>  			*val2 = 1000;
+>  			return IIO_VAL_FRACTIONAL;
+>  
+>  		case INA2XX_CURRENT:
+> -			/* processed (mA) = raw (mA) */
+> -			*val = 1;
+> -			return IIO_VAL_INT;
+> +			/* processed (mA) = raw*lsb (uA) / 1000 */
+> +			*val = chip->current_lsb;
+> +			*val2 = 1000;
+> +			return IIO_VAL_FRACTIONAL;
+>  		}
+>  	}
+>  
+> @@ -434,24 +439,47 @@ static ssize_t ina2xx_allow_async_readout_store(struct device *dev,
+>  }
+>  
+>  /*
+> - * Set current LSB to 1mA, shunt is in uOhms
+> - * (equation 13 in datasheet). We hardcode a Current_LSB
+> - * of 1.0 x10-6. The only remaining parameter is RShunt.
+> + * Calculate calibration value according to equation 1 in ina226 datasheet
+> + * http://www.ti.com/lit/ds/symlink/ina226.pdf.
+> + * Current LSB is in uA and RShunt is in uOhms, so RShunt should be
+> + * converted to mOhms in order to keep the scale.
+>   * There is no need to expose the CALIBRATION register
+>   * to the user for now. But we need to reset this register
+> - * if the user updates RShunt after driver init, e.g upon
+> - * reading an EEPROM/Probe-type value.
+> + * if the user updates RShunt or max expected current after driver
+> + * init, e.g upon reading an EEPROM/Probe-type value.
+>   */
+>  static int ina2xx_set_calibration(struct ina2xx_chip_info *chip)
+>  {
+> +	unsigned int rshunt = DIV_ROUND_CLOSEST(chip->shunt_resistor, 1000);
+>  	u16 regval = DIV_ROUND_CLOSEST(chip->config->calibration_factor,
+> -				   chip->shunt_resistor);
+> +				     chip->current_lsb * rshunt);
+>  
+>  	return regmap_write(chip->regmap, INA2XX_CALIBRATION, regval);
+>  }
+>  
+> +/*
+> + * Set max_expected_current (mA) and calculate current_lsb (uA),
+> + * according to equation 2 in ina226 datasheet. Power LSB is calculated
+> + * by multiplying Current LSB by a given factor, which may vary depending
+> + * on ina version.
+> + */
+> +static int set_max_expected_current(struct ina2xx_chip_info *chip,
+> +				    unsigned int val)
+> +{
+> +	if (val <= 0 || val > chip->config->calibration_factor)
+> +		return -EINVAL;
+> +
+> +	chip->max_expected_current = val;
+> +	chip->current_lsb = DIV_ROUND_CLOSEST(chip->max_expected_current * 1000,
+> +					      1 << 15);
+> +	chip->power_lsb = chip->current_lsb * chip->config->power_lsb_factor;
+> +
+> +	return 0;
+> +}
+> +
+>  static int set_shunt_resistor(struct ina2xx_chip_info *chip, unsigned int val)
+>  {
+> +
+>  	if (val <= 0 || val > chip->config->calibration_factor)
+>  		return -EINVAL;
+>  
+> @@ -493,6 +521,39 @@ static ssize_t ina2xx_shunt_resistor_store(struct device *dev,
+>  	return len;
+>  }
+>  
+> +static ssize_t ina2xx_max_expected_current_show(struct device *dev,
+> +					  struct device_attribute *attr,
+> +					  char *buf)
+> +{
+> +	struct ina2xx_chip_info *chip = iio_priv(dev_to_iio_dev(dev));
+> +
+> +	return sprintf(buf, "%d\n", chip->max_expected_current);
+> +}
+> +
+> +static ssize_t ina2xx_max_expected_current_store(struct device *dev,
+> +					   struct device_attribute *attr,
+> +					   const char *buf, size_t len)
+> +{
+> +	struct ina2xx_chip_info *chip = iio_priv(dev_to_iio_dev(dev));
+> +	unsigned long val;
+> +	int ret;
+> +
+> +	ret = kstrtoul((const char *) buf, 10, &val);
+
+Odd bit of casting given that's what it already is...
+
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = set_max_expected_current(chip, val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Update the Calibration register */
+> +	ret = ina2xx_set_calibration(chip);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return len;
+> +}
+> +
+>  #define INA219_CHAN(_type, _index, _address) { \
+>  	.type = (_type), \
+>  	.address = (_address), \
+> @@ -755,10 +816,15 @@ static IIO_DEVICE_ATTR(in_shunt_resistor, S_IRUGO | S_IWUSR,
+>  		       ina2xx_shunt_resistor_show,
+>  		       ina2xx_shunt_resistor_store, 0);
+>  
+> +static IIO_DEVICE_ATTR(in_max_expected_current, S_IRUGO | S_IWUSR,
+> +		       ina2xx_max_expected_current_show,
+> +		       ina2xx_max_expected_current_store, 0);
+> +
+>  static struct attribute *ina219_attributes[] = {
+>  	&iio_dev_attr_in_allow_async_readout.dev_attr.attr,
+>  	&iio_const_attr_ina219_integration_time_available.dev_attr.attr,
+>  	&iio_dev_attr_in_shunt_resistor.dev_attr.attr,
+> +	&iio_dev_attr_in_max_expected_current.dev_attr.attr,
+>  	NULL,
+>  };
+>  
+> @@ -766,6 +832,7 @@ static struct attribute *ina226_attributes[] = {
+>  	&iio_dev_attr_in_allow_async_readout.dev_attr.attr,
+>  	&iio_const_attr_ina226_integration_time_available.dev_attr.attr,
+>  	&iio_dev_attr_in_shunt_resistor.dev_attr.attr,
+> +	&iio_dev_attr_in_max_expected_current.dev_attr.attr,
+>  	NULL,
+>  };
+>  
+> @@ -851,6 +918,21 @@ static int ina2xx_probe(struct i2c_client *client,
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (of_property_read_u32(client->dev.of_node,
+> +				  "max-expected-current", &val) < 0) {
+> +		struct ina2xx_platform_data *pdata =
+> +		    dev_get_platdata(&client->dev);
+> +
+> +		if (pdata && pdata->max_mA != 0)
+> +			val = pdata->max_mA;
+> +		else
+> +			val = INA2XX_MAX_EXPECTED_A_DEFAULT;
+> +	}
+> +
+> +	ret = set_max_expected_current(chip, val);
+> +	if (ret)
+> +		return ret;
+> +
+>  	/* Patch the current config register with default. */
+>  	val = chip->config->config_default;
+>  
+> diff --git a/include/linux/platform_data/ina2xx.h b/include/linux/platform_data/ina2xx.h
+> index 9abc0ca..f02b1d8 100644
+> --- a/include/linux/platform_data/ina2xx.h
+> +++ b/include/linux/platform_data/ina2xx.h
+> @@ -13,7 +13,9 @@
+>  /**
+>   * struct ina2xx_platform_data - ina2xx info
+>   * @shunt_uohms		shunt resistance in microohms
+> + * @max_mA		max expected current in mA
+>   */
+>  struct ina2xx_platform_data {
+>  	long shunt_uohms;
+> +	int max_mA;
+>  };
