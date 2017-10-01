@@ -1,64 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 1 Oct 2017 10:14:07 -0700
-Subject: [PATCH 1/7] dt-bindings: bus: Minimal TI sysc interconnect
- target module binding
-In-Reply-To: <20171001131151.loanjnvarkihbhik@earth>
-References: <20170929223411.9691-1-tony@atomide.com>
- <20170929223411.9691-2-tony@atomide.com>
- <20171001131151.loanjnvarkihbhik@earth>
-Message-ID: <20171001171406.GL4394@atomide.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Sun, 1 Oct 2017 19:36:14 +0200
+Subject: [PATCH 22/48] ARM: dts: gr-peach: Add user led device nodes
+In-Reply-To: <e2e2b3a5-23b2-7f11-4fb3-2f835fdbc11a@cogentembedded.com>
+References: <cover.1506683482.git.horms+renesas@verge.net.au>
+ <cfce5ac1aaf08fc0920d6572779360f80e8f3489.1506683482.git.horms+renesas@verge.net.au>
+ <e2e2b3a5-23b2-7f11-4fb3-2f835fdbc11a@cogentembedded.com>
+Message-ID: <20171001173614.GB4037@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [171001 06:12]:
-> On Fri, Sep 29, 2017 at 03:34:05PM -0700, Tony Lindgren wrote:
-> > Note that additional properties for sysc capabilities will be added
-> > later on. For now, we can already use this binding for interconnect
-> > target modules that do not have any child device drivers available.
-> > This allows us to idle the unused interconnect target modules during
-> > init without the need for legacy hwmod platform data for doing it.
-> 
-> DT backwards compatibility is about booting an old DT file with a
-> newer kernel. Since old DT file does not contain a "ti,sysc-omap*"
-> node you don't need to add "ti,hwmod = *" support to it. Instead a
-> DT file, that uses ti,hwmod in the device node and does not have a
-> "ti,sysc-omap*" at all should still work.
+Hi Seregei,
 
-Not sure if I parse that right, but I'm assuming you suggest leaving
-out ti,hwmod to start with. Well I considered that, but it causes
-the "waiting for a magical flip issue". So initially we need to use
-both ti,sysc and ti,hwmod until ti,sysc alone has the equal
-functionality. That's because then we can do the following steps:
+On Sat, Sep 30, 2017 at 01:36:18PM +0300, Sergei Shtylyov wrote:
+> Hello!
+>
+> On 9/29/2017 2:53 PM, Simon Horman wrote:
+>
+> >From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >
+> >Add device nodes for user leds on gr-peach board.
+> >
+> >Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/boot/dts/r7s72100-gr-peach.dts | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> >index bcfa6445bbaa..13d745bb56a5 100644
+> >--- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> >+++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> [...]
+> >@@ -51,6 +52,15 @@
+> >  			reg = <0x00600000 0x00200000>;
+> >  		};
+> >  	};
+> >+
+> >+leds {
+>
+>    Not indented properly...
 
-1. We want to add compatible = ti,sysc so we can define the
-   nodes and get the parent-children hierarhcy right. We can
-   already use the parent-child features even with ti,hwmods
-   before we have complete dts based data. We are currently
-   missing that capability without doing device specific parent
-   drivers like we do with drivers/usb/musb/musb_am335x.c. Note
-   that in this step we are moving the ti,hwmod to the parent
-   node
+Thanks!
 
-2. When ti,sysc can configure things based on dts data alone the
-   same way as the legacy platform data, we can just drop the
-   ti,hwmod property. We also want to be able to test one driver
-   at a time between ti,sysc + ti,hwmod vs ti,sysc only
+Simon, as you sent pull request already, will we need a patch on top
+of this to fix it?
 
-3. Once ti,hwmod properties have been removed from the mainline
-   kernel, we can add a warning about ti,hwmod properties being
-   deprecated
-
-4. Then later on, we can also drop the hwmod platform data and
-   continue produce warnings if ti,hwmod is seen
-
-> IMHO we should break DT ABI for OMAP at some point, so that we can
-> get rid of the hwmod database. My suggestion would be, that
-> simple-bus checks if any child device is != "ti,omap-sysc*" and
-> does panic("please update DT!").
-
-Yes we can eventually drop the static data and ti,hwmod while
-providing helpful information to the users.
-
-Regards,
-
-Tony
+Thanks
+  j
+>
+> >+		status = "okay";
+> >+		compatible = "gpio-leds";
+> >+
+> >+		led1 {
+> >+			gpios = <&port6 12 GPIO_ACTIVE_HIGH>;
+> >+		};
+> >+	};
+> >  };
+> >  &pinctrl {
+>
+> MBR, Sergei
