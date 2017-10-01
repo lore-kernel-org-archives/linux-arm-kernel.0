@@ -1,85 +1,104 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 1 Sep 2017 14:56:04 +0800
-Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
-In-Reply-To: <1186423751.115248.1504244969355@email.1und1.de>
-References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
- <20170901013317.GA516@leoy-ThinkPad-T440>
- <1186423751.115248.1504244969355@email.1und1.de>
-Message-ID: <20170901065604.GA22838@leoy-ThinkPad-T440>
+From: hch@lst.de (Christoph Hellwig)
+Date: Sun, 1 Oct 2017 09:42:03 +0200
+Subject: [PATCH v2] nvme-pci: Use PCI bus address for data/queues in CMB
+In-Reply-To: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
+References: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <20171001074203.GA11115@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 01, 2017 at 07:49:29AM +0200, Stefan Wahren wrote:
-> Hi Leo,
-> 
-> > Leo Yan <leo.yan@linaro.org> hat am 1. September 2017 um 03:33 geschrieben:
-> > 
-> > 
-> > Hi Stefan,
-> > 
-> > On Thu, Aug 31, 2017 at 10:24:36PM +0200, Stefan Wahren wrote:
-> > > In case there are no DT idle states defined or
-> > > cpuidle_register_driver() fails, the copy of the idle driver is leaked:
-> > > 
-> > >     unreferenced object 0xede0dc00 (size 1024):
-> > >     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
-> > >     hex dump (first 32 bytes):
-> > >     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
-> > >     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
-> > >     backtrace:
-> > >     [<c1295f04>] arm_idle_init+0x44/0x1ac
-> > >     [<c0301e6c>] do_one_initcall+0x3c/0x16c
-> > >     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
-> > >     [<c0cb3624>] kernel_init+0x8/0x114
-> > >     [<c0307a98>] ret_from_fork+0x14/0x3c
-> > > 
-> > > So fix this by freeing the unregistered copy in error case.
-> > > 
-> > > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > > Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
-> > > ---
-> > >  drivers/cpuidle/cpuidle-arm.c | 6 ++++--
-> > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> > > index 7080c38..52a7505 100644
-> > > --- a/drivers/cpuidle/cpuidle-arm.c
-> > > +++ b/drivers/cpuidle/cpuidle-arm.c
-> > > @@ -104,13 +104,13 @@ static int __init arm_idle_init(void)
-> > >  		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
-> > >  		if (ret <= 0) {
-> > >  			ret = ret ? : -ENODEV;
-> > > -			goto out_fail;
-> > > +			goto init_fail;
-> > >  		}
-> > >  
-> > >  		ret = cpuidle_register_driver(drv);
-> > >  		if (ret) {
-> > >  			pr_err("Failed to register cpuidle driver\n");
-> > > -			goto out_fail;
-> > > +			goto init_fail;
-> > >  		}
-> > >  
-> > >  		/*
-> > > @@ -149,6 +149,8 @@ static int __init arm_idle_init(void)
-> > >  	}
-> > >  
-> > >  	return 0;
-> > > +init_fail:
-> > > +	kfree(drv);
-> > 
-> > The below loop only releases resource for previous CPUs, so should check
-> > two variables 'drv' and 'dev'. If 'dev != NULL', we also need to release
-> > it.
-> 
-> i cannot see a leak for 'dev', because this is already handled in the error case of cpuidle_register_device before jumping to out_fail. I agree this isn't consistent, but this is a fix which should go to stable. So only necessary changes.
+This looks very convoluted, mostly because the existing code is
+doing weird things.  For one thing what is sq_dma_addr currently
+is not a DMA adddress - we either need the resource address
+for the ioremap, but we don't need to stash that away, and second
+the one programmed into the controller should be a pci_bus_addr_t.
 
-You are right, so please ignore my comment.
+Second we already have a nice PCI-layer helper called pci_bus_address
+to get the bus address for us and we should use it.
 
-BTW, to avoid missing anything, are you working on the second
-fixing to correct the previous CPU resourcee releasing? Actually
-I think you are welcome to work on the second fixing, but if
-not I will take the second fixing with rebasing your patch.
+Something like the patch below should solve the issue:
 
-Thanks,
-Leo Yan
+---
+>From b78f4164881125c4fecfdb87878d0120b2177c53 Mon Sep 17 00:00:00 2001
+From: Christoph Hellwig <hch@lst.de>
+Date: Sun, 1 Oct 2017 09:37:35 +0200
+Subject: nvme-pci: Use PCI bus address for data/queues in CMB
+
+Currently, NVMe PCI host driver is programming CMB dma address as
+I/O SQs addresses. This results in failures on systems where 1:1
+outbound mapping is not used (example Broadcom iProc SOCs) because
+CMB BAR will be progammed with PCI bus address but NVMe PCI EP will
+try to access CMB using dma address.
+
+To have CMB working on systems without 1:1 outbound mapping, we
+program PCI bus address for I/O SQs instead of dma address. This
+approach will work on systems with/without 1:1 outbound mapping.
+
+Based on a report and previous patch from Abhishek Shah.
+
+Fixes: 8ffaadf7 ("NVMe: Use CMB for the IO SQes if available")
+Cc: stable at vger.kernel.org
+Reported-by: Abhishek Shah <abhishek.shah@broadcom.com>
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ drivers/nvme/host/pci.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/nvme/host/pci.c b/drivers/nvme/host/pci.c
+index cb73bc8cad3b..3f5a04c586ce 100644
+--- a/drivers/nvme/host/pci.c
++++ b/drivers/nvme/host/pci.c
+@@ -94,7 +94,7 @@ struct nvme_dev {
+ 	struct mutex shutdown_lock;
+ 	bool subsystem;
+ 	void __iomem *cmb;
+-	dma_addr_t cmb_dma_addr;
++	pci_bus_addr_t cmb_bus_addr;
+ 	u64 cmb_size;
+ 	u32 cmbsz;
+ 	u32 cmbloc;
+@@ -1226,7 +1226,7 @@ static int nvme_alloc_sq_cmds(struct nvme_dev *dev, struct nvme_queue *nvmeq,
+ 	if (qid && dev->cmb && use_cmb_sqes && NVME_CMB_SQS(dev->cmbsz)) {
+ 		unsigned offset = (qid - 1) * roundup(SQ_SIZE(depth),
+ 						      dev->ctrl.page_size);
+-		nvmeq->sq_dma_addr = dev->cmb_dma_addr + offset;
++		nvmeq->sq_dma_addr = dev->cmb_bus_addr + offset;
+ 		nvmeq->sq_cmds_io = dev->cmb + offset;
+ 	} else {
+ 		nvmeq->sq_cmds = dma_alloc_coherent(dev->dev, SQ_SIZE(depth),
+@@ -1527,7 +1527,7 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
+ 	resource_size_t bar_size;
+ 	struct pci_dev *pdev = to_pci_dev(dev->dev);
+ 	void __iomem *cmb;
+-	dma_addr_t dma_addr;
++	int bar;
+ 
+ 	dev->cmbsz = readl(dev->bar + NVME_REG_CMBSZ);
+ 	if (!(NVME_CMB_SZ(dev->cmbsz)))
+@@ -1540,7 +1540,8 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
+ 	szu = (u64)1 << (12 + 4 * NVME_CMB_SZU(dev->cmbsz));
+ 	size = szu * NVME_CMB_SZ(dev->cmbsz);
+ 	offset = szu * NVME_CMB_OFST(dev->cmbloc);
+-	bar_size = pci_resource_len(pdev, NVME_CMB_BIR(dev->cmbloc));
++	bar = NVME_CMB_BIR(dev->cmbloc);
++	bar_size = pci_resource_len(pdev, bar);
+ 
+ 	if (offset > bar_size)
+ 		return NULL;
+@@ -1553,12 +1554,11 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
+ 	if (size > bar_size - offset)
+ 		size = bar_size - offset;
+ 
+-	dma_addr = pci_resource_start(pdev, NVME_CMB_BIR(dev->cmbloc)) + offset;
+-	cmb = ioremap_wc(dma_addr, size);
++	cmb = ioremap_wc(pci_resource_start(pdev, bar) + offset, size);
+ 	if (!cmb)
+ 		return NULL;
+ 
+-	dev->cmb_dma_addr = dma_addr;
++	dev->cmb_bus_addr = pci_bus_address(pdev, bar) + offset;
+ 	dev->cmb_size = size;
+ 	return cmb;
+ }
+-- 
+2.14.1
