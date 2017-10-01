@@ -1,104 +1,93 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Sun, 1 Oct 2017 09:42:03 +0200
-Subject: [PATCH v2] nvme-pci: Use PCI bus address for data/queues in CMB
-In-Reply-To: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
-References: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
-Message-ID: <20171001074203.GA11115@lst.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 1 Oct 2017 11:01:33 +0200
+Subject: Questions about bluetooth on N900
+In-Reply-To: <87h8vkpvtu.fsf@sange.fi>
+References: <87tvzow7jv.fsf@sange.fi>
+ <20170927160611.GA10775@xo-6d-61-c0.localdomain>
+ <87h8vkpvtu.fsf@sange.fi>
+Message-ID: <20171001090133.GA16848@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This looks very convoluted, mostly because the existing code is
-doing weird things.  For one thing what is sq_dma_addr currently
-is not a DMA adddress - we either need the resource address
-for the ioremap, but we don't need to stash that away, and second
-the one programmed into the controller should be a pci_bus_addr_t.
+Hi!
 
-Second we already have a nice PCI-layer helper called pci_bus_address
-to get the bus address for us and we should use it.
+>  > There is some interest. I'd like to have working bluetooth, and people from postmarketos
+>  > would probably like something, too. Unfortunately my experience is same as yours -- current
+>  > mainline does not work well on N900.
+> 
+> I might try debugging that at some point, but I doubt I can resolve the issue,
+> because I have no experience in serial port programming. With latest BlueZ I
+> got my braille display working for few seconds, before it stalled.
+> 
+>  > > I'm considering to rebase the old hci_h4p driver on current mainline, because
+>  > > I just need a working BT connection, not code that is of good quality. Some
+> 
+>  > Ok, I may save you some work. I have rebased version, it should be in
+>  > linux-n900 on kernel.org.
+> 
+> I found a repo from
+> https://kernel.googlesource.com/pub/scm/linux/kernel/git/pavel/linux-n900/. I
+> assume that's what you meant.
+> 
+> The latest version is based on 4.13, but it has also some changes which seem
+> not to be related to BT. I incorporated them also, but I don't know if they
+> are valid.
 
-Something like the patch below should solve the issue:
+Feel free to take those or not.
 
----
->From b78f4164881125c4fecfdb87878d0120b2177c53 Mon Sep 17 00:00:00 2001
-From: Christoph Hellwig <hch@lst.de>
-Date: Sun, 1 Oct 2017 09:37:35 +0200
-Subject: nvme-pci: Use PCI bus address for data/queues in CMB
+> I was lucky that you had done rebasing of nokia_h4p, because I wouldn't have
+> known what to do with DTS.
+> 
+> Unfortunately the driver does not work properly. I can access N900 to some
+> extent with my braille display, but the connection has random freezes, and
+> accessing my GPS receiver (through RFCOMM) causes the whole system to hang.
+> 
+> I get the following message to syslog something like 100 times per second when
+> BRLTTY (the braille display daemon) is communicating with the display:
+> Got IIR_RX_TIMEOUT, handling it as IIR_DRI
+> 
+> Active BT connection also seems to trigger a bug in nokia_h4p related to
+> spinlocks. This happens in random intervals between 0.1 s and 30 s.
+> 
+> The bugs are:
+> BUG: scheduling while atomic
+> and
+> BUG: workqueue leaked lock or atomic
+> 
+> Stack traces suggest that it is (at least sometimes) caused by h4p_set_clk
+> calling clk_prepare_enable and clk_disable_unprepare functions, which should
+> only be used in non-atomic context.
+> 
+> So, I thought it would be good for you to know that BT does not really work. I
+> would like to work on this, but I'm afraid my knowledge is too limited to
+> track this down. It would be good to know what is causing those IIR RX
+> timeouts.
+> 
+> Also working on an obsolete driver feels like stupid now that there is a
+> driver written more properly.
 
-Currently, NVMe PCI host driver is programming CMB dma address as
-I/O SQs addresses. This results in failures on systems where 1:1
-outbound mapping is not used (example Broadcom iProc SOCs) because
-CMB BAR will be progammed with PCI bus address but NVMe PCI EP will
-try to access CMB using dma address.
+Yes, fixing obsolete driver is hard and has drawbacks. The new one
+should be fixed.
 
-To have CMB working on systems without 1:1 outbound mapping, we
-program PCI bus address for I/O SQs instead of dma address. This
-approach will work on systems with/without 1:1 outbound mapping.
+I believe the way forward would be
 
-Based on a report and previous patch from Abhishek Shah.
+a) add logging to the old driver, to see exact data being exchanged
+during initialization.
 
-Fixes: 8ffaadf7 ("NVMe: Use CMB for the IO SQes if available")
-Cc: stable at vger.kernel.org
-Reported-by: Abhishek Shah <abhishek.shah@broadcom.com>
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- drivers/nvme/host/pci.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+b) add logging to the new driver, and compare old and new driver
 
-diff --git a/drivers/nvme/host/pci.c b/drivers/nvme/host/pci.c
-index cb73bc8cad3b..3f5a04c586ce 100644
---- a/drivers/nvme/host/pci.c
-+++ b/drivers/nvme/host/pci.c
-@@ -94,7 +94,7 @@ struct nvme_dev {
- 	struct mutex shutdown_lock;
- 	bool subsystem;
- 	void __iomem *cmb;
--	dma_addr_t cmb_dma_addr;
-+	pci_bus_addr_t cmb_bus_addr;
- 	u64 cmb_size;
- 	u32 cmbsz;
- 	u32 cmbloc;
-@@ -1226,7 +1226,7 @@ static int nvme_alloc_sq_cmds(struct nvme_dev *dev, struct nvme_queue *nvmeq,
- 	if (qid && dev->cmb && use_cmb_sqes && NVME_CMB_SQS(dev->cmbsz)) {
- 		unsigned offset = (qid - 1) * roundup(SQ_SIZE(depth),
- 						      dev->ctrl.page_size);
--		nvmeq->sq_dma_addr = dev->cmb_dma_addr + offset;
-+		nvmeq->sq_dma_addr = dev->cmb_bus_addr + offset;
- 		nvmeq->sq_cmds_io = dev->cmb + offset;
- 	} else {
- 		nvmeq->sq_cmds = dma_alloc_coherent(dev->dev, SQ_SIZE(depth),
-@@ -1527,7 +1527,7 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
- 	resource_size_t bar_size;
- 	struct pci_dev *pdev = to_pci_dev(dev->dev);
- 	void __iomem *cmb;
--	dma_addr_t dma_addr;
-+	int bar;
- 
- 	dev->cmbsz = readl(dev->bar + NVME_REG_CMBSZ);
- 	if (!(NVME_CMB_SZ(dev->cmbsz)))
-@@ -1540,7 +1540,8 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
- 	szu = (u64)1 << (12 + 4 * NVME_CMB_SZU(dev->cmbsz));
- 	size = szu * NVME_CMB_SZ(dev->cmbsz);
- 	offset = szu * NVME_CMB_OFST(dev->cmbloc);
--	bar_size = pci_resource_len(pdev, NVME_CMB_BIR(dev->cmbloc));
-+	bar = NVME_CMB_BIR(dev->cmbloc);
-+	bar_size = pci_resource_len(pdev, bar);
- 
- 	if (offset > bar_size)
- 		return NULL;
-@@ -1553,12 +1554,11 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
- 	if (size > bar_size - offset)
- 		size = bar_size - offset;
- 
--	dma_addr = pci_resource_start(pdev, NVME_CMB_BIR(dev->cmbloc)) + offset;
--	cmb = ioremap_wc(dma_addr, size);
-+	cmb = ioremap_wc(pci_resource_start(pdev, bar) + offset, size);
- 	if (!cmb)
- 		return NULL;
- 
--	dev->cmb_dma_addr = dma_addr;
-+	dev->cmb_bus_addr = pci_bus_address(pdev, bar) + offset;
- 	dev->cmb_size = size;
- 	return cmb;
- }
+c) fix the new driver to do the initialization same way the old driver
+did
+
+Best regards,
+									Pavel
 -- 
-2.14.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171001/5665a0f4/attachment-0001.sig>
