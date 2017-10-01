@@ -1,58 +1,64 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 1 Oct 2017 17:12:58 +0200
-Subject: [PATCH] omap_ssi_core: fix kilo to be "k" not "K"
-In-Reply-To: <20170923190838.GA16966@amd>
-References: <20170923190838.GA16966@amd>
-Message-ID: <20171001151258.du7jdx3kqkswrp6r@earth>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 1 Oct 2017 10:14:07 -0700
+Subject: [PATCH 1/7] dt-bindings: bus: Minimal TI sysc interconnect
+ target module binding
+In-Reply-To: <20171001131151.loanjnvarkihbhik@earth>
+References: <20170929223411.9691-1-tony@atomide.com>
+ <20170929223411.9691-2-tony@atomide.com>
+ <20171001131151.loanjnvarkihbhik@earth>
+Message-ID: <20171001171406.GL4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Sep 23, 2017 at 09:08:38PM +0200, Pavel Machek wrote:
+* Sebastian Reichel <sre@ring0.de> [171001 06:12]:
+> On Fri, Sep 29, 2017 at 03:34:05PM -0700, Tony Lindgren wrote:
+> > Note that additional properties for sysc capabilities will be added
+> > later on. For now, we can already use this binding for interconnect
+> > target modules that do not have any child device drivers available.
+> > This allows us to idle the unused interconnect target modules during
+> > init without the need for legacy hwmod platform data for doing it.
 > 
-> Kilo should be "k" not "K", fix it it comments and messages.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> DT backwards compatibility is about booting an old DT file with a
+> newer kernel. Since old DT file does not contain a "ti,sysc-omap*"
+> node you don't need to add "ti,hwmod = *" support to it. Instead a
+> DT file, that uses ti,hwmod in the device node and does not have a
+> "ti,sysc-omap*" at all should still work.
 
-Thanks, queued.
+Not sure if I parse that right, but I'm assuming you suggest leaving
+out ti,hwmod to start with. Well I considered that, but it causes
+the "waiting for a magical flip issue". So initially we need to use
+both ti,sysc and ti,hwmod until ti,sysc alone has the equal
+functionality. That's because then we can do the following steps:
 
--- Sebastian
+1. We want to add compatible = ti,sysc so we can define the
+   nodes and get the parent-children hierarhcy right. We can
+   already use the parent-child features even with ti,hwmods
+   before we have complete dts based data. We are currently
+   missing that capability without doing device specific parent
+   drivers like we do with drivers/usb/musb/musb_am335x.c. Note
+   that in this step we are moving the ti,hwmod to the parent
+   node
 
-> index 88e48b3..41a09f5 100644
-> --- a/drivers/hsi/controllers/omap_ssi_core.c
-> +++ b/drivers/hsi/controllers/omap_ssi_core.c
-> @@ -334,7 +334,7 @@ static int ssi_clk_event(struct notifier_block *nb, unsigned long event,
->  	case POST_RATE_CHANGE:
->  		dev_dbg(&ssi->device, "post rate change (%lu -> %lu)\n",
->  			clk_data->old_rate, clk_data->new_rate);
-> -		omap_ssi->fck_rate = DIV_ROUND_CLOSEST(clk_data->new_rate, 1000); /* KHz */
-> +		omap_ssi->fck_rate = DIV_ROUND_CLOSEST(clk_data->new_rate, 1000); /* kHz */
->  
->  		for (i = 0; i < ssi->num_ports; i++) {
->  			omap_port = omap_ssi->port[i];
-> @@ -467,9 +467,9 @@ static int ssi_hw_init(struct hsi_controller *ssi)
->  	}
->  	/* Resetting GDD */
->  	writel_relaxed(SSI_SWRESET, omap_ssi->gdd + SSI_GDD_GRST_REG);
-> -	/* Get FCK rate in KHz */
-> +	/* Get FCK rate in kHz */
->  	omap_ssi->fck_rate = DIV_ROUND_CLOSEST(ssi_get_clk_rate(ssi), 1000);
-> -	dev_dbg(&ssi->device, "SSI fck rate %lu KHz\n", omap_ssi->fck_rate);
-> +	dev_dbg(&ssi->device, "SSI fck rate %lu kHz\n", omap_ssi->fck_rate);
->  
->  	writel_relaxed(SSI_CLK_AUTOGATING_ON, omap_ssi->sys + SSI_GDD_GCR_REG);
->  	omap_ssi->gdd_gcr = SSI_CLK_AUTOGATING_ON;
-> 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2. When ti,sysc can configure things based on dts data alone the
+   same way as the legacy platform data, we can just drop the
+   ti,hwmod property. We also want to be able to test one driver
+   at a time between ti,sysc + ti,hwmod vs ti,sysc only
 
+3. Once ti,hwmod properties have been removed from the mainline
+   kernel, we can add a warning about ti,hwmod properties being
+   deprecated
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171001/e55de115/attachment.sig>
+4. Then later on, we can also drop the hwmod platform data and
+   continue produce warnings if ti,hwmod is seen
+
+> IMHO we should break DT ABI for OMAP at some point, so that we can
+> get rid of the hwmod database. My suggestion would be, that
+> simple-bus checks if any child device is != "ti,omap-sysc*" and
+> does panic("please update DT!").
+
+Yes we can eventually drop the static data and ti,hwmod while
+providing helpful information to the users.
+
+Regards,
+
+Tony
