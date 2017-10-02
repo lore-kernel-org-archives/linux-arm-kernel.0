@@ -1,30 +1,59 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 2 Oct 2017 11:02:50 -0500
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
- <20170919070422.GI3349@codeaurora.org>
- <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
- <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
- <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
- <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
- <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
- <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
-Message-ID: <0ede14eb-a9fc-ab90-4e18-c6c955da2601@codeaurora.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 2 Oct 2017 17:11:00 +0100
+Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
+In-Reply-To: <CACRpkdZ=BZHp3mjccUYaPTuMbXgwGSErvLprnp4j0H+7C5NYJQ@mail.gmail.com>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-2-linus.walleij@linaro.org>
+ <CACRpkdZ=BZHp3mjccUYaPTuMbXgwGSErvLprnp4j0H+7C5NYJQ@mail.gmail.com>
+Message-ID: <3100653b-21b7-0a84-6379-7c38e18e2dd6@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2017 08:29 AM, Linus Walleij wrote:
-> I am waiting for the maintainer, Bjorn Andersson, to provide review.
+On 02/10/17 02:05, Linus Walleij wrote:
+> On Sun, Sep 17, 2017 at 11:39 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+> 
+>> - The MFD Silicon Motion SM501 is a special case. It dynamically
+>>    spawns an I2C bus off the MFD using sm501_create_subdev().
+>>    We use an approach to dynamically create a machine descriptor
+>>    table and attach this to the "SM501-LOW" or "SM501-HIGH"
+>>    gpiochip. We use chip-local offsets to grab the right lines.
+>>    We can get rid of two local static inline helpers as part
+>>    of this refactoring.
+> (...)
+>> SM501 users: requesting Tested-by on this patch.
+> 
+> Paging Simtec (if it reaches anyone), Vincent Sanders,
+> Teddy Wang at Silicon Motion:
 
-Bjorn,
+I'm fairly sure Simtec is not currently active. See below.
+I have no idea if the SM501 is even available for current designs.
 
-Would you please take a moment to review these patches?  I'm guessing 
-it's too late for 4.14, so I would like these merged into 4.15.  But 
-without your review, very little progress is being made.
+> Does any of you have an "Anubis" board so you can test GPIO
+> on this board before/after this patch and see if it checks out right?
+> 
+> I guess it's this board:
+> http://www.simtec.co.uk/products/BBD20EUROA/
+
+I think that's fairly close.
+We did have a couple of other designs done for clients, but they may
+not have been available to the general public.
+
+> 
+> Does anyone know of a commercially obtainable product using
+> SM501 with reasonable mainline Linux support so I can test it myself?
+> 
+> Getting a bit desperate...
+
+At the moment I have no time to go through the boxes of ex-Simtec stuff
+that I still have... quite a lot of my old Simtec stuff has already been
+recycled as it has been over five years since leaving.
+
+> Yours,
+> Linus Walleij
+> 
+
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
