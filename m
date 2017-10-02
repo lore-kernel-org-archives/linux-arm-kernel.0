@@ -1,68 +1,51 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 2 Oct 2017 09:54:56 +0800
-Subject: [PATCH v3 06/10] arm: dts: mt7623: add subsystem clock controller
- nodes
+Date: Mon, 2 Oct 2017 09:54:54 +0800
+Subject: [PATCH v3 04/10] arm: dts: mediatek: update audio node for mt2701 and
+ mt7623
 In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
 References: <cover.1506908511.git.ryder.lee@mediatek.com>
-Message-ID: <1a6aba8921584fe465bc2138a3aec10c2637f226.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <13ee41c37cbfd0de335b6fbbf061715184944cb8.1506908511.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing susbsystem clock controllers nodes for MT7623.
-(e.g., mmsys, imgsys, vdecsys and bdpsys)
+This patch adds interrupt-names property in audio node so that
+binding can be agnostic of the IRQ order.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/mt2701.dtsi | 4 +++-
+ arch/arm/boot/dts/mt7623.dtsi | 4 +++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 8c9fbe5..ecd388a 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -445,7 +445,9 @@
+ 		compatible = "mediatek,mt2701-audio";
+ 		reg = <0 0x11220000 0 0x2000>,
+ 		      <0 0x112a0000 0 0x20000>;
+-		interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
++		interrupts =  <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
++			      <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names	= "afe", "asys";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
+ 
+ 		clocks = <&infracfg CLK_INFRA_AUDIO>,
 diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index 0640fb7..a877f9a 100644
+index ec8a074..381843e 100644
 --- a/arch/arm/boot/dts/mt7623.dtsi
 +++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -661,6 +661,30 @@
- 		status = "disabled";
- 	};
+@@ -544,7 +544,9 @@
+ 			     "mediatek,mt2701-audio";
+ 		reg = <0 0x11220000 0 0x2000>,
+ 		      <0 0x112a0000 0 0x20000>;
+-		interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
++		interrupts =  <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
++			      <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names	= "afe", "asys";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
  
-+	mmsys: syscon at 14000000 {
-+		compatible = "mediatek,mt7623-mmsys",
-+			     "mediatek,mt2701-mmsys",
-+			     "syscon";
-+		reg = <0 0x14000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	imgsys: syscon at 15000000 {
-+		compatible = "mediatek,mt7623-imgsys",
-+			     "mediatek,mt2701-imgsys",
-+			     "syscon";
-+		reg = <0 0x15000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	vdecsys: syscon at 16000000 {
-+		compatible = "mediatek,mt7623-vdecsys",
-+			     "mediatek,mt2701-vdecsys",
-+			     "syscon";
-+		reg = <0 0x16000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
- 	hifsys: syscon at 1a000000 {
- 		compatible = "mediatek,mt7623-hifsys",
- 			     "mediatek,mt2701-hifsys",
-@@ -799,4 +823,12 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
- 		status = "disabled";
- 	};
-+
-+	bdpsys: syscon at 1c000000 {
-+		compatible = "mediatek,mt7623-bdpsys",
-+			     "mediatek,mt2701-bdpsys",
-+			     "syscon";
-+		reg = <0 0x1c000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
- };
+ 		clocks = <&infracfg CLK_INFRA_AUDIO>,
 -- 
 1.9.1
