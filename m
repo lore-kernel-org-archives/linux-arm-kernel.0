@@ -1,139 +1,201 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 2 Oct 2017 17:17:56 +0200
-Subject: [PATCH v10 3/7] edac, soc: thunderx: Add wrapper for EDAC LMC PCI
- device
-In-Reply-To: <20170927161901.4hto7mrc2s4yuugn@pd.tnic>
-References: <20170925123502.17289-1-jglauber@cavium.com>
- <20170925123502.17289-4-jglauber@cavium.com>
- <20170927161901.4hto7mrc2s4yuugn@pd.tnic>
-Message-ID: <20171002151756.GA11514@hc>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 2 Oct 2017 16:28:38 +0100
+Subject: [PATCH 3/4] nvmem: add a driver for the Amlogic
+ Meson6/Meson8/Meson8b SoCs
+In-Reply-To: <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
+References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
+ <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
+Message-ID: <8f1f5a45-951c-7434-44d5-4ef2a61ec038@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 27, 2017 at 06:19:01PM +0200, Borislav Petkov wrote:
-> On Mon, Sep 25, 2017 at 02:34:58PM +0200, Jan Glauber wrote:
-> > Cavium SOCs contain a memory controller that is presented as a
-> > PCI device. This PCI device will be used by an EDAC driver and
-> > by a PMU driver.
-> > 
-> > To allow both subsystems to access the device a small wrapper is
-> > introduced that multi-plexes PCI probe and removal calls of the
-> > device to the EDAC driver.
-> > 
-> > The same mechanism will be used later to call the PMU driver.
-> > 
-> > The ThunderX EDAC driver is limited to only build as module
-> > with this patch. The reason is that with multiple users of the
-> > multi-plexer all users must be either builtin or modules.
-> > 
-> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > ---
+Minor comments!!
+
+On 01/10/17 13:56, Martin Blumenstingl wrote:
+> This adds a driver to access the efuse on Amlogic Meson6, Meson8 and
+> Meson8b SoCs.
+> These SoCs are accessing the efuse IP block directly through the
+> registers in the "secbus" region. This makes it different from the Meson
+> GX efuse driver which uses the "secure monitor" firmware to access the
+> efuse.
 > 
-> ...
+> The efuse on Meson6 can only read one byte at a time, while the efuse on
+> Meson8 and Meson8b always reads 4 bytes at a time. The new driver
+> supports both, but due to lack of hardware Meson6 support was not tested.
 > 
-> > diff --git a/drivers/soc/cavium/cavium_lmc.c b/drivers/soc/cavium/cavium_lmc.c
-> > new file mode 100644
-> > index 000000000000..87248e83c55b
-> > --- /dev/null
-> > +++ b/drivers/soc/cavium/cavium_lmc.c
-> > @@ -0,0 +1,49 @@
-> > +/*
-> > + * These PCI devices contain RAS functionality and PMU counters. To allow
-> > + * independent RAS and PMU drivers this driver registers for the PCI devices
-> > + * and multi-plexes probe and removal.
-> > + *
-> > + * This file is subject to the terms and conditions of the GNU General Public
-> > + * License.  See the file "COPYING" in the main directory of this archive
-> > + * for more details.
-> > + *
-> > + * Copyright: Cavium, Inc. (C) 2017
-> > + *
-> > + */
-> > +#include <linux/module.h>
-> > +#include <linux/pci.h>
-> > +#include <linux/soc/cavium/lmc.h>
-> > +
-> > +static int cvm_lmc_probe(struct pci_dev *pdev,
-> > +			 const struct pci_device_id *ent)
-> > +{
-> > +	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
-> > +		thunderx_edac_lmc_probe(pdev, ent);
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>   drivers/nvmem/Kconfig          |  10 ++
+>   drivers/nvmem/Makefile         |   2 +
+>   drivers/nvmem/meson-mx-efuse.c | 272 +++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 284 insertions(+)
+>   create mode 100644 drivers/nvmem/meson-mx-efuse.c
 > 
-> You could save yourself the if (IS_ENABLED()) here by adding stubs in
-> the lmc.h header for those functions for the !CONFIG_EDAC_THUNDERX case.
+> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> +	
+> +
+> +static void meson_mx_efuse_mask_bits(struct meson_mx_efuse *efuse, u32 reg,
+> +				     u32 mask, u32 set)
+> +{
+> +	u32 data;
+> +
+> +	data = readl(efuse->base + reg);
+> +	data &= ~mask;
+> +	data |= (set & mask);
+> +
+> +	writel(data, efuse->base + reg);
+> +}
+> +
+> +static int meson_mx_efuse_hw_enable(struct meson_mx_efuse *efuse)
+> +{
+> +	int err;
+> +
+> +	err = clk_prepare_enable(efuse->core_clk);
+> +	if (err)
+> +		return err;
+> +
+> +	/* power up the efuse */
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_PD_ENABLE, 0);
+> +
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL4,
+> +				 MESON_MX_EFUSE_CNTL4_ENCRYPT_ENABLE, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static void meson_mx_efuse_hw_disable(struct meson_mx_efuse *efuse)
+> +{
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_PD_ENABLE,
+> +				 MESON_MX_EFUSE_CNTL1_PD_ENABLE);
+> +
+> +	clk_disable_unprepare(efuse->core_clk);
+> +}
+> +
+> +static int meson_mx_efuse_read_addr(struct meson_mx_efuse *efuse,
+> +				    unsigned int addr, u32 *value)
+> +{
+> +	int err;
+> +	u32 regval;
+> +
+> +	/* write the address to read */
+> +	regval = FIELD_PREP(MESON_MX_EFUSE_CNTL1_BYTE_ADDR_MASK, addr);
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_MASK, regval);
+> +
+> +	/* inform the hardware that we changed the address */
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_SET,
+> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_SET);
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_SET, 0);
+> +
+> +	/* start the read process */
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_START,
+> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_START);
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_START, 0);
+> +
+> +	/*
+> +	 * perform a dummy read to ensure that the HW has the RD_BUSY bit set
+> +	 * when polling for the status below.
+> +	 */
+> +	readl(efuse->base + MESON_MX_EFUSE_CNTL1);
+> +
+> +	err = readl_poll_timeout_atomic(efuse->base + MESON_MX_EFUSE_CNTL1,
+> +			regval,
+> +			(!(regval & MESON_MX_EFUSE_CNTL1_AUTO_RD_BUSY)),
+> +			1, 1000);
+> +	if (err) {
+> +		dev_err(efuse->config.dev,
+> +			"Timeout while reading efuse address %u\n", addr);
+> +		return err;
+> +	}
+> +
+> +	*value = readl(efuse->base + MESON_MX_EFUSE_CNTL2);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_mx_efuse_read(void *context, unsigned int offset,
+> +			       void *buf, size_t bytes)
+> +{
+> +	struct meson_mx_efuse *efuse = context;
+> +	u32 tmp;
+> +	int err, i, addr;
+> +
+> +	err = meson_mx_efuse_hw_enable(efuse);
+> +	if (err)
+> +		return err;
+> +
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
+> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
+> +
+> +	for (i = offset; i < offset + bytes; i += efuse->config.word_size) {
+> +		addr = i / efuse->config.word_size;
+> +
+> +		err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
+> +		if (err)
+> +			break;
+> +
+> +		memcpy(buf + i, &tmp, efuse->config.word_size);
+> +	}
+> +
+> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE, 0);
+> +
+> +	meson_mx_efuse_hw_disable(efuse);
+> +
+> +	return err;
+> +}
+...
+> +
+> +static int meson_mx_efuse_probe(struct platform_device *pdev)
+> +{
+> +	const struct meson_mx_efuse_platform_data *drvdata;
+> +	struct meson_mx_efuse *efuse;
+> +	struct resource *res;
+> +
 
-OK.
+...
 
-> One thing I'm not clear on though, is the design of the whole thing:
-> cvm_lmc_probe() probes the EDAC driver during its own probe, which
-> means, thunderx_edac needs to be loaded first. And the other things that
-> get loaded, do the same.
+> +
+> +	efuse->core_clk = devm_clk_get(&pdev->dev, "core");
+> +	if (IS_ERR(efuse->core_clk)) {
+> +		dev_err(&pdev->dev, "Failed to get core clock\n");
+> +		return PTR_ERR(efuse->core_clk);
+> +	}
+> +
+> +	efuse->nvmem = nvmem_register(&efuse->config);
+> +	if (IS_ERR(efuse->nvmem)) {
+> +		clk_unprepare(efuse->core_clk);
 
-Yes. That seems to work fine with the limitation of not being
-able to have mixed build options, everything needs to be modular or
-built-in. So I forced all parts to be buildable only as modules.
+Do you need this???
 
-I went for this as the simplest solution, the probing is completely
-synchronous and no state needs to be stored in the wrapper.
+> +		return PTR_ERR(efuse->nvmem);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, efuse);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_mx_efuse_remove(struct platform_device *pdev)
+> +{
+> +	struct meson_mx_efuse *efuse = platform_get_drvdata(pdev);
+> +	int err;
+> +
+> +	err = nvmem_unregister(efuse->nvmem);
+> +
+> +	clk_unprepare(efuse->core_clk);
 
-> What I was expecting is those small cavium_lmc.c and cavium_ocx.c
-> wrappers to probe and register the respective PCI device and then its
-> *users* - EDAC and PMU drivers to go and request the PCI device from
-> them:
-> 
-> cavium_lmc_get_pci_dev()
-> cavium_ocx_get_pci_dev()
-> 
-> and so on. Those will be exported to modules. And the small stubs can
-> also be built-in too.
+Do you need this disable here? AFAIU, this driver would never leave the 
+clk prepared unless we are in the middle of read.
 
-So this is the opposite approach which would be asynchronous. What I
-don't understand with that approach:
-
-1. What will trigger probing the edac (or perf) driver part?
-   Right now the trigger is the PCI device ID. If the wrapper
-   does not call into edac how should we load the ThunderX edac/perf drivers?
-   The only option I see is a initcall in edac/perf to look for their devices.
-
-2. The probe & register is _very_ specific to perf/edac and very different.
-   The only part that would fit in the wrapper is pci_enable_device().
-   So is that what you have in mind?
-
-> This way you can do reference counting and whatever else.
-> 
-> If the above calls fail, neither EDAC nor PMU will load properly but you
-> solve the multiplexing issue by having those wrappers arbitrate access
-> to the PCI devices.
-> 
-> Because right now the wrappers are simply weakly hiding the calls into
-> EDAC and that's exactly what I was opposing to.
-> 
-> Hmmm?
-
-> > +	return 0;
-> > +}
-> > +
-> > +static void cvm_lmc_remove(struct pci_dev *pdev)
-> > +{
-> > +	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
-> > +		thunderx_edac_lmc_remove(pdev);
-> > +}
-> > +
-> > +static const struct pci_device_id cvm_lmc_pci_table[] = {
-> > +	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa022) },
-> 
->         { PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_LMC) },
-> 
-> You already have that PCI device id define.
-
-True, will use it.
-
-Thanks for looking at this!
-
---Jan
-
-> -- 
-> Regards/Gruss,
->     Boris.
-> 
-> Good mailing practices for 400: avoid top-posting and trim the reply.
+> +
+> +	return err;
+> +}
+> +
