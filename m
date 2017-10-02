@@ -1,141 +1,69 @@
-From: todor.tomov@linaro.org (Todor Tomov)
-Date: Mon,  2 Oct 2017 17:13:33 +0300
-Subject: [PATCH 4/4] arm64: dts: qcom: Add Camera Control Interface support
-In-Reply-To: <1506953613-23875-1-git-send-email-todor.tomov@linaro.org>
-References: <1506953613-23875-1-git-send-email-todor.tomov@linaro.org>
-Message-ID: <1506953613-23875-5-git-send-email-todor.tomov@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 02 Oct 2017 16:21:19 +0200
+Subject: [PATCH v2 1/2] ARM: dts: Fix I2C repeated start issue on
+ Armada-38x
+In-Reply-To: <20170928213605.22874-2-kalyan.kinthada@alliedtelesis.co.nz>
+ (Kalyan Kinthada's message of "Fri, 29 Sep 2017 10:36:04 +1300")
+References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+ <20170928213605.22874-2-kalyan.kinthada@alliedtelesis.co.nz>
+Message-ID: <87o9ppmy00.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the CCI node for the CCI controller that resides on
-the Qualcomm MSM8916 and MSM8996 platforms.
-
-CC: Andy Gross <andy.gross@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: devicetree at vger.kernel.org
-CC: linux-soc at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Todor Tomov <todor.tomov@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 14 ++++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi      | 21 +++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi | 14 ++++++++++++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi      | 24 ++++++++++++++++++++++++
- 4 files changed, 73 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-index 4cb0b58..4fa6a72 100644
---- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-@@ -733,4 +733,18 @@
- 			bias-pull-up;
- 		};
- 	};
-+
-+	cci_lines {
-+		cci0_default: cci0_default {
-+			pinmux {
-+				function = "cci_i2c";
-+				pins = "gpio29", "gpio30";
-+			};
-+			pinconf {
-+				pins = "gpio29", "gpio30";
-+				drive-strength = <16>;
-+				bias-disable;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index dc38175..4885360 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1325,6 +1325,27 @@
- 				compatible = "venus-encoder";
- 			};
- 		};
-+
-+		cci: qcom,cci at 1b0c000 {
-+			compatible = "qcom,cci-v1.0.8";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x1b0c000 0x1000>;
-+			reg-names = "cci";
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-names = "cci";
-+			clocks = <&gcc GCC_CAMSS_TOP_AHB_CLK>,
-+				<&gcc GCC_CAMSS_CCI_AHB_CLK>,
-+				<&gcc GCC_CAMSS_CCI_CLK>,
-+				<&gcc GCC_CAMSS_AHB_CLK>;
-+			clock-names = "camss_top_ahb",
-+				"cci_ahb",
-+				"cci",
-+				"camss_ahb";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&cci0_default>;
-+			status = "disabled";
-+		};
- 	};
+Hi Kalyan,
  
- 	smd {
-diff --git a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-index 6599404..3faaa4c 100644
---- a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
-@@ -300,4 +300,18 @@
- 			drive-strength = <2>;	/* 2 MA */
- 		};
- 	};
-+
-+	cci_lines {
-+		cci0_default: cci0_default {
-+			pinmux {
-+				function = "cci_i2c";
-+				pins = "gpio17", "gpio18";
-+			};
-+			pinconf {
-+				pins = "gpio17", "gpio18";
-+				drive-strength = <16>;
-+				bias-disable;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 887b61c..118722f 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -819,6 +819,30 @@
- 				phy-names = "usb2-phy", "usb3-phy";
- 			};
- 		};
-+
-+		cci: qcom,cci at a0c000 {
-+			compatible = "qcom,cci-v1.4.0";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0xa0c000 0x1000>;
-+			reg-names = "cci";
-+			interrupts = <GIC_SPI 295 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-names = "cci";
-+			power-domains = <&mmcc CAMSS_GDSC>;
-+			clocks = <&mmcc MMSS_MMAGIC_AHB_CLK>,
-+					<&mmcc CAMSS_TOP_AHB_CLK>,
-+					<&mmcc CAMSS_CCI_AHB_CLK>,
-+					<&mmcc CAMSS_CCI_CLK>,
-+					<&mmcc CAMSS_AHB_CLK>;
-+			clock-names = "mmss_mmagic_ahb",
-+					"camss_top_ahb",
-+					"cci_ahb",
-+					"cci",
-+					"camss_ahb";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&cci0_default>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	adsp-pil {
+ On ven., sept. 29 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
+
+> All the Armada 38x(380, 385, 388) have a silicon issue in
+> the I2C controller which violates the I2C repeated start timing
+> (errata FE-8471889).
+>
+> i2c-mv64xxx driver handles this errata based on the compatible string
+> "marvell,mv78230-a0-i2c".
+>
+> This patch activates the "marvell,mv78230-a0-i2c" compatible string
+> for the I2C controller on armada-38x SoC based devices.
+>
+> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+
+Applied on mvebu/fixes
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 7ff0811e61db..4960722aab32 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -178,7 +178,7 @@
+>  			};
+>  
+>  			i2c0: i2c at 11000 {
+> -				compatible = "marvell,mv64xxx-i2c";
+> +				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+>  				reg = <0x11000 0x20>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -189,7 +189,7 @@
+>  			};
+>  
+>  			i2c1: i2c at 11100 {
+> -				compatible = "marvell,mv64xxx-i2c";
+> +				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+>  				reg = <0x11100 0x20>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -- 
+> 2.14.1
+>
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
