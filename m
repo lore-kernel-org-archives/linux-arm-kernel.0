@@ -1,39 +1,102 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Mon, 2 Oct 2017 09:23:31 +0200
-Subject: i2c-omap.c vs. qemu: too much work in one irq (and broken boot)
-In-Reply-To: <20171001221935.GA29628@amd>
-References: <20171001204215.GA9928@amd>
- <20171001221935.GA29628@amd>
-Message-ID: <20171002072331.GB25930@pali>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 2 Oct 2017 09:55:32 +0200
+Subject: [RFC v2 1/2] dt-bindings: mmc: Document the Amlogic Meson8 and
+ Meson8b SDIO bindings
+In-Reply-To: <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
+References: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
+ <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
+Message-ID: <CAPDyKFohh0_aONKyoc2deN+L8TCzY8tdEs5-fja3t5oVL2Gs7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 October 2017 00:19:35 Pavel Machek wrote:
-> Hi!
-> 
-> > I'm trying to get qemu emulation of Nokia N900 to work, but
-> > unfortunately i2c-omap.c breaks boot in the emulator (real hardware
-> > works ok).
-> 
-> I started bisection. v4.6 works, v4.7 is broken. (It still may be
-> config difference or something).
-> 
-> This looked suspect, so I tried reverting it, but it did not help. And
-> it is only significant change in i2c-omap.c. So... this may be a lot
-> of fun.
-> 
-> commit 126a66caec4a00b8d66dbc3174b0efa905cf68c3
-> Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Date:   Mon Apr 4 16:55:23 2016 +0300
-> 
-> Unfortunately, mmc is broken in v4.6, so its useless for
-> emulation... [ 3.236724] mmc1: error -22 whilst initialising SDIO card
+On 24 September 2017 at 21:05, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> This documents the devicetree bindings for the SDIO/MMC host found in
+> Amlogic Meson8 and Meson8b SoCs. It supports the SD specification v2.0
+> and the eMMC specification v4.41.
+> It has an internal "mux" which allows connecting up to three MMC devices
+> to it. The maximum supported bus-width is 4-bits.
+>
+> Amlogic's GPL kernel sources call it "SDIO" to differentiate it from the
+> other MMC controller in (at least the Meson8 and Meson8b) the SoCs (they
+> call the other one "SDHC", which supports a bus-width of up to 8-bits).
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  .../bindings/mmc/amlogic,meson-mx-sdio.txt         | 52 ++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt b/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+> new file mode 100644
+> index 000000000000..124ea362eec9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+> @@ -0,0 +1,52 @@
+> +* Amlogic Meson6, Meson8 and Meson8b SDIO/MMC controller
+> +
+> +The highspeed MMC host controller on Amlogic SoCs provides an interface
+> +for MMC, SD, SDIO and SDHC types of memory cards.
+> +
+> +Supported maximum speeds are the ones of the eMMC standard 4.41 as well
+> +as the speed of SD standard 2.0.
+> +
+> +The hardware provides an internal "mux" which allows up to three slots
+> +to be controlled. Only one slot can be accessed at a time.
 
-Hi! You can apply special patch to make mmc work in both qemu and real
-N900 device for previous kernel versions...
+This is good information, however as the driver won't support multiple
+slots, at least short term, I think we need to mention that. Otherwise
+people may think that three slots is actually supported, while in fact
+it isn't.
 
-https://github.com/pali/linux-n900/commit/eb080ecdcfc5868d8e36d0f5f42d9cb7f13b4db9
+> +
+> +Required properties:
+> + - compatible : must be one of
+> +       - "amlogic,meson8-sdio"
+> +       - "amlogic,meson8b-sdio"
+> +       along with the generic "amlogic,meson-mx-sdio"
+> + - reg : mmc controller base registers
+> + - interrupts : mmc controller interrupt
+> + - #address-cells : must be 1
+> + - size-cells : must be 0
+> + - clocks : phandle to clock providers
+> + - clock-names : must contain "core" and "clkin"
+> +
+> +Required child nodes:
+> +A node for each slot provided by the MMC controller is required.
+> +
+> +Required properties on each child node (= slot):
+> + - compatible : must be "mmc-slot" (see mmc.txt within this directory)
+> + - reg : the slot (or "port") ID
+> +
+> +Optional properties on each child node (= slot):
+> + - bus-width : must be 1 or 4 (8-bit bus is not supported)
+> + - for cd and all other additional generic mmc parameters
+> +   please refer to mmc.txt within this directory
+> +
+> +Examples:
+> +       mmc at c1108c20 {
+> +               compatible = "amlogic,meson8-sdio", "amlogic,meson-mx-sdio";
+> +               reg = <0xc1108c20 0x20>;
+> +               interrupts = <0 28 1>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               clocks = <&clkc CLKID_SDIO>, <&clkc CLKID_CLK81>;
+> +               clock-names = "core", "clkin";
+> +
+> +               slot at 1 {
+> +                       compatible = "mmc-slot";
+> +                       reg = <1>;
+> +
+> +                       bus-width = <4>;
+> +               };
+> +       };
+> --
+> 2.14.1
+>
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Kind regards
+Uffe
