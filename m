@@ -1,109 +1,51 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 2 Oct 2017 20:47:48 +0200
-Subject: [RFC v2 1/2] dt-bindings: mmc: Document the Amlogic Meson8 and
- Meson8b SDIO bindings
-In-Reply-To: <CAPDyKFohh0_aONKyoc2deN+L8TCzY8tdEs5-fja3t5oVL2Gs7w@mail.gmail.com>
-References: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
- <20170924190528.21841-2-martin.blumenstingl@googlemail.com>
- <CAPDyKFohh0_aONKyoc2deN+L8TCzY8tdEs5-fja3t5oVL2Gs7w@mail.gmail.com>
-Message-ID: <CAFBinCA6HfKTNSLczx=V3dtfsrUSMKJw-nLAp6s9m55dJ9nQxA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 2 Oct 2017 21:06:00 +0200
+Subject: [PATCH 9/9] arm64: dts: register Hi3660's thermal sensor
+In-Reply-To: <1506073332-92438-10-git-send-email-kevin.wangtao@hisilicon.com>
+References: <1506073332-92438-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1506073332-92438-10-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <f83a0936-23cc-0f5e-b6a3-c3adf1a0d7a0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 2, 2017 at 9:55 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 24 September 2017 at 21:05, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> This documents the devicetree bindings for the SDIO/MMC host found in
->> Amlogic Meson8 and Meson8b SoCs. It supports the SD specification v2.0
->> and the eMMC specification v4.41.
->> It has an internal "mux" which allows connecting up to three MMC devices
->> to it. The maximum supported bus-width is 4-bits.
->>
->> Amlogic's GPL kernel sources call it "SDIO" to differentiate it from the
->> other MMC controller in (at least the Meson8 and Meson8b) the SoCs (they
->> call the other one "SDHC", which supports a bus-width of up to 8-bits).
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  .../bindings/mmc/amlogic,meson-mx-sdio.txt         | 52 ++++++++++++++++++++++
->>  1 file changed, 52 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt b/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
->> new file mode 100644
->> index 000000000000..124ea362eec9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
->> @@ -0,0 +1,52 @@
->> +* Amlogic Meson6, Meson8 and Meson8b SDIO/MMC controller
->> +
->> +The highspeed MMC host controller on Amlogic SoCs provides an interface
->> +for MMC, SD, SDIO and SDHC types of memory cards.
->> +
->> +Supported maximum speeds are the ones of the eMMC standard 4.41 as well
->> +as the speed of SD standard 2.0.
->> +
->> +The hardware provides an internal "mux" which allows up to three slots
->> +to be controlled. Only one slot can be accessed at a time.
->
-> This is good information, however as the driver won't support multiple
-> slots, at least short term, I think we need to mention that. Otherwise
-> people may think that three slots is actually supported, while in fact
-> it isn't.
-OK, I'll add a note when I re-spin this series
+On 22/09/2017 11:42, Tao Wang wrote:
+> From: Kevin Wangtao <kevin.wangtao@linaro.org>
+> 
+> add binding for tsensor on H3660, this tsensor is used for
+> SoC thermal control, it supports alarm interrupt.
+> 
+> Signed-off-by: Kevin Wangtao <kevin.wangtao@linaro.org>
 
->> +
->> +Required properties:
->> + - compatible : must be one of
->> +       - "amlogic,meson8-sdio"
->> +       - "amlogic,meson8b-sdio"
->> +       along with the generic "amlogic,meson-mx-sdio"
->> + - reg : mmc controller base registers
->> + - interrupts : mmc controller interrupt
->> + - #address-cells : must be 1
->> + - size-cells : must be 0
->> + - clocks : phandle to clock providers
->> + - clock-names : must contain "core" and "clkin"
->> +
->> +Required child nodes:
->> +A node for each slot provided by the MMC controller is required.
->> +
->> +Required properties on each child node (= slot):
->> + - compatible : must be "mmc-slot" (see mmc.txt within this directory)
->> + - reg : the slot (or "port") ID
->> +
->> +Optional properties on each child node (= slot):
->> + - bus-width : must be 1 or 4 (8-bit bus is not supported)
->> + - for cd and all other additional generic mmc parameters
->> +   please refer to mmc.txt within this directory
->> +
->> +Examples:
->> +       mmc at c1108c20 {
->> +               compatible = "amlogic,meson8-sdio", "amlogic,meson-mx-sdio";
->> +               reg = <0xc1108c20 0x20>;
->> +               interrupts = <0 28 1>;
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               clocks = <&clkc CLKID_SDIO>, <&clkc CLKID_CLK81>;
->> +               clock-names = "core", "clkin";
->> +
->> +               slot at 1 {
->> +                       compatible = "mmc-slot";
->> +                       reg = <1>;
->> +
->> +                       bus-width = <4>;
->> +               };
->> +       };
->> --
->> 2.14.1
->>
->
-> Kind regards
-> Uffe
+I'm not able to apply this patch. Does it rely on another patch?
+
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> index b7a90d6..ae90991 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> @@ -978,5 +978,13 @@
+>  			clocks = <&crg_ctrl HI3660_OSC32K>;
+>  			clock-names = "apb_pclk";
+>  		};
+> +
+> +		tsensor: tsensor at fff30000 {
+> +			compatible = "hisilicon,hi3660-tsensor";
+> +			reg = <0x0 0xfff30000 0x0 0x1000>;
+> +			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+>  	};
+>  };
+> 
 
 
-Regards,
-Martin
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
