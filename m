@@ -1,187 +1,55 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 2 Oct 2017 09:55:00 +0800
-Subject: [PATCH v3 10/10] arm: dts: mt7623: add PCIe related nodes
-In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
-References: <cover.1506908511.git.ryder.lee@mediatek.com>
-Message-ID: <8befb307f6fddf0a39657f04f2e270b6f803b8b9.1506908511.git.ryder.lee@mediatek.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun,  1 Oct 2017 22:06:18 -0400
+Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than printch()
+In-Reply-To: <20171002020618.23924-1-nicolas.pitre@linaro.org>
+References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
+Message-ID: <20171002020618.23924-4-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds devices nodes and updates pinmux setting for the PICe
-function block. Just note that PCIe port2 PHY is shared with U3 port.
+With printch() the console messages are sent out one character at a time
+which is agonizingly slow especially with semihosting as the whole trap
+intercept, remote byte access, and system resume danse is performed for
+every single character across a relatively slow remote debug connection.
+Let's use printascii() to send a whole string at once. This is also going
+to be more efficient, albeit to a quite lesser extent, with serial ports
+as well.
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/boot/dts/mt7623.dtsi                 | 108 ++++++++++++++++++++++++++
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  30 +++++++
- 2 files changed, 138 insertions(+)
+ arch/arm/kernel/early_printk.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index b19aa9f..32d454e 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -862,6 +862,114 @@
- 		#reset-cells = <1>;
- 	};
+diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
+index 4307653696..9257736ec9 100644
+--- a/arch/arm/kernel/early_printk.c
++++ b/arch/arm/kernel/early_printk.c
+@@ -11,16 +11,20 @@
+ #include <linux/kernel.h>
+ #include <linux/console.h>
+ #include <linux/init.h>
++#include <linux/string.h>
  
-+	pcie: pcie-controller at 1a140000 {
-+		compatible = "mediatek,mt7623-pcie";
-+		device_type = "pci";
-+		reg = <0 0x1a140000 0 0x1000>, /* PCIe shared registers */
-+		      <0 0x1a142000 0 0x1000>, /* Port0 registers */
-+		      <0 0x1a143000 0 0x1000>, /* Port1 registers */
-+		      <0 0x1a144000 0 0x1000>; /* Port2 registers */
-+		reg-names = "subsys", "port0", "port1", "port2";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0xf800 0 0 0>;
-+		interrupt-map = <0x0000 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>,
-+				<0x0800 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>,
-+				<0x1000 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-+			 <&hifsys CLK_HIFSYS_PCIE0>,
-+			 <&hifsys CLK_HIFSYS_PCIE1>,
-+			 <&hifsys CLK_HIFSYS_PCIE2>;
-+		clock-names = "free_ck", "sys_ck0", "sys_ck1", "sys_ck2";
-+		resets = <&hifsys MT2701_HIFSYS_PCIE0_RST>,
-+			 <&hifsys MT2701_HIFSYS_PCIE1_RST>,
-+			 <&hifsys MT2701_HIFSYS_PCIE2_RST>;
-+		reset-names = "pcie-rst0", "pcie-rst1", "pcie-rst2";
-+		phys = <&pcie0_port PHY_TYPE_PCIE>,
-+		       <&pcie1_port PHY_TYPE_PCIE>,
-+		       <&u3port1 PHY_TYPE_PCIE>;
-+		phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
-+		bus-range = <0x00 0xff>;
-+		status = "disabled";
-+		ranges = <0x81000000 0 0x1a160000 0 0x1a160000 0 0x00010000
-+			  0x83000000 0 0x60000000 0 0x60000000 0 0x10000000>;
-+
-+		pcie at 0,0 {
-+			device_type = "pci";
-+			reg = <0x0000 0 0 0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>;
-+			ranges;
-+			num-lanes = <1>;
-+			status = "disabled";
-+		};
-+
-+		pcie at 1,0 {
-+			device_type = "pci";
-+			reg = <0x0800 0 0 0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
-+			ranges;
-+			num-lanes = <1>;
-+			status = "disabled";
-+		};
-+
-+		pcie at 2,0 {
-+			device_type = "pci";
-+			reg = <0x1000 0 0 0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &sysirq GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
-+			ranges;
-+			num-lanes = <1>;
-+			status = "disabled";
-+		};
-+	};
-+
-+	pcie0_phy: pcie-phy at 1a149000 {
-+		compatible = "mediatek,generic-tphy-v1";
-+		reg = <0 0x1a149000 0 0x0700>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		status = "disabled";
-+
-+		pcie0_port: pcie-phy at 1a149900 {
-+			reg = <0 0x1a149900 0 0x0700>;
-+			clocks = <&clk26m>;
-+			clock-names = "ref";
-+			#phy-cells = <1>;
-+			status = "okay";
-+		};
-+	};
-+
-+	pcie1_phy: pcie-phy at 1a14a000 {
-+		compatible = "mediatek,generic-tphy-v1";
-+		reg = <0 0x1a14a000 0 0x0700>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		status = "disabled";
-+
-+		pcie1_port: pcie-phy at 1a14a900 {
-+			reg = <0 0x1a14a900 0 0x0700>;
-+			clocks = <&clk26m>;
-+			clock-names = "ref";
-+			#phy-cells = <1>;
-+			status = "okay";
-+		};
-+	};
-+
- 	usb1: usb at 1a1c0000 {
- 		compatible = "mediatek,mt7623-xhci",
- 			     "mediatek,mt8173-xhci";
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index 267a05a..134a39a 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -226,6 +226,28 @@
- 	vqmmc-supply = <&mt6323_vio18_reg>;
- };
+-extern void printch(int);
++extern void printascii(const char *);
  
-+&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pcie_default>;
-+	status = "okay";
-+
-+	pcie at 0,0 {
-+		status = "okay";
-+	};
-+
-+	pcie at 1,0 {
-+		status = "okay";
-+	};
-+};
-+
-+&pcie0_phy {
-+	status = "okay";
-+};
-+
-+&pcie1_phy {
-+	status = "okay";
-+};
-+
- &pio {
- 	bls_pins_a: bls at 0 {
- 		pins_cmd_dat {
-@@ -414,6 +436,14 @@
- 		};
- 	};
+ static void early_write(const char *s, unsigned n)
+ {
+-	while (n-- > 0) {
+-		if (*s == '\n')
+-			printch('\r');
+-		printch(*s);
+-		s++;
++	char buf[128];
++	while (n) {
++		unsigned l = min(n, sizeof(buf)-1);
++		memcpy(buf, s, l);
++		buf[l] = 0;
++		s += l;
++		n -= l;
++		printascii(buf);
+ 	}
+ }
  
-+	pcie_default: pcie_pin_default {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_208_AUD_EXT_CK1_FUNC_PCIE0_PERST_N>,
-+				 <MT7623_PIN_209_AUD_EXT_CK2_FUNC_PCIE1_PERST_N>;
-+			bias-disable;
-+		};
-+	};
-+
- 	pwm_pins_a: pwm at 0 {
- 		pins_pwm {
- 			pinmux = <MT7623_PIN_204_PWM1_FUNC_PWM1>,
 -- 
-1.9.1
+2.9.5
