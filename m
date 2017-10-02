@@ -1,44 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Oct 2017 22:40:16 +0200
-Subject: [PATCH v3 07/12] ARM: dts: sun8i: a711: include axp81x dtsi
-In-Reply-To: <20171002120854.5212-8-quentin.schulz@free-electrons.com>
-References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
- <20171002120854.5212-8-quentin.schulz@free-electrons.com>
-Message-ID: <20171002204016.ogaoesvz263leoj6@flea>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon,  2 Oct 2017 16:19:23 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.15
+Message-ID: <1506979163-6296-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 12:08:49PM +0000, Quentin Schulz wrote:
-> This board has an AXP813 PMIC so let's include its dtsi.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-> index 723641f56a74..4f4db07ca19f 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-> +++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-> @@ -146,7 +146,7 @@
->  &r_rsb {
->  	status = "okay";
->  
-> -	axp813: pmic at 3a3 {
-> +	axp81x: pmic at 3a3 {
+Hi Arnd, Kevin, and Olof:
 
-Aren't we going to have an axp813 DTSI? What's your plan here
+Please pull in these SoCFPGA Stratix10 DTS updates for v4.15.
 
-Maxime
+Thanks,
+Dinh
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/f86d5263/attachment.sig>
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.15_part1
+
+for you to fetch changes up to 788251fa08118efa934ba2f54989997e7a5be679:
+
+  arm64: dts: stratix10: add reset property for various peripherals (2017-09-21 09:16:50 -0500)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.15
+- Stratix10 platform updates
+  - Fix up gic register entry
+  - Enable ethernet/SDMMC
+  - Update reset manager properties
+
+----------------------------------------------------------------
+Dinh Nguyen (5):
+      arm64: dts: stratix10: fix up the gic register for the Stratix10 platform
+      arm64: dts: stratix10: add ethernet/sdmmc support to the S10 devkit
+      arm64: dts: stratix10: include the reset manager bindings
+      arm64: dts: stratix10: add the 'altr,modrst-off' property
+      arm64: dts: stratix10: add reset property for various peripherals
+
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 35 ++++++++++++++++---
+ .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 40 +++++++++++++++++++++-
+ 2 files changed, 70 insertions(+), 5 deletions(-)
