@@ -1,48 +1,68 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 2 Oct 2017 09:54:50 +0800
-Subject: [PATCH v3 00/10] update MT7623 and MT2701 dts
-Message-ID: <cover.1506908511.git.ryder.lee@mediatek.com>
+Date: Mon, 2 Oct 2017 09:54:56 +0800
+Subject: [PATCH v3 06/10] arm: dts: mt7623: add subsystem clock controller
+ nodes
+In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
+References: <cover.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <1a6aba8921584fe465bc2138a3aec10c2637f226.1506908511.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+This patch adds missing susbsystem clock controllers nodes for MT7623.
+(e.g., mmsys, imgsys, vdecsys and bdpsys)
 
-This patch series adds/corrects some device nodes for both MT7623 and MT2701.
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ arch/arm/boot/dts/mt7623.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-changes since v3:
-- revert PIO register space.
-
-changes since v2:
-- move non-common part and non-display related nodes to different patches.
-- remove unused wdma node.
-- add display related nodes for MT2701.
-
-changes since v1:
-- rebase to v4.14.
-- sort nodes in alphabetical order
-
-Ryder Lee (7):
-  arm: dts: mediatek: update audio node for mt2701 and mt7623
-  arm: dts: mt7623: update pio, usb and crypto nodes
-  arm: dts: mt7623: add subsystem clock controller nodes
-  arm: dts: mt7623: add iommu and jpecdec nodes
-  arm: dts: mt7623: add display subsystem related nodes
-  arm: dts: mt7623: enable bananapi-r2 display function
-  arm: dts: mt7623: add PCIe related nodes
-
-Weiqing Kong (2):
-  arm: dts: mt2701: add pwm backlight device node
-  arm: dts: mt2701: enable display pwm backlight
-
-YT Shen (1):
-  arm: dts: mt2701: add display subsystem related nodes
-
- arch/arm/boot/dts/mt2701-evb.dts              |  23 ++
- arch/arm/boot/dts/mt2701.dtsi                 |  88 ++++++-
- arch/arm/boot/dts/mt7623.dtsi                 | 338 +++++++++++++++++++++++++-
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  71 +++++-
- include/dt-bindings/pinctrl/mt7623-pinfunc.h  |  12 +
- 5 files changed, 516 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 0640fb7..a877f9a 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -661,6 +661,30 @@
+ 		status = "disabled";
+ 	};
+ 
++	mmsys: syscon at 14000000 {
++		compatible = "mediatek,mt7623-mmsys",
++			     "mediatek,mt2701-mmsys",
++			     "syscon";
++		reg = <0 0x14000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	imgsys: syscon at 15000000 {
++		compatible = "mediatek,mt7623-imgsys",
++			     "mediatek,mt2701-imgsys",
++			     "syscon";
++		reg = <0 0x15000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++	vdecsys: syscon at 16000000 {
++		compatible = "mediatek,mt7623-vdecsys",
++			     "mediatek,mt2701-vdecsys",
++			     "syscon";
++		reg = <0 0x16000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
++
+ 	hifsys: syscon at 1a000000 {
+ 		compatible = "mediatek,mt7623-hifsys",
+ 			     "mediatek,mt2701-hifsys",
+@@ -799,4 +823,12 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+ 		status = "disabled";
+ 	};
++
++	bdpsys: syscon at 1c000000 {
++		compatible = "mediatek,mt7623-bdpsys",
++			     "mediatek,mt2701-bdpsys",
++			     "syscon";
++		reg = <0 0x1c000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
+ };
 -- 
 1.9.1
