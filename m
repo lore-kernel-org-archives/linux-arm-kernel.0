@@ -1,46 +1,32 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 2 Oct 2017 13:17:01 +0100
-Subject: [PATCH] arm64: fix misleading data abort decoding
-In-Reply-To: <1506944520-21998-1-git-send-email-mark.rutland@arm.com>
-References: <1506944520-21998-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <79b16fda-43be-63f5-aabd-9078f92a97aa@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon,  2 Oct 2017 14:27:40 +0200
+Subject: [PATCH 0/3] mmc: meson-gx: fixes for v4.14
+Message-ID: <20171002122743.32334-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset fixes the issues reported by Heiner [0] with the odroid-c2.
+In a nutshell, this series does the following:
 
+* Make sure the mmc clock rate is not set higher than what is requested
+* Reset the tuning values on mmc power cycle instead of POWER_ON
+* Add tuning of the tx phase to the tuning function.
 
-On 02/10/17 12:42, Mark Rutland wrote:
-> Currently data_abort_decode() dumps the ISS field as a decimal value
-> with a '0x' prefix, which is somewhat misleading.
-> 
-> Fix it to print as hexadecimal, as was intended.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Julien Thierry <julien.thierry@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Fixes: 1f9b8936f36f4a8e ("arm64: Decode information from ESR upon mem faults")
-> ---
->   arch/arm64/mm/fault.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 89993c4b..a6d5281 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -97,7 +97,7 @@ static void data_abort_decode(unsigned int esr)
->   			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
->   			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
->   	} else {
-> -		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
-> +		pr_alert("  ISV = 0, ISS = 0x%08lx\n", esr & ESR_ELx_ISS_MASK);
+This fixes the problem seen on the odroid-c2, both for hs200 and hs400.
+To check for regression, this series has also been tested on the gxl
+libretech-cc
 
-Whoops, thanks for catching that.
+Ulf, could you please pick this as fixes for v4.14 ?
 
-FWIW:
-reviewed-by: Julien Thierry <julien.thierry@arm.com>
+[0]: https://lkml.kernel.org/r/e2171288-84ef-82db-2efc-300935e6c062 at gmail.com
 
-Thanks,
+Jerome Brunet (3):
+  mmc: meson-gx: make sure the clock is rounded down
+  mmc: meson-gx: fix rx phase reset
+  mmc: meson-gx: include tx phase in the tuning process
+
+ drivers/mmc/host/meson-gx-mmc.c | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
 
 -- 
-Julien Thierry
+2.13.5
