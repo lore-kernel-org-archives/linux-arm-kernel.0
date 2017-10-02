@@ -1,58 +1,30 @@
-From: linus.luessing@c0d3.blue (=?UTF-8?q?Linus=20L=C3=BCssing?=)
-Date: Mon,  2 Oct 2017 17:59:03 +0200
-Subject: [PATCH] ARM: dts: meson8b: add reserved memory zone to fix silent
- freezes
-Message-ID: <20171002155903.19511-1-linus.luessing@c0d3.blue>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 2 Oct 2017 11:02:50 -0500
+Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <20170919070422.GI3349@codeaurora.org>
+ <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
+ <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
+ <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
+ <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
+ <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
+ <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
+ <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
+Message-ID: <0ede14eb-a9fc-ab90-4e18-c6c955da2601@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the stress-ng tool for instance quickly resulted in a silent
-freeze of the system with no prior notice on a serial console when
-running its filesystem or memory stressor classes.
+On 09/22/2017 08:29 AM, Linus Walleij wrote:
+> I am waiting for the maintainer, Bjorn Andersson, to provide review.
 
-Even with a panic-on-OOM and reboot-on-panic (vm.panic_on_oom=1,
-kernel.panic=10) configured, the system would neither reboot nor
-would the OOM killer get any chance to otherwise do its job.
+Bjorn,
 
-The Amlogic reference source code uses a 2MB PHYS_OFFSET. With these 2MB
-reserved via DT, stress-ng was able to run on an Odroid C1+ just fine for
-several hours, the OOM killer was able to kill processes again and if
-configured would successfully trigger a reboot of the system.
+Would you please take a moment to review these patches?  I'm guessing 
+it's too late for 4.14, so I would like these merged into 4.15.  But 
+without your review, very little progress is being made.
 
-Fixes: 4a69fcd3a108 ("ARM: meson: Add DTS for Odroid-C1 and Tronfy MXQ boards")
-Signed-off-by: Linus L?ssing <linus.luessing@c0d3.blue>
-
----
-The following stress-ng command worked fine now:
-$ stress-ng -v --sequential 0 -t 120s --exclude sysfs,opcode --metrics
-(5 hours runtime, tested on an Odroid C1+ with an 4.14-rc1 kernel + SMP
-+ USB DTS patches)
----
- arch/arm/boot/dts/meson8b.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index bc278da..d75a5b5 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -83,6 +83,18 @@
- 		};
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* 2 MiB reserved for Hardware ROM Firmware? */
-+		hwrom at 0 {
-+			reg = <0x0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	scu at c4300000 {
- 		compatible = "arm,cortex-a5-scu";
- 		reg = <0xc4300000 0x100>;
 -- 
-2.1.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
