@@ -1,77 +1,36 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 2 Oct 2017 11:14:46 -0700
-Subject: [PATCH v3] doc: coresight: correct usage for disabling idle states
-In-Reply-To: <1505882817-19582-1-git-send-email-leo.yan@linaro.org>
-References: <1505882817-19582-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CANLsYkwFd1EyX+wmfsaUHwhJv-1Erde6t+omLpniudTC1Lvx_w@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 02 Oct 2017 11:33:20 -0700
+Subject: [PATCH 0/3] mmc: meson-gx: fixes for v4.14
+In-Reply-To: <20171002122743.32334-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Mon, 2 Oct 2017 14:27:40 +0200")
+References: <20171002122743.32334-1-jbrunet@baylibre.com>
+Message-ID: <7hk20d8knj.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 September 2017 at 21:46, Leo Yan <leo.yan@linaro.org> wrote:
-> In the coresight CPU debug document it suggests to use 'echo' command
-> to set latency request to /dev/cpu_dma_latency so can disable all CPU
-> idle states, but in fact this doesn't work.
->
-> This is because when the command 'echo' exits, it releases the device
-> node's file descriptor and the kernel release function removes the QoS
-> constraint; finally when the command 'echo' finished there have no
-> constraint imposed on cpu_dma_latency.
->
-> This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-> command 'exec' can avoid the file descriptor to be closed so we can
-> keep the constraint on cpu_dma_latency.
->
-> This patch also adds the info for reference docs for PM QoS and cpuidle
-> sysfs.
->
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Reported-by: Kim Phillips <kim.phillips@arm.com>
-> Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  Documentation/trace/coresight-cpu-debug.txt | 22 +++++++++++++++++-----
->  1 file changed, 17 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-> index b3da1f9..2b9b51c 100644
-> --- a/Documentation/trace/coresight-cpu-debug.txt
-> +++ b/Documentation/trace/coresight-cpu-debug.txt
-> @@ -149,11 +149,23 @@ If you want to limit idle states at boot time, you can use "nohlt" or
->
->  At the runtime you can disable idle states with below methods:
->
-> -Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
-> -states (if latency = 0uS then disable all idle states):
-> -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
-> -
-> -Disable specific CPU's specific idle state:
-> +It is possible to disable CPU idle states by way of the PM QoS
-> +subsystem, more specifically by using the "/dev/cpu_dma_latency"
-> +interface (see Documentation/power/pm_qos_interface.txt for more
-> +details).  As specified in the PM QoS documentation the requested
-> +parameter will stay in effect until the file descriptor is released.
-> +For example:
-> +
-> +# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
-> +...
-> +Do some work...
-> +...
-> +# exec 3<>-
-> +
-> +The same can also be done from an application program.
-> +
-> +Disable specific CPU's specific idle state from cpuidle sysfs (see
-> +Documentation/cpuidle/sysfs.txt):
->  # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
->
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Applied.
-
-Thanks,
-Mathieu
-
+> This patchset fixes the issues reported by Heiner [0] with the odroid-c2.
+> In a nutshell, this series does the following:
 >
-> --
-> 2.7.4
+> * Make sure the mmc clock rate is not set higher than what is requested
+> * Reset the tuning values on mmc power cycle instead of POWER_ON
+> * Add tuning of the tx phase to the tuning function.
 >
+> This fixes the problem seen on the odroid-c2, both for hs200 and hs400.
+> To check for regression, this series has also been tested on the gxl
+> libretech-cc
+>
+> Ulf, could you please pick this as fixes for v4.14 ?
+>
+> [0]: https://lkml.kernel.org/r/e2171288-84ef-82db-2efc-300935e6c062 at gmail.com
+>
+> Jerome Brunet (3):
+>   mmc: meson-gx: make sure the clock is rounded down
+>   mmc: meson-gx: fix rx phase reset
+>   mmc: meson-gx: include tx phase in the tuning process
+>
+>  drivers/mmc/host/meson-gx-mmc.c | 26 ++++++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 4 deletions(-)
+
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
