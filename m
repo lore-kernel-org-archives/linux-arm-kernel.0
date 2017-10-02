@@ -1,88 +1,69 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Mon, 2 Oct 2017 01:18:49 +0000
-Subject: [PATCH 20/22] arm64: dts: renesas: r8a77995: draak: enable
- EthernetAVB
-In-Reply-To: <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
-References: <cover.1506678250.git.horms+renesas@verge.net.au>
- <4503b50eac08f472e8690ec61f4d144e62cbdc55.1506678250.git.horms+renesas@verge.net.au>
- <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
-Message-ID: <TY1PR06MB09924F9B2BE2CA1C5F1CF318D87D0@TY1PR06MB0992.apcprd06.prod.outlook.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 2 Oct 2017 09:54:52 +0800
+Subject: [PATCH v3 02/10] arm: dts: mt2701: enable display pwm backlight
+In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
+References: <cover.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <0f9441e9fc40e47e94927a3a4c96dd3f7f287d94.1506908511.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Weiqing Kong <weiqing.kong@mediatek.com>
 
-> -----Original Message-----
-> From: Sergei Shtylyov
-> Sent: Saturday, September 30, 2017 7:24 PM
-> 
-> Hello!
-> 
-> On 9/29/2017 2:52 PM, Simon Horman wrote:
-> 
-> > From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> >
-> > This patch enables EthernetAVB for R-Car D3 draak board.
-> >
-> > Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >   arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 25 +++++++++++++++++++++++++
-> >   1 file changed, 25 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> > index 7b776cb7e928..96b7ff5cc321 100644
-> > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> [...]
-> > @@ -37,6 +39,14 @@
-> >   };
-> >
-> >   &pfc {
-> > +	avb0_pins: avb {
-> > +		mux {
-> > +			groups = "avb0_link", "avb0_phy_int", "avb0_mdc",
->                                                ^^^^^^^^^^^^^^
->     Hum, I don't think it's compatible with routing the PHY interrupt via
-> GPIO5_19 below. The driver doesn't support signalling via AVB_PHY_INT anyway.
+This patch adds board related config for MT2701 pwm backlight.
 
-Oops! You're correct. I should drop "avb0_phy_int".
+Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ arch/arm/boot/dts/mt2701-evb.dts | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Simon-san, may I send a follow-up patch to fix this?
-
-Best regards,
-Yoshihiro Shimoda
-
-> > +				 "avb0_mii";
-> > +			function = "avb0";
-> > +		};
-> > +	};
-> > +
-> >   	scif2_pins: scif2 {
-> >   		groups = "scif2_data";
-> >   		function = "scif2";
-> > @@ -56,6 +66,21 @@
-> >   	status = "okay";
-> >   };
-> >
-> > +&avb {
-> > +	pinctrl-0 = <&avb0_pins>;
-> > +	pinctrl-names = "default";
-> > +	renesas,no-ether-link;
-> > +	phy-handle = <&phy0>;
-> > +	status = "okay";
-> > +
-> > +	phy0: ethernet-phy at 0 {
-> > +		rxc-skew-ps = <1500>;
-> > +		reg = <0>;
-> > +		interrupt-parent = <&gpio5>;
-> > +		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> > +};
-> > +
-> >   &scif2 {
-> >   	pinctrl-0 = <&scif2_pins>;
-> >   	pinctrl-names = "default";
-> 
-> MBR, Sergei
+diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+index f484973..63af4b1 100644
+--- a/arch/arm/boot/dts/mt2701-evb.dts
++++ b/arch/arm/boot/dts/mt2701-evb.dts
+@@ -56,12 +56,29 @@
+ 	bt_sco_codec:bt_sco_codec {
+ 		compatible = "linux,bt-sco";
+ 	};
++
++	backlight_lcd: backlight_lcd {
++		compatible = "pwm-backlight";
++		pwms = <&bls 0 100000>;
++		brightness-levels = <
++			  0  16  32  48  64  80  96 112
++			128 144 160 176 192 208 224 240
++			255
++		>;
++		default-brightness-level = <9>;
++	};
+ };
+ 
+ &auxadc {
+ 	status = "okay";
+ };
+ 
++&bls {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm_bls_gpio>;
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
+@@ -111,6 +128,12 @@
+ 		};
+ 	};
+ 
++	pwm_bls_gpio: pwm_bls_gpio {
++		pins_cmd_dat {
++			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
++		};
++	};
++
+ 	spi_pins_a: spi0 at 0 {
+ 		pins_spi {
+ 			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
+-- 
+1.9.1
