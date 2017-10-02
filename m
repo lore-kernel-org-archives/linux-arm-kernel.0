@@ -1,69 +1,85 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 02 Oct 2017 16:21:19 +0200
-Subject: [PATCH v2 1/2] ARM: dts: Fix I2C repeated start issue on
- Armada-38x
-In-Reply-To: <20170928213605.22874-2-kalyan.kinthada@alliedtelesis.co.nz>
- (Kalyan Kinthada's message of "Fri, 29 Sep 2017 10:36:04 +1300")
-References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
- <20170928213605.22874-2-kalyan.kinthada@alliedtelesis.co.nz>
-Message-ID: <87o9ppmy00.fsf@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  2 Oct 2017 16:21:29 +0200
+Subject: [PATCH] arm64: dts: hisilicon: Standardize Poplar GPIO line names
+Message-ID: <20171002142129.13102-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kalyan,
+The hi6220-HiKey board started to name GPIO lines for
+96boards, using just the plain names "GPIO-A" etc from the
+96boards specification.
+
+Poplar started to use an arbitrary "LS-GPIO-A" (etc) prefix
+that is not part of the 96boards specification.
+
+As the former notation arrived first, and we need
+consistency among 96board, rectify the Poplar board to use
+this too. This is important for userspace that wants to
+look up GPIO names from these strings.
+
+Cc: Jiancheng Xue <xuejiancheng@hisilicon.com>
+Cc: Alex Elder <elder@linaro.org>
+Cc: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+index b9142871d6fe..a6fd13389f8d 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+@@ -78,17 +78,17 @@
  
- On ven., sept. 29 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
-
-> All the Armada 38x(380, 385, 388) have a silicon issue in
-> the I2C controller which violates the I2C repeated start timing
-> (errata FE-8471889).
->
-> i2c-mv64xxx driver handles this errata based on the compatible string
-> "marvell,mv78230-a0-i2c".
->
-> This patch activates the "marvell,mv78230-a0-i2c" compatible string
-> for the I2C controller on armada-38x SoC based devices.
->
-> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
-
-Applied on mvebu/fixes
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 7ff0811e61db..4960722aab32 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -178,7 +178,7 @@
->  			};
->  
->  			i2c0: i2c at 11000 {
-> -				compatible = "marvell,mv64xxx-i2c";
-> +				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
->  				reg = <0x11000 0x20>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> @@ -189,7 +189,7 @@
->  			};
->  
->  			i2c1: i2c at 11100 {
-> -				compatible = "marvell,mv64xxx-i2c";
-> +				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
->  				reg = <0x11100 0x20>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> -- 
-> 2.14.1
->
-
+ &gpio1 {
+ 	status = "okay";
+-	gpio-line-names = "LS-GPIO-E",	"",
++	gpio-line-names = "GPIO-E",	"",
+ 			  "",		"",
+-			  "",		"LS-GPIO-F",
+-			  "",		"LS-GPIO-J";
++			  "",		"GPIO-F",
++			  "",		"GPIO-J";
+ };
+ 
+ &gpio2 {
+ 	status = "okay";
+-	gpio-line-names = "LS-GPIO-H",	"LS-GPIO-I",
+-			  "LS-GPIO-L",	"LS-GPIO-G",
+-			  "LS-GPIO-K",	"",
++	gpio-line-names = "GPIO-H",	"GPIO-I",
++			  "GPIO-L",	"GPIO-G",
++			  "GPIO-K",	"",
+ 			  "",		"";
+ };
+ 
+@@ -96,15 +96,15 @@
+ 	status = "okay";
+ 	gpio-line-names = "",		"",
+ 			  "",		"",
+-			  "LS-GPIO-C",	"",
+-			  "",		"LS-GPIO-B";
++			  "GPIO-C",	"",
++			  "",		"GPIO-B";
+ };
+ 
+ &gpio4 {
+ 	status = "okay";
+ 	gpio-line-names = "",		"",
+ 			  "",		"",
+-			  "",		"LS-GPIO-D",
++			  "",		"GPIO-D",
+ 			  "",		"";
+ };
+ 
+@@ -112,7 +112,7 @@
+ 	status = "okay";
+ 	gpio-line-names = "",		"USER-LED-1",
+ 			  "USER-LED-2",	"",
+-			  "",		"LS-GPIO-A",
++			  "",		"GPIO-A",
+ 			  "",		"";
+ };
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.13.5
