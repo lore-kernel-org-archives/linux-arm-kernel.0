@@ -1,22 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 01 Oct 2017 22:51:59 -0700 (PDT)
-Subject: [PATCH v2 net] net: mvpp2: Fix clock resource by adding an
- optional bus clock
-In-Reply-To: <20170929122739.5296-1-gregory.clement@free-electrons.com>
-References: <20170929122739.5296-1-gregory.clement@free-electrons.com>
-Message-ID: <20171001.225159.2176517451167649617.davem@davemloft.net>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 2 Oct 2017 08:04:55 +0200
+Subject: [PATCH] MAINTAINERS: Remove myself as reviewer
+In-Reply-To: <20170927212334.28124-1-soren.brinkmann@xilinx.com>
+References: <20170927212334.28124-1-soren.brinkmann@xilinx.com>
+Message-ID: <3b717951-fe99-a5af-643d-79b042b23e37@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Fri, 29 Sep 2017 14:27:39 +0200
-
-> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-> is optional because not all the SoCs need them but at least for Armada
-> 7K/8K it is actually mandatory.
+On 27.9.2017 23:23, Soren Brinkmann wrote:
+> This address is gonna bounce in the not too far away future.
 > 
-> The binding documentation is updating accordingly.
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  MAINTAINERS | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index dc3ff3aaa588..4502f016be12 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2161,7 +2161,6 @@ F:	sound/soc/zte/
+>  
+>  ARM/ZYNQ ARCHITECTURE
+>  M:	Michal Simek <michal.simek@xilinx.com>
+> -R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  W:	http://wiki.xilinx.com
+>  T:	git https://github.com/Xilinx/linux-xlnx.git
+> 
 
-Applied.
+Applied to zynq/soc.
+
+Thanks,
+Michal
