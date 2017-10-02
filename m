@@ -1,49 +1,112 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Mon, 2 Oct 2017 14:58:08 -0700
-Subject: 4879b7ae05 ("Merge tag 'dmaengine-4.12-rc1' of .."): WARNING:
- kernel stack regs at bd92bc2e in 01-cpu-hotplug:3811 has bad 'bp' value
- 000001be
-In-Reply-To: <20171002212654.rsm4uj3hfioddldd@treble>
-References: <59d177a7.vsiddgOxdHRIlRvy%fengguang.wu@intel.com>
- <CA+55aFz_ijfUxyk2kdLhfzfS1z0_uRBw6eQb9UxFvh=5zOzzaw@mail.gmail.com>
- <20171002212654.rsm4uj3hfioddldd@treble>
-Message-ID: <CA+55aFwo4U3vHFtKyCrGaumcfCMszfS48QSxNfEC3pD5wLxQnA@mail.gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Tue, 3 Oct 2017 00:07:50 +0200
+Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
+ scpi_probe
+In-Reply-To: <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
+References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+ <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
+ <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
+Message-ID: <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 2, 2017 at 2:26 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
->
-> The bisect is pointing to a commit which is almost 5 months old, so this
-> is pre-ORC.  Kallsyms *is* enabled, but the unwinder dump isn't smart
-> enough to realize it's dumping misaligned stack addresses:
+Am 02.10.2017 um 13:17 schrieb Sudeep Holla:
+> 
+> 
+> On 29/09/17 22:44, Heiner Kallweit wrote:
+>> Pre-populating the dvfs info data in scpi_probe allows to make all
+>> memory allocations device-managed. This helps to simplify scpi_remove
+>> and eventually to get rid of scpi_remove completely.
+>>
+>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+>> ---
+>>  drivers/firmware/arm_scpi.c | 57 ++++++++++++++++++++++++++++-----------------
+>>  1 file changed, 35 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>> index d80d11ae..fd79adb5 100644
+>> --- a/drivers/firmware/arm_scpi.c
+>> +++ b/drivers/firmware/arm_scpi.c
+>> @@ -644,35 +644,35 @@ static int opp_cmp_func(const void *opp1, const void *opp2)
+>>  }
+>>  
+>>  static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
+>> +{
+>> +	if (domain >= MAX_DVFS_DOMAINS)
+>> +		return ERR_PTR(-EINVAL);
+>> +
+>> +	return scpi_info->dvfs[domain] ?: ERR_PTR(-EINVAL);
+>> +}
+>> +
+>> +static int scpi_dvfs_populate_info(struct device *dev, u8 domain)
+>>  {
+>>  	struct scpi_dvfs_info *info;
+>>  	struct scpi_opp *opp;
+>>  	struct dvfs_info buf;
+>>  	int ret, i;
+>>  
+>> -	if (domain >= MAX_DVFS_DOMAINS)
+>> -		return ERR_PTR(-EINVAL);
+>> -
+>> -	if (scpi_info->dvfs[domain])	/* data already populated */
+>> -		return scpi_info->dvfs[domain];
+>> -
+>>  	ret = scpi_send_message(CMD_GET_DVFS_INFO, &domain, sizeof(domain),
+>>  				&buf, sizeof(buf));
+>>  	if (ret)
+>> -		return ERR_PTR(ret);
+>> +		return ret;
+>>  
+>> -	info = kmalloc(sizeof(*info), GFP_KERNEL);
+>> +	info = devm_kmalloc(dev, sizeof(*info), GFP_KERNEL);
+>>  	if (!info)
+>> -		return ERR_PTR(-ENOMEM);
+>> +		return -ENOMEM;
+>>  
+>>  	info->count = DVFS_OPP_COUNT(buf.header);
+>>  	info->latency = DVFS_LATENCY(buf.header) * 1000; /* uS to nS */
+>>  
+>> -	info->opps = kcalloc(info->count, sizeof(*opp), GFP_KERNEL);
+>> -	if (!info->opps) {
+>> -		kfree(info);
+>> -		return ERR_PTR(-ENOMEM);
+>> -	}
+>> +	info->opps = devm_kcalloc(dev, info->count, sizeof(*opp), GFP_KERNEL);
+>> +	if (!info->opps)
+>> +		return -ENOMEM;
+>>  
+>>  	for (i = 0, opp = info->opps; i < info->count; i++, opp++) {
+>>  		opp->freq = le32_to_cpu(buf.opps[i].freq);
+>> @@ -682,7 +682,20 @@ static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
+>>  	sort(info->opps, info->count, sizeof(*opp), opp_cmp_func, NULL);
+>>  
+>>  	scpi_info->dvfs[domain] = info;
+>> -	return info;
+>> +	return 0;
+>> +}
+>> +
+>> +static int scpi_dvfs_populate(struct device *dev)
+>> +{
+>> +	int ret, i;
+>> +
+>> +	for (i = 0; i < MAX_DVFS_DOMAINS; i++) {
+>> +		ret = scpi_dvfs_populate_info(dev, i);
+>> +		if (ret)
+>> +			break;
+> 
+> Does it make sense to continue to complete all MAX_DVFS_DOMAINS ?
+> Just wondering if there will be any firmware that returns errors for
+> few domains(e.g. not supported in initial versions of firmware).
+> I don't want to stop probing due to that. Let me know what you think.
+> 
+The (legacy) SCPI firmware on my system seems to ignore the domain
+in CMD_GET_DVFS_INFO. It returns the same dvfs info independent of
+the domain parameter. So indeed prepopulating may not be the best idea.
 
-Ahh, I didn't pick up on that "esp isn't aligned" part.
+Still we need to do something in the remove callback to deal with the
+scenario you describe (error for few domains).
 
-That said, if %esp gets unaligned at some point, it's not clear
-exactly when we should align it. An unaligned stack pointer will
-continue to _work_ just potentially perform fairly badly.
-
-But more likely, we picked the wrong frame value to begin with.
-
-For example, maybe that decode_frame_pointer() logic really should
-check not that the low bit in bp is set, but instead check that it's a
-valid "unsigned long *" that has the low bit set.
-
-IOW, the difference would be that instead of checking
-
-        if (!(regs & 0x1))
-                return NULL;
-
-if would check
-
-        if ((regs & (sizeof(unsigned long)-1)) != 1)
-                return NULL;
-
-but also maybe add logic to simply not trust a next frame pointer that
-isn't appropriately aligned.
-
-So I think adding PTR_ALIGN() there in the unwind dumper might be a
-bit late. By that time it has already accepted what looks like a
-garbage frame. No?
-
-                Linus
+Remove does
+for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
+and therefore stops at the first unpopulated domain and doesn't free
+the memory for further populated domains. I'll provide a patch for it.
