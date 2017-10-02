@@ -1,58 +1,53 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Mon,  2 Oct 2017 16:13:47 -0700
-Subject: [PATCH 2/2] memory: brcmstb: dpfe: skip downloading firmware when
- possible
-In-Reply-To: <20171002231347.8671-1-code@mmayer.net>
-References: <20171002231347.8671-1-code@mmayer.net>
-Message-ID: <20171002231347.8671-3-code@mmayer.net>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue,  3 Oct 2017 01:28:01 +0200
+Subject: [PATCH v2 1/4] dt-bindings: nvmem: Describe the Amlogic
+ Meson6/Meson8/Meson8b efuse
+In-Reply-To: <20171002232804.20042-1-martin.blumenstingl@googlemail.com>
+References: <20171002232804.20042-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20171002232804.20042-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Mayer <mmayer@broadcom.com>
+Amlogic Meson6, Meson8 and Meson8b SoCs have an efuse which contains
+calibration data from the factory (for the internal temperature sensor
+and some CVBS connector settings). Some manufacturers also store the MAC
+address or serial number in the efuse.
 
-We want to skip downloading the DPFE firmware from Linux if it was
-already downloaded by the boot loader.
+This documents the devicetree bindings for the efuse on these SoCs.
 
-The driver now checks if the DCPU is already running and, if so,
-whether it can process commands. If the DCPU processes commands
-successfully, the driver skips the firmware download step.
-
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- drivers/memory/brcmstb_dpfe.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ .../bindings/nvmem/amlogic-meson-mx-efuse.txt      | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-meson-mx-efuse.txt
 
-diff --git a/drivers/memory/brcmstb_dpfe.c b/drivers/memory/brcmstb_dpfe.c
-index 3516ee8..0a7bdbe 100644
---- a/drivers/memory/brcmstb_dpfe.c
-+++ b/drivers/memory/brcmstb_dpfe.c
-@@ -431,13 +431,25 @@ static int brcmstb_dpfe_download_firmware(struct platform_device *pdev,
- 	const void *fw_blob;
- 	int ret;
- 
-+	priv = platform_get_drvdata(pdev);
+diff --git a/Documentation/devicetree/bindings/nvmem/amlogic-meson-mx-efuse.txt b/Documentation/devicetree/bindings/nvmem/amlogic-meson-mx-efuse.txt
+new file mode 100644
+index 000000000000..a3c63954a1a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/amlogic-meson-mx-efuse.txt
+@@ -0,0 +1,22 @@
++Amlogic Meson6/Meson8/Meson8b efuse
 +
-+	/*
-+	 * Skip downloading the firmware if the DCPU is already running and
-+	 * responding to commands.
-+	 */
-+	if (is_dcpu_enabled(priv->regs)) {
-+		u32 response[MSG_FIELD_MAX];
++Required Properties:
++- compatible: depending on the SoC this should be one of:
++	- "amlogic,meson6-efuse"
++	- "amlogic,meson8-efuse"
++	- "amlogic,meson8b-efuse"
++- reg: base address and size of the efuse registers
++- clocks: a reference to the efuse core gate clock
++- clock-names: must be "core"
 +
-+		ret = __send_command(priv, DPFE_CMD_GET_INFO, response);
-+		if (!ret)
-+			return 0;
-+	}
++All properties and sub-nodes as well as the consumer bindings
++defined in nvmem.txt in this directory are also supported.
 +
- 	ret = request_firmware(&fw, FIRMWARE_NAME, dev);
- 	/* request_firmware() prints its own error messages. */
- 	if (ret)
- 		return ret;
- 
--	priv = platform_get_drvdata(pdev);
--
- 	ret = __verify_firmware(init, fw);
- 	if (ret)
- 		return -EFAULT;
++
++Example:
++	efuse: nvmem at 0 {
++		compatible = "amlogic,meson8-efuse";
++		reg = <0x0 0x2000>;
++		clocks = <&clkc CLKID_EFUSE>;
++		clock-names = "core";
++	};
 -- 
-2.7.4
+2.14.2
