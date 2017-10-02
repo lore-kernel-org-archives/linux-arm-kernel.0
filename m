@@ -1,65 +1,65 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 02 Oct 2017 10:36:38 -0700
-Subject: [GIT PULL] Amlogic fixes for v4.14-rc
-Message-ID: <7hr2ul8na1.fsf@baylibre.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 2 Oct 2017 10:44:14 -0700
+Subject: [PATCH 1/2] [v5] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <1504798409-32041-2-git-send-email-timur@codeaurora.org>
+References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
+ <1504798409-32041-2-git-send-email-timur@codeaurora.org>
+Message-ID: <20171002174414.GL1165@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Thu 07 Sep 08:33 PDT 2017, Timur Tabi wrote:
 
-This is the same DT series that was sent for next/late but was missed,
-so I'm sending it again as fixes for v4.14-rc since we have some users
-having issues because the driver was merged for v4.14, but the
-correspnding DT enhancements were not.
+Sorry for the slow response, I finally met with Linus last week to
+discuss this.
 
-Please merge for v4.14-rc3.  It's unmodified since the previous pull request.
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+[..]
+> @@ -825,13 +897,39 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>  	chip->owner = THIS_MODULE;
+>  	chip->of_node = pctrl->dev->of_node;
+>  
+> +	/* If the GPIO map is sparse, then we need to disable specific IRQs */
+> +	chip->irq_need_valid_mask = pctrl->soc->sparse;
+> +
+>  	ret = gpiochip_add_data(&pctrl->chip, pctrl);
+>  	if (ret) {
+>  		dev_err(pctrl->dev, "Failed register gpiochip\n");
+>  		return ret;
+>  	}
+>  
+> -	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
+> +	/*
+> +	 * If irq_need_valid_mask is true, then gpiochip_add_data() will
+> +	 * initialize irq_valid_mask to all 1s.  We need to clear all the
+> +	 * GPIOs that are unavailable, and we need to find each block
+> +	 * of consecutive available GPIOs are add them as pin ranges.
+> +	 */
+> +	if (chip->irq_need_valid_mask) {
+> +		for (i = 0; i < ngpio; i++)
+> +			if (!groups[i].npins)
+> +				clear_bit(i, pctrl->chip.irq_valid_mask);
+> +
+> +		while ((count = msm_gpio_get_next_range(pctrl, &start))) {
+> +			ret = gpiochip_add_pin_range(&pctrl->chip,
+> +						     dev_name(pctrl->dev),
+> +						     start, start, count);
+> +			if (ret)
+> +				break;
+> +			start += count;
 
-Thanks,
+I do not fancy the idea of specifying a bitmap of valid irq pins and
+then having the driver register the pin-ranges in-between. If we provide
+a bitmap of validity to the core it should support using this for the
+pins as well. (Which I believe is what Linus answered in the discussion
+following patch 0/2)
 
-Kevin
+> +		}
+> +	} else {
+> +		ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
+> +					     0, 0, ngpio);
+> +	}
+> +
 
-
-The following changes since commit 47884c5c746ee7c02e06fbf60480e0f13aa11dfe:
-
-  ARM64: dts: meson-gxl-libretech-cc: Add GPIO lines names (2017-08-22 15:37:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
-
-for you to fetch changes up to 485a308f05d843034b6e82f688704c44888aecde:
-
-  ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode (2017-09-05 12:05:01 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT updates for v4.14 (round 3)
-- updates for new MMC driver features/fixes
-- support high-speed modes
-
-----------------------------------------------------------------
-Jerome Brunet (9):
-      ARM64: dts: meson-gx: Use correct mmc clock source 0
-      ARM64: dts: meson: remove cap-sd-highspeed from emmc nodes
-      ARM64: dts: meson: add mmc clk gate pins
-      ARM64: dts: meson-gxbb: nanopi-k2: add card regulator settle times
-      ARM64: dts: meson-gxl: libretech-cc: add card regulator settle times
-      ARM64: dts: meson-gxl: libretech-cc: enable high speed modes
-      ARM64: dts: meson-gxbb: p20x: enable sdcard UHS modes
-      ARM64: dts: meson-gxbb: nanopi-k2: enable sdcard UHS modes
-      ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode
-
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            | 10 ++++++----
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           | 19 ++++++++++++++-----
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         | 12 +++++++-----
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            |  9 +++++----
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               | 13 +++++++++----
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           | 10 ++++++----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                    | 39 ++++++++++++++++++++++++++++++++++++---
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts |  7 ++++---
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 13 +++++++++++--
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 10 ++++++----
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 10 ++++++----
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                     | 39 ++++++++++++++++++++++++++++++++++++---
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            |  7 ++++---
- arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             |  1 -
- 14 files changed, 150 insertions(+), 49 deletions(-)
+Regards,
+Bjorn
