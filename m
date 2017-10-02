@@ -1,48 +1,28 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 02 Oct 2017 16:03:55 +0200
-Subject: [PATCH] arm64: defconfig: enable NAND on Armada 7K/8K SoCs
-In-Reply-To: <20170927160259.6074-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 27 Sep 2017 18:02:59 +0200")
-References: <20170927160259.6074-1-gregory.clement@free-electrons.com>
-Message-ID: <87shf1myt0.fsf@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 2 Oct 2017 15:06:33 +0100
+Subject: [PATCH] arm64: fix misleading data abort decoding
+In-Reply-To: <1506944520-21998-1-git-send-email-mark.rutland@arm.com>
+References: <1506944520-21998-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20171002140632.alqo4u5dn5uenjt7@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., sept. 27 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> The PXA3xx NAND driver supports also the NAND controller found on the
-> Armada 7K/8K SoCs, so enable it.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Applied on mvebu/arm64
-
-Gregory
-
+On Mon, Oct 02, 2017 at 12:42:00PM +0100, Mark Rutland wrote:
+> Currently data_abort_decode() dumps the ISS field as a decimal value
+> with a '0x' prefix, which is somewhat misleading.
+> 
+> Fix it to print as hexadecimal, as was intended.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Julien Thierry <julien.thierry@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Fixes: 1f9b8936f36f4a8e ("arm64: Decode information from ESR upon mem faults")
 > ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 8495b88a0966..c7fda967719b 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -156,6 +156,7 @@ CONFIG_MTD_BLOCK=y
->  CONFIG_MTD_M25P80=y
->  CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_DENALI_DT=y
-> +CONFIG_MTD_NAND_PXA3xx=y
->  CONFIG_MTD_SPI_NOR=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_NBD=m
-> -- 
-> 2.14.1
->
+>  arch/arm64/mm/fault.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+
+Queued for 4.14-rc4. Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
