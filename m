@@ -1,38 +1,61 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 2 Oct 2017 10:25:24 +0100
-Subject: [v3,20/22] hwmon: add support for sensors exported via ARM SCMI
-In-Reply-To: <20171001142605.GA340@roeck-us.net>
-References: <1506604306-20739-21-git-send-email-sudeep.holla@arm.com>
- <20171001142605.GA340@roeck-us.net>
-Message-ID: <7bd07042-895b-a4c2-ec58-f941f07883f0@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 2 Oct 2017 10:34:57 +0100
+Subject: Tegra baseline test results for v4.14-rc3
+Message-ID: <39a8ab29-1eda-674a-6f55-d4cf95eff223@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Here are some basic Tegra test results for Linux v4.14-rc3.
+Logs and other details at:
+
+    https://nvtb.github.io//linux/test_v4.14-rc3/20171001153104/
 
 
-On 01/10/17 15:26, Guenter Roeck wrote:
-> On Thu, Sep 28, 2017 at 02:11:44PM +0100, Sudeep Holla wrote:
->> Create a driver to add support for SoC sensors exported by the System
->> Control Processor (SCP) via the System Control and Management Interface
->> (SCMI). The supported sensor types is one of voltage, temperature,
->> current, and power.
->>
->> The sensor labels and values provided by the SCP are exported via the
->> hwmon sysfs interface.
->>
->> Cc: Guenter Roeck <linux@roeck-us.net>
->> Cc: linux-hwmon at vger.kernel.org
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> 
-> Couple of minor comments. With those addressed,
-> 
+Test summary
+------------
 
-Yes, I have fixed them locally now.
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-> Acked-by: Guenter Roeck <linux@roeck-us.net>
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-Thanks.
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
 
--- 
-Regards,
-Sudeep
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 3/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+    Pass: ( 2/ 5): tegra124-nyan-big, tegra20-trimslice
+
+PM: System suspend: tegra_defconfig:
+    FAIL: ( 3/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+    Pass: ( 2/ 5): tegra124-nyan-big, tegra20-trimslice
+
+
+vmlinux object size
+(delta in bytes from test_v4.14-rc2 (e19b205be43d11bff638cad4487008c48d21c103)):
+   text     data      bss    total  kernel
+  +3056    +9928        0   +12984  defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.14-rc2 (e19b205be43d11bff638cad4487008c48d21c103))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+
+--
+nvpublic
