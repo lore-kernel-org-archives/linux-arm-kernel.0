@@ -1,51 +1,50 @@
-From: acme@redhat.com (Arnaldo Carvalho de Melo)
-Date: Mon, 2 Oct 2017 13:49:30 -0300
-Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <20171002141405.GC12847@arm.com>
-References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
- <1506607791-8621-7-git-send-email-will.deacon@arm.com>
- <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
- <20171002141405.GC12847@arm.com>
-Message-ID: <20171002164930.GB2121@redhat.com>
+From: keith.busch@intel.com (Keith Busch)
+Date: Mon, 2 Oct 2017 11:21:29 -0600
+Subject: [PATCH v2] nvme-pci: Use PCI bus address for data/queues in CMB
+In-Reply-To: <20171001074203.GA11115@lst.de>
+References: <1506763722-10687-1-git-send-email-abhishek.shah@broadcom.com>
+ <20171001074203.GA11115@lst.de>
+Message-ID: <20171002172128.GV8463@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, Oct 02, 2017 at 03:14:05PM +0100, Will Deacon escreveu:
-> On Fri, Sep 29, 2017 at 05:19:40PM -0500, Kim Phillips wrote:
-> > On Thu, 28 Sep 2017 15:09:50 +0100
-> > Will Deacon <will.deacon@arm.com> wrote:
-> > > +	if (arm_spe_event_to_pmsevfr(event) & SYS_PMSEVFR_EL1_RES0)
-> > > +		return -EOPNOTSUPP;
-> > > +	if (attr->exclude_idle)
-> > > +		return -EOPNOTSUPP;
-
-> > "PMU Hardware doesn't support sampling/overflow-interrupts." will be
-> > printed if the user didn't specify a sample period.  Otherwise, a
-> > string with "/bin/dmesg may provide additional information." will be
-> > printed.
-
-> > I was hoping for a response from acme by now for this:
-
-> > https://www.spinics.net/lists/linux-perf-users/msg04066.html
-
-> > Alas, nothing.  Looking at the #ifdef x86 in evsel.c, I'm guessing
-> > it'll be ok, although I'm still not sure how PMU-specific we can get in
-> > evsel.c, nor whether it's ok to communicate lists of h/w supported
-> > sample periods through /sys/bus/event_source/devices/...
-> > 
-> > acme?  OK to refactor evsel messaging for Arm, including parsing for
-> > which PMUs are being used, so customize the message?
+On Sun, Oct 01, 2017 at 09:42:03AM +0200, Christoph Hellwig wrote:
+> This looks very convoluted, mostly because the existing code is
+> doing weird things.  For one thing what is sq_dma_addr currently
+> is not a DMA adddress - we either need the resource address
+> for the ioremap, but we don't need to stash that away, and second
+> the one programmed into the controller should be a pci_bus_addr_t.
 > 
-> Arnaldo's probably got enough on his plate maintaining perf tool, so my
-> advice would be to post a patch as an RFC and use that as a concrete basis
-> for discussion. It often works out better starting with code, even if none
-> of it ends up getting merged (and you can include bits of your email above
-> in the cover letter).
+> Second we already have a nice PCI-layer helper called pci_bus_address
+> to get the bus address for us and we should use it.
+> 
+> Something like the patch below should solve the issue:
 
-I'm all for more informative messages, and if you guys agree on how to
-provide the info in a way that combined with logic in evsel.c, I'd say
-do what Will suggested, post a patch series and include usage examples,
-before and after.
+Yah, calling this a DMA address was a misnomer and confusing.
 
-- Arnaldo
+> ---
+> From b78f4164881125c4fecfdb87878d0120b2177c53 Mon Sep 17 00:00:00 2001
+> From: Christoph Hellwig <hch@lst.de>
+> Date: Sun, 1 Oct 2017 09:37:35 +0200
+> Subject: nvme-pci: Use PCI bus address for data/queues in CMB
+> 
+> Currently, NVMe PCI host driver is programming CMB dma address as
+> I/O SQs addresses. This results in failures on systems where 1:1
+> outbound mapping is not used (example Broadcom iProc SOCs) because
+> CMB BAR will be progammed with PCI bus address but NVMe PCI EP will
+> try to access CMB using dma address.
+> 
+> To have CMB working on systems without 1:1 outbound mapping, we
+> program PCI bus address for I/O SQs instead of dma address. This
+> approach will work on systems with/without 1:1 outbound mapping.
+> 
+> Based on a report and previous patch from Abhishek Shah.
+> 
+> Fixes: 8ffaadf7 ("NVMe: Use CMB for the IO SQes if available")
+> Cc: stable at vger.kernel.org
+> Reported-by: Abhishek Shah <abhishek.shah@broadcom.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+
+This looks good.
+
+Reviewed-by: Keith Busch <keith.busch@intel.com>
