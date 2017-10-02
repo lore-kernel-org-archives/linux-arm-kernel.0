@@ -1,23 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Oct 2017 12:48:17 -0700
-Subject: [PATCH] ARM: omap2plus_defconfig: enable NEON based crypto
-In-Reply-To: <20170906184729.7980-1-ard.biesheuvel@linaro.org>
-References: <20170906184729.7980-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171002194817.GQ4394@atomide.com>
+Date: Mon, 2 Oct 2017 12:49:09 -0700
+Subject: [PATCH] ARM: OMAP2+: make omap_dma_dev_info __initdata
+In-Reply-To: <1505753230-14014-1-git-send-email-bhumirks@gmail.com>
+References: <1505753230-14014-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20171002194909.GR4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 11:48]:
-> Enable kernel mode NEON and the various NEON based crypto algorithms,
-> which are between 1.4x (AES-XTS) and 2.4x (AES-GCM) faster than
-> scalar code (measured on Cortex-A8).
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> Note that this was tested using the updated GHASH code that is queued
-> for v4.14
+* Bhumika Goyal <bhumirks@gmail.com> [170918 09:48]:
+> Make this __initdata as it is only modified only during the initialisation
+> phase in the function omap2_system_dma_init_dev and after this it is not
+> referenced anywhere in the kernel.
 
-Applying finally into omap-for-v4.15/defconfig thanks.
+Applying into omap-for-v4.15/soc thanks.
 
 Tony
