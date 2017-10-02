@@ -1,90 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Oct 2017 15:21:57 +0100
-Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
-In-Reply-To: <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
-References: <20171002104947.GE20737@leverpostej>
- <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
-Message-ID: <20171002142156.GB21696@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 02 Oct 2017 16:23:43 +0200
+Subject: [PATCH v2 2/2] dt-bindings: i2c: Update documentation for
+ "mv78230-a0-i2c"
+In-Reply-To: <20170928213605.22874-3-kalyan.kinthada@alliedtelesis.co.nz>
+ (Kalyan Kinthada's message of "Fri, 29 Sep 2017 10:36:05 +1300")
+References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+ <20170928213605.22874-3-kalyan.kinthada@alliedtelesis.co.nz>
+Message-ID: <87k20dmxw0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Wolfram,
+ 
+ On ven., sept. 29 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
 
-On Mon, Oct 02, 2017 at 06:36:32AM -0700, Eric Dumazet wrote:
-> On Mon, Oct 2, 2017 at 3:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > I hit the below splat at net/core/skbuff.c:2626 while fuzzing v4.14-rc2
-> > on arm64 with Syzkaller. This is the BUG_ON(len) at the end of
-> > skb_copy_and_csum_bits().
+> This commit modifies the documentation for
+> "marvell,mv78230-a0-i2c" compatible string.
+>
+> The "marvell,mv78230-a0-i2c" compatible string enables the workaround
+> for an i2c repeated start timing violation, but unlike
+> "marvell,mv78230-i2c" it disables the i2c offload support. This is
+> applicable to a number of SoCs such as early revisions of the Armada XP
+> and the Armada 38x.
+>
+> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
 
-> > kernel BUG at net/core/skbuff.c:2626!
 
-> > [<ffff200009e03214>] skb_copy_and_csum_bits+0x8dc/0xae0 net/core/skbuff.c:2626
-> > [<ffff20000a01d244>] icmp_glue_bits+0xa4/0x2a0 net/ipv4/icmp.c:357
-> > [<ffff200009f3f0d4>] __ip_append_data+0x10e4/0x20a8 net/ipv4/ip_output.c:1018
-> > [<ffff200009f41a88>] ip_append_data.part.3+0xe8/0x1a0 net/ipv4/ip_output.c:1170
-> > [<ffff200009f46e74>] ip_append_data+0xa4/0xb0 net/ipv4/ip_output.c:1173
-> > [<ffff20000a01ccc8>] icmp_push_reply+0x1b8/0x690 net/ipv4/icmp.c:375
-> > [<ffff20000a0211b0>] icmp_send+0x1070/0x1890 net/ipv4/icmp.c:741
-> > [<ffff200009f41d48>] ip_fragment.constprop.4+0x208/0x340 net/ipv4/ip_output.c:552
-> > [<ffff200009f42228>] ip_finish_output+0x3a8/0xab0 net/ipv4/ip_output.c:315
-> > [<ffff200009f468c4>] NF_HOOK_COND include/linux/netfilter.h:238 [inline]
-> > [<ffff200009f468c4>] ip_output+0x284/0x790 net/ipv4/ip_output.c:405
-> > [<ffff200009f43204>] dst_output include/net/dst.h:458 [inline]
-> > [<ffff200009f43204>] ip_local_out+0x9c/0x1b8 net/ipv4/ip_output.c:124
-> > [<ffff200009f445e8>] ip_queue_xmit+0x850/0x18e0 net/ipv4/ip_output.c:504
-> > [<ffff200009fb091c>] tcp_transmit_skb+0x107c/0x3338 net/ipv4/tcp_output.c:1123
-> > [<ffff200009fbbcc4>] __tcp_retransmit_skb+0x614/0x1d18 net/ipv4/tcp_output.c:2847
-> > [<ffff200009fbd840>] tcp_send_loss_probe+0x478/0x7d0 net/ipv4/tcp_output.c:2457
-> > [<ffff200009fc707c>] tcp_write_timer_handler+0x50c/0x7e8 net/ipv4/tcp_timer.c:557
-> > [<ffff200009fc73d0>] tcp_write_timer+0x78/0x170 net/ipv4/tcp_timer.c:579
-> > [<ffff2000082f8980>] call_timer_fn+0x1b8/0x430 kernel/time/timer.c:1281
-> > [<ffff2000082f8dcc>] expire_timers+0x1d4/0x320 kernel/time/timer.c:1320
-> > [<ffff2000082f912c>] __run_timers kernel/time/timer.c:1620 [inline]
-> > [<ffff2000082f912c>] run_timer_softirq+0x214/0x5f0 kernel/time/timer.c:1646
-> > [<ffff2000080826c0>] __do_softirq+0x350/0xc0c kernel/softirq.c:284
-> > [<ffff200008170af4>] do_softirq_own_stack include/linux/interrupt.h:498 [inline]
-> > [<ffff200008170af4>] invoke_softirq kernel/softirq.c:371 [inline]
-> > [<ffff200008170af4>] irq_exit+0x1dc/0x2f8 kernel/softirq.c:405
-> > [<ffff2000082a95bc>] __handle_domain_irq+0xdc/0x230 kernel/irq/irqdesc.c:647
-> > [<ffff2000080820ac>] handle_domain_irq include/linux/irqdesc.h:175 [inline]
-> > [<ffff2000080820ac>] gic_handle_irq+0x6c/0xe0 drivers/irqchip/irq-gic.c:367
-
-> This is most likely a bug caused by syzkaller setting a ridiculous MTU
-> on loopback device, below minimum size of ipv4 MTU.
-
-> I tried to track it in August [1], but it seems hard to find all the
-> issues with this.
-> 
-> commit c780a049f9bf442314335372c9abc4548bfe3e44
-> Author: Eric Dumazet <edumazet@google.com>
-> Date:   Wed Aug 16 11:09:12 2017 -0700
-> 
->     ipv4: better IP_MAX_MTU enforcement
-> 
->     While working on yet another syzkaller report, I found
->     that our IP_MAX_MTU enforcements were not properly done.
-> 
->     gcc seems to reload dev->mtu for min(dev->mtu, IP_MAX_MTU), and
->     final result can be bigger than IP_MAX_MTU :/
-> 
->     This is a problem because device mtu can be changed on other cpus or
->     threads.
-> 
->     While this patch does not fix the issue I am working on, it is
->     probably worth addressing it.
-
-Just to check I've understood correctly, are you suggesting that the
-IPv4 code should also check the dev->mtu against a IP_MIN_MTU (which
-doesn't seem to exist today)?
-
-Otherwise, I do spot another potential issue. The writer side (e.g. most
-net_device::ndo_change_mtu implementations and the __dev_set_mtu()
-fallback) doesn't use WRITE_ONCE().
-
-IIUC, that means that the write could be torn across multiple accesses,
-and we could see dev->mtu < dev->min_mtu on the read side, even if we
-use READ_ONCE(), and sanity check the mtu value before calling
-__dev_set_mtu().
+I applied the dt fix on my mvebu/fixes branch. Do you want to apply this
+one on your branch, or do you prefer I take it. In this case an acked-by
+would be nice.
 
 Thanks,
-Mark.
+
+Gregory
+
+
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index 5c30026921ae..c6cbab17ed0a 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -10,10 +10,12 @@ Required properties :
+>                       - "marvell,mv64xxx-i2c"
+>                       - "marvell,mv78230-i2c"
+>                       - "marvell,mv78230-a0-i2c"
+> -                       * Note: Only use "marvell,mv78230-a0-i2c" for a
+> -                         very rare, initial version of the SoC which
+> -                         had broken offload support.  Linux
+> -                         auto-detects this and sets it appropriately.
+> +                       * Note: Use "marvell,mv78230-a0-i2c" for
+> +                         controller which do not support offload
+> +                         but still have the i2c repeated start
+> +                         timing violation issue, such as the
+> +                         ones found in the Armada XP A0 and the
+> +                         Armada 38x SoCs.
+>   - interrupts      : The interrupt number
+>  
+>  Optional properties :
+> -- 
+> 2.14.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
