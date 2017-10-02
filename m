@@ -1,69 +1,42 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 2 Oct 2017 09:54:52 +0800
-Subject: [PATCH v3 02/10] arm: dts: mt2701: enable display pwm backlight
+Date: Mon, 2 Oct 2017 09:54:51 +0800
+Subject: [PATCH v3 01/10] arm: dts: mt2701: add pwm backlight device node
 In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
 References: <cover.1506908511.git.ryder.lee@mediatek.com>
-Message-ID: <0f9441e9fc40e47e94927a3a4c96dd3f7f287d94.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <144f5d526d15cbf3ada220765c609eb2b59c240a.1506908511.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Weiqing Kong <weiqing.kong@mediatek.com>
 
-This patch adds board related config for MT2701 pwm backlight.
+This patch adds the device node for MT2701 pwm backlight.
 
 Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701-evb.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/mt2701.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index f484973..63af4b1 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -56,12 +56,29 @@
- 	bt_sco_codec:bt_sco_codec {
- 		compatible = "linux,bt-sco";
- 	};
-+
-+	backlight_lcd: backlight_lcd {
-+		compatible = "pwm-backlight";
-+		pwms = <&bls 0 100000>;
-+		brightness-levels = <
-+			  0  16  32  48  64  80  96 112
-+			128 144 160 176 192 208 224 240
-+			255
-+		>;
-+		default-brightness-level = <9>;
-+	};
- };
- 
- &auxadc {
- 	status = "okay";
- };
- 
-+&bls {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm_bls_gpio>;
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins_a>;
-@@ -111,6 +128,12 @@
- 		};
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index afe12e5..3c85879 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -530,6 +530,15 @@
+ 		#clock-cells = <1>;
  	};
  
-+	pwm_bls_gpio: pwm_bls_gpio {
-+		pins_cmd_dat {
-+			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
-+		};
++	bls: pwm at 1400a000 {
++		compatible = "mediatek,mt2701-disp-pwm";
++		reg = <0 0x1400a000 0 0x1000>;
++		#pwm-cells = <2>;
++		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
++		clock-names = "main", "mm";
++		status = "disabled";
 +	};
 +
- 	spi_pins_a: spi0 at 0 {
- 		pins_spi {
- 			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
+ 	larb0: larb at 14010000 {
+ 		compatible = "mediatek,mt2701-smi-larb";
+ 		reg = <0 0x14010000 0 0x1000>;
 -- 
 1.9.1
