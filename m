@@ -1,39 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 2 Oct 2017 03:05:22 +0200
-Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
-In-Reply-To: <20170917093906.16325-2-linus.walleij@linaro.org>
-References: <20170917093906.16325-1-linus.walleij@linaro.org>
- <20170917093906.16325-2-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZ=BZHp3mjccUYaPTuMbXgwGSErvLprnp4j0H+7C5NYJQ@mail.gmail.com>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Mon, 2 Oct 2017 01:18:49 +0000
+Subject: [PATCH 20/22] arm64: dts: renesas: r8a77995: draak: enable
+ EthernetAVB
+In-Reply-To: <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
+References: <cover.1506678250.git.horms+renesas@verge.net.au>
+ <4503b50eac08f472e8690ec61f4d144e62cbdc55.1506678250.git.horms+renesas@verge.net.au>
+ <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
+Message-ID: <TY1PR06MB09924F9B2BE2CA1C5F1CF318D87D0@TY1PR06MB0992.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 17, 2017 at 11:39 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+Hello,
 
-> - The MFD Silicon Motion SM501 is a special case. It dynamically
->   spawns an I2C bus off the MFD using sm501_create_subdev().
->   We use an approach to dynamically create a machine descriptor
->   table and attach this to the "SM501-LOW" or "SM501-HIGH"
->   gpiochip. We use chip-local offsets to grab the right lines.
->   We can get rid of two local static inline helpers as part
->   of this refactoring.
-(...)
-> SM501 users: requesting Tested-by on this patch.
+> -----Original Message-----
+> From: Sergei Shtylyov
+> Sent: Saturday, September 30, 2017 7:24 PM
+> 
+> Hello!
+> 
+> On 9/29/2017 2:52 PM, Simon Horman wrote:
+> 
+> > From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> >
+> > This patch enables EthernetAVB for R-Car D3 draak board.
+> >
+> > Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >   arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 25 +++++++++++++++++++++++++
+> >   1 file changed, 25 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > index 7b776cb7e928..96b7ff5cc321 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> [...]
+> > @@ -37,6 +39,14 @@
+> >   };
+> >
+> >   &pfc {
+> > +	avb0_pins: avb {
+> > +		mux {
+> > +			groups = "avb0_link", "avb0_phy_int", "avb0_mdc",
+>                                                ^^^^^^^^^^^^^^
+>     Hum, I don't think it's compatible with routing the PHY interrupt via
+> GPIO5_19 below. The driver doesn't support signalling via AVB_PHY_INT anyway.
 
-Paging Simtec (if it reaches anyone), Vincent Sanders,
-Teddy Wang at Silicon Motion:
+Oops! You're correct. I should drop "avb0_phy_int".
 
-Does any of you have an "Anubis" board so you can test GPIO
-on this board before/after this patch and see if it checks out right?
+Simon-san, may I send a follow-up patch to fix this?
 
-I guess it's this board:
-http://www.simtec.co.uk/products/BBD20EUROA/
+Best regards,
+Yoshihiro Shimoda
 
-Does anyone know of a commercially obtainable product using
-SM501 with reasonable mainline Linux support so I can test it myself?
-
-Getting a bit desperate...
-
-Yours,
-Linus Walleij
+> > +				 "avb0_mii";
+> > +			function = "avb0";
+> > +		};
+> > +	};
+> > +
+> >   	scif2_pins: scif2 {
+> >   		groups = "scif2_data";
+> >   		function = "scif2";
+> > @@ -56,6 +66,21 @@
+> >   	status = "okay";
+> >   };
+> >
+> > +&avb {
+> > +	pinctrl-0 = <&avb0_pins>;
+> > +	pinctrl-names = "default";
+> > +	renesas,no-ether-link;
+> > +	phy-handle = <&phy0>;
+> > +	status = "okay";
+> > +
+> > +	phy0: ethernet-phy at 0 {
+> > +		rxc-skew-ps = <1500>;
+> > +		reg = <0>;
+> > +		interrupt-parent = <&gpio5>;
+> > +		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
+> > +	};
+> > +};
+> > +
+> >   &scif2 {
+> >   	pinctrl-0 = <&scif2_pins>;
+> >   	pinctrl-names = "default";
+> 
+> MBR, Sergei
