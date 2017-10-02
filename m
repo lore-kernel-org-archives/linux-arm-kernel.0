@@ -1,24 +1,22 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Tue, 3 Oct 2017 00:10:08 +0200
-Subject: [PATCH 0/5] firmware: arm_scpi: series with smaller improvements
-In-Reply-To: <18e22585-801a-18e7-a42b-8e10035abc37@arm.com>
-References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
- <18e22585-801a-18e7-a42b-8e10035abc37@arm.com>
-Message-ID: <de10ab6e-2a47-2baa-fefa-20fdfcacc9e8@gmail.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Mon,  2 Oct 2017 16:13:45 -0700
+Subject: [PATCH 0/2] memory: brcmstb: dpfe: skip downloading firmware
+Message-ID: <20171002231347.8671-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.10.2017 um 13:25 schrieb Sudeep Holla:
-> 
-> 
-> On 29/09/17 22:25, Heiner Kallweit wrote:
->> This series includes smaller improvements to make all memory allocations
->> device-managed and eventually get rid of scpi_remove. This also improves
->> the cleanup path in scpi_probe.
->>
-> Overall looks good, just one question on DVFS in patch 3. I vaguely
-> remember the need to support that in past.
-> 
-I will remove the prepopulating in patch 3 and just submit the fix
-described in my reply to your review comment.
-Do you want me to re-submit the full patch series or just patches 3-5?
+From: Markus Mayer <mmayer@broadcom.com>
+
+This series lets the DPFE driver skip the DPFE firmware download if the
+DCPU is already running. If it's running by the time Linux comes up, it
+means the boot loader already downloaded the DPFE firmware.
+
+Markus Mayer (2):
+  memory: brcmstb: dpfe: introduce is_dcpu_enabled()
+  memory: brcmstb: dpfe: skip downloading firmware when possible
+
+ drivers/memory/brcmstb_dpfe.c | 37 +++++++++++++++++++++++++++++--------
+ 1 file changed, 29 insertions(+), 8 deletions(-)
+
+-- 
+2.7.4
