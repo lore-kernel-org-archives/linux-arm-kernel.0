@@ -1,201 +1,136 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 2 Oct 2017 16:28:38 +0100
-Subject: [PATCH 3/4] nvmem: add a driver for the Amlogic
- Meson6/Meson8/Meson8b SoCs
-In-Reply-To: <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
-References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
- <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
-Message-ID: <8f1f5a45-951c-7434-44d5-4ef2a61ec038@linaro.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 2 Oct 2017 10:34:18 -0500
+Subject: [PATCH v4 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170928083827.GE23750@n2100.armlinux.org.uk>
+References: <20170927000355.30597-1-d-gerlach@ti.com>
+ <20170927000355.30597-3-d-gerlach@ti.com>
+ <20170928083827.GE23750@n2100.armlinux.org.uk>
+Message-ID: <0bbba52e-c7d8-647e-9b58-55cbbe236d4a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor comments!!
-
-On 01/10/17 13:56, Martin Blumenstingl wrote:
-> This adds a driver to access the efuse on Amlogic Meson6, Meson8 and
-> Meson8b SoCs.
-> These SoCs are accessing the efuse IP block directly through the
-> registers in the "secbus" region. This makes it different from the Meson
-> GX efuse driver which uses the "secure monitor" firmware to access the
-> efuse.
+Russell,
+On 09/28/2017 03:38 AM, Russell King - ARM Linux wrote:
+> On Tue, Sep 26, 2017 at 07:03:55PM -0500, Dave Gerlach wrote:
+>> diff --git a/drivers/memory/emif-asm-offsets.c b/drivers/memory/emif-asm-offsets.c
+>> new file mode 100644
+>> index 000000000000..bdb153c9e948
+>> --- /dev/null
+>> +++ b/drivers/memory/emif-asm-offsets.c
+>> @@ -0,0 +1,22 @@
+>> +/*
+>> + * TI AM33XX EMIF PM Assembly Offsets
+>> + *
+>> + * Copyright (C) 2016-2017 Texas Instruments Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +#include <linux/ti-emif-sram.h>
+>> +
+>> +int main(void)
+>> +{
+>> +	ti_emif_offsets();
+>> +
+>> +	return 0;
+>> +}
 > 
-> The efuse on Meson6 can only read one byte at a time, while the efuse on
-> Meson8 and Meson8b always reads 4 bytes at a time. The new driver
-> supports both, but due to lack of hardware Meson6 support was not tested.
+> ...
 > 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->   drivers/nvmem/Kconfig          |  10 ++
->   drivers/nvmem/Makefile         |   2 +
->   drivers/nvmem/meson-mx-efuse.c | 272 +++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 284 insertions(+)
->   create mode 100644 drivers/nvmem/meson-mx-efuse.c
+>> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+>> +static inline void ti_emif_offsets(void)
+>> +{
+>> +	DEFINE(EMIF_SDCFG_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_sdcfg_val));
+>> +	DEFINE(EMIF_TIMING1_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_timing1_val));
+>> +	DEFINE(EMIF_TIMING2_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_timing2_val));
+>> +	DEFINE(EMIF_TIMING3_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_timing3_val));
+>> +	DEFINE(EMIF_REF_CTRL_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_ref_ctrl_val));
+>> +	DEFINE(EMIF_ZQCFG_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_zqcfg_val));
+>> +	DEFINE(EMIF_PMCR_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_pmcr_val));
+>> +	DEFINE(EMIF_PMCR_SHDW_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_pmcr_shdw_val));
+>> +	DEFINE(EMIF_RD_WR_LEVEL_RAMP_CTRL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_rd_wr_level_ramp_ctrl));
+>> +	DEFINE(EMIF_RD_WR_EXEC_THRESH_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_rd_wr_exec_thresh));
+>> +	DEFINE(EMIF_COS_CONFIG_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_cos_config));
+>> +	DEFINE(EMIF_PRIORITY_TO_COS_MAPPING_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_priority_to_cos_mapping));
+>> +	DEFINE(EMIF_CONNECT_ID_SERV_1_MAP_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_connect_id_serv_1_map));
+>> +	DEFINE(EMIF_CONNECT_ID_SERV_2_MAP_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_connect_id_serv_2_map));
+>> +	DEFINE(EMIF_OCP_CONFIG_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_ocp_config_val));
+>> +	DEFINE(EMIF_LPDDR2_NVM_TIM_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_lpddr2_nvm_tim));
+>> +	DEFINE(EMIF_LPDDR2_NVM_TIM_SHDW_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_lpddr2_nvm_tim_shdw));
+>> +	DEFINE(EMIF_DLL_CALIB_CTRL_VAL_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_dll_calib_ctrl_val));
+>> +	DEFINE(EMIF_DLL_CALIB_CTRL_VAL_SHDW_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_dll_calib_ctrl_val_shdw));
+>> +	DEFINE(EMIF_DDR_PHY_CTLR_1_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_ddr_phy_ctlr_1));
+>> +	DEFINE(EMIF_EXT_PHY_CTRL_VALS_OFFSET,
+>> +	       offsetof(struct emif_regs_amx3, emif_ext_phy_ctrl_vals));
+>> +	DEFINE(EMIF_REGS_AMX3_SIZE, sizeof(struct emif_regs_amx3));
+>> +
+>> +	BLANK();
+>> +
+>> +	DEFINE(EMIF_PM_BASE_ADDR_VIRT_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_data, ti_emif_base_addr_virt));
+>> +	DEFINE(EMIF_PM_BASE_ADDR_PHYS_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_data, ti_emif_base_addr_phys));
+>> +	DEFINE(EMIF_PM_CONFIG_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_data, ti_emif_sram_config));
+>> +	DEFINE(EMIF_PM_REGS_VIRT_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_data, regs_virt));
+>> +	DEFINE(EMIF_PM_REGS_PHYS_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_data, regs_phys));
+>> +	DEFINE(EMIF_PM_DATA_SIZE, sizeof(struct ti_emif_pm_data));
+>> +
+>> +	BLANK();
+>> +
+>> +	DEFINE(EMIF_PM_SAVE_CONTEXT_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_functions, save_context));
+>> +	DEFINE(EMIF_PM_RESTORE_CONTEXT_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_functions, restore_context));
+>> +	DEFINE(EMIF_PM_ENTER_SR_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_functions, enter_sr));
+>> +	DEFINE(EMIF_PM_EXIT_SR_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_functions, exit_sr));
+>> +	DEFINE(EMIF_PM_ABORT_SR_OFFSET,
+>> +	       offsetof(struct ti_emif_pm_functions, abort_sr));
+>> +	DEFINE(EMIF_PM_FUNCTIONS_SIZE, sizeof(struct ti_emif_pm_functions));
+>> +}
+>> +#else
+>> +static inline void ti_emif_offsets(void) {}
+>> +#endif
 > 
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> +	
-> +
-> +static void meson_mx_efuse_mask_bits(struct meson_mx_efuse *efuse, u32 reg,
-> +				     u32 mask, u32 set)
-> +{
-> +	u32 data;
-> +
-> +	data = readl(efuse->base + reg);
-> +	data &= ~mask;
-> +	data |= (set & mask);
-> +
-> +	writel(data, efuse->base + reg);
-> +}
-> +
-> +static int meson_mx_efuse_hw_enable(struct meson_mx_efuse *efuse)
-> +{
-> +	int err;
-> +
-> +	err = clk_prepare_enable(efuse->core_clk);
-> +	if (err)
-> +		return err;
-> +
-> +	/* power up the efuse */
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_PD_ENABLE, 0);
-> +
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL4,
-> +				 MESON_MX_EFUSE_CNTL4_ENCRYPT_ENABLE, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +static void meson_mx_efuse_hw_disable(struct meson_mx_efuse *efuse)
-> +{
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_PD_ENABLE,
-> +				 MESON_MX_EFUSE_CNTL1_PD_ENABLE);
-> +
-> +	clk_disable_unprepare(efuse->core_clk);
-> +}
-> +
-> +static int meson_mx_efuse_read_addr(struct meson_mx_efuse *efuse,
-> +				    unsigned int addr, u32 *value)
-> +{
-> +	int err;
-> +	u32 regval;
-> +
-> +	/* write the address to read */
-> +	regval = FIELD_PREP(MESON_MX_EFUSE_CNTL1_BYTE_ADDR_MASK, addr);
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_MASK, regval);
-> +
-> +	/* inform the hardware that we changed the address */
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_SET,
-> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_SET);
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_BYTE_ADDR_SET, 0);
-> +
-> +	/* start the read process */
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_START,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_START);
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_START, 0);
-> +
-> +	/*
-> +	 * perform a dummy read to ensure that the HW has the RD_BUSY bit set
-> +	 * when polling for the status below.
-> +	 */
-> +	readl(efuse->base + MESON_MX_EFUSE_CNTL1);
-> +
-> +	err = readl_poll_timeout_atomic(efuse->base + MESON_MX_EFUSE_CNTL1,
-> +			regval,
-> +			(!(regval & MESON_MX_EFUSE_CNTL1_AUTO_RD_BUSY)),
-> +			1, 1000);
-> +	if (err) {
-> +		dev_err(efuse->config.dev,
-> +			"Timeout while reading efuse address %u\n", addr);
-> +		return err;
-> +	}
-> +
-> +	*value = readl(efuse->base + MESON_MX_EFUSE_CNTL2);
-> +
-> +	return 0;
-> +}
-> +
-> +static int meson_mx_efuse_read(void *context, unsigned int offset,
-> +			       void *buf, size_t bytes)
-> +{
-> +	struct meson_mx_efuse *efuse = context;
-> +	u32 tmp;
-> +	int err, i, addr;
-> +
-> +	err = meson_mx_efuse_hw_enable(efuse);
-> +	if (err)
-> +		return err;
-> +
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
-> +
-> +	for (i = offset; i < offset + bytes; i += efuse->config.word_size) {
-> +		addr = i / efuse->config.word_size;
-> +
-> +		err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
-> +		if (err)
-> +			break;
-> +
-> +		memcpy(buf + i, &tmp, efuse->config.word_size);
-> +	}
-> +
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE, 0);
-> +
-> +	meson_mx_efuse_hw_disable(efuse);
-> +
-> +	return err;
-> +}
-...
-> +
-> +static int meson_mx_efuse_probe(struct platform_device *pdev)
-> +{
-> +	const struct meson_mx_efuse_platform_data *drvdata;
-> +	struct meson_mx_efuse *efuse;
-> +	struct resource *res;
-> +
+> Any reason the above can't be part of emif-asm-offsets.c ?
+> 
 
-...
+Yes that's a good point. I was focused on moving the macros and didn't think
+about why I hid everything away in the header in the first place, to avoid
+cluttering the global asm-offsets.c. Now that we have our own file there's no
+reason for this, I will fix this and the kbuild robot issue and send v5. I can
+simplify the makefile more which will avoid that build error.
 
-> +
-> +	efuse->core_clk = devm_clk_get(&pdev->dev, "core");
-> +	if (IS_ERR(efuse->core_clk)) {
-> +		dev_err(&pdev->dev, "Failed to get core clock\n");
-> +		return PTR_ERR(efuse->core_clk);
-> +	}
-> +
-> +	efuse->nvmem = nvmem_register(&efuse->config);
-> +	if (IS_ERR(efuse->nvmem)) {
-> +		clk_unprepare(efuse->core_clk);
-
-Do you need this???
-
-> +		return PTR_ERR(efuse->nvmem);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, efuse);
-> +
-> +	return 0;
-> +}
-> +
-> +static int meson_mx_efuse_remove(struct platform_device *pdev)
-> +{
-> +	struct meson_mx_efuse *efuse = platform_get_drvdata(pdev);
-> +	int err;
-> +
-> +	err = nvmem_unregister(efuse->nvmem);
-> +
-> +	clk_unprepare(efuse->core_clk);
-
-Do you need this disable here? AFAIU, this driver would never leave the 
-clk prepared unless we are in the middle of read.
-
-> +
-> +	return err;
-> +}
-> +
+Regards,
+Dave
