@@ -1,21 +1,16 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 2 Oct 2017 19:59:19 +0200
-Subject: [PATCH 2/6] ARM: s3c24xx: Improve a size determination in
- s3c2410_iotiming_get()
+Date: Mon, 2 Oct 2017 20:00:27 +0200
+Subject: [PATCH 3/6] ARM: s3c2410: Fix a typo in a comment line
 In-Reply-To: <d2ae00c8-da57-9ffc-3692-67ed6daa95e0@users.sourceforge.net>
 References: <d2ae00c8-da57-9ffc-3692-67ed6daa95e0@users.sourceforge.net>
-Message-ID: <3cccfa2f-4bcd-9c45-c56c-2b71b2ae4a42@users.sourceforge.net>
+Message-ID: <b93ca267-88d2-b68a-1570-dc8fc71f3888@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Mon, 2 Oct 2017 19:16:58 +0200
+Date: Mon, 2 Oct 2017 19:34:36 +0200
 
-Replace the specification of a data structure by a pointer dereference
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
-
-This issue was detected by using the Coccinelle software.
+Adjust a word in this function description.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
@@ -23,17 +18,17 @@ Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-s3c24xx/iotiming-s3c2410.c b/arch/arm/mach-s3c24xx/iotiming-s3c2410.c
-index f587c78fba33..c18769b5f15a 100644
+index c18769b5f15a..d5f1f06e4811 100644
 --- a/arch/arm/mach-s3c24xx/iotiming-s3c2410.c
 +++ b/arch/arm/mach-s3c24xx/iotiming-s3c2410.c
-@@ -453,7 +453,7 @@ int s3c2410_iotiming_get(struct s3c_cpufreq_config *cfg,
- 		s3c_freq_iodbg("%s: bank %d: con %08lx\n",
- 			       __func__, bank, bankcon);
+@@ -206,7 +206,7 @@ static int calc_tacc(unsigned int cyc, int nwait_en,
+ }
  
--		bt = kzalloc(sizeof(struct s3c2410_iobank_timing), GFP_KERNEL);
-+		bt = kzalloc(sizeof(*bt), GFP_KERNEL);
- 		if (!bt)
- 			return -ENOMEM;
- 
+ /**
+- * s3c2410_calc_bank - calculate bank timing infromation
++ * s3c2410_calc_bank - calculate bank timing information
+  * @cfg: The configuration we need to calculate for.
+  * @bt: The bank timing information.
+  *
 -- 
 2.14.2
