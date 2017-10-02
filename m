@@ -1,124 +1,198 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 02 Oct 2017 15:59:06 +0200
-Subject: [PATCH v2] arm64: dts: marvell: fix interrupt-map property for
- Armada CP110 PCIe controller
-In-Reply-To: <20170928140633.13942-1-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 28 Sep 2017 16:06:33 +0200")
-References: <20170928140633.13942-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <87wp4dmz11.fsf@free-electrons.com>
+Date: Mon,  2 Oct 2017 16:58:52 +0200
+Subject: [PATCH v3] mmc: sdhci-xenon: Fix clock resource by adding an optional
+ bus clock
+Message-ID: <20171002145852.24729-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On jeu., sept. 28 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+is optional because not all the SoCs need them but at least for Armada
+7K/8K it is actually mandatory.
 
-> The interrupt-map property used in the description of the Marvell
-> Armada 7K/8K PCIe controllers has a bogus extraneous 0 that causes the
-> interrupt conversion to not be done properly. This causes the PCIe PME
-> and AER root port service drivers to fail their initialization:
->
-> [    5.019900] genirq: Setting trigger mode 7 for irq 114 failed (irq_chip_set_type_parent+0x0/0x30)
-> [    5.028821] pcie_pme: probe of 0001:00:00.0:pcie001 failed with error -22
-> [    5.035687] genirq: Setting trigger mode 7 for irq 114 failed (irq_chip_set_type_parent+0x0/0x30)
-> [    5.044614] aer: probe of 0001:00:00.0:pcie002 failed with error -22
->
-> This problem was introduced when the interrupt description was
-> switched from using the GIC directly to using the ICU interrupt
-> controller. Indeed, the GIC has address-cells = <1>, which requires a
-> parent unit address, while the ICU has address-cells = <0>.
->
-> Fixes: 6ef84a827c37 ("arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+The binding documentation is updating accordingly.
 
-Applied on mvebu/fixes
+Without this patch the kernel hand during boot if the mvpp2.2 network
+driver was not present in the kernel. Indeed the clock needed by the
+xenon controller was set by the network driver.
+
+Fixes: 3a3748dba881 ("mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+functionality)"
+CC: Stable <stable@vger.kernel.org>
+Tested-by: Zhoujie Wu <zjwu@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi Ulf and Adrian,
+
+This patch should be merged in 4.14-rc, as it fixes real issues.
+
+This patch may looks like just as a nice clean-up but it is not. On
+the earlier version of the series adding the support for the xenon
+controller there was already this axi bus clock. But at this moment
+the documentation for the clock on the Armada 7K/8K was missing and
+there was no driver for it, so we just use the clock set by the
+bootloader and never change them that's why it worked without any
+visible problem.
+
+Then as explained in the commit log the network driver enabled the
+clock for us, and it happened that it was setup before the xenon
+driver. It is only thanks the new information we received on the
+clocks of the SoC and with more exhaustive testes that we found this
+issue and the fix for it.
 
 Thanks,
 
 Gregory
-> ---
-> Changes since v1:
->  - Fix the commit log with a proper explanation, as noticed by Yehuda
->  - Adjust the Fixes tag accordingly
->  - Squash both patches together since they fix the same commit
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 6 +++---
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 6 +++---
->  2 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 8263a8a504a8..f2aa2a81de4d 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -336,7 +336,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xf6000000 0  0xf6000000 0 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cpm_icu ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
->  			num-lanes = <1>;
->  			clocks = <&cpm_clk 1 13>;
-> @@ -362,7 +362,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xf7000000 0  0xf7000000 0 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cpm_icu ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> @@ -389,7 +389,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xf8000000 0  0xf8000000 0 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cpm_icu 0 ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cpm_icu ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index b71ee6c83668..4fe70323abb3 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -335,7 +335,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xfa000000 0  0xfa000000 0 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cps_icu 0 ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cps_icu ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
->  			num-lanes = <1>;
->  			clocks = <&cps_clk 1 13>;
-> @@ -361,7 +361,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xfb000000 0  0xfb000000 0 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cps_icu 0 ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cps_icu ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> @@ -388,7 +388,7 @@
->  				/* non-prefetchable memory */
->  				0x82000000 0 0xfc000000 0  0xfc000000 0 0xf00000>;
->  			interrupt-map-mask = <0 0 0 0>;
-> -			interrupt-map = <0 0 0 0 &cps_icu 0 ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-map = <0 0 0 0 &cps_icu ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> -- 
-> 2.13.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
+Changelog:
+v2->v3:
+ - remove useless test on clk pointer
+ - added tested-by from  Zhoujie Wu
+
+v1->v2:
+ - manage the -EPROBE_DEFER case
+ - remove warning message when axi clock is not present
+ - remove useless test before clk_disable_unprepare()
+
+ .../bindings/mmc/marvell,xenon-sdhci.txt           | 12 ++++++-----
+ drivers/mmc/host/sdhci-xenon.c                     | 24 ++++++++++++++++++----
+ drivers/mmc/host/sdhci-xenon.h                     |  1 +
+ 3 files changed, 28 insertions(+), 9 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+index b878a1e305af..ed1456f5c94d 100644
+--- a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+@@ -16,11 +16,13 @@ Required Properties:
+ 
+ - clocks:
+   Array of clocks required for SDHC.
+-  Require at least input clock for Xenon IP core.
++  Require at least input clock for Xenon IP core. For Armada AP806 and
++  CP110, the AXI clock is also mandatory.
+ 
+ - clock-names:
+   Array of names corresponding to clocks property.
+   The input clock for Xenon IP core should be named as "core".
++  The input clock for the AXI bus must be named as "axi".
+ 
+ - reg:
+   * For "marvell,armada-3700-sdhci", two register areas.
+@@ -106,8 +108,8 @@ Example:
+ 		compatible = "marvell,armada-ap806-sdhci";
+ 		reg = <0xaa0000 0x1000>;
+ 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
+-		clocks = <&emmc_clk>;
+-		clock-names = "core";
++		clocks = <&emmc_clk>,<&axi_clk>;
++		clock-names = "core", "axi";
+ 		bus-width = <4>;
+ 		marvell,xenon-phy-slow-mode;
+ 		marvell,xenon-tun-count = <11>;
+@@ -126,8 +128,8 @@ Example:
+ 		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
+ 		vqmmc-supply = <&sd_vqmmc_regulator>;
+ 		vmmc-supply = <&sd_vmmc_regulator>;
+-		clocks = <&sdclk>;
+-		clock-names = "core";
++		clocks = <&sdclk>, <&axi_clk>;
++		clock-names = "core", "axi";
+ 		bus-width = <4>;
+ 		marvell,xenon-tun-count = <9>;
+ 	};
+diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+index 2eec2e652c53..0842bbc2d7ad 100644
+--- a/drivers/mmc/host/sdhci-xenon.c
++++ b/drivers/mmc/host/sdhci-xenon.c
+@@ -466,6 +466,7 @@ static int xenon_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_host *host;
++	struct xenon_priv *priv;
+ 	int err;
+ 
+ 	host = sdhci_pltfm_init(pdev, &sdhci_xenon_pdata,
+@@ -474,6 +475,7 @@ static int xenon_probe(struct platform_device *pdev)
+ 		return PTR_ERR(host);
+ 
+ 	pltfm_host = sdhci_priv(host);
++	priv = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	/*
+ 	 * Link Xenon specific mmc_host_ops function,
+@@ -491,9 +493,20 @@ static int xenon_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto free_pltfm;
+ 
++	priv->axi_clk = devm_clk_get(&pdev->dev, "axi");
++	if (IS_ERR(priv->axi_clk)) {
++		err = PTR_ERR(priv->axi_clk);
++		if (err == -EPROBE_DEFER)
++			goto err_clk;
++	} else {
++		err = clk_prepare_enable(priv->axi_clk);
++		if (err)
++			goto err_clk;
++	}
++
+ 	err = mmc_of_parse(host->mmc);
+ 	if (err)
+-		goto err_clk;
++		goto err_clk_axi;
+ 
+ 	sdhci_get_of_property(pdev);
+ 
+@@ -502,11 +515,11 @@ static int xenon_probe(struct platform_device *pdev)
+ 	/* Xenon specific dt parse */
+ 	err = xenon_probe_dt(pdev);
+ 	if (err)
+-		goto err_clk;
++		goto err_clk_axi;
+ 
+ 	err = xenon_sdhc_prepare(host);
+ 	if (err)
+-		goto err_clk;
++		goto err_clk_axi;
+ 
+ 	pm_runtime_get_noresume(&pdev->dev);
+ 	pm_runtime_set_active(&pdev->dev);
+@@ -527,6 +540,8 @@ static int xenon_probe(struct platform_device *pdev)
+ 	pm_runtime_disable(&pdev->dev);
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 	xenon_sdhc_unprepare(host);
++err_clk_axi:
++	clk_disable_unprepare(priv->axi_clk);
+ err_clk:
+ 	clk_disable_unprepare(pltfm_host->clk);
+ free_pltfm:
+@@ -538,6 +553,7 @@ static int xenon_remove(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host = platform_get_drvdata(pdev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+@@ -546,7 +562,7 @@ static int xenon_remove(struct platform_device *pdev)
+ 	sdhci_remove_host(host, 0);
+ 
+ 	xenon_sdhc_unprepare(host);
+-
++	clk_disable_unprepare(priv->axi_clk);
+ 	clk_disable_unprepare(pltfm_host->clk);
+ 
+ 	sdhci_pltfm_free(pdev);
+diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+index 2bc0510c0769..9994995c7c56 100644
+--- a/drivers/mmc/host/sdhci-xenon.h
++++ b/drivers/mmc/host/sdhci-xenon.h
+@@ -83,6 +83,7 @@ struct xenon_priv {
+ 	unsigned char	bus_width;
+ 	unsigned char	timing;
+ 	unsigned int	clock;
++	struct clk      *axi_clk;
+ 
+ 	int		phy_type;
+ 	/*
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.14.1
