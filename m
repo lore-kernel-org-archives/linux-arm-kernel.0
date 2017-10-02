@@ -1,72 +1,141 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Oct 2017 15:14:05 +0100
-Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
-References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
- <1506607791-8621-7-git-send-email-will.deacon@arm.com>
- <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
-Message-ID: <20171002141405.GC12847@arm.com>
+From: todor.tomov@linaro.org (Todor Tomov)
+Date: Mon,  2 Oct 2017 17:13:33 +0300
+Subject: [PATCH 4/4] arm64: dts: qcom: Add Camera Control Interface support
+In-Reply-To: <1506953613-23875-1-git-send-email-todor.tomov@linaro.org>
+References: <1506953613-23875-1-git-send-email-todor.tomov@linaro.org>
+Message-ID: <1506953613-23875-5-git-send-email-todor.tomov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kim,
+This commit adds the CCI node for the CCI controller that resides on
+the Qualcomm MSM8916 and MSM8996 platforms.
 
-On Fri, Sep 29, 2017 at 05:19:40PM -0500, Kim Phillips wrote:
-> On Thu, 28 Sep 2017 15:09:50 +0100
-> Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > +/* Perf callbacks */
-> > +static int arm_spe_pmu_event_init(struct perf_event *event)
-> > +{
-> > +	u64 reg;
-> > +	struct perf_event_attr *attr = &event->attr;
-> > +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> > +
-> > +	/* This is, of course, deeply driver-specific */
-> > +	if (attr->type != event->pmu->type)
-> > +		return -ENOENT;
-> > +
-> > +	if (event->cpu >= 0 &&
-> > +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-> > +		return -ENOENT;
-> 
-> So -ENOENT will make tools/perf/util/evsel.c tell the user "The %s event is not
-> supported." whereas returning -ENODEV will say "No such device - did
-> you specify an out-of-range profile CPU?" which may or may not be more
-> appropriate for this check.
+CC: Andy Gross <andy.gross@linaro.org>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: devicetree at vger.kernel.org
+CC: linux-soc at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Todor Tomov <todor.tomov@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 14 ++++++++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      | 21 +++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/msm8996-pins.dtsi | 14 ++++++++++++++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi      | 24 ++++++++++++++++++++++++
+ 4 files changed, 73 insertions(+)
 
-I agree that the message isn't great, but I'm returning ENOENT here to
-be consistent with the CPU PMU behaviour (which necessarily has to return
-ENOENT so that we can support ABI event types over there -- see
-perf_init_event).
-
-> > +	if (arm_spe_event_to_pmsevfr(event) & SYS_PMSEVFR_EL1_RES0)
-> > +		return -EOPNOTSUPP;
-> > +	if (attr->exclude_idle)
-> > +		return -EOPNOTSUPP;
-> 
-> "PMU Hardware doesn't support sampling/overflow-interrupts." will be
-> printed if the user didn't specify a sample period.  Otherwise, a
-> string with "/bin/dmesg may provide additional information." will be
-> printed.
-> 
-> I was hoping for a response from acme by now for this:
-> 
-> https://www.spinics.net/lists/linux-perf-users/msg04066.html
-> 
-> Alas, nothing.  Looking at the #ifdef x86 in evsel.c, I'm guessing
-> it'll be ok, although I'm still not sure how PMU-specific we can get in
-> evsel.c, nor whether it's ok to communicate lists of h/w supported
-> sample periods through /sys/bus/event_source/devices/...
-> 
-> acme?  OK to refactor evsel messaging for Arm, including parsing for
-> which PMUs are being used, so customize the message?
-
-Arnaldo's probably got enough on his plate maintaining perf tool, so my
-advice would be to post a patch as an RFC and use that as a concrete basis
-for discussion. It often works out better starting with code, even if none
-of it ends up getting merged (and you can include bits of your email above
-in the cover letter).
-
-Will
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+index 4cb0b58..4fa6a72 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+@@ -733,4 +733,18 @@
+ 			bias-pull-up;
+ 		};
+ 	};
++
++	cci_lines {
++		cci0_default: cci0_default {
++			pinmux {
++				function = "cci_i2c";
++				pins = "gpio29", "gpio30";
++			};
++			pinconf {
++				pins = "gpio29", "gpio30";
++				drive-strength = <16>;
++				bias-disable;
++			};
++		};
++	};
+ };
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index dc38175..4885360 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1325,6 +1325,27 @@
+ 				compatible = "venus-encoder";
+ 			};
+ 		};
++
++		cci: qcom,cci at 1b0c000 {
++			compatible = "qcom,cci-v1.0.8";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x1b0c000 0x1000>;
++			reg-names = "cci";
++			interrupts = <GIC_SPI 50 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "cci";
++			clocks = <&gcc GCC_CAMSS_TOP_AHB_CLK>,
++				<&gcc GCC_CAMSS_CCI_AHB_CLK>,
++				<&gcc GCC_CAMSS_CCI_CLK>,
++				<&gcc GCC_CAMSS_AHB_CLK>;
++			clock-names = "camss_top_ahb",
++				"cci_ahb",
++				"cci",
++				"camss_ahb";
++			pinctrl-names = "default";
++			pinctrl-0 = <&cci0_default>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	smd {
+diff --git a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
+index 6599404..3faaa4c 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996-pins.dtsi
+@@ -300,4 +300,18 @@
+ 			drive-strength = <2>;	/* 2 MA */
+ 		};
+ 	};
++
++	cci_lines {
++		cci0_default: cci0_default {
++			pinmux {
++				function = "cci_i2c";
++				pins = "gpio17", "gpio18";
++			};
++			pinconf {
++				pins = "gpio17", "gpio18";
++				drive-strength = <16>;
++				bias-disable;
++			};
++		};
++	};
+ };
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 887b61c..118722f 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -819,6 +819,30 @@
+ 				phy-names = "usb2-phy", "usb3-phy";
+ 			};
+ 		};
++
++		cci: qcom,cci at a0c000 {
++			compatible = "qcom,cci-v1.4.0";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0xa0c000 0x1000>;
++			reg-names = "cci";
++			interrupts = <GIC_SPI 295 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "cci";
++			power-domains = <&mmcc CAMSS_GDSC>;
++			clocks = <&mmcc MMSS_MMAGIC_AHB_CLK>,
++					<&mmcc CAMSS_TOP_AHB_CLK>,
++					<&mmcc CAMSS_CCI_AHB_CLK>,
++					<&mmcc CAMSS_CCI_CLK>,
++					<&mmcc CAMSS_AHB_CLK>;
++			clock-names = "mmss_mmagic_ahb",
++					"camss_top_ahb",
++					"cci_ahb",
++					"cci",
++					"camss_ahb";
++			pinctrl-names = "default";
++			pinctrl-0 = <&cci0_default>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	adsp-pil {
+-- 
+2.7.4
