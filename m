@@ -1,171 +1,112 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 2 Oct 2017 10:08:09 +0200
-Subject: [RFC v2 2/2] mmc: meson-mx-sdio: Add a driver for the Amlogic
- Meson8 and Meson8b SoCs
-In-Reply-To: <20170924190528.21841-3-martin.blumenstingl@googlemail.com>
-References: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
- <20170924190528.21841-3-martin.blumenstingl@googlemail.com>
-Message-ID: <CAPDyKFqj1CkhHO4SvUySEV4OnKcTeHRu6YAfBPSN4hvkQpHKfA@mail.gmail.com>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Mon, 2 Oct 2017 09:16:56 +0000
+Subject: [PATCH 20/22] arm64: dts: renesas: r8a77995: draak: enable
+ EthernetAVB
+In-Reply-To: <20171002071433.GA10579@verge.net.au>
+References: <cover.1506678250.git.horms+renesas@verge.net.au>
+ <4503b50eac08f472e8690ec61f4d144e62cbdc55.1506678250.git.horms+renesas@verge.net.au>
+ <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
+ <TY1PR06MB09924F9B2BE2CA1C5F1CF318D87D0@TY1PR06MB0992.apcprd06.prod.outlook.com>
+ <20171002071433.GA10579@verge.net.au>
+Message-ID: <TY1PR06MB099289399914401B22232C67D87D0@TY1PR06MB0992.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi Simon-san,
 
-> +#define MESON_MX_SDIO_MAX_SLOTS                                        3
-> +
-> +struct meson_mx_mmc_slot {
-> +       struct device                   *dev;
-> +       struct mmc_host                 *mmc;
-> +       struct meson_mx_mmc_host        *host;
-> +
-> +       struct mmc_request              *mrq;
-> +       struct mmc_command              *cmd;
-> +       int                             error;
-> +
-> +       unsigned int                    id;
-> +};
+> -----Original Message-----
+> From: Simon Horman
+> Sent: Monday, October 2, 2017 4:15 PM
+> 
+> On Mon, Oct 02, 2017 at 01:18:49AM +0000, Yoshihiro Shimoda wrote:
+> > Hello,
+> >
+> > > -----Original Message-----
+> > > From: Sergei Shtylyov
+> > > Sent: Saturday, September 30, 2017 7:24 PM
+> > >
+> > > Hello!
+> > >
+> > > On 9/29/2017 2:52 PM, Simon Horman wrote:
+> > >
+> > > > From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > >
+> > > > This patch enables EthernetAVB for R-Car D3 draak board.
+> > > >
+> > > > Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > ---
+> > > >   arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 25 +++++++++++++++++++++++++
+> > > >   1 file changed, 25 insertions(+)
+> > > >
+> > > > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > > > index 7b776cb7e928..96b7ff5cc321 100644
+> > > > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > > > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > > [...]
+> > > > @@ -37,6 +39,14 @@
+> > > >   };
+> > > >
+> > > >   &pfc {
+> > > > +	avb0_pins: avb {
+> > > > +		mux {
+> > > > +			groups = "avb0_link", "avb0_phy_int", "avb0_mdc",
+> > >                                                ^^^^^^^^^^^^^^
+> > >     Hum, I don't think it's compatible with routing the PHY interrupt via
+> > > GPIO5_19 below. The driver doesn't support signalling via AVB_PHY_INT anyway.
+> >
+> > Oops! You're correct. I should drop "avb0_phy_int".
+> >
+> > Simon-san, may I send a follow-up patch to fix this?
+> 
+> Thanks Sergei, thanks Shimoda-san,
+> 
+> yes, please provide a follow-up patch.
+> 
+> At this stage I don't think we need to re-spin this pull-request
+> to fix this, rather a follow-up patch can be included
+> in a follow-up pull request.
 
-If I recall correctly, we agreed on postponing the multiple slot
-support for now as to start simple.
-Therefore, can you please remove all that code, and instead only use
-the struct meson_mx_mmc_host for the data needed.
+I got it. I will send it. Also, should I send salvator-common and ulcb patches
+about Geert-san's comment (These dtsi files also enable "avb_phy_int" for now)?
 
-Just to be clear, I am fine having using the mmc slot bindings, as we
-agreed. However as only one slot is supported in this stage, we don't
-need a separate struct for that.
+Best regards,
+Yoshihiro Shimoda
 
-> +
-> +struct meson_mx_mmc_host {
-> +       struct device                   *dev;
-> +
-> +       struct clk                      *parent_clk;
-> +       struct clk                      *core_clk;
-> +       struct clk_divider              cfg_div;
-> +       struct clk                      *cfg_div_clk;
-> +       struct clk_fixed_factor         fixed_factor;
-> +       struct clk                      *fixed_factor_clk;
-> +
-> +       void __iomem                    *base;
-> +       int                             irq;
-> +       spinlock_t                      irq_lock;
-> +
-> +       struct timer_list               cmd_timeout;
-> +
-> +       struct meson_mx_mmc_slot        *slot;
-> +};
-> +
-
-[...]
-
-> +static int meson_mx_mmc_slot_probe(struct device *slot_dev,
-> +                                  struct meson_mx_mmc_host *host)
-> +{
-> +       struct meson_mx_mmc_slot *slot;
-> +       struct mmc_host *mmc;
-> +       unsigned int id;
-> +       int ret;
-> +
-> +       if (of_property_read_u32(slot_dev->of_node, "reg", &id)) {
-> +               dev_err(slot_dev, "missing 'reg' property\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       if (id >= MESON_MX_SDIO_MAX_SLOTS) {
-> +               dev_err(slot_dev, "invalid 'reg' property value %d\n", id);
-> +               return -EINVAL;
-> +       }
-> +
-> +       mmc = mmc_alloc_host(sizeof(*slot), slot_dev);
-> +       if (!mmc)
-> +               return -ENOMEM;
-> +
-> +       slot = mmc_priv(mmc);
-> +       slot->dev = slot_dev;
-> +       slot->mmc = mmc;
-> +       slot->id = id;
-> +       slot->host = host;
-> +
-> +       host->slot = slot;
-> +
-> +       /* Get regulators and the supported OCR mask */
-> +       ret = mmc_regulator_get_supply(mmc);
-> +       if (ret == -EPROBE_DEFER)
-> +               goto error_free_host;
-> +
-> +       mmc->max_req_size = MESON_MX_SDIO_BOUNCE_REQ_SIZE;
-> +       mmc->max_seg_size = mmc->max_req_size;
-> +       mmc->max_blk_count =
-> +               FIELD_GET(MESON_MX_SDIO_SEND_REPEAT_PACKAGE_TIMES_MASK,
-> +                         0xffffffff);
-> +       mmc->max_blk_size = FIELD_GET(MESON_MX_SDIO_EXT_DATA_RW_NUMBER_MASK,
-> +                                     0xffffffff);
-> +       mmc->max_blk_size -= (4 * MESON_MX_SDIO_RESPONSE_CRC16_BITS);
-> +       mmc->max_blk_size /= BITS_PER_BYTE;
-> +
-> +       /* Get the min and max supported clock rates */
-> +       mmc->f_min = clk_round_rate(host->cfg_div_clk, 1);
-> +       mmc->f_max = clk_round_rate(host->cfg_div_clk,
-> +                                   clk_get_rate(host->parent_clk));
-> +
-> +       mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
-> +       mmc->ops = &meson_mx_mmc_ops;
-> +
-> +       ret = mmc_of_parse(mmc);
-> +       if (ret)
-> +               goto error_free_host;
-> +
-> +       ret = mmc_add_host(mmc);
-> +       if (ret)
-> +               goto error_free_host;
-> +
-> +       return 0;
-> +
-> +error_free_host:
-> +       mmc_free_host(mmc);
-> +       return ret;
-> +}
-> +
-> +static int meson_mx_mmc_probe_slots(struct meson_mx_mmc_host *host)
-> +{
-> +       struct device_node *slot_node;
-> +       struct platform_device *slot_pdev;
-> +       int ret;
-> +
-> +       for_each_child_of_node(host->dev->of_node, slot_node) {
-> +               if (!of_device_is_compatible(slot_node, "mmc-slot"))
-> +                       continue;
-> +
-> +               /*
-> +                * TODO: the MMC core framework currently does not support
-> +                * controllers with multiple slots properly.
-> +                */
-> +               if (host->slot) {
-> +                       dev_warn(host->dev,
-> +                                "skipping slot other than the first\n");
-> +                       continue;
-> +               }
-> +
-> +               slot_pdev = of_platform_device_create(slot_node, NULL,
-> +                                                     host->dev);
-> +               if (!slot_pdev)
-> +                       continue;
-> +
-> +               ret = meson_mx_mmc_slot_probe(&slot_pdev->dev, host);
-> +               if (ret) {
-> +                       of_platform_device_destroy(&slot_pdev->dev, NULL);
-> +                       return ret;
-> +               }
-> +       }
-> +
-> +       return 0;
-> +}
-
-For the above two functions, please simplify the code by limiting them
-to deal with only one valid mmc-slot.
-
-[...]
-
-Besides the comments on the multiple slot support, this looks good to me.
-
-Kind regards
-Uffe
+> >
+> > Best regards,
+> > Yoshihiro Shimoda
+> >
+> > > > +				 "avb0_mii";
+> > > > +			function = "avb0";
+> > > > +		};
+> > > > +	};
+> > > > +
+> > > >   	scif2_pins: scif2 {
+> > > >   		groups = "scif2_data";
+> > > >   		function = "scif2";
+> > > > @@ -56,6 +66,21 @@
+> > > >   	status = "okay";
+> > > >   };
+> > > >
+> > > > +&avb {
+> > > > +	pinctrl-0 = <&avb0_pins>;
+> > > > +	pinctrl-names = "default";
+> > > > +	renesas,no-ether-link;
+> > > > +	phy-handle = <&phy0>;
+> > > > +	status = "okay";
+> > > > +
+> > > > +	phy0: ethernet-phy at 0 {
+> > > > +		rxc-skew-ps = <1500>;
+> > > > +		reg = <0>;
+> > > > +		interrupt-parent = <&gpio5>;
+> > > > +		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
+> > > > +	};
+> > > > +};
+> > > > +
+> > > >   &scif2 {
+> > > >   	pinctrl-0 = <&scif2_pins>;
+> > > >   	pinctrl-names = "default";
+> > >
+> > > MBR, Sergei
