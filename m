@@ -1,68 +1,67 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Oct 2017 11:03:01 +0100
-Subject: [PATCH v5 5/7] arm64: head: Init PMSCR_EL2.{PA, PCT} when entered
- at EL2 without VHE
-In-Reply-To: <1506607791-8621-6-git-send-email-will.deacon@arm.com>
+Date: Mon, 2 Oct 2017 11:07:00 +0100
+Subject: [PATCH v5 7/7] dt-bindings: Document devicetree binding for ARM
+ SPE
+In-Reply-To: <1506607791-8621-8-git-send-email-will.deacon@arm.com>
 References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
- <1506607791-8621-6-git-send-email-will.deacon@arm.com>
-Message-ID: <20171002100301.GC20737@leverpostej>
+ <1506607791-8621-8-git-send-email-will.deacon@arm.com>
+Message-ID: <20171002100700.GD20737@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 03:09:49PM +0100, Will Deacon wrote:
-> When booting at EL2, ensure that we permit the EL1 host to sample
-> physical addresses and physical counter values using SPE.
+On Thu, Sep 28, 2017 at 03:09:51PM +0100, Will Deacon wrote:
+> This patch documents the devicetree binding in use for ARM SPE.
 > 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/kernel/head.S | 17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
+>  Documentation/devicetree/bindings/arm/spe-pmu.txt | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 7434ec0c7a27..c370e270ae55 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -479,14 +479,21 @@ set_hcr:
->  
->  	/* Statistical profiling */
->  	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
-> -	cbz	x0, 6f				// Skip if SPE not present
-> -	cbnz	x2, 5f				// VHE?
-> +	cbz	x0, 7f				// Skip if SPE not present
-> +	cbnz	x2, 6f				// VHE?
-> +	mrs_s	x4, SYS_PMBIDR_EL1		// If SPE available at EL2,
-> +	and	x4, x4, #(1 << SYS_PMBIDR_EL1_P_SHIFT)
-> +	cbnz	x4, 5f				// then permit sampling of physical
-> +	mov	x4, #(1 << SYS_PMSCR_EL2_PCT_SHIFT | \
-> +		      1 << SYS_PMSCR_EL2_PA_SHIFT)
-> +	msr_s	SYS_PMSCR_EL2, x4		// addresses and physical counter
+> diff --git a/Documentation/devicetree/bindings/arm/spe-pmu.txt b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+> new file mode 100644
+> index 000000000000..93372f2a7df9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+> @@ -0,0 +1,20 @@
+> +* ARMv8.2 Statistical Profiling Extension (SPE) Performance Monitor Units (PMU)
+> +
+> +ARMv8.2 introduces the optional Statistical Profiling Extension for collecting
+> +performance sample data using an in-memory trace buffer.
 
-As a general note, I find these right-hand-side comments difficult to
-read, especially here with multiple line gaps mid-sentence.
+It might make sense to comment that even if described in the DT, a
+higher exception level may disallow access (discoverable via
+PMBIDR_EL1).
 
-If I'm alone in that view, there's no reason to change them, but
-otherwise it might make sense to replace the more complex comments with
-/* */ comment blocks on their own lines...
-
-The logic looks fine to me, so FWIW:
+Either way:
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 
+As a nit, this should've come before the driver, as per
+Documentation/devicetree/bindings/submitting-patches.txt, but thanks for
+splitting as its own patch.
+
+Thanks,
 Mark.
 
-> +5:
->  	mov	x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
->  	orr	x3, x3, x1			// If we don't have VHE, then
-> -	b	6f				// use EL1&0 translation.
-> -5:						// For VHE, use EL2 translation
-> +	b	7f				// use EL1&0 translation.
-> +6:						// For VHE, use EL2 translation
->  	orr	x3, x3, #MDCR_EL2_TPMS		// and disable access from EL1
-> -6:
-> +7:
->  	msr	mdcr_el2, x3			// Configure debug traps
->  
->  	/* Stage-2 translation */
+> +
+> +** SPE Required properties:
+> +
+> +- compatible : should be one of:
+> +	       "arm,statistical-profiling-extension-v1"
+> +
+> +- interrupts : Exactly 1 PPI must be listed. For heterogeneous systems where
+> +               SPE is only supported on a subset of the CPUs, please consult
+> +	       the arm,gic-v3 binding for details on describing a PPI partition.
+> +
+> +** Example:
+> +
+> +spe-pmu {
+> +        compatible = "arm,statistical-profiling-extension-v1";
+> +        interrupts = <GIC_PPI 05 IRQ_TYPE_LEVEL_HIGH &part1>;
+> +};
 > -- 
 > 2.1.4
->
+> 
