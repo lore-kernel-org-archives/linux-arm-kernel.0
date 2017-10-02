@@ -1,143 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 2 Oct 2017 14:24:35 -0700
-Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
-In-Reply-To: <20170921042641.7326-4-joel@jms.id.au>
-References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-4-joel@jms.id.au>
-Message-ID: <20171002212435.GP457@codeaurora.org>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Mon, 2 Oct 2017 16:26:54 -0500
+Subject: 4879b7ae05 ("Merge tag 'dmaengine-4.12-rc1' of .."): WARNING:
+ kernel stack regs at bd92bc2e in 01-cpu-hotplug:3811 has bad 'bp' value
+ 000001be
+In-Reply-To: <CA+55aFz_ijfUxyk2kdLhfzfS1z0_uRBw6eQb9UxFvh=5zOzzaw@mail.gmail.com>
+References: <59d177a7.vsiddgOxdHRIlRvy%fengguang.wu@intel.com>
+ <CA+55aFz_ijfUxyk2kdLhfzfS1z0_uRBw6eQb9UxFvh=5zOzzaw@mail.gmail.com>
+Message-ID: <20171002212654.rsm4uj3hfioddldd@treble>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21, Joel Stanley wrote:
-> @@ -160,6 +191,104 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
->  			mult, div);
->  }
->  
-> +static int __init aspeed_clk_probe(struct platform_device *pdev)
+On Mon, Oct 02, 2017 at 01:09:31PM -0700, Linus Torvalds wrote:
+> Bringing in Josh on this, because the merge commit gets fingered
+> because it seems to be an interaction between the new code from the
+> merge and the ORC unwinder changes. It's probably some almost trivial
+> code difference that just causes some code generation to change.
+> 
+> And because Josh wasn't implicated in the merge, he didn't get cc'd by
+> the kernel test robot.
+> 
+> Of course, the stack trace itself seems to be pretty useless, since
+> that randconfig doesn't have KALLSYMS enabled, so it's just random hex
+> numbers.
+> 
+> Josh, original email on lkml and a few other mailing lists, see for example:
+> 
+>     https://www.spinics.net/lists/devicetree/msg196692.html
+> 
+> Any ideas?
 
-Drop __init? Should be a section mismatch with __init here.
+The bisect is pointing to a commit which is almost 5 months old, so this
+is pre-ORC.  Kallsyms *is* enabled, but the unwinder dump isn't smart
+enough to realize it's dumping misaligned stack addresses:
 
-> +{
-> +	const struct aspeed_clk_soc_data *soc_data;
-> +	const struct clk_div_table *mac_div_table;
-> +	const struct clk_div_table *div_table;
-> +	struct device *dev = &pdev->dev;
-> +	struct regmap *map;
-> +	struct clk_hw *hw;
-> +	u32 val, rate;
-> +
-> +	map = syscon_node_to_regmap(dev->of_node);
-> +	if (IS_ERR(map)) {
-> +		dev_err(dev, "no syscon regmap\n");
-> +		return PTR_ERR(map);
-> +	}
-> +
-> +	/* SoC generations share common layouts but have different divisors */
-> +	soc_data = of_device_get_match_data(&pdev->dev);
+[  110.399425] WARNING: kernel stack regs at bd92bc2e in 01-cpu-hotplug:3811 has bad 'bp' value 000001be
+[  110.399428] unwind stack type:0 next_sp:  (null) mask:0x2 graph_idx:0
+[  110.399431] bd92bc2e: 92bc7f00 (0x92bc7f00)
+[  110.399433] bd92bc32: c27041bd (0xc27041bd)
 
-Check for soc_data being NULL.
+So kallsyms doesn't help if I'm dumping bad data.  Oops.
 
-> +	div_table = soc_data->div_table;
-> +	mac_div_table = soc_data->mac_div_table;
-> +
-> +	/* UART clock div13 setting */
-> +	regmap_read(map, ASPEED_MISC_CTRL, &val);
-> +	if (val & BIT(12))
+I tried to recreate it with the reproducer script and a similar GCC
+version, but no luck.
 
-What does BIT(12) mean? #define or comment please.
+Fengguang, assuming it's reliably recreatable, any chance you could
+recreate with the following patch?
 
-> +		rate = 24000000 / 13;
-> +	else
-> +		rate = 24000000;
-> +	/* TODO: Find the parent data for the uart clock */
-> +	hw = clk_hw_register_fixed_rate(NULL, "uart", NULL, 0, rate);
-> +	aspeed_clk_data->hws[ASPEED_CLK_UART] = hw;
-> +
-> +	/*
-> +	 * Memory controller (M-PLL) PLL. This clock is configured by the
-> +	 * bootloader, and is exposed to Linux as a read-only clock rate.
-> +	 */
-> +	regmap_read(map, ASPEED_MPLL_PARAM, &val);
-> +	aspeed_clk_data->hws[ASPEED_CLK_MPLL] =	aspeed_calc_pll("mpll", val);
-> +
-> +	/* SD/SDIO clock divider (TODO: There's a gate too) */
-> +	hw = clk_hw_register_divider_table(NULL, "sdio", "hpll", 0,
 
-Please pass your dev pointer here from the platform device.
-
-> +			scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
-> +			div_table,
-> +			&aspeed_clk_lock);
-
-And check for errors? Perhaps use devm_clk_hw_regsiter() APIs and
-construct the dividers and muxes directly instead of using the
-basic type registration APIs.
-
-> +	aspeed_clk_data->hws[ASPEED_CLK_SDIO] = hw;
-> +
-> +	/* MAC AHB bus clock divider */
-> +	hw = clk_hw_register_divider_table(NULL, "mac", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 16, 3, 0,
-> +			mac_div_table,
-> +			&aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_MAC] = hw;
-> +
-> +	/* LPC Host (LHCLK) clock divider */
-> +	hw = clk_hw_register_divider_table(NULL, "lhclk", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
-> +			div_table,
-> +			&aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_LHCLK] = hw;
-> +
-> +	/* Video Engine (ECLK) mux and clock divider */
-> +	hw = clk_hw_register_mux(NULL, "eclk_mux",
-> +			eclk_parents, ARRAY_SIZE(eclk_parents), 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 2, 2,
-> +			0, &aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_ECLK_MUX] = hw;
-> +	hw = clk_hw_register_divider_table(NULL, "eclk", "eclk_mux", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
-> +			div_table,
-> +			&aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_ECLK] = hw;
-> +
-> +	/* P-Bus (BCLK) clock divider */
-> +	hw = clk_hw_register_divider_table(NULL, "bclk", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 0, 2, 0,
-> +			div_table,
-> +			&aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
-> +
-> +	return 0;
-> +};
-> +
-> +static const struct of_device_id aspeed_clk_dt_ids[] = {
-> +	{ .compatible = "aspeed,ast2400-scu", .data = &ast2400_data },
-> +	{ .compatible = "aspeed,ast2500-scu", .data = &ast2500_data },
-> +	{ },
-
-           ^
-Nitpick, drop the comma
-
-> +};
-> +
-> +static struct platform_driver aspeed_clk_driver = {
-> +	.probe  = aspeed_clk_probe,
-> +	.driver = {
-> +		.name = "aspeed-clk",
-> +		.of_match_table = aspeed_clk_dt_ids,
-> +		.suppress_bind_attrs = true,
-> +	},
-> +};
-> +builtin_platform_driver(aspeed_clk_driver);
-> +
-> +
-
-Kill a newline, save the internet.
-
->  static void __init aspeed_ast2400_cc(struct regmap *map)
->  {
->  	struct clk_hw *hw;
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+diff --git a/arch/x86/kernel/unwind_frame.c b/arch/x86/kernel/unwind_frame.c
+index 82c6d7f1fd73..64282ec73eb8 100644
+--- a/arch/x86/kernel/unwind_frame.c
++++ b/arch/x86/kernel/unwind_frame.c
+@@ -42,7 +42,7 @@ static void unwind_dump(struct unwind_state *state)
+ 			state->stack_info.type, state->stack_info.next_sp,
+ 			state->stack_mask, state->graph_idx);
+ 
+-	for (sp = state->orig_sp; sp; sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
++	for (sp = PTR_ALIGN(state->orig_sp); sp; sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
+ 		if (get_stack_info(sp, state->task, &stack_info, &visit_mask))
+ 			break;
+ 
