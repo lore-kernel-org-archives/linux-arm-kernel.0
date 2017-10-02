@@ -1,89 +1,72 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 02 Oct 2017 15:11:18 +0100
-Subject: undefined instruction d5380001 (arm64 mrs emulation)
-In-Reply-To: <20171002112433.GM3611@e103592.cambridge.arm.com>
-References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
- <20171002112433.GM3611@e103592.cambridge.arm.com>
-Message-ID: <59D24906.4060104@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Oct 2017 15:14:05 +0100
+Subject: [PATCH v5 6/7] drivers/perf: Add support for ARMv8.2 Statistical
+ Profiling Extension
+In-Reply-To: <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
+References: <1506607791-8621-1-git-send-email-will.deacon@arm.com>
+ <1506607791-8621-7-git-send-email-will.deacon@arm.com>
+ <20170929171940.2aa33d00463b1e9c987aea15@arm.com>
+Message-ID: <20171002141405.GC12847@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matwey,
+Hi Kim,
 
-On 02/10/17 12:24, Dave Martin wrote:
-> On Fri, Sep 29, 2017 at 10:23:54PM +0300, Matwey V. Kornilov wrote:
->> I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
->> and see the following at booting:
->>
->> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
->> [   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
->> [   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
->> [   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
->> [   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
->> [   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
->> [   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
->> [   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
->>
->> As far as I understand d5380001 should be emulated in cpufeature.c but
->> it is not. What could be wrong here?
+On Fri, Sep 29, 2017 at 05:19:40PM -0500, Kim Phillips wrote:
+> On Thu, 28 Sep 2017 15:09:50 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
 > 
-> The whole sequence is
+> > +/* Perf callbacks */
+> > +static int arm_spe_pmu_event_init(struct perf_event *event)
+> > +{
+> > +	u64 reg;
+> > +	struct perf_event_attr *attr = &event->attr;
+> > +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
+> > +
+> > +	/* This is, of course, deeply driver-specific */
+> > +	if (attr->type != event->pmu->type)
+> > +		return -ENOENT;
+> > +
+> > +	if (event->cpu >= 0 &&
+> > +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
+> > +		return -ENOENT;
 > 
->    0:   d503201f        nop
->    4:   8a180320        and     x0, x25, x24
->    8:   92750001        and     x1, x0, #0x800
->    c:   365ffc20        tbz     w0, #11, 0xffffffffffffff90
->   10:*  d5380001        mrs     x1, midr_el1            <-- trapping instruction
+> So -ENOENT will make tools/perf/util/evsel.c tell the user "The %s event is not
+> supported." whereas returning -ENODEV will say "No such device - did
+> you specify an out-of-range profile CPU?" which may or may not be more
+> appropriate for this check.
 
-This looks the same as:
-https://bugzilla.redhat.com/show_bug.cgi?id=1496209
+I agree that the message isn't great, but I'm returning ENOENT here to
+be consistent with the CPU PMU behaviour (which necessarily has to return
+ENOENT so that we can support ABI event types over there -- see
+perf_init_event).
 
-[...]
-
-> What should happen here is that the do_undefinstr() in
-> arch/arm64/kernel/traps.c should call registered undef hooks until it
-> finds one that accepts the faulting instruction.
+> > +	if (arm_spe_event_to_pmsevfr(event) & SYS_PMSEVFR_EL1_RES0)
+> > +		return -EOPNOTSUPP;
+> > +	if (attr->exclude_idle)
+> > +		return -EOPNOTSUPP;
 > 
-> So, either the cpufeatures undef hook is not getting called, or it is
-> failing the instruction somewhere, possibly in
-> cpufeatures.c:emulate_id_reg() or emulate_sys_reg().
+> "PMU Hardware doesn't support sampling/overflow-interrupts." will be
+> printed if the user didn't specify a sample period.  Otherwise, a
+> string with "/bin/dmesg may provide additional information." will be
+> printed.
 > 
+> I was hoping for a response from acme by now for this:
 > 
-> Can you add some trace to those functions to see what's happening?
+> https://www.spinics.net/lists/linux-perf-users/msg04066.html
+> 
+> Alas, nothing.  Looking at the #ifdef x86 in evsel.c, I'm guessing
+> it'll be ok, although I'm still not sure how PMU-specific we can get in
+> evsel.c, nor whether it's ok to communicate lists of h/w supported
+> sample periods through /sys/bus/event_source/devices/...
+> 
+> acme?  OK to refactor evsel messaging for Arm, including parsing for
+> which PMUs are being used, so customize the message?
 
-I couldn't reproduce this with linux-stable's v4.13.3 defconfig on Seattle or Juno.
+Arnaldo's probably got enough on his plate maintaining perf tool, so my
+advice would be to post a patch as an RFC and use that as a concrete basis
+for discussion. It often works out better starting with code, even if none
+of it ends up getting merged (and you can include bits of your email above
+in the cover letter).
 
-What distribution are you running? Could you also try [0] to see if this is
-something specific to your version of modprobe?
-
-
-Thanks,
-
-James
-
-[0] works for me:
----------------------%<---------------------
-#include <stdio.h>
-#include <sys/auxv.h>
-
-#ifndef HWCAP_CPUID
-#define HWCAP_CPUID (1 << 11)
-#endif
-
-int main(int argc, char **argv)
-{
-        register unsigned int midr asm ("r1") = 0;
-        unsigned long hwcaps = getauxval(AT_HWCAP);
-
-        if (!(hwcaps & HWCAP_CPUID)) {
-                fprintf(stderr, "mrs emulation not supported\n");
-                return 1;
-        }
-
-        asm("mrs %0, midr_el1" : "=r"(midr));
-
-        fprintf(stderr, "mrs x1, midr_el1; x1=0x%x\n", midr);
-
-        return 0;
-}
----------------------%<---------------------
+Will
