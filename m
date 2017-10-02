@@ -1,32 +1,35 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon,  2 Oct 2017 14:27:40 +0200
-Subject: [PATCH 0/3] mmc: meson-gx: fixes for v4.14
-Message-ID: <20171002122743.32334-1-jbrunet@baylibre.com>
+Date: Mon,  2 Oct 2017 14:27:41 +0200
+Subject: [PATCH 1/3] mmc: meson-gx: make sure the clock is rounded down
+In-Reply-To: <20171002122743.32334-1-jbrunet@baylibre.com>
+References: <20171002122743.32334-1-jbrunet@baylibre.com>
+Message-ID: <20171002122743.32334-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes the issues reported by Heiner [0] with the odroid-c2.
-In a nutshell, this series does the following:
+Using CLK_DIVIDER_ROUND_CLOSEST is unsafe as the mmc clock could be
+rounded to a rate higher the specified rate. Removing this flag ensure
+that, if the rate needs to be rounded, it will be rounded down.
 
-* Make sure the mmc clock rate is not set higher than what is requested
-* Reset the tuning values on mmc power cycle instead of POWER_ON
-* Add tuning of the tx phase to the tuning function.
+Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/mmc/host/meson-gx-mmc.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-This fixes the problem seen on the odroid-c2, both for hs200 and hs400.
-To check for regression, this series has also been tested on the gxl
-libretech-cc
-
-Ulf, could you please pick this as fixes for v4.14 ?
-
-[0]: https://lkml.kernel.org/r/e2171288-84ef-82db-2efc-300935e6c062 at gmail.com
-
-Jerome Brunet (3):
-  mmc: meson-gx: make sure the clock is rounded down
-  mmc: meson-gx: fix rx phase reset
-  mmc: meson-gx: include tx phase in the tuning process
-
- drivers/mmc/host/meson-gx-mmc.c | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index c885c2d4b904..421c8719c202 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -531,8 +531,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
+ 	div->shift = __ffs(CLK_DIV_MASK);
+ 	div->width = __builtin_popcountl(CLK_DIV_MASK);
+ 	div->hw.init = &init;
+-	div->flags = (CLK_DIVIDER_ONE_BASED |
+-		      CLK_DIVIDER_ROUND_CLOSEST);
++	div->flags = CLK_DIVIDER_ONE_BASED;
+ 
+ 	clk = devm_clk_register(host->dev, &div->hw);
+ 	if (WARN_ON(IS_ERR(clk)))
 -- 
 2.13.5
