@@ -1,99 +1,71 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 2 Oct 2017 09:14:34 +0200
-Subject: [PATCH 20/22] arm64: dts: renesas: r8a77995: draak: enable
- EthernetAVB
-In-Reply-To: <TY1PR06MB09924F9B2BE2CA1C5F1CF318D87D0@TY1PR06MB0992.apcprd06.prod.outlook.com>
-References: <cover.1506678250.git.horms+renesas@verge.net.au>
- <4503b50eac08f472e8690ec61f4d144e62cbdc55.1506678250.git.horms+renesas@verge.net.au>
- <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
- <TY1PR06MB09924F9B2BE2CA1C5F1CF318D87D0@TY1PR06MB0992.apcprd06.prod.outlook.com>
-Message-ID: <20171002071433.GA10579@verge.net.au>
+Date: Mon, 2 Oct 2017 09:15:59 +0200
+Subject: [PATCH 22/48] ARM: dts: gr-peach: Add user led device nodes
+In-Reply-To: <20171001173614.GB4037@w540>
+References: <cover.1506683482.git.horms+renesas@verge.net.au>
+ <cfce5ac1aaf08fc0920d6572779360f80e8f3489.1506683482.git.horms+renesas@verge.net.au>
+ <e2e2b3a5-23b2-7f11-4fb3-2f835fdbc11a@cogentembedded.com>
+ <20171001173614.GB4037@w540>
+Message-ID: <20171002071559.GB10579@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 01:18:49AM +0000, Yoshihiro Shimoda wrote:
-> Hello,
+On Sun, Oct 01, 2017 at 07:36:14PM +0200, jacopo mondi wrote:
+> Hi Seregei,
 > 
-> > -----Original Message-----
-> > From: Sergei Shtylyov
-> > Sent: Saturday, September 30, 2017 7:24 PM
-> > 
+> On Sat, Sep 30, 2017 at 01:36:18PM +0300, Sergei Shtylyov wrote:
 > > Hello!
-> > 
-> > On 9/29/2017 2:52 PM, Simon Horman wrote:
-> > 
-> > > From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> >
+> > On 9/29/2017 2:53 PM, Simon Horman wrote:
+> >
+> > >From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 > > >
-> > > This patch enables EthernetAVB for R-Car D3 draak board.
+> > >Add device nodes for user leds on gr-peach board.
 > > >
-> > > Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >   arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 25 +++++++++++++++++++++++++
-> > >   1 file changed, 25 insertions(+)
+> > >Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > >Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > >---
+> > >  arch/arm/boot/dts/r7s72100-gr-peach.dts | 10 ++++++++++
+> > >  1 file changed, 10 insertions(+)
 > > >
-> > > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> > > index 7b776cb7e928..96b7ff5cc321 100644
-> > > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> > > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > >diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> > >index bcfa6445bbaa..13d745bb56a5 100644
+> > >--- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
+> > >+++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
 > > [...]
-> > > @@ -37,6 +39,14 @@
-> > >   };
-> > >
-> > >   &pfc {
-> > > +	avb0_pins: avb {
-> > > +		mux {
-> > > +			groups = "avb0_link", "avb0_phy_int", "avb0_mdc",
-> >                                                ^^^^^^^^^^^^^^
-> >     Hum, I don't think it's compatible with routing the PHY interrupt via
-> > GPIO5_19 below. The driver doesn't support signalling via AVB_PHY_INT anyway.
+> > >@@ -51,6 +52,15 @@
+> > >  			reg = <0x00600000 0x00200000>;
+> > >  		};
+> > >  	};
+> > >+
+> > >+leds {
+> >
+> >    Not indented properly...
 > 
-> Oops! You're correct. I should drop "avb0_phy_int".
+> Thanks!
 > 
-> Simon-san, may I send a follow-up patch to fix this?
+> Simon, as you sent pull request already, will we need a patch on top
+> of this to fix it?
 
-Thanks Sergei, thanks Shimoda-san,
+Thanks, please do.
 
-yes, please provide a follow-up patch.
-
-At this stage I don't think we need to re-spin this pull-request
-to fix this, rather a follow-up patch can be included
-in a follow-up pull request.
+I don't think we need to re-spin the pull-request to correct this,
+rather, a follow-up patch can be provided in a follow-up pull-request.
 
 > 
-> Best regards,
-> Yoshihiro Shimoda
-> 
-> > > +				 "avb0_mii";
-> > > +			function = "avb0";
-> > > +		};
-> > > +	};
-> > > +
-> > >   	scif2_pins: scif2 {
-> > >   		groups = "scif2_data";
-> > >   		function = "scif2";
-> > > @@ -56,6 +66,21 @@
-> > >   	status = "okay";
-> > >   };
-> > >
-> > > +&avb {
-> > > +	pinctrl-0 = <&avb0_pins>;
-> > > +	pinctrl-names = "default";
-> > > +	renesas,no-ether-link;
-> > > +	phy-handle = <&phy0>;
-> > > +	status = "okay";
-> > > +
-> > > +	phy0: ethernet-phy at 0 {
-> > > +		rxc-skew-ps = <1500>;
-> > > +		reg = <0>;
-> > > +		interrupt-parent = <&gpio5>;
-> > > +		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
-> > > +	};
-> > > +};
-> > > +
-> > >   &scif2 {
-> > >   	pinctrl-0 = <&scif2_pins>;
-> > >   	pinctrl-names = "default";
-> > 
+> Thanks
+>   j
+> >
+> > >+		status = "okay";
+> > >+		compatible = "gpio-leds";
+> > >+
+> > >+		led1 {
+> > >+			gpios = <&port6 12 GPIO_ACTIVE_HIGH>;
+> > >+		};
+> > >+	};
+> > >  };
+> > >  &pinctrl {
+> >
 > > MBR, Sergei
+> 
