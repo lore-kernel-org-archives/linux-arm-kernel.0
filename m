@@ -1,41 +1,39 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 2 Oct 2017 00:19:35 +0200
-Subject: i2c-omap.c vs. qemu: too much work in one irq (and broken boot)
-In-Reply-To: <20171001204215.GA9928@amd>
-References: <20171001204215.GA9928@amd>
-Message-ID: <20171001221935.GA29628@amd>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 2 Oct 2017 03:05:22 +0200
+Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
+In-Reply-To: <20170917093906.16325-2-linus.walleij@linaro.org>
+References: <20170917093906.16325-1-linus.walleij@linaro.org>
+ <20170917093906.16325-2-linus.walleij@linaro.org>
+Message-ID: <CACRpkdZ=BZHp3mjccUYaPTuMbXgwGSErvLprnp4j0H+7C5NYJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Sun, Sep 17, 2017 at 11:39 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-> I'm trying to get qemu emulation of Nokia N900 to work, but
-> unfortunately i2c-omap.c breaks boot in the emulator (real hardware
-> works ok).
+> - The MFD Silicon Motion SM501 is a special case. It dynamically
+>   spawns an I2C bus off the MFD using sm501_create_subdev().
+>   We use an approach to dynamically create a machine descriptor
+>   table and attach this to the "SM501-LOW" or "SM501-HIGH"
+>   gpiochip. We use chip-local offsets to grab the right lines.
+>   We can get rid of two local static inline helpers as part
+>   of this refactoring.
+(...)
+> SM501 users: requesting Tested-by on this patch.
 
-I started bisection. v4.6 works, v4.7 is broken. (It still may be
-config difference or something).
+Paging Simtec (if it reaches anyone), Vincent Sanders,
+Teddy Wang at Silicon Motion:
 
-This looked suspect, so I tried reverting it, but it did not help. And
-it is only significant change in i2c-omap.c. So... this may be a lot
-of fun.
+Does any of you have an "Anubis" board so you can test GPIO
+on this board before/after this patch and see if it checks out right?
 
-commit 126a66caec4a00b8d66dbc3174b0efa905cf68c3
-Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Date:   Mon Apr 4 16:55:23 2016 +0300
+I guess it's this board:
+http://www.simtec.co.uk/products/BBD20EUROA/
 
-Unfortunately, mmc is broken in v4.6, so its useless for
-emulation... [ 3.236724] mmc1: error -22 whilst initialising SDIO card
+Does anyone know of a commercially obtainable product using
+SM501 with reasonable mainline Linux support so I can test it myself?
 
-Ideas?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/df3ab2e2/attachment.sig>
+Getting a bit desperate...
+
+Yours,
+Linus Walleij
