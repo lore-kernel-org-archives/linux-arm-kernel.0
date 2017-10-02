@@ -1,123 +1,89 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 2 Oct 2017 15:12:17 +0100
-Subject: [PATCH v3] arm64: acpi/gtdt: validate CNTFRQ after having enabled
- the frame
-In-Reply-To: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
-References: <20170901103533.8970-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu97WoJCXqxQPvdJDavuMF6LZbrpFYb1H+Q3BUw8wqp0dA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 02 Oct 2017 15:11:18 +0100
+Subject: undefined instruction d5380001 (arm64 mrs emulation)
+In-Reply-To: <20171002112433.GM3611@e103592.cambridge.arm.com>
+References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
+ <20171002112433.GM3611@e103592.cambridge.arm.com>
+Message-ID: <59D24906.4060104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2017 at 11:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
-> frame against the CNTFRQ system register of the current CPU, to
-> ensure that they are equal, which is mandated by the architecture.
->
-> However, reading the CNTFRQ field of a frame is not possible until
-> the RFRQ bit in the frame's CNTACRn register is set, and doing so
-> before that willl produce the following error:
->
->   arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
->   arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
->   arch_timer: Failed to initialize memory-mapped timer.
->
-> The reason is that the CNTFRQ field is RES0 if access is not enabled.
->
-> So move the validation of CNTFRQ into the loop that iterates over the
-> timers to find the best frame, but defer it until after we have selected
-> the best frame, which should also have enabled the RFRQ bit.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v3: - preserve existing logic as much as possible wrt verifying all frames of
->       all timers before selecting a suitable one
->
+Hi Matwey,
 
-Ping?
+On 02/10/17 12:24, Dave Martin wrote:
+> On Fri, Sep 29, 2017 at 10:23:54PM +0300, Matwey V. Kornilov wrote:
+>> I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
+>> and see the following at booting:
+>>
+>> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
+>> [   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>> [   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
+>> [   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>> [   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
+>> [   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>> [   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
+>> [   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>
+>> As far as I understand d5380001 should be emulated in cpufeature.c but
+>> it is not. What could be wrong here?
+> 
+> The whole sequence is
+> 
+>    0:   d503201f        nop
+>    4:   8a180320        and     x0, x25, x24
+>    8:   92750001        and     x1, x0, #0x800
+>    c:   365ffc20        tbz     w0, #11, 0xffffffffffffff90
+>   10:*  d5380001        mrs     x1, midr_el1            <-- trapping instruction
+
+This looks the same as:
+https://bugzilla.redhat.com/show_bug.cgi?id=1496209
+
+[...]
+
+> What should happen here is that the do_undefinstr() in
+> arch/arm64/kernel/traps.c should call registered undef hooks until it
+> finds one that accepts the faulting instruction.
+> 
+> So, either the cpufeatures undef hook is not getting called, or it is
+> failing the instruction somewhere, possibly in
+> cpufeatures.c:emulate_id_reg() or emulate_sys_reg().
+> 
+> 
+> Can you add some trace to those functions to see what's happening?
+
+I couldn't reproduce this with linux-stable's v4.13.3 defconfig on Seattle or Juno.
+
+What distribution are you running? Could you also try [0] to see if this is
+something specific to your version of modprobe?
 
 
->  drivers/clocksource/arm_arch_timer.c | 38 +++++++++++---------
->  1 file changed, 21 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 72bbfccef113..30071cdea846 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1264,10 +1264,6 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
->
->         iounmap(cntctlbase);
->
-> -       if (!best_frame)
-> -               pr_err("Unable to find a suitable frame in timer @ %pa\n",
-> -                       &timer_mem->cntctlbase);
-> -
->         return best_frame;
->  }
->
-> @@ -1368,6 +1364,8 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
->
->         frame = arch_timer_mem_find_best_frame(timer_mem);
->         if (!frame) {
-> +               pr_err("Unable to find a suitable frame in timer @ %pa\n",
-> +                       &timer_mem->cntctlbase);
->                 ret = -EINVAL;
->                 goto out;
->         }
-> @@ -1416,7 +1414,7 @@ arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
->  static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->  {
->         struct arch_timer_mem *timers, *timer;
-> -       struct arch_timer_mem_frame *frame;
-> +       struct arch_timer_mem_frame *frame, *best_frame = NULL;
->         int timer_count, i, ret = 0;
->
->         timers = kcalloc(platform_timer_count, sizeof(*timers),
-> @@ -1428,14 +1426,6 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->         if (ret || !timer_count)
->                 goto out;
->
-> -       for (i = 0; i < timer_count; i++) {
-> -               ret = arch_timer_mem_verify_cntfrq(&timers[i]);
-> -               if (ret) {
-> -                       pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-> -                       goto out;
-> -               }
-> -       }
-> -
->         /*
->          * While unlikely, it's theoretically possible that none of the frames
->          * in a timer expose the combination of feature we want.
-> @@ -1444,12 +1434,26 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->                 timer = &timers[i];
->
->                 frame = arch_timer_mem_find_best_frame(timer);
-> -               if (frame)
-> -                       break;
-> +               if (!best_frame)
-> +                       best_frame = frame;
-> +
-> +               ret = arch_timer_mem_verify_cntfrq(timer);
-> +               if (ret) {
-> +                       pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-> +                       goto out;
-> +               }
-> +
-> +               if (!best_frame) /* implies !frame */
-> +                       /*
-> +                        * Only complain about missing suitable frames if we
-> +                        * haven't already found one in a previous iteration.
-> +                        */
-> +                       pr_err("Unable to find a suitable frame in timer @ %pa\n",
-> +                               &timer->cntctlbase);
->         }
->
-> -       if (frame)
-> -               ret = arch_timer_mem_frame_register(frame);
-> +       if (best_frame)
-> +               ret = arch_timer_mem_frame_register(best_frame);
->  out:
->         kfree(timers);
->         return ret;
-> --
-> 2.11.0
->
+Thanks,
+
+James
+
+[0] works for me:
+---------------------%<---------------------
+#include <stdio.h>
+#include <sys/auxv.h>
+
+#ifndef HWCAP_CPUID
+#define HWCAP_CPUID (1 << 11)
+#endif
+
+int main(int argc, char **argv)
+{
+        register unsigned int midr asm ("r1") = 0;
+        unsigned long hwcaps = getauxval(AT_HWCAP);
+
+        if (!(hwcaps & HWCAP_CPUID)) {
+                fprintf(stderr, "mrs emulation not supported\n");
+                return 1;
+        }
+
+        asm("mrs %0, midr_el1" : "=r"(midr));
+
+        fprintf(stderr, "mrs x1, midr_el1; x1=0x%x\n", midr);
+
+        return 0;
+}
+---------------------%<---------------------
