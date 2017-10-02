@@ -1,98 +1,139 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 2 Oct 2017 17:58:55 +0530
-Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
- support
-In-Reply-To: <alpine.DEB.2.20.1709280757230.2488@mgerlach-VirtualBox>
+Date: Mon, 2 Oct 2017 18:16:40 +0530
+Subject: [PATCH v3 2/5] mtd: spi-nor: cadence-quadspi: add a delay in
+ write sequence
+In-Reply-To: <d35d0891-71b9-12df-9689-dc77f56453ab@gmail.com>
 References: <20170924105924.23923-1-vigneshr@ti.com>
- <20170924105924.23923-6-vigneshr@ti.com>
- <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
- <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
- <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
- <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
- <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
- <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
- <fdfe29bf-ff46-7542-8e36-e8e45e1ca85f@gmail.com>
- <7237fa9e-4d3a-8a82-10c6-76737c23ed6f@ti.com>
- <alpine.DEB.2.20.1709280757230.2488@mgerlach-VirtualBox>
-Message-ID: <5bc42364-21e1-56b6-788c-2848b8faa50f@ti.com>
+ <20170924105924.23923-3-vigneshr@ti.com>
+ <94313cae-4805-0b13-a469-72aa7556b685@gmail.com>
+ <8990b971-91d5-747f-905b-5e24743e090d@ti.com>
+ <d35d0891-71b9-12df-9689-dc77f56453ab@gmail.com>
+Message-ID: <07137a92-244b-e009-54ae-71f733860f28@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 9/28/2017 8:31 PM, matthew.gerlach at linux.intel.com wrote:
+
+On 9/24/2017 6:43 PM, Marek Vasut wrote:
+> On 09/24/2017 02:33 PM, Vignesh R wrote:
+>>
+>>
+>> On 9/24/2017 5:29 PM, Marek Vasut wrote:
+>>> On 09/24/2017 12:59 PM, Vignesh R wrote:
+>>>> As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
+>>>> Controller programming sequence, a delay equal to couple of QSPI master
+>>>> clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
+>>>> writing data to the flash. Introduce a quirk flag CQSPI_NEEDS_WR_DELAY
+>>>> to handle this and set this flag for TI 66AK2G SoC.
+>>>>
+>>>> [1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
+>>>>
+>>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>>
+>>> Is this TI specific or is this controller property ? I wouldn't be
+>>> surprised of the later ...
+>>
+>> I am not sure, there is no generic public documentation by cadence for
+>> this IP. TI TRM clearly states this delay is required and I have
+>> verified it practically that this delay is indeed needed.
+>> But current user of this IP, socfpga does not seem to mention anything
+>> about it. So, I guess its TI specific quirk.
 > 
-> Hi Vignesh,
-> 
-> I tried this patch on an Arria10 SOCFPGA devkit against the 4.1.33-ltsi 
-> kernel, and it did not go well.  Commands to the flash chip timedout 
-> resulting in the probe function failing.  I ran into other problems, not 
-> related to cadence-quadspi, that prevented me from testing against 4.9 and 
-> 4.12 kernels, but I suspect similar behavior.
+> OK, let's go with that then. I didn't observe any stability issues with
+> SoCFPGA, but I didn't run the flash at 100s of MHz either. At what kind
+> of frequencies does the quirk become relevant ?
 > 
 
-Ok, thanks! I will keep the clk_*() calls for now.
+Actually, delay is tied to QSPI master clk rate(not SPI bus clk rate).
+It runs at 384MHz. Changing SPI bus rate has no effect.
 
 Regards
 Vignesh
-> Matthew Gerlach
-> 
-> On Wed, 27 Sep 2017, Vignesh R wrote:
-> 
->> Hi Matthew,
->>
->> On Tuesday 26 September 2017 05:19 AM, Marek Vasut wrote:
->> [...]
->>>>>> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
->>>>>> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
->>>>>> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
->>>>>
->>>>> Not of the top of my head, sorry. +CC Matthew, he should know.
+
+>>>
+>>>> ---
 >>>>
->>>> I am not an expert at the clock framework nor the power management, but I
->>>> did ask around a bit.? No one I asked was planning to change the clk_*()
->>>> calls to pm_*() call, but the feedback was that it would be a good idea.
+>>>> v3:
+>>>> Fix build warnings reported by kbuild test bot.
+>>>>
+>>>>  drivers/mtd/spi-nor/cadence-quadspi.c | 27 ++++++++++++++++++++++++++-
+>>>>  1 file changed, 26 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+>>>> index 53c7d8e0327a..5cd5d6f7303f 100644
+>>>> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+>>>> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+>>>> @@ -38,6 +38,9 @@
+>>>>  #define CQSPI_NAME			"cadence-qspi"
+>>>>  #define CQSPI_MAX_CHIPSELECT		16
+>>>>  
+>>>> +/* Quirks */
+>>>> +#define CQSPI_NEEDS_WR_DELAY		BIT(0)
+>>>> +
+>>>>  struct cqspi_st;
+>>>>  
+>>>>  struct cqspi_flash_pdata {
+>>>> @@ -76,6 +79,7 @@ struct cqspi_st {
+>>>>  	u32			fifo_depth;
+>>>>  	u32			fifo_width;
+>>>>  	u32			trigger_address;
+>>>> +	u32			wr_delay;
+>>>>  	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
+>>>>  };
+>>>>  
+>>>> @@ -608,6 +612,15 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+>>>>  	reinit_completion(&cqspi->transfer_complete);
+>>>>  	writel(CQSPI_REG_INDIRECTWR_START_MASK,
+>>>>  	       reg_base + CQSPI_REG_INDIRECTWR);
+>>>> +	/*
+>>>> +	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
+>>>> +	 * Controller programming sequence, couple of cycles of
+>>>> +	 * QSPI_REF_CLK delay is required for the above bit to
+>>>> +	 * be internally synchronized by the QSPI module. Provide 5
+>>>> +	 * cycles of delay.
+>>>> +	 */
+>>>> +	if (cqspi->wr_delay)
+>>>> +		ndelay(cqspi->wr_delay);
+>>>>  
+>>>>  	while (remaining > 0) {
+>>>>  		write_bytes = remaining > page_size ? page_size : remaining;
+>>>> @@ -1156,6 +1169,7 @@ static int cqspi_probe(struct platform_device *pdev)
+>>>>  	struct cqspi_st *cqspi;
+>>>>  	struct resource *res;
+>>>>  	struct resource *res_ahb;
+>>>> +	unsigned long data;
+>>>>  	int ret;
+>>>>  	int irq;
+>>>>  
+>>>> @@ -1213,6 +1227,10 @@ static int cqspi_probe(struct platform_device *pdev)
+>>>>  	}
+>>>>  
+>>>>  	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+>>>> +	data  = (unsigned long)of_device_get_match_data(dev);
+>>>> +	if (data & CQSPI_NEEDS_WR_DELAY)
+>>>> +		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
+>>>> +						   cqspi->master_ref_clk_hz);
+>>>>  
+>>>>  	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
+>>>>  			       pdev->name, cqspi);
+>>>> @@ -1284,7 +1302,14 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
+>>>>  #endif
+>>>>  
+>>>>  static const struct of_device_id cqspi_dt_ids[] = {
+>>>> -	{.compatible = "cdns,qspi-nor",},
+>>>> +	{
+>>>> +		.compatible = "cdns,qspi-nor",
+>>>> +		.data = (void *)0,
+>>>> +	},
+>>>> +	{
+>>>> +		.compatible = "ti,k2g-qspi",
+>>>> +		.data = (void *)CQSPI_NEEDS_WR_DELAY,
+>>>> +	},
+>>>>  	{ /* end of table */ }
+>>>>  };
+>>>>  
+>>>>
 >>>
->>> The question is, if we do the replacement, will it break on socfpga ?
->>> A quick test might be useful.
 >>>
->>
->> yes, a quick qspi test with clk_prepare_enable() replaced by pm_*() calls
->> like below patch would be helpful:
->>
->>
->> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
->> index 53c7d8e0327a..7ad3e176cc88 100644
->> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
->> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
->> @@ -34,6 +34,7 @@
->> #include <linux/sched.h>
->> #include <linux/spi/spi.h>
->> #include <linux/timer.h>
->> +#include <linux/pm_runtime.h>
->>
->> #define CQSPI_NAME                     "cadence-qspi"
->> #define CQSPI_MAX_CHIPSELECT           16
->> @@ -1206,11 +1207,8 @@ static int cqspi_probe(struct platform_device *pdev)
->>                return -ENXIO;
->>        }
->>
->> -       ret = clk_prepare_enable(cqspi->clk);
->> -       if (ret) {
->> -               dev_err(dev, "Cannot enable QSPI clock.\n");
->> -               return ret;
->> -       }
->> +       pm_runtime_enable(dev);
->> +       pm_runtime_get_sync(dev);
->>
->>        cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
->>
->>
->>
->>
->>
->> -- 
->> Regards
->> Vignesh
->>
+> 
 > 
