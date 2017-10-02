@@ -1,59 +1,75 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 2 Oct 2017 17:11:00 +0100
-Subject: [PATCH 1/7] i2c: gpio: Convert to use descriptors
-In-Reply-To: <CACRpkdZ=BZHp3mjccUYaPTuMbXgwGSErvLprnp4j0H+7C5NYJQ@mail.gmail.com>
-References: <20170917093906.16325-1-linus.walleij@linaro.org>
- <20170917093906.16325-2-linus.walleij@linaro.org>
- <CACRpkdZ=BZHp3mjccUYaPTuMbXgwGSErvLprnp4j0H+7C5NYJQ@mail.gmail.com>
-Message-ID: <3100653b-21b7-0a84-6379-7c38e18e2dd6@codethink.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 2 Oct 2017 18:24:05 +0200
+Subject: [PATCH 5/7] ARM: dts: sun8i: a83t: cubietruck-plus: Add AXP818
+ regulator nodes
+In-Reply-To: <20170929032514.31727-6-wens@csie.org>
+References: <20170929032514.31727-1-wens@csie.org>
+ <20170929032514.31727-6-wens@csie.org>
+Message-ID: <20171002162405.jndvig3fxuj6d3ce@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/17 02:05, Linus Walleij wrote:
-> On Sun, Sep 17, 2017 at 11:39 AM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> 
->> - The MFD Silicon Motion SM501 is a special case. It dynamically
->>    spawns an I2C bus off the MFD using sm501_create_subdev().
->>    We use an approach to dynamically create a machine descriptor
->>    table and attach this to the "SM501-LOW" or "SM501-HIGH"
->>    gpiochip. We use chip-local offsets to grab the right lines.
->>    We can get rid of two local static inline helpers as part
->>    of this refactoring.
-> (...)
->> SM501 users: requesting Tested-by on this patch.
-> 
-> Paging Simtec (if it reaches anyone), Vincent Sanders,
-> Teddy Wang at Silicon Motion:
+Hi,
 
-I'm fairly sure Simtec is not currently active. See below.
-I have no idea if the SM501 is even available for current designs.
+On Fri, Sep 29, 2017 at 03:25:12AM +0000, Chen-Yu Tsai wrote:
+> +#include "axp81x.dtsi"
+> +
+> +&reg_aldo1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +	regulator-name = "vcc18-csi2-dsi-efuse-hdmi-d4dp";
+> +};
 
-> Does any of you have an "Anubis" board so you can test GPIO
-> on this board before/after this patch and see if it checks out right?
-> 
-> I guess it's this board:
-> http://www.simtec.co.uk/products/BBD20EUROA/
+I'm not really fond of these names. It's easy to miss some components
+(especially since we most of the time don't have the schematics), and
+if it's not complete, the obscure name isn't worth it either.
 
-I think that's fairly close.
-We did have a couple of other designs done for clients, but they may
-not have been available to the general public.
+What about vcc-1.8 for this one ?
 
-> 
-> Does anyone know of a commercially obtainable product using
-> SM501 with reasonable mainline Linux support so I can test it myself?
-> 
-> Getting a bit desperate...
+> +&reg_aldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +	regulator-name = "vdd-drampll-vcc18-pll-adc-cpvdd-ldoin";
+> +};
 
-At the moment I have no time to go through the boxes of ex-Simtec stuff
-that I still have... quite a lot of my old Simtec stuff has already been
-recycled as it has been over five years since leaving.
+dram-pll?
 
-> Yours,
-> Linus Walleij
-> 
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-pl-avcc";
+> +};
 
+avcc?
+
+etc..
+
+>  	status = "disabled";
+>  };
+>  
+> +&reg_vcc3v3 {
+> +	status = "disabled";
+> +};
+> +
+>  &reg_vcc5v0 {
+>  	status = "disabled";
+>  };
+
+Why not simply remove the DTSI then?
+
+Maxime
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/290c9d6e/attachment.sig>
