@@ -1,67 +1,44 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 2 Oct 2017 15:47:51 -0500
-Subject: [PATCH 1/2] [v5] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <20171002174414.GL1165@minitux>
-References: <1504798409-32041-1-git-send-email-timur@codeaurora.org>
- <1504798409-32041-2-git-send-email-timur@codeaurora.org>
- <20171002174414.GL1165@minitux>
-Message-ID: <9f28c9dd-6277-6c75-1186-a834e15c5346@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 2 Oct 2017 22:40:16 +0200
+Subject: [PATCH v3 07/12] ARM: dts: sun8i: a711: include axp81x dtsi
+In-Reply-To: <20171002120854.5212-8-quentin.schulz@free-electrons.com>
+References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
+ <20171002120854.5212-8-quentin.schulz@free-electrons.com>
+Message-ID: <20171002204016.ogaoesvz263leoj6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2017 12:44 PM, Bjorn Andersson wrote:
->> +	/*
->> +	 * If irq_need_valid_mask is true, then gpiochip_add_data() will
->> +	 * initialize irq_valid_mask to all 1s.  We need to clear all the
->> +	 * GPIOs that are unavailable, and we need to find each block
->> +	 * of consecutive available GPIOs are add them as pin ranges.
->> +	 */
->> +	if (chip->irq_need_valid_mask) {
->> +		for (i = 0; i < ngpio; i++)
->> +			if (!groups[i].npins)
->> +				clear_bit(i, pctrl->chip.irq_valid_mask);
->> +
->> +		while ((count = msm_gpio_get_next_range(pctrl, &start))) {
->> +			ret = gpiochip_add_pin_range(&pctrl->chip,
->> +						     dev_name(pctrl->dev),
->> +						     start, start, count);
->> +			if (ret)
->> +				break;
->> +			start += count;
-> I do not fancy the idea of specifying a bitmap of valid irq pins and
-> then having the driver register the pin-ranges in-between. 
+On Mon, Oct 02, 2017 at 12:08:49PM +0000, Quentin Schulz wrote:
+> This board has an AXP813 PMIC so let's include its dtsi.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+> index 723641f56a74..4f4db07ca19f 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+> +++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+> @@ -146,7 +146,7 @@
+>  &r_rsb {
+>  	status = "okay";
+>  
+> -	axp813: pmic at 3a3 {
+> +	axp81x: pmic at 3a3 {
 
-But that's exactly what abx500_gpio_probe() in pinctrl-abx500.c does. 
-Here's even a reference to holes in the GPIO space:
+Aren't we going to have an axp813 DTSI? What's your plan here
 
-/*
-  * Compute number of GPIOs from the last SoC gpio range descriptors
-  * These ranges may include "holes" but the GPIO number space shall
-  * still be homogeneous, so we need to detect and account for any
-  * such holes so that these are included in the number of GPIO pins.
-  */
-
- > If we provide
-> a bitmap of validity to the core it should support using this for the
-> pins as well. (Which I believe is what Linus answered in the discussion
-> following patch 0/2)
-
-So you want to change "gpio_chip" to add an "available" callback?  And 
-every time gpiolib wants to call a gpio_chip callback, it should call 
-->available first?  Like this:
-
-if (chip->available && chip->available())
-	status = chip->direction_input(chip, gpio_chip_hwgpio(desc));
-
-I can do that, but it just seems very redundant.  The core already knows 
-not to touch GPIOs that are not in a pin range.  The only exception is 
-gpiochip_add_data(), as I've stated before.
-
-It just seems wrong to call an API every time to ask permission before 
-we can call any other API.  But since the API may not be defined, we 
-have to first check if the API exists before we can ask permission.
+Maxime
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/f86d5263/attachment.sig>
