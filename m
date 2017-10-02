@@ -1,136 +1,124 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 2 Oct 2017 09:54:53 +0800
-Subject: [PATCH v3 03/10] arm: dts: mt2701: add display subsystem related nodes
+Date: Mon, 2 Oct 2017 09:54:59 +0800
+Subject: [PATCH v3 09/10] arm: dts: mt7623: enable bananapi-r2 display function
 In-Reply-To: <cover.1506908511.git.ryder.lee@mediatek.com>
 References: <cover.1506908511.git.ryder.lee@mediatek.com>
-Message-ID: <b1874b93aac73ebdc4e6cd5b6507cac0b116ddd7.1506908511.git.ryder.lee@mediatek.com>
+Message-ID: <766824a45d7170c0b2cbb36a5423821a68afa3a0.1506908511.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YT Shen <yt.shen@mediatek.com>
+This patch adds missing MIPI pin macros in mt7623-pinfunc.h and
+enables pwm backlight support for bananapi-r2.
 
-This patch adds the device nodes for MT2701 DISP function blocks.
-
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-Signed-off-by: Ryder Lee <ryder.lo@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 75 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 41 +++++++++++++++++++++++++--
+ include/dt-bindings/pinctrl/mt7623-pinfunc.h  | 12 ++++++++
+ 2 files changed, 51 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 3c85879..8c9fbe5 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -26,6 +26,11 @@
- 	compatible = "mediatek,mt2701";
- 	interrupt-parent = <&cirq>;
- 
-+	aliases {
-+		rdma0 = &rdma0;
-+		rdma1 = &rdma1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -203,6 +208,16 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 688a863..267a05a 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -17,6 +17,17 @@
+ 		serial2 = &uart2;
  	};
  
-+	mipi_tx0: mipi-dphy at 10010000 {
-+		compatible = "mediatek,mt2701-mipi-tx";
-+		reg = <0 0x10010000 0 0x90>;
-+		clocks = <&clk26m>;
-+		clock-output-names = "mipi_tx0_pll";
-+		#clock-cells = <0>;
-+		#phy-cells = <0>;
-+		status = "disabled";
++	backlight_lcd: backlight_lcd {
++		compatible = "pwm-backlight";
++		pwms = <&bls 0 100000>;
++		brightness-levels = <
++			  0  16  32  48  64  80  96 112
++			128 144 160 176 192 208 224 240
++			255
++		>;
++		default-brightness-level = <9>;
 +	};
 +
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -530,6 +545,30 @@
- 		#clock-cells = <1>;
+ 	chosen {
+ 		stdout-path = "serial2:115200n8";
+ 	};
+@@ -86,6 +97,12 @@
+ 	};
+ };
+ 
++&bls {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&bls_pins_a>;
++};
++
+ &cir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&cir_pins_a>;
+@@ -210,6 +227,12 @@
+ };
+ 
+ &pio {
++	bls_pins_a: bls at 0 {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_203_PWM0_FUNC_DISP_PWM>;
++		};
++	};
++
+ 	cir_pins_a:cir at 0 {
+ 		pins_cir {
+ 			pinmux = <MT7623_PIN_46_IR_FUNC_IR>;
+@@ -273,6 +296,21 @@
+ 		};
  	};
  
-+	display_components: dispsys at 14000000 {
-+		compatible = "mediatek,mt2701-mmsys";
-+		reg = <0 0x14000000 0 0x1000>;
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
++	mipi_dsi_pin: mipi_dsi_pin {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_100_MIPI_TDP0_FUNC_TDP0>,
++				 <MT7623_PIN_99_MIPI_TDN0_FUNC_TDN0>,
++				 <MT7623_PIN_98_MIPI_TDP1_FUNC_TDP1>,
++				 <MT7623_PIN_97_MIPI_TDN1_FUNC_TDN1>,
++				 <MT7623_PIN_96_MIPI_TCP_FUNC_TCP>,
++				 <MT7623_PIN_95_MIPI_TCN_FUNC_TCN>,
++				 <MT7623_PIN_94_MIPI_TDP2_FUNC_TDP2>,
++				 <MT7623_PIN_93_MIPI_TDN2_FUNC_TDN2>,
++				 <MT7623_PIN_92_MIPI_TDP3_FUNC_TDP3>,
++				 <MT7623_PIN_91_MIPI_TDN3_FUNC_TDN3>;
++		};
 +	};
 +
-+	ovl: ovl at 14007000 {
-+		compatible = "mediatek,mt2701-disp-ovl";
-+		reg = <0 0x14007000 0 0x1000>;
-+		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_OVL>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	rdma0: rdma at 14008000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14008000 0 0x1000>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
- 	bls: pwm at 1400a000 {
- 		compatible = "mediatek,mt2701-disp-pwm";
- 		reg = <0 0x1400a000 0 0x1000>;
-@@ -539,6 +578,33 @@
- 		status = "disabled";
- 	};
+ 	mmc0_pins_default: mmc0default {
+ 		pins_cmd_dat {
+ 			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
+@@ -378,8 +416,7 @@
  
-+	color: color at 1400b000 {
-+		compatible = "mediatek,mt2701-disp-color";
-+		reg = <0 0x1400b000 0 0x1000>;
-+		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-+	};
-+
-+	dsi: dsi at 1400c000 {
-+		compatible = "mediatek,mt2701-dsi";
-+		reg = <0 0x1400c000 0 0x1000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DSI_ENGINE>,
-+			 <&mmsys CLK_MM_DSI_DIG>,
-+			 <&mipi_tx0>;
-+		clock-names = "engine", "digital", "hs";
-+		phys = <&mipi_tx0>;
-+		phy-names = "dphy";
-+		status = "disabled";
-+	};
-+
-+	mutex: mutex at 1400e000 {
-+		compatible = "mediatek,mt2701-disp-mutex";
-+		reg = <0 0x1400e000 0 0x1000>;
-+		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-+	};
-+
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
-@@ -550,6 +616,15 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
+ 	pwm_pins_a: pwm at 0 {
+ 		pins_pwm {
+-			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
+-				 <MT7623_PIN_204_PWM1_FUNC_PWM1>,
++			pinmux = <MT7623_PIN_204_PWM1_FUNC_PWM1>,
+ 				 <MT7623_PIN_205_PWM2_FUNC_PWM2>,
+ 				 <MT7623_PIN_206_PWM3_FUNC_PWM3>,
+ 				 <MT7623_PIN_207_PWM4_FUNC_PWM4>;
+diff --git a/include/dt-bindings/pinctrl/mt7623-pinfunc.h b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+index 436a87b..72bed67 100644
+--- a/include/dt-bindings/pinctrl/mt7623-pinfunc.h
++++ b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+@@ -272,6 +272,18 @@
+ #define MT7623_PIN_84_DSI_TE_FUNC_GPIO84 (MTK_PIN_NO(84) | 0)
+ #define MT7623_PIN_84_DSI_TE_FUNC_DSI_TE (MTK_PIN_NO(84) | 1)
  
-+	rdma1: rdma at 14012000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14012000 0 0x1000>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-+		mediatek,larb = <&larb0>;
-+	};
++#define MT7623_PIN_91_MIPI_TDN3_FUNC_GPIO91 (MTK_PIN_NO(91) | 0)
++#define MT7623_PIN_91_MIPI_TDN3_FUNC_TDN3 (MTK_PIN_NO(91) | 1)
 +
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
++#define MT7623_PIN_92_MIPI_TDP3_FUNC_GPIO92 (MTK_PIN_NO(92) | 0)
++#define MT7623_PIN_92_MIPI_TDP3_FUNC_TDP3 (MTK_PIN_NO(92) | 1)
++
++#define MT7623_PIN_93_MIPI_TDN2_FUNC_GPIO93 (MTK_PIN_NO(93) | 0)
++#define MT7623_PIN_93_MIPI_TDN2_FUNC_TDN2 (MTK_PIN_NO(93) | 1)
++
++#define MT7623_PIN_94_MIPI_TDP2_FUNC_GPIO94 (MTK_PIN_NO(94) | 0)
++#define MT7623_PIN_94_MIPI_TDP2_FUNC_TDP2 (MTK_PIN_NO(94) | 1)
++
+ #define MT7623_PIN_95_MIPI_TCN_FUNC_GPIO95 (MTK_PIN_NO(95) | 0)
+ #define MT7623_PIN_95_MIPI_TCN_FUNC_TCN (MTK_PIN_NO(95) | 1)
+ 
 -- 
 1.9.1
