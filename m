@@ -1,63 +1,86 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 2 Oct 2017 12:24:33 +0100
-Subject: undefined instruction d5380001
-In-Reply-To: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
-References: <CAJs94EZqdWJRTF+tLgGU=pcRoU5HvuV959Qq8nFB5yQ-sQyxzg@mail.gmail.com>
-Message-ID: <20171002112433.GM3611@e103592.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 2 Oct 2017 14:24:12 +0300
+Subject: [PATCH 3/5] dmaengine: Support for querying maximum trasnfer
+ length (of an SG element)
+In-Reply-To: <20170926165413.GQ30097@localhost>
+References: <20170912104424.18495-1-peter.ujfalusi@ti.com>
+ <20170912104424.18495-4-peter.ujfalusi@ti.com>
+ <20170921171451.GG30097@localhost>
+ <02509904-4ae8-c6f8-3514-5f77d665c9a6@ti.com>
+ <20170926165413.GQ30097@localhost>
+Message-ID: <11471508-b61c-7842-2080-7f5c2f292c2b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 10:23:54PM +0300, Matwey V. Kornilov wrote:
-> Hello,
+?
+
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
+On 2017-09-26 19:54, Vinod Koul wrote:
+>>>
+>>> not another callback :)
+>>>
+>>> on a serious note, why shouldn't this be one more capability in
+>>> dma_slave_caps. looking at next patch it seems static
+>>
+>> It is not really static, the size in bytes depends on the dev_width and
+>> the maxburst:
+>> dev_width * burst * (SZ_64K - 1);
 > 
-> I am running 4.13.3 on rockchip 3328 platform(aarch64) with glibc 2.26
-> and see the following at booting:
+> well DMAengines work on FIFOs, in above you are giving length as SZ_64K - 1
+> 'items' which IIUC in DMAengine terms for bytes would always refer wrt width
+> used and burst applied.
+
+I think we can live with this and let the user to figure out what to do
+with this information.
+
+But I'm having hard time to figure out a good name for this. It is not
+the number of SGs we can support, but the number of 'items' within one
+SG that we have the limit. It could be:
+u32 max_bursts_per_sg;
+
+which would also apply to period length (for cyclic) in a similar way.
+
+> Return length in bytes does make sense (from user PoV), but then you need to
+> "know" the applied  width and burst. How do you decide those?
+
+The number of items works eDMA and sDMA, but we also have the cpp41. It
+is a packet DMA and it has no understanding of bursts, address widths or
+any of the 'traditional' things. It only cares about the number of bytes
+we want to transfer and it has limitation of 4194303 bytes (21bits for
+length). This is again per SG. How this could report the
+'max_bursts_per_sg' ?
+
+This was one of the reasons that I have settled with the callback.
+
+What we can also do is to code this within the DMA drivers itself.
+
+When setting up the transfer and we realize that one of the SG will not
+going to fit, we destroy what we have done so far, pass the sg list
+along with length/sg limit to create a new sg list where all sg item's
+length is under the limit. Then using this new sg list we can set up the
+transfer.
+
+I'm not sure how hard is to do the sg list optimization, I see that
+sg_split() is not what we want so we might need to code this in
+dmaengine or in the scatterlist code.
+
+We certainly don't want to verify all slave_sg transfers proactively to
+avoid adding latency when it is not necessary.
+
+
+>>
+>> The number of (dev_width * burst) is static, yes. Other DMA engines
+>> might have similar interpretation, but returning the maximum length in
+>> bytes sounded more generic for other engines to be able to adopt.
+>>
+>> Initially I had maxburst_cnt in struct dma_device for maximum burst
+>> count within one SG, but it felt clumsy and not too intuitive either.
 > 
-> [   11.152061] modprobe[93]: undefined instruction: pc=0000ffff8ca48ff4
-> [   11.152707] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> [   11.154347] modprobe[94]: undefined instruction: pc=0000ffff94243ff4
-> [   11.154991] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> [   11.157070] modprobe[97]: undefined instruction: pc=0000ffff839a0ff4
-> [   11.157715] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
-> [   11.159265] modprobe[98]: undefined instruction: pc=0000ffffb0591ff4
-> [   11.159908] Code: d503201f 8a180320 92750001 365ffc20 (d5380001)
+>>
+>> - P?ter
+>>
 > 
-> As far as I understand d5380001 should be emulated in cpufeature.c but
-> it is not. What could be wrong here?
 
-The whole sequence is
-
-   0:   d503201f        nop
-   4:   8a180320        and     x0, x25, x24
-   8:   92750001        and     x1, x0, #0x800
-   c:   365ffc20        tbz     w0, #11, 0xffffffffffffff90
-  10:*  d5380001        mrs     x1, midr_el1            <-- trapping instruction
-
-I'm _guessing_ this is the glibc startup code, or otherwise something
-similar:
-
-http://www.sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/aarch64/cpu-features.c;h=0275d11c7fa5cba02f3173db25a8a02993e92b7e;hb=1c9a5c270d8b66f30dcfaf1cb2d6cf39d3e18369#l46
-
-The emulation is not guaranteed to work if HWCAP_CPUID (1 << 11) is not
-set, but this code does seem to be checking correctly, and v4.13 should
-unconditionally set this hwcap and emulate MRS.
-
-So no, I don't know what's going wrong here.
-
-
-What should happen here is that the do_undefinstr() in
-arch/arm64/kernel/traps.c should call registered undef hooks until it
-finds one that accepts the faulting instruction.
-
-So, either the cpufeatures undef hook is not getting called, or it is
-failing the instruction somewhere, possibly in
-cpufeatures.c:emulate_id_reg() or emulate_sys_reg().
-
-
-Can you add some trace to those functions to see what's happening?
-
-Cc'ing Suzuki, who knows this code better than me and may have some
-ideas.
-
-Cheers
----Dave
+- P?ter
