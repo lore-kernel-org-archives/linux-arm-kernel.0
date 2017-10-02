@@ -1,31 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Oct 2017 22:39:11 +0200
-Subject: [PATCH v3 06/12] mfd: axp20x: add pinctrl cell for AXP813
-In-Reply-To: <20171002120854.5212-7-quentin.schulz@free-electrons.com>
-References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
- <20171002120854.5212-7-quentin.schulz@free-electrons.com>
-Message-ID: <20171002203911.okuubxjb6mag3oym@flea>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 2 Oct 2017 22:39:56 +0200
+Subject: [PATCH 1/2] ARM: s3c64xx: Delete two error messages for a failed
+ memory allocation in samsung_bl_set()
+In-Reply-To: <0b695686-2e07-910d-6278-91d54a1b0b2f@users.sourceforge.net>
+References: <0b695686-2e07-910d-6278-91d54a1b0b2f@users.sourceforge.net>
+Message-ID: <7f06d074-231b-85b9-3649-304edce6bc2c@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 12:08:48PM +0000, Quentin Schulz wrote:
-> As GPIO/pinctrl driver now supports AXP813, add a cell for it.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 2 Oct 2017 22:20:39 +0200
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Omit extra messages for a memory allocation failure in this function.
 
-Thanks!
-Maxime
+This issue was detected by using the Coccinelle software.
 
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/mach-s3c64xx/dev-backlight.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/dev-backlight.c b/arch/arm/mach-s3c64xx/dev-backlight.c
+index e62e789f9aee..7e2db762c442 100644
+--- a/arch/arm/mach-s3c64xx/dev-backlight.c
++++ b/arch/arm/mach-s3c64xx/dev-backlight.c
+@@ -94,17 +94,14 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+ 
+ 	samsung_bl_device = kmemdup(&samsung_dfl_bl_device,
+ 			sizeof(struct platform_device), GFP_KERNEL);
+-	if (!samsung_bl_device) {
+-		printk(KERN_ERR "%s: no memory for platform dev\n", __func__);
++	if (!samsung_bl_device)
+ 		return;
+-	}
+ 
+ 	samsung_bl_drvdata = kmemdup(&samsung_dfl_bl_data,
+ 				sizeof(samsung_dfl_bl_data), GFP_KERNEL);
+-	if (!samsung_bl_drvdata) {
+-		printk(KERN_ERR "%s: no memory for platform dev\n", __func__);
++	if (!samsung_bl_drvdata)
+ 		goto err_data;
+-	}
++
+ 	samsung_bl_device->dev.platform_data = &samsung_bl_drvdata->plat_data;
+ 	samsung_bl_drvdata->gpio_info = gpio_info;
+ 	samsung_bl_data = &samsung_bl_drvdata->plat_data;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/891e2574/attachment.sig>
+2.14.2
