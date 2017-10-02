@@ -1,65 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 2 Oct 2017 09:21:31 +0200
-Subject: [PATCH 20/22] arm64: dts: renesas: r8a77995: draak: enable
- EthernetAVB
-In-Reply-To: <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
-References: <cover.1506678250.git.horms+renesas@verge.net.au>
- <4503b50eac08f472e8690ec61f4d144e62cbdc55.1506678250.git.horms+renesas@verge.net.au>
- <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
-Message-ID: <CAMuHMdVBXQny03HET3y_JuA+TFq=0ngvMt29XAmpTY0MrzNmKQ@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Mon, 2 Oct 2017 09:23:31 +0200
+Subject: i2c-omap.c vs. qemu: too much work in one irq (and broken boot)
+In-Reply-To: <20171001221935.GA29628@amd>
+References: <20171001204215.GA9928@amd>
+ <20171001221935.GA29628@amd>
+Message-ID: <20171002072331.GB25930@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Monday 02 October 2017 00:19:35 Pavel Machek wrote:
+> Hi!
+> 
+> > I'm trying to get qemu emulation of Nokia N900 to work, but
+> > unfortunately i2c-omap.c breaks boot in the emulator (real hardware
+> > works ok).
+> 
+> I started bisection. v4.6 works, v4.7 is broken. (It still may be
+> config difference or something).
+> 
+> This looked suspect, so I tried reverting it, but it did not help. And
+> it is only significant change in i2c-omap.c. So... this may be a lot
+> of fun.
+> 
+> commit 126a66caec4a00b8d66dbc3174b0efa905cf68c3
+> Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Date:   Mon Apr 4 16:55:23 2016 +0300
+> 
+> Unfortunately, mmc is broken in v4.6, so its useless for
+> emulation... [ 3.236724] mmc1: error -22 whilst initialising SDIO card
 
-On Sat, Sep 30, 2017 at 12:24 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 9/29/2017 2:52 PM, Simon Horman wrote:
->> From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->>
->> This patch enables EthernetAVB for R-Car D3 draak board.
->>
->> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi! You can apply special patch to make mmc work in both qemu and real
+N900 device for previous kernel versions...
 
->> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
->
-> [...]
->>
->> @@ -37,6 +39,14 @@
->>   };
->>     &pfc {
->> +       avb0_pins: avb {
->> +               mux {
->> +                       groups = "avb0_link", "avb0_phy_int", "avb0_mdc",
->
->                                               ^^^^^^^^^^^^^^
->    Hum, I don't think it's compatible with routing the PHY interrupt via
-> GPIO5_19 below. The driver doesn't support signalling via AVB_PHY_INT
-> anyway.
+https://github.com/pali/linux-n900/commit/eb080ecdcfc5868d8e36d0f5f42d9cb7f13b4db9
 
-Seems we have the same issue in arch/arm64/boot/dts/renesas/ulcb.dtsi and
-arch/arm64/boot/dts/renesas/salvator-common.dtsi?
-
->>   +&avb {
-
->> +       phy0: ethernet-phy at 0 {
->> +               rxc-skew-ps = <1500>;
->> +               reg = <0>;
->> +               interrupt-parent = <&gpio5>;
->> +               interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
->> +       };
->> +};
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
