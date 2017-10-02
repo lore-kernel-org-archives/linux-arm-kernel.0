@@ -1,75 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Oct 2017 18:24:05 +0200
-Subject: [PATCH 5/7] ARM: dts: sun8i: a83t: cubietruck-plus: Add AXP818
- regulator nodes
-In-Reply-To: <20170929032514.31727-6-wens@csie.org>
-References: <20170929032514.31727-1-wens@csie.org>
- <20170929032514.31727-6-wens@csie.org>
-Message-ID: <20171002162405.jndvig3fxuj6d3ce@flea>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 2 Oct 2017 18:45:50 +0200
+Subject: [PATCH] ARM: footbridge: Delete an error message for a failed memory
+ allocation in dc21285_setup()
+Message-ID: <a7a12144-a9fa-9c38-ff2f-c8f70ca451a1@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 2 Oct 2017 18:36:56 +0200
 
-On Fri, Sep 29, 2017 at 03:25:12AM +0000, Chen-Yu Tsai wrote:
-> +#include "axp81x.dtsi"
-> +
-> +&reg_aldo1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-name = "vcc18-csi2-dsi-efuse-hdmi-d4dp";
-> +};
+Omit an extra message for a memory allocation failure in this function.
 
-I'm not really fond of these names. It's easy to miss some components
-(especially since we most of the time don't have the schematics), and
-if it's not complete, the obscure name isn't worth it either.
+This issue was detected by using the Coccinelle software.
 
-What about vcc-1.8 for this one ?
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/mach-footbridge/dc21285.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-> +&reg_aldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-name = "vdd-drampll-vcc18-pll-adc-cpvdd-ldoin";
-> +};
-
-dram-pll?
-
-> +&reg_aldo3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "vcc-pl-avcc";
-> +};
-
-avcc?
-
-etc..
-
->  	status = "disabled";
->  };
->  
-> +&reg_vcc3v3 {
-> +	status = "disabled";
-> +};
-> +
->  &reg_vcc5v0 {
->  	status = "disabled";
->  };
-
-Why not simply remove the DTSI then?
-
-Maxime
-
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index 96a3d73ef4bf..e40c78358b16 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -258,10 +258,8 @@ int __init dc21285_setup(int nr, struct pci_sys_data *sys)
+ 		return 0;
+ 
+ 	res = kzalloc(sizeof(struct resource) * 2, GFP_KERNEL);
+-	if (!res) {
+-		printk("out of memory for root bus resources");
++	if (!res)
+ 		return 0;
+-	}
+ 
+ 	res[0].flags = IORESOURCE_MEM;
+ 	res[0].name  = "Footbridge non-prefetch";
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/290c9d6e/attachment.sig>
+2.14.2
