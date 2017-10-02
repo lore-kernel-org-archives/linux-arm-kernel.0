@@ -1,71 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 2 Oct 2017 09:15:59 +0200
-Subject: [PATCH 22/48] ARM: dts: gr-peach: Add user led device nodes
-In-Reply-To: <20171001173614.GB4037@w540>
-References: <cover.1506683482.git.horms+renesas@verge.net.au>
- <cfce5ac1aaf08fc0920d6572779360f80e8f3489.1506683482.git.horms+renesas@verge.net.au>
- <e2e2b3a5-23b2-7f11-4fb3-2f835fdbc11a@cogentembedded.com>
- <20171001173614.GB4037@w540>
-Message-ID: <20171002071559.GB10579@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 2 Oct 2017 09:21:31 +0200
+Subject: [PATCH 20/22] arm64: dts: renesas: r8a77995: draak: enable
+ EthernetAVB
+In-Reply-To: <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
+References: <cover.1506678250.git.horms+renesas@verge.net.au>
+ <4503b50eac08f472e8690ec61f4d144e62cbdc55.1506678250.git.horms+renesas@verge.net.au>
+ <29d4573f-4127-225c-1abc-7f341734d7d7@cogentembedded.com>
+Message-ID: <CAMuHMdVBXQny03HET3y_JuA+TFq=0ngvMt29XAmpTY0MrzNmKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 01, 2017 at 07:36:14PM +0200, jacopo mondi wrote:
-> Hi Seregei,
-> 
-> On Sat, Sep 30, 2017 at 01:36:18PM +0300, Sergei Shtylyov wrote:
-> > Hello!
-> >
-> > On 9/29/2017 2:53 PM, Simon Horman wrote:
-> >
-> > >From: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > >
-> > >Add device nodes for user leds on gr-peach board.
-> > >
-> > >Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > >Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > >---
-> > >  arch/arm/boot/dts/r7s72100-gr-peach.dts | 10 ++++++++++
-> > >  1 file changed, 10 insertions(+)
-> > >
-> > >diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> > >index bcfa6445bbaa..13d745bb56a5 100644
-> > >--- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> > >+++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
-> > [...]
-> > >@@ -51,6 +52,15 @@
-> > >  			reg = <0x00600000 0x00200000>;
-> > >  		};
-> > >  	};
-> > >+
-> > >+leds {
-> >
-> >    Not indented properly...
-> 
-> Thanks!
-> 
-> Simon, as you sent pull request already, will we need a patch on top
-> of this to fix it?
+Hi Sergei,
 
-Thanks, please do.
+On Sat, Sep 30, 2017 at 12:24 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 9/29/2017 2:52 PM, Simon Horman wrote:
+>> From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>>
+>> This patch enables EthernetAVB for R-Car D3 draak board.
+>>
+>> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-I don't think we need to re-spin the pull-request to correct this,
-rather, a follow-up patch can be provided in a follow-up pull-request.
+>> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+>
+> [...]
+>>
+>> @@ -37,6 +39,14 @@
+>>   };
+>>     &pfc {
+>> +       avb0_pins: avb {
+>> +               mux {
+>> +                       groups = "avb0_link", "avb0_phy_int", "avb0_mdc",
+>
+>                                               ^^^^^^^^^^^^^^
+>    Hum, I don't think it's compatible with routing the PHY interrupt via
+> GPIO5_19 below. The driver doesn't support signalling via AVB_PHY_INT
+> anyway.
 
-> 
-> Thanks
->   j
-> >
-> > >+		status = "okay";
-> > >+		compatible = "gpio-leds";
-> > >+
-> > >+		led1 {
-> > >+			gpios = <&port6 12 GPIO_ACTIVE_HIGH>;
-> > >+		};
-> > >+	};
-> > >  };
-> > >  &pinctrl {
-> >
-> > MBR, Sergei
-> 
+Seems we have the same issue in arch/arm64/boot/dts/renesas/ulcb.dtsi and
+arch/arm64/boot/dts/renesas/salvator-common.dtsi?
+
+>>   +&avb {
+
+>> +       phy0: ethernet-phy at 0 {
+>> +               rxc-skew-ps = <1500>;
+>> +               reg = <0>;
+>> +               interrupt-parent = <&gpio5>;
+>> +               interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
+>> +       };
+>> +};
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
