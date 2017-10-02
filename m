@@ -1,62 +1,98 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon,  2 Oct 2017 14:27:43 +0200
-Subject: [PATCH 3/3] mmc: meson-gx: include tx phase in the tuning process
-In-Reply-To: <20171002122743.32334-1-jbrunet@baylibre.com>
-References: <20171002122743.32334-1-jbrunet@baylibre.com>
-Message-ID: <20171002122743.32334-4-jbrunet@baylibre.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 2 Oct 2017 17:58:55 +0530
+Subject: [PATCH v3 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM
+ support
+In-Reply-To: <alpine.DEB.2.20.1709280757230.2488@mgerlach-VirtualBox>
+References: <20170924105924.23923-1-vigneshr@ti.com>
+ <20170924105924.23923-6-vigneshr@ti.com>
+ <3a1160f9-a0ae-c84c-d209-af97c3c3b0f6@gmail.com>
+ <4ee69ea4-14cc-4305-bf3f-8fe76d43bf6b@ti.com>
+ <fa700cdf-f0b5-779b-4f38-3138a7612cc2@gmail.com>
+ <038919d3-ff32-d0a7-4c0a-3be16436052d@ti.com>
+ <e4ad5d80-9093-b667-f0a5-d3105be4e8cf@gmail.com>
+ <alpine.DEB.2.20.1709251538420.2472@mgerlach-VirtualBox>
+ <fdfe29bf-ff46-7542-8e36-e8e45e1ca85f@gmail.com>
+ <7237fa9e-4d3a-8a82-10c6-76737c23ed6f@ti.com>
+ <alpine.DEB.2.20.1709280757230.2488@mgerlach-VirtualBox>
+Message-ID: <5bc42364-21e1-56b6-788c-2848b8faa50f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has been reported that some platforms (odroid-c2) may require
-a different tx phase setting to operate at high speed (hs200 and hs400)
+Hi,
 
-To improve the situation, this patch includes tx phase in the tuning
-process.
+On 9/28/2017 8:31 PM, matthew.gerlach at linux.intel.com wrote:
+> 
+> Hi Vignesh,
+> 
+> I tried this patch on an Arria10 SOCFPGA devkit against the 4.1.33-ltsi 
+> kernel, and it did not go well.  Commands to the flash chip timedout 
+> resulting in the probe function failing.  I ran into other problems, not 
+> related to cadence-quadspi, that prevented me from testing against 4.9 and 
+> 4.12 kernels, but I suspect similar behavior.
+> 
 
-Fixes: d341ca88eead ("mmc: meson-gx: rework tuning function")
-Reported-by: Heiner Kallweit <hkallweit1@gmail.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/mmc/host/meson-gx-mmc.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+Ok, thanks! I will keep the clk_*() calls for now.
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 08a55c2e96e1..85745ef179e2 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -716,6 +716,22 @@ static int meson_mmc_clk_phase_tuning(struct mmc_host *mmc, u32 opcode,
- static int meson_mmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
- {
- 	struct meson_host *host = mmc_priv(mmc);
-+	int ret;
-+
-+	/*
-+	 * If this is the initial tuning, try to get a sane Rx starting
-+	 * phase before doing the actual tuning.
-+	 */
-+	if (!mmc->doing_retune) {
-+		ret = meson_mmc_clk_phase_tuning(mmc, opcode, host->rx_clk);
-+
-+		if (ret)
-+			return ret;
-+	}
-+
-+	ret = meson_mmc_clk_phase_tuning(mmc, opcode, host->tx_clk);
-+	if (ret)
-+		return ret;
- 
- 	return meson_mmc_clk_phase_tuning(mmc, opcode, host->rx_clk);
- }
-@@ -746,8 +762,9 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		if (!IS_ERR(mmc->supply.vmmc))
- 			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
- 
--		/* Reset rx phase */
-+		/* Reset phases */
- 		clk_set_phase(host->rx_clk, 0);
-+		clk_set_phase(host->tx_clk, 270);
- 
- 		break;
- 
--- 
-2.13.5
+Regards
+Vignesh
+> Matthew Gerlach
+> 
+> On Wed, 27 Sep 2017, Vignesh R wrote:
+> 
+>> Hi Matthew,
+>>
+>> On Tuesday 26 September 2017 05:19 AM, Marek Vasut wrote:
+>> [...]
+>>>>>> Ok thanks! Do you know if pm_runtime_get_sync() can enable clocks for
+>>>>>> QSPI on SoCFPGA or if clk_prepare_enable() is needed? Just trying to see
+>>>>>> if its possible to get rid of clk_*() calls in favor of pm_*() calls.
+>>>>>
+>>>>> Not of the top of my head, sorry. +CC Matthew, he should know.
+>>>>
+>>>> I am not an expert at the clock framework nor the power management, but I
+>>>> did ask around a bit.? No one I asked was planning to change the clk_*()
+>>>> calls to pm_*() call, but the feedback was that it would be a good idea.
+>>>
+>>> The question is, if we do the replacement, will it break on socfpga ?
+>>> A quick test might be useful.
+>>>
+>>
+>> yes, a quick qspi test with clk_prepare_enable() replaced by pm_*() calls
+>> like below patch would be helpful:
+>>
+>>
+>> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+>> index 53c7d8e0327a..7ad3e176cc88 100644
+>> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+>> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+>> @@ -34,6 +34,7 @@
+>> #include <linux/sched.h>
+>> #include <linux/spi/spi.h>
+>> #include <linux/timer.h>
+>> +#include <linux/pm_runtime.h>
+>>
+>> #define CQSPI_NAME                     "cadence-qspi"
+>> #define CQSPI_MAX_CHIPSELECT           16
+>> @@ -1206,11 +1207,8 @@ static int cqspi_probe(struct platform_device *pdev)
+>>                return -ENXIO;
+>>        }
+>>
+>> -       ret = clk_prepare_enable(cqspi->clk);
+>> -       if (ret) {
+>> -               dev_err(dev, "Cannot enable QSPI clock.\n");
+>> -               return ret;
+>> -       }
+>> +       pm_runtime_enable(dev);
+>> +       pm_runtime_get_sync(dev);
+>>
+>>        cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+>>
+>>
+>>
+>>
+>>
+>> -- 
+>> Regards
+>> Vignesh
+>>
+> 
