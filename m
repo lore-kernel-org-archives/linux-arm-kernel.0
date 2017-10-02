@@ -1,55 +1,64 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun,  1 Oct 2017 22:06:18 -0400
-Subject: [PATCH 3/3] ARM: early_printk: use printascii() rather than printch()
+Date: Sun,  1 Oct 2017 22:06:17 -0400
+Subject: [PATCH 2/3] ARM: semihosting: use proper instruction on v7m processors
 In-Reply-To: <20171002020618.23924-1-nicolas.pitre@linaro.org>
 References: <20171002020618.23924-1-nicolas.pitre@linaro.org>
-Message-ID: <20171002020618.23924-4-nicolas.pitre@linaro.org>
+Message-ID: <20171002020618.23924-3-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With printch() the console messages are sent out one character at a time
-which is agonizingly slow especially with semihosting as the whole trap
-intercept, remote byte access, and system resume danse is performed for
-every single character across a relatively slow remote debug connection.
-Let's use printascii() to send a whole string at once. This is also going
-to be more efficient, albeit to a quite lesser extent, with serial ports
-as well.
+The svc instruction doesn't exist on v7m processors. Semihosting ops are
+invoked with the bkpt instruction instead.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/kernel/early_printk.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/boot/compressed/debug.S | 4 ++++
+ arch/arm/kernel/debug.S          | 8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
-index 4307653696..9257736ec9 100644
---- a/arch/arm/kernel/early_printk.c
-+++ b/arch/arm/kernel/early_printk.c
-@@ -11,16 +11,20 @@
- #include <linux/kernel.h>
- #include <linux/console.h>
- #include <linux/init.h>
-+#include <linux/string.h>
+diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
+index 5392ee6333..8f6e37177d 100644
+--- a/arch/arm/boot/compressed/debug.S
++++ b/arch/arm/boot/compressed/debug.S
+@@ -23,7 +23,11 @@ ENTRY(putc)
+ 	strb	r0, [r1]
+ 	mov	r0, #0x03		@ SYS_WRITEC
+    ARM(	svc	#0x123456	)
++#ifdef CONFIG_CPU_V7M
++ THUMB(	bkpt	#0xab		)
++#else
+  THUMB(	svc	#0xab		)
++#endif
+ 	mov	pc, lr
+ 	.align	2
+ 1:	.word	_GLOBAL_OFFSET_TABLE_ - .
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index 423f443258..35145b618c 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -121,7 +121,11 @@ ENTRY(printascii)
+ 		mov	r1, r0
+ 		mov	r0, #0x04		@ SYS_WRITE0
+ 	ARM(	svc	#0x123456	)
++#ifdef CONFIG_CPU_V7M
++	THUMB(	bkpt	#0xab		)
++#else
+ 	THUMB(	svc	#0xab		)
++#endif
+ 		ret	lr
+ ENDPROC(printascii)
  
--extern void printch(int);
-+extern void printascii(const char *);
- 
- static void early_write(const char *s, unsigned n)
- {
--	while (n-- > 0) {
--		if (*s == '\n')
--			printch('\r');
--		printch(*s);
--		s++;
-+	char buf[128];
-+	while (n) {
-+		unsigned l = min(n, sizeof(buf)-1);
-+		memcpy(buf, s, l);
-+		buf[l] = 0;
-+		s += l;
-+		n -= l;
-+		printascii(buf);
- 	}
- }
+@@ -132,7 +136,11 @@ ENTRY(printch)
+ 		strb	r0, [r1]
+ 		mov	r0, #0x03		@ SYS_WRITEC
+ 	ARM(	svc	#0x123456	)
++#ifdef CONFIG_CPU_V7M
++	THUMB(	bkpt	#0xab		)
++#else
+ 	THUMB(	svc	#0xab		)
++#endif
+ 		ret	lr
+ ENDPROC(printch)
  
 -- 
 2.9.5
