@@ -1,57 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Oct 2017 22:42:35 +0200
-Subject: [PATCH v3 12/12] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when
- used as LDOs
-In-Reply-To: <20171002120854.5212-13-quentin.schulz@free-electrons.com>
-References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
- <20171002120854.5212-13-quentin.schulz@free-electrons.com>
-Message-ID: <20171002204235.25d4437a2p5qzrrj@flea>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 2 Oct 2017 22:40:44 +0200
+Subject: [PATCH 2/2] ARM: s3c64xx: Delete an unnecessary return statement in
+ samsung_bl_set()
+In-Reply-To: <0b695686-2e07-910d-6278-91d54a1b0b2f@users.sourceforge.net>
+References: <0b695686-2e07-910d-6278-91d54a1b0b2f@users.sourceforge.net>
+Message-ID: <6d599b4d-93e3-3e3e-875a-f24ee879ca74@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 12:08:54PM +0000, Quentin Schulz wrote:
-> On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
-> ldo_io0 and ldo_io1.
-> 
-> Let's add the pinctrl properties to the said regulators.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
->  arch/arm/boot/dts/axp81x.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
-> index f90f257130d5..099b0ddc1bbb 100644
-> --- a/arch/arm/boot/dts/axp81x.dtsi
-> +++ b/arch/arm/boot/dts/axp81x.dtsi
-> @@ -52,6 +52,16 @@
->  		compatible = "x-powers,axp813-gpio";
->  		gpio-controller;
->  		#gpio-cells = <2>;
-> +
-> +		gpio0_ldo: gpio0_ldo {
-> +			pins = "GPIO0";
-> +			function = "ldo";
-> +		};
-> +
-> +		gpio1_ldo: gpio1_ldo {
-> +			pins = "GPIO1";
-> +			function = "ldo";
-> +		};
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 2 Oct 2017 22:30:55 +0200
 
-The node names are not supposed to contain any hyphens.
+The script "checkpatch.pl" pointed information out like the following.
 
-Thanks!
-Maxime
+WARNING: void function return statements are not generally useful
 
+Thus remove such a statement in the affected function.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/mach-s3c64xx/dev-backlight.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-s3c64xx/dev-backlight.c b/arch/arm/mach-s3c64xx/dev-backlight.c
+index 7e2db762c442..7ef8b9019344 100644
+--- a/arch/arm/mach-s3c64xx/dev-backlight.c
++++ b/arch/arm/mach-s3c64xx/dev-backlight.c
+@@ -141,5 +141,4 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+ 	kfree(samsung_bl_data);
+ err_data:
+ 	kfree(samsung_bl_device);
+-	return;
+ }
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171002/9bc56e2b/attachment.sig>
+2.14.2
