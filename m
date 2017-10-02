@@ -1,34 +1,77 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 2 Oct 2017 20:04:40 +0200
-Subject: [PATCH 6/6] ARM: s3c2412: Fix a typo in a comment line
-In-Reply-To: <d2ae00c8-da57-9ffc-3692-67ed6daa95e0@users.sourceforge.net>
-References: <d2ae00c8-da57-9ffc-3692-67ed6daa95e0@users.sourceforge.net>
-Message-ID: <e2567b9e-d556-bac2-a810-ca478f4398bd@users.sourceforge.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 2 Oct 2017 11:14:46 -0700
+Subject: [PATCH v3] doc: coresight: correct usage for disabling idle states
+In-Reply-To: <1505882817-19582-1-git-send-email-leo.yan@linaro.org>
+References: <1505882817-19582-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkwFd1EyX+wmfsaUHwhJv-1Erde6t+omLpniudTC1Lvx_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Mon, 2 Oct 2017 19:41:10 +0200
+On 19 September 2017 at 21:46, Leo Yan <leo.yan@linaro.org> wrote:
+> In the coresight CPU debug document it suggests to use 'echo' command
+> to set latency request to /dev/cpu_dma_latency so can disable all CPU
+> idle states, but in fact this doesn't work.
+>
+> This is because when the command 'echo' exits, it releases the device
+> node's file descriptor and the kernel release function removes the QoS
+> constraint; finally when the command 'echo' finished there have no
+> constraint imposed on cpu_dma_latency.
+>
+> This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
+> command 'exec' can avoid the file descriptor to be closed so we can
+> keep the constraint on cpu_dma_latency.
+>
+> This patch also adds the info for reference docs for PM QoS and cpuidle
+> sysfs.
+>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Reported-by: Kim Phillips <kim.phillips@arm.com>
+> Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  Documentation/trace/coresight-cpu-debug.txt | 22 +++++++++++++++++-----
+>  1 file changed, 17 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+> index b3da1f9..2b9b51c 100644
+> --- a/Documentation/trace/coresight-cpu-debug.txt
+> +++ b/Documentation/trace/coresight-cpu-debug.txt
+> @@ -149,11 +149,23 @@ If you want to limit idle states at boot time, you can use "nohlt" or
+>
+>  At the runtime you can disable idle states with below methods:
+>
+> -Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
+> -states (if latency = 0uS then disable all idle states):
+> -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
+> -
+> -Disable specific CPU's specific idle state:
+> +It is possible to disable CPU idle states by way of the PM QoS
+> +subsystem, more specifically by using the "/dev/cpu_dma_latency"
+> +interface (see Documentation/power/pm_qos_interface.txt for more
+> +details).  As specified in the PM QoS documentation the requested
+> +parameter will stay in effect until the file descriptor is released.
+> +For example:
+> +
+> +# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
+> +...
+> +Do some work...
+> +...
+> +# exec 3<>-
+> +
+> +The same can also be done from an application program.
+> +
+> +Disable specific CPU's specific idle state from cpuidle sysfs (see
+> +Documentation/cpuidle/sysfs.txt):
+>  # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
+>
 
-Adjust a word in this function description.
+Applied.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-s3c24xx/iotiming-s3c2412.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
+Mathieu
 
-diff --git a/arch/arm/mach-s3c24xx/iotiming-s3c2412.c b/arch/arm/mach-s3c24xx/iotiming-s3c2412.c
-index 01bcd7d5dac7..c5b12f6b02b5 100644
---- a/arch/arm/mach-s3c24xx/iotiming-s3c2412.c
-+++ b/arch/arm/mach-s3c24xx/iotiming-s3c2412.c
-@@ -35,7 +35,7 @@
- #define print_ns(x) ((x) / 10), ((x) % 10)
- 
- /**
-- * s3c2412_print_timing - print timing infromation via printk.
-+ * s3c2412_print_timing - print timing information via printk.
-  * @pfx: The prefix to print each line with.
-  * @iot: The IO timing information
-  */
--- 
-2.14.2
+>
+> --
+> 2.7.4
+>
