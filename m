@@ -1,67 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Oct 2017 18:34:02 +0100
-Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
-In-Reply-To: <CANn89iKXGx2AmaYtqaD_CTvxgG2xC6vbuuNigixtUM82fExODQ@mail.gmail.com>
-References: <20171002104947.GE20737@leverpostej>
- <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
- <20171002142156.GB21696@leverpostej>
- <1506955708.8061.5.camel@edumazet-glaptop3.roam.corp.google.com>
- <20171002172131.GA3360@leverpostej>
- <CANn89iKXGx2AmaYtqaD_CTvxgG2xC6vbuuNigixtUM82fExODQ@mail.gmail.com>
-Message-ID: <20171002173401.GA3456@leverpostej>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 02 Oct 2017 10:36:38 -0700
+Subject: [GIT PULL] Amlogic fixes for v4.14-rc
+Message-ID: <7hr2ul8na1.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 10:27:15AM -0700, Eric Dumazet wrote:
-> On Mon, Oct 2, 2017 at 10:21 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Oct 02, 2017 at 07:48:28AM -0700, Eric Dumazet wrote:
-> >> Please try the following fool proof patch.
-> >>
-> >> This is what I had in my local tree back in August but could not
-> >> conclude on the syzkaller bug I was working on.
-> >>
-> >> diff --git a/net/ipv4/icmp.c b/net/ipv4/icmp.c
-> >> index 681e33998e03b609fdca83a83e0fc62a3fee8c39..e51d777797a927058760a1ab7af00579f7488cb5 100644
-> >> --- a/net/ipv4/icmp.c
-> >> +++ b/net/ipv4/icmp.c
-> >> @@ -732,7 +732,8 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, __be32 info)
-> >>               room = 576;
-> >>       room -= sizeof(struct iphdr) + icmp_param.replyopts.opt.opt.optlen;
-> >>       room -= sizeof(struct icmphdr);
-> >> -
-> >> +     if (room < 0)
-> >> +             goto ende;
-> >>       icmp_param.data_len = skb_in->len - icmp_param.offset;
-> >>       if (icmp_param.data_len > room)
-> >>               icmp_param.data_len = room;
-> >>
-> >
-> > Unfortuantely, with this applied I still see the issue.
-> >
-> > Syzkaller came up with a minimized reproducer [1], which can trigger the
-> > issue near instantly under syz-execprog. If there's anything that would
-> > help to narrow this down, I'm more than happy to give it a go.
-> >
-> > Thanks,
-> > Mark.
-> >
-> > [1] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20171002-skb_clone-misaligned-atomic/syzkaller.repro
-> 
-> Note that I was not trying to address the misaligned stuff.
+Hi Olof,
 
-Aargh, I put the reproducer in the wrong folder thanks to tab-completing
-my kup command. :/
+This is the same DT series that was sent for next/late but was missed,
+so I'm sending it again as fixes for v4.14-rc since we have some users
+having issues because the driver was merged for v4.14, but the
+correspnding DT enhancements were not.
 
-The reproducer linked above is for the kernel BUG at
-net/core/skbuff.c:2626.
-
-I've uploaded a copy into the relevant bug directory [1], but that'll
-take a little while to sync out. I'll drop it from the misalignment bug
-folder once that's visible to all.
-
-Sorry about that!
+Please merge for v4.14-rc3.  It's unmodified since the previous pull request.
 
 Thanks,
-Mark.
 
-[1] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20171002-skbuff-bug/
+Kevin
+
+
+The following changes since commit 47884c5c746ee7c02e06fbf60480e0f13aa11dfe:
+
+  ARM64: dts: meson-gxl-libretech-cc: Add GPIO lines names (2017-08-22 15:37:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
+
+for you to fetch changes up to 485a308f05d843034b6e82f688704c44888aecde:
+
+  ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode (2017-09-05 12:05:01 -0700)
+
+----------------------------------------------------------------
+Amlogic 64-bit DT updates for v4.14 (round 3)
+- updates for new MMC driver features/fixes
+- support high-speed modes
+
+----------------------------------------------------------------
+Jerome Brunet (9):
+      ARM64: dts: meson-gx: Use correct mmc clock source 0
+      ARM64: dts: meson: remove cap-sd-highspeed from emmc nodes
+      ARM64: dts: meson: add mmc clk gate pins
+      ARM64: dts: meson-gxbb: nanopi-k2: add card regulator settle times
+      ARM64: dts: meson-gxl: libretech-cc: add card regulator settle times
+      ARM64: dts: meson-gxl: libretech-cc: enable high speed modes
+      ARM64: dts: meson-gxbb: p20x: enable sdcard UHS modes
+      ARM64: dts: meson-gxbb: nanopi-k2: enable sdcard UHS modes
+      ARM64: dts: meson-gxbb: nanopi-k2: enable sdr104 mode
+
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            | 10 ++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           | 19 ++++++++++++++-----
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         | 12 +++++++-----
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            |  9 +++++----
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               | 13 +++++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           | 10 ++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                    | 39 ++++++++++++++++++++++++++++++++++++---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts |  7 ++++---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 13 +++++++++++--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 10 ++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 10 ++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                     | 39 ++++++++++++++++++++++++++++++++++++---
+ arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            |  7 ++++---
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             |  1 -
+ 14 files changed, 150 insertions(+), 49 deletions(-)
