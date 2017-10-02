@@ -1,35 +1,52 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon,  2 Oct 2017 14:27:41 +0200
-Subject: [PATCH 1/3] mmc: meson-gx: make sure the clock is rounded down
+Date: Mon,  2 Oct 2017 14:27:42 +0200
+Subject: [PATCH 2/3] mmc: meson-gx: fix rx phase reset
 In-Reply-To: <20171002122743.32334-1-jbrunet@baylibre.com>
 References: <20171002122743.32334-1-jbrunet@baylibre.com>
-Message-ID: <20171002122743.32334-2-jbrunet@baylibre.com>
+Message-ID: <20171002122743.32334-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using CLK_DIVIDER_ROUND_CLOSEST is unsafe as the mmc clock could be
-rounded to a rate higher the specified rate. Removing this flag ensure
-that, if the rate needs to be rounded, it will be rounded down.
+Resetting the phase when POWER_ON is set the set_ios() call means that the
+phase is reset almost every time the set_ios() is called, while the
+expected behavior was to reset the phase on a power cycle.
 
-Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
+This had gone unnoticed until now because in all mode (except hs400) the
+tuning is done after the last to set_ios(). In such case, the tuning
+result is used anyway.  In HS400, there are a few calls to set_ios() after
+the tuning is done, overwriting the tuning result.
+
+Resetting the phase on POWER_UP instead of POWER_ON solve the problem.
+
+Fixes: d341ca88eead ("mmc: meson-gx: rework tuning function")
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/mmc/host/meson-gx-mmc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index c885c2d4b904..421c8719c202 100644
+index 421c8719c202..08a55c2e96e1 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -531,8 +531,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	div->shift = __ffs(CLK_DIV_MASK);
- 	div->width = __builtin_popcountl(CLK_DIV_MASK);
- 	div->hw.init = &init;
--	div->flags = (CLK_DIVIDER_ONE_BASED |
--		      CLK_DIVIDER_ROUND_CLOSEST);
-+	div->flags = CLK_DIVIDER_ONE_BASED;
+@@ -745,6 +745,10 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	case MMC_POWER_UP:
+ 		if (!IS_ERR(mmc->supply.vmmc))
+ 			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
++
++		/* Reset rx phase */
++		clk_set_phase(host->rx_clk, 0);
++
+ 		break;
  
- 	clk = devm_clk_register(host->dev, &div->hw);
- 	if (WARN_ON(IS_ERR(clk)))
+ 	case MMC_POWER_ON:
+@@ -758,8 +762,6 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 				host->vqmmc_enabled = true;
+ 		}
+ 
+-		/* Reset rx phase */
+-		clk_set_phase(host->rx_clk, 0);
+ 		break;
+ 	}
+ 
 -- 
 2.13.5
