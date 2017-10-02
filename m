@@ -1,113 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon,  2 Oct 2017 18:28:44 +0100
-Subject: [PATCH v2] ACPI/IORT: Fix PCI ACS enablement
-Message-ID: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: edumazet@google.com (Eric Dumazet)
+Date: Mon, 2 Oct 2017 10:27:15 -0700
+Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
+In-Reply-To: <20171002172131.GA3360@leverpostej>
+References: <20171002104947.GE20737@leverpostej>
+ <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
+ <20171002142156.GB21696@leverpostej>
+ <1506955708.8061.5.camel@edumazet-glaptop3.roam.corp.google.com>
+ <20171002172131.GA3360@leverpostej>
+Message-ID: <CANn89iKXGx2AmaYtqaD_CTvxgG2xC6vbuuNigixtUM82fExODQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-workarounds") removed kernel code that was allowing to initialize
-and probe the SMMU devices early (ie earlier than PCI devices, through
-linker script callback entries) in the boot process because it was not
-needed any longer in that the SMMU devices/drivers now support deferred
-probing.
+On Mon, Oct 2, 2017 at 10:21 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Oct 02, 2017 at 07:48:28AM -0700, Eric Dumazet wrote:
+>> Please try the following fool proof patch.
+>>
+>> This is what I had in my local tree back in August but could not
+>> conclude on the syzkaller bug I was working on.
+>>
+>> diff --git a/net/ipv4/icmp.c b/net/ipv4/icmp.c
+>> index 681e33998e03b609fdca83a83e0fc62a3fee8c39..e51d777797a927058760a1ab7af00579f7488cb5 100644
+>> --- a/net/ipv4/icmp.c
+>> +++ b/net/ipv4/icmp.c
+>> @@ -732,7 +732,8 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, __be32 info)
+>>               room = 576;
+>>       room -= sizeof(struct iphdr) + icmp_param.replyopts.opt.opt.optlen;
+>>       room -= sizeof(struct icmphdr);
+>> -
+>> +     if (room < 0)
+>> +             goto ende;
+>>       icmp_param.data_len = skb_in->len - icmp_param.offset;
+>>       if (icmp_param.data_len > room)
+>>               icmp_param.data_len = room;
+>>
+>
+> Unfortuantely, with this applied I still see the issue.
+>
+> Syzkaller came up with a minimized reproducer [1], which can trigger the
+> issue near instantly under syz-execprog. If there's anything that would
+> help to narrow this down, I'm more than happy to give it a go.
+>
+> Thanks,
+> Mark.
+>
+> [1] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20171002-skb_clone-misaligned-atomic/syzkaller.repro
 
-Since the SMMUs probe routines are also in charge of requesting global
-PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
-up early-probing workarounds") also postponed PCI ACS enablement to
-SMMUs devices probe time, which is too late given that PCI devices needs
-to detect if PCI ACS is enabled to init the respective capability
-through the following call path:
+Note that I was not trying to address the misaligned stuff.
 
-pci_device_add()
- -> pci_init_capabilities()
-  -> pci_enable_acs()
+Only this :
 
-Add code in the ACPI IORT SMMU platform devices initialization path
-(that is called before ACPI PCI enumeration) to detect if there
-exists firmware mappings to map root complexes ids to SMMU ids
-and if so enable ACS for the system.
-
-Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-Signed-workarounds")
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Zhou Wang <wangzhou1@hisilicon.com>
-Cc: Alex Williamson <alex.williamson@redhat.com>
----
-v1 -> v2:
-
-- Reworked ACS enablement logic and based on root complex to SMMU
-  ids firmware mapping detection
-- Rebased against v4.14-rc3
-
-v1: https://marc.info/?l=linux-acpi&m=150584059818925&w=2
-
- drivers/acpi/arm64/iort.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 9565d57..de56394 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -1178,12 +1178,44 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 	return ret;
- }
- 
-+static bool __init iort_enable_acs(struct acpi_iort_node *iort_node)
-+{
-+	if (iort_node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-+		struct acpi_iort_node *parent;
-+		struct acpi_iort_id_mapping *map;
-+		int i;
-+
-+		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, iort_node,
-+				   iort_node->mapping_offset);
-+
-+		for (i = 0; i < iort_node->mapping_count; i++, map++) {
-+			if (!map->output_reference)
-+				continue;
-+
-+			parent = ACPI_ADD_PTR(struct acpi_iort_node,
-+					iort_table,  map->output_reference);
-+			/*
-+			 * If we detect a RC->SMMU mapping, make sure
-+			 * we enable ACS on the system.
-+			 */
-+			if ((parent->type == ACPI_IORT_NODE_SMMU) ||
-+				(parent->type == ACPI_IORT_NODE_SMMU_V3)) {
-+				pci_request_acs();
-+				return true;
-+			}
-+		}
-+	}
-+
-+	return false;
-+}
-+
- static void __init iort_init_platform_devices(void)
- {
- 	struct acpi_iort_node *iort_node, *iort_end;
- 	struct acpi_table_iort *iort;
- 	struct fwnode_handle *fwnode;
- 	int i, ret;
-+	bool acs_enabled = false;
- 
- 	/*
- 	 * iort_table and iort both point to the start of IORT table, but
-@@ -1203,6 +1235,9 @@ static void __init iort_init_platform_devices(void)
- 			return;
- 		}
- 
-+		if (!acs_enabled)
-+			acs_enabled = iort_enable_acs(iort_node);
-+
- 		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
- 			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
- 
--- 
-2.4.12
+------------[ cut here ]------------
+kernel BUG at net/core/skbuff.c:2626!
+Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 3 PID: 0 Comm: swapper/3 Not tainted 4.14.0-rc2-00001-gd7ad33d #115
+Hardware name: linux,dummy-virt (DT)
+task: ffff80003a901a80 task.stack: ffff80003a908000
+PC is at skb_copy_and_csum_bits+0x8dc/0xae0 net/core/skbuff.c:2626
+LR is at skb_copy_and_csum_bits+0x8dc/0xae0 net/core/skbuff.c:2626
