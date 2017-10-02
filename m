@@ -1,43 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Oct 2017 16:03:50 +0100
-Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
-In-Reply-To: <1506955708.8061.5.camel@edumazet-glaptop3.roam.corp.google.com>
-References: <20171002104947.GE20737@leverpostej>
- <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
- <20171002142156.GB21696@leverpostej>
- <1506955708.8061.5.camel@edumazet-glaptop3.roam.corp.google.com>
-Message-ID: <20171002150350.GD21696@leverpostej>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 2 Oct 2017 08:14:50 -0700
+Subject: [PATCH] ASoC: rockchip: Fix wrong allocation size of dapm routes
+In-Reply-To: <20170929035252.19808-1-jeffy.chen@rock-chips.com>
+References: <20170929035252.19808-1-jeffy.chen@rock-chips.com>
+Message-ID: <CAD=FV=V+sVf8E_ka1u5kDBKWS6MY3vMpaVgmjDV1CnVSOkQ3AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 07:48:28AM -0700, Eric Dumazet wrote:
-> Please try the following fool proof patch.
-> 
-> This is what I had in my local tree back in August but could not
-> conclude on the syzkaller bug I was working on.
+Hi,
 
-Thanks, I'll give this a go shortly.
+On Thu, Sep 28, 2017 at 8:52 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> The allocation size of dapm routes is wrong, correct it.
+>
+> Fixes: d9f9c167edae ("ASoC: rockchip: Init dapm routes dynamically")
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+>  sound/soc/rockchip/rk3399_gru_sound.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 
-I'm currently minimizing the Syzkaller log so that I can trigger the
-issue more quickly (and have some confidence in a Tested-by)!
+I guess Jeffy and I found this independently.  In
+http://crosreview.com/693319 Jeffy indicated that he thought my patch
+could land, so I guess drop his and take mine from
+<https://patchwork.kernel.org/patch/9978763/>?
 
-Thanks,
-Mark.
+Thanks!
 
-> diff --git a/net/ipv4/icmp.c b/net/ipv4/icmp.c
-> index 681e33998e03b609fdca83a83e0fc62a3fee8c39..e51d777797a927058760a1ab7af00579f7488cb5 100644
-> --- a/net/ipv4/icmp.c
-> +++ b/net/ipv4/icmp.c
-> @@ -732,7 +732,8 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, __be32 info)
->  		room = 576;
->  	room -= sizeof(struct iphdr) + icmp_param.replyopts.opt.opt.optlen;
->  	room -= sizeof(struct icmphdr);
-> -
-> +	if (room < 0)
-> +		goto ende;
->  	icmp_param.data_len = skb_in->len - icmp_param.offset;
->  	if (icmp_param.data_len > room)
->  		icmp_param.data_len = room;
-> 
-> 
-> 
+-Doug
