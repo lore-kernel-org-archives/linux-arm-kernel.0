@@ -1,18 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Oct 2017 12:39:26 -0700
-Subject: [PATCH] ARM: omap1: add const and initconst to omap_lcd_config
-In-Reply-To: <1503383150-2363-1-git-send-email-bhumirks@gmail.com>
-References: <1503383150-2363-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <20171002193926.GO4394@atomide.com>
+Date: Mon, 2 Oct 2017 12:48:17 -0700
+Subject: [PATCH] ARM: omap2plus_defconfig: enable NEON based crypto
+In-Reply-To: <20170906184729.7980-1-ard.biesheuvel@linaro.org>
+References: <20170906184729.7980-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171002194817.GQ4394@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bhumika Goyal <bhumirks@gmail.com> [170821 23:26]:
-> Make these const as they are only passed to a const argument of the function
-> omapfb_set_lcd_config.
-> Also, replace __initdata with __initconst to avoid section conflict error.
-> Done using Coccinelle.
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 11:48]:
+> Enable kernel mode NEON and the various NEON based crypto algorithms,
+> which are between 1.4x (AES-XTS) and 2.4x (AES-GCM) faster than
+> scalar code (measured on Cortex-A8).
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> Note that this was tested using the updated GHASH code that is queued
+> for v4.14
 
-Applying into omap-for-v4.15/omap1 thanks.
+Applying finally into omap-for-v4.15/defconfig thanks.
 
 Tony
