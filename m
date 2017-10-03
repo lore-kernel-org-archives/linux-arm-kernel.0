@@ -1,65 +1,47 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 3 Oct 2017 11:57:14 +0100
-Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
- scpi_probe
-In-Reply-To: <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
-References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
- <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
- <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
- <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
-Message-ID: <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Oct 2017 11:57:17 +0100
+Subject: [kbuild-all] [arm:for-next 9/11] awk: line 2: function strtonum
+ never defined
+In-Reply-To: <20171003100540.tfcehrcvf356332x@wfg-t540p.sh.intel.com>
+References: <201710030905.zGRrw4dZ%fengguang.wu@intel.com>
+ <20171003090642.GJ20805@n2100.armlinux.org.uk>
+ <20171003100540.tfcehrcvf356332x@wfg-t540p.sh.intel.com>
+Message-ID: <20171003105717.GL20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/10/17 23:07, Heiner Kallweit wrote:
-> Am 02.10.2017 um 13:17 schrieb Sudeep Holla:
->> 
->> 
->> On 29/09/17 22:44, Heiner Kallweit wrote:
->>> Pre-populating the dvfs info data in scpi_probe allows to make 
->>> all memory allocations device-managed. This helps to simplify 
->>> scpi_remove and eventually to get rid of scpi_remove completely.
->>> 
->>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
-
-[...]
-
->> Does it make sense to continue to complete all MAX_DVFS_DOMAINS ? 
->> Just wondering if there will be any firmware that returns errors 
->> for few domains(e.g. not supported in initial versions of 
->> firmware). I don't want to stop probing due to that. Let me know 
->> what you think.
->> 
-> The (legacy) SCPI firmware on my system seems to ignore the domain
-> in CMD_GET_DVFS_INFO. It returns the same dvfs info independent of
-> the domain parameter. So indeed prepopulating may not be the best
-> idea.
+On Tue, Oct 03, 2017 at 06:05:40PM +0800, Fengguang Wu wrote:
+> Hi Russell King,
 > 
-
-I can't follow that. Does the behavior change probe time vs runtime ?
-I am fine with probe time populate, just that we can't stop or propagate
-any error as it fails to probe other dependent drivers which may work
-fine without DVFS(e.g. clocks, sensors and power domains)
-
-> Still we need to do something in the remove callback to deal with the
-> scenario you describe (error for few domains).
-
-devm_* APIs will take care of freeing DVFS domain info, so what else
-needs to be done ? I just noticed devm_kfree(NULL) can produce WARN_ON
-splat, is that what you are referring ?
-
+> On Tue, Oct 03, 2017 at 10:06:42AM +0100, Russell King - ARM Linux wrote:
+> >Shall I repeat my question from the last time this was reported?
 > 
-> Remove does for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
-> and therefore stops at the first unpopulated domain and doesn't free
-> the memory for further populated domains. I'll provide a patch for
-> it.
-> 
+> Sorry I cannot find your reply in email archive.
 
-Does that mean you are re-introducing scpi_remove ? I kind of liked
-removing it.
+Odd, because I sent a reply to your report on 29th September, and it
+made it to the linux-arm-kernel mailing list, and its archives:
+
+  http://archive.armlinux.org.uk/lurker/message/20170929.190625.9f5a9438.en.html
+
+> Looking at this
+> error, the root cause should be strtonum requires gawk while what we
+> installed is
+> 
+>        mawk 1.3.3 Nov 1996, Copyright (C) Michael D. Brennan
+> 
+> We can trivially install gawk and make it the default, however is gawk
+> a requirement for kernel compilation? Or can we make it work with mawk,
+> too?
+
+Well, awk isn't mentioned in Documentation/Changes as a build requirement,
+but then neither is grep.  However, kbuild itself makes use of both:
+
+Makefile:AWK                = awk
+Makefile:   $(Q)$(AWK) '!x[$$0]++' $(vmlinux-dirs:%=$(objtree)/%/modules.order) > $(objtree)/modules.order
+Makefile:   $(Q)$(AWK) '!x[$$0]++' $^ > $(objtree)/modules.builtin
+scripts/Makefile.build:     if $(OBJDUMP) -h $(@D)/.tmp_$(@F) | grep -q __ksymtab; then                \
 
 -- 
-Regards,
-Sudeep
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
