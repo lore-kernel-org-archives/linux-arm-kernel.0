@@ -1,151 +1,128 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 3 Oct 2017 14:41:29 +0200
-Subject: [PATCH v2 1/5] ARM: head-common.S: speed up startup code
-In-Reply-To: <20170830025547.30347-2-nicolas.pitre@linaro.org>
-References: <20170830025547.30347-1-nicolas.pitre@linaro.org>
- <20170830025547.30347-2-nicolas.pitre@linaro.org>
-Message-ID: <CAMuHMdXnYysiDURyztXv3bhBMyk0o1EN=JzwqwvUifzw5fFYAw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 3 Oct 2017 13:48:43 +0100
+Subject: [PATCH v2] ACPI/IORT: Fix PCI ACS enablement
+In-Reply-To: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20171003124843.GA16134@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+[+Nate]
 
-On Wed, Aug 30, 2017 at 4:55 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> Let's use optimized routines such as memcpy to copy .data and memzero
-> to clear .bss in the startup code instead of doing it one word at a
-> time. Those routines don't use any global data so they're safe to use
-> even if .data and .bss segments are not initialized.
->
-> In the .data copy case a temporary stack is installed in the .bss area
-> as the actual kernel stack is located within the copied data area. The
-> XIP kernel linker script ensures a 8 byte alignment for that purpose.
->
-> Finally, make the .data copy and related pointers surrounded by
-> CONFIG_XIP_KERNEL to make it obvious what it is all about. This will
-> allow for further cleanups in the non-XIP linker script.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Zhou, Nate,
 
-This is now commit 9520b1a1b5f7a348 ("ARM: head-common.S: speed up startup
-code") in arm/for-next.
+On Mon, Oct 02, 2017 at 06:28:44PM +0100, Lorenzo Pieralisi wrote:
+> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
+> workarounds") removed kernel code that was allowing to initialize
+> and probe the SMMU devices early (ie earlier than PCI devices, through
+> linker script callback entries) in the boot process because it was not
+> needed any longer in that the SMMU devices/drivers now support deferred
+> probing.
+> 
+> Since the SMMUs probe routines are also in charge of requesting global
+> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
+> up early-probing workarounds") also postponed PCI ACS enablement to
+> SMMUs devices probe time, which is too late given that PCI devices needs
+> to detect if PCI ACS is enabled to init the respective capability
+> through the following call path:
+> 
+> pci_device_add()
+>  -> pci_init_capabilities()
+>   -> pci_enable_acs()
+> 
+> Add code in the ACPI IORT SMMU platform devices initialization path
+> (that is called before ACPI PCI enumeration) to detect if there
+> exists firmware mappings to map root complexes ids to SMMU ids
+> and if so enable ACS for the system.
+> 
+> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
+> Signed-workarounds")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Zhou Wang <wangzhou1@hisilicon.com>
+> Cc: Alex Williamson <alex.williamson@redhat.com>
+> ---
+> v1 -> v2:
+> 
+> - Reworked ACS enablement logic and based on root complex to SMMU
+>   ids firmware mapping detection
+> - Rebased against v4.14-rc3
+> 
+> v1: https://marc.info/?l=linux-acpi&m=150584059818925&w=2
+> 
+>  drivers/acpi/arm64/iort.c | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
 
-If CONFIG_DEBUG_LOCK_ALLOC=y, the kernel log is spammed with a few hundred
-identical messages on various Renesas systems:
+I have reworked the enablement logic wrt v1, dou you mind testing it
+please, I would like to get it merged since I have 4.15 patches depending
+on it.
 
-    unwind: Unknown symbol address c0800300
-    unwind: Index not found c0800300
+Thanks,
+Lorenzo
 
-I've bisected this to the aforementioned commit.
-
-c0800300 points to the instruction just after the __memzero call, cfr. below.
-
-Do you have a clue? Thanks!
-
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -79,47 +79,59 @@ ENDPROC(__vet_atags)
->   */
->         __INIT
->  __mmap_switched:
-> -       adr     r3, __mmap_switched_data
-> -
-> -       ldmia   r3!, {r4, r5, r6, r7}
-> -       cmp     r4, r5                          @ Copy data segment if needed
-> -1:     cmpne   r5, r6
-> -       ldrne   fp, [r4], #4
-> -       strne   fp, [r5], #4
-> -       bne     1b
-> -
-> -       mov     fp, #0                          @ Clear BSS (and zero fp)
-> -1:     cmp     r6, r7
-> -       strcc   fp, [r6],#4
-> -       bcc     1b
-> -
-> - ARM(  ldmia   r3, {r4, r5, r6, r7, sp})
-> - THUMB(        ldmia   r3, {r4, r5, r6, r7}    )
-> - THUMB(        ldr     sp, [r3, #16]           )
-> -       str     r9, [r4]                        @ Save processor ID
-> -       str     r1, [r5]                        @ Save machine type
-> -       str     r2, [r6]                        @ Save atags pointer
-> -       cmp     r7, #0
-> -       strne   r0, [r7]                        @ Save control register values
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 9565d57..de56394 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -1178,12 +1178,44 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>  	return ret;
+>  }
+>  
+> +static bool __init iort_enable_acs(struct acpi_iort_node *iort_node)
+> +{
+> +	if (iort_node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> +		struct acpi_iort_node *parent;
+> +		struct acpi_iort_id_mapping *map;
+> +		int i;
 > +
-> +       mov     r7, r1
-> +       mov     r8, r2
-> +       mov     r10, r0
+> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, iort_node,
+> +				   iort_node->mapping_offset);
 > +
-> +       adr     r4, __mmap_switched_data
-> +       mov     fp, #0
+> +		for (i = 0; i < iort_node->mapping_count; i++, map++) {
+> +			if (!map->output_reference)
+> +				continue;
 > +
-> +#ifdef CONFIG_XIP_KERNEL
-> +   ARM(        ldmia   r4!, {r0, r1, r2, sp} )
-> + THUMB(        ldmia   r4!, {r0, r1, r2, r3} )
-> + THUMB(        mov     sp, r3 )
-> +       sub     r2, r2, r1
-> +       bl      memcpy                          @ copy .data to RAM
-> +#endif
+> +			parent = ACPI_ADD_PTR(struct acpi_iort_node,
+> +					iort_table,  map->output_reference);
+> +			/*
+> +			 * If we detect a RC->SMMU mapping, make sure
+> +			 * we enable ACS on the system.
+> +			 */
+> +			if ((parent->type == ACPI_IORT_NODE_SMMU) ||
+> +				(parent->type == ACPI_IORT_NODE_SMMU_V3)) {
+> +				pci_request_acs();
+> +				return true;
+> +			}
+> +		}
+> +	}
 > +
-> +   ARM(        ldmia   r4!, {r0, r1, sp} )
-> + THUMB(        ldmia   r4!, {r0, r1, r3} )
-> + THUMB(        mov     sp, r3 )
-> +       sub     r1, r1, r0
-> +       bl      __memzero                       @ clear .bss
+> +	return false;
+> +}
 > +
-
-c0800300 is the address of the next instruction:
-
-> +       ldmia   r4, {r0, r1, r2, r3}
-> +       str     r9, [r0]                        @ Save processor ID
-> +       str     r7, [r1]                        @ Save machine type
-> +       str     r8, [r2]                        @ Save atags pointer
-> +       cmp     r3, #0
-> +       strne   r10, [r3]                       @ Save control register values
->         b       start_kernel
->  ENDPROC(__mmap_switched)
->
->         .align  2
->         .type   __mmap_switched_data, %object
->  __mmap_switched_data:
-> -       .long   __data_loc                      @ r4
-> -       .long   _sdata                          @ r5
-> -       .long   __bss_start                     @ r6
-> -       .long   _end                            @ r7
-> -       .long   processor_id                    @ r4
-> -       .long   __machine_arch_type             @ r5
-> -       .long   __atags_pointer                 @ r6
-> +#ifdef CONFIG_XIP_KERNEL
-> +       .long   _sdata                          @ r0
-> +       .long   __data_loc                      @ r1
-> +       .long   _edata_loc                      @ r2
-> +       .long   __bss_stop                      @ sp (temporary stack in .bss)
-> +#endif
+>  static void __init iort_init_platform_devices(void)
+>  {
+>  	struct acpi_iort_node *iort_node, *iort_end;
+>  	struct acpi_table_iort *iort;
+>  	struct fwnode_handle *fwnode;
+>  	int i, ret;
+> +	bool acs_enabled = false;
+>  
+>  	/*
+>  	 * iort_table and iort both point to the start of IORT table, but
+> @@ -1203,6 +1235,9 @@ static void __init iort_init_platform_devices(void)
+>  			return;
+>  		}
+>  
+> +		if (!acs_enabled)
+> +			acs_enabled = iort_enable_acs(iort_node);
 > +
-> +       .long   __bss_start                     @ r0
-> +       .long   __bss_stop                      @ r1
-> +       .long   init_thread_union + THREAD_START_SP @ sp
-> +
-> +       .long   processor_id                    @ r0
-> +       .long   __machine_arch_type             @ r1
-> +       .long   __atags_pointer                 @ r2
->  #ifdef CONFIG_CPU_CP15
-> -       .long   cr_alignment                    @ r7
-> +       .long   cr_alignment                    @ r3
->  #else
-> -       .long   0                               @ r7
-> +       .long   0                               @ r3
->  #endif
-> -       .long   init_thread_union + THREAD_START_SP @ sp
->         .size   __mmap_switched_data, . - __mmap_switched_data
->
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
+>  			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
+>  
+> -- 
+> 2.4.12
+> 
