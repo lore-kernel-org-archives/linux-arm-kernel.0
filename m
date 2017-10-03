@@ -1,77 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Oct 2017 16:43:28 +0200
+Date: Tue, 3 Oct 2017 16:47:37 +0200
 Subject: [PATCH v3 12/12] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when
  used as LDOs
-In-Reply-To: <20171003091837.GK20805@n2100.armlinux.org.uk>
+In-Reply-To: <CACRpkdZYcSuhvn0b0qa0k1PQHoyXjNyjoyhR2sPme_t1pF12Dg@mail.gmail.com>
 References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
  <20171002120854.5212-13-quentin.schulz@free-electrons.com>
- <20171002204235.25d4437a2p5qzrrj@flea>
- <CAGb2v67ZV0oZ41WS1Borrz0fDYiXV5B1DTKnPzRQVcodMOOLzQ@mail.gmail.com>
- <20171003091837.GK20805@n2100.armlinux.org.uk>
-Message-ID: <20171003144328.wgk57lmda52djcl5@flea>
+ <CACRpkdZYcSuhvn0b0qa0k1PQHoyXjNyjoyhR2sPme_t1pF12Dg@mail.gmail.com>
+Message-ID: <20171003144737.rhgtp3uwckhvoqdw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 09:18:37AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Oct 03, 2017 at 10:06:29AM +0800, Chen-Yu Tsai wrote:
-> > On Tue, Oct 3, 2017 at 4:42 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > On Mon, Oct 02, 2017 at 12:08:54PM +0000, Quentin Schulz wrote:
-> > >> On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
-> > >> ldo_io0 and ldo_io1.
-> > >>
-> > >> Let's add the pinctrl properties to the said regulators.
-> > >>
-> > >> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > >> ---
-> > >>  arch/arm/boot/dts/axp81x.dtsi | 14 ++++++++++++++
-> > >>  1 file changed, 14 insertions(+)
-> > >>
-> > >> diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
-> > >> index f90f257130d5..099b0ddc1bbb 100644
-> > >> --- a/arch/arm/boot/dts/axp81x.dtsi
-> > >> +++ b/arch/arm/boot/dts/axp81x.dtsi
-> > >> @@ -52,6 +52,16 @@
-> > >>               compatible = "x-powers,axp813-gpio";
-> > >>               gpio-controller;
-> > >>               #gpio-cells = <2>;
-> > >> +
-> > >> +             gpio0_ldo: gpio0_ldo {
-> > >> +                     pins = "GPIO0";
-> > >> +                     function = "ldo";
-> > >> +             };
-> > >> +
-> > >> +             gpio1_ldo: gpio1_ldo {
-> > >> +                     pins = "GPIO1";
-> > >> +                     function = "ldo";
-> > >> +             };
-> > >
-> > > The node names are not supposed to contain any hyphens.
-> > 
-> > Hmm, I was under the impression that hyphens were preferred in
-> > node names, and a warning would be added to dtc later on.
-> > I might be wrong though.
-> 
-> I think there's a terminology issue here.
-> 
-> "-" is a hyphen or minus sign.
-> "_" is an underscore.
-> 
-> Underscores are not supposed to be used for node names, instead hyphens
-> are preferred.  I think Maxime means "underscore".
-> 
-> Here's the list from dtc/checks.c:
-> 
-> #define LOWERCASE       "abcdefghijklmnopqrstuvwxyz"
-> #define UPPERCASE       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-> #define DIGITS          "0123456789"
-> #define PROPNODECHARS   LOWERCASE UPPERCASE DIGITS ",._+*#?-"
-> #define PROPNODECHARSSTRICT     LOWERCASE UPPERCASE DIGITS ",-"
-> 
-> If strict mode is enabled, use of any of "._+#?" in the node name will
-> produce a warning.
+Hi Linus,
 
-Right, sorry, I meant underscores..
+On Tue, Oct 03, 2017 at 09:27:17AM +0000, Linus Walleij wrote:
+> On Mon, Oct 2, 2017 at 2:08 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+> 
+> > On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
+> > ldo_io0 and ldo_io1.
+> (...)
+> > +               gpio0_ldo: gpio0_ldo {
+> > +                       pins = "GPIO0";
+> > +                       function = "ldo";
+> > +               };
+> (...)
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&gpio0_ldo>;
+> >                         /* Disable by default to avoid conflicts with GPIO */
+> >                         status = "disabled";
+> 
+> So this is still by default disabled, but you make the default
+> mode something called "ldo".
+> 
+> And I think that is to be understood as a low-dropout regulator?
+> 
+> So is the idea that this should be represented as a regulator
+> in the end?
+> 
+> Then I think the state name should not be "default" rather
+> something like "regulator" and "default" should be the GPIO
+> mode, as I guess something like that exists.
+> 
+> Activating a regulator using pin control "default" mode is
+> not very pretty. It would probably be unintuitive and end
+> up wasting power because people will get confused about
+> what is going on.
+
+That's not really it. The PMIC has pins that can be muxed either to
+(regular) GPIOs, an ADC or to an LDO regulator.
+
+This is just muxing, the regulator will be enabled and disabled
+separately through another register. If it wasn't the case, it would
+indeed be very messy.
 
 Maxime
 
@@ -85,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171003/2c8e76b6/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171003/86e623f2/attachment.sig>
