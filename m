@@ -1,72 +1,54 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 3 Oct 2017 10:49:25 +0530
-Subject: [PATCH v4 6/6] mtd: spi-nor: cadence-quadspi: Add runtime PM support
-In-Reply-To: <20171003051925.8821-1-vigneshr@ti.com>
-References: <20171003051925.8821-1-vigneshr@ti.com>
-Message-ID: <20171003051925.8821-7-vigneshr@ti.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 3 Oct 2017 15:17:17 +0930
+Subject: [PATCH v2 4/5] clk: aspeed: Register gated clocks
+In-Reply-To: <20171002213742.GQ457@codeaurora.org>
+References: <20170921042641.7326-1-joel@jms.id.au>
+ <20170921042641.7326-5-joel@jms.id.au>
+ <20171002213742.GQ457@codeaurora.org>
+Message-ID: <CACPK8XdrqmBC8M+=NDUVhYKPafw-Qc8fRikV+xJ84FyzG6BfxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm_runtime* calls to cadence-quadspi driver. This is required to
-switch on QSPI power domain on TI 66AK2G SoC during probe.
+On Tue, Oct 3, 2017 at 7:07 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 09/21, Joel Stanley wrote:
+>> The majority of the clocks in the system are gates paired with a reset
+>> controller that holds the IP in reset.
+>>
+>> This borrows from clk_hw_register_gate, but registers two 'gates', one
+>> to control the clock enable register and the other to control the reset
+>> IP. This allows us to enforce the ordering:
+>>
+>>  1. Place IP in reset
+>>  2. Enable clock
+>>  3. Delay
+>>  4. Release reset
+>>
+>> There are some gates that do not have an associated reset; these are
+>> handled by using -1 as the index for the reset.
+>
+> Half of these aren't clks, but reset bits? Perhaps you should
+> register power domains for these things and then have the power
+> domain assert the reset, enable the clock, delay, and then
+> release the reset in the poweron callback. Then device drivers
+> don't have to be aware of the ordering, and you can keep
+> enforcing the ordering in one place, but we don't have to make
+> fake gates and shoehorn the sequence into the clk framework.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
-v4: Disable pm in error path.
+I had a look. We've got 24 gates being registered, and half are just
+gate+reset pairs, while the other half are both. Some of them have
+clocks with divisors upstream of the gate, so in those cases we do
+care what the rate is. For the others they are simply bringing the IP
+online.
 
- drivers/mtd/spi-nor/cadence-quadspi.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+Note that we don't have drivers for all of the peripherals, so things
+may change once those drivers are written.
 
-diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index 60b557e00cfb..75a2bc447a99 100644
---- a/drivers/mtd/spi-nor/cadence-quadspi.c
-+++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -31,6 +31,7 @@
- #include <linux/of_device.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/sched.h>
- #include <linux/spi/spi.h>
- #include <linux/timer.h>
-@@ -1224,10 +1225,17 @@ static int cqspi_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
- 
-+	pm_runtime_enable(dev);
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0) {
-+		pm_runtime_put_noidle(dev);
-+		return ret;
-+	}
-+
- 	ret = clk_prepare_enable(cqspi->clk);
- 	if (ret) {
- 		dev_err(dev, "Cannot enable QSPI clock.\n");
--		return ret;
-+		goto probe_clk_failed;
- 	}
- 
- 	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
-@@ -1259,6 +1267,9 @@ static int cqspi_probe(struct platform_device *pdev)
- 	cqspi_controller_enable(cqspi, 0);
- probe_irq_failed:
- 	clk_disable_unprepare(cqspi->clk);
-+probe_clk_failed:
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
- 	return ret;
- }
- 
-@@ -1275,6 +1286,9 @@ static int cqspi_remove(struct platform_device *pdev)
- 
- 	clk_disable_unprepare(cqspi->clk);
- 
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
- 	return 0;
- }
- 
--- 
-2.14.1
+I hadn't looked into the power domain stuff - when I brought this up
+on the list recently Philip suggested that this should be contained in
+a clk driver, so that's the direction we went:
+
+ http://www.spinics.net/lists/linux-clk/msg18733.html
+
+Cheers,
+
+Joel
