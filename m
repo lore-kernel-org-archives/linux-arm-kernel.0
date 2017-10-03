@@ -1,32 +1,32 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  3 Oct 2017 17:29:45 +0200
-Subject: [PATCH v2 2/2] dt-bindings: arm: amlogic: Add Tronsmart Vega S96
- binding
-In-Reply-To: <1507044585-20117-1-git-send-email-narmstrong@baylibre.com>
-References: <1507044585-20117-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1507044585-20117-3-git-send-email-narmstrong@baylibre.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Tue, 3 Oct 2017 11:29:16 -0400
+Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
+In-Reply-To: <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-9-pasha.tatashin@oracle.com>
+ <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
+Message-ID: <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: support at tronsmart.com
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-Signed-off-by: Oleg Ivanov <balbes-150@yandex.ru>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
- 1 file changed, 1 insertion(+)
+On 10/03/2017 09:18 AM, Michal Hocko wrote:
+> On Wed 20-09-17 16:17:10, Pavel Tatashin wrote:
+>> Some memory is reserved but unavailable: not present in memblock.memory
+>> (because not backed by physical pages), but present in memblock.reserved.
+>> Such memory has backing struct pages, but they are not initialized by going
+>> through __init_single_page().
+> 
+> Could you be more specific where is such a memory reserved?
+> 
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 4e4bc0b..d6163ac 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -73,6 +73,7 @@ Board compatible values (alphabetically, grouped by SoC):
-   - "amlogic,q201" (Meson gxm s912)
-   - "kingnovel,r-box-pro" (Meson gxm S912)
-   - "nexbox,a1" (Meson gxm s912)
-+  - "tronsmart,vega-s96" (Meson gxm s912)
- 
- Amlogic Meson Firmware registers Interface
- ------------------------------------------
--- 
-2.7.4
+I know of one example: trim_low_memory_range() unconditionally reserves 
+from pfn 0, but e820__memblock_setup() might provide the exiting memory 
+from pfn 1 (i.e. KVM).
+
+But, there could be more based on this comment from linux/page-flags.h:
+
+  19  * PG_reserved is set for special pages, which can never be swapped 
+out. Some
+  20  * of them might not even exist (eg empty_bad_page)...
+
+Pasha
