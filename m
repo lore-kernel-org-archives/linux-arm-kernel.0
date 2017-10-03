@@ -1,84 +1,64 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 3 Oct 2017 13:14:15 +0200
-Subject: [PATCH 3/4] nvmem: add a driver for the Amlogic
- Meson6/Meson8/Meson8b SoCs
-In-Reply-To: <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
-References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
- <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
- <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
-Message-ID: <CAFBinCA8abWDpC71g_LEM3hU6QB8QUifG_6V6rv1ZMsi3remZQ@mail.gmail.com>
+Date: Tue, 3 Oct 2017 13:19:08 +0200
+Subject: [RFC v2 0/2] Add support for Meson MX "SDIO" MMC controller
+In-Reply-To: <20170927193616.32gxszmk4cjjoqmo@rob-hp-laptop>
+References: <20170924190528.21841-1-martin.blumenstingl@googlemail.com>
+ <20170927193616.32gxszmk4cjjoqmo@rob-hp-laptop>
+Message-ID: <CAFBinCDrEmj27ewWQ4+rNXtFSWR3dUoF5H2qZmn2=bpP6OXSZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Rob,
 
-On Tue, Oct 3, 2017 at 6:48 AM, Chris Moore <moore@free.fr> wrote:
-> Hi,
+On Wed, Sep 27, 2017 at 9:36 PM, Rob Herring <robh@kernel.org> wrote:
+> On Sun, Sep 24, 2017 at 09:05:26PM +0200, Martin Blumenstingl wrote:
+>> This is the successor to Carlo Caione's "Add support for Amlogic Meson
+>> MMC driver" series (v5) from [0].
+>> This new driver is for the "SDIO" controller found in Amlogic Meson6,
+>> Meson8 and Meson8b SoCs and supports an internal mux to allow connecting
+>> three cards to it.
+>>
+>>
+>> changes since RFC v1 at [1]:
+>> - added COMMON_CLK dependency as reported by the kbuild test robot
+>> - use of_platform_device_{create,destroy} instead of open-coding it's
+>>   logic
+>> - moved struct device (which was an array) from meson_mx_mmc_host to
+>>   the corresponding meson_mx_mmc_slot
+>> - use struct mmc_command's busy_timeout instead of hard-coding the
+>>   timeout values in meson_mx_mmc_start_cmd()
+>> - don't use arrays with only one element for the clock parents in
+>>   meson_mx_mmc_register_clks()
+>> - removed the wrapper functions meson_mx_mmc_readl() meson_mx_mmc_writel()
+>> - allow setting the MMC clock to 0 for UHS speed mode (the actual
+>>   hardware clock cannot be gated as far as I know, so instead the
+>>   lowest supported rate is chosen)
+>> - remove unused #include <linux/init.h>
+>> - add MMC_CAP_ERASE
+>> - removed multiple slot support after discussing this with Ulf
+>>   (this is a feature that needs to be part of the MMC core before drivers
+>>   can use it)
+>> - removed SDIO interrupt support (as I currently don't have a way to
+>>   test it)
+>> - merge meson_mx_mmc_apply_ios into meson_mx_mmc_set_ios (as that's
+>>   the only place where it's needed after removing multiple slot support)
+>> - updated the commit message of the driver patch to indicate the
+>>   difference between the meson-mx-sdio.c and meson-gx.c (and the "still
+>>   missing SDHC") driver
+>> - NOTE: I did not add Rob's ACK on the dt-bindings patch because I
+>>   introduced the "mmc-slot" compatible for the child nodes as suggested
+>>   by Ulf (and I want confirmation from the DT maintainers that I did this
+>>   correctly)
 >
-> Sorry in advance if I am being extremely stupid here.
->
-> Le 01/10/2017 ? 14:56, Martin Blumenstingl a ?crit :
->
-> [snip]
->
->> +static int meson_mx_efuse_read(void *context, unsigned int offset,
->> +                              void *buf, size_t bytes)
->> +{
->> +       struct meson_mx_efuse *efuse = context;
->> +       u32 tmp;
->> +       int err, i, addr;
->> +
->> +       err = meson_mx_efuse_hw_enable(efuse);
->> +       if (err)
->> +               return err;
->> +
->> +       meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
->> +                                MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
->> +                                MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
->> +
->> +       for (i = offset; i < offset + bytes; i += efuse->config.word_size)
->> {
->> +               addr = i / efuse->config.word_size;
->> +
->> +               err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
->> +               if (err)
->> +                       break;
->> +
->> +               memcpy(buf + i, &tmp, efuse->config.word_size);
->> +       }
->
->
-> This will not give the expected result if offset is not a multiple of
-> efuse->config.word_size.
-I had a look at mtk-efuse.c and bcm-ocotp.c and both are doing similar
-calculations
-thus I assumed that the nvmem core takes care of handling this
+> Didn't slot support get removed as no h/w really uses that feature?
+I have at least one boards which uses it: Endless Mini (EC-100)
+the SoC itself has two MMC controllers, but that board has:
+- an eMMC module (connected to a yet unsupported MMC controller)
+- an internal SD card (connected to the SDIO controller from this patch)
+- a RTL8723BS wifi SDIO card (also connected to the SDIO controller
+from this patch)
 
-> This will cause buffer overflow if bytes is not a multiple of
-> efuse->config.word_size.
-that would be very nasty indeed
-
-> Shouldn't there at least be some sort of test on offset and bytes?
-in the driver or in core? if possible these checks should be part of
-the core nvmem code to prevent code duplication across various drivers
-(and to prevent bugs if a specific driver forgets these checks)
-
-> Also this doesn't look endian-safe, but maybe it is.
-dumping the whole efuse via sysfs showed the same results as (the
-vendor command in Amlogic's) u-boot.
-
-> Old-timer remarks:
-> - I try to avoid divisions where possible but I suppose they are very
-> low-cost on recent hardware.
-> - I don't like arithmetic on void pointers but I know it is supported by gcc
-> (and possibly by recent C standards too).
->
-> Sorry again for the noise if I am being stupid.
-your questions are reasonable
-this is my first nvmem driver, so there may be mistakes in the code -
-maybe Srinivas could also comment on your feedback
-
-also thank you for taking the time to review this!
+so it's pretty rare - but such hardware exists.
 
 
 Regards,
