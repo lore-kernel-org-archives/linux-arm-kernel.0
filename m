@@ -1,452 +1,146 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Tue, 3 Oct 2017 14:43:38 -0300
-Subject: [PATCH] ARM: dts: imx: Fix incorrect display nodes notation
-Message-ID: <1507052618-30329-1-git-send-email-marco.franchi@nxp.com>
+From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
+Date: Tue, 3 Oct 2017 19:49:14 +0200
+Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
+In-Reply-To: <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+ <20171003091155.7138-2-linus.walleij@linaro.org>
+ <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+ <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
+Message-ID: <CAP71Wjy2gEn=sGz5kN++=TdZ4S1cmE-3fdw-5__tdtR-M9RDGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following build warnings are seen with W=1:
+On Tue, Oct 3, 2017 at 6:37 PM, Rob Clark <robdclark@gmail.com> wrote:
+> On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
+> <srinivas.kandagatla@linaro.org> wrote:
+>>
+>>
+>> On 03/10/17 10:11, Linus Walleij wrote:
+>>>
+>>> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
+>>> is not very helpful for users looking for their device tree in
+>>> the kernel. Also the db820c is named properly.
+>>>
+>>> Rectify this, simply, do not change the compatible strings but name
+>>> the DTS files in a consistent manner.
+>>>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I did not like the sbc naming convention too, This was primarily done due to
+>> some legacy build tools + bootloaders which have used sbc compatible to
+>> identify boards from multiple dtb blobs. Now that we can append dtb to
+>> kernel with new LK, this should not be a issue anymore.
+>
+> maybe it would be an idea to update skales/dbttool first to look for
+> the new name, and then give people some time to upgrade, before
+> changing this in the kernel.  Otherwise I expect you'll cause some
+> confusion..
 
-Warning (unit_address_vs_reg): Node /display at di0 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /display at di1 has a unit name, but no reg property
+iirc, skale is using the compatible name, not the filename.
 
-Fix all these warnings by changing 'display at diX' to 'dispX'.
-
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
-I have already submitted a fix for the Documentation bindings:
-https://git.pengutronix.de/cgit/pza/linux/commit/?h=imx-drm/next&id=dbfdd153d4aefec13460c97475737e59af92d8e2
-
- arch/arm/boot/dts/imx51-apf51dev.dts          | 2 +-
- arch/arm/boot/dts/imx51-babbage.dts           | 4 ++--
- arch/arm/boot/dts/imx51-ts4800.dts            | 2 +-
- arch/arm/boot/dts/imx53-m53evk.dts            | 2 +-
- arch/arm/boot/dts/imx53-mba53.dts             | 2 +-
- arch/arm/boot/dts/imx53-qsb-common.dtsi       | 2 +-
- arch/arm/boot/dts/imx53-tx53-x03x.dts         | 2 +-
- arch/arm/boot/dts/imx6dl-aristainetos2_4.dts  | 2 +-
- arch/arm/boot/dts/imx6dl-aristainetos_4.dts   | 2 +-
- arch/arm/boot/dts/imx6dl-aristainetos_7.dts   | 2 +-
- arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts  | 2 +-
- arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts     | 2 +-
- arch/arm/boot/dts/imx6dl-tx6s-8034.dts        | 2 +-
- arch/arm/boot/dts/imx6dl-tx6s-8035.dts        | 2 +-
- arch/arm/boot/dts/imx6dl-tx6u-801x.dts        | 2 +-
- arch/arm/boot/dts/imx6dl-tx6u-8033.dts        | 2 +-
- arch/arm/boot/dts/imx6q-apalis-eval.dts       | 2 +-
- arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 2 +-
- arch/arm/boot/dts/imx6q-apalis-ixora.dts      | 2 +-
- arch/arm/boot/dts/imx6q-tx6q-1010-comtft.dts  | 2 +-
- arch/arm/boot/dts/imx6q-tx6q-1010.dts         | 2 +-
- arch/arm/boot/dts/imx6q-tx6q-1020-comtft.dts  | 2 +-
- arch/arm/boot/dts/imx6q-tx6q-1020.dts         | 2 +-
- arch/arm/boot/dts/imx6q-tx6q-1036.dts         | 2 +-
- arch/arm/boot/dts/imx6qdl-apf6dev.dtsi        | 2 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi  | 2 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 2 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi     | 2 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi      | 2 +-
- arch/arm/boot/dts/imx6ul-tx6ul.dtsi           | 2 +-
- 30 files changed, 31 insertions(+), 31 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index a5e6091..f04d0df 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -24,7 +24,7 @@
- 		default-on;
- 	};
- 
--	display at di1 {
-+	disp1 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "bgr666";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 873cf24..297953c 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -39,7 +39,7 @@
- 		};
- 	};
- 
--	display0: display at di0 {
-+	display0: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-@@ -66,7 +66,7 @@
- 		};
- 	};
- 
--	display1: display at di1 {
-+	display1: disp1 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb565";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-index ca1cc5e..e6be869 100644
---- a/arch/arm/boot/dts/imx51-ts4800.dts
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -50,7 +50,7 @@
- 		power-supply = <&backlight_reg>;
- 	};
- 
--	display0: display at di0 {
-+	display0: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 4347a32..9794a04 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -16,7 +16,7 @@
- 	model = "Aries/DENX M53EVK";
- 	compatible = "aries,imx53-m53evk", "denx,imx53-m53evk", "fsl,imx53";
- 
--	display1: display at di1 {
-+	display1: disp1 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "bgr666";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index df705ba..296dd74 100644
---- a/arch/arm/boot/dts/imx53-mba53.dts
-+++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -30,7 +30,7 @@
- 		power-supply = <&reg_backlight>;
- 	};
- 
--	disp1: display at disp1 {
-+	disp1: disp1 {
- 		compatible = "fsl,imx-parallel-display";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_disp1_1>;
-diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-index 683dcbe..d5adf33 100644
---- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-+++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-@@ -22,7 +22,7 @@
- 		      <0xb0000000 0x20000000>;
- 	};
- 
--	display0: display at di0 {
-+	display0: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb565";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-index 0ecb43d..b1ea73f 100644
---- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
-+++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-@@ -24,7 +24,7 @@
- 	};
- 
- 	soc {
--		display: display at di0 {
-+		display: disp0 {
- 			compatible = "fsl,imx-parallel-display";
- 			interface-pix-fmt = "rgb24";
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-index 0677625..5f0d196 100644
---- a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-@@ -52,7 +52,7 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	display0: display at di0 {
-+	display0: disp0 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "fsl,imx-parallel-display";
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos_4.dts
-index 32a812b..cc418ce 100644
---- a/arch/arm/boot/dts/imx6dl-aristainetos_4.dts
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos_4.dts
-@@ -32,7 +32,7 @@
- 	};
- 
- 	soc {
--		display0: display at di0 {
-+		display0: disp0 {
- 			compatible = "fsl,imx-parallel-display";
- 			interface-pix-fmt = "rgb24";
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos_7.dts b/arch/arm/boot/dts/imx6dl-aristainetos_7.dts
-index 15203f0..126ff96 100644
---- a/arch/arm/boot/dts/imx6dl-aristainetos_7.dts
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos_7.dts
-@@ -21,7 +21,7 @@
- 	};
- 
- 	soc {
--		display0: display at di0 {
-+		display0: disp0 {
- 			compatible = "fsl,imx-parallel-display";
- 			interface-pix-fmt = "rgb24";
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-index 2654153..5705ebe 100644
---- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-@@ -88,7 +88,7 @@
- 		};
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts b/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts
-index aac42ac..389fc16 100644
---- a/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6dl-comtft.dts
-@@ -73,7 +73,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6dl-tx6s-8034.dts b/arch/arm/boot/dts/imx6dl-tx6s-8034.dts
-index ff8f7b1..a21075b 100644
---- a/arch/arm/boot/dts/imx6dl-tx6s-8034.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6s-8034.dts
-@@ -81,7 +81,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_disp0_2>;
-diff --git a/arch/arm/boot/dts/imx6dl-tx6s-8035.dts b/arch/arm/boot/dts/imx6dl-tx6s-8035.dts
-index f988950..fee8854 100644
---- a/arch/arm/boot/dts/imx6dl-tx6s-8035.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6s-8035.dts
-@@ -81,7 +81,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_disp0_2>;
-diff --git a/arch/arm/boot/dts/imx6dl-tx6u-801x.dts b/arch/arm/boot/dts/imx6dl-tx6u-801x.dts
-index d1f1298..efe5772 100644
---- a/arch/arm/boot/dts/imx6dl-tx6u-801x.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6u-801x.dts
-@@ -73,7 +73,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6dl-tx6u-8033.dts b/arch/arm/boot/dts/imx6dl-tx6u-8033.dts
-index 4d3204a..e222086 100644
---- a/arch/arm/boot/dts/imx6dl-tx6u-8033.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6u-8033.dts
-@@ -76,7 +76,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_disp0_2>;
-diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
-index 4bbfe3d..8b56656 100644
---- a/arch/arm/boot/dts/imx6q-apalis-eval.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
-@@ -76,7 +76,7 @@
- 		};
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-index a35c7a5..27dc0fc 100644
---- a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-@@ -77,7 +77,7 @@
- 		};
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-index 60d33e9..40b2c67 100644
---- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-@@ -76,7 +76,7 @@
- 		};
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1010-comtft.dts b/arch/arm/boot/dts/imx6q-tx6q-1010-comtft.dts
-index 71746ed..d3ee1f5 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1010-comtft.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1010-comtft.dts
-@@ -73,7 +73,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1010.dts b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
-index f9cd21a..e14e6be 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1010.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1010.dts
-@@ -73,7 +73,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1020-comtft.dts b/arch/arm/boot/dts/imx6q-tx6q-1020-comtft.dts
-index 959ff3fb..ea84561 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1020-comtft.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1020-comtft.dts
-@@ -73,7 +73,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1020.dts b/arch/arm/boot/dts/imx6q-tx6q-1020.dts
-index b49133d..9c168ee 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1020.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1020.dts
-@@ -73,7 +73,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1036.dts b/arch/arm/boot/dts/imx6q-tx6q-1036.dts
-index 7c152e3..c81e8bd 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1036.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1036.dts
-@@ -76,7 +76,7 @@
- 		default-brightness-level = <50>;
- 	};
- 
--	display: display at di0 {
-+	display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_disp0_2>;
-diff --git a/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi b/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
-index 9cd2a74..37a59a8 100644
---- a/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
-@@ -54,7 +54,7 @@
- 		stdout-path = &uart4;
- 	};
- 
--	display at di0 {
-+	disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "bgr666";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-index b63134e..472b0c9 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-@@ -256,7 +256,7 @@
- 		status = "okay";
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-index a24e4f1..4bab60a 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-@@ -120,7 +120,7 @@
- 		};
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index d309a4d..9a46cf1 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -197,7 +197,7 @@
- 		status = "okay";
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 756c505..fc1f2c0 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -221,7 +221,7 @@
- 		status = "okay";
- 	};
- 
--	lcd_display: display at di0 {
-+	lcd_display: disp0 {
- 		compatible = "fsl,imx-parallel-display";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-index ec745eb..5610d19 100644
---- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-@@ -424,7 +424,7 @@
- 	display = <&display>;
- 	status = "okay";
- 
--	display: display at di0 {
-+	display: disp0 {
- 		bits-per-pixel = <32>;
- 		bus-width = <24>;
- 		status = "okay";
--- 
-2.7.4
+>
+> BR,
+> -R
+>
+>
+>> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>
+>>
+>>> ---
+>>> It's not like I don't understand that people will be nitpicky
+>>> about this.
+>>>
+>>> I was looking for the DragonBoard 410c devicetree and could not
+>>> find it until I realized this hopeless idiomatic naming.
+>>>
+>>> It cost me time and effort, and it is going to cost others time
+>>> and effort. Fixing it.
+>>>
+>>> The other patch naming the GPIO lines can be applied without
+>>> this one.
+>>> ---
+>>>   arch/arm64/boot/dts/qcom/Makefile                                    | 2
+>>> +-
+>>>   .../{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi}    | 0
+>>>   .../qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} | 0
+>>>   arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}     | 5
+>>> +++--
+>>>   arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi}   | 4
+>>> ++--
+>>>   5 files changed, 6 insertions(+), 5 deletions(-)
+>>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-pmic-pins.dtsi =>
+>>> apq8016-db410c-pmic-pins.dtsi} (100%)
+>>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-soc-pins.dtsi =>
+>>> apq8016-db410c-soc-pins.dtsi} (100%)
+>>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}
+>>> (95%)
+>>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi =>
+>>> apq8016-db410c.dtsi} (99%)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/qcom/Makefile
+>>> b/arch/arm64/boot/dts/qcom/Makefile
+>>> index ff81d7e5805e..fc46ab79acd9 100644
+>>> --- a/arch/arm64/boot/dts/qcom/Makefile
+>>> +++ b/arch/arm64/boot/dts/qcom/Makefile
+>>> @@ -1,4 +1,4 @@
+>>> -dtb-$(CONFIG_ARCH_QCOM)        += apq8016-sbc.dtb
+>>> +dtb-$(CONFIG_ARCH_QCOM)        += apq8016-db410c.dtb
+>>>   dtb-$(CONFIG_ARCH_QCOM)       += apq8096-db820c.dtb
+>>>   dtb-$(CONFIG_ARCH_QCOM)       += ipq8074-hk01.dtb
+>>>   dtb-$(CONFIG_ARCH_QCOM)       += msm8916-mtp.dtb
+>>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+>>> b/arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
+>>> similarity index 100%
+>>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+>>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
+>>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>>> b/arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
+>>> similarity index 100%
+>>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
+>>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+>>> b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+>>> similarity index 95%
+>>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+>>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+>>> index 40b0d62861bb..86cfae4d2b9d 100644
+>>> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+>>> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+>>> @@ -13,10 +13,11 @@
+>>>     /dts-v1/;
+>>>   -#include "apq8016-sbc.dtsi"
+>>> +#include "apq8016-db410c.dtsi"
+>>>     / {
+>>> -       model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
+>>> +       model = "Qualcomm Technologies, Inc. APQ 8016 DragonBoard 410c";
+>>> +       /* The "SBC" (Single Board Computer) is another name for this
+>>> board */
+>>>         compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
+>>>   };
+>>>   diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>>> b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+>>> similarity index 99%
+>>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+>>> index 1d63e6b879de..1300c11e5f0e 100644
+>>> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>>> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+>>> @@ -13,8 +13,8 @@
+>>>     #include "msm8916.dtsi"
+>>>   #include "pm8916.dtsi"
+>>> -#include "apq8016-sbc-soc-pins.dtsi"
+>>> -#include "apq8016-sbc-pmic-pins.dtsi"
+>>> +#include "apq8016-db410c-soc-pins.dtsi"
+>>> +#include "apq8016-db410c-pmic-pins.dtsi"
+>>>   #include <dt-bindings/gpio/gpio.h>
+>>>   #include <dt-bindings/input/input.h>
+>>>   #include <dt-bindings/sound/apq8016-lpass.h>
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
