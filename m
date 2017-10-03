@@ -1,40 +1,68 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 3 Oct 2017 15:21:27 +0200
-Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
-In-Reply-To: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
-References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <d785929a-a6af-b803-d34d-a7138102f55f@linaro.org>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Tue, 3 Oct 2017 08:21:25 -0500
+Subject: 4879b7ae05 ("Merge tag 'dmaengine-4.12-rc1' of .."): WARNING:
+ kernel stack regs at bd92bc2e in 01-cpu-hotplug:3811 has bad 'bp' value
+ 000001be
+In-Reply-To: <20171003034538.ntvuwtm2uha6wt6h@wfg-t540p.sh.intel.com>
+References: <59d177a7.vsiddgOxdHRIlRvy%fengguang.wu@intel.com>
+ <CA+55aFz_ijfUxyk2kdLhfzfS1z0_uRBw6eQb9UxFvh=5zOzzaw@mail.gmail.com>
+ <20171002212654.rsm4uj3hfioddldd@treble>
+ <20171002213109.5n3skzy76edhwkvf@treble>
+ <20171003034538.ntvuwtm2uha6wt6h@wfg-t540p.sh.intel.com>
+Message-ID: <20171003132125.ulj3nnmiimamsm6w@treble>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/2017 22:24, Stefan Wahren wrote:
-> In case there are no DT idle states defined or
-> cpuidle_register_driver() fails, the copy of the idle driver is leaked:
+On Tue, Oct 03, 2017 at 11:45:38AM +0800, Fengguang Wu wrote:
+> Hi Josh,
 > 
->     unreferenced object 0xede0dc00 (size 1024):
->     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
->     hex dump (first 32 bytes):
->     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
->     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
->     backtrace:
->     [<c1295f04>] arm_idle_init+0x44/0x1ac
->     [<c0301e6c>] do_one_initcall+0x3c/0x16c
->     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
->     [<c0cb3624>] kernel_init+0x8/0x114
->     [<c0307a98>] ret_from_fork+0x14/0x3c
+> On Mon, Oct 02, 2017 at 04:31:09PM -0500, Josh Poimboeuf wrote:
+> > On Mon, Oct 02, 2017 at 04:26:54PM -0500, Josh Poimboeuf wrote:
+> > > Fengguang, assuming it's reliably recreatable, any chance you could
+> > > recreate with the following patch?
 > 
-> So fix this by freeing the unregistered copy in error case.
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
-> ---
+> Sure, I'll try your patch on v4.14-rc3 since it looks the most
+> reproducible kernel. For the bisected 4879b7ae05, the warning only
+> shows up once out of 909 boots according to the below stats. So I'm
+> not sure whether it's the _first_ bad commit. To double confirm, I
+> just queued 5000 more boot tests for each of its parent commits.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Fengguang, here's an improved version of the patch based on Linus'
+suggestions.  If you can use it instead, that would be helpful because
+it has a better chance of dumping useful data.  Thanks!
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+diff --git a/arch/x86/kernel/unwind_frame.c b/arch/x86/kernel/unwind_frame.c
+index d145a0b1f529..191012762aa0 100644
+--- a/arch/x86/kernel/unwind_frame.c
++++ b/arch/x86/kernel/unwind_frame.c
+@@ -44,7 +44,8 @@ static void unwind_dump(struct unwind_state *state)
+ 			state->stack_info.type, state->stack_info.next_sp,
+ 			state->stack_mask, state->graph_idx);
+ 
+-	for (sp = state->orig_sp; sp; sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
++	for (sp = PTR_ALIGN(state->orig_sp, sizeof(long)); sp;
++	     sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
+ 		if (get_stack_info(sp, state->task, &stack_info, &visit_mask))
+ 			break;
+ 
+@@ -178,7 +179,7 @@ static struct pt_regs *decode_frame_pointer(unsigned long *bp)
+ {
+ 	unsigned long regs = (unsigned long)bp;
+ 
+-	if (!(regs & 0x1))
++	if ((regs & (sizeof(long)-1)) != 1)
+ 		return NULL;
+ 
+ 	return (struct pt_regs *)(regs & ~0x1);
+@@ -221,6 +222,10 @@ static bool update_stack_state(struct unwind_state *state,
+ 				   &state->stack_mask))
+ 			return false;
+ 
++	/* Make sure the frame pointer is properly aligned: */
++	if ((unsigned long)frame & (sizeof(long)-1))
++		return false;
++
+ 	/* Make sure it only unwinds up and doesn't overlap the prev frame: */
+ 	if (state->orig_sp && state->stack_info.type == prev_type &&
+ 	    frame < prev_frame_end)
