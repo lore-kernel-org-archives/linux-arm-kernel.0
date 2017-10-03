@@ -1,27 +1,35 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  3 Oct 2017 10:52:56 +0530
-Subject: [PATCH 0/4] Few more SBA RAID driver improvements
-Message-ID: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
+Date: Tue,  3 Oct 2017 10:51:52 +0530
+Subject: [PATCH 5/5] mailbox: Build Broadcom FlexRM driver as loadable module
+ for iProc SOCs
+In-Reply-To: <1507008112-27117-1-git-send-email-anup.patel@broadcom.com>
+References: <1507008112-27117-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1507008112-27117-6-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset does few more improvements to Broadcom SBA RAID
-driver.
+By default, we build Broadcom FlexRM driver as loadable module for
+iProc SOCs so that kernel image is little smaller and we load FlexRM
+driver only when required.
 
-The patches are based on Linux-4.14-rc3 and can also be found
-at sba-raid-imp2-v1 branch of:
-https://github.com/Broadcom/arm64-linux.git
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ drivers/mailbox/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Anup Patel (4):
-  dmaengine: bcm-sba-raid: serialize dma_cookie_complete() using
-    reqs_lock
-  dmaengine: bcm-sba-raid: Use only single mailbox channel
-  dmaengine: bcm-sba-raid: Use common GPL comment header
-  dmaengine: Build bcm-sba-raid driver as loadable module for iProc SoCs
-
- drivers/dma/Kconfig        |   2 +-
- drivers/dma/bcm-sba-raid.c | 117 ++++++++++++++-------------------------------
- 2 files changed, 38 insertions(+), 81 deletions(-)
-
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index 3161f23..ba2f152 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -166,7 +166,7 @@ config BCM_FLEXRM_MBOX
+ 	depends on ARCH_BCM_IPROC || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select GENERIC_MSI_IRQ_DOMAIN
+-	default ARCH_BCM_IPROC
++	default m if ARCH_BCM_IPROC
+ 	help
+ 	  Mailbox implementation of the Broadcom FlexRM ring manager,
+ 	  which provides access to various offload engines on Broadcom
 -- 
 2.7.4
