@@ -1,128 +1,276 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 Oct 2017 13:48:43 +0100
-Subject: [PATCH v2] ACPI/IORT: Fix PCI ACS enablement
-In-Reply-To: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20171003124843.GA16134@red-moon>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 3 Oct 2017 14:57:54 +0200
+Subject: [PATCH v9 03/12] mm: deferred_init_memmap improvements
+In-Reply-To: <20170920201714.19817-4-pasha.tatashin@oracle.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-4-pasha.tatashin@oracle.com>
+Message-ID: <20171003125754.2kuqzkstywg7axhd@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Nate]
+On Wed 20-09-17 16:17:05, Pavel Tatashin wrote:
+> This patch fixes two issues in deferred_init_memmap
+> 
+> =====
+> In deferred_init_memmap() where all deferred struct pages are initialized
+> we have a check like this:
+> 
+> if (page->flags) {
+> 	VM_BUG_ON(page_zone(page) != zone);
+> 	goto free_range;
+> }
+> 
+> This way we are checking if the current deferred page has already been
+> initialized. It works, because memory for struct pages has been zeroed, and
+> the only way flags are not zero if it went through __init_single_page()
+> before.  But, once we change the current behavior and won't zero the memory
+> in memblock allocator, we cannot trust anything inside "struct page"es
+> until they are initialized. This patch fixes this.
+> 
+> The deferred_init_memmap() is re-written to loop through only free memory
+> ranges provided by memblock.
 
-Zhou, Nate,
+Please be explicit that this is possible only because we discard
+memblock data later after 3010f876500f ("mm: discard memblock data
+later"). Also be more explicit how the new code works.
 
-On Mon, Oct 02, 2017 at 06:28:44PM +0100, Lorenzo Pieralisi wrote:
-> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> workarounds") removed kernel code that was allowing to initialize
-> and probe the SMMU devices early (ie earlier than PCI devices, through
-> linker script callback entries) in the boot process because it was not
-> needed any longer in that the SMMU devices/drivers now support deferred
-> probing.
+I like how the resulting code is more compact and smaller.
+for_each_free_mem_range also looks more appropriate but I really detest
+the DEFERRED_FREE thingy. Maybe we can handle all that in a single goto
+section. I know this is not an art but manipulating variables from
+macros is more error prone and much more ugly IMHO.
+
+> =====
+> This patch fixes another existing issue on systems that have holes in
+> zones i.e CONFIG_HOLES_IN_ZONE is defined.
 > 
-> Since the SMMUs probe routines are also in charge of requesting global
-> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
-> up early-probing workarounds") also postponed PCI ACS enablement to
-> SMMUs devices probe time, which is too late given that PCI devices needs
-> to detect if PCI ACS is enabled to init the respective capability
-> through the following call path:
+> In for_each_mem_pfn_range() we have code like this:
 > 
-> pci_device_add()
->  -> pci_init_capabilities()
->   -> pci_enable_acs()
+> if (!pfn_valid_within(pfn)
+> 	goto free_range;
 > 
-> Add code in the ACPI IORT SMMU platform devices initialization path
-> (that is called before ACPI PCI enumeration) to detect if there
-> exists firmware mappings to map root complexes ids to SMMU ids
-> and if so enable ACS for the system.
-> 
-> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> Signed-workarounds")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> Cc: Alex Williamson <alex.williamson@redhat.com>
+> Note: 'page' is not set to NULL and is not incremented but 'pfn' advances.
+> Thus means if deferred struct pages are enabled on systems with these kind
+> of holes, linux would get memory corruptions. I have fixed this issue by
+> defining a new macro that performs all the necessary operations when we
+> free the current set of pages.
+
+please do not use macros. Btw. this deserves its own fix. I suspect that
+no CONFIG_HOLES_IN_ZONE arch enables DEFERRED_STRUCT_PAGE_INIT but
+purely from the review point of view it should be its own patch.
+
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
 > ---
-> v1 -> v2:
+>  mm/page_alloc.c | 161 +++++++++++++++++++++++++++-----------------------------
+>  1 file changed, 78 insertions(+), 83 deletions(-)
 > 
-> - Reworked ACS enablement logic and based on root complex to SMMU
->   ids firmware mapping detection
-> - Rebased against v4.14-rc3
-> 
-> v1: https://marc.info/?l=linux-acpi&m=150584059818925&w=2
-> 
->  drivers/acpi/arm64/iort.c | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
-
-I have reworked the enablement logic wrt v1, dou you mind testing it
-please, I would like to get it merged since I have 4.15 patches depending
-on it.
-
-Thanks,
-Lorenzo
-
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 9565d57..de56394 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -1178,12 +1178,44 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->  	return ret;
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index c841af88836a..d132c801d2c1 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1410,14 +1410,17 @@ void clear_zone_contiguous(struct zone *zone)
 >  }
 >  
-> +static bool __init iort_enable_acs(struct acpi_iort_node *iort_node)
+>  #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
+> -static void __init deferred_free_range(struct page *page,
+> -					unsigned long pfn, int nr_pages)
+> +static void __init deferred_free_range(unsigned long pfn,
+> +				       unsigned long nr_pages)
+>  {
+> -	int i;
+> +	struct page *page;
+> +	unsigned long i;
+>  
+> -	if (!page)
+> +	if (!nr_pages)
+>  		return;
+>  
+> +	page = pfn_to_page(pfn);
+> +
+>  	/* Free a large naturally-aligned chunk if possible */
+>  	if (nr_pages == pageblock_nr_pages &&
+>  	    (pfn & (pageblock_nr_pages - 1)) == 0) {
+> @@ -1443,19 +1446,82 @@ static inline void __init pgdat_init_report_one_done(void)
+>  		complete(&pgdat_init_all_done_comp);
+>  }
+>  
+> +#define DEFERRED_FREE(nr_free, free_base_pfn, page)			\
+> +({									\
+> +	unsigned long nr = (nr_free);					\
+> +									\
+> +	deferred_free_range((free_base_pfn), (nr));			\
+> +	(free_base_pfn) = 0;						\
+> +	(nr_free) = 0;							\
+> +	page = NULL;							\
+> +	nr;								\
+> +})
+> +
+> +static unsigned long deferred_init_range(int nid, int zid, unsigned long pfn,
+> +					 unsigned long end_pfn)
 > +{
-> +	if (iort_node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> +		struct acpi_iort_node *parent;
-> +		struct acpi_iort_id_mapping *map;
-> +		int i;
+> +	struct mminit_pfnnid_cache nid_init_state = { };
+> +	unsigned long nr_pgmask = pageblock_nr_pages - 1;
+> +	unsigned long free_base_pfn = 0;
+> +	unsigned long nr_pages = 0;
+> +	unsigned long nr_free = 0;
+> +	struct page *page = NULL;
 > +
-> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, iort_node,
-> +				   iort_node->mapping_offset);
-> +
-> +		for (i = 0; i < iort_node->mapping_count; i++, map++) {
-> +			if (!map->output_reference)
-> +				continue;
-> +
-> +			parent = ACPI_ADD_PTR(struct acpi_iort_node,
-> +					iort_table,  map->output_reference);
-> +			/*
-> +			 * If we detect a RC->SMMU mapping, make sure
-> +			 * we enable ACS on the system.
-> +			 */
-> +			if ((parent->type == ACPI_IORT_NODE_SMMU) ||
-> +				(parent->type == ACPI_IORT_NODE_SMMU_V3)) {
-> +				pci_request_acs();
-> +				return true;
-> +			}
+> +	for (; pfn < end_pfn; pfn++) {
+> +		/*
+> +		 * First we check if pfn is valid on architectures where it is
+> +		 * possible to have holes within pageblock_nr_pages. On systems
+> +		 * where it is not possible, this function is optimized out.
+> +		 *
+> +		 * Then, we check if a current large page is valid by only
+> +		 * checking the validity of the head pfn.
+> +		 *
+> +		 * meminit_pfn_in_nid is checked on systems where pfns can
+> +		 * interleave within a node: a pfn is between start and end
+> +		 * of a node, but does not belong to this memory node.
+> +		 *
+> +		 * Finally, we minimize pfn page lookups and scheduler checks by
+> +		 * performing it only once every pageblock_nr_pages.
+> +		 */
+> +		if (!pfn_valid_within(pfn)) {
+> +			nr_pages += DEFERRED_FREE(nr_free, free_base_pfn, page);
+> +		} else if (!(pfn & nr_pgmask) && !pfn_valid(pfn)) {
+> +			nr_pages += DEFERRED_FREE(nr_free, free_base_pfn, page);
+> +		} else if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
+> +			nr_pages += DEFERRED_FREE(nr_free, free_base_pfn, page);
+> +		} else if (page && (pfn & nr_pgmask)) {
+> +			page++;
+> +			__init_single_page(page, pfn, zid, nid);
+> +			nr_free++;
+> +		} else {
+> +			nr_pages += DEFERRED_FREE(nr_free, free_base_pfn, page);
+> +			page = pfn_to_page(pfn);
+> +			__init_single_page(page, pfn, zid, nid);
+> +			free_base_pfn = pfn;
+> +			nr_free = 1;
+> +			cond_resched();
 > +		}
 > +	}
+> +	/* Free the last block of pages to allocator */
+> +	nr_pages += DEFERRED_FREE(nr_free, free_base_pfn, page);
 > +
-> +	return false;
+> +	return nr_pages;
 > +}
 > +
->  static void __init iort_init_platform_devices(void)
+>  /* Initialise remaining memory on a node */
+>  static int __init deferred_init_memmap(void *data)
 >  {
->  	struct acpi_iort_node *iort_node, *iort_end;
->  	struct acpi_table_iort *iort;
->  	struct fwnode_handle *fwnode;
->  	int i, ret;
-> +	bool acs_enabled = false;
+>  	pg_data_t *pgdat = data;
+>  	int nid = pgdat->node_id;
+> -	struct mminit_pfnnid_cache nid_init_state = { };
+>  	unsigned long start = jiffies;
+>  	unsigned long nr_pages = 0;
+> -	unsigned long walk_start, walk_end;
+> -	int i, zid;
+> +	unsigned long spfn, epfn;
+> +	phys_addr_t spa, epa;
+> +	int zid;
+>  	struct zone *zone;
+>  	unsigned long first_init_pfn = pgdat->first_deferred_pfn;
+>  	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
+> +	u64 i;
 >  
->  	/*
->  	 * iort_table and iort both point to the start of IORT table, but
-> @@ -1203,6 +1235,9 @@ static void __init iort_init_platform_devices(void)
->  			return;
->  		}
+>  	if (first_init_pfn == ULONG_MAX) {
+>  		pgdat_init_report_one_done();
+> @@ -1477,83 +1543,12 @@ static int __init deferred_init_memmap(void *data)
+>  		if (first_init_pfn < zone_end_pfn(zone))
+>  			break;
+>  	}
+> +	first_init_pfn = max(zone->zone_start_pfn, first_init_pfn);
 >  
-> +		if (!acs_enabled)
-> +			acs_enabled = iort_enable_acs(iort_node);
-> +
->  		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
->  			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
+> -	for_each_mem_pfn_range(i, nid, &walk_start, &walk_end, NULL) {
+> -		unsigned long pfn, end_pfn;
+> -		struct page *page = NULL;
+> -		struct page *free_base_page = NULL;
+> -		unsigned long free_base_pfn = 0;
+> -		int nr_to_free = 0;
+> -
+> -		end_pfn = min(walk_end, zone_end_pfn(zone));
+> -		pfn = first_init_pfn;
+> -		if (pfn < walk_start)
+> -			pfn = walk_start;
+> -		if (pfn < zone->zone_start_pfn)
+> -			pfn = zone->zone_start_pfn;
+> -
+> -		for (; pfn < end_pfn; pfn++) {
+> -			if (!pfn_valid_within(pfn))
+> -				goto free_range;
+> -
+> -			/*
+> -			 * Ensure pfn_valid is checked every
+> -			 * pageblock_nr_pages for memory holes
+> -			 */
+> -			if ((pfn & (pageblock_nr_pages - 1)) == 0) {
+> -				if (!pfn_valid(pfn)) {
+> -					page = NULL;
+> -					goto free_range;
+> -				}
+> -			}
+> -
+> -			if (!meminit_pfn_in_nid(pfn, nid, &nid_init_state)) {
+> -				page = NULL;
+> -				goto free_range;
+> -			}
+> -
+> -			/* Minimise pfn page lookups and scheduler checks */
+> -			if (page && (pfn & (pageblock_nr_pages - 1)) != 0) {
+> -				page++;
+> -			} else {
+> -				nr_pages += nr_to_free;
+> -				deferred_free_range(free_base_page,
+> -						free_base_pfn, nr_to_free);
+> -				free_base_page = NULL;
+> -				free_base_pfn = nr_to_free = 0;
+> -
+> -				page = pfn_to_page(pfn);
+> -				cond_resched();
+> -			}
+> -
+> -			if (page->flags) {
+> -				VM_BUG_ON(page_zone(page) != zone);
+> -				goto free_range;
+> -			}
+> -
+> -			__init_single_page(page, pfn, zid, nid);
+> -			if (!free_base_page) {
+> -				free_base_page = page;
+> -				free_base_pfn = pfn;
+> -				nr_to_free = 0;
+> -			}
+> -			nr_to_free++;
+> -
+> -			/* Where possible, batch up pages for a single free */
+> -			continue;
+> -free_range:
+> -			/* Free the current block of pages to allocator */
+> -			nr_pages += nr_to_free;
+> -			deferred_free_range(free_base_page, free_base_pfn,
+> -								nr_to_free);
+> -			free_base_page = NULL;
+> -			free_base_pfn = nr_to_free = 0;
+> -		}
+> -		/* Free the last block of pages to allocator */
+> -		nr_pages += nr_to_free;
+> -		deferred_free_range(free_base_page, free_base_pfn, nr_to_free);
+> -
+> -		first_init_pfn = max(end_pfn, first_init_pfn);
+> +	for_each_free_mem_range(i, nid, MEMBLOCK_NONE, &spa, &epa, NULL) {
+> +		spfn = max_t(unsigned long, first_init_pfn, PFN_UP(spa));
+> +		epfn = min_t(unsigned long, zone_end_pfn(zone), PFN_DOWN(epa));
+> +		nr_pages += deferred_init_range(nid, zid, spfn, epfn);
+>  	}
 >  
+>  	/* Sanity check that the next zone really is unpopulated */
 > -- 
-> 2.4.12
-> 
+> 2.14.1
+
+-- 
+Michal Hocko
+SUSE Labs
