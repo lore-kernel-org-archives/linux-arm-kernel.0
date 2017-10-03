@@ -1,71 +1,71 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 3 Oct 2017 15:09:35 +0100
-Subject: [PATCH v2] arm64: dts: foundation-v8: Enable PSCI mode
-In-Reply-To: <8c4a4114-b7f7-301e-20b8-960e6234b661@linaro.org>
-References: <20170918153832.16356-1-daniel.thompson@linaro.org>
- <20170919183204.12751-1-daniel.thompson@linaro.org>
- <da8a0cf5-3c1e-1398-b5c3-ac489ae955fa@arm.com>
- <9a542b9a-3c37-ed8a-04e6-de41493f4b0d@linaro.org>
- <e49177f9-a9a8-e322-3743-5c58277c46ea@arm.com>
- <8c4a4114-b7f7-301e-20b8-960e6234b661@linaro.org>
-Message-ID: <521d6f60-ee90-bc96-97a7-1da33170a9c4@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  3 Oct 2017 15:20:50 +0100
+Subject: [PATCH] perf/core: Avoid freeing static PMU contexts when PMU is
+ unregistered
+Message-ID: <1507040450-7730-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since commit 1fd7e4169954 ("perf/core: Remove perf_cpu_context::unique_pmu"),
+when a PMU is unregistered then its associated ->pmu_cpu_context is
+unconditionally freed. Whilst this is fine for dynamically allocated
+context types (i.e. those registered using perf_invalid_context), this
+causes a problem for sharing of static contexts such as
+perf_{sw,hw}_context, which are used by multiple built-in PMUs and
+effectively have a global lifetime.
 
+Whilst testing the ARM SPE driver, which must use perf_sw_context to
+support per-task AUX tracing, unregistering the driver as a result of a
+module unload resulted in:
 
-On 03/10/17 10:12, Daniel Thompson wrote:
-> On 02/10/17 18:26, Sudeep Holla wrote:
->> Sorry for late response, I thought I had sent this mail out long back
->> but was sitting in my draft :(
-> 
-> No worries. I've been at Linaro connect this last week anyway.
-> 
-> 
->> On 20/09/17 12:17, Daniel Thompson wrote:
->>> On 20/09/17 10:42, Sudeep Holla wrote:
->>>>
->>>>
->>>> On 19/09/17 19:32, Daniel Thompson wrote:
->>>>> Currently if the Foundation model is running ARM Trusted Firmware then
->>>>> the kernel, which is configured to use spin tables, cannot start
->>>>> secondary
->>>>> processors or "power off" the simulation.
->>>>>
->>>>> After adding a couple of labels to the include file and splitting out
->>>>> the
->>>>> spin-table configuration into a header, we add a couple of new headers
->>>>> together with two new DTs (GICv2+PSCI and GICv3+PSCI).
->>>>>
->>>>> The new GICv3+PSCI DT has been boot tested, the remaining three
->>>>> (two of
->>>>> which existed prior to this patch) have been "tested" by
->>>>> decompiling the
->>>>> blobs and comparing them against a reference.
->>>>>
->>>>
->>>> How different are these from the ones hosted in [1] ?
->>>
->>> They look like they were either independently written or diverged a long
->>> time ago. The existing kernel DTs describe hardware absent from the ARM
->>> TF ones and vice versa.
->>>
->>
->> OK.
->>
->>> With specific reference to PSCI it looks like my patches could perhaps
->>> be improved by adding idle-state support.
->>
->> Yes I know.
-> 
-> You want a v3 with it added?
-> 
+ Unable to handle kernel NULL pointer dereference at virtual address 00000038
+ Internal error: Oops: 96000004 [#1] PREEMPT SMP
+ Modules linked in: [last unloaded: arm_spe_pmu]
+ PC is at ctx_resched+0x38/0xe8
+ LR is at perf_event_exec+0x20c/0x278
+ [...]
+ ctx_resched+0x38/0xe8
+ perf_event_exec+0x20c/0x278
+ setup_new_exec+0x88/0x118
+ load_elf_binary+0x26c/0x109c
+ search_binary_handler+0x90/0x298
+ do_execveat_common.isra.14+0x540/0x618
+ SyS_execve+0x38/0x48
 
-No, that's fine. I have pushed this already [1] with Mark's ack for now.
-We can add it later after some testing, not urgent.
+since the software context has been freed and the ctx.pmu->pmu_disable_count
+field has been set to NULL.
 
---
-Regards,
-Sudeep
+This patch fixes the problem by avoiding the freeing of static PMU contexts
+altogether. Whilst the sharing of dynamic contexts is questionable, this
+actually requires the caller to share their context pointer explicitly
+and so the burden is on them to manage the object lifetime.
 
-[1] https://git.kernel.org/sudeep.holla/linux/h/for-next/juno
+Cc: Peter Zijlstra <peterz@infradead.org>
+Fixes: 1fd7e4169954 ("perf/core: Remove perf_cpu_context::unique_pmu")
+Reported-by: Kim Phillips <kim.phillips@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ kernel/events/core.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 6bc21e202ae4..243bfc68d0fe 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -8955,6 +8955,14 @@ static struct perf_cpu_context __percpu *find_pmu_context(int ctxn)
+ 
+ static void free_pmu_context(struct pmu *pmu)
+ {
++	/*
++	 * Static contexts such as perf_sw_context have a global lifetime
++	 * and may be shared between different PMUs. Avoid freeing them
++	 * when a single PMU is going away.
++	 */
++	if (pmu->task_ctx_nr > perf_invalid_context)
++		return;
++
+ 	mutex_lock(&pmus_lock);
+ 	free_percpu(pmu->pmu_cpu_context);
+ 	mutex_unlock(&pmus_lock);
+-- 
+2.1.4
