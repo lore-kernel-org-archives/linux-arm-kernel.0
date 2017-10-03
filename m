@@ -1,42 +1,69 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  3 Oct 2017 10:52:59 +0530
-Subject: [PATCH 3/4] dmaengine: bcm-sba-raid: Use common GPL comment header
-In-Reply-To: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
-References: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1507008180-27171-4-git-send-email-anup.patel@broadcom.com>
+Date: Tue,  3 Oct 2017 10:57:43 +0530
+Subject: [PATCH v10] FlexRM support in VFIO platform
+Message-ID: <1507008464-27236-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the comment header of Broadcom SBA RAID driver
-similar to the GPL comment header used across Broadcom driver
-sources.
+This patchset primarily adds Broadcom FlexRM reset module for
+VFIO platform driver.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
----
- drivers/dma/bcm-sba-raid.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+The patches are based on Linux-4.14-rc3 and can also be
+found at flexrm-vfio-v10 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index 409da59..3956a01 100644
---- a/drivers/dma/bcm-sba-raid.c
-+++ b/drivers/dma/bcm-sba-raid.c
-@@ -1,9 +1,14 @@
- /*
-  * Copyright (C) 2017 Broadcom
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- /*
+Changes since v9:
+ - Make GPL comment header similar to other Broadcom drivers
+
+Changes since v8:
+ - Add missing "ring_num++" in vfio_platform_bcmflexrm_reset()
+
+Changes since v7:
+ - Use "ret |= rc" instead of "ret = rc" in
+   vfio_platform_bcmflexrm_reset()
+
+Changes since v6:
+ - Update the FlexRM ring flush sequence as suggested
+   by HW folks
+ - Shutdown all FlexRM ring anyway even if it fails on
+   any of the FlexRM rings
+ - Use dev_warn() instead of pr_warn()
+
+Changes since v5:
+ - Make kconfig option VFIO_PLATFORM_BCMFLEXRM_RESET
+   default to ARCH_BCM_IPROC
+
+Changes since v4:
+ - Use "--timeout" instead of "timeout--" in
+   vfio_platform_bcmflexrm_shutdown()
+
+Changes since v3:
+ - Improve "depends on" for Kconfig option
+   VFIO_PLATFORM_BCMFLEXRM_RESET
+ - Fix typo in pr_warn() called by
+   vfio_platform_bcmflexrm_shutdown()
+ - Return error from vfio_platform_bcmflexrm_shutdown()
+   when FlexRM ring flush timeout happens
+
+Changes since v2:
+ - Remove PATCH1 because fixing VFIO no-IOMMU mode is
+   a separate topic
+
+Changes since v1:
+ - Remove iommu_present() check in vfio_iommu_group_get()
+ - Drop PATCH1-to-PATCH3 because IOMMU_CAP_BYPASS is not
+   required
+ - Move additional comments out of license header in
+   vfio_platform_bcmflexrm.c
+
+Anup Patel (1):
+  vfio: platform: reset: Add Broadcom FlexRM reset module
+
+ drivers/vfio/platform/reset/Kconfig                |   9 ++
+ drivers/vfio/platform/reset/Makefile               |   1 +
+ .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 113 +++++++++++++++++++++
+ 3 files changed, 123 insertions(+)
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+
 -- 
 2.7.4
