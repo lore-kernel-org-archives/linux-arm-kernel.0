@@ -1,161 +1,84 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue,  3 Oct 2017 17:25:40 +1030
-Subject: [PATCH v4 5/5] clk: aspeed: Add reset controller
-In-Reply-To: <20171003065540.11722-1-joel@jms.id.au>
-References: <20171003065540.11722-1-joel@jms.id.au>
-Message-ID: <20171003065540.11722-6-joel@jms.id.au>
+From: Christina.Jacob@cavium.com (cjacob)
+Date: Tue,  3 Oct 2017 13:07:04 +0530
+Subject: [PATCH 0/1] XDP Program for Ip forward 
+Message-ID: <1507016225-319-1-git-send-email-Christina.Jacob@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some resets that are not associated with gates. These are
-represented by a reset controller.
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
+The patch below implements port to port forwarding through route table and arp
+table lookup for ipv4 packets using bpf_redirect helper function and lpm_trie
+map.  This has an improved performance over the normal kernel stack ip forward.
 
----
-v3:
-  - Add named initalisers for the reset defines
-  - Add define for ADC
----
- drivers/clk/clk-aspeed.c                 | 82 +++++++++++++++++++++++++++++++-
- include/dt-bindings/clock/aspeed-clock.h | 10 ++++
- 2 files changed, 91 insertions(+), 1 deletion(-)
+Implementation details.
+-----------------------
+The program uses one map each for arp table, route table and packet count.
+The number of entries the program can process is limited by the size of the
+map used.
 
-diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index a424b056e767..de491dc7f955 100644
---- a/drivers/clk/clk-aspeed.c
-+++ b/drivers/clk/clk-aspeed.c
-@@ -17,6 +17,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset-controller.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-@@ -292,6 +293,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
- 	.is_enabled = aspeed_clk_is_enabled,
- };
- 
-+/**
-+ * struct aspeed_reset - Aspeed reset controller
-+ * @map: regmap to access the containing system controller
-+ * @rcdev: reset controller device
-+ */
-+struct aspeed_reset {
-+	struct regmap			*map;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
-+
-+static const u8 aspeed_resets[] = {
-+	[ASPEED_RESET_XDMA]	= 25,
-+	[ASPEED_RESET_MCTP]	= 24,
-+	[ASPEED_RESET_ADC]	= 23,
-+	[ASPEED_RESET_JTAG_MASTER] = 22,
-+	[ASPEED_RESET_MIC]	= 18,
-+	[ASPEED_RESET_PWM]	=  9,
-+	[ASPEED_RESET_PCIVGA]	=  8,
-+	[ASPEED_RESET_I2C]	=  2,
-+	[ASPEED_RESET_AHB]	=  1,
-+};
-+
-+static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
-+}
-+
-+static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
-+}
-+
-+static int aspeed_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 val, rst = BIT(aspeed_resets[id]);
-+	int ret;
-+
-+	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
-+	if (ret)
-+		return ret;
-+
-+	return !!(val & rst);
-+}
-+
-+static const struct reset_control_ops aspeed_reset_ops = {
-+	.assert = aspeed_reset_assert,
-+	.deassert = aspeed_reset_deassert,
-+	.status = aspeed_reset_status,
-+};
-+
- static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		struct regmap *map, u8 clock_idx, u8 reset_idx,
-@@ -333,10 +396,11 @@ static int aspeed_clk_probe(struct platform_device *pdev)
- {
- 	const struct aspeed_clk_soc_data *soc_data;
- 	struct device *dev = &pdev->dev;
-+	struct aspeed_reset *ar;
- 	struct regmap *map;
- 	struct clk_hw *hw;
- 	u32 val, rate;
--	int i;
-+	int i, ret;
- 
- 	map = syscon_node_to_regmap(dev->of_node);
- 	if (IS_ERR(map)) {
-@@ -344,6 +408,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
- 		return PTR_ERR(map);
- 	}
- 
-+	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
-+	if (!ar)
-+		return -ENOMEM;
-+
-+	ar->map = map;
-+	ar->rcdev.owner = THIS_MODULE;
-+	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
-+	ar->rcdev.ops = &aspeed_reset_ops;
-+	ar->rcdev.of_node = dev->of_node;
-+
-+	ret = devm_reset_controller_register(dev, &ar->rcdev);
-+	if (ret) {
-+		dev_err(dev, "could not register reset controller\n");
-+		return ret;
-+	}
-+
- 	/* SoC generations share common layouts but have different divisors */
- 	soc_data = of_device_get_match_data(dev);
- 	if (!soc_data) {
-diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
-index 4a99421d77c8..8e19646d8025 100644
---- a/include/dt-bindings/clock/aspeed-clock.h
-+++ b/include/dt-bindings/clock/aspeed-clock.h
-@@ -39,4 +39,14 @@
- 
- #define ASPEED_NUM_CLKS			35
- 
-+#define ASPEED_RESET_XDMA		0
-+#define ASPEED_RESET_MCTP		1
-+#define ASPEED_RESET_ADC		2
-+#define ASPEED_RESET_JTAG_MASTER	3
-+#define ASPEED_RESET_MIC		4
-+#define ASPEED_RESET_PWM		5
-+#define ASPEED_RESET_PCIVGA		6
-+#define ASPEED_RESET_I2C		7
-+#define ASPEED_RESET_AHB		8
-+
- #endif
--- 
-2.14.1
+In the xdp3_user.c,
+
+initially, the routing table is read and stored in an lpm trie map.
+The arp table is read and stored in an array map. There are two netlink sockets
+that listen to any change in the route table and arp table.
+There are two types of changes to the route table.
+
+	1.New
+	
+	The new entries are added to the lpm trie with proper key and prefix
+	length. If there is a another entry in the route table with a different
+	metric(only metric is considered), then the values are compared and the
+	one with lowest metric is added to the trie node.
+	
+	2.Deletion 
+
+	On deletion from the route table, the particular node is removed and the
+	entire route table is read again to check if there is another entry with
+	the same key and prefix length but a different metric. If it exists it
+	is added to the lpm trie.
+
+This implementation depends on Patch bpf: Implement map_delete_elem for
+BPF_MAP_TYPE_LPM_TRIE which is not yet upstreamed.
+
+There are two types of changes to the route table
+
+	1.New
+	
+	The new arp entries are added in the in the array map directly with the
+	ip address as the key and the destination mac address as the value.
+	
+	2.Delete 
+	
+	The entry corresponding to the particular ip is deleted from the 
+	arp table map.
+
+Another map is maintained for entries in the route table having 32 bit mask.
+Such entries can have a corresponding arp entry which if stored together with
+the route entry in an array map and can be accessed in O(1) time, thereby 
+eliminating the trie lookup and arp lookup.
+
+In the xdp3_kern.c,
+
+The array map for the 32 bit mask entries is checked to see if there is a key
+that exactly matches the destination ip. If it has a non zero destination mac
+entry then the xdp data is updated accordingly. Otherwise a proper route and 
+arp table lookup is done using the lpm_trie and the arp table array map.
+	
+	Usage: ./xdp3 [-S] <ifindex1...ifindexn> 
+
+	-S to choose generic xdp implementation 
+	  [Default is driver xdp implementation]
+	ifindex - the index of the interface to which 
+	the xdp program has to be attached.
+	in 4.14-rc3 kernel.
+
+
+cjacob (1):
+  xdp: Sample xdp program implementing ip forward
+
+ samples/bpf/Makefile    |    4 +
+ samples/bpf/xdp3_kern.c |  204 +++++++++++++++
+ samples/bpf/xdp3_user.c |  649 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 857 insertions(+), 0 deletions(-)
+ create mode 100644 samples/bpf/xdp3_kern.c
+ create mode 100644 samples/bpf/xdp3_user.c
