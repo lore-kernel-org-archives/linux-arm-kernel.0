@@ -1,64 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  3 Oct 2017 18:25:46 +0100
-Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
-Message-ID: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 03 Oct 2017 18:37:54 +0100
+Subject: [RFC PATCH v2 19/31] KVM: arm64: Describe AT instruction emulation
+ design
+In-Reply-To: <1507000273-3735-17-git-send-email-jintack.lim@linaro.org>
+References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
+ <1507000273-3735-17-git-send-email-jintack.lim@linaro.org>
+Message-ID: <59D3CAF2.2030704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AddressSanitizer instrumentation can significantly bloat the stack, and
-with GCC 7 this can result in stack overflows at boot time in some
-configurations.
+Hi Jintack,
 
-We can avoid this by doubling our stack size when KASAN is in use, as is
-already done on x86 (and has been since KASAN was introduced).
-Regardless of other patches to decrease KASAN's stack utilization,
-kernels built with KASAN will always require more stack space than those
-built without, and we should take this into account.
+On 03/10/17 04:11, Jintack Lim wrote:
+> This design overview will help to digest the subsequent patches that
+> implement AT instruction emulation.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/memory.h | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 8d04926..d8728cc 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1621,6 +1621,72 @@ static bool access_id_aa64mmfr0_el1(struct kvm_vcpu *v,
+>  	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
+>  };
+>  
+> +/*
+> + * AT instruction emulation
+> + *
+> + * We emulate AT instructions executed in the virtual EL2.
 
-In local testing (with KASAN and other options enabled), I've seen a stack
-depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
-mounted over NFS. Without KASAN (but with other debug options enabled), this
-was 7992 bytes.
+> + * Basic strategy for the stage-1 translation emulation is to load proper
+> + * context, which depends on the trapped instruction and the virtual HCR_EL2,
+> + * to the EL1 virtual memory control registers and execute S1E[01] instructions
+> + * in EL2. See below for more detail.
 
-I wonder if we want to go for 4x rather than 2x...
+What happens if the guest memory containing some stage1-page-table has been
+unmapped from stage2? (e.g. its swapped to disk).
+
+(there is some background to this: I tried to implement the kvm_translate
+ioctl() using this approach, running 'at s1e1*' from EL2. I ran into problems
+when parts of the guest's stage1 page tables had been unmapped from stage2.)
+
+>From memory, I found that the AT instructions would fault-in those pages when
+run from EL1, but when executing the same instruction at EL2 they just failed
+without any hint of which IPA needed mapping in.
+
+I can try digging for any left over code if we want to setup a test case for this...
+
 
 Thanks,
-Mark.
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 3585a5e..f7c4d21 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -95,16 +95,19 @@
- #define KERNEL_END        _end
- 
- /*
-- * The size of the KASAN shadow region. This should be 1/8th of the
-- * size of the entire kernel virtual address space.
-+ * KASAN requires 1/8th of the kernel virtual address space for the shadow
-+ * region. KASAN can bloat the stack significantly, so double the (minimum)
-+ * stack size when KASAN is in use.
-  */
- #ifdef CONFIG_KASAN
- #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - 3))
-+#define KASAN_THREAD_SHIFT	1
- #else
- #define KASAN_SHADOW_SIZE	(0)
-+#define KASAN_THREAD_SHIFT	0
- #endif
- 
--#define MIN_THREAD_SHIFT	14
-+#define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
- 
- /*
-  * VMAP'd stacks are allocated@page granularity, so we must ensure that such
--- 
-1.9.1
+James
