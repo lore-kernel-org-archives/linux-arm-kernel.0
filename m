@@ -1,49 +1,50 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 3 Oct 2017 11:35:38 +0300
-Subject: [PATCH v2 2/2] dmaengine: omap-dma: Implement protection for invalid
- max_burst
-In-Reply-To: <20171003083538.11044-1-peter.ujfalusi@ti.com>
-References: <20171003083538.11044-1-peter.ujfalusi@ti.com>
-Message-ID: <20171003083538.11044-3-peter.ujfalusi@ti.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 3 Oct 2017 10:40:05 +0200
+Subject: [PATCH] ARM: vexpress/spc: Delete an error message for a failed
+ memory allocation in two functions
+Message-ID: <557666e2-45b6-8f47-2fc9-756bd7f23541@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?Set the device's max_burst to 16777215 (EN is 24bit unsigned value) so
-clients can take this into consideration when setting up the transfer.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Tue, 3 Oct 2017 10:30:07 +0200
 
-During slave transfer preparation check if the requested maxburst is valid.
+Omit extra messages for a memory allocation failure in these functions.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Russell King <linux@armlinux.org.uk>
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/dma/omap-dma.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-vexpress/spc.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 8c1665c8fe33..f6dd849159d8 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -1288,6 +1288,10 @@ static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config
- 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
- 		return -EINVAL;
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index fe488523694c..21c064267af5 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -451,10 +451,8 @@ int __init ve_spc_init(void __iomem *baseaddr, u32 a15_clusid, int irq)
+ {
+ 	int ret;
+ 	info = kzalloc(sizeof(*info), GFP_KERNEL);
+-	if (!info) {
+-		pr_err(SPCLOG "unable to allocate mem\n");
++	if (!info)
+ 		return -ENOMEM;
+-	}
  
-+	if (cfg->src_maxburst > chan->device->max_burst ||
-+	    cfg->dst_maxburst > chan->device->max_burst)
-+		return -EINVAL;
-+
- 	memcpy(&c->cfg, cfg, sizeof(c->cfg));
+ 	info->baseaddr = baseaddr;
+ 	info->a15_clusid = a15_clusid;
+@@ -535,10 +533,8 @@ static struct clk *ve_spc_clk_register(struct device *cpu_dev)
+ 	struct clk_spc *spc;
  
- 	return 0;
-@@ -1482,6 +1486,7 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	od->ddev.dst_addr_widths = OMAP_DMA_BUSWIDTHS;
- 	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	od->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
-+	od->ddev.max_burst = SZ_16M - 1; /* CCEN: 24bit unsigned */
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
- 	spin_lock_init(&od->lock);
+ 	spc = kzalloc(sizeof(*spc), GFP_KERNEL);
+-	if (!spc) {
+-		pr_err("could not allocate spc clk\n");
++	if (!spc)
+ 		return ERR_PTR(-ENOMEM);
+-	}
+ 
+ 	spc->hw.init = &init;
+ 	spc->cluster = topology_physical_package_id(cpu_dev->id);
 -- 
 2.14.2
-
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
