@@ -1,137 +1,147 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Tue, 3 Oct 2017 18:06:54 +0200
-Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
-In-Reply-To: <CANn89iJrJzTL+e4FDN76Fc1iptXpM9aJ6Hwa=pT=+v-zbv7+8g@mail.gmail.com>
-References: <20171002104947.GE20737@leverpostej>
- <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
- <20171002142156.GB21696@leverpostej>
- <CANn89i+zQG=rjHRqzsvPzjg5tqW43Lcz-BJ9spLascP9Nt5z8Q@mail.gmail.com>
- <CACT4Y+Yf86hS_3u=qe0ZL208GmrfF6bp50kYcL+3D9QFBh=LZA@mail.gmail.com>
- <CANn89iJrJzTL+e4FDN76Fc1iptXpM9aJ6Hwa=pT=+v-zbv7+8g@mail.gmail.com>
-Message-ID: <CACT4Y+azruiH-oEXVFen8WiDHhz0PS3DF7OdrkSCJYVRmkhoiQ@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 3 Oct 2017 17:17:24 +0100
+Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
+ instructions
+In-Reply-To: <874lrgz0yf.fsf@linaro.org>
+References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
+ <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
+ <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
+ <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
+ <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
+ <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
+ <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
+ <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
+ <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
+ <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
+ <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
+ <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com> <877ewcz3bv.fsf@linaro.org>
+ <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com> <874lrgz0yf.fsf@linaro.org>
+Message-ID: <37d50b72-58cb-633e-552e-96d5b528b5ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 5:38 PM, 'Eric Dumazet' via syzkaller
-<syzkaller@googlegroups.com> wrote:
-> On Tue, Oct 3, 2017 at 8:19 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
->> On Mon, Oct 2, 2017 at 4:42 PM, 'Eric Dumazet' via syzkaller
->> <syzkaller@googlegroups.com> wrote:
->>> On Mon, Oct 2, 2017 at 7:21 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> Hi Eric,
->>>>
->>>> On Mon, Oct 02, 2017 at 06:36:32AM -0700, Eric Dumazet wrote:
->>>>> On Mon, Oct 2, 2017 at 3:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>> > I hit the below splat at net/core/skbuff.c:2626 while fuzzing v4.14-rc2
->>>>> > on arm64 with Syzkaller. This is the BUG_ON(len) at the end of
->>>>> > skb_copy_and_csum_bits().
->>>>
->>>>> > kernel BUG at net/core/skbuff.c:2626!
->>>>
->>>>> > [<ffff200009e03214>] skb_copy_and_csum_bits+0x8dc/0xae0 net/core/skbuff.c:2626
->>>>> > [<ffff20000a01d244>] icmp_glue_bits+0xa4/0x2a0 net/ipv4/icmp.c:357
->>>>> > [<ffff200009f3f0d4>] __ip_append_data+0x10e4/0x20a8 net/ipv4/ip_output.c:1018
->>>>> > [<ffff200009f41a88>] ip_append_data.part.3+0xe8/0x1a0 net/ipv4/ip_output.c:1170
->>>>> > [<ffff200009f46e74>] ip_append_data+0xa4/0xb0 net/ipv4/ip_output.c:1173
->>>>> > [<ffff20000a01ccc8>] icmp_push_reply+0x1b8/0x690 net/ipv4/icmp.c:375
->>>>> > [<ffff20000a0211b0>] icmp_send+0x1070/0x1890 net/ipv4/icmp.c:741
->>>>> > [<ffff200009f41d48>] ip_fragment.constprop.4+0x208/0x340 net/ipv4/ip_output.c:552
->>>>> > [<ffff200009f42228>] ip_finish_output+0x3a8/0xab0 net/ipv4/ip_output.c:315
->>>>> > [<ffff200009f468c4>] NF_HOOK_COND include/linux/netfilter.h:238 [inline]
->>>>> > [<ffff200009f468c4>] ip_output+0x284/0x790 net/ipv4/ip_output.c:405
->>>>> > [<ffff200009f43204>] dst_output include/net/dst.h:458 [inline]
->>>>> > [<ffff200009f43204>] ip_local_out+0x9c/0x1b8 net/ipv4/ip_output.c:124
->>>>> > [<ffff200009f445e8>] ip_queue_xmit+0x850/0x18e0 net/ipv4/ip_output.c:504
->>>>> > [<ffff200009fb091c>] tcp_transmit_skb+0x107c/0x3338 net/ipv4/tcp_output.c:1123
->>>>> > [<ffff200009fbbcc4>] __tcp_retransmit_skb+0x614/0x1d18 net/ipv4/tcp_output.c:2847
->>>>> > [<ffff200009fbd840>] tcp_send_loss_probe+0x478/0x7d0 net/ipv4/tcp_output.c:2457
->>>>> > [<ffff200009fc707c>] tcp_write_timer_handler+0x50c/0x7e8 net/ipv4/tcp_timer.c:557
->>>>> > [<ffff200009fc73d0>] tcp_write_timer+0x78/0x170 net/ipv4/tcp_timer.c:579
->>>>> > [<ffff2000082f8980>] call_timer_fn+0x1b8/0x430 kernel/time/timer.c:1281
->>>>> > [<ffff2000082f8dcc>] expire_timers+0x1d4/0x320 kernel/time/timer.c:1320
->>>>> > [<ffff2000082f912c>] __run_timers kernel/time/timer.c:1620 [inline]
->>>>> > [<ffff2000082f912c>] run_timer_softirq+0x214/0x5f0 kernel/time/timer.c:1646
->>>>> > [<ffff2000080826c0>] __do_softirq+0x350/0xc0c kernel/softirq.c:284
->>>>> > [<ffff200008170af4>] do_softirq_own_stack include/linux/interrupt.h:498 [inline]
->>>>> > [<ffff200008170af4>] invoke_softirq kernel/softirq.c:371 [inline]
->>>>> > [<ffff200008170af4>] irq_exit+0x1dc/0x2f8 kernel/softirq.c:405
->>>>> > [<ffff2000082a95bc>] __handle_domain_irq+0xdc/0x230 kernel/irq/irqdesc.c:647
->>>>> > [<ffff2000080820ac>] handle_domain_irq include/linux/irqdesc.h:175 [inline]
->>>>> > [<ffff2000080820ac>] gic_handle_irq+0x6c/0xe0 drivers/irqchip/irq-gic.c:367
->>>>
->>>>> This is most likely a bug caused by syzkaller setting a ridiculous MTU
->>>>> on loopback device, below minimum size of ipv4 MTU.
->>>>
->>>>> I tried to track it in August [1], but it seems hard to find all the
->>>>> issues with this.
->>>>>
->>>>> commit c780a049f9bf442314335372c9abc4548bfe3e44
->>>>> Author: Eric Dumazet <edumazet@google.com>
->>>>> Date:   Wed Aug 16 11:09:12 2017 -0700
->>>>>
->>>>>     ipv4: better IP_MAX_MTU enforcement
->>>>>
->>>>>     While working on yet another syzkaller report, I found
->>>>>     that our IP_MAX_MTU enforcements were not properly done.
->>>>>
->>>>>     gcc seems to reload dev->mtu for min(dev->mtu, IP_MAX_MTU), and
->>>>>     final result can be bigger than IP_MAX_MTU :/
->>>>>
->>>>>     This is a problem because device mtu can be changed on other cpus or
->>>>>     threads.
->>>>>
->>>>>     While this patch does not fix the issue I am working on, it is
->>>>>     probably worth addressing it.
->>>>
->>>> Just to check I've understood correctly, are you suggesting that the
->>>> IPv4 code should also check the dev->mtu against a IP_MIN_MTU (which
->>>> doesn't seem to exist today)?
+
+
+On 03/10/17 16:48, Alex Benn?e wrote:
+> 
+> Julien Thierry <julien.thierry@arm.com> writes:
+> 
+>> On 03/10/17 15:57, Alex Benn?e wrote:
 >>>
->>> We have plenty of places this is checked.
+>>> Julien Thierry <julien.thierry@arm.com> writes:
 >>>
->>> For example, trying to set MTU < 68 usually removes IPv4 addresses and routes.
->>>
->>> Problem is : these checks are not fool proof yet.
->>>
->>> ( Only the admin was supposed to play these games )
->>>
+>>>> On 31/08/17 15:01, Christoffer Dall wrote:
+> <snip>
+>>>>>>>>>>>> On 30/08/17 19:53, Christoffer Dall wrote:
+>>>>>>>>>>>>> Hi Julien,
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> [cc'ing Alex Benn?e here who wrote the debug code for arm64]
+>>>>>>>>>>>>>
+> <snip>
+>>>>>> I can try to detail the comment in kvm_arm_setup_debug when we set SPSR,
+>>>>>> hopefully making things clearer when seeing that part of the code.
+>>>>>>
+>>>>>
+>>>>> I also think we need to improve the comment in the world-switch return
+>>>>> path, and I'd like Alex to weigh in here before we merge this.   He's
+>>>>> back from holiday on Monday.
+>>>>>
 >>>>
->>>> Otherwise, I do spot another potential issue. The writer side (e.g. most
->>>> net_device::ndo_change_mtu implementations and the __dev_set_mtu()
->>>> fallback) doesn't use WRITE_ONCE().
+>>>> Ping Alex?
 >>>
->>> It does not matter how many strange values can be observed by the reader :
->>> We must be fool proof anyway from reader point of view, so the
->>> WRITE_ONCE() is not strictly needed.
+>>> Sorry for the delay getting back to you. I had flagged the email but
+>>> with holidays and conferences in the way it fell off my queue.
+>>>
 >>
+>> No problem, thanks for looking at it.
 >>
->> Note if writer stores some temporal garbage there (which C language
->> perfectly allows), it does not matter what we do on reader side --
->> reader won't get correct data anyway. Say mtu changes from 1000 to
->> 2000, but writer temporary stores 1 there, reader can observe 1 while
->> it must not. Synchronization is always a game of two.
->
-> Since we have no sync here, a reader _must_ cope with any MTU value.
->
-> We need to care of any value, so we do not care how dummy writers can be.
->
-> Sure, a WRITE_ONCE() will help avoiding some strange values being written,
->  but since we _allow_ writers to write such strange values,
-> there is really no point pretending to be safe here.
->
-> Adding a WRITE_ONCE() will not fix the bug.
+>>> So to summarise as I understand things:
+>>>
+>>>    Host User Space   |      Host KVM   |   Host Hyp    |  Guest VM      |
+>>>
+>>>    Enable Debug(SS)
+>>>    KVM_RUN ----------->
+>>>                        Guest SPSR.SS set
+>>>                                      --> World Switch ->
+>>>                                                         Insn Trap to Hyp
+>>>                                          World Switch <-
+>>>                                          (SS not cleared)
+>>>                                      <--
+>>>                        Insn Emulated
+>>>                        pc += 4
+>>>                                      -->
+>>>                                          World Switch
+>>>                                          (SS still set)
+>>>                                                        ->
+>>>                                                         Insn +4 SS
+>>>                                                       <-
+>>>                                          World Switch
+>>>                                          (SS cleared)
+>>>
+>>>                                       <--
+>>>                        Guest exit (debug)
+>>>                     <--
+>>>     See SS did 2 insns?
+>>>
+>>> Do I understand the problem you are trying to fix correctly?
+>>
+>> Yes that's the issue. The debugger is not made aware of the
+>> emulated/skipped instruction and the hypervisor jumps back into the
+>> guest.
+>>
+>> Clearing SS before jumping back to the guest will simply trigger a
+>> debug exception as soon as we ERET from EL2 to EL1 (so we end up just
+>> getting back to EL2).
+> 
+> Why don't we just exit KVM after we've emulated the instruction if we
+> are under debug? After all at this point whatever needed to be done is
+> done and the guest debug code can get on with life.
+> 
+> I understand there is the problem of exiting for an MMIO emulation but
+> maybe that complexity should be handled by userspace ("render unto
+> userspace the things that are userspaces") and it can decide to lift the
+> step ioctl if appropriate.
+> 
 
+I think the issue was that there was no clear way on how to let userland 
+know that it has to deal with both MMIO emulation + debug exception in 
+one return.
+I guess currently userland relies on having KVM_EXIT_DEBUG exit code to 
+inform the debugger. I'm not well aware how MMIO works, so maybe the 
+userland being aware it has set single step it should also deal with the 
+debug case when it perfoms MMIO.
 
-Reader must cope with any value. But there is an additional
-requirement that it must behave correctly. If mtu was 1000 and then
-reset to 2000 once (and not other manipulations with mtu), then
-correct behavior is either (1) sending packets with mtu 1000 or (2)
-sending packets with mtu 2000 (after mtu change) and nothing else.
-Sending packets with mtu 500, dropping packets because mtu is observed
-to be 1, or formatting hard drive are all incorrect behaviors and must
-not happen.
+However, KVM_EXIT_MMIO code seem to be part of the arch independent 
+interface, so I guess it should have the same semantic on all platforms? 
+(and avoid having one where it means "do MMIO" and another where it 
+means "do MMIO + debug step if needed")
 
-What you say is valid for communication with user-space
-(copy_form_user, etc). Because there we don't control write side and
-racy writes are indistinguishable from intentional writes that do the
-same.
+KVM doc states:
+
+> NOTE: For KVM_EXIT_IO, KVM_EXIT_MMIO, KVM_EXIT_OSI, KVM_EXIT_PAPR and
+>       KVM_EXIT_EPR the corresponding
+> operations are complete (and guest state is consistent) only after userspace
+> has re-entered the kernel with KVM_RUN.  The kernel side will first finish
+> incomplete operations and then check for pending signals.  Userspace
+> can re-enter the guest with an unmasked signal pending to complete
+> pending operations.
+
+Since the pausing is supposed to take place after the instruction has 
+completed, I'm not sure we can expect userland to MMIO + debug 
+emulation. But maybe I'm not interpreting this correctly.
+
+Otherwise I can have a look at what other arch expect from userland in 
+such scenario.
+
+> I guess I should have a look at the series. Are you re-basing anytime
+> soon? It looks like it currently has a few minor merge conflicts with
+> current master.
+> 
+
+Yes, haven't updated it since v4.13, I guess I can repost it rebased 
+some 4.14-rc.
+
+Thanks,
+
+-- 
+Julien Thierry
