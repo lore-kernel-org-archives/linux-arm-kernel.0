@@ -1,41 +1,65 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 3 Oct 2017 02:19:00 -0400
-Subject: [PATCH] tee: ACPI support for optee driver
-In-Reply-To: <20170922093703.GD1523@red-moon>
-References: <1505977937-25034-1-git-send-email-mchitale@apm.com>
- <59C36E18.1050106@huawei.com> <20170922093703.GD1523@red-moon>
-Message-ID: <03008e2f-5a2f-78af-528a-3b31b1013aad@redhat.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue,  3 Oct 2017 17:25:35 +1030
+Subject: [PATCH v4 0/5] clk: Add Aspeed clock driver
+Message-ID: <20171003065540.11722-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2017 05:37 AM, Lorenzo Pieralisi wrote:
-> On Thu, Sep 21, 2017 at 03:45:28PM +0800, Hanjun Guo wrote:
->> On 2017/9/21 15:12, Mayuresh Chitale wrote:
->>> This patch modifies the optee driver to add support for parsing
->>> the conduit method from an ACPI node.
->>
->> Sorry I didn't involve this earlier, but I think this is a wrong
->> approach, in ACPI 5.1+ spec, there is a bit in FADT table which
->> indicates PSCI using SMC or HVC, please see ACPI 6.2 [1],
->> Table 5-37 Fixed ACPI Description Table ARM Boot Architecture Flags.
->>
->> Can we just use that to get the conduit method for optee driver too?
->>
->> [1]: http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
-> 
-> It is just not a matter of conduit method but also to define how OPTEE
-> should be detected. It is up to Linaro (who owns OP-TEE) to put forward
-> a binding at ACPI (ARM) spec level.
-> 
-> We do not define ACPI bindings on a kernel mailing list.
-> 
-> NAK on this patch.
+This driver supports the ast2500, ast2400 (and derivative) BMC SoCs from
+Aspeed.
 
-Is this actively being tracked by Linaro? If not, can Applied folks ping
-me off-list and I will proxy your request into Linaro.
+This is v4. See patches for detailed changelogs.
 
-Jon.
+v4: Address review from Andrew and Stephen. 
+v3: Address review from Andrew and has seen more testing on hardware
+v2: split the driver out into a series of patches to make them easier to
+review.
 
+All of the important clocks are supported, with most non-essential ones
+also implemented where information is available. I am working with
+Aspeed to clear up some of the missing information, including the
+missing parent-sibling relationships.
+
+We need to know the rate of the apb clock in order to correctly program
+the clocksource driver, so the apb and it's parents are created in the
+CLK_OF_DECLARE_DRIVER callback.
+
+The rest of the clocks are created at normal driver probe time. I
+followed the Gemini driver's lead with using the regmap where I could,
+but also having a pointer to the base address for use with the common
+clock callbacks.
+
+The driver borrows from the clk_gate common clock infrastructure, but modifies
+it in order to support the clock gate and reset pair that most of the clocks
+have. This pair must be reset-ungated-released, with appropriate delays,
+according to the datasheet.
+
+The first patch introduces the core clock registration parts, and describes
+the clocks. The second creates the core clocks, giving the system enough to
+boot (but without uart). Next come the non-core clocks, and finally the reset
+controller that is used for the few cocks that don't have a gate to go with their
+reset pair.
+
+Please review!
+
+Cheers,
+
+Joel
+
+Joel Stanley (5):
+  clk: Add clock driver for ASPEED BMC SoCs
+  clk: aspeed: Register core clocks
+  clk: aspeed: Add platform driver and register PLLs
+  clk: aspeed: Register gated clocks
+  clk: aspeed: Add reset controller
+
+ drivers/clk/Kconfig                      |  12 +
+ drivers/clk/Makefile                     |   1 +
+ drivers/clk/clk-aspeed.c                 | 698 +++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/aspeed-clock.h |  52 +++
+ 4 files changed, 763 insertions(+)
+ create mode 100644 drivers/clk/clk-aspeed.c
+ create mode 100644 include/dt-bindings/clock/aspeed-clock.h
 
 -- 
-Computer Architect | Sent from my Fedora powered laptop
+2.14.1
