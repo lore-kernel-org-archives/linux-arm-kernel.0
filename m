@@ -1,62 +1,48 @@
-From: moore@free.fr (Chris Moore)
-Date: Tue, 3 Oct 2017 06:48:25 +0200
-Subject: [PATCH 3/4] nvmem: add a driver for the Amlogic
- Meson6/Meson8/Meson8b SoCs
-In-Reply-To: <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
-References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
- <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
-Message-ID: <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue,  3 Oct 2017 14:10:16 +0900
+Subject: [PATCH v4 0/3] arm64: kgdb: fix single stepping
+Message-ID: <20171003051019.29714-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is the fourth version of my kgdb patch to fix issues on single
+stepping.
 
-Sorry in advance if I am being extremely stupid here.
+Kgdb support on arm64 was merged in v3.15, but from its first appearance,
+as far as I know, "single step" has never worked well. This patchset
+addresses all the error cases I found so far.
+Issues are reproducable, at least, on Hikey and fast model and I tested
+the patch on both of them.
 
-Le 01/10/2017 ? 14:56, Martin Blumenstingl a ?crit?:
+The original patch[1] was split into several pieces, patch #1/#2 (and
+v3's patch#2), addressing issues one by one, but I dropped v3's patch#2
+here because Will really doesn't like a way to fix.
+Instead, I propose that we should do the same thing with a *gdb macro*
+shown in patch #1 so that we can optionally disable interrupts while
+single stepping.
 
-[snip]
+Regarding to patch #3, I'm not still sure whether it is a right fix,
+but it certainly fixes some corner case.
 
-> +static int meson_mx_efuse_read(void *context, unsigned int offset,
-> +			       void *buf, size_t bytes)
-> +{
-> +	struct meson_mx_efuse *efuse = context;
-> +	u32 tmp;
-> +	int err, i, addr;
-> +
-> +	err = meson_mx_efuse_hw_enable(efuse);
-> +	if (err)
-> +		return err;
-> +
-> +	meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
-> +				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
-> +
-> +	for (i = offset; i < offset + bytes; i += efuse->config.word_size) {
-> +		addr = i / efuse->config.word_size;
-> +
-> +		err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
-> +		if (err)
-> +			break;
-> +
-> +		memcpy(buf + i, &tmp, efuse->config.word_size);
-> +	}
 
-This will not give the expected result if offset is not a multiple of 
-efuse->config.word_size.
-This will cause buffer overflow if bytes is not a multiple of 
-efuse->config.word_size.
-Shouldn't there at least be some sort of test on offset and bytes?
+Changes in v4 (Oct 3, 2017):
+* remove v3's patch#2 (disable interrupts while single stepping)
 
-Also this doesn't look endian-safe, but maybe it is.
+Changes in v3 (May 23, 2017):
+* simplify patch #1 to respect the original code
+* swap patch #2 and #3
+* add patch #4
 
-Old-timer remarks:
-- I try to avoid divisions where possible but I suppose they are very 
-low-cost on recent hardware.
-- I don't like arithmetic on void pointers but I know it is supported by 
-gcc (and possibly by recent C standards too).
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295632.html
 
-Sorry again for the noise if I am being stupid.
+AKASHI Takahiro (3):
+  arm64: kgdb: fix single stepping
+  arm64: kgdb: prevent kgdb from being invoked recursively
+  kgdb: select a correct cpu while in a single stepping
 
-Cheers,
-Chris
+ arch/arm64/kernel/kgdb.c  | 42 ++++++++++++++++++++++++++++++++++++++----
+ kernel/debug/debug_core.c |  8 ++++----
+ 2 files changed, 42 insertions(+), 8 deletions(-)
+
+-- 
+2.14.1
