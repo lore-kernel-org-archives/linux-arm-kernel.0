@@ -1,104 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 3 Oct 2017 12:33:03 +0100
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20170913143325.hi4cfcajbts3bbao@localhost>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913143325.hi4cfcajbts3bbao@localhost>
-Message-ID: <20171003113302.GR3611@e103592.cambridge.arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 3 Oct 2017 14:44:23 +0300
+Subject: [PATCH v2 1/4] mmc: sdhci-msm: fix issue with power irq
+In-Reply-To: <1506490483-46871-2-git-send-email-vviswana@codeaurora.org>
+References: <1506490483-46871-1-git-send-email-vviswana@codeaurora.org>
+ <1506490483-46871-2-git-send-email-vviswana@codeaurora.org>
+Message-ID: <3ebe9c45-f338-87ef-1513-7255124902b1@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 13, 2017 at 07:33:25AM -0700, Catalin Marinas wrote:
-> On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
-> > +/*
-> > + * Handle SVE state across fork():
-> > + *
-> > + * dst and src must not end up with aliases of the same sve_state.
-> > + * Because a task cannot fork except in a syscall, we can discard SVE
-> > + * state for dst here, so long as we take care to retain the FPSIMD
-> > + * subset of the state if SVE is in use.  Reallocation of the SVE state
-> > + * will be deferred until dst tries to use SVE.
-> > + */
-> > +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
-> > +{
-> > +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
-> > +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
-> > +		sve_to_fpsimd(dst);
-> > +	}
-> > +
-> > +	dst->thread.sve_state = NULL;
-> > +}
+On 27/09/17 08:34, Vijay Viswanath wrote:
+> From: Subhash Jadavani <subhashj@codeaurora.org>
 > 
-> I first thought the thread flags are not visible in dst yet since
-> dup_task_struct() calls arch_dup_task_struct() before
-> setup_thread_stack(). However, at the end of the last year we enabled
-> CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
-> on this.
+> SDCC controller reset (SW_RST) during probe may trigger power irq if
+> previous status of PWRCTL was either BUS_ON or IO_HIGH_V. So before we
+> enable the power irq interrupt in GIC (by registering the interrupt
+> handler), we need to ensure that any pending power irq interrupt status
+> is acknowledged otherwise power irq interrupt handler would be fired
+> prematurely.
 > 
-> Anyway, IIUC we don't need sve_to_fpsimd() here. The
-> arch_dup_task_struct() already called fpsimd_preserve_current_state()
-> for src, so the FPSIMD state (which we care about) is transferred during
-> the *dst = *src assignment. So you'd only need the last statement,
-> possibly with a different function name like fpsimd_erase_sve (and maybe
-> make the function static inline in the header).
+> Signed-off-by: Subhash Jadavani <subhashj@codeaurora.org>
+> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
 
-Regarding the intended meanings of the thread flags, does this help?
+I already acked v1, nevertheless:
 
---8<--
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-TIF_FOREIGN_FPSTATE's meaning is expanded to cover SVE, but otherwise
-unchanged:
-
- * If a task is running and !TIF_FOREIGN_FPSTATE, then the the CPU
-   registers of the CPU the task is running on contain the authoritative
-   FPSIMD/SVE state of the task.  The backing memory may be stale.
-
- * Otherwise (i.e., task not running, or task running and
-   TIF_FOREIGN_FPSTATE), the task's FPSIMD/SVE backing memory is
-   authoritative.  If additionally per_cpu(fpsimd_last_state,
-   task->fpsimd_state.cpu) == &task->fpsimd_state.cpu, then
-   task->fpsimd_state.cpu's registers are also up to date for task, but
-   not authorititive: the current FPSIMD/SVE state may be read from
-   them, but they must not be written.
- 
-The FPSIMD/SVE backing memory is selected by TIF_SVE:
-
- * TIF_SVE set: Zn (incorporating Vn in bits[127:0]), Pn and FFR are
-   stored in task->thread.sve_state, formatted appropriately for vector
-   length task->thread.sve_vl.  task->thread.sve_state must point to a
-   valid buffer at least sve_state_size(task) bytes in size.
-
- * TIF_SVE clear: Vn are stored in task->fpsimd_state; Zn[max : 128] are
-   logically zero[*] but not stored anywhere; Pn, FFR are not stored and
-   have unspecified values from userspace's point of view.
-   task->thread.sve_state does not need to be non-null, valid or any
-   particular size: it must not be dereferenced.
-
-   In practice I don't exploit the "unspecifiedness" much.  The Zn high
-   bits, Pn and FFR are all zeroed when setting TIF_SVE again:
-   sve_alloc() is the common path for this.
-
- * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
-   whether TIF_SVE is clear or set, since these are not vector length
-   dependent.
-
-
-[*] theoretically unspecified, which is what I've written in sve.txt.
-However, on any FPSIMD Vn write the upper bits of the corresponding Zn
-must become logically zero in order to conform to the SVE programmer's
-model.  It's not feasible to track which Vn have been written
-individually because that would involve trapping every FPSIMD insn until
-all possible Vn have been written.  So the kernel ensures that the Zn
-high bits become zero.
-
-Maybe we should just guarantee "zero-or-preserved" behaviour for
-userspace.  This may close down some future optimisation opportunities,
-but maybe it's better to be simple.
-
-Thoughts?
-
-[...]
-
-Cheers
----Dave
+> ---
+>  drivers/mmc/host/sdhci-msm.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+> index 9d601dc..d636251 100644
+> --- a/drivers/mmc/host/sdhci-msm.c
+> +++ b/drivers/mmc/host/sdhci-msm.c
+> @@ -1250,6 +1250,21 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>  			       CORE_VENDOR_SPEC_CAPABILITIES0);
+>  	}
+>  
+> +	/*
+> +	 * Power on reset state may trigger power irq if previous status of
+> +	 * PWRCTL was either BUS_ON or IO_HIGH_V. So before enabling pwr irq
+> +	 * interrupt in GIC, any pending power irq interrupt should be
+> +	 * acknowledged. Otherwise power irq interrupt handler would be
+> +	 * fired prematurely.
+> +	 */
+> +	sdhci_msm_voltage_switch(host);
+> +
+> +	/*
+> +	 * Ensure that above writes are propogated before interrupt enablement
+> +	 * in GIC.
+> +	 */
+> +	mb();
+> +
+>  	/* Setup IRQ for handling power/voltage tasks with PMIC */
+>  	msm_host->pwr_irq = platform_get_irq_byname(pdev, "pwr_irq");
+>  	if (msm_host->pwr_irq < 0) {
+> @@ -1259,6 +1274,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+>  		goto clk_disable;
+>  	}
+>  
+> +	/* Enable pwr irq interrupts */
+> +	writel_relaxed(INT_MASK, msm_host->core_mem + CORE_PWRCTL_MASK);
+> +
+>  	ret = devm_request_threaded_irq(&pdev->dev, msm_host->pwr_irq, NULL,
+>  					sdhci_msm_pwr_irq, IRQF_ONESHOT,
+>  					dev_name(&pdev->dev), host);
+> 
