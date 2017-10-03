@@ -1,76 +1,52 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Tue, 3 Oct 2017 12:01:08 -0400
-Subject: [PATCH v9 03/12] mm: deferred_init_memmap improvements
-In-Reply-To: <fc4ef789-d9a8-5dab-6508-f0fe8751b462@oracle.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-4-pasha.tatashin@oracle.com>
- <20171003125754.2kuqzkstywg7axhd@dhcp22.suse.cz>
- <fc4ef789-d9a8-5dab-6508-f0fe8751b462@oracle.com>
-Message-ID: <d81baa49-b796-7130-4ace-0f14ed59be46@oracle.com>
+From: stuart.yoder@arm.com (Stuart Yoder)
+Date: Tue, 3 Oct 2017 11:05:29 -0500
+Subject: [Tee-dev] [PATCH v1 00/14] tee: optee: add dynamic shared memory
+ support
+In-Reply-To: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <c761d5d8-63f3-2a6e-145d-300260a362af@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
 
-Are you OK, if I replace DEFERRED_FREE() macro with a function like this:
 
-/*
-  * Helper for deferred_init_range, free the given range, and reset the
-  * counters
-  */
-static inline unsigned long __def_free(unsigned long *nr_free,
-                                        unsigned long *free_base_pfn,
-                                        struct page **page)
-{
-         unsigned long nr = *nr_free;
+On 9/28/17 1:03 PM, Volodymyr Babchuk wrote:
+> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+> 
+> This patch series enables dynamic shared memory support in the TEE
+> subsystem as a whole and in OP-TEE in particular.
+> 
+> Global Platform TEE specification [1] allows client applications
+> to register part of own memory as a shared buffer between
+> application and TEE. This allows fast zero-copy communication between
+> TEE and REE. But current implementation of TEE in Linux does not support
+> this feature.
+> 
+> Also, current implementation of OP-TEE transport uses fixed size
+> pre-shared buffer for all communications with OP-TEE OS. This is okay
+> in the most use cases. But this prevents use of OP-TEE in virtualized
+> environments, because:
+>   a) We can't share the same buffer between different virtual machines
+>   b) Physically contiguous memory as seen by VM can be non-contiguous
+>      in reality (and as seen by OP-TEE OS) due to second stage of
+>      MMU translation.
+>   c) Size of this pre-shared buffer is limited.
+> 
+> So, first part of this patch series adds generic register/unregister
+> interface to tee subsystem. Next patches add necessary features
+> into OP-TEE driver, so it can use not only static pre-shared buffer,
+> but whole RAM to communicate with OP-TEE OS.
 
-         deferred_free_range(*free_base_pfn, nr);
-         *free_base_pfn = 0;
-         *nr_free = 0;
-         *page = NULL;
+As is, the patch series enables dynamic shared memory, but keeps the
+assumption that there must static shared memory as well.  In the case
+of virtual machines this isn't what we want (at least that's the way
+I see KVM working).
 
-         return nr;
-}
+The series substantially re-works optee_config_shm_memremap() and it
+seems like it would not be that difficult to remove the assumptions that
+there _must_ be static shared memory available.
 
-Since it is inline, and we operate with non-volatile counters, compiler 
-will be smart enough to remove all the unnecessary de-references. As a 
-plus, we won't be adding any new branches, and the code is still going 
-to stay compact.
+...I have some more specific comments on patch 12/14.
 
-Pasha
-
-On 10/03/2017 11:15 AM, Pasha Tatashin wrote:
-> Hi Michal,
-> 
->>
->> Please be explicit that this is possible only because we discard
->> memblock data later after 3010f876500f ("mm: discard memblock data
->> later"). Also be more explicit how the new code works.
-> 
-> OK
-> 
->>
->> I like how the resulting code is more compact and smaller.
-> 
-> That was the goal :)
-> 
->> for_each_free_mem_range also looks more appropriate but I really detest
->> the DEFERRED_FREE thingy. Maybe we can handle all that in a single goto
->> section. I know this is not an art but manipulating variables from
->> macros is more error prone and much more ugly IMHO.
-> 
-> Sure, I can re-arrange to have a goto place. Function won't be as small, 
-> and if compiler is not smart enough we might end up with having more 
-> branches than what my current code has.
-> 
->>
->> please do not use macros. Btw. this deserves its own fix. I suspect that
->> no CONFIG_HOLES_IN_ZONE arch enables DEFERRED_STRUCT_PAGE_INIT but
->> purely from the review point of view it should be its own patch.
-> 
-> Sure, I will submit this patch separately from the rest of the project. 
-> In my opinion DEFERRED_STRUCT_PAGE_INIT is the way of the future, so we 
-> should make sure it is working with as many configs as possible.
-> 
-> Thank you,
-> Pasha
+Thanks,
+Stuart
