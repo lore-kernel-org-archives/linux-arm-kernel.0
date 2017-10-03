@@ -1,151 +1,93 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:11:05 -0500
-Subject: [RFC PATCH v2 23/31] KVM: arm64: Emulate AT S12E[01] instructions
+Date: Mon,  2 Oct 2017 22:11:03 -0500
+Subject: [RFC PATCH v2 21/31] KVM: arm64: Emulate AT S1E[01] instructions
 In-Reply-To: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
 References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1507000273-3735-21-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1507000273-3735-19-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emulating AT A12E[01] instructions involves two steps. First, do the
-stage-1 translation by reusing the existing AT emulation functions. Then
-do the stage-2 translation by walking the guest hypervisor's stage-2
-page table in software. Record the translation result to PAR_EL1.
+Emulate AT S1E[01] instructions by issuing the same instructions in EL2. We
+set the physical EL1 registers, NV and NV1 bits as described in the AT
+instruction emulation overview.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/include/asm/kvm_arm.h |  1 +
- arch/arm64/kvm/sys_regs.c        | 99 ++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 96 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/kvm_emulate.h | 11 +++++++++++
+ arch/arm64/kvm/sys_regs.c            | 32 ++++++++++++++++++++++++++------
+ 2 files changed, 37 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 3993703..e160895 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -111,6 +111,7 @@
- #define VTCR_EL2_TG0_16K	TCR_TG0_16K
- #define VTCR_EL2_TG0_64K	TCR_TG0_64K
- #define VTCR_EL2_SH0_MASK	TCR_SH0_MASK
-+#define VTCR_EL2_SH0_SHIFT	TCR_SH0_SHIFT
- #define VTCR_EL2_SH0_INNER	TCR_SH0_INNER
- #define VTCR_EL2_ORGN0_MASK	TCR_ORGN0_MASK
- #define VTCR_EL2_ORGN0_WBWA	TCR_ORGN0_WBWA
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index cb46db5..7950ee0 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1656,6 +1656,97 @@ static bool handle_s1e2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 4c47bc7..a494db2 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -185,6 +185,17 @@ static inline bool vcpu_el2_tge_is_set(const struct kvm_vcpu *vcpu)
+ 	return (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_TGE);
  }
  
-+static u64 setup_par_aborted(u32 esr)
++
++/*
++ * When the NV and NV1 bits are set, the EL2 page table format is used for the
++ * EL1 translation regime.
++ */
++static inline bool vcpu_el2_format_used(const struct kvm_vcpu *vcpu)
 +{
-+	u64 par = 0;
-+
-+	/* S [9]: fault in the stage 2 translation */
-+	par |= (1 << 9);
-+	/* FST [6:1]: Fault status code  */
-+	par |= (esr << 1);
-+	/* F [0]: translation is aborted */
-+	par |= 1;
-+
-+	return par;
++	return ((vcpu_sys_reg(vcpu, HCR_EL2) & HCR_NV) &&
++		(vcpu_sys_reg(vcpu, HCR_EL2) & HCR_NV1));
 +}
 +
-+static u64 setup_par_completed(struct kvm_vcpu *vcpu, struct kvm_s2_trans *out)
+ static inline bool is_hyp_ctxt(const struct kvm_vcpu *vcpu)
+ {
+ 	/*
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index d8728cc..a82274f 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1621,6 +1621,26 @@ static bool access_id_aa64mmfr0_el1(struct kvm_vcpu *v,
+ 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
+ };
+ 
++static bool handle_s1e01(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			 const struct sys_reg_desc *r)
 +{
-+	u64 par, vtcr_sh0;
++	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++	bool el2_format;
++	int sys_encoding = sys_insn(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
 +
-+	/* F [0]: Translation is completed successfully */
-+	par = 0;
-+	/* ATTR [63:56] */
-+	par |= out->upper_attr;
-+	/* PA [47:12] */
-+	par |= out->output & GENMASK_ULL(11, 0);
-+	/* RES1 [11] */
-+	par |= (1UL << 11);
-+	/* SH [8:7]: Shareability attribute */
-+	vtcr_sh0 = vcpu_sys_reg(vcpu, VTCR_EL2) & VTCR_EL2_SH0_MASK;
-+	par |= (vtcr_sh0 >> VTCR_EL2_SH0_SHIFT) << 7;
++	/* See '2. EL0/EL1 AT instructions: S1E[01]x, S12E1x' table. */
++	if (vcpu_el2_e2h_is_set(vcpu) && vcpu_el2_tge_is_set(vcpu))
++		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
++	else
++		ctxt->hw_sys_regs = ctxt->sys_regs;
 +
-+	return par;
-+}
++	el2_format = vcpu_el2_format_used(vcpu);
 +
-+static bool handle_s12(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+		       const struct sys_reg_desc *r, bool write)
-+{
-+	u64 par, va;
-+	u32 esr;
-+	phys_addr_t ipa;
-+	struct kvm_s2_trans out;
-+	int ret;
++	kvm_call_hyp(__kvm_at_insn, vcpu, p->regval, el2_format, sys_encoding);
 +
-+	/* Do the stage-1 translation */
-+	handle_s1e01(vcpu, p, r);
-+	par = vcpu_sys_reg(vcpu, PAR_EL1);
-+	if (par & 1) {
-+		/* The stage-1 translation aborted */
-+		return true;
-+	}
-+
-+	/* Do the stage-2 translation */
-+	va = p->regval;
-+	ipa = (par & GENMASK_ULL(47, 12)) | (va & GENMASK_ULL(11, 0));
-+	out.esr = 0;
-+	ret = kvm_walk_nested_s2(vcpu, ipa, &out);
-+	if (ret < 0)
-+		return false;
-+
-+	/* Check if the stage-2 PTW is aborted */
-+	if (out.esr) {
-+		esr = out.esr;
-+		goto s2_trans_abort;
-+	}
-+
-+	/* Check the access permission */
-+	if ((!write && !out.readable) || (write && !out.writable)) {
-+		esr = ESR_ELx_FSC_PERM;
-+		esr |= out.level & 0x3;
-+		goto s2_trans_abort;
-+	}
-+
-+	vcpu_sys_reg(vcpu, PAR_EL1) = setup_par_completed(vcpu, &out);
 +	return true;
-+
-+s2_trans_abort:
-+	vcpu_sys_reg(vcpu, PAR_EL1) = setup_par_aborted(esr);
-+	return true;
-+}
-+
-+static bool handle_s12r(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			const struct sys_reg_desc *r)
-+{
-+	return handle_s12(vcpu, p, r, false);
-+}
-+
-+static bool handle_s12w(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			const struct sys_reg_desc *r)
-+{
-+	return handle_s12(vcpu, p, r, true);
 +}
 +
  /*
   * AT instruction emulation
   *
-@@ -1733,10 +1824,10 @@ static bool handle_s1e2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, NULL),
- 	SYS_INSN_TO_DESC(AT_S1E2R, handle_s1e2, NULL),
- 	SYS_INSN_TO_DESC(AT_S1E2W, handle_s1e2, NULL),
--	SYS_INSN_TO_DESC(AT_S12E1R, NULL, NULL),
--	SYS_INSN_TO_DESC(AT_S12E1W, NULL, NULL),
--	SYS_INSN_TO_DESC(AT_S12E0R, NULL, NULL),
--	SYS_INSN_TO_DESC(AT_S12E0W, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E1R, handle_s12r, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E1W, handle_s12w, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E0R, handle_s12r, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E0W, handle_s12w, NULL),
- 	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, NULL, NULL),
- 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
- 	SYS_INSN_TO_DESC(TLBI_ALLE2IS, NULL, NULL),
+@@ -1690,12 +1710,12 @@ static bool access_id_aa64mmfr0_el1(struct kvm_vcpu *v,
+ #define SYS_INSN_TO_DESC(insn, access_fn, forward_fn)	\
+ 	{ SYS_DESC((insn)), (access_fn), NULL, 0, 0, NULL, NULL, (forward_fn) }
+ static struct sys_reg_desc sys_insn_descs[] = {
+-	SYS_INSN_TO_DESC(AT_S1E1R, NULL, NULL),
+-	SYS_INSN_TO_DESC(AT_S1E1W, NULL, NULL),
+-	SYS_INSN_TO_DESC(AT_S1E0R, NULL, NULL),
+-	SYS_INSN_TO_DESC(AT_S1E0W, NULL, NULL),
+-	SYS_INSN_TO_DESC(AT_S1E1RP, NULL, NULL),
+-	SYS_INSN_TO_DESC(AT_S1E1WP, NULL, NULL),
++	SYS_INSN_TO_DESC(AT_S1E1R, handle_s1e01, NULL),
++	SYS_INSN_TO_DESC(AT_S1E1W, handle_s1e01, NULL),
++	SYS_INSN_TO_DESC(AT_S1E0R, handle_s1e01, NULL),
++	SYS_INSN_TO_DESC(AT_S1E0W, handle_s1e01, NULL),
++	SYS_INSN_TO_DESC(AT_S1E1RP, handle_s1e01, NULL),
++	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, NULL),
+ 	SYS_INSN_TO_DESC(AT_S1E2R, NULL, NULL),
+ 	SYS_INSN_TO_DESC(AT_S1E2W, NULL, NULL),
+ 	SYS_INSN_TO_DESC(AT_S12E1R, NULL, NULL),
 -- 
 1.9.1
