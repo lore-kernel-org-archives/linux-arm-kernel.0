@@ -1,107 +1,251 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 03 Oct 2017 16:48:56 +0100
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
- <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
- <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
- <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
- <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
- <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
- <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
- <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
- <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com> <877ewcz3bv.fsf@linaro.org>
- <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com>
-Message-ID: <874lrgz0yf.fsf@linaro.org>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Tue, 03 Oct 2017 17:54:10 +0200
+Subject: [PATCH 1/1] xdp: Sample xdp program implementing ip forward
+In-Reply-To: <1507016225-319-2-git-send-email-Christina.Jacob@cavium.com>
+References: <1507016225-319-1-git-send-email-Christina.Jacob@cavium.com>
+ <1507016225-319-2-git-send-email-Christina.Jacob@cavium.com>
+Message-ID: <59D3B2A2.4030100@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Julien Thierry <julien.thierry@arm.com> writes:
-
-> On 03/10/17 15:57, Alex Benn?e wrote:
->>
->> Julien Thierry <julien.thierry@arm.com> writes:
->>
->>> On 31/08/17 15:01, Christoffer Dall wrote:
-<snip>
->>>>>>>>>>> On 30/08/17 19:53, Christoffer Dall wrote:
->>>>>>>>>>>> Hi Julien,
->>>>>>>>>>>>
->>>>>>>>>>>> [cc'ing Alex Benn?e here who wrote the debug code for arm64]
->>>>>>>>>>>>
-<snip>
->>>>> I can try to detail the comment in kvm_arm_setup_debug when we set SPSR,
->>>>> hopefully making things clearer when seeing that part of the code.
->>>>>
->>>>
->>>> I also think we need to improve the comment in the world-switch return
->>>> path, and I'd like Alex to weigh in here before we merge this.   He's
->>>> back from holiday on Monday.
->>>>
->>>
->>> Ping Alex?
->>
->> Sorry for the delay getting back to you. I had flagged the email but
->> with holidays and conferences in the way it fell off my queue.
->>
+On 10/03/2017 09:37 AM, cjacob wrote:
+> Implements port to port forwarding with route table and arp table
+> lookup for ipv4 packets using bpf_redirect helper function and
+> lpm_trie  map.
 >
-> No problem, thanks for looking at it.
->
->> So to summarise as I understand things:
->>
->>   Host User Space   |      Host KVM   |   Host Hyp    |  Guest VM      |
->>
->>   Enable Debug(SS)
->>   KVM_RUN ----------->
->>                       Guest SPSR.SS set
->>                                     --> World Switch ->
->>                                                        Insn Trap to Hyp
->>                                         World Switch <-
->>                                         (SS not cleared)
->>                                     <--
->>                       Insn Emulated
->>                       pc += 4
->>                                     -->
->>                                         World Switch
->>                                         (SS still set)
->>                                                       ->
->>                                                        Insn +4 SS
->>                                                      <-
->>                                         World Switch
->>                                         (SS cleared)
->>
->>                                      <--
->>                       Guest exit (debug)
->>                    <--
->>    See SS did 2 insns?
->>
->> Do I understand the problem you are trying to fix correctly?
->
-> Yes that's the issue. The debugger is not made aware of the
-> emulated/skipped instruction and the hypervisor jumps back into the
-> guest.
->
-> Clearing SS before jumping back to the guest will simply trigger a
-> debug exception as soon as we ERET from EL2 to EL1 (so we end up just
-> getting back to EL2).
+> Signed-off-by: cjacob <Christina.Jacob@cavium.com>
 
-Why don't we just exit KVM after we've emulated the instruction if we
-are under debug? After all at this point whatever needed to be done is
-done and the guest debug code can get on with life.
+Thanks for the patch, just few minor comments below!
 
-I understand there is the problem of exiting for an MMIO emulation but
-maybe that complexity should be handled by userspace ("render unto
-userspace the things that are userspaces") and it can decide to lift the
-step ioctl if appropriate.
+Note, should be full name, e.g.:
 
-I guess I should have a look at the series. Are you re-basing anytime
-soon? It looks like it currently has a few minor merge conflicts with
-current master.
+   Signed-off-by: Christina Jacob <Christina.Jacob@cavium.com>
 
---
-Alex Benn?e
+Also you From: only shows 'cjacob' as can be seen from the cover letter
+as well, so perhaps check your git settings to make that full name:
+
+   cjacob (1):
+     xdp: Sample xdp program implementing ip forward
+
+If there's one single patch, then cover letter is not needed, only
+for >1 sets.
+
+[...]
+> +#define KBUILD_MODNAME "foo"
+> +#include <uapi/linux/bpf.h>
+> +#include <linux/in.h>
+> +#include <linux/if_ether.h>
+> +#include <linux/if_packet.h>
+> +#include <linux/if_vlan.h>
+> +#include <linux/ip.h>
+> +#include <linux/ipv6.h>
+> +#include "bpf_helpers.h"
+> +#include <linux/slab.h>
+> +#include <net/ip_fib.h>
+> +
+> +struct trie_value {
+> +	__u8 prefix[4];
+> +	long value;
+> +	int gw;
+> +	int ifindex;
+> +	int metric;
+> +};
+> +
+> +union key_4 {
+> +	u32 b32[2];
+> +	u8 b8[8];
+> +};
+> +
+> +struct arp_entry {
+> +	int dst;
+> +	long mac;
+> +};
+> +
+> +struct direct_map {
+> +	long mac;
+> +	int ifindex;
+> +	struct arp_entry arp;
+> +};
+> +
+> +/* Map for trie implementation*/
+> +struct bpf_map_def SEC("maps") lpm_map = {
+> +	.type = BPF_MAP_TYPE_LPM_TRIE,
+> +	.key_size = 8,
+> +	.value_size =
+> +		sizeof(struct trie_value),
+
+(Nit: there are couple of such breaks throughout the patch, can we
+  just use single line for such cases where reasonable?)
+
+> +	.max_entries = 50,
+> +	.map_flags = BPF_F_NO_PREALLOC,
+> +};
+> +
+> +/* Map for counter*/
+> +struct bpf_map_def SEC("maps") rxcnt = {
+> +	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
+> +	.key_size = sizeof(u32),
+> +	.value_size = sizeof(long),
+> +	.max_entries = 256,
+> +};
+> +
+> +/* Map for ARP table*/
+> +struct bpf_map_def SEC("maps") arp_table = {
+> +	.type = BPF_MAP_TYPE_HASH,
+> +	.key_size = sizeof(int),
+> +	.value_size = sizeof(long),
+
+Perhaps these should be proper structs here, such that it
+becomes easier to read/handle later on lookup.
+
+> +	.max_entries = 50,
+> +};
+> +
+> +/* Map to keep the exact match entries in the route table*/
+> +struct bpf_map_def SEC("maps") exact_match = {
+> +	.type = BPF_MAP_TYPE_HASH,
+> +	.key_size = sizeof(int),
+> +	.value_size = sizeof(struct direct_map),
+> +	.max_entries = 50,
+> +};
+> +
+> +/**
+> + * Function to set source and destination mac of the packet
+> + */
+> +static inline void set_src_dst_mac(void *data, void *src, void *dst)
+> +{
+> +	unsigned short *p      = data;
+> +	unsigned short *dest   = dst;
+> +	unsigned short *source = src;
+> +
+> +	p[3] = source[0];
+> +	p[4] = source[1];
+> +	p[5] = source[2];
+> +	p[0] = dest[0];
+> +	p[1] = dest[1];
+> +	p[2] = dest[2];
+
+You could just use __builtin_memcpy() given length is
+constant anyway, so LLVM will do the inlining.
+
+> +}
+> +
+> +/**
+> + * Parse IPV4 packet to get SRC, DST IP and protocol
+> + */
+> +static inline int parse_ipv4(void *data, u64 nh_off, void *data_end,
+> +			     unsigned int *src, unsigned int *dest)
+> +{
+> +	struct iphdr *iph = data + nh_off;
+> +
+> +	if (iph + 1 > data_end)
+> +		return 0;
+> +	*src = (unsigned int)iph->saddr;
+> +	*dest = (unsigned int)iph->daddr;
+
+Why not stay with __be32 types?
+
+> +	return iph->protocol;
+> +}
+> +
+> +SEC("xdp3")
+> +int xdp_prog3(struct xdp_md *ctx)
+> +{
+> +	void *data_end = (void *)(long)ctx->data_end;
+> +	void *data = (void *)(long)ctx->data;
+> +	struct ethhdr *eth = data;
+> +	int rc = XDP_DROP, forward_to;
+> +	long *value;
+> +	struct trie_value *prefix_value;
+> +	long *dest_mac = NULL, *src_mac = NULL;
+> +	u16 h_proto;
+> +	u64 nh_off;
+> +	u32 ipproto;
+> +	union key_4 key4;
+> +
+> +	nh_off = sizeof(*eth);
+> +	if (data + nh_off > data_end)
+> +		return rc;
+> +
+> +	h_proto = eth->h_proto;
+> +
+> +	if (h_proto == htons(ETH_P_8021Q) || h_proto == htons(ETH_P_8021AD)) {
+> +		struct vlan_hdr *vhdr;
+> +
+> +		vhdr = data + nh_off;
+> +		nh_off += sizeof(struct vlan_hdr);
+> +		if (data + nh_off > data_end)
+> +			return rc;
+> +		h_proto = vhdr->h_vlan_encapsulated_proto;
+> +	}
+> +	if (h_proto == htons(ETH_P_ARP)) {
+> +		return XDP_PASS;
+> +	} else if (h_proto == htons(ETH_P_IP)) {
+> +		int src_ip = 0, dest_ip = 0;
+> +		struct direct_map *direct_entry;
+> +
+> +		ipproto = parse_ipv4(data, nh_off, data_end, &src_ip, &dest_ip);
+> +		direct_entry = (struct direct_map *)bpf_map_lookup_elem
+> +			(&exact_match, &dest_ip);
+> +		/*check for exact match, this would give a faster lookup*/
+> +		if (direct_entry && direct_entry->mac &&
+> +		    direct_entry->arp.mac) {
+> +			src_mac = &direct_entry->mac;
+> +			dest_mac = &direct_entry->arp.mac;
+> +			forward_to = direct_entry->ifindex;
+> +		} else {
+> +			/*Look up in the trie for lpm*/
+> +			// Key for trie
+
+Nit: please check style throughout the patch.
+
+> +			key4.b32[0] = 32;
+> +			key4.b8[4] = dest_ip % 0x100;
+> +			key4.b8[5] = (dest_ip >> 8) % 0x100;
+> +			key4.b8[6] = (dest_ip >> 16) % 0x100;
+> +			key4.b8[7] = (dest_ip >> 24) % 0x100;
+> +			prefix_value =
+> +				((struct trie_value *)bpf_map_lookup_elem
+> +				 (&lpm_map, &key4));
+
+For key, please use proper struct bpf_lpm_trie_key, see also
+usage example in tools/testing/selftests/bpf/test_lpm_map.c
+for LPM handling.
+
+> +			if (!prefix_value) {
+> +				return XDP_DROP;
+> +			} else {
+> +				src_mac = &prefix_value->value;
+> +				if (src_mac) {
+> +					dest_mac = (long *)bpf_map_lookup_elem
+> +						(&arp_table, &dest_ip);
+> +					if (!dest_mac) {
+> +						if (prefix_value->gw) {
+> +							dest_ip = *(unsigned int *)(&(prefix_value->gw));
+> +							dest_mac = (long *)bpf_map_lookup_elem
+> +								(&arp_table, &dest_ip);
+> +						} else {
+> +							return XDP_DROP;
+> +						}
+> +					}
+> +					forward_to = prefix_value->ifindex;
+> +				} else {
+> +					return XDP_DROP;
+> +				}
+> +			}
+> +		}
+> +	} else {
+> +		ipproto = 0;
+> +	}
+> +	if (src_mac && dest_mac) {
+> +		set_src_dst_mac(data, src_mac,
+> +				dest_mac);
+> +		value = bpf_map_lookup_elem
+> +			(&rxcnt, &ipproto);
+> +		if (value)
+> +			*value += 1;
+> +		return  bpf_redirect(
+> +				     forward_to,
+> +				     0);
+> +	}
+> +	return rc;
