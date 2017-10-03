@@ -1,107 +1,120 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:11:00 -0500
-Subject: [RFC PATCH v2 18/31] KVM: arm64: Enumerate AT and TLBI instructions
- to emulate
+Date: Mon,  2 Oct 2017 22:10:59 -0500
+Subject: [RFC PATCH v2 17/31] KVM: arm64: Rework the system instruction
+ emulation framework
 In-Reply-To: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
 References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1507000273-3735-16-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1507000273-3735-15-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-List all system instructions to emulate. This patch only introduces the
-definitions, emulation handlers will be added in subsequent patches.
+Rework the system instruction emulation framework to handle potentially
+all system instruction traps other than MSR/MRS instructions. Those
+system instructions would be AT and TLBI instructions controlled by
+HCR_EL2.NV, AT, and TTLB bits.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/include/asm/sysreg.h | 38 ++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/sys_regs.c       | 26 ++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 66 ++++++++++++++++++-----------------------------
+ 1 file changed, 25 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index a051d42..53df733 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -367,6 +367,44 @@
- 
- #define SYS_SP_EL2			sys_reg(3, 6, 4, 1, 0)
- 
-+/* AT instructions */
-+#define AT_Op0 1
-+#define AT_CRn 7
-+
-+#define AT_S1E1R	sys_insn(AT_Op0, 0, AT_CRn, 8, 0)
-+#define AT_S1E1W	sys_insn(AT_Op0, 0, AT_CRn, 8, 1)
-+#define AT_S1E0R	sys_insn(AT_Op0, 0, AT_CRn, 8, 2)
-+#define AT_S1E0W	sys_insn(AT_Op0, 0, AT_CRn, 8, 3)
-+#define AT_S1E1RP	sys_insn(AT_Op0, 0, AT_CRn, 9, 0)
-+#define AT_S1E1WP	sys_insn(AT_Op0, 0, AT_CRn, 9, 1)
-+#define AT_S1E2R	sys_insn(AT_Op0, 4, AT_CRn, 8, 0)
-+#define AT_S1E2W	sys_insn(AT_Op0, 4, AT_CRn, 8, 1)
-+#define AT_S12E1R	sys_insn(AT_Op0, 4, AT_CRn, 8, 4)
-+#define AT_S12E1W	sys_insn(AT_Op0, 4, AT_CRn, 8, 5)
-+#define AT_S12E0R	sys_insn(AT_Op0, 4, AT_CRn, 8, 6)
-+#define AT_S12E0W	sys_insn(AT_Op0, 4, AT_CRn, 8, 7)
-+
-+/* TLBI instructions */
-+#define TLBI_Op0	1
-+#define TLBI_Op1_EL2	4	/* Accessible from EL2 or higher */
-+#define TLBI_CRn	8
-+#define tlbi_insn_el2(CRm, Op2)	sys_insn(TLBI_Op0, TLBI_Op1_EL2, TLBI_CRn, (CRm), (Op2))
-+
-+#define TLBI_IPAS2E1IS	tlbi_insn_el2(0, 1)
-+#define TLBI_IPAS2LE1IS	tlbi_insn_el2(0, 5)
-+#define TLBI_ALLE2IS	tlbi_insn_el2(3, 0)
-+#define TLBI_VAE2IS	tlbi_insn_el2(3, 1)
-+#define TLBI_ALLE1IS	tlbi_insn_el2(3, 4)
-+#define TLBI_VALE2IS	tlbi_insn_el2(3, 5)
-+#define TLBI_VMALLS12E1IS	tlbi_insn_el2(3, 6)
-+#define TLBI_IPAS2E1	tlbi_insn_el2(4, 1)
-+#define TLBI_IPAS2LE1	tlbi_insn_el2(4, 5)
-+#define TLBI_ALLE2	tlbi_insn_el2(7, 0)
-+#define TLBI_VAE2	tlbi_insn_el2(7, 1)
-+#define TLBI_ALLE1	tlbi_insn_el2(7, 4)
-+#define TLBI_VALE2	tlbi_insn_el2(7, 5)
-+#define TLBI_VMALLS12E1	tlbi_insn_el2(7, 6)
-+
- /* Common SCTLR_ELx flags. */
- #define SCTLR_ELx_EE    (1 << 25)
- #define SCTLR_ELx_I	(1 << 12)
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 481bea64..8d04926 100644
+index 88ce172..481bea64 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -1624,6 +1624,32 @@ static bool access_id_aa64mmfr0_el1(struct kvm_vcpu *v,
- #define SYS_INSN_TO_DESC(insn, access_fn, forward_fn)	\
- 	{ SYS_DESC((insn)), (access_fn), NULL, 0, 0, NULL, NULL, (forward_fn) }
- static struct sys_reg_desc sys_insn_descs[] = {
-+	SYS_INSN_TO_DESC(AT_S1E1R, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E1W, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E0R, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E0W, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E1RP, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E1WP, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E2R, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E2W, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E1R, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E1W, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E0R, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S12E0W, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_ALLE2IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_VAE2IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_ALLE1IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_VALE2IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_IPAS2E1, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_ALLE2, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_VAE2, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_ALLE1, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_VALE2, NULL, NULL),
-+	SYS_INSN_TO_DESC(TLBI_VMALLS12E1, NULL, NULL),
+@@ -1621,6 +1621,11 @@ static bool access_id_aa64mmfr0_el1(struct kvm_vcpu *v,
+ 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
  };
  
++#define SYS_INSN_TO_DESC(insn, access_fn, forward_fn)	\
++	{ SYS_DESC((insn)), (access_fn), NULL, 0, 0, NULL, NULL, (forward_fn) }
++static struct sys_reg_desc sys_insn_descs[] = {
++};
++
  #define reg_to_match_value(x)						\
+ 	({								\
+ 		unsigned long val;					\
+@@ -1674,6 +1679,25 @@ static void perform_access(struct kvm_vcpu *vcpu,
+ 		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+ }
+ 
++static int emulate_sys_instr(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
++{
++
++	const struct sys_reg_desc *r;
++
++	/* Search from the system instruction table. */
++	r = find_reg(p, sys_insn_descs, ARRAY_SIZE(sys_insn_descs));
++
++	if (likely(r)) {
++		perform_access(vcpu, p, r);
++	} else {
++		kvm_err("Unsupported guest sys instruction at: %lx\n",
++			*vcpu_pc(vcpu));
++		print_sys_reg_instr(p);
++		kvm_inject_undefined(vcpu);
++	}
++	return 1;
++}
++
+ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+ 			struct sys_reg_params *p,
+ 			const struct sys_reg_desc *r)
+@@ -2236,47 +2260,6 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 	return 1;
+ }
+ 
+-static int emulate_tlbi(struct kvm_vcpu *vcpu,
+-			     struct sys_reg_params *params)
+-{
+-	/* TODO: support tlbi instruction emulation*/
+-	kvm_inject_undefined(vcpu);
+-	return 1;
+-}
+-
+-static int emulate_at(struct kvm_vcpu *vcpu,
+-			     struct sys_reg_params *params)
+-{
+-	/* TODO: support address translation instruction emulation */
+-	kvm_inject_undefined(vcpu);
+-	return 1;
+-}
+-
+-static int emulate_sys_instr(struct kvm_vcpu *vcpu,
+-			     struct sys_reg_params *params)
+-{
+-	int ret = 0;
+-
+-	/*
+-	 * Forward this trap to the virtual EL2 if the virtual HCR_EL2.NV
+-	 * bit is set.
+-	 */
+-	if (forward_nv_traps(vcpu))
+-		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+-
+-	/* TLB maintenance instructions*/
+-	if (params->CRn == 0b1000)
+-		ret = emulate_tlbi(vcpu, params);
+-	/* Address Translation instructions */
+-	else if (params->CRn == 0b0111 && params->CRm == 0b1000)
+-		ret = emulate_at(vcpu, params);
+-
+-	if (ret)
+-		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-
+-	return ret;
+-}
+-
+ static void reset_sys_reg_descs(struct kvm_vcpu *vcpu,
+ 			      const struct sys_reg_desc *table, size_t num)
+ {
+@@ -2754,6 +2737,7 @@ void kvm_sys_reg_table_init(void)
+ 	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
+ 	BUG_ON(check_sysreg_table(cp15_64_regs, ARRAY_SIZE(cp15_64_regs)));
+ 	BUG_ON(check_sysreg_table(invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs)));
++	BUG_ON(check_sysreg_table(sys_insn_descs, ARRAY_SIZE(sys_insn_descs)));
+ 
+ 	/* We abuse the reset function to overwrite the table itself. */
+ 	for (i = 0; i < ARRAY_SIZE(invariant_sys_regs); i++)
 -- 
 1.9.1
