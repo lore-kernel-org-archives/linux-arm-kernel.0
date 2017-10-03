@@ -1,80 +1,82 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:10:45 -0500
-Subject: [RFC PATCH v2 03/31] KVM: arm/arm64: Remove unused params in mmu
- functions
-Message-ID: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
+Date: Mon,  2 Oct 2017 22:10:48 -0500
+Subject: [RFC PATCH v2 06/31] KVM: arm64: Invalidate virtual EL2 TLB entries
+ when needed
+In-Reply-To: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
+References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1507000273-3735-4-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-stage2_flush_xxx functions take a pointer to the kvm struct as the first
-parameter but they are never used. Clean this up before modifying mmu
-code for nested virtualization support.
+Sometimes when we are invalidating the TLB for a certain S2 MMU
+context, this context can also have EL2 context associated with it and
+we have to invalidate this too.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- virt/kvm/arm/mmu.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+ virt/kvm/arm/arm.c |  5 +++++
+ virt/kvm/arm/mmu.c | 23 ++++++++++++++++++++++-
+ 2 files changed, 27 insertions(+), 1 deletion(-)
 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 41e0654..63dd897 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -362,6 +362,11 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 		u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+ 
+ 		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
++
++		if (mmu->el2_vmid.vmid) {
++			vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
++			kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
++		}
+ 		*last_ran = vcpu->vcpu_id;
+ 	}
+ 
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index f2d5b6c..0a5f5ca 100644
+index 0edcf23..184cdc9 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -315,8 +315,7 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	} while (pgd++, addr = next, addr != end);
+@@ -64,7 +64,21 @@ void kvm_flush_remote_tlbs(struct kvm *kvm)
+ 	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
+ 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+ 
+-	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
++	if (!mmu->el2_vmid.vmid) {
++		/*
++		 * For a normal (i.e. non-nested) guest, flush entries for the
++		 * given VMID *
++		 */
++		kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
++	} else {
++		/*
++		 * When supporting nested virtualization, we can have multiple
++		 * VMIDs in play for each VCPU in the VM, so it's really not
++		 * worth it to try to quiesce the system and flush all the
++		 * VMIDs that may be in use, instead just nuke the whole thing.
++		 */
++		kvm_call_hyp(__kvm_flush_vm_context);
++	}
  }
  
--static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
--			      phys_addr_t addr, phys_addr_t end)
-+static void stage2_flush_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
- {
- 	pte_t *pte;
+ static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
+@@ -72,6 +86,13 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
+ 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
  
-@@ -327,8 +326,7 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ 	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
++
++	if (!mmu->el2_vmid.vmid) {
++		/* Nothing to do more for a non-nested guest */
++		return;
++	}
++	vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
++	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
  }
  
--static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
--			      phys_addr_t addr, phys_addr_t end)
-+static void stage2_flush_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
- {
- 	pmd_t *pmd;
- 	phys_addr_t next;
-@@ -340,13 +338,12 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
- 			if (pmd_thp_or_huge(*pmd))
- 				kvm_flush_dcache_pmd(*pmd);
- 			else
--				stage2_flush_ptes(kvm, pmd, addr, next);
-+				stage2_flush_ptes(pmd, addr, next);
- 		}
- 	} while (pmd++, addr = next, addr != end);
- }
- 
--static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
--			      phys_addr_t addr, phys_addr_t end)
-+static void stage2_flush_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- {
- 	pud_t *pud;
- 	phys_addr_t next;
-@@ -358,7 +355,7 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
- 			if (stage2_pud_huge(*pud))
- 				kvm_flush_dcache_pud(*pud);
- 			else
--				stage2_flush_pmds(kvm, pud, addr, next);
-+				stage2_flush_pmds(pud, addr, next);
- 		}
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -374,7 +371,7 @@ static void stage2_flush_memslot(struct kvm *kvm,
- 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
- 		next = stage2_pgd_addr_end(addr, end);
--		stage2_flush_puds(kvm, pgd, addr, next);
-+		stage2_flush_puds(pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
- 
+ /*
 -- 
 1.9.1
