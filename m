@@ -1,57 +1,84 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:11:04 -0500
-Subject: [RFC PATCH v2 22/31] KVM: arm64: Emulate AT S1E2 instructions
+Date: Mon,  2 Oct 2017 22:11:06 -0500
+Subject: [RFC PATCH v2 24/31] KVM: arm64: Emulate TLBI ALLE2(IS) instruction
 In-Reply-To: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
 References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1507000273-3735-20-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1507000273-3735-22-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emulate AT S1E2 instructions by issuing the corresponding S1E1
-instructions in EL2. We set the physical EL1 registers and the HCR_EL2
-register as described in the AT instruction emulation overview.
+Emulate TLBI ALLE2(IS) instruction executed in the virtual EL2. Since we
+emulate the virtual EL2 in the EL1, we invalidate EL1&0 regime stage 1
+TLB entries with setting vttbr_el2 having the VMID of the virtual EL2.
+
+Note that we are able to emulate TLBI ALLE2IS precisely by only
+invalidating stage 1 TLB entries via TLBI VMALL1IS instruction, but to
+make it simeple, we reuse the existing function, __kvm_tlb_flush_vmid(),
+which invalidates both of stage 1 and 2 TLB entries.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 35 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 33 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index a82274f..cb46db5 100644
+index 7950ee0..90329b7 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -1641,6 +1641,21 @@ static bool handle_s1e01(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+@@ -1747,6 +1747,37 @@ static bool handle_s12w(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return handle_s12(vcpu, p, r, true);
  }
  
-+static bool handle_s1e2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			const struct sys_reg_desc *r)
++static bool handle_alle2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			 const struct sys_reg_desc *r)
 +{
-+	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
-+	bool el2_format;
-+	int sys_encoding = sys_insn(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
++	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
++	u64 vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
 +
-+	/* See the '1. EL2 AT instructions: S1E2x' table */
-+	ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
-+	el2_format = !vcpu_el2_e2h_is_set(vcpu);
++	/*
++	 * To emulate invalidating all EL2 regime stage 1 TLB entries,
++	 * invalidate EL1&0 regime stage 1 TLB entries with the virtual EL2's
++	 * VMID.
++	 */
++	kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
++	return true;
++}
 +
-+	kvm_call_hyp(__kvm_at_insn, vcpu, p->regval, el2_format, sys_encoding);
++static bool handle_alle2is(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
++	u64 vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
++
++	/*
++	 * To emulate invalidating all EL2 regime stage 1 TLB entries for all
++	 * PEs, executing TLBI VMALLE1IS is enough. But reuse the existing
++	 * interface for the simplicity; invalidating stage 2 entries doesn't
++	 * affect the correctness.
++	 */
++	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
 +	return true;
 +}
 +
  /*
   * AT instruction emulation
   *
-@@ -1716,8 +1731,8 @@ static bool handle_s1e01(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	SYS_INSN_TO_DESC(AT_S1E0W, handle_s1e01, NULL),
- 	SYS_INSN_TO_DESC(AT_S1E1RP, handle_s1e01, NULL),
- 	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, NULL),
--	SYS_INSN_TO_DESC(AT_S1E2R, NULL, NULL),
--	SYS_INSN_TO_DESC(AT_S1E2W, NULL, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E2R, handle_s1e2, NULL),
-+	SYS_INSN_TO_DESC(AT_S1E2W, handle_s1e2, NULL),
- 	SYS_INSN_TO_DESC(AT_S12E1R, NULL, NULL),
- 	SYS_INSN_TO_DESC(AT_S12E1W, NULL, NULL),
- 	SYS_INSN_TO_DESC(AT_S12E0R, NULL, NULL),
+@@ -1830,14 +1861,14 @@ static bool handle_s12w(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	SYS_INSN_TO_DESC(AT_S12E0W, handle_s12w, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
+-	SYS_INSN_TO_DESC(TLBI_ALLE2IS, NULL, NULL),
++	SYS_INSN_TO_DESC(TLBI_ALLE2IS, handle_alle2is, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_VAE2IS, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_ALLE1IS, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_VALE2IS, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_IPAS2E1, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, NULL, NULL),
+-	SYS_INSN_TO_DESC(TLBI_ALLE2, NULL, NULL),
++	SYS_INSN_TO_DESC(TLBI_ALLE2, handle_alle2, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_VAE2, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_ALLE1, NULL, NULL),
+ 	SYS_INSN_TO_DESC(TLBI_VALE2, NULL, NULL),
 -- 
 1.9.1
