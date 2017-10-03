@@ -1,166 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  3 Oct 2017 14:53:31 +0100
-Subject: [PATCH 3/3] ACPI/IORT: Make platform devices initialization code SMMU
- agnostic
-In-Reply-To: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1507038811-23382-4-git-send-email-lorenzo.pieralisi@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Oct 2017 14:56:21 +0100
+Subject: [PATCH] rtc: armada38x: add support for trimming the RTC
+In-Reply-To: <20171003132433.vkgjxuoeq26x3f47@piout.net>
+References: <E1dxsSB-0006RM-08@rmk-PC.armlinux.org.uk>
+ <20171003132433.vkgjxuoeq26x3f47@piout.net>
+Message-ID: <20171003135620.GN20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way current IORT code initializes platform devices for SMMU nodes
-is somewhat tied (mostly for naming convention) to the SMMU nodes
-themselves but it need not be in that it is completely generic and
-can easily be made so by structures renaming and code reshuffling.
+On Tue, Oct 03, 2017 at 03:24:33PM +0200, Alexandre Belloni wrote:
+> Hi Russell,
+> 
+> On 29/09/2017 at 11:23:31 +0100, Russell King wrote:
+> > +/*
+> > + * The information given in the Armada 388 functional spec is complex.
+> > + * They give two different formulas for calculating the offset value,
+> > + * but when considering "Offset" as an 8-bit signed integer, they both
+> > + * reduce down to (we shall rename "Offset" as "val" here):
+> > + *
+> > + *   val = (f_ideal / f_measured - 1) / resolution   where f_ideal = 32768
+> > + *
+> > + * Converting to time, f = 1/t:
+> > + *   val = (t_measured / t_ideal - 1) / resolution   where t_ideal = 1/32768
+> > + *
+> > + *   =>  t_measured / t_ideal = val * resolution + 1
+> > + *
+> > + * "offset" in the RTC interface is defined as:
+> > + *   t = t0 * (1 + offset * 1e-9)
+> > + * where t is the desired period, t0 is the measured period with a zero
+> > + * offset, which is t_measured above. With t0 = t_measured and t = t_ideal,
+> > + *   offset = (t_ideal / t_measured - 1) / 1e-9
+> > + *
+> > + *   => t_ideal / t_measured = offset * 1e-9 + 1
+> > + *
+> > + * so:
+> > + *
+> > + *   offset * 1e-9 + 1 = 1 / (val * resolution + 1)
+> > + *
+> > + * We want "resolution" to be an integer, so resolution = R * 1e-9, giving
+> > + *   offset = 1e18 / (val * R + 1e9) - 1e9
+> > + *   val = (1e18 / (offset + 1e9) - 1e9) / R
+> > + * with a common transformation:
+> > + *   f(x) = 1e18 / (x + 1e9) - 1e9
+> > + *   offset = f(val * R)
+> > + *   val = f(offset) / R
+> > + *
+> > + * Armada 38x supports two modes, fine mode (954ppb) and coarse mode (3815ppb).
+> > + */
+> > +static long armada38x_ppb_convert(long ppb)
+> > +{
+> > +	long div = ppb + 1000000000L;
+> > +
+> > +	return div_s64(1000000000000000000LL + div / 2, div) - 1000000000L;
+> 
+> The previous comment is perfect but it was not completely obvious to me
+> why you are adding div / 2. Maybe you can add a small comment.
 
-Rework IORT platform devices initialization code to make the functions
-and data structures SMMU agnostic.
+It's the standard way to turn a regular integer division into one which
+rounds-to-closest - I consider it to be one of the basics which every
+programmer should know, and therefore should be obvious.
 
-No functional changes intended.
+Integer division in the form of:
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/acpi/arm64/iort.c | 61 ++++++++++++++++++++++-------------------------
- 1 file changed, 29 insertions(+), 32 deletions(-)
+	r = (a + b / 2) / b
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index f4775e7..271ec1f 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -1049,30 +1049,30 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
- 	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
- }
- 
--struct iort_iommu_config {
-+struct iort_dev_config {
- 	const char *name;
--	int (*iommu_init)(struct acpi_iort_node *node);
--	bool (*iommu_is_coherent)(struct acpi_iort_node *node);
--	int (*iommu_count_resources)(struct acpi_iort_node *node);
--	void (*iommu_init_resources)(struct resource *res,
-+	int (*dev_init)(struct acpi_iort_node *node);
-+	bool (*dev_is_coherent)(struct acpi_iort_node *node);
-+	int (*dev_count_resources)(struct acpi_iort_node *node);
-+	void (*dev_init_resources)(struct resource *res,
- 				     struct acpi_iort_node *node);
--	void (*iommu_set_proximity)(struct device *dev,
-+	void (*dev_set_proximity)(struct device *dev,
- 				    struct acpi_iort_node *node);
- };
- 
--static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-+static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
- 	.name = "arm-smmu-v3",
--	.iommu_is_coherent = arm_smmu_v3_is_coherent,
--	.iommu_count_resources = arm_smmu_v3_count_resources,
--	.iommu_init_resources = arm_smmu_v3_init_resources,
--	.iommu_set_proximity = arm_smmu_v3_set_proximity,
-+	.dev_is_coherent = arm_smmu_v3_is_coherent,
-+	.dev_count_resources = arm_smmu_v3_count_resources,
-+	.dev_init_resources = arm_smmu_v3_init_resources,
-+	.dev_set_proximity = arm_smmu_v3_set_proximity,
- };
- 
--static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-+static const struct iort_dev_config iort_arm_smmu_cfg __initconst = {
- 	.name = "arm-smmu",
--	.iommu_is_coherent = arm_smmu_is_coherent,
--	.iommu_count_resources = arm_smmu_count_resources,
--	.iommu_init_resources = arm_smmu_init_resources
-+	.dev_is_coherent = arm_smmu_is_coherent,
-+	.dev_count_resources = arm_smmu_count_resources,
-+	.dev_init_resources = arm_smmu_init_resources
- };
- 
- static __init const struct iort_dev_config *iort_get_dev_cfg(
-@@ -1089,31 +1089,28 @@ static __init const struct iort_dev_config *iort_get_dev_cfg(
- }
- 
- /**
-- * iort_add_smmu_platform_device() - Allocate a platform device for SMMU
-- * @node: Pointer to SMMU ACPI IORT node
-+ * iort_add_platform_device() - Allocate a platform device for IORT node
-+ * @node: Pointer to device ACPI IORT node
-  *
-  * Returns: 0 on success, <0 failure
-  */
--static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-+static int __init iort_add_platform_device(struct acpi_iort_node *node,
-+					   const struct iort_dev_config *ops)
- {
- 	struct fwnode_handle *fwnode;
- 	struct platform_device *pdev;
- 	struct resource *r;
- 	enum dev_dma_attr attr;
- 	int ret, count;
--	const struct iort_iommu_config *ops = iort_get_iommu_cfg(node);
--
--	if (!ops)
--		return -ENODEV;
- 
- 	pdev = platform_device_alloc(ops->name, PLATFORM_DEVID_AUTO);
- 	if (!pdev)
- 		return -ENOMEM;
- 
--	if (ops->iommu_set_proximity)
--		ops->iommu_set_proximity(&pdev->dev, node);
-+	if (ops->dev_set_proximity)
-+		ops->dev_set_proximity(&pdev->dev, node);
- 
--	count = ops->iommu_count_resources(node);
-+	count = ops->dev_count_resources(node);
- 
- 	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
- 	if (!r) {
-@@ -1121,7 +1118,7 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 		goto dev_put;
- 	}
- 
--	ops->iommu_init_resources(r, node);
-+	ops->dev_init_resources(r, node);
- 
- 	ret = platform_device_add_resources(pdev, r, count);
- 	/*
-@@ -1156,8 +1153,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 
- 	pdev->dev.fwnode = fwnode;
- 
--	attr = ops->iommu_is_coherent(node) ?
--			     DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
-+	attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
-+			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
- 
- 	/* Configure DMA for the page table walker */
- 	acpi_dma_configure(&pdev->dev, attr);
-@@ -1214,6 +1211,7 @@ static void __init iort_init_platform_devices(void)
- 	struct fwnode_handle *fwnode;
- 	int i, ret;
- 	bool acs_enabled = false;
-+	const struct iort_dev_config *ops;
- 
- 	/*
- 	 * iort_table and iort both point to the start of IORT table, but
-@@ -1236,16 +1234,15 @@ static void __init iort_init_platform_devices(void)
- 		if (!acs_enabled)
- 			acs_enabled = iort_enable_acs(iort_node);
- 
--		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
--			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
--
-+		ops = iort_get_dev_cfg(iort_node);
-+		if (ops) {
- 			fwnode = acpi_alloc_fwnode_static();
- 			if (!fwnode)
- 				return;
- 
- 			iort_set_fwnode(iort_node, fwnode);
- 
--			ret = iort_add_smmu_platform_device(iort_node);
-+			ret = iort_add_platform_device(iort_node, ops);
- 			if (ret) {
- 				iort_delete_fwnode(iort_node);
- 				acpi_free_fwnode_static(fwnode);
+should be part of the programmers basic knowledge set.
+
 -- 
-2.4.12
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
