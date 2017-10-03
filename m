@@ -1,28 +1,76 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  3 Oct 2017 14:53:28 +0100
-Subject: [PATCH 0/3] ACPI/IORT: Clean-up/rework for v4.15
-Message-ID: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue,  3 Oct 2017 14:53:30 +0100
+Subject: [PATCH 2/3] ACPI/IORT: Improve functions return type/storage class
+ specifier indentation
+In-Reply-To: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1507038811-23382-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A three-patch series collection of backlog clean-ups/rework in
-preparation for future code restructuring and features support.
+Some functions definition indentations are using a style that is frowned
+upon with return value type/storage class specifier in a separate line.
 
-Patch series depends on:
+Reindent the function definitions to fix them.
 
-https://marc.info/?l=linux-arm-kernel&m=150696522211494&w=2
-
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/acpi/arm64/iort.c | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
-Lorenzo Pieralisi (3):
-  ACPI/IORT: Remove leftover ACPI_IORT_SMMU_V3_PXM_VALID guard
-  ACPI/IORT: Improve functions return type/storage class specifier
-    indentation
-  ACPI/IORT: Make platform devices initialization code SMMU agnostic
-
- drivers/acpi/arm64/iort.c | 83 ++++++++++++++++++++++-------------------------
- 1 file changed, 39 insertions(+), 44 deletions(-)
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 69f21f3..f4775e7 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -88,8 +88,8 @@ static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
+  *
+  * Returns: fwnode_handle pointer on success, NULL on failure
+  */
+-static inline
+-struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
++static inline struct fwnode_handle *iort_get_fwnode(
++			struct acpi_iort_node *node)
+ {
+ 	struct iort_fwnode *curr;
+ 	struct fwnode_handle *fwnode = NULL;
+@@ -306,9 +306,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 	return 0;
+ }
+ 
+-static
+-struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+-					u32 *id_out, int index)
++static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
++					       u32 *id_out, int index)
+ {
+ 	struct acpi_iort_node *parent;
+ 	struct acpi_iort_id_mapping *map;
+@@ -392,10 +391,9 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+ 	return NULL;
+ }
+ 
+-static
+-struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+-						 u32 *id_out, u8 type_mask,
+-						 int index)
++static struct acpi_iort_node *iort_node_map_platform_id(
++		struct acpi_iort_node *node, u32 *id_out, u8 type_mask,
++		int index)
+ {
+ 	struct acpi_iort_node *parent;
+ 	u32 id;
+@@ -1077,8 +1075,8 @@ static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+ 	.iommu_init_resources = arm_smmu_init_resources
+ };
+ 
+-static __init
+-const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
++static __init const struct iort_dev_config *iort_get_dev_cfg(
++			struct acpi_iort_node *node)
+ {
+ 	switch (node->type) {
+ 	case ACPI_IORT_NODE_SMMU_V3:
 -- 
 2.4.12
