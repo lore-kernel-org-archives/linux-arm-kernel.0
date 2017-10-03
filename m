@@ -1,137 +1,154 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 3 Oct 2017 12:37:03 -0400
-Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
-In-Reply-To: <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
-References: <20171003091155.7138-1-linus.walleij@linaro.org>
- <20171003091155.7138-2-linus.walleij@linaro.org>
- <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
-Message-ID: <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Tue, 3 Oct 2017 16:38:54 +0000
+Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
+In-Reply-To: <AM5PR0402MB2691BFAD9ABB649BE3C0DE9AEC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+References: <1506109046-11527-1-git-send-email-leoyang.li@nxp.com>
+ <AM5PR0402MB2691BFAD9ABB649BE3C0DE9AEC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+Message-ID: <AM4PR0401MB169995A82BB3DEA3B28450E58F720@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
->
->
-> On 03/10/17 10:11, Linus Walleij wrote:
->>
->> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
->> is not very helpful for users looking for their device tree in
->> the kernel. Also the db820c is named properly.
->>
->> Rectify this, simply, do not change the compatible strings but name
->> the DTS files in a consistent manner.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> I did not like the sbc naming convention too, This was primarily done due to
-> some legacy build tools + bootloaders which have used sbc compatible to
-> identify boards from multiple dtb blobs. Now that we can append dtb to
-> kernel with new LK, this should not be a issue anymore.
 
-maybe it would be an idea to update skales/dbttool first to look for
-the new name, and then give people some time to upgrade, before
-changing this in the kernel.  Otherwise I expect you'll cause some
-confusion..
+> -----Original Message-----
+> From: Madalin-cristian Bucur
+> Sent: Tuesday, October 03, 2017 4:55 AM
+> To: Leo Li <leoyang.li@nxp.com>
+> Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> <catalin.marinas@arm.com>; Roy Pledge <roy.pledge@nxp.com>; Arnd
+> Bergmann <arnd@arndb.de>
+> Subject: RE: [GIT PULL] updates to soc/fsl drivers for v4.14
+> 
+> Hi Leo,
+> 
+> Should we include the Reviewed-by tags in the pull request commits logs?
 
-BR,
--R
+I have already included Catalin's Reviewed-by in the git log for patches he replied with a Reviewed-by.  There are a few patches that are not related to ARM architecture don't have his reviewed-by, which I think is fine.
 
+Leo
 
-> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->
->
->> ---
->> It's not like I don't understand that people will be nitpicky
->> about this.
->>
->> I was looking for the DragonBoard 410c devicetree and could not
->> find it until I realized this hopeless idiomatic naming.
->>
->> It cost me time and effort, and it is going to cost others time
->> and effort. Fixing it.
->>
->> The other patch naming the GPIO lines can be applied without
->> this one.
->> ---
->>   arch/arm64/boot/dts/qcom/Makefile                                    | 2
->> +-
->>   .../{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi}    | 0
->>   .../qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} | 0
->>   arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}     | 5
->> +++--
->>   arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi}   | 4
->> ++--
->>   5 files changed, 6 insertions(+), 5 deletions(-)
->>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-pmic-pins.dtsi =>
->> apq8016-db410c-pmic-pins.dtsi} (100%)
->>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-soc-pins.dtsi =>
->> apq8016-db410c-soc-pins.dtsi} (100%)
->>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}
->> (95%)
->>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi =>
->> apq8016-db410c.dtsi} (99%)
->>
->> diff --git a/arch/arm64/boot/dts/qcom/Makefile
->> b/arch/arm64/boot/dts/qcom/Makefile
->> index ff81d7e5805e..fc46ab79acd9 100644
->> --- a/arch/arm64/boot/dts/qcom/Makefile
->> +++ b/arch/arm64/boot/dts/qcom/Makefile
->> @@ -1,4 +1,4 @@
->> -dtb-$(CONFIG_ARCH_QCOM)        += apq8016-sbc.dtb
->> +dtb-$(CONFIG_ARCH_QCOM)        += apq8016-db410c.dtb
->>   dtb-$(CONFIG_ARCH_QCOM)       += apq8096-db820c.dtb
->>   dtb-$(CONFIG_ARCH_QCOM)       += ipq8074-hk01.dtb
->>   dtb-$(CONFIG_ARCH_QCOM)       += msm8916-mtp.dtb
->> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
->> b/arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
->> similarity index 100%
->> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
->> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
->> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
->> b/arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
->> similarity index 100%
->> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
->> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
->> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
->> b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
->> similarity index 95%
->> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dts
->> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dts
->> index 40b0d62861bb..86cfae4d2b9d 100644
->> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
->> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
->> @@ -13,10 +13,11 @@
->>     /dts-v1/;
->>   -#include "apq8016-sbc.dtsi"
->> +#include "apq8016-db410c.dtsi"
->>     / {
->> -       model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
->> +       model = "Qualcomm Technologies, Inc. APQ 8016 DragonBoard 410c";
->> +       /* The "SBC" (Single Board Computer) is another name for this
->> board */
->>         compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
->>   };
->>   diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
->> b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
->> similarity index 99%
->> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
->> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
->> index 1d63e6b879de..1300c11e5f0e 100644
->> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
->> @@ -13,8 +13,8 @@
->>     #include "msm8916.dtsi"
->>   #include "pm8916.dtsi"
->> -#include "apq8016-sbc-soc-pins.dtsi"
->> -#include "apq8016-sbc-pmic-pins.dtsi"
->> +#include "apq8016-db410c-soc-pins.dtsi"
->> +#include "apq8016-db410c-pmic-pins.dtsi"
->>   #include <dt-bindings/gpio/gpio.h>
->>   #include <dt-bindings/input/input.h>
->>   #include <dt-bindings/sound/apq8016-lpass.h>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Madalin
+> 
+> > -----Original Message-----
+> > From: Li Yang [mailto:leoyang.li at nxp.com]
+> > Sent: Friday, September 22, 2017 10:37 PM
+> > To: arm at kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> > <catalin.marinas@arm.com>; Roy Pledge <roy.pledge@nxp.com>; Arnd
+> > Bergmann <arnd@arndb.de>; Madalin-cristian Bucur
+> > <madalin.bucur@nxp.com>
+> > Subject: [GIT PULL] updates to soc/fsl drivers for v4.14
+> >
+> > Hi arm-soc maintainers,
+> >
+> > This pull request includes updates to the QMAN/BMAN drivers to make
+> > them work on the arm/arm64 architectures in addition to the power
+> > architecture and a few minor update/bug-fix to the soc/fsl drivers.
+> >
+> > We got the Reviewed-by from Catalin on the ARM architecture side.
+> >
+> > DPAA (Data Path Acceleration Architecture) is a set of hardware
+> > components used on some FSL/NXP QorIQ Networking SoCs, it provides the
+> > infrastructure to support simplified sharing of networking interfaces
+> > and accelerators by multiple CPU cores, and the accelerators
+> > themselves.  The QMan(Queue Manager) and BMan(Buffer Manager) are
+> > infrastructural components within the DPAA framework.  They are used
+> > to manage queues and buffers for various I/O interfaces, hardware
+> > accelerators.
+> >
+> > More information can be found via link:
+> >
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.n
+> xp.
+> > com%2Fproducts%2Fmicrocontrollers-and-processors%2Fpower-architecture-
+> > processors%2Fqoriq-platforms%2Fdata-path-
+> >
+> acceleration%3AQORIQ_DPAA&data=01%7C01%7Cmadalin.bucur%40nxp.com%
+> 7Ca38
+> > 4d00
+> >
+> a91714cf5710808d501f161da%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&
+> sdata
+> > =e2a
+> > XiPCt%2FwQbTr6JafKqGzTjSdDv4qNUizPVDKPcRQw%3D&reserved=0
+> >
+> > Regards,
+> > Leo
+> >
+> >
+> > The following changes since commit
+> > 0a8abd97dcda50e5d2c893a51733416534e95706:
+> >
+> >   Merge tag 'for-linus-4.14b-rc2-tag' of
+> > git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip (2017-09-22
+> > 06:40:47
+> > -1000)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
+> > tags/soc-
+> > fsl-for-4.14
+> >
+> > for you to fetch changes up to e868adf21c0a25634d5dfa5b1e6dbf839306d8fa:
+> >
+> >   soc/fsl/qbman: Enable FSL_LAYERSCAPE config on ARM (2017-09-22
+> > 13:33:07
+> > -0500)
+> >
+> > ----------------------------------------------------------------
+> > FSL/NXP ARM SoC drivers updates for 4.14
+> >
+> > This adds the DPAA QBMan support for ARM SoCs and a few minor
+> > fixes/updates.
+> >
+> > ----------------------------------------------------------------
+> > Claudiu Manoil (2):
+> >       soc/fsl/qbman: Drop L1_CACHE_BYTES compile time check
+> >       soc/fsl/qbman: Add missing headers on ARM
+> >
+> > Karim Eshapa (1):
+> >       soc/fsl/qman: Sleep instead of stuck hacking jiffies
+> >
+> > Madalin Bucur (4):
+> >       soc/fsl/qbman: Drop set/clear_bits usage
+> >       soc/fsl/qbman: add QMAN_REV32
+> >       soc/fsl/qbman: different register offsets on ARM
+> >       soc/fsl/qbman: Enable FSL_LAYERSCAPE config on ARM
+> >
+> > Roy Pledge (5):
+> >       soc/fsl/qbman: Add common routine for QBMan private allocations
+> >       soc/fsl/qbman: Use shared-dma-pool for BMan private memory
+> > allocations
+> >       soc/fsl/qbman: Use shared-dma-pool for QMan private memory
+> > allocations
+> >       dt-bindings: soc/fsl: Update reserved memory binding for QBMan
+> >       soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
+> >
+> > Valentin Rothberg (1):
+> >       soc/fsl/qbman: Fix ARM32 typo
+> >
+> > ashish kumar (1):
+> >       soc/fsl/guts: Add compatible string for LS1088
+> >
+> >  Documentation/devicetree/bindings/soc/fsl/bman.txt | 12 +--
+> > Documentation/devicetree/bindings/soc/fsl/qman.txt | 26 ++++--
+> >  drivers/soc/fsl/guts.c                             |  1 +
+> >  drivers/soc/fsl/qbman/Kconfig                      |  2 +-
+> >  drivers/soc/fsl/qbman/Makefile                     |  2 +-
+> >  drivers/soc/fsl/qbman/bman.c                       | 42 ++++++++--
+> >  drivers/soc/fsl/qbman/bman_ccsr.c                  | 15 ++++
+> >  drivers/soc/fsl/qbman/bman_portal.c                | 23 +++---
+> >  drivers/soc/fsl/qbman/bman_priv.h                  |  8 +-
+> >  drivers/soc/fsl/qbman/dpaa_sys.c                   | 78
+> > ++++++++++++++++++
+> >  drivers/soc/fsl/qbman/dpaa_sys.h                   | 25 ++++--
+> >  drivers/soc/fsl/qbman/qman.c                       | 83 +++++++++++++----
+> > --
+> >  drivers/soc/fsl/qbman/qman_ccsr.c                  | 95 +++++++++++++++--
+> > -----
+> >  drivers/soc/fsl/qbman/qman_portal.c                | 23 +++---
+> >  drivers/soc/fsl/qbman/qman_priv.h                  | 11 +--
+> >  drivers/soc/fsl/qbman/qman_test.h                  |  2 -
+> >  16 files changed, 320 insertions(+), 128 deletions(-)  create mode
+> > 100644 drivers/soc/fsl/qbman/dpaa_sys.c
