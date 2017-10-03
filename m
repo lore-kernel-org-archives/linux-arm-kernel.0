@@ -1,33 +1,43 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Tue, 3 Oct 2017 11:22:35 -0400
-Subject: [PATCH v9 06/12] mm: zero struct pages during initialization
-In-Reply-To: <20171003130857.vohli6lnqj4tdmhl@dhcp22.suse.cz>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-7-pasha.tatashin@oracle.com>
- <20171003130857.vohli6lnqj4tdmhl@dhcp22.suse.cz>
-Message-ID: <73ea1215-7aa2-39e1-b820-30f58119183e@oracle.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue,  3 Oct 2017 17:23:04 +0200
+Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to start_kernel()
+Message-ID: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If CONFIG_DEBUG_LOCK_ALLOC=y, the kernel log is spammed with a few
+hundred identical messages:
 
+    unwind: Unknown symbol address c0800300
+    unwind: Index not found c0800300
 
-On 10/03/2017 09:08 AM, Michal Hocko wrote:
-> On Wed 20-09-17 16:17:08, Pavel Tatashin wrote:
->> Add struct page zeroing as a part of initialization of other fields in
->> __init_single_page().
->>
->> This single thread performance collected on: Intel(R) Xeon(R) CPU E7-8895
->> v3 @ 2.60GHz with 1T of memory (268400646 pages in 8 nodes):
->>
->>                          BASE            FIX
->> sparse_init     11.244671836s   0.007199623s
->> zone_sizes_init  4.879775891s   8.355182299s
->>                    --------------------------
->> Total           16.124447727s   8.362381922s
-> 
-> Hmm, this is confusing. This assumes that sparse_init doesn't zero pages
-> anymore, right? So these number depend on the last patch in the series?
+c0800300 is the return address from the last subroutine call (to
+__memzero()) in __mmap_switched().  Apparently having this address in
+the link register confuses the unwinder.
 
-Correct, without the last patch sparse_init time won't change.
+To fix this, reset the link register to zero before jumping to
+start_kernel().
 
-Pasha
+Fixes: 9520b1a1b5f7a348 ("ARM: head-common.S: speed up startup code")
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Commit 9520b1a1b5f7a348 is in arm/for-next.
+
+ arch/arm/kernel/head-common.S | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index a25027b87a6024b9..21dde771a7dd8d14 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -114,6 +114,7 @@ __mmap_switched:
+ 	str	r8, [r2]			@ Save atags pointer
+ 	cmp	r3, #0
+ 	strne	r10, [r3]			@ Save control register values
++	mov	lr, #0
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
+-- 
+2.7.4
