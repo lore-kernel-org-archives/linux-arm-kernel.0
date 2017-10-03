@@ -1,110 +1,107 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 3 Oct 2017 13:25:55 +0100
-Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
-In-Reply-To: <20171003091155.7138-2-linus.walleij@linaro.org>
-References: <20171003091155.7138-1-linus.walleij@linaro.org>
- <20171003091155.7138-2-linus.walleij@linaro.org>
-Message-ID: <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 3 Oct 2017 14:26:58 +0200
+Subject: [PATCH v9 01/12] x86/mm: setting fields in deferred pages
+In-Reply-To: <20170920201714.19817-2-pasha.tatashin@oracle.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-2-pasha.tatashin@oracle.com>
+Message-ID: <20171003122658.cv64pxnuavopjid6@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/10/17 10:11, Linus Walleij wrote:
-> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
-> is not very helpful for users looking for their device tree in
-> the kernel. Also the db820c is named properly.
+On Wed 20-09-17 16:17:03, Pavel Tatashin wrote:
+> Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
+> flags and other fields in "struct page"es are never changed prior to first
+> initializing struct pages by going through __init_single_page().
 > 
-> Rectify this, simply, do not change the compatible strings but name
-> the DTS files in a consistent manner.
+> With deferred struct page feature enabled, however, we set fields in
+> register_page_bootmem_info that are subsequently clobbered right after in
+> free_all_bootmem:
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-I did not like the sbc naming convention too, This was primarily done 
-due to some legacy build tools + bootloaders which have used sbc 
-compatible to identify boards from multiple dtb blobs. Now that we can 
-append dtb to kernel with new LK, this should not be a issue anymore.
+>         mem_init() {
+>                 register_page_bootmem_info();
+>                 free_all_bootmem();
+>                 ...
+>         }
+> 
+> When register_page_bootmem_info() is called only non-deferred struct pages
+> are initialized. But, this function goes through some reserved pages which
+> might be part of the deferred, and thus are not yet initialized.
+> 
+>   mem_init
+>    register_page_bootmem_info
+>     register_page_bootmem_info_node
+>      get_page_bootmem
+>       .. setting fields here ..
+>       such as: page->freelist = (void *)type;
+> 
+>   free_all_bootmem()
+>    free_low_memory_core_early()
+>     for_each_reserved_mem_region()
+>      reserve_bootmem_region()
+>       init_reserved_page() <- Only if this is deferred reserved page
+>        __init_single_pfn()
+>         __init_single_page()
+>             memset(0) <-- Loose the set fields here
+> 
+> We end-up with issue where, currently we do not observe problem as memory
+> is explicitly zeroed. But, if flag asserts are changed we can start hitting
+> issues.
+> 
+> Also, because in this patch series we will stop zeroing struct page memory
+> during allocation, we must make sure that struct pages are properly
+> initialized prior to using them.
+> 
+> The deferred-reserved pages are initialized in free_all_bootmem().
+> Therefore, the fix is to switch the above calls.
 
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Thanks for extending the changelog. This is more informative now.
+ 
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
 
+I hope I haven't missed anything but it looks good to me.
+
+Acked-by: Michal Hocko <mhocko@suse.com>
+
+one nit below
 > ---
-> It's not like I don't understand that people will be nitpicky
-> about this.
+>  arch/x86/mm/init_64.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> I was looking for the DragonBoard 410c devicetree and could not
-> find it until I realized this hopeless idiomatic naming.
-> 
-> It cost me time and effort, and it is going to cost others time
-> and effort. Fixing it.
-> 
-> The other patch naming the GPIO lines can be applied without
-> this one.
-> ---
->   arch/arm64/boot/dts/qcom/Makefile                                    | 2 +-
->   .../{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi}    | 0
->   .../qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} | 0
->   arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}     | 5 +++--
->   arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi}   | 4 ++--
->   5 files changed, 6 insertions(+), 5 deletions(-)
->   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi} (100%)
->   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} (100%)
->   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts} (95%)
->   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi} (99%)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-> index ff81d7e5805e..fc46ab79acd9 100644
-> --- a/arch/arm64/boot/dts/qcom/Makefile
-> +++ b/arch/arm64/boot/dts/qcom/Makefile
-> @@ -1,4 +1,4 @@
-> -dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb
-> +dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-db410c.dtb
->   dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
->   dtb-$(CONFIG_ARCH_QCOM)	+= ipq8074-hk01.dtb
->   dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
-> similarity index 100%
-> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
-> similarity index 100%
-> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
-> similarity index 95%
-> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dts
-> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dts
-> index 40b0d62861bb..86cfae4d2b9d 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
-> @@ -13,10 +13,11 @@
->   
->   /dts-v1/;
->   
-> -#include "apq8016-sbc.dtsi"
-> +#include "apq8016-db410c.dtsi"
->   
->   / {
-> -	model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
-> +	model = "Qualcomm Technologies, Inc. APQ 8016 DragonBoard 410c";
-> +	/* The "SBC" (Single Board Computer) is another name for this board */
->   	compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
->   };
->   
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
-> similarity index 99%
-> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
-> index 1d63e6b879de..1300c11e5f0e 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
-> @@ -13,8 +13,8 @@
->   
->   #include "msm8916.dtsi"
->   #include "pm8916.dtsi"
-> -#include "apq8016-sbc-soc-pins.dtsi"
-> -#include "apq8016-sbc-pmic-pins.dtsi"
-> +#include "apq8016-db410c-soc-pins.dtsi"
-> +#include "apq8016-db410c-pmic-pins.dtsi"
->   #include <dt-bindings/gpio/gpio.h>
->   #include <dt-bindings/input/input.h>
->   #include <dt-bindings/sound/apq8016-lpass.h>
-> 
+> diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
+> index 5ea1c3c2636e..30fe22558720 100644
+> --- a/arch/x86/mm/init_64.c
+> +++ b/arch/x86/mm/init_64.c
+> @@ -1182,12 +1182,17 @@ void __init mem_init(void)
+>  
+>  	/* clear_bss() already clear the empty_zero_page */
+>  
+> -	register_page_bootmem_info();
+> -
+>  	/* this will put all memory onto the freelists */
+>  	free_all_bootmem();
+>  	after_bootmem = 1;
+>  
+> +	/* Must be done after boot memory is put on freelist, because here we
+
+standard code style is to do
+	/*
+	 * text starts here
+
+> +	 * might set fields in deferred struct pages that have not yet been
+> +	 * initialized, and free_all_bootmem() initializes all the reserved
+> +	 * deferred pages for us.
+> +	 */
+> +	register_page_bootmem_info();
+> +
+>  	/* Register memory areas for /proc/kcore */
+>  	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
+>  			 PAGE_SIZE, KCORE_OTHER);
+> -- 
+> 2.14.1
+
+-- 
+Michal Hocko
+SUSE Labs
