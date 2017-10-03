@@ -1,26 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 3 Oct 2017 21:38:57 +0100
-Subject: [PATCH] ARM: omap2plus_defconfig: enable NEON based crypto
-In-Reply-To: <20171002194817.GQ4394@atomide.com>
-References: <20170906184729.7980-1-ard.biesheuvel@linaro.org>
- <20171002194817.GQ4394@atomide.com>
-Message-ID: <CAKv+Gu9MKnNXTXLYhAB5GaXpqzP=Fa=7aTONzAZCCayj8EFGsQ@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue,  3 Oct 2017 15:53:24 -0500
+Subject: [PATCH v2 0/1] arm64: spinlocks: Fix write starvation with rwlock
+Message-ID: <20171003205325.28703-1-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2017 at 20:48, Tony Lindgren <tony@atomide.com> wrote:
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170906 11:48]:
->> Enable kernel mode NEON and the various NEON based crypto algorithms,
->> which are between 1.4x (AES-XTS) and 2.4x (AES-GCM) faster than
->> scalar code (measured on Cortex-A8).
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> Note that this was tested using the updated GHASH code that is queued
->> for v4.14
->
-> Applying finally into omap-for-v4.15/defconfig thanks.
->
+The ARM64 rwlock is unfair in that readers can perpetually
+block the writer. This is most noticeable with tests like
 
-Thanks Tony.
+`stress-ng --kill $SOMENUMBERLESSTHANCPUS -t $RUNTIME -v`
+
+which can hold the task lock with fairly small counts
+(say 4 on thunderx). This can in some circumstances result
+in machine deadlocks as kernel tasks get blocked and the
+machine gradually falls over.
+
+This patch changes the rwlock behavior so that readers
+not in_interrupt() wait for the writer to complete before
+acquiring the lock.
+
+Heavily tested on 1S thunderx, further testing the v8.3 fast
+model (for LSE). With the thunderx machines the stress-ng
+process counts can be larger than the number of cores on the
+machine without causing interactivity problems previously seen
+at much lower counts.
+
+V1->V2:
+  Added additional code to the arch_read_lock() case which
+  allows the read lock to bypass a waiting writer when its
+  in interrupt context.
+
+Jeremy Linton (1):
+  arm64: spinlocks: Fix write starvation with rwlock
+
+ arch/arm64/include/asm/spinlock.h | 67 ++++++++++++++++++++++++++-------------
+ 1 file changed, 45 insertions(+), 22 deletions(-)
+
+-- 
+2.13.5
