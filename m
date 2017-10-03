@@ -1,76 +1,101 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue,  3 Oct 2017 14:10:17 +0900
-Subject: [PATCH v4 1/3] arm64: kgdb: fix single stepping
+Date: Tue,  3 Oct 2017 14:10:19 +0900
+Subject: [PATCH v4 3/3] kgdb: select a correct cpu while in a single stepping
 In-Reply-To: <20171003051019.29714-1-takahiro.akashi@linaro.org>
 References: <20171003051019.29714-1-takahiro.akashi@linaro.org>
-Message-ID: <20171003051019.29714-2-takahiro.akashi@linaro.org>
+Message-ID: <20171003051019.29714-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After entering kgdb mode, the first 'stepi' can succeed, but the following
-'stepi' never executes the next instruction.
+When a breakpoint is set somewhere in an irq handler and it is hit
+almost at the same time on multiple cpus, we may see the following
+error from gdb in trying to do a single stepping:
 
-This is because a software step cannot get enabled as the software step
-bit(SS) in SPSR, which is cleared by the first single stepping, will not
-be set again for the following 's' commands.
-Please note that this bit, as well as the software step control bit(SS)
-in MDSCR, must be set before resuming the execution.
+  (gdb) si
+  /home/tcwg-buildslave/workspace/tcwg-make-release/label/docker-trusty
+  -amd64-tcwg-build/target/aarch64-linux-gnu/snapshots/binutils-gdb.git
+  ~gdb-7.12-branch/gdb/infrun.c:5565: internal-error: int finish_step_o
+  ver(execution_control_state*): Assertion `ecs->event_thread->control.
+  trap_expected' failed.
+  A problem internal to GDB has been detected,
+  further debugging may prove unreliable.
+  Quit this debugging session? (y or n)
 
-If you want to take a single step with interrupts disabled, please try
-the following gdb macro:
-===8<===
-define my-si
-	set $instr = *(int *)$pc
-	set $opsr = $cpsr
-	set $cpsr = $cpsr | 0x80
+This message indicates that, before and after a single stepping,
+different cpus/tasks are selected as a kgdb master in kgdb_cpu_enter
+(DCPU_WANT_MASTER).
 
-	stepi
+This issue was seen on arm64 when a breakpoint was set, for example,
+to gic_handle_irq.
 
-	# If interrupt was enabled before stepi, restore the I flag.
-	if !($opsr & 0x80)
-		# msr daifset, <val>
-		if (($instr & 0xfffff0ff) == 0xd50340df)
-			if !($instr & 0x200)
-				set $cpsr = $cpsr & ~0x80
-			end
-		else
-			# msr daif, <reg>
-			if (($instr & 0xffffffe0) == 0xd51b4220)
-				eval "set $val = $x%d", $instr & 0x1f
-				if !($val & 0x80)
-					set $cpsr = $cpsr & ~0x80
-				end
-			else
-				set $cpsr = $cpsr & ~0x80
-			end
+How can this happen?
+With the following commit, kgdb_cpu_enter() tries to "only enter on
+the processor that was single stepping."
 
-		end
-	end
-end
-===>8===
+  commit 028e7b175970
+  Author: Jason Wessel <jason.wessel@windriver.com>
+  Date:   Fri Dec 11 08:43:17 2009 -0600
+
+      kgdb: allow for cpu switch when single stepping
+
+If idle task is running when a breakpoint is hit, kgdb_info[cpu].task
+is set to current, pid of which is 0 (zero).
+(Actually 'current' has nothing to do with this breakpoint though.)
+Then if a few cpus are competing for becoming a kgdb master while in
+idle state,
+
+        if (atomic_read(&kgdb_cpu_doing_single_step) != -1 &&
+            (kgdb_info[cpu].task &&
+             kgdb_info[cpu].task->pid != kgdb_sstep_pid) && --sstep_tries)
+
+this check will mistakenly pass and select a wrong cpu just because
+kgdb_info[cpu].task->pid can be equal to 0 for all of the cpus at this
+point.
+
+So the issue is fixed in this patch by using 'task_struct *' instead of
+process id to identify a targeted single-stepping cpu.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Jason Wessel <jason.wessel@windriver.com>
 ---
- arch/arm64/kernel/kgdb.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ kernel/debug/debug_core.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 2122cd187f19..8d3ec8cf4ec4 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -253,6 +253,10 @@ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
- 		return DBG_HOOK_ERROR;
+diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
+index 65c0f1363788..4dd2a41c8309 100644
+--- a/kernel/debug/debug_core.c
++++ b/kernel/debug/debug_core.c
+@@ -135,7 +135,7 @@ struct task_struct		*kgdb_usethread;
+ struct task_struct		*kgdb_contthread;
  
- 	kgdb_handle_exception(1, SIGTRAP, 0, regs);
-+
-+	/* rewind a single step */
-+	regs->pstate |= DBG_SPSR_SS;
-+
- 	return 0;
- }
- NOKPROBE_SYMBOL(kgdb_step_brk_fn);
+ int				kgdb_single_step;
+-static pid_t			kgdb_sstep_pid;
++static struct task_struct	*kgdb_sstep_thread;
+ 
+ /* to keep track of the CPU which is doing the single stepping*/
+ atomic_t			kgdb_cpu_doing_single_step = ATOMIC_INIT(-1);
+@@ -555,7 +555,7 @@ static int kgdb_cpu_enter(struct kgdb_state *ks, struct pt_regs *regs,
+ 	 */
+ 	if (atomic_read(&kgdb_cpu_doing_single_step) != -1 &&
+ 	    (kgdb_info[cpu].task &&
+-	     kgdb_info[cpu].task->pid != kgdb_sstep_pid) && --sstep_tries) {
++	     kgdb_info[cpu].task != kgdb_sstep_thread) && --sstep_tries) {
+ 		atomic_set(&kgdb_active, -1);
+ 		raw_spin_unlock(&dbg_master_lock);
+ 		dbg_touch_watchdogs();
+@@ -658,9 +658,9 @@ static int kgdb_cpu_enter(struct kgdb_state *ks, struct pt_regs *regs,
+ 	if (atomic_read(&kgdb_cpu_doing_single_step) != -1) {
+ 		int sstep_cpu = atomic_read(&kgdb_cpu_doing_single_step);
+ 		if (kgdb_info[sstep_cpu].task)
+-			kgdb_sstep_pid = kgdb_info[sstep_cpu].task->pid;
++			kgdb_sstep_thread = kgdb_info[sstep_cpu].task;
+ 		else
+-			kgdb_sstep_pid = 0;
++			kgdb_sstep_thread = NULL;
+ 	}
+ 	if (arch_kgdb_ops.correct_hw_break)
+ 		arch_kgdb_ops.correct_hw_break();
 -- 
 2.14.1
