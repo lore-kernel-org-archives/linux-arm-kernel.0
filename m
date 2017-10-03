@@ -1,117 +1,64 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 03 Oct 2017 18:26:00 +0100
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <5a4f0493-6d3d-85de-fc45-030d4b03b5a8@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
- <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
- <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
- <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
- <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
- <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
- <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
- <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
- <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com> <877ewcz3bv.fsf@linaro.org>
- <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com> <873770yz1o.fsf@linaro.org>
- <5a4f0493-6d3d-85de-fc45-030d4b03b5a8@arm.com>
-Message-ID: <871smkywgn.fsf@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  3 Oct 2017 18:25:46 +0100
+Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
+Message-ID: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+AddressSanitizer instrumentation can significantly bloat the stack, and
+with GCC 7 this can result in stack overflows at boot time in some
+configurations.
 
-Julien Thierry <julien.thierry@arm.com> writes:
+We can avoid this by doubling our stack size when KASAN is in use, as is
+already done on x86 (and has been since KASAN was introduced).
+Regardless of other patches to decrease KASAN's stack utilization,
+kernels built with KASAN will always require more stack space than those
+built without, and we should take this into account.
 
-> On 03/10/17 17:30, Alex Benn?e wrote:
->>
->> Julien Thierry <julien.thierry@arm.com> writes:
->>
->>> On 03/10/17 15:57, Alex Benn?e wrote:
->>>>
->>>> Julien Thierry <julien.thierry@arm.com> writes:
->>>>
->>>>> On 31/08/17 15:01, Christoffer Dall wrote:
->> <snip>
->>>>>>>>>
->>>>>>>>> Does that sound like what you had in mind? Or does it seem better than
->>>>>>>>> the
->>>>>>>>> current patch?
->>>>>>>>>
->>>>>>>> I was thinking to change the skip_instruction function to return an
->>>>>>>> int, and then call kvm_handle_debug_ss() from skip_instruction, which
->>>>>>>> would update the kvm_run structure and exit here and then.
->>>>>>>>
->>>>>>>
->>>>>>> Setting up the debug exception from within kvm_skip_instruction seem to
->>>>>>> change a bit too much its semantic from arm to arm64. I would find this
->>>>>>> easily confusing.
->>>>>>>
->>>>>>>> However, I'm now thinking that this doesn't really work either,
->>>>>>>> because we could have to emulate a trapped MMIO instruction in user
->>>>>>>> space, and then it's not clear how to exit with a debug exception at
->>>>>>>> the same time.
->>>>
->>>> A debug exception at guest exit point is (IIRC) just having the
->>>> appropriate status in the run->exit_reason (KVM_EXIT_DEBUG). If you need
->>>> to exit for MMIO emulation (i.e. the instruction has not run yet) you
->>>> shouldn't do that. Exit, emulate and return. We could handle the ioctl
->>>> to clear SS in userspace but I guess that gets just as messy.
->>>>
->>>>>>>>
->>>>>>>> So perhaps we should stick with your original approach.
->>>>>>>>
->>>>>>>
->>>>>>> I had not realized that was possible. This makes things more complicated for
->>>>>>> avoiding a back and forth with the guest for trapped exceptions. Out of
->>>>>>> luck, having the debug flag does look like single stepping would work as
->>>>>>> expected for userland MMIOs.
->>
->> <snip>
->>
->> This is my currently untested but otherwise simpler solution:
->>
->>  From 46ea80d7dc9b98661fcd51c41090f8ad74a6690f Mon Sep 17 00:00:00 2001
->> From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
->> Date: Tue, 3 Oct 2017 17:17:15 +0100
->> Subject: [PATCH] KVM: arm64: handle single-stepping trapped instructions
->> MIME-Version: 1.0
->> Content-Type: text/plain; charset=UTF-8
->> Content-Transfer-Encoding: 8bit
->>
->> If we are using guest debug to single-step the guest we need to ensure
->> we exit after emulating the instruction. This only affects
->> instructions emulated by the kernel. If we exit to userspace anyway we
->> leave it to userspace to work out what to do.
->>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>   arch/arm64/kvm/handle_exit.c | 51 ++++++++++++++++++++++++++++++++------------
->>   1 file changed, 37 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> index 7debb74843a0..b197ffb10e96 100644
->> --- a/arch/arm64/kvm/handle_exit.c
->> +++ b/arch/arm64/kvm/handle_exit.c
->> @@ -178,6 +178,42 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->>   	return arm_exit_handlers[hsr_ec];
->>   }
->>
->> +/*
->> + * When handling traps we need to ensure exit the guest if we
->> + * successfully emulated the instruction while single-stepping. If we
->> + * have to exit anyway for userspace emulation then it's up to
->> + * userspace to handle the "while SSing case".
->> + */
->> +
->
-> I have not tested the code but if it work we also need to do something
-> similar for MMIOs that are handled by the kernel (without returning to
-> userland). But it should be pretty similar.
-<snip>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/memory.h | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Which path do they take to the mmio emulation?
+In local testing (with KASAN and other options enabled), I've seen a stack
+depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
+mounted over NFS. Without KASAN (but with other debug options enabled), this
+was 7992 bytes.
 
---
-Alex Benn?e
+I wonder if we want to go for 4x rather than 2x...
+
+Thanks,
+Mark.
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 3585a5e..f7c4d21 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -95,16 +95,19 @@
+ #define KERNEL_END        _end
+ 
+ /*
+- * The size of the KASAN shadow region. This should be 1/8th of the
+- * size of the entire kernel virtual address space.
++ * KASAN requires 1/8th of the kernel virtual address space for the shadow
++ * region. KASAN can bloat the stack significantly, so double the (minimum)
++ * stack size when KASAN is in use.
+  */
+ #ifdef CONFIG_KASAN
+ #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - 3))
++#define KASAN_THREAD_SHIFT	1
+ #else
+ #define KASAN_SHADOW_SIZE	(0)
++#define KASAN_THREAD_SHIFT	0
+ #endif
+ 
+-#define MIN_THREAD_SHIFT	14
++#define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
+ 
+ /*
+  * VMAP'd stacks are allocated@page granularity, so we must ensure that such
+-- 
+1.9.1
