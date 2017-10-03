@@ -1,73 +1,72 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  3 Oct 2017 10:51:48 +0530
-Subject: [PATCH 1/5] mailbox: bcm-flexrm-mailbox: Fix FlexRM ring flush
- sequence
-In-Reply-To: <1507008112-27117-1-git-send-email-anup.patel@broadcom.com>
-References: <1507008112-27117-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1507008112-27117-2-git-send-email-anup.patel@broadcom.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 3 Oct 2017 10:49:25 +0530
+Subject: [PATCH v4 6/6] mtd: spi-nor: cadence-quadspi: Add runtime PM support
+In-Reply-To: <20171003051925.8821-1-vigneshr@ti.com>
+References: <20171003051925.8821-1-vigneshr@ti.com>
+Message-ID: <20171003051925.8821-7-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As-per suggestion from FlexRM HW folks, we have to first set
-FlexRM ring flush state and then clear it for FlexRM ring flush
-to work properly.
+Add pm_runtime* calls to cadence-quadspi driver. This is required to
+switch on QSPI power domain on TI 66AK2G SoC during probe.
 
-Currently, the FlexRM driver has incomplete FlexRM ring flush
-sequence which causes repeated insmod+rmmod of mailbox client
-drivers to fail.
-
-This patch fixes FlexRM ring flush sequence in flexrm_shutdown()
-as described above.
-
-Fixes: dbc049eee730 ("mailbox: Add driver for Broadcom FlexRM
-ring manager")
-
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-Cc: stable at vger.kernel.org
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- drivers/mailbox/bcm-flexrm-mailbox.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+v4: Disable pm in error path.
 
-diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
-index ae61463..f052a3e 100644
---- a/drivers/mailbox/bcm-flexrm-mailbox.c
-+++ b/drivers/mailbox/bcm-flexrm-mailbox.c
-@@ -1365,8 +1365,8 @@ static void flexrm_shutdown(struct mbox_chan *chan)
- 	/* Disable/inactivate ring */
- 	writel_relaxed(0x0, ring->regs + RING_CONTROL);
+ drivers/mtd/spi-nor/cadence-quadspi.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+index 60b557e00cfb..75a2bc447a99 100644
+--- a/drivers/mtd/spi-nor/cadence-quadspi.c
++++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+@@ -31,6 +31,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/sched.h>
+ #include <linux/spi/spi.h>
+ #include <linux/timer.h>
+@@ -1224,10 +1225,17 @@ static int cqspi_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
  
--	/* Flush ring with timeout of 1s */
--	timeout = 1000;
-+	/* Set ring flush state */
-+	timeout = 1000; /* timeout of 1s */
- 	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT),
- 			ring->regs + RING_CONTROL);
- 	do {
-@@ -1374,7 +1374,23 @@ static void flexrm_shutdown(struct mbox_chan *chan)
- 		    FLUSH_DONE_MASK)
- 			break;
- 		mdelay(1);
--	} while (timeout--);
-+	} while (--timeout);
-+	if (!timeout)
-+		dev_err(ring->mbox->dev,
-+			"setting ring%d flush state timedout\n", ring->num);
++	pm_runtime_enable(dev);
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(dev);
++		return ret;
++	}
 +
-+	/* Clear ring flush state */
-+	timeout = 1000; /* timeout of 1s */
-+	writel_relaxed(0x0, ring + RING_CONTROL);
-+	do {
-+		if (!(readl_relaxed(ring + RING_FLUSH_DONE) &
-+		      FLUSH_DONE_MASK))
-+			break;
-+		mdelay(1);
-+	} while (--timeout);
-+	if (!timeout)
-+		dev_err(ring->mbox->dev,
-+			"clearing ring%d flush state timedout\n", ring->num);
+ 	ret = clk_prepare_enable(cqspi->clk);
+ 	if (ret) {
+ 		dev_err(dev, "Cannot enable QSPI clock.\n");
+-		return ret;
++		goto probe_clk_failed;
+ 	}
  
- 	/* Abort all in-flight requests */
- 	for (reqid = 0; reqid < RING_MAX_REQ_COUNT; reqid++) {
+ 	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+@@ -1259,6 +1267,9 @@ static int cqspi_probe(struct platform_device *pdev)
+ 	cqspi_controller_enable(cqspi, 0);
+ probe_irq_failed:
+ 	clk_disable_unprepare(cqspi->clk);
++probe_clk_failed:
++	pm_runtime_put_sync(dev);
++	pm_runtime_disable(dev);
+ 	return ret;
+ }
+ 
+@@ -1275,6 +1286,9 @@ static int cqspi_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(cqspi->clk);
+ 
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++
+ 	return 0;
+ }
+ 
 -- 
-2.7.4
+2.14.1
