@@ -1,66 +1,76 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Tue, 3 Oct 2017 18:00:55 +0200
-Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
- scpi_probe
-In-Reply-To: <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
-References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
- <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
- <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
- <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
- <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
-Message-ID: <ffb9c571-edd3-7ea0-ecf6-f72c2ddd9fc1@gmail.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Tue, 3 Oct 2017 12:01:08 -0400
+Subject: [PATCH v9 03/12] mm: deferred_init_memmap improvements
+In-Reply-To: <fc4ef789-d9a8-5dab-6508-f0fe8751b462@oracle.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-4-pasha.tatashin@oracle.com>
+ <20171003125754.2kuqzkstywg7axhd@dhcp22.suse.cz>
+ <fc4ef789-d9a8-5dab-6508-f0fe8751b462@oracle.com>
+Message-ID: <d81baa49-b796-7130-4ace-0f14ed59be46@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.10.2017 um 12:57 schrieb Sudeep Holla:
-> 
-> 
-> On 02/10/17 23:07, Heiner Kallweit wrote:
->> Am 02.10.2017 um 13:17 schrieb Sudeep Holla:
->>>
->>>
->>> On 29/09/17 22:44, Heiner Kallweit wrote:
->>>> Pre-populating the dvfs info data in scpi_probe allows to make 
->>>> all memory allocations device-managed. This helps to simplify 
->>>> scpi_remove and eventually to get rid of scpi_remove completely.
->>>>
->>>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
-> 
-> [...]
-> 
->>> Does it make sense to continue to complete all MAX_DVFS_DOMAINS ? 
->>> Just wondering if there will be any firmware that returns errors 
->>> for few domains(e.g. not supported in initial versions of 
->>> firmware). I don't want to stop probing due to that. Let me know 
->>> what you think.
->>>
->> The (legacy) SCPI firmware on my system seems to ignore the domain
->> in CMD_GET_DVFS_INFO. It returns the same dvfs info independent of
->> the domain parameter. So indeed prepopulating may not be the best
->> idea.
->>
-> 
-> I can't follow that. Does the behavior change probe time vs runtime ?
-> I am fine with probe time populate, just that we can't stop or propagate
-> any error as it fails to probe other dependent drivers which may work
-> fine without DVFS(e.g. clocks, sensors and power domains)
-> 
->> Still we need to do something in the remove callback to deal with the
->> scenario you describe (error for few domains).
-> 
-> devm_* APIs will take care of freeing DVFS domain info, so what else
-> needs to be done ? I just noticed devm_kfree(NULL) can produce WARN_ON
-> splat, is that what you are referring ?
+Hi Michal,
+
+Are you OK, if I replace DEFERRED_FREE() macro with a function like this:
+
+/*
+  * Helper for deferred_init_range, free the given range, and reset the
+  * counters
+  */
+static inline unsigned long __def_free(unsigned long *nr_free,
+                                        unsigned long *free_base_pfn,
+                                        struct page **page)
+{
+         unsigned long nr = *nr_free;
+
+         deferred_free_range(*free_base_pfn, nr);
+         *free_base_pfn = 0;
+         *nr_free = 0;
+         *page = NULL;
+
+         return nr;
+}
+
+Since it is inline, and we operate with non-volatile counters, compiler 
+will be smart enough to remove all the unnecessary de-references. As a 
+plus, we won't be adding any new branches, and the code is still going 
+to stay compact.
+
+Pasha
+
+On 10/03/2017 11:15 AM, Pasha Tatashin wrote:
+> Hi Michal,
 > 
 >>
->> Remove does for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
->> and therefore stops at the first unpopulated domain and doesn't free
->> the memory for further populated domains. I'll provide a patch for
->> it.
+>> Please be explicit that this is possible only because we discard
+>> memblock data later after 3010f876500f ("mm: discard memblock data
+>> later"). Also be more explicit how the new code works.
+> 
+> OK
+> 
 >>
+>> I like how the resulting code is more compact and smaller.
 > 
-> Does that mean you are re-introducing scpi_remove ? I kind of liked
-> removing it.
+> That was the goal :)
 > 
-Sorry for the confusion. Then I'll go with the original approach and
-just make sure that errors whilst populating dvfs info are ignored.
+>> for_each_free_mem_range also looks more appropriate but I really detest
+>> the DEFERRED_FREE thingy. Maybe we can handle all that in a single goto
+>> section. I know this is not an art but manipulating variables from
+>> macros is more error prone and much more ugly IMHO.
+> 
+> Sure, I can re-arrange to have a goto place. Function won't be as small, 
+> and if compiler is not smart enough we might end up with having more 
+> branches than what my current code has.
+> 
+>>
+>> please do not use macros. Btw. this deserves its own fix. I suspect that
+>> no CONFIG_HOLES_IN_ZONE arch enables DEFERRED_STRUCT_PAGE_INIT but
+>> purely from the review point of view it should be its own patch.
+> 
+> Sure, I will submit this patch separately from the rest of the project. 
+> In my opinion DEFERRED_STRUCT_PAGE_INIT is the way of the future, so we 
+> should make sure it is working with as many configs as possible.
+> 
+> Thank you,
+> Pasha
