@@ -1,251 +1,66 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 03 Oct 2017 17:54:10 +0200
-Subject: [PATCH 1/1] xdp: Sample xdp program implementing ip forward
-In-Reply-To: <1507016225-319-2-git-send-email-Christina.Jacob@cavium.com>
-References: <1507016225-319-1-git-send-email-Christina.Jacob@cavium.com>
- <1507016225-319-2-git-send-email-Christina.Jacob@cavium.com>
-Message-ID: <59D3B2A2.4030100@iogearbox.net>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Tue, 3 Oct 2017 18:00:55 +0200
+Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
+ scpi_probe
+In-Reply-To: <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
+References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+ <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
+ <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
+ <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
+ <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
+Message-ID: <ffb9c571-edd3-7ea0-ecf6-f72c2ddd9fc1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2017 09:37 AM, cjacob wrote:
-> Implements port to port forwarding with route table and arp table
-> lookup for ipv4 packets using bpf_redirect helper function and
-> lpm_trie  map.
->
-> Signed-off-by: cjacob <Christina.Jacob@cavium.com>
-
-Thanks for the patch, just few minor comments below!
-
-Note, should be full name, e.g.:
-
-   Signed-off-by: Christina Jacob <Christina.Jacob@cavium.com>
-
-Also you From: only shows 'cjacob' as can be seen from the cover letter
-as well, so perhaps check your git settings to make that full name:
-
-   cjacob (1):
-     xdp: Sample xdp program implementing ip forward
-
-If there's one single patch, then cover letter is not needed, only
-for >1 sets.
-
-[...]
-> +#define KBUILD_MODNAME "foo"
-> +#include <uapi/linux/bpf.h>
-> +#include <linux/in.h>
-> +#include <linux/if_ether.h>
-> +#include <linux/if_packet.h>
-> +#include <linux/if_vlan.h>
-> +#include <linux/ip.h>
-> +#include <linux/ipv6.h>
-> +#include "bpf_helpers.h"
-> +#include <linux/slab.h>
-> +#include <net/ip_fib.h>
-> +
-> +struct trie_value {
-> +	__u8 prefix[4];
-> +	long value;
-> +	int gw;
-> +	int ifindex;
-> +	int metric;
-> +};
-> +
-> +union key_4 {
-> +	u32 b32[2];
-> +	u8 b8[8];
-> +};
-> +
-> +struct arp_entry {
-> +	int dst;
-> +	long mac;
-> +};
-> +
-> +struct direct_map {
-> +	long mac;
-> +	int ifindex;
-> +	struct arp_entry arp;
-> +};
-> +
-> +/* Map for trie implementation*/
-> +struct bpf_map_def SEC("maps") lpm_map = {
-> +	.type = BPF_MAP_TYPE_LPM_TRIE,
-> +	.key_size = 8,
-> +	.value_size =
-> +		sizeof(struct trie_value),
-
-(Nit: there are couple of such breaks throughout the patch, can we
-  just use single line for such cases where reasonable?)
-
-> +	.max_entries = 50,
-> +	.map_flags = BPF_F_NO_PREALLOC,
-> +};
-> +
-> +/* Map for counter*/
-> +struct bpf_map_def SEC("maps") rxcnt = {
-> +	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-> +	.key_size = sizeof(u32),
-> +	.value_size = sizeof(long),
-> +	.max_entries = 256,
-> +};
-> +
-> +/* Map for ARP table*/
-> +struct bpf_map_def SEC("maps") arp_table = {
-> +	.type = BPF_MAP_TYPE_HASH,
-> +	.key_size = sizeof(int),
-> +	.value_size = sizeof(long),
-
-Perhaps these should be proper structs here, such that it
-becomes easier to read/handle later on lookup.
-
-> +	.max_entries = 50,
-> +};
-> +
-> +/* Map to keep the exact match entries in the route table*/
-> +struct bpf_map_def SEC("maps") exact_match = {
-> +	.type = BPF_MAP_TYPE_HASH,
-> +	.key_size = sizeof(int),
-> +	.value_size = sizeof(struct direct_map),
-> +	.max_entries = 50,
-> +};
-> +
-> +/**
-> + * Function to set source and destination mac of the packet
-> + */
-> +static inline void set_src_dst_mac(void *data, void *src, void *dst)
-> +{
-> +	unsigned short *p      = data;
-> +	unsigned short *dest   = dst;
-> +	unsigned short *source = src;
-> +
-> +	p[3] = source[0];
-> +	p[4] = source[1];
-> +	p[5] = source[2];
-> +	p[0] = dest[0];
-> +	p[1] = dest[1];
-> +	p[2] = dest[2];
-
-You could just use __builtin_memcpy() given length is
-constant anyway, so LLVM will do the inlining.
-
-> +}
-> +
-> +/**
-> + * Parse IPV4 packet to get SRC, DST IP and protocol
-> + */
-> +static inline int parse_ipv4(void *data, u64 nh_off, void *data_end,
-> +			     unsigned int *src, unsigned int *dest)
-> +{
-> +	struct iphdr *iph = data + nh_off;
-> +
-> +	if (iph + 1 > data_end)
-> +		return 0;
-> +	*src = (unsigned int)iph->saddr;
-> +	*dest = (unsigned int)iph->daddr;
-
-Why not stay with __be32 types?
-
-> +	return iph->protocol;
-> +}
-> +
-> +SEC("xdp3")
-> +int xdp_prog3(struct xdp_md *ctx)
-> +{
-> +	void *data_end = (void *)(long)ctx->data_end;
-> +	void *data = (void *)(long)ctx->data;
-> +	struct ethhdr *eth = data;
-> +	int rc = XDP_DROP, forward_to;
-> +	long *value;
-> +	struct trie_value *prefix_value;
-> +	long *dest_mac = NULL, *src_mac = NULL;
-> +	u16 h_proto;
-> +	u64 nh_off;
-> +	u32 ipproto;
-> +	union key_4 key4;
-> +
-> +	nh_off = sizeof(*eth);
-> +	if (data + nh_off > data_end)
-> +		return rc;
-> +
-> +	h_proto = eth->h_proto;
-> +
-> +	if (h_proto == htons(ETH_P_8021Q) || h_proto == htons(ETH_P_8021AD)) {
-> +		struct vlan_hdr *vhdr;
-> +
-> +		vhdr = data + nh_off;
-> +		nh_off += sizeof(struct vlan_hdr);
-> +		if (data + nh_off > data_end)
-> +			return rc;
-> +		h_proto = vhdr->h_vlan_encapsulated_proto;
-> +	}
-> +	if (h_proto == htons(ETH_P_ARP)) {
-> +		return XDP_PASS;
-> +	} else if (h_proto == htons(ETH_P_IP)) {
-> +		int src_ip = 0, dest_ip = 0;
-> +		struct direct_map *direct_entry;
-> +
-> +		ipproto = parse_ipv4(data, nh_off, data_end, &src_ip, &dest_ip);
-> +		direct_entry = (struct direct_map *)bpf_map_lookup_elem
-> +			(&exact_match, &dest_ip);
-> +		/*check for exact match, this would give a faster lookup*/
-> +		if (direct_entry && direct_entry->mac &&
-> +		    direct_entry->arp.mac) {
-> +			src_mac = &direct_entry->mac;
-> +			dest_mac = &direct_entry->arp.mac;
-> +			forward_to = direct_entry->ifindex;
-> +		} else {
-> +			/*Look up in the trie for lpm*/
-> +			// Key for trie
-
-Nit: please check style throughout the patch.
-
-> +			key4.b32[0] = 32;
-> +			key4.b8[4] = dest_ip % 0x100;
-> +			key4.b8[5] = (dest_ip >> 8) % 0x100;
-> +			key4.b8[6] = (dest_ip >> 16) % 0x100;
-> +			key4.b8[7] = (dest_ip >> 24) % 0x100;
-> +			prefix_value =
-> +				((struct trie_value *)bpf_map_lookup_elem
-> +				 (&lpm_map, &key4));
-
-For key, please use proper struct bpf_lpm_trie_key, see also
-usage example in tools/testing/selftests/bpf/test_lpm_map.c
-for LPM handling.
-
-> +			if (!prefix_value) {
-> +				return XDP_DROP;
-> +			} else {
-> +				src_mac = &prefix_value->value;
-> +				if (src_mac) {
-> +					dest_mac = (long *)bpf_map_lookup_elem
-> +						(&arp_table, &dest_ip);
-> +					if (!dest_mac) {
-> +						if (prefix_value->gw) {
-> +							dest_ip = *(unsigned int *)(&(prefix_value->gw));
-> +							dest_mac = (long *)bpf_map_lookup_elem
-> +								(&arp_table, &dest_ip);
-> +						} else {
-> +							return XDP_DROP;
-> +						}
-> +					}
-> +					forward_to = prefix_value->ifindex;
-> +				} else {
-> +					return XDP_DROP;
-> +				}
-> +			}
-> +		}
-> +	} else {
-> +		ipproto = 0;
-> +	}
-> +	if (src_mac && dest_mac) {
-> +		set_src_dst_mac(data, src_mac,
-> +				dest_mac);
-> +		value = bpf_map_lookup_elem
-> +			(&rxcnt, &ipproto);
-> +		if (value)
-> +			*value += 1;
-> +		return  bpf_redirect(
-> +				     forward_to,
-> +				     0);
-> +	}
-> +	return rc;
+Am 03.10.2017 um 12:57 schrieb Sudeep Holla:
+> 
+> 
+> On 02/10/17 23:07, Heiner Kallweit wrote:
+>> Am 02.10.2017 um 13:17 schrieb Sudeep Holla:
+>>>
+>>>
+>>> On 29/09/17 22:44, Heiner Kallweit wrote:
+>>>> Pre-populating the dvfs info data in scpi_probe allows to make 
+>>>> all memory allocations device-managed. This helps to simplify 
+>>>> scpi_remove and eventually to get rid of scpi_remove completely.
+>>>>
+>>>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+> 
+> [...]
+> 
+>>> Does it make sense to continue to complete all MAX_DVFS_DOMAINS ? 
+>>> Just wondering if there will be any firmware that returns errors 
+>>> for few domains(e.g. not supported in initial versions of 
+>>> firmware). I don't want to stop probing due to that. Let me know 
+>>> what you think.
+>>>
+>> The (legacy) SCPI firmware on my system seems to ignore the domain
+>> in CMD_GET_DVFS_INFO. It returns the same dvfs info independent of
+>> the domain parameter. So indeed prepopulating may not be the best
+>> idea.
+>>
+> 
+> I can't follow that. Does the behavior change probe time vs runtime ?
+> I am fine with probe time populate, just that we can't stop or propagate
+> any error as it fails to probe other dependent drivers which may work
+> fine without DVFS(e.g. clocks, sensors and power domains)
+> 
+>> Still we need to do something in the remove callback to deal with the
+>> scenario you describe (error for few domains).
+> 
+> devm_* APIs will take care of freeing DVFS domain info, so what else
+> needs to be done ? I just noticed devm_kfree(NULL) can produce WARN_ON
+> splat, is that what you are referring ?
+> 
+>>
+>> Remove does for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
+>> and therefore stops at the first unpopulated domain and doesn't free
+>> the memory for further populated domains. I'll provide a patch for
+>> it.
+>>
+> 
+> Does that mean you are re-introducing scpi_remove ? I kind of liked
+> removing it.
+> 
+Sorry for the confusion. Then I'll go with the original approach and
+just make sure that errors whilst populating dvfs info are ignored.
