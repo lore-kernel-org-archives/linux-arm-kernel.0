@@ -1,51 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Oct 2017 11:27:17 +0200
-Subject: [PATCH v3 12/12] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when
- used as LDOs
-In-Reply-To: <20171002120854.5212-13-quentin.schulz@free-electrons.com>
-References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
- <20171002120854.5212-13-quentin.schulz@free-electrons.com>
-Message-ID: <CACRpkdZYcSuhvn0b0qa0k1PQHoyXjNyjoyhR2sPme_t1pF12Dg@mail.gmail.com>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Tue,  3 Oct 2017 17:28:35 +0800
+Subject: [PATCH v10 0/4] Add Rockchip RGA V4l2 support
+Message-ID: <20171003092839.26236-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 2, 2017 at 2:08 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
+This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module.
 
-> On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
-> ldo_io0 and ldo_io1.
-(...)
-> +               gpio0_ldo: gpio0_ldo {
-> +                       pins = "GPIO0";
-> +                       function = "ldo";
-> +               };
-(...)
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&gpio0_ldo>;
->                         /* Disable by default to avoid conflicts with GPIO */
->                         status = "disabled";
+change in V10:
+- move to rockchip/rga
+- changes according to comments
+- some style changes
 
-So this is still by default disabled, but you make the default
-mode something called "ldo".
+change in V9:
+- remove protduff things
+- test with the latest v4l2-compliance
 
-And I think that is to be understood as a low-dropout regulator?
+change in V8:
+- remove protduff things
 
-So is the idea that this should be represented as a regulator
-in the end?
+change in V6,V7:
+- correct warning in checkpatch.pl
 
-Then I think the state name should not be "default" rather
-something like "regulator" and "default" should be the GPIO
-mode, as I guess something like that exists.
+change in V5:
+- v4l2-compliance: handle invalid pxielformat
+- v4l2-compliance: add subscribe_event
+- add colorspace support
 
-Activating a regulator using pin control "default" mode is
-not very pretty. It would probably be unintuitive and end
-up wasting power because people will get confused about
-what is going on.
+change in V4:
+- document the controls.
+- change according to Hans's comments
 
-Instead, call this state "regulator" and when using, in Linux
-create a regulator device that set the pin into "regulator" state to
-start using it as a LDO, and "default" to deactivate it as
-LDO, if that is how the usage is intended.
+change in V3:
+- rename the controls.
+- add pm_runtime support.
+- enable node by default.
+- correct spelling in documents.
 
-Yours,
-Linus Walleij
+change in V2:
+- generalize the controls.
+- map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+actively used systems.
+- remove status in dt-bindings examples.
+
+Jacob Chen (4):
+  rockchip/rga: v4l2 m2m support
+  ARM: dts: rockchip: add RGA device node for RK3288
+  arm64: dts: rockchip: add RGA device node for RK3399
+  dt-bindings: Document the Rockchip RGA bindings
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |   33 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   11 +
+ drivers/media/platform/Kconfig                     |   15 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/rockchip/rga/Makefile       |    3 +
+ drivers/media/platform/rockchip/rga/rga-buf.c      |  154 +++
+ drivers/media/platform/rockchip/rga/rga-hw.c       |  421 ++++++++
+ drivers/media/platform/rockchip/rga/rga-hw.h       |  437 +++++++++
+ drivers/media/platform/rockchip/rga/rga.c          | 1012 ++++++++++++++++++++
+ drivers/media/platform/rockchip/rga/rga.h          |  123 +++
+ 11 files changed, 2222 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip/rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip/rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip/rga/rga.h
+
+-- 
+2.14.1
