@@ -1,35 +1,40 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 3 Oct 2017 10:49:24 +0530
-Subject: [PATCH v4 5/6] mtd: spi-nor: cadence-quadspi: Fix error path in probe
-In-Reply-To: <20171003051925.8821-1-vigneshr@ti.com>
-References: <20171003051925.8821-1-vigneshr@ti.com>
-Message-ID: <20171003051925.8821-6-vigneshr@ti.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue,  3 Oct 2017 10:52:57 +0530
+Subject: [PATCH 1/4] dmaengine: bcm-sba-raid: serialize dma_cookie_complete()
+ using reqs_lock
+In-Reply-To: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
+References: <1507008180-27171-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1507008180-27171-2-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the reversed goto labels, so that we disable cqspi controller only
-if its enabled previously. This is a minor cleanup.
+As-per documentation in driver/dma/dmaengine.h, the
+dma_cookie_complete() API should be called with lock
+held.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
+This patch ensures that Broadcom SBA RAID driver calls
+the dma_cookie_complete() API with reqs_lock held.
+
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/mtd/spi-nor/cadence-quadspi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/bcm-sba-raid.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index d9629e8f4798..60b557e00cfb 100644
---- a/drivers/mtd/spi-nor/cadence-quadspi.c
-+++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -1255,9 +1255,9 @@ static int cqspi_probe(struct platform_device *pdev)
- 	}
+diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
+index 6c2c447..15c5585 100644
+--- a/drivers/dma/bcm-sba-raid.c
++++ b/drivers/dma/bcm-sba-raid.c
+@@ -442,7 +442,9 @@ static void sba_process_received_request(struct sba_device *sba,
  
- 	return ret;
--probe_irq_failed:
--	cqspi_controller_enable(cqspi, 0);
- probe_setup_failed:
-+	cqspi_controller_enable(cqspi, 0);
-+probe_irq_failed:
- 	clk_disable_unprepare(cqspi->clk);
- 	return ret;
- }
+ 		WARN_ON(tx->cookie < 0);
+ 		if (tx->cookie > 0) {
++			spin_lock_irqsave(&sba->reqs_lock, flags);
+ 			dma_cookie_complete(tx);
++			spin_unlock_irqrestore(&sba->reqs_lock, flags);
+ 			dmaengine_desc_get_callback_invoke(tx, NULL);
+ 			dma_descriptor_unmap(tx);
+ 			tx->callback = NULL;
 -- 
-2.14.1
+2.7.4
