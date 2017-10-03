@@ -1,59 +1,119 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 3 Oct 2017 11:37:20 -0400 (EDT)
-Subject: [PATCH] ARM: head-common.S: Clear lr before jumping to
- start_kernel()
-In-Reply-To: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
-References: <1507044184-27152-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <nycvar.YSQ.7.76.1710031134140.5407@knanqh.ubzr>
+From: edumazet@google.com (Eric Dumazet)
+Date: Tue, 3 Oct 2017 08:38:55 -0700
+Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
+In-Reply-To: <CACT4Y+Yf86hS_3u=qe0ZL208GmrfF6bp50kYcL+3D9QFBh=LZA@mail.gmail.com>
+References: <20171002104947.GE20737@leverpostej>
+ <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
+ <20171002142156.GB21696@leverpostej>
+ <CANn89i+zQG=rjHRqzsvPzjg5tqW43Lcz-BJ9spLascP9Nt5z8Q@mail.gmail.com>
+ <CACT4Y+Yf86hS_3u=qe0ZL208GmrfF6bp50kYcL+3D9QFBh=LZA@mail.gmail.com>
+Message-ID: <CANn89iJrJzTL+e4FDN76Fc1iptXpM9aJ6Hwa=pT=+v-zbv7+8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Oct 2017, Geert Uytterhoeven wrote:
+On Tue, Oct 3, 2017 at 8:19 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Mon, Oct 2, 2017 at 4:42 PM, 'Eric Dumazet' via syzkaller
+> <syzkaller@googlegroups.com> wrote:
+>> On Mon, Oct 2, 2017 at 7:21 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> Hi Eric,
+>>>
+>>> On Mon, Oct 02, 2017 at 06:36:32AM -0700, Eric Dumazet wrote:
+>>>> On Mon, Oct 2, 2017 at 3:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> > I hit the below splat at net/core/skbuff.c:2626 while fuzzing v4.14-rc2
+>>>> > on arm64 with Syzkaller. This is the BUG_ON(len) at the end of
+>>>> > skb_copy_and_csum_bits().
+>>>
+>>>> > kernel BUG at net/core/skbuff.c:2626!
+>>>
+>>>> > [<ffff200009e03214>] skb_copy_and_csum_bits+0x8dc/0xae0 net/core/skbuff.c:2626
+>>>> > [<ffff20000a01d244>] icmp_glue_bits+0xa4/0x2a0 net/ipv4/icmp.c:357
+>>>> > [<ffff200009f3f0d4>] __ip_append_data+0x10e4/0x20a8 net/ipv4/ip_output.c:1018
+>>>> > [<ffff200009f41a88>] ip_append_data.part.3+0xe8/0x1a0 net/ipv4/ip_output.c:1170
+>>>> > [<ffff200009f46e74>] ip_append_data+0xa4/0xb0 net/ipv4/ip_output.c:1173
+>>>> > [<ffff20000a01ccc8>] icmp_push_reply+0x1b8/0x690 net/ipv4/icmp.c:375
+>>>> > [<ffff20000a0211b0>] icmp_send+0x1070/0x1890 net/ipv4/icmp.c:741
+>>>> > [<ffff200009f41d48>] ip_fragment.constprop.4+0x208/0x340 net/ipv4/ip_output.c:552
+>>>> > [<ffff200009f42228>] ip_finish_output+0x3a8/0xab0 net/ipv4/ip_output.c:315
+>>>> > [<ffff200009f468c4>] NF_HOOK_COND include/linux/netfilter.h:238 [inline]
+>>>> > [<ffff200009f468c4>] ip_output+0x284/0x790 net/ipv4/ip_output.c:405
+>>>> > [<ffff200009f43204>] dst_output include/net/dst.h:458 [inline]
+>>>> > [<ffff200009f43204>] ip_local_out+0x9c/0x1b8 net/ipv4/ip_output.c:124
+>>>> > [<ffff200009f445e8>] ip_queue_xmit+0x850/0x18e0 net/ipv4/ip_output.c:504
+>>>> > [<ffff200009fb091c>] tcp_transmit_skb+0x107c/0x3338 net/ipv4/tcp_output.c:1123
+>>>> > [<ffff200009fbbcc4>] __tcp_retransmit_skb+0x614/0x1d18 net/ipv4/tcp_output.c:2847
+>>>> > [<ffff200009fbd840>] tcp_send_loss_probe+0x478/0x7d0 net/ipv4/tcp_output.c:2457
+>>>> > [<ffff200009fc707c>] tcp_write_timer_handler+0x50c/0x7e8 net/ipv4/tcp_timer.c:557
+>>>> > [<ffff200009fc73d0>] tcp_write_timer+0x78/0x170 net/ipv4/tcp_timer.c:579
+>>>> > [<ffff2000082f8980>] call_timer_fn+0x1b8/0x430 kernel/time/timer.c:1281
+>>>> > [<ffff2000082f8dcc>] expire_timers+0x1d4/0x320 kernel/time/timer.c:1320
+>>>> > [<ffff2000082f912c>] __run_timers kernel/time/timer.c:1620 [inline]
+>>>> > [<ffff2000082f912c>] run_timer_softirq+0x214/0x5f0 kernel/time/timer.c:1646
+>>>> > [<ffff2000080826c0>] __do_softirq+0x350/0xc0c kernel/softirq.c:284
+>>>> > [<ffff200008170af4>] do_softirq_own_stack include/linux/interrupt.h:498 [inline]
+>>>> > [<ffff200008170af4>] invoke_softirq kernel/softirq.c:371 [inline]
+>>>> > [<ffff200008170af4>] irq_exit+0x1dc/0x2f8 kernel/softirq.c:405
+>>>> > [<ffff2000082a95bc>] __handle_domain_irq+0xdc/0x230 kernel/irq/irqdesc.c:647
+>>>> > [<ffff2000080820ac>] handle_domain_irq include/linux/irqdesc.h:175 [inline]
+>>>> > [<ffff2000080820ac>] gic_handle_irq+0x6c/0xe0 drivers/irqchip/irq-gic.c:367
+>>>
+>>>> This is most likely a bug caused by syzkaller setting a ridiculous MTU
+>>>> on loopback device, below minimum size of ipv4 MTU.
+>>>
+>>>> I tried to track it in August [1], but it seems hard to find all the
+>>>> issues with this.
+>>>>
+>>>> commit c780a049f9bf442314335372c9abc4548bfe3e44
+>>>> Author: Eric Dumazet <edumazet@google.com>
+>>>> Date:   Wed Aug 16 11:09:12 2017 -0700
+>>>>
+>>>>     ipv4: better IP_MAX_MTU enforcement
+>>>>
+>>>>     While working on yet another syzkaller report, I found
+>>>>     that our IP_MAX_MTU enforcements were not properly done.
+>>>>
+>>>>     gcc seems to reload dev->mtu for min(dev->mtu, IP_MAX_MTU), and
+>>>>     final result can be bigger than IP_MAX_MTU :/
+>>>>
+>>>>     This is a problem because device mtu can be changed on other cpus or
+>>>>     threads.
+>>>>
+>>>>     While this patch does not fix the issue I am working on, it is
+>>>>     probably worth addressing it.
+>>>
+>>> Just to check I've understood correctly, are you suggesting that the
+>>> IPv4 code should also check the dev->mtu against a IP_MIN_MTU (which
+>>> doesn't seem to exist today)?
+>>
+>> We have plenty of places this is checked.
+>>
+>> For example, trying to set MTU < 68 usually removes IPv4 addresses and routes.
+>>
+>> Problem is : these checks are not fool proof yet.
+>>
+>> ( Only the admin was supposed to play these games )
+>>
+>>>
+>>> Otherwise, I do spot another potential issue. The writer side (e.g. most
+>>> net_device::ndo_change_mtu implementations and the __dev_set_mtu()
+>>> fallback) doesn't use WRITE_ONCE().
+>>
+>> It does not matter how many strange values can be observed by the reader :
+>> We must be fool proof anyway from reader point of view, so the
+>> WRITE_ONCE() is not strictly needed.
+>
+>
+> Note if writer stores some temporal garbage there (which C language
+> perfectly allows), it does not matter what we do on reader side --
+> reader won't get correct data anyway. Say mtu changes from 1000 to
+> 2000, but writer temporary stores 1 there, reader can observe 1 while
+> it must not. Synchronization is always a game of two.
 
-> If CONFIG_DEBUG_LOCK_ALLOC=y, the kernel log is spammed with a few
-> hundred identical messages:
-> 
->     unwind: Unknown symbol address c0800300
->     unwind: Index not found c0800300
-> 
-> c0800300 is the return address from the last subroutine call (to
-> __memzero()) in __mmap_switched().  Apparently having this address in
-> the link register confuses the unwinder.
-> 
-> To fix this, reset the link register to zero before jumping to
-> start_kernel().
-> 
-> Fixes: 9520b1a1b5f7a348 ("ARM: head-common.S: speed up startup code")
-> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Since we have no sync here, a reader _must_ cope with any MTU value.
 
-Good! This fixes another similar case I had but I didn't come around to 
-look at closely yet.
+We need to care of any value, so we do not care how dummy writers can be.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Sure, a WRITE_ONCE() will help avoiding some strange values being written,
+ but since we _allow_ writers to write such strange values,
+there is really no point pretending to be safe here.
 
-Please send it to RMK's patch system.
-
-
-> ---
-> Commit 9520b1a1b5f7a348 is in arm/for-next.
-> 
->  arch/arm/kernel/head-common.S | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index a25027b87a6024b9..21dde771a7dd8d14 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -114,6 +114,7 @@ __mmap_switched:
->  	str	r8, [r2]			@ Save atags pointer
->  	cmp	r3, #0
->  	strne	r10, [r3]			@ Save control register values
-> +	mov	lr, #0
->  	b	start_kernel
->  ENDPROC(__mmap_switched)
->  
-> -- 
-> 2.7.4
-> 
-> 
+Adding a WRITE_ONCE() will not fix the bug.
