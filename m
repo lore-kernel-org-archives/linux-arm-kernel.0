@@ -1,42 +1,28 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  3 Oct 2017 14:53:29 +0100
-Subject: [PATCH 1/3] ACPI/IORT: Remove leftover ACPI_IORT_SMMU_V3_PXM_VALID
- guard
-In-Reply-To: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1507038811-23382-2-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue,  3 Oct 2017 14:53:28 +0100
+Subject: [PATCH 0/3] ACPI/IORT: Clean-up/rework for v4.15
+Message-ID: <1507038811-23382-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conditional ACPI_IORT_SMMU_V3_PXM_VALID guard around
-arm_smmu_v3_set_proximity() was added to manage a cross tree
-ACPICA merge dependency; with ACPICA changes merged in:
+A three-patch series collection of backlog clean-ups/rework in
+preparation for future code restructuring and features support.
 
-commit c944230064eb ("ACPICA: iasl: Update to IORT SMMUv3
-disassembling")
+Patch series depends on:
 
-the guard has become useless. Remove it.
+https://marc.info/?l=linux-arm-kernel&m=150696522211494&w=2
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- drivers/acpi/arm64/iort.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index de56394..69f21f3 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -968,7 +968,7 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
- 	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
- }
- 
--#if defined(CONFIG_ACPI_NUMA) && defined(ACPI_IORT_SMMU_V3_PXM_VALID)
-+#if defined(CONFIG_ACPI_NUMA)
- /*
-  * set numa proximity domain for smmuv3 device
-  */
+Lorenzo Pieralisi (3):
+  ACPI/IORT: Remove leftover ACPI_IORT_SMMU_V3_PXM_VALID guard
+  ACPI/IORT: Improve functions return type/storage class specifier
+    indentation
+  ACPI/IORT: Make platform devices initialization code SMMU agnostic
+
+ drivers/acpi/arm64/iort.c | 83 ++++++++++++++++++++++-------------------------
+ 1 file changed, 39 insertions(+), 44 deletions(-)
+
 -- 
 2.4.12
