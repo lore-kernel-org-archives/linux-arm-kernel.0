@@ -1,54 +1,58 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Tue, 3 Oct 2017 20:28:00 +0800
-Subject: [kbuild-all] [arm:for-next 9/11] awk: line 2: function strtonum
- never defined
-In-Reply-To: <20171003105717.GL20805@n2100.armlinux.org.uk>
-References: <201710030905.zGRrw4dZ%fengguang.wu@intel.com>
- <20171003090642.GJ20805@n2100.armlinux.org.uk>
- <20171003100540.tfcehrcvf356332x@wfg-t540p.sh.intel.com>
- <20171003105717.GL20805@n2100.armlinux.org.uk>
-Message-ID: <20171003122800.kzt767xlao7hbfnx@wfg-t540p.sh.intel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Oct 2017 14:38:36 +0200
+Subject: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
+In-Reply-To: <AM3PR04MB0743030F8D97FFB37016F11AE6720@AM3PR04MB0743.eurprd04.prod.outlook.com>
+References: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
+ <1505811698-7338-6-git-send-email-razvan.stefanescu@nxp.com>
+ <20170919121755.GB4569@lunn.ch>
+ <AM5PR0402MB26917E7523D582ABB0A3D0D2EC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+ <AM3PR04MB0743030F8D97FFB37016F11AE6720@AM3PR04MB0743.eurprd04.prod.outlook.com>
+Message-ID: <20171003123836.GD13548@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 11:57:17AM +0100, Russell King - ARM Linux wrote:
->On Tue, Oct 03, 2017 at 06:05:40PM +0800, Fengguang Wu wrote:
->> Hi Russell King,
->>
->> On Tue, Oct 03, 2017 at 10:06:42AM +0100, Russell King - ARM Linux wrote:
->> >Shall I repeat my question from the last time this was reported?
->>
->> Sorry I cannot find your reply in email archive.
->
->Odd, because I sent a reply to your report on 29th September, and it
->made it to the linux-arm-kernel mailing list, and its archives:
->
->  http://archive.armlinux.org.uk/lurker/message/20170929.190625.9f5a9438.en.html
+On Tue, Oct 03, 2017 at 10:07:41AM +0000, Razvan Stefanescu wrote:
+> > -----Original Message-----
+> > From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> > On Behalf Of Andrew Lunn
+> > Sent: Tuesday, September 19, 2017 3:18 PM
+> > To: Razvan Stefanescu <razvan.stefanescu@nxp.com>
+> > Cc: devel at driverdev.osuosl.org; Ruxandra Ioana Radulescu
+> > <ruxandra.radulescu@nxp.com>; arnd at arndb.de; gregkh at linuxfoundation.org;
+> > Alexandru Marginean <alexandru.marginean@nxp.com>; linux-
+> > kernel at vger.kernel.org; agraf at suse.de; stuyoder at gmail.com; Bogdan
+> > Purcareata <bogdan.purcareata@nxp.com>; linux-arm-
+> > kernel at lists.infradead.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> > Subject: Re: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
+> > 
+> > On Tue, Sep 19, 2017 at 12:01:37PM +0300, Razvan Stefanescu wrote:
+> > > +Driver uses the switch device driver model and exposes each switch port as
+> > > +a network interface, which can be included in a bridge. Traffic switched
+> > > +between ports is offloaded into the hardware. Exposed network interfaces
+> > > +are not used for I/O, they are used just for configuration. This
+> > > +limitation is going to be addressed in the future.
+> > 
+> > Hi Razvan
+> > 
+> > Could you briefly describe how Ethernet frames get from the CPU to the
+> > switch. This is what decided if you should write a plain switchdev
+> > driver, or a DSA driver.
+> > 
+> > 	Andrew
+> > 
+> Hello Andrew,
+> 
+> CPU frame handling will be added in a later. Each netdevice associated 
+> to a switch port will have I/O capabilities like dpaa2-ethernet devices.
+> The dpaa2-ethsw will use ACLs to redirect specific types of frames
+> (i.e BPDUs) to CPU.
 
-Ah yes, I find that now. So I'm using mawk, which does not support
-gawk's strtonum..
+Hi Razvan
 
->> Looking at this
->> error, the root cause should be strtonum requires gawk while what we
->> installed is
->>
->>        mawk 1.3.3 Nov 1996, Copyright (C) Michael D. Brennan
->>
->> We can trivially install gawk and make it the default, however is gawk
->> a requirement for kernel compilation? Or can we make it work with mawk,
->> too?
->
->Well, awk isn't mentioned in Documentation/Changes as a build requirement,
->but then neither is grep.  However, kbuild itself makes use of both:
->
->Makefile:AWK                = awk
->Makefile:   $(Q)$(AWK) '!x[$$0]++' $(vmlinux-dirs:%=$(objtree)/%/modules.order) > $(objtree)/modules.order
->Makefile:   $(Q)$(AWK) '!x[$$0]++' $^ > $(objtree)/modules.builtin
->scripts/Makefile.build:     if $(OBJDUMP) -h $(@D)/.tmp_$(@F) | grep -q __ksymtab; then                \
+I looked at the architecture documentation after i posted this
+email. It looks like each switch port will get its own DMA queues, etc
+on the host. It is not sharing one host interface to get packets to
+the switch, which is what DSA does. So a pure switchdev driver is the
+correct solution here.
 
-Right. Here gawk/mawk happen to behave different on int(), which makes
-awk not usable here in a portable way. As you said in the other email,
-perl looks a viable alternative.
-
-Thanks,
-Fengguang
+      Andrew
