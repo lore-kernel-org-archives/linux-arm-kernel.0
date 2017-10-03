@@ -1,39 +1,50 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue,  3 Oct 2017 18:05:49 +0100
-Subject: [PATCH REPOST 0/3] Fix single step for traps
-Message-ID: <1507050352-15909-1-git-send-email-julien.thierry@arm.com>
+Date: Tue,  3 Oct 2017 18:05:50 +0100
+Subject: [PATCH REPOST 1/3] arm64: Use existing defines for mdscr
+In-Reply-To: <1507050352-15909-1-git-send-email-julien.thierry@arm.com>
+References: <1507050352-15909-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1507050352-15909-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Reposting series rebased on v4.14-rc3]
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 
-When single stepping a trapped/emulated instruction, the instruction not being
-actually executed, the PE ends up single stepping the instruction we return to
-after ERET-ing from the trap.
+---
+ arch/arm64/include/asm/assembler.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-The issue affects traps in the kernel and emulated instructions in KVM guests.
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d58a625..00a4526 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -30,6 +30,7 @@
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
++#include <asm/debug-monitors.h>
 
-This patch series ensures we properly single step trapped instruction.
-
-First patch is just to avoid raw values when using single stepping
-registers/bits.
-Patches 2 and 3 fix the issue for kernel and kvm respectively.
-
-Julien Thierry (3):
-  arm64: Use existing defines for mdscr
-  arm64: Fix single stepping in kernel traps
-  arm64: kvm: Fix single step for guest skipped instructions
-
- arch/arm64/include/asm/assembler.h   |  5 +++--
- arch/arm64/include/asm/kvm_asm.h     |  2 ++
- arch/arm64/include/asm/kvm_emulate.h |  2 ++
- arch/arm64/include/asm/traps.h       |  2 ++
- arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/traps.c            | 21 ++++++++++++++++-----
- arch/arm64/kvm/debug.c               | 17 ++++++++++++++++-
- arch/arm64/kvm/hyp/switch.c          | 10 ++++++++++
- 9 files changed, 56 insertions(+), 13 deletions(-)
-
+ /*
+  * Enable and disable interrupts.
+@@ -65,7 +66,7 @@
+ 	.macro	disable_step_tsk, flgs, tmp
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	mrs	\tmp, mdscr_el1
+-	bic	\tmp, \tmp, #1
++	bic	\tmp, \tmp, #DBG_MDSCR_SS
+ 	msr	mdscr_el1, \tmp
+ 	isb	// Synchronise with enable_dbg
+ 9990:
+@@ -75,7 +76,7 @@
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	disable_dbg
+ 	mrs	\tmp, mdscr_el1
+-	orr	\tmp, \tmp, #1
++	orr	\tmp, \tmp, #DBG_MDSCR_SS
+ 	msr	mdscr_el1, \tmp
+ 9990:
+ 	.endm
 --
 1.9.1
