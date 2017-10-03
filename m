@@ -1,124 +1,475 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:08:29 -0500
-Subject: [RFC PATCH v2 00/31] Nested Virtualization on KVM/ARM - memory
- virtualization
-Message-ID: <1507000109-3536-1-git-send-email-jintack.lim@linaro.org>
+Date: Mon,  2 Oct 2017 22:09:29 -0500
+Subject: [RFC PATCH v2 01/31] arm64: KVM: Hide unsupported AArch64 CPU
+ features from guests
+Message-ID: <1507000169-3586-1-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second part of nested virtualization patch series v2 - memory
-virtualization. You can find the first part (cpu virtualization) here [1].
+From: Dave Martin <Dave.Martin@arm.com>
 
-For memory virtualization, the biggest issue is that we now have more than two
-stages of translation when running nested VMs while hardware only supports two
-stages. We choose to merge two stage-2 page tables (one from the guest
-hypervisor and the other from the host hypervisor) and create shadow stage-2
-page tables, which have mappings from the nested VM?s physical addresses to the
-machine physical addresses. Stage-1 translation is done by the hardware as is
-done for the normal VMs. Patch 2 to 14 handle the shadow page table. Note that
-patch 1 is borrowed from Dave Martin's SVE patches [2], so that we can fake
-ID_AA64MMFR0_EL1 register value to the guest hypervisor in patch 2.
+Currently, a guest kernel sees the true CPU feature registers
+(ID_*_EL1) when it reads them using MRS instructions.  This means
+that the guest will observe features that are present in the
+hardware but the host doesn't understand or doesn't provide support
+for.  A guest may legimitately try to use such a feature as per the
+architecture, but use of the feature may trap instead of working
+normally, triggering undef injection into the guest.
 
-The second half of the patch series (15 to 30) are to handle AT and TLBI
-instructions from the guest hypervisor. To get an idea of the AT instruction
-emulation, I'd recommend you start with patch 19. For TLBI instructions, see
-individual patches from patch 24 to 30. Note that we need to forward AT and
-TLBI instructions to the virtual EL2 if corresponding bits are set in the
-virtual HCR_EL2. This is mostly for recursive virtualization, and handled in
-patch 29 and 30.
+This is not a problem for the host, but the guest may go wrong when
+running on newer hardware than the host knows about.
 
-This patch set is tested on the FastModel with the v8.3 extension for arm64. I
-used a cubietruck for arm32 and was able to boot a VM without a problem. See
-the test setup here [3, 4].
+This patch hides from guest VMs any AArch64-specific CPU features
+that the host doesn't support, by exposing to the guest the
+sanitised versions of the registers computed by the cpufeatures
+framework, instead of the true hardware registers.  To achieve
+this, HCR_EL2.TID3 is now set for AArch64 guests, and emulation
+code is added to KVM to report the sanitised versions of the
+affected registers in response to MRS and register reads from
+userspace.
 
-This patch series is based on kvm/next d38338e and cpu virtualization patch set
-[1].  The whole patch series including cpu, memory, VGIC, and timer patches is
-available here:
+The affected registers are removed from invariant_sys_regs[] (since
+the invariant_sys_regs handling is no longer quite correct for
+them) and added to sys_reg_desgs[], with appropriate access(),
+get_user() and set_user() methods.  No runtime vcpu storage is
+allocated for the registers: instead, they are read on demand from
+the cpufeatures framework.  This may need modification in the
+future if there is a need for userspace to customise the features
+visible to the guest.
 
-git at github.com:columbia/nesting-pub.git rfc-v2-mem
+Attempts by userspace to write the registers are handled similarly
+to the current invariant_sys_regs handling: writes are permitted,
+but only if they don't attempt to change the value.  This is
+sufficient to support VM snapshot/restore from userspace.
 
-TODO:
-- Implement the reverse mapping feature to handle mmu notifiers more
-  efficiently.
+Because of the additional registers, restoring a VM on an older
+kernel may not work unless userspace knows how to handle the extra
+VM registers exposed to the KVM user ABI by this patch.
 
-v1-->v2:
-- Fixed a bug on arm32 (patch 5).
-- Removed most of TODOs.
-- Updated comments and commit messages.
-- Put change notes for each patches if any.
+Under the principle of least damage, this patch makes no attempt to
+handle any of the other registers currently in
+invariant_sys_regs[], or to emulate registers for AArch32: however,
+these could be handled in a similar way in future, as necessary.
 
-[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2017-July/026388.html
-[2] https://lists.cs.columbia.edu/pipermail/kvmarm/2017-August/026961.html
-[3] https://lists.cs.columbia.edu/pipermail/kvmarm/2017-July/026427.html
-[4] https://github.com/columbia/nesting-pub/wiki/Nested-virtualization-on-ARM-setup
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-Christoffer Dall (12):
-  KVM: arm/arm64: Remove unused params in mmu functions
-  KVM: arm/arm64: Abstract stage-2 MMU state into a separate structure
-  KVM: arm/arm64: Support mmu for the virtual EL2 execution
-  KVM: arm64: Invalidate virtual EL2 TLB entries when needed
-  KVM: arm64: Setup vttbr_el2 on each VM entry
-  KVM: arm/arm64: Make mmu functions non-static
-  KVM: arm/arm64: Unmap/flush shadow stage 2 page tables
-  KVM: arm64: Implement nested Stage-2 page table walk logic
-  KVM: arm/arm64: Handle shadow stage 2 page faults
-  KVM: arm/arm64: Move kvm_is_write_fault to header file
-  KVM: arm/arm64: Forward the guest hypervisor's stage 2 permission
-    faults
-  KVM: arm64: Fixes to toggle_cache for nesting
+---
 
-Dave Martin (1):
-  arm64: KVM: Hide unsupported AArch64 CPU features from guests
+Changes since v1
+----------------
 
-Jintack Lim (18):
-  KVM: arm64: Expose limited memory management support to the virtual
-    EL2
-  KVM: arm/arm64: Manage mmus for nested VMs
-  KVM: arm64: Move system register helper functions around
-  KVM: arm64: Introduce sys_reg_desc.forward_trap
-  KVM: arm64: Rework the system instruction emulation framework
-  KVM: arm64: Enumerate AT and TLBI instructions to emulate
-  KVM: arm64: Describe AT instruction emulation design
-  KVM: arm64: Implement AT instruction handling
-  KVM: arm64: Emulate AT S1E[01] instructions
-  KVM: arm64: Emulate AT S1E2 instructions
-  KVM: arm64: Emulate AT S12E[01] instructions
-  KVM: arm64: Emulate TLBI ALLE2(IS) instruction
-  KVM: arm64: Emulate TLBI VAE2* instrutions
-  KVM: arm64: Emulate TLBI ALLE1(IS)
-  KVM: arm64: Emulate TLBI VMALLS12E1(IS) instruction
-  KVM: arm64: Emulate TLBI IPAS2E1* instructions
-  KVM: arm64: Respect the virtual HCR_EL2.AT and NV setting
-  KVM: arm64: Emulate TLBI instructions accesible from EL1
+Requested by Marc Zyngier:
 
- arch/arm/include/asm/kvm_asm.h       |   7 +-
- arch/arm/include/asm/kvm_emulate.h   |  19 +
- arch/arm/include/asm/kvm_host.h      |  42 +-
- arch/arm/include/asm/kvm_mmu.h       |  44 ++
- arch/arm/kvm/hyp/switch.c            |   3 +-
- arch/arm/kvm/hyp/tlb.c               |  15 +-
- arch/arm64/include/asm/esr.h         |   1 +
- arch/arm64/include/asm/kvm_arm.h     |   5 +
- arch/arm64/include/asm/kvm_asm.h     |  12 +-
- arch/arm64/include/asm/kvm_emulate.h |  29 ++
- arch/arm64/include/asm/kvm_host.h    |  45 +-
- arch/arm64/include/asm/kvm_mmu.h     |  69 ++-
- arch/arm64/include/asm/sysreg.h      |  56 +++
- arch/arm64/kvm/Makefile              |   1 +
- arch/arm64/kvm/context.c             |  12 +
- arch/arm64/kvm/hyp/Makefile          |   1 +
- arch/arm64/kvm/hyp/at.c              | 131 +++++
- arch/arm64/kvm/hyp/switch.c          |   8 +-
- arch/arm64/kvm/hyp/tlb.c             | 114 ++++-
- arch/arm64/kvm/mmu-nested.c          | 441 +++++++++++++++++
- arch/arm64/kvm/sys_regs.c            | 907 ++++++++++++++++++++++++++++++-----
- arch/arm64/kvm/sys_regs.h            |   6 +
- virt/kvm/arm/arm.c                   |  77 ++-
- virt/kvm/arm/mmio.c                  |  12 +-
- virt/kvm/arm/mmu.c                   | 361 +++++++++-----
- 25 files changed, 2084 insertions(+), 334 deletions(-)
- create mode 100644 arch/arm64/kvm/hyp/at.c
- create mode 100644 arch/arm64/kvm/mmu-nested.c
+* Get rid of ternary operator use in walk_sys_regs().
 
+* Call write_to_read_only() if an attempt to write an ID reg is
+trapped, rather than reinventing.
+Probably we won't get there anyway: the architecture says that this
+should undef at EL1 instead.
+
+* Make ID register sysreg table less cryptic and spread the entries one
+per line.
+Also, make the architecturally unallocated and allocated but hidden
+cases more clearly distinct.  These require the same behaviour but for
+different reasons, so it's better to identify them as separate.
+
+Other:
+
+* Delete BUG_ON()s that are skipped by construction:
+These check that the result of sys_reg_to_index() is a 64-bit
+register, which is always true because sys_reg_to_index()
+explicitly sets this.
+
+* Remove duplicate const in __access_id_reg args [sparse]
+---
+ arch/arm64/include/asm/sysreg.h |   3 +
+ arch/arm64/kvm/hyp/switch.c     |   5 +
+ arch/arm64/kvm/sys_regs.c       | 282 +++++++++++++++++++++++++++++++++-------
+ 3 files changed, 245 insertions(+), 45 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index b8d4d0c..a051d42 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -149,6 +149,9 @@
+ #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
+ #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
+ 
++#define SYS_ID_AA64AFR0_EL1		sys_reg(3, 0, 0, 5, 4)
++#define SYS_ID_AA64AFR1_EL1		sys_reg(3, 0, 0, 5, 5)
++
+ #define SYS_ID_AA64ISAR0_EL1		sys_reg(3, 0, 0, 6, 0)
+ #define SYS_ID_AA64ISAR1_EL1		sys_reg(3, 0, 0, 6, 1)
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 50c90f2..2a64a5c 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -88,11 +88,15 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	 * it will cause an exception.
+ 	 */
+ 	val = vcpu->arch.hcr_el2;
++
+ 	if (!(val & HCR_RW) && system_supports_fpsimd()) {
+ 		write_sysreg(1 << 30, fpexc32_el2);
+ 		isb();
+ 	}
+ 
++	if (val & HCR_RW) /* for AArch64 only: */
++		val |= HCR_TID3; /* TID3: trap feature register accesses */
++
+ 	if (is_hyp_ctxt(vcpu)) {
+ 		/*
+ 		 * For a guest hypervisor on v8.0, trap and emulate the EL1
+@@ -113,6 +117,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	write_sysreg(val, hcr_el2);
++
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+ 	/*
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index ba2966d..65f4c20 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1114,6 +1114,137 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
++/* Read a sanitised cpufeature ID register by sys_reg_desc */
++static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
++{
++	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
++			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
++
++	return raz ? 0 : read_sanitised_ftr_reg(id);
++}
++
++/* cpufeature ID register access trap handlers */
++
++static bool __access_id_reg(struct kvm_vcpu *vcpu,
++			    struct sys_reg_params *p,
++			    const struct sys_reg_desc *r,
++			    bool raz)
++{
++	if (p->is_write)
++		return write_to_read_only(vcpu, p, r);
++
++	p->regval = read_id_reg(r, raz);
++	return true;
++}
++
++static bool access_id_reg(struct kvm_vcpu *vcpu,
++			  struct sys_reg_params *p,
++			  const struct sys_reg_desc *r)
++{
++	return __access_id_reg(vcpu, p, r, false);
++}
++
++static bool access_raz_id_reg(struct kvm_vcpu *vcpu,
++			      struct sys_reg_params *p,
++			      const struct sys_reg_desc *r)
++{
++	return __access_id_reg(vcpu, p, r, true);
++}
++
++static int reg_from_user(u64 *val, const void __user *uaddr, u64 id);
++static int reg_to_user(void __user *uaddr, const u64 *val, u64 id);
++static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
++
++/*
++ * cpufeature ID register user accessors
++ *
++ * For now, these registers are immutable for userspace, so no values
++ * are stored, and for set_id_reg() we don't allow the effective value
++ * to be changed.
++ */
++static int __get_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
++			bool raz)
++{
++	const u64 id = sys_reg_to_index(rd);
++	const u64 val = read_id_reg(rd, raz);
++
++	return reg_to_user(uaddr, &val, id);
++}
++
++static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
++			bool raz)
++{
++	const u64 id = sys_reg_to_index(rd);
++	int err;
++	u64 val;
++
++	err = reg_from_user(&val, uaddr, id);
++	if (err)
++		return err;
++
++	/* This is what we mean by invariant: you can't change it. */
++	if (val != read_id_reg(rd, raz))
++		return -EINVAL;
++
++	return 0;
++}
++
++static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		      const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	return __get_id_reg(rd, uaddr, false);
++}
++
++static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		      const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	return __set_id_reg(rd, uaddr, false);
++}
++
++static int get_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++			  const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	return __get_id_reg(rd, uaddr, true);
++}
++
++static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++			  const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	return __set_id_reg(rd, uaddr, true);
++}
++
++/* sys_reg_desc initialiser for known cpufeature ID registers */
++#define ID_SANITISED(name) {			\
++	SYS_DESC(SYS_##name),			\
++	.access	= access_id_reg,		\
++	.get_user = get_id_reg,			\
++	.set_user = set_id_reg,			\
++}
++
++/*
++ * sys_reg_desc initialiser for architecturally unallocated cpufeature ID
++ * register with encoding Op0=3, Op1=0, CRn=0, CRm=crm, Op2=op2
++ * (1 <= crm < 8, 0 <= Op2 < 8).
++ */
++#define ID_UNALLOCATED(crm, op2) {			\
++	Op0(3), Op1(0), CRn(0), CRm(crm), Op2(op2),	\
++	.access = access_raz_id_reg,			\
++	.get_user = get_raz_id_reg,			\
++	.set_user = set_raz_id_reg,			\
++}
++
++/*
++ * sys_reg_desc initialiser for known ID registers that we hide from guests.
++ * For now, these are exposed just like unallocated ID regs: they appear
++ * RAZ for the guest.
++ */
++#define ID_HIDDEN(name) {			\
++	SYS_DESC(SYS_##name),			\
++	.access = access_raz_id_reg,		\
++	.get_user = get_raz_id_reg,		\
++	.set_user = set_raz_id_reg,		\
++}
++
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+@@ -1166,6 +1297,84 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
+ 	{ SYS_DESC(SYS_DBGVCR32_EL2), NULL, reset_val, DBGVCR32_EL2, 0 },
+ 
+ 	{ SYS_DESC(SYS_MPIDR_EL1), NULL, reset_mpidr, MPIDR_EL1 },
++
++	/*
++	 * ID regs: all ID_SANITISED() entries here must have corresponding
++	 * entries in arm64_ftr_regs[].
++	 */
++
++	/* AArch64 mappings of the AArch32 ID registers */
++	/* CRm=1 */
++	ID_SANITISED(ID_PFR0_EL1),
++	ID_SANITISED(ID_PFR1_EL1),
++	ID_SANITISED(ID_DFR0_EL1),
++	ID_HIDDEN(ID_AFR0_EL1),
++	ID_SANITISED(ID_MMFR0_EL1),
++	ID_SANITISED(ID_MMFR1_EL1),
++	ID_SANITISED(ID_MMFR2_EL1),
++	ID_SANITISED(ID_MMFR3_EL1),
++
++	/* CRm=2 */
++	ID_SANITISED(ID_ISAR0_EL1),
++	ID_SANITISED(ID_ISAR1_EL1),
++	ID_SANITISED(ID_ISAR2_EL1),
++	ID_SANITISED(ID_ISAR3_EL1),
++	ID_SANITISED(ID_ISAR4_EL1),
++	ID_SANITISED(ID_ISAR5_EL1),
++	ID_SANITISED(ID_MMFR4_EL1),
++	ID_UNALLOCATED(2,7),
++
++	/* CRm=3 */
++	ID_SANITISED(MVFR0_EL1),
++	ID_SANITISED(MVFR1_EL1),
++	ID_SANITISED(MVFR2_EL1),
++	ID_UNALLOCATED(3,3),
++	ID_UNALLOCATED(3,4),
++	ID_UNALLOCATED(3,5),
++	ID_UNALLOCATED(3,6),
++	ID_UNALLOCATED(3,7),
++
++	/* AArch64 ID registers */
++	/* CRm=4 */
++	ID_SANITISED(ID_AA64PFR0_EL1),
++	ID_SANITISED(ID_AA64PFR1_EL1),
++	ID_UNALLOCATED(4,2),
++	ID_UNALLOCATED(4,3),
++	ID_UNALLOCATED(4,4),
++	ID_UNALLOCATED(4,5),
++	ID_UNALLOCATED(4,6),
++	ID_UNALLOCATED(4,7),
++
++	/* CRm=5 */
++	ID_SANITISED(ID_AA64DFR0_EL1),
++	ID_SANITISED(ID_AA64DFR1_EL1),
++	ID_UNALLOCATED(5,2),
++	ID_UNALLOCATED(5,3),
++	ID_HIDDEN(ID_AA64AFR0_EL1),
++	ID_HIDDEN(ID_AA64AFR1_EL1),
++	ID_UNALLOCATED(5,6),
++	ID_UNALLOCATED(5,7),
++
++	/* CRm=6 */
++	ID_SANITISED(ID_AA64ISAR0_EL1),
++	ID_SANITISED(ID_AA64ISAR1_EL1),
++	ID_UNALLOCATED(6,2),
++	ID_UNALLOCATED(6,3),
++	ID_UNALLOCATED(6,4),
++	ID_UNALLOCATED(6,5),
++	ID_UNALLOCATED(6,6),
++	ID_UNALLOCATED(6,7),
++
++	/* CRm=7 */
++	ID_SANITISED(ID_AA64MMFR0_EL1),
++	ID_SANITISED(ID_AA64MMFR1_EL1),
++	ID_SANITISED(ID_AA64MMFR2_EL1),
++	ID_UNALLOCATED(7,3),
++	ID_UNALLOCATED(7,4),
++	ID_UNALLOCATED(7,5),
++	ID_UNALLOCATED(7,6),
++	ID_UNALLOCATED(7,7),
++
+ 	{ SYS_DESC(SYS_SCTLR_EL1), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
+ 	{ SYS_DESC(SYS_CPACR_EL1), access_cpacr, reset_val, CPACR_EL1, 0 },
+ 	{ SYS_DESC(SYS_TTBR0_EL1), access_vm_reg, reset_unknown, TTBR0_EL1 },
+@@ -2123,8 +2332,8 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+ 	if (!r)
+ 		r = find_reg(&params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+ 
+-	/* Not saved in the sys_reg array? */
+-	if (r && !r->reg)
++	/* Not saved in the sys_reg array and not otherwise accessible? */
++	if (r && !(r->reg || r->get_user))
+ 		r = NULL;
+ 
+ 	return r;
+@@ -2148,20 +2357,6 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+ FUNCTION_INVARIANT(midr_el1)
+ FUNCTION_INVARIANT(ctr_el0)
+ FUNCTION_INVARIANT(revidr_el1)
+-FUNCTION_INVARIANT(id_pfr0_el1)
+-FUNCTION_INVARIANT(id_pfr1_el1)
+-FUNCTION_INVARIANT(id_dfr0_el1)
+-FUNCTION_INVARIANT(id_afr0_el1)
+-FUNCTION_INVARIANT(id_mmfr0_el1)
+-FUNCTION_INVARIANT(id_mmfr1_el1)
+-FUNCTION_INVARIANT(id_mmfr2_el1)
+-FUNCTION_INVARIANT(id_mmfr3_el1)
+-FUNCTION_INVARIANT(id_isar0_el1)
+-FUNCTION_INVARIANT(id_isar1_el1)
+-FUNCTION_INVARIANT(id_isar2_el1)
+-FUNCTION_INVARIANT(id_isar3_el1)
+-FUNCTION_INVARIANT(id_isar4_el1)
+-FUNCTION_INVARIANT(id_isar5_el1)
+ FUNCTION_INVARIANT(clidr_el1)
+ FUNCTION_INVARIANT(aidr_el1)
+ 
+@@ -2169,20 +2364,6 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+ static struct sys_reg_desc invariant_sys_regs[] = {
+ 	{ SYS_DESC(SYS_MIDR_EL1), NULL, get_midr_el1 },
+ 	{ SYS_DESC(SYS_REVIDR_EL1), NULL, get_revidr_el1 },
+-	{ SYS_DESC(SYS_ID_PFR0_EL1), NULL, get_id_pfr0_el1 },
+-	{ SYS_DESC(SYS_ID_PFR1_EL1), NULL, get_id_pfr1_el1 },
+-	{ SYS_DESC(SYS_ID_DFR0_EL1), NULL, get_id_dfr0_el1 },
+-	{ SYS_DESC(SYS_ID_AFR0_EL1), NULL, get_id_afr0_el1 },
+-	{ SYS_DESC(SYS_ID_MMFR0_EL1), NULL, get_id_mmfr0_el1 },
+-	{ SYS_DESC(SYS_ID_MMFR1_EL1), NULL, get_id_mmfr1_el1 },
+-	{ SYS_DESC(SYS_ID_MMFR2_EL1), NULL, get_id_mmfr2_el1 },
+-	{ SYS_DESC(SYS_ID_MMFR3_EL1), NULL, get_id_mmfr3_el1 },
+-	{ SYS_DESC(SYS_ID_ISAR0_EL1), NULL, get_id_isar0_el1 },
+-	{ SYS_DESC(SYS_ID_ISAR1_EL1), NULL, get_id_isar1_el1 },
+-	{ SYS_DESC(SYS_ID_ISAR2_EL1), NULL, get_id_isar2_el1 },
+-	{ SYS_DESC(SYS_ID_ISAR3_EL1), NULL, get_id_isar3_el1 },
+-	{ SYS_DESC(SYS_ID_ISAR4_EL1), NULL, get_id_isar4_el1 },
+-	{ SYS_DESC(SYS_ID_ISAR5_EL1), NULL, get_id_isar5_el1 },
+ 	{ SYS_DESC(SYS_CLIDR_EL1), NULL, get_clidr_el1 },
+ 	{ SYS_DESC(SYS_AIDR_EL1), NULL, get_aidr_el1 },
+ 	{ SYS_DESC(SYS_CTR_EL0), NULL, get_ctr_el0 },
+@@ -2412,12 +2593,31 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
+ 	return true;
+ }
+ 
++static int walk_one_sys_reg(const struct sys_reg_desc *rd,
++			    u64 __user **uind,
++			    unsigned int *total)
++{
++	/*
++	 * Ignore registers we trap but don't save,
++	 * and for which no custom user accessor is provided.
++	 */
++	if (!(rd->reg || rd->get_user))
++		return 0;
++
++	if (!copy_reg_to_user(rd, uind))
++		return -EFAULT;
++
++	(*total)++;
++	return 0;
++}
++
+ /* Assumed ordered tables, see kvm_sys_reg_table_init. */
+ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+ {
+ 	const struct sys_reg_desc *i1, *i2, *end1, *end2;
+ 	unsigned int total = 0;
+ 	size_t num;
++	int err;
+ 
+ 	/* We check for duplicates here, to allow arch-specific overrides. */
+ 	i1 = get_target_table(vcpu->arch.target, true, &num);
+@@ -2431,21 +2631,13 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+ 	while (i1 || i2) {
+ 		int cmp = cmp_sys_reg(i1, i2);
+ 		/* target-specific overrides generic entry. */
+-		if (cmp <= 0) {
+-			/* Ignore registers we trap but don't save. */
+-			if (i1->reg) {
+-				if (!copy_reg_to_user(i1, &uind))
+-					return -EFAULT;
+-				total++;
+-			}
+-		} else {
+-			/* Ignore registers we trap but don't save. */
+-			if (i2->reg) {
+-				if (!copy_reg_to_user(i2, &uind))
+-					return -EFAULT;
+-				total++;
+-			}
+-		}
++		if (cmp <= 0)
++			err = walk_one_sys_reg(i1, &uind, &total);
++		else
++			err = walk_one_sys_reg(i2, &uind, &total);
++
++		if (err)
++			return err;
+ 
+ 		if (cmp <= 0 && ++i1 == end1)
+ 			i1 = NULL;
 -- 
 1.9.1
