@@ -1,48 +1,76 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue,  3 Oct 2017 14:10:16 +0900
-Subject: [PATCH v4 0/3] arm64: kgdb: fix single stepping
-Message-ID: <20171003051019.29714-1-takahiro.akashi@linaro.org>
+Date: Tue,  3 Oct 2017 14:10:17 +0900
+Subject: [PATCH v4 1/3] arm64: kgdb: fix single stepping
+In-Reply-To: <20171003051019.29714-1-takahiro.akashi@linaro.org>
+References: <20171003051019.29714-1-takahiro.akashi@linaro.org>
+Message-ID: <20171003051019.29714-2-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the fourth version of my kgdb patch to fix issues on single
-stepping.
+After entering kgdb mode, the first 'stepi' can succeed, but the following
+'stepi' never executes the next instruction.
 
-Kgdb support on arm64 was merged in v3.15, but from its first appearance,
-as far as I know, "single step" has never worked well. This patchset
-addresses all the error cases I found so far.
-Issues are reproducable, at least, on Hikey and fast model and I tested
-the patch on both of them.
+This is because a software step cannot get enabled as the software step
+bit(SS) in SPSR, which is cleared by the first single stepping, will not
+be set again for the following 's' commands.
+Please note that this bit, as well as the software step control bit(SS)
+in MDSCR, must be set before resuming the execution.
 
-The original patch[1] was split into several pieces, patch #1/#2 (and
-v3's patch#2), addressing issues one by one, but I dropped v3's patch#2
-here because Will really doesn't like a way to fix.
-Instead, I propose that we should do the same thing with a *gdb macro*
-shown in patch #1 so that we can optionally disable interrupts while
-single stepping.
+If you want to take a single step with interrupts disabled, please try
+the following gdb macro:
+===8<===
+define my-si
+	set $instr = *(int *)$pc
+	set $opsr = $cpsr
+	set $cpsr = $cpsr | 0x80
 
-Regarding to patch #3, I'm not still sure whether it is a right fix,
-but it certainly fixes some corner case.
+	stepi
 
+	# If interrupt was enabled before stepi, restore the I flag.
+	if !($opsr & 0x80)
+		# msr daifset, <val>
+		if (($instr & 0xfffff0ff) == 0xd50340df)
+			if !($instr & 0x200)
+				set $cpsr = $cpsr & ~0x80
+			end
+		else
+			# msr daif, <reg>
+			if (($instr & 0xffffffe0) == 0xd51b4220)
+				eval "set $val = $x%d", $instr & 0x1f
+				if !($val & 0x80)
+					set $cpsr = $cpsr & ~0x80
+				end
+			else
+				set $cpsr = $cpsr & ~0x80
+			end
 
-Changes in v4 (Oct 3, 2017):
-* remove v3's patch#2 (disable interrupts while single stepping)
+		end
+	end
+end
+===>8===
 
-Changes in v3 (May 23, 2017):
-* simplify patch #1 to respect the original code
-* swap patch #2 and #3
-* add patch #4
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jason Wessel <jason.wessel@windriver.com>
+---
+ arch/arm64/kernel/kgdb.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295632.html
-
-AKASHI Takahiro (3):
-  arm64: kgdb: fix single stepping
-  arm64: kgdb: prevent kgdb from being invoked recursively
-  kgdb: select a correct cpu while in a single stepping
-
- arch/arm64/kernel/kgdb.c  | 42 ++++++++++++++++++++++++++++++++++++++----
- kernel/debug/debug_core.c |  8 ++++----
- 2 files changed, 42 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+index 2122cd187f19..8d3ec8cf4ec4 100644
+--- a/arch/arm64/kernel/kgdb.c
++++ b/arch/arm64/kernel/kgdb.c
+@@ -253,6 +253,10 @@ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+ 		return DBG_HOOK_ERROR;
+ 
+ 	kgdb_handle_exception(1, SIGTRAP, 0, regs);
++
++	/* rewind a single step */
++	regs->pstate |= DBG_SPSR_SS;
++
+ 	return 0;
+ }
+ NOKPROBE_SYMBOL(kgdb_step_brk_fn);
 -- 
 2.14.1
