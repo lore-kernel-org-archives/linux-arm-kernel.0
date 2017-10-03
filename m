@@ -1,20 +1,22 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 3 Oct 2017 15:18:17 +0200
-Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
-In-Reply-To: <20170920201714.19817-9-pasha.tatashin@oracle.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-9-pasha.tatashin@oracle.com>
-Message-ID: <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Tue, 03 Oct 2017 15:19:10 +0200
+Subject: [PATCHv2 0/2]
+In-Reply-To: <1507035578-24945-1-git-send-email-andrzej.p@samsung.com>
+References: <ba580a0c-36c3-b227-61ee-97637532823e@ti.com>
+ <CGME20171003125944eucas1p1fad23e6171786fda69ccd9419354911b@eucas1p1.samsung.com>
+ <1507035578-24945-1-git-send-email-andrzej.p@samsung.com>
+Message-ID: <56d25541-109c-0d4f-eea8-9dc25c206f18@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 20-09-17 16:17:10, Pavel Tatashin wrote:
-> Some memory is reserved but unavailable: not present in memblock.memory
-> (because not backed by physical pages), but present in memblock.reserved.
-> Such memory has backing struct pages, but they are not initialized by going
-> through __init_single_page().
+W dniu 03.10.2017 o?14:59, Andrzej Pietrasiewicz pisze:
+> Hi all,
+> 
+> This is the second version of patches in this thread.
+> 
 
-Could you be more specific where is such a memory reserved?
--- 
-Michal Hocko
-SUSE Labs
+I have lost the subject of the cover letter.
+Should be "dwc3 on XU3". I did not resend the series in order
+not to spam the recipients. Sorry for confusion.
+
+Andrzej
