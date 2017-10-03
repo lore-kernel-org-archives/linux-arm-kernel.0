@@ -1,37 +1,55 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 3 Oct 2017 22:16:45 +0200
-Subject: [PATCH 4/4] ARM: OMAP: Fix typos in two comment lines in
- _omap_dm_timer_request()
-In-Reply-To: <b196ffac-4bd1-4465-cee9-e46b7405633d@users.sourceforge.net>
-References: <b196ffac-4bd1-4465-cee9-e46b7405633d@users.sourceforge.net>
-Message-ID: <fba4ace8-a277-fb08-7a6b-89d518ada080@users.sourceforge.net>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Tue, 3 Oct 2017 16:26:51 -0400
+Subject: [PATCH v9 12/12] mm: stop zeroing memory during allocation in
+ vmemmap
+In-Reply-To: <c028f65a-b4a6-e56d-3a50-5d7ad9af50cb@oracle.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-13-pasha.tatashin@oracle.com>
+ <20171003131952.aqq377pjug5me6go@dhcp22.suse.cz>
+ <c028f65a-b4a6-e56d-3a50-5d7ad9af50cb@oracle.com>
+Message-ID: <e5872937-b166-fd48-d46d-1921c738d4b1@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 3 Oct 2017 21:24:00 +0200
+Hi Michal,
 
-Adjust three words in this description.
+I decided not to merge these two patches, because in addition to sparc 
+optimization move, we have this dependancies:
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/plat-omap/dmtimer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+mm: zero reserved and unavailable struct pages
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 14779d6f425d..d443e481c3e9 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -254,8 +254,8 @@ static struct omap_dm_timer *_omap_dm_timer_request(int req_type, void *data)
- 			if (cap == (t->capability & cap)) {
- 				/*
- 				 * If timer is not NULL, we have already found
--				 * one timer but it was not an exact match
--				 * because it had more capabilites that what
-+				 * one timer. But it was not an exact match
-+				 * because it had more capabilities than what
- 				 * was required. Therefore, unreserve the last
- 				 * timer found and see if this one is a better
- 				 * match.
--- 
-2.14.2
+must be before
+
+mm: stop zeroing memory during allocation in vmemmap.
+
+Otherwise, we can end-up with struct pages that are not zeroed properly.
+
+However, the first patch depends on
+mm: zero struct pages during initialization
+
+As it uses mm_zero_struct_page().
+
+Pasha
+
+
+On 10/03/2017 11:34 AM, Pasha Tatashin wrote:
+> On 10/03/2017 09:19 AM, Michal Hocko wrote:
+>> On Wed 20-09-17 16:17:14, Pavel Tatashin wrote:
+>>> vmemmap_alloc_block() will no longer zero the block, so zero memory
+>>> at its call sites for everything except struct pages.? Struct page 
+>>> memory
+>>> is zero'd by struct page initialization.
+>>>
+>>> Replace allocators in sprase-vmemmap to use the non-zeroing version. So,
+>>> we will get the performance improvement by zeroing the memory in 
+>>> parallel
+>>> when struct pages are zeroed.
+>>
+>> Is it possible to merge this patch with 
+>> http://lkml.kernel.org/r/20170920201714.19817-7-pasha.tatashin at oracle.com
+> 
+> Yes, I will do that. It would also require re-arranging
+> [PATCH v9 07/12] sparc64: optimized struct page zeroing
+> optimization to come after this patch.
+> 
+> Pasha
