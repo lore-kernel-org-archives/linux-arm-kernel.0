@@ -1,75 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Oct 2017 10:18:37 +0100
-Subject: [PATCH v3 12/12] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when
- used as LDOs
-In-Reply-To: <CAGb2v67ZV0oZ41WS1Borrz0fDYiXV5B1DTKnPzRQVcodMOOLzQ@mail.gmail.com>
-References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
- <20171002120854.5212-13-quentin.schulz@free-electrons.com>
- <20171002204235.25d4437a2p5qzrrj@flea>
- <CAGb2v67ZV0oZ41WS1Borrz0fDYiXV5B1DTKnPzRQVcodMOOLzQ@mail.gmail.com>
-Message-ID: <20171003091837.GK20805@n2100.armlinux.org.uk>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 3 Oct 2017 11:23:23 +0200
+Subject: [PATCH] ARM: cache-l2x0-pmu: Delete an error message for a failed
+ memory allocation in l2x0_pmu_init()
+Message-ID: <672554ba-b476-8852-3c37-9e8716f1eec4@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 10:06:29AM +0800, Chen-Yu Tsai wrote:
-> On Tue, Oct 3, 2017 at 4:42 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Oct 02, 2017 at 12:08:54PM +0000, Quentin Schulz wrote:
-> >> On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
-> >> ldo_io0 and ldo_io1.
-> >>
-> >> Let's add the pinctrl properties to the said regulators.
-> >>
-> >> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> >> ---
-> >>  arch/arm/boot/dts/axp81x.dtsi | 14 ++++++++++++++
-> >>  1 file changed, 14 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
-> >> index f90f257130d5..099b0ddc1bbb 100644
-> >> --- a/arch/arm/boot/dts/axp81x.dtsi
-> >> +++ b/arch/arm/boot/dts/axp81x.dtsi
-> >> @@ -52,6 +52,16 @@
-> >>               compatible = "x-powers,axp813-gpio";
-> >>               gpio-controller;
-> >>               #gpio-cells = <2>;
-> >> +
-> >> +             gpio0_ldo: gpio0_ldo {
-> >> +                     pins = "GPIO0";
-> >> +                     function = "ldo";
-> >> +             };
-> >> +
-> >> +             gpio1_ldo: gpio1_ldo {
-> >> +                     pins = "GPIO1";
-> >> +                     function = "ldo";
-> >> +             };
-> >
-> > The node names are not supposed to contain any hyphens.
-> 
-> Hmm, I was under the impression that hyphens were preferred in
-> node names, and a warning would be added to dtc later on.
-> I might be wrong though.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Tue, 3 Oct 2017 11:16:56 +0200
 
-I think there's a terminology issue here.
+Omit an extra message for a memory allocation failure in this function.
 
-"-" is a hyphen or minus sign.
-"_" is an underscore.
+This issue was detected by using the Coccinelle software.
 
-Underscores are not supposed to be used for node names, instead hyphens
-are preferred.  I think Maxime means "underscore".
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/mm/cache-l2x0-pmu.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Here's the list from dtc/checks.c:
-
-#define LOWERCASE       "abcdefghijklmnopqrstuvwxyz"
-#define UPPERCASE       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-#define DIGITS          "0123456789"
-#define PROPNODECHARS   LOWERCASE UPPERCASE DIGITS ",._+*#?-"
-#define PROPNODECHARSSTRICT     LOWERCASE UPPERCASE DIGITS ",-"
-
-If strict mode is enabled, use of any of "._+#?" in the node name will
-produce a warning.
-
+diff --git a/arch/arm/mm/cache-l2x0-pmu.c b/arch/arm/mm/cache-l2x0-pmu.c
+index 0a1e2280141f..b3734da93010 100644
+--- a/arch/arm/mm/cache-l2x0-pmu.c
++++ b/arch/arm/mm/cache-l2x0-pmu.c
+@@ -528,10 +528,8 @@ static __init int l2x0_pmu_init(void)
+ 		return 0;
+ 
+ 	l2x0_pmu = kzalloc(sizeof(*l2x0_pmu), GFP_KERNEL);
+-	if (!l2x0_pmu) {
+-		pr_warn("Unable to allocate L2x0 PMU\n");
++	if (!l2x0_pmu)
+ 		return -ENOMEM;
+-	}
+ 
+ 	*l2x0_pmu = (struct pmu) {
+ 		.task_ctx_nr = perf_invalid_context,
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.2
