@@ -1,49 +1,52 @@
-From: razvan.stefanescu@nxp.com (Razvan Stefanescu)
-Date: Tue, 3 Oct 2017 10:07:41 +0000
-Subject: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
-In-Reply-To: <AM5PR0402MB26917E7523D582ABB0A3D0D2EC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
-References: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
- <1505811698-7338-6-git-send-email-razvan.stefanescu@nxp.com>
- <20170919121755.GB4569@lunn.ch>
- <AM5PR0402MB26917E7523D582ABB0A3D0D2EC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
-Message-ID: <AM3PR04MB0743030F8D97FFB37016F11AE6720@AM3PR04MB0743.eurprd04.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Oct 2017 11:07:20 +0100
+Subject: [PATCH] ARM: cache-l2x0-pmu: Delete an error message for a
+ failed memory allocation in l2x0_pmu_init()
+In-Reply-To: <672554ba-b476-8852-3c37-9e8716f1eec4@users.sourceforge.net>
+References: <672554ba-b476-8852-3c37-9e8716f1eec4@users.sourceforge.net>
+Message-ID: <20171003100719.GB4931@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> On Behalf Of Andrew Lunn
-> Sent: Tuesday, September 19, 2017 3:18 PM
-> To: Razvan Stefanescu <razvan.stefanescu@nxp.com>
-> Cc: devel at driverdev.osuosl.org; Ruxandra Ioana Radulescu
-> <ruxandra.radulescu@nxp.com>; arnd at arndb.de; gregkh at linuxfoundation.org;
-> Alexandru Marginean <alexandru.marginean@nxp.com>; linux-
-> kernel at vger.kernel.org; agraf at suse.de; stuyoder at gmail.com; Bogdan
-> Purcareata <bogdan.purcareata@nxp.com>; linux-arm-
-> kernel at lists.infradead.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> Subject: Re: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
+On Tue, Oct 03, 2017 at 11:23:23AM +0200, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Tue, 3 Oct 2017 11:16:56 +0200
 > 
-> On Tue, Sep 19, 2017 at 12:01:37PM +0300, Razvan Stefanescu wrote:
-> > +Driver uses the switch device driver model and exposes each switch port as
-> > +a network interface, which can be included in a bridge. Traffic switched
-> > +between ports is offloaded into the hardware. Exposed network interfaces
-> > +are not used for I/O, they are used just for configuration. This
-> > +limitation is going to be addressed in the future.
+> Omit an extra message for a memory allocation failure in this function.
 > 
-> Hi Razvan
+> This issue was detected by using the Coccinelle software.
 > 
-> Could you briefly describe how Ethernet frames get from the CPU to the
-> switch. This is what decided if you should write a plain switchdev
-> driver, or a DSA driver.
-> 
-> 	Andrew
-> 
-Hello Andrew,
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-CPU frame handling will be added in a later. Each netdevice associated 
-to a switch port will have I/O capabilities like dpaa2-ethernet devices.
-The dpaa2-ethsw will use ACLs to redirect specific types of frames
-(i.e BPDUs) to CPU.
+FWIW:
 
-Best regards,
-Razvan S.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+I assume you'll drop this in Russell's patch system.
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm/mm/cache-l2x0-pmu.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-l2x0-pmu.c b/arch/arm/mm/cache-l2x0-pmu.c
+> index 0a1e2280141f..b3734da93010 100644
+> --- a/arch/arm/mm/cache-l2x0-pmu.c
+> +++ b/arch/arm/mm/cache-l2x0-pmu.c
+> @@ -528,10 +528,8 @@ static __init int l2x0_pmu_init(void)
+>  		return 0;
+>  
+>  	l2x0_pmu = kzalloc(sizeof(*l2x0_pmu), GFP_KERNEL);
+> -	if (!l2x0_pmu) {
+> -		pr_warn("Unable to allocate L2x0 PMU\n");
+> +	if (!l2x0_pmu)
+>  		return -ENOMEM;
+> -	}
+>  
+>  	*l2x0_pmu = (struct pmu) {
+>  		.task_ctx_nr = perf_invalid_context,
+> -- 
+> 2.14.2
+> 
