@@ -1,72 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Oct 2017 14:56:21 +0100
-Subject: [PATCH] rtc: armada38x: add support for trimming the RTC
-In-Reply-To: <20171003132433.vkgjxuoeq26x3f47@piout.net>
-References: <E1dxsSB-0006RM-08@rmk-PC.armlinux.org.uk>
- <20171003132433.vkgjxuoeq26x3f47@piout.net>
-Message-ID: <20171003135620.GN20805@n2100.armlinux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 3 Oct 2017 15:09:35 +0100
+Subject: [PATCH v2] arm64: dts: foundation-v8: Enable PSCI mode
+In-Reply-To: <8c4a4114-b7f7-301e-20b8-960e6234b661@linaro.org>
+References: <20170918153832.16356-1-daniel.thompson@linaro.org>
+ <20170919183204.12751-1-daniel.thompson@linaro.org>
+ <da8a0cf5-3c1e-1398-b5c3-ac489ae955fa@arm.com>
+ <9a542b9a-3c37-ed8a-04e6-de41493f4b0d@linaro.org>
+ <e49177f9-a9a8-e322-3743-5c58277c46ea@arm.com>
+ <8c4a4114-b7f7-301e-20b8-960e6234b661@linaro.org>
+Message-ID: <521d6f60-ee90-bc96-97a7-1da33170a9c4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 03:24:33PM +0200, Alexandre Belloni wrote:
-> Hi Russell,
+
+
+On 03/10/17 10:12, Daniel Thompson wrote:
+> On 02/10/17 18:26, Sudeep Holla wrote:
+>> Sorry for late response, I thought I had sent this mail out long back
+>> but was sitting in my draft :(
 > 
-> On 29/09/2017 at 11:23:31 +0100, Russell King wrote:
-> > +/*
-> > + * The information given in the Armada 388 functional spec is complex.
-> > + * They give two different formulas for calculating the offset value,
-> > + * but when considering "Offset" as an 8-bit signed integer, they both
-> > + * reduce down to (we shall rename "Offset" as "val" here):
-> > + *
-> > + *   val = (f_ideal / f_measured - 1) / resolution   where f_ideal = 32768
-> > + *
-> > + * Converting to time, f = 1/t:
-> > + *   val = (t_measured / t_ideal - 1) / resolution   where t_ideal = 1/32768
-> > + *
-> > + *   =>  t_measured / t_ideal = val * resolution + 1
-> > + *
-> > + * "offset" in the RTC interface is defined as:
-> > + *   t = t0 * (1 + offset * 1e-9)
-> > + * where t is the desired period, t0 is the measured period with a zero
-> > + * offset, which is t_measured above. With t0 = t_measured and t = t_ideal,
-> > + *   offset = (t_ideal / t_measured - 1) / 1e-9
-> > + *
-> > + *   => t_ideal / t_measured = offset * 1e-9 + 1
-> > + *
-> > + * so:
-> > + *
-> > + *   offset * 1e-9 + 1 = 1 / (val * resolution + 1)
-> > + *
-> > + * We want "resolution" to be an integer, so resolution = R * 1e-9, giving
-> > + *   offset = 1e18 / (val * R + 1e9) - 1e9
-> > + *   val = (1e18 / (offset + 1e9) - 1e9) / R
-> > + * with a common transformation:
-> > + *   f(x) = 1e18 / (x + 1e9) - 1e9
-> > + *   offset = f(val * R)
-> > + *   val = f(offset) / R
-> > + *
-> > + * Armada 38x supports two modes, fine mode (954ppb) and coarse mode (3815ppb).
-> > + */
-> > +static long armada38x_ppb_convert(long ppb)
-> > +{
-> > +	long div = ppb + 1000000000L;
-> > +
-> > +	return div_s64(1000000000000000000LL + div / 2, div) - 1000000000L;
+> No worries. I've been at Linaro connect this last week anyway.
 > 
-> The previous comment is perfect but it was not completely obvious to me
-> why you are adding div / 2. Maybe you can add a small comment.
+> 
+>> On 20/09/17 12:17, Daniel Thompson wrote:
+>>> On 20/09/17 10:42, Sudeep Holla wrote:
+>>>>
+>>>>
+>>>> On 19/09/17 19:32, Daniel Thompson wrote:
+>>>>> Currently if the Foundation model is running ARM Trusted Firmware then
+>>>>> the kernel, which is configured to use spin tables, cannot start
+>>>>> secondary
+>>>>> processors or "power off" the simulation.
+>>>>>
+>>>>> After adding a couple of labels to the include file and splitting out
+>>>>> the
+>>>>> spin-table configuration into a header, we add a couple of new headers
+>>>>> together with two new DTs (GICv2+PSCI and GICv3+PSCI).
+>>>>>
+>>>>> The new GICv3+PSCI DT has been boot tested, the remaining three
+>>>>> (two of
+>>>>> which existed prior to this patch) have been "tested" by
+>>>>> decompiling the
+>>>>> blobs and comparing them against a reference.
+>>>>>
+>>>>
+>>>> How different are these from the ones hosted in [1] ?
+>>>
+>>> They look like they were either independently written or diverged a long
+>>> time ago. The existing kernel DTs describe hardware absent from the ARM
+>>> TF ones and vice versa.
+>>>
+>>
+>> OK.
+>>
+>>> With specific reference to PSCI it looks like my patches could perhaps
+>>> be improved by adding idle-state support.
+>>
+>> Yes I know.
+> 
+> You want a v3 with it added?
+> 
 
-It's the standard way to turn a regular integer division into one which
-rounds-to-closest - I consider it to be one of the basics which every
-programmer should know, and therefore should be obvious.
+No, that's fine. I have pushed this already [1] with Mark's ack for now.
+We can add it later after some testing, not urgent.
 
-Integer division in the form of:
+--
+Regards,
+Sudeep
 
-	r = (a + b / 2) / b
-
-should be part of the programmers basic knowledge set.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+[1] https://git.kernel.org/sudeep.holla/linux/h/for-next/juno
