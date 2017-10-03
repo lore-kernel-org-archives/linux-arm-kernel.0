@@ -1,53 +1,51 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 3 Oct 2017 15:17:17 +0930
-Subject: [PATCH v2 4/5] clk: aspeed: Register gated clocks
-In-Reply-To: <20171002213742.GQ457@codeaurora.org>
+Date: Tue, 3 Oct 2017 15:18:00 +0930
+Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
+In-Reply-To: <20171002212435.GP457@codeaurora.org>
 References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-5-joel@jms.id.au>
- <20171002213742.GQ457@codeaurora.org>
-Message-ID: <CACPK8XdrqmBC8M+=NDUVhYKPafw-Qc8fRikV+xJ84FyzG6BfxQ@mail.gmail.com>
+ <20170921042641.7326-4-joel@jms.id.au>
+ <20171002212435.GP457@codeaurora.org>
+Message-ID: <CACPK8XeHj2xdw6HgkWRDiJPjurip3wVbkOmY0mGW=dSTVWsYmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 7:07 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Tue, Oct 3, 2017 at 6:54 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 > On 09/21, Joel Stanley wrote:
->> The majority of the clocks in the system are gates paired with a reset
->> controller that holds the IP in reset.
->>
->> This borrows from clk_hw_register_gate, but registers two 'gates', one
->> to control the clock enable register and the other to control the reset
->> IP. This allows us to enforce the ordering:
->>
->>  1. Place IP in reset
->>  2. Enable clock
->>  3. Delay
->>  4. Release reset
->>
->> There are some gates that do not have an associated reset; these are
->> handled by using -1 as the index for the reset.
+>> @@ -160,6 +191,104 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
+>> +     /*
+>> +      * Memory controller (M-PLL) PLL. This clock is configured by the
+>> +      * bootloader, and is exposed to Linux as a read-only clock rate.
+>> +      */
+>> +     regmap_read(map, ASPEED_MPLL_PARAM, &val);
+>> +     aspeed_clk_data->hws[ASPEED_CLK_MPLL] = aspeed_calc_pll("mpll", val);
+>> +
+>> +     /* SD/SDIO clock divider (TODO: There's a gate too) */
+>> +     hw = clk_hw_register_divider_table(NULL, "sdio", "hpll", 0,
 >
-> Half of these aren't clks, but reset bits? Perhaps you should
-> register power domains for these things and then have the power
-> domain assert the reset, enable the clock, delay, and then
-> release the reset in the poweron callback. Then device drivers
-> don't have to be aware of the ordering, and you can keep
-> enforcing the ordering in one place, but we don't have to make
-> fake gates and shoehorn the sequence into the clk framework.
+> Please pass your dev pointer here from the platform device.
+>
+>> +                     scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
+>> +                     div_table,
+>> +                     &aspeed_clk_lock);
+>
+> And check for errors? Perhaps use devm_clk_hw_regsiter() APIs and
+> construct the dividers and muxes directly instead of using the
+> basic type registration APIs.
 
-I had a look. We've got 24 gates being registered, and half are just
-gate+reset pairs, while the other half are both. Some of them have
-clocks with divisors upstream of the gate, so in those cases we do
-care what the rate is. For the others they are simply bringing the IP
-online.
+Do you think that devm_ is overkill, given we will never unload this driver?
 
-Note that we don't have drivers for all of the peripherals, so things
-may change once those drivers are written.
+Can you explain why you suggest to construct the structures directly
+instead of using the APIs?
 
-I hadn't looked into the power domain stuff - when I brought this up
-on the list recently Philip suggested that this should be contained in
-a clk driver, so that's the direction we went:
+I had a read of the basic type registration functions, and the
+relevant failure paths are memory allocation failures. If we're out of
+memory that early in boot then things have gone pretty bad.
 
- http://www.spinics.net/lists/linux-clk/msg18733.html
+I can add checks for null and bail out; I don't think there's value in
+freeing the allocated memory: if a system can't load it's clock driver
+then it's super hosed.
+
+Thanks for the review. I fixed all of the other things you mentioned.
 
 Cheers,
 
