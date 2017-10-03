@@ -1,33 +1,90 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Tue, 3 Oct 2017 07:48:08 +0000
-Subject: [PATCH v3 1/3] crypto: engine - permit to enqueue aead_request
-In-Reply-To: <20170922090921.GA15677@gondor.apana.org.au>
-References: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
- <1503047946-27799-2-git-send-email-fabien.dessenne@st.com>
- <20170922090921.GA15677@gondor.apana.org.au>
-Message-ID: <20206811-7075-5ca9-98cd-26a5709751fb@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 3 Oct 2017 10:09:21 +0200
+Subject: [PATCH] PM: ARM: locomo: Drop suspend and resume bus type
+ callbacks
+In-Reply-To: <2826985.0zUqx1lpzM@aspire.rjw.lan>
+References: <2826985.0zUqx1lpzM@aspire.rjw.lan>
+Message-ID: <CAPDyKFrkUW7S7hkEsYH9UWex3F=1QHFLozxyMey1e+XT2a8JGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/17 11:09, Herbert Xu wrote:
-> On Fri, Aug 18, 2017 at 11:19:04AM +0200, Fabien Dessenne wrote:
->> The current crypto engine allows ablkcipher_request and ahash_request to
->> be enqueued. Extend this to aead_request.
->>
->> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
-> I'd like to see the crypto_engine interface cleaned up a little
-> before we expand it further.  Please refer to
+On 26 September 2017 at 22:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 >
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
+> None of the locomo drivers in the tree implements the suspend and
+> resume callbacks from struct locomo_driver, so drop them and drop
+> the corresponding callbacks from locomo_bus_type.
 >
-> Thanks,
-It looks like there is no more activity around this "crypto_engine 
-interface clean up" task.
-This unfortunately has been blocking the introduction of this new STM32 
-crypto driver for 3 months now.
-Would it make sense to have this driver reviewed first, and then 
-reworked (I expect minor update here) when the interface update is ready?
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-BR
+FWIW:
 
-Fabien
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Do you also plan to convert the locomo_device_driver (platform_driver)
+to be converted to the modern PM callbacks for suspend/resume?
+
+Kind regards
+Uffe
+
+> ---
+>  arch/arm/common/locomo.c               |   24 ------------------------
+>  arch/arm/include/asm/hardware/locomo.h |    2 --
+>  2 files changed, 26 deletions(-)
+>
+> Index: linux-pm/arch/arm/include/asm/hardware/locomo.h
+> ===================================================================
+> --- linux-pm.orig/arch/arm/include/asm/hardware/locomo.h
+> +++ linux-pm/arch/arm/include/asm/hardware/locomo.h
+> @@ -189,8 +189,6 @@ struct locomo_driver {
+>         unsigned int            devid;
+>         int (*probe)(struct locomo_dev *);
+>         int (*remove)(struct locomo_dev *);
+> -       int (*suspend)(struct locomo_dev *, pm_message_t);
+> -       int (*resume)(struct locomo_dev *);
+>  };
+>
+>  #define LOCOMO_DRV(_d) container_of((_d), struct locomo_driver, drv)
+> Index: linux-pm/arch/arm/common/locomo.c
+> ===================================================================
+> --- linux-pm.orig/arch/arm/common/locomo.c
+> +++ linux-pm/arch/arm/common/locomo.c
+> @@ -826,28 +826,6 @@ static int locomo_match(struct device *_
+>         return dev->devid == drv->devid;
+>  }
+>
+> -static int locomo_bus_suspend(struct device *dev, pm_message_t state)
+> -{
+> -       struct locomo_dev *ldev = LOCOMO_DEV(dev);
+> -       struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
+> -       int ret = 0;
+> -
+> -       if (drv && drv->suspend)
+> -               ret = drv->suspend(ldev, state);
+> -       return ret;
+> -}
+> -
+> -static int locomo_bus_resume(struct device *dev)
+> -{
+> -       struct locomo_dev *ldev = LOCOMO_DEV(dev);
+> -       struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
+> -       int ret = 0;
+> -
+> -       if (drv && drv->resume)
+> -               ret = drv->resume(ldev);
+> -       return ret;
+> -}
+> -
+>  static int locomo_bus_probe(struct device *dev)
+>  {
+>         struct locomo_dev *ldev = LOCOMO_DEV(dev);
+> @@ -875,8 +853,6 @@ struct bus_type locomo_bus_type = {
+>         .match          = locomo_match,
+>         .probe          = locomo_bus_probe,
+>         .remove         = locomo_bus_remove,
+> -       .suspend        = locomo_bus_suspend,
+> -       .resume         = locomo_bus_resume,
+>  };
+>
+>  int locomo_driver_register(struct locomo_driver *driver)
+>
