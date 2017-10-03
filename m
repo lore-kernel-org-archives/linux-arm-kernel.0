@@ -1,121 +1,70 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Oct 2017 16:56:31 -0500
-Subject: [PATCH v2 1/3] dt-bindings: Add document for rockchip RGB output
- interface
-In-Reply-To: <1506049229-117376-1-git-send-email-hjc@rock-chips.com>
-References: <1506049221-117283-1-git-send-email-hjc@rock-chips.com>
- <1506049229-117376-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <20171003215631.rc2jsf2m3qgoltsb@rob-hp-laptop>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Tue, 3 Oct 2017 14:58:43 -0700
+Subject: [PATCH 2/2] of/fdt: skip unflattening of disabled nodes
+In-Reply-To: <nycvar.YSQ.7.76.1710031444060.5407@knanqh.ubzr>
+References: <20171003161815.25999-1-robh@kernel.org>
+ <20171003161815.25999-2-robh@kernel.org>
+ <nycvar.YSQ.7.76.1710031444060.5407@knanqh.ubzr>
+Message-ID: <59D40813.4020009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 11:00:26AM +0800, Sandy Huang wrote:
-> This path add support rv1108 rgb output interface driver.
+On 10/03/17 11:46, Nicolas Pitre wrote:
+> On Tue, 3 Oct 2017, Rob Herring wrote:
 > 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> ---
-> Changes in v2:
->  1. rename rockchip,rgb-mode to rgb-mode;
-
-You can't just drop the vendor. This needs to be documented in a common 
-place that others will find and use. See panel-common.txt or 
-panel-dpi.txt.
-
-Alternatively, you could just drop it and let the panel compatible imply 
-what the mode is. 
-
-
->  2. delete reg for signle endpoint;
+>> For static DT usecases, we don't need the disabled nodes and can skip
+>> unflattening. This saves a significant amount of RAM in memory constrained
+>> cases. In one example on STM32F469, the RAM usage goes from 118K to 26K.
+>>
+>> There are a few cases in the kernel that modify the status property
+>> dynamically. These all are changes from enabled to disabled, depend on
+>> OF_DYNAMIC or are not FDT based (PDT based).
+>>
+>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> Cc: Frank Rowand <frowand.list@gmail.com>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
 > 
->  .../bindings/display/rockchip/rockchip-rgb.txt     | 78 ++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+> Tested-by: Nicolas Pitre <nico@linaro.org>
 > 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> new file mode 100644
-> index 0000000..86bd1ce
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> @@ -0,0 +1,78 @@
-> +Rockchip RV1108 RGB interface
-> +================================
-> +
-> +Required properties:
-> +- compatible: matching the soc type:
-> +	- "rockchip,rv1108-rgb";
-> +
-> +Optional properties:
-> +- pinctrl-names: must contain a "lcdc" entry.
-> +- pinctrl-0: pin control group to be used for this interface.
-> +
-> +Required nodes:
-> +- rgb-mode: should be "p888", "p666", "p565", "s888", "s888-dummy"
-> +	- p888: output r8-g8-b8 at each dclk cycle for per-pixel
-> +	- p666: output r6-g6-b6 at each dclk cycle for per-pixel
-> +	- p565: output r5-g6-b5 at each dclk cycle for per-pixel
-> +	- s888: output r8-g8-b8 in three dclk cycle for per-pixel
-> +	- s888-dmmy: output r8-g8-b8-dummy in four dclk cycle for per-pixel
-> +
-> +The rgb has two video ports described by:
-> +	Documentation/devicetree/bindings/media/video-interfaces.txt
-> +Their connections are modeled using the OF graph bindings specified in
-> +	Documentation/devicetree/bindings/graph.txt.
-> +
-> +- video port 0 for the VOP input, the remote endpoint maybe vopb/vopl/vop
-> +- video port 1 for either a panel or subsequent encoder
-> +
-> +the panel described by:
-> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> +Panel other required properties:
-> +- ports for remote rgb output.
-> +
-> +Example:
-> +
-> +panel: panel {
-> +	compatible = "auo,b101ean01";
-> +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
-> +
-> +	ports {
-> +		panel_in_rgb: endpoint {
-> +			remote-endpoint = <&rgb_out_panel>;
-> +		};
-> +	};
-> +};
-> +
-> +For Rockchip RV1108:
-> +
-> +	rgb: rgb {
-> +		compatible = "rockchip,rv1108-rgb";
-> +		pinctrl-names = "lcdc";
-> +		pinctrl-0 = <&lcdc_ctl>;
-> +		rgb-mode = "p888";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			rgb_in: port at 0 {
-> +				reg = <0>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				rgb_in_vop: endpoint {
-> +					remote-endpoint = <&vop_out_rgb>;
-> +				};
-> +			};
-> +
-> +			rgb_out: port at 1 {
-> +				reg = <1>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				rgb_out_panel: endpoint {
-> +					remote-endpoint = <&panel_in_rgb>;
-> +				};
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.7.4
+>> ---
+>> For more background, see this presentation from Nico:
+>>
+>> https://connect.linaro.org/resource/sfo17/sfo17-100/
 > 
+> Oh my ... this is horrible ...
+
+I found the presentation to be quite good and useful.
+The Linaro site does not have the slides, could you please send
+me a copy?
+
+Thanks,
+
+Frank
+
+> 
+> /me hides in shame
+> 
+>>
+>>  drivers/of/fdt.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>> index f8c39705418b..efe91c6856a0 100644
+>> --- a/drivers/of/fdt.c
+>> +++ b/drivers/of/fdt.c
+>> @@ -396,6 +396,10 @@ static int unflatten_dt_nodes(const void *blob,
+>>  		if (WARN_ON_ONCE(depth >= FDT_MAX_DEPTH))
+>>  			continue;
+>>  
+>> +		if (!IS_ENABLED(CONFIG_OF_DYNAMIC) &&
+>> +		    !of_fdt_device_is_available(blob, offset))
+>> +			continue;
+>> +
+>>  		if (!populate_node(blob, offset, &mem, nps[depth],
+>>  				   &nps[depth+1], dryrun))
+>>  			return mem - base;
+>> -- 
+>> 2.11.0
+>>
+>>
 > 
