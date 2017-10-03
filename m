@@ -1,97 +1,69 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:11:01 -0500
-Subject: [RFC PATCH v2 19/31] KVM: arm64: Describe AT instruction emulation
- design
-In-Reply-To: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
-References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1507000273-3735-17-git-send-email-jintack.lim@linaro.org>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Tue, 3 Oct 2017 11:45:38 +0800
+Subject: 4879b7ae05 ("Merge tag 'dmaengine-4.12-rc1' of .."): WARNING:
+ kernel stack regs at bd92bc2e in 01-cpu-hotplug:3811 has bad 'bp' value
+ 000001be
+In-Reply-To: <20171002213109.5n3skzy76edhwkvf@treble>
+References: <59d177a7.vsiddgOxdHRIlRvy%fengguang.wu@intel.com>
+ <CA+55aFz_ijfUxyk2kdLhfzfS1z0_uRBw6eQb9UxFvh=5zOzzaw@mail.gmail.com>
+ <20171002212654.rsm4uj3hfioddldd@treble>
+ <20171002213109.5n3skzy76edhwkvf@treble>
+Message-ID: <20171003034538.ntvuwtm2uha6wt6h@wfg-t540p.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This design overview will help to digest the subsequent patches that
-implement AT instruction emulation.
+Hi Josh,
 
-Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
----
- arch/arm64/kvm/sys_regs.c | 66 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+On Mon, Oct 02, 2017 at 04:31:09PM -0500, Josh Poimboeuf wrote:
+>On Mon, Oct 02, 2017 at 04:26:54PM -0500, Josh Poimboeuf wrote:
+>> Fengguang, assuming it's reliably recreatable, any chance you could
+>> recreate with the following patch?
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 8d04926..d8728cc 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1621,6 +1621,72 @@ static bool access_id_aa64mmfr0_el1(struct kvm_vcpu *v,
- 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
- };
- 
-+/*
-+ * AT instruction emulation
-+ *
-+ * We emulate AT instructions executed in the virtual EL2.
-+ * Basic strategy for the stage-1 translation emulation is to load proper
-+ * context, which depends on the trapped instruction and the virtual HCR_EL2,
-+ * to the EL1 virtual memory control registers and execute S1E[01] instructions
-+ * in EL2. See below for more detail.
-+ *
-+ * For the stage-2 translation, which is necessary for S12E[01] emulation,
-+ * we walk the guest hypervisor's stage-2 page table in software.
-+ *
-+ * The stage-1 translation emulations can be divided into two groups depending
-+ * on the translation regime.
-+ *
-+ * 1. EL2 AT instructions: S1E2x
-+ * +-----------------------------------------------------------------------+
-+ * |                             |         Setting for the emulation       |
-+ * | Virtual HCR_EL2.E2H on trap |-----------------------------------------+
-+ * |                             | Phys EL1 regs | Phys NV, NV1 | Phys TGE |
-+ * |-----------------------------------------------------------------------|
-+ * |             0               |     vEL2      |    (1, 1)    |    0     |
-+ * |             1               |     vEL2      |    (0, 0)    |    0     |
-+ * +-----------------------------------------------------------------------+
-+ *
-+ * We emulate the EL2 AT instructions by loading virtual EL2 context
-+ * to the EL1 virtual memory control registers and executing corresponding
-+ * EL1 AT instructions.
-+ *
-+ * We set physical NV and NV1 bits to use EL2 page table format for non-VHE
-+ * guest hypervisor (i.e. HCR_EL2.E2H == 0). As a VHE guest hypervisor uses the
-+ * EL1 page table format, we don't set those bits.
-+ *
-+ * We should clear physical TGE bit not to use the EL2 translation regime when
-+ * the host uses the VHE feature.
-+ *
-+ *
-+ * 2. EL0/EL1 AT instructions: S1E[01]x, S12E1x
-+ * +----------------------------------------------------------------------+
-+ * |   Virtual HCR_EL2 on trap  |        Setting for the emulation        |
-+ * |----------------------------------------------------------------------+
-+ * | (vE2H, vTGE) | (vNV, vNV1) | Phys EL1 regs | Phys NV, NV1 | Phys TGE |
-+ * |----------------------------------------------------------------------|
-+ * |    (0, 0)*   |   (0, 0)    |      vEL1     |    (0, 0)    |    0     |
-+ * |    (0, 0)    |   (1, 1)    |      vEL1     |    (1, 1)    |    0     |
-+ * |    (1, 1)    |   (0, 0)    |      vEL2     |    (0, 0)    |    0     |
-+ * |    (1, 1)    |   (1, 1)    |      vEL2     |    (1, 1)    |    0     |
-+ * +----------------------------------------------------------------------+
-+ *
-+ * *For (0, 0) in the 'Virtual HCR_EL2 on trap' column, it actually means
-+ *  (1, 1). Keep them (0, 0) just for the readability.
-+ *
-+ * We set physical EL1 virtual memory control registers depending on
-+ * (vE2H, vTGE) pair. When the pair is (0, 0) where AT instructions are
-+ * supposed to use EL0/EL1 translation regime, we load the EL1 registers with
-+ * the virtual EL1 registers (i.e. EL1 registers from the guest hypervisor's
-+ * point of view). When the pair is (1, 1), however, AT instructions are defined
-+ * to apply EL2 translation regime. To emulate this behavior, we load the EL1
-+ * registers with the virtual EL2 context. (i.e the shadow registers)
-+ *
-+ * We respect the virtual NV and NV1 bit for the emulation. When those bits are
-+ * set, it means that a guest hypervisor would like to use EL2 page table format
-+ * for the EL1 translation regime. We emulate this by setting the physical
-+ * NV and NV1 bits.
-+ */
-+
- #define SYS_INSN_TO_DESC(insn, access_fn, forward_fn)	\
- 	{ SYS_DESC((insn)), (access_fn), NULL, 0, 0, NULL, NULL, (forward_fn) }
- static struct sys_reg_desc sys_insn_descs[] = {
--- 
-1.9.1
+Sure, I'll try your patch on v4.14-rc3 since it looks the most
+reproducible kernel. For the bisected 4879b7ae05, the warning only
+shows up once out of 909 boots according to the below stats. So I'm
+not sure whether it's the _first_ bad commit. To double confirm, I
+just queued 5000 more boot tests for each of its parent commits.
+
+> ecc721a72c  Merge tag 'pwm/for-4.12-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm
+> be13ec668d  Merge branch 'topic/pl330' into for-linus
+> 4879b7ae05  Merge tag 'dmaengine-4.12-rc1' of git://git.infradead.org/users/vkoul/slave-dma
+> 9e66317d3c  Linux 4.14-rc3
+> 1418b85217  Add linux-next specific files for 20170929
+> +-------------------------------------------------------+------------+------------+------------+-----------+---------------+
+> |                                                       | ecc721a72c | be13ec668d | 4879b7ae05 | v4.14-rc3 | next-20170929 |
+> +-------------------------------------------------------+------------+------------+------------+-----------+---------------+
+> | boot_successes                                        | 1009       | 1009       | 909        | 5         | 510           |
+> | boot_failures                                         | 0          | 0          | 1          | 4         | 153           |
+> | WARNING:kernel_stack                                  | 0          | 0          | 1          | 3         | 111           |
+> | BUG:unable_to_handle_kernel                           | 0          | 0          | 0          | 3         | 48            |
+> | Oops:#[##]                                            | 0          | 0          | 0          | 3         | 48            |
+> | EIP:update_stack_state                                | 0          | 0          | 0          | 3         | 48            |
+> | Kernel_panic-not_syncing:Fatal_exception_in_interrupt | 0          | 0          | 0          | 3         | 48            |
+> | invoked_oom-killer:gfp_mask=0x                        | 0          | 0          | 0          | 1         | 16            |
+> | Mem-Info                                              | 0          | 0          | 0          | 1         | 16            |
+> | EIP:clear_user                                        | 0          | 0          | 0          | 0         | 2             |
+> | EIP:copy_page_to_iter                                 | 0          | 0          | 0          | 0         | 1             |
+> +-------------------------------------------------------+------------+------------+------------+-----------+---------------+
+
+>Sorry, here's a version which actually compiles.
+
+OK.
+
+Thanks,
+Fengguang
+
+>diff --git a/arch/x86/kernel/unwind_frame.c b/arch/x86/kernel/unwind_frame.c
+>index d145a0b1f529..00234fa5a33a 100644
+>--- a/arch/x86/kernel/unwind_frame.c
+>+++ b/arch/x86/kernel/unwind_frame.c
+>@@ -44,7 +44,8 @@ static void unwind_dump(struct unwind_state *state)
+> 			state->stack_info.type, state->stack_info.next_sp,
+> 			state->stack_mask, state->graph_idx);
+>
+>-	for (sp = state->orig_sp; sp; sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
+>+	for (sp = PTR_ALIGN(state->orig_sp, sizeof(long)); sp;
+>+	     sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
+> 		if (get_stack_info(sp, state->task, &stack_info, &visit_mask))
+> 			break;
+>
