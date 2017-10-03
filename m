@@ -1,10 +1,10 @@
 From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 04 Oct 2017 00:28:15 +0100
+Date: Wed, 04 Oct 2017 00:28:31 +0100
 Subject: [PATCH REPOST 1/3] arm64: Use existing defines for mdscr
 In-Reply-To: <1507050352-15909-2-git-send-email-julien.thierry@arm.com>
 References: <1507050352-15909-1-git-send-email-julien.thierry@arm.com>
  <1507050352-15909-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <87zi97yfow.fsf@linaro.org>
+Message-ID: <87y3oryfog.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,7 +16,9 @@ Julien Thierry <julien.thierry@arm.com> writes:
 > Cc: Will Deacon <will.deacon@arm.com>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Sorry I meant:
+
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
 >
 > ---
