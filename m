@@ -1,42 +1,51 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 3 Oct 2017 09:52:08 +0800
-Subject: [arm:for-next 9/11] awk: line 2: function strtonum never defined
-Message-ID: <201710030905.zGRrw4dZ%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 3 Oct 2017 10:06:29 +0800
+Subject: [PATCH v3 12/12] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when
+ used as LDOs
+In-Reply-To: <20171002204235.25d4437a2p5qzrrj@flea>
+References: <20171002120854.5212-1-quentin.schulz@free-electrons.com>
+ <20171002120854.5212-13-quentin.schulz@free-electrons.com>
+ <20171002204235.25d4437a2p5qzrrj@flea>
+Message-ID: <CAGb2v67ZV0oZ41WS1Borrz0fDYiXV5B1DTKnPzRQVcodMOOLzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, Oct 3, 2017 at 4:42 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Oct 02, 2017 at 12:08:54PM +0000, Quentin Schulz wrote:
+>> On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
+>> ldo_io0 and ldo_io1.
+>>
+>> Let's add the pinctrl properties to the said regulators.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/axp81x.dtsi | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+>> index f90f257130d5..099b0ddc1bbb 100644
+>> --- a/arch/arm/boot/dts/axp81x.dtsi
+>> +++ b/arch/arm/boot/dts/axp81x.dtsi
+>> @@ -52,6 +52,16 @@
+>>               compatible = "x-powers,axp813-gpio";
+>>               gpio-controller;
+>>               #gpio-cells = <2>;
+>> +
+>> +             gpio0_ldo: gpio0_ldo {
+>> +                     pins = "GPIO0";
+>> +                     function = "ldo";
+>> +             };
+>> +
+>> +             gpio1_ldo: gpio1_ldo {
+>> +                     pins = "GPIO1";
+>> +                     function = "ldo";
+>> +             };
+>
+> The node names are not supposed to contain any hyphens.
 
-FYI, the error/warning still remains.
+Hmm, I was under the impression that hyphens were preferred in
+node names, and a warning would be added to dtc later on.
+I might be wrong though.
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
-head:   3cef8ede5ead55fbaf2225206f00361828adc3a1
-commit: 887518f5e9963a82c3fc2ad8911eedb2304f8c57 [9/11] ARM: decompressor: fix BSS size calculation
-config: arm-clps711x_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 887518f5e9963a82c3fc2ad8911eedb2304f8c57
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> awk: line 2: function strtonum never defined
->> awk: line 2: function strtonum never defined
---
->> awk: line 2: function strtonum never defined
->> awk: line 2: function strtonum never defined
-   arm-linux-gnueabi-nm: 'arch/arm/boot/compressed/../../../../vmlinux': No such file
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 12371 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171003/dca33ac4/attachment-0001.gz>
+ChenYu
