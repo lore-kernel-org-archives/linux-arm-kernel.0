@@ -1,138 +1,40 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 3 Oct 2017 15:19:52 +0200
-Subject: [PATCH v9 12/12] mm: stop zeroing memory during allocation in
- vmemmap
-In-Reply-To: <20170920201714.19817-13-pasha.tatashin@oracle.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-13-pasha.tatashin@oracle.com>
-Message-ID: <20171003131952.aqq377pjug5me6go@dhcp22.suse.cz>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 3 Oct 2017 15:21:27 +0200
+Subject: [PATCH] ARM: cpuidle: Avoid memleak if init fail
+In-Reply-To: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
+References: <1504211076-2331-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <d785929a-a6af-b803-d34d-a7138102f55f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 20-09-17 16:17:14, Pavel Tatashin wrote:
-> vmemmap_alloc_block() will no longer zero the block, so zero memory
-> at its call sites for everything except struct pages.  Struct page memory
-> is zero'd by struct page initialization.
+On 31/08/2017 22:24, Stefan Wahren wrote:
+> In case there are no DT idle states defined or
+> cpuidle_register_driver() fails, the copy of the idle driver is leaked:
 > 
-> Replace allocators in sprase-vmemmap to use the non-zeroing version. So,
-> we will get the performance improvement by zeroing the memory in parallel
-> when struct pages are zeroed.
-
-Is it possible to merge this patch with http://lkml.kernel.org/r/20170920201714.19817-7-pasha.tatashin at oracle.com
-
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+>     unreferenced object 0xede0dc00 (size 1024):
+>     comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
+>     hex dump (first 32 bytes):
+>     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00 ................
+>     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00 WFI.............
+>     backtrace:
+>     [<c1295f04>] arm_idle_init+0x44/0x1ac
+>     [<c0301e6c>] do_one_initcall+0x3c/0x16c
+>     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
+>     [<c0cb3624>] kernel_init+0x8/0x114
+>     [<c0307a98>] ret_from_fork+0x14/0x3c
+> 
+> So fix this by freeing the unregistered copy in error case.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition")
 > ---
->  include/linux/mm.h  | 11 +++++++++++
->  mm/sparse-vmemmap.c | 15 +++++++--------
->  mm/sparse.c         |  6 +++---
->  3 files changed, 21 insertions(+), 11 deletions(-)
-> 
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index a7bba4ce79ba..25848764570f 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -2501,6 +2501,17 @@ static inline void *vmemmap_alloc_block_buf(unsigned long size, int node)
->  	return __vmemmap_alloc_block_buf(size, node, NULL);
->  }
->  
-> +static inline void *vmemmap_alloc_block_zero(unsigned long size, int node)
-> +{
-> +	void *p = vmemmap_alloc_block(size, node);
-> +
-> +	if (!p)
-> +		return NULL;
-> +	memset(p, 0, size);
-> +
-> +	return p;
-> +}
-> +
->  void vmemmap_verify(pte_t *, int, unsigned long, unsigned long);
->  int vmemmap_populate_basepages(unsigned long start, unsigned long end,
->  			       int node);
-> diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
-> index d1a39b8051e0..c2f5654e7c9d 100644
-> --- a/mm/sparse-vmemmap.c
-> +++ b/mm/sparse-vmemmap.c
-> @@ -41,7 +41,7 @@ static void * __ref __earlyonly_bootmem_alloc(int node,
->  				unsigned long align,
->  				unsigned long goal)
->  {
-> -	return memblock_virt_alloc_try_nid(size, align, goal,
-> +	return memblock_virt_alloc_try_nid_raw(size, align, goal,
->  					    BOOTMEM_ALLOC_ACCESSIBLE, node);
->  }
->  
-> @@ -54,9 +54,8 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
->  	if (slab_is_available()) {
->  		struct page *page;
->  
-> -		page = alloc_pages_node(node,
-> -			GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
-> -			get_order(size));
-> +		page = alloc_pages_node(node, GFP_KERNEL | __GFP_RETRY_MAYFAIL,
-> +					get_order(size));
->  		if (page)
->  			return page_address(page);
->  		return NULL;
-> @@ -183,7 +182,7 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
->  {
->  	pmd_t *pmd = pmd_offset(pud, addr);
->  	if (pmd_none(*pmd)) {
-> -		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-> +		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
->  		if (!p)
->  			return NULL;
->  		pmd_populate_kernel(&init_mm, pmd, p);
-> @@ -195,7 +194,7 @@ pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
->  {
->  	pud_t *pud = pud_offset(p4d, addr);
->  	if (pud_none(*pud)) {
-> -		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-> +		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
->  		if (!p)
->  			return NULL;
->  		pud_populate(&init_mm, pud, p);
-> @@ -207,7 +206,7 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
->  {
->  	p4d_t *p4d = p4d_offset(pgd, addr);
->  	if (p4d_none(*p4d)) {
-> -		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-> +		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
->  		if (!p)
->  			return NULL;
->  		p4d_populate(&init_mm, p4d, p);
-> @@ -219,7 +218,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
->  {
->  	pgd_t *pgd = pgd_offset_k(addr);
->  	if (pgd_none(*pgd)) {
-> -		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
-> +		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
->  		if (!p)
->  			return NULL;
->  		pgd_populate(&init_mm, pgd, p);
-> diff --git a/mm/sparse.c b/mm/sparse.c
-> index 83b3bf6461af..d22f51bb7c79 100644
-> --- a/mm/sparse.c
-> +++ b/mm/sparse.c
-> @@ -437,9 +437,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
->  	}
->  
->  	size = PAGE_ALIGN(size);
-> -	map = memblock_virt_alloc_try_nid(size * map_count,
-> -					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
-> -					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
-> +	map = memblock_virt_alloc_try_nid_raw(size * map_count,
-> +					      PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
-> +					      BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
->  	if (map) {
->  		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
->  			if (!present_section_nr(pnum))
-> -- 
-> 2.14.1
+
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
 
 -- 
-Michal Hocko
-SUSE Labs
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
