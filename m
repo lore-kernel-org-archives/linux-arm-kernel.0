@@ -1,50 +1,55 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 3 Oct 2017 10:40:05 +0200
-Subject: [PATCH] ARM: vexpress/spc: Delete an error message for a failed
- memory allocation in two functions
-Message-ID: <557666e2-45b6-8f47-2fc9-756bd7f23541@users.sourceforge.net>
+From: ckeepax@opensource.cirrus.com (Charles Keepax)
+Date: Tue, 3 Oct 2017 09:58:48 +0100
+Subject: [PATCH] extcon: Split out extcon header file for consumer and
+ provider device
+In-Reply-To: <1506643305-4581-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20170929000148epcas2p200e56186b067ec626a033c7ae2d4bbdb@epcas2p2.samsung.com>
+ <1506643305-4581-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20171003085848.tma5l5lq4yavddli@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 3 Oct 2017 10:30:07 +0200
+On Fri, Sep 29, 2017 at 09:01:45AM +0900, Chanwoo Choi wrote:
+> The extcon has two type of extcon devices as following.
+> - 'extcon provider deivce' adds new extcon device and detect the
+>    state/properties of external connector. Also, it notifies the
+>    state/properties to the extcon consumer device.
+> - 'extcon consumer device' gets the change state/properties
+>    from extcon provider device.
+> Prior to that, include/linux/extcon.h contains all exported API for
+> both provider and consumer device driver. To clarify the meaning of
+> header file and to remove the wrong use-case on consumer device,
+> this patch separates into extcon.h and extcon-provider.h.
+> 
+> [Description for include/linux/{extcon.h|extcon-provider.h}]
+> - extcon.h includes the extcon API and data structure for extcon consumer
+>   device driver. This header file contains the following APIs:
+>   : Register/unregister the notifier to catch the change of extcon device
+>   : Get the extcon device instance
+>   : Get the extcon device name
+>   : Get the state of each external connector
+>   : Get the property value of each external connector
+>   : Get the property capability of each external connector
+> 
+> - extcon-provider.h includes the extcon API and data structure for extcon
+>   provider device driver. This header file contains the following APIs:
+>   : Include 'include/linux/extcon.h'
+>   : Allocate the memory for extcon device instance
+>   : Register/unregister extcon device
+>   : Set the state of each external connector
+>   : Set the property value of each external connector
+>   : Set the property capability of each external connector
+> 
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/extcon/extcon-arizona.c               |   2 +-
 
-Omit extra messages for a memory allocation failure in these functions.
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-vexpress/spc.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-index fe488523694c..21c064267af5 100644
---- a/arch/arm/mach-vexpress/spc.c
-+++ b/arch/arm/mach-vexpress/spc.c
-@@ -451,10 +451,8 @@ int __init ve_spc_init(void __iomem *baseaddr, u32 a15_clusid, int irq)
- {
- 	int ret;
- 	info = kzalloc(sizeof(*info), GFP_KERNEL);
--	if (!info) {
--		pr_err(SPCLOG "unable to allocate mem\n");
-+	if (!info)
- 		return -ENOMEM;
--	}
- 
- 	info->baseaddr = baseaddr;
- 	info->a15_clusid = a15_clusid;
-@@ -535,10 +533,8 @@ static struct clk *ve_spc_clk_register(struct device *cpu_dev)
- 	struct clk_spc *spc;
- 
- 	spc = kzalloc(sizeof(*spc), GFP_KERNEL);
--	if (!spc) {
--		pr_err("could not allocate spc clk\n");
-+	if (!spc)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	spc->hw.init = &init;
- 	spc->cluster = topology_physical_package_id(cpu_dev->id);
--- 
-2.14.2
+Thanks,
+Charles
