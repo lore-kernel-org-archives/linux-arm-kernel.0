@@ -1,149 +1,85 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 3 Oct 2017 12:11:01 +0100
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20170920135856.dfuowttwi4bk4nqb@localhost>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913143325.hi4cfcajbts3bbao@localhost>
- <20170914195555.GB24231@e103592.cambridge.arm.com>
- <20170920135856.dfuowttwi4bk4nqb@localhost>
-Message-ID: <20171003111100.GQ3611@e103592.cambridge.arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 3 Oct 2017 13:14:15 +0200
+Subject: [PATCH 3/4] nvmem: add a driver for the Amlogic
+ Meson6/Meson8/Meson8b SoCs
+In-Reply-To: <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
+References: <20171001125700.1520-1-martin.blumenstingl@googlemail.com>
+ <20171001125700.1520-4-martin.blumenstingl@googlemail.com>
+ <cd1e7f9c-5aff-8f4c-82b0-c58c2de4c253@free.fr>
+Message-ID: <CAFBinCA8abWDpC71g_LEM3hU6QB8QUifG_6V6rv1ZMsi3remZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 02:58:56PM +0100, Catalin Marinas wrote:
-> On Thu, Sep 14, 2017 at 08:55:56PM +0100, Dave P Martin wrote:
-> > On Wed, Sep 13, 2017 at 07:33:25AM -0700, Catalin Marinas wrote:
-> > > On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
-> > > > +/*
-> > > > + * Handle SVE state across fork():
-> > > > + *
-> > > > + * dst and src must not end up with aliases of the same sve_state.
-> > > > + * Because a task cannot fork except in a syscall, we can discard SVE
-> > > > + * state for dst here, so long as we take care to retain the FPSIMD
-> > > > + * subset of the state if SVE is in use.  Reallocation of the SVE state
-> > > > + * will be deferred until dst tries to use SVE.
-> > > > + */
-> > > > +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
-> > > > +{
-> > > > +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
-> > > > +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
-> > > > +		sve_to_fpsimd(dst);
-> > > > +	}
-> > > > +
-> > > > +	dst->thread.sve_state = NULL;
-> > > > +}
-> > > 
-> > > I first thought the thread flags are not visible in dst yet since
-> > > dup_task_struct() calls arch_dup_task_struct() before
-> > > setup_thread_stack(). However, at the end of the last year we enabled
-> > > CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
-> > > on this.
-> > 
-> > Hmmm, I see your point, but there are some sequencing issues here.
-> > 
-> > > Anyway, IIUC we don't need sve_to_fpsimd() here. The
-> > > arch_dup_task_struct() already called fpsimd_preserve_current_state()
-> > 
-> > I consider SVE discard as an optional side effect of task_fpsimd_save(),
-> > not something that is guaranteed to happen -- the decision about whether
-> > to do so may become more intelligent later on.  So, for src, we may
-> > discard SVE (because syscall), but for dst we must NULL .sve_state (and
-> > therefore clear TIF_SVE) simply to avoid aliasing of src->sve_state and
-> > dst->sve_state.
-> 
-> My point was that the SVE state of src is already preserved at this
-> point and copied into dst. You don't need the sve_to_fpsimd(dst) again
-> which basically does the same copying of the src SVE saved state into
-> the FPSIMD one in dst. This has already been done in
-> arch_dup_task_struct() by the combination of
-> fpsimd_preserve_current_state() and *dst = *src (and, of course,
-> clearing TIF_SVE in dst).
-> 
-> I don't think the TIF_SVE clearing in src is just a side effect of
-> task_fpsimd_save() here but rather a requirement. When returning from
-> fork(), both src and dst would need to have the same state. However,
-> your fpsimd_dup_sve() implementation makes it very clear that the SVE
-> state is lost in dst. This is only allowed if we also lose it in src (as
-> a result of a syscall). So making dst->sve_state = NULL requires that
-> TIF_SVE is also cleared in both src and dst. Alternatively, you'd have
-> to allocate a new state here and copy the full src SVE state across to
-> dst, together with setting TIF_SVE (that's not necessary, however, since
-> we get here as a result of a syscall).
+Hi Chris,
 
-The currently intended ABI is that the SVE bits are unspecified after a
-syscall, so it is legitimate (though perhaps surprising) for different
-things to happen in dst and src.
+On Tue, Oct 3, 2017 at 6:48 AM, Chris Moore <moore@free.fr> wrote:
+> Hi,
+>
+> Sorry in advance if I am being extremely stupid here.
+>
+> Le 01/10/2017 ? 14:56, Martin Blumenstingl a ?crit :
+>
+> [snip]
+>
+>> +static int meson_mx_efuse_read(void *context, unsigned int offset,
+>> +                              void *buf, size_t bytes)
+>> +{
+>> +       struct meson_mx_efuse *efuse = context;
+>> +       u32 tmp;
+>> +       int err, i, addr;
+>> +
+>> +       err = meson_mx_efuse_hw_enable(efuse);
+>> +       if (err)
+>> +               return err;
+>> +
+>> +       meson_mx_efuse_mask_bits(efuse, MESON_MX_EFUSE_CNTL1,
+>> +                                MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
+>> +                                MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
+>> +
+>> +       for (i = offset; i < offset + bytes; i += efuse->config.word_size)
+>> {
+>> +               addr = i / efuse->config.word_size;
+>> +
+>> +               err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
+>> +               if (err)
+>> +                       break;
+>> +
+>> +               memcpy(buf + i, &tmp, efuse->config.word_size);
+>> +       }
+>
+>
+> This will not give the expected result if offset is not a multiple of
+> efuse->config.word_size.
+I had a look at mtk-efuse.c and bcm-ocotp.c and both are doing similar
+calculations
+thus I assumed that the nvmem core takes care of handling this
 
-This complicates things a lot though, just to avoid the next SVE usage
-exception in src after the fork.
+> This will cause buffer overflow if bytes is not a multiple of
+> efuse->config.word_size.
+that would be very nasty indeed
 
+> Shouldn't there at least be some sort of test on offset and bytes?
+in the driver or in core? if possible these checks should be part of
+the core nvmem code to prevent code duplication across various drivers
+(and to prevent bugs if a specific driver forgets these checks)
 
-It should be simpler to do what you suggest and discard the SVE state of
-src unconditionally before the copy: then we really are just cloning the
-thread apart from the need to set dst->thread.sve_state to NULL.
+> Also this doesn't look endian-safe, but maybe it is.
+dumping the whole efuse via sysfs showed the same results as (the
+vendor command in Amlogic's) u-boot.
 
-fpsimd_preserve_current_state() does not necessarily write back to
-current->thread.fpsmid_state though: at the moment, it does do this as a
-side effect of task_fpsimd_save() because we happen to be in a syscall
-(i.e., fork).  
+> Old-timer remarks:
+> - I try to avoid divisions where possible but I suppose they are very
+> low-cost on recent hardware.
+> - I don't like arithmetic on void pointers but I know it is supported by gcc
+> (and possibly by recent C standards too).
+>
+> Sorry again for the noise if I am being stupid.
+your questions are reasonable
+this is my first nvmem driver, so there may be mistakes in the code -
+maybe Srinivas could also comment on your feedback
 
-What we really want is unconditional discarding of the state.  This
-wasn't needed anywhere else yet, so there's no explicit helper for it.
-But it makes sense to add one.
-
-What about refactoring along these lines:
+also thank you for taking the time to review this!
 
 
-fpsimd.c:
-/* Unconditionally discard the SVE state */
-void task_sve_discard(struct task_struct *task)
-{
-	if (!system_supports_sve())
-		return;
-
-	local_bh_disable();
-	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
-		sve_to_fpsimd(task);
-	local_bh_enable();
-}
-
-process.c:
-int arch_dup_task_struct(sturct task_struct *dst, struct task_struct *src)
-{
-	if (current->mm) {
-		fpsimd_preserve_current_state();
-		task_sve_discard(src);
-	}
-
-	*dst = *src;
-
-	dst->thread.sve_state = NULL;
-}
-
-
-This also avoids having to touch dst's thread flags, since now we
-are just cloning the task except for assigning NULL to
-dst->thread.sve_state.
-
-
-> > > for src, so the FPSIMD state (which we care about) is transferred during
-> > > the *dst = *src assignment. So you'd only need the last statement,
-> > > possibly with a different function name like fpsimd_erase_sve (and maybe
-> > > make the function static inline in the header).
-> > 
-> > Not quite: TIF_SVE must be cleared so that a context switch or
-> > kernel_neon_begin() after dst is scheduled doesn't try to save state in
-> > the (NULL) dst->sve_state.
-> 
-> Yes, TIF_SVE must also be cleared in dst when dst->sve_state = NULL (I
-> may have forgotten to mention this).
-
-With the above factoring, the constraint "TIF_SVE implies sve_state
-valid" is then never false, because TIF_SVE is already cleared before
-the NULL assignment.
-
-What do you think?
-
-Cheers
----Dave
+Regards,
+Martin
