@@ -1,52 +1,45 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 3 Oct 2017 22:14:20 +0200
-Subject: [PATCH 2/4] ARM: OMAP: Improve a size determination in two functions
+Date: Tue, 3 Oct 2017 22:15:19 +0200
+Subject: [PATCH 3/4] ARM: OMAP: Use kcalloc() in omap_system_dma_probe()
 In-Reply-To: <b196ffac-4bd1-4465-cee9-e46b7405633d@users.sourceforge.net>
 References: <b196ffac-4bd1-4465-cee9-e46b7405633d@users.sourceforge.net>
-Message-ID: <8735e7ee-a744-cda4-005b-7a32075655a5@users.sourceforge.net>
+Message-ID: <cb714a17-9400-13fe-c4b0-f99aaf2e1aed@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 3 Oct 2017 20:46:48 +0200
+Date: Tue, 3 Oct 2017 21:07:33 +0200
 
-Replace the specification of data structures by pointer dereferences
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
+* A multiplication for the size determination of a memory allocation
+  indicated that an array data structure should be processed.
+  Thus use the corresponding function "kcalloc".
 
-This issue was detected by using the Coccinelle software.
+  This issue was detected by using the Coccinelle software.
+
+* Replace the specification of a data type by a pointer dereference
+  to make the corresponding size determination a bit safer according to
+  the Linux coding style convention.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- arch/arm/plat-omap/dma.c     | 2 +-
- arch/arm/plat-omap/dmtimer.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/dma.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index 6ede0427548c..409e4ecaebe9 100644
+index 409e4ecaebe9..d4012d6c0dcb 100644
 --- a/arch/arm/plat-omap/dma.c
 +++ b/arch/arm/plat-omap/dma.c
-@@ -1316,7 +1316,7 @@ static int omap_system_dma_probe(struct platform_device *pdev)
- 	enable_1510_mode	= d->dev_caps & ENABLE_1510_MODE;
- 
- 	dma_chan = devm_kcalloc(&pdev->dev, dma_lch_count,
--				sizeof(struct omap_dma_lch), GFP_KERNEL);
-+				sizeof(*dma_chan), GFP_KERNEL);
- 	if (!dma_chan)
+@@ -1321,8 +1321,9 @@ static int omap_system_dma_probe(struct platform_device *pdev)
  		return -ENOMEM;
  
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 446ac0e3a35a..14779d6f425d 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -857,7 +857,7 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	timer = devm_kzalloc(dev, sizeof(struct omap_dm_timer), GFP_KERNEL);
-+	timer = devm_kzalloc(dev, sizeof(*timer), GFP_KERNEL);
- 	if (!timer)
- 		return  -ENOMEM;
- 
+ 	if (dma_omap2plus()) {
+-		dma_linked_lch = kzalloc(sizeof(struct dma_link_info) *
+-						dma_lch_count, GFP_KERNEL);
++		dma_linked_lch = kcalloc(dma_lch_count,
++					 sizeof(*dma_linked_lch),
++					 GFP_KERNEL);
+ 		if (!dma_linked_lch) {
+ 			ret = -ENOMEM;
+ 			goto exit_dma_lch_fail;
 -- 
 2.14.2
