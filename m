@@ -1,69 +1,49 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Tue, 3 Oct 2017 18:05:40 +0800
-Subject: [kbuild-all] [arm:for-next 9/11] awk: line 2: function strtonum
- never defined
-In-Reply-To: <20171003090642.GJ20805@n2100.armlinux.org.uk>
-References: <201710030905.zGRrw4dZ%fengguang.wu@intel.com>
- <20171003090642.GJ20805@n2100.armlinux.org.uk>
-Message-ID: <20171003100540.tfcehrcvf356332x@wfg-t540p.sh.intel.com>
+From: razvan.stefanescu@nxp.com (Razvan Stefanescu)
+Date: Tue, 3 Oct 2017 10:07:41 +0000
+Subject: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
+In-Reply-To: <AM5PR0402MB26917E7523D582ABB0A3D0D2EC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+References: <1505811698-7338-1-git-send-email-razvan.stefanescu@nxp.com>
+ <1505811698-7338-6-git-send-email-razvan.stefanescu@nxp.com>
+ <20170919121755.GB4569@lunn.ch>
+ <AM5PR0402MB26917E7523D582ABB0A3D0D2EC720@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+Message-ID: <AM3PR04MB0743030F8D97FFB37016F11AE6720@AM3PR04MB0743.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Andrew Lunn
+> Sent: Tuesday, September 19, 2017 3:18 PM
+> To: Razvan Stefanescu <razvan.stefanescu@nxp.com>
+> Cc: devel at driverdev.osuosl.org; Ruxandra Ioana Radulescu
+> <ruxandra.radulescu@nxp.com>; arnd at arndb.de; gregkh at linuxfoundation.org;
+> Alexandru Marginean <alexandru.marginean@nxp.com>; linux-
+> kernel at vger.kernel.org; agraf at suse.de; stuyoder at gmail.com; Bogdan
+> Purcareata <bogdan.purcareata@nxp.com>; linux-arm-
+> kernel at lists.infradead.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> Subject: Re: [PATCH 5/6] staging: fsl-dpaa2/ethsw: Add README
+> 
+> On Tue, Sep 19, 2017 at 12:01:37PM +0300, Razvan Stefanescu wrote:
+> > +Driver uses the switch device driver model and exposes each switch port as
+> > +a network interface, which can be included in a bridge. Traffic switched
+> > +between ports is offloaded into the hardware. Exposed network interfaces
+> > +are not used for I/O, they are used just for configuration. This
+> > +limitation is going to be addressed in the future.
+> 
+> Hi Razvan
+> 
+> Could you briefly describe how Ethernet frames get from the CPU to the
+> switch. This is what decided if you should write a plain switchdev
+> driver, or a DSA driver.
+> 
+> 	Andrew
+> 
+Hello Andrew,
 
-On Tue, Oct 03, 2017 at 10:06:42AM +0100, Russell King - ARM Linux wrote:
->Shall I repeat my question from the last time this was reported?
+CPU frame handling will be added in a later. Each netdevice associated 
+to a switch port will have I/O capabilities like dpaa2-ethernet devices.
+The dpaa2-ethsw will use ACLs to redirect specific types of frames
+(i.e BPDUs) to CPU.
 
-Sorry I cannot find your reply in email archive. Looking at this
-error, the root cause should be strtonum requires gawk while what we
-installed is
-
-        mawk 1.3.3 Nov 1996, Copyright (C) Michael D. Brennan
-
-We can trivially install gawk and make it the default, however is gawk
-a requirement for kernel compilation? Or can we make it work with mawk,
-too?
-
-Regards,
-Fengguang
-
->On Tue, Oct 03, 2017 at 09:52:08AM +0800, kbuild test robot wrote:
->> Hi Russell,
->>
->> FYI, the error/warning still remains.
->>
->> tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
->> head:   3cef8ede5ead55fbaf2225206f00361828adc3a1
->> commit: 887518f5e9963a82c3fc2ad8911eedb2304f8c57 [9/11] ARM: decompressor: fix BSS size calculation
->> config: arm-clps711x_defconfig (attached as .config)
->> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
->> reproduce:
->>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->>         chmod +x ~/bin/make.cross
->>         git checkout 887518f5e9963a82c3fc2ad8911eedb2304f8c57
->>         # save the attached .config to linux build tree
->>         make.cross ARCH=arm
->>
->> All errors (new ones prefixed by >>):
->>
->> >> awk: line 2: function strtonum never defined
->> >> awk: line 2: function strtonum never defined
->> --
->> >> awk: line 2: function strtonum never defined
->> >> awk: line 2: function strtonum never defined
->>    arm-linux-gnueabi-nm: 'arch/arm/boot/compressed/../../../../vmlinux': No such file
->>
->> ---
->> 0-DAY kernel test infrastructure                Open Source Technology Center
->> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
->
->
->-- 
->RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
->FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
->According to speedtest.net: 8.21Mbps down 510kbps up
->_______________________________________________
->kbuild-all mailing list
->kbuild-all at lists.01.org
->https://lists.01.org/mailman/listinfo/kbuild-all
+Best regards,
+Razvan S.
