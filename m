@@ -1,68 +1,62 @@
-From: jpoimboe@redhat.com (Josh Poimboeuf)
-Date: Tue, 3 Oct 2017 08:21:25 -0500
-Subject: 4879b7ae05 ("Merge tag 'dmaengine-4.12-rc1' of .."): WARNING:
- kernel stack regs at bd92bc2e in 01-cpu-hotplug:3811 has bad 'bp' value
- 000001be
-In-Reply-To: <20171003034538.ntvuwtm2uha6wt6h@wfg-t540p.sh.intel.com>
-References: <59d177a7.vsiddgOxdHRIlRvy%fengguang.wu@intel.com>
- <CA+55aFz_ijfUxyk2kdLhfzfS1z0_uRBw6eQb9UxFvh=5zOzzaw@mail.gmail.com>
- <20171002212654.rsm4uj3hfioddldd@treble>
- <20171002213109.5n3skzy76edhwkvf@treble>
- <20171003034538.ntvuwtm2uha6wt6h@wfg-t540p.sh.intel.com>
-Message-ID: <20171003132125.ulj3nnmiimamsm6w@treble>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 3 Oct 2017 15:24:33 +0200
+Subject: [PATCH] rtc: armada38x: add support for trimming the RTC
+In-Reply-To: <E1dxsSB-0006RM-08@rmk-PC.armlinux.org.uk>
+References: <E1dxsSB-0006RM-08@rmk-PC.armlinux.org.uk>
+Message-ID: <20171003132433.vkgjxuoeq26x3f47@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 11:45:38AM +0800, Fengguang Wu wrote:
-> Hi Josh,
-> 
-> On Mon, Oct 02, 2017 at 04:31:09PM -0500, Josh Poimboeuf wrote:
-> > On Mon, Oct 02, 2017 at 04:26:54PM -0500, Josh Poimboeuf wrote:
-> > > Fengguang, assuming it's reliably recreatable, any chance you could
-> > > recreate with the following patch?
-> 
-> Sure, I'll try your patch on v4.14-rc3 since it looks the most
-> reproducible kernel. For the bisected 4879b7ae05, the warning only
-> shows up once out of 909 boots according to the below stats. So I'm
-> not sure whether it's the _first_ bad commit. To double confirm, I
-> just queued 5000 more boot tests for each of its parent commits.
+Hi Russell,
 
-Fengguang, here's an improved version of the patch based on Linus'
-suggestions.  If you can use it instead, that would be helpful because
-it has a better chance of dumping useful data.  Thanks!
+On 29/09/2017 at 11:23:31 +0100, Russell King wrote:
+> +/*
+> + * The information given in the Armada 388 functional spec is complex.
+> + * They give two different formulas for calculating the offset value,
+> + * but when considering "Offset" as an 8-bit signed integer, they both
+> + * reduce down to (we shall rename "Offset" as "val" here):
+> + *
+> + *   val = (f_ideal / f_measured - 1) / resolution   where f_ideal = 32768
+> + *
+> + * Converting to time, f = 1/t:
+> + *   val = (t_measured / t_ideal - 1) / resolution   where t_ideal = 1/32768
+> + *
+> + *   =>  t_measured / t_ideal = val * resolution + 1
+> + *
+> + * "offset" in the RTC interface is defined as:
+> + *   t = t0 * (1 + offset * 1e-9)
+> + * where t is the desired period, t0 is the measured period with a zero
+> + * offset, which is t_measured above. With t0 = t_measured and t = t_ideal,
+> + *   offset = (t_ideal / t_measured - 1) / 1e-9
+> + *
+> + *   => t_ideal / t_measured = offset * 1e-9 + 1
+> + *
+> + * so:
+> + *
+> + *   offset * 1e-9 + 1 = 1 / (val * resolution + 1)
+> + *
+> + * We want "resolution" to be an integer, so resolution = R * 1e-9, giving
+> + *   offset = 1e18 / (val * R + 1e9) - 1e9
+> + *   val = (1e18 / (offset + 1e9) - 1e9) / R
+> + * with a common transformation:
+> + *   f(x) = 1e18 / (x + 1e9) - 1e9
+> + *   offset = f(val * R)
+> + *   val = f(offset) / R
+> + *
+> + * Armada 38x supports two modes, fine mode (954ppb) and coarse mode (3815ppb).
+> + */
+> +static long armada38x_ppb_convert(long ppb)
+> +{
+> +	long div = ppb + 1000000000L;
+> +
+> +	return div_s64(1000000000000000000LL + div / 2, div) - 1000000000L;
 
+The previous comment is perfect but it was not completely obvious to me
+why you are adding div / 2. Maybe you can add a small comment.
 
-diff --git a/arch/x86/kernel/unwind_frame.c b/arch/x86/kernel/unwind_frame.c
-index d145a0b1f529..191012762aa0 100644
---- a/arch/x86/kernel/unwind_frame.c
-+++ b/arch/x86/kernel/unwind_frame.c
-@@ -44,7 +44,8 @@ static void unwind_dump(struct unwind_state *state)
- 			state->stack_info.type, state->stack_info.next_sp,
- 			state->stack_mask, state->graph_idx);
- 
--	for (sp = state->orig_sp; sp; sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
-+	for (sp = PTR_ALIGN(state->orig_sp, sizeof(long)); sp;
-+	     sp = PTR_ALIGN(stack_info.next_sp, sizeof(long))) {
- 		if (get_stack_info(sp, state->task, &stack_info, &visit_mask))
- 			break;
- 
-@@ -178,7 +179,7 @@ static struct pt_regs *decode_frame_pointer(unsigned long *bp)
- {
- 	unsigned long regs = (unsigned long)bp;
- 
--	if (!(regs & 0x1))
-+	if ((regs & (sizeof(long)-1)) != 1)
- 		return NULL;
- 
- 	return (struct pt_regs *)(regs & ~0x1);
-@@ -221,6 +222,10 @@ static bool update_stack_state(struct unwind_state *state,
- 				   &state->stack_mask))
- 			return false;
- 
-+	/* Make sure the frame pointer is properly aligned: */
-+	if ((unsigned long)frame & (sizeof(long)-1))
-+		return false;
-+
- 	/* Make sure it only unwinds up and doesn't overlap the prev frame: */
- 	if (state->orig_sp && state->stack_info.type == prev_type &&
- 	    frame < prev_frame_end)
+> +}
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
