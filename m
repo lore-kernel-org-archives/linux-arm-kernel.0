@@ -1,89 +1,60 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Tue, 03 Oct 2017 14:59:37 +0200
-Subject: [PATCHv2 1/2] drivers: phy: add calibrate method
-In-Reply-To: <1507035578-24945-1-git-send-email-andrzej.p@samsung.com>
-References: <ba580a0c-36c3-b227-61ee-97637532823e@ti.com>
- <1507035578-24945-1-git-send-email-andrzej.p@samsung.com>
- <CGME20171003125945eucas1p24d49f5c51ea9acd59a76314158b69352@eucas1p2.samsung.com>
-Message-ID: <1507035578-24945-2-git-send-email-andrzej.p@samsung.com>
+From: madalin.bucur@nxp.com (Madalin Bucur)
+Date: Tue, 3 Oct 2017 16:04:15 +0300
+Subject: [PATCH] arm64: dts: update the DPAA QBMan nodes
+Message-ID: <1507035855-23068-1-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some quirky UDCs (like dwc3 on exynos) need to have heir phys calibrated
-e.g. for using super speed.
+Use constants in the interrupt description.
 
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- drivers/phy/phy-core.c  | 14 ++++++++++++++
- include/linux/phy/phy.h | 10 ++++++++++
- 2 files changed, 24 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index a268f4d..fdf343a 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -372,6 +372,20 @@ int phy_reset(struct phy *phy)
- }
- EXPORT_SYMBOL_GPL(phy_reset);
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index d16b9cc..0f5e9fe 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -376,14 +376,14 @@
+ 		qman: qman at 1880000 {
+ 			compatible = "fsl,qman";
+ 			reg = <0x0 0x1880000 0x0 0x10000>;
+-			interrupts = <0 45 0x4>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+ 			memory-region = <&qman_fqd &qman_pfdr>;
+ 		};
  
-+int phy_calibrate(struct phy *phy)
-+{
-+	int ret;
-+
-+	if (!phy || !phy->ops->calibrate)
-+		return 0;
-+
-+	mutex_lock(&phy->mutex);
-+	ret = phy->ops->calibrate(phy);
-+	mutex_unlock(&phy->mutex);
-+
-+	return ret;
-+}
-+
- /**
-  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
-  * @np: device_node for which to get the phy
-diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-index e694d40..87580c8 100644
---- a/include/linux/phy/phy.h
-+++ b/include/linux/phy/phy.h
-@@ -39,6 +39,7 @@ enum phy_mode {
-  * @power_off: powering off the phy
-  * @set_mode: set the mode of the phy
-  * @reset: resetting the phy
-+ * @calibrate: calibrate the phy
-  * @owner: the module owner containing the ops
-  */
- struct phy_ops {
-@@ -48,6 +49,7 @@ struct phy_ops {
- 	int	(*power_off)(struct phy *phy);
- 	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
- 	int	(*reset)(struct phy *phy);
-+	int	(*calibrate)(struct phy *phy);
- 	struct module *owner;
- };
+ 		bman: bman at 1890000 {
+ 			compatible = "fsl,bman";
+ 			reg = <0x0 0x1890000 0x0 0x10000>;
+-			interrupts = <0 45 0x4>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+ 			memory-region = <&bman_fbpr>;
+ 		};
  
-@@ -141,6 +143,7 @@ static inline void *phy_get_drvdata(struct phy *phy)
- int phy_power_off(struct phy *phy);
- int phy_set_mode(struct phy *phy, enum phy_mode mode);
- int phy_reset(struct phy *phy);
-+int phy_calibrate(struct phy *phy);
- static inline int phy_get_bus_width(struct phy *phy)
- {
- 	return phy->attrs.bus_width;
-@@ -262,6 +265,13 @@ static inline int phy_reset(struct phy *phy)
- 	return -ENOSYS;
- }
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index c8ff0ba..eddee02 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -281,7 +281,7 @@
+ 		qman: qman at 1880000 {
+ 			compatible = "fsl,qman";
+ 			reg = <0x0 0x1880000 0x0 0x10000>;
+-			interrupts = <0 45 0x4>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+ 			memory-region = <&qman_fqd &qman_pfdr>;
  
-+static inline int phy_calibrate(struct phy *phy)
-+{
-+	if (!phy)
-+		return 0;
-+	return -ENOSYS;
-+}
-+
- static inline int phy_get_bus_width(struct phy *phy)
- {
- 	return -ENOSYS;
+ 		};
+@@ -289,7 +289,7 @@
+ 		bman: bman at 1890000 {
+ 			compatible = "fsl,bman";
+ 			reg = <0x0 0x1890000 0x0 0x10000>;
+-			interrupts = <0 45 0x4>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+ 			memory-region = <&bman_fbpr>;
+ 
+ 		};
 -- 
-1.9.1
+2.1.0
