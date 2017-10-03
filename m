@@ -1,53 +1,112 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue,  3 Oct 2017 13:58:22 -0700
-Subject: [PATCH] arm64: Enforce endianness build flags for LD and AS
-Message-ID: <1507064302-3972-1-git-send-email-linux@roeck-us.net>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 3 Oct 2017 13:58:24 -0700
+Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
+In-Reply-To: <20171003091155.7138-2-linus.walleij@linaro.org>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+ <20171003091155.7138-2-linus.walleij@linaro.org>
+Message-ID: <20171003205823.GP1165@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If LD or AS is specified on the command line using "make LD=<my-ld>",
-the endianness flag will not be added. Depending on the toolchain used,
-this can result in endianness mismatch errors, such as
+On Tue 03 Oct 02:11 PDT 2017, Linus Walleij wrote:
 
-aarch64-cros-linux-gnu/binutils-bin/2.27.0/ld.bfd.real:
-arch/arm64/crypto/.tmp_aes-ce-cipher.o:
-	compiled for a big endian system and target is little endian
+> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
+> is not very helpful for users looking for their device tree in
+> the kernel. Also the db820c is named properly.
+> 
+> Rectify this, simply, do not change the compatible strings but name
+> the DTS files in a consistent manner.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-The problem was observed when using the Chrome OS build system (which sets
-LD on the command line) for an arm64:allmodconfig build.
+This annoys me every time I'm poking at the 410c.
 
-Use the override flag for both LD and AS to ensure that the endianness
-flag is always set.
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Cc: Douglas Anderson <dianders@chromium.org>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- arch/arm64/Makefile | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Regards,
+Bjorn
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..d780d00bea9c 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -56,15 +56,15 @@ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
--AS		+= -EB
--LD		+= -EB
-+override AS		+= -EB
-+override LD		+= -EB
- LDFLAGS		+= -maarch64linuxb
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- CHECKFLAGS	+= -D__AARCH64EL__
--AS		+= -EL
--LD		+= -EL
-+override AS		+= -EL
-+override LD		+= -EL
- LDFLAGS		+= -maarch64linux
- UTS_MACHINE	:= aarch64
- endif
--- 
-2.7.4
+> ---
+> It's not like I don't understand that people will be nitpicky
+> about this.
+> 
+> I was looking for the DragonBoard 410c devicetree and could not
+> find it until I realized this hopeless idiomatic naming.
+> 
+> It cost me time and effort, and it is going to cost others time
+> and effort. Fixing it.
+> 
+> The other patch naming the GPIO lines can be applied without
+> this one.
+> ---
+>  arch/arm64/boot/dts/qcom/Makefile                                    | 2 +-
+>  .../{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi}    | 0
+>  .../qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} | 0
+>  arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}     | 5 +++--
+>  arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi}   | 4 ++--
+>  5 files changed, 6 insertions(+), 5 deletions(-)
+>  rename arch/arm64/boot/dts/qcom/{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi} (100%)
+>  rename arch/arm64/boot/dts/qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} (100%)
+>  rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts} (95%)
+>  rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi} (99%)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+> index ff81d7e5805e..fc46ab79acd9 100644
+> --- a/arch/arm64/boot/dts/qcom/Makefile
+> +++ b/arch/arm64/boot/dts/qcom/Makefile
+> @@ -1,4 +1,4 @@
+> -dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb
+> +dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-db410c.dtb
+>  dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
+>  dtb-$(CONFIG_ARCH_QCOM)	+= ipq8074-hk01.dtb
+>  dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
+> similarity index 100%
+> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
+> similarity index 100%
+> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+> similarity index 95%
+> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+> index 40b0d62861bb..86cfae4d2b9d 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+> @@ -13,10 +13,11 @@
+>  
+>  /dts-v1/;
+>  
+> -#include "apq8016-sbc.dtsi"
+> +#include "apq8016-db410c.dtsi"
+>  
+>  / {
+> -	model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
+> +	model = "Qualcomm Technologies, Inc. APQ 8016 DragonBoard 410c";
+> +	/* The "SBC" (Single Board Computer) is another name for this board */
+>  	compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
+>  };
+>  
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+> similarity index 99%
+> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+> index 1d63e6b879de..1300c11e5f0e 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+> @@ -13,8 +13,8 @@
+>  
+>  #include "msm8916.dtsi"
+>  #include "pm8916.dtsi"
+> -#include "apq8016-sbc-soc-pins.dtsi"
+> -#include "apq8016-sbc-pmic-pins.dtsi"
+> +#include "apq8016-db410c-soc-pins.dtsi"
+> +#include "apq8016-db410c-pmic-pins.dtsi"
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/sound/apq8016-lpass.h>
+> -- 
+> 2.13.5
+> 
