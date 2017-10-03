@@ -1,71 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  3 Oct 2017 15:20:50 +0100
-Subject: [PATCH] perf/core: Avoid freeing static PMU contexts when PMU is
- unregistered
-Message-ID: <1507040450-7730-1-git-send-email-will.deacon@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 3 Oct 2017 15:21:25 +0100
+Subject: [PATCH] ARM: vexpress/spc: Delete an error message for a failed
+ memory allocation in two functions
+In-Reply-To: <557666e2-45b6-8f47-2fc9-756bd7f23541@users.sourceforge.net>
+References: <557666e2-45b6-8f47-2fc9-756bd7f23541@users.sourceforge.net>
+Message-ID: <eb4e21f3-f16c-e640-80b2-0d12b01ea4e2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1fd7e4169954 ("perf/core: Remove perf_cpu_context::unique_pmu"),
-when a PMU is unregistered then its associated ->pmu_cpu_context is
-unconditionally freed. Whilst this is fine for dynamically allocated
-context types (i.e. those registered using perf_invalid_context), this
-causes a problem for sharing of static contexts such as
-perf_{sw,hw}_context, which are used by multiple built-in PMUs and
-effectively have a global lifetime.
+Hi,
 
-Whilst testing the ARM SPE driver, which must use perf_sw_context to
-support per-task AUX tracing, unregistering the driver as a result of a
-module unload resulted in:
+I am not sure if such trivial patches get merged by someone via
+kernel-janitors list with just maintainers ack or not. Please let
+me know if you want me to pickup this, for now I am just Ack-ing.
 
- Unable to handle kernel NULL pointer dereference at virtual address 00000038
- Internal error: Oops: 96000004 [#1] PREEMPT SMP
- Modules linked in: [last unloaded: arm_spe_pmu]
- PC is at ctx_resched+0x38/0xe8
- LR is at perf_event_exec+0x20c/0x278
- [...]
- ctx_resched+0x38/0xe8
- perf_event_exec+0x20c/0x278
- setup_new_exec+0x88/0x118
- load_elf_binary+0x26c/0x109c
- search_binary_handler+0x90/0x298
- do_execveat_common.isra.14+0x540/0x618
- SyS_execve+0x38/0x48
+On 03/10/17 09:40, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Tue, 3 Oct 2017 10:30:07 +0200
+> 
+> Omit extra messages for a memory allocation failure in these functions.
+> 
+> This issue was detected by using the Coccinelle software.
+> 
 
-since the software context has been freed and the ctx.pmu->pmu_disable_count
-field has been set to NULL.
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-This patch fixes the problem by avoiding the freeing of static PMU contexts
-altogether. Whilst the sharing of dynamic contexts is questionable, this
-actually requires the caller to share their context pointer explicitly
-and so the burden is on them to manage the object lifetime.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
-Fixes: 1fd7e4169954 ("perf/core: Remove perf_cpu_context::unique_pmu")
-Reported-by: Kim Phillips <kim.phillips@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- kernel/events/core.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 6bc21e202ae4..243bfc68d0fe 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -8955,6 +8955,14 @@ static struct perf_cpu_context __percpu *find_pmu_context(int ctxn)
- 
- static void free_pmu_context(struct pmu *pmu)
- {
-+	/*
-+	 * Static contexts such as perf_sw_context have a global lifetime
-+	 * and may be shared between different PMUs. Avoid freeing them
-+	 * when a single PMU is going away.
-+	 */
-+	if (pmu->task_ctx_nr > perf_invalid_context)
-+		return;
-+
- 	mutex_lock(&pmus_lock);
- 	free_percpu(pmu->pmu_cpu_context);
- 	mutex_unlock(&pmus_lock);
 -- 
-2.1.4
+Regards,
+Sudeep
