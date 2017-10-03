@@ -1,82 +1,62 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon,  2 Oct 2017 22:10:48 -0500
-Subject: [RFC PATCH v2 06/31] KVM: arm64: Invalidate virtual EL2 TLB entries
- when needed
+Date: Mon,  2 Oct 2017 22:10:49 -0500
+Subject: [RFC PATCH v2 07/31] KVM: arm64: Setup vttbr_el2 on each VM entry
 In-Reply-To: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
 References: <1507000273-3735-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1507000273-3735-4-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1507000273-3735-5-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Sometimes when we are invalidating the TLB for a certain S2 MMU
-context, this context can also have EL2 context associated with it and
-we have to invalidate this too.
+Now that the vttbr value will be different depending on the VM's
+exception level, we set it on each VM entry.
+
+We only have one mmu instance at this point, but there will be
+multiple of them if we come to run nested VMs.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- virt/kvm/arm/arm.c |  5 +++++
- virt/kvm/arm/mmu.c | 23 ++++++++++++++++++++++-
- 2 files changed, 27 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/context.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 41e0654..63dd897 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -362,6 +362,11 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 		u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index a7811e1..afd1702 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -18,6 +18,7 @@
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/esr.h>
++#include <asm/kvm_mmu.h>
  
- 		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
-+
-+		if (mmu->el2_vmid.vmid) {
-+			vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
-+			kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
-+		}
- 		*last_ran = vcpu->vcpu_id;
- 	}
- 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 0edcf23..184cdc9 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -64,7 +64,21 @@ void kvm_flush_remote_tlbs(struct kvm *kvm)
- 	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
- 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
- 
--	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
-+	if (!mmu->el2_vmid.vmid) {
-+		/*
-+		 * For a normal (i.e. non-nested) guest, flush entries for the
-+		 * given VMID *
-+		 */
-+		kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
-+	} else {
-+		/*
-+		 * When supporting nested virtualization, we can have multiple
-+		 * VMIDs in play for each VCPU in the VM, so it's really not
-+		 * worth it to try to quiesce the system and flush all the
-+		 * VMIDs that may be in use, instead just nuke the whole thing.
-+		 */
-+		kvm_call_hyp(__kvm_flush_vm_context);
-+	}
+ struct el1_el2_map {
+ 	enum vcpu_sysreg	el1;
+@@ -174,6 +175,15 @@ static void flush_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
+ 		flush_shadow_el1_sysregs_nvhe(vcpu);
  }
  
- static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
-@@ -72,6 +86,13 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
- 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
- 
- 	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
++static void setup_s2_mmu(struct kvm_vcpu *vcpu)
++{
++	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
++	struct kvm_s2_vmid *vmid = vcpu_get_active_vmid(vcpu);
 +
-+	if (!mmu->el2_vmid.vmid) {
-+		/* Nothing to do more for a non-nested guest */
-+		return;
-+	}
-+	vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
-+	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
- }
- 
++	vcpu->arch.hw_vttbr = kvm_get_vttbr(vmid, mmu);
++	vcpu->arch.hw_mmu = mmu;
++}
++
  /*
+  * List of EL0 and EL1 registers which we allow the virtual EL2 mode to access
+  * directly without trapping. This is possible because the impact of
+@@ -323,6 +333,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ 		setup_mpidr_el1(vcpu);
+ 		ctxt->hw_sys_regs = ctxt->sys_regs;
+ 	}
++
++	setup_s2_mmu(vcpu);
+ }
+ 
+ /**
 -- 
 1.9.1
