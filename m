@@ -1,90 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 3 Oct 2017 10:09:21 +0200
-Subject: [PATCH] PM: ARM: locomo: Drop suspend and resume bus type
- callbacks
-In-Reply-To: <2826985.0zUqx1lpzM@aspire.rjw.lan>
-References: <2826985.0zUqx1lpzM@aspire.rjw.lan>
-Message-ID: <CAPDyKFrkUW7S7hkEsYH9UWex3F=1QHFLozxyMey1e+XT2a8JGg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 3 Oct 2017 11:35:37 +0300
+Subject: [PATCH v2 1/2] dmaengine: edma: Implement protection for invalid
+ max_burst
+In-Reply-To: <20171003083538.11044-1-peter.ujfalusi@ti.com>
+References: <20171003083538.11044-1-peter.ujfalusi@ti.com>
+Message-ID: <20171003083538.11044-2-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 September 2017 at 22:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->
-> None of the locomo drivers in the tree implements the suspend and
-> resume callbacks from struct locomo_driver, so drop them and drop
-> the corresponding callbacks from locomo_bus_type.
->
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+?Set the device's max_burst to 32767 (CIDX is 16bit signed value) so clients
+can take this into consideration when setting up the transfer.
 
-FWIW:
+During slave transfer preparation check if the requested maxburst is valid.
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/edma.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Do you also plan to convert the locomo_device_driver (platform_driver)
-to be converted to the modern PM callbacks for suspend/resume?
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index a7ea20e7b8e9..9364a3ed345a 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -891,6 +891,10 @@ static int edma_slave_config(struct dma_chan *chan,
+ 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+ 		return -EINVAL;
+ 
++	if (cfg->src_maxburst > chan->device->max_burst ||
++	    cfg->dst_maxburst > chan->device->max_burst)
++		return -EINVAL;
++
+ 	memcpy(&echan->cfg, cfg, sizeof(echan->cfg));
+ 
+ 	return 0;
+@@ -1868,6 +1872,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 	s_ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+ 	s_ddev->directions |= (BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV));
+ 	s_ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
++	s_ddev->max_burst = SZ_32K - 1; /* CIDX: 16bit signed */
+ 
+ 	s_ddev->dev = ecc->dev;
+ 	INIT_LIST_HEAD(&s_ddev->channels);
+-- 
+2.14.2
 
-Kind regards
-Uffe
 
-> ---
->  arch/arm/common/locomo.c               |   24 ------------------------
->  arch/arm/include/asm/hardware/locomo.h |    2 --
->  2 files changed, 26 deletions(-)
->
-> Index: linux-pm/arch/arm/include/asm/hardware/locomo.h
-> ===================================================================
-> --- linux-pm.orig/arch/arm/include/asm/hardware/locomo.h
-> +++ linux-pm/arch/arm/include/asm/hardware/locomo.h
-> @@ -189,8 +189,6 @@ struct locomo_driver {
->         unsigned int            devid;
->         int (*probe)(struct locomo_dev *);
->         int (*remove)(struct locomo_dev *);
-> -       int (*suspend)(struct locomo_dev *, pm_message_t);
-> -       int (*resume)(struct locomo_dev *);
->  };
->
->  #define LOCOMO_DRV(_d) container_of((_d), struct locomo_driver, drv)
-> Index: linux-pm/arch/arm/common/locomo.c
-> ===================================================================
-> --- linux-pm.orig/arch/arm/common/locomo.c
-> +++ linux-pm/arch/arm/common/locomo.c
-> @@ -826,28 +826,6 @@ static int locomo_match(struct device *_
->         return dev->devid == drv->devid;
->  }
->
-> -static int locomo_bus_suspend(struct device *dev, pm_message_t state)
-> -{
-> -       struct locomo_dev *ldev = LOCOMO_DEV(dev);
-> -       struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
-> -       int ret = 0;
-> -
-> -       if (drv && drv->suspend)
-> -               ret = drv->suspend(ldev, state);
-> -       return ret;
-> -}
-> -
-> -static int locomo_bus_resume(struct device *dev)
-> -{
-> -       struct locomo_dev *ldev = LOCOMO_DEV(dev);
-> -       struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
-> -       int ret = 0;
-> -
-> -       if (drv && drv->resume)
-> -               ret = drv->resume(ldev);
-> -       return ret;
-> -}
-> -
->  static int locomo_bus_probe(struct device *dev)
->  {
->         struct locomo_dev *ldev = LOCOMO_DEV(dev);
-> @@ -875,8 +853,6 @@ struct bus_type locomo_bus_type = {
->         .match          = locomo_match,
->         .probe          = locomo_bus_probe,
->         .remove         = locomo_bus_remove,
-> -       .suspend        = locomo_bus_suspend,
-> -       .resume         = locomo_bus_resume,
->  };
->
->  int locomo_driver_register(struct locomo_driver *driver)
->
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
