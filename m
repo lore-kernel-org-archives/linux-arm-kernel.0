@@ -1,129 +1,147 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 3 Oct 2017 15:45:38 +0100
-Subject: [PATCH v2] ACPI/IORT: Fix PCI ACS enablement
-In-Reply-To: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1506965324-5818-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <116e7445-b2be-68fd-d707-ff2babd8d415@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Oct 2017 15:48:46 +0100
+Subject: [PATCH v9 09/12] mm/kasan: kasan specific map populate function
+In-Reply-To: <20170920201714.19817-10-pasha.tatashin@oracle.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-10-pasha.tatashin@oracle.com>
+Message-ID: <20171003144845.GD4931@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2017 18:28, Lorenzo Pieralisi wrote:
-> commit f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> workarounds") removed kernel code that was allowing to initialize
-> and probe the SMMU devices early (ie earlier than PCI devices, through
-> linker script callback entries) in the boot process because it was not
-> needed any longer in that the SMMU devices/drivers now support deferred
-> probing.
->
-> Since the SMMUs probe routines are also in charge of requesting global
-> PCI ACS kernel enablement, commit f6810c15cf97 ("iommu/arm-smmu: Clean
-> up early-probing workarounds") also postponed PCI ACS enablement to
-> SMMUs devices probe time, which is too late given that PCI devices needs
-> to detect if PCI ACS is enabled to init the respective capability
-> through the following call path:
->
-> pci_device_add()
->  -> pci_init_capabilities()
->   -> pci_enable_acs()
->
-> Add code in the ACPI IORT SMMU platform devices initialization path
-> (that is called before ACPI PCI enumeration) to detect if there
-> exists firmware mappings to map root complexes ids to SMMU ids
-> and if so enable ACS for the system.
->
-> Fixes: f6810c15cf97 ("iommu/arm-smmu: Clean up early-probing
-> Signed-workarounds")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> Cc: Alex Williamson <alex.williamson@redhat.com>
+Hi Pavel,
+
+On Wed, Sep 20, 2017 at 04:17:11PM -0400, Pavel Tatashin wrote:
+> During early boot, kasan uses vmemmap_populate() to establish its shadow
+> memory. But, that interface is intended for struct pages use.
+> 
+> Because of the current project, vmemmap won't be zeroed during allocation,
+> but kasan expects that memory to be zeroed. We are adding a new
+> kasan_map_populate() function to resolve this difference.
+
+Thanks for putting this together.
+
+I've given this a spin on arm64, and can confirm that it works.
+
+Given that this involes redundant walking of page tables, I still think
+it'd be preferable to have some common *_populate() helper that took a
+gfp argument, but I guess it's not the end of the world.
+
+I'll leave it to Will and Catalin to say whether they're happy with the
+page table walking and the new p{u,m}d_large() helpers added to arm64.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 > ---
-> v1 -> v2:
->
-> - Reworked ACS enablement logic and based on root complex to SMMU
->   ids firmware mapping detection
-> - Rebased against v4.14-rc3
->
-> v1: https://marc.info/?l=linux-acpi&m=150584059818925&w=2
->
->  drivers/acpi/arm64/iort.c | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 9565d57..de56394 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -1178,12 +1178,44 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->  	return ret;
+>  arch/arm64/include/asm/pgtable.h |  3 ++
+>  include/linux/kasan.h            |  2 ++
+>  mm/kasan/kasan_init.c            | 67 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 72 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index bc4e92337d16..d89713f04354 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -381,6 +381,9 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>  				 PUD_TYPE_TABLE)
+>  #endif
+>  
+> +#define pmd_large(pmd)		pmd_sect(pmd)
+> +#define pud_large(pud)		pud_sect(pud)
+> +
+>  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+>  {
+>  	*pmdp = pmd;
+> diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+> index a5c7046f26b4..7e13df1722c2 100644
+> --- a/include/linux/kasan.h
+> +++ b/include/linux/kasan.h
+> @@ -78,6 +78,8 @@ size_t kasan_metadata_size(struct kmem_cache *cache);
+>  
+>  bool kasan_save_enable_multi_shot(void);
+>  void kasan_restore_multi_shot(bool enabled);
+> +int __meminit kasan_map_populate(unsigned long start, unsigned long end,
+> +				 int node);
+>  
+>  #else /* CONFIG_KASAN */
+>  
+> diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
+> index 554e4c0f23a2..57a973f05f63 100644
+> --- a/mm/kasan/kasan_init.c
+> +++ b/mm/kasan/kasan_init.c
+> @@ -197,3 +197,70 @@ void __init kasan_populate_zero_shadow(const void *shadow_start,
+>  		zero_p4d_populate(pgd, addr, next);
+>  	} while (pgd++, addr = next, addr != end);
 >  }
->
-> +static bool __init iort_enable_acs(struct acpi_iort_node *iort_node)
+> +
+> +/* Creates mappings for kasan during early boot. The mapped memory is zeroed */
+> +int __meminit kasan_map_populate(unsigned long start, unsigned long end,
+> +				 int node)
 > +{
-> +	if (iort_node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> +		struct acpi_iort_node *parent;
-> +		struct acpi_iort_id_mapping *map;
-> +		int i;
+> +	unsigned long addr, pfn, next;
+> +	unsigned long long size;
+> +	pgd_t *pgd;
+> +	p4d_t *p4d;
+> +	pud_t *pud;
+> +	pmd_t *pmd;
+> +	pte_t *pte;
+> +	int ret;
 > +
-> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, iort_node,
-> +				   iort_node->mapping_offset);
+> +	ret = vmemmap_populate(start, end, node);
+> +	/*
+> +	 * We might have partially populated memory, so check for no entries,
+> +	 * and zero only those that actually exist.
+> +	 */
+> +	for (addr = start; addr < end; addr = next) {
+> +		pgd = pgd_offset_k(addr);
+> +		if (pgd_none(*pgd)) {
+> +			next = pgd_addr_end(addr, end);
+> +			continue;
+> +		}
 > +
-> +		for (i = 0; i < iort_node->mapping_count; i++, map++) {
-> +			if (!map->output_reference)
+> +		p4d = p4d_offset(pgd, addr);
+> +		if (p4d_none(*p4d)) {
+> +			next = p4d_addr_end(addr, end);
+> +			continue;
+> +		}
+> +
+> +		pud = pud_offset(p4d, addr);
+> +		if (pud_none(*pud)) {
+> +			next = pud_addr_end(addr, end);
+> +			continue;
+> +		}
+> +		if (pud_large(*pud)) {
+> +			/* This is PUD size page */
+> +			next = pud_addr_end(addr, end);
+> +			size = PUD_SIZE;
+> +			pfn = pud_pfn(*pud);
+> +		} else {
+> +			pmd = pmd_offset(pud, addr);
+> +			if (pmd_none(*pmd)) {
+> +				next = pmd_addr_end(addr, end);
 > +				continue;
-> +
-> +			parent = ACPI_ADD_PTR(struct acpi_iort_node,
-> +					iort_table,  map->output_reference);
-> +			/*
-> +			 * If we detect a RC->SMMU mapping, make sure
-> +			 * we enable ACS on the system.
-> +			 */
-> +			if ((parent->type == ACPI_IORT_NODE_SMMU) ||
-> +				(parent->type == ACPI_IORT_NODE_SMMU_V3)) {
-
-Hi Lorenzo,
-
-There are a couple of places now which check for any SMMU type. Should 
-we have a helper function/macro to condense, like this:
-IORT_TYPE_MASK(type) & IORT_IOMMU_TYPE
-
-Personal taste, I guess.
-
-BTW, unfortunately we can't re-test this week due to Chinese holiday.
-
-Cheers,
-John
-
-> +				pci_request_acs();
-> +				return true;
+> +			}
+> +			if (pmd_large(*pmd)) {
+> +				/* This is PMD size page */
+> +				next = pmd_addr_end(addr, end);
+> +				size = PMD_SIZE;
+> +				pfn = pmd_pfn(*pmd);
+> +			} else {
+> +				pte = pte_offset_kernel(pmd, addr);
+> +				next = addr + PAGE_SIZE;
+> +				if (pte_none(*pte))
+> +					continue;
+> +				/* This is base size page */
+> +				size = PAGE_SIZE;
+> +				pfn = pte_pfn(*pte);
 > +			}
 > +		}
+> +		memset(phys_to_virt(PFN_PHYS(pfn)), 0, size);
 > +	}
-> +
-> +	return false;
+> +	return ret;
 > +}
-> +
->  static void __init iort_init_platform_devices(void)
->  {
->  	struct acpi_iort_node *iort_node, *iort_end;
->  	struct acpi_table_iort *iort;
->  	struct fwnode_handle *fwnode;
->  	int i, ret;
-> +	bool acs_enabled = false;
->
->  	/*
->  	 * iort_table and iort both point to the start of IORT table, but
-> @@ -1203,6 +1235,9 @@ static void __init iort_init_platform_devices(void)
->  			return;
->  		}
->
-> +		if (!acs_enabled)
-> +			acs_enabled = iort_enable_acs(iort_node);
-> +
->  		if ((iort_node->type == ACPI_IORT_NODE_SMMU) ||
->  			(iort_node->type == ACPI_IORT_NODE_SMMU_V3)) {
->
->
+> -- 
+> 2.14.1
+> 
