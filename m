@@ -1,73 +1,51 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 3 Oct 2017 14:59:40 +0200
-Subject: [PATCH v9 04/12] sparc64: simplify vmemmap_populate
-In-Reply-To: <20170920201714.19817-5-pasha.tatashin@oracle.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-5-pasha.tatashin@oracle.com>
-Message-ID: <20171003125940.6d5fyhwx2lkzxn67@dhcp22.suse.cz>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Tue, 03 Oct 2017 14:59:36 +0200
+Subject: [PATCHv2 0/2]
+In-Reply-To: <ba580a0c-36c3-b227-61ee-97637532823e@ti.com>
+References: <ba580a0c-36c3-b227-61ee-97637532823e@ti.com>
+ <CGME20171003125944eucas1p1fad23e6171786fda69ccd9419354911b@eucas1p1.samsung.com>
+Message-ID: <1507035578-24945-1-git-send-email-andrzej.p@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 20-09-17 16:17:06, Pavel Tatashin wrote:
-> Remove duplicating code by using common functions
-> vmemmap_pud_populate and vmemmap_pgd_populate.
-> 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
-> Acked-by: David S. Miller <davem@davemloft.net>
+Hi all,
 
-Acked-by: Michal Hocko <mhocko@suse.com>
+This is the second version of patches in this thread.
 
-> ---
->  arch/sparc/mm/init_64.c | 23 ++++++-----------------
->  1 file changed, 6 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-> index 310c6754bcaa..99aea4d15a5f 100644
-> --- a/arch/sparc/mm/init_64.c
-> +++ b/arch/sparc/mm/init_64.c
-> @@ -2651,30 +2651,19 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
->  	vstart = vstart & PMD_MASK;
->  	vend = ALIGN(vend, PMD_SIZE);
->  	for (; vstart < vend; vstart += PMD_SIZE) {
-> -		pgd_t *pgd = pgd_offset_k(vstart);
-> +		pgd_t *pgd = vmemmap_pgd_populate(vstart, node);
->  		unsigned long pte;
->  		pud_t *pud;
->  		pmd_t *pmd;
->  
-> -		if (pgd_none(*pgd)) {
-> -			pud_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
-> +		if (!pgd)
-> +			return -ENOMEM;
->  
-> -			if (!new)
-> -				return -ENOMEM;
-> -			pgd_populate(&init_mm, pgd, new);
-> -		}
-> -
-> -		pud = pud_offset(pgd, vstart);
-> -		if (pud_none(*pud)) {
-> -			pmd_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
-> -
-> -			if (!new)
-> -				return -ENOMEM;
-> -			pud_populate(&init_mm, pud, new);
-> -		}
-> +		pud = vmemmap_pud_populate(pgd, vstart, node);
-> +		if (!pud)
-> +			return -ENOMEM;
->  
->  		pmd = pmd_offset(pud, vstart);
-> -
->  		pte = pmd_val(*pmd);
->  		if (!(pte & _PAGE_VALID)) {
->  			void *block = vmemmap_alloc_block(PMD_SIZE, node);
-> -- 
-> 2.14.1
+The series fixes problems with enumerating of SuperSpeed devices
+on an Odroid XU3. There was a patch series from Vivek Gautam in
+circulation, but it got lost somehow. Please see:
+
+https://lkml.org/lkml/2014/9/2/166
+https://lkml.org/lkml/2015/2/2/257
+
+I adapted his patch so that it does not use a hacky solution to force
+additional initialization in order for calibration to happen.
+With this patch enumeration happens correctly and a super speed device
+is recognized as such.
+
+@Kishon:
+
+As far as I understand what you suggest is to move phy_init() and
+phy_power_on() invocations from dwc3/core.c to xhci-plat, but,
+to the best of my knowledge, they are needed in device mode, too.
+
+Changes since v1:
+
+- added calibrate() callback to phy
+- used calibrate() instead of reset() to trigger the calibration
+
+Andrzej Pietrasiewicz (1):
+  drivers: phy: add calibrate method
+
+Vivek Gautam (1):
+  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
+
+ drivers/phy/phy-core.c                   |  14 +++
+ drivers/phy/samsung/phy-exynos5-usbdrd.c | 183 +++++++++++++++++++++++++++++++
+ drivers/usb/dwc3/core.c                  |   7 +-
+ include/linux/phy/phy.h                  |  10 ++
+ 4 files changed, 212 insertions(+), 2 deletions(-)
 
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
