@@ -1,171 +1,137 @@
-From: edumazet@google.com (Eric Dumazet)
-Date: Tue, 3 Oct 2017 09:36:04 -0700
-Subject: v4.14-rc2/arm64 kernel BUG at net/core/skbuff.c:2626
-In-Reply-To: <CACT4Y+azruiH-oEXVFen8WiDHhz0PS3DF7OdrkSCJYVRmkhoiQ@mail.gmail.com>
-References: <20171002104947.GE20737@leverpostej>
- <CANn89i++X2rzsaHkTRayMpCED_exL8WPq12=RwD_hXsZ6cN-wQ@mail.gmail.com>
- <20171002142156.GB21696@leverpostej>
- <CANn89i+zQG=rjHRqzsvPzjg5tqW43Lcz-BJ9spLascP9Nt5z8Q@mail.gmail.com>
- <CACT4Y+Yf86hS_3u=qe0ZL208GmrfF6bp50kYcL+3D9QFBh=LZA@mail.gmail.com>
- <CANn89iJrJzTL+e4FDN76Fc1iptXpM9aJ6Hwa=pT=+v-zbv7+8g@mail.gmail.com>
- <CACT4Y+azruiH-oEXVFen8WiDHhz0PS3DF7OdrkSCJYVRmkhoiQ@mail.gmail.com>
-Message-ID: <CANn89iL1UPan+pQR44gwfpVRH0cCJ9N8Y1gHfOUL_xZpN2Bhdw@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 3 Oct 2017 12:37:03 -0400
+Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
+In-Reply-To: <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+ <20171003091155.7138-2-linus.walleij@linaro.org>
+ <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+Message-ID: <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 9:06 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> On Tue, Oct 3, 2017 at 5:38 PM, 'Eric Dumazet' via syzkaller
-> <syzkaller@googlegroups.com> wrote:
->> On Tue, Oct 3, 2017 at 8:19 AM, Dmitry Vyukov <dvyukov@google.com> wrote:
->>> On Mon, Oct 2, 2017 at 4:42 PM, 'Eric Dumazet' via syzkaller
->>> <syzkaller@googlegroups.com> wrote:
->>>> On Mon, Oct 2, 2017 at 7:21 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>> Hi Eric,
->>>>>
->>>>> On Mon, Oct 02, 2017 at 06:36:32AM -0700, Eric Dumazet wrote:
->>>>>> On Mon, Oct 2, 2017 at 3:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>>> > I hit the below splat at net/core/skbuff.c:2626 while fuzzing v4.14-rc2
->>>>>> > on arm64 with Syzkaller. This is the BUG_ON(len) at the end of
->>>>>> > skb_copy_and_csum_bits().
->>>>>
->>>>>> > kernel BUG at net/core/skbuff.c:2626!
->>>>>
->>>>>> > [<ffff200009e03214>] skb_copy_and_csum_bits+0x8dc/0xae0 net/core/skbuff.c:2626
->>>>>> > [<ffff20000a01d244>] icmp_glue_bits+0xa4/0x2a0 net/ipv4/icmp.c:357
->>>>>> > [<ffff200009f3f0d4>] __ip_append_data+0x10e4/0x20a8 net/ipv4/ip_output.c:1018
->>>>>> > [<ffff200009f41a88>] ip_append_data.part.3+0xe8/0x1a0 net/ipv4/ip_output.c:1170
->>>>>> > [<ffff200009f46e74>] ip_append_data+0xa4/0xb0 net/ipv4/ip_output.c:1173
->>>>>> > [<ffff20000a01ccc8>] icmp_push_reply+0x1b8/0x690 net/ipv4/icmp.c:375
->>>>>> > [<ffff20000a0211b0>] icmp_send+0x1070/0x1890 net/ipv4/icmp.c:741
->>>>>> > [<ffff200009f41d48>] ip_fragment.constprop.4+0x208/0x340 net/ipv4/ip_output.c:552
->>>>>> > [<ffff200009f42228>] ip_finish_output+0x3a8/0xab0 net/ipv4/ip_output.c:315
->>>>>> > [<ffff200009f468c4>] NF_HOOK_COND include/linux/netfilter.h:238 [inline]
->>>>>> > [<ffff200009f468c4>] ip_output+0x284/0x790 net/ipv4/ip_output.c:405
->>>>>> > [<ffff200009f43204>] dst_output include/net/dst.h:458 [inline]
->>>>>> > [<ffff200009f43204>] ip_local_out+0x9c/0x1b8 net/ipv4/ip_output.c:124
->>>>>> > [<ffff200009f445e8>] ip_queue_xmit+0x850/0x18e0 net/ipv4/ip_output.c:504
->>>>>> > [<ffff200009fb091c>] tcp_transmit_skb+0x107c/0x3338 net/ipv4/tcp_output.c:1123
->>>>>> > [<ffff200009fbbcc4>] __tcp_retransmit_skb+0x614/0x1d18 net/ipv4/tcp_output.c:2847
->>>>>> > [<ffff200009fbd840>] tcp_send_loss_probe+0x478/0x7d0 net/ipv4/tcp_output.c:2457
->>>>>> > [<ffff200009fc707c>] tcp_write_timer_handler+0x50c/0x7e8 net/ipv4/tcp_timer.c:557
->>>>>> > [<ffff200009fc73d0>] tcp_write_timer+0x78/0x170 net/ipv4/tcp_timer.c:579
->>>>>> > [<ffff2000082f8980>] call_timer_fn+0x1b8/0x430 kernel/time/timer.c:1281
->>>>>> > [<ffff2000082f8dcc>] expire_timers+0x1d4/0x320 kernel/time/timer.c:1320
->>>>>> > [<ffff2000082f912c>] __run_timers kernel/time/timer.c:1620 [inline]
->>>>>> > [<ffff2000082f912c>] run_timer_softirq+0x214/0x5f0 kernel/time/timer.c:1646
->>>>>> > [<ffff2000080826c0>] __do_softirq+0x350/0xc0c kernel/softirq.c:284
->>>>>> > [<ffff200008170af4>] do_softirq_own_stack include/linux/interrupt.h:498 [inline]
->>>>>> > [<ffff200008170af4>] invoke_softirq kernel/softirq.c:371 [inline]
->>>>>> > [<ffff200008170af4>] irq_exit+0x1dc/0x2f8 kernel/softirq.c:405
->>>>>> > [<ffff2000082a95bc>] __handle_domain_irq+0xdc/0x230 kernel/irq/irqdesc.c:647
->>>>>> > [<ffff2000080820ac>] handle_domain_irq include/linux/irqdesc.h:175 [inline]
->>>>>> > [<ffff2000080820ac>] gic_handle_irq+0x6c/0xe0 drivers/irqchip/irq-gic.c:367
->>>>>
->>>>>> This is most likely a bug caused by syzkaller setting a ridiculous MTU
->>>>>> on loopback device, below minimum size of ipv4 MTU.
->>>>>
->>>>>> I tried to track it in August [1], but it seems hard to find all the
->>>>>> issues with this.
->>>>>>
->>>>>> commit c780a049f9bf442314335372c9abc4548bfe3e44
->>>>>> Author: Eric Dumazet <edumazet@google.com>
->>>>>> Date:   Wed Aug 16 11:09:12 2017 -0700
->>>>>>
->>>>>>     ipv4: better IP_MAX_MTU enforcement
->>>>>>
->>>>>>     While working on yet another syzkaller report, I found
->>>>>>     that our IP_MAX_MTU enforcements were not properly done.
->>>>>>
->>>>>>     gcc seems to reload dev->mtu for min(dev->mtu, IP_MAX_MTU), and
->>>>>>     final result can be bigger than IP_MAX_MTU :/
->>>>>>
->>>>>>     This is a problem because device mtu can be changed on other cpus or
->>>>>>     threads.
->>>>>>
->>>>>>     While this patch does not fix the issue I am working on, it is
->>>>>>     probably worth addressing it.
->>>>>
->>>>> Just to check I've understood correctly, are you suggesting that the
->>>>> IPv4 code should also check the dev->mtu against a IP_MIN_MTU (which
->>>>> doesn't seem to exist today)?
->>>>
->>>> We have plenty of places this is checked.
->>>>
->>>> For example, trying to set MTU < 68 usually removes IPv4 addresses and routes.
->>>>
->>>> Problem is : these checks are not fool proof yet.
->>>>
->>>> ( Only the admin was supposed to play these games )
->>>>
->>>>>
->>>>> Otherwise, I do spot another potential issue. The writer side (e.g. most
->>>>> net_device::ndo_change_mtu implementations and the __dev_set_mtu()
->>>>> fallback) doesn't use WRITE_ONCE().
->>>>
->>>> It does not matter how many strange values can be observed by the reader :
->>>> We must be fool proof anyway from reader point of view, so the
->>>> WRITE_ONCE() is not strictly needed.
->>>
->>>
->>> Note if writer stores some temporal garbage there (which C language
->>> perfectly allows), it does not matter what we do on reader side --
->>> reader won't get correct data anyway. Say mtu changes from 1000 to
->>> 2000, but writer temporary stores 1 there, reader can observe 1 while
->>> it must not. Synchronization is always a game of two.
->>
->> Since we have no sync here, a reader _must_ cope with any MTU value.
->>
->> We need to care of any value, so we do not care how dummy writers can be.
->>
->> Sure, a WRITE_ONCE() will help avoiding some strange values being written,
->>  but since we _allow_ writers to write such strange values,
->> there is really no point pretending to be safe here.
->>
->> Adding a WRITE_ONCE() will not fix the bug.
+On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
 >
 >
-> Reader must cope with any value. But there is an additional
-> requirement that it must behave correctly.
-
-As soon as we allow admin to change MTU on a device, we _are_ dropping packets.
-This is absolutely normal so far.
-
-On most NIC , an MTU change closes and opens the port, typically
-blocking the device for several seconds.
-
-Networking is best effort, there is no 'requirement' that networking
-stack is supposed to cope with any events,
-including silly admins.
-
-The following is still legal
-
-while :
-do
- ifconfig lo mu random
-done
-
-And nothing asks us to deliver any packet while this loop is running.
-
-We only have to prevent crashes ;)
-
-> If mtu was 1000 and then
-> reset to 2000 once (and not other manipulations with mtu), then
-> correct behavior is either (1) sending packets with mtu 1000 or (2)
-> sending packets with mtu 2000 (after mtu change) and nothing else.
-> Sending packets with mtu 500, dropping packets because mtu is observed
-> to be 1, or formatting hard drive are all incorrect behaviors and must
-> not happen.
+> On 03/10/17 10:11, Linus Walleij wrote:
+>>
+>> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
+>> is not very helpful for users looking for their device tree in
+>> the kernel. Also the db820c is named properly.
+>>
+>> Rectify this, simply, do not change the compatible strings but name
+>> the DTS files in a consistent manner.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> What you say is valid for communication with user-space
-> (copy_form_user, etc). Because there we don't control write side and
-> racy writes are indistinguishable from intentional writes that do the
-> same.
+> I did not like the sbc naming convention too, This was primarily done due to
+> some legacy build tools + bootloaders which have used sbc compatible to
+> identify boards from multiple dtb blobs. Now that we can append dtb to
+> kernel with new LK, this should not be a issue anymore.
 
-This is absolutely not relevant to the bug we are looking at at this
-moment, even if true.
+maybe it would be an idea to update skales/dbttool first to look for
+the new name, and then give people some time to upgrade, before
+changing this in the kernel.  Otherwise I expect you'll cause some
+confusion..
 
-Unless you found the root cause, I will kindly ask you to open another
-thread on lkml
-to not pollute this one.
+BR,
+-R
 
-Thank you !
+
+> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+>
+>> ---
+>> It's not like I don't understand that people will be nitpicky
+>> about this.
+>>
+>> I was looking for the DragonBoard 410c devicetree and could not
+>> find it until I realized this hopeless idiomatic naming.
+>>
+>> It cost me time and effort, and it is going to cost others time
+>> and effort. Fixing it.
+>>
+>> The other patch naming the GPIO lines can be applied without
+>> this one.
+>> ---
+>>   arch/arm64/boot/dts/qcom/Makefile                                    | 2
+>> +-
+>>   .../{apq8016-sbc-pmic-pins.dtsi => apq8016-db410c-pmic-pins.dtsi}    | 0
+>>   .../qcom/{apq8016-sbc-soc-pins.dtsi => apq8016-db410c-soc-pins.dtsi} | 0
+>>   arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}     | 5
+>> +++--
+>>   arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi => apq8016-db410c.dtsi}   | 4
+>> ++--
+>>   5 files changed, 6 insertions(+), 5 deletions(-)
+>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-pmic-pins.dtsi =>
+>> apq8016-db410c-pmic-pins.dtsi} (100%)
+>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc-soc-pins.dtsi =>
+>> apq8016-db410c-soc-pins.dtsi} (100%)
+>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dts => apq8016-db410c.dts}
+>> (95%)
+>>   rename arch/arm64/boot/dts/qcom/{apq8016-sbc.dtsi =>
+>> apq8016-db410c.dtsi} (99%)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/Makefile
+>> b/arch/arm64/boot/dts/qcom/Makefile
+>> index ff81d7e5805e..fc46ab79acd9 100644
+>> --- a/arch/arm64/boot/dts/qcom/Makefile
+>> +++ b/arch/arm64/boot/dts/qcom/Makefile
+>> @@ -1,4 +1,4 @@
+>> -dtb-$(CONFIG_ARCH_QCOM)        += apq8016-sbc.dtb
+>> +dtb-$(CONFIG_ARCH_QCOM)        += apq8016-db410c.dtb
+>>   dtb-$(CONFIG_ARCH_QCOM)       += apq8096-db820c.dtb
+>>   dtb-$(CONFIG_ARCH_QCOM)       += ipq8074-hk01.dtb
+>>   dtb-$(CONFIG_ARCH_QCOM)       += msm8916-mtp.dtb
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+>> b/arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
+>> similarity index 100%
+>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-pmic-pins.dtsi
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>> b/arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
+>> similarity index 100%
+>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c-soc-pins.dtsi
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+>> b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+>> similarity index 95%
+>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+>> index 40b0d62861bb..86cfae4d2b9d 100644
+>> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+>> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dts
+>> @@ -13,10 +13,11 @@
+>>     /dts-v1/;
+>>   -#include "apq8016-sbc.dtsi"
+>> +#include "apq8016-db410c.dtsi"
+>>     / {
+>> -       model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
+>> +       model = "Qualcomm Technologies, Inc. APQ 8016 DragonBoard 410c";
+>> +       /* The "SBC" (Single Board Computer) is another name for this
+>> board */
+>>         compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
+>>   };
+>>   diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>> b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+>> similarity index 99%
+>> rename from arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>> rename to arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+>> index 1d63e6b879de..1300c11e5f0e 100644
+>> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/apq8016-db410c.dtsi
+>> @@ -13,8 +13,8 @@
+>>     #include "msm8916.dtsi"
+>>   #include "pm8916.dtsi"
+>> -#include "apq8016-sbc-soc-pins.dtsi"
+>> -#include "apq8016-sbc-pmic-pins.dtsi"
+>> +#include "apq8016-db410c-soc-pins.dtsi"
+>> +#include "apq8016-db410c-pmic-pins.dtsi"
+>>   #include <dt-bindings/gpio/gpio.h>
+>>   #include <dt-bindings/input/input.h>
+>>   #include <dt-bindings/sound/apq8016-lpass.h>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
