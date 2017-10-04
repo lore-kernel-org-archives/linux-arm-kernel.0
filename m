@@ -1,65 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 4 Oct 2017 14:18:20 -0700
-Subject: [PATCH v2 3/5] clk: aspeed: Add platform driver and register PLLs
-In-Reply-To: <CACPK8XeHj2xdw6HgkWRDiJPjurip3wVbkOmY0mGW=dSTVWsYmg@mail.gmail.com>
-References: <20170921042641.7326-1-joel@jms.id.au>
- <20170921042641.7326-4-joel@jms.id.au>
- <20171002212435.GP457@codeaurora.org>
- <CACPK8XeHj2xdw6HgkWRDiJPjurip3wVbkOmY0mGW=dSTVWsYmg@mail.gmail.com>
-Message-ID: <20171004211820.GX457@codeaurora.org>
+From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Wed, 4 Oct 2017 23:20:34 +0200
+Subject: [PATCH 2/2] arm: AT91: fix DT duplicate node name
+In-Reply-To: <e5868359-8708-3d17-df8c-b04ad3624df0@microchip.com>
+References: <cover.1504037038.git.mirq-linux@rere.qmqm.pl>
+ <910fee2eb99b2d95e59fa6b997645b498f167022.1504037038.git.mirq-linux@rere.qmqm.pl>
+ <e5868359-8708-3d17-df8c-b04ad3624df0@microchip.com>
+Message-ID: <20171004212034.6znvbdfe2wbd7uvh@qmqm.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03, Joel Stanley wrote:
-> On Tue, Oct 3, 2017 at 6:54 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 09/21, Joel Stanley wrote:
-> >> @@ -160,6 +191,104 @@ static struct clk_hw *aspeed_calc_pll(const char *name, u32 val)
-> >> +     /*
-> >> +      * Memory controller (M-PLL) PLL. This clock is configured by the
-> >> +      * bootloader, and is exposed to Linux as a read-only clock rate.
-> >> +      */
-> >> +     regmap_read(map, ASPEED_MPLL_PARAM, &val);
-> >> +     aspeed_clk_data->hws[ASPEED_CLK_MPLL] = aspeed_calc_pll("mpll", val);
-> >> +
-> >> +     /* SD/SDIO clock divider (TODO: There's a gate too) */
-> >> +     hw = clk_hw_register_divider_table(NULL, "sdio", "hpll", 0,
-> >
-> > Please pass your dev pointer here from the platform device.
-> >
-> >> +                     scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
-> >> +                     div_table,
-> >> +                     &aspeed_clk_lock);
-> >
-> > And check for errors? Perhaps use devm_clk_hw_regsiter() APIs and
-> > construct the dividers and muxes directly instead of using the
-> > basic type registration APIs.
+On Thu, Sep 14, 2017 at 06:53:30PM +0200, Nicolas Ferre wrote:
+> On 29/08/2017 at 22:08, Micha? Miros?aw wrote:
+> > Fix following warning at bootup:
+> > 
+> > device-tree: Duplicate name in fb at 0x00500000, renamed to "display#1"
+> > 
+> > Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> > ---
+> >  arch/arm/boot/dts/at91sam9m10g45ek.dts | 48 +++++++++++++++++-----------------
+> >  1 file changed, 24 insertions(+), 24 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > index 9cf1f5163fbd..272af5867403 100644
+> > --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > @@ -223,30 +223,6 @@
+> >  		fb0: fb at 0x00500000 {
+> >  			display = <&display0>;
+> >  			status = "okay";
+> > -
+> > -			display0: display {
 > 
-> Do you think that devm_ is overkill, given we will never unload this driver?
-
-Is probe defer going to happen? Even if unload can't happen,
-probe defer is a concern unless that is also ruled out.
-
+> Micha?, thanks for your patch.
 > 
-> Can you explain why you suggest to construct the structures directly
-> instead of using the APIs?
-
-There aren't devm APIs for some of these basic clk type
-registration functions.
-
+> Actually the DT binding requires this:
+> Documentation/devicetree/bindings/video/atmel,lcdc.txt
 > 
-> I had a read of the basic type registration functions, and the
-> relevant failure paths are memory allocation failures. If we're out of
-> memory that early in boot then things have gone pretty bad.
+> So it's somehow a bigger issue.
+> Moreover, several boards have exactly the same arrangement than the
+> at91sam9m10g45ek, so you probably need to modify them all at the same time.
 > 
-> I can add checks for null and bail out; I don't think there's value in
-> freeing the allocated memory: if a system can't load it's clock driver
-> then it's super hosed.
+> After a brief look at drivers/video/fbdev/atmel_lcdfb.c it seems that
+> the name of the node is not so much important, so we can modify it
+> (something like display0: lcd-display {}) .
+> 
+> I suggest that you modify the binding, the board files affected and
+> re-submit a patch.
 
-If we can't proceed without this driver because it's super hosed,
-then perhaps we need to panic the system on errors here. Should
-be simple enough to add some error checks and goto panic("Things
-are super hosed").
+It looks like the binding documentation is wrong. The driver code does
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+	of_parse_phandle(np, "display", 0);
+
+so it expects a phandle, not a node.
+
+Best Regards,
+Micha? Miros?aw
