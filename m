@@ -1,217 +1,109 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 4 Oct 2017 13:49:33 +0200
-Subject: [Tee-dev] [PATCH v1 12/14] tee: optee: enable dynamic SHM support
-In-Reply-To: <31f5c449-ab0c-f033-6a7e-0ce23c7cc452@arm.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <1506621851-6929-13-git-send-email-volodymyr_babchuk@epam.com>
- <31f5c449-ab0c-f033-6a7e-0ce23c7cc452@arm.com>
-Message-ID: <20171004114932.GA27797@jax>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 4 Oct 2017 19:56:12 +0800
+Subject: [arm64:for-next/core 8/11] arch/arm64/kernel/setup.c:247:10: error:
+ implicit declaration of function 'init_utsname'
+Message-ID: <201710041909.9ayqjprI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 11:06:38AM -0500, Stuart Yoder wrote:
-> 
-> 
-> On 9/28/17 1:04 PM, Volodymyr Babchuk wrote:
-> >From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
-> >
-> >Previous patches added various features that are needed for dynamic SHM.
-> >Dynamic SHM allows Normal World to share any buffers with OP-TEE.
-> >While original design suggested to use pre-allocated region (usually of
-> >1M to 2M of size), this new approach allows to use all non-secure RAM for
-> >command buffers, RPC allocations and TA parameters.
-> >
-> >This patch checks capability OPTEE_SMC_SEC_CAP_DYNAMIC_SHM. If it was set
-> >by OP-TEE, then kernel part of OP-TEE will use kernel page allocator
-> >to allocate command buffers. Also it will set TEE_GEN_CAP_REG_MEM
-> >capability to tell userspace that it supports shared memory registration.
-> >
-> >Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
-> >---
-> >  drivers/tee/optee/core.c | 69 +++++++++++++++++++++++++++++++++++-------------
-> >  1 file changed, 51 insertions(+), 18 deletions(-)
-> >
-> >diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-> >index 8e012ea..e8fd9af 100644
-> >--- a/drivers/tee/optee/core.c
-> >+++ b/drivers/tee/optee/core.c
-> >@@ -28,6 +28,7 @@
-> >  #include <linux/uaccess.h>
-> >  #include "optee_private.h"
-> >  #include "optee_smc.h"
-> >+#include "shm_pool.h"
-> >  #define DRIVER_NAME "optee"
-> >@@ -227,6 +228,10 @@ static void optee_get_version(struct tee_device *teedev,
-> >  		.impl_caps = TEE_OPTEE_CAP_TZ,
-> >  		.gen_caps = TEE_GEN_CAP_GP,
-> >  	};
-> >+	struct optee *optee = tee_get_drvdata(teedev);
-> >+
-> >+	if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-> >+		v.gen_caps |= TEE_GEN_CAP_REG_MEM;
-> >  	*vers = v;
-> >  }
-> >@@ -405,21 +410,22 @@ static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
-> >  }
-> >  static struct tee_shm_pool *
-> >-optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
-> >+optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm,
-> >+			  u32 sec_caps)
-> >  {
-> >  	union {
-> >  		struct arm_smccc_res smccc;
-> >  		struct optee_smc_get_shm_config_result result;
-> >  	} res;
-> >-	struct tee_shm_pool *pool;
-> >  	unsigned long vaddr;
-> >  	phys_addr_t paddr;
-> >  	size_t size;
-> >  	phys_addr_t begin;
-> >  	phys_addr_t end;
-> >  	void *va;
-> >-	struct tee_shm_pool_mem_info priv_info;
-> >-	struct tee_shm_pool_mem_info dmabuf_info;
-> >+	struct tee_shm_pool_mgr *priv_mgr;
-> >+	struct tee_shm_pool_mgr *dmabuf_mgr;
-> >+	void *rc;
-> >  	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res.smccc);
-> >  	if (res.result.status != OPTEE_SMC_RETURN_OK) {
-> >@@ -449,22 +455,49 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
-> >  	}
-> >  	vaddr = (unsigned long)va;
-> >-	priv_info.vaddr = vaddr;
-> >-	priv_info.paddr = paddr;
-> >-	priv_info.size = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-> >-	dmabuf_info.vaddr = vaddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-> >-	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-> >-	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-> >-
-> >-	pool = tee_shm_pool_alloc_res_mem(&priv_info, &dmabuf_info);
-> >-	if (IS_ERR(pool)) {
-> >-		memunmap(va);
-> >-		goto out;
-> 
-> Now that you removed the call to tee_shm_pool_alloc_res_mem() it is dead
-> code and no longer used.  Do we still need tee_shm_pool_alloc_res_mem at
-> all?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+head:   03d1315cf115bfae05f3f70a5c1b3256cbb5613d
+commit: 374f1b872ff597b11b96b3c1f06accf72d246668 [8/11] arm64: consistently log boot/secondary CPU IDs
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 374f1b872ff597b11b96b3c1f06accf72d246668
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Yes, we still need that function in order to support static shared
-memory. We'll always need to optionally support static shared memory as
-some hardware configurations depend on it.
+All errors (new ones prefixed by >>):
 
-> 
-> >+	/*
-> >+	 * If OP-TEE can work with unregistered SHM, we will use own pool
-> >+	 * for private shm
-> >+	 */
-> >+	if (sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM) {
-> >+		rc = optee_shm_pool_alloc_pages();
-> >+		if (IS_ERR(rc))
-> >+			goto err_memunmap;
-> >+		priv_mgr = rc;
-> >+	} else {
-> >+		const size_t sz = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-> >+
-> >+		rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, sz,
-> >+						    3 /* 8 bytes aligned */);
-> >+		if (IS_ERR(rc))
-> >+			goto err_memunmap;
-> >+		priv_mgr = rc;
-> >+
-> >+		vaddr += sz;
-> >+		paddr += sz;
-> >+		size -= sz;
-> >  	}
-> >+	rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, size, PAGE_SHIFT);
-> >+	if (IS_ERR(rc))
-> >+		goto err_free_priv_mgr;
-> >+	dmabuf_mgr = rc;
-> >+
-> >+	rc = tee_shm_pool_alloc(priv_mgr, dmabuf_mgr);
-> >+	if (IS_ERR(rc))
-> >+		goto err_free_dmabuf_mgr;
-> >+
-> >  	*memremaped_shm = va;
-> >-out:
-> >-	return pool;
-> >+
-> >+	return rc;
-> >+
-> >+err_free_dmabuf_mgr:
-> >+	tee_shm_pool_mgr_destroy(dmabuf_mgr);
-> >+err_free_priv_mgr:
-> >+	tee_shm_pool_mgr_destroy(priv_mgr);
-> >+err_memunmap:
-> >+	memunmap(va);
-> >+	return rc;
-> >  }
-> 
-> This function now mixes dynamic and shared memory based allocation in a way that
-> only applies to certain cases.
-> 
-> We're going to have the following cases:
->  -Linux OP-TEE driver sees only static shared memory advertised (older versions
->   of OP-TEE)
->  -Linux OP-TEE driver sees only dynamic shared memory advertised (e.g. a guest
->   kernel in a VM)
->  -Linux OP-TEE driver sees both static and dynamic memory advertised
-> 
-> We are not handling the 'only dynamic shared memory' case currently and this code
-> is going to have to be refactored again to support that.  Since we are substantially
-> re-working it anyway here, why don't we support all the cases.
+   arch/arm64/kernel/setup.c: In function 'setup_arch':
+>> arch/arm64/kernel/setup.c:247:10: error: implicit declaration of function 'init_utsname' [-Werror=implicit-function-declaration]
+     sprintf(init_utsname()->machine, UTS_MACHINE);
+             ^~~~~~~~~~~~
+>> arch/arm64/kernel/setup.c:247:24: error: invalid type argument of '->' (have 'int')
+     sprintf(init_utsname()->machine, UTS_MACHINE);
+                           ^~
+>> arch/arm64/kernel/setup.c:247:35: error: 'UTS_MACHINE' undeclared (first use in this function)
+     sprintf(init_utsname()->machine, UTS_MACHINE);
+                                      ^~~~~~~~~~~
+   arch/arm64/kernel/setup.c:247:35: note: each undeclared identifier is reported only once for each function it appears in
+   cc1: some warnings being treated as errors
 
-We're trying to keep this patchset as small as possible.
+vim +/init_utsname +247 arch/arm64/kernel/setup.c
 
-What you're proposing below is something that suits our long term
-aspirations, but it's a bit more complicated than just adding the lines
-below.
+   244	
+   245	void __init setup_arch(char **cmdline_p)
+   246	{
+ > 247		sprintf(init_utsname()->machine, UTS_MACHINE);
+   248		init_mm.start_code = (unsigned long) _text;
+   249		init_mm.end_code   = (unsigned long) _etext;
+   250		init_mm.end_data   = (unsigned long) _edata;
+   251		init_mm.brk	   = (unsigned long) _end;
+   252	
+   253		*cmdline_p = boot_command_line;
+   254	
+   255		early_fixmap_init();
+   256		early_ioremap_init();
+   257	
+   258		setup_machine_fdt(__fdt_pointer);
+   259	
+   260		parse_early_param();
+   261	
+   262		/*
+   263		 *  Unmask asynchronous aborts after bringing up possible earlycon.
+   264		 * (Report possible System Errors once we can report this occurred)
+   265		 */
+   266		local_async_enable();
+   267	
+   268		/*
+   269		 * TTBR0 is only used for the identity mapping at this stage. Make it
+   270		 * point to zero page to avoid speculatively fetching new entries.
+   271		 */
+   272		cpu_uninstall_idmap();
+   273	
+   274		xen_early_init();
+   275		efi_init();
+   276		arm64_memblock_init();
+   277	
+   278		paging_init();
+   279	
+   280		acpi_table_upgrade();
+   281	
+   282		/* Parse the ACPI tables for possible boot-time configuration */
+   283		acpi_boot_table_init();
+   284	
+   285		if (acpi_disabled)
+   286			unflatten_device_tree();
+   287	
+   288		bootmem_init();
+   289	
+   290		kasan_init();
+   291	
+   292		request_standard_resources();
+   293	
+   294		early_ioremap_reset();
+   295	
+   296		if (acpi_disabled)
+   297			psci_dt_init();
+   298		else
+   299			psci_acpi_init();
+   300	
+   301		cpu_read_bootcpu_ops();
+   302		smp_init_cpus();
+   303		smp_build_mpidr_hash();
+   304	
 
-Once we're done with this patchset I'd be happy to work together to
-implement what you're proposing.
-
-Thanks,
-Jens
-
-> 
-> It seems like we need logic along the lines of:
-> 
->     invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res.smccc);
->     if (res.result.status == OPTEE_SMC_RETURN_OK)
->         optee_static_shm = true;
->     else
->         optee_static_shm = false;
-> 
->     if (sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
->         optee_dynamic_shm = true;
->     else
->         optee_dynamic_shm = false;
-> 
->     /* allocate private pool */
->     if (optee_dynamic_shm) {
->         rc = optee_shm_pool_alloc_pages();
->         priv_mgr = rc;
->     } else {
->         rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, sz, 3);
->         priv_mgr = rc;
->     }
-> 
->     /* allocate dmabuf pool */
->     if (optee_dynamic_shm && !optee_static_shm) {
->         dmabuf_mgr = NULL;
->     } else {
->         rc = tee_shm_pool_mgr_alloc_res_mem(vaddr, paddr, size, PAGE_SHIFT);
->         dmabuf_mgr = rc;
->     }
-> 
->     rc = tee_shm_pool_alloc(priv_mgr, dmabuf_mgr);
-> 
-> >  /* Simple wrapper functions to be able to use a function pointer */
-> >@@ -542,7 +575,7 @@ static struct optee *optee_probe(struct device_node *np)
-> >  	if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM))
-> >  		return ERR_PTR(-EINVAL);
-> 
-> We should remove the above assumption that there must be static shared memory.  It
-> shouldn't be an error.
-> 
-> Thanks,
-> Stuart
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 36749 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/843e93fd/attachment-0001.gz>
