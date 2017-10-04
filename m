@@ -1,81 +1,138 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 4 Oct 2017 16:13:16 +0800
-Subject: [PATCH v3] doc: coresight: correct usage for disabling idle states
-In-Reply-To: <CANLsYkwFd1EyX+wmfsaUHwhJv-1Erde6t+omLpniudTC1Lvx_w@mail.gmail.com>
-References: <1505882817-19582-1-git-send-email-leo.yan@linaro.org>
- <CANLsYkwFd1EyX+wmfsaUHwhJv-1Erde6t+omLpniudTC1Lvx_w@mail.gmail.com>
-Message-ID: <20171004081316.GB31048@leoy-linaro>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 04 Oct 2017 10:22:53 +0200
+Subject: [PATCH] ARM: dts: imx: Fix incorrect display nodes notation
+In-Reply-To: <1507052618-30329-1-git-send-email-marco.franchi@nxp.com>
+References: <1507052618-30329-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <1507105373.11691.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 11:14:46AM -0700, Mathieu Poirier wrote:
-> On 19 September 2017 at 21:46, Leo Yan <leo.yan@linaro.org> wrote:
-> > In the coresight CPU debug document it suggests to use 'echo' command
-> > to set latency request to /dev/cpu_dma_latency so can disable all CPU
-> > idle states, but in fact this doesn't work.
-> >
-> > This is because when the command 'echo' exits, it releases the device
-> > node's file descriptor and the kernel release function removes the QoS
-> > constraint; finally when the command 'echo' finished there have no
-> > constraint imposed on cpu_dma_latency.
-> >
-> > This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-> > command 'exec' can avoid the file descriptor to be closed so we can
-> > keep the constraint on cpu_dma_latency.
-> >
-> > This patch also adds the info for reference docs for PM QoS and cpuidle
-> > sysfs.
-> >
-> > Cc: Jonathan Corbet <corbet@lwn.net>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Reported-by: Kim Phillips <kim.phillips@arm.com>
-> > Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  Documentation/trace/coresight-cpu-debug.txt | 22 +++++++++++++++++-----
-> >  1 file changed, 17 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-> > index b3da1f9..2b9b51c 100644
-> > --- a/Documentation/trace/coresight-cpu-debug.txt
-> > +++ b/Documentation/trace/coresight-cpu-debug.txt
-> > @@ -149,11 +149,23 @@ If you want to limit idle states at boot time, you can use "nohlt" or
-> >
-> >  At the runtime you can disable idle states with below methods:
-> >
-> > -Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
-> > -states (if latency = 0uS then disable all idle states):
-> > -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
-> > -
-> > -Disable specific CPU's specific idle state:
-> > +It is possible to disable CPU idle states by way of the PM QoS
-> > +subsystem, more specifically by using the "/dev/cpu_dma_latency"
-> > +interface (see Documentation/power/pm_qos_interface.txt for more
-> > +details).  As specified in the PM QoS documentation the requested
-> > +parameter will stay in effect until the file descriptor is released.
-> > +For example:
-> > +
-> > +# exec 3<> /dev/cpu_dma_latency; echo 0 >&3
-> > +...
-> > +Do some work...
-> > +...
-> > +# exec 3<>-
-> > +
-> > +The same can also be done from an application program.
-> > +
-> > +Disable specific CPU's specific idle state from cpuidle sysfs (see
-> > +Documentation/cpuidle/sysfs.txt):
-> >  # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
-> >
-> 
-> Applied.
+Hi Marco,
 
-Thanks a lot, Mathieu.
-
-> Thanks,
-> Mathieu
+On Tue, 2017-10-03 at 14:43 -0300, Marco Franchi wrote:
+> The following build warnings are seen with W=1:
 > 
-> >
-> > --
-> > 2.7.4
-> >
+> > Warning (unit_address_vs_reg): Node /display at di0 has a unit name, but no reg property
+> > Warning (unit_address_vs_reg): Node /display at di1 has a unit name, but no reg property
+> 
+> Fix all these warnings by changing 'display at diX' to 'dispX'.
+> 
+> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+
+Thank you for fixing this. Mostly
+
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+but I have one remark regarding i.MX51. While on the later SoCs the
+parallel display interface pad groups are called DISP0 and DISP1 in the
+reference manual, on i.MX51 they were called DISP1 and DISP2 [1].
+This is already reflected by the pin function ids: MX51_PAD_DISP[12]_*.
+
+Also, the display ports are currently inconsistently named across the
+i.MX51 board device trees, see below. Should we use this opportunity to
+also fix this inconsistency?
+
+[1] https://www.nxp.com/docs/en/reference-manual/MCIMX51RM.pdf
+
+> ---
+> I have already submitted a fix for the Documentation bindings:
+> https://git.pengutronix.de/cgit/pza/linux/commit/?h=imx-drm/next&id=db
+> fdd153d4aefec13460c97475737e59af92d8e2
+> 
+> ?arch/arm/boot/dts/imx51-apf51dev.dts??????????| 2 +-
+> ?arch/arm/boot/dts/imx51-babbage.dts???????????| 4 ++--
+> ?arch/arm/boot/dts/imx51-ts4800.dts????????????| 2 +-
+[...]
+> ?30 files changed, 31 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts
+> b/arch/arm/boot/dts/imx51-apf51dev.dts
+> index a5e6091..f04d0df 100644
+> --- a/arch/arm/boot/dts/imx51-apf51dev.dts
+> +++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+> @@ -24,7 +24,7 @@
+> ?		default-on;
+> ?	};
+> ?
+> -	display at di1 {
+> +	disp1 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "bgr666";
+> ?		pinctrl-names = "default";
+
+This is actually DISP1 in the reference manual (connected to IPU DI0):
+
+????????????????pinctrl-0 = <&pinctrl_ipu_disp1>;
+????????????????port {
+????????????????????????display_in: endpoint {
+????????????????????????????????remote-endpoint = <&ipu_di0_disp0>;???????????????????????????????????????????????????????????????????????????
+????????????????????????};
+????????????????};
+
+The remote endpoint should be renamed to ipu_di0_disp1 for consistency.
+
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index 873cf24..297953c 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -39,7 +39,7 @@
+> ?		};
+> ?	};
+> ?
+> -	display0: display at di0 {
+> +	display0: disp0 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "rgb24";
+> ?		pinctrl-names = "default";
+
+This is also DISP1 in the reference manual (connected to IPU DI0):
+
+		pinctrl-0 = <&pinctrl_ipu_disp1>;
+????????????????port {
+????????????????????????display0_in: endpoint {
+???
+?????????????????????????????remote-endpoint = <&ipu_di0_disp0>;
+????????
+????????????????};
+????????????????};
+
+@@ -66,7 +66,7 @@
+> ?		};
+> ?	};
+> ?
+> -	display1: display at di1 {
+> +	display1: disp1 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "rgb565";
+> ?		pinctrl-names = "default";
+
+And this is actually DISP2 in the reference manual (connected to IPU
+DI1):
+		pinctrl-0 = <&pinctrl_ipu_disp2>;
+????????????????port {
+????????????????????????display1_in: endpoint {
+????????????????????????????????remote-endpoint = <&ipu_di1_disp1>;
+????????????????????????};
+????????????????};
+
+The remote endpoint should be renamed to ipu_di1_disp2.
+
+> diff --git a/arch/arm/boot/dts/imx51-ts4800.dts
+> b/arch/arm/boot/dts/imx51-ts4800.dts
+> index ca1cc5e..e6be869 100644
+> --- a/arch/arm/boot/dts/imx51-ts4800.dts
+> +++ b/arch/arm/boot/dts/imx51-ts4800.dts
+> @@ -50,7 +50,7 @@
+> ?		power-supply = <&backlight_reg>;
+> ?	};
+> ?
+> -	display0: display at di0 {
+> +	display0: disp0 {
+> ?		compatible = "fsl,imx-parallel-display";
+> ?		interface-pix-fmt = "rgb24";
+> ?		pinctrl-names = "default";
+
+And this is also DISP1 according to the reference manual.
+
+regards
+Philipp
