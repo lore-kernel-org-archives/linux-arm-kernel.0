@@ -1,46 +1,95 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Wed,  4 Oct 2017 23:25:14 +0100
-Subject: [RESEND][PATCH 0/7] Fix i.MX7D OCOTP write support
-Message-ID: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
+Date: Wed,  4 Oct 2017 23:25:18 +0100
+Subject: [RESEND][PATCH 4/7] nvmem: imx-ocotp: Move i.MX6 write clock setup to
+ dedicated function
+In-Reply-To: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
+References: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507155921-824-5-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Resend: I may have missed Philip Zabel on the first send - apologies if
-that is the case Philip.)
+The i.MX7S/D has a different set of timing requirements, as a pre-cursor to
+adding the i.MX7 timing parameters, move the i.MX6 stuff to a dedicated
+function.
 
-The current OCOTP driver added support for i.MX7 read access and then added
-support for i.MX6 write access. Between the two commits the fact that the
-added write routine was only appropriate for i.MX6 was missed.
+Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 
-As a result its certain that attempting to write i.MX7 OTP fuses on Linux
-would fail as the destination address on i.MX7 is different to i.MX6.
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+---
+ drivers/nvmem/imx-ocotp.c | 47 +++++++++++++++++++++++++++--------------------
+ 1 file changed, 27 insertions(+), 20 deletions(-)
 
-Without the update to the i.MX7 setup and hold timings it's not clear that
-a write operation would actually do any writing which means the bad
-addressing on i.MX7 might not actually destroy the wrong OTP fuses, it
-probably would just fail to do anything, understandably I haven't
-experimented with knowingly bad values for one-time-programmable fuses.
-
-This series fixes the gap by:
-
-1. Switching off OTP writing for i.MX7
-2. Adding in support for the i.MX7 way of doing things
-3. Switching OTP write support back on for i.MX7
-
-There's an additional small fix for the naming of the module then to
-indicate it works for i.MX7 as well as for i.MX6.
-
-Bryan O'Donoghue (7):
-  nvmem: imx-ocotp: Restrict OTP write to IMX6 processors
-  nvmem: imx-ocotp: Pass parameters via a struct
-  nvmem: imx-ocotp: Add support for banked OTP addressing
-  nvmem: imx-ocotp: Move i.MX6 write clock setup to dedicated function
-  nvmem: imx-ocotp: Add i.MX7D timing write clock setup support
-  nvmem: imx-ocotp: Enable i.MX7D OTP write support
-  nvmem: imx-ocotp: Update module description
-
- drivers/nvmem/imx-ocotp.c | 191 +++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 156 insertions(+), 35 deletions(-)
-
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index 8034937..0cd7e03 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -169,6 +169,31 @@ static int imx_ocotp_read(void *context, unsigned int offset,
+ 	return ret;
+ }
+ 
++static void imx_ocotp_set_imx6_timing(struct ocotp_priv *priv)
++{
++	unsigned long clk_rate = 0;
++	unsigned long strobe_read, relax, strobe_prog;
++	u32 timing = 0;
++
++	/* 47.3.1.3.1
++	 * Program HW_OCOTP_TIMING[STROBE_PROG] and HW_OCOTP_TIMING[RELAX]
++	 * fields with timing values to match the current frequency of the
++	 * ipg_clk. OTP writes will work at maximum bus frequencies as long
++	 * as the HW_OCOTP_TIMING parameters are set correctly.
++	 */
++	clk_rate = clk_get_rate(priv->clk);
++
++	relax = clk_rate / (1000000000 / DEF_RELAX) - 1;
++	strobe_prog = clk_rate / (1000000000 / 10000) + 2 * (DEF_RELAX + 1) - 1;
++	strobe_read = clk_rate / (1000000000 / 40) + 2 * (DEF_RELAX + 1) - 1;
++
++	timing = strobe_prog & 0x00000FFF;
++	timing |= (relax       << 12) & 0x0000F000;
++	timing |= (strobe_read << 16) & 0x003F0000;
++
++	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
++}
++
+ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 			   size_t bytes)
+ {
+@@ -176,9 +201,6 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 	u32 *buf = val;
+ 	int ret;
+ 
+-	unsigned long clk_rate = 0;
+-	unsigned long strobe_read, relax, strobe_prog;
+-	u32 timing = 0;
+ 	u32 ctrl;
+ 	u8 waddr;
+ 	u8 word = 0;
+@@ -197,23 +219,8 @@ static int imx_ocotp_write(void *context, unsigned int offset, void *val,
+ 		return ret;
+ 	}
+ 
+-	/* 47.3.1.3.1
+-	 * Program HW_OCOTP_TIMING[STROBE_PROG] and HW_OCOTP_TIMING[RELAX]
+-	 * fields with timing values to match the current frequency of the
+-	 * ipg_clk. OTP writes will work at maximum bus frequencies as long
+-	 * as the HW_OCOTP_TIMING parameters are set correctly.
+-	 */
+-	clk_rate = clk_get_rate(priv->clk);
+-
+-	relax = clk_rate / (1000000000 / DEF_RELAX) - 1;
+-	strobe_prog = clk_rate / (1000000000 / 10000) + 2 * (DEF_RELAX + 1) - 1;
+-	strobe_read = clk_rate / (1000000000 / 40) + 2 * (DEF_RELAX + 1) - 1;
+-
+-	timing = strobe_prog & 0x00000FFF;
+-	timing |= (relax       << 12) & 0x0000F000;
+-	timing |= (strobe_read << 16) & 0x003F0000;
+-
+-	writel(timing, priv->base + IMX_OCOTP_ADDR_TIMING);
++	/* Setup the write timing values */
++	imx_ocotp_set_imx6_timing(priv);
+ 
+ 	/* 47.3.1.3.2
+ 	 * Check that HW_OCOTP_CTRL[BUSY] and HW_OCOTP_CTRL[ERROR] are clear.
 -- 
 2.7.4
