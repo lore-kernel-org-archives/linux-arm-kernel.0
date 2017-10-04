@@ -1,65 +1,40 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 16:01:13 +0100
-Subject: [PATCH v3 21/22] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
-In-Reply-To: <CAK8P3a3pAFKM+Dq_yb7KYhB+xeneVuODBq_4nacEuw9creT6Yw@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-22-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a3pAFKM+Dq_yb7KYhB+xeneVuODBq_4nacEuw9creT6Yw@mail.gmail.com>
-Message-ID: <5efbd0a7-8b62-5b30-98e6-dfaff64e2628@arm.com>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Wed, 4 Oct 2017 17:07:55 +0200
+Subject: [PATCH 0/1] XDP Program for Ip forward
+In-Reply-To: <1507016225-319-1-git-send-email-Christina.Jacob@cavium.com>
+References: <1507016225-319-1-git-send-email-Christina.Jacob@cavium.com>
+Message-ID: <20171004170755.4b1d8de4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+First of all thank you for working on this.
 
-On 04/10/17 12:30, Arnd Bergmann wrote:
->> +static int scmi_cpufreq_probe(struct platform_device *pdev)
->> +{
->> +       int ret;
->> +
->> +       handle = devm_scmi_handle_get(&pdev->dev);
->> +
->> +       if (IS_ERR_OR_NULL(handle) || !handle->perf_ops)
->> +               return -EPROBE_DEFER;
+On Tue,  3 Oct 2017 13:07:04 +0530 cjacob <Christina.Jacob@cavium.com> wrote:
+
+> 	Usage: ./xdp3 [-S] <ifindex1...ifindexn> 
 > 
-> As mentioned before, never create an interface that needs to use
-> IS_ERR_OR_NULL(), make it return either NULL on error, or always
-> have an error code.
-> 
+> 	-S to choose generic xdp implementation 
+> 	  [Default is driver xdp implementation]
+> 	ifindex - the index of the interface to which 
+> 	the xdp program has to be attached.
+> 	in 4.14-rc3 kernel.
 
-Agreed.
+I would prefer if we can name the program something more descriptive
+than "xdp3".  What about "xdp_redirect_router" or "xdp_router_ipv4" ?
 
->> +
->> +static struct platform_driver scmi_cpufreq_platdrv = {
->> +       .driver = {
->> +               .name   = "scmi-cpufreq",
->> +       },
->> +       .probe          = scmi_cpufreq_probe,
->> +       .remove         = scmi_cpufreq_remove,
->> +};
-> 
-> You appear to have split this driver into the 'cpufreq' side and
-> the 'protocol' handler in a different file. I already commented that
-> the way the main scmi driver knows about all the protocols looks
-> bad, here we can see another aspect of the same problem.
-> 
-> Rather than manually register a platform_device for the purpose
-> of connecting it to the cpufreq driver, there should be a way
-> to dynamically register the protocol from the cpufreq driver
-> and then have both in the same file.
-> 
+I would also appreciate if we can stop using ifindex'es, and instead
+use normal device ifname's.  And simply do the lookup to the ifindex in
+the program via if_nametoindex(ifname), see how in [1] and [2].
 
-I agree that should be possible. I took this approach for 2 reasons:
+When adding more ifname's you can just use the same trick as with
+multiple --cpu options like [1] and [2].
 
-1. to avoid all sorts of probe ordering issues
-2. we may have system with multiple instances of SCMI. E.g. a system
-   may have multiple remote processors, each controlling dvfs/power mgmt
-   of a subset of CPUs/devices controller in OS.
-
-I have to admit that I haven't thought too much in details yet. That's
-the main idea behind scmi_handle and restricting access to that only to
-sub-nodes in it. I am open to suggestions.
+[1] http://lkml.kernel.org/r/150711864538.9499.11712573036995600273.stgit at firesoul
+[2] https://github.com/netoptimizer/prototype-kernel/blob/master/kernel/samples/bpf/xdp_redirect_cpu_user.c
 
 -- 
-Regards,
-Sudeep
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  LinkedIn: http://www.linkedin.com/in/brouer
