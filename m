@@ -1,33 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Oct 2017 13:19:40 +0200
-Subject: [PATCH v3 04/22] firmware: arm_scmi: add basic driver
- infrastructure for SCMI
-In-Reply-To: <1506604306-20739-5-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAK8P3a1o+thrkyUmf2DGYq4pb087y8gwHo2jTyqcDxWdMAnogQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Oct 2017 12:22:04 +0100
+Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
+ helper
+In-Reply-To: <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+ <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-
-> +static int scmi_mbox_free_channel(struct scmi_info *info)
+On 27/09/17 14:32, Shameer Kolothum wrote:
+> From: John Garry <john.garry@huawei.com>
+> 
+> On some platforms msi-controller address regions have to be excluded
+> from normal IOVA allocation in that they are detected and decoded in
+> a HW specific way by system components and so they cannot be considered
+> normal IOVA address space.
+> 
+> Add a helper function that retrieves msi address regions through device
+> tree msi mapping, so that these regions will not be translated by IOMMU
+> and will be excluded from IOVA allocations.
+> 
+> Signed-off-by: John Garry <john.garry@huawei.com>
+> [Shameer: Modified msi-parent retrieval logic]
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_iommu.h | 10 +++++
+>  2 files changed, 105 insertions(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index e60e3db..ffd7fb7 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/iommu.h>
+>  #include <linux/limits.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/of_iommu.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/slab.h>
+> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
+>  	return ops->of_xlate(dev, iommu_spec);
+>  }
+>  
+> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
 > +{
-> +       if (!IS_ERR_OR_NULL(info->tx_chan)) {
-> +               mbox_free_channel(info->tx_chan);
-> +               info->tx_chan = NULL;
-> +       }
+> +	u32 *rid = data;
 > +
-> +       return 0;
+> +	*rid = alias;
+> +	return 0;
 > +}
+> +
+>  struct of_pci_iommu_alias_info {
+>  	struct device *dev;
+>  	struct device_node *np;
+> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+>  	return info->np == pdev->bus->dev.of_node;
+>  }
+>  
+> +static int of_iommu_alloc_resv_region(struct device_node *np,
+> +				      struct list_head *head)
+> +{
+> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +	struct iommu_resv_region *region;
+> +	struct resource res;
+> +	int err;
+> +
+> +	err = of_address_to_resource(np, 0, &res);
 
-Any use of IS_ERR_OR_NULL() tends to be an indication of a bad API
-design. Please make a decision about what you want to store in
-info->tx_chan and stick with it.
+What is the rational for registering the first region only? Surely you
+can have more than one region in an MSI controller (yes, your particular
+case is the ITS which has only one, but we're trying to do something
+generic here).
 
-Usually, we don't store error pointers in permanent data structures.
-If you can deal with tx_chan being absent here, then you can just
-store NULL into it when you don't have one, otherwise you should
-make sure you never call this and fail the probe function earlier.
+Another issue I have with this code is that it inserts all of the ITS
+MMIO in the RESV_MSI range. As long as we don't generate any page tables
+for this, we're fine. But if we ever change this, we'll end-up with the
+ITS programming interface being exposed to a device, which wouldn't be
+acceptable.
 
-      Arnd
+Why can't we have some generic property instead, that would describe the
+actual ranges that cannot be translated? That way, no random insertion
+of a random range, and relatively future proof.
+
+I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd feel
+like a much nicer and simpler solution to this problem.
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
