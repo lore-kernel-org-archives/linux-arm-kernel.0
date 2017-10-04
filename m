@@ -1,99 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 12:07:50 +0100
-Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
-Message-ID: <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 4 Oct 2017 13:10:26 +0200
+Subject: [PATCH v2 7/8] arm64: dts: renesas: initial Eagle board device
+ tree
+In-Reply-To: <9ad9bd62-300c-cc78-a8f3-bbdd9eed6bed@cogentembedded.com>
+References: <20170915194445.950496886@cogentembedded.com>
+ <CAMuHMdUX+RW9H-p5n_JB-SkW8k5g_i0bg-i9LD59b5MLvFm3YQ@mail.gmail.com>
+ <9ad9bd62-300c-cc78-a8f3-bbdd9eed6bed@cogentembedded.com>
+Message-ID: <CAMuHMdUfRr-X_+pZhmWw28SDwa5=7daSefjVaT9y5cFB9VoO6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Sergei,
 
-Thanks for taking a look at this.
+On Wed, Oct 4, 2017 at 1:03 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 9/21/2017 4:18 PM, Geert Uytterhoeven wrote:
+>>> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
+>>> The board has 1 debug serial port (SCIF0); include support for it,
+>>> so that the serial console can work.
+>>>
+>>> Based on the original (and large) patch by Vladimir Barinov
+>>> <vladimir.barinov@cogentembedded.com>.
+>>>
+>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>>> --- /dev/null
+>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
 
-On 04/10/17 11:50, Arnd Bergmann wrote:
-> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> +
->> +The SCMI is intended to allow agents such as OSPM to manage various functions
->> +that are provided by the hardware platform it is running on, including power
->> +and performance functions.
->> +
->> +This binding is intended to define the interface the firmware implementing
->> +the SCMI as described in ARM document number ARM DUI 0922B ("ARM System Control
->> +and Management Interface Platform Design Document")[0] provide for OSPM in
->> +the device tree.
->> +
->> +Required properties:
->> +
->> +The scmi node with the following properties shall be under the /firmware/ node.
->> +
->> +- compatible : shall be "arm,scmi"
->> +- mboxes: List of phandle and mailbox channel specifiers. It should contain
->> +         exactly one or two mailboxes, one for transmitting messages("tx")
->> +         and another optional for receiving the notifications("rx") if
->> +         supported.
->> +- mbox-names: shall be "tx" or "rx"
-> 
-> The example below does not have the mbox-names property. If you require
-> exactly two mailboxes, why do you need the names anyway?
-> 
+>>> +&extal_clk {
+>>> +       clock-frequency = <16666666>;
+>>
+>>
+>> Nitpicking: the schematics say 16.6666 MHz
+>> At 100 ppm accuracy that's the same, though.
+>
+>    So, you still want me to change this freq?
 
-Good question. I can drop it, but would like to keep in case we need to
-extend it in future. We can always use then to identify.
+I don't think that's really needed, as the difference is smaller than the
+accuracy anyway.
 
-> However, your example does have a #addresss-cells/#size-cells
-> property that are not documented here. Please add them here as either
-> optional or required, and describe what the permitted values are and
-> how the address is interpreted.
-> 
+Gr{oetje,eeting}s,
 
-Ah right, I didn't notice that. I will add it. It was added to provide
-the protocol number in "reg" property.
+                        Geert
 
->> +- shmem : List of phandle pointing to the shared memory(SHM) area as per
->> +         generic mailbox client binding.
->> +
->> +See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
->> +about the generic mailbox controller and client driver bindings.
->> +
->> +The mailbox is the only permitted method of calling the SCMI firmware.
->> +Mailbox doorbell is used as a mechanism to alert the presence of a
->> +messages and/or notification.
-> 
-> This looks odd: why not make the message itself part of the mailbox
-> protocol here, and leave the shmem as a implementation detail of the
-> mailbox driver?
-> 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-I am not sure if I follow you here. But generally shmem can be memory
-carved out of anything in the system and it's dependent on the protocol
-and the remote firmware rather than the mailbox hardware itself.
-
->> +Each protocol supported shall have a sub-node with corresponding compatible
->> +as described in the following sections. If the platform supports dedicated
->> +communication channel for a particular protocol, the 3 properties namely:
->> +mboxes, mbox-names and shmem shall be present in the sub-node corresponding
->> +to that protocol.
->> +
->> +Clock/Performance bindings for the clocks/OPPs based on SCMI Message Protocol
->> +------------------------------------------------------------
->> +
->> +This binding uses the common clock binding[1].
->> +
->> +Required properties:
->> +- #clock-cells : Should be 1. Contains the Clock ID value used by SCMI commands.
->> +
-> 
-> How does the OS identify the fact that a subnode uses the clock binding?
-> Do you need to look for the #clock-cells property, or is this based on the
-> unit address?
-> 
-
-Yes it depends on #clock-cells property. That's the main reason for
-adding #clock-cells
--- 
-Regards,
-Sudeep
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
