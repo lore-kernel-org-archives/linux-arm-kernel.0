@@ -1,66 +1,29 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 4 Oct 2017 11:31:08 -0700
-Subject: [PATCH] arm64: Enforce endianness build flags for LD and AS
-In-Reply-To: <1507064302-3972-1-git-send-email-linux@roeck-us.net>
-References: <1507064302-3972-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20171004183108.GA10699@roeck-us.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 4 Oct 2017 20:38:35 +0200
+Subject: [PATCH 1/2] ARM: s3c64xx: Delete two error messages for a failed
+ memory allocation in samsung_bl_set()
+In-Reply-To: <7f06d074-231b-85b9-3649-304edce6bc2c@users.sourceforge.net>
+References: <0b695686-2e07-910d-6278-91d54a1b0b2f@users.sourceforge.net>
+ <7f06d074-231b-85b9-3649-304edce6bc2c@users.sourceforge.net>
+Message-ID: <20171004183835.7mtvoyia7ta4uqxl@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 01:58:22PM -0700, Guenter Roeck wrote:
-> If LD or AS is specified on the command line using "make LD=<my-ld>",
-> the endianness flag will not be added. Depending on the toolchain used,
-> this can result in endianness mismatch errors, such as
+On Mon, Oct 02, 2017 at 10:39:56PM +0200, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Mon, 2 Oct 2017 22:20:39 +0200
 > 
-> aarch64-cros-linux-gnu/binutils-bin/2.27.0/ld.bfd.real:
-> arch/arm64/crypto/.tmp_aes-ce-cipher.o:
-> 	compiled for a big endian system and target is little endian
+> Omit extra messages for a memory allocation failure in this function.
 > 
-> The problem was observed when using the Chrome OS build system (which sets
-> LD on the command line) for an arm64:allmodconfig build.
+> This issue was detected by using the Coccinelle software.
 > 
-> Use the override flag for both LD and AS to ensure that the endianness
-> flag is always set.
-> 
-> Cc: Douglas Anderson <dianders@chromium.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-
-Please ignore this patch for now; it doesn't help with my problem. Not yet
-sure what happens, but it appears that "-EB" doesn't make it into the LD
-variable used by cmd_make_builtin in scripts/Makefile.build. I'll have
-to figure out what is going on.
-
-Thanks,
-Guenter
-
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 > ---
->  arch/arm64/Makefile | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/mach-s3c64xx/dev-backlight.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 939b310913cf..d780d00bea9c 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -56,15 +56,15 @@ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
->  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
->  KBUILD_CPPFLAGS	+= -mbig-endian
->  CHECKFLAGS	+= -D__AARCH64EB__
-> -AS		+= -EB
-> -LD		+= -EB
-> +override AS		+= -EB
-> +override LD		+= -EB
->  LDFLAGS		+= -maarch64linuxb
->  UTS_MACHINE	:= aarch64_be
->  else
->  KBUILD_CPPFLAGS	+= -mlittle-endian
->  CHECKFLAGS	+= -D__AARCH64EL__
-> -AS		+= -EL
-> -LD		+= -EL
-> +override AS		+= -EL
-> +override LD		+= -EL
->  LDFLAGS		+= -maarch64linux
->  UTS_MACHINE	:= aarch64
->  endif
-> -- 
-> 2.7.4
-> 
+
+Thanks, applied.
+
+Best regards,
+Krzysztof
