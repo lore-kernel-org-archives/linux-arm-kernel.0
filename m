@@ -1,61 +1,47 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 4 Oct 2017 10:31:46 -0500
-Subject: [PATCH] perf/core: Avoid freeing static PMU contexts when PMU
- is unregistered
-In-Reply-To: <20171003145813.GF4931@leverpostej>
-References: <1507040450-7730-1-git-send-email-will.deacon@arm.com>
- <20171003145813.GF4931@leverpostej>
-Message-ID: <20171004103146.43cd7185662d842ff11a5940@arm.com>
+From: jacopo+renesas@jmondi.org (Jacopo Mondi)
+Date: Wed,  4 Oct 2017 17:40:57 +0200
+Subject: [PATCH] arm: dts: gr-peach: Reduce extal_clk resolution
+Message-ID: <1507131657-6414-1-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Oct 2017 15:58:13 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
+The system clock described by extal_clk is reported to have a frequency
+of 13.333 Mhz and is correctly described by gr-peach device tree.
 
-> On Tue, Oct 03, 2017 at 03:20:50PM +0100, Will Deacon wrote:
-> > Since commit 1fd7e4169954 ("perf/core: Remove perf_cpu_context::unique_pmu"),
-> > when a PMU is unregistered then its associated ->pmu_cpu_context is
-> > unconditionally freed. Whilst this is fine for dynamically allocated
-> > context types (i.e. those registered using perf_invalid_context), this
-> > causes a problem for sharing of static contexts such as
-> > perf_{sw,hw}_context, which are used by multiple built-in PMUs and
-> > effectively have a global lifetime.
-> > 
-> > Whilst testing the ARM SPE driver, which must use perf_sw_context to
-> > support per-task AUX tracing, unregistering the driver as a result of a
-> > module unload resulted in:
-> > 
-> >  Unable to handle kernel NULL pointer dereference at virtual address 00000038
-> >  Internal error: Oops: 96000004 [#1] PREEMPT SMP
-> >  Modules linked in: [last unloaded: arm_spe_pmu]
-> >  PC is at ctx_resched+0x38/0xe8
-> >  LR is at perf_event_exec+0x20c/0x278
-> >  [...]
-> >  ctx_resched+0x38/0xe8
-> >  perf_event_exec+0x20c/0x278
-> >  setup_new_exec+0x88/0x118
-> >  load_elf_binary+0x26c/0x109c
-> >  search_binary_handler+0x90/0x298
-> >  do_execveat_common.isra.14+0x540/0x618
-> >  SyS_execve+0x38/0x48
-> > 
-> > since the software context has been freed and the ctx.pmu->pmu_disable_count
-> > field has been set to NULL.
-> > 
-> > This patch fixes the problem by avoiding the freeing of static PMU contexts
-> > altogether. Whilst the sharing of dynamic contexts is questionable, this
-> > actually requires the caller to share their context pointer explicitly
-> > and so the burden is on them to manage the object lifetime.
-> > 
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Fixes: 1fd7e4169954 ("perf/core: Remove perf_cpu_context::unique_pmu")
-> > Reported-by: Kim Phillips <kim.phillips@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+However, when enabling a RIIC device the following error is reported by
+drivers/i2c/busses/i2c-riic.c
 
-Tested-by: Kim Phillips <kim.phillips@arm.com>
+"invalid parent clk (33332500). Must be 33325000Hz"
 
-Thanks,
+As RIIC devices have a clock source obtained by dividing by 12 the
+system clock, the resulting value is not accepted by the driver
+(which clearly states not to support any frequency except the reported
+33325000Hz one).
 
-Kim
+Hence, reduce the system clock accuracy to a value which makes
+frequencies obtained through division accepted by RIIC driver.
+
+Please note that other r7s72100 boards, such as Genmai, report the same
+"reduced accuracy" frequency, even if their external clock sources are
+effectively 13.333Mhz as gr-peach one.
+
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+---
+ arch/arm/boot/dts/r7s72100-gr-peach.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/r7s72100-gr-peach.dts b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+index a1c5e88..20309ac 100644
+--- a/arch/arm/boot/dts/r7s72100-gr-peach.dts
++++ b/arch/arm/boot/dts/r7s72100-gr-peach.dts
+@@ -71,7 +71,7 @@
+ };
+
+ &extal_clk {
+-	clock-frequency = <13333000>;
++	clock-frequency = <13330000>;
+ };
+
+ &usb_x1_clk {
+--
+2.7.4
