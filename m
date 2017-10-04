@@ -1,38 +1,47 @@
 From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 4 Oct 2017 10:45:54 +0200
-Subject: [PATCH v9 06/12] mm: zero struct pages during initialization
-In-Reply-To: <73ea1215-7aa2-39e1-b820-30f58119183e@oracle.com>
+Date: Wed, 4 Oct 2017 10:48:16 +0200
+Subject: [PATCH v9 03/12] mm: deferred_init_memmap improvements
+In-Reply-To: <d81baa49-b796-7130-4ace-0f14ed59be46@oracle.com>
 References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-7-pasha.tatashin@oracle.com>
- <20171003130857.vohli6lnqj4tdmhl@dhcp22.suse.cz>
- <73ea1215-7aa2-39e1-b820-30f58119183e@oracle.com>
-Message-ID: <20171004084554.fhxpmywtovs5umnm@dhcp22.suse.cz>
+ <20170920201714.19817-4-pasha.tatashin@oracle.com>
+ <20171003125754.2kuqzkstywg7axhd@dhcp22.suse.cz>
+ <fc4ef789-d9a8-5dab-6508-f0fe8751b462@oracle.com>
+ <d81baa49-b796-7130-4ace-0f14ed59be46@oracle.com>
+Message-ID: <20171004084816.ljyw2gdf5gmgtm7z@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 03-10-17 11:22:35, Pasha Tatashin wrote:
+On Tue 03-10-17 12:01:08, Pasha Tatashin wrote:
+> Hi Michal,
 > 
+> Are you OK, if I replace DEFERRED_FREE() macro with a function like this:
 > 
-> On 10/03/2017 09:08 AM, Michal Hocko wrote:
-> > On Wed 20-09-17 16:17:08, Pavel Tatashin wrote:
-> > > Add struct page zeroing as a part of initialization of other fields in
-> > > __init_single_page().
-> > > 
-> > > This single thread performance collected on: Intel(R) Xeon(R) CPU E7-8895
-> > > v3 @ 2.60GHz with 1T of memory (268400646 pages in 8 nodes):
-> > > 
-> > >                          BASE            FIX
-> > > sparse_init     11.244671836s   0.007199623s
-> > > zone_sizes_init  4.879775891s   8.355182299s
-> > >                    --------------------------
-> > > Total           16.124447727s   8.362381922s
-> > 
-> > Hmm, this is confusing. This assumes that sparse_init doesn't zero pages
-> > anymore, right? So these number depend on the last patch in the series?
+> /*
+>  * Helper for deferred_init_range, free the given range, and reset the
+>  * counters
+>  */
+> static inline unsigned long __def_free(unsigned long *nr_free,
+>                                        unsigned long *free_base_pfn,
+>                                        struct page **page)
+> {
+>         unsigned long nr = *nr_free;
 > 
-> Correct, without the last patch sparse_init time won't change.
+>         deferred_free_range(*free_base_pfn, nr);
+>         *free_base_pfn = 0;
+>         *nr_free = 0;
+>         *page = NULL;
+> 
+>         return nr;
+> }
+> 
+> Since it is inline, and we operate with non-volatile counters, compiler will
+> be smart enough to remove all the unnecessary de-references. As a plus, we
+> won't be adding any new branches, and the code is still going to stay
+> compact.
 
-THen this is just misleading.
+OK. It is a bit clunky but we are holding too much state there. I
+haven't checked whether that can be simplified but this can be always
+done later.
 -- 
 Michal Hocko
 SUSE Labs
