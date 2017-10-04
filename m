@@ -1,216 +1,110 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 04 Oct 2017 13:01:30 +0100
-Subject: [PATCH REPOST 2/3] arm64: Fix single stepping in kernel traps
-In-Reply-To: <7ae7d5c5-0c28-51c6-913c-f8d003e11f47@arm.com>
-References: <1507050352-15909-1-git-send-email-julien.thierry@arm.com>
- <1507050352-15909-3-git-send-email-julien.thierry@arm.com>
- <87wp4byewv.fsf@linaro.org> <7ae7d5c5-0c28-51c6-913c-f8d003e11f47@arm.com>
-Message-ID: <87h8vfxgth.fsf@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Oct 2017 14:16:25 +0200
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <20170908153143.27279-1-ard.biesheuvel@linaro.org> (Ard
+ Biesheuvel's message of "Fri, 8 Sep 2017 16:31:43 +0100")
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+Message-ID: <87d163kt0m.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
+ 
+ On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Julien Thierry <julien.thierry@arm.com> writes:
-
-> On 04/10/17 00:45, Alex Benn?e wrote:
->>
->> Julien Thierry <julien.thierry@arm.com> writes:
->>
->>> Software Step exception is missing after stepping a trapped instruction.
->>>
->>> Ensure SPSR.SS gets set to 0 after emulating/skipping a trapped instruction
->>> before doing ERET.
->>>
->>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>
->>> ---
->>>   arch/arm64/include/asm/traps.h       |  2 ++
->>>   arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
->>>   arch/arm64/kernel/cpufeature.c       |  2 +-
->>>   arch/arm64/kernel/traps.c            | 21 ++++++++++++++++-----
->>>   4 files changed, 23 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
->>> index d131501..dd7affb 100644
->>> --- a/arch/arm64/include/asm/traps.h
->>> +++ b/arch/arm64/include/asm/traps.h
->>> @@ -37,6 +37,8 @@ struct undef_hook {
->>>
->>>   void arm64_notify_segfault(struct pt_regs *regs, unsigned long addr);
->>>
->>> +void arm64_skip_trapped_instr(struct pt_regs *regs, unsigned long size);
->>> +
->>
->> Personally I think this is a poor name as it implies there is no effect
->> from the operation. I suspect arm64_update_regs is a little too generic
->> through. Naming things as ever is hard....
+> As it turns out, building the ARM kernel with EFI support pulls in
+> a couple of sections that we don't really need in the decompressor.
+> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
+> memory map, which is an exported symbol pulled in from lib/sort.c.
 >
-> What about arm64_step_trapped_instr? Don't know if it is much better
-> but maybe less misleading than just "skip".
+> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
+> separate PE/COFF sections"), this resulted in the following layout
+> for the decompressor ELF binary.
 >
-> Or arm64_setup_next_instr?
-
-Yes, I like arm64_setup_next_instr() better.
-
+>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
+>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
+>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
+>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
+>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
+>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
+>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
+>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
+>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
+>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
+>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
 >
->>
->>>   static inline int __in_irqentry_text(unsigned long ptr)
->>>   {
->>>   	return ptr >= (unsigned long)&__irqentry_text_start &&
->>> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
->>> index f0e6d71..1f38208 100644
->>> --- a/arch/arm64/kernel/armv8_deprecated.c
->>> +++ b/arch/arm64/kernel/armv8_deprecated.c
->>> @@ -431,7 +431,7 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
->>>   	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
->>>   			current->comm, (unsigned long)current->pid, regs->pc);
->>>
->>> -	regs->pc += 4;
->>> +	arm64_skip_trapped_instr(regs, 4);
->>>   	return 0;
->>>
->>>   fault:
->>> @@ -512,7 +512,7 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
->>>   	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated CP15 Barrier instruction at 0x%llx\n",
->>>   			current->comm, (unsigned long)current->pid, regs->pc);
->>>
->>> -	regs->pc += 4;
->>> +	arm64_skip_trapped_instr(regs, 4);
->>>   	return 0;
->>>   }
->>>
->>> @@ -586,14 +586,14 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
->>>   static int a32_setend_handler(struct pt_regs *regs, u32 instr)
->>>   {
->>>   	int rc = compat_setend_handler(regs, (instr >> 9) & 1);
->>> -	regs->pc += 4;
->>> +	arm64_skip_trapped_instr(regs, 4);
->>>   	return rc;
->>>   }
->>
->> Why didn't we use AARCH64_INSN_SIZE for these here?
+> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
+> UEFI firmware to map the decompressor with strict R-X/RW- permissions
+> before invoking it. Unfortunately, this turns out to break the boot on
+> some systems, because the linker now also moves the ksymtab/kcrctab
+> sections around, resulting in .piggydata to appear misaligned.
 >
-> Because these are AARCH32 instructions, although it is the same size,
-> I thought it would be misleading to use AARCH64 macro.
-
-Ahh I was thrown by the fact we are in armv8_deprecated.c but of course
-AArch32 is part of armv8...
-
+>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
+>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
+>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
+>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
+>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
+>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
+>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
+>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
+>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
+>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
+>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
 >
->>
->>>
->>>   static int t16_setend_handler(struct pt_regs *regs, u32 instr)
->>>   {
->>>   	int rc = compat_setend_handler(regs, (instr >> 3) & 1);
->>> -	regs->pc += 2;
->>> +	arm64_skip_trapped_instr(regs, 2);
->>>   	return rc;
->>>   }
->>
->> I guess we don't have an equivalent AARCH32_T16_INSN_SIZE?
->>
+> So let's align piggydata explicitly, and discard these sections from the
+> binary.
 >
-> Yes, I was a bit hesitant because thumb2 can have 16 and 32bits
-> instructions, but I guess having "T16" in the macro name makes it
-> clear it should be used only on 16bits instructions.
+> Cc: Russell King <linux@armlinux.org.uk>
+> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Any new for this patch?
+
+It is not yet in v4.14-rc whereas "arm/efi: Split zImage code and data
+into separate ..." was already merged. So currently I have many boards
+which still does not boot in v4.14-rc3.
+
+Gregory
+
+> ---
+>  arch/arm/boot/compressed/piggy.S       | 1 +
+>  arch/arm/boot/compressed/vmlinux.lds.S | 1 +
+>  2 files changed, 2 insertions(+)
 >
-> I'll add this define, and might as well add AARCH32_INSN_SIZE.
-
-Maybe AARCH32_T32_INSN_SIZE and AARCH32_T16_INSN_SIZE? Then it is clear
-there are two encodings.
-
+> diff --git a/arch/arm/boot/compressed/piggy.S b/arch/arm/boot/compressed/piggy.S
+> index f72088495f43..5d52c556dd32 100644
+> --- a/arch/arm/boot/compressed/piggy.S
+> +++ b/arch/arm/boot/compressed/piggy.S
+> @@ -1,5 +1,6 @@
+>  	.section .piggydata,#alloc
+>  	.globl	input_data
+> +	.align	2
+>  input_data:
+>  	.incbin	"arch/arm/boot/compressed/piggy_data"
+>  	.globl	input_data_end
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index 7a4c59154361..5c5265be4605 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -29,6 +29,7 @@ SECTIONS
+>       * of the text/got segments.
+>       */
+>      *(.data)
+> +    *(*ksymtab* *kcrctab*)
+>    }
+>  
+>    . = TEXT_START;
+> -- 
+> 2.11.0
 >
->>>
->>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>> index cd52d36..2956d5a 100644
->>> --- a/arch/arm64/kernel/cpufeature.c
->>> +++ b/arch/arm64/kernel/cpufeature.c
->>> @@ -1287,7 +1287,7 @@ static int emulate_mrs(struct pt_regs *regs, u32 insn)
->>>   	if (!rc) {
->>>   		dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
->>>   		pt_regs_write_reg(regs, dst, val);
->>> -		regs->pc += 4;
->>> +		arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
->>>   	}
->>>
->>>   	return rc;
->>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
->>> index 5ea4b85..ed9d856 100644
->>> --- a/arch/arm64/kernel/traps.c
->>> +++ b/arch/arm64/kernel/traps.c
->>> @@ -293,6 +293,17 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
->>>   	}
->>>   }
->>>
->>> +void arm64_skip_trapped_instr(struct pt_regs *regs, unsigned long size)
->>> +{
->>> +	regs->pc += size;
->>> +
->>> +	/*
->>> +	 * If we were single stepping, we want to get the step exception after
->>> +	 * we return from the skipped exception
->>> +	 */
->>> +	regs->pstate &= ~DBG_SPSR_SS;
->>> +}
->>> +
->>>   static LIST_HEAD(undef_hook);
->>>   static DEFINE_RAW_SPINLOCK(undef_lock);
->>>
->>> @@ -480,7 +491,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
->>>   	if (ret)
->>>   		arm64_notify_segfault(regs, address);
->>>   	else
->>> -		regs->pc += 4;
->>> +		arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
->>>   }
->>>
->>>   static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
->>> @@ -490,7 +501,7 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
->>>
->>>   	pt_regs_write_reg(regs, rt, val);
->>>
->>> -	regs->pc += 4;
->>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
->>>   }
->>>
->>>   static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
->>> @@ -498,7 +509,7 @@ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
->>>   	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
->>>
->>>   	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
->>> -	regs->pc += 4;
->>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
->>>   }
->>>
->>>   static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
->>> @@ -506,7 +517,7 @@ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
->>>   	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
->>>
->>>   	pt_regs_write_reg(regs, rt, arch_timer_get_rate());
->>> -	regs->pc += 4;
->>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
->>>   }
->>>
->>>   struct sys64_hook {
->>> @@ -761,7 +772,7 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
->>>   	}
->>>
->>>   	/* If thread survives, skip over the BUG instruction and continue: */
->>> -	regs->pc += AARCH64_INSN_SIZE;	/* skip BRK and resume */
->>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
->>>   	return DBG_HOOK_HANDLED;
->>>   }
->>
->> It would be nice to find a better name but otherwise:
->>
->> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
->>
->
-> Thanks,
 
-
---
-Alex Benn?e
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
