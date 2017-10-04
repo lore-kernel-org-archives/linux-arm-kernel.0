@@ -1,141 +1,66 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 04 Oct 2017 19:23:01 +0100
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <edd5e138-bda0-7cdf-83b2-8698cfb4304f@arm.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
- <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
- <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
- <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
- <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
- <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
- <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
- <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
- <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com> <877ewcz3bv.fsf@linaro.org>
- <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com> <873770yz1o.fsf@linaro.org>
- <5a4f0493-6d3d-85de-fc45-030d4b03b5a8@arm.com> <871smkywgn.fsf@linaro.org>
- <db80e858-0127-af96-e09b-865893f927cb@arm.com> <87k20bxm13.fsf@linaro.org>
- <1bdaff65-c784-4698-5c04-bfb1c943e6c0@arm.com> <87efqiyl64.fsf@linaro.org>
- <edd5e138-bda0-7cdf-83b2-8698cfb4304f@arm.com>
-Message-ID: <87d162ydq2.fsf@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 4 Oct 2017 11:31:08 -0700
+Subject: [PATCH] arm64: Enforce endianness build flags for LD and AS
+In-Reply-To: <1507064302-3972-1-git-send-email-linux@roeck-us.net>
+References: <1507064302-3972-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20171004183108.GA10699@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 03, 2017 at 01:58:22PM -0700, Guenter Roeck wrote:
+> If LD or AS is specified on the command line using "make LD=<my-ld>",
+> the endianness flag will not be added. Depending on the toolchain used,
+> this can result in endianness mismatch errors, such as
+> 
+> aarch64-cros-linux-gnu/binutils-bin/2.27.0/ld.bfd.real:
+> arch/arm64/crypto/.tmp_aes-ce-cipher.o:
+> 	compiled for a big endian system and target is little endian
+> 
+> The problem was observed when using the Chrome OS build system (which sets
+> LD on the command line) for an arm64:allmodconfig build.
+> 
+> Use the override flag for both LD and AS to ensure that the endianness
+> flag is always set.
+> 
+> Cc: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Julien Thierry <julien.thierry@arm.com> writes:
+Please ignore this patch for now; it doesn't help with my problem. Not yet
+sure what happens, but it appears that "-EB" doesn't make it into the LD
+variable used by cmd_make_builtin in scripts/Makefile.build. I'll have
+to figure out what is going on.
 
-> On 04/10/17 16:42, Alex Benn?e wrote:
->>
-<snip>
->>
->> Looking more closely though it has a point. The IO/MMIO exits work
->> purely from the address and data entries in the run structure. When we
->> return to KVM_RUN we do:
->>
->> 	if (run->exit_reason == KVM_EXIT_MMIO) {
->> 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
->> 		if (ret)
->> 			return ret;
->> 	}
->>
->> So you are correct the instruction emulation is not complete. Once that
->> fixup is done however I think we are good to return. So perhaps we can
->> avoid involving QEMU entirely in this by generating a debug exit
->> here.
->>
->> QEMU ->
->>          kvm_run ->
->>                      switch ->
->>                                guest
->>                             <-
->>                      trap
->>                   <-
->>          exit mmio
->>       <-
->> QEMU
->>       -> kvm_run
->>          handle_mmio_return
->>          exit debug
->>       <-
->> QEMU
->>
->
-> Thanks for the explanation. This approach sounds good to me. Also, it
-> means QEMU doesn't need to get patched, is that correct?
+Thanks,
+Guenter
 
-Correct.
-
->
->> I don't think this affects the handle_exit() case as we only force the
->> exit for successfully emulated instructions inside kvm.
->>
->
-> Yes, in handle_exit MMIO handled by the kernel will exit with
-> KVM_EXIT_DEBUG and MMIO handled by the userland will exit with
-> KVM_EXIT_MMIO. So from your patch we just need to add the exit debug
-> after handle_mmio_return.
-
-One minor wrinkle in kvm_handle_mmio_return() I can't use
-vcpu->debug_flags as the v7 code doesn't have it in kvm_vcpu_arch.
-
->
->> Looking at x86 for reference it does seem happy with triggering exits on
->> single stepped emulation, see kvm_vcpu_do_singlestep(). However it also
->> has a number of comments on IO emulation:
->>
->>    /* FIXME: return into emulator if single-stepping.  */
->>
->> So ARM is at least not behind the curve on this support ;-)
->>
->>>> I'd like to test these patches on some real life examples. I tried
->>>> tracing over the pl011_write code in a kernel boot but I ran into the
->>>> problem of el1_irq's occurring as I tried to step through the guest
->>>> kernel. Is this something you've come across? What MMIO accesses have
->>>> you been using in your testing?
->>>>
->>>
->>> I didn't know which MMIOs were handled by userland so I have only
->>> tested traps and MMIOs handled by the kernel.
->>
->> Any particular MMIOs I could also use to replicate in my tests?
->>
->
-> For MMIOs handled by the kernel, I was testing with the GIC. You could
-> try to break on gic_cpu_config in the guest, where it will write to
-> distributor registers. The function should be called during
-> initialization, before IRQs are enabled, so you shouldn't be bothered
-> by the earlier trouble.
-
-Thanks - this will be useful.
-
->>> This sounds like an issue when you are debugging an interruptible
->>> context, an issue Pratyush has been looking at [1]. Are you taking a
->>> guest interrupt when you try to execute the instruction to be stepped?
->>> I don't know what's the status of this patch series. Can you test the
->>> userland MMIO in a non-interruptible context?
->>>
->>> [1]
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/517234.html
->>
->> Again looking at x86 it looks like the approach is to suspend IRQs if
->> you are single-stepping. I'll have a look at Pratyush's patches.
->>
->
-> I think that was the idea with Pratyush's patches as well.
->
-> So, I'm happy to replace my patch with yours in this series (unless
-> you want to post it separated since it doesn't depend on my patches).
-
-
-Nope I'm happy for you to carry it to merge. I'll see if I can send you
-a v2 once I've addressed the mmio completion.
-
->
-> Thank you for looking at this and providing your input.
-
-No problem, sorry it took so long.
-
---
-Alex Benn?e
+> ---
+>  arch/arm64/Makefile | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 939b310913cf..d780d00bea9c 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -56,15 +56,15 @@ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+>  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+>  KBUILD_CPPFLAGS	+= -mbig-endian
+>  CHECKFLAGS	+= -D__AARCH64EB__
+> -AS		+= -EB
+> -LD		+= -EB
+> +override AS		+= -EB
+> +override LD		+= -EB
+>  LDFLAGS		+= -maarch64linuxb
+>  UTS_MACHINE	:= aarch64_be
+>  else
+>  KBUILD_CPPFLAGS	+= -mlittle-endian
+>  CHECKFLAGS	+= -D__AARCH64EL__
+> -AS		+= -EL
+> -LD		+= -EL
+> +override AS		+= -EL
+> +override LD		+= -EL
+>  LDFLAGS		+= -maarch64linux
+>  UTS_MACHINE	:= aarch64
+>  endif
+> -- 
+> 2.7.4
+> 
