@@ -1,24 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Oct 2017 18:08:12 -0700
-Subject: [PATCH] ARM: defconfig: update Gemini defconfig
-In-Reply-To: <20170917142618.2126-1-linus.walleij@linaro.org>
-References: <20170917142618.2126-1-linus.walleij@linaro.org>
-Message-ID: <20171004010812.fyaioy6can7mirbi@localhost>
+Date: Tue, 3 Oct 2017 18:09:19 -0700
+Subject: [GIT PULL] DaVinci fixes for v4.14
+In-Reply-To: <e28d3e5b-03b6-4def-edb0-d586f3c7627b@ti.com>
+References: <e28d3e5b-03b6-4def-edb0-d586f3c7627b@ti.com>
+Message-ID: <20171004010919.sdjcy2727czcqnk4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 17, 2017 at 04:26:18PM +0200, Linus Walleij wrote:
-> This updates the Gemini defconfig with drivers merged
-> for v4.13 or v4.14:
-> - ATA driver is merged
-> - DMA driver is merged
-> - RTC driver gets selected from default Kconfig
+On Wed, Sep 20, 2017 at 01:43:02PM +0530, Sekhar Nori wrote:
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this directly for v4.14-rc:s.
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.14
+> 
+> for you to fetch changes up to ce21574ad1922b403198ee664c4dff276f514f1d:
+> 
+>   ARM: dts: da850-evm: add serial and ethernet aliases (2017-09-20 13:33:41 +0530)
 
-Applied.
+Merged to fixes.
 
 
 -Olof
