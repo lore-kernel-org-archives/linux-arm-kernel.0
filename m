@@ -1,30 +1,102 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 4 Oct 2017 21:04:28 +0200
-Subject: [PATCH 1/2] ARM: SAMSUNG: Delete an error message for a failed
- memory allocation in three functions
-In-Reply-To: <ae29b97e-9a60-fdf4-5bd2-af33f6081446@users.sourceforge.net>
-References: <75c352ad-c51e-2e63-2f93-0f14522ff09c@users.sourceforge.net>
- <ae29b97e-9a60-fdf4-5bd2-af33f6081446@users.sourceforge.net>
-Message-ID: <20171004190428.6agsco3456oeyab5@kozik-lap>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Wed, 4 Oct 2017 21:00:39 +0200
+Subject: [PATCH 2/3] firmware: arm_scpi: improve handling of protocol and
+ firmware version subfields
+In-Reply-To: <16d1cd8c-e124-cc94-ca29-d7cb04ff26d9@gmail.com>
+References: <16d1cd8c-e124-cc94-ca29-d7cb04ff26d9@gmail.com>
+Message-ID: <54b28f23-d650-5f74-7fb9-499864f57bc3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 01:11:56PM +0200, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Wed, 4 Oct 2017 09:33:52 +0200
-> 
-> Omit extra messages for a memory allocation failure in these functions.
-> 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->  arch/arm/plat-samsung/adc.c          | 8 ++------
->  arch/arm/plat-samsung/platformdata.c | 4 +---
->  2 files changed, 3 insertions(+), 9 deletions(-)
-> 
+By using FIELD_GET and proper masks we can avoid quite some shifting
+and masking macro magic and make the code better readable.
 
-Thanks, applied.
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
+ drivers/firmware/arm_scpi.c | 43 +++++++++++++++++++------------------------
+ 1 file changed, 19 insertions(+), 24 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index 412f1c4c..d305b926 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -28,6 +28,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/bitmap.h>
++#include <linux/bitfield.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/export.h>
+@@ -73,18 +74,12 @@
+ #define MAX_DVFS_DOMAINS	8
+ #define MAX_DVFS_OPPS		16
+ 
+-#define PROTOCOL_REV_MINOR_BITS	16
+-#define PROTOCOL_REV_MINOR_MASK	((1U << PROTOCOL_REV_MINOR_BITS) - 1)
+-#define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
+-#define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
++#define PROTO_REV_MAJOR_MASK	GENMASK(31, 16)
++#define PROTO_REV_MINOR_MASK	GENMASK(15, 0)
+ 
+-#define FW_REV_MAJOR_BITS	24
+-#define FW_REV_MINOR_BITS	16
+-#define FW_REV_PATCH_MASK	((1U << FW_REV_MINOR_BITS) - 1)
+-#define FW_REV_MINOR_MASK	((1U << FW_REV_MAJOR_BITS) - 1)
+-#define FW_REV_MAJOR(x)		((x) >> FW_REV_MAJOR_BITS)
+-#define FW_REV_MINOR(x)		(((x) & FW_REV_MINOR_MASK) >> FW_REV_MINOR_BITS)
+-#define FW_REV_PATCH(x)		((x) & FW_REV_PATCH_MASK)
++#define FW_REV_MAJOR_MASK	GENMASK(31, 24)
++#define FW_REV_MINOR_MASK	GENMASK(23, 16)
++#define FW_REV_PATCH_MASK	GENMASK(15, 0)
+ 
+ #define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
+ 
+@@ -867,19 +862,19 @@ static int scpi_init_versions(struct scpi_drvinfo *info)
+ static ssize_t protocol_version_show(struct device *dev,
+ 				     struct device_attribute *attr, char *buf)
+ {
+-	return sprintf(buf, "%d.%d\n",
+-		       PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
+-		       PROTOCOL_REV_MINOR(scpi_info->protocol_version));
++	return sprintf(buf, "%lu.%lu\n",
++		FIELD_GET(PROTO_REV_MAJOR_MASK, scpi_info->protocol_version),
++		FIELD_GET(PROTO_REV_MINOR_MASK, scpi_info->protocol_version));
+ }
+ static DEVICE_ATTR_RO(protocol_version);
+ 
+ static ssize_t firmware_version_show(struct device *dev,
+ 				     struct device_attribute *attr, char *buf)
+ {
+-	return sprintf(buf, "%d.%d.%d\n",
+-		       FW_REV_MAJOR(scpi_info->firmware_version),
+-		       FW_REV_MINOR(scpi_info->firmware_version),
+-		       FW_REV_PATCH(scpi_info->firmware_version));
++	return sprintf(buf, "%lu.%lu.%lu\n",
++		     FIELD_GET(FW_REV_MAJOR_MASK, scpi_info->firmware_version),
++		     FIELD_GET(FW_REV_MINOR_MASK, scpi_info->firmware_version),
++		     FIELD_GET(FW_REV_PATCH_MASK, scpi_info->firmware_version));
+ }
+ static DEVICE_ATTR_RO(firmware_version);
+ 
+@@ -1021,12 +1016,12 @@ static int scpi_probe(struct platform_device *pdev)
+ 
+ 	scpi_dvfs_populate(dev);
+ 
+-	_dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
+-		  PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
+-		  PROTOCOL_REV_MINOR(scpi_info->protocol_version),
+-		  FW_REV_MAJOR(scpi_info->firmware_version),
+-		  FW_REV_MINOR(scpi_info->firmware_version),
+-		  FW_REV_PATCH(scpi_info->firmware_version));
++	_dev_info(dev, "SCP Protocol %lu.%lu Firmware %lu.%lu.%lu version\n",
++		  FIELD_GET(PROTO_REV_MAJOR_MASK, scpi_info->protocol_version),
++		  FIELD_GET(PROTO_REV_MINOR_MASK, scpi_info->protocol_version),
++		  FIELD_GET(FW_REV_MAJOR_MASK, scpi_info->firmware_version),
++		  FIELD_GET(FW_REV_MINOR_MASK, scpi_info->firmware_version),
++		  FIELD_GET(FW_REV_PATCH_MASK, scpi_info->firmware_version));
+ 
+ 	ret = devm_device_add_groups(dev, versions_groups);
+ 	if (ret)
+-- 
+2.14.2
