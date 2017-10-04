@@ -1,26 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Oct 2017 18:09:19 -0700
-Subject: [GIT PULL] DaVinci fixes for v4.14
-In-Reply-To: <e28d3e5b-03b6-4def-edb0-d586f3c7627b@ti.com>
-References: <e28d3e5b-03b6-4def-edb0-d586f3c7627b@ti.com>
-Message-ID: <20171004010919.sdjcy2727czcqnk4@localhost>
+Date: Tue, 3 Oct 2017 18:13:11 -0700
+Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
+In-Reply-To: <20170924173912.9199-1-linus.walleij@linaro.org>
+References: <20170924173912.9199-1-linus.walleij@linaro.org>
+Message-ID: <20171004011311.rn3plqb4es5hcupa@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 20, 2017 at 01:43:02PM +0530, Sekhar Nori wrote:
-> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+On Sun, Sep 24, 2017 at 07:39:12PM +0200, Linus Walleij wrote:
+> There is exactly one board in the kernel that defines platform data
+> for the GPIO NAND driver.
 > 
->   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+> Use the feature to provide a lookup table for the GPIOs in the board
+> file so we can convert the driver as a whole to just use GPIO
+> descriptors.
 > 
-> are available in the git repository at:
+> After this we can cut the use of <linux/of_gpio.h> and use the GPIO
+> descriptor management from <linux/gpio/consumer.h> alone to grab and use
+> the GPIOs used in the driver.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.14
+> I also created a local struct device *dev in the probe() function
+> because I was getting annoyed with all the &pdev->dev dereferencing.
 > 
-> for you to fetch changes up to ce21574ad1922b403198ee664c4dff276f514f1d:
-> 
->   ARM: dts: da850-evm: add serial and ethernet aliases (2017-09-20 13:33:41 +0530)
+> Cc: arm at kernel.org
+> Cc: Mike Rapoport <rppt@linux.vnet.ibm.com>
+> Cc: Frans Klaver <fransklaver@gmail.com>
+> Cc: Gerhard Sittig <gsi@denx.de>
+> Cc: Jamie Iles <jamie.iles@oracle.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: Please ACK this so it can be merged through the MTD
+> subsystem.
 
-Merged to fixes.
+Acked-by: Olof Johansson <olof@lixom.net>
 
 
 -Olof
