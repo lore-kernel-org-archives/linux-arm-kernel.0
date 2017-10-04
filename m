@@ -1,31 +1,40 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 4 Oct 2017 20:40:58 +0200
-Subject: [PATCH 2/2] ARM: s3c64xx: Delete an unnecessary return statement
- in samsung_bl_set()
-In-Reply-To: <6d599b4d-93e3-3e3e-875a-f24ee879ca74@users.sourceforge.net>
-References: <0b695686-2e07-910d-6278-91d54a1b0b2f@users.sourceforge.net>
- <6d599b4d-93e3-3e3e-875a-f24ee879ca74@users.sourceforge.net>
-Message-ID: <20171004184058.vn74ricacf476j7q@kozik-lap>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 4 Oct 2017 11:41:35 -0700
+Subject: [PATCH] arm64: Enforce endianness build flags for LD and AS
+In-Reply-To: <20171004183108.GA10699@roeck-us.net>
+References: <1507064302-3972-1-git-send-email-linux@roeck-us.net>
+ <20171004183108.GA10699@roeck-us.net>
+Message-ID: <20171004184135.GA12348@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 02, 2017 at 10:40:44PM +0200, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Mon, 2 Oct 2017 22:30:55 +0200
+On Wed, Oct 04, 2017 at 11:31:08AM -0700, Guenter Roeck wrote:
+> On Tue, Oct 03, 2017 at 01:58:22PM -0700, Guenter Roeck wrote:
+> > If LD or AS is specified on the command line using "make LD=<my-ld>",
+> > the endianness flag will not be added. Depending on the toolchain used,
+> > this can result in endianness mismatch errors, such as
+> > 
+> > aarch64-cros-linux-gnu/binutils-bin/2.27.0/ld.bfd.real:
+> > arch/arm64/crypto/.tmp_aes-ce-cipher.o:
+> > 	compiled for a big endian system and target is little endian
+> > 
+> > The problem was observed when using the Chrome OS build system (which sets
+> > LD on the command line) for an arm64:allmodconfig build.
+> > 
+> > Use the override flag for both LD and AS to ensure that the endianness
+> > flag is always set.
+> > 
+> > Cc: Douglas Anderson <dianders@chromium.org>
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 > 
-> The script "checkpatch.pl" pointed information out like the following.
+> Please ignore this patch for now; it doesn't help with my problem. Not yet
+> sure what happens, but it appears that "-EB" doesn't make it into the LD
+> variable used by cmd_make_builtin in scripts/Makefile.build. I'll have
+> to figure out what is going on.
 > 
-> WARNING: void function return statements are not generally useful
-> 
-> Thus remove such a statement in the affected function.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->  arch/arm/mach-s3c64xx/dev-backlight.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
+Yes, the problem is that the gcc in the Chrome OS toolchain doesn't tell
+the linker which endianness to use (ie it doesn't translate -mbig-endian 
+into a linker flag). Please forget this patch, it doesn't solve anything.
+Sorry for the noise.
 
-Thanks, applied.
-
-Best regards,
-Krzysztof
+Guenter
