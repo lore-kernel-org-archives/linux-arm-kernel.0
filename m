@@ -1,98 +1,202 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 05 Oct 2017 10:05:03 +1030
-Subject: [PATCH v2 4/9] ARM: dts: aspeed-romulus: Add I2C devices
-In-Reply-To: <20171004064917.2498-5-joel@jms.id.au>
+Date: Thu, 05 Oct 2017 10:07:17 +1030
+Subject: [PATCH v2 8/9] ARM: dts: aspeed: Correctly order UART nodes
+In-Reply-To: <20171004064917.2498-9-joel@jms.id.au>
 References: <20171004064917.2498-1-joel@jms.id.au>
- <20171004064917.2498-5-joel@jms.id.au>
-Message-ID: <1507160103.5452.35.camel@aj.id.au>
+ <20171004064917.2498-9-joel@jms.id.au>
+Message-ID: <1507160237.5452.36.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 2017-10-04 at 17:19 +1030, Joel Stanley wrote:
-> Enable the buses that are in use and the devices that are attached.
-> Currently that is just the battery backed RTC.
->?
-> Some of these buses are for hotplugged cards, such as PCIe cards. Others
-> do not yet have upstream drivers, so there are no devices attached.
->?
-> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+> Order them all by address.
+> 
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
 
 Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
 > ---
-> v2:
-> ?- Use okay not enabled for the status
-> ---
-> ?arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 54 ++++++++++++++++++++++++++++
-> ?1 file changed, 54 insertions(+)
->?
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> index 1190fec1b5d0..8b96baf7c4de 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> @@ -79,3 +79,57 @@
-> ?	pinctrl-names = "default";
-> ?	pinctrl-0 = <&pinctrl_rmii1_default>;
-> ?};
+> ?arch/arm/boot/dts/aspeed-g4.dtsi | 48 +++++++++++++++---------------
+> -
+> ?arch/arm/boot/dts/aspeed-g5.dtsi | 61 ++++++++++++++++++++--------
+> ------------
+> ?2 files changed, 54 insertions(+), 55 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi
+> b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index a549413bda3f..4125e07f22f9 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -183,6 +183,27 @@
+> ?				clock-names = "PCLK";
+> ?			};
+> ?
+> +			uart1: serial at 1e783000 {
+> +				compatible = "ns16550a";
+> +				reg = <0x1e783000 0x1000>;
+> +				reg-shift = <2>;
+> +				interrupts = <9>;
+> +				clocks = <&clk_uart>;
+> +				no-loopback-test;
+> +				status = "disabled";
+> +			};
 > +
-> +&i2c2 {
-> +	status = "okay";
-> +};
+> +			uart5: serial at 1e784000 {
+> +				compatible = "ns16550a";
+> +				reg = <0x1e784000 0x1000>;
+> +				reg-shift = <2>;
+> +				interrupts = <10>;
+> +				clocks = <&clk_uart>;
+> +				current-speed = <38400>;
+> +				no-loopback-test;
+> +				status = "disabled";
+> +			};
 > +
-> +&i2c3 {
-> +	status = "okay";
-> +};
+> ?			wdt1: wdt at 1e785000 {
+> ?				compatible = "aspeed,ast2400-wdt";
+> ?				reg = <0x1e785000 0x1c>;
+> @@ -197,11 +218,11 @@
+> ?				status = "disabled";
+> ?			};
+> ?
+> -			uart1: serial at 1e783000 {
+> +			uart6: serial at 1e787000 {
+> ?				compatible = "ns16550a";
+> -				reg = <0x1e783000 0x1000>;
+> +				reg = <0x1e787000 0x1000>;
+> ?				reg-shift = <2>;
+> -				interrupts = <9>;
+> +				interrupts = <10>;
+> ?				clocks = <&clk_uart>;
+> ?				no-loopback-test;
+> ?				status = "disabled";
+> @@ -237,27 +258,6 @@
+> ?				status = "disabled";
+> ?			};
+> ?
+> -			uart5: serial at 1e784000 {
+> -				compatible = "ns16550a";
+> -				reg = <0x1e784000 0x1000>;
+> -				reg-shift = <2>;
+> -				interrupts = <10>;
+> -				clocks = <&clk_uart>;
+> -				current-speed = <38400>;
+> -				no-loopback-test;
+> -				status = "disabled";
+> -			};
+> -
+> -			uart6: serial at 1e787000 {
+> -				compatible = "ns16550a";
+> -				reg = <0x1e787000 0x1000>;
+> -				reg-shift = <2>;
+> -				interrupts = <10>;
+> -				clocks = <&clk_uart>;
+> -				no-loopback-test;
+> -				status = "disabled";
+> -			};
+> -
+> ?			i2c: i2c at 1e78a000 {
+> ?				compatible = "simple-bus";
+> ?				#address-cells = <1>;
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi
+> b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index de2dafa71651..61cc2d25143a 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -227,6 +227,26 @@
+> ?				clock-names = "PCLK";
+> ?			};
+> ?
+> +			uart1: serial at 1e783000 {
+> +				compatible = "ns16550a";
+> +				reg = <0x1e783000 0x1000>;
+> +				reg-shift = <2>;
+> +				interrupts = <9>;
+> +				clocks = <&clk_uart>;
+> +				no-loopback-test;
+> +				status = "disabled";
+> +			};
 > +
-> +&i2c4 {
-> +	status = "okay";
-> +};
+> +			uart5: serial at 1e784000 {
+> +				compatible = "ns16550a";
+> +				reg = <0x1e784000 0x1000>;
+> +				reg-shift = <2>;
+> +				interrupts = <10>;
+> +				clocks = <&clk_uart>;
+> +				current-speed = <38400>;
+> +				no-loopback-test;
+> +				status = "disabled";
+> +			};
+> ?
+> ?			wdt1: wdt at 1e785000 {
+> ?				compatible = "aspeed,ast2500-wdt";
+> @@ -247,16 +267,6 @@
+> ?				status = "disabled";
+> ?			};
+> ?
+> -			uart1: serial at 1e783000 {
+> -				compatible = "ns16550a";
+> -				reg = <0x1e783000 0x1000>;
+> -				reg-shift = <2>;
+> -				interrupts = <9>;
+> -				clocks = <&clk_uart>;
+> -				no-loopback-test;
+> -				status = "disabled";
+> -			};
+> -
+> ?			lpc: lpc at 1e789000 {
+> ?				compatible = "aspeed,ast2500-lpc",
+> "simple-mfd";
+> ?				reg = <0x1e789000 0x1000>;
+> @@ -287,6 +297,16 @@
+> ?				};
+> ?			};
+> ?
+> +			uart6: serial at 1e787000 {
+> +				compatible = "ns16550a";
+> +				reg = <0x1e787000 0x1000>;
+> +				reg-shift = <2>;
+> +				interrupts = <10>;
+> +				clocks = <&clk_uart>;
+> +				no-loopback-test;
+> +				status = "disabled";
+> +			};
 > +
-> +&i2c5 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c6 {
-> +	/* PCIe slot 1 (x8) */
-> +	status = "okay";
-> +};
-> +
-> +&i2c7 {
-> +	/* PCIe slot 2 (x16) */
-> +	status = "okay";
-> +};
-> +
-> +&i2c8 {
-> +	/* PCIe slot 3 (x16) */
-> +	status = "okay";
-> +};
-> +
-> +&i2c9 {
-> +	/* PCIe slot 4 (x16) */
-> +	status = "okay";
-> +};
-> +
-> +&i2c10 {
-> +	/* PCIe slot 5 (x8) */
-> +	status = "okay";
-> +};
-> +
-> +&i2c11 {
-> +	status = "okay";
-> +
-> +	rtc at 32 {
-> +		compatible = "epson,rx8900";
-> +		reg = <0x32>;
-> +	};
-> +};
-> +
-> +&i2c12 {
-> +	status = "okay";
-> +};
+> ?			uart2: serial at 1e78d000 {
+> ?				compatible = "ns16550a";
+> ?				reg = <0x1e78d000 0x1000>;
+> @@ -317,27 +337,6 @@
+> ?				status = "disabled";
+> ?			};
+> ?
+> -			uart5: serial at 1e784000 {
+> -				compatible = "ns16550a";
+> -				reg = <0x1e784000 0x1000>;
+> -				reg-shift = <2>;
+> -				interrupts = <10>;
+> -				clocks = <&clk_uart>;
+> -				current-speed = <38400>;
+> -				no-loopback-test;
+> -				status = "disabled";
+> -			};
+> -
+> -			uart6: serial at 1e787000 {
+> -				compatible = "ns16550a";
+> -				reg = <0x1e787000 0x1000>;
+> -				reg-shift = <2>;
+> -				interrupts = <10>;
+> -				clocks = <&clk_uart>;
+> -				no-loopback-test;
+> -				status = "disabled";
+> -			};
+> -
+> ?			i2c: i2c at 1e78a000 {
+> ?				compatible = "simple-bus";
+> ?				#address-cells = <1>;
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/0c718a9d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/a288ad9d/attachment-0001.sig>
