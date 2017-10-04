@@ -1,58 +1,61 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 12:32:22 +0100
-Subject: [PATCH v3 15/22] firmware: arm_scmi: abstract mailbox interface
-In-Reply-To: <CAK8P3a0EUr_aEZdOrjHixzp44yXqsNxTMzBceSBTmk-x8x2MAg@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a0EUr_aEZdOrjHixzp44yXqsNxTMzBceSBTmk-x8x2MAg@mail.gmail.com>
-Message-ID: <f316b938-c6d5-3aa9-4f03-6b5c6ad4bfa7@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Oct 2017 12:32:12 +0100
+Subject: [PATCH] arm64: Enable MRS emulation early
+In-Reply-To: <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
+References: <20171004094805.24009-1-suzuki.poulose@arm.com>
+ <20171004101425.GB23092@leverpostej>
+ <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
+Message-ID: <20171004113212.GC23092@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/10/17 12:24, Arnd Bergmann wrote:
-> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Some of the mailbox controller expects controller specific data in order
->> to implement simple doorbell mechanism as expected by SCMI specification.
->>
->> This patch creates a shim layer to abstract the mailbox interface so
->> that it can support any mailbox controller. It also provides default
->> implementation which maps to standard mailbox client APIs, so that
->> controllers implementing doorbell mechanism need not require any
->> additional layer.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+On Wed, Oct 04, 2017 at 12:10:40PM +0100, Catalin Marinas wrote:
+> On Wed, Oct 04, 2017 at 11:14:26AM +0100, Mark Rutland wrote:
+> > On Wed, Oct 04, 2017 at 10:48:05AM +0100, Suzuki K Poulose wrote:
+> > > Make sure the MRS emulation is enabled early enough, such that the
+> > > early userspace applications (e.g, those run from initrd) could
+> > > use the facility without crashing them.
+> > > 
+> > > Fixes: commit 77c97b4ee2129 ("arm64: cpufeature: Expose CPUID registers by emulation")
+> > > Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
+> > > Cc: James Morse <james.morse@arm.com>
+> > > Cc: Dave Martin <Dave.martin@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: stable at vger.kernel.org
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > 
+> > This looks sensible, but shouldn't we do the same for other
+> > late_inicalls can affect initrd userspace?
+> > 
+> > e.g. armv8_deprecated_init, fpsimd_init, sys_reg_genericv8_init?
 > 
-> Another level? Now we have three levels of stacked mailboxes, with
-> the highest level being the combined mailbox/memory, then the shim,
-> and below it the hardware mailbox.
-> 
-> Can you try to come up with a way to do this with fewer abstractions?
-> 
+> I think we should, though not all of them are concerned with the user
+> code. For example, fpsimd_init() takes care of the pm/hotplug aspect and
+> nothing to do with user space.
 
-I completely agree with you. I was against this but Jassi recommended
-this. I just wanted this SCMI to work with mailbox controllers that
-support simple doorbell mechanism as specified in the specification but
-Jassi disagrees with that.
+My worry was that without the pm/hotplug notifiers, things could go
+wrong during the initrd. e.g. we could lose userspace fp state without
+the pm notifier, or userspace could trigger hotplpug that we wouldn't
+manage correctly
 
-> Maybe you could assume that the mailbox itself can take variable-length
-> data packets, and then use the shim here for those that require
-> something else?
-> 
+So even if it's not directly userspace related, it can affect (or can be
+affected by) initrd userspace.
 
-As per SCMI specification, we pass all the data in shared memory and it
-just expects to use a simple doorbell feature from hardware mailbox
-controllers. It's done that way intentionally to avoid dependency on h/w
-and we for sure will have variety of it and that defeats the purpose
-of this standard specification.
+> That said, making it core_initcall() is probably not a bad thing (just
+> a statement that it is concerned with the core initialisation), as
+> long as all the other infrastructure it registers with is up.
 
-Also, I have added shim only for specific controllers that need them.
-E.g. ARM MHU as Jassi disagreed to add doorbell mechanism to that.
-mbox_if provides default implementation that just calls direct mailbox
-APIs.
+Sure.
 
--- 
-Regards,
-Sudeep
+> For Suzuki's patch, I was thinking of enabling emulation before we
+> register the HWCAP_CPUID bit (setup_elf_hwcaps). However, that means we
+> have to bring it before smp_cpus_done(). It's not really worth it as we
+> don't expect any user space at that point.
+
+I think so long as we bring it up before *any* userspace can run, it
+doesn't matter if we set the hwcaps earlier.
+
+Thanks,
+Mark.
