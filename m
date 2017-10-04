@@ -1,26 +1,82 @@
-From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Wed, 4 Oct 2017 23:25:34 +0200
-Subject: [PATCH 0/9] Bringing Asus TF300T support to mainline
-In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20171004212534.uosfz6757bbds2c5@qmqm.qmqm.pl>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 4 Oct 2017 14:45:32 -0700
+Subject: [PATCH 1/2] arm64: qcom: sbc: Name GPIO lines
+In-Reply-To: <20171003091155.7138-1-linus.walleij@linaro.org>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+Message-ID: <20171004214532.GZ457@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 02:29:22AM +0200, Micha? Miros?aw wrote:
-> Here is a suprisingly small set of patches that enable Asus TF300T tablet
-> to boot and have all cores available. TF300T is one of a consumer devices
-> based on NVidia's Cardhu reference tablet.
+On 10/03, Linus Walleij wrote:
+> This names the GPIO lines on the APQ8016 "SBC" also known
+> as the DragonBoard 410c, according to the schematic. This
+> is necessary for a conforming userspace looking across
+> all GPIO chips for the GPIO lines named "GPIO-A" thru
+> "GPIO-L".
 > 
-> This series is an arch-dependent part. TF parts were extracted from ASUS's
-> GPL code dump.  The rest being driver code - a work in progress - is
-> available in branch tf300t at:
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I don't have this hardware available, you can test it
+> easily by compiling tools/gpio/* and issue "lsgpio" to
+> see the GPIO line names in the console.
 > 
->         https://rere.qmqm.pl/git/linux
+> Please apply this even if you're not applying the second
+> patch renaming the DTS files.
+> ---
+>  arch/arm64/boot/dts/qcom/apq8016-sbc.dts | 167 +++++++++++++++++++++++++++++++
 
-Just a quick note, that I've rebased the branch on v4.14-rc3 and added
-some more patches on top. This includes updated defconfig and devicetree
-with working eMMC and an attempt at making TF300T's dock hot-pluggable.
+Can you add this to the apq8016-sbc.dtsi file instead? Probably
+we should fold the two files together, but so far nothing goes
+into the .dts file besides compatible string and model for the
+board.
 
-Best Regards,
-Micha? Miros?aw
+>  1 file changed, 167 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts b/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+> index 825f489a2af7..40b0d62861bb 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
+> @@ -19,3 +19,170 @@
+>  	model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
+>  	compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
+>  };
+> +
+> +/*
+> + * Legend: proper name = the GPIO line is used as GPIO
+> + *         NC = not connected (pin out but not routed from the chip to
+> + *              anything the board)
+> + *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
+> + *         "" = no idea, schematic doesn't say, could be
+> + *              unrouted (not connected to any external pin)
+
+This never happens?
+
+> + *         LSEC = Low Speed External Connector
+> + *         HSEC = High Speed External Connector
+
+This is not in the patch?
+
+> + *
+> + * Line names are taken from the schematic "DragonBoard410c"
+> + * dated monday, august 31, 2015. Page 5 in particular.
+> + *
+> + * For the lines routed to the external connectors the
+> + * lines are named after the 96Boards CE Specification 1.0,
+> + * Appendix "Expansion Connector Signal Description".
+> + *
+> + * When the 96Board naming of a line and the schematic name of
+> + * the same line are in conflict, the 96Board specification
+> + * takes precedence, which means that the external UART on the
+> + * LSEC is named UART0 while the schematic and SoC names this
+> + * UART3. This is only for the informational lines i.e. "[FOO]",
+> + * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
+> + * ones actually used for GPIO.
+> + */
+> +&msmgpio {
+
+And also not use phandles and put the gpio-line-names into the
+node at the correct path?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
