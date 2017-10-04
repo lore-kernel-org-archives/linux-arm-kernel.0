@@ -1,115 +1,55 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed,  4 Oct 2017 11:58:57 -0700
-Subject: [PATCH 4/4] ARM: qcom_defconfig: Enable Z2 Tablet related options
-In-Reply-To: <20171004185857.24510-1-bjorn.andersson@linaro.org>
-References: <20171004185857.24510-1-bjorn.andersson@linaro.org>
-Message-ID: <20171004185857.24510-5-bjorn.andersson@linaro.org>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 4 Oct 2017 21:00:28 +0200
+Subject: [PATCH v6 05/11] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <20170928073708.GB32676@Red>
+References: <20170927073414.17361-1-clabbe.montjoie@gmail.com>
+ <20170927073414.17361-6-clabbe.montjoie@gmail.com>
+ <20170927140210.GE13516@lunn.ch> <20170928073708.GB32676@Red>
+Message-ID: <20171004190028.GA9208@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the options necessary to get USB, coincell, WiFI, touchscreen and
-backlight on the Z2 Tablet (and other family B devices) working. The
-device specific peripherals are selected as modules.
+On Thu, Sep 28, 2017 at 09:37:08AM +0200, Corentin Labbe wrote:
+> On Wed, Sep 27, 2017 at 04:02:10PM +0200, Andrew Lunn wrote:
+> > Hi Corentin
+> > 
+> > > +Required properties for the mdio-mux node:
+> > > +  - compatible = "mdio-mux"
+> > 
+> > This is too generic. Please add a more specific compatible for this
+> > particular mux. You can keep "mdio-mux", since that is what the MDIO
+> > subsystem will look for.
+> > 
+> 
+> I will add allwinner,sun8i-h3-mdio-mux
+> 
+> > > +Required properties of the integrated phy node:
+> > >  - clocks: a phandle to the reference clock for the EPHY
+> > >  - resets: a phandle to the reset control for the EPHY
+> > > +- phy-is-integrated
+> > 
+> > So the last thing you said is that the mux is not the problem
+> > here. Something else is locking up. Did you discover what?
+> > 
+> > I really would like phy-is-integrated to go away.
+> > 
+> 
+> I have found the problem: by enabling ephy clk/reset the timeout does not occur anymore.
+> So we could remove phy-is-integrated by:
+> Moving internal phy clk/reset handling in mdio_mux_syscon_switch_fn()
+> But this means:
+> - getting internalphy node always by manually get internal_mdio/internal_phy (and not by the given phyhandle)
+> - doing some unnecessary tasks (enable/scan/disable) when external_phy is needed
+> 
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm/configs/qcom_defconfig | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Hello
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index f6aa100bf69c..d937f2be7c39 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -60,6 +60,7 @@ CONFIG_MTD_M25P80=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
-+CONFIG_QCOM_COINCELL=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_CHR_DEV_SG=y
- CONFIG_CHR_DEV_SCH=y
-@@ -82,6 +83,7 @@ CONFIG_SLIP_MODE_SLIP6=y
- CONFIG_USB_USBNET=y
- # CONFIG_USB_NET_AX8817X is not set
- # CONFIG_USB_NET_ZAURUS is not set
-+CONFIG_BRCMFMAC=m
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
-@@ -93,6 +95,10 @@ CONFIG_INPUT_MISC=y
- CONFIG_INPUT_PM8XXX_VIBRATOR=y
- CONFIG_INPUT_PMIC8XXX_PWRKEY=y
- CONFIG_INPUT_UINPUT=y
-+CONFIG_RMI4_CORE=m
-+CONFIG_RMI4_I2C=m
-+CONFIG_RMI4_F11=y
-+CONFIG_RMI4_F12=y
- CONFIG_SERIO_LIBPS2=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_MSM=y
-@@ -128,8 +134,13 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_QCOM_RPM=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
-+CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_FB=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+# CONFIG_LCD_CLASS_DEVICE is not set
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_LP855X=m
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_DYNAMIC_MINORS=y
-@@ -148,11 +159,17 @@ CONFIG_USB_ACM=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_UDC=y
- CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_CHIPIDEA_ULPI=y
- CONFIG_USB_SERIAL=y
- CONFIG_USB_MSM_OTG=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_GADGET_DEBUG_FILES=y
- CONFIG_USB_GADGET_VBUS_DRAW=500
-+CONFIG_USB_CONFIGFS=y
-+CONFIG_USB_CONFIGFS_NCM=y
-+CONFIG_USB_CONFIGFS_ECM=y
-+CONFIG_USB_CONFIGFS_F_FS=y
-+CONFIG_USB_ULPI_BUS=y
- CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=32
- CONFIG_MMC_ARMMMCI=y
-@@ -187,6 +204,7 @@ CONFIG_REMOTEPROC=y
- CONFIG_QCOM_ADSP_PIL=y
- CONFIG_QCOM_Q6V5_PIL=y
- CONFIG_QCOM_WCNSS_PIL=y
-+CONFIG_RPMSG_CHAR=y
- CONFIG_RPMSG_QCOM_SMD=y
- CONFIG_QCOM_GSBI=y
- CONFIG_QCOM_PM=y
-@@ -195,6 +213,7 @@ CONFIG_QCOM_SMD_RPM=y
- CONFIG_QCOM_SMP2P=y
- CONFIG_QCOM_SMSM=y
- CONFIG_QCOM_WCNSS_CTRL=y
-+CONFIG_EXTCON_QCOM_SPMI_MISC=y
- CONFIG_IIO=y
- CONFIG_IIO_BUFFER_CB=y
- CONFIG_IIO_SW_TRIGGER=y
-@@ -203,8 +222,10 @@ CONFIG_MPU3050_I2C=y
- CONFIG_AK8975=y
- CONFIG_IIO_HRTIMER_TRIGGER=y
- CONFIG_BMP280=y
-+CONFIG_PWM=y
- CONFIG_PHY_QCOM_APQ8064_SATA=y
- CONFIG_PHY_QCOM_IPQ806X_SATA=y
-+CONFIG_PHY_QCOM_USB_HS=y
- CONFIG_QCOM_QFPROM=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
-@@ -226,3 +247,4 @@ CONFIG_DYNAMIC_DEBUG=y
- CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_SCHED_DEBUG is not set
-+CONFIG_CRYPTO_DRBG_MENU=y
--- 
-2.12.0
+I have get rid of phy-is-integrated, but mdio_mux_syscon_switch_fn need to enable/disable ephy clk/reset.
+And so access to internal PHY node.
+But current DT made this ugly: (need to find mdio-mux then internalmdio then internal PHY)
+
+Since MAC cannot reset/choose internal MDIO without ephy clk/rst, could we interpret this as thoses clk/rst must be set in emac node.
+This will simplify a lot the code.
+
+Regards
