@@ -1,47 +1,48 @@
 From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Tue, 3 Oct 2017 20:07:32 -0700
-Subject: [PATCH 2/7] gpio: brcmstb: release the bgpio lock during irq
- handlers
-In-Reply-To: <2cdf149b-f034-d98a-e77a-e2779a0d1e47@gmail.com>
+Date: Tue, 3 Oct 2017 20:15:51 -0700
+Subject: [PATCH 5/7] gpio: brcmstb: enable masking of interrupts when
+ changing type
+In-Reply-To: <5b38f92b-47a9-c75e-dd4e-3f1f907f1359@gmail.com>
 References: <20170930034057.15166-1-opendmb@gmail.com>
- <20170930034057.15166-3-opendmb@gmail.com>
- <CADtm3G58SBF0FskUPJCs_8km8oXrKYs-+hrJoV4osyw9mvQbiQ@mail.gmail.com>
- <2cdf149b-f034-d98a-e77a-e2779a0d1e47@gmail.com>
-Message-ID: <CADtm3G6yUco7Av2b3qFRD9rseFH6R8mBnduBBsr8nm2JXGp7OQ@mail.gmail.com>
+ <20170930034057.15166-6-opendmb@gmail.com>
+ <CADtm3G5oWZTZ7OkAko9_5ge_eOG7FRaEd702rqh55hJnnFi5ow@mail.gmail.com>
+ <5b38f92b-47a9-c75e-dd4e-3f1f907f1359@gmail.com>
+Message-ID: <CADtm3G4uTVGRj45ksCqp-jV9tq1QGSmw7radz8vU8wSqRdmr7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 7:09 PM, Doug Berger <opendmb@gmail.com> wrote:
-> On 10/03/2017 06:55 PM, Gregory Fong wrote:
+On Tue, Oct 3, 2017 at 7:22 PM, Doug Berger <opendmb@gmail.com> wrote:
+> On 10/03/2017 07:10 PM, Gregory Fong wrote:
 >> Hi Doug,
 >>
 >> On Fri, Sep 29, 2017 at 8:40 PM, Doug Berger <opendmb@gmail.com> wrote:
->>> The basic memory-mapped GPIO controller lock must be released
->>> before calling the registered GPIO interrupt handlers to allow
->>> the interrupt handlers to access the hardware.  Otherwise, the
->>> hardware accesses will deadlock when they attempt to grab the
->>> lock.
+>>> Mask the GPIO interrupt while its type is being changed, just in case
+>>> it can prevent a spurious interrupt.
 >>
->> I was having some trouble understanding exactly what the problem was
->> here, but I think I see it now.  Since this locks the entire bank,
->> where some GPIOs might be set as inputs and some as inputs (and
->> interrupt sources), then an interrupt on a GPIO that is supposed to
->> set another GPIO in the bank would result in deadlock.  Is that
->> correct?  If so, please update the commit message to make that clear,
->> and nice fix.  If not that, it would be nice to know what scenario can
->> cause a problem.
+>> "Just in case"?  I don't have access to hardware documentation for
+>> this anymore, but I'd expect to some stronger claim that the hardware
+>> actually requires masking before changing the trigger type.  If you
+>> can quote documentation for this or explain an actual problem seen,
+>> that would be good.
 >
-> That is an example, but there are really many possibilities.
+> Well spotted ;).  This was a protectionist change added at the request
+> of a user of the driver.  I believe that it is superfluous and I suppose
+> that belief leaked through in the language of my comment.
 >
-> Basically, if a registered interrupt handler wants to access its GPIO
-> you are likely to run into trouble.  Another example might be an
-> interrupt that is configured to trigger on either edge transition and
-> the handler wants to know whether the input is currently high or low.
->
-> I can submit a V2 with a change in the description if you would like,
-> but I'm not sure what the clearest example would be.
+> In actuality, the GPIO APIs don't make provision for clearing GPIO
+> interrupts before enabling them so this masking is really only a
+> deferral of a spurious interrupt if one is triggered by changes in the
+> hardware programming.
 
-If you could just mention both of these possible cases, that would be
-great! With that change,
+Indeed.  If the hardware is behaving in unexpected ways that would be
+a whole different kind of problem.
 
-Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+>
+> I can strike this from the upstream submission and save a couple lines
+> of source code (after IRQCHIP_MASK_ON_SUSPEND goes away) if you prefer.
+>
+
+Yes, please remove.
+
+Thanks,
+Gregory
