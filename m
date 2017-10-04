@@ -1,23 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Oct 2017 18:11:59 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.14 (#1)
-In-Reply-To: <87wp4rksln.fsf@free-electrons.com>
-References: <87wp4rksln.fsf@free-electrons.com>
-Message-ID: <20171004011159.rjoecyhyfuor7afz@localhost>
+Date: Tue, 3 Oct 2017 18:13:57 -0700
+Subject: [GIT PULL v2] Rockchip dts64 Fixes for 4.14
+In-Reply-To: <2709130.jIo7eQHvkl@phil>
+References: <6990785.aOlALvEuSf@phil>
+ <2709130.jIo7eQHvkl@phil>
+Message-ID: <20171004011357.bclazdklfeuzdqev@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 22, 2017 at 11:09:08AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Wed, Sep 27, 2017 at 08:11:32PM +0200, Heiko Stuebner wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Here is the first pull request for fixes for mvebu for v4.14.
+> please find below three fixes for 64bit Rockchip devicetrees.
 > 
-> The MAINTAINER patch should have been merged but I missed it when I
-> rebased my arm64 branch on v4.13-rc1. I move it in the fixes branche
-> because it is always good to be up to date for this file, and I saw
-> that in the past you applied this change as a fix.
+> As the tag explains the main change is the revert of the rk3368 opp
+> addition, as this cannot safely run on current rk3368 boards and thus
+> shouldn't make a kernel release.
 > 
-> Gregory
+> 
+> Please pull, thanks
+> Heiko
+> 
+> changes in v2:
+> - remove left over half-sentence at the end of the tag message
+> - add rk3399 mipi dsi grf-clock reference (part of the binding already
+>   and of course needed on rk3399)
+> 
 > 
 > The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 > 
@@ -25,13 +33,13 @@ On Fri, Sep 22, 2017 at 11:09:08AM +0200, Gregory CLEMENT wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.14-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts64fixes-1
 > 
-> for you to fetch changes up to 9e7460fc325dad06d2066abdbc1f4dd49456f9a4:
+> for you to fetch changes up to 0bc15d85d97d44e8979ff91d0c1fbafe6fd4172c:
 > 
->   arm64: dt marvell: Fix AP806 system controller size (2017-09-19 16:40:07 +0200)
+>   arm64: dts: rockchip: add the grf clk for dw-mipi-dsi on rk3399 (2017-09-26 15:59:17 +0200)
 
-Merged (while using a Macchiatobin, no less).
+Merged to fixes, thanks.
 
 
 -Olof
