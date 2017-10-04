@@ -1,64 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Oct 2017 13:36:39 +0200
-Subject: [PATCH v3 16/22] firmware: arm_scmi: add arm_mhu specific mailbox
- interface
-In-Reply-To: <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-17-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAK8P3a0XmiXqZ-z7WV+nk7B86p23Jmf31Q=pVovXVebhA28_0Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Oct 2017 12:39:09 +0100
+Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
+In-Reply-To: <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
+References: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
+ <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
+Message-ID: <20171004113908.GD23092@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> This patch adds ARM MHU specific mailbox interface for SCMI.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+On Wed, Oct 04, 2017 at 12:31:31PM +0100, Catalin Marinas wrote:
+> On Tue, Oct 03, 2017 at 06:25:46PM +0100, Mark Rutland wrote:
+> > AddressSanitizer instrumentation can significantly bloat the stack, and
+> > with GCC 7 this can result in stack overflows at boot time in some
+> > configurations.
+> > 
+> > We can avoid this by doubling our stack size when KASAN is in use, as is
+> > already done on x86 (and has been since KASAN was introduced).
+> > Regardless of other patches to decrease KASAN's stack utilization,
+> > kernels built with KASAN will always require more stack space than those
+> > built without, and we should take this into account.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > ---
+> >  arch/arm64/include/asm/memory.h | 9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > In local testing (with KASAN and other options enabled), I've seen a stack
+> > depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
+> > mounted over NFS. Without KASAN (but with other debug options enabled), this
+> > was 7992 bytes.
+> > 
+> > I wonder if we want to go for 4x rather than 2x...
+> 
+> Let's hope it's fine for now with 32K stacks. We may run into allocation
+> issues with 64K stacks (and without VMAP_STACKS).
+> 
+> Do you want this patch for 4.14?
 
-This clearly needs an explanation why we need another driver.
+If you're happy to take it, that would be great, but otherwise it can
+wait for v4.15.
 
-> +union mhu_data {
-> +       void *ptr;
-> +       u32 val;
-> +};
-> +
-> +static void mhu_tx_prepare(struct mbox_client *cl, void *m)
-> +{
-> +       struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
-> +       union mhu_data tmp;
-> +
-> +       scmi_generic_tx_prepare(cinfo, m);
-> +
-> +       /* clear only the relavant bit */
-> +       tmp.ptr = cinfo->priv;
-> +       *(u32 *)m &= tmp.val;
-> +}
+Arguably this fixes the introduction of KASAN to arm64, but I'm not sure
+how much we care about backporting this to stable.
 
-Why do you use the first 32 bits of the pointer here? That doesn't
-seem to make any sense, in particular on big-endian 64-bit
-architectures.
-
-> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-> index 97285a22dfaa..bdc9c566e6c1 100644
-> --- a/drivers/firmware/arm_scmi/driver.c
-> +++ b/drivers/firmware/arm_scmi/driver.c
-> @@ -648,6 +648,9 @@ EXPORT_SYMBOL_GPL(devm_scmi_handle_get);
->  /* Each compatible listed below must have descriptor associated with it */
->  static const struct of_device_id scmi_of_match[] = {
->         { .compatible = "arm,scmi", .data = &scmi_generic_desc },
-> +#if IS_REACHABLE(CONFIG_ARM_MHU)
-> +       { .compatible = "arm,mhu-scmi", .data = &mhu_scmi_desc },
-> +#endif
->         { /* Sentinel */ },
->  };
->
-
-This again is a bad abstraction, if the main part needs to know about
-each mailbox that it could use.
-
-Turn the registration around so rather than referring to an exported
-symbol from mhu_scmi_desc.c in the main driver, you export
-a symbol to register the operations and make the mhu
-part its own module.
-
-       Arnd
+Thanks,
+Mark.
