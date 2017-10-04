@@ -1,52 +1,51 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 4 Oct 2017 15:30:10 +0930
-Subject: [PATCH 8/8] ARM: dts: aspeed: Clean up UART nodes
-In-Reply-To: <1507094931.5452.20.camel@aj.id.au>
-References: <20170928075149.8154-1-joel@jms.id.au>
- <20170928075149.8154-9-joel@jms.id.au>
- <1507094931.5452.20.camel@aj.id.au>
-Message-ID: <CACPK8Xe6eftZvZzuXChUr3+Nd+Hj5nDB723d-9QwrMszxto6-A@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 4 Oct 2017 11:43:28 +0530
+Subject: [PATCH v3] cpufreq: imx6q: Move speed grading check to cpufreq
+ driver
+In-Reply-To: <1506784606-2064-1-git-send-email-festevam@gmail.com>
+References: <1506784606-2064-1-git-send-email-festevam@gmail.com>
+Message-ID: <20171004061328.GC8478@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 4, 2017 at 2:58 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> On Thu, 2017-09-28 at 17:21 +0930, Joel Stanley wrote:
+On 30-09-17, 12:16, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> On some i.MX6 SoCs (like i.MX6SL, i.MX6SX and i.MX6UL) that do not have
+> speed grading check, opp table will not be created in platform code,
+> so cpufreq driver prints the following error message:
+> 
+> cpu cpu0: dev_pm_opp_get_opp_count: OPP table not found (-19)
+> 
+> However, this is not really an error in this case because the
+> imx6q-cpufreq driver first calls dev_pm_opp_get_opp_count()
+> and if it fails, it means that platform code does not provide
+> OPP and then dev_pm_opp_of_add_table() will be called.
+> 
+> In order to avoid such confusing error message, move the speed grading
+> check from platform code to the imx6q-cpufreq driver.
+> 
+> This way the imx6q-cpufreq no longer has to check whether OPP table
+> is supplied by platform code.
+> 
+> Tested on a i.MX6Q and i.MX6UL based boards.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+> Previous discussion on this topic:
+> https://patchwork.kernel.org/patch/9295059/
+> 
+> Changes since v2:
+> - Fixed a typo in the commit log (missed SL) - Otavio
+> - Remove __init anotation from imx6q_opp_check_speed_grading()
+> Changes since v1:
+> - Remove unneeded has_speed_grading() function.
 
->> -                     uart6: serial at 1e787000 {
->> -                             compatible = "ns16550a";
->> -                             reg = <0x1e787000 0x1000>;
->> +                     vuart: vuart at 1e787000 {
->
-> Bit of a nit, but arguably this should be `vuart: serial at ...`?
+Looks fine to me.
 
-Yep, that makes sense.
+@Shawn: Can you please let us know if you are fine with it?
 
->
->> +                             compatible = "aspeed,ast2400-vuart";
->> +                             reg = <0x1e787000 0x40>;
->>                               reg-shift = <2>;
->>                               interrupts = <10>;
->>                               clocks = <&clk_uart>;
->> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
->> index 251fc9f4637e..0b793305120a 100644
->> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
->> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
->> @@ -287,9 +278,19 @@
->>                               };
->>                       };
->>
->> +                     uart1: serial at 1e783000 {
->
-> Earlier in the series you had a patch moving the ADC node to be in
-> address-order with respect to the rest of the nodes but this change puts uart1
-> out of address-order. As it turns out the uarts blocks are sprayed around in
-> the address-space: uart1 and uart5 are together, the vuart is elsewhere, then
-> uarts 2-4 are lumped together in another spot. I think it makes sense to
-> consolidate them, but it is inconsistent. Thoughts?
-
-Yeah. I'll move them to where they should be.
-
-Cheers,
-
-Joel
+-- 
+viresh
