@@ -1,24 +1,69 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 4 Oct 2017 13:10:44 +0200
-Subject: [PATCH 0/2] ARM-SAMSUNG: Adjustments for 14 function implementations
-Message-ID: <75c352ad-c51e-2e63-2f93-0f14522ff09c@users.sourceforge.net>
+Date: Wed, 4 Oct 2017 13:11:56 +0200
+Subject: [PATCH 1/2] ARM: SAMSUNG: Delete an error message for a failed memory
+ allocation in three functions
+In-Reply-To: <75c352ad-c51e-2e63-2f93-0f14522ff09c@users.sourceforge.net>
+References: <75c352ad-c51e-2e63-2f93-0f14522ff09c@users.sourceforge.net>
+Message-ID: <ae29b97e-9a60-fdf4-5bd2-af33f6081446@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 4 Oct 2017 12:48:24 +0200
+Date: Wed, 4 Oct 2017 09:33:52 +0200
 
-Two update suggestions were taken into account
-from static source code analysis.
+Omit extra messages for a memory allocation failure in these functions.
 
-Markus Elfring (2):
-  Delete an error message for a failed memory allocation in three functions
-  Improve a size determination in 13 functions
+This issue was detected by using the Coccinelle software.
 
- arch/arm/plat-samsung/adc.c          | 12 ++++--------
- arch/arm/plat-samsung/devs.c         | 33 +++++++++++----------------------
- arch/arm/plat-samsung/platformdata.c |  4 +---
- 3 files changed, 16 insertions(+), 33 deletions(-)
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/plat-samsung/adc.c          | 8 ++------
+ arch/arm/plat-samsung/platformdata.c | 4 +---
+ 2 files changed, 3 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index daf3db9f0058..f8d6206e4daa 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -239,10 +239,8 @@ struct s3c_adc_client *s3c_adc_register(struct platform_device *pdev,
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	client = kzalloc(sizeof(struct s3c_adc_client), GFP_KERNEL);
+-	if (!client) {
+-		dev_err(&pdev->dev, "no memory for adc client\n");
++	if (!client)
+ 		return ERR_PTR(-ENOMEM);
+-	}
+ 
+ 	client->pdev = pdev;
+ 	client->is_ts = is_ts;
+@@ -345,10 +343,8 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	unsigned tmp;
+ 
+ 	adc = devm_kzalloc(dev, sizeof(struct adc_device), GFP_KERNEL);
+-	if (adc == NULL) {
+-		dev_err(dev, "failed to allocate adc_device\n");
++	if (!adc)
+ 		return -ENOMEM;
+-	}
+ 
+ 	spin_lock_init(&adc->lock);
+ 
+diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
+index b430e9946287..6cf52ee7eeec 100644
+--- a/arch/arm/plat-samsung/platformdata.c
++++ b/arch/arm/plat-samsung/platformdata.c
+@@ -29,10 +29,8 @@ void __init *s3c_set_platdata(void *pd, size_t pdsize,
+ 	}
+ 
+ 	npd = kmemdup(pd, pdsize, GFP_KERNEL);
+-	if (!npd) {
+-		printk(KERN_ERR "%s: cannot clone platform data\n", pdev->name);
++	if (!npd)
+ 		return NULL;
+-	}
+ 
+ 	pdev->dev.platform_data = npd;
+ 	return npd;
 -- 
 2.14.2
