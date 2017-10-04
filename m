@@ -1,42 +1,47 @@
 From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Tue, 3 Oct 2017 20:03:12 -0700
-Subject: [PATCH 6/7] gpio: brcmstb: consolidate interrupt domains
-In-Reply-To: <20170930034057.15166-7-opendmb@gmail.com>
+Date: Tue, 3 Oct 2017 20:07:32 -0700
+Subject: [PATCH 2/7] gpio: brcmstb: release the bgpio lock during irq
+ handlers
+In-Reply-To: <2cdf149b-f034-d98a-e77a-e2779a0d1e47@gmail.com>
 References: <20170930034057.15166-1-opendmb@gmail.com>
- <20170930034057.15166-7-opendmb@gmail.com>
-Message-ID: <CADtm3G5v6_BHwanRYvCq1y-8Hdmn7gxX3zoVHx2c7cOFL-pj+Q@mail.gmail.com>
+ <20170930034057.15166-3-opendmb@gmail.com>
+ <CADtm3G58SBF0FskUPJCs_8km8oXrKYs-+hrJoV4osyw9mvQbiQ@mail.gmail.com>
+ <2cdf149b-f034-d98a-e77a-e2779a0d1e47@gmail.com>
+Message-ID: <CADtm3G6yUco7Av2b3qFRD9rseFH6R8mBnduBBsr8nm2JXGp7OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On Fri, Sep 29, 2017 at 8:40 PM, Doug Berger <opendmb@gmail.com> wrote:
-> The GPIOLIB IRQ chip helpers were very appealing, but badly broke
-> the 1:1 mapping between a GPIO controller's device_node and its
-> interrupt domain.
-
-Out of curiosity, what sort of problems have you seen from this?
-
+On Tue, Oct 3, 2017 at 7:09 PM, Doug Berger <opendmb@gmail.com> wrote:
+> On 10/03/2017 06:55 PM, Gregory Fong wrote:
+>> Hi Doug,
+>>
+>> On Fri, Sep 29, 2017 at 8:40 PM, Doug Berger <opendmb@gmail.com> wrote:
+>>> The basic memory-mapped GPIO controller lock must be released
+>>> before calling the registered GPIO interrupt handlers to allow
+>>> the interrupt handlers to access the hardware.  Otherwise, the
+>>> hardware accesses will deadlock when they attempt to grab the
+>>> lock.
+>>
+>> I was having some trouble understanding exactly what the problem was
+>> here, but I think I see it now.  Since this locks the entire bank,
+>> where some GPIOs might be set as inputs and some as inputs (and
+>> interrupt sources), then an interrupt on a GPIO that is supposed to
+>> set another GPIO in the bank would result in deadlock.  Is that
+>> correct?  If so, please update the commit message to make that clear,
+>> and nice fix.  If not that, it would be nice to know what scenario can
+>> cause a problem.
 >
-> This commit consolidates the per bank irq domains to a version
-> where we have one larger interrupt domain per GPIO controller
-> instance spanning multiple GPIO banks.
+> That is an example, but there are really many possibilities.
+>
+> Basically, if a registered interrupt handler wants to access its GPIO
+> you are likely to run into trouble.  Another example might be an
+> interrupt that is configured to trigger on either edge transition and
+> the handler wants to know whether the input is currently high or low.
+>
+> I can submit a V2 with a change in the description if you would like,
+> but I'm not sure what the clearest example would be.
 
-This works (and is reminiscent to my initially submitted
-implementation at [1]), but I think it might make sense to keep as-is
-(using the gpiolib irqchip helpers), and instead allocate an irqchip
-fwnode per bank and use to_of_node() to set it as the of_node for the
-gpiochip before calling gpiochip_irqchip_add().  OTOH, that capability
-might go away...
+If you could just mention both of these possible cases, that would be
+great! With that change,
 
-Linus, can you comment on the FIXME in gpiochip_irqchip_add_key() that
-says "get rid of this and use gpiochip->parent->of_node everywhere"?
-It seems like it would still be beneficial to be able to override the
-associated node for a gpiochip, since that's what's used for the
-irqdomain, but if that's going away, obviously we don't want to start
-using that now.
-
-Thanks,
-Gregory
-
-[1] https://patchwork.kernel.org/patch/6347811/
+Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
