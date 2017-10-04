@@ -1,68 +1,78 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 4 Oct 2017 17:23:39 -0400
-Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
-In-Reply-To: <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
-References: <20171003091155.7138-1-linus.walleij@linaro.org>
- <20171003091155.7138-2-linus.walleij@linaro.org>
- <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
- <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
- <CAP71Wjy2gEn=sGz5kN++=TdZ4S1cmE-3fdw-5__tdtR-M9RDGQ@mail.gmail.com>
- <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
-Message-ID: <CAF6AEGvtfAYx5mgg9mMVeXdO5mStD9gJvi5+Pp46jYj-e8WnOQ@mail.gmail.com>
+From: opendmb@gmail.com (Doug Berger)
+Date: Wed, 4 Oct 2017 14:24:37 -0700
+Subject: [PATCH 6/7] gpio: brcmstb: consolidate interrupt domains
+In-Reply-To: <CADtm3G5v6_BHwanRYvCq1y-8Hdmn7gxX3zoVHx2c7cOFL-pj+Q@mail.gmail.com>
+References: <20170930034057.15166-1-opendmb@gmail.com>
+ <20170930034057.15166-7-opendmb@gmail.com>
+ <CADtm3G5v6_BHwanRYvCq1y-8Hdmn7gxX3zoVHx2c7cOFL-pj+Q@mail.gmail.com>
+Message-ID: <61cb2c09-8078-d3ed-907b-64aff4553650@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 3, 2017 at 2:54 PM, Rob Clark <robdclark@gmail.com> wrote:
-> On Tue, Oct 3, 2017 at 1:49 PM, Nicolas Dechesne
-> <nicolas.dechesne@linaro.org> wrote:
->> On Tue, Oct 3, 2017 at 6:37 PM, Rob Clark <robdclark@gmail.com> wrote:
->>> On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
->>> <srinivas.kandagatla@linaro.org> wrote:
->>>>
->>>>
->>>> On 03/10/17 10:11, Linus Walleij wrote:
->>>>>
->>>>> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
->>>>> is not very helpful for users looking for their device tree in
->>>>> the kernel. Also the db820c is named properly.
->>>>>
->>>>> Rectify this, simply, do not change the compatible strings but name
->>>>> the DTS files in a consistent manner.
->>>>>
->>>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>>>
->>>> I did not like the sbc naming convention too, This was primarily done due to
->>>> some legacy build tools + bootloaders which have used sbc compatible to
->>>> identify boards from multiple dtb blobs. Now that we can append dtb to
->>>> kernel with new LK, this should not be a issue anymore.
->>>
->>> maybe it would be an idea to update skales/dbttool first to look for
->>> the new name, and then give people some time to upgrade, before
->>> changing this in the kernel.  Otherwise I expect you'll cause some
->>> confusion..
+On 10/03/2017 08:03 PM, Gregory Fong wrote:
+> Hi Doug,
+> 
+> On Fri, Sep 29, 2017 at 8:40 PM, Doug Berger <opendmb@gmail.com> wrote:
+>> The GPIOLIB IRQ chip helpers were very appealing, but badly broke
+>> the 1:1 mapping between a GPIO controller's device_node and its
+>> interrupt domain.
+> 
+> Out of curiosity, what sort of problems have you seen from this?
+> 
+
+As you know, the BRCMSTB devices conceptually distinguish between an
+always-on GPIO device and a regular GPIO device that each can have many
+more than 32 General Purpose I/Os. The driver supports these by dividing
+the GPIO across a number of banks each of which is implemented as a
+separate gpiochip as an implementation convenience. The main issue is
+that each gpiochip that uses the GPIOLIB IRQ chip helpers creates its
+own irq domain even though they are associated with the same device and
+device-tree node.
+
+When another device-tree node references a GPIO device as its interrupt
+parent, the irq_create_of_mapping() function looks for the irq domain of
+the GPIO device and since all bank irq domains reference the same GPIO
+device node it always resolves to the irq domain of the first bank
+regardless of which bank the number of the GPIO should resolve. This
+domain can only map hwirq numbers 0-31 so interrupts on GPIO above that
+can't be mapped by the device-tree.
+
 >>
->> iirc, skale is using the compatible name, not the filename.
->>
->
-> ahh, yes, I think you are right.. u-boot is using a different filename.
->
-> So in this case, no issue to pick a saner name :-)
->
+>> This commit consolidates the per bank irq domains to a version
+>> where we have one larger interrupt domain per GPIO controller
+>> instance spanning multiple GPIO banks.
+> 
+> This works (and is reminiscent to my initially submitted
+> implementation at [1]), but I think it might make sense to keep as-is
+> (using the gpiolib irqchip helpers), and instead allocate an irqchip
+> fwnode per bank and use to_of_node() to set it as the of_node for the
+> gpiochip before calling gpiochip_irqchip_add().  OTOH, that capability
+> might go away...
+> 
+> Linus, can you comment on the FIXME in gpiochip_irqchip_add_key() that
+> says "get rid of this and use gpiochip->parent->of_node everywhere"?
+> It seems like it would still be beneficial to be able to override the
+> associated node for a gpiochip, since that's what's used for the
+> irqdomain, but if that's going away, obviously we don't want to start
+> using that now.
+> 
 
-So, actually u-boot encodes the board's fdtname..  so as much as I'd
-like to rename it to something more sane, unless the kernel can manage
-to install a symlink for backwards compat, NAK
+Yes, this is effectively a reversion to an earlier implementation. I
+produced an implementation based on the generic irqchip libraries, but
+that was stripped from this submission when I discovered that no support
+exists within the generic irqchip libraries for removal of domain
+generic chips and we wanted to preserve the module support of this driver.
 
-I was trying to think of hacks for u-boot to check for multiple fdt
-names, but if we want to get to the point of being able to install
-multiple distro's on a single disk, we actually need to pass fdtname
-to grub (where distro specific grub.cfg is encoding the UUID of the
-distro's /boot partition, so it knows where to load the dtb from)..
-this gets nearly impossible when one name becomes multiple names.  So
-hurray for the fdt name becoming accidental ABI!
+It is conceivable that the current GPIO device-tree nodes could be
+broken down into separate devices per bank, but it is believed that this
+would only confuse things for users of the device as the concept
+diverges from the concept expressed in device documentation.
 
-If we managed to get this in before the 4.14 LTS I might feel
-differently.  But afterwards, totally not. :-(
+> Thanks,
+> Gregory
+> 
+> [1] https://patchwork.kernel.org/patch/6347811/
+> 
 
-BR,
--R
+Thanks for the review,
+    Doug
