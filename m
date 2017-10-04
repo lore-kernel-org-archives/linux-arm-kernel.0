@@ -1,57 +1,68 @@
-From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Wed, 4 Oct 2017 23:20:34 +0200
-Subject: [PATCH 2/2] arm: AT91: fix DT duplicate node name
-In-Reply-To: <e5868359-8708-3d17-df8c-b04ad3624df0@microchip.com>
-References: <cover.1504037038.git.mirq-linux@rere.qmqm.pl>
- <910fee2eb99b2d95e59fa6b997645b498f167022.1504037038.git.mirq-linux@rere.qmqm.pl>
- <e5868359-8708-3d17-df8c-b04ad3624df0@microchip.com>
-Message-ID: <20171004212034.6znvbdfe2wbd7uvh@qmqm.qmqm.pl>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 4 Oct 2017 17:23:39 -0400
+Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
+In-Reply-To: <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+ <20171003091155.7138-2-linus.walleij@linaro.org>
+ <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+ <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
+ <CAP71Wjy2gEn=sGz5kN++=TdZ4S1cmE-3fdw-5__tdtR-M9RDGQ@mail.gmail.com>
+ <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
+Message-ID: <CAF6AEGvtfAYx5mgg9mMVeXdO5mStD9gJvi5+Pp46jYj-e8WnOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 14, 2017 at 06:53:30PM +0200, Nicolas Ferre wrote:
-> On 29/08/2017 at 22:08, Micha? Miros?aw wrote:
-> > Fix following warning at bootup:
-> > 
-> > device-tree: Duplicate name in fb at 0x00500000, renamed to "display#1"
-> > 
-> > Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> > ---
-> >  arch/arm/boot/dts/at91sam9m10g45ek.dts | 48 +++++++++++++++++-----------------
-> >  1 file changed, 24 insertions(+), 24 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > index 9cf1f5163fbd..272af5867403 100644
-> > --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > @@ -223,30 +223,6 @@
-> >  		fb0: fb at 0x00500000 {
-> >  			display = <&display0>;
-> >  			status = "okay";
-> > -
-> > -			display0: display {
-> 
-> Micha?, thanks for your patch.
-> 
-> Actually the DT binding requires this:
-> Documentation/devicetree/bindings/video/atmel,lcdc.txt
-> 
-> So it's somehow a bigger issue.
-> Moreover, several boards have exactly the same arrangement than the
-> at91sam9m10g45ek, so you probably need to modify them all at the same time.
-> 
-> After a brief look at drivers/video/fbdev/atmel_lcdfb.c it seems that
-> the name of the node is not so much important, so we can modify it
-> (something like display0: lcd-display {}) .
-> 
-> I suggest that you modify the binding, the board files affected and
-> re-submit a patch.
+On Tue, Oct 3, 2017 at 2:54 PM, Rob Clark <robdclark@gmail.com> wrote:
+> On Tue, Oct 3, 2017 at 1:49 PM, Nicolas Dechesne
+> <nicolas.dechesne@linaro.org> wrote:
+>> On Tue, Oct 3, 2017 at 6:37 PM, Rob Clark <robdclark@gmail.com> wrote:
+>>> On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
+>>> <srinivas.kandagatla@linaro.org> wrote:
+>>>>
+>>>>
+>>>> On 03/10/17 10:11, Linus Walleij wrote:
+>>>>>
+>>>>> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
+>>>>> is not very helpful for users looking for their device tree in
+>>>>> the kernel. Also the db820c is named properly.
+>>>>>
+>>>>> Rectify this, simply, do not change the compatible strings but name
+>>>>> the DTS files in a consistent manner.
+>>>>>
+>>>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>>>
+>>>> I did not like the sbc naming convention too, This was primarily done due to
+>>>> some legacy build tools + bootloaders which have used sbc compatible to
+>>>> identify boards from multiple dtb blobs. Now that we can append dtb to
+>>>> kernel with new LK, this should not be a issue anymore.
+>>>
+>>> maybe it would be an idea to update skales/dbttool first to look for
+>>> the new name, and then give people some time to upgrade, before
+>>> changing this in the kernel.  Otherwise I expect you'll cause some
+>>> confusion..
+>>
+>> iirc, skale is using the compatible name, not the filename.
+>>
+>
+> ahh, yes, I think you are right.. u-boot is using a different filename.
+>
+> So in this case, no issue to pick a saner name :-)
+>
 
-It looks like the binding documentation is wrong. The driver code does
+So, actually u-boot encodes the board's fdtname..  so as much as I'd
+like to rename it to something more sane, unless the kernel can manage
+to install a symlink for backwards compat, NAK
 
-	of_parse_phandle(np, "display", 0);
+I was trying to think of hacks for u-boot to check for multiple fdt
+names, but if we want to get to the point of being able to install
+multiple distro's on a single disk, we actually need to pass fdtname
+to grub (where distro specific grub.cfg is encoding the UUID of the
+distro's /boot partition, so it knows where to load the dtb from)..
+this gets nearly impossible when one name becomes multiple names.  So
+hurray for the fdt name becoming accidental ABI!
 
-so it expects a phandle, not a node.
+If we managed to get this in before the 4.14 LTS I might feel
+differently.  But afterwards, totally not. :-(
 
-Best Regards,
-Micha? Miros?aw
+BR,
+-R
