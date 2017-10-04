@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 04 Oct 2017 12:27:56 +0100
-Subject: Applied "ASoC: cygnus: Add EXPORT_SYMBOL for helper function" to the
- asoc tree
-In-Reply-To: <1502748417-26417-9-git-send-email-lori.hikichi@broadcom.com>
-Message-ID: <E1dzhqG-0004Fb-As@debutante>
+Date: Wed, 04 Oct 2017 12:27:52 +0100
+Subject: Applied "ASoC: cygnus: Remove set_fmt from SPDIF dai ops" to the asoc
+ tree
+In-Reply-To: <1506637775-18293-3-git-send-email-lori.hikichi@broadcom.com>
+Message-ID: <E1dzhqC-0004EQ-7A@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: cygnus: Add EXPORT_SYMBOL for helper function
+   ASoC: cygnus: Remove set_fmt from SPDIF dai ops
 
 has been applied to the asoc tree at
 
@@ -34,32 +34,48 @@ to this mail.
 Thanks,
 Mark
 
->From d8302aa6b53acbe421fe615b9d704fd813623e96 Mon Sep 17 00:00:00 2001
+>From fcf30f3b4377d2475aa709ce28964461990c3caa Mon Sep 17 00:00:00 2001
 From: Lori Hikichi <lori.hikichi@broadcom.com>
-Date: Thu, 28 Sep 2017 15:29:32 -0700
-Subject: [PATCH] ASoC: cygnus: Add EXPORT_SYMBOL for helper function
+Date: Thu, 28 Sep 2017 15:29:34 -0700
+Subject: [PATCH] ASoC: cygnus: Remove set_fmt from SPDIF dai ops
 
-The helper function cygnus_ssp_set_custom_fsync_width() is intended
-to be called from an ASoC machine driver, need to export symbol
-if using modules.
+The SPDIF port cannot modify its format so a set_fmt function is not
+needed. Previously, we used a generic set_fmt for all ports and returned
+an error code for the SPDIF port. It is cleaner to not populate the
+set_fmt field.
 
 Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/bcm/cygnus-ssp.c | 1 +
- 1 file changed, 1 insertion(+)
+ sound/soc/bcm/cygnus-ssp.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
-index 15c438f0f22d..e9c73a451cf6 100644
+index e9c73a451cf6..da14facb8a6f 100644
 --- a/sound/soc/bcm/cygnus-ssp.c
 +++ b/sound/soc/bcm/cygnus-ssp.c
-@@ -842,6 +842,7 @@ int cygnus_ssp_set_custom_fsync_width(struct snd_soc_dai *cpu_dai, int len)
- 		return -EINVAL;
- 	}
- }
-+EXPORT_SYMBOL_GPL(cygnus_ssp_set_custom_fsync_width);
+@@ -1137,6 +1137,13 @@ static const struct snd_soc_dai_ops cygnus_ssp_dai_ops = {
+ 	.set_tdm_slot	= cygnus_set_dai_tdm_slot,
+ };
  
- static int cygnus_ssp_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- {
++static const struct snd_soc_dai_ops cygnus_spdif_dai_ops = {
++	.startup	= cygnus_ssp_startup,
++	.shutdown	= cygnus_ssp_shutdown,
++	.trigger	= cygnus_ssp_trigger,
++	.hw_params	= cygnus_ssp_hw_params,
++	.set_sysclk	= cygnus_ssp_set_sysclk,
++};
+ 
+ #define INIT_CPU_DAI(num) { \
+ 	.name = "cygnus-ssp" #num, \
+@@ -1175,7 +1182,7 @@ static const struct snd_soc_dai_driver cygnus_spdif_dai_info = {
+ 		.formats = SNDRV_PCM_FMTBIT_S16_LE |
+ 			SNDRV_PCM_FMTBIT_S32_LE,
+ 	},
+-	.ops = &cygnus_ssp_dai_ops,
++	.ops = &cygnus_spdif_dai_ops,
+ 	.suspend = cygnus_ssp_suspend,
+ 	.resume = cygnus_ssp_resume,
+ };
 -- 
 2.14.1
