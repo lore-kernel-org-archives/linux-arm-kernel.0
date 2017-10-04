@@ -1,140 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Oct 2017 18:29:56 +0100
-Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
-In-Reply-To: <20171003111100.GQ3611@e103592.cambridge.arm.com>
-References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
- <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
- <20170913143325.hi4cfcajbts3bbao@localhost>
- <20170914195555.GB24231@e103592.cambridge.arm.com>
- <20170920135856.dfuowttwi4bk4nqb@localhost>
- <20171003111100.GQ3611@e103592.cambridge.arm.com>
-Message-ID: <20171004172955.tyooqxdoo73iq66u@armageddon.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 4 Oct 2017 10:31:15 -0700
+Subject: [GIT PULL] STM32 DT fixes for v4.14
+In-Reply-To: <ec743780-6c16-ada9-3e0a-335758c989df@st.com>
+References: <ec743780-6c16-ada9-3e0a-335758c989df@st.com>
+Message-ID: <CAOesGMgbsJFN46ADtd97DCzsRokZLVQ6Y6PVgFUKXPn0f9KKmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 12:11:01PM +0100, Dave P Martin wrote:
-> On Wed, Sep 20, 2017 at 02:58:56PM +0100, Catalin Marinas wrote:
-> > On Thu, Sep 14, 2017 at 08:55:56PM +0100, Dave P Martin wrote:
-> > > On Wed, Sep 13, 2017 at 07:33:25AM -0700, Catalin Marinas wrote:
-> > > > On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
-> > > > > +/*
-> > > > > + * Handle SVE state across fork():
-> > > > > + *
-> > > > > + * dst and src must not end up with aliases of the same sve_state.
-> > > > > + * Because a task cannot fork except in a syscall, we can discard SVE
-> > > > > + * state for dst here, so long as we take care to retain the FPSIMD
-> > > > > + * subset of the state if SVE is in use.  Reallocation of the SVE state
-> > > > > + * will be deferred until dst tries to use SVE.
-> > > > > + */
-> > > > > +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
-> > > > > +{
-> > > > > +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
-> > > > > +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
-> > > > > +		sve_to_fpsimd(dst);
-> > > > > +	}
-> > > > > +
-> > > > > +	dst->thread.sve_state = NULL;
-> > > > > +}
-> > > > 
-> > > > I first thought the thread flags are not visible in dst yet since
-> > > > dup_task_struct() calls arch_dup_task_struct() before
-> > > > setup_thread_stack(). However, at the end of the last year we enabled
-> > > > CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
-> > > > on this.
-> > > 
-> > > Hmmm, I see your point, but there are some sequencing issues here.
-> > > 
-> > > > Anyway, IIUC we don't need sve_to_fpsimd() here. The
-> > > > arch_dup_task_struct() already called fpsimd_preserve_current_state()
-> > > 
-> > > I consider SVE discard as an optional side effect of task_fpsimd_save(),
-> > > not something that is guaranteed to happen -- the decision about whether
-> > > to do so may become more intelligent later on.  So, for src, we may
-> > > discard SVE (because syscall), but for dst we must NULL .sve_state (and
-> > > therefore clear TIF_SVE) simply to avoid aliasing of src->sve_state and
-> > > dst->sve_state.
-> > 
-> > My point was that the SVE state of src is already preserved at this
-> > point and copied into dst. You don't need the sve_to_fpsimd(dst) again
-> > which basically does the same copying of the src SVE saved state into
-> > the FPSIMD one in dst. This has already been done in
-> > arch_dup_task_struct() by the combination of
-> > fpsimd_preserve_current_state() and *dst = *src (and, of course,
-> > clearing TIF_SVE in dst).
-> > 
-> > I don't think the TIF_SVE clearing in src is just a side effect of
-> > task_fpsimd_save() here but rather a requirement. When returning from
-> > fork(), both src and dst would need to have the same state. However,
-> > your fpsimd_dup_sve() implementation makes it very clear that the SVE
-> > state is lost in dst. This is only allowed if we also lose it in src (as
-> > a result of a syscall). So making dst->sve_state = NULL requires that
-> > TIF_SVE is also cleared in both src and dst. Alternatively, you'd have
-> > to allocate a new state here and copy the full src SVE state across to
-> > dst, together with setting TIF_SVE (that's not necessary, however, since
-> > we get here as a result of a syscall).
-> 
-> The currently intended ABI is that the SVE bits are unspecified after a
-> syscall, so it is legitimate (though perhaps surprising) for different
-> things to happen in dst and src.
-> 
-> This complicates things a lot though, just to avoid the next SVE usage
-> exception in src after the fork.
-> 
-> 
-> It should be simpler to do what you suggest and discard the SVE state of
-> src unconditionally before the copy: then we really are just cloning the
-> thread apart from the need to set dst->thread.sve_state to NULL.
-> 
-> fpsimd_preserve_current_state() does not necessarily write back to
-> current->thread.fpsmid_state though: at the moment, it does do this as a
-> side effect of task_fpsimd_save() because we happen to be in a syscall
-> (i.e., fork).  
-> 
-> What we really want is unconditional discarding of the state.  This
-> wasn't needed anywhere else yet, so there's no explicit helper for it.
-> But it makes sense to add one.
-> 
-> What about refactoring along these lines:
-> 
-> 
-> fpsimd.c:
-> /* Unconditionally discard the SVE state */
-> void task_sve_discard(struct task_struct *task)
-> {
-> 	if (!system_supports_sve())
-> 		return;
-> 
-> 	local_bh_disable();
-> 	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
-> 		sve_to_fpsimd(task);
-> 	local_bh_enable();
-> }
-> 
-> process.c:
-> int arch_dup_task_struct(sturct task_struct *dst, struct task_struct *src)
-> {
-> 	if (current->mm) {
-> 		fpsimd_preserve_current_state();
-> 		task_sve_discard(src);
-> 	}
-> 
-> 	*dst = *src;
-> 
-> 	dst->thread.sve_state = NULL;
-> }
-> 
-> 
-> This also avoids having to touch dst's thread flags, since now we
-> are just cloning the task except for assigning NULL to
-> dst->thread.sve_state.
+On Wed, Oct 4, 2017 at 7:08 AM, Alexandre Torgue
+<alexandre.torgue@st.com> wrote:
+> Hi Arnd, Kevin and Olof,
+>
+> Please consider this round of STM32 DT fixes for v4.14:
+>
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+>
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/stm32-dt-fixes-for-v4.14
+>
+> for you to fetch changes up to 2aaae13a9db7897a007c5d7bb46cacfb37dffacd:
+>
+>   ARM: dts: stm32: use right pinctrl compatible for stm32f469 (2017-10-04
+> 15:34:48 +0200)
+>
+> ----------------------------------------------------------------
+> STM32 fixes for v4.14:
+> ---------------------
+>
+> -Fix STMPE1600 bindings for stm32429i-eval board
+> -Use right compatible for stm32f469 pinctrl. It implies to use
+> pinctrl dedicated files for F4 SoCs.
 
-This looks fine to me, the execution of task_sve_discard() is nearly a
-no-op with the current code.
+Merged, thanks.
 
-We still have some local_bh_disable/enable() calls, though I don't think
-it's worth optimising them now (e.g. having a
-fpsimd_preserve_current_state_and_discard_sve() function with a
-"sve_discard" argument to task_fpsimd_save() to force this). 
 
--- 
-Catalin
+-Olof
