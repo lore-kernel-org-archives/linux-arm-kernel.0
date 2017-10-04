@@ -1,59 +1,90 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Wed, 4 Oct 2017 08:40:11 -0400
-Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
-In-Reply-To: <20171004085636.w2rnwf5xxhahzuy7@dhcp22.suse.cz>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-9-pasha.tatashin@oracle.com>
- <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
- <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
- <20171004085636.w2rnwf5xxhahzuy7@dhcp22.suse.cz>
-Message-ID: <9198a33d-cd40-dd70-4823-7f70c57ef9a2@oracle.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Oct 2017 13:43:20 +0100
+Subject: [PATCH] ARM: compressed: discard ksym/kcrctab input section
+In-Reply-To: <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
+References: <20170908153143.27279-1-ard.biesheuvel@linaro.org>
+ <87d163kt0m.fsf@free-electrons.com>
+ <CAKv+Gu_pGeDxK_vD9iGUO486VgLsntMQwVs9wGKa79pkx7paMQ@mail.gmail.com>
+Message-ID: <20171004124320.GP20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Could you be more specific where is such a memory reserved?
->>>
->>
->> I know of one example: trim_low_memory_range() unconditionally reserves from
->> pfn 0, but e820__memblock_setup() might provide the exiting memory from pfn
->> 1 (i.e. KVM).
+On Wed, Oct 04, 2017 at 01:20:26PM +0100, Ard Biesheuvel wrote:
+> On 4 October 2017 at 13:16, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+> > Hi Ard,
+> >
+> >  On ven., sept. 08 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >
+> >> As it turns out, building the ARM kernel with EFI support pulls in
+> >> a couple of sections that we don't really need in the decompressor.
+> >> This is due to the fact the the UEFI stub uses sort() to sort the UEFI
+> >> memory map, which is an exported symbol pulled in from lib/sort.c.
+> >>
+> >> Before commit e4bae4d0b5f3 ("arm/efi: Split zImage code and data into
+> >> separate PE/COFF sections"), this resulted in the following layout
+> >> for the decompressor ELF binary.
+> >>
+> >>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+> >>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+> >>   [ 1] .text             PROGBITS 00000000 010000 009b3c 00  AX  0   0 512
+> >>   [ 2] .rodata           PROGBITS 00009b3c 019b3c 001684 00   A  0   0  4
+> >>   [ 3] __ksymtab_strings PROGBITS 0000b1c0 01b1c0 000005 00   A  0   0  1
+> >>   [ 4] .data             PROGBITS 0000b1c8 01b1c8 000020 00  WA  0   0  8
+> >>   [ 5] ___ksymtab+sort   PROGBITS 0000b1e8 01b1e8 000008 00  WA  0   0  4
+> >>   [ 6] .piggydata        PROGBITS 0000b1f0 01b1f0 77ac38 00   A  0   0  1
+> >>   [ 7] .got.plt          PROGBITS 00785e28 795e28 00000c 04  WA  0   0  4
+> >>   [ 8] .got              PROGBITS 00785e34 795e34 000028 00  WA  0   0  4
+> >>   [ 9] .pad              PROGBITS 00785e5c 795e5c 000004 00  WA  0   0  1
+> >>   [10] .bss              NOBITS   00785e60 795e60 00001c 00  WA  0   0  4
+> >>   [11] .stack            NOBITS   00785e80 795e60 001000 00  WA  0   0  1
+> >>
+> >> Commit e4bae4d0b5f3 made some changes to the linker script to allow the
+> >> UEFI firmware to map the decompressor with strict R-X/RW- permissions
+> >> before invoking it. Unfortunately, this turns out to break the boot on
+> >> some systems, because the linker now also moves the ksymtab/kcrctab
+> >> sections around, resulting in .piggydata to appear misaligned.
+> >>
+> >>   [Nr] Name              Type     Addr     Off    Size   ES Flg Lk Inf Al
+> >>   [ 0]                   NULL     00000000 000000 000000 00      0   0  0
+> >>   [ 1] .text             PROGBITS 00000000 010000 00a93c 00  AX  0   0 4096
+> >>   [ 2] .rodata           PROGBITS 0000a93c 01a93c 001684 00   A  0   0  4
+> >>   [ 3] __ksymtab_strings PROGBITS 0000bfc0 01bfc0 000005 00   A  0   0  1
+> >>   [ 4] .piggydata        PROGBITS 0000bfc5 01bfc5 77ac47 00   A  0   0  1
+> >>   [ 5] .got.plt          PROGBITS 00786c0c 796c0c 00000c 04  WA  0   0  4
+> >>   [ 6] .got              PROGBITS 00786c18 796c18 000028 00  WA  0   0  4
+> >>   [ 7] .pad              PROGBITS 00786c40 796c40 000008 00  WA  0   0  1
+> >>   [ 8] .data             PROGBITS 00787000 797000 000200 00  WA  0   0 4096
+> >>   [ 9] ___ksymtab+sort   PROGBITS 00787200 797200 000008 00  WA  0   0  4
+> >>   [10] .bss              NOBITS   00787208 797208 00001c 00  WA  0   0  4
+> >>   [11] .stack            NOBITS   00787228 797208 001000 00  WA  0   0  1
+> >>
+> >> So let's align piggydata explicitly, and discard these sections from the
+> >> binary.
+> >>
+> >> Cc: Russell King <linux@armlinux.org.uk>
+> >> Fixes: e4bae4d0b5f3 ("arm/efi: Split zImage code and data into separate ...")
+> >> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> > Any new for this patch?
+> >
+> > It is not yet in v4.14-rc whereas "arm/efi: Split zImage code and data
+> > into separate ..." was already merged. So currently I have many boards
+> > which still does not boot in v4.14-rc3.
+> >
 > 
-> Then just initialize struct pages for that mapping rigth there where a
-> special API is used.
-> 
->> But, there could be more based on this comment from linux/page-flags.h:
->>
->>   19  * PG_reserved is set for special pages, which can never be swapped out.
->> Some
->>   20  * of them might not even exist (eg empty_bad_page)...
-> 
-> I have no idea wht empty_bad_page is but a quick grep shows that this is
-> never used. I might be wrong here but if somebody is reserving a memory
-> in a special way then we should handle the initialization right there.
-> E.g. create an API for special memblock reservations.
-> 
+> Russell, any objections?
 
-Hi Michal,
+It would be nice if there was something in the commit log that described
+why we need to align data that is basically a byte stream, and which
+decompressor methods it affects.  Maybe the decompressors should cope
+with a misaligned byte stream - what if (for example) someone supplies
+the kernel with a compressed initramfs image that is not word aligned?
+We already have people using non-page aligned compressed initramfs
+images.
 
-The reservations happen before struct pages are allocated and mapped. 
-So, it is not always possible to do it at call sites.
-
-Previously, I have solved this problem like this:
-
-https://patchwork.kernel.org/patch/9886163
-
-But, I was not too happy with that approach, so I replaced it with the 
-current approach as it is more generic, and solves similar issues if 
-they happen in other places. Also, the comment in page-flags got me 
-scared that there are probably other places perhaps on other 
-architectures that can have the similar issue.
-
-In addition, I did not like my solution, I was simply shrinking the low 
-reservation from:
-[0 - reserve_low) to [min_pfn - reserve_low), but if min_pfn > 
-reserve_low can we skip low reservation entirely? I was not sure.
-
-The current approach notifies us if there are such pages, and we can 
-fix/remove them in the future without crashing kernel in the meantime.
-
-Pasha
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
