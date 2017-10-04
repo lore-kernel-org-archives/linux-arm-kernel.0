@@ -1,90 +1,120 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 4 Oct 2017 16:19:34 +0200
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <87infvxk30.fsf@linaro.org>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
- <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
- <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
- <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
- <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
- <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
- <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
- <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
- <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com> <877ewcz3bv.fsf@linaro.org>
- <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com> <873770yz1o.fsf@linaro.org>
- <5a4f0493-6d3d-85de-fc45-030d4b03b5a8@arm.com> <871smkywgn.fsf@linaro.org>
- <db80e858-0127-af96-e09b-865893f927cb@arm.com> <87k20bxm13.fsf@linaro.org>
- <93d7d64e-e32c-0c6b-5d02-68704c1d45ba@redhat.com> <87infvxk30.fsf@linaro.org>
-Message-ID: <94f821e3-feb7-d4b5-137c-84f7deb897ec@redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 4 Oct 2017 15:47:55 +0100
+Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
+ Control and Management Interface(SCMI) protocol
+In-Reply-To: <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
+ <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
+ <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
+ <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
+ <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
+Message-ID: <86fc9060-e0da-3dde-899d-1c4055f15386@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2017 12:50, Alex Benn?e wrote:
+
+
+On 04/10/17 15:17, Arnd Bergmann wrote:
+> On Wed, Oct 4, 2017 at 3:53 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 04/10/17 13:35, Arnd Bergmann wrote:
+>>> On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 > 
-> Paolo Bonzini <pbonzini@redhat.com> writes:
-> 
->> On 04/10/2017 12:08, Alex Benn?e wrote:
+>>>>
+>>>> Yes it depends on #clock-cells property. That's the main reason for
+>>>> adding #clock-cells
 >>>
->>> From 2e8fcea695a9eca67fbeb331d3104d1d9e7e337a Mon Sep 17 00:00:00 2001
->>> From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
->>> Date: Wed, 4 Oct 2017 09:49:41 +0000
->>> Subject: [PATCH] kvm: exit run loop after emulating IO when single stepping
->>> MIME-Version: 1.0
->>> Content-Type: text/plain; charset=UTF-8
->>> Content-Transfer-Encoding: 8bit
->>>
->>> If single-stepping is enabled we should exit the run-loop after
->>> emulating the access. Otherwise single-stepping across emulated IO
->>> accesses may skip an instruction.
->>>
->>> This only addresses user-space emulation. Stuff done in kernel-mode
->>> should be handled there.
->>>
->>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>> ---
->>>  accel/kvm/kvm-all.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/accel/kvm/kvm-all.c b/accel/kvm/kvm-all.c
->>> index 90c88b517d..85bcb2b0d4 100644
->>> --- a/accel/kvm/kvm-all.c
->>> +++ b/accel/kvm/kvm-all.c
->>> @@ -1940,7 +1940,7 @@ int kvm_cpu_exec(CPUState *cpu)
->>>                            run->io.direction,
->>>                            run->io.size,
->>>                            run->io.count);
->>> -            ret = 0;
->>> +            ret = cpu->singlestep_enabled ? EXCP_DEBUG : 0;
->>>              break;
->>>          case KVM_EXIT_MMIO:
->>>              DPRINTF("handle_mmio\n");
->>> @@ -1950,7 +1950,7 @@ int kvm_cpu_exec(CPUState *cpu)
->>>                               run->mmio.data,
->>>                               run->mmio.len,
->>>                               run->mmio.is_write);
->>> -            ret = 0;
->>> +            ret = cpu->singlestep_enabled ? EXCP_DEBUG : 0;
->>>              break;
->>>          case KVM_EXIT_IRQ_WINDOW_OPEN:
->>>              DPRINTF("irq_window_open\n");
+>>> I'm still unclear on this. Do you mean we look for a subnode with
+>>> reg=<0x14> and then assume it's a clock node and require the
+>>>  #clock-cells to be there,
 >>
->> Singlestep mode doesn't make much sense for KVM.  For TCG the purpose is
->> to build one-instruction translation blocks, but what would it mean for KVM?
+>> Yes that's how it's used. Presence of subnode with reg=0x14 indicates
+>> clock protocol and #clock-cells to indicate that it's clock provider
+>> expecting 1 parameter from consumer which is the clock identifier.
+>>
+>> or do we look through the sub-nodes to
+>>> find one with the #clock-cells property and then look up the 'reg'
+>>> property to find out which protocol number to use?
+>>>
+>>
+>> Not this way. Do you see any issues ?
 > 
-> It's used by the kvm_arch_handle_debug() code to verify single-stepping
-> is enabled when processing debug exceptions. And also kvm_update_debug:
+> We normally don't assume that a particular unit address implies
+> a specific function. Conventionally that would be done by matching
+> the "compatible" property instead.
 > 
->     if (cpu->singlestep_enabled) {
->         data.dbg.control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
->     }
+> What you do clearly works, but it's surprising to the reader.
 > 
-> We also have an aliased singlestep_enabled in our disas_context for the
-> translator.
+> 
+>>> I think the problem is the way we use the mailbox API in Linux, which
+>>> is completely abstract at the moment: it could be a pure doorbell, a
+>>> single-register for a data, some structured memory, or a
+>>> variable-length message. The assumption today is that the mailbox
+>>> user and the mailbox driver agree on the interpretation of that
+>>> void pointer.
+>>>
+>>
+>> Unfortunately true.
+>>
+>>> This breaks down here, as you require the message to be a
+>>> variable-length message in a fixed physical location, but assume that
+>>> the mailbox serves only as a doorbell.
+>>>
+>>
+>> Yes.
+>>
+>>> The solution might be to extend the mailbox API slightly, to
+>>> have explicit support for variable-length messages, and implement
+>>> support for that in either mailbox drivers or as an abstraction
+>>> on top of doorbell-type mailboxes.
+>>>
+>> I got the concept. But are you also suggesting that in bindings it shmem
+>> should be associated with mailbox controller rather than client ?
+> 
+> There are probably several ways of doing this better, we should see
+> what the best is we can come up with.
+> 
+> I think generally speaking we need a way for a mailbox user to
+> know what it should use as the mailbox data here, so it is
+> able to talk to different incompatible mailbox providers.
+> 
+> One idea I had is to use a nested mailbox driver, that turns
+> a doorbell or single-register styled mailbox into a variable-length
+> mailbox by adding a memory region, like
+> 
+>     mailbox at 1233000 {
+>         compatible = "vendor-hardware-specifc-id";
+>         interrupts = <34>;
+>         reg = <0x1233000 0x100>;
+>         #mbox-cells = <1>;
+>     };
+> 
+>     mailbox {
+>            compatible = "shmem-mailbox";
+>            mboxes = <&/mailbox@1233000  25>;
+>            #mbox-cells = <1>;
+>            shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+>     };
+> 
+> This would create one mailbox that only takes a register argument,
+> and another one that can take longer messages based on the first.
+> In your driver, you then refer to the second one and pass the
+> variable-length data into that directly.
 
-Nevermind, I was confusing cpu->singlestep_enabled with the "singlestep"
-global.
+1. IIUC it was intentional not to include shmem as part of mailbox
+   controller binding and was pushed to client drivers as it's generally
+   not part of mailbox IP block. I am not sure if there are any other
+   specific reasons for that, but I may be missing some facts.
 
-Paolo
+2. I am not sure if we need nested driver/bindings (at-least to begin
+   with). On a platform I don't think both/all modes will be used.
+   I had  proposal for adding doorbell for ARM MHU based on extended
+   bindings, but it was rejected[1]. But I really preferred that over
+   the shim layer I had to add in v3.
+
+--
+Regards,
+Sudeep
+
+[1] https://patchwork.kernel.org/patch/9745683/
