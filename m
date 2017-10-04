@@ -1,47 +1,43 @@
 From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 4 Oct 2017 10:48:16 +0200
-Subject: [PATCH v9 03/12] mm: deferred_init_memmap improvements
-In-Reply-To: <d81baa49-b796-7130-4ace-0f14ed59be46@oracle.com>
+Date: Wed, 4 Oct 2017 10:56:36 +0200
+Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
+In-Reply-To: <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
 References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-4-pasha.tatashin@oracle.com>
- <20171003125754.2kuqzkstywg7axhd@dhcp22.suse.cz>
- <fc4ef789-d9a8-5dab-6508-f0fe8751b462@oracle.com>
- <d81baa49-b796-7130-4ace-0f14ed59be46@oracle.com>
-Message-ID: <20171004084816.ljyw2gdf5gmgtm7z@dhcp22.suse.cz>
+ <20170920201714.19817-9-pasha.tatashin@oracle.com>
+ <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
+ <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
+Message-ID: <20171004085636.w2rnwf5xxhahzuy7@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 03-10-17 12:01:08, Pasha Tatashin wrote:
-> Hi Michal,
+On Tue 03-10-17 11:29:16, Pasha Tatashin wrote:
+> On 10/03/2017 09:18 AM, Michal Hocko wrote:
+> > On Wed 20-09-17 16:17:10, Pavel Tatashin wrote:
+> > > Some memory is reserved but unavailable: not present in memblock.memory
+> > > (because not backed by physical pages), but present in memblock.reserved.
+> > > Such memory has backing struct pages, but they are not initialized by going
+> > > through __init_single_page().
+> > 
+> > Could you be more specific where is such a memory reserved?
+> > 
 > 
-> Are you OK, if I replace DEFERRED_FREE() macro with a function like this:
-> 
-> /*
->  * Helper for deferred_init_range, free the given range, and reset the
->  * counters
->  */
-> static inline unsigned long __def_free(unsigned long *nr_free,
->                                        unsigned long *free_base_pfn,
->                                        struct page **page)
-> {
->         unsigned long nr = *nr_free;
-> 
->         deferred_free_range(*free_base_pfn, nr);
->         *free_base_pfn = 0;
->         *nr_free = 0;
->         *page = NULL;
-> 
->         return nr;
-> }
-> 
-> Since it is inline, and we operate with non-volatile counters, compiler will
-> be smart enough to remove all the unnecessary de-references. As a plus, we
-> won't be adding any new branches, and the code is still going to stay
-> compact.
+> I know of one example: trim_low_memory_range() unconditionally reserves from
+> pfn 0, but e820__memblock_setup() might provide the exiting memory from pfn
+> 1 (i.e. KVM).
 
-OK. It is a bit clunky but we are holding too much state there. I
-haven't checked whether that can be simplified but this can be always
-done later.
+Then just initialize struct pages for that mapping rigth there where a
+special API is used.
+
+> But, there could be more based on this comment from linux/page-flags.h:
+> 
+>  19  * PG_reserved is set for special pages, which can never be swapped out.
+> Some
+>  20  * of them might not even exist (eg empty_bad_page)...
+
+I have no idea wht empty_bad_page is but a quick grep shows that this is
+never used. I might be wrong here but if somebody is reserving a memory
+in a special way then we should handle the initialization right there.
+E.g. create an API for special memblock reservations.
 -- 
 Michal Hocko
 SUSE Labs
