@@ -1,65 +1,140 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Wed, 4 Oct 2017 20:23:34 +0300
-Subject: [Tee-dev] [PATCH v1 00/14] tee: optee: add dynamic shared memory
- support
-In-Reply-To: <c761d5d8-63f3-2a6e-145d-300260a362af@arm.com>
-References: <1506621851-6929-1-git-send-email-volodymyr_babchuk@epam.com>
- <c761d5d8-63f3-2a6e-145d-300260a362af@arm.com>
-Message-ID: <eedaf055-c529-dd20-98da-783e1cd73108@epam.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Oct 2017 18:29:56 +0100
+Subject: [PATCH v2 11/28] arm64/sve: Core task context handling
+In-Reply-To: <20171003111100.GQ3611@e103592.cambridge.arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-12-git-send-email-Dave.Martin@arm.com>
+ <20170913143325.hi4cfcajbts3bbao@localhost>
+ <20170914195555.GB24231@e103592.cambridge.arm.com>
+ <20170920135856.dfuowttwi4bk4nqb@localhost>
+ <20171003111100.GQ3611@e103592.cambridge.arm.com>
+Message-ID: <20171004172955.tyooqxdoo73iq66u@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stuart,
+On Tue, Oct 03, 2017 at 12:11:01PM +0100, Dave P Martin wrote:
+> On Wed, Sep 20, 2017 at 02:58:56PM +0100, Catalin Marinas wrote:
+> > On Thu, Sep 14, 2017 at 08:55:56PM +0100, Dave P Martin wrote:
+> > > On Wed, Sep 13, 2017 at 07:33:25AM -0700, Catalin Marinas wrote:
+> > > > On Thu, Aug 31, 2017 at 06:00:43PM +0100, Dave P Martin wrote:
+> > > > > +/*
+> > > > > + * Handle SVE state across fork():
+> > > > > + *
+> > > > > + * dst and src must not end up with aliases of the same sve_state.
+> > > > > + * Because a task cannot fork except in a syscall, we can discard SVE
+> > > > > + * state for dst here, so long as we take care to retain the FPSIMD
+> > > > > + * subset of the state if SVE is in use.  Reallocation of the SVE state
+> > > > > + * will be deferred until dst tries to use SVE.
+> > > > > + */
+> > > > > +void fpsimd_dup_sve(struct task_struct *dst, struct task_struct const *src)
+> > > > > +{
+> > > > > +	if (test_and_clear_tsk_thread_flag(dst, TIF_SVE)) {
+> > > > > +		WARN_ON(dst->mm && !in_syscall(task_pt_regs(dst)));
+> > > > > +		sve_to_fpsimd(dst);
+> > > > > +	}
+> > > > > +
+> > > > > +	dst->thread.sve_state = NULL;
+> > > > > +}
+> > > > 
+> > > > I first thought the thread flags are not visible in dst yet since
+> > > > dup_task_struct() calls arch_dup_task_struct() before
+> > > > setup_thread_stack(). However, at the end of the last year we enabled
+> > > > CONFIG_THREAD_INFO_IN_TASK_STRUCT. But I don't particularly like relying
+> > > > on this.
+> > > 
+> > > Hmmm, I see your point, but there are some sequencing issues here.
+> > > 
+> > > > Anyway, IIUC we don't need sve_to_fpsimd() here. The
+> > > > arch_dup_task_struct() already called fpsimd_preserve_current_state()
+> > > 
+> > > I consider SVE discard as an optional side effect of task_fpsimd_save(),
+> > > not something that is guaranteed to happen -- the decision about whether
+> > > to do so may become more intelligent later on.  So, for src, we may
+> > > discard SVE (because syscall), but for dst we must NULL .sve_state (and
+> > > therefore clear TIF_SVE) simply to avoid aliasing of src->sve_state and
+> > > dst->sve_state.
+> > 
+> > My point was that the SVE state of src is already preserved at this
+> > point and copied into dst. You don't need the sve_to_fpsimd(dst) again
+> > which basically does the same copying of the src SVE saved state into
+> > the FPSIMD one in dst. This has already been done in
+> > arch_dup_task_struct() by the combination of
+> > fpsimd_preserve_current_state() and *dst = *src (and, of course,
+> > clearing TIF_SVE in dst).
+> > 
+> > I don't think the TIF_SVE clearing in src is just a side effect of
+> > task_fpsimd_save() here but rather a requirement. When returning from
+> > fork(), both src and dst would need to have the same state. However,
+> > your fpsimd_dup_sve() implementation makes it very clear that the SVE
+> > state is lost in dst. This is only allowed if we also lose it in src (as
+> > a result of a syscall). So making dst->sve_state = NULL requires that
+> > TIF_SVE is also cleared in both src and dst. Alternatively, you'd have
+> > to allocate a new state here and copy the full src SVE state across to
+> > dst, together with setting TIF_SVE (that's not necessary, however, since
+> > we get here as a result of a syscall).
+> 
+> The currently intended ABI is that the SVE bits are unspecified after a
+> syscall, so it is legitimate (though perhaps surprising) for different
+> things to happen in dst and src.
+> 
+> This complicates things a lot though, just to avoid the next SVE usage
+> exception in src after the fork.
+> 
+> 
+> It should be simpler to do what you suggest and discard the SVE state of
+> src unconditionally before the copy: then we really are just cloning the
+> thread apart from the need to set dst->thread.sve_state to NULL.
+> 
+> fpsimd_preserve_current_state() does not necessarily write back to
+> current->thread.fpsmid_state though: at the moment, it does do this as a
+> side effect of task_fpsimd_save() because we happen to be in a syscall
+> (i.e., fork).  
+> 
+> What we really want is unconditional discarding of the state.  This
+> wasn't needed anywhere else yet, so there's no explicit helper for it.
+> But it makes sense to add one.
+> 
+> What about refactoring along these lines:
+> 
+> 
+> fpsimd.c:
+> /* Unconditionally discard the SVE state */
+> void task_sve_discard(struct task_struct *task)
+> {
+> 	if (!system_supports_sve())
+> 		return;
+> 
+> 	local_bh_disable();
+> 	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
+> 		sve_to_fpsimd(task);
+> 	local_bh_enable();
+> }
+> 
+> process.c:
+> int arch_dup_task_struct(sturct task_struct *dst, struct task_struct *src)
+> {
+> 	if (current->mm) {
+> 		fpsimd_preserve_current_state();
+> 		task_sve_discard(src);
+> 	}
+> 
+> 	*dst = *src;
+> 
+> 	dst->thread.sve_state = NULL;
+> }
+> 
+> 
+> This also avoids having to touch dst's thread flags, since now we
+> are just cloning the task except for assigning NULL to
+> dst->thread.sve_state.
 
-On 03.10.17 19:05, Stuart Yoder wrote:
-> 
-> 
-> On 9/28/17 1:03 PM, Volodymyr Babchuk wrote:
->> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
->>
->> This patch series enables dynamic shared memory support in the TEE
->> subsystem as a whole and in OP-TEE in particular.
->>
->> Global Platform TEE specification [1] allows client applications
->> to register part of own memory as a shared buffer between
->> application and TEE. This allows fast zero-copy communication between
->> TEE and REE. But current implementation of TEE in Linux does not support
->> this feature.
->>
->> Also, current implementation of OP-TEE transport uses fixed size
->> pre-shared buffer for all communications with OP-TEE OS. This is okay
->> in the most use cases. But this prevents use of OP-TEE in virtualized
->> environments, because:
->>   a) We can't share the same buffer between different virtual machines
->>   b) Physically contiguous memory as seen by VM can be non-contiguous
->>      in reality (and as seen by OP-TEE OS) due to second stage of
->>      MMU translation.
->>   c) Size of this pre-shared buffer is limited.
->>
->> So, first part of this patch series adds generic register/unregister
->> interface to tee subsystem. Next patches add necessary features
->> into OP-TEE driver, so it can use not only static pre-shared buffer,
->> but whole RAM to communicate with OP-TEE OS.
-> 
-> As is, the patch series enables dynamic shared memory, but keeps the
-> assumption that there must static shared memory as well.  In the case
-> of virtual machines this isn't what we want (at least that's the way
-> I see KVM working).
-Yep, but it is needed for backward compatibility. I can't guarantee, 
-that all devices will support dynamic shared memory. Also, hypervisor 
-(XEN on KVM) need to intercept all SMCs anyways. My intention was to 
-disable static memory buffer in TEE mediator inside hypervisor. 
-Hypervisor will trap OPTEE_SMC_GET_SHM_CONFIG call and return error on 
-NULL pointers, or something like that. This is my next step.
+This looks fine to me, the execution of task_sve_discard() is nearly a
+no-op with the current code.
 
-> The series substantially re-works optee_config_shm_memremap() and it
-> seems like it would not be that difficult to remove the assumptions that
-> there _must_ be static shared memory available.
-Yes, I'm agree. We can remove assumption that there must be static 
-shared region. But I think, this is not task for this patch series. This 
-patches only add generic feature, that can benefit all clients. I plan 
-to add virtualization-specific changes later.
-> ...I have some more specific comments on patch 12/14.
-> 
-> Thanks,
-> Stuart
+We still have some local_bh_disable/enable() calls, though I don't think
+it's worth optimising them now (e.g. having a
+fpsimd_preserve_current_state_and_discard_sve() function with a
+"sve_discard" argument to task_fpsimd_save() to force this). 
+
+-- 
+Catalin
