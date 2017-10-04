@@ -1,55 +1,57 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 04 Oct 2017 21:45:39 +1030
-Subject: [PATCH 2/2] ARM: dts: aspeed: Enable watchdog two
-In-Reply-To: <20171004091635.12499-3-joel@jms.id.au>
-References: <20171004091635.12499-1-joel@jms.id.au>
- <20171004091635.12499-3-joel@jms.id.au>
-Message-ID: <1507115739.5452.33.camel@aj.id.au>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 4 Oct 2017 12:18:59 +0100
+Subject: [PATCH v3 11/22] firmware: arm_scmi: add support for polling
+ based SCMI transfers
+In-Reply-To: <CAK8P3a2wRFif2zYKKmdcNm5wgbGdhqwLdA-YV7AX_0LmM+OiQQ@mail.gmail.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-12-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a2wRFif2zYKKmdcNm5wgbGdhqwLdA-YV7AX_0LmM+OiQQ@mail.gmail.com>
+Message-ID: <6b2f2e70-6d0f-e7e4-d130-cd384289eb1a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-10-04 at 19:46 +1030, Joel Stanley wrote:
-> The second watchdog is left running by u-boot in the common
-> configurations of the firmware shipped on ASPEED boards. Ensure a driver
-> is loaded so the system can succcessfully boot.
->?
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
 
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
-> ---
-> ?arch/arm/boot/dts/aspeed-g4.dtsi | 1 -
-> ?arch/arm/boot/dts/aspeed-g5.dtsi | 1 -
-> ?2 files changed, 2 deletions(-)
->?
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 5be2e6a39917..9bf84d2ba038 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -212,7 +212,6 @@
-> ?			wdt2: watchdog at 1e785020 {
-> ?				compatible = "aspeed,ast2400-wdt";
-> ?				reg = <0x1e785020 0x1c>;
-> -				status = "disabled";
-> ?			};
-> ?
-> ?			vuart: serial at 1e787000 {
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 71e1264b81aa..ca023e9ab0b8 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -256,7 +256,6 @@
-> ?			wdt2: watchdog at 1e785020 {
-> ?				compatible = "aspeed,ast2500-wdt";
-> ?				reg = <0x1e785020 0x20>;
-> -				status = "disabled";
-> ?			};
-> ?
-> ?			wdt3: watchdog at 1e785040 {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/e9d5f527/attachment.sig>
+On 04/10/17 12:13, Arnd Bergmann wrote:
+> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> It would be useful to have options to perform some SCMI transfers
+>> atomically by polling for the completion flag instead of interrupt
+>> driven. The SCMI specification has option to disable the interrupt and
+>> poll for the completion flag in the shared memory.
+>>
+>> This patch adds support for polling based SCMI transfers using that
+>> option. This might be used for uninterrupted/atomic DVFS operations
+>> from the scheduler context.
+> 
+> multi-millisecond timeouts from inside the scheduler sound like a
+> really bad idea. Could this maybe get changed to an asynchronous
+> operation?
+> 
+
+We already support asynchronous version. This is mainly to support fast
+DVFS switching done at context switch. I can reduce the timeouts to
+few uS as the whole idea of fast dvfs is we can't return or schedule out
+of this function. Typically the remote should see the request in < 10 uS
+and acknowledge it.
+
+>> +       if (xfer->hdr.poll_completion) {
+>> +               timeout = info->desc->max_rx_timeout_ms * 100;
+>> +               while (!scmi_xfer_poll_done(info, xfer) && timeout--)
+>> +                       udelay(10);
+> 
+> The timeout calculation is bad as well, since both the
+> scmi_xfer_poll_done() call and udelay() can take much longer
+> than the 10 microsecond delay that you use for the calculation.
+> 
+
+Ah, agreed. I will change it to few uS as that's what is expected.
+
+> If you want to do a timeout check like this, it should generally
+> be done using ktime_get()/ktime_add()/ktime_before().
+> 
+
+Good idea, will try to use that.
+
+-- 
+Regards,
+Sudeep
