@@ -1,56 +1,50 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 4 Oct 2017 16:04:10 +0200
-Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
-In-Reply-To: <d743668c-6b7e-1775-a5b8-d6e997537990@oracle.com>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-9-pasha.tatashin@oracle.com>
- <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
- <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
- <20171004085636.w2rnwf5xxhahzuy7@dhcp22.suse.cz>
- <9198a33d-cd40-dd70-4823-7f70c57ef9a2@oracle.com>
- <20171004125743.fm6mf2artbga76et@dhcp22.suse.cz>
- <d743668c-6b7e-1775-a5b8-d6e997537990@oracle.com>
-Message-ID: <20171004140410.2w2zf2gbutdxunir@dhcp22.suse.cz>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 4 Oct 2017 16:08:10 +0200
+Subject: [GIT PULL] STM32 DT fixes for v4.14
+Message-ID: <ec743780-6c16-ada9-3e0a-335758c989df@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 04-10-17 09:28:55, Pasha Tatashin wrote:
-> 
-> > I am not really familiar with the trim_low_memory_range code path. I am
-> > not even sure we have to care about it because nobody should be walking
-> > pfns outside of any zone.
-> 
-> According to commit comments first 4K belongs to BIOS, so I think the memory
-> exists but BIOS may or may not report it to Linux. So, reserve it to make
-> sure we never touch it.
+Hi Arnd, Kevin and Olof,
 
-Yes and that memory should be outside of any zones, no?
+Please consider this round of STM32 DT fixes for v4.14:
 
-> > I am worried that this patch adds a code which
-> > is not really used and it will just stay that way for ever because
-> > nobody will dare to change it as it is too obscure and not explained
-> > very well.
-> 
-> I could explain mine code better. Perhaps add more comments, and explain
-> when it can be removed?
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-More explanation would be definitely helpful
+   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
 
-> > trim_low_memory_range is a good example of this. Why do we
-> > even reserve this range from the memory block allocator? The memory
-> > shouldn't be backed by any real memory and thus not in the allocator in
-> > the first place, no?
-> > 
-> 
-> Since it is not enforced in memblock that everything in reserved list must
-> be part of memory list, we can have it, and we need to make sure kernel does
-> not panic. Otherwise, it is very hard to detect such bugs.
+are available in the git repository at:
 
-So, should we report such a memblock reservation API (ab)use to the log?
-Are you actually sure that trim_low_memory_range is doing a sane and
-really needed thing? In other words do we have a zone which contains
-this no-memory backed pfns?
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-dt-fixes-for-v4.14
 
--- 
-Michal Hocko
-SUSE Labs
+for you to fetch changes up to 2aaae13a9db7897a007c5d7bb46cacfb37dffacd:
+
+   ARM: dts: stm32: use right pinctrl compatible for stm32f469 
+(2017-10-04 15:34:48 +0200)
+
+----------------------------------------------------------------
+STM32 fixes for v4.14:
+---------------------
+
+-Fix STMPE1600 bindings for stm32429i-eval board
+-Use right compatible for stm32f469 pinctrl. It implies to use
+pinctrl dedicated files for F4 SoCs.
+
+----------------------------------------------------------------
+Alexandre Torgue (2):
+       ARM: dts: stm32: Fix STMPE1600 binding on stm32429i-eval board
+       ARM: dts: stm32: use right pinctrl compatible for stm32f469
+
+  arch/arm/boot/dts/stm32429i-eval.dts     |   5 +-
+  arch/arm/boot/dts/stm32f4-pinctrl.dtsi   | 343 
++++++++++++++++++++++++++++++++
+  arch/arm/boot/dts/stm32f429-disco.dts    |   1 +
+  arch/arm/boot/dts/stm32f429-pinctrl.dtsi |  95 +++++++++
+  arch/arm/boot/dts/stm32f429.dtsi         | 297 --------------------------
+  arch/arm/boot/dts/stm32f469-disco.dts    |   1 +
+  arch/arm/boot/dts/stm32f469-pinctrl.dtsi |  96 +++++++++
+  7 files changed, 538 insertions(+), 300 deletions(-)
+  create mode 100644 arch/arm/boot/dts/stm32f4-pinctrl.dtsi
+  create mode 100644 arch/arm/boot/dts/stm32f429-pinctrl.dtsi
+  create mode 100644 arch/arm/boot/dts/stm32f469-pinctrl.dtsi
