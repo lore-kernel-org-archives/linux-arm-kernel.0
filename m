@@ -1,139 +1,86 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 14:53:24 +0100
-Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
- <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
- <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
-Message-ID: <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 4 Oct 2017 15:02:59 +0100
+Subject: defconfig'ed v4.13 does not boot on ThunderX
+In-Reply-To: <20171004134414.GF23092@leverpostej>
+References: <135495b6-e13e-5c90-6130-addb60d0fa5c@riken.jp>
+ <dfecaf11-d133-91c2-c630-0b08356cebd9@arm.com>
+ <20171004134414.GF23092@leverpostej>
+Message-ID: <db08ee33-5e54-5c9a-d265-14155b72b5ad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/10/17 13:35, Arnd Bergmann wrote:
-> On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Arnd,
->>
->> Thanks for taking a look at this.
->>
->> On 04/10/17 11:50, Arnd Bergmann wrote:
->>> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>> +
->>>> +The SCMI is intended to allow agents such as OSPM to manage various functions
->>>> +that are provided by the hardware platform it is running on, including power
->>>> +and performance functions.
->>>> +
->>>> +This binding is intended to define the interface the firmware implementing
->>>> +the SCMI as described in ARM document number ARM DUI 0922B ("ARM System Control
->>>> +and Management Interface Platform Design Document")[0] provide for OSPM in
->>>> +the device tree.
->>>> +
->>>> +Required properties:
->>>> +
->>>> +The scmi node with the following properties shall be under the /firmware/ node.
->>>> +
->>>> +- compatible : shall be "arm,scmi"
->>>> +- mboxes: List of phandle and mailbox channel specifiers. It should contain
->>>> +         exactly one or two mailboxes, one for transmitting messages("tx")
->>>> +         and another optional for receiving the notifications("rx") if
->>>> +         supported.
->>>> +- mbox-names: shall be "tx" or "rx"
+On 04/10/17 14:44, Mark Rutland wrote:
+> On Wed, Oct 04, 2017 at 02:38:58PM +0100, Robin Murphy wrote:
+>> On 04/10/17 08:25, Itaru Kitayama wrote:
+>>> Hi,
 >>>
->>> The example below does not have the mbox-names property. If you require
->>> exactly two mailboxes, why do you need the names anyway?
+>>> defconfig'ed kernel v4.13 does not boot on ThunderX, leaving only
+>>> messages below:
 >>>
+>>> EFI stub: Booting Linux Kernel...
+>>> EFI stub: Using DTB from configuration table
+>>> EFI stub: Exiting boot services and installing virtual address map...
+>>>
+>>> Our HW is by GIGABYTE, the model is R150 T62 rev 100:
+>>>
+>>> http://b2b.gigabyte.com/ARM-Server/R150-T62-rev-100#ov
+>>>
+>>> The BIOS we're on is T43. Has anyone testing upstream kernels seen a
+>>> similar issue like this?
 >>
->> Good question. I can drop it, but would like to keep in case we need to
->> extend it in future. We can always use then to identify.
+>> FWIW defconfig does *not* enable most of the ThunderX drivers (most
+>> importantly, PCI and networking will be missing).
 > 
-> I don't think it's necessary, as long you always need to have the first two,
-> but it doesn't hurt either.
->
-> Just make the description match the example.
+> .... it's a bit worrying if earlycon doesn't work without those, though.
+> It shouldn't be dependendent on either. :/
+
+Well, my earlycon was fine too, but that was an a different board with
+different firmware, so who knows...
+
+>> I've just built the v4.13 tag with the appropriate drivers added and
+>> booted it on a different ThunderX box - the net core throws some
+>> warnings from __dev_xdp_attached() but it gets to userspace OK for me.
 > 
+> Given these seem to exist out in the field, we should probably enable
+> those drivers in defconfig.
 
-Sure.
+True, I think the below ought to suffice - arm-soc take defconfig
+patches now, right?
 
->>> However, your example does have a #addresss-cells/#size-cells
->>> property that are not documented here. Please add them here as either
->>> optional or required, and describe what the permitted values are and
->>> how the address is interpreted.
->>>
->>
->> Ah right, I didn't notice that. I will add it. It was added to provide
->> the protocol number in "reg" property.
-> ...
->>> How does the OS identify the fact that a subnode uses the clock binding?
->>> Do you need to look for the #clock-cells property, or is this based on the
->>> unit address?
->>>
->>
->> Yes it depends on #clock-cells property. That's the main reason for
->> adding #clock-cells
-> 
-> I'm still unclear on this. Do you mean we look for a subnode with
-> reg=<0x14> and then assume it's a clock node and require the
->  #clock-cells to be there, 
+Robin.
 
-Yes that's how it's used. Presence of subnode with reg=0x14 indicates
-clock protocol and #clock-cells to indicate that it's clock provider
-expecting 1 parameter from consumer which is the clock identifier.
+----->8-----
+From: Robin Murphy <robin.murphy@arm.com>
+Subject: [PATCH] arm64: Add ThunderX drivers to defconfig
 
-or do we look through the sub-nodes to
-> find one with the #clock-cells property and then look up the 'reg'
-> property to find out which protocol number to use?
-> 
+ThunderX needs its PCI host drivers to do anything useful, and it's
+probably helpful to have networking by default too.
 
-Not this way. Do you see any issues ?
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
->>>> +- shmem : List of phandle pointing to the shared memory(SHM) area as per
->>>> +         generic mailbox client binding.
->>>> +
->>>> +See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
->>>> +about the generic mailbox controller and client driver bindings.
->>>> +
->>>> +The mailbox is the only permitted method of calling the SCMI firmware.
->>>> +Mailbox doorbell is used as a mechanism to alert the presence of a
->>>> +messages and/or notification.
->>>
->>> This looks odd: why not make the message itself part of the mailbox
->>> protocol here, and leave the shmem as a implementation detail of the
->>> mailbox driver?
->>>
->>
->> I am not sure if I follow you here. But generally shmem can be memory
->> carved out of anything in the system and it's dependent on the protocol
->> and the remote firmware rather than the mailbox hardware itself.
-> 
-> I think the problem is the way we use the mailbox API in Linux, which
-> is completely abstract at the moment: it could be a pure doorbell, a
-> single-register for a data, some structured memory, or a
-> variable-length message. The assumption today is that the mailbox
-> user and the mailbox driver agree on the interpretation of that
-> void pointer.
-> 
-
-Unfortunately true.
-
-> This breaks down here, as you require the message to be a
-> variable-length message in a fixed physical location, but assume that
-> the mailbox serves only as a doorbell.
-> 
-
-Yes.
-
-> The solution might be to extend the mailbox API slightly, to
-> have explicit support for variable-length messages, and implement
-> support for that in either mailbox drivers or as an abstraction
-> on top of doorbell-type mailboxes.
-> 
-I got the concept. But are you also suggesting that in bindings it shmem
-should be associated with mailbox controller rather than client ?
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 34480e9af2e7..1c8e0d77deee 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -76,6 +76,8 @@ CONFIG_PCIE_RCAR=y
+ CONFIG_PCIE_ROCKCHIP=m
+ CONFIG_PCI_HOST_GENERIC=y
+ CONFIG_PCI_XGENE=y
++CONFIG_PCI_HOST_THUNDER_PEM=y
++CONFIG_PCI_HOST_THUNDER_ECAM=y
+ CONFIG_ARM64_VA_BITS_48=y
+ CONFIG_SCHED_MC=y
+ CONFIG_NUMA=y
+@@ -188,6 +190,7 @@ CONFIG_VIRTIO_NET=y
+ CONFIG_AMD_XGBE=y
+ CONFIG_NET_XGENE=y
+ CONFIG_MACB=y
++CONFIG_THUNDER_NIC_PF=y
+ CONFIG_HNS_DSAF=y
+ CONFIG_HNS_ENET=y
+ CONFIG_E1000E=y
 -- 
-Regards,
-Sudeep
+2.13.4.dirty
