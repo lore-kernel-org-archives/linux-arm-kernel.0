@@ -1,54 +1,55 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Wed, 4 Oct 2017 11:46:24 -0700
-Subject: [GIT PULL] Reset controller fixes for v4.14
-In-Reply-To: <20171004011003.ae5r55dttjtxrvlj@localhost>
-References: <1506010379.10081.15.camel@pengutronix.de>
- <20171004011003.ae5r55dttjtxrvlj@localhost>
-Message-ID: <fc2949d7-c038-1ac7-d93d-d2c645f5022d@synopsys.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Wed, 4 Oct 2017 20:50:03 +0200
+Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
+ scpi_probe
+In-Reply-To: <6ece57aa-81e0-c984-5eac-a0b54aa0d625@arm.com>
+References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+ <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
+ <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
+ <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
+ <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
+ <ffb9c571-edd3-7ea0-ecf6-f72c2ddd9fc1@gmail.com>
+ <e34ca682-aa86-4057-cf29-172ff5764d07@arm.com>
+ <106745da-1027-5760-de51-7a74c033964b@gmail.com>
+ <6ece57aa-81e0-c984-5eac-a0b54aa0d625@arm.com>
+Message-ID: <486a06bc-6bb8-d8e8-29b3-bd959afd2326@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On 10/03/2017 06:10 PM, Olof Johansson wrote:
-> On Thu, Sep 21, 2017 at 06:12:59PM +0200, Philipp Zabel wrote:
->> Dear arm-soc-maintainers,
->>
->> please consider merging this tag for v4.14. It removes the "v1" suffix
->> from the newly merged HSDK reset driver, fixes its Kconfig dependencies,
->> and adds back the DT binding documentation that I accidentally dropped
->> onto the floor when applying the original patch.
->>
->> regards
->> Philipp
->>
->> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
->>
->>    Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.14
->>
->> for you to fetch changes up to 544e3bf4f0e8278400f19ca7918a3cdf2548b4eb:
->>
->>    reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST (2017-09-21 12:44:01 +0200)
->>
->> ----------------------------------------------------------------
->> Reset controller fixes for v4.14
->>
->> - Remove misleading HSDK v1 suffix, as there is no v2 planned
->> - Add missing DT binding documentation for HSDK reset driver
->> - Fix HSDK reset driver dependencies
+Am 04.10.2017 um 12:10 schrieb Sudeep Holla:
 > 
-> Merged, thanks.
-
-What's the tentative plan for this hitting mainline since I have pending ARC HSDK 
-DT changes to use the new DT binding. If it is not goign to be 4.14-rc4, is it OK 
-for me to pull this branch into ARC tree as well and send to Linus' way before 
-armsoc pull request. Does it matter if Linux gets same changes via 2 tree !
-
-P.S. Consider this no-ob question since I don't use merge commits in my typical 
-workflow !
-
--Vineet
+> 
+> On 03/10/17 19:19, Heiner Kallweit wrote:
+>> Am 03.10.2017 um 18:18 schrieb Sudeep Holla:
+>>>
+>>>
+>>> On 03/10/17 17:00, Heiner Kallweit wrote:
+> 
+> [...]
+> 
+>>>>>>
+>>>>>> Remove does for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
+>>>>>> and therefore stops at the first unpopulated domain and doesn't free
+>>>>>> the memory for further populated domains. I'll provide a patch for
+>>>>>> it.
+>>>>>>
+>>>>>
+>>>>> Does that mean you are re-introducing scpi_remove ? I kind of liked
+>>>>> removing it.
+>>>>>
+>>>> Sorry for the confusion. Then I'll go with the original approach and
+>>>> just make sure that errors whilst populating dvfs info are ignored.
+>>>>
+>>>
+>>> Indeed.
+>>>
+>>> If you are fine with the below fixup, then I can add it myself. Let me know.
+>>>
+>> Fine with me.
+> 
+> Thanks for confirming, pushed now[1]. Can you please double check if
+> possible.
+> 
+Compiles and works fine here.
+By the way, I have three more small patches which I think are improvements (YMMV).
+Will submit them later today.
