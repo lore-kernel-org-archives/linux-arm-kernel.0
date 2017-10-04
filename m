@@ -1,101 +1,167 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Oct 2017 16:17:39 +0200
-Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
- <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
- <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
- <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
-Message-ID: <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Oct 2017 15:17:40 +0100
+Subject: [PATCH v8 2/5] ACPI/IORT: Add msi address regions reservation
+ helper
+In-Reply-To: <20170927133241.21036-3-shameerali.kolothum.thodi@huawei.com>
+References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
+ <20170927133241.21036-3-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <001729e8-7b34-0bb4-8af6-8af100661906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 4, 2017 at 3:53 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 04/10/17 13:35, Arnd Bergmann wrote:
->> On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On 27/09/17 14:32, Shameer Kolothum wrote:
+> On some platforms msi parent address regions have to be excluded from
+> normal IOVA allocation in that they are detected and decoded in a HW
+> specific way by system components and so they cannot be considered normal
+> IOVA address space.
+> 
+> Add a helper function that retrieves ITS address regions - the msi
+> parent - through IORT device <-> ITS mappings and reserves it so that
+> these regions will not be translated by IOMMU and will be excluded from
+> IOVA allocations.
+> 
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> [lorenzo.pieralisi at arm.com: updated commit log/added comments]
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  drivers/acpi/arm64/iort.c        | 96 ++++++++++++++++++++++++++++++++++++++--
+>  drivers/irqchip/irq-gic-v3-its.c |  3 +-
+>  include/linux/acpi_iort.h        |  7 ++-
+>  3 files changed, 101 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 9565d57..14efa9d 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -39,6 +39,7 @@
+>  struct iort_its_msi_chip {
+>  	struct list_head	list;
+>  	struct fwnode_handle	*fw_node;
+> +	phys_addr_t		base_addr;
+>  	u32			translation_id;
+>  };
+>  
+> @@ -136,14 +137,16 @@ typedef acpi_status (*iort_find_node_callback)
+>  static DEFINE_SPINLOCK(iort_msi_chip_lock);
+>  
+>  /**
+> - * iort_register_domain_token() - register domain token and related ITS ID
+> - * to the list from where we can get it back later on.
+> + * iort_register_domain_token() - register domain token along with related
+> + * ITS ID and base address to the list from where we can get it back later on.
+>   * @trans_id: ITS ID.
+> + * @base: ITS base address.
+>   * @fw_node: Domain token.
+>   *
+>   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+>   */
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node)
+>  {
+>  	struct iort_its_msi_chip *its_msi_chip;
+>  
+> @@ -153,6 +156,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+>  
+>  	its_msi_chip->fw_node = fw_node;
+>  	its_msi_chip->translation_id = trans_id;
+> +	its_msi_chip->base_addr = base;
+>  
+>  	spin_lock(&iort_msi_chip_lock);
+>  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+> @@ -481,6 +485,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+>  	return -ENODEV;
+>  }
+>  
+> +static int __maybe_unused iort_find_its_base(u32 its_id, phys_addr_t *base)
+> +{
+> +	struct iort_its_msi_chip *its_msi_chip;
+> +	bool match = false;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
+> +		if (its_msi_chip->translation_id == its_id) {
+> +			*base = its_msi_chip->base_addr;
+> +			match = true;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_msi_chip_lock);
+> +
+> +	return match ? 0 : -ENODEV;
+> +}
+> +
+>  /**
+>   * iort_dev_find_its_id() - Find the ITS identifier for a device
+>   * @dev: The device.
+> @@ -639,6 +661,72 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+>  
+>  	return err;
+>  }
+> +
+> +/**
+> + * iort_iommu_msi_get_resv_regions - Reserved region driver helper
+> + * @dev: Device from iommu_get_resv_regions()
+> + * @head: Reserved region list from iommu_get_resv_regions()
+> + *
+> + * Returns: Number of reserved regions on success (0 if no associated msi
+> + *          regions), appropriate error value otherwise. The ITS regions
+> + *          associated with the device are the msi reserved regions.
+> + */
+> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
+> +{
+> +	struct acpi_iort_its_group *its;
+> +	struct acpi_iort_node *node, *its_node = NULL;
+> +	int i, resv = 0;
+> +
+> +	node = iort_find_dev_node(dev);
+> +	if (!node)
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * Current logic to reserve ITS regions relies on HW topologies
+> +	 * where a given PCI or named component maps its IDs to only one
+> +	 * ITS group; if a PCI or named component can map its IDs to
+> +	 * different ITS groups through IORT mappings this function has
+> +	 * to be reworked to ensure we reserve regions for all ITS groups
+> +	 * a given PCI or named component may map IDs to.
+> +	 */
+> +	if (dev_is_pci(dev)) {
+> +		u32 rid;
+> +
+> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
+> +		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
+> +	} else {
+> +		for (i = 0; i < node->mapping_count; i++) {
+> +			its_node = iort_node_map_platform_id(node, NULL,
+> +							 IORT_MSI_TYPE, i);
+> +			if (its_node)
+> +				break;
+> +		}
+> +	}
+> +
+> +	if (!its_node)
+> +		return 0;
+> +
+> +	/* Move to ITS specific data */
+> +	its = (struct acpi_iort_its_group *)its_node->node_data;
+> +
+> +	for (i = 0; i < its->its_count; i++) {
+> +		phys_addr_t base;
+> +
+> +		if (!iort_find_its_base(its->identifiers[i], &base)) {
+> +			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +			struct iommu_resv_region *region;
+> +
+> +			region = iommu_alloc_resv_region(base, SZ_128K, prot,
+> +							 IOMMU_RESV_MSI);
 
->>>
->>> Yes it depends on #clock-cells property. That's the main reason for
->>> adding #clock-cells
->>
->> I'm still unclear on this. Do you mean we look for a subnode with
->> reg=<0x14> and then assume it's a clock node and require the
->>  #clock-cells to be there,
->
-> Yes that's how it's used. Presence of subnode with reg=0x14 indicates
-> clock protocol and #clock-cells to indicate that it's clock provider
-> expecting 1 parameter from consumer which is the clock identifier.
->
-> or do we look through the sub-nodes to
->> find one with the #clock-cells property and then look up the 'reg'
->> property to find out which protocol number to use?
->>
->
-> Not this way. Do you see any issues ?
+Same as the OF part: I strongly object to reserving the whole 128kB
+range. What we really care about is the second 64kB page, and that is
+what should get reserved.
 
-We normally don't assume that a particular unit address implies
-a specific function. Conventionally that would be done by matching
-the "compatible" property instead.
+Thanks,
 
-What you do clearly works, but it's surprising to the reader.
-
-
->> I think the problem is the way we use the mailbox API in Linux, which
->> is completely abstract at the moment: it could be a pure doorbell, a
->> single-register for a data, some structured memory, or a
->> variable-length message. The assumption today is that the mailbox
->> user and the mailbox driver agree on the interpretation of that
->> void pointer.
->>
->
-> Unfortunately true.
->
->> This breaks down here, as you require the message to be a
->> variable-length message in a fixed physical location, but assume that
->> the mailbox serves only as a doorbell.
->>
->
-> Yes.
->
->> The solution might be to extend the mailbox API slightly, to
->> have explicit support for variable-length messages, and implement
->> support for that in either mailbox drivers or as an abstraction
->> on top of doorbell-type mailboxes.
->>
-> I got the concept. But are you also suggesting that in bindings it shmem
-> should be associated with mailbox controller rather than client ?
-
-There are probably several ways of doing this better, we should see
-what the best is we can come up with.
-
-I think generally speaking we need a way for a mailbox user to
-know what it should use as the mailbox data here, so it is
-able to talk to different incompatible mailbox providers.
-
-One idea I had is to use a nested mailbox driver, that turns
-a doorbell or single-register styled mailbox into a variable-length
-mailbox by adding a memory region, like
-
-    mailbox at 1233000 {
-        compatible = "vendor-hardware-specifc-id";
-        interrupts = <34>;
-        reg = <0x1233000 0x100>;
-        #mbox-cells = <1>;
-    };
-
-    mailbox {
-           compatible = "shmem-mailbox";
-           mboxes = <&/mailbox@1233000  25>;
-           #mbox-cells = <1>;
-           shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
-    };
-
-This would create one mailbox that only takes a register argument,
-and another one that can take longer messages based on the first.
-In your driver, you then refer to the second one and pass the
-variable-length data into that directly.
-
-        Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
