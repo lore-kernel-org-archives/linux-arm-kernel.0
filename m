@@ -1,102 +1,51 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Wed, 4 Oct 2017 21:00:39 +0200
-Subject: [PATCH 2/3] firmware: arm_scpi: improve handling of protocol and
- firmware version subfields
+Date: Wed, 4 Oct 2017 21:05:17 +0200
+Subject: [PATCH 3/3] firmware: arm_scpi: improve struct sensor_value
 In-Reply-To: <16d1cd8c-e124-cc94-ca29-d7cb04ff26d9@gmail.com>
 References: <16d1cd8c-e124-cc94-ca29-d7cb04ff26d9@gmail.com>
-Message-ID: <54b28f23-d650-5f74-7fb9-499864f57bc3@gmail.com>
+Message-ID: <39b87656-dd9f-b24f-db41-5253d3a878ef@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By using FIELD_GET and proper masks we can avoid quite some shifting
-and masking macro magic and make the code better readable.
+lo_val and hi_val together in this order are a little endian 64 bit value.
+Therefore we can simplify struct sensor_value and the code by defining
+it as a __le64 value and by using le64_to_cpu.
 
 Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 ---
- drivers/firmware/arm_scpi.c | 43 +++++++++++++++++++------------------------
- 1 file changed, 19 insertions(+), 24 deletions(-)
+ drivers/firmware/arm_scpi.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 412f1c4c..d305b926 100644
+index d305b926..c923d1eb 100644
 --- a/drivers/firmware/arm_scpi.c
 +++ b/drivers/firmware/arm_scpi.c
-@@ -28,6 +28,7 @@
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+@@ -347,9 +347,8 @@ struct _scpi_sensor_info {
+ };
  
- #include <linux/bitmap.h>
-+#include <linux/bitfield.h>
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/export.h>
-@@ -73,18 +74,12 @@
- #define MAX_DVFS_DOMAINS	8
- #define MAX_DVFS_OPPS		16
+ struct sensor_value {
+-	__le32 lo_val;
+-	__le32 hi_val;
+-} __packed;
++	__le64 val;
++};
  
--#define PROTOCOL_REV_MINOR_BITS	16
--#define PROTOCOL_REV_MINOR_MASK	((1U << PROTOCOL_REV_MINOR_BITS) - 1)
--#define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
--#define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
-+#define PROTO_REV_MAJOR_MASK	GENMASK(31, 16)
-+#define PROTO_REV_MINOR_MASK	GENMASK(15, 0)
+ struct dev_pstate_set {
+ 	__le16 dev_id;
+@@ -785,11 +784,10 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
+ 		return ret;
  
--#define FW_REV_MAJOR_BITS	24
--#define FW_REV_MINOR_BITS	16
--#define FW_REV_PATCH_MASK	((1U << FW_REV_MINOR_BITS) - 1)
--#define FW_REV_MINOR_MASK	((1U << FW_REV_MAJOR_BITS) - 1)
--#define FW_REV_MAJOR(x)		((x) >> FW_REV_MAJOR_BITS)
--#define FW_REV_MINOR(x)		(((x) & FW_REV_MINOR_MASK) >> FW_REV_MINOR_BITS)
--#define FW_REV_PATCH(x)		((x) & FW_REV_PATCH_MASK)
-+#define FW_REV_MAJOR_MASK	GENMASK(31, 24)
-+#define FW_REV_MINOR_MASK	GENMASK(23, 16)
-+#define FW_REV_PATCH_MASK	GENMASK(15, 0)
+ 	if (scpi_info->is_legacy)
+-		/* only 32-bits supported, hi_val can be junk */
+-		*val = le32_to_cpu(buf.lo_val);
++		/* only 32-bits supported, upper 32 bits can be junk */
++		*val = le32_to_cpup((__le32 *)&buf.val);
+ 	else
+-		*val = (u64)le32_to_cpu(buf.hi_val) << 32 |
+-			le32_to_cpu(buf.lo_val);
++		*val = le64_to_cpu(buf.val);
  
- #define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
- 
-@@ -867,19 +862,19 @@ static int scpi_init_versions(struct scpi_drvinfo *info)
- static ssize_t protocol_version_show(struct device *dev,
- 				     struct device_attribute *attr, char *buf)
- {
--	return sprintf(buf, "%d.%d\n",
--		       PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
--		       PROTOCOL_REV_MINOR(scpi_info->protocol_version));
-+	return sprintf(buf, "%lu.%lu\n",
-+		FIELD_GET(PROTO_REV_MAJOR_MASK, scpi_info->protocol_version),
-+		FIELD_GET(PROTO_REV_MINOR_MASK, scpi_info->protocol_version));
+ 	return 0;
  }
- static DEVICE_ATTR_RO(protocol_version);
- 
- static ssize_t firmware_version_show(struct device *dev,
- 				     struct device_attribute *attr, char *buf)
- {
--	return sprintf(buf, "%d.%d.%d\n",
--		       FW_REV_MAJOR(scpi_info->firmware_version),
--		       FW_REV_MINOR(scpi_info->firmware_version),
--		       FW_REV_PATCH(scpi_info->firmware_version));
-+	return sprintf(buf, "%lu.%lu.%lu\n",
-+		     FIELD_GET(FW_REV_MAJOR_MASK, scpi_info->firmware_version),
-+		     FIELD_GET(FW_REV_MINOR_MASK, scpi_info->firmware_version),
-+		     FIELD_GET(FW_REV_PATCH_MASK, scpi_info->firmware_version));
- }
- static DEVICE_ATTR_RO(firmware_version);
- 
-@@ -1021,12 +1016,12 @@ static int scpi_probe(struct platform_device *pdev)
- 
- 	scpi_dvfs_populate(dev);
- 
--	_dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
--		  PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
--		  PROTOCOL_REV_MINOR(scpi_info->protocol_version),
--		  FW_REV_MAJOR(scpi_info->firmware_version),
--		  FW_REV_MINOR(scpi_info->firmware_version),
--		  FW_REV_PATCH(scpi_info->firmware_version));
-+	_dev_info(dev, "SCP Protocol %lu.%lu Firmware %lu.%lu.%lu version\n",
-+		  FIELD_GET(PROTO_REV_MAJOR_MASK, scpi_info->protocol_version),
-+		  FIELD_GET(PROTO_REV_MINOR_MASK, scpi_info->protocol_version),
-+		  FIELD_GET(FW_REV_MAJOR_MASK, scpi_info->firmware_version),
-+		  FIELD_GET(FW_REV_MINOR_MASK, scpi_info->firmware_version),
-+		  FIELD_GET(FW_REV_PATCH_MASK, scpi_info->firmware_version));
- 
- 	ret = devm_device_add_groups(dev, versions_groups);
- 	if (ret)
 -- 
 2.14.2
