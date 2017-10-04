@@ -1,48 +1,48 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 04 Oct 2017 17:03:58 +0800
-Subject: [PATCH v3 1/2] dt-bindings: add device tree binding for Allwinner
- XR819 SDIO Wi-Fi
-In-Reply-To: <871smjxp46.fsf@kamboji.qca.qualcomm.com>
-References: <20171003165944.13056-1-icenowy@aosc.io>
- <20171003165944.13056-2-icenowy@aosc.io>
- <871smjxp46.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <E46F3A20-294A-497E-AF71-C77A67AFDB8C@aosc.io>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 4 Oct 2017 17:08:08 +0800
+Subject: [PATCH v4 03/10] kexec_file: factor out arch_kexec_kernel_*()
+ from x86, powerpc
+In-Reply-To: <20171002061431.11117-4-takahiro.akashi@linaro.org>
+Message-ID: <201710041658.Ukz7Eof0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi AKASHI,
 
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.14-rc3 next-20170929]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-? 2017?10?4? GMT+08:00 ??5:02:17, Kalle Valo <kvalo@codeaurora.org> ??:
->Icenowy Zheng <icenowy@aosc.io> writes:
->
->> Allwinner XR819 is a SDIO Wi-Fi chip, which has the functionality to
->use
->> an out-of-band interrupt pin instead of SDIO in-band interrupt.
->>
->> Add the device tree binding of this chip, in order to make it
->possible
->> to add this interrupt pin to device trees.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->> Changes in v3:
->> - Renames the node name.
->> - Adds ACK from Rob.
->> Changes in v2:
->> - Removed status property in example.
->> - Added required property reg.
->>
->>  .../bindings/net/wireless/allwinner,xr819.txt      | 38
->++++++++++++++++++++++
->>  1 file changed, 38 insertions(+)
->>  create mode 100644
->Documentation/devicetree/bindings/net/wireless/allwinner,xr819.txt
->
->Like I asked already last time, AFAICS there is no upstream xr819
->wireless driver in drivers/net/wireless directory. Do we still accept
->bindings like this for out-of-tree drivers?
+url:    https://github.com/0day-ci/linux/commits/AKASHI-Takahiro/arm64-kexec-add-kexec_file_load-support/20171004-163130
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: x86_64-randconfig-x000-201740 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-See esp8089.
+All errors (new ones prefixed by >>):
 
-There's also no in-tree driver for it.
+>> arch/x86/kernel/kexec-bzimage64.c:541:29: error: conflicting type qualifiers for 'kexec_bzImage64_ops'
+    const struct kexec_file_ops kexec_bzImage64_ops = {
+                                ^~~~~~~~~~~~~~~~~~~
+   In file included from arch/x86/kernel/kexec-bzimage64.c:29:0:
+   arch/x86/include/asm/kexec-bzimage64.h:4:30: note: previous declaration of 'kexec_bzImage64_ops' was here
+    extern struct kexec_file_ops kexec_bzImage64_ops;
+                                 ^~~~~~~~~~~~~~~~~~~
+
+vim +/kexec_bzImage64_ops +541 arch/x86/kernel/kexec-bzimage64.c
+
+   540	
+ > 541	const struct kexec_file_ops kexec_bzImage64_ops = {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 27479 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/8a75116f/attachment-0001.gz>
