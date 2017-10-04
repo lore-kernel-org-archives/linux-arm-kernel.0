@@ -1,22 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Oct 2017 18:10:03 -0700
-Subject: [GIT PULL] Reset controller fixes for v4.14
-In-Reply-To: <1506010379.10081.15.camel@pengutronix.de>
-References: <1506010379.10081.15.camel@pengutronix.de>
-Message-ID: <20171004011003.ae5r55dttjtxrvlj@localhost>
+Date: Tue, 3 Oct 2017 18:11:59 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.14 (#1)
+In-Reply-To: <87wp4rksln.fsf@free-electrons.com>
+References: <87wp4rksln.fsf@free-electrons.com>
+Message-ID: <20171004011159.rjoecyhyfuor7afz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 21, 2017 at 06:12:59PM +0200, Philipp Zabel wrote:
-> Dear arm-soc-maintainers,
+On Fri, Sep 22, 2017 at 11:09:08AM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> please consider merging this tag for v4.14. It removes the "v1" suffix
-> from the newly merged HSDK reset driver, fixes its Kconfig dependencies,
-> and adds back the DT binding documentation that I accidentally dropped
-> onto the floor when applying the original patch.
+> Here is the first pull request for fixes for mvebu for v4.14.
 > 
-> regards
-> Philipp
+> The MAINTAINER patch should have been merged but I missed it when I
+> rebased my arm64 branch on v4.13-rc1. I move it in the fixes branche
+> because it is always good to be up to date for this file, and I saw
+> that in the past you applied this change as a fix.
+> 
+> Gregory
 > 
 > The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 > 
@@ -24,20 +25,13 @@ On Thu, Sep 21, 2017 at 06:12:59PM +0200, Philipp Zabel wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.14
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.14-1
 > 
-> for you to fetch changes up to 544e3bf4f0e8278400f19ca7918a3cdf2548b4eb:
+> for you to fetch changes up to 9e7460fc325dad06d2066abdbc1f4dd49456f9a4:
 > 
->   reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST (2017-09-21 12:44:01 +0200)
-> 
-> ----------------------------------------------------------------
-> Reset controller fixes for v4.14
-> 
-> - Remove misleading HSDK v1 suffix, as there is no v2 planned
-> - Add missing DT binding documentation for HSDK reset driver
-> - Fix HSDK reset driver dependencies
+>   arm64: dt marvell: Fix AP806 system controller size (2017-09-19 16:40:07 +0200)
 
-Merged, thanks.
+Merged (while using a Macchiatobin, no less).
 
 
 -Olof
