@@ -1,77 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 4 Oct 2017 14:03:24 +0300
-Subject: [PATCH v2 7/8] arm64: dts: renesas: initial Eagle board device
- tree
-In-Reply-To: <CAMuHMdUX+RW9H-p5n_JB-SkW8k5g_i0bg-i9LD59b5MLvFm3YQ@mail.gmail.com>
-References: <20170915194445.950496886@cogentembedded.com>
- <CAMuHMdUX+RW9H-p5n_JB-SkW8k5g_i0bg-i9LD59b5MLvFm3YQ@mail.gmail.com>
-Message-ID: <9ad9bd62-300c-cc78-a8f3-bbdd9eed6bed@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Oct 2017 13:06:20 +0200
+Subject: [PATCH v3 10/22] firmware: arm_scmi: probe and initialise all the
+ supported protocols
+In-Reply-To: <1506604306-20739-11-git-send-email-sudeep.holla@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-11-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAK8P3a15DxNYzaYmAbxEqAm2FCJS9KQFk8vBDqmSn9QUiw64=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> +static const struct scmi_protocol_match scmi_protocols[] = {
+> +       {
+> +               .protocol_id = SCMI_PROTOCOL_PERF,
+> +               .fn = scmi_perf_protocol_init,
+> +               .name = "scmi-cpufreq",
+> +       }, {
+> +               .protocol_id = SCMI_PROTOCOL_CLOCK,
+> +               .fn = scmi_clock_protocol_init,
+> +               .name = "scmi-clocks",
+> +       }, {
+> +               .protocol_id = SCMI_PROTOCOL_POWER,
+> +               .fn = scmi_power_protocol_init,
+> +               .name = "scmi-power-domain",
+> +       }, {
+> +               .protocol_id = SCMI_PROTOCOL_SENSOR,
+> +               .fn = scmi_sensors_protocol_init,
+> +               .name = "scmi-hwmon",
+> +       },
+> +       {}
+> +};
 
-On 9/21/2017 4:18 PM, Geert Uytterhoeven wrote:
+This looks backwards from what we do elsewhere in the kernel,
+and could be considered a layering violation: it requires a generic
+part of of the driver to know about all the more specific ones,
+and it means that we have to modify the global table here each
+time we add another protocol.
 
->> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
->> The board has 1 debug serial port (SCIF0); include support for it,
->> so that the serial console can work.
->>
->> Based on the original (and large) patch by Vladimir Barinov
->> <vladimir.barinov@cogentembedded.com>.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
->> --- /dev/null
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->> @@ -0,0 +1,45 @@
->> +/*
->> + * Device Tree Source for the Eagle board
->> + *
->> + * Copyright (C) 2016-2017 Renesas Electronics Corp.
->> + * Copyright (C) 2017 Cogent Embedded, Inc.
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/dts-v1/;
->> +#include "r8a77970.dtsi"
->> +
->> +/ {
->> +       model = "Renesas Eagle board based on r8a77970";
->> +       compatible = "renesas,eagle", "renesas,r8a77970";
->> +
->> +       aliases {
->> +               serial0 = &scif0;
->> +       };
->> +
->> +       chosen {
->> +               bootargs = "ignore_loglevel";
->> +               stdout-path = "serial0:115200n8";
->> +       };
->> +
->> +       memory at 48000000 {
->> +               device_type = "memory";
->> +               /* first 128MB is reserved for secure area. */
->> +               reg = <0x0 0x48000000 0x0 0x38000000>;
->> +       };
->> +};
->> +
->> +&extal_clk {
->> +       clock-frequency = <16666666>;
-> 
-> Nitpicking: the schematics say 16.6666 MHz
-> At 100 ppm accuracy that's the same, though.
+Can you rewrite this to allow dynamic registration of the protocols?
 
-    So, you still want me to change this freq?
-
-> Gr{oetje,eeting}s,
-> 
->                          Geert
-
-MBR, Sergei
+       Arnd
