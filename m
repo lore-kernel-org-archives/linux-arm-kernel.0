@@ -1,84 +1,39 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 4 Oct 2017 18:12:29 -0400
-Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
-In-Reply-To: <20171004220923.GB457@codeaurora.org>
-References: <20171003091155.7138-1-linus.walleij@linaro.org>
- <20171003091155.7138-2-linus.walleij@linaro.org>
- <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
- <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
- <CAP71Wjy2gEn=sGz5kN++=TdZ4S1cmE-3fdw-5__tdtR-M9RDGQ@mail.gmail.com>
- <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
- <CAF6AEGvtfAYx5mgg9mMVeXdO5mStD9gJvi5+Pp46jYj-e8WnOQ@mail.gmail.com>
- <20171004220923.GB457@codeaurora.org>
-Message-ID: <CAF6AEGvHfKfuVRVoZvGkKKzLwRLvwJHJqBdbPUtwBY8_rH6V-w@mail.gmail.com>
+From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
+Date: Wed,  4 Oct 2017 23:25:15 +0100
+Subject: [RESEND][PATCH 1/7] nvmem: imx-ocotp: Restrict OTP write to IMX6
+ processors
+In-Reply-To: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
+References: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1507155921-824-2-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 4, 2017 at 6:09 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/04, Rob Clark wrote:
->> On Tue, Oct 3, 2017 at 2:54 PM, Rob Clark <robdclark@gmail.com> wrote:
->> > On Tue, Oct 3, 2017 at 1:49 PM, Nicolas Dechesne
->> > <nicolas.dechesne@linaro.org> wrote:
->> >> On Tue, Oct 3, 2017 at 6:37 PM, Rob Clark <robdclark@gmail.com> wrote:
->> >>> On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
->> >>> <srinivas.kandagatla@linaro.org> wrote:
->> >>>>
->> >>>>
->> >>>> On 03/10/17 10:11, Linus Walleij wrote:
->> >>>>>
->> >>>>> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
->> >>>>> is not very helpful for users looking for their device tree in
->> >>>>> the kernel. Also the db820c is named properly.
->> >>>>>
->> >>>>> Rectify this, simply, do not change the compatible strings but name
->> >>>>> the DTS files in a consistent manner.
->> >>>>>
->> >>>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> >>>>
->> >>>> I did not like the sbc naming convention too, This was primarily done due to
->> >>>> some legacy build tools + bootloaders which have used sbc compatible to
->> >>>> identify boards from multiple dtb blobs. Now that we can append dtb to
->> >>>> kernel with new LK, this should not be a issue anymore.
->> >>>
->> >>> maybe it would be an idea to update skales/dbttool first to look for
->> >>> the new name, and then give people some time to upgrade, before
->> >>> changing this in the kernel.  Otherwise I expect you'll cause some
->> >>> confusion..
->> >>
->> >> iirc, skale is using the compatible name, not the filename.
->> >>
->> >
->> > ahh, yes, I think you are right.. u-boot is using a different filename.
->> >
->> > So in this case, no issue to pick a saner name :-)
->> >
->>
->> So, actually u-boot encodes the board's fdtname..  so as much as I'd
->> like to rename it to something more sane, unless the kernel can manage
->> to install a symlink for backwards compat, NAK
->>
->> I was trying to think of hacks for u-boot to check for multiple fdt
->> names, but if we want to get to the point of being able to install
->> multiple distro's on a single disk, we actually need to pass fdtname
->> to grub (where distro specific grub.cfg is encoding the UUID of the
->> distro's /boot partition, so it knows where to load the dtb from)..
->> this gets nearly impossible when one name becomes multiple names.  So
->> hurray for the fdt name becoming accidental ABI!
->>
->> If we managed to get this in before the 4.14 LTS I might feel
->> differently.  But afterwards, totally not. :-(
->>
->
-> How do you install dtbs onto your device? Should be simple enough
-> to run 'mv' on the new filename to the old one?
->
+i.MX7S/D have a different scheme for addressing the OTP registers inside
+the OCOTP block. Currently it's possible to address the wrong OTP registers
+given the disparity between IMX6 and IMX7 OTP addressing.
 
-it is part of the kernel package.. but fixing it in the distro means
-fixing it in *every* distro..
+Since OTP programming is one-time destructive its important we restrict
+this interface ASAP.
 
-if we are going for a workaround, then it should be the kernel
-installing a symlink.  Not every distro having to fix things up in the
-same way for one particular board.
+Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
 
-BR,
--R
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+---
+ drivers/nvmem/imx-ocotp.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index 193ca8f..17d160f 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -347,6 +347,8 @@ static int imx_ocotp_probe(struct platform_device *pdev)
+ 	imx_ocotp_nvmem_config.dev = dev;
+ 	imx_ocotp_nvmem_config.priv = priv;
+ 	priv->config = &imx_ocotp_nvmem_config;
++	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx7d-ocotp"))
++		imx_ocotp_nvmem_config.read_only = true;
+ 	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
+ 
+ 	if (IS_ERR(nvmem))
+-- 
+2.7.4
