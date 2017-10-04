@@ -1,138 +1,29 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 04 Oct 2017 10:22:53 +0200
-Subject: [PATCH] ARM: dts: imx: Fix incorrect display nodes notation
-In-Reply-To: <1507052618-30329-1-git-send-email-marco.franchi@nxp.com>
-References: <1507052618-30329-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <1507105373.11691.1.camel@pengutronix.de>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 4 Oct 2017 10:36:57 +0200
+Subject: regression introduced by commit 70d435ba1cd6 ("ASoC: imx-pcm-dma:
+ simplify pcm_config")
+Message-ID: <20171004103657.1c6a433d@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marco,
+Hi,
 
-On Tue, 2017-10-03 at 14:43 -0300, Marco Franchi wrote:
-> The following build warnings are seen with W=1:
-> 
-> > Warning (unit_address_vs_reg): Node /display at di0 has a unit name, but no reg property
-> > Warning (unit_address_vs_reg): Node /display at di1 has a unit name, but no reg property
-> 
-> Fix all these warnings by changing 'display at diX' to 'dispX'.
-> 
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+the commit 70d435ba1cd6 ("ASoC: imx-pcm-dma: simplify pcm_config")
+introduced a regression on the Ka-Ro TX series modules (and possibly
+other hardware as well).
 
-Thank you for fixing this. Mostly
+The problem is, that this commit restricts the supported sound formats
+to S24_LE only rather than S16_LE, S24_LE, S20_3LE without the
+patch. Therefore aplay fails with the following error messages, when
+trying to play a sound file with S16_LE format:
+|ALSA lib alsa-lib-1.1.2/src/pcm/pcm_params.c:2162:(snd1_pcm_hw_refine_slave) Slave PCM not usable
+|aplay: set_params:1204: Broken configuration for this PCM: no configurations available
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+This is with the simple-sound-card driver as well as the imx-sgtl5000
+driver.
 
-but I have one remark regarding i.MX51. While on the later SoCs the
-parallel display interface pad groups are called DISP0 and DISP1 in the
-reference manual, on i.MX51 they were called DISP1 and DISP2 [1].
-This is already reflected by the pin function ids: MX51_PAD_DISP[12]_*.
+Can someone tell me on what hardware and with what software has this
+patch been tested?
 
-Also, the display ports are currently inconsistently named across the
-i.MX51 board device trees, see below. Should we use this opportunity to
-also fix this inconsistency?
 
-[1] https://www.nxp.com/docs/en/reference-manual/MCIMX51RM.pdf
-
-> ---
-> I have already submitted a fix for the Documentation bindings:
-> https://git.pengutronix.de/cgit/pza/linux/commit/?h=imx-drm/next&id=db
-> fdd153d4aefec13460c97475737e59af92d8e2
-> 
-> ?arch/arm/boot/dts/imx51-apf51dev.dts??????????| 2 +-
-> ?arch/arm/boot/dts/imx51-babbage.dts???????????| 4 ++--
-> ?arch/arm/boot/dts/imx51-ts4800.dts????????????| 2 +-
-[...]
-> ?30 files changed, 31 insertions(+), 31 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts
-> b/arch/arm/boot/dts/imx51-apf51dev.dts
-> index a5e6091..f04d0df 100644
-> --- a/arch/arm/boot/dts/imx51-apf51dev.dts
-> +++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-> @@ -24,7 +24,7 @@
-> ?		default-on;
-> ?	};
-> ?
-> -	display at di1 {
-> +	disp1 {
-> ?		compatible = "fsl,imx-parallel-display";
-> ?		interface-pix-fmt = "bgr666";
-> ?		pinctrl-names = "default";
-
-This is actually DISP1 in the reference manual (connected to IPU DI0):
-
-????????????????pinctrl-0 = <&pinctrl_ipu_disp1>;
-????????????????port {
-????????????????????????display_in: endpoint {
-????????????????????????????????remote-endpoint = <&ipu_di0_disp0>;???????????????????????????????????????????????????????????????????????????
-????????????????????????};
-????????????????};
-
-The remote endpoint should be renamed to ipu_di0_disp1 for consistency.
-
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index 873cf24..297953c 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -39,7 +39,7 @@
-> ?		};
-> ?	};
-> ?
-> -	display0: display at di0 {
-> +	display0: disp0 {
-> ?		compatible = "fsl,imx-parallel-display";
-> ?		interface-pix-fmt = "rgb24";
-> ?		pinctrl-names = "default";
-
-This is also DISP1 in the reference manual (connected to IPU DI0):
-
-		pinctrl-0 = <&pinctrl_ipu_disp1>;
-????????????????port {
-????????????????????????display0_in: endpoint {
-???
-?????????????????????????????remote-endpoint = <&ipu_di0_disp0>;
-????????
-????????????????};
-????????????????};
-
-@@ -66,7 +66,7 @@
-> ?		};
-> ?	};
-> ?
-> -	display1: display at di1 {
-> +	display1: disp1 {
-> ?		compatible = "fsl,imx-parallel-display";
-> ?		interface-pix-fmt = "rgb565";
-> ?		pinctrl-names = "default";
-
-And this is actually DISP2 in the reference manual (connected to IPU
-DI1):
-		pinctrl-0 = <&pinctrl_ipu_disp2>;
-????????????????port {
-????????????????????????display1_in: endpoint {
-????????????????????????????????remote-endpoint = <&ipu_di1_disp1>;
-????????????????????????};
-????????????????};
-
-The remote endpoint should be renamed to ipu_di1_disp2.
-
-> diff --git a/arch/arm/boot/dts/imx51-ts4800.dts
-> b/arch/arm/boot/dts/imx51-ts4800.dts
-> index ca1cc5e..e6be869 100644
-> --- a/arch/arm/boot/dts/imx51-ts4800.dts
-> +++ b/arch/arm/boot/dts/imx51-ts4800.dts
-> @@ -50,7 +50,7 @@
-> ?		power-supply = <&backlight_reg>;
-> ?	};
-> ?
-> -	display0: display at di0 {
-> +	display0: disp0 {
-> ?		compatible = "fsl,imx-parallel-display";
-> ?		interface-pix-fmt = "rgb24";
-> ?		pinctrl-names = "default";
-
-And this is also DISP1 according to the reference manual.
-
-regards
-Philipp
+Lothar Wa?mann
