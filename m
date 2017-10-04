@@ -1,39 +1,46 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Wed,  4 Oct 2017 23:25:15 +0100
-Subject: [RESEND][PATCH 1/7] nvmem: imx-ocotp: Restrict OTP write to IMX6
- processors
-In-Reply-To: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
-References: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1507155921-824-2-git-send-email-pure.logic@nexus-software.ie>
+Date: Wed,  4 Oct 2017 23:25:14 +0100
+Subject: [RESEND][PATCH 0/7] Fix i.MX7D OCOTP write support
+Message-ID: <1507155921-824-1-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7S/D have a different scheme for addressing the OTP registers inside
-the OCOTP block. Currently it's possible to address the wrong OTP registers
-given the disparity between IMX6 and IMX7 OTP addressing.
+(Resend: I may have missed Philip Zabel on the first send - apologies if
+that is the case Philip.)
 
-Since OTP programming is one-time destructive its important we restrict
-this interface ASAP.
+The current OCOTP driver added support for i.MX7 read access and then added
+support for i.MX6 write access. Between the two commits the fact that the
+added write routine was only appropriate for i.MX6 was missed.
 
-Fixes: 0642bac7da42 ("nvmem: imx-ocotp: add write support")
+As a result its certain that attempting to write i.MX7 OTP fuses on Linux
+would fail as the destination address on i.MX7 is different to i.MX6.
 
-Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
----
- drivers/nvmem/imx-ocotp.c | 2 ++
- 1 file changed, 2 insertions(+)
+Without the update to the i.MX7 setup and hold timings it's not clear that
+a write operation would actually do any writing which means the bad
+addressing on i.MX7 might not actually destroy the wrong OTP fuses, it
+probably would just fail to do anything, understandably I haven't
+experimented with knowingly bad values for one-time-programmable fuses.
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index 193ca8f..17d160f 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -347,6 +347,8 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	imx_ocotp_nvmem_config.dev = dev;
- 	imx_ocotp_nvmem_config.priv = priv;
- 	priv->config = &imx_ocotp_nvmem_config;
-+	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx7d-ocotp"))
-+		imx_ocotp_nvmem_config.read_only = true;
- 	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
- 
- 	if (IS_ERR(nvmem))
+This series fixes the gap by:
+
+1. Switching off OTP writing for i.MX7
+2. Adding in support for the i.MX7 way of doing things
+3. Switching OTP write support back on for i.MX7
+
+There's an additional small fix for the naming of the module then to
+indicate it works for i.MX7 as well as for i.MX6.
+
+Bryan O'Donoghue (7):
+  nvmem: imx-ocotp: Restrict OTP write to IMX6 processors
+  nvmem: imx-ocotp: Pass parameters via a struct
+  nvmem: imx-ocotp: Add support for banked OTP addressing
+  nvmem: imx-ocotp: Move i.MX6 write clock setup to dedicated function
+  nvmem: imx-ocotp: Add i.MX7D timing write clock setup support
+  nvmem: imx-ocotp: Enable i.MX7D OTP write support
+  nvmem: imx-ocotp: Update module description
+
+ drivers/nvmem/imx-ocotp.c | 191 +++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 156 insertions(+), 35 deletions(-)
+
 -- 
 2.7.4
