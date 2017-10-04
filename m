@@ -1,34 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Oct 2017 13:24:03 +0200
-Subject: [PATCH v3 15/22] firmware: arm_scmi: abstract mailbox interface
-In-Reply-To: <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAK8P3a0EUr_aEZdOrjHixzp44yXqsNxTMzBceSBTmk-x8x2MAg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 04 Oct 2017 12:27:56 +0100
+Subject: Applied "ASoC: cygnus: Add EXPORT_SYMBOL for helper function" to the
+ asoc tree
+In-Reply-To: <1502748417-26417-9-git-send-email-lori.hikichi@broadcom.com>
+Message-ID: <E1dzhqG-0004Fb-As@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Some of the mailbox controller expects controller specific data in order
-> to implement simple doorbell mechanism as expected by SCMI specification.
->
-> This patch creates a shim layer to abstract the mailbox interface so
-> that it can support any mailbox controller. It also provides default
-> implementation which maps to standard mailbox client APIs, so that
-> controllers implementing doorbell mechanism need not require any
-> additional layer.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+The patch
 
-Another level? Now we have three levels of stacked mailboxes, with
-the highest level being the combined mailbox/memory, then the shim,
-and below it the hardware mailbox.
+   ASoC: cygnus: Add EXPORT_SYMBOL for helper function
 
-Can you try to come up with a way to do this with fewer abstractions?
+has been applied to the asoc tree at
 
-Maybe you could assume that the mailbox itself can take variable-length
-data packets, and then use the shim here for those that require
-something else?
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-        Arnd
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From d8302aa6b53acbe421fe615b9d704fd813623e96 Mon Sep 17 00:00:00 2001
+From: Lori Hikichi <lori.hikichi@broadcom.com>
+Date: Thu, 28 Sep 2017 15:29:32 -0700
+Subject: [PATCH] ASoC: cygnus: Add EXPORT_SYMBOL for helper function
+
+The helper function cygnus_ssp_set_custom_fsync_width() is intended
+to be called from an ASoC machine driver, need to export symbol
+if using modules.
+
+Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/bcm/cygnus-ssp.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+index 15c438f0f22d..e9c73a451cf6 100644
+--- a/sound/soc/bcm/cygnus-ssp.c
++++ b/sound/soc/bcm/cygnus-ssp.c
+@@ -842,6 +842,7 @@ int cygnus_ssp_set_custom_fsync_width(struct snd_soc_dai *cpu_dai, int len)
+ 		return -EINVAL;
+ 	}
+ }
++EXPORT_SYMBOL_GPL(cygnus_ssp_set_custom_fsync_width);
+ 
+ static int cygnus_ssp_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+ {
+-- 
+2.14.1
