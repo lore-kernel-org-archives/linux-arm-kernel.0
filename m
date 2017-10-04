@@ -1,53 +1,75 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 4 Oct 2017 21:19:15 +0800
-Subject: [xlnx:master 823/1043] drivers/usb//dwc3/host.c:24:6: error:
- redefinition of 'dwc3_host_wakeup_capable'
-Message-ID: <201710042113.Ej59BcG6%fengguang.wu@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Oct 2017 14:24:36 +0100
+Subject: [PATCH] arm64: Enable MRS emulation early
+In-Reply-To: <20171004124819.GU3611@e103592.cambridge.arm.com>
+References: <20171004094805.24009-1-suzuki.poulose@arm.com>
+ <20171004101425.GB23092@leverpostej>
+ <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
+ <20171004113207.GT3611@e103592.cambridge.arm.com>
+ <20171004113628.t4gv7srwpvbwwbsl@armageddon.cambridge.arm.com>
+ <20171004124819.GU3611@e103592.cambridge.arm.com>
+Message-ID: <20171004132435.yt54irsc7vwht5dy@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anurag,
+On Wed, Oct 04, 2017 at 01:48:19PM +0100, Dave P Martin wrote:
+> On Wed, Oct 04, 2017 at 12:36:29PM +0100, Catalin Marinas wrote:
+> > On Wed, Oct 04, 2017 at 12:32:07PM +0100, Dave P Martin wrote:
+> 
+> [...]
+> 
+> > > I don't think the hwcaps shouldn't change after entry to userspace,
+> > > so it really doesn't matter whether HWCAP_CPUID is set before or
+> > > after registration: for userspace it should all already have happened.
+> > 
+> > Good point, I forgot about this.
+> > 
+> > > It looks to me like all initcalls are called in the same kernel thread
+> > > that execs the initramfs init process, before the exec.
+> > > 
+> > > So I still don't see how a built-in late initcall can not have been
+> > > called before entry to userspace.
+> > > 
+> > > The patch seems to demonstrate that I'm wrong though.
+> > > What am I missing?
+> > 
+> > I also wondered about this. I think is the kernel invoking modprobe
+> > before the actual init/linuxrc in an initrd.
+> 
+> Ah, right.  Could that be a bug, do you think?
+> 
+> I wonder whether it's even well-defined how early that can happen.
+> i.e., which initcall level is guaranteed early enough to prevent this?
 
-FYI, the error/warning still remains.
+I don't think it's a bug, probably just an undocumented convention. I
+don't know which module triggered this specific issue but, for example,
+I see the possibility of request_module in the ipv4 code only after
+fs_initcall(). Let's hope nothing executes user space prior to
+arch_initcall().
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   f1b1e077d641fc83b54c1b8f168cbb58044fbd4e
-commit: 80ac0da9010ebabef6ed1d66b6607b345fd14cb4 [823/1043] dwc3: Add support for clock disabling during suspend
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 80ac0da9010ebabef6ed1d66b6607b345fd14cb4
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+usermodehlper_enable() is called in do_basic_setup() prior to
+do_initcalls(), so there is always a chance of someone calling user
+space early. If we want some guarantee, maybe something like below:
 
-All errors (new ones prefixed by >>):
-
->> drivers/usb//dwc3/host.c:24:6: error: redefinition of 'dwc3_host_wakeup_capable'
-    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-         ^~~~~~~~~~~~~~~~~~~~~~~~
-   In file included from drivers/usb//dwc3/host.c:20:0:
-   include/linux/usb/xhci_pdriver.h:25:6: note: previous definition of 'dwc3_host_wakeup_capable' was here
-    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-         ^~~~~~~~~~~~~~~~~~~~~~~~
-
-vim +/dwc3_host_wakeup_capable +24 drivers/usb//dwc3/host.c
-
-    23	
-  > 24	void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-    25	{
-    26		dwc3_simple_wakeup_capable(dev, wakeup);
-    27	}
-    28	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45285 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/d660c2fb/attachment-0001.gz>
+diff --git a/init/main.c b/init/main.c
+index 0ee9c6866ada..67040e570533 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -914,10 +914,16 @@ static void __init do_basic_setup(void)
+ 	driver_init();
+ 	init_irq_proc();
+ 	do_ctors();
+-	usermodehelper_enable();
+ 	do_initcalls();
+ }
+ 
++static int usermodehelper_init(void)
++{
++	usermodehelper_enable();
++	return 0;
++}
++arch_initcall_sync(usermodehelper_init);
++
+ static void __init do_pre_smp_initcalls(void)
+ {
+ 	initcall_t *fn;
