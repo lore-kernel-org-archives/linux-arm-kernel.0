@@ -1,38 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Oct 2017 18:13:11 -0700
-Subject: [PATCH] mtd: nand: gpio: Convert to use GPIO descriptors
-In-Reply-To: <20170924173912.9199-1-linus.walleij@linaro.org>
-References: <20170924173912.9199-1-linus.walleij@linaro.org>
-Message-ID: <20171004011311.rn3plqb4es5hcupa@localhost>
+Date: Tue, 3 Oct 2017 18:10:03 -0700
+Subject: [GIT PULL] Reset controller fixes for v4.14
+In-Reply-To: <1506010379.10081.15.camel@pengutronix.de>
+References: <1506010379.10081.15.camel@pengutronix.de>
+Message-ID: <20171004011003.ae5r55dttjtxrvlj@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 24, 2017 at 07:39:12PM +0200, Linus Walleij wrote:
-> There is exactly one board in the kernel that defines platform data
-> for the GPIO NAND driver.
+On Thu, Sep 21, 2017 at 06:12:59PM +0200, Philipp Zabel wrote:
+> Dear arm-soc-maintainers,
 > 
-> Use the feature to provide a lookup table for the GPIOs in the board
-> file so we can convert the driver as a whole to just use GPIO
-> descriptors.
+> please consider merging this tag for v4.14. It removes the "v1" suffix
+> from the newly merged HSDK reset driver, fixes its Kconfig dependencies,
+> and adds back the DT binding documentation that I accidentally dropped
+> onto the floor when applying the original patch.
 > 
-> After this we can cut the use of <linux/of_gpio.h> and use the GPIO
-> descriptor management from <linux/gpio/consumer.h> alone to grab and use
-> the GPIOs used in the driver.
+> regards
+> Philipp
 > 
-> I also created a local struct device *dev in the probe() function
-> because I was getting annoyed with all the &pdev->dev dereferencing.
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 > 
-> Cc: arm at kernel.org
-> Cc: Mike Rapoport <rppt@linux.vnet.ibm.com>
-> Cc: Frans Klaver <fransklaver@gmail.com>
-> Cc: Gerhard Sittig <gsi@denx.de>
-> Cc: Jamie Iles <jamie.iles@oracle.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: Please ACK this so it can be merged through the MTD
-> subsystem.
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.14
+> 
+> for you to fetch changes up to 544e3bf4f0e8278400f19ca7918a3cdf2548b4eb:
+> 
+>   reset: Restrict RESET_HSDK to ARC_SOC_HSDK or COMPILE_TEST (2017-09-21 12:44:01 +0200)
+> 
+> ----------------------------------------------------------------
+> Reset controller fixes for v4.14
+> 
+> - Remove misleading HSDK v1 suffix, as there is no v2 planned
+> - Add missing DT binding documentation for HSDK reset driver
+> - Fix HSDK reset driver dependencies
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Merged, thanks.
 
 
 -Olof
