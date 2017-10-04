@@ -1,54 +1,74 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 4 Oct 2017 14:50:23 -0700
-Subject: [PATCH 0/2] [v5] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <40a0ab68-dc3a-10e2-f78e-9a386b4a72bd@codeaurora.org>
-References: <CACRpkdZcdLac_wYW+XqtZ=-APo8VmvYL4B1oL-wZyLy8KEs9AA@mail.gmail.com>
- <1ecdf6ee-5098-15d3-f85e-66b39a6c25f9@codeaurora.org>
- <CACRpkdaUV1Mjh7U9bBAgZA5Zq1oqN0HBT=VH5NkvPnY4gHxDVw@mail.gmail.com>
- <d53e67a2-4f69-752f-ba35-53872d9b9760@codeaurora.org>
- <CACRpkdYfAcKrgbgybccurUKTyR0E+tHDyzp7sbXxXxKuyMOGhQ@mail.gmail.com>
- <619f48d2-59c7-c090-4ace-9e8db9f92064@codeaurora.org>
- <CACRpkdZFunwQ=tiQqsapap7Ozz42hr=df5vqbC0S5xy5Wn+ZWw@mail.gmail.com>
- <255ad0dc-2d16-ae7f-0b45-500e23cff1a4@codeaurora.org>
- <20171003220311.GU457@codeaurora.org>
- <40a0ab68-dc3a-10e2-f78e-9a386b4a72bd@codeaurora.org>
-Message-ID: <20171004215023.GA457@codeaurora.org>
+Date: Wed, 4 Oct 2017 15:09:23 -0700
+Subject: [PATCH 2/2] arm64: dts: qcom: Rename SBC to DragonBoard 410c
+In-Reply-To: <CAF6AEGvtfAYx5mgg9mMVeXdO5mStD9gJvi5+Pp46jYj-e8WnOQ@mail.gmail.com>
+References: <20171003091155.7138-1-linus.walleij@linaro.org>
+ <20171003091155.7138-2-linus.walleij@linaro.org>
+ <b6b065c7-ad6b-d3da-704f-f139f12752d8@linaro.org>
+ <CAF6AEGta20EGJOvLcFWVfUa3kpfq+Udyp1QRNzjY8P290A2tVg@mail.gmail.com>
+ <CAP71Wjy2gEn=sGz5kN++=TdZ4S1cmE-3fdw-5__tdtR-M9RDGQ@mail.gmail.com>
+ <CAF6AEGvRB_SGQ_Xv33FiPZRyp+Wf29aG_Ex6rVk2Czov-Gjj9Q@mail.gmail.com>
+ <CAF6AEGvtfAYx5mgg9mMVeXdO5mStD9gJvi5+Pp46jYj-e8WnOQ@mail.gmail.com>
+Message-ID: <20171004220923.GB457@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03, Timur Tabi wrote:
-> On 10/03/2017 05:03 PM, Stephen Boyd wrote:
-> >I've run into this now on our mobile SoCs after I pull in commit
-> >8e51533780ba ("pinctrl: qcom: add get_direction function").
-> >Before that commit we never read each pin of the device. On our
-> >mobile SoCs we have devicetree and it feels like having that
-> >describe which pins are available and not available is
-> >half-duplicating information we would already have via consumers
-> >indicating which pins they care about. I don't see any value
-> >beyond system wide debug in figuring out the default pin
-> >configuration of a pin that doesn't have a consumer in Linux.
+On 10/04, Rob Clark wrote:
+> On Tue, Oct 3, 2017 at 2:54 PM, Rob Clark <robdclark@gmail.com> wrote:
+> > On Tue, Oct 3, 2017 at 1:49 PM, Nicolas Dechesne
+> > <nicolas.dechesne@linaro.org> wrote:
+> >> On Tue, Oct 3, 2017 at 6:37 PM, Rob Clark <robdclark@gmail.com> wrote:
+> >>> On Tue, Oct 3, 2017 at 8:25 AM, Srinivas Kandagatla
+> >>> <srinivas.kandagatla@linaro.org> wrote:
+> >>>>
+> >>>>
+> >>>> On 03/10/17 10:11, Linus Walleij wrote:
+> >>>>>
+> >>>>> Naming the DragonBoard 410c "SBC" (I guess "single board computer")
+> >>>>> is not very helpful for users looking for their device tree in
+> >>>>> the kernel. Also the db820c is named properly.
+> >>>>>
+> >>>>> Rectify this, simply, do not change the compatible strings but name
+> >>>>> the DTS files in a consistent manner.
+> >>>>>
+> >>>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >>>>
+> >>>> I did not like the sbc naming convention too, This was primarily done due to
+> >>>> some legacy build tools + bootloaders which have used sbc compatible to
+> >>>> identify boards from multiple dtb blobs. Now that we can append dtb to
+> >>>> kernel with new LK, this should not be a issue anymore.
+> >>>
+> >>> maybe it would be an idea to update skales/dbttool first to look for
+> >>> the new name, and then give people some time to upgrade, before
+> >>> changing this in the kernel.  Otherwise I expect you'll cause some
+> >>> confusion..
+> >>
+> >> iirc, skale is using the compatible name, not the filename.
+> >>
+> >
+> > ahh, yes, I think you are right.. u-boot is using a different filename.
+> >
+> > So in this case, no issue to pick a saner name :-)
+> >
 > 
-> At the time I wrote that patch, the ACPI tables exposed all of the
-> GPIOs, even the ones it didn't care about.  The new ACPI tables list
-> only specific GPIOs, and so we no longer need to blindly read the
-> direction of all GPIOs.
+> So, actually u-boot encodes the board's fdtname..  so as much as I'd
+> like to rename it to something more sane, unless the kernel can manage
+> to install a symlink for backwards compat, NAK
+> 
+> I was trying to think of hacks for u-boot to check for multiple fdt
+> names, but if we want to get to the point of being able to install
+> multiple distro's on a single disk, we actually need to pass fdtname
+> to grub (where distro specific grub.cfg is encoding the UUID of the
+> distro's /boot partition, so it knows where to load the dtb from)..
+> this gets nearly impossible when one name becomes multiple names.  So
+> hurray for the fdt name becoming accidental ABI!
+> 
+> If we managed to get this in before the 4.14 LTS I might feel
+> differently.  But afterwards, totally not. :-(
 > 
 
-Do you avoid this problem on new ACPI tables because only pins
-that are able to be read are exposed?
-
-> 
-> >This is basically a revert of commit 72d320006177 ("gpio: set up
-> >initial state from .get_direction()").
-> 
-> I would be in favor of either reverting that patch, or moving the
-> code into gpiochip_add_pin_range().
-
-If it's in gpiochip_add_pin_range() would we still read the
-hardware when creating the pin ranges? I don't want to have to
-describe pin ranges of "valid" pins that won't cause the system
-to blow up if we touch them, because those pins are never used by
-Linux so reading them is not useful.
+How do you install dtbs onto your device? Should be simple enough
+to run 'mv' on the new filename to the old one?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
