@@ -1,54 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 4 Oct 2017 13:10:26 +0200
-Subject: [PATCH v2 7/8] arm64: dts: renesas: initial Eagle board device
- tree
-In-Reply-To: <9ad9bd62-300c-cc78-a8f3-bbdd9eed6bed@cogentembedded.com>
-References: <20170915194445.950496886@cogentembedded.com>
- <CAMuHMdUX+RW9H-p5n_JB-SkW8k5g_i0bg-i9LD59b5MLvFm3YQ@mail.gmail.com>
- <9ad9bd62-300c-cc78-a8f3-bbdd9eed6bed@cogentembedded.com>
-Message-ID: <CAMuHMdUfRr-X_+pZhmWw28SDwa5=7daSefjVaT9y5cFB9VoO6Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Oct 2017 12:10:40 +0100
+Subject: [PATCH] arm64: Enable MRS emulation early
+In-Reply-To: <20171004101425.GB23092@leverpostej>
+References: <20171004094805.24009-1-suzuki.poulose@arm.com>
+ <20171004101425.GB23092@leverpostej>
+Message-ID: <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Wed, Oct 04, 2017 at 11:14:26AM +0100, Mark Rutland wrote:
+> On Wed, Oct 04, 2017 at 10:48:05AM +0100, Suzuki K Poulose wrote:
+> > Make sure the MRS emulation is enabled early enough, such that the
+> > early userspace applications (e.g, those run from initrd) could
+> > use the facility without crashing them.
+> > 
+> > Fixes: commit 77c97b4ee2129 ("arm64: cpufeature: Expose CPUID registers by emulation")
+> > Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
+> > Cc: James Morse <james.morse@arm.com>
+> > Cc: Dave Martin <Dave.martin@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: stable at vger.kernel.org
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+> This looks sensible, but shouldn't we do the same for other
+> late_inicalls can affect initrd userspace?
+> 
+> e.g. armv8_deprecated_init, fpsimd_init, sys_reg_genericv8_init?
 
-On Wed, Oct 4, 2017 at 1:03 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 9/21/2017 4:18 PM, Geert Uytterhoeven wrote:
->>> Add the initial device  tree for  the R8A77970 SoC based Eagle board.
->>> The board has 1 debug serial port (SCIF0); include support for it,
->>> so that the serial console can work.
->>>
->>> Based on the original (and large) patch by Vladimir Barinov
->>> <vladimir.barinov@cogentembedded.com>.
->>>
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->>> --- /dev/null
->>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+I think we should, though not all of them are concerned with the user
+code. For example, fpsimd_init() takes care of the pm/hotplug aspect and
+nothing to do with user space. That said, making it core_initcall() is
+probably not a bad thing (just a statement that it is concerned with the
+core initialisation), as long as all the other infrastructure it
+registers with is up.
 
->>> +&extal_clk {
->>> +       clock-frequency = <16666666>;
->>
->>
->> Nitpicking: the schematics say 16.6666 MHz
->> At 100 ppm accuracy that's the same, though.
->
->    So, you still want me to change this freq?
+For Suzuki's patch, I was thinking of enabling emulation before we
+register the HWCAP_CPUID bit (setup_elf_hwcaps). However, that means we
+have to bring it before smp_cpus_done(). It's not really worth it as we
+don't expect any user space at that point.
 
-I don't think that's really needed, as the difference is smaller than the
-accuracy anyway.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Catalin
