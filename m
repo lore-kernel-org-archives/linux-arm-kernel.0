@@ -1,69 +1,203 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 4 Oct 2017 13:11:56 +0200
-Subject: [PATCH 1/2] ARM: SAMSUNG: Delete an error message for a failed memory
- allocation in three functions
-In-Reply-To: <75c352ad-c51e-2e63-2f93-0f14522ff09c@users.sourceforge.net>
-References: <75c352ad-c51e-2e63-2f93-0f14522ff09c@users.sourceforge.net>
-Message-ID: <ae29b97e-9a60-fdf4-5bd2-af33f6081446@users.sourceforge.net>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 4 Oct 2017 12:12:42 +0100
+Subject: [PATCH REPOST 2/3] arm64: Fix single stepping in kernel traps
+In-Reply-To: <87wp4byewv.fsf@linaro.org>
+References: <1507050352-15909-1-git-send-email-julien.thierry@arm.com>
+ <1507050352-15909-3-git-send-email-julien.thierry@arm.com>
+ <87wp4byewv.fsf@linaro.org>
+Message-ID: <7ae7d5c5-0c28-51c6-913c-f8d003e11f47@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 4 Oct 2017 09:33:52 +0200
 
-Omit extra messages for a memory allocation failure in these functions.
 
-This issue was detected by using the Coccinelle software.
+On 04/10/17 00:45, Alex Benn?e wrote:
+> 
+> Julien Thierry <julien.thierry@arm.com> writes:
+> 
+>> Software Step exception is missing after stepping a trapped instruction.
+>>
+>> Ensure SPSR.SS gets set to 0 after emulating/skipping a trapped instruction
+>> before doing ERET.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>
+>> ---
+>>   arch/arm64/include/asm/traps.h       |  2 ++
+>>   arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
+>>   arch/arm64/kernel/cpufeature.c       |  2 +-
+>>   arch/arm64/kernel/traps.c            | 21 ++++++++++++++++-----
+>>   4 files changed, 23 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+>> index d131501..dd7affb 100644
+>> --- a/arch/arm64/include/asm/traps.h
+>> +++ b/arch/arm64/include/asm/traps.h
+>> @@ -37,6 +37,8 @@ struct undef_hook {
+>>
+>>   void arm64_notify_segfault(struct pt_regs *regs, unsigned long addr);
+>>
+>> +void arm64_skip_trapped_instr(struct pt_regs *regs, unsigned long size);
+>> +
+> 
+> Personally I think this is a poor name as it implies there is no effect
+> from the operation. I suspect arm64_update_regs is a little too generic
+> through. Naming things as ever is hard....
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/plat-samsung/adc.c          | 8 ++------
- arch/arm/plat-samsung/platformdata.c | 4 +---
- 2 files changed, 3 insertions(+), 9 deletions(-)
+What about arm64_step_trapped_instr? Don't know if it is much better but 
+maybe less misleading than just "skip".
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index daf3db9f0058..f8d6206e4daa 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -239,10 +239,8 @@ struct s3c_adc_client *s3c_adc_register(struct platform_device *pdev,
- 		return ERR_PTR(-EINVAL);
- 
- 	client = kzalloc(sizeof(struct s3c_adc_client), GFP_KERNEL);
--	if (!client) {
--		dev_err(&pdev->dev, "no memory for adc client\n");
-+	if (!client)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	client->pdev = pdev;
- 	client->is_ts = is_ts;
-@@ -345,10 +343,8 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	unsigned tmp;
- 
- 	adc = devm_kzalloc(dev, sizeof(struct adc_device), GFP_KERNEL);
--	if (adc == NULL) {
--		dev_err(dev, "failed to allocate adc_device\n");
-+	if (!adc)
- 		return -ENOMEM;
--	}
- 
- 	spin_lock_init(&adc->lock);
- 
-diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
-index b430e9946287..6cf52ee7eeec 100644
---- a/arch/arm/plat-samsung/platformdata.c
-+++ b/arch/arm/plat-samsung/platformdata.c
-@@ -29,10 +29,8 @@ void __init *s3c_set_platdata(void *pd, size_t pdsize,
- 	}
- 
- 	npd = kmemdup(pd, pdsize, GFP_KERNEL);
--	if (!npd) {
--		printk(KERN_ERR "%s: cannot clone platform data\n", pdev->name);
-+	if (!npd)
- 		return NULL;
--	}
- 
- 	pdev->dev.platform_data = npd;
- 	return npd;
+Or arm64_setup_next_instr?
+
+> 
+>>   static inline int __in_irqentry_text(unsigned long ptr)
+>>   {
+>>   	return ptr >= (unsigned long)&__irqentry_text_start &&
+>> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+>> index f0e6d71..1f38208 100644
+>> --- a/arch/arm64/kernel/armv8_deprecated.c
+>> +++ b/arch/arm64/kernel/armv8_deprecated.c
+>> @@ -431,7 +431,7 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
+>>   	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
+>>   			current->comm, (unsigned long)current->pid, regs->pc);
+>>
+>> -	regs->pc += 4;
+>> +	arm64_skip_trapped_instr(regs, 4);
+>>   	return 0;
+>>
+>>   fault:
+>> @@ -512,7 +512,7 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+>>   	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated CP15 Barrier instruction at 0x%llx\n",
+>>   			current->comm, (unsigned long)current->pid, regs->pc);
+>>
+>> -	regs->pc += 4;
+>> +	arm64_skip_trapped_instr(regs, 4);
+>>   	return 0;
+>>   }
+>>
+>> @@ -586,14 +586,14 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
+>>   static int a32_setend_handler(struct pt_regs *regs, u32 instr)
+>>   {
+>>   	int rc = compat_setend_handler(regs, (instr >> 9) & 1);
+>> -	regs->pc += 4;
+>> +	arm64_skip_trapped_instr(regs, 4);
+>>   	return rc;
+>>   }
+> 
+> Why didn't we use AARCH64_INSN_SIZE for these here?
+
+Because these are AARCH32 instructions, although it is the same size, I 
+thought it would be misleading to use AARCH64 macro.
+
+> 
+>>
+>>   static int t16_setend_handler(struct pt_regs *regs, u32 instr)
+>>   {
+>>   	int rc = compat_setend_handler(regs, (instr >> 3) & 1);
+>> -	regs->pc += 2;
+>> +	arm64_skip_trapped_instr(regs, 2);
+>>   	return rc;
+>>   }
+> 
+> I guess we don't have an equivalent AARCH32_T16_INSN_SIZE?
+> 
+
+Yes, I was a bit hesitant because thumb2 can have 16 and 32bits 
+instructions, but I guess having "T16" in the macro name makes it clear 
+it should be used only on 16bits instructions.
+
+I'll add this define, and might as well add AARCH32_INSN_SIZE.
+
+>>
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index cd52d36..2956d5a 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -1287,7 +1287,7 @@ static int emulate_mrs(struct pt_regs *regs, u32 insn)
+>>   	if (!rc) {
+>>   		dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
+>>   		pt_regs_write_reg(regs, dst, val);
+>> -		regs->pc += 4;
+>> +		arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
+>>   	}
+>>
+>>   	return rc;
+>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>> index 5ea4b85..ed9d856 100644
+>> --- a/arch/arm64/kernel/traps.c
+>> +++ b/arch/arm64/kernel/traps.c
+>> @@ -293,6 +293,17 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+>>   	}
+>>   }
+>>
+>> +void arm64_skip_trapped_instr(struct pt_regs *regs, unsigned long size)
+>> +{
+>> +	regs->pc += size;
+>> +
+>> +	/*
+>> +	 * If we were single stepping, we want to get the step exception after
+>> +	 * we return from the skipped exception
+>> +	 */
+>> +	regs->pstate &= ~DBG_SPSR_SS;
+>> +}
+>> +
+>>   static LIST_HEAD(undef_hook);
+>>   static DEFINE_RAW_SPINLOCK(undef_lock);
+>>
+>> @@ -480,7 +491,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+>>   	if (ret)
+>>   		arm64_notify_segfault(regs, address);
+>>   	else
+>> -		regs->pc += 4;
+>> +		arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
+>>   }
+>>
+>>   static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+>> @@ -490,7 +501,7 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+>>
+>>   	pt_regs_write_reg(regs, rt, val);
+>>
+>> -	regs->pc += 4;
+>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
+>>   }
+>>
+>>   static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+>> @@ -498,7 +509,7 @@ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+>>   	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+>>
+>>   	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
+>> -	regs->pc += 4;
+>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
+>>   }
+>>
+>>   static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+>> @@ -506,7 +517,7 @@ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+>>   	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+>>
+>>   	pt_regs_write_reg(regs, rt, arch_timer_get_rate());
+>> -	regs->pc += 4;
+>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
+>>   }
+>>
+>>   struct sys64_hook {
+>> @@ -761,7 +772,7 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
+>>   	}
+>>
+>>   	/* If thread survives, skip over the BUG instruction and continue: */
+>> -	regs->pc += AARCH64_INSN_SIZE;	/* skip BRK and resume */
+>> +	arm64_skip_trapped_instr(regs, AARCH64_INSN_SIZE);
+>>   	return DBG_HOOK_HANDLED;
+>>   }
+> 
+> It would be nice to find a better name but otherwise:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+
+Thanks,
+
 -- 
-2.14.2
+Julien Thierry
