@@ -1,120 +1,65 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 15:47:55 +0100
-Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
+Date: Wed, 4 Oct 2017 16:01:13 +0100
+Subject: [PATCH v3 21/22] cpufreq: add support for CPU DVFS based on SCMI
+ message protocol
+In-Reply-To: <CAK8P3a3pAFKM+Dq_yb7KYhB+xeneVuODBq_4nacEuw9creT6Yw@mail.gmail.com>
 References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
- <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
- <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
- <69fc9095-6961-b861-d2e0-afb58de11d59@arm.com>
- <CAK8P3a3C-xyE-mkj8ERDZHtWbpcOx3Z-gPgHrQHxNVi_3AmAZA@mail.gmail.com>
-Message-ID: <86fc9060-e0da-3dde-899d-1c4055f15386@arm.com>
+ <1506604306-20739-22-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a3pAFKM+Dq_yb7KYhB+xeneVuODBq_4nacEuw9creT6Yw@mail.gmail.com>
+Message-ID: <5efbd0a7-8b62-5b30-98e6-dfaff64e2628@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 04/10/17 15:17, Arnd Bergmann wrote:
-> On Wed, Oct 4, 2017 at 3:53 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 04/10/17 13:35, Arnd Bergmann wrote:
->>> On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On 04/10/17 12:30, Arnd Bergmann wrote:
+>> +static int scmi_cpufreq_probe(struct platform_device *pdev)
+>> +{
+>> +       int ret;
+>> +
+>> +       handle = devm_scmi_handle_get(&pdev->dev);
+>> +
+>> +       if (IS_ERR_OR_NULL(handle) || !handle->perf_ops)
+>> +               return -EPROBE_DEFER;
 > 
->>>>
->>>> Yes it depends on #clock-cells property. That's the main reason for
->>>> adding #clock-cells
->>>
->>> I'm still unclear on this. Do you mean we look for a subnode with
->>> reg=<0x14> and then assume it's a clock node and require the
->>>  #clock-cells to be there,
->>
->> Yes that's how it's used. Presence of subnode with reg=0x14 indicates
->> clock protocol and #clock-cells to indicate that it's clock provider
->> expecting 1 parameter from consumer which is the clock identifier.
->>
->> or do we look through the sub-nodes to
->>> find one with the #clock-cells property and then look up the 'reg'
->>> property to find out which protocol number to use?
->>>
->>
->> Not this way. Do you see any issues ?
+> As mentioned before, never create an interface that needs to use
+> IS_ERR_OR_NULL(), make it return either NULL on error, or always
+> have an error code.
 > 
-> We normally don't assume that a particular unit address implies
-> a specific function. Conventionally that would be done by matching
-> the "compatible" property instead.
-> 
-> What you do clearly works, but it's surprising to the reader.
-> 
-> 
->>> I think the problem is the way we use the mailbox API in Linux, which
->>> is completely abstract at the moment: it could be a pure doorbell, a
->>> single-register for a data, some structured memory, or a
->>> variable-length message. The assumption today is that the mailbox
->>> user and the mailbox driver agree on the interpretation of that
->>> void pointer.
->>>
->>
->> Unfortunately true.
->>
->>> This breaks down here, as you require the message to be a
->>> variable-length message in a fixed physical location, but assume that
->>> the mailbox serves only as a doorbell.
->>>
->>
->> Yes.
->>
->>> The solution might be to extend the mailbox API slightly, to
->>> have explicit support for variable-length messages, and implement
->>> support for that in either mailbox drivers or as an abstraction
->>> on top of doorbell-type mailboxes.
->>>
->> I got the concept. But are you also suggesting that in bindings it shmem
->> should be associated with mailbox controller rather than client ?
-> 
-> There are probably several ways of doing this better, we should see
-> what the best is we can come up with.
-> 
-> I think generally speaking we need a way for a mailbox user to
-> know what it should use as the mailbox data here, so it is
-> able to talk to different incompatible mailbox providers.
-> 
-> One idea I had is to use a nested mailbox driver, that turns
-> a doorbell or single-register styled mailbox into a variable-length
-> mailbox by adding a memory region, like
-> 
->     mailbox at 1233000 {
->         compatible = "vendor-hardware-specifc-id";
->         interrupts = <34>;
->         reg = <0x1233000 0x100>;
->         #mbox-cells = <1>;
->     };
-> 
->     mailbox {
->            compatible = "shmem-mailbox";
->            mboxes = <&/mailbox@1233000  25>;
->            #mbox-cells = <1>;
->            shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
->     };
-> 
-> This would create one mailbox that only takes a register argument,
-> and another one that can take longer messages based on the first.
-> In your driver, you then refer to the second one and pass the
-> variable-length data into that directly.
 
-1. IIUC it was intentional not to include shmem as part of mailbox
-   controller binding and was pushed to client drivers as it's generally
-   not part of mailbox IP block. I am not sure if there are any other
-   specific reasons for that, but I may be missing some facts.
+Agreed.
 
-2. I am not sure if we need nested driver/bindings (at-least to begin
-   with). On a platform I don't think both/all modes will be used.
-   I had  proposal for adding doorbell for ARM MHU based on extended
-   bindings, but it was rejected[1]. But I really preferred that over
-   the shim layer I had to add in v3.
+>> +
+>> +static struct platform_driver scmi_cpufreq_platdrv = {
+>> +       .driver = {
+>> +               .name   = "scmi-cpufreq",
+>> +       },
+>> +       .probe          = scmi_cpufreq_probe,
+>> +       .remove         = scmi_cpufreq_remove,
+>> +};
+> 
+> You appear to have split this driver into the 'cpufreq' side and
+> the 'protocol' handler in a different file. I already commented that
+> the way the main scmi driver knows about all the protocols looks
+> bad, here we can see another aspect of the same problem.
+> 
+> Rather than manually register a platform_device for the purpose
+> of connecting it to the cpufreq driver, there should be a way
+> to dynamically register the protocol from the cpufreq driver
+> and then have both in the same file.
+> 
 
---
+I agree that should be possible. I took this approach for 2 reasons:
+
+1. to avoid all sorts of probe ordering issues
+2. we may have system with multiple instances of SCMI. E.g. a system
+   may have multiple remote processors, each controlling dvfs/power mgmt
+   of a subset of CPUs/devices controller in OS.
+
+I have to admit that I haven't thought too much in details yet. That's
+the main idea behind scmi_handle and restricting access to that only to
+sub-nodes in it. I am open to suggestions.
+
+-- 
 Regards,
 Sudeep
-
-[1] https://patchwork.kernel.org/patch/9745683/
