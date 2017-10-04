@@ -1,57 +1,33 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 12:18:59 +0100
-Subject: [PATCH v3 11/22] firmware: arm_scmi: add support for polling
- based SCMI transfers
-In-Reply-To: <CAK8P3a2wRFif2zYKKmdcNm5wgbGdhqwLdA-YV7AX_0LmM+OiQQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Oct 2017 13:19:40 +0200
+Subject: [PATCH v3 04/22] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <1506604306-20739-5-git-send-email-sudeep.holla@arm.com>
 References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-12-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a2wRFif2zYKKmdcNm5wgbGdhqwLdA-YV7AX_0LmM+OiQQ@mail.gmail.com>
-Message-ID: <6b2f2e70-6d0f-e7e4-d130-cd384289eb1a@arm.com>
+ <1506604306-20739-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAK8P3a1o+thrkyUmf2DGYq4pb087y8gwHo2jTyqcDxWdMAnogQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
+> +static int scmi_mbox_free_channel(struct scmi_info *info)
+> +{
+> +       if (!IS_ERR_OR_NULL(info->tx_chan)) {
+> +               mbox_free_channel(info->tx_chan);
+> +               info->tx_chan = NULL;
+> +       }
+> +
+> +       return 0;
+> +}
 
-On 04/10/17 12:13, Arnd Bergmann wrote:
-> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> It would be useful to have options to perform some SCMI transfers
->> atomically by polling for the completion flag instead of interrupt
->> driven. The SCMI specification has option to disable the interrupt and
->> poll for the completion flag in the shared memory.
->>
->> This patch adds support for polling based SCMI transfers using that
->> option. This might be used for uninterrupted/atomic DVFS operations
->> from the scheduler context.
-> 
-> multi-millisecond timeouts from inside the scheduler sound like a
-> really bad idea. Could this maybe get changed to an asynchronous
-> operation?
-> 
+Any use of IS_ERR_OR_NULL() tends to be an indication of a bad API
+design. Please make a decision about what you want to store in
+info->tx_chan and stick with it.
 
-We already support asynchronous version. This is mainly to support fast
-DVFS switching done at context switch. I can reduce the timeouts to
-few uS as the whole idea of fast dvfs is we can't return or schedule out
-of this function. Typically the remote should see the request in < 10 uS
-and acknowledge it.
+Usually, we don't store error pointers in permanent data structures.
+If you can deal with tx_chan being absent here, then you can just
+store NULL into it when you don't have one, otherwise you should
+make sure you never call this and fail the probe function earlier.
 
->> +       if (xfer->hdr.poll_completion) {
->> +               timeout = info->desc->max_rx_timeout_ms * 100;
->> +               while (!scmi_xfer_poll_done(info, xfer) && timeout--)
->> +                       udelay(10);
-> 
-> The timeout calculation is bad as well, since both the
-> scmi_xfer_poll_done() call and udelay() can take much longer
-> than the 10 microsecond delay that you use for the calculation.
-> 
-
-Ah, agreed. I will change it to few uS as that's what is expected.
-
-> If you want to do a timeout check like this, it should generally
-> be done using ktime_get()/ktime_add()/ktime_before().
-> 
-
-Good idea, will try to use that.
-
--- 
-Regards,
-Sudeep
+      Arnd
