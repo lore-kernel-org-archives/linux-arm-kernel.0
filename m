@@ -1,102 +1,98 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 05 Oct 2017 10:01:50 +1030
-Subject: [PATCH v2 2/9] ARM: dts: aspeed: Reorder ADC node
-In-Reply-To: <20171004064917.2498-3-joel@jms.id.au>
+Date: Thu, 05 Oct 2017 10:05:03 +1030
+Subject: [PATCH v2 4/9] ARM: dts: aspeed-romulus: Add I2C devices
+In-Reply-To: <20171004064917.2498-5-joel@jms.id.au>
 References: <20171004064917.2498-1-joel@jms.id.au>
- <20171004064917.2498-3-joel@jms.id.au>
-Message-ID: <1507159910.5452.34.camel@aj.id.au>
+ <20171004064917.2498-5-joel@jms.id.au>
+Message-ID: <1507160103.5452.35.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 2017-10-04 at 17:19 +1030, Joel Stanley wrote:
-> We try to keep the nodes in address order. The ADC node was out of
-> place.
+> Enable the buses that are in use and the devices that are attached.
+> Currently that is just the battery backed RTC.
 >?
+> Some of these buses are for hotplugged cards, such as PCIe cards. Others
+> do not yet have upstream drivers, so there are no devices attached.
+>?
+> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
 
 Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
->?
 > ---
 > v2:
-> ?- Don't introduce new clk bindings
+> ?- Use okay not enabled for the status
 > ---
-> ?arch/arm/boot/dts/aspeed-g4.dtsi | 16 ++++++++--------
-> ?arch/arm/boot/dts/aspeed-g5.dtsi | 16 ++++++++--------
-> ?2 files changed, 16 insertions(+), 16 deletions(-)
+> ?arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 54 ++++++++++++++++++++++++++++
+> ?1 file changed, 54 insertions(+)
 >?
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 1edd0cee6221..c2d96b8a5065 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -129,6 +129,14 @@
-> ?				};
-> ?			};
-> ?
-> +			adc: adc at 1e6e9000 {
-> +				compatible = "aspeed,ast2400-adc";
-> +				reg = <0x1e6e9000 0xb0>;
-> +				clocks = <&clk_apb>;
-> +				#io-channel-cells = <1>;
-> +				status = "disabled";
-> +			};
-> +
-> ?			sram at 1e720000 {
-> ?				compatible = "mmio-sram";
-> ?				reg = <0x1e720000 0x8000>;	// 32K
-> @@ -227,14 +235,6 @@
-> ?				no-loopback-test;
-> ?				status = "disabled";
-> ?			};
-> -
-> -			adc: adc at 1e6e9000 {
-> -				compatible = "aspeed,ast2400-adc";
-> -				reg = <0x1e6e9000 0xb0>;
-> -				clocks = <&clk_apb>;
-> -				#io-channel-cells = <1>;
-> -				status = "disabled";
-> -			};
-> ?		};
-> ?	};
+> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> index 1190fec1b5d0..8b96baf7c4de 100644
+> --- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> @@ -79,3 +79,57 @@
+> ?	pinctrl-names = "default";
+> ?	pinctrl-0 = <&pinctrl_rmii1_default>;
 > ?};
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index f56dd67efa50..9e71c2dac0ba 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -173,6 +173,14 @@
-> ?				reg-io-width = <4>;
-> ?			};
-> ?
-> +			adc: adc at 1e6e9000 {
-> +				compatible = "aspeed,ast2500-adc";
-> +				reg = <0x1e6e9000 0xb0>;
-> +				clocks = <&clk_apb>;
-> +				#io-channel-cells = <1>;
-> +				status = "disabled";
-> +			};
 > +
-> ?			sram at 1e720000 {
-> ?				compatible = "mmio-sram";
-> ?				reg = <0x1e720000 0x9000>;	// 36K
-> @@ -307,14 +315,6 @@
-> ?				no-loopback-test;
-> ?				status = "disabled";
-> ?			};
-> -
-> -			adc: adc at 1e6e9000 {
-> -				compatible = "aspeed,ast2500-adc";
-> -				reg = <0x1e6e9000 0xb0>;
-> -				clocks = <&clk_apb>;
-> -				#io-channel-cells = <1>;
-> -				status = "disabled";
-> -			};
-> ?		};
-> ?	};
-> ?};
+> +&i2c2 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c4 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c5 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c6 {
+> +	/* PCIe slot 1 (x8) */
+> +	status = "okay";
+> +};
+> +
+> +&i2c7 {
+> +	/* PCIe slot 2 (x16) */
+> +	status = "okay";
+> +};
+> +
+> +&i2c8 {
+> +	/* PCIe slot 3 (x16) */
+> +	status = "okay";
+> +};
+> +
+> +&i2c9 {
+> +	/* PCIe slot 4 (x16) */
+> +	status = "okay";
+> +};
+> +
+> +&i2c10 {
+> +	/* PCIe slot 5 (x8) */
+> +	status = "okay";
+> +};
+> +
+> +&i2c11 {
+> +	status = "okay";
+> +
+> +	rtc at 32 {
+> +		compatible = "epson,rx8900";
+> +		reg = <0x32>;
+> +	};
+> +};
+> +
+> +&i2c12 {
+> +	status = "okay";
+> +};
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/39023557/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171005/0c718a9d/attachment.sig>
