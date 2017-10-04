@@ -1,75 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Oct 2017 14:24:36 +0100
-Subject: [PATCH] arm64: Enable MRS emulation early
-In-Reply-To: <20171004124819.GU3611@e103592.cambridge.arm.com>
-References: <20171004094805.24009-1-suzuki.poulose@arm.com>
- <20171004101425.GB23092@leverpostej>
- <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
- <20171004113207.GT3611@e103592.cambridge.arm.com>
- <20171004113628.t4gv7srwpvbwwbsl@armageddon.cambridge.arm.com>
- <20171004124819.GU3611@e103592.cambridge.arm.com>
-Message-ID: <20171004132435.yt54irsc7vwht5dy@armageddon.cambridge.arm.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Wed, 4 Oct 2017 09:28:55 -0400
+Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
+In-Reply-To: <20171004125743.fm6mf2artbga76et@dhcp22.suse.cz>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-9-pasha.tatashin@oracle.com>
+ <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
+ <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
+ <20171004085636.w2rnwf5xxhahzuy7@dhcp22.suse.cz>
+ <9198a33d-cd40-dd70-4823-7f70c57ef9a2@oracle.com>
+ <20171004125743.fm6mf2artbga76et@dhcp22.suse.cz>
+Message-ID: <d743668c-6b7e-1775-a5b8-d6e997537990@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 01:48:19PM +0100, Dave P Martin wrote:
-> On Wed, Oct 04, 2017 at 12:36:29PM +0100, Catalin Marinas wrote:
-> > On Wed, Oct 04, 2017 at 12:32:07PM +0100, Dave P Martin wrote:
-> 
-> [...]
-> 
-> > > I don't think the hwcaps shouldn't change after entry to userspace,
-> > > so it really doesn't matter whether HWCAP_CPUID is set before or
-> > > after registration: for userspace it should all already have happened.
-> > 
-> > Good point, I forgot about this.
-> > 
-> > > It looks to me like all initcalls are called in the same kernel thread
-> > > that execs the initramfs init process, before the exec.
-> > > 
-> > > So I still don't see how a built-in late initcall can not have been
-> > > called before entry to userspace.
-> > > 
-> > > The patch seems to demonstrate that I'm wrong though.
-> > > What am I missing?
-> > 
-> > I also wondered about this. I think is the kernel invoking modprobe
-> > before the actual init/linuxrc in an initrd.
-> 
-> Ah, right.  Could that be a bug, do you think?
-> 
-> I wonder whether it's even well-defined how early that can happen.
-> i.e., which initcall level is guaranteed early enough to prevent this?
 
-I don't think it's a bug, probably just an undocumented convention. I
-don't know which module triggered this specific issue but, for example,
-I see the possibility of request_module in the ipv4 code only after
-fs_initcall(). Let's hope nothing executes user space prior to
-arch_initcall().
+> I am not really familiar with the trim_low_memory_range code path. I am
+> not even sure we have to care about it because nobody should be walking
+> pfns outside of any zone.
 
-usermodehlper_enable() is called in do_basic_setup() prior to
-do_initcalls(), so there is always a chance of someone calling user
-space early. If we want some guarantee, maybe something like below:
+According to commit comments first 4K belongs to BIOS, so I think the 
+memory exists but BIOS may or may not report it to Linux. So, reserve it 
+to make sure we never touch it.
 
-diff --git a/init/main.c b/init/main.c
-index 0ee9c6866ada..67040e570533 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -914,10 +914,16 @@ static void __init do_basic_setup(void)
- 	driver_init();
- 	init_irq_proc();
- 	do_ctors();
--	usermodehelper_enable();
- 	do_initcalls();
- }
- 
-+static int usermodehelper_init(void)
-+{
-+	usermodehelper_enable();
-+	return 0;
-+}
-+arch_initcall_sync(usermodehelper_init);
-+
- static void __init do_pre_smp_initcalls(void)
- {
- 	initcall_t *fn;
+  I am worried that this patch adds a code which
+> is not really used and it will just stay that way for ever because
+> nobody will dare to change it as it is too obscure and not explained
+> very well.
+
+I could explain mine code better. Perhaps add more comments, and explain 
+when it can be removed?
+
+  trim_low_memory_range is a good example of this. Why do we
+> even reserve this range from the memory block allocator? The memory
+> shouldn't be backed by any real memory and thus not in the allocator in
+> the first place, no?
+> 
+
+Since it is not enforced in memblock that everything in reserved list 
+must be part of memory list, we can have it, and we need to make sure 
+kernel does not panic. Otherwise, it is very hard to detect such bugs.
