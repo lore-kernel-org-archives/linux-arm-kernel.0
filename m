@@ -1,56 +1,79 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 04 Oct 2017 15:42:08 +1030
-Subject: [PATCH 6/8] ARM: dts: aspeed-ast2500: Add I2C devices
-In-Reply-To: <20170928075149.8154-7-joel@jms.id.au>
+Date: Wed, 04 Oct 2017 15:43:19 +1030
+Subject: [PATCH 7/8] ARM: dts: aspeed: Add aliases for UARTs
+In-Reply-To: <20170928075149.8154-8-joel@jms.id.au>
 References: <20170928075149.8154-1-joel@jms.id.au>
- <20170928075149.8154-7-joel@jms.id.au>
-Message-ID: <1507093928.5452.15.camel@aj.id.au>
+ <20170928075149.8154-8-joel@jms.id.au>
+Message-ID: <1507093999.5452.16.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 2017-09-28 at 17:21 +0930, Joel Stanley wrote:
-> Enable the buses that are in use and the devices that are attached.
-> Currently that includes temperature measurement and EEPROM.
+> Existing userspace expects the console (UART5) to be at /dev/ttyS4.??To
+> ensure the UARTs show up where users expect them, we give them fixed
+> aliases starting at 0.
 >?
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
 
 Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
 > ---
-> ?arch/arm/boot/dts/aspeed-ast2500-evb.dts | 19 +++++++++++++++++++
-> ?1 file changed, 19 insertions(+)
+> ?arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 4 ----
+> ?arch/arm/boot/dts/aspeed-g4.dtsi??????????????| 5 +++++
+> ?arch/arm/boot/dts/aspeed-g5.dtsi??????????????| 5 +++++
+> ?3 files changed, 10 insertions(+), 4 deletions(-)
 >?
-> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> index 7c90dac99822..dc7d73b02b76 100644
-> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> @@ -59,3 +59,22 @@
-> ?	pinctrl-names = "default";
-> ?	pinctrl-0 = <&pinctrl_rgmii2_default &pinctrl_mdio2_default>;
-> ?};
-> +
-> +&i2c3 {
-> +	status = "okay";
-> +
-> +	eeprom at 50 {
-> +		compatible = "atmel,24c08";
-> +		reg = <0x50>;
-> +		pagesize = <16>;
-> +	};
-> +};
-> +
-> +&i2c7 {
-> +	status = "okay";
-> +
-> +	lm75 at 4d {
-> +		compatible = "national,lm75";
-> +		reg = <0x4d>;
-> +	};
-> +};
+> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+> index e387c80b7f4f..be51be5a5f39 100644
+> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+> @@ -6,10 +6,6 @@
+> ?	model = "Palmetto BMC";
+> ?	compatible = "tyan,palmetto-bmc", "aspeed,ast2400";
+> ?
+> -	aliases {
+> -		serial4 = &uart5;
+> -	};
+> -
+> ?	chosen {
+> ?		stdout-path = &uart5;
+> ?		bootargs = "console=ttyS4,115200 earlyprintk";
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index f8611d5a6465..191c33d18122 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -22,6 +22,11 @@
+> ?		i2c11 = &i2c11;
+> ?		i2c12 = &i2c12;
+> ?		i2c13 = &i2c13;
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +		serial3 = &uart4;
+> +		serial4 = &uart5;
+> ?	};
+> ?
+> ?	cpus {
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index de127370131d..251fc9f4637e 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -22,6 +22,11 @@
+> ?		i2c11 = &i2c11;
+> ?		i2c12 = &i2c12;
+> ?		i2c13 = &i2c13;
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +		serial3 = &uart4;
+> +		serial4 = &uart5;
+> ?	};
+> ?
+> ?	cpus {
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/e88d7abd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/3a522091/attachment-0001.sig>
