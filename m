@@ -1,95 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 Oct 2017 12:22:04 +0100
-Subject: [PATCH v8 3/5] iommu/of: Add msi address regions reservation
- helper
-In-Reply-To: <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
-References: <20170927133241.21036-1-shameerali.kolothum.thodi@huawei.com>
- <20170927133241.21036-4-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <f3146f49-6004-7a15-866b-653e3ea54856@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Oct 2017 13:24:03 +0200
+Subject: [PATCH v3 15/22] firmware: arm_scmi: abstract mailbox interface
+In-Reply-To: <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-16-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAK8P3a0EUr_aEZdOrjHixzp44yXqsNxTMzBceSBTmk-x8x2MAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/09/17 14:32, Shameer Kolothum wrote:
-> From: John Garry <john.garry@huawei.com>
-> 
-> On some platforms msi-controller address regions have to be excluded
-> from normal IOVA allocation in that they are detected and decoded in
-> a HW specific way by system components and so they cannot be considered
-> normal IOVA address space.
-> 
-> Add a helper function that retrieves msi address regions through device
-> tree msi mapping, so that these regions will not be translated by IOMMU
-> and will be excluded from IOVA allocations.
-> 
-> Signed-off-by: John Garry <john.garry@huawei.com>
-> [Shameer: Modified msi-parent retrieval logic]
-> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/iommu/of_iommu.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_iommu.h | 10 +++++
->  2 files changed, 105 insertions(+)
-> 
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index e60e3db..ffd7fb7 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -21,6 +21,7 @@
->  #include <linux/iommu.h>
->  #include <linux/limits.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_iommu.h>
->  #include <linux/of_pci.h>
->  #include <linux/slab.h>
-> @@ -138,6 +139,14 @@ static int of_iommu_xlate(struct device *dev,
->  	return ops->of_xlate(dev, iommu_spec);
->  }
->  
-> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-> +{
-> +	u32 *rid = data;
-> +
-> +	*rid = alias;
-> +	return 0;
-> +}
-> +
->  struct of_pci_iommu_alias_info {
->  	struct device *dev;
->  	struct device_node *np;
-> @@ -163,6 +172,73 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
->  	return info->np == pdev->bus->dev.of_node;
->  }
->  
-> +static int of_iommu_alloc_resv_region(struct device_node *np,
-> +				      struct list_head *head)
-> +{
-> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> +	struct iommu_resv_region *region;
-> +	struct resource res;
-> +	int err;
-> +
-> +	err = of_address_to_resource(np, 0, &res);
+On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Some of the mailbox controller expects controller specific data in order
+> to implement simple doorbell mechanism as expected by SCMI specification.
+>
+> This patch creates a shim layer to abstract the mailbox interface so
+> that it can support any mailbox controller. It also provides default
+> implementation which maps to standard mailbox client APIs, so that
+> controllers implementing doorbell mechanism need not require any
+> additional layer.
+>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-What is the rational for registering the first region only? Surely you
-can have more than one region in an MSI controller (yes, your particular
-case is the ITS which has only one, but we're trying to do something
-generic here).
+Another level? Now we have three levels of stacked mailboxes, with
+the highest level being the combined mailbox/memory, then the shim,
+and below it the hardware mailbox.
 
-Another issue I have with this code is that it inserts all of the ITS
-MMIO in the RESV_MSI range. As long as we don't generate any page tables
-for this, we're fine. But if we ever change this, we'll end-up with the
-ITS programming interface being exposed to a device, which wouldn't be
-acceptable.
+Can you try to come up with a way to do this with fewer abstractions?
 
-Why can't we have some generic property instead, that would describe the
-actual ranges that cannot be translated? That way, no random insertion
-of a random range, and relatively future proof.
+Maybe you could assume that the mailbox itself can take variable-length
+data packets, and then use the shim here for those that require
+something else?
 
-I'm not sure where to declare it (PCIe node? IOMMU node?), but it'd feel
-like a much nicer and simpler solution to this problem.
-
-Thoughts?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+        Arnd
