@@ -1,75 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Oct 2017 12:50:08 +0200
-Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Oct 2017 11:50:18 +0100
+Subject: [PATCH 2/7] regulator: axp20x: Add support for AXP813 regulators
+In-Reply-To: <20170929032514.31727-3-wens@csie.org>
+References: <20170929032514.31727-1-wens@csie.org>
+ <20170929032514.31727-3-wens@csie.org>
+Message-ID: <20171004105018.oxwhialssxh62sv3@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> +
-> +The SCMI is intended to allow agents such as OSPM to manage various functions
-> +that are provided by the hardware platform it is running on, including power
-> +and performance functions.
-> +
-> +This binding is intended to define the interface the firmware implementing
-> +the SCMI as described in ARM document number ARM DUI 0922B ("ARM System Control
-> +and Management Interface Platform Design Document")[0] provide for OSPM in
-> +the device tree.
-> +
-> +Required properties:
-> +
-> +The scmi node with the following properties shall be under the /firmware/ node.
-> +
-> +- compatible : shall be "arm,scmi"
-> +- mboxes: List of phandle and mailbox channel specifiers. It should contain
-> +         exactly one or two mailboxes, one for transmitting messages("tx")
-> +         and another optional for receiving the notifications("rx") if
-> +         supported.
-> +- mbox-names: shall be "tx" or "rx"
+On Fri, 29 Sep 2017, Chen-Yu Tsai wrote:
 
-The example below does not have the mbox-names property. If you require
-exactly two mailboxes, why do you need the names anyway?
+> The AXP813 PMIC has 7 DC-DC buck regulators, 16 LDOs (including the
+> fixed RTC LDO and 2 GPIO LDOs), and 1 switchable. The drive-vbus
+> feature is also supported. All the hardware details are very similar
+> to the AXP803, with the following exceptions:
+> 
+>   - Extra DCDC7 buck regulator, with the same range as DCDC6
+> 
+>   - SWitch now has a separate supply pin, instead of being chained
+>     internaly from DCDC1
+> 
+>   - RTC LDO output voltage is now 1.8V
+> 
+>   - FLDO3 is an LDO with switchable supplies, but unconfigurable output
+>     voltage. The voltage is always half that of its supply.
+> 
+> Support for FLDO3 is currently unimplemented, as it requires runtime
+> switching of its supplies, something the regulator subsystem does not
+> support. It is not used in either the reference designs nor actually
+> produced boards available.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/regulator/axp20x-regulator.c | 102 +++++++++++++++++++++++++++++++++--
 
-However, your example does have a #addresss-cells/#size-cells
-property that are not documented here. Please add them here as either
-optional or required, and describe what the permitted values are and
-how the address is interpreted.
+>  include/linux/mfd/axp20x.h           |   3 ++
 
-> +- shmem : List of phandle pointing to the shared memory(SHM) area as per
-> +         generic mailbox client binding.
-> +
-> +See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
-> +about the generic mailbox controller and client driver bindings.
-> +
-> +The mailbox is the only permitted method of calling the SCMI firmware.
-> +Mailbox doorbell is used as a mechanism to alert the presence of a
-> +messages and/or notification.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-This looks odd: why not make the message itself part of the mailbox
-protocol here, and leave the shmem as a implementation detail of the
-mailbox driver?
+>  2 files changed, 101 insertions(+), 4 deletions(-)
 
-> +Each protocol supported shall have a sub-node with corresponding compatible
-> +as described in the following sections. If the platform supports dedicated
-> +communication channel for a particular protocol, the 3 properties namely:
-> +mboxes, mbox-names and shmem shall be present in the sub-node corresponding
-> +to that protocol.
-> +
-> +Clock/Performance bindings for the clocks/OPPs based on SCMI Message Protocol
-> +------------------------------------------------------------
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +Required properties:
-> +- #clock-cells : Should be 1. Contains the Clock ID value used by SCMI commands.
-> +
-
-How does the OS identify the fact that a subnode uses the clock binding?
-Do you need to look for the #clock-cells property, or is this based on the
-unit address?
-
-          Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
