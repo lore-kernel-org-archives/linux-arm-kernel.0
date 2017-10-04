@@ -1,42 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Oct 2017 12:31:31 +0100
-Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
-In-Reply-To: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
-References: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 4 Oct 2017 12:32:07 +0100
+Subject: [PATCH] arm64: Enable MRS emulation early
+In-Reply-To: <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
+References: <20171004094805.24009-1-suzuki.poulose@arm.com>
+ <20171004101425.GB23092@leverpostej>
+ <20171004111040.vumbc3bk7sj2enc6@armageddon.cambridge.arm.com>
+Message-ID: <20171004113207.GT3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 03, 2017 at 06:25:46PM +0100, Mark Rutland wrote:
-> AddressSanitizer instrumentation can significantly bloat the stack, and
-> with GCC 7 this can result in stack overflows at boot time in some
-> configurations.
+On Wed, Oct 04, 2017 at 12:10:40PM +0100, Catalin Marinas wrote:
+> On Wed, Oct 04, 2017 at 11:14:26AM +0100, Mark Rutland wrote:
+> > On Wed, Oct 04, 2017 at 10:48:05AM +0100, Suzuki K Poulose wrote:
+> > > Make sure the MRS emulation is enabled early enough, such that the
+> > > early userspace applications (e.g, those run from initrd) could
+> > > use the facility without crashing them.
+> > > 
+> > > Fixes: commit 77c97b4ee2129 ("arm64: cpufeature: Expose CPUID registers by emulation")
+> > > Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
+> > > Cc: James Morse <james.morse@arm.com>
+> > > Cc: Dave Martin <Dave.martin@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: stable at vger.kernel.org
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > 
+> > This looks sensible, but shouldn't we do the same for other
+> > late_inicalls can affect initrd userspace?
+> > 
+> > e.g. armv8_deprecated_init, fpsimd_init, sys_reg_genericv8_init?
 > 
-> We can avoid this by doubling our stack size when KASAN is in use, as is
-> already done on x86 (and has been since KASAN was introduced).
-> Regardless of other patches to decrease KASAN's stack utilization,
-> kernels built with KASAN will always require more stack space than those
-> built without, and we should take this into account.
+> I think we should, though not all of them are concerned with the user
+> code. For example, fpsimd_init() takes care of the pm/hotplug aspect and
+> nothing to do with user space. That said, making it core_initcall() is
+> probably not a bad thing (just a statement that it is concerned with the
+> core initialisation), as long as all the other infrastructure it
+> registers with is up.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/memory.h | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> In local testing (with KASAN and other options enabled), I've seen a stack
-> depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
-> mounted over NFS. Without KASAN (but with other debug options enabled), this
-> was 7992 bytes.
-> 
-> I wonder if we want to go for 4x rather than 2x...
+> For Suzuki's patch, I was thinking of enabling emulation before we
+> register the HWCAP_CPUID bit (setup_elf_hwcaps). However, that means we
+> have to bring it before smp_cpus_done(). It's not really worth it as we
+> don't expect any user space at that point.
 
-Let's hope it's fine for now with 32K stacks. We may run into allocation
-issues with 64K stacks (and without VMAP_STACKS).
+I don't think the hwcaps shouldn't change after entry to userspace,
+so it really doesn't matter whether HWCAP_CPUID is set before or
+after registration: for userspace it should all already have happened.
 
-Do you want this patch for 4.14?
 
--- 
-Catalin
+It looks to me like all initcalls are called in the same kernel thread
+that execs the initramfs init process, before the exec.
+
+So I still don't see how a built-in late initcall can not have been
+called before entry to userspace.
+
+The patch seems to demonstrate that I'm wrong though.
+What am I missing?
+
+Cheers
+---Dave
