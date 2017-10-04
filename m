@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 04 Oct 2017 12:27:49 +0100
-Subject: Applied "ASoC: cygnus: Remove support for 8 bit audio and for mono"
- to the asoc tree
-In-Reply-To: <1506637775-18293-5-git-send-email-lori.hikichi@broadcom.com>
-Message-ID: <E1dzhq9-0004DL-4s@debutante>
+Date: Wed, 04 Oct 2017 12:29:07 +0100
+Subject: Applied "regulator: axp20x: Fix poly-phase bit offset for AXP803
+ DCDC5/6" to the regulator tree
+In-Reply-To: <20170929032514.31727-2-wens@csie.org>
+Message-ID: <E1dzhrP-0004X4-NL@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: cygnus: Remove support for 8 bit audio and for mono
+   regulator: axp20x: Fix poly-phase bit offset for AXP803 DCDC5/6
 
-has been applied to the asoc tree at
+has been applied to the regulator tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,73 +34,41 @@ to this mail.
 Thanks,
 Mark
 
->From 934e4885cb958566a34124e5a1dad2f9212a8ec6 Mon Sep 17 00:00:00 2001
-From: Lori Hikichi <lori.hikichi@broadcom.com>
-Date: Thu, 28 Sep 2017 15:29:35 -0700
-Subject: [PATCH] ASoC: cygnus: Remove support for 8 bit audio and for mono
+>From 986e7b7e4991a5d3abab26f97a671512e09e4417 Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Fri, 29 Sep 2017 11:25:08 +0800
+Subject: [PATCH] regulator: axp20x: Fix poly-phase bit offset for AXP803
+ DCDC5/6
 
-These modes of operation were not working properly and it is
-unclear if the hardware could fully support these modes properly.
-There is little to be gained by enabling these modes, therefore,
-we will just remove support.
+The bit offset used to check if DCDC5 and DCDC6 are tied together in
+poly-phase output is wrong. It was checking against a reserved bit,
+which is always false.
 
-Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
+In reality, neither the reference design layout nor actually produced
+boards tie these two buck regulators together. But we should still
+fix it, just in case.
+
+Fixes: 1dbe0ccb0631 ("regulator: axp20x-regulator: add support for AXP803")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/bcm/cygnus-ssp.c | 22 ++++------------------
- 1 file changed, 4 insertions(+), 18 deletions(-)
+ drivers/regulator/axp20x-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
-index da14facb8a6f..cd8aef8ed8a5 100644
---- a/sound/soc/bcm/cygnus-ssp.c
-+++ b/sound/soc/bcm/cygnus-ssp.c
-@@ -655,23 +655,10 @@ static int cygnus_ssp_hw_params(struct snd_pcm_substream *substream,
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
- 		value = readl(aio->cygaud->audio + aio->regs.bf_sourcech_cfg);
- 		value &= ~BIT(BF_SRC_CFGX_BUFFER_PAIR_ENABLE);
--		/* Configure channels as mono or stereo/TDM */
--		if (params_channels(params) == 1)
--			value |= BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
--		else
--			value &= ~BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
-+		value &= ~BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
- 		writel(value, aio->cygaud->audio + aio->regs.bf_sourcech_cfg);
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index f18b36dd57dd..376a99b7cf5d 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -590,7 +590,7 @@ static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
+ 		case AXP803_DCDC3:
+ 			return !!(reg & BIT(6));
+ 		case AXP803_DCDC6:
+-			return !!(reg & BIT(7));
++			return !!(reg & BIT(5));
+ 		}
+ 		break;
  
- 		switch (params_format(params)) {
--		case SNDRV_PCM_FORMAT_S8:
--			if (aio->port_type == PORT_SPDIF) {
--				dev_err(aio->cygaud->dev,
--				"SPDIF does not support 8bit format\n");
--				return -EINVAL;
--			}
--			bitres = 8;
--			break;
--
- 		case SNDRV_PCM_FORMAT_S16_LE:
- 			bitres = 16;
- 			break;
-@@ -1148,11 +1135,10 @@ static const struct snd_soc_dai_ops cygnus_spdif_dai_ops = {
- #define INIT_CPU_DAI(num) { \
- 	.name = "cygnus-ssp" #num, \
- 	.playback = { \
--		.channels_min = 1, \
-+		.channels_min = 2, \
- 		.channels_max = 16, \
- 		.rates = SNDRV_PCM_RATE_KNOT, \
--		.formats = SNDRV_PCM_FMTBIT_S8 | \
--				SNDRV_PCM_FMTBIT_S16_LE | \
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE | \
- 				SNDRV_PCM_FMTBIT_S32_LE, \
- 	}, \
- 	.capture = { \
-@@ -1160,7 +1146,7 @@ static const struct snd_soc_dai_ops cygnus_spdif_dai_ops = {
- 		.channels_max = 16, \
- 		.rates = SNDRV_PCM_RATE_KNOT, \
- 		.formats =  SNDRV_PCM_FMTBIT_S16_LE | \
--					SNDRV_PCM_FMTBIT_S32_LE, \
-+				SNDRV_PCM_FMTBIT_S32_LE, \
- 	}, \
- 	.ops = &cygnus_ssp_dai_ops, \
- 	.suspend = cygnus_ssp_suspend, \
 -- 
 2.14.1
