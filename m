@@ -1,29 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Oct 2017 11:08:50 +0100
-Subject: defconfig'ed v4.13 does not boot on ThunderX
-In-Reply-To: <135495b6-e13e-5c90-6130-addb60d0fa5c@riken.jp>
-References: <135495b6-e13e-5c90-6130-addb60d0fa5c@riken.jp>
-Message-ID: <20171004100641.GA23092@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 4 Oct 2017 11:10:21 +0100
+Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
+ scpi_probe
+In-Reply-To: <106745da-1027-5760-de51-7a74c033964b@gmail.com>
+References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
+ <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
+ <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
+ <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
+ <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
+ <ffb9c571-edd3-7ea0-ecf6-f72c2ddd9fc1@gmail.com>
+ <e34ca682-aa86-4057-cf29-172ff5764d07@arm.com>
+ <106745da-1027-5760-de51-7a74c033964b@gmail.com>
+Message-ID: <6ece57aa-81e0-c984-5eac-a0b54aa0d625@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 04:25:58PM +0900, Itaru Kitayama wrote:
-> Hi,
 
-Hi,
 
-> defconfig'ed kernel v4.13 does not boot on ThunderX, leaving only
-> messages below:
-> 
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Using DTB from configuration table
-> EFI stub: Exiting boot services and installing virtual address map...
+On 03/10/17 19:19, Heiner Kallweit wrote:
+> Am 03.10.2017 um 18:18 schrieb Sudeep Holla:
+>>
+>>
+>> On 03/10/17 17:00, Heiner Kallweit wrote:
 
-These are all message from the EFI stub. It's likely that we get into
-the kernel proper, but it dies before bringing up the usual console.
+[...]
 
-Can you try booting with 'earlycon' on the kernel commandline? That
-might get some early boot-time console output.
+>>>>>
+>>>>> Remove does for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
+>>>>> and therefore stops at the first unpopulated domain and doesn't free
+>>>>> the memory for further populated domains. I'll provide a patch for
+>>>>> it.
+>>>>>
+>>>>
+>>>> Does that mean you are re-introducing scpi_remove ? I kind of liked
+>>>> removing it.
+>>>>
+>>> Sorry for the confusion. Then I'll go with the original approach and
+>>> just make sure that errors whilst populating dvfs info are ignored.
+>>>
+>>
+>> Indeed.
+>>
+>> If you are fine with the below fixup, then I can add it myself. Let me know.
+>>
+> Fine with me.
 
-Thanks,
-Mark.
+Thanks for confirming, pushed now[1]. Can you please double check if
+possible.
+
+-- 
+Regards,
+Sudeep
+
+[1] https://git.kernel.org/sudeep.holla/linux/h/for-next/scpi-updates
