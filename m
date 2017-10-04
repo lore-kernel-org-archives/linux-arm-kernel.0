@@ -1,79 +1,52 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 04 Oct 2017 15:43:19 +1030
-Subject: [PATCH 7/8] ARM: dts: aspeed: Add aliases for UARTs
-In-Reply-To: <20170928075149.8154-8-joel@jms.id.au>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 4 Oct 2017 14:43:15 +0930
+Subject: [PATCH 2/8] ARM: dts: aspeed: Reorder ADC node
+In-Reply-To: <1507088159.5452.3.camel@aj.id.au>
 References: <20170928075149.8154-1-joel@jms.id.au>
- <20170928075149.8154-8-joel@jms.id.au>
-Message-ID: <1507093999.5452.16.camel@aj.id.au>
+ <20170928075149.8154-3-joel@jms.id.au>
+ <1507088159.5452.3.camel@aj.id.au>
+Message-ID: <CACPK8XfENyKdcV1ZgPrf-Kv+H5BsyQcaCX9ha_gNgD3gcuBUwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-09-28 at 17:21 +0930, Joel Stanley wrote:
-> Existing userspace expects the console (UART5) to be at /dev/ttyS4.??To
-> ensure the UARTs show up where users expect them, we give them fixed
-> aliases starting at 0.
->?
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+On Wed, Oct 4, 2017 at 1:05 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> On Thu, 2017-09-28 at 17:21 +0930, Joel Stanley wrote:
+>> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+>> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+>> @@ -129,6 +129,14 @@
+>>                               };
+>>                       };
+>>
+>> +                     adc: adc at 1e6e9000 {
+>> +                             compatible = "aspeed,ast2400-adc";
+>> +                             reg = <0x1e6e9000 0xb0>;
+>> +                             clocks = <&syscon ASPEED_CLK_APB>;
+>
+> We can't do this yet as the clk driver isn't yet merged, and it breaks from the
+> "just move the node" description in the commit message.
 
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+Yep. This was a bad commit that comes from post-clk driver. I will fix in v2.
 
-> ---
-> ?arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 4 ----
-> ?arch/arm/boot/dts/aspeed-g4.dtsi??????????????| 5 +++++
-> ?arch/arm/boot/dts/aspeed-g5.dtsi??????????????| 5 +++++
-> ?3 files changed, 10 insertions(+), 4 deletions(-)
->?
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> index e387c80b7f4f..be51be5a5f39 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> @@ -6,10 +6,6 @@
-> ?	model = "Palmetto BMC";
-> ?	compatible = "tyan,palmetto-bmc", "aspeed,ast2400";
-> ?
-> -	aliases {
-> -		serial4 = &uart5;
-> -	};
-> -
-> ?	chosen {
-> ?		stdout-path = &uart5;
-> ?		bootargs = "console=ttyS4,115200 earlyprintk";
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index f8611d5a6465..191c33d18122 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -22,6 +22,11 @@
-> ?		i2c11 = &i2c11;
-> ?		i2c12 = &i2c12;
-> ?		i2c13 = &i2c13;
-> +		serial0 = &uart1;
-> +		serial1 = &uart2;
-> +		serial2 = &uart3;
-> +		serial3 = &uart4;
-> +		serial4 = &uart5;
-> ?	};
-> ?
-> ?	cpus {
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index de127370131d..251fc9f4637e 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -22,6 +22,11 @@
-> ?		i2c11 = &i2c11;
-> ?		i2c12 = &i2c12;
-> ?		i2c13 = &i2c13;
-> +		serial0 = &uart1;
-> +		serial1 = &uart2;
-> +		serial2 = &uart3;
-> +		serial3 = &uart4;
-> +		serial4 = &uart5;
-> ?	};
-> ?
-> ?	cpus {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/3a522091/attachment-0001.sig>
+>> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+>> index f56dd67efa50..f6430b313f90 100644
+>> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+>> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+>> @@ -173,6 +173,14 @@
+>>                               reg-io-width = <4>;
+>>                       };
+>>
+>> +                     adc: adc at 1e6e9000 {
+>> +                             compatible = "aspeed,ast2500-adc";
+>> +                             reg = <0x1e6e9000 0xb0>;
+>
+> Did you intend to change the size cell value here? It now matches the g4, but
+> there was an explicit comment about the size for some reason in the -hunk
+> below. It's probably worth an explicit call-out if we're going to change it.
+
+Looks ok to me.
+
+Thanks for the review.
+
+Cheers,
+
+Joel
