@@ -1,42 +1,112 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Wed, 4 Oct 2017 08:26:57 -0400
-Subject: [PATCH v9 06/12] mm: zero struct pages during initialization
-In-Reply-To: <20171004084554.fhxpmywtovs5umnm@dhcp22.suse.cz>
-References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
- <20170920201714.19817-7-pasha.tatashin@oracle.com>
- <20171003130857.vohli6lnqj4tdmhl@dhcp22.suse.cz>
- <73ea1215-7aa2-39e1-b820-30f58119183e@oracle.com>
- <20171004084554.fhxpmywtovs5umnm@dhcp22.suse.cz>
-Message-ID: <2fd7b718-c254-612b-e100-a457094e7c38@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Oct 2017 14:35:08 +0200
+Subject: [PATCH v3 02/22] dt-bindings: arm: add support for ARM System
+ Control and Management Interface(SCMI) protocol
+In-Reply-To: <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-3-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a2-7NJTukWaf3=oB9dC+b3uuOGiN+Kc95FS_YBGGHz3ug@mail.gmail.com>
+ <c561b2b9-7146-6262-0e9f-fd6511455518@arm.com>
+Message-ID: <CAK8P3a2Vu1SWjYykyXtzjFVmGjm_pAfA1QuTG_X5CHzmtk+WJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2017 04:45 AM, Michal Hocko wrote:
-> On Tue 03-10-17 11:22:35, Pasha Tatashin wrote:
+On Wed, Oct 4, 2017 at 1:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi Arnd,
+>
+> Thanks for taking a look at this.
+>
+> On 04/10/17 11:50, Arnd Bergmann wrote:
+>> On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> +
+>>> +The SCMI is intended to allow agents such as OSPM to manage various functions
+>>> +that are provided by the hardware platform it is running on, including power
+>>> +and performance functions.
+>>> +
+>>> +This binding is intended to define the interface the firmware implementing
+>>> +the SCMI as described in ARM document number ARM DUI 0922B ("ARM System Control
+>>> +and Management Interface Platform Design Document")[0] provide for OSPM in
+>>> +the device tree.
+>>> +
+>>> +Required properties:
+>>> +
+>>> +The scmi node with the following properties shall be under the /firmware/ node.
+>>> +
+>>> +- compatible : shall be "arm,scmi"
+>>> +- mboxes: List of phandle and mailbox channel specifiers. It should contain
+>>> +         exactly one or two mailboxes, one for transmitting messages("tx")
+>>> +         and another optional for receiving the notifications("rx") if
+>>> +         supported.
+>>> +- mbox-names: shall be "tx" or "rx"
 >>
+>> The example below does not have the mbox-names property. If you require
+>> exactly two mailboxes, why do you need the names anyway?
 >>
->> On 10/03/2017 09:08 AM, Michal Hocko wrote:
->>> On Wed 20-09-17 16:17:08, Pavel Tatashin wrote:
->>>> Add struct page zeroing as a part of initialization of other fields in
->>>> __init_single_page().
->>>>
->>>> This single thread performance collected on: Intel(R) Xeon(R) CPU E7-8895
->>>> v3 @ 2.60GHz with 1T of memory (268400646 pages in 8 nodes):
->>>>
->>>>                           BASE            FIX
->>>> sparse_init     11.244671836s   0.007199623s
->>>> zone_sizes_init  4.879775891s   8.355182299s
->>>>                     --------------------------
->>>> Total           16.124447727s   8.362381922s
->>>
->>> Hmm, this is confusing. This assumes that sparse_init doesn't zero pages
->>> anymore, right? So these number depend on the last patch in the series?
->>
->> Correct, without the last patch sparse_init time won't change.
-> 
-> THen this is just misleading.
-> 
+>
+> Good question. I can drop it, but would like to keep in case we need to
+> extend it in future. We can always use then to identify.
 
-OK, I will re-arrange patches the way you suggested earlier.
+I don't think it's necessary, as long you always need to have the first two,
+but it doesn't hurt either.
 
-Pasha
+Just make the description match the example.
+
+>> However, your example does have a #addresss-cells/#size-cells
+>> property that are not documented here. Please add them here as either
+>> optional or required, and describe what the permitted values are and
+>> how the address is interpreted.
+>>
+>
+> Ah right, I didn't notice that. I will add it. It was added to provide
+> the protocol number in "reg" property.
+...
+>> How does the OS identify the fact that a subnode uses the clock binding?
+>> Do you need to look for the #clock-cells property, or is this based on the
+>> unit address?
+>>
+>
+> Yes it depends on #clock-cells property. That's the main reason for
+> adding #clock-cells
+
+I'm still unclear on this. Do you mean we look for a subnode with
+reg=<0x14> and then assume it's a clock node and require the
+ #clock-cells to be there, or do we look through the sub-nodes to
+find one with the #clock-cells property and then look up the 'reg'
+property to find out which protocol number to use?
+
+>>> +- shmem : List of phandle pointing to the shared memory(SHM) area as per
+>>> +         generic mailbox client binding.
+>>> +
+>>> +See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
+>>> +about the generic mailbox controller and client driver bindings.
+>>> +
+>>> +The mailbox is the only permitted method of calling the SCMI firmware.
+>>> +Mailbox doorbell is used as a mechanism to alert the presence of a
+>>> +messages and/or notification.
+>>
+>> This looks odd: why not make the message itself part of the mailbox
+>> protocol here, and leave the shmem as a implementation detail of the
+>> mailbox driver?
+>>
+>
+> I am not sure if I follow you here. But generally shmem can be memory
+> carved out of anything in the system and it's dependent on the protocol
+> and the remote firmware rather than the mailbox hardware itself.
+
+I think the problem is the way we use the mailbox API in Linux, which
+is completely abstract at the moment: it could be a pure doorbell, a
+single-register for a data, some structured memory, or a
+variable-length message. The assumption today is that the mailbox
+user and the mailbox driver agree on the interpretation of that
+void pointer.
+
+This breaks down here, as you require the message to be a
+variable-length message in a fixed physical location, but assume that
+the mailbox serves only as a doorbell.
+
+The solution might be to extend the mailbox API slightly, to
+have explicit support for variable-length messages, and implement
+support for that in either mailbox drivers or as an abstraction
+on top of doorbell-type mailboxes.
+
+      Arnd
