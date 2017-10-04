@@ -1,55 +1,89 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Oct 2017 11:10:21 +0100
-Subject: [PATCH 3/5] firmware: arm_scpi: pre-populate dvfs info in
- scpi_probe
-In-Reply-To: <106745da-1027-5760-de51-7a74c033964b@gmail.com>
-References: <c245d2fa-2aa0-fa40-21a7-318e8db3b763@gmail.com>
- <c8c0ff86-de14-f157-68e0-9df005defffa@gmail.com>
- <d6578a58-b7ab-9770-d78d-1971d1e702d4@arm.com>
- <db4476f4-df96-6ce5-ca5f-95141364fa62@gmail.com>
- <0e5959a7-6826-1909-1509-f6627a9688ed@arm.com>
- <ffb9c571-edd3-7ea0-ecf6-f72c2ddd9fc1@gmail.com>
- <e34ca682-aa86-4057-cf29-172ff5764d07@arm.com>
- <106745da-1027-5760-de51-7a74c033964b@gmail.com>
-Message-ID: <6ece57aa-81e0-c984-5eac-a0b54aa0d625@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 Oct 2017 12:11:45 +0200
+Subject: [PATCH v3 1/2] dt-bindings: add device tree binding for
+ Allwinner XR819 SDIO Wi-Fi
+In-Reply-To: <59D4B1C8.8020105@broadcom.com>
+References: <20171003165944.13056-1-icenowy@aosc.io>
+ <20171003165944.13056-2-icenowy@aosc.io>
+ <871smjxp46.fsf@kamboji.qca.qualcomm.com>
+ <E46F3A20-294A-497E-AF71-C77A67AFDB8C@aosc.io>
+ <59D4B1C8.8020105@broadcom.com>
+Message-ID: <20171004101145.kgjufpcktodppuy3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 04, 2017 at 10:02:48AM +0000, Arend van Spriel wrote:
+> On 10/4/2017 11:03 AM, Icenowy Zheng wrote:
+> > 
+> > 
+> > ? 2017?10?4? GMT+08:00 ??5:02:17, Kalle Valo <kvalo@codeaurora.org> ??:
+> > > Icenowy Zheng <icenowy@aosc.io> writes:
+> > > 
+> > > > Allwinner XR819 is a SDIO Wi-Fi chip, which has the functionality to
+> > > use
+> > > > an out-of-band interrupt pin instead of SDIO in-band interrupt.
+> > > > 
+> > > > Add the device tree binding of this chip, in order to make it
+> > > possible
+> > > > to add this interrupt pin to device trees.
+> > > > 
+> > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > Acked-by: Rob Herring <robh@kernel.org>
+> > > > ---
+> > > > Changes in v3:
+> > > > - Renames the node name.
+> > > > - Adds ACK from Rob.
+> > > > Changes in v2:
+> > > > - Removed status property in example.
+> > > > - Added required property reg.
+> > > > 
+> > > >   .../bindings/net/wireless/allwinner,xr819.txt      | 38
+> > > ++++++++++++++++++++++
+> > > >   1 file changed, 38 insertions(+)
+> > > >   create mode 100644
+> > > Documentation/devicetree/bindings/net/wireless/allwinner,xr819.txt
+> > > 
+> > > Like I asked already last time, AFAICS there is no upstream xr819
+> > > wireless driver in drivers/net/wireless directory. Do we still accept
+> > > bindings like this for out-of-tree drivers?
+> > 
+> > See esp8089.
+> > 
+> > There's also no in-tree driver for it.
+> 
+> The question is whether we should. The above might be a precedent, but it
+> may not necessarily be the way to go. The commit message for esp8089 seems
+> to hint that there is intent to have an in-tree driver:
+> 
+> """
+>     Note that at this point there only is an out of tree driver for this
+>     hardware, there is no clear timeline / path for merging this. Still
+>     I believe it would be good to specify the binding for this in tree
+>     now, so that any future migration to an in tree driver will not cause
+>     compatiblity issues.
+> 
+>     Cc: Icenowy Zheng <icenowy@aosc.xyz>
+>     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>     Signed-off-by: Rob Herring <robh@kernel.org>
+> """
+> 
+> Regardless the bindings are in principle independent of the kernel and just
+> describing hardware. I think there have been discussions to move the
+> bindings to their own repository, but apparently it was decided otherwise.
 
+Yeah, I guess especially how it could be merged with the cw1200 driver
+would be very relevant to that commit log.
 
-On 03/10/17 19:19, Heiner Kallweit wrote:
-> Am 03.10.2017 um 18:18 schrieb Sudeep Holla:
->>
->>
->> On 03/10/17 17:00, Heiner Kallweit wrote:
-
-[...]
-
->>>>>
->>>>> Remove does for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
->>>>> and therefore stops at the first unpopulated domain and doesn't free
->>>>> the memory for further populated domains. I'll provide a patch for
->>>>> it.
->>>>>
->>>>
->>>> Does that mean you are re-introducing scpi_remove ? I kind of liked
->>>> removing it.
->>>>
->>> Sorry for the confusion. Then I'll go with the original approach and
->>> just make sure that errors whilst populating dvfs info are ignored.
->>>
->>
->> Indeed.
->>
->> If you are fine with the below fixup, then I can add it myself. Let me know.
->>
-> Fine with me.
-
-Thanks for confirming, pushed now[1]. Can you please double check if
-possible.
+Maxime
 
 -- 
-Regards,
-Sudeep
-
-[1] https://git.kernel.org/sudeep.holla/linux/h/for-next/scpi-updates
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171004/873e8dea/attachment.sig>
