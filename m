@@ -1,86 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 4 Oct 2017 15:02:59 +0100
-Subject: defconfig'ed v4.13 does not boot on ThunderX
-In-Reply-To: <20171004134414.GF23092@leverpostej>
-References: <135495b6-e13e-5c90-6130-addb60d0fa5c@riken.jp>
- <dfecaf11-d133-91c2-c630-0b08356cebd9@arm.com>
- <20171004134414.GF23092@leverpostej>
-Message-ID: <db08ee33-5e54-5c9a-d265-14155b72b5ad@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 4 Oct 2017 16:04:10 +0200
+Subject: [PATCH v9 08/12] mm: zero reserved and unavailable struct pages
+In-Reply-To: <d743668c-6b7e-1775-a5b8-d6e997537990@oracle.com>
+References: <20170920201714.19817-1-pasha.tatashin@oracle.com>
+ <20170920201714.19817-9-pasha.tatashin@oracle.com>
+ <20171003131817.omzbam3js67edp3s@dhcp22.suse.cz>
+ <691dba28-718c-e9a9-d006-88505eb5cd7e@oracle.com>
+ <20171004085636.w2rnwf5xxhahzuy7@dhcp22.suse.cz>
+ <9198a33d-cd40-dd70-4823-7f70c57ef9a2@oracle.com>
+ <20171004125743.fm6mf2artbga76et@dhcp22.suse.cz>
+ <d743668c-6b7e-1775-a5b8-d6e997537990@oracle.com>
+Message-ID: <20171004140410.2w2zf2gbutdxunir@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/17 14:44, Mark Rutland wrote:
-> On Wed, Oct 04, 2017 at 02:38:58PM +0100, Robin Murphy wrote:
->> On 04/10/17 08:25, Itaru Kitayama wrote:
->>> Hi,
->>>
->>> defconfig'ed kernel v4.13 does not boot on ThunderX, leaving only
->>> messages below:
->>>
->>> EFI stub: Booting Linux Kernel...
->>> EFI stub: Using DTB from configuration table
->>> EFI stub: Exiting boot services and installing virtual address map...
->>>
->>> Our HW is by GIGABYTE, the model is R150 T62 rev 100:
->>>
->>> http://b2b.gigabyte.com/ARM-Server/R150-T62-rev-100#ov
->>>
->>> The BIOS we're on is T43. Has anyone testing upstream kernels seen a
->>> similar issue like this?
->>
->> FWIW defconfig does *not* enable most of the ThunderX drivers (most
->> importantly, PCI and networking will be missing).
+On Wed 04-10-17 09:28:55, Pasha Tatashin wrote:
 > 
-> .... it's a bit worrying if earlycon doesn't work without those, though.
-> It shouldn't be dependendent on either. :/
-
-Well, my earlycon was fine too, but that was an a different board with
-different firmware, so who knows...
-
->> I've just built the v4.13 tag with the appropriate drivers added and
->> booted it on a different ThunderX box - the net core throws some
->> warnings from __dev_xdp_attached() but it gets to userspace OK for me.
+> > I am not really familiar with the trim_low_memory_range code path. I am
+> > not even sure we have to care about it because nobody should be walking
+> > pfns outside of any zone.
 > 
-> Given these seem to exist out in the field, we should probably enable
-> those drivers in defconfig.
+> According to commit comments first 4K belongs to BIOS, so I think the memory
+> exists but BIOS may or may not report it to Linux. So, reserve it to make
+> sure we never touch it.
 
-True, I think the below ought to suffice - arm-soc take defconfig
-patches now, right?
+Yes and that memory should be outside of any zones, no?
 
-Robin.
+> > I am worried that this patch adds a code which
+> > is not really used and it will just stay that way for ever because
+> > nobody will dare to change it as it is too obscure and not explained
+> > very well.
+> 
+> I could explain mine code better. Perhaps add more comments, and explain
+> when it can be removed?
 
------>8-----
-From: Robin Murphy <robin.murphy@arm.com>
-Subject: [PATCH] arm64: Add ThunderX drivers to defconfig
+More explanation would be definitely helpful
 
-ThunderX needs its PCI host drivers to do anything useful, and it's
-probably helpful to have networking by default too.
+> > trim_low_memory_range is a good example of this. Why do we
+> > even reserve this range from the memory block allocator? The memory
+> > shouldn't be backed by any real memory and thus not in the allocator in
+> > the first place, no?
+> > 
+> 
+> Since it is not enforced in memblock that everything in reserved list must
+> be part of memory list, we can have it, and we need to make sure kernel does
+> not panic. Otherwise, it is very hard to detect such bugs.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+So, should we report such a memblock reservation API (ab)use to the log?
+Are you actually sure that trim_low_memory_range is doing a sane and
+really needed thing? In other words do we have a zone which contains
+this no-memory backed pfns?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34480e9af2e7..1c8e0d77deee 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -76,6 +76,8 @@ CONFIG_PCIE_RCAR=y
- CONFIG_PCIE_ROCKCHIP=m
- CONFIG_PCI_HOST_GENERIC=y
- CONFIG_PCI_XGENE=y
-+CONFIG_PCI_HOST_THUNDER_PEM=y
-+CONFIG_PCI_HOST_THUNDER_ECAM=y
- CONFIG_ARM64_VA_BITS_48=y
- CONFIG_SCHED_MC=y
- CONFIG_NUMA=y
-@@ -188,6 +190,7 @@ CONFIG_VIRTIO_NET=y
- CONFIG_AMD_XGBE=y
- CONFIG_NET_XGENE=y
- CONFIG_MACB=y
-+CONFIG_THUNDER_NIC_PF=y
- CONFIG_HNS_DSAF=y
- CONFIG_HNS_ENET=y
- CONFIG_E1000E=y
 -- 
-2.13.4.dirty
+Michal Hocko
+SUSE Labs
