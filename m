@@ -1,36 +1,74 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed,  4 Oct 2017 10:48:05 +0100
-Subject: [PATCH] arm64: Enable MRS emulation early
-Message-ID: <20171004094805.24009-1-suzuki.poulose@arm.com>
+From: arend.vanspriel@broadcom.com (Arend van Spriel)
+Date: Wed, 4 Oct 2017 12:02:48 +0200
+Subject: [PATCH v3 1/2] dt-bindings: add device tree binding for Allwinner
+ XR819 SDIO Wi-Fi
+In-Reply-To: <E46F3A20-294A-497E-AF71-C77A67AFDB8C@aosc.io>
+References: <20171003165944.13056-1-icenowy@aosc.io>
+ <20171003165944.13056-2-icenowy@aosc.io>
+ <871smjxp46.fsf@kamboji.qca.qualcomm.com>
+ <E46F3A20-294A-497E-AF71-C77A67AFDB8C@aosc.io>
+Message-ID: <59D4B1C8.8020105@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure the MRS emulation is enabled early enough, such that the
-early userspace applications (e.g, those run from initrd) could
-use the facility without crashing them.
+On 10/4/2017 11:03 AM, Icenowy Zheng wrote:
+>
+>
+> ? 2017?10?4? GMT+08:00 ??5:02:17, Kalle Valo <kvalo@codeaurora.org> ??:
+>> Icenowy Zheng <icenowy@aosc.io> writes:
+>>
+>>> Allwinner XR819 is a SDIO Wi-Fi chip, which has the functionality to
+>> use
+>>> an out-of-band interrupt pin instead of SDIO in-band interrupt.
+>>>
+>>> Add the device tree binding of this chip, in order to make it
+>> possible
+>>> to add this interrupt pin to device trees.
+>>>
+>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>> Changes in v3:
+>>> - Renames the node name.
+>>> - Adds ACK from Rob.
+>>> Changes in v2:
+>>> - Removed status property in example.
+>>> - Added required property reg.
+>>>
+>>>   .../bindings/net/wireless/allwinner,xr819.txt      | 38
+>> ++++++++++++++++++++++
+>>>   1 file changed, 38 insertions(+)
+>>>   create mode 100644
+>> Documentation/devicetree/bindings/net/wireless/allwinner,xr819.txt
+>>
+>> Like I asked already last time, AFAICS there is no upstream xr819
+>> wireless driver in drivers/net/wireless directory. Do we still accept
+>> bindings like this for out-of-tree drivers?
+>
+> See esp8089.
+>
+> There's also no in-tree driver for it.
 
-Fixes: commit 77c97b4ee2129 ("arm64: cpufeature: Expose CPUID registers by emulation")
-Reported-by: Matwey V. Kornilov <matwey.kornilov@gmail.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Dave Martin <Dave.martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: stable at vger.kernel.org
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The question is whether we should. The above might be a precedent, but 
+it may not necessarily be the way to go. The commit message for esp8089 
+seems to hint that there is intent to have an in-tree driver:
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9f9e0064c8c1..276eecab6cea 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1294,4 +1294,4 @@ static int __init enable_mrs_emulation(void)
- 	return 0;
- }
- 
--late_initcall(enable_mrs_emulation);
-+core_initcall(enable_mrs_emulation);
--- 
-2.13.5
+"""
+     Note that at this point there only is an out of tree driver for this
+     hardware, there is no clear timeline / path for merging this. Still
+     I believe it would be good to specify the binding for this in tree
+     now, so that any future migration to an in tree driver will not cause
+     compatiblity issues.
+
+     Cc: Icenowy Zheng <icenowy@aosc.xyz>
+     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+     Signed-off-by: Rob Herring <robh@kernel.org>
+"""
+
+Regardless the bindings are in principle independent of the kernel and 
+just describing hardware. I think there have been discussions to move 
+the bindings to their own repository, but apparently it was decided 
+otherwise.
+
+Regards,
+Arend
