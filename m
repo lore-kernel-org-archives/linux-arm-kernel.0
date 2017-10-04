@@ -1,88 +1,102 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 04 Oct 2017 11:50:59 +0100
-Subject: [PATCH 3/3] arm64: kvm: Fix single step for guest skipped
- instructions
-In-Reply-To: <93d7d64e-e32c-0c6b-5d02-68704c1d45ba@redhat.com>
-References: <1504083688-48334-1-git-send-email-julien.thierry@arm.com>
- <1504083688-48334-4-git-send-email-julien.thierry@arm.com>
- <CAMJs5B9u_s_wOoR7tyOV7t67aWmmgA6KavEWhDuDN98+z5rACg@mail.gmail.com>
- <3c249a68-45e3-a3a5-7d05-4cfc2d97713b@arm.com>
- <CAMJs5B8hYTJBxKa8Wu3Bw7EjaG4UZ56QQyVYx1E_4kJzkPhN+Q@mail.gmail.com>
- <ab00b377-c42d-d920-237f-9b30c9de5044@arm.com>
- <CAMJs5B-i4h63Hx68b6z-DxDphXieoNGJcLTfi2zLuq0CnU_S3g@mail.gmail.com>
- <3d7d2b36-da2f-04dc-611e-d7aab7666c29@arm.com>
- <CAMJs5B8F9VffM3pDQxbk-qfUmvvqdvbVOt8WZgFX2Q4Ud3eJrA@mail.gmail.com>
- <9bc5abc2-ab03-3137-82bd-e8afa62624eb@arm.com>
- <CAMJs5B9iVYGE2mODE1raHzGQ+Mz7V_kT+bJiWm0zUHfmLN1-DQ@mail.gmail.com>
- <861b4e4f-0fbe-cbc6-39ad-4660065449de@arm.com> <877ewcz3bv.fsf@linaro.org>
- <4d9fc0a2-bcf9-ca26-8646-037c2dcc6545@arm.com> <873770yz1o.fsf@linaro.org>
- <5a4f0493-6d3d-85de-fc45-030d4b03b5a8@arm.com> <871smkywgn.fsf@linaro.org>
- <db80e858-0127-af96-e09b-865893f927cb@arm.com> <87k20bxm13.fsf@linaro.org>
- <93d7d64e-e32c-0c6b-5d02-68704c1d45ba@redhat.com>
-Message-ID: <87infvxk30.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Oct 2017 12:59:54 +0200
+Subject: [PATCH v3 04/22] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <1506604306-20739-5-git-send-email-sudeep.holla@arm.com>
+References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
+ <1506604306-20739-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAK8P3a06PM-2t4FpnMaj+57Fp6MvZ8KLo2bcLMRVCO8=K92u4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 28, 2017 at 3:11 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Paolo Bonzini <pbonzini@redhat.com> writes:
+> +/**
+> + * struct scmi_msg_hdr - Message(Tx/Rx) header
+> + *
+> + * @id: The identifier of the command being sent
+> + * @protocol_id: The identifier of the protocol used to send @id command
+> + * @seq: The token to identify the message. when a message/command returns,
+> + *       the platform returns the whole message header unmodified including
+> + *      the token.
+> + */
+> +struct scmi_msg_hdr {
+> +       u8 id;
+> +       u8 protocol_id;
+> +       u16 seq;
+> +       u32 status;
+> +       bool poll_completion;
+> +};
 
-> On 04/10/2017 12:08, Alex Benn?e wrote:
->>
->> From 2e8fcea695a9eca67fbeb331d3104d1d9e7e337a Mon Sep 17 00:00:00 2001
->> From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
->> Date: Wed, 4 Oct 2017 09:49:41 +0000
->> Subject: [PATCH] kvm: exit run loop after emulating IO when single stepping
->> MIME-Version: 1.0
->> Content-Type: text/plain; charset=UTF-8
->> Content-Transfer-Encoding: 8bit
->>
->> If single-stepping is enabled we should exit the run-loop after
->> emulating the access. Otherwise single-stepping across emulated IO
->> accesses may skip an instruction.
->>
->> This only addresses user-space emulation. Stuff done in kernel-mode
->> should be handled there.
->>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  accel/kvm/kvm-all.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/accel/kvm/kvm-all.c b/accel/kvm/kvm-all.c
->> index 90c88b517d..85bcb2b0d4 100644
->> --- a/accel/kvm/kvm-all.c
->> +++ b/accel/kvm/kvm-all.c
->> @@ -1940,7 +1940,7 @@ int kvm_cpu_exec(CPUState *cpu)
->>                            run->io.direction,
->>                            run->io.size,
->>                            run->io.count);
->> -            ret = 0;
->> +            ret = cpu->singlestep_enabled ? EXCP_DEBUG : 0;
->>              break;
->>          case KVM_EXIT_MMIO:
->>              DPRINTF("handle_mmio\n");
->> @@ -1950,7 +1950,7 @@ int kvm_cpu_exec(CPUState *cpu)
->>                               run->mmio.data,
->>                               run->mmio.len,
->>                               run->mmio.is_write);
->> -            ret = 0;
->> +            ret = cpu->singlestep_enabled ? EXCP_DEBUG : 0;
->>              break;
->>          case KVM_EXIT_IRQ_WINDOW_OPEN:
->>              DPRINTF("irq_window_open\n");
->
-> Singlestep mode doesn't make much sense for KVM.  For TCG the purpose is
-> to build one-instruction translation blocks, but what would it mean for KVM?
+Is this structure part of the protocol, or just part of the linux
+implementation?
+If this is in the protocol, you should not have a 'bool' member in there, which
+does not have a well-defined binary representation across architectures.
 
-It's used by the kvm_arch_handle_debug() code to verify single-stepping
-is enabled when processing debug exceptions. And also kvm_update_debug:
+> +/*
+> + * The SCP firmware providing SCM interface to OSPM and other agents must
+> + * execute only in little-endian mode as per SCMI specification, so any buffers
+> + * shared through SCMI should have their contents converted to little-endian
+> + */
 
-    if (cpu->singlestep_enabled) {
-        data.dbg.control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
-    }
+That is a very odd thing to put into a specification, are you sure it requires
+a specific runtime endian-mode? I would bet that it only requires the protocol
+to use little-endian data, so better describe it like that.
 
-We also have an aliased singlestep_enabled in our disas_context for the
-translator.
+> +struct scmi_shared_mem {
+> +       __le32 reserved;
+> +       __le32 channel_status;
+> +#define SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR     BIT(1)
+> +#define SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE      BIT(0)
+> +       __le32 reserved1[2];
+> +       __le32 flags;
+> +#define SCMI_SHMEM_FLAG_INTR_ENABLED   BIT(0)
+> +       __le32 length;
+> +       __le32 msg_header;
+> +       u8 msg_payload[0];
+> +};
+> +
+> +static int scmi_linux_errmap[] = {
+> +       /* better than switch case as long as return value is continuous */
+> +       0,                      /* SCMI_SUCCESS */
+> +       -EOPNOTSUPP,            /* SCMI_ERR_SUPPORT */
+> +       -EINVAL,                /* SCMI_ERR_PARAM */
+> +       -EACCES,                /* SCMI_ERR_ACCESS */
+> +       -ENOENT,                /* SCMI_ERR_ENTRY */
+> +       -ERANGE,                /* SCMI_ERR_RANGE */
+> +       -EBUSY,                 /* SCMI_ERR_BUSY */
+> +       -ECOMM,                 /* SCMI_ERR_COMMS */
+> +       -EIO,                   /* SCMI_ERR_GENERIC */
+> +       -EREMOTEIO,             /* SCMI_ERR_HARDWARE */
+> +       -EPROTO,                /* SCMI_ERR_PROTOCOL */
+> +};
 
---
-Alex Benn?e
+maybe make this 'const'.
+
+> +static struct platform_driver scmi_driver = {
+> +       .driver = {
+> +                  .name = "arm-scmi",
+> +                  .of_match_table = of_match_ptr(scmi_of_match),
+> +                  },
+> +       .probe = scmi_probe,
+> +       .remove = scmi_remove,
+> +};
+
+The 'of_match_ptr' annotation probably causes an 'unused variable'
+warning, better just drop that.
+
+> +#if IS_REACHABLE(CONFIG_ARM_SCMI_PROTOCOL)
+> +int scmi_handle_put(const struct scmi_handle *handle);
+> +const struct scmi_handle *scmi_handle_get(struct device *dev);
+> +const struct scmi_handle *devm_scmi_handle_get(struct device *dev);
+
+IS_REACHABLE() can easily lead to confusion when the driver is
+a loadable module but never gets used by a built-in driver. Maybe use
+IS_ENABLED() here, and add a Kconfig symbol that other drivers
+can depend on if you want them to optionally use it, like:
+
+config MAYBE_ARM_SCMI_PROTOCOL
+        default y if ARM_SCMI_PROTOCOL=n
+        default ARM_SCMI_PROTOCOL
+
+     Arnd
