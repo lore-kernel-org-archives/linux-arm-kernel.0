@@ -1,24 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Oct 2017 18:07:30 -0700
-Subject: [PATCH] ARM: defconfig: FRAMEBUFFER_CONSOLE can no longer be =m
-In-Reply-To: <20170918154827.1654377-1-arnd@arndb.de>
-References: <20170918154827.1654377-1-arnd@arndb.de>
-Message-ID: <20171004010730.rnlweo4p4wko6e4h@localhost>
+Date: Tue, 3 Oct 2017 18:08:55 -0700
+Subject: [GIT PULL] ARM: at91: fixes for 4.14 #1
+In-Reply-To: <20170918162029.15894-1-nicolas.ferre@microchip.com>
+References: <20170918162029.15894-1-nicolas.ferre@microchip.com>
+Message-ID: <20171004010855.4xamlbzxgso26dsh@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 18, 2017 at 05:47:50PM +0200, Arnd Bergmann wrote:
-> It is no longer possible to load this at runtime, so let's
-> change the few remaining users to have it built-in all
-> the time.
+On Mon, Sep 18, 2017 at 06:20:29PM +0200, Nicolas Ferre wrote:
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> arch/arm/configs/zeus_defconfig:115:warning: symbol value 'm' invalid for FRAMEBUFFER_CONSOLE
-> arch/arm/configs/viper_defconfig:116:warning: symbol value 'm' invalid for FRAMEBUFFER_CONSOLE
-> arch/arm/configs/pxa_defconfig:474:warning: symbol value 'm' invalid for FRAMEBUFFER_CONSOLE
+> Arnd, Olof,
 > 
-> Reported-by: kernelci.org bot <bot@kernelci.org>
-> Fixes: 6104c37094e7 ("fbcon: Make fbcon a built-time depency for fbdev")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Here are some fixes for 4.14. I send them while Alexandre is in the US. The
+> most of this PR are modifications to the sama5d27 SOM1 EK board that was
+> introducts lately. These modifications are errors due to typos, misunderstanding
+> of the DT binding or simply last minute hardware modifications.
+> I also added one patch for the AT91 PM subsystem as it is the re-alignment on
+> one treewide change by Russell to get rid of virt_to_phys() in low-level code.
+> I think that unifying this move the soonest for all ARM platform is better.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+> 
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
+> 
+> for you to fetch changes up to 093d79f62a89f47d9b5fd0746768146d9696535c:
+> 
+>   ARM: at91: Replace uses of virt_to_phys with __pa_symbol (2017-09-18 10:05:38 +0200)
 
 Applied to fixes.
 
