@@ -1,50 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Oct 2017 12:39:09 +0100
-Subject: [PATCH] arm64: Use larger stacks when KASAN is selected
-In-Reply-To: <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
-References: <1507051546-11677-1-git-send-email-mark.rutland@arm.com>
- <20171004113130.t76oxehchtfcvbo3@armageddon.cambridge.arm.com>
-Message-ID: <20171004113908.GD23092@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 04 Oct 2017 12:28:57 +0100
+Subject: Applied "regmap: add iopoll-like polling macro for regmap_field" to
+ the regmap tree
+In-Reply-To: <20170926065919.24446-9-wens@csie.org>
+Message-ID: <E1dzhrF-0004Tf-A0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 04, 2017 at 12:31:31PM +0100, Catalin Marinas wrote:
-> On Tue, Oct 03, 2017 at 06:25:46PM +0100, Mark Rutland wrote:
-> > AddressSanitizer instrumentation can significantly bloat the stack, and
-> > with GCC 7 this can result in stack overflows at boot time in some
-> > configurations.
-> > 
-> > We can avoid this by doubling our stack size when KASAN is in use, as is
-> > already done on x86 (and has been since KASAN was introduced).
-> > Regardless of other patches to decrease KASAN's stack utilization,
-> > kernels built with KASAN will always require more stack space than those
-> > built without, and we should take this into account.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > ---
-> >  arch/arm64/include/asm/memory.h | 9 ++++++---
-> >  1 file changed, 6 insertions(+), 3 deletions(-)
-> > 
-> > In local testing (with KASAN and other options enabled), I've seen a stack
-> > depth of 23928 bytes while booting to a prompt with an Ubuntu 14.04 filesystem
-> > mounted over NFS. Without KASAN (but with other debug options enabled), this
-> > was 7992 bytes.
-> > 
-> > I wonder if we want to go for 4x rather than 2x...
-> 
-> Let's hope it's fine for now with 32K stacks. We may run into allocation
-> issues with 64K stacks (and without VMAP_STACKS).
-> 
-> Do you want this patch for 4.14?
+The patch
 
-If you're happy to take it, that would be great, but otherwise it can
-wait for v4.15.
+   regmap: add iopoll-like polling macro for regmap_field
 
-Arguably this fixes the introduction of KASAN to arm64, but I'm not sure
-how much we care about backporting this to stable.
+has been applied to the regmap tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Mark.
+Mark
+
+>From 667063acb81931e2f8fd0cb91df9fcccad131d9a Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Fri, 29 Sep 2017 16:23:01 +0800
+Subject: [PATCH] regmap: add iopoll-like polling macro for regmap_field
+
+This patch adds a macro regmap_field_read_poll_timeout that works
+similar to the readx_poll_timeout defined in linux/iopoll.h, except
+that this can also return the error value returned by a failed
+regmap_field_read.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ include/linux/regmap.h | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 978abfbac617..93a4663d7acb 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -139,6 +139,45 @@ struct reg_sequence {
+ 	pollret ?: ((cond) ? 0 : -ETIMEDOUT); \
+ })
+ 
++/**
++ * regmap_field_read_poll_timeout - Poll until a condition is met or timeout
++ *
++ * @field: Regmap field to read from
++ * @val: Unsigned integer variable to read the value into
++ * @cond: Break condition (usually involving @val)
++ * @sleep_us: Maximum time to sleep between reads in us (0
++ *            tight-loops).  Should be less than ~20ms since usleep_range
++ *            is used (see Documentation/timers/timers-howto.txt).
++ * @timeout_us: Timeout in us, 0 means never timeout
++ *
++ * Returns 0 on success and -ETIMEDOUT upon a timeout or the regmap_field_read
++ * error return value in case of a error read. In the two former cases,
++ * the last read value at @addr is stored in @val. Must not be called
++ * from atomic context if sleep_us or timeout_us are used.
++ *
++ * This is modelled after the readx_poll_timeout macros in linux/iopoll.h.
++ */
++#define regmap_field_read_poll_timeout(field, val, cond, sleep_us, timeout_us) \
++({ \
++	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
++	int pollret; \
++	might_sleep_if(sleep_us); \
++	for (;;) { \
++		pollret = regmap_field_read((field), &(val)); \
++		if (pollret) \
++			break; \
++		if (cond) \
++			break; \
++		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
++			pollret = regmap_field_read((field), &(val)); \
++			break; \
++		} \
++		if (sleep_us) \
++			usleep_range((sleep_us >> 2) + 1, sleep_us); \
++	} \
++	pollret ?: ((cond) ? 0 : -ETIMEDOUT); \
++})
++
+ #ifdef CONFIG_REGMAP
+ 
+ enum regmap_endian {
+-- 
+2.14.1
