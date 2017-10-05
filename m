@@ -1,51 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Oct 2017 13:20:11 +0200
-Subject: [PATCH v3 21/22] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
-In-Reply-To: <5efbd0a7-8b62-5b30-98e6-dfaff64e2628@arm.com>
-References: <1506604306-20739-1-git-send-email-sudeep.holla@arm.com>
- <1506604306-20739-22-git-send-email-sudeep.holla@arm.com>
- <CAK8P3a3pAFKM+Dq_yb7KYhB+xeneVuODBq_4nacEuw9creT6Yw@mail.gmail.com>
- <5efbd0a7-8b62-5b30-98e6-dfaff64e2628@arm.com>
-Message-ID: <CAK8P3a18i-=6PE2WAZ5LkYHty5CrVjMhTF_qJjtGGE3aCxLOuw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 5 Oct 2017 12:22:18 +0100
+Subject: [PATCH v2 10/28] arm64/sve: Low-level CPU setup
+In-Reply-To: <76020d51-a971-e73e-9fba-1e2ec97985dc@arm.com>
+References: <1504198860-12951-1-git-send-email-Dave.Martin@arm.com>
+ <1504198860-12951-11-git-send-email-Dave.Martin@arm.com>
+ <20170913133206.rwobtu7ft5nrsh4p@localhost>
+ <20170913192110.GE23415@e103592.cambridge.arm.com>
+ <20171005104716.GV3611@e103592.cambridge.arm.com>
+ <76020d51-a971-e73e-9fba-1e2ec97985dc@arm.com>
+Message-ID: <20171005112217.GW3611@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 4, 2017 at 5:01 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> +
->>> +static struct platform_driver scmi_cpufreq_platdrv = {
->>> +       .driver = {
->>> +               .name   = "scmi-cpufreq",
->>> +       },
->>> +       .probe          = scmi_cpufreq_probe,
->>> +       .remove         = scmi_cpufreq_remove,
->>> +};
->>
->> You appear to have split this driver into the 'cpufreq' side and
->> the 'protocol' handler in a different file. I already commented that
->> the way the main scmi driver knows about all the protocols looks
->> bad, here we can see another aspect of the same problem.
->>
->> Rather than manually register a platform_device for the purpose
->> of connecting it to the cpufreq driver, there should be a way
->> to dynamically register the protocol from the cpufreq driver
->> and then have both in the same file.
->>
->
-> I agree that should be possible. I took this approach for 2 reasons:
->
-> 1. to avoid all sorts of probe ordering issues
-> 2. we may have system with multiple instances of SCMI. E.g. a system
->    may have multiple remote processors, each controlling dvfs/power mgmt
->    of a subset of CPUs/devices controller in OS.
->
-> I have to admit that I haven't thought too much in details yet. That's
-> the main idea behind scmi_handle and restricting access to that only to
-> sub-nodes in it. I am open to suggestions.
+On Thu, Oct 05, 2017 at 12:04:12PM +0100, Suzuki K Poulose wrote:
+> On 05/10/17 11:47, Dave Martin wrote:
 
-How about introducing a separate bus_type for protocols?
-The platform_device you use here isn't really the best abstraction,
-and with a new bus_type, you can handle multiple instances of
-scmi as well as decoupling them from the protocol drivers.
+[...]
 
-      Arnd
+> >>>On Thu, Aug 31, 2017 at 06:00:42PM +0100, Dave P Martin wrote:
+> >>>>diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> >>>>index 877d42f..dd22ef2 100644
+> >>>>--- a/arch/arm64/mm/proc.S
+> >>>>+++ b/arch/arm64/mm/proc.S
+> >>>>@@ -27,6 +27,7 @@
+> >>>>  #include <asm/pgtable-hwdef.h>
+> >>>>  #include <asm/cpufeature.h>
+> >>>>  #include <asm/alternative.h>
+> >>>>+#include <asm/sysreg.h>
+> >>>>  #ifdef CONFIG_ARM64_64K_PAGES
+> >>>>  #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+> >>>>@@ -186,8 +187,17 @@ ENTRY(__cpu_setup)
+> >>>>  	tlbi	vmalle1				// Invalidate local TLB
+> >>>>  	dsb	nsh
+> >>>>-	mov	x0, #3 << 20
+> >>>>-	msr	cpacr_el1, x0			// Enable FP/ASIMD
+> >>>>+	mov	x0, #3 << 20			// FEN
+> >>>>+
+> >>>>+	/* SVE */
+> >>>>+	mrs	x5, id_aa64pfr0_el1
+> >>>>+	ubfx	x5, x5, #ID_AA64PFR0_SVE_SHIFT, #4
+> >>>>+	cbz	x5, 1f
+> >>>>+
+> >>>>+	bic	x0, x0, #CPACR_EL1_ZEN
+> >>>>+	orr	x0, x0, #CPACR_EL1_ZEN_EL1EN	// SVE: trap for EL0, not EL1
+> >>>>+1:	msr	cpacr_el1, x0			// Enable FP/ASIMD
+
+[..]
+
+> >I can add a helper el1_enable_sve() say, and call it before probing
+> >ZCR_EL1 in the cpufeatures code.
+> >
+> >This makes enabling SVE a side-effect of the cpufeatures code, which
+> >I'm not that comfortable with -- it feels like something that later
+> >refactoring could easily break.
+> >
+> >I can also add an explicit call to el1_enable_sve() in sve_setup(),
+> >but this only works on the boot cpu.
+> >
+> >For secondaries, I could add something in secondary_start_kernel(),
+> >but this looks incongruous since there's no other call to do something
+> >similar yet.
+> >
+> >
+> >** Suzuki, do we have any other case where the trap for a CPU feature is
+> >turned off by the cpufeatures code?  If there's already a template for
+> >this then I'm happy to follow it.
+> 
+> The closest thing you have is an "enable" callback for each "available"
+> capability, which gets invoked on all CPUs (boot time active CPUs and the
+> ones which are brought up later). This is used by things like, PAN to
+> do some CPU specific setups.
+> 
+> See  :
+>    enable_cpu_capabilities()  // For all boot time active CPUs
+>    and
+>    verify_local_cpu_features()  // For CPUs brought up later
+
+That may allow me to do something tidier, provided the enable method is
+called early enough.
+
+I'll take a look.
+
+Cheers
+---Dave
