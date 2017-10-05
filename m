@@ -1,88 +1,142 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  5 Oct 2017 20:17:58 +0100
-Subject: [PATCH v3 06/20] arm64: entry.S: convert el1_sync
+Date: Thu,  5 Oct 2017 20:17:59 +0100
+Subject: [PATCH v3 07/20] arm64: entry.S convert el0_sync
 In-Reply-To: <20171005191812.5678-1-james.morse@arm.com>
 References: <20171005191812.5678-1-james.morse@arm.com>
-Message-ID: <20171005191812.5678-7-james.morse@arm.com>
+Message-ID: <20171005191812.5678-8-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-el1_sync unmasks exceptions on a case-by-case basis, debug exceptions
-are unmasked, unless this was a debug exception. IRQs are unmasked
-for instruction and data aborts only if the interrupted context had
-irqs unmasked.
+el0_sync also unmasks exceptions on a case-by-case basis, debug exceptions
+are enabled, unless this was a debug exception. Irqs are unmasked for
+some exception types but not for others.
 
-Following our 'dai' order, el1_dbg should run with everything masked.
-For the other cases we can inherit whatever we interrupted.
+el0_dbg should run with everything masked to prevent us taking a debug
+exception from do_debug_exception. For the other cases we can unmask
+everything. This changes the behaviour of fpsimd_{acc,exc} and el0_inv
+which previously ran with irqs masked.
 
-Add a macro inherit_daif to set daif based on the interrupted pstate.
+This patch removed the last user of enable_dbg_and_irq, remove it.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/assembler.h |  6 ++++++
- arch/arm64/kernel/entry.S          | 12 ++++--------
- 2 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/assembler.h |  9 ---------
+ arch/arm64/kernel/entry.S          | 24 ++++++++++--------------
+ 2 files changed, 10 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 1b0972046a72..abb5abd61ddb 100644
+index abb5abd61ddb..c2a37e2f733c 100644
 --- a/arch/arm64/include/asm/assembler.h
 +++ b/arch/arm64/include/asm/assembler.h
-@@ -48,6 +48,12 @@
- 	msr	daif, \flags
+@@ -97,15 +97,6 @@
  	.endm
  
-+	/* Only on aarch64 pstate, PSR_D_BIT is different for aarch32 */
-+	.macro	inherit_daif, pstate:req, tmp:req
-+	and	\tmp, \pstate, #(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-+	msr	daif, \tmp
-+	.endm
-+
  /*
-  * Enable and disable interrupts.
+- * Enable both debug exceptions and interrupts. This is likely to be
+- * faster than two daifclr operations, since writes to this register
+- * are self-synchronising.
+- */
+-	.macro	enable_dbg_and_irq
+-	msr	daifclr, #(8 | 2)
+-	.endm
+-
+-/*
+  * SMP data memory barrier
   */
+ 	.macro	smp_dmb, opt
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f7d7bf9d76e7..bd54115972a4 100644
+index bd54115972a4..f7dfe5d2b1fb 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -510,11 +510,7 @@ el1_da:
+@@ -670,8 +670,7 @@ el0_da:
  	 * Data abort handling
  	 */
- 	mrs	x3, far_el1
+ 	mrs	x26, far_el1
+-	// enable interrupts before calling the main handler
+-	enable_dbg_and_irq
++	enable_daif
+ 	ct_user_exit
+ 	clear_address_tag x0, x26
+ 	mov	x1, x25
+@@ -683,8 +682,7 @@ el0_ia:
+ 	 * Instruction abort handling
+ 	 */
+ 	mrs	x26, far_el1
+-	// enable interrupts before calling the main handler
+-	enable_dbg_and_irq
++	enable_daif
+ 	ct_user_exit
+ 	mov	x0, x26
+ 	mov	x1, x25
+@@ -695,7 +693,7 @@ el0_fpsimd_acc:
+ 	/*
+ 	 * Floating Point or Advanced SIMD access
+ 	 */
 -	enable_dbg
--	// re-enable interrupts if they were enabled in the aborted context
--	tbnz	x23, #7, 1f			// PSR_I_BIT
--	enable_irq
--1:
-+	inherit_daif	pstate=x23, tmp=x2
- 	clear_address_tag x0, x3
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_mem_abort
-@@ -525,7 +521,7 @@ el1_sp_pc:
++	enable_daif
+ 	ct_user_exit
+ 	mov	x0, x25
+ 	mov	x1, sp
+@@ -705,7 +703,7 @@ el0_fpsimd_exc:
+ 	/*
+ 	 * Floating Point or Advanced SIMD exception
+ 	 */
+-	enable_dbg
++	enable_daif
+ 	ct_user_exit
+ 	mov	x0, x25
+ 	mov	x1, sp
+@@ -716,8 +714,7 @@ el0_sp_pc:
  	 * Stack or PC alignment exception handling
  	 */
- 	mrs	x0, far_el1
--	enable_dbg
-+	inherit_daif	pstate=x23, tmp=x2
- 	mov	x2, sp
- 	bl	do_sp_pc_abort
- 	ASM_BUG()
-@@ -533,7 +529,7 @@ el1_undef:
+ 	mrs	x26, far_el1
+-	// enable interrupts before calling the main handler
+-	enable_dbg_and_irq
++	enable_daif
+ 	ct_user_exit
+ 	mov	x0, x26
+ 	mov	x1, x25
+@@ -728,8 +725,7 @@ el0_undef:
  	/*
  	 * Undefined instruction
  	 */
--	enable_dbg
-+	inherit_daif	pstate=x23, tmp=x2
+-	// enable interrupts before calling the main handler
+-	enable_dbg_and_irq
++	enable_daif
+ 	ct_user_exit
  	mov	x0, sp
  	bl	do_undefinstr
- 	ASM_BUG()
-@@ -550,7 +546,7 @@ el1_dbg:
- 	kernel_exit 1
- el1_inv:
- 	// TODO: add support for undefined instructions in kernel mode
+@@ -738,7 +734,7 @@ el0_sys:
+ 	/*
+ 	 * System instructions, for trapped cache maintenance instructions
+ 	 */
+-	enable_dbg_and_irq
++	enable_daif
+ 	ct_user_exit
+ 	mov	x0, x25
+ 	mov	x1, sp
+@@ -753,11 +749,11 @@ el0_dbg:
+ 	mov	x1, x25
+ 	mov	x2, sp
+ 	bl	do_debug_exception
 -	enable_dbg
-+	inherit_daif	pstate=x23, tmp=x2
++	enable_daif
+ 	ct_user_exit
+ 	b	ret_to_user
+ el0_inv:
+-	enable_dbg
++	enable_daif
+ 	ct_user_exit
  	mov	x0, sp
- 	mov	x2, x1
  	mov	x1, #BAD_SYNC
+@@ -836,7 +832,7 @@ el0_svc:
+ 	mov	wsc_nr, #__NR_syscalls
+ el0_svc_naked:					// compat entry point
+ 	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+-	enable_dbg_and_irq
++	enable_daif
+ 	ct_user_exit 1
+ 
+ 	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
 -- 
 2.13.3
